@@ -35,7 +35,7 @@ from lca.contracts.capabilities import (
     TEAM_ROLE_LIBRARY,
 )
 from lca.contracts.mechanisms.capability import MissingCapabilityError
-from lca.contracts.protocols.run_mode import ModeAdapter
+from lca.contracts.protocols.session.run_mode import ModeAdapter
 from lca.harness.plugin_api import definition_from_plugin
 from lca.plugins.seam_definitions.run_mode_registry import (
     RunModeRegistry,

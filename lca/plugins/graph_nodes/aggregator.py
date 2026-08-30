@@ -9,7 +9,7 @@ from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import Result
 from lca.contracts.models.core.state import Budget
 from lca.contracts.models.team.graph import NodeType
-from lca.contracts.protocols.graph_node_executor import (
+from lca.contracts.protocols.collaboration.graph_node_executor import (
     GraphNodeExecutionContext,
     GraphNodeExecutor,
 )

@@ -9,8 +9,8 @@ from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.gate_policy import GateDecided
 from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.state import AgentState
-from lca.contracts.protocols.control_verdict import ControlVerdict, ControlVerdictKind
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ContributionRole,
     PhaseContext,
     PhaseContribution,

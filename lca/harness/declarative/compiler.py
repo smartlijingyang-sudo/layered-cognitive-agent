@@ -9,13 +9,13 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 
-from lca.contracts.protocols.declarative_common import (
+from lca.contracts.protocols.declarative.declarative_common import (
     DECLARATIVE_PLAN_VERSION,
     ContributionRole,
     RelationType,
     SemanticPhase,
 )
-from lca.contracts.protocols.declarative_graph import (
+from lca.contracts.protocols.declarative.declarative_graph import (
     ActionAuthorityPlan,
     CapabilityBinding,
     CognitivePhaseGraphPlan,
@@ -26,7 +26,7 @@ from lca.contracts.protocols.declarative_graph import (
     ReplacementDecision,
     ValidationReport,
 )
-from lca.contracts.protocols.declarative_plugin import CapabilityDeclaration, PluginSpec
+from lca.contracts.protocols.declarative.declarative_plugin import CapabilityDeclaration, PluginSpec
 from lca.harness.declarative.action_authority import compile_action_authority
 from lca.harness.declarative.effect_policy import compile_effect_policy
 from lca.harness.declarative.phase_graph_compiler import compile_phase_graph_projection

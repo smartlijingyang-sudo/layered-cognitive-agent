@@ -40,7 +40,7 @@ class TestDefaultDecisionClassifier:
 
     def test_implements_protocol(self):
         """Should implement DecisionClassifier Protocol."""
-        from lca.contracts.protocols.decision_classifier import DecisionClassifier
+        from lca.contracts.protocols.gate.decision_classifier import DecisionClassifier
 
         classifier = DefaultDecisionClassifier()
         assert isinstance(classifier, DecisionClassifier)
@@ -57,21 +57,21 @@ class TestEffectHandlers:
 
     def test_body_act_handler_implements_protocol(self):
         """BodyActEffectHandler should implement EffectHandler Protocol."""
-        from lca.contracts.protocols.effect_handler import EffectHandler
+        from lca.contracts.protocols.act.effect_handler import EffectHandler
 
         handler = BodyActEffectHandler()
         assert isinstance(handler, EffectHandler)
 
     def test_memory_update_handler_implements_protocol(self):
         """MemoryUpdateEffectHandler should implement EffectHandler Protocol."""
-        from lca.contracts.protocols.effect_handler import EffectHandler
+        from lca.contracts.protocols.act.effect_handler import EffectHandler
 
         handler = MemoryUpdateEffectHandler()
         assert isinstance(handler, EffectHandler)
 
     def test_empty_registry_implements_protocol(self):
         """The seam-provided registry is a neutral EffectHandlerRegistry container."""
-        from lca.contracts.protocols.effect_handler import EffectHandlerRegistry
+        from lca.contracts.protocols.act.effect_handler import EffectHandlerRegistry
 
         registry = InMemoryEffectHandlerRegistry()
         assert isinstance(registry, EffectHandlerRegistry)
@@ -127,84 +127,84 @@ class TestDeltaHandlers:
 
     def test_step_handler_implements_protocol(self):
         """StepDeltaHandler should implement DeltaHandler Protocol."""
-        from lca.contracts.protocols.delta_handler import DeltaHandler
+        from lca.contracts.protocols.state.delta_handler import DeltaHandler
 
         handler = StepDeltaHandler()
         assert isinstance(handler, DeltaHandler)
 
     def test_perception_handler_implements_protocol(self):
         """PerceptionDeltaHandler should implement DeltaHandler Protocol."""
-        from lca.contracts.protocols.delta_handler import DeltaHandler
+        from lca.contracts.protocols.state.delta_handler import DeltaHandler
 
         handler = PerceptionDeltaHandler()
         assert isinstance(handler, DeltaHandler)
 
     def test_turn_handler_implements_protocol(self):
         """TurnDeltaHandler should implement DeltaHandler Protocol."""
-        from lca.contracts.protocols.delta_handler import DeltaHandler
+        from lca.contracts.protocols.state.delta_handler import DeltaHandler
 
         handler = TurnDeltaHandler()
         assert isinstance(handler, DeltaHandler)
 
     def test_skill_route_handler_implements_protocol(self):
         """SkillRouteDeltaHandler should implement DeltaHandler Protocol."""
-        from lca.contracts.protocols.delta_handler import DeltaHandler
+        from lca.contracts.protocols.state.delta_handler import DeltaHandler
 
         handler = SkillRouteDeltaHandler()
         assert isinstance(handler, DeltaHandler)
 
     def test_activation_handler_implements_protocol(self):
         """ActivationDeltaHandler should implement DeltaHandler Protocol."""
-        from lca.contracts.protocols.delta_handler import DeltaHandler
+        from lca.contracts.protocols.state.delta_handler import DeltaHandler
 
         handler = ActivationDeltaHandler()
         assert isinstance(handler, DeltaHandler)
 
     def test_memory_handler_implements_protocol(self):
         """MemoryDeltaHandler should implement DeltaHandler Protocol."""
-        from lca.contracts.protocols.delta_handler import DeltaHandler
+        from lca.contracts.protocols.state.delta_handler import DeltaHandler
 
         handler = MemoryDeltaHandler()
         assert isinstance(handler, DeltaHandler)
 
     def test_stop_handler_implements_protocol(self):
         """StopDeltaHandler should implement DeltaHandler Protocol."""
-        from lca.contracts.protocols.delta_handler import DeltaHandler
+        from lca.contracts.protocols.state.delta_handler import DeltaHandler
 
         handler = StopDeltaHandler()
         assert isinstance(handler, DeltaHandler)
 
     def test_error_handler_implements_protocol(self):
         """ErrorDeltaHandler should implement DeltaHandler Protocol."""
-        from lca.contracts.protocols.delta_handler import DeltaHandler
+        from lca.contracts.protocols.state.delta_handler import DeltaHandler
 
         handler = ErrorDeltaHandler()
         assert isinstance(handler, DeltaHandler)
 
     def test_resume_handler_implements_protocol(self):
         """ResumeDeltaHandler should implement DeltaHandler Protocol."""
-        from lca.contracts.protocols.delta_handler import DeltaHandler
+        from lca.contracts.protocols.state.delta_handler import DeltaHandler
 
         handler = ResumeDeltaHandler()
         assert isinstance(handler, DeltaHandler)
 
     def test_artifact_closure_handler_implements_protocol(self):
         """ArtifactClosureDeltaHandler should implement DeltaHandler Protocol."""
-        from lca.contracts.protocols.delta_handler import DeltaHandler
+        from lca.contracts.protocols.state.delta_handler import DeltaHandler
 
         handler = ArtifactClosureDeltaHandler()
         assert isinstance(handler, DeltaHandler)
 
     def test_paused_handler_implements_protocol(self):
         """PausedDeltaHandler should implement DeltaHandler Protocol."""
-        from lca.contracts.protocols.delta_handler import DeltaHandler
+        from lca.contracts.protocols.state.delta_handler import DeltaHandler
 
         handler = PausedDeltaHandler()
         assert isinstance(handler, DeltaHandler)
 
     def test_default_registry_implements_protocol(self):
         """DefaultDeltaHandlerRegistry should implement DeltaHandlerRegistry Protocol."""
-        from lca.contracts.protocols.delta_handler import DeltaHandlerRegistry
+        from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 
         registry = DefaultDeltaHandlerRegistry()
         assert isinstance(registry, DeltaHandlerRegistry)
@@ -259,14 +259,14 @@ class TestActionHandlers:
 
     def test_respond_handler_implements_protocol(self):
         """RespondActionHandler should implement ActionHandler Protocol."""
-        from lca.contracts.protocols.action_handler import ActionHandler
+        from lca.contracts.protocols.act.action_handler import ActionHandler
 
         handler = RespondActionHandler()
         assert isinstance(handler, ActionHandler)
 
     def test_use_tool_handler_implements_protocol(self):
         """UseToolActionHandler should implement ActionHandler Protocol."""
-        from lca.contracts.protocols.action_handler import ActionHandler
+        from lca.contracts.protocols.act.action_handler import ActionHandler
 
         handler = UseToolActionHandler(SafeToolBatchExecutionPolicy())
         assert isinstance(handler, ActionHandler)
@@ -279,21 +279,21 @@ class TestActionHandlers:
 
     def test_delegate_handler_implements_protocol(self):
         """DelegateActionHandler should implement ActionHandler Protocol."""
-        from lca.contracts.protocols.action_handler import ActionHandler
+        from lca.contracts.protocols.act.action_handler import ActionHandler
 
         handler = DelegateActionHandler()
         assert isinstance(handler, ActionHandler)
 
     def test_handoff_handler_implements_protocol(self):
         """HandoffActionHandler should implement ActionHandler Protocol."""
-        from lca.contracts.protocols.action_handler import ActionHandler
+        from lca.contracts.protocols.act.action_handler import ActionHandler
 
         handler = HandoffActionHandler()
         assert isinstance(handler, ActionHandler)
 
     def test_default_registry_implements_protocol(self):
         """DefaultActionHandlerRegistry should implement ActionHandlerRegistry Protocol."""
-        from lca.contracts.protocols.action_handler import ActionHandlerRegistry
+        from lca.contracts.protocols.act.action_handler import ActionHandlerRegistry
 
         registry = DefaultActionHandlerRegistry()
         assert isinstance(registry, ActionHandlerRegistry)
@@ -336,7 +336,7 @@ class TestDefaultArtifactClosure:
 
     def test_implements_protocol(self):
         """Should implement ArtifactClosure Protocol."""
-        from lca.contracts.protocols.artifact_closure import ArtifactClosure
+        from lca.contracts.protocols.journal.artifact_closure import ArtifactClosure
 
         closure = DefaultArtifactClosure()
         assert isinstance(closure, ArtifactClosure)
@@ -353,7 +353,7 @@ class TestDefaultGateChainComposer:
 
     def test_implements_protocol(self):
         """Should implement GateChainComposer Protocol."""
-        from lca.contracts.protocols.gate_chain_composer import GateChainComposer
+        from lca.contracts.protocols.gate.gate_chain_composer import GateChainComposer
 
         composer = DefaultGateChainComposer()
         assert isinstance(composer, GateChainComposer)

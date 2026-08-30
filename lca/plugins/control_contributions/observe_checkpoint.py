@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
-from lca.contracts.protocols.control_verdict import ControlVerdict, ControlVerdictKind
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ContributionRole,
     PhaseContext,
     PhaseContribution,

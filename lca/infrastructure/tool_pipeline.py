@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import structlog
 
-from lca.contracts.protocols.tool_pipeline import (
+from lca.contracts.protocols.act.tool_pipeline import (
     ExecuteFn,
     ExecuteMiddlewareFn,
     ExecuteNextFn,

@@ -17,7 +17,7 @@ from lca.contracts.mechanisms.capability import MissingCapabilityError
 if TYPE_CHECKING:
     from cordis import Context
 
-    from lca.contracts.protocols.plan import CompiledRunPlan
+    from lca.contracts.protocols.state.plan import CompiledRunPlan
     from lca.harness.profile.resolve import ResolvedProfile
 
 

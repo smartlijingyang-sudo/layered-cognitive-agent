@@ -9,9 +9,9 @@ from lca.contracts.models.core.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.core.stop import StopDecision, StopReason
-from lca.contracts.protocols.command_envelope import RunFact
-from lca.contracts.protocols.control_verdict import ControlVerdict, ControlVerdictKind
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.act.command_envelope import RunFact
+from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ContributionRole,
     DeclarativeRunOutcome,
     DeclarativeValidationError,

@@ -10,7 +10,7 @@ from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.protocols import Tool
-from lca.contracts.protocols.operational_skills import (
+from lca.contracts.protocols.memory.operational_skills import (
     SkillImporter,
     SkillImportError,
     SkillPackageStore,

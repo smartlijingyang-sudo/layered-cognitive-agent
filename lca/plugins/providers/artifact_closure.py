@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.contracts.protocols.artifact_closure import ArtifactClosure
+from lca.contracts.protocols.journal.artifact_closure import ArtifactClosure
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.workspace import get_run_workspace
 

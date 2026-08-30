@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from lca.contracts.protocols import Runtime
-from lca.contracts.protocols.runtime_composition import RuntimeFactory
+from lca.contracts.protocols.runtime.runtime_composition import RuntimeFactory
 from lca.plugins.composer.internal.runtime_binding import bind_runtime_graph
 from lca.plugins.composer.internal.runtime_capabilities import (
     RuntimeCapabilityClosure,
@@ -22,8 +22,8 @@ if TYPE_CHECKING:
     from cordis import Context
 
     from lca.contracts.harness.composer import AgentGraph
-    from lca.contracts.protocols.plan import CompiledRunPlan
-    from lca.contracts.protocols.spec import AgentSpec
+    from lca.contracts.protocols.state.plan import CompiledRunPlan
+    from lca.contracts.protocols.journal.spec import AgentSpec
 
 
 def assemble_runtime_from_graph(

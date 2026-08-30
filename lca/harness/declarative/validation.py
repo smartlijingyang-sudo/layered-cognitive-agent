@@ -10,21 +10,21 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Sequence
 
-from lca.contracts.protocols.declarative_common import (
+from lca.contracts.protocols.declarative.declarative_common import (
     ContributionRole,
     DeclarativeValidationError,
     PluginSpecKind,
     RelationType,
     SemanticPhase,
 )
-from lca.contracts.protocols.declarative_graph import (
+from lca.contracts.protocols.declarative.declarative_graph import (
     ControlEntry,
     PhaseBinding,
     ValidationIssue,
     ValidationReport,
     ValidationSeverity,
 )
-from lca.contracts.protocols.declarative_plugin import PluginSpec
+from lca.contracts.protocols.declarative.declarative_plugin import PluginSpec
 from lca.harness.declarative.graph_validation import PhaseGraphValidator
 
 

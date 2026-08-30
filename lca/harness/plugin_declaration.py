@@ -39,8 +39,8 @@ from lca.harness.plugin_spec_projection import native_spec_from_declaration
 
 if TYPE_CHECKING:
     from lca.contracts.harness.plugin_contract import PluginContract
-    from lca.contracts.protocols.declarative_phase_graph import PluginSpec
-    from lca.contracts.protocols.logic_address import LogicAddress
+    from lca.contracts.protocols.declarative.declarative_phase_graph import PluginSpec
+    from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 __all__ = ["PluginCarrier", "definition_from_plugin", "plugin"]

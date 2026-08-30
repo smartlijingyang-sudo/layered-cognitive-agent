@@ -351,7 +351,7 @@ def _dedup_subsets(
 
 
 def _proto_import_path(source_file: str) -> str:
-    """将 ``lca/contracts/protocols/infra.py`` 转为 ``lca.contracts.protocols.infra``。"""
+    """将 ``lca/contracts/protocols/infra.py`` 转为 ``lca.contracts.protocols.runtime.infra``。"""
     return source_file.removesuffix(".py").replace("/", ".")
 
 

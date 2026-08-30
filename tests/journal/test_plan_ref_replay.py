@@ -37,9 +37,9 @@ from lca.contracts.models.observability.journal import (
 from lca.contracts.models.observability.plan_ref import (
     plan_ref_scope,
 )
-from lca.contracts.protocols.capability_plan import CapabilityPlan, ProviderBinding
-from lca.contracts.protocols.plan import CompiledRunPlan
-from lca.contracts.protocols.scope_plan import BudgetCeiling, ScopePlan
+from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan, ProviderBinding
+from lca.contracts.protocols.state.plan import CompiledRunPlan
+from lca.contracts.protocols.state.scope_plan import BudgetCeiling, ScopePlan
 from lca.harness.plan import compiled_run_plan_ref
 
 # ── Helper: build a minimal CompiledRunPlan ──────────────────────────

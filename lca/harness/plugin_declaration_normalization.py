@@ -16,7 +16,7 @@ from lca.contracts.capabilities import Capability, cap_key
 from lca.harness.plugin_manifest import _LAYER_VALUES, EffectClass, PluginKind, RawRelationEntry
 
 if TYPE_CHECKING:
-    from lca.contracts.protocols.declarative_phase_graph import PhaseContribution
+    from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseContribution
 
 
 def config_from_annotations(fn: Callable[..., object]) -> type[BaseModel] | None:
@@ -92,7 +92,7 @@ def normalize_contributes(value: Sequence[object] | None) -> tuple[PhaseContribu
         return ()
     if not isinstance(value, (list, tuple)):
         raise TypeError(f"@plugin contributes must be list/tuple, got {type(value).__name__}")
-    from lca.contracts.protocols.declarative_phase_graph import (
+    from lca.contracts.protocols.declarative.declarative_phase_graph import (
         ContributionRole,
         PhaseContribution,
         SemanticPhase,

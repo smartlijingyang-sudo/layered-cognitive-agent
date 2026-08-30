@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from lca.contracts.harness.delegation_grant import derive_child_grant
-from lca.contracts.protocols.command_envelope import CapabilityGrant
+from lca.contracts.protocols.act.command_envelope import CapabilityGrant
 
 
 def test_child_grant_must_remain_within_parent() -> None:

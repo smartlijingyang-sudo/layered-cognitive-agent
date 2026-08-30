@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.protocols.idempotency import IdempotencyClaim, IdempotencyStore
+from lca.contracts.protocols.journal.idempotency import IdempotencyClaim, IdempotencyStore
 
 
 class InMemoryFixtureIdempotencyStore(IdempotencyStore):

@@ -13,8 +13,8 @@ from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.harness.eval_comparison import EvalComparison
-from lca.contracts.protocols.learning import SkillAcquirer
-from lca.contracts.protocols.logic_address import score_logic_address
+from lca.contracts.protocols.think.learning import SkillAcquirer
+from lca.contracts.protocols.composition.logic_address import score_logic_address
 from lca.harness.plugin_declaration import definition_from_plugin
 from lca.harness.profile.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile

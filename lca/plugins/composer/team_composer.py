@@ -8,7 +8,7 @@ from lca.contracts.capabilities import STRATEGIES, TEAM_SEAM
 from lca.contracts.harness.composer import TeamGraph
 from lca.contracts.mechanisms.capability import require_capability
 from lca.contracts.protocols import TeamAssembly, TeamStage
-from lca.contracts.protocols.spec import LeadSpec, TeamSpec, strategy_key_for_governance
+from lca.contracts.protocols.journal.spec import LeadSpec, TeamSpec, strategy_key_for_governance
 from lca.plugins.composer.agent_assembly import AgentAssemblyPort
 from lca.plugins.composer.internal.team import resolve_team_observability
 

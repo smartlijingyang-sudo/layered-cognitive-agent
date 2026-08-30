@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from lca.contracts.protocols.operational_skills import SkillNotFoundError
+from lca.contracts.protocols.memory.operational_skills import SkillNotFoundError
 from lca.infrastructure.skills.disk_store import (
     DiskSkillPackageStore,
     content_hash,

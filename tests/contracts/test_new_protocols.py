@@ -1,20 +1,20 @@
 """Tests for new ADR-0074 Protocol definitions."""
 
-from lca.contracts.protocols.action_handler import (
+from lca.contracts.protocols.act.action_handler import (
     ActionHandler,
     ActionHandlerRegistry,
 )
-from lca.contracts.protocols.artifact_closure import ArtifactClosure
-from lca.contracts.protocols.decision_classifier import DecisionClassifier
-from lca.contracts.protocols.delta_handler import (
+from lca.contracts.protocols.journal.artifact_closure import ArtifactClosure
+from lca.contracts.protocols.gate.decision_classifier import DecisionClassifier
+from lca.contracts.protocols.state.delta_handler import (
     DeltaHandler,
     DeltaHandlerRegistry,
 )
-from lca.contracts.protocols.effect_handler import (
+from lca.contracts.protocols.act.effect_handler import (
     EffectHandler,
     EffectHandlerRegistry,
 )
-from lca.contracts.protocols.gate_chain_composer import GateChainComposer
+from lca.contracts.protocols.gate.gate_chain_composer import GateChainComposer
 
 
 class TestDecisionClassifierProtocol:

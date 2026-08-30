@@ -26,9 +26,9 @@ from lca.contracts.models.core.decision import Turn
 from lca.contracts.models.core.perception import ContextManifest
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.core.stop import StopDecision
-from lca.contracts.protocols.command_envelope import RunDelta
-from lca.contracts.protocols.delta_handler import DeltaHandler, DeltaHandlerRegistry
-from lca.contracts.protocols.reducer import Reducer
+from lca.contracts.protocols.act.command_envelope import RunDelta
+from lca.contracts.protocols.state.delta_handler import DeltaHandler, DeltaHandlerRegistry
+from lca.contracts.protocols.state.reducer import Reducer
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.providers.delta_handler_registry import (
     DefaultDeltaHandlerRegistry,

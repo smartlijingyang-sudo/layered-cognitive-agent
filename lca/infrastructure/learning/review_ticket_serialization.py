@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.protocols.learning import (
+from lca.contracts.protocols.think.learning import (
     FailureAnalysis,
     LearningReviewAssessment,
     LearningReviewTicket,

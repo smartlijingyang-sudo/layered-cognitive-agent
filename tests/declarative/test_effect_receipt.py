@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from lca.contracts.models.core.decision import Observation
-from lca.contracts.protocols.declarative_phase_graph import DeclarativeValidationError
+from lca.contracts.protocols.declarative.declarative_phase_graph import DeclarativeValidationError
 from lca.harness.declarative.effect_receipt import adapt_effect_receipt
 
 

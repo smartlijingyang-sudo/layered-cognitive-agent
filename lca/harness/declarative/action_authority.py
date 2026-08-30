@@ -11,7 +11,7 @@ from collections.abc import Sequence
 
 from lca.contracts.atoms.enums import ActionScope, ActionType
 from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ActionAuthorityPlan,
     ActionScopeAuthority,
     PluginSpec,

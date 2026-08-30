@@ -12,8 +12,8 @@ from dataclasses import dataclass, field
 
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.protocols.command_envelope import RunDelta, RunFact
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.act.command_envelope import RunDelta, RunFact
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeValidationError,
     DeltaReducer,
     EffectGateway,
@@ -24,8 +24,8 @@ from lca.contracts.protocols.declarative_phase_graph import (
     PhaseResult,
     PhaseRunCursor,
 )
-from lca.contracts.protocols.loop_guard import LoopGuardEvaluator
-from lca.contracts.protocols.runtime_lifecycle import (
+from lca.contracts.protocols.gate.loop_guard import LoopGuardEvaluator
+from lca.contracts.protocols.runtime.runtime_lifecycle import (
     RuntimeBudgetSnapshot,
     RuntimeLifecycleEvent,
     RuntimeLifecycleEventType,

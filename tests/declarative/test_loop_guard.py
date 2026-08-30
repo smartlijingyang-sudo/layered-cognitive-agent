@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.protocols.declarative_phase_graph import LoopGuard, PhaseEdge, PhaseResult
-from lca.contracts.protocols.loop_guard import LoopGuardVerdict
+from lca.contracts.protocols.declarative.declarative_phase_graph import LoopGuard, PhaseEdge, PhaseResult
+from lca.contracts.protocols.gate.loop_guard import LoopGuardVerdict
 from lca.harness.declarative import GenericPlanInterpreter
 from lca.harness.declarative.loop_guard import DeclarativeLoopGuardEvaluator
 

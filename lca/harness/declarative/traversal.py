@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeValidationError,
     PhaseEdge,
     PhaseInput,

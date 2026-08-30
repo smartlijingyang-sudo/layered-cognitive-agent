@@ -19,7 +19,7 @@ from lca.contracts.capabilities import (
     SESSION_TURN_CONTROLLER_FACTORY,
 )
 from lca.contracts.mechanisms.capability import require_capability
-from lca.contracts.protocols.run_mode import RunModeRegistryProtocol
+from lca.contracts.protocols.session.run_mode import RunModeRegistryProtocol
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.loop_drivers.cognitive import build_cognitive_live_agent
 

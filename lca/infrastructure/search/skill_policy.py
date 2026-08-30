@@ -7,7 +7,7 @@ from ``search_skill`` / ``activate_skill`` so agents stay on the builtin wire.
 
 from __future__ import annotations
 
-from lca.contracts.protocols.operational_skills import SkillSearchResult
+from lca.contracts.protocols.memory.operational_skills import SkillSearchResult
 
 # Market ids like ``tavily-ai-skills-tavily-search`` — CLI guides, not LCA search plane.
 _CLI_SEARCH_SKILL_ID_MARKERS: tuple[str, ...] = ("tavily",)

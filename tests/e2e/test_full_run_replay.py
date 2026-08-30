@@ -11,9 +11,9 @@ from __future__ import annotations
 
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.models.observability.plan_ref import get_current_plan_ref, plan_ref_scope
-from lca.contracts.protocols.capability_plan import CapabilityPlan, ProviderBinding
-from lca.contracts.protocols.plan import CompiledRunPlan
-from lca.contracts.protocols.scope_plan import BudgetCeiling, ScopePlan
+from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan, ProviderBinding
+from lca.contracts.protocols.state.plan import CompiledRunPlan
+from lca.contracts.protocols.state.scope_plan import BudgetCeiling, ScopePlan
 from lca.harness.plan import compiled_run_plan_ref
 
 

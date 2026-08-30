@@ -6,7 +6,7 @@ import json
 from typing import Any
 
 from lca.contracts.models.core.plane import PlaneRef
-from lca.contracts.protocols.infra import MachineTransport
+from lca.contracts.protocols.runtime.infra import MachineTransport
 from lca.infrastructure.computer.machine_exec import MachineExecMixin
 from lca.infrastructure.computer.op_result import ComputerOpResult
 from lca.infrastructure.file_store import FileStore

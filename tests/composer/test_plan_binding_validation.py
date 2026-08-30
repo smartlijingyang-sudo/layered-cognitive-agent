@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from lca.contracts.protocols.capability_plan import ProviderBinding
+from lca.contracts.protocols.perceive.capability_plan import ProviderBinding
 from lca.plugins.composer.plan_binding import BindPlanError, bind_plan
 
 

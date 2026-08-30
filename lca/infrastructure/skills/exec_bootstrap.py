@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from lca.contracts.protocols.operational_skills import SANDBOX_SKILL_MOUNT_PREFIX
+from lca.contracts.protocols.memory.operational_skills import SANDBOX_SKILL_MOUNT_PREFIX
 from lca.infrastructure.credentials.sandbox_env import build_sandbox_env_preamble
 from lca.infrastructure.sandbox.paths import ONLYBOXES
 

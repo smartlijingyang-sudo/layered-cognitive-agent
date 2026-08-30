@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.contracts.protocols.loop_guard import LoopGuardEvaluator
+from lca.contracts.protocols.gate.loop_guard import LoopGuardEvaluator
 from lca.harness.declarative.loop_guard import DeclarativeLoopGuardEvaluator
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 

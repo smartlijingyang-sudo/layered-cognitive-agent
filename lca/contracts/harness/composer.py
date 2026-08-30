@@ -40,7 +40,7 @@ if TYPE_CHECKING:
         TeamStage,
         TeamStrategy,
     )
-    from lca.contracts.protocols.spec import AgentSpec, TeamSpec
+    from lca.contracts.protocols.journal.spec import AgentSpec, TeamSpec
 
 
 # ── Composition requests and graph containers ─────────────────────────

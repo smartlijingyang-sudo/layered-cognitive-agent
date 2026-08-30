@@ -137,7 +137,7 @@ def _ledger_high_watermark_for(path: Path) -> int:
         return 0
     last_seq = 0
     try:
-        from lca.infrastructure.observability.journal.journal_io import load_journal_records
+        from lca.infrastructure.observability.journal.engine.journal_io import load_journal_records
 
         for row in load_journal_records(path, strict=False):
             seq = int(row.get("run_seq", row.get("seq", 0)) or 0)
@@ -154,7 +154,7 @@ def _terminal_event_seq_for(path: Path) -> int:
         return 0
     last_seq = 0
     try:
-        from lca.infrastructure.observability.journal.journal_io import load_journal_records
+        from lca.infrastructure.observability.journal.engine.journal_io import load_journal_records
 
         for row in load_journal_records(path, strict=False):
             et = row.get("event_type", "") or (row.get("descriptor") or {}).get("type", "")

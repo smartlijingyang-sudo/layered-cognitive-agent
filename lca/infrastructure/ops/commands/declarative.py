@@ -147,7 +147,7 @@ def register(app: typer.Typer) -> None:
         """编译 Profile 并列出指定 plugin 的出/入关系。"""
         if not plugin:
             _fail("plan relations: --plugin <id> required")
-        from lca.contracts.protocols.capability_plan import (
+        from lca.contracts.protocols.perceive.capability_plan import (
             relations_from_plugin,
             relations_to_plugin,
         )

@@ -6,7 +6,7 @@ import asyncio
 from collections.abc import Awaitable, Callable
 
 from lca.contracts.harness.agent import MessageReceipt, UserMessage
-from lca.contracts.protocols.session_turn import (
+from lca.contracts.protocols.session.session_turn import (
     FollowupDispatch,
     SessionFollowupPolicy,
     TurnAlreadyRunningError,

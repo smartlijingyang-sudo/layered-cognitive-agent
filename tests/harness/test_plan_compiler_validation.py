@@ -5,8 +5,8 @@ from dataclasses import replace
 import pytest
 
 import lca.harness.profile.plan_compiler as plan_compiler
-from lca.contracts.protocols.declarative_common import DeclarativeValidationError
-from lca.contracts.protocols.declarative_graph import ValidationIssue, ValidationReport
+from lca.contracts.protocols.declarative.declarative_common import DeclarativeValidationError
+from lca.contracts.protocols.declarative.declarative_graph import ValidationIssue, ValidationReport
 from lca.harness.declarative.compiler import compile_declarative_projection
 from lca.harness.profile.resolve import resolve_profile
 

@@ -47,7 +47,7 @@ class TestDomainLanguagePublicSurface(unittest.TestCase):
 
     def test_team_spec_shape(self) -> None:
         """TeamSpec 是团队形态唯一事实来源：字段面冻结，无旧模型残留字段。"""
-        from lca.contracts.protocols.spec import TeamSpec
+        from lca.contracts.protocols.journal.spec import TeamSpec
 
         names = {f.name for f in dataclasses.fields(TeamSpec)}
         self.assertEqual(
@@ -65,7 +65,7 @@ class TestDomainLanguagePublicSurface(unittest.TestCase):
 
     def test_governance_strategy_key_derivation(self) -> None:
         """strategy key 由 governance 单向派生（lead 与 coordination 同一入口）。"""
-        from lca.contracts.protocols.spec import (
+        from lca.contracts.protocols.journal.spec import (
             AgentSpec,
             LeadSpec,
             strategy_key_for_governance,

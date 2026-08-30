@@ -15,20 +15,20 @@ from typing import TYPE_CHECKING, cast
 from lca.contracts.mechanisms import HookRegistry
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.team.team_awareness import TeamAwareness
-from lca.contracts.protocols.artifact_closure import ArtifactClosure
-from lca.contracts.protocols.cognition import Brain, PerceiveHub
-from lca.contracts.protocols.declarative_execution import PhaseCapabilityReader
-from lca.contracts.protocols.declarative_phase_graph import PhaseExecutor
-from lca.contracts.protocols.delta_handler import DeltaHandlerRegistry
-from lca.contracts.protocols.effect_handler import EffectHandlerRegistry
-from lca.contracts.protocols.embodiment import Body
-from lca.contracts.protocols.idempotency import IdempotencyStore
-from lca.contracts.protocols.infra import StateStore
-from lca.contracts.protocols.memory import MemorySystem
-from lca.contracts.protocols.plan import CompiledRunPlan
-from lca.contracts.protocols.reducer import Reducer
-from lca.contracts.protocols.resume_input import ResumeInputAdapter
-from lca.contracts.protocols.runtime_composition import (
+from lca.contracts.protocols.journal.artifact_closure import ArtifactClosure
+from lca.contracts.protocols.think.cognition import Brain, PerceiveHub
+from lca.contracts.protocols.declarative.declarative_execution import PhaseCapabilityReader
+from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseExecutor
+from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
+from lca.contracts.protocols.act.effect_handler import EffectHandlerRegistry
+from lca.contracts.protocols.act.embodiment import Body
+from lca.contracts.protocols.journal.idempotency import IdempotencyStore
+from lca.contracts.protocols.runtime.infra import StateStore
+from lca.contracts.protocols.memory.memory import MemorySystem
+from lca.contracts.protocols.state.plan import CompiledRunPlan
+from lca.contracts.protocols.state.reducer import Reducer
+from lca.contracts.protocols.session.resume_input import ResumeInputAdapter
+from lca.contracts.protocols.runtime.runtime_composition import (
     CheckpointStateResolver,
     CheckpointStateResolverFactory,
     DeclarativeInterpreter,
@@ -40,7 +40,7 @@ from lca.contracts.protocols.runtime_composition import (
     RuntimeJournal,
     RuntimeJournalFactory,
 )
-from lca.contracts.protocols.runtime_lifecycle import RuntimeLifecyclePublisher
+from lca.contracts.protocols.runtime.runtime_lifecycle import RuntimeLifecyclePublisher
 from lca.harness.declarative import MappingRestrictedScope
 from lca.harness.declarative.phase_observation import PhaseObserver
 from lca.harness.plan import compiled_run_plan_ref

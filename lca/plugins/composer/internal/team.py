@@ -8,8 +8,8 @@ from lca.contracts.atoms.enums import DecisionGateName
 from lca.contracts.capabilities import GATES, OBSERVABILITY
 from lca.contracts.mechanisms.capability import require_capability
 from lca.contracts.protocols import DecisionGate, ObservabilityBackend
-from lca.contracts.protocols.infra import AgentTransport, TransportRegistryProtocol
-from lca.contracts.protocols.spec import AgentSpec, LeadSpec, TeamSpec, strategy_key_for_governance
+from lca.contracts.protocols.runtime.infra import AgentTransport, TransportRegistryProtocol
+from lca.contracts.protocols.journal.spec import AgentSpec, LeadSpec, TeamSpec, strategy_key_for_governance
 from lca.infrastructure.observability import BoundObservability, TeamTraceProfile, team_id_for
 
 if TYPE_CHECKING:

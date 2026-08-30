@@ -7,7 +7,7 @@ from gateway.device_gateway.models import Device
 from gateway.device_gateway.registry import DeviceRegistry
 from gateway.device_gateway.transport import DeviceTransport
 from lca.contracts.models.core.plane import PlaneKind, PlaneRef
-from lca.contracts.protocols.infra import MachineResolver, MachineTransport
+from lca.contracts.protocols.runtime.infra import MachineResolver, MachineTransport
 from lca.infrastructure.plane.paths import outputs_under
 from lca.infrastructure.sandbox.host_settings import load_host_settings
 

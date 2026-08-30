@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from gateway.device_gateway.hub import DeviceHub
-from lca.contracts.protocols.infra import DshRuntime
+from lca.contracts.protocols.runtime.infra import DshRuntime
 from lca.infrastructure.comparison.dsh_driver.driver import DshTurnSpec
 from lca.infrastructure.comparison.dsh_driver.models import DshNotification, DshTurnResult
 from lca.infrastructure.comparison.dsh_driver.settings import DshSettings

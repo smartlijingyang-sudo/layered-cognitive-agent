@@ -49,7 +49,7 @@ from lca.contracts.protocols import (
     TeamUnit,
     Tool,
 )
-from lca.contracts.protocols.spec import (
+from lca.contracts.protocols.journal.spec import (
     BRAIN_CHOICE_DEFAULT,
     DEFAULT_DELEGATE_MAX_ATTEMPTS,
     MEMORY_CHOICE_SIMPLE,

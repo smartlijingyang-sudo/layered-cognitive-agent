@@ -29,7 +29,7 @@ from lca.contracts.models.team.partial_buffer import (
 from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols import AgentUnit, Runtime
-from lca.contracts.protocols.capabilities import HasHooks
+from lca.contracts.protocols.perceive.capabilities import HasHooks
 from lca.infrastructure.observability import (
     BoundObservability,
     adopt_run_scope,

@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from lca.contracts.atoms.enums import ComponentKind
 from lca.contracts.capabilities import COMPONENT_REGISTRY
-from lca.contracts.protocols.spec import STATE_STORE_CHOICE_MEMORY
+from lca.contracts.protocols.journal.spec import STATE_STORE_CHOICE_MEMORY
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

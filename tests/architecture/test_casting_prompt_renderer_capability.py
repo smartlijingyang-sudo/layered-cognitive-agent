@@ -6,7 +6,7 @@ from pathlib import Path
 
 from lca.contracts.capabilities import TEAM_CASTER, TEAM_CASTING_PROMPT_RENDERER
 from lca.contracts.models.core.llm import LLMResponse
-from lca.contracts.protocols.casting import RoleCard, RoleIndexEntry, RoleNotFoundError
+from lca.contracts.protocols.collaboration.casting import RoleCard, RoleIndexEntry, RoleNotFoundError
 from lca.harness.profile.resolve import resolve_profile
 from lca.application.casting import LLMTeamCaster
 from tests.harness.scripted_llm import ScriptedLLMAdapter

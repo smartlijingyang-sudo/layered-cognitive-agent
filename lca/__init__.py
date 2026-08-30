@@ -20,7 +20,7 @@ from lca.contracts.models.team.team_coordination import (
     PeerSwarm,
     Pipeline,
 )
-from lca.contracts.protocols.spec import AgentSpec, Governance, LeadSpec, TeamSpec
+from lca.contracts.protocols.journal.spec import AgentSpec, Governance, LeadSpec, TeamSpec
 
 __all__ = [
     "Agent",

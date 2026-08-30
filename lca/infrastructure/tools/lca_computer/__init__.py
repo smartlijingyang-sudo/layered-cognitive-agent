@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any, cast
 
 from lca.contracts.protocols import Sandbox, Tool
-from lca.contracts.protocols.infra import MachineTransport
+from lca.contracts.protocols.runtime.infra import MachineTransport
 from lca.infrastructure.computer.machine import MachineComputer
 from lca.infrastructure.computer.ops import ComputerOps
 

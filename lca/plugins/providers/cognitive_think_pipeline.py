@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.capabilities import COGNITIVE_THINK_PIPELINE
-from lca.contracts.protocols.cognitive_pipeline import CognitiveThinkPipeline
+from lca.contracts.protocols.think.cognitive_pipeline import CognitiveThinkPipeline
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

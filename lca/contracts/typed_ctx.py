@@ -16,8 +16,8 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from lca.contracts.protocols.cognition import Brain, BrainFactory
-from lca.contracts.protocols.infra import (
+from lca.contracts.protocols.think.cognition import Brain, BrainFactory
+from lca.contracts.protocols.runtime.infra import (
     AgentTransport,
     AttachmentIdentity,
     LLMAdapter,
@@ -26,10 +26,10 @@ from lca.contracts.protocols.infra import (
     ToolRegistry,
     TransportRegistryProtocol,
 )
-from lca.contracts.protocols.memory import MemorySystem
-from lca.contracts.protocols.observability import ObservabilityBackend
-from lca.contracts.protocols.operational_skills import SkillPackageInstaller
-from lca.contracts.protocols.runtime import Runtime
+from lca.contracts.protocols.memory.memory import MemorySystem
+from lca.contracts.protocols.journal.observability import ObservabilityBackend
+from lca.contracts.protocols.memory.operational_skills import SkillPackageInstaller
+from lca.contracts.protocols.runtime.runtime import Runtime
 
 
 class TypedContext(Protocol):

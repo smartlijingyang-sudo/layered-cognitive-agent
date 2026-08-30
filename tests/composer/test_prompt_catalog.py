@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from lca.contracts.protocols.operational_skills import SkillIndexEntry
+from lca.contracts.protocols.memory.operational_skills import SkillIndexEntry
 from lca.plugins.composer.prompt_catalog import ModelPromptCatalog
 
 

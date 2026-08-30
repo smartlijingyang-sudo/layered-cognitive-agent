@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from lca.contracts.protocols.learning import (
+from lca.contracts.protocols.think.learning import (
     LearningReviewAssessment,
     LearningReviewTicket,
     LearningReviewTicketStatus,

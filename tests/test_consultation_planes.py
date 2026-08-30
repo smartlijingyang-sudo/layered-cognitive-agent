@@ -32,7 +32,7 @@ from lca.contracts.models.team.partial_buffer import (
     reset_partial_buffer,
 )
 from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
-from lca.contracts.protocols.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
+from lca.contracts.protocols.journal.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
 from lca.infrastructure.transport.agent_transport import InternalTransport
 from lca.infrastructure.transport.transport_registry import TransportRegistry
 from lca.cognition.body.action_handlers import resolve_spec_timeout_s

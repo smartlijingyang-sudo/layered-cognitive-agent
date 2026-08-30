@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.contracts.protocols.runtime_composition import RuntimeFactory
+from lca.contracts.protocols.runtime.runtime_composition import RuntimeFactory
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.runtime.runtime_bindings import DeclarativeRuntimeBindings
 from lca.runtime.runtime_loop import CognitiveRuntime

@@ -38,7 +38,7 @@ from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.result import ApprovalPendingError, ToolExecutionError
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.contracts.protocols import SafeExecutor, Tool
-from lca.contracts.protocols.tool_pipeline import (
+from lca.contracts.protocols.act.tool_pipeline import (
     ToolDefinition,
     ToolExecutionContext,
     ToolExecutionResult,
@@ -256,7 +256,7 @@ class PipelineSafeExecutor(SafeExecutor):
         invocation_id = invocation_id.strip() or new_id("inv")
 
         from lca.contracts.models.observability.plan_ref import get_current_plan_ref
-        from lca.contracts.protocols.command_envelope import (
+        from lca.contracts.protocols.act.command_envelope import (
             BudgetReservation,
             CapabilityGrant,
             command_envelope_to_dict,

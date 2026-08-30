@@ -25,7 +25,7 @@ from lca.contracts.harness.skill import (
 from lca.contracts.models.core.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.protocols import Tool
-from lca.contracts.protocols.operational_skills import (
+from lca.contracts.protocols.memory.operational_skills import (
     SkillNotFoundError,
     SkillPackage,
     SkillPackageStore,

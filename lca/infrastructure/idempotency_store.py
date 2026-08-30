@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Final
 
 from lca.contracts.models.core.decision import Observation
-from lca.contracts.protocols.idempotency import IdempotencyClaim, IdempotencyStore
+from lca.contracts.protocols.journal.idempotency import IdempotencyClaim, IdempotencyStore
 
 _DEFAULT_PATH: Final[Path] = Path("traces/runtime/idempotency.sqlite3")
 _OBSERVATION_TAG: Final[str] = f"{Observation.__module__}:{Observation.__qualname__}"

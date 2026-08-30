@@ -15,8 +15,8 @@ from typing import Any
 from lca.contracts.harness.agent import AgentHandle, LiveAgent, SessionLiveBuilder
 from lca.contracts.harness.command import CommandReceipt
 from lca.contracts.harness.projection import SessionProjectionRegistry
-from lca.contracts.protocols.session_command_ledger import SessionCommandLedger
-from lca.contracts.protocols.session_persistence import SessionPersistenceFactory
+from lca.contracts.protocols.session.session_command_ledger import SessionCommandLedger
+from lca.contracts.protocols.session.session_persistence import SessionPersistenceFactory
 from lca.harness.agent.activation import SessionActivator
 from lca.harness.agent.command_router import AgentCommandRouter
 from lca.harness.agent.health import live_totals as project_live_totals

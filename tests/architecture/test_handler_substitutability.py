@@ -14,14 +14,14 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.protocols.action_handler import ActionHandlerRegistry
-from lca.contracts.protocols.command_envelope import CapabilityGrant, CommandEnvelope
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.act.action_handler import ActionHandlerRegistry
+from lca.contracts.protocols.act.command_envelope import CapabilityGrant, CommandEnvelope
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeValidationError,
     EffectPolicyPlan,
 )
-from lca.contracts.protocols.delta_handler import DeltaHandler, DeltaHandlerRegistry
-from lca.contracts.protocols.effect_handler import EffectHandler, EffectHandlerRegistry
+from lca.contracts.protocols.state.delta_handler import DeltaHandler, DeltaHandlerRegistry
+from lca.contracts.protocols.act.effect_handler import EffectHandler, EffectHandlerRegistry
 from lca.harness.declarative.dispatch import RegistryEffectGateway
 from lca.cognition.body.tool_batch_execution import SafeToolBatchExecutionPolicy
 from lca.runtime.declarative_runtime import RuntimePhaseCapabilities
@@ -406,7 +406,7 @@ async def test_effect_class_rejects_non_string_metadata_before_handler() -> None
 def test_delta_reducer_rejects_invalid_operation_before_registry_lookup(operation) -> None:
     """Delta operation names are typed inputs at the reducer seam."""
     from lca.contracts.models.core.state import AgentState, Budget
-    from lca.contracts.protocols.command_envelope import RunDelta
+    from lca.contracts.protocols.act.command_envelope import RunDelta
     from lca.harness.declarative.dispatch import RegistryDeltaReducer
 
     class _Reducer:

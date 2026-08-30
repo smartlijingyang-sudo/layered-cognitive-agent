@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.protocols.session_turn import FollowupDispatch, SessionFollowupPolicy
+from lca.contracts.protocols.session.session_turn import FollowupDispatch, SessionFollowupPolicy
 
 
 class EnqueueFollowupPolicy(SessionFollowupPolicy):

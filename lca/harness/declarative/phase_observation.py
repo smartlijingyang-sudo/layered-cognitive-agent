@@ -14,8 +14,8 @@ from enum import StrEnum
 import structlog
 
 from lca.contracts.atoms.telemetry import ATTR_AGENT_ROLE, ATTR_STEP, SpanName
-from lca.contracts.protocols.declarative_phase_graph import SemanticPhase
-from lca.contracts.protocols.phase_observation import (
+from lca.contracts.protocols.declarative.declarative_phase_graph import SemanticPhase
+from lca.contracts.protocols.journal.phase_observation import (
     PhaseObserver,
     PhaseObserverContribution,
     PhaseObserverRegistry,

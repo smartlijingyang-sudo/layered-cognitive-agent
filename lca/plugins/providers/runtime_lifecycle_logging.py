@@ -5,7 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from lca.contracts.capabilities import RUNTIME_LIFECYCLE_SUBSCRIBER_REGISTRY
-from lca.contracts.protocols.runtime_lifecycle import (
+from lca.contracts.protocols.runtime.runtime_lifecycle import (
     RuntimeLifecycleSubscriber,
     RuntimeLifecycleSubscriberContribution,
     RuntimeLifecycleSubscriberRegistry,

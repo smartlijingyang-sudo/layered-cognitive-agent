@@ -11,9 +11,9 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from lca.contracts.capabilities import TEAM_COMMUNICATION
-from lca.contracts.protocols.agent import AgentUnit
-from lca.contracts.protocols.spec import TeamSpec
-from lca.contracts.protocols.team_seam import (
+from lca.contracts.protocols.collaboration.agent import AgentUnit
+from lca.contracts.protocols.journal.spec import TeamSpec
+from lca.contracts.protocols.collaboration.team_seam import (
     TeamCommunication,
     TeamCommunicationAssemblerProtocol,
 )

@@ -13,7 +13,7 @@ from gateway.runs.lifecycle.runnable_assembly import (
 )
 from gateway.runs.session.session import RunSession
 from lca.contracts.protocols import LLMAdapter
-from lca.contracts.protocols.run_mode import RunModeRegistryProtocol
+from lca.contracts.protocols.session.run_mode import RunModeRegistryProtocol
 from lca.infrastructure.observability import BoundObservability
 
 

@@ -25,10 +25,10 @@ from lca.contracts.capabilities import (
 )
 from lca.contracts.mechanisms.capability import require_capability
 from lca.contracts.models.core.memory import MemoryLayer
-from lca.contracts.protocols.agent import AgentUnit
-from lca.contracts.protocols.infra import AgentTransport
-from lca.contracts.protocols.spec import TeamSpec
-from lca.contracts.protocols.team_seam import (
+from lca.contracts.protocols.collaboration.agent import AgentUnit
+from lca.contracts.protocols.runtime.infra import AgentTransport
+from lca.contracts.protocols.journal.spec import TeamSpec
+from lca.contracts.protocols.collaboration.team_seam import (
     TeamCommunicationAssemblerProtocol,
     TeamSeamFactoryProtocol,
     TeamSharedMemoryResolverProtocol,

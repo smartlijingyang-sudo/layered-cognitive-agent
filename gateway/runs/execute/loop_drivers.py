@@ -32,12 +32,12 @@ from lca.contracts.models.observability.journal import (
     RunScope,
 )
 from lca.contracts.models.team.run_context import RunContext
-from lca.contracts.protocols.casting import (
+from lca.contracts.protocols.collaboration.casting import (
     CastingError,
     RoleLibrary,
     TeamCaster,
 )
-from lca.contracts.protocols.infra import Tool
+from lca.contracts.protocols.runtime.infra import Tool
 from lca.infrastructure.observability import (
     BoundObservability,
     bind_backends,

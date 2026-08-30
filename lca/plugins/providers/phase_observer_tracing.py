@@ -5,7 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from lca.contracts.capabilities import PHASE_OBSERVER_REGISTRY
-from lca.contracts.protocols.phase_observation import (
+from lca.contracts.protocols.journal.phase_observation import (
     PhaseObserver,
     PhaseObserverContribution,
     PhaseObserverRegistry,

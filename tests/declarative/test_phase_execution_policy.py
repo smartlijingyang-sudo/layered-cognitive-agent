@@ -12,14 +12,14 @@ from lca.contracts.atoms.ids import utc_now
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.core.stop import StopReason
-from lca.contracts.protocols.command_envelope import RunFact
-from lca.contracts.protocols.declarative_execution import (
+from lca.contracts.protocols.act.command_envelope import RunFact
+from lca.contracts.protocols.declarative.declarative_execution import (
     PhaseExecutionFailure,
     PhaseInput,
     PhaseResult,
 )
-from lca.contracts.protocols.declarative_fault_tolerance import PhaseExecutionPolicy
-from lca.contracts.protocols.declarative_phase_graph import SemanticPhase
+from lca.contracts.protocols.declarative.declarative_fault_tolerance import PhaseExecutionPolicy
+from lca.contracts.protocols.declarative.declarative_phase_graph import SemanticPhase
 from lca.harness.declarative import GenericPlanInterpreter, GraphAssembler, MappingRestrictedScope
 from lca.harness.declarative.assembler import ExecutableNode
 from lca.harness.declarative.phase_execution_policy import (
@@ -291,7 +291,7 @@ async def test_default_graph_routes_retry_exhaustion_to_stop_without_runtime_bra
 
 class _AllowContribution:
     async def execute(self, _context: object, _input: PhaseInput) -> PhaseResult:
-        from lca.contracts.protocols.control_verdict import ControlVerdict, ControlVerdictKind
+        from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 
         return PhaseResult(
             result_kind="control",

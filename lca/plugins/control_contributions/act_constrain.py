@@ -7,8 +7,8 @@ from pydantic import BaseModel, ConfigDict
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.control_verdict import ControlVerdict, ControlVerdictKind
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ContributionRole,
     PhaseContext,
     PhaseContribution,
@@ -16,7 +16,7 @@ from lca.contracts.protocols.declarative_phase_graph import (
     PhaseResult,
     SemanticPhase,
 )
-from lca.contracts.protocols.logic_address import LogicAddress
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 
 

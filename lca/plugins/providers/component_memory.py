@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from lca.contracts.atoms.enums import ComponentKind
 from lca.contracts.capabilities import COMPONENT_REGISTRY
-from lca.contracts.protocols.spec import MEMORY_CHOICE_SIMPLE, MEMORY_CHOICE_TEMPORAL
+from lca.contracts.protocols.journal.spec import MEMORY_CHOICE_SIMPLE, MEMORY_CHOICE_TEMPORAL
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

@@ -10,7 +10,7 @@ from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
-from lca.contracts.protocols.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
+from lca.contracts.protocols.journal.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
 from lca.cognition.brain.reasoner import build_teammates_text
 from lca.cognition.member_status import InMemoryMemberStatus
 

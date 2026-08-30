@@ -20,7 +20,7 @@ from lca.contracts.models.observability.journal import (
     StampedEvent,
     ToolInvoked,
 )
-from lca.infrastructure.observability.journal import sse_frames
+from lca.infrastructure.observability.journal.sse import frames as sse_frames
 from lca.infrastructure.observability.journal.sse.frames import stamped_to_sse_frame
 
 

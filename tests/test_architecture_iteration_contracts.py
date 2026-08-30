@@ -39,7 +39,7 @@ CASES: list[tuple[str, str]] = [
     ("lca.contracts.mechanisms.registries", "Registries"),
     ("lca.contracts.mechanisms.seam", "consume"),
     ("lca.contracts.harness.skill", "LoadedSkill"),
-    ("lca.contracts.protocols.operational_skills", "SkillPackage"),
+    ("lca.contracts.protocols.memory.operational_skills", "SkillPackage"),
     ("lca.harness.skills.projection", "SkillsProjection"),
     ("lca.harness.skills.service", "SkillCatalogService"),
     ("lca.infrastructure.capability.skills", "SkillsService"),
@@ -56,7 +56,7 @@ CASES: list[tuple[str, str]] = [
     ("lca.infrastructure.skills.settings", "SkillSettings"),
     ("lca.infrastructure.skills.url_sources", "ParsedSkillUrl"),
     ("lca.infrastructure.skills.zip_security", "find_skill_markdown"),
-    ("lca.contracts.protocols.operational_skills", "SkillPackageInstaller"),
+    ("lca.contracts.protocols.memory.operational_skills", "SkillPackageInstaller"),
 ]
 
 

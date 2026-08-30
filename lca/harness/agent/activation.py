@@ -19,7 +19,7 @@ from lca.contracts.harness.agent import AgentHandle, LiveAgent, SessionLiveBuild
 from lca.contracts.harness.events import SessionCreated
 from lca.contracts.harness.projection import SessionProjectionRegistry
 from lca.contracts.harness.session import SESSION_FORMAT_VERSION, SessionHeader
-from lca.contracts.protocols.session_persistence import (
+from lca.contracts.protocols.session.session_persistence import (
     SessionPersistence,
     SessionPersistenceFactory,
 )

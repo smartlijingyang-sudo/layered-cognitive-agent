@@ -6,9 +6,9 @@ from dataclasses import dataclass, replace
 
 import pytest
 
-from lca.contracts.protocols.control_verdict import ControlVerdict, ControlVerdictKind
-from lca.contracts.protocols.declarative_phase_graph import PhaseInput, PhaseResult, SemanticPhase
-from lca.contracts.protocols.runtime_lifecycle import (
+from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
+from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseInput, PhaseResult, SemanticPhase
+from lca.contracts.protocols.runtime.runtime_lifecycle import (
     RuntimeLifecycleEvent,
     RuntimeLifecycleEventType,
 )

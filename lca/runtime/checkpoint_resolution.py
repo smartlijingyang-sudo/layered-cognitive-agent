@@ -12,12 +12,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from lca.contracts.models.core.state import AgentState, StateSnapshot
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeValidationError,
     PhaseRunCursor,
 )
-from lca.contracts.protocols.infra import StateStore
-from lca.contracts.protocols.runtime_composition import CheckpointStateResolver
+from lca.contracts.protocols.runtime.infra import StateStore
+from lca.contracts.protocols.runtime.runtime_composition import CheckpointStateResolver
 
 
 @dataclass(frozen=True, slots=True)

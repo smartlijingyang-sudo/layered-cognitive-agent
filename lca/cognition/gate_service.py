@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import TypeAlias
 
 from lca.contracts.protocols import DecisionGate
-from lca.contracts.protocols.cognition import DecisionGateAssembler
+from lca.contracts.protocols.think.cognition import DecisionGateAssembler
 from lca.cognition.group_assembly import (
     AssemblyStrategy,
     OrderedContributionCatalog,

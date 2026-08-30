@@ -5,7 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from lca.contracts.harness.session import SessionEvent
-from lca.contracts.protocols.session_command_ledger import (
+from lca.contracts.protocols.session.session_command_ledger import (
     ApprovalResumeDecision,
     ApprovalResumeDisposition,
     SessionCommandLedger,

@@ -12,7 +12,7 @@ from dataclasses import replace
 
 from lca.contracts.atoms.enums import ActionScope, ActionType
 from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.protocols.declarative_phase_graph import ActionAuthorityPlan
+from lca.contracts.protocols.declarative.declarative_phase_graph import ActionAuthorityPlan
 from lca.harness.declarative.action_authority import compile_action_authority
 from lca.harness.declarative.authority import (
     action_authority_for_scope,
@@ -67,7 +67,7 @@ def test_action_authority_plan_rejects_empty_scope() -> None:
 
     import pytest
 
-    from lca.contracts.protocols.declarative_phase_graph import (
+    from lca.contracts.protocols.declarative.declarative_phase_graph import (
         DeclarativeValidationError,
     )
 

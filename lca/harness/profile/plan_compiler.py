@@ -11,9 +11,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.declarative_phase_graph import SemanticPhase
-from lca.contracts.protocols.plan import COMPILED_RUN_PLAN_VERSION, CompiledRunPlan
-from lca.contracts.protocols.scope_plan import BudgetCeiling, ScopePlan
+from lca.contracts.protocols.declarative.declarative_phase_graph import SemanticPhase
+from lca.contracts.protocols.state.plan import COMPILED_RUN_PLAN_VERSION, CompiledRunPlan
+from lca.contracts.protocols.state.scope_plan import BudgetCeiling, ScopePlan
 from lca.harness.declarative.compiler import (
     DeclarativePlanProjection,
     compile_declarative_projection,

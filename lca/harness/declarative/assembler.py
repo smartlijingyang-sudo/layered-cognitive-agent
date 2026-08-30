@@ -6,14 +6,14 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
-from lca.contracts.protocols.declarative_fault_tolerance import PhaseExecutionPolicy
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_fault_tolerance import PhaseExecutionPolicy
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeValidationError,
     PhaseContribution,
     PhaseExecutor,
     SemanticPhase,
 )
-from lca.contracts.protocols.plan import CompiledRunPlan
+from lca.contracts.protocols.state.plan import CompiledRunPlan
 from lca.harness.declarative.validation import require_valid
 
 

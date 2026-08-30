@@ -10,7 +10,7 @@ from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.capabilities import STRATEGIES
 from lca.contracts.models.team.team_coordination import STRATEGY_KEY_LEAD, LeadMandate
 from lca.contracts.protocols import TeamAssembly
-from lca.contracts.protocols.spec import LeadSpec
+from lca.contracts.protocols.journal.spec import LeadSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 _DUTY_MANDATES: frozenset[LeadMandate] = frozenset({LeadMandate.CONSULT, LeadMandate.BOARD})

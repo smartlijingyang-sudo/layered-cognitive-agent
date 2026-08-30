@@ -36,7 +36,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from lca.contracts.capabilities import RUN_MODE_REGISTRY
-from lca.contracts.protocols.run_mode import (
+from lca.contracts.protocols.session.run_mode import (
     ModeAdapter,
     RegisteredMode,
     RunModeRegistryProtocol,

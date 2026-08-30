@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from lca.contracts.protocols import ArtifactClosure
-from lca.contracts.protocols.delta_handler import DeltaHandlerRegistry
-from lca.contracts.protocols.effect_handler import EffectHandlerRegistry
-from lca.contracts.protocols.idempotency import IdempotencyStore
-from lca.contracts.protocols.resume_input import ResumeInputAdapter
+from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
+from lca.contracts.protocols.act.effect_handler import EffectHandlerRegistry
+from lca.contracts.protocols.journal.idempotency import IdempotencyStore
+from lca.contracts.protocols.session.resume_input import ResumeInputAdapter
 from lca.runtime.idempotency_fixtures import InMemoryFixtureIdempotencyStore
 from lca.runtime.resume_input import HumanAnswerResumeInputAdapter
 from lca.plugins.providers.artifact_closure import DefaultArtifactClosure

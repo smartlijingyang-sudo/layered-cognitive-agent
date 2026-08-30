@@ -19,11 +19,11 @@ from lca.contracts.protocols import (
     LLMAdapter,
     Tool,
 )
-from lca.contracts.protocols.cognitive_pipeline import (
+from lca.contracts.protocols.think.cognitive_pipeline import (
     CognitiveReflectionPipeline,
     CognitiveThinkPipeline,
 )
-from lca.contracts.protocols.decision_classifier import DecisionClassifier
+from lca.contracts.protocols.gate.decision_classifier import DecisionClassifier
 from lca.cognition.brain.modular_brain import ModularBrain
 from lca.cognition.brain.reasoner import PromptReasoner
 

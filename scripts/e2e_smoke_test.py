@@ -121,7 +121,7 @@ async def main() -> int:
     print("\n[5/6] spawn_agent (plan-bound assembly) ...")
     try:
         from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
-        from lca.contracts.protocols.spec import AgentSpec
+        from lca.contracts.protocols.journal.spec import AgentSpec
 
         # Use mock LLM to avoid needing a real key
         from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter

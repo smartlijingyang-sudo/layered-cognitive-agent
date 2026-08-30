@@ -19,7 +19,7 @@ from lca.contracts.capabilities import (
     SESSION_TURN_CONTROLLER_FACTORY,
 )
 from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
-from lca.contracts.protocols.session_turn import (
+from lca.contracts.protocols.session.session_turn import (
     SessionFollowupPolicy,
     SessionTurnController,
     SessionTurnControllerFactory,

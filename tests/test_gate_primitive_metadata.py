@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.protocols.logic_address import score_logic_address
+from lca.contracts.protocols.composition.logic_address import score_logic_address
 from lca.harness.plugin_declaration import definition_from_plugin
 from lca.plugins.gates.artifact_respond_injector import setup as artifact_respond_setup
 from lca.plugins.gates.must_consult_all import setup as must_consult_all_setup

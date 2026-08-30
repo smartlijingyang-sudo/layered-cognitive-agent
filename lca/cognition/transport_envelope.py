@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from lca.contracts.models.observability.plan_ref import get_current_plan_ref
-from lca.contracts.protocols.command_envelope import CapabilityGrant, CommandEnvelope, mint_envelope
+from lca.contracts.protocols.act.command_envelope import CapabilityGrant, CommandEnvelope, mint_envelope
 from lca.infrastructure.transport.invocation import handoff_task_traced, send_and_wait
 
 

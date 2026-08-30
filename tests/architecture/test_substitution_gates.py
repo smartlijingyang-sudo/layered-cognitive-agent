@@ -54,7 +54,7 @@ GRAPH_STRATEGY_PATH = (
     REPO / "lca" / "agent" / "orchestration_strategies" / "graph" / "strategy.py"
 )
 GATEWAY_MODE_PATH = REPO / "gateway" / "modes.py"
-GATEWAY_LOOP_PATH = REPO / "gateway" / "runs" / "loop_drivers.py"
+GATEWAY_LOOP_PATH = REPO / "gateway" / "runs" / "execute/loop_drivers.py"
 
 
 def _read(path: Path) -> str:

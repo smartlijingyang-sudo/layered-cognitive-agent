@@ -35,7 +35,7 @@ class TestEnvelopeGateOrder:
 
     def test_envelope_gate_order_enforced(self) -> None:
         """Verify 5-gate order is enforced in envelope construction."""
-        from lca.contracts.protocols.command_envelope import (
+        from lca.contracts.protocols.act.command_envelope import (
             CommandEnvelope,
             mint_envelope,
         )

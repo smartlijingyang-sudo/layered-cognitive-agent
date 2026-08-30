@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from lca.contracts.models.core.result import Result
 from lca.contracts.models.core.state import AgentState
-from lca.contracts.protocols.declarative_phase_graph import PhaseRunCursor
-from lca.contracts.protocols.runtime_composition import ResultFinalizer
+from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseRunCursor
+from lca.contracts.protocols.runtime.runtime_composition import ResultFinalizer
 from lca.harness.declarative import GraphAssembler
 from lca.runtime.checkpoint_resolution import DeclarativeCheckpoint
 from lca.runtime.runtime_bindings import (

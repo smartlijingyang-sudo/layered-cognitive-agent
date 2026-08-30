@@ -10,7 +10,7 @@ from __future__ import annotations
 from lca.contracts.models.core.perception import ContextItem
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import Sensor
-from lca.contracts.protocols.operational_skills import SkillPackageStore
+from lca.contracts.protocols.memory.operational_skills import SkillPackageStore
 
 
 class SkillCatalogSensor(Sensor):

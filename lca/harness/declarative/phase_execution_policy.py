@@ -14,14 +14,14 @@ from collections.abc import Awaitable, Callable
 from lca.contracts.atoms.ids import elapsed_seconds
 from lca.contracts.models.core.result import ApprovalPendingError
 from lca.contracts.models.core.state import Budget
-from lca.contracts.protocols.command_envelope import RunFact
-from lca.contracts.protocols.declarative_execution import (
+from lca.contracts.protocols.act.command_envelope import RunFact
+from lca.contracts.protocols.declarative.declarative_execution import (
     PhaseAttemptFailure,
     PhaseErrorCategory,
     PhaseExecutionFailure,
     PhaseResult,
 )
-from lca.contracts.protocols.declarative_fault_tolerance import PhaseExecutionPolicy
+from lca.contracts.protocols.declarative.declarative_fault_tolerance import PhaseExecutionPolicy
 
 
 class PhaseExecutionExhaustedError(RuntimeError):

@@ -10,7 +10,7 @@ import pytest
 from lca.contracts.atoms.enums import ComponentKind, DecisionGateName
 from lca.contracts.capabilities import COMPONENT_REGISTRY, GATES, LEAD_BUDGET_POLICY_RESOLVER
 from lca.contracts.protocols import DecisionGate, LeadBudgetPolicyResolver
-from lca.contracts.protocols.spec import (
+from lca.contracts.protocols.journal.spec import (
     MEMORY_CHOICE_SIMPLE,
     MEMORY_CHOICE_TEMPORAL,
     STATE_STORE_CHOICE_MEMORY,

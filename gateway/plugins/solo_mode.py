@@ -11,8 +11,8 @@ from gateway.runs.lifecycle.runnable_assembly import RunnableBuildRequest
 from lca.contracts.capabilities import RUN_MODE_REGISTRY
 from lca.contracts.mechanisms.capability import require_capability
 from lca.contracts.protocols import LLMAdapter
-from lca.contracts.protocols.infra import Tool
-from lca.contracts.protocols.run_mode import ModeAdapter
+from lca.contracts.protocols.runtime.infra import Tool
+from lca.contracts.protocols.session.run_mode import ModeAdapter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.observability import BoundObservability
 from lca.application.api import Agent

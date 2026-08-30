@@ -11,7 +11,7 @@ from lca.contracts.models.core.terminal_outcome import (
     TerminalOutcomeKind,
     TextRef,
 )
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeRunOutcome,
     DeclarativeValidationError,
     PhaseRunCursor,

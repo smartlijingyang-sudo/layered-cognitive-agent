@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.contracts.protocols.session_turn import SessionTurnControllerFactory
+from lca.contracts.protocols.session.session_turn import SessionTurnControllerFactory
 from lca.harness.agent.turn_controller import InProcessSessionTurnController
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 

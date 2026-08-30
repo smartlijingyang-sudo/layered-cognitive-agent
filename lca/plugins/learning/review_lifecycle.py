@@ -17,12 +17,12 @@ from lca.contracts.capabilities import (
     RUNTIME_LIFECYCLE_SUBSCRIBER_REGISTRY,
 )
 from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.protocols.learning import (
+from lca.contracts.protocols.think.learning import (
     FailureAnalyzer,
     LearningReviewTicketStore,
     SkillAcquirer,
 )
-from lca.contracts.protocols.runtime_lifecycle import (
+from lca.contracts.protocols.runtime.runtime_lifecycle import (
     RuntimeLifecycleSubscriber,
     RuntimeLifecycleSubscriberContribution,
     RuntimeLifecycleSubscriberRegistry,

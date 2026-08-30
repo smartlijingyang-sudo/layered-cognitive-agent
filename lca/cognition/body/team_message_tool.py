@@ -53,7 +53,7 @@ def build_team_message_publish_tool() -> object:
     registry wires up the standard tool schema.
     """
     from lca.contracts.models.core.decision import Observation
-    from lca.contracts.protocols.infra import Tool
+    from lca.contracts.protocols.runtime.infra import Tool
 
     class _TeamMessagePublishTool(Tool):
         def __init__(self) -> None:

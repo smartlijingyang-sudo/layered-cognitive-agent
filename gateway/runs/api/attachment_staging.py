@@ -20,7 +20,7 @@ from lca.contracts.models.observability.journal import (
     AttachmentStagingFailed,
     AttachmentStagingStarted,
 )
-from lca.contracts.protocols.infra import MachineResolver
+from lca.contracts.protocols.runtime.infra import MachineResolver
 from lca.infrastructure.attachment import FileStoreAttachmentIdentity
 from lca.infrastructure.file_store import FileStore
 from lca.infrastructure.observability import record

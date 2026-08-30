@@ -5,7 +5,7 @@ from __future__ import annotations
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.logic_address import (
+from lca.contracts.protocols.composition.logic_address import (
     LogicAddress,
     canonical_scope_of,
     declared_dim_count,

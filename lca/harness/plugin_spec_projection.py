@@ -11,7 +11,7 @@ from lca.harness.plugin_manifest import EffectClass, PluginKind
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
-    from lca.contracts.protocols.declarative_phase_graph import PhaseContribution, PluginSpec
+    from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseContribution, PluginSpec
 
 
 def native_spec_from_declaration(
@@ -35,7 +35,7 @@ def native_spec_from_declaration(
     decorator values, so the plan compiler has no compatibility projection or
     parallel source of declaration truth.
     """
-    from lca.contracts.protocols.declarative_phase_graph import (
+    from lca.contracts.protocols.declarative.declarative_phase_graph import (
         CapabilityDeclaration,
         EvidenceDeclaration,
         LifecycleDeclaration,

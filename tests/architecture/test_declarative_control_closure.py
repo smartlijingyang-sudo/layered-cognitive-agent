@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ContributionRole,
     ControlEntry,
     DeclarativeValidationError,

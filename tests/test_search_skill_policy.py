@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-from lca.contracts.protocols.operational_skills import SkillIndexEntry, SkillSearchResult
+from lca.contracts.protocols.memory.operational_skills import SkillIndexEntry, SkillSearchResult
 from lca.infrastructure.search.skill_policy import (
     filter_skill_search_result,
     is_redundant_cli_search_skill,

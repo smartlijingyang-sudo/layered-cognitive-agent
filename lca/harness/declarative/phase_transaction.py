@@ -6,8 +6,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.protocols.command_envelope import RunDelta, RunFact
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.act.command_envelope import RunDelta, RunFact
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeRunOutcome,
     DeclarativeValidationError,
     DeltaReducer,

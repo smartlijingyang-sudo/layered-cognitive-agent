@@ -13,7 +13,7 @@ from pathlib import Path
 from threading import RLock
 
 from lca.contracts.models.core.memory import MemoryRecord, MemoryRelationKind
-from lca.contracts.protocols.memory import TemporalMemoryStore
+from lca.contracts.protocols.memory.memory import TemporalMemoryStore
 from lca.infrastructure.state_store.sqlite_temporal_codec import (
     TOKEN_PATTERN,
     materialize_record,

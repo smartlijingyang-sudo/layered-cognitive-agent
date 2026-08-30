@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from lca.contracts.protocols.session_turn import SessionFollowupPolicy
+from lca.contracts.protocols.session.session_turn import SessionFollowupPolicy
 from lca.harness.agent.followup_policy import EnqueueFollowupPolicy, RejectFollowupPolicy
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 

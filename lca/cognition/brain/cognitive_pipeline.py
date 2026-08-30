@@ -18,12 +18,12 @@ from lca.contracts.protocols import (
     SkillRouter,
     SupportsShortcut,
 )
-from lca.contracts.protocols.cognitive_pipeline import (
+from lca.contracts.protocols.think.cognitive_pipeline import (
     CognitiveReflectionPipeline,
     CognitiveThinkPipeline,
 )
-from lca.contracts.protocols.decision_classifier import DecisionClassifier
-from lca.contracts.protocols.reducer import Reducer
+from lca.contracts.protocols.gate.decision_classifier import DecisionClassifier
+from lca.contracts.protocols.state.reducer import Reducer
 
 
 class StandardCognitiveThinkPipeline(CognitiveThinkPipeline):

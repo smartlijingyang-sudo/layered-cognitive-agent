@@ -11,8 +11,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.protocols.command_envelope import RunFact
-from lca.contracts.protocols.declarative_phase_graph import JournalCommitter
+from lca.contracts.protocols.act.command_envelope import RunFact
+from lca.contracts.protocols.declarative.declarative_phase_graph import JournalCommitter
 from lca.infrastructure.observability import record_runtime
 
 

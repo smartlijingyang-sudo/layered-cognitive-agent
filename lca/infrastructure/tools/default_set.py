@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from lca.contracts.models.core.plane import PlaneBindings, PlaneKind, PlaneRef
 from lca.contracts.protocols import Tool
-from lca.contracts.protocols.infra import MachineResolver, Sandbox
-from lca.contracts.protocols.operational_skills import SkillPackageInstaller
+from lca.contracts.protocols.runtime.infra import MachineResolver, Sandbox
+from lca.contracts.protocols.memory.operational_skills import SkillPackageInstaller
 from lca.infrastructure.capability.search import SearchService
 from lca.infrastructure.file_store import FileStore
 from lca.infrastructure.plane.resolve import ref_of, resolve_plane_bindings, sandbox_ref_from

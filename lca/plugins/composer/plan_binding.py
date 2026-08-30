@@ -24,9 +24,9 @@ if TYPE_CHECKING:
 
     from lca.contracts.harness.composer import AgentGraph, TeamGraph
     from lca.contracts.protocols import DecisionGate, SharedMemoryStore
-    from lca.contracts.protocols.infra import AgentTransport
-    from lca.contracts.protocols.plan import CompiledRunPlan
-    from lca.contracts.protocols.spec import AgentSpec, TeamSpec
+    from lca.contracts.protocols.runtime.infra import AgentTransport
+    from lca.contracts.protocols.state.plan import CompiledRunPlan
+    from lca.contracts.protocols.journal.spec import AgentSpec, TeamSpec
 
 
 @dataclass(frozen=True, slots=True)

@@ -31,8 +31,8 @@ from lca.contracts.capabilities import (
 )
 from lca.contracts.harness.agent import SessionLiveBuilder
 from lca.contracts.harness.projection import SessionProjectionRegistryFactory
-from lca.contracts.protocols.plan import CompiledRunPlan
-from lca.contracts.protocols.runtime_composition import (
+from lca.contracts.protocols.state.plan import CompiledRunPlan
+from lca.contracts.protocols.runtime.runtime_composition import (
     CheckpointStateResolverFactory,
     DeclarativeInterpreterFactory,
     DeltaReducerFactory,
@@ -40,8 +40,8 @@ from lca.contracts.protocols.runtime_composition import (
     ResultFinalizerFactory,
     RuntimeJournalFactory,
 )
-from lca.contracts.protocols.session_persistence import SessionPersistenceFactory
-from lca.contracts.protocols.spec import AgentSpec
+from lca.contracts.protocols.session.session_persistence import SessionPersistenceFactory
+from lca.contracts.protocols.journal.spec import AgentSpec
 from lca.harness.profile.boot import boot_profile
 from lca.plugins.composer.internal.runtime_binding import (
     ProductionRuntimeDeps,

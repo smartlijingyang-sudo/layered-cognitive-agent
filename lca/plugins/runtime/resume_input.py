@@ -10,7 +10,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from lca.contracts.capabilities import RESUME_INPUT_ADAPTERS
-from lca.contracts.protocols.resume_input import ResumeInputAdapter
+from lca.contracts.protocols.session.resume_input import ResumeInputAdapter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.runtime.resume_input import HumanAnswerResumeInputAdapter
 

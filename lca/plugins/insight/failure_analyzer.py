@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pydantic import BaseModel, ConfigDict, Field
 
 from lca.contracts.capabilities import LEARNING_FAILURE_ANALYZER
-from lca.contracts.protocols.learning import FailureAnalysis, FailureAnalyzer
+from lca.contracts.protocols.think.learning import FailureAnalysis, FailureAnalyzer
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

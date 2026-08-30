@@ -13,9 +13,9 @@ from dataclasses import dataclass
 from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.capabilities import BRAIN_PROMPT_CATALOG_FACTORY
-from lca.contracts.protocols.cognition import BrainPromptCatalog, BrainPromptCatalogFactory
-from lca.contracts.protocols.infra import Tool
-from lca.contracts.protocols.operational_skills import SkillIndexEntry, SkillPackageStore
+from lca.contracts.protocols.think.cognition import BrainPromptCatalog, BrainPromptCatalogFactory
+from lca.contracts.protocols.runtime.infra import Tool
+from lca.contracts.protocols.memory.operational_skills import SkillIndexEntry, SkillPackageStore
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 _EMPTY_SKILLS = "（无可用技能；可使用 search_skill 查找）"

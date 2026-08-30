@@ -14,7 +14,7 @@ from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.team.team_awareness import TeamAwareness
 
 if TYPE_CHECKING:
-    from lca.contracts.protocols.declarative_phase_graph import PhaseRunCursor
+    from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseRunCursor
 
 
 @dataclass

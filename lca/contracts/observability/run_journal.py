@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from lca.contracts.models.observability.journal import StampedEvent
-from lca.contracts.protocols.journal import JournalProjector
+from lca.contracts.protocols.journal.journal import JournalProjector
 
 
 @runtime_checkable

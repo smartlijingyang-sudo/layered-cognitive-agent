@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from lca.contracts.harness.session import EventScope, SessionEvent, SessionHeader
-from lca.contracts.protocols.session_persistence import (
+from lca.contracts.protocols.session.session_persistence import (
     SessionPersistence,
     SessionPersistenceFactory,
 )

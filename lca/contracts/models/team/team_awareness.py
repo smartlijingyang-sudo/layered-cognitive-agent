@@ -32,7 +32,7 @@ class ConsultDuty:
     - ``outcomes``：证据平面（综合时用什么）
 
     ``max_attempts`` 由组合期注入（唯一默认值见
-    ``lca.contracts.protocols.spec.DEFAULT_DELEGATE_MAX_ATTEMPTS``），
+    ``lca.contracts.protocols.journal.spec.DEFAULT_DELEGATE_MAX_ATTEMPTS``），
     契约层不私藏重试策略。
 
     Mutability（一次 run 内）:

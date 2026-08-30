@@ -38,10 +38,10 @@ def test_session_registry_is_a_facade_over_activation_and_command_routing() -> N
 
 def test_execution_environment_only_coordinates_scope_order() -> None:
     """Binding resolution and attachment effects must stay outside the coordinator."""
-    source = _source("gateway/runs/execution_environment.py")
+    source = _source("gateway/runs/execute/execution_environment.py")
 
     assert "gateway.runs.execute.environment_bindings" in source
-    assert "gateway.runs.api.routes.attachment_staging" in source
+    assert "gateway.runs.api.attachment_staging" in source
     assert "resolve_plane_bindings(" not in source
     assert "FileStoreAttachmentIdentity" not in source
     assert "AttachmentStagingStarted" not in source
@@ -63,18 +63,18 @@ def test_default_mode_facade_keeps_backward_imports_without_owning_behavior() ->
 
 def test_ingress_only_orchestrates_text_history_and_file_reference_parsing() -> None:
     """Message ingress must not regain its platform-specific parsing implementations."""
-    source = _source("gateway/runs/ingress.py")
+    source = _source("gateway/runs/ingest/ingress.py")
 
     assert "gateway.runs.session.message_history" in source
     assert "gateway.runs.session.message_text" in source
-    assert "gateway.runs.api.routes.file_reference_parsing" in source
+    assert "gateway.runs.api.file_reference_parsing" in source
     assert "re.compile(" not in source
     assert "def _collect_file_refs" not in source
 
 
 def test_ingest_facade_keeps_policy_cache_transport_and_mirroring_separate() -> None:
     """The stable ingest path must not become a second implementation container."""
-    source = _source("gateway/runs/ingest.py")
+    source = _source("gateway/runs/ingest/ingest.py")
 
     assert "gateway.runs.ingest.cache" in source
     assert "gateway.runs.ingest.integrity" in source
@@ -86,14 +86,14 @@ def test_ingest_facade_keeps_policy_cache_transport_and_mirroring_separate() -> 
 
 def test_doctor_facade_separates_legacy_and_session_spine_read_models() -> None:
     """Legacy journal hops and Session Spine projections must retain separate owners."""
-    source = _source("gateway/runs/doctor.py")
+    source = _source("gateway/runs/doctor/doctor.py")
 
     assert "gateway.runs.doctor.legacy" in source
     assert "gateway.runs.doctor.session_check" in source
     assert "def _scan_jsonl" not in source
     assert "def _hop_h2" not in source
 
-    legacy_source = _source("gateway/runs/doctor_legacy.py")
+    legacy_source = _source("gateway/runs/doctor/legacy.py")
     assert "gateway.runs.doctor.journal" in legacy_source
 
 
@@ -110,7 +110,7 @@ def test_temporal_memory_store_delegates_schema_and_record_codec() -> None:
 
 def test_terminalizer_only_coordinates_terminal_transition_order() -> None:
     """Terminal status, artifact closure, manifest, and exporter cleanup have owners."""
-    source = _source("gateway/runs/terminalizer.py")
+    source = _source("gateway/runs/terminal/terminalizer.py")
 
     assert "gateway.runs.terminal.status" in source
     assert "gateway.runs.observability.artifact_closure" in source

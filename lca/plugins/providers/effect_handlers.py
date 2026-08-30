@@ -14,11 +14,11 @@ from pydantic import BaseModel
 
 from lca.contracts.models.core.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.state import AgentState
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     CommandEnvelope,
     EffectPolicyPlan,
 )
-from lca.contracts.protocols.effect_handler import (
+from lca.contracts.protocols.act.effect_handler import (
     EffectCapabilities,
     EffectHandler,
     EffectHandlerRegistry,

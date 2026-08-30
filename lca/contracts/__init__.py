@@ -69,8 +69,8 @@ from lca.contracts.protocols import (
     StopPolicy,
     TransportRegistryProtocol,
 )
-from lca.contracts.protocols.action import Action, ActionRegistryProtocol
-from lca.contracts.protocols.spec import (
+from lca.contracts.protocols.act.action import Action, ActionRegistryProtocol
+from lca.contracts.protocols.journal.spec import (
     Governance,
     TeamSpec,
     strategy_key_for_governance,

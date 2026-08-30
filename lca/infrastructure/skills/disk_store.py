@@ -8,7 +8,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from lca.contracts.protocols.operational_skills import (
+from lca.contracts.protocols.memory.operational_skills import (
     SKILL_MAX_CONTENT_CHARS,
     SKILL_MAX_RESOURCE_BYTES,
     SkillIndexEntry,

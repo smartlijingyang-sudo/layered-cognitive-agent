@@ -14,13 +14,13 @@ from lca.contracts.protocols import (
     PerceiveHub,
     StateStore,
 )
-from lca.contracts.protocols.declarative_phase_graph import PhaseExecutor
-from lca.contracts.protocols.delta_handler import DeltaHandlerRegistry
-from lca.contracts.protocols.effect_handler import EffectHandlerRegistry
-from lca.contracts.protocols.idempotency import IdempotencyStore
-from lca.contracts.protocols.plan import CompiledRunPlan
-from lca.contracts.protocols.reducer import Reducer
-from lca.contracts.protocols.resume_input import ResumeInputAdapter
+from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseExecutor
+from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
+from lca.contracts.protocols.act.effect_handler import EffectHandlerRegistry
+from lca.contracts.protocols.journal.idempotency import IdempotencyStore
+from lca.contracts.protocols.state.plan import CompiledRunPlan
+from lca.contracts.protocols.state.reducer import Reducer
+from lca.contracts.protocols.session.resume_input import ResumeInputAdapter
 from lca.harness.declarative.phase_observation import PhaseObserver
 from lca.runtime.reducer import DefaultReducer
 from lca.runtime.resume_input import HumanAnswerResumeInputAdapter

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.contracts.protocols.infra import TransportRegistryProtocol
+from lca.contracts.protocols.runtime.infra import TransportRegistryProtocol
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

@@ -11,7 +11,7 @@ import unittest
 from typing import Any
 
 from lca.contracts.models.team.team_coordination import LeadMandate, Pipeline
-from lca.contracts.protocols.casting import (
+from lca.contracts.protocols.collaboration.casting import (
     CastingError,
     CastingPlan,
     RoleCard,
@@ -19,7 +19,7 @@ from lca.contracts.protocols.casting import (
     RoleNotFoundError,
     SelectedRole,
 )
-from lca.contracts.protocols.spec import LeadSpec
+from lca.contracts.protocols.journal.spec import LeadSpec
 from lca.agent.role_library import FileRoleLibrary
 from lca.application.api import Team
 from lca.application.casting import (

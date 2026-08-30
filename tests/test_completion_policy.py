@@ -19,7 +19,7 @@ from lca.contracts.models.team.consultation import ConsultationDisposition
 from lca.contracts.models.team.role_status_rules import is_success_status, is_terminal_status
 from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
 from lca.contracts.protocols import SupportsShortcut
-from lca.contracts.protocols.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
+from lca.contracts.protocols.journal.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
 from lca.cognition.brain.critic import SimpleCritic
 from lca.cognition.brain.decision_gates.must_consult_all import (
     MustConsultAllMembers,

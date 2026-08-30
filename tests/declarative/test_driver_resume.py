@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from lca.contracts.models.core.state import AgentState, Budget, StateSnapshot
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeValidationError,
     PhaseRunCursor,
 )

@@ -8,12 +8,12 @@ from typing import Any
 from lca.contracts.models.core.result import ApprovalPendingError
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.core.stop import StopDecision, StopReason
-from lca.contracts.protocols.command_envelope import RunFact
-from lca.contracts.protocols.declarative_common import (
+from lca.contracts.protocols.act.command_envelope import RunFact
+from lca.contracts.protocols.declarative.declarative_common import (
     DeclarativeValidationError,
     SemanticPhase,
 )
-from lca.contracts.protocols.declarative_execution import (
+from lca.contracts.protocols.declarative.declarative_execution import (
     DeclarativeRunOutcome,
     JournalCommitter,
     PhaseResult,

@@ -11,9 +11,9 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from lca.contracts.mechanisms import consume
-from lca.contracts.protocols.declarative_phase_graph import PhaseExecutor
-from lca.contracts.protocols.plan import CompiledRunPlan
-from lca.contracts.protocols.resume_input import ResumeInputAdapter
+from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseExecutor
+from lca.contracts.protocols.state.plan import CompiledRunPlan
+from lca.contracts.protocols.session.resume_input import ResumeInputAdapter
 from lca.runtime.runtime_bindings import DeclarativeRuntimeBindings
 from lca.plugins.composer.internal.runtime_deps import ProductionRuntimeDeps
 
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from cordis import Context
 
     from lca.contracts.harness.composer import AgentGraph
-    from lca.contracts.protocols.spec import AgentSpec
+    from lca.contracts.protocols.journal.spec import AgentSpec
     from lca.plugins.composer.internal.runtime_capabilities import RuntimeCapabilityClosure
 
 

@@ -16,8 +16,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from lca.contracts.atoms.enums import ReflectionVerdict
 from lca.contracts.models.core.decision import Decision, Turn
-from lca.contracts.protocols.control_verdict import ControlVerdict, ControlVerdictKind
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ContributionRole,
     PhaseContext,
     PhaseContribution,

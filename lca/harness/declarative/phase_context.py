@@ -7,8 +7,8 @@ from dataclasses import dataclass, field
 
 from lca.contracts.models.core.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.protocols.command_envelope import RunDelta, RunFact
-from lca.contracts.protocols.declarative_execution import (
+from lca.contracts.protocols.act.command_envelope import RunDelta, RunFact
+from lca.contracts.protocols.declarative.declarative_execution import (
     JournalCommitter,
     PhaseCapabilityReader,
     PhaseContext,

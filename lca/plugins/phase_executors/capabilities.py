@@ -5,14 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import cast
 
-from lca.contracts.protocols.cognition import Brain, PerceiveHub
-from lca.contracts.protocols.declarative_execution import (
+from lca.contracts.protocols.think.cognition import Brain, PerceiveHub
+from lca.contracts.protocols.declarative.declarative_execution import (
     PhaseCapabilityReader,
     StandardPhaseCapability,
 )
-from lca.contracts.protocols.embodiment import Body
-from lca.contracts.protocols.memory import MemorySystem
-from lca.contracts.protocols.runtime import StopPolicy
+from lca.contracts.protocols.act.embodiment import Body
+from lca.contracts.protocols.memory.memory import MemorySystem
+from lca.contracts.protocols.runtime.runtime import StopPolicy
 
 
 @dataclass(frozen=True, slots=True)

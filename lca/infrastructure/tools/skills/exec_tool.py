@@ -10,7 +10,7 @@ from lca.contracts.atoms.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDAT
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.sandbox import DEFAULT_SANDBOX_TIMEOUT_S
 from lca.contracts.protocols import Sandbox, Tool
-from lca.contracts.protocols.operational_skills import (
+from lca.contracts.protocols.memory.operational_skills import (
     SANDBOX_SKILL_MOUNT_PREFIX,
     SkillNotFoundError,
     SkillPackageStore,

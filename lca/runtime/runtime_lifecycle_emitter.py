@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import Result
-from lca.contracts.protocols.runtime_lifecycle import (
+from lca.contracts.protocols.runtime.runtime_lifecycle import (
     RuntimeBudgetSnapshot,
     RuntimeLifecycleEvent,
     RuntimeLifecycleEventType,

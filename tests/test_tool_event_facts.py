@@ -172,7 +172,7 @@ def test_v2_invoke_xor_ref_default() -> None:
 
 def test_v3_journal_io_no_view_only_stripping() -> None:
     """V3:journal_io 不再有 ``_strip_view_only_data`` / ``_is_view_only_field`` 调用。"""
-    from lca.infrastructure.observability.journal import journal_io
+    from lca.infrastructure.observability.journal.engine import journal_io
 
     assert not hasattr(journal_io, "_strip_view_only_data")
     assert not hasattr(journal_io, "_is_view_only_field")

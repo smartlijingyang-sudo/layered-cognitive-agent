@@ -10,7 +10,7 @@ from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
 from lca.contracts.models.core.message import AgentMessage, agent_message_as_text
-from lca.contracts.protocols.resume_input import ResumeInput, ResumeInputAdapter
+from lca.contracts.protocols.session.resume_input import ResumeInput, ResumeInputAdapter
 
 
 class HumanAnswerResumeInputAdapter(ResumeInputAdapter):

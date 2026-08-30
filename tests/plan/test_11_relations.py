@@ -29,7 +29,7 @@ from lca.contracts.atoms.relation import (
     validate_relations,
 )
 from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.capability_plan import (
+from lca.contracts.protocols.perceive.capability_plan import (
     CapabilityPlan,
     ProviderBinding,
     capability_plan_hash,
@@ -38,7 +38,7 @@ from lca.contracts.protocols.capability_plan import (
     relations_of_kind,
     relations_to_plugin,
 )
-from lca.contracts.protocols.relation import (
+from lca.contracts.protocols.composition.relation import (
     TypedRelation,
     typed_relation_to_dict,
     typed_relations_from_iter,

@@ -9,7 +9,7 @@ from pathlib import Path
 from gateway.runs.terminal.failure import RunFailureFacts
 
 ROOT = Path(__file__).parents[2]
-FAILURE_RECORDING = ROOT / "gateway" / "runs" / "failure_recording.py"
+FAILURE_RECORDING = ROOT / "gateway" / "runs" / "terminal/failure.py"
 
 
 def test_failure_recording_does_not_import_mutable_run_carrier() -> None:

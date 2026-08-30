@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.contracts.protocols.session_persistence import SessionPersistenceFactory
+from lca.contracts.protocols.session.session_persistence import SessionPersistenceFactory
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.harness.session.persistence import JsonlSessionPersistenceFactory
 

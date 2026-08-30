@@ -130,7 +130,7 @@ def main() -> int:
         print(
             f"\nV4 acceptance (PR-7): {len(violations)} execute() methods "
             f"lack mint_envelope call. Add "
-            f"`from lca.contracts.protocols.command_envelope import mint_envelope` "
+            f"`from lca.contracts.protocols.act.command_envelope import mint_envelope` "
             f"and call mint_envelope(...) in body.execute()."
         )
         return 1

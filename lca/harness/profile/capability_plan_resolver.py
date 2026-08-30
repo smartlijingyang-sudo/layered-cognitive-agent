@@ -34,8 +34,8 @@ from typing import Any
 from lca.contracts.atoms.relation import (
     Relation,
 )
-from lca.contracts.protocols.capability_plan import CapabilityPlan, ProviderBinding
-from lca.contracts.protocols.relation import (
+from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan, ProviderBinding
+from lca.contracts.protocols.composition.relation import (
     TypedRelation,
     typed_relations_from_iter,
 )

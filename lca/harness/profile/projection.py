@@ -14,7 +14,7 @@ from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import Any
 
-from lca.contracts.protocols.declarative_plugin import PluginSpec
+from lca.contracts.protocols.declarative.declarative_plugin import PluginSpec
 from lca.harness.profile.immutable import freeze_mapping
 from lca.harness.profile.plugin_metadata import plugin_metadata
 from lca.harness.profile.resolve import ResolvedPlugin, ResolvedProfile

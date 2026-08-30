@@ -12,8 +12,8 @@ def _source(path: Path) -> str:
 
 
 def test_session_projection_owns_summary_payload_shape() -> None:
-    projection = _source(ROOT / "gateway" / "runs" / "session_projection.py")
-    registry = _source(ROOT / "gateway" / "runs" / "session.py")
+    projection = _source(ROOT / "gateway" / "runs" / "session/projection.py")
+    registry = _source(ROOT / "gateway" / "runs" / "session/session.py")
 
     assert "def summary_for_session" in projection
     assert '"approval_request"' in projection
@@ -22,7 +22,7 @@ def test_session_projection_owns_summary_payload_shape() -> None:
 
 
 def test_session_projection_keeps_registry_import_type_only() -> None:
-    projection = _source(ROOT / "gateway" / "runs" / "session_projection.py")
+    projection = _source(ROOT / "gateway" / "runs" / "session/projection.py")
 
     assert "if TYPE_CHECKING:" in projection
     assert "from gateway.runs.session.session import RunSession" in projection

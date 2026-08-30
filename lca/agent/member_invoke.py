@@ -12,7 +12,7 @@ from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import Result
 from lca.contracts.models.team.delegation_context import member_invoke_scope
 from lca.contracts.protocols import AgentUnit, MemberInvoker, TeamStage
-from lca.contracts.protocols.infra import AgentTransport
+from lca.contracts.protocols.runtime.infra import AgentTransport
 from lca.infrastructure.transport.invocation import send_and_wait
 
 

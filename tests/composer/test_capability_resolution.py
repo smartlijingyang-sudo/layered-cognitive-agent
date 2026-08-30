@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.protocols.capability_plan import ProviderBinding
+from lca.contracts.protocols.perceive.capability_plan import ProviderBinding
 from lca.plugins.composer.capability_resolution import (
     CapabilityResolutionError,
     ScopeCapabilityResolver,

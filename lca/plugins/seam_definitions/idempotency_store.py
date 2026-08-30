@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from lca.contracts.protocols.idempotency import IdempotencyStore
+from lca.contracts.protocols.journal.idempotency import IdempotencyStore
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

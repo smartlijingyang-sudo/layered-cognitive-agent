@@ -11,7 +11,7 @@ from lca.contracts.models.core.budget import create_budget
 from lca.contracts.models.core.decision import Decision, Observation, ToolCall
 from lca.contracts.models.core.result import ToolExecutionError
 from lca.contracts.models.core.state import AgentState
-from lca.contracts.protocols.tool_batch_execution import (
+from lca.contracts.protocols.act.tool_batch_execution import (
     ToolBatchEntry,
     ToolBatchExecutionMode,
     ToolBatchExecutionSegment,

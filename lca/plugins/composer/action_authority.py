@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from lca.contracts.mechanisms.capability import MissingCapabilityError
-from lca.contracts.protocols.action_handler import ActionHandlerRegistry
-from lca.contracts.protocols.infra import (
+from lca.contracts.protocols.act.action_handler import ActionHandlerRegistry
+from lca.contracts.protocols.runtime.infra import (
     SafeExecutor,
     ToolRegistry,
     TransportRegistryProtocol,

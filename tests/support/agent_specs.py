@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.protocols import LLMAdapter
-from lca.contracts.protocols.spec import AgentSpec
+from lca.contracts.protocols.journal.spec import AgentSpec
 
 
 def make_spec(

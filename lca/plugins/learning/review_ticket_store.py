@@ -7,7 +7,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.capabilities import LEARNING_REVIEW_TICKET_STORE
-from lca.contracts.protocols.learning import LearningReviewTicketStore
+from lca.contracts.protocols.think.learning import LearningReviewTicketStore
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 from lca.infrastructure.learning.review_ticket_sqlite import SqliteLearningReviewTicketStore
 

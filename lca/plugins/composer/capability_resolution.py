@@ -11,7 +11,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from lca.contracts.protocols.capability_plan import ProviderBinding
+from lca.contracts.protocols.perceive.capability_plan import ProviderBinding
 
 
 class CapabilityResolutionError(LookupError):

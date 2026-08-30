@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, cast
 from lca.contracts.atoms.enums import ActionScope, MemoryLayer
 from lca.contracts.models.team.team_coordination import Coordination, LeadMandate
 from lca.contracts.protocols import SharedMemoryStore, TeamUnit
-from lca.contracts.protocols.infra import AgentTransport
-from lca.contracts.protocols.spec import (
+from lca.contracts.protocols.runtime.infra import AgentTransport
+from lca.contracts.protocols.journal.spec import (
     DEFAULT_DELEGATE_MAX_ATTEMPTS,
     AgentSpec,
     Governance,

@@ -9,7 +9,7 @@ import pytest
 
 from lca.contracts.capabilities import BRAIN_PROMPT_CATALOG_FACTORY, BRAINS
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.protocols.spec import AgentSpec
+from lca.contracts.protocols.journal.spec import AgentSpec
 from lca.plugins.composer.internal import brain
 from lca.plugins.composer.prompt_catalog import DefaultBrainPromptCatalogFactory
 

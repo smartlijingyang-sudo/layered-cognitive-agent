@@ -9,7 +9,7 @@ import pytest
 from lca.contracts.atoms.enums import ContentType
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
-from lca.contracts.protocols.tool_pipeline import (
+from lca.contracts.protocols.act.tool_pipeline import (
     ExecuteNextFn,
     ToolDefinition,
     ToolExecutionContext,

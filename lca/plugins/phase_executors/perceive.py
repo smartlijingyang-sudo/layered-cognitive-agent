@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lca.contracts.protocols.command_envelope import RunDelta
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.act.command_envelope import RunDelta
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     PhaseContext,
     PhaseInput,
     PhaseResult,

@@ -145,7 +145,7 @@ class TestStrictPlanBinding:
         Individual composers may return partial contributions, but binding is
         the one closure seam and must reject missing runtime dependencies.
         """
-        from lca.contracts.protocols.plan import CapabilityBinding
+        from lca.contracts.protocols.state.plan import CapabilityBinding
 
         plan = _plan(
             with_capability_bindings=(
@@ -171,7 +171,7 @@ class TestStrictPlanBinding:
             bind_plan(_request(), _plan(), scope=object())
 
     def test_complete_composers_return_complete_plan_binding(self) -> None:
-        from lca.contracts.protocols.plan import CapabilityBinding
+        from lca.contracts.protocols.state.plan import CapabilityBinding
 
         plan = _plan(
             with_capability_bindings=tuple(
@@ -196,7 +196,7 @@ class TestStrictPlanBinding:
     def test_agent_binding_reads_the_plan_frozen_on_the_scope(self) -> None:
         """Production Agent binding must not accept a second plan interpretation."""
 
-        from lca.contracts.protocols.plan import CapabilityBinding
+        from lca.contracts.protocols.state.plan import CapabilityBinding
         from lca.harness.profile.boot_products import (
             ProfileBootProducts,
             attach_profile_boot_products,
@@ -227,7 +227,7 @@ class TestStrictPlanBinding:
     def test_team_composer_is_not_called_while_binding_agent_graph(self) -> None:
         """A Team-only composer cannot join AgentGraph composition by accident."""
 
-        from lca.contracts.protocols.plan import CapabilityBinding
+        from lca.contracts.protocols.state.plan import CapabilityBinding
 
         plan = _plan(
             with_capability_bindings=tuple(
@@ -247,7 +247,7 @@ class TestStrictPlanBinding:
         )
 
     def test_plan_ref_is_propagated(self) -> None:
-        from lca.contracts.protocols.declarative_phase_graph import CapabilityBinding
+        from lca.contracts.protocols.declarative.declarative_phase_graph import CapabilityBinding
         from lca.harness.plan import compiled_run_plan_ref
 
         plan = _plan(
@@ -264,7 +264,7 @@ class TestStrictPlanBinding:
         assert result.plan_ref == compiled_run_plan_ref(plan)
 
     def test_unresolvable_provider_binding_fails_closed(self) -> None:
-        from lca.contracts.protocols.plan import CapabilityBinding
+        from lca.contracts.protocols.state.plan import CapabilityBinding
 
         plan = _plan(
             with_binding=True,
@@ -291,7 +291,7 @@ class TestStrictTeamBinding:
     def test_agent_composers_are_not_called_while_binding_team_graph(self) -> None:
         """Only the TeamGraph composer is eligible for Team composition."""
 
-        from lca.contracts.protocols.plan import CapabilityBinding
+        from lca.contracts.protocols.state.plan import CapabilityBinding
 
         plan = _plan(
             with_capability_bindings=tuple(
@@ -307,7 +307,7 @@ class TestStrictTeamBinding:
         assert result.composer_capability == "composer.team"
 
     def test_complete_team_composer_returns_binding(self) -> None:
-        from lca.contracts.protocols.plan import CapabilityBinding
+        from lca.contracts.protocols.state.plan import CapabilityBinding
 
         plan = _plan(
             with_capability_bindings=(
@@ -327,7 +327,7 @@ class TestStrictTeamBinding:
     def test_team_binding_reads_the_plan_frozen_on_the_scope(self) -> None:
         """Production Team binding must not accept a second plan interpretation."""
 
-        from lca.contracts.protocols.plan import CapabilityBinding
+        from lca.contracts.protocols.state.plan import CapabilityBinding
 
         plan = _plan(
             with_capability_bindings=(
@@ -388,16 +388,16 @@ def _plan(
     composers from the compiled plan (ADR-0074/0075 cutover).
     """
     from lca.contracts.atoms.scope import Scope
-    from lca.contracts.protocols.capability_plan import CapabilityPlan, ProviderBinding
-    from lca.contracts.protocols.declarative_phase_graph import (
+    from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan, ProviderBinding
+    from lca.contracts.protocols.declarative.declarative_phase_graph import (
         ActionAuthorityPlan,
         CognitivePhaseGraphPlan,
         PhaseBinding,
         PhaseNode,
         SemanticPhase,
     )
-    from lca.contracts.protocols.plan import CompiledRunPlan
-    from lca.contracts.protocols.scope_plan import BudgetCeiling, ScopePlan
+    from lca.contracts.protocols.state.plan import CompiledRunPlan
+    from lca.contracts.protocols.state.scope_plan import BudgetCeiling, ScopePlan
 
     bindings = (
         (ProviderBinding(capability="missing_capability", owner_plugin="missing_plugin"),)

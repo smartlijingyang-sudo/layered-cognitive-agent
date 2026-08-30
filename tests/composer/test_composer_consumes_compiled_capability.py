@@ -35,7 +35,7 @@ from lca.contracts.capabilities import (
     TEAM_SEAM,
 )
 from lca.contracts.harness.composer import AgentCompositionRequest
-from lca.contracts.protocols.spec import AgentSpec
+from lca.contracts.protocols.journal.spec import AgentSpec
 from lca.plugins.seam_definitions.team_communication import (
     DefaultTeamCommunicationAssembler,
 )
@@ -291,7 +291,7 @@ def test_team_composer_passes_resolved_store_to_one_member_assembly_pass() -> No
     """A Team member receives the seam-resolved store during its only assembly pass."""
 
     from lca.contracts.models.team.team_coordination import Pipeline
-    from lca.contracts.protocols.spec import TeamSpec
+    from lca.contracts.protocols.journal.spec import TeamSpec
     from lca.plugins.composer.team_composer import TeamComposer
     from tests.support.agent_specs import make_spec
 
@@ -401,7 +401,7 @@ def test_team_seam_factory_produces_complete_seam() -> None:
     """The default ``TeamSeamFactory.build`` must return a fully populated seam."""
 
     from lca.contracts.models.team.team_coordination import Pipeline
-    from lca.contracts.protocols.spec import TeamSpec
+    from lca.contracts.protocols.journal.spec import TeamSpec
     from lca.infrastructure.transport.agent_transport import InternalTransport
 
     factory = _default_team_seam_factory()
@@ -425,7 +425,7 @@ def test_team_seam_factory_returns_no_shared_memory_when_layers_empty() -> None:
     """When no shared layers are declared, ``shared_memory`` is ``None``."""
 
     from lca.contracts.models.team.team_coordination import Pipeline
-    from lca.contracts.protocols.spec import TeamSpec
+    from lca.contracts.protocols.journal.spec import TeamSpec
 
     factory = _default_team_seam_factory()
     spec = TeamSpec(members=(), governance=Pipeline())
@@ -525,7 +525,7 @@ def test_default_team_seam_factory_keeps_backend_decisions_independent() -> None
     """
 
     from lca.contracts.models.team.team_coordination import Pipeline
-    from lca.contracts.protocols.spec import TeamSpec
+    from lca.contracts.protocols.journal.spec import TeamSpec
 
     class _SharedMemoryResolver:
         def __init__(self) -> None:

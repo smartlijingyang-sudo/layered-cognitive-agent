@@ -16,7 +16,7 @@ from gateway.runs.session.session import RunRegistry
 from gateway.runs.terminal.port import RunCommandReceipt, RunReceipt, RunRequest
 from gateway.runs.terminal.registry_commands import RegistryRunCommands
 from gateway.runs.terminal.registry_queries import RegistryRunQueries
-from lca.contracts.protocols.infra import MachineResolver
+from lca.contracts.protocols.runtime.infra import MachineResolver
 
 
 class RegistryRunAdapter:

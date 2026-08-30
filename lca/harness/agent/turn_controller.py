@@ -7,7 +7,7 @@ from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from typing import TypeVar, cast
 
-from lca.contracts.protocols.session_turn import SessionTurnController, TurnAlreadyRunningError
+from lca.contracts.protocols.session.session_turn import SessionTurnController, TurnAlreadyRunningError
 
 ResultT = TypeVar("ResultT")
 

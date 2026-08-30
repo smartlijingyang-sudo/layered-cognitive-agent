@@ -32,7 +32,7 @@ from lca.contracts.observability.evidence import (
     EvidenceRef,
     EvidenceStore,
 )
-from lca.contracts.protocols.infra import Tool
+from lca.contracts.protocols.runtime.infra import Tool
 from lca.infrastructure.observability import record, record_runtime
 from lca.infrastructure.tools.contract.project import project_tool_state
 from lca.cognition.body.tool_result_preview import tool_files

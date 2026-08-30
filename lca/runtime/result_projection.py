@@ -19,11 +19,11 @@ from lca.contracts.models.core.terminal_outcome import (
     TerminalOutcomeKind,
     TextRef,
 )
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeRunOutcome,
     DeclarativeValidationError,
 )
-from lca.contracts.protocols.infra import StateStore
+from lca.contracts.protocols.runtime.infra import StateStore
 
 
 class TerminalResultProjection:

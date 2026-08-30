@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import deque
 from collections.abc import Mapping, Sequence
 
-from lca.contracts.protocols.declarative_phase_graph import PhaseEdge, PhaseNode
+from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseEdge, PhaseNode
 
 
 def reachable(entry: str, outgoing: Mapping[str, Sequence[PhaseEdge]]) -> set[str]:

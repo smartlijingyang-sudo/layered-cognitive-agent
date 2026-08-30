@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from lca.contracts.protocols.command_envelope import CommandEnvelope
+from lca.contracts.protocols.act.command_envelope import CommandEnvelope
 from lca.harness.declarative.dispatch import RegistryEffectGateway
 from lca.runtime.declarative_runtime import RuntimePhaseCapabilities
 from lca.runtime.idempotency_fixtures import InMemoryFixtureIdempotencyStore
@@ -109,8 +109,8 @@ class TestEffectIdempotency:
             capabilities, _default_effect_handlers(), idempotency_store=store
         )
 
-        from lca.contracts.protocols.command_envelope import CapabilityGrant
-        from lca.contracts.protocols.declarative_phase_graph import EffectPolicyPlan
+        from lca.contracts.protocols.act.command_envelope import CapabilityGrant
+        from lca.contracts.protocols.declarative.declarative_phase_graph import EffectPolicyPlan
 
         # Create envelope with idempotency key
         envelope = CommandEnvelope(
@@ -149,8 +149,8 @@ class TestEffectIdempotency:
             capabilities, _default_effect_handlers(), idempotency_store=store
         )
 
-        from lca.contracts.protocols.command_envelope import CapabilityGrant
-        from lca.contracts.protocols.declarative_phase_graph import EffectPolicyPlan
+        from lca.contracts.protocols.act.command_envelope import CapabilityGrant
+        from lca.contracts.protocols.declarative.declarative_phase_graph import EffectPolicyPlan
 
         # Create envelope
         envelope = CommandEnvelope(
@@ -203,8 +203,8 @@ class TestEffectIdempotency:
             capabilities, _default_effect_handlers(), idempotency_store=store
         )
 
-        from lca.contracts.protocols.command_envelope import CapabilityGrant
-        from lca.contracts.protocols.declarative_phase_graph import EffectPolicyPlan
+        from lca.contracts.protocols.act.command_envelope import CapabilityGrant
+        from lca.contracts.protocols.declarative.declarative_phase_graph import EffectPolicyPlan
 
         envelope = CommandEnvelope(
             plan_ref="plan_v1",
@@ -236,8 +236,8 @@ class TestEffectIdempotency:
             capabilities, _default_effect_handlers(), idempotency_store=store
         )
 
-        from lca.contracts.protocols.command_envelope import CapabilityGrant
-        from lca.contracts.protocols.declarative_phase_graph import (
+        from lca.contracts.protocols.act.command_envelope import CapabilityGrant
+        from lca.contracts.protocols.declarative.declarative_phase_graph import (
             DeclarativeValidationError,
             EffectPolicyPlan,
         )

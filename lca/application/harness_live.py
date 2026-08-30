@@ -20,7 +20,7 @@ from lca.contracts.harness.events import (
     TurnEnded,
     TurnStarted,
 )
-from lca.contracts.protocols.session_turn import SessionFollowupPolicy, SessionTurnController
+from lca.contracts.protocols.session.session_turn import SessionFollowupPolicy, SessionTurnController
 from lca.harness.agent.followup_policy import EnqueueFollowupPolicy
 from lca.harness.session.inbox import Inbox
 from lca.harness.session.resume_point import (

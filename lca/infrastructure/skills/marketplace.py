@@ -10,7 +10,7 @@ from urllib.parse import urljoin
 
 import httpx
 
-from lca.contracts.protocols.operational_skills import (
+from lca.contracts.protocols.memory.operational_skills import (
     SkillImportError,
     SkillIndexEntry,
     SkillSearchResult,

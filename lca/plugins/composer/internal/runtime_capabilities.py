@@ -25,8 +25,8 @@ from lca.contracts.capabilities import (
     RUNTIME_LIFECYCLE_PUBLISHER,
 )
 from lca.contracts.mechanisms.capability import MissingCapabilityError
-from lca.contracts.protocols.resume_input import ResumeInputAdapter, ResumeInputAdapterFactory
-from lca.contracts.protocols.spec import AgentSpec
+from lca.contracts.protocols.session.resume_input import ResumeInputAdapter, ResumeInputAdapterFactory
+from lca.contracts.protocols.journal.spec import AgentSpec
 from lca.plugins.composer.capability_resolution import (
     CapabilityResolutionError,
     ScopeCapabilityResolver,
@@ -37,12 +37,12 @@ if TYPE_CHECKING:
 
     from lca.contracts.harness.composer import AgentGraph
     from lca.contracts.protocols import ArtifactClosure, Reducer
-    from lca.contracts.protocols.declarative_phase_graph import PhaseExecutor
-    from lca.contracts.protocols.delta_handler import DeltaHandlerRegistry
-    from lca.contracts.protocols.effect_handler import EffectHandlerRegistry
-    from lca.contracts.protocols.idempotency import IdempotencyStore
-    from lca.contracts.protocols.plan import CompiledRunPlan
-    from lca.contracts.protocols.runtime_composition import (
+    from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseExecutor
+    from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
+    from lca.contracts.protocols.act.effect_handler import EffectHandlerRegistry
+    from lca.contracts.protocols.journal.idempotency import IdempotencyStore
+    from lca.contracts.protocols.state.plan import CompiledRunPlan
+    from lca.contracts.protocols.runtime.runtime_composition import (
         CheckpointStateResolverFactory,
         DeclarativeInterpreterFactory,
         DeltaReducerFactory,
@@ -51,7 +51,7 @@ if TYPE_CHECKING:
         RuntimeFactory,
         RuntimeJournalFactory,
     )
-    from lca.contracts.protocols.runtime_lifecycle import RuntimeLifecyclePublisher
+    from lca.contracts.protocols.runtime.runtime_lifecycle import RuntimeLifecyclePublisher
     from lca.harness.declarative.phase_observation import PhaseObserver
 
 

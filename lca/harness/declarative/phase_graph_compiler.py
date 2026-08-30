@@ -14,8 +14,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from lca.contracts.protocols.declarative_fault_tolerance import PhaseExecutionPolicy
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_fault_tolerance import PhaseExecutionPolicy
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     CognitivePhaseGraphPlan,
     ContributionRole,
     LoopGuard,

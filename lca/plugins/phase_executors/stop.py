@@ -7,8 +7,8 @@ from typing import cast
 
 from lca.contracts.models.core.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.stop import StopDecision, StopReason
-from lca.contracts.protocols.command_envelope import RunDelta
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.act.command_envelope import RunDelta
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     PhaseContext,
     PhaseExecutionFailure,
     PhaseInput,

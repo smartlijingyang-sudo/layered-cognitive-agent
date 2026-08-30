@@ -11,7 +11,7 @@ import asyncio
 from typing import Any
 
 from gateway.runs.session.session import RunRegistry, RunSession, RunStatus
-from lca.contracts.protocols.infra import MachineResolver
+from lca.contracts.protocols.runtime.infra import MachineResolver
 
 
 async def _execute(

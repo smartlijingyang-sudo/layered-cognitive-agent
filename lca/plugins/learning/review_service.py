@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from hashlib import sha256
 
 from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.protocols.learning import (
+from lca.contracts.protocols.think.learning import (
     FailureAnalysis,
     FailureAnalyzer,
     LearningReviewAssessment,
@@ -22,7 +22,7 @@ from lca.contracts.protocols.learning import (
     SkillAcquirer,
     SkillAcquisitionCandidate,
 )
-from lca.contracts.protocols.runtime_lifecycle import (
+from lca.contracts.protocols.runtime.runtime_lifecycle import (
     RuntimeLifecycleEvent,
     RuntimeLifecycleEventType,
     RuntimeLifecycleSubscriber,

@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar, Token
 
 from lca.contracts.models.core.activation import ActivatedSkill
-from lca.contracts.protocols.operational_skills import SkillNotFoundError
+from lca.contracts.protocols.memory.operational_skills import SkillNotFoundError
 
 # Re-export for backward compatibility
 __all__ = [

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.contracts.protocols.infra import ToolRegistry
+from lca.contracts.protocols.runtime.infra import ToolRegistry
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

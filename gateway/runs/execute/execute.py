@@ -37,7 +37,7 @@ from lca.contracts.models.observability.journal import (
 )
 from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols import JournalProjector
-from lca.contracts.protocols.infra import Sandbox
+from lca.contracts.protocols.runtime.infra import Sandbox
 from lca.infrastructure.attachment import FileStoreAttachmentIdentity
 from lca.infrastructure.file_store import FileStore
 from lca.infrastructure.observability import (

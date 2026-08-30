@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from lca.contracts.protocols import Sandbox, Tool
-from lca.contracts.protocols.operational_skills import (
+from lca.contracts.protocols.memory.operational_skills import (
     SkillImporter,
     SkillPackageInstaller,
 )

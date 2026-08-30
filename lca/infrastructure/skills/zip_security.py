@@ -6,7 +6,7 @@ import io
 import zipfile
 from pathlib import PurePosixPath
 
-from lca.contracts.protocols.operational_skills import (
+from lca.contracts.protocols.memory.operational_skills import (
     SKILL_MAX_RESOURCE_BYTES,
     SKILL_MAX_RESOURCES,
     SKILL_MAX_ZIP_BYTES,

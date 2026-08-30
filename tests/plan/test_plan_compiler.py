@@ -13,12 +13,12 @@ from pathlib import Path
 import pytest
 
 from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.capability_plan import (
+from lca.contracts.protocols.perceive.capability_plan import (
     CapabilityPlan,
     capability_plan_hash,
 )
-from lca.contracts.protocols.plan import COMPILED_RUN_PLAN_VERSION, CompiledRunPlan
-from lca.contracts.protocols.scope_plan import (
+from lca.contracts.protocols.state.plan import COMPILED_RUN_PLAN_VERSION, CompiledRunPlan
+from lca.contracts.protocols.state.scope_plan import (
     BudgetCeiling,
     ScopePlan,
     scope_plan_hash,

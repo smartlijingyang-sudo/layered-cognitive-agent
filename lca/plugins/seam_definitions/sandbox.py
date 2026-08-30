@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.contracts.protocols.infra import Sandbox
+from lca.contracts.protocols.runtime.infra import Sandbox
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

@@ -10,8 +10,8 @@ import pytest
 
 from lca.contracts.capabilities import PHASE_OBSERVER, PHASE_OBSERVER_REGISTRY
 from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.protocols.declarative_phase_graph import SemanticPhase
-from lca.contracts.protocols.phase_observation import PhaseStateSnapshot
+from lca.contracts.protocols.declarative.declarative_phase_graph import SemanticPhase
+from lca.contracts.protocols.journal.phase_observation import PhaseStateSnapshot
 from lca.harness.declarative.phase_observation import (
     CompositePhaseObserver,
     InMemoryPhaseObserverRegistry,

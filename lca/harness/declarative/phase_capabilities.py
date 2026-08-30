@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from lca.contracts.protocols.declarative_execution import PhaseCapabilityReader
+from lca.contracts.protocols.declarative.declarative_execution import PhaseCapabilityReader
 
 
 @dataclass(frozen=True, slots=True)

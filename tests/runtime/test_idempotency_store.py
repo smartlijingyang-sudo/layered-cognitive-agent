@@ -61,8 +61,8 @@ async def test_in_progress_claim_survives_restart_and_fails_closed(tmp_path) -> 
 async def test_gateway_reuses_receipt_after_runtime_reconstruction(tmp_path) -> None:
     from types import SimpleNamespace
 
-    from lca.contracts.protocols.command_envelope import CapabilityGrant, CommandEnvelope
-    from lca.contracts.protocols.declarative_phase_graph import EffectPolicyPlan
+    from lca.contracts.protocols.act.command_envelope import CapabilityGrant, CommandEnvelope
+    from lca.contracts.protocols.declarative.declarative_phase_graph import EffectPolicyPlan
     from lca.harness.declarative.dispatch import RegistryEffectGateway
     from lca.runtime.declarative_runtime import RuntimePhaseCapabilities
     from lca.plugins.providers.effect_handlers import (

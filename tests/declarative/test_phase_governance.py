@@ -7,8 +7,8 @@ import pytest
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.core.stop import StopDecision, StopReason
-from lca.contracts.protocols.control_verdict import ControlVerdict, ControlVerdictKind
-from lca.contracts.protocols.declarative_phase_graph import PhaseResult
+from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
+from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseResult
 from lca.harness.declarative.phase_context import RestrictedPhaseContext
 from lca.harness.declarative.phase_governance import interpret_control_verdict
 from lca.harness.declarative.traversal import PhaseTraversal
@@ -209,7 +209,7 @@ async def test_phase_governance_keeps_rewrite_nonblocking_and_stops_explicitly(
     commits_immediately: bool,
 ) -> None:
     """Governance owns verdict interpretation while the transaction owns later commits."""
-    from lca.contracts.protocols.declarative_phase_graph import (
+    from lca.contracts.protocols.declarative.declarative_phase_graph import (
         ContributionRole,
         PhaseContribution,
         SemanticPhase,
@@ -292,7 +292,7 @@ class _ContextCapturingGovernExecutor:
 async def test_phase_governance_uses_semantic_phase_when_node_name_is_custom() -> None:
     """A renamed Think node still exposes its Decision to govern contributions."""
     from lca.contracts.models.core.decision import Decision
-    from lca.contracts.protocols.declarative_phase_graph import (
+    from lca.contracts.protocols.declarative.declarative_phase_graph import (
         ContributionRole,
         PhaseContribution,
         SemanticPhase,

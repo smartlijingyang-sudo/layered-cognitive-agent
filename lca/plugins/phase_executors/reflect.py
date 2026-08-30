@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import cast
 
 from lca.contracts.models.core.decision import Observation
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     PhaseContext,
     PhaseInput,
     PhaseResult,

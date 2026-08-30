@@ -33,8 +33,8 @@ from lca.contracts.harness.projection import (
     SessionProjectionRegistryFactory,
 )
 from lca.contracts.harness.session import SessionEvent
-from lca.contracts.protocols.session_command_ledger import SessionCommandLedger
-from lca.contracts.protocols.session_persistence import SessionPersistenceFactory
+from lca.contracts.protocols.session.session_command_ledger import SessionCommandLedger
+from lca.contracts.protocols.session.session_persistence import SessionPersistenceFactory
 from lca.harness.agent.registry import AgentRegistry
 from lca.harness.command.gateway import CommandGateway
 

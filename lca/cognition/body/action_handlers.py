@@ -42,9 +42,9 @@ from lca.contracts.protocols import (
     ToolRegistry,
     TransportRegistryProtocol,
 )
-from lca.contracts.protocols.action import Action
-from lca.contracts.protocols.command_envelope import command_envelope_to_dict
-from lca.contracts.protocols.tool_batch_execution import ToolBatchExecutionPolicy
+from lca.contracts.protocols.act.action import Action
+from lca.contracts.protocols.act.command_envelope import command_envelope_to_dict
+from lca.contracts.protocols.act.tool_batch_execution import ToolBatchExecutionPolicy
 from lca.infrastructure.observability import record
 from lca.cognition.body.delegation_cache import (
     cached_delegation_observation,

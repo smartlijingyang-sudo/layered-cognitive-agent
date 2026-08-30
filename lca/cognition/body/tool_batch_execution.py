@@ -7,7 +7,7 @@ permission checks, retries, idempotency, audit receipt, and world effect.
 
 from __future__ import annotations
 
-from lca.contracts.protocols.tool_batch_execution import (
+from lca.contracts.protocols.act.tool_batch_execution import (
     ToolBatchEntry,
     ToolBatchExecutionMode,
     ToolBatchExecutionPolicy,

@@ -7,8 +7,8 @@ PluginSpec declaration, not to the outer plan compiler or effect gateway.
 
 from __future__ import annotations
 
-from lca.contracts.protocols.declarative_graph import EffectPolicyPlan
-from lca.contracts.protocols.declarative_plugin import (
+from lca.contracts.protocols.declarative.declarative_graph import EffectPolicyPlan
+from lca.contracts.protocols.declarative.declarative_plugin import (
     EffectGovernanceDeclaration,
     PluginSpec,
 )

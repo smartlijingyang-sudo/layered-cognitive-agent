@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 from lca.contracts.atoms.enums import ActionType, DecisionGateName
 from lca.contracts.models.team.team_coordination import LeadMandate, gate_name_for_mandate
-from lca.contracts.protocols.spec import AgentSpec, LeadSpec
+from lca.contracts.protocols.journal.spec import AgentSpec, LeadSpec
 from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
 from lca.cognition.brain.decision_gates import MustConsultAllMembers
 from lca.cognition.brain.modular_brain import ModularBrain

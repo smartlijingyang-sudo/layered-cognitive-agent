@@ -20,8 +20,8 @@ from lca.contracts.models.core.terminal_outcome import (
     TerminalOutcomeKind,
     TextRef,
 )
-from lca.contracts.protocols.declarative_phase_graph import DeclarativeValidationError
-from lca.contracts.protocols.reducer import Reducer
+from lca.contracts.protocols.declarative.declarative_phase_graph import DeclarativeValidationError
+from lca.contracts.protocols.state.reducer import Reducer
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

@@ -6,7 +6,7 @@ from collections.abc import Sequence
 
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.protocols import AgentTransport
-from lca.contracts.protocols.agent import AgentUnit
+from lca.contracts.protocols.collaboration.agent import AgentUnit
 from lca.infrastructure.transport.a2a_transport import A2ATransport
 from lca.infrastructure.transport.agent_transport import InternalTransport
 from lca.infrastructure.transport.mcp_transport import MCPTransport

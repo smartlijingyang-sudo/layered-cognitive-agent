@@ -14,15 +14,15 @@ from dataclasses import asdict, is_dataclass
 from enum import Enum
 from typing import Any, cast
 
-from lca.contracts.protocols.capability_plan import CapabilityPlan, capability_plan_hash
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan, capability_plan_hash
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     CognitivePhaseGraphPlan,
     PluginSpec,
     ValidationReport,
     ValidationSeverity,
 )
-from lca.contracts.protocols.plan import CompiledRunPlan
-from lca.contracts.protocols.scope_plan import ScopePlan, scope_plan_hash
+from lca.contracts.protocols.state.plan import CompiledRunPlan
+from lca.contracts.protocols.state.scope_plan import ScopePlan, scope_plan_hash
 
 
 def canonical_json(value: Any) -> str:

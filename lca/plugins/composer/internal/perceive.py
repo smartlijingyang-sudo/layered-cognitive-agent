@@ -13,7 +13,7 @@ from lca.contracts.protocols import (
     StateStore,
     StopPolicy,
 )
-from lca.contracts.protocols.spec import STATE_STORE_CHOICE_PROFILE_DEFAULT
+from lca.contracts.protocols.journal.spec import STATE_STORE_CHOICE_PROFILE_DEFAULT
 from lca.infrastructure.capability.memory import MemoryService
 from lca.infrastructure.capability.state_store import StateStoreService
 from lca.infrastructure.observability.adapters import TelemetryMemoryAdapter

@@ -10,7 +10,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from lca.contracts.capabilities import TEAM_CASTER, TEAM_CASTING_PROMPT_RENDERER
-from lca.contracts.protocols.casting import TeamCaster
+from lca.contracts.protocols.collaboration.casting import TeamCaster
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.application.casting import LLMTeamCaster
 

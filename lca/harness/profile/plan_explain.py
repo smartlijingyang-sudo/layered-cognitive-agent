@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.protocols.plan import CompiledRunPlan
+from lca.contracts.protocols.state.plan import CompiledRunPlan
 from lca.harness.declarative.validation import (
     is_validation_valid,
     validation_errors,

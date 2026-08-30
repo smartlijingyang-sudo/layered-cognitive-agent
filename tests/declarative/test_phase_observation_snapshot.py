@@ -8,8 +8,8 @@ from dataclasses import FrozenInstanceError
 import pytest
 
 from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.protocols.declarative_phase_graph import PhaseInput, PhaseResult, SemanticPhase
-from lca.contracts.protocols.phase_observation import PhaseStateSnapshot
+from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseInput, PhaseResult, SemanticPhase
+from lca.contracts.protocols.journal.phase_observation import PhaseStateSnapshot
 from lca.harness.declarative.assembler import ExecutableNode
 from lca.harness.declarative.phase_observation import PhaseObserver, phase_state_snapshot
 from lca.harness.declarative.phase_transaction import PhaseExecutionTransaction

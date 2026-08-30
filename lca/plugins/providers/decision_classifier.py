@@ -8,7 +8,7 @@ from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.decision import Decision, DelegationSpec, ToolCall
 from lca.contracts.models.core.llm import LLMResponse
-from lca.contracts.protocols.decision_classifier import DecisionClassifier
+from lca.contracts.protocols.gate.decision_classifier import DecisionClassifier
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.cognition.brain.leaked_tool_call import recover_leaked_tool_calls
 

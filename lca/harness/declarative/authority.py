@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from lca.contracts.atoms.enums import ActionScope
-from lca.contracts.protocols.declarative_phase_graph import ActionAuthorityPlan
+from lca.contracts.protocols.declarative.declarative_phase_graph import ActionAuthorityPlan
 
 
 def action_authority_for_scope(

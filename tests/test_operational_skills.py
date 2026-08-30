@@ -10,7 +10,7 @@ import zipfile
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-from lca.contracts.protocols.operational_skills import (
+from lca.contracts.protocols.memory.operational_skills import (
     SkillImportError,
     SkillNotFoundError,
     SkillPackage,

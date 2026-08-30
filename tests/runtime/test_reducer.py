@@ -145,7 +145,7 @@ def test_apply_artifact_closure_appends_once_and_completes_working_state() -> No
 
 
 def test_apply_terminal_outcome_rejects_waiting_input_without_durable_cursor() -> None:
-    from lca.contracts.protocols.declarative_phase_graph import DeclarativeValidationError
+    from lca.contracts.protocols.declarative.declarative_phase_graph import DeclarativeValidationError
 
     stop = StopDecision(
         should_stop=True,

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from lca.contracts.capabilities import GRAPH_NODE_EXECUTORS
 from lca.contracts.models.team.graph import NodeType
-from lca.contracts.protocols.graph_node_executor import (
+from lca.contracts.protocols.collaboration.graph_node_executor import (
     GraphNodeExecutor,
     GraphNodeExecutorRegistryProtocol,
 )

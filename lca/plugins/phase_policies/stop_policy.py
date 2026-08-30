@@ -19,7 +19,7 @@ from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.core.stop import StopDecision, StopReason
 from lca.contracts.protocols import ArtifactClosure, StopPolicy
-from lca.contracts.protocols.logic_address import LogicAddress
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 _FALSE_COMPLETION_WINDOW = 3

@@ -132,7 +132,7 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/contracts/protocols/__init__.py": (
         "contracts/protocols re-export hub（所有 contracts 子模块类型统一导出）"
     ),
-    "lca/contracts/protocols/command_envelope.py": (
+    "lca/contracts/protocols/act/command_envelope.py": (
         "PR-7 CommandEnvelope + RunFact + Verdict 5 闸单调聚合数据面"
     ),
     "lca/infrastructure/observability/__init__.py": (

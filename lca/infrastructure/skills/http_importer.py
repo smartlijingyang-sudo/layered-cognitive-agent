@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from lca.contracts.protocols.operational_skills import (
+from lca.contracts.protocols.memory.operational_skills import (
     SkillImporter,
     SkillImportError,
     SkillIndexEntry,

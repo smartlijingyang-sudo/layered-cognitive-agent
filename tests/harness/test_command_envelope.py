@@ -18,7 +18,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from lca.contracts.protocols.command_envelope import (
+from lca.contracts.protocols.act.command_envelope import (
     BudgetReservation,
     CapabilityGrant,
     CommandEnvelope,

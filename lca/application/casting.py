@@ -28,7 +28,7 @@ from lca.contracts.models.team.team_coordination import (
     PeerSwarm,
     Pipeline,
 )
-from lca.contracts.protocols.casting import (
+from lca.contracts.protocols.collaboration.casting import (
     CASTING_GOVERNANCE_KINDS,
     CASTING_MAX_ROLES,
     CASTING_MIN_ROLES,
@@ -42,9 +42,9 @@ from lca.contracts.protocols.casting import (
     SelectedRole,
     TeamCaster,
 )
-from lca.contracts.protocols.infra import LLMAdapter, Tool
-from lca.contracts.protocols.observability import ObservabilityBackend
-from lca.contracts.protocols.spec import OBSERVABILITY_CHOICE_CONSOLE
+from lca.contracts.protocols.runtime.infra import LLMAdapter, Tool
+from lca.contracts.protocols.journal.observability import ObservabilityBackend
+from lca.contracts.protocols.journal.spec import OBSERVABILITY_CHOICE_CONSOLE
 from lca.application.api import Agent, Team, TeamLead
 from lca.application.role_suggest import suggest_for_auto_repair, suggest_from_paths
 

@@ -6,7 +6,7 @@ import re
 from collections.abc import Sequence
 
 from lca.contracts.models.core.attachment import AttachmentRecord
-from lca.contracts.protocols.infra import AttachmentIdentity
+from lca.contracts.protocols.runtime.infra import AttachmentIdentity
 from lca.infrastructure.attachment.files_info import AttachmentManifest
 from lca.infrastructure.attachment.layout import AttachmentLayout
 from lca.infrastructure.attachment.settings import AttachmentPolicyDocument, get_attachment_policy

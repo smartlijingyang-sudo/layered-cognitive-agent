@@ -1,21 +1,21 @@
 """Keep declarative contract module boundaries explicit and backward compatible."""
 
-from lca.contracts.protocols.declarative_common import (
+from lca.contracts.protocols.declarative.declarative_common import (
     DeclarativeValidationError as SplitDeclarativeValidationError,
 )
-from lca.contracts.protocols.declarative_execution import (
+from lca.contracts.protocols.declarative.declarative_execution import (
     DeclarativeRunOutcome as SplitDeclarativeRunOutcome,
 )
-from lca.contracts.protocols.declarative_execution import (
+from lca.contracts.protocols.declarative.declarative_execution import (
     PhaseRunCursor as SplitPhaseRunCursor,
 )
-from lca.contracts.protocols.declarative_graph import (
+from lca.contracts.protocols.declarative.declarative_graph import (
     CognitivePhaseGraphPlan as SplitCognitivePhaseGraphPlan,
 )
-from lca.contracts.protocols.declarative_graph import (
+from lca.contracts.protocols.declarative.declarative_graph import (
     ValidationReport as SplitValidationReport,
 )
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     CognitivePhaseGraphPlan,
     DeclarativeRunOutcome,
     DeclarativeValidationError,
@@ -23,7 +23,7 @@ from lca.contracts.protocols.declarative_phase_graph import (
     PluginSpec,
     ValidationReport,
 )
-from lca.contracts.protocols.declarative_plugin import PluginSpec as SplitPluginSpec
+from lca.contracts.protocols.declarative.declarative_plugin import PluginSpec as SplitPluginSpec
 
 
 def test_legacy_declarative_module_reexports_specialized_contracts() -> None:

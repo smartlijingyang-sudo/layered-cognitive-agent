@@ -12,7 +12,7 @@ from lca.contracts.protocols import (
     DecisionGate,
     LLMAdapter,
 )
-from lca.contracts.protocols.spec import AgentSpec
+from lca.contracts.protocols.journal.spec import AgentSpec
 from lca.infrastructure.observability.adapters import TelemetryLLMAdapter
 from lca.cognition.brain.modular_brain import ModularBrain
 from lca.cognition.brain.reasoner import PromptReasoner

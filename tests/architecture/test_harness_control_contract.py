@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from lca.contracts.protocols.control_verdict import ControlVerdict, ControlVerdictKind
+from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 
 REPO = Path(__file__).resolve().parents[2]
 INTERPRETER = REPO / "lca" / "harness" / "declarative" / "interpreter.py"
@@ -42,7 +42,7 @@ def test_control_contract_stays_in_harness_without_layer2_dependency() -> None:
     assert "lca.runtime.control_runtime" not in transaction_imports
     assert "lca.runtime.control_runtime" not in governance_imports
     assert "lca.runtime.control_runtime" not in verdict_imports
-    assert "lca.contracts.protocols.control_verdict" in verdict_imports
+    assert "lca.contracts.protocols.gate.control_verdict" in verdict_imports
 
 
 def test_legacy_control_modules_remain_retired() -> None:

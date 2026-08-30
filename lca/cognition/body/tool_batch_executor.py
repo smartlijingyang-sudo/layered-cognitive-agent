@@ -21,7 +21,7 @@ from lca.contracts.models.core.decision import Observation, ToolCall
 from lca.contracts.models.core.result import ToolExecutionError
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy
 from lca.contracts.protocols import SafeExecutor, Tool, ToolRegistry
-from lca.contracts.protocols.tool_batch_execution import (
+from lca.contracts.protocols.act.tool_batch_execution import (
     ToolBatchEntry,
     ToolBatchExecutionMode,
     ToolBatchExecutionPolicy,

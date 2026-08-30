@@ -14,7 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 RUNTIME_FILE = ROOT / "lca" / "runtime" / "runtime_loop.py"
-SEMANTIC_PHASE_CONTRACT_FILE = ROOT / "lca" / "contracts" / "protocols" / "declarative_common.py"
+SEMANTIC_PHASE_CONTRACT_FILE = ROOT / "lca" / "contracts" / "protocols" / "declarative" / "declarative_common.py"
 PHASE_GRAPH_COMPILER_FILE = ROOT / "lca" / "harness" / "declarative" / "phase_graph_compiler.py"
 EXPECTED_PHASES = (
     "perceive",

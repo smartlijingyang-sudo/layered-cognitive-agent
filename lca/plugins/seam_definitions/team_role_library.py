@@ -10,7 +10,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from lca.contracts.capabilities import TEAM_ROLE_LIBRARY
-from lca.contracts.protocols.casting import RoleLibrary
+from lca.contracts.protocols.collaboration.casting import RoleLibrary
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.agent.role_library import FileRoleLibrary
 

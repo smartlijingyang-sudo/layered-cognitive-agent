@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.capabilities import TEAM_CASTING_PROMPT_RENDERER
-from lca.contracts.protocols.casting import CastingPromptRenderer, RoleIndexEntry
+from lca.contracts.protocols.collaboration.casting import CastingPromptRenderer, RoleIndexEntry
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.cognition.brain.prompts import load_builtin_prompt
 

@@ -15,7 +15,7 @@ from lca.contracts.harness.session import (
     SessionHeader,
     event_type_of,
 )
-from lca.contracts.protocols.session_persistence import SessionPersistence
+from lca.contracts.protocols.session.session_persistence import SessionPersistence
 from lca.harness.session.event_validation import validate_event_stream
 
 EventListener = Callable[[SessionEvent], None]

@@ -13,7 +13,7 @@ import contextlib
 from gateway.runs.execute.execute import create_run_session, resume_run, schedule_run
 from gateway.runs.session.session import RunRegistry, RunStatus
 from gateway.runs.terminal.port import RunCommandReceipt, RunReceipt, RunRequest
-from lca.contracts.protocols.infra import MachineResolver
+from lca.contracts.protocols.runtime.infra import MachineResolver
 
 
 class RegistryRunCommands:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.protocols.operational_skills import SkillPackageInstaller
+from lca.contracts.protocols.memory.operational_skills import SkillPackageInstaller
 from lca.infrastructure.skills.bundled import ensure_bundled_skills
 from lca.infrastructure.skills.disk_store import DiskSkillPackageStore
 from lca.infrastructure.skills.http_importer import HttpSkillImporter

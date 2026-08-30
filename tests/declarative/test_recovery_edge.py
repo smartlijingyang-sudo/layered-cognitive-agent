@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     CapabilityDeclaration,
     EvidenceDeclaration,
     LifecycleDeclaration,
@@ -147,7 +147,7 @@ def test_phase_graph_includes_recovery_edge() -> None:
 
 def test_no_edge_without_phase_edge_capability() -> None:
     """Plugin without phase.edge.* capability should not produce edges."""
-    from lca.contracts.protocols.declarative_phase_graph import (
+    from lca.contracts.protocols.declarative.declarative_phase_graph import (
         ContributionRole,
         PhaseContribution,
     )

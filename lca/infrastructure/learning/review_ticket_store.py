@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime
 
-from lca.contracts.protocols.learning import (
+from lca.contracts.protocols.think.learning import (
     LearningReviewAssessment,
     LearningReviewTicket,
     LearningReviewTicketStatus,

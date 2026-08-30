@@ -36,7 +36,7 @@ from lca.contracts.atoms.ids import RunId, TraceId
 from lca.contracts.models.core.plane import PlaneBindings
 from lca.contracts.models.observability.journal import RunScope
 from lca.contracts.models.team.run_context import RunContext
-from lca.contracts.protocols.infra import MachineResolver
+from lca.contracts.protocols.runtime.infra import MachineResolver
 from lca.infrastructure.observability import BoundObservability, bind_backends, run_scope
 from lca.infrastructure.observability.event_descriptor_env import bind_descriptors
 from lca.infrastructure.plane.scope import plane_bindings_scope

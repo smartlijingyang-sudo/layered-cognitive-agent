@@ -7,7 +7,7 @@ import pytest
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.core.stop import StopDecision, StopReason
-from lca.contracts.protocols.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeRunOutcome,
     PhaseRunCursor,
 )

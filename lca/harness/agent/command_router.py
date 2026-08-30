@@ -9,7 +9,7 @@ from lca.contracts.atoms.ids import new_id
 from lca.contracts.harness.agent import ContextMessage, UserMessage
 from lca.contracts.harness.command import CommandReceipt
 from lca.contracts.harness.events import CommandRejected
-from lca.contracts.protocols.session_command_ledger import SessionCommandLedger
+from lca.contracts.protocols.session.session_command_ledger import SessionCommandLedger
 from lca.harness.agent.activation import SessionActivator
 from lca.harness.agent.approval_resume import ApprovalResumeCoordinator
 from lca.harness.agent.live_command_executor import LiveCommandExecutor

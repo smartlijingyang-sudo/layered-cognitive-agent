@@ -15,7 +15,7 @@ from gateway.device_gateway.bind import DeviceMachineResolver
 from gateway.device_gateway.hub import DeviceHub
 from gateway.device_gateway.registry import DeviceRegistry
 from gateway.device_gateway.settings import DeviceGatewaySettings
-from lca.contracts.protocols.infra import MachineResolver
+from lca.contracts.protocols.runtime.infra import MachineResolver
 from lca.infrastructure.file_store import FileStore, LocalFileStore
 
 

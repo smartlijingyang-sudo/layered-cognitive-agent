@@ -12,9 +12,9 @@ from pydantic import BaseModel
 
 from lca.contracts.capabilities import TEAM_SHARED_MEMORY_RESOLVER
 from lca.contracts.models.core.memory import MemoryLayer
-from lca.contracts.protocols.orchestration import SharedMemoryStore
-from lca.contracts.protocols.spec import TeamSpec
-from lca.contracts.protocols.team_seam import TeamSharedMemoryResolverProtocol
+from lca.contracts.protocols.collaboration.orchestration import SharedMemoryStore
+from lca.contracts.protocols.journal.spec import TeamSpec
+from lca.contracts.protocols.collaboration.team_seam import TeamSharedMemoryResolverProtocol
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

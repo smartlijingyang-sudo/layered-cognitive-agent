@@ -12,8 +12,8 @@ def _source(path: Path) -> str:
 
 
 def test_session_health_owns_combined_health_projection() -> None:
-    health = _source(ROOT / "gateway" / "runs" / "session_health.py")
-    registry = _source(ROOT / "gateway" / "runs" / "session.py")
+    health = _source(ROOT / "gateway" / "runs" / "session/health.py")
+    registry = _source(ROOT / "gateway" / "runs" / "session/session.py")
 
     assert "class RunHealthProjection" in health
     assert 'totals["journal_subscribers"]' in health
@@ -22,7 +22,7 @@ def test_session_health_owns_combined_health_projection() -> None:
 
 
 def test_registry_does_not_assemble_health_payload() -> None:
-    registry = _source(ROOT / "gateway" / "runs" / "session.py")
+    registry = _source(ROOT / "gateway" / "runs" / "session/session.py")
 
     assert "self._index.status_counts()" not in registry
     assert "self._index.live_tail_totals()" not in registry

@@ -19,7 +19,7 @@ def _imports(path: Path) -> set[str]:
 
 def test_session_setup_coordinator_does_not_own_builder_or_diagnostics() -> None:
     """The setup facade coordinates distinct ownership modules."""
-    setup = ROOT / "gateway" / "runs" / "session_setup.py"
+    setup = ROOT / "gateway" / "runs" / "session/setup.py"
     source = setup.read_text(encoding="utf-8")
 
     assert "RunSessionBuilder" in source
@@ -30,7 +30,7 @@ def test_session_setup_coordinator_does_not_own_builder_or_diagnostics() -> None
 
 def test_session_builder_does_not_publish_or_emit_diagnostics() -> None:
     """The builder owns assembly only, not publication or observability writes."""
-    builder = ROOT / "gateway" / "runs" / "session_builder.py"
+    builder = ROOT / "gateway" / "runs" / "session/builder.py"
     imports = _imports(builder)
     source = builder.read_text(encoding="utf-8")
 

@@ -10,8 +10,8 @@ from lca.contracts.capabilities import LEAD_BUDGET_POLICY_RESOLVER
 from lca.contracts.mechanisms.capability import require_capability
 from lca.contracts.models.team.team_coordination import LeadMandate, gate_name_for_mandate
 from lca.contracts.protocols import BudgetPolicy, LeadBudgetPolicyResolver, SharedMemoryStore
-from lca.contracts.protocols.infra import AgentTransport
-from lca.contracts.protocols.spec import AgentSpec
+from lca.contracts.protocols.runtime.infra import AgentTransport
+from lca.contracts.protocols.journal.spec import AgentSpec
 from lca.infrastructure.observability import BoundObservability
 from lca.agent.cognitive_agent import CognitiveAgent
 from lca.plugins.composer.internal.team import resolve_decision_gate
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
     from lca.contracts.harness.composer import AgentGraph
     from lca.contracts.protocols import DecisionGate
-    from lca.contracts.protocols.plan import CompiledRunPlan
+    from lca.contracts.protocols.state.plan import CompiledRunPlan
 
 
 class AgentAssemblyPort(Protocol):

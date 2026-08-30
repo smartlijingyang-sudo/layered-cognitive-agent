@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.protocols.action import Action, ActionRegistryProtocol
+from lca.contracts.protocols.act.action import Action, ActionRegistryProtocol
 from lca.infrastructure.component_registry import NamedRegistry, RegistryKeyError
 
 

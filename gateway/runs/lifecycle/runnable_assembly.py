@@ -16,8 +16,8 @@ from lca.application.api import Agent, Team
 from lca.contracts.mechanisms.capability import provider_current, require_capability
 from lca.contracts.models.core.plane import PlaneBindings
 from lca.contracts.protocols import LLMAdapter
-from lca.contracts.protocols.infra import MachineResolver, Tool
-from lca.contracts.protocols.run_mode import RunModeRegistryProtocol
+from lca.contracts.protocols.runtime.infra import MachineResolver, Tool
+from lca.contracts.protocols.session.run_mode import RunModeRegistryProtocol
 from lca.infrastructure.observability import BoundObservability
 
 if TYPE_CHECKING:

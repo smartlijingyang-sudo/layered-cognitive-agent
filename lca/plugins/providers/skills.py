@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from lca.contracts.protocols.operational_skills import SkillPackageInstaller
+from lca.contracts.protocols.memory.operational_skills import SkillPackageInstaller
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

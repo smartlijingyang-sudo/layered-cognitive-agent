@@ -22,7 +22,7 @@ def test_production_runtime_and_composer_contain_no_legacy_execution_fallbacks()
         "lca/runtime/runtime_loop.py",
         "lca/plugins/composer/plan_binding.py",
         "lca/plugins/loop_drivers/cognitive.py",
-        "gateway/runs/loop_drivers.py",
+        "gateway/runs/execute/loop_drivers.py",
     ]
     forbidden = (
         "def _loop(",

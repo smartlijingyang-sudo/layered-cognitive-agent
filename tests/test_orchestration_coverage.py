@@ -83,7 +83,7 @@ class TestOrchestrationCoverage(unittest.IsolatedAsyncioTestCase):
 
     def test_governance_keys_drive_registry_dispatch(self) -> None:
         """ADR-0034：strategy key 由 governance 单向派生，注册表按 key 分发。"""
-        from lca.contracts.protocols.spec import strategy_key_for_governance
+        from lca.contracts.protocols.journal.spec import strategy_key_for_governance
 
         self.assertEqual(strategy_key_for_governance(Pipeline()), STRATEGY_KEY_PIPELINE)
         self.assertEqual(strategy_key_for_governance(Debate()), STRATEGY_KEY_DEBATE)
