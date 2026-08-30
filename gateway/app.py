@@ -320,6 +320,26 @@ def create_app(
     application.state.run_registry = _registry
     application.state.bootstrap_factory = bootstrap_factory
     application.state.bootstrap_config = bootstrap_config
+    # If a bootstrap_factory is supplied, use it to install an explicit
+    # ownership bundle on the app (per main's API). The factory decides
+    # how to source file_store / devices / device_hub etc.
+    if bootstrap_factory is not None:
+        from gateway.bootstrap import GatewayBootstrapConfig as _GBC
+
+        product = bootstrap_factory.create(
+            bootstrap_config
+            if bootstrap_config is not None
+            else _GBC(file_store_root=Path("traces"))
+        )
+        application.state.bootstrap = product
+        application.state.file_store = product.file_store
+        application.state.devices = product.devices
+        application.state.device_hub = product.device_hub
+        application.state.device_settings = product.device_settings
+        application.state.machine_resolver = product.machine_resolver
+        # rebind globals for downstream handlers
+        _registry = RunRegistry()  # bootstrap owns RunRegistry creation
+        bind_devices(product.devices, product.device_hub)
 
     # ── Harness plugin tree (Phase A) ──
     # Per ADR-0103 §2: gateway/app.py is adapter layer; allowed to evolve
