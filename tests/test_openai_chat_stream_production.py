@@ -15,8 +15,8 @@ import pytest
 from starlette.testclient import TestClient
 
 from gateway.app import create_app
-from gateway.runs.legacy_adapter import RegistryRunAdapter
-from gateway.runs.session import RunRegistry, RunSession
+from gateway.runs.terminal.legacy_adapter import RegistryRunAdapter
+from gateway.runs.session.session import RunRegistry, RunSession
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     ReasoningDelta,
@@ -86,7 +86,7 @@ def test_session_run_adapter_is_not_on_the_chat_path() -> None:
     import importlib
 
     with pytest.raises(ModuleNotFoundError):
-        importlib.import_module("gateway.runs.session_adapter")
+        importlib.import_module("gateway.runs.session.session_adapter")
 
 
 def test_default_create_app_run_port_is_registry_not_session_stub() -> None:

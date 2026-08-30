@@ -17,7 +17,7 @@ from gateway.runs.ingest import (
     reset_ingest_cache_for_tests,
     select_ingest_files,
 )
-from gateway.runs.ingress import compose_run_question, parse_messages, prepare_run_from_messages
+from gateway.runs.ingest.ingress import compose_run_question, parse_messages, prepare_run_from_messages
 from lca.contracts.atoms.enums import StreamChannel
 from lca.infrastructure.file_store import LocalFileStore
 

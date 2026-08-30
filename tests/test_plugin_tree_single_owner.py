@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 
 from gateway.runs.execute import create_run_session, execute_run
-from gateway.runs.session import RunRegistry, RunStatus
+from gateway.runs.session.session import RunRegistry, RunStatus
 from lca.contracts.atoms.enums import ActionScope
 from lca.contracts.mechanisms.capability import MissingCapabilityError
 from lca.harness.profile.boot import boot_entries, boot_profile, load_profile_entries
@@ -217,7 +217,7 @@ async def test_omitting_tools_provider_skips_g2a_not_fallback(
         raise AssertionError("build_g2a_chat_tools must not run when tools-provider is omitted")
 
     monkeypatch.setattr("lca.infrastructure.tools.default_set.build_g2a_chat_tools", _boom)
-    from gateway.runs.runnable_assembly import tools_from_scope
+    from gateway.runs.lifecycle.runnable_assembly import tools_from_scope
 
     tools = tools_from_scope(ctx, None)
     tool_names = [t.name for t in tools]

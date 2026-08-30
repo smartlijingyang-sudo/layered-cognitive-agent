@@ -6,7 +6,7 @@ import ast
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
-from gateway.runs.failure_recording import RunFailureFacts
+from gateway.runs.terminal.failure import RunFailureFacts
 
 ROOT = Path(__file__).parents[2]
 FAILURE_RECORDING = ROOT / "gateway" / "runs" / "failure_recording.py"
@@ -22,7 +22,7 @@ def test_failure_recording_does_not_import_mutable_run_carrier() -> None:
         if isinstance(node, ast.ImportFrom) and node.module is not None
     }
 
-    assert "gateway.runs.session" not in imported_modules
+    assert "gateway.runs.session.session" not in imported_modules
 
 
 def test_failure_facts_are_immutable_and_observation_ready() -> None:

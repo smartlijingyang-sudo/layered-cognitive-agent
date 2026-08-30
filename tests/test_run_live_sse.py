@@ -297,7 +297,7 @@ async def test_text_channel_none_disables_filter() -> None:
 
 @pytest.mark.asyncio
 async def test_gateway_api_iter_live_sse_emits_frames() -> None:
-    """Regression: ``gateway.runs.api.iter_live_sse`` must not pass ``redact``.
+    """Regression: ``gateway.runs.api.routes.iter_live_sse`` must not pass ``redact``.
 
     The local copy of ``iter_live_sse`` in ``gateway/runs/api.py`` historically
     called ``stamped_to_sse_frame(item, redact=redact)`` even though the
@@ -308,7 +308,7 @@ async def test_gateway_api_iter_live_sse_emits_frames() -> None:
     gateway-local generator directly so a future signature drift cannot
     silently regress the wire.
     """
-    from gateway.runs.api import iter_live_sse as gateway_iter_live_sse
+    from gateway.runs.api.routes import iter_live_sse as gateway_iter_live_sse
 
     tail = LiveTail()
     stamped = _stamped(1, ReasoningDelta(step=0, text_delta="hello", seq=0))

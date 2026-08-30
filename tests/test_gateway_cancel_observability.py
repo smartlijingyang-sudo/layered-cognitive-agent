@@ -10,7 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from gateway.runs.execute import create_run_session, schedule_run
-from gateway.runs.session import RunRegistry, RunStatus
+from gateway.runs.session.session import RunRegistry, RunStatus
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.agent.cognitive_agent import CognitiveAgent
 from tests.support.gateway_scripted import ScriptedLLMResolver

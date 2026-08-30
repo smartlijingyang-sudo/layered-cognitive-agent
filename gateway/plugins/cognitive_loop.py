@@ -11,8 +11,8 @@ from typing import Any, cast
 
 import structlog
 
-from gateway.runs.loop_drivers import CognitiveRunDriver
-from gateway.runs.runnable_assembly import CognitiveRunnableAssembler
+from gateway.runs.execute.loop_drivers import CognitiveRunDriver
+from gateway.runs.lifecycle.runnable_assembly import CognitiveRunnableAssembler
 from lca.contracts.capabilities import (
     RUN_MODE_REGISTRY,
     SESSION_FOLLOWUP_POLICY,

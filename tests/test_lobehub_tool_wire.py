@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from gateway.runs.wire import WIRE, resolve
+from gateway.runs.wire.wire import WIRE, resolve
 
 
 class TestToolWireTable(unittest.TestCase):

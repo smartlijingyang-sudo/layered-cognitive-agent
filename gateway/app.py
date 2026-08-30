@@ -47,7 +47,7 @@ from gateway.openai_shim import (
     list_models,
     responses_create,
 )
-from gateway.runs.api import (
+from gateway.runs.api.routes import (
     answer_run,
     cancel_run,
     create_run,
@@ -58,7 +58,7 @@ from gateway.runs.api import (
     stream_journal_live,
     stream_run_live,
 )
-from gateway.runs.session import RunRegistry
+from gateway.runs.session.session import RunRegistry
 from gateway.session_routes import (
     command_answer,
     command_cancel,
@@ -295,7 +295,7 @@ def create_app(
     application.state.device_hub = _device_hub
     application.state.device_settings = _device_settings
     if run_port is None:
-        from gateway.runs.legacy_adapter import RegistryRunAdapter
+        from gateway.runs.terminal.legacy_adapter import RegistryRunAdapter
 
         run_port = RegistryRunAdapter(_registry)
     application.state.run_port = run_port

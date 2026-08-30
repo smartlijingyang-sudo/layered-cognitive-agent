@@ -51,7 +51,7 @@ def test_default_profile_exposes_ledger_factory() -> None:
 def test_run_session_consumes_profile_selected_journal_factory(tmp_path: Path) -> None:
     """Gateway must not select journal writer, tail, or process projection itself."""
     from gateway.runs.execute import create_run_session
-    from gateway.runs.session import RunRegistry
+    from gateway.runs.session.session import RunRegistry
     from lca.contracts.observability.run_journal import RunJournalComponents
     from lca.infrastructure.observability.facade import BoundObservability
     from lca.infrastructure.observability.journal.jsonl.projector import JsonlJournalProjector

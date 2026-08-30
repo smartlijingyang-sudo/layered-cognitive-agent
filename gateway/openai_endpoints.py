@@ -16,7 +16,7 @@ from gateway.openai_housekeeping import (
     passthrough_responses_completion,
 )
 from gateway.openai_protocol import error_response, lca_models_payload
-from gateway.runs.execute import llm_status
+from gateway.runs.execute.execute import llm_status
 from lca.infrastructure.openai_compat import (
     StructuredLLMError,
     build_responses_payload,

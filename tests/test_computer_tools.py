@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from gateway.runs.wire import WIRE, resolve
+from gateway.runs.wire.wire import WIRE, resolve
 from lca.infrastructure.computer.constants import COMPUTER_RESULT_BEGIN, COMPUTER_RESULT_END
 from lca.infrastructure.computer.parse_result import parse_computer_stdout
 from lca.infrastructure.file_store import LocalFileStore

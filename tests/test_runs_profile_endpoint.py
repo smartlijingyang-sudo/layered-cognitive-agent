@@ -2,7 +2,7 @@
 
 The tracker named ``gateway/runs/api.py``; that facade was removed
 (``tests/test_run_import_boundaries.py::test_run_handler_facade_is_absent``).
-The handler lives in ``gateway.runs.query_endpoints`` and is registered
+The handler lives in ``gateway.runs.api.routes.query_endpoints`` and is registered
 on ``/runs/{run_id}/profile`` (LobeHub prefixes ``/lca-api`` at the proxy).
 """
 
@@ -18,7 +18,7 @@ from starlette.testclient import TestClient
 if TYPE_CHECKING:
     import pytest
 
-from gateway.runs.query_endpoints import get_run_profile
+from gateway.runs.api.query_endpoints import get_run_profile
 from lca.contracts.observability.run_locator import RunLocator
 from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
 from lca.plugins.providers.profile_snapshot.run_boot import RunBootSnapshot

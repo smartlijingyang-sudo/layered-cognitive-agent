@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, cast
 
 from pydantic import BaseModel
 
-from gateway.runs.runnable_assembly import RunnableBuildRequest
+from gateway.runs.lifecycle.runnable_assembly import RunnableBuildRequest
 from lca.contracts.capabilities import RUN_MODE_REGISTRY
 from lca.contracts.mechanisms.capability import require_capability
 from lca.contracts.protocols import LLMAdapter

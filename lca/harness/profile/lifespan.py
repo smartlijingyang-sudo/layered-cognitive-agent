@@ -139,7 +139,7 @@ async def noop_lifespan(_app: _LifespanApp) -> AsyncIterator[dict[str, Any]]:
     """Empty lifespan for the no-profile configuration.
 
     Routes that read ``app.state.ctx`` will see ``None``; they are
-    expected to surface a 503 in that case (``gateway.runs.query_endpoints._ctx_of``).
+    expected to surface a 503 in that case (``gateway.runs.api.routes.query_endpoints._ctx_of``).
     """
     yield {}
 

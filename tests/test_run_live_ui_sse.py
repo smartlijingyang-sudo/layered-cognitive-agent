@@ -11,8 +11,8 @@ from starlette.applications import Starlette
 from starlette.testclient import TestClient
 
 from gateway.routes import build_routes
-from gateway.runs.legacy_adapter import RegistryRunAdapter
-from gateway.runs.session import RunRegistry, RunSession
+from gateway.runs.terminal.legacy_adapter import RegistryRunAdapter
+from gateway.runs.session.session import RunRegistry, RunSession
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     ReasoningDelta,

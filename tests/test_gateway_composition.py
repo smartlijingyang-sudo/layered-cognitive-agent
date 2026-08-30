@@ -36,7 +36,7 @@ def test_profile_resolution_returns_none_without_fallback(tmp_path: Path) -> Non
 
 
 def test_create_app_publishes_one_session_object_graph() -> None:
-    from gateway.runs.legacy_adapter import RegistryRunAdapter
+    from gateway.runs.terminal.legacy_adapter import RegistryRunAdapter
 
     application = create_app(lifespan=lambda app: None)
 

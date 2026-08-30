@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from gateway.runs.evidence import (
+from gateway.runs.observability.evidence import (
     EvidencePayloadDecodeError,
     InvalidEvidenceDigestError,
     RunEvidenceNotFoundError,

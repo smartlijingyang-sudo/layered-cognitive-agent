@@ -8,8 +8,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from gateway.runs.session import RunStatus
-from gateway.runs.terminalizer import RunTerminalizer
+from gateway.runs.session.session import RunStatus
+from gateway.runs.terminal.terminalizer import RunTerminalizer
 
 
 def _session(*, canceled: bool = False) -> Any:

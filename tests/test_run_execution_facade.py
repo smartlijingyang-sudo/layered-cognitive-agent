@@ -7,7 +7,7 @@ from importlib import import_module
 from typing import Any, cast
 from unittest.mock import patch
 
-from gateway.runs.session import RunRegistry, RunSession
+from gateway.runs.session.session import RunRegistry, RunSession
 
 
 class _Coordinator:

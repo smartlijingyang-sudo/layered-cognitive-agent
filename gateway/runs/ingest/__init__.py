@@ -1,0 +1,34 @@
+"""ingest subpackage of gateway.runs — split per ADR-0105 §11.2.
+
+Re-exports public entry points so callers can
+``from gateway.runs.ingest import FileFetcher``.
+"""
+
+from gateway.runs.ingest.cache import (
+    IngestCache,
+    IngestCacheEntry,
+    cache_key,
+    get_ingest_cache,
+)
+from gateway.runs.ingest.fetcher import FileFetcher, HttpxFileFetcher
+from gateway.runs.ingest.ingest import FileRef
+from gateway.runs.ingest.models import FileIntegrityError
+from gateway.runs.ingest.service import (
+    ingest_file_refs,
+    load_bytes,
+    select_ingest_files,
+)
+
+__all__ = [
+    "FileFetcher",
+    "FileIntegrityError",
+    "FileRef",
+    "HttpxFileFetcher",
+    "IngestCache",
+    "IngestCacheEntry",
+    "cache_key",
+    "get_ingest_cache",
+    "ingest_file_refs",
+    "load_bytes",
+    "select_ingest_files",
+]

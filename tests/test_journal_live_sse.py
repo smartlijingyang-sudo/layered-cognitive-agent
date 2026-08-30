@@ -6,8 +6,8 @@ endpoint must respond with a structured 503
 (``legacy_process_journal_unavailable``) so ``lca-ops logs`` can pick the
 matching hint instead of falling back to a generic 500.
 
-Both ``gateway.runs.api.stream_journal_live`` (legacy soft-lock surface)
-and ``gateway.runs.query_endpoints.stream_journal_live`` (the
+Both ``gateway.runs.api.routes.stream_journal_live`` (legacy soft-lock surface)
+and ``gateway.runs.api.routes.query_endpoints.stream_journal_live`` (the
 Session Spine module that owns ``app.state.run_port``) must surface the
 same refusal envelope so the wire shape stays stable.
 """
@@ -20,8 +20,8 @@ from starlette.applications import Starlette
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from gateway.runs.api import stream_journal_live as api_stream_journal_live
-from gateway.runs.query_endpoints import (
+from gateway.runs.api.routes import stream_journal_live as api_stream_journal_live
+from gateway.runs.api.query_endpoints import (
     stream_journal_live as query_stream_journal_live,
 )
 
@@ -85,14 +85,14 @@ def test_api_stream_journal_live_unbound_returns_503() -> None:
     client = _client()
     response = client.get("/api/journal/live")
     assert response.status_code == 503, response.text
-    _assert_unavailable(response.json(), where="gateway.runs.api")
+    _assert_unavailable(response.json(), where="gateway.runs.api.routes")
 
 
 def test_query_stream_journal_live_unbound_returns_503() -> None:
     client = _client()
     response = client.get("/query/journal/live")
     assert response.status_code == 503, response.text
-    _assert_unavailable(response.json(), where="gateway.runs.query_endpoints")
+    _assert_unavailable(response.json(), where="gateway.runs.api.routes.query_endpoints")
 
 
 def test_options_request_is_a_noop() -> None:

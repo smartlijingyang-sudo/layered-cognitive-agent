@@ -45,9 +45,9 @@ def _run_driver(driver, session, hub, *, question, mode):
 class TestInboxFollowupCreation:
     def test_run_creation_emits_inbox_followup(self, tmp_path: Path) -> None:
         """``CognitiveRunDriver.execute`` MUST emit InboxFollowupCreated."""
-        from gateway.runs.loop_drivers import CognitiveRunDriver
-        from gateway.runs.runnable_assembly import CognitiveRunnableAssembler
-        from gateway.runs.session import RunSession
+        from gateway.runs.execute.loop_drivers import CognitiveRunDriver
+        from gateway.runs.lifecycle.runnable_assembly import CognitiveRunnableAssembler
+        from gateway.runs.session.session import RunSession
         from lca.contracts.models.observability.journal import InboxFollowupCreated, RunScope
         from lca.infrastructure.observability import bind_backends, run_scope
         from tests.support.observability_helpers import make_test_bound
@@ -87,9 +87,9 @@ class TestInboxFollowupCreation:
 
     def test_inbox_followup_carries_question(self, tmp_path: Path) -> None:
         """The first ``InboxFollowupCreated`` MUST carry the question."""
-        from gateway.runs.loop_drivers import CognitiveRunDriver
-        from gateway.runs.runnable_assembly import CognitiveRunnableAssembler
-        from gateway.runs.session import RunSession
+        from gateway.runs.execute.loop_drivers import CognitiveRunDriver
+        from gateway.runs.lifecycle.runnable_assembly import CognitiveRunnableAssembler
+        from gateway.runs.session.session import RunSession
         from lca.contracts.models.observability.journal import InboxFollowupCreated, RunScope
         from lca.infrastructure.observability import bind_backends, run_scope
         from tests.support.observability_helpers import make_test_bound

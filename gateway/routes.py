@@ -42,8 +42,8 @@ from gateway.openai_shim import (
     list_models,
     responses_create,
 )
-from gateway.runs.command_endpoints import answer_run, cancel_run, create_run
-from gateway.runs.query_endpoints import (
+from gateway.runs.api.command_endpoints import answer_run, cancel_run, create_run
+from gateway.runs.api.query_endpoints import (
     get_context,
     get_run,
     get_run_doctor,

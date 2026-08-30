@@ -8,7 +8,7 @@ from lca.plugins.providers.profile_snapshot.run_boot import RunBootSnapshot
 
 def test_snapshot_recorder_writes_file(monkeypatch) -> None:
     """Mocked context; verify write() is called with correct args."""
-    from gateway.runs.session_diagnostics import RunBootSnapshotRecorder
+    from gateway.runs.session.diagnostics import RunBootSnapshotRecorder
 
     ctx = MagicMock()
     session = MagicMock()
@@ -34,7 +34,7 @@ def test_snapshot_recorder_writes_file(monkeypatch) -> None:
 
 def test_snapshot_recorder_swallows_write_errors(monkeypatch) -> None:
     """If write fails, recorder does not raise (snapshot is diagnostic only)."""
-    from gateway.runs.session_diagnostics import RunBootSnapshotRecorder
+    from gateway.runs.session.diagnostics import RunBootSnapshotRecorder
 
     ctx = MagicMock()
     session = MagicMock()
@@ -52,7 +52,7 @@ def test_snapshot_recorder_swallows_write_errors(monkeypatch) -> None:
 
 def test_snapshot_outdir_uses_default_when_no_locator() -> None:
     """Without run_locator capability, falls back to traces/runs/<id>."""
-    from gateway.runs.session_diagnostics import _snapshot_outdir_for
+    from gateway.runs.session.diagnostics import _snapshot_outdir_for
 
     outdir = _snapshot_outdir_for("r1", ctx=None)
     assert outdir == Path("traces/runs") / "r1"

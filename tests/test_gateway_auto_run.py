@@ -6,7 +6,7 @@ import json
 import unittest
 
 from gateway.runs.execute import create_run_session, execute_run
-from gateway.runs.session import RunRegistry, RunStatus
+from gateway.runs.session.session import RunRegistry, RunStatus
 from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.protocols import LLMAdapter
 from lca.harness.profile.lifespan import profile_lifespan
@@ -30,7 +30,7 @@ class _ScriptedResolver:
 def _journal_event_types(session: object) -> set[str]:
     from typing import cast
 
-    from gateway.runs.session import RunSession
+    from gateway.runs.session.session import RunSession
     from lca.infrastructure.observability.journal.engine.engine import RunStore
     from lca.infrastructure.observability.journal.engine.journal_io import read_journal
 

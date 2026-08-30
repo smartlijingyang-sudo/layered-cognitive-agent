@@ -25,4 +25,4 @@ def test_session_projection_keeps_registry_import_type_only() -> None:
     projection = _source(ROOT / "gateway" / "runs" / "session_projection.py")
 
     assert "if TYPE_CHECKING:" in projection
-    assert "from gateway.runs.session import RunSession" in projection
+    assert "from gateway.runs.session.session import RunSession" in projection
