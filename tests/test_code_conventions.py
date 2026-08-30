@@ -90,6 +90,22 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/layer0_infra/sandbox/runtime.py": (
         "Sandbox Protocol 单模块承载 session/ready/exec 全链路（ADR-0043~0047）"
     ),
+    "lca/contracts/capabilities.py": (
+        "L4 组合根 capability 注册中心 — STOP_RULES 由 C6 port 引入（C4 后向兼容 alias），"
+        "无法拆到子模块"
+    ),
+    "lca/harness/declarative/graph_validation.py": (
+        "ADR-0075 声明式阶段图校验集中文件；运行时由 phase_graph_compiler 调用"
+    ),
+    "lca/harness/declarative/outcome_projection.py": (
+        "ADR-0075 outcome projection 中心化（plan_ref × Journal 绑定）"
+    ),
+    "lca/harness/declarative/phase_governance.py": (
+        "ADR-0075 phase governance 中心化"
+    ),
+    "lca/layer0_infra/observability/event_doc.py": (
+        "Observability event_doc 词表 — ADR-0065 L1~L9 不变量清单"
+    ),
     "lca/layer0_infra/computer/runtime_exec.py": (
         "ComputerRuntime 执行平面单模块：code/shell/background/export + SandboxPolicy 检查"
     ),

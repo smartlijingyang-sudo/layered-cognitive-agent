@@ -242,3 +242,21 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **UpstreamTree** | upstream 仓库目录树；已退役 — 替代：Layer0 upstream patch scan |
 
 
+
+## Bulk-port additions (2026-08-30)
+
+Classes brought over from main's bulk port (commit 46094979 + follow-ups).
+Some are existing concepts with new names; some are entirely new.
+
+| 术语 | 定义 |
+|---|---|
+| **CausationEnricher** | JournalRecord Causation 字段的丰富器（主路径 → daemon 端 fallback） |
+| **DeclarativeCheckpoint** | 声明式 checkpoint：阶段图节点冻结点（resume 时从 checkpoint 续跑） |
+| **DocumentEnricher** | tool 观察 document 字段的丰富器 |
+| **EvidenceBinding** | Evidence store binding：tool 观察引用 → content-addressed payload 的桥 |
+| **LLMFailoverCandidate** | LLM failover 候选：resolver 选不到主模型时的备用 backend |
+| **LiveGap** | SSE StreamEvents 心跳帧：长空闲期保持连接 |
+| **LiveTail** | gateway 实时流：JSONL → SSE 帧的转换 |
+| **NarrativeSidecar** | narrative journal 与 RunLocator 的 sidecar 索引（PR-6 plan_ref × Journal） |
+| **OrderedContribution** | 阶段图节点贡献值的有序枚举 |
+| **PhaseLiftingEnricher** | phase JSONL → UI state 的提升丰富器 |
