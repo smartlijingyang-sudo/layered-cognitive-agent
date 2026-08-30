@@ -109,9 +109,10 @@ class CognitiveRunDriver:
         run_context: RunContext,
         ctx: Context | None = None,
         llm_resolver: Any | None = None,
+        machine_resolver: Any | None = None,
     ) -> DriverOutcome:
         _record_inbox_followup(session=session, question=question, mode=mode)
-        if llm_resolver is None:
+        if llm_resolver is None and machine_resolver is None:
             if ctx is None:
                 raise TypeError("CognitiveRunDriver.execute requires ctx or llm_resolver")
             llm = require_capability(ctx, "llm_resolver").resolve()
@@ -178,8 +179,12 @@ class DshRunDriver:
         bindings: Any,
         run_context: RunContext,
         ctx: Context,
+        machine_resolver: Any | None = None,
     ) -> DriverOutcome:
-        del question, mode, hub, bindings, run_context, ctx
+        # Soft-locked per ADR-0103 §2. Main's RunLifecycleCoordinator
+        # forwards machine_resolver to the driver. Accept it and ignore
+        # for the DSH-bridge branch (branch's driver uses bindings).
+        del question, mode, hub, bindings, run_context, ctx, machine_resolver
         await execute_dsh_session(session)
         return DriverOutcome(success=not session.error, error=session.error)
 
