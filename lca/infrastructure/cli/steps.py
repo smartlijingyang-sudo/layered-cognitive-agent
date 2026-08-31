@@ -198,8 +198,11 @@ def daemon_stop(ctx: PipelineContext) -> None:
 
 # ── Composite Steps ───────────────────────────────────────────────────
 
-STATUS_SERVICES = ("infra", "gateway", "lobehub", "daemon", "onlyboxes")
-STOP_SERVICES = ("daemon", "lobehub", "gateway", "infra")
+# ADR-0119 决定 4:lca-ops 不再管 LCA 进程。gateway (LCA 进程) 入口是
+# ``python -m lca_kernel serve`` 直管,K6 SIGTERM/SIGINT/fail-loud 守护。
+# lca-ops status / stop 仍管理 lobehub / infra / daemon / onlyboxes 外部服务。
+STATUS_SERVICES = ("infra", "lobehub", "daemon", "onlyboxes")
+STOP_SERVICES = ("daemon", "lobehub", "infra")
 
 
 @register_step("stack.status")
