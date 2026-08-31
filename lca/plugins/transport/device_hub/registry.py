@@ -7,7 +7,7 @@ import threading
 from datetime import UTC, datetime
 from pathlib import Path
 
-from lca.plugins.transport.device_gateway.models import Device, DeviceConnection
+from lca.plugins.transport.device_hub.models import Device, DeviceConnection
 
 
 class DeviceRegistry:

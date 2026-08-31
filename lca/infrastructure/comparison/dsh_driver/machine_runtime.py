@@ -1,7 +1,7 @@
 """DSH runtime that delegates execution to the machine plane.
 
 Phase 2 (preferred): daemon runs SDK in-process; notifications stream over
-device WebSocket via ``StreamingDshRuntime`` (``gateway/device_gateway``).
+device WebSocket via ``StreamingDshRuntime`` (``lca.plugins.transport.device_hub``).
 
 Legacy batch path (``runCommand`` + ``events.jsonl`` replay) remains as fallback
 when the device hub is unavailable.

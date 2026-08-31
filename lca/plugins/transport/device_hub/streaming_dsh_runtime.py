@@ -9,7 +9,7 @@ from lca.infrastructure.comparison.dsh_driver.driver import DshTurnSpec
 from lca.infrastructure.comparison.dsh_driver.models import DshNotification, DshTurnResult
 from lca.infrastructure.comparison.dsh_driver.settings import DshSettings
 from lca.infrastructure.comparison.dsh_driver.stream_params import build_turn_config
-from lca.plugins.transport.device_gateway.hub import DeviceHub
+from lca.plugins.transport.device_hub.hub import DeviceHub
 
 
 class StreamingDshRuntime(DshRuntime):

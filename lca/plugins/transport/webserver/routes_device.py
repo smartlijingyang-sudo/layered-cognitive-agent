@@ -1,6 +1,6 @@
 """Register ``/api/device/*`` route family (PR-4 routes-device).
 
-handler 内部继续复用 ``gateway.device_gateway.routes`` 现有实现;本 PR
+handler 内部继续复用 ``lca.plugins.transport.device_hub.routes`` 现有实现;本 PR
 只 plugin 化路由注册,不重构 handler 内部(留给 PR-5 清理跨层 import)。
 """
 
@@ -23,7 +23,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.plugins.transport.device_gateway.routes import (
+from lca.plugins.transport.device_hub.routes import (
     agent_run,
     connect_device,
     device_status,

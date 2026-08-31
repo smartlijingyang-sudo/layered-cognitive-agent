@@ -17,17 +17,17 @@ from typing import cast
 
 import pytest
 
+from lca.contracts.models.core.plane import PlaneRef
+from lca.contracts.protocols.runtime.infra import MachineResolver, MachineTransport
+from lca.infrastructure.file_store import LocalFileStore
+from lca.plugins.transport.device_hub.hub import DeviceHub
+from lca.plugins.transport.device_hub.registry import DeviceRegistry
+from lca.plugins.transport.device_hub.settings import DeviceHubSettings
 from lca.plugins.transport.webserver.bootstrap import (
     DefaultWebserverBootstrapFactory,
     WebserverBootstrap,
     WebserverBootstrapConfig,
 )
-from lca.plugins.transport.device_gateway.hub import DeviceHub
-from lca.plugins.transport.device_gateway.registry import DeviceRegistry
-from lca.plugins.transport.device_gateway.settings import DeviceGatewaySettings
-from lca.contracts.models.core.plane import PlaneRef
-from lca.contracts.protocols.runtime.infra import MachineResolver, MachineTransport
-from lca.infrastructure.file_store import LocalFileStore
 
 
 class _EmptyMachineResolver(MachineResolver):
@@ -60,13 +60,13 @@ def test_default_bootstrap_factory_creates_isolated_app_resources() -> None:
         first = factory.create(
             WebserverBootstrapConfig(
                 file_store_root=root / "one-files",
-                device_settings=DeviceGatewaySettings(db_path=str(root / "one-devices.db")),
+                device_settings=DeviceHubSettings(db_path=str(root / "one-devices.db")),
             )
         )
         second = factory.create(
             WebserverBootstrapConfig(
                 file_store_root=root / "two-files",
-                device_settings=DeviceGatewaySettings(db_path=str(root / "two-devices.db")),
+                device_settings=DeviceHubSettings(db_path=str(root / "two-devices.db")),
             )
         )
 

@@ -5,12 +5,12 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
-from lca.plugins.transport.device_gateway.auth import AuthError, verify_token
-from lca.plugins.transport.device_gateway.bind import DeviceMachineResolver
-from lca.plugins.transport.device_gateway.hub import DeviceHub
-from lca.plugins.transport.device_gateway.models import DeviceConnection
-from lca.plugins.transport.device_gateway.registry import DeviceRegistry
-from lca.plugins.transport.device_gateway.settings import DeviceGatewaySettings
+from lca.plugins.transport.device_hub.auth import AuthError, verify_token
+from lca.plugins.transport.device_hub.bind import DeviceMachineResolver
+from lca.plugins.transport.device_hub.hub import DeviceHub
+from lca.plugins.transport.device_hub.models import DeviceConnection
+from lca.plugins.transport.device_hub.registry import DeviceRegistry
+from lca.plugins.transport.device_hub.settings import DeviceHubSettings
 
 
 def test_register_is_idempotent(tmp_path: Path) -> None:
@@ -121,7 +121,7 @@ def test_workspace_pool(tmp_path: Path) -> None:
 
 
 def test_service_token_auth() -> None:
-    settings = DeviceGatewaySettings(service_token="secret", subject="local-dev-user")  # noqa: S106
+    settings = DeviceHubSettings(service_token="secret", subject="local-dev-user")  # noqa: S106
     user = verify_token("secret", "serviceToken", settings)
     assert user.user_id == "local-dev-user"
     try:

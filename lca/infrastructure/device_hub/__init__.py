@@ -2,6 +2,6 @@
 
 from __future__ import annotations
 
-from lca.infrastructure.device_gateway.client import KernelServeHttpClient
+from lca.infrastructure.device_hub.client import KernelServeHttpClient
 
 __all__ = ["KernelServeHttpClient"]

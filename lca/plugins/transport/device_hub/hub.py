@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import structlog
 
-from lca.plugins.transport.device_gateway.registry import DeviceRegistry
+from lca.plugins.transport.device_hub.registry import DeviceRegistry
 
 _log = structlog.get_logger(__name__)
 

@@ -1,4 +1,4 @@
-# gateway/device_gateway
+# lca/infrastructure/device_hub
 
 > 状态：稳定
 > 所有者：@lca-maintainers
@@ -11,22 +11,22 @@ LCA 框架的组成部分。具体职责参见同目录下各子包的 README �
 与下层契约的合规性检查（由 lint-imports 与 check_package_contracts 门禁统一处理）；任何不在本目录 schema_version 范围内的修改都不应提交。
 
 ## 3. 输入
-- 当前包内 `9` 个公开模块 + `65` 个公开符号（class / function）
+- 当前包内 `1` 个公开模块 + `9` 个公开符号（class / function）
 
 ## 4. 输出
-- 暴露的公共 API：8 个显式 __all__ 条目； 65 个定义符号中，50 个为公共命名
+- 暴露的公共 API：1 个显式 __all__ 条目； 9 个定义符号中，7 个为公共命名
 
 ## 5. 允许依赖
 —
 
 ## 6. 禁止依赖
-**pyproject.toml `[tool.lca.package_contracts.gateway.device_gateway].forbidden_dependencies`**:
+**pyproject.toml `[tool.lca.package_contracts.lca.infrastructure.device_hub].forbidden_dependencies`**:
 
+- `gateway`
 - `lca.agent`
 - `lca.application`
 - `lca.cognition`
 - `lca.harness`
-- `lca.infrastructure`
 - `lca.plugins`
 - `lca.runtime`
 
@@ -39,23 +39,8 @@ log:emit
 ## 9. 公共入口
 **__init__.py 显式 __all__**:
 
-- `AuthError`
-- `AuthenticatedUser`
-- `Device`
-- `DeviceConnection`
-- `DeviceGatewaySettings`
-- `DeviceHub`
-- `DeviceRegistry`
-- `verify_token`
+- `GatewayHttpClient`
 
 **模块清单**:
 
-- `gateway/device_gateway/auth.py`
-- `gateway/device_gateway/bind.py`
-- `gateway/device_gateway/hub.py`
-- `gateway/device_gateway/models.py`
-- `gateway/device_gateway/registry.py`
-- `gateway/device_gateway/routes.py`
-- `gateway/device_gateway/settings.py`
-- `gateway/device_gateway/streaming_dsh_runtime.py`
-- `gateway/device_gateway/transport.py`
+- `lca/infrastructure/device_hub/client.py`

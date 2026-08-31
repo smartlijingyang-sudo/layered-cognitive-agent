@@ -17,8 +17,8 @@ from lca.infrastructure.comparison.dsh_driver.sink import HandleJournalSink
 from lca.infrastructure.computer.machine import MachineTransport
 from lca.infrastructure.runtime_plane.machine import resolve_machine_transport
 from lca.infrastructure.runtime_plane.resolve import ref_of
-from lca.plugins.transport.device_gateway.bind import device_hub
-from lca.plugins.transport.device_gateway.streaming_dsh_runtime import StreamingDshRuntime
+from lca.plugins.transport.device_hub.bind import device_hub
+from lca.plugins.transport.device_hub.streaming_dsh_runtime import StreamingDshRuntime
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
 
 _log = structlog.get_logger(__name__)

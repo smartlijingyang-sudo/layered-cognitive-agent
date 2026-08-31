@@ -13,8 +13,8 @@ from lca.contracts.models.core.sandbox import (
 )
 from lca.contracts.protocols import Sandbox
 from lca.infrastructure.tools.lca_computer.manifest import LOCAL_SYSTEM_ID as _COMPUTER_IDENTIFIER
-from lca.plugins.transport.device_gateway.hub import DeviceHub, encode_arguments
-from lca.plugins.transport.device_gateway.registry import DeviceRegistry
+from lca.plugins.transport.device_hub.hub import DeviceHub, encode_arguments
+from lca.plugins.transport.device_hub.registry import DeviceRegistry
 
 
 class DeviceTransport(Sandbox):

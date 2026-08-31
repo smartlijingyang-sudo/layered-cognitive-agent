@@ -8,7 +8,7 @@ import hmac
 import json
 from dataclasses import dataclass
 
-from lca.plugins.transport.device_gateway.settings import DeviceGatewaySettings
+from lca.plugins.transport.device_hub.settings import DeviceHubSettings
 
 
 class AuthError(Exception):
@@ -25,7 +25,7 @@ class AuthenticatedUser:
 def verify_token(
     token: str,
     token_type: str,
-    settings: DeviceGatewaySettings,
+    settings: DeviceHubSettings,
 ) -> AuthenticatedUser:
     kind = (token_type or "serviceToken").strip()
     if kind == "serviceToken":
@@ -49,7 +49,7 @@ def verify_token(
     raise AuthError(f"Unknown token type: {kind}")
 
 
-def _verify_jwt(token: str, settings: DeviceGatewaySettings) -> AuthenticatedUser:
+def _verify_jwt(token: str, settings: DeviceHubSettings) -> AuthenticatedUser:
     parts = token.split(".")
     if len(parts) != 3:
         raise AuthError("Malformed JWT")

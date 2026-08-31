@@ -1213,8 +1213,8 @@ public_api = [
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.infrastructure.device_gateway"]
-responsibility = "lca/infrastructure/device_gateway. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+[tool.lca.package_contracts."lca.infrastructure.device_hub"]
+responsibility = "lca/infrastructure/device_hub. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -1237,35 +1237,7 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.infrastructure.device_gateway",
-]
-schema_version = "1.0.0"
-
-[tool.lca.package_contracts."lca.infrastructure.dsh"]
-responsibility = "lca/infrastructure/dsh. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
-not_responsible_for = "认知决策、阶段编排、组合根"
-allowed_dependencies = [
-    "lca.contracts",
-    "lca.infrastructure",
-]
-forbidden_dependencies = [
-    "lca.cognition",
-    "lca.runtime",
-    "lca.agent",
-    "lca.application",
-    "lca.harness",
-    "lca.plugins",
-    "gateway",
-]
-side_effects = [
-    "file:read",
-    "file:write",
-    "network:openai",
-    "log:emit",
-    "subprocess:spawn",
-]
-public_api = [
-    "lca.infrastructure.dsh",
+    "lca.infrastructure.device_hub",
 ]
 schema_version = "1.0.0"
 
@@ -2353,19 +2325,6 @@ allowed_dependencies = []
 forbidden_dependencies = []
 side_effects = []
 public_api = ["lca.infrastructure.cli.commands"]
-# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
-# is structurally inseparable (multiple data/protocol types in
-# one concept; splitting would fragment cross-cutting concerns).
-filename_whitelist = ["all"]
-schema_version = "1.0.0"
-
-[tool.lca.package_contracts."lca.infrastructure.comparison.dsh_driver"]
-responsibility = "lca.infrastructure.comparison.dsh_driver: DSH comparison driver. Structurally inseparable per ADR-0105 §3.3 (single integration adapter)."
-not_responsible_for = "see ADR-0105 §3.3 exception channel"
-allowed_dependencies = []
-forbidden_dependencies = []
-side_effects = []
-public_api = ["lca.infrastructure.comparison.dsh_driver"]
 # filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
 # is structurally inseparable (multiple data/protocol types in
 # one concept; splitting would fragment cross-cutting concerns).

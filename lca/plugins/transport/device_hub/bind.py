@@ -6,10 +6,10 @@ from lca.contracts.models.core.plane import PlaneKind, PlaneRef
 from lca.contracts.protocols.runtime.infra import MachineResolver, MachineTransport
 from lca.infrastructure.runtime_plane.paths import outputs_under
 from lca.infrastructure.sandbox.host_settings import load_host_settings
-from lca.plugins.transport.device_gateway.hub import DeviceHub
-from lca.plugins.transport.device_gateway.models import Device
-from lca.plugins.transport.device_gateway.registry import DeviceRegistry
-from lca.plugins.transport.device_gateway.transport import DeviceTransport
+from lca.plugins.transport.device_hub.hub import DeviceHub
+from lca.plugins.transport.device_hub.models import Device
+from lca.plugins.transport.device_hub.registry import DeviceRegistry
+from lca.plugins.transport.device_hub.transport import DeviceTransport
 
 
 def plane_ref_for_device(device: Device) -> PlaneRef:

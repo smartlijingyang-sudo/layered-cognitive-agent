@@ -12,11 +12,11 @@ from starlette.responses import JSONResponse
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from lca.infrastructure.tools.lca_computer.manifest import LOCAL_SYSTEM_ID as _COMPUTER_IDENTIFIER
-from lca.plugins.transport.device_gateway.auth import AuthenticatedUser, AuthError, verify_token
-from lca.plugins.transport.device_gateway.hub import DeviceHub, encode_arguments
-from lca.plugins.transport.device_gateway.models import DeviceConnection
-from lca.plugins.transport.device_gateway.registry import DeviceRegistry
-from lca.plugins.transport.device_gateway.settings import DeviceGatewaySettings
+from lca.plugins.transport.device_hub.auth import AuthenticatedUser, AuthError, verify_token
+from lca.plugins.transport.device_hub.hub import DeviceHub, encode_arguments
+from lca.plugins.transport.device_hub.models import DeviceConnection
+from lca.plugins.transport.device_hub.registry import DeviceRegistry
+from lca.plugins.transport.device_hub.settings import DeviceHubSettings
 from lca.plugins.transport.webserver.handlers.cors import cors_headers
 
 _log = structlog.get_logger(__name__)
@@ -30,8 +30,8 @@ def _hub(request: Request) -> DeviceHub:
     return cast("DeviceHub", request.app.state.device_hub)
 
 
-def _settings(request: Request) -> DeviceGatewaySettings:
-    return cast("DeviceGatewaySettings", request.app.state.device_settings)
+def _settings(request: Request) -> DeviceHubSettings:
+    return cast("DeviceHubSettings", request.app.state.device_settings)
 
 
 def _auth_from_body(request: Request, body: dict[str, Any]) -> AuthenticatedUser:
@@ -206,7 +206,7 @@ async def connect_device(websocket: WebSocket) -> None:
     await websocket.accept()
     registry: DeviceRegistry = websocket.app.state.devices
     hub: DeviceHub = websocket.app.state.device_hub
-    settings: DeviceGatewaySettings = websocket.app.state.device_settings
+    settings: DeviceHubSettings = websocket.app.state.device_settings
     params = websocket.query_params
     device_id = str(params.get("deviceId") or "").strip()
     connection_id = str(params.get("connectionId") or "").strip()
