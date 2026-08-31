@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Mapping
 from typing import Any
 
@@ -136,6 +137,13 @@ def expand_env_refs(
 
     return walk(config, ""), refs
 
+
+# === Deprecation (ADR-0115) ===
+warnings.warn(
+    "lca.harness.profile.declarations is deprecated, use lca_kernel.declarations (ADR-0115)",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 __all__ = [
     "apply_patches",

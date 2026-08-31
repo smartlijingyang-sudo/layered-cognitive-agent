@@ -27,6 +27,7 @@ PR-2.5 阶段：runtime 不消费 CapabilityPlan（PR-3 PlanCompiler 才
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -244,6 +245,13 @@ def _validate_relation_targets(
             f"(prefix 'descriptor:'/'fact:'/'journal.')"
         )
 
+
+# === Deprecation (ADR-0115) ===
+warnings.warn(
+    "lca.harness.profile.capability_plan_resolver is deprecated, use lca_kernel.capability_plan_resolver (ADR-0115)",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 __all__ = [
     "CapabilityPlanOptions",

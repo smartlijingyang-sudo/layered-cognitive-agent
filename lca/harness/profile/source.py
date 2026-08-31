@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import os
+import warnings
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -249,5 +250,12 @@ def _normalize_fallback_policy(raw: Any, *, profile_path: str) -> Mapping[str, s
         normalized_policy[capability] = normalized
     return MappingProxyType(normalized_policy)
 
+
+# === Deprecation (ADR-0115) ===
+warnings.warn(
+    "lca.harness.profile.source is deprecated, use lca_kernel.source (ADR-0115)",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 __all__ = ["ProfileSource", "load_profile_entries", "load_profile_source"]

@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 
 from lca.contracts.atoms.scope import Scope
@@ -184,6 +185,13 @@ def _require_executable_phase_graph(declarative: DeclarativePlanProjection) -> N
         )
     require_valid(declarative.validation_report)
 
+
+# === Deprecation (ADR-0115) ===
+warnings.warn(
+    "lca.harness.profile.plan_compiler is deprecated, use lca_kernel.plan_compiler (ADR-0115)",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 __all__ = [
     "CompileOptions",

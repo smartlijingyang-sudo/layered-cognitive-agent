@@ -12,6 +12,7 @@ capability 必须具备 provider、缺失时允许哪种 fixture 回退、以及
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
@@ -155,6 +156,13 @@ def closure_provider_hint(capability: str) -> str | None:
     requirement = runtime_closure_requirement(capability)
     return requirement.provider_hint if requirement is not None else None
 
+
+# === Deprecation (ADR-0115) ===
+warnings.warn(
+    "lca.harness.profile.runtime_closure is deprecated, use lca_kernel.runtime_closure (ADR-0115)",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 __all__ = [
     "RUNTIME_CLOSURE_FALLBACK_POLICIES",

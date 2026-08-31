@@ -18,6 +18,9 @@ list (ADR-0062 §4).
 from __future__ import annotations
 
 import contextlib
+
+# === Deprecation (ADR-0115) ===
+import warnings
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -40,6 +43,12 @@ from lca.harness.profile.resolve import (
 )
 from lca.harness.profile.source import load_profile_entries
 from lca.infrastructure.file_store import FileStore
+
+warnings.warn(
+    "lca.harness.profile.boot is deprecated, use lca_kernel.boot (ADR-0115)",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 __all__ = [
     "ProfileResolveError",

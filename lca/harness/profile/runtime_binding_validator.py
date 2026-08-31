@@ -18,6 +18,7 @@ W1 目标：
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -248,6 +249,13 @@ def validate_runtime_closure(
     validator = RuntimeBindingValidator()
     validator.validate(resolved, projection=projection)
 
+
+# === Deprecation (ADR-0115) ===
+warnings.warn(
+    "lca.harness.profile.runtime_binding_validator is deprecated, use lca_kernel.runtime_binding_validator (ADR-0115)",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 __all__ = [
     "MissingBindingError",

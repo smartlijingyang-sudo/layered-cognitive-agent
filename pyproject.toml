@@ -33,7 +33,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["lca*", "gateway*", "lca-kernel"]
+include = ["lca*", "gateway*", "lca_kernel"]
 exclude = ["tests*", "skills*", "roles*", "profiles*", "bundles*", "history*", "packages*", "deploy*", "vendor*"]
 
 [tool.importlinter]
@@ -105,6 +105,38 @@ name = "plugins: 不得依赖 gateway"
 type = "forbidden"
 source_modules = ["lca.plugins"]
 forbidden_modules = ["gateway"]
+
+# ── 契约 6: 下层 (L0–L3 + application) 不得反向依赖 kernel ──
+# ADR-0115 决定 3: lca_kernel 是顶层 host 包,下层禁止 import。
+# Application 是 L4 组合根,允许走公共面调 run_kernel,但禁止 import
+# 内部模块(source/resolve/plan/boot/lifecycle/...)。当前阶段仅阻断
+# source_modules = contracts/infrastructure/cognition/runtime/agent
+# 防止反向 import 内部模块;公共面(lca_kernel.run_kernel 等)在应用层
+# 走 spawn 入口而非直接 import。
+[[tool.importlinter.contracts]]
+name = "kernel-domain-isolation: L0–L3 + application 不得 import lca_kernel 内部"
+type = "forbidden"
+source_modules = [
+    "lca.contracts",
+    "lca.infrastructure",
+    "lca.cognition",
+    "lca.runtime",
+    "lca.agent",
+]
+forbidden_modules = [
+    "lca_kernel.source",
+    "lca_kernel.resolve",
+    "lca_kernel.declarations",
+    "lca_kernel.plan",
+    "lca_kernel.closure",
+    "lca_kernel.boot",
+    "lca_kernel.observability",
+    "lca_kernel.lifecycle",
+    "lca_kernel.env",
+    "lca_kernel.stages",
+    "lca_kernel.trace",
+    "lca_kernel.errors",
+]
 
 [dependency-groups]
 dev = [
@@ -192,6 +224,7 @@ ignore = [
 "lca.infrastructure.cli/service.py" = ["S603", "S607", "S110", "SIM105"]  # subprocess for process management
 "lca.infrastructure.cli/services/*.py" = ["S603", "S607", "S110", "SIM105"]  # subprocess for service management
 "deploy/lobehub/engine.py" = ["S603", "S607"]  # git describe on .lobehub-upstream (controlled path)
+"lca_kernel/*" = ["N999", "TC002", "RUF006"]  # top-level pkg; Stage re-imported at runtime; fire-and-forget create_task
 
 [tool.ruff.format]
 quote-style = "double"
