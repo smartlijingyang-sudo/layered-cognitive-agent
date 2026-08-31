@@ -30,7 +30,14 @@ def test_prefixes_tuple_and_floor() -> None:
 
 
 def test_prefixes_contain_required_buckets() -> None:
-    for prefix in ("LCA_", "DSH_", "XDG_", "LLM_", "GATEWAY_", "LOBE_"):
+    for prefix in (
+        "LCA_",
+        "XDG_",
+        "LLM_",
+        "LCA_KERNEL_SERVE_",
+        "GATEWAY_",  # compat shim — ADR-0119 followup-2
+        "LOBE_",
+    ):
         assert prefix in BOOTSTRAP_PREFIXES
 
 

@@ -10,11 +10,12 @@ import typer
 
 from lca.infrastructure.cli.config import OpsConfig
 
-# Error codes returned by the gateway when it explicitly refuses a journal
-# subscription. We surface these verbatim so operators don't chase ghosts.
-_GATEWAY_REFUSAL_CODES = {
+# Error codes returned by the kernel serve HTTP layer when it explicitly
+# refuses a journal subscription. We surface these verbatim so operators
+# don't chase ghosts.
+_KERNEL_SERVE_REFUSAL_CODES = {
     # Session Spine intentionally removed process-wide journal streaming;
-    # gateway asks clients to follow per-run live streams or replay from disk.
+    # kernel_serve asks clients to follow per-run live streams or replay from disk.
     "legacy_process_journal_unavailable": (
         "Session Spine 已不再暴露全局 /journal/live；请改用下列任一路径查看 journal 事实：",
         [
@@ -148,7 +149,7 @@ def _print_journal_refusal(status_code: int, body: str) -> None:
     """
     code, message = _extract_refusal(body)
     print(f"gateway 拒绝 journal 订阅（HTTP {status_code}）")
-    directive = _GATEWAY_REFUSAL_CODES.get(code or "")
+    directive = _KERNEL_SERVE_REFUSAL_CODES.get(code or "")
     if directive is not None:
         head, hints = directive
         print(f"  ↳ {head}")

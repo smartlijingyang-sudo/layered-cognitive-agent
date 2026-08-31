@@ -34,7 +34,7 @@ class KernelServeConfig(BaseModel):
 
     @property
     def base_url(self) -> str:
-        """HTTP base URL for this gateway."""
+        """HTTP base URL for kernel serve."""
         return f"http://{self.host}:{self.port}"
 
     @property
@@ -149,14 +149,42 @@ class OpsConfig(BaseModel):
         return instance._apply_environ()
 
     def _apply_environ(self) -> Self:
-        """Overlay well-known environment variables."""
-        gw = self.gateway
-        if host := os.environ.get("GATEWAY_HOST"):
-            gw = gw.model_copy(update={"host": host})
-        if port := os.environ.get("GATEWAY_PORT"):
-            gw = gw.model_copy(update={"port": int(port)})
-        if bind := os.environ.get("GATEWAY_BIND"):
-            gw = gw.model_copy(update={"bind": bind})
+        """Overlay well-known environment variables.
+
+        Adopts new ``LCA_KERNEL_SERVE_*`` env names (ADR-0119 followup-2).
+        Old ``GATEWAY_*`` names still resolved with a deprecation warning so
+        existing deployment scripts survive the transition window.
+        """
+        import structlog
+
+        ks = self.kernel_serve
+        if host := os.environ.get("LCA_KERNEL_SERVE_HOST"):
+            ks = ks.model_copy(update={"host": host})
+        elif host := os.environ.get("GATEWAY_HOST"):
+            ks = ks.model_copy(update={"host": host})
+            structlog.get_logger("lca.cli.config").warning(
+                "env_var_deprecated",
+                old="GATEWAY_HOST",
+                new="LCA_KERNEL_SERVE_HOST",
+            )
+        if port := os.environ.get("LCA_KERNEL_SERVE_PORT"):
+            ks = ks.model_copy(update={"port": int(port)})
+        elif port := os.environ.get("GATEWAY_PORT"):
+            ks = ks.model_copy(update={"port": int(port)})
+            structlog.get_logger("lca.cli.config").warning(
+                "env_var_deprecated",
+                old="GATEWAY_PORT",
+                new="LCA_KERNEL_SERVE_PORT",
+            )
+        if bind := os.environ.get("LCA_KERNEL_SERVE_BIND"):
+            ks = ks.model_copy(update={"bind": bind})
+        elif bind := os.environ.get("GATEWAY_BIND"):
+            ks = ks.model_copy(update={"bind": bind})
+            structlog.get_logger("lca.cli.config").warning(
+                "env_var_deprecated",
+                old="GATEWAY_BIND",
+                new="LCA_KERNEL_SERVE_BIND",
+            )
 
         lh = self.lobehub
         if host := os.environ.get("LOBE_HOST"):
@@ -172,7 +200,7 @@ class OpsConfig(BaseModel):
         if service := os.environ.get("ONLYBOXES_WORKER_SERVICE"):
             ob = ob.model_copy(update={"worker_service": service})
 
-        return self.model_copy(update={"gateway": gw, "lobehub": lh, "onlyboxes": ob})
+        return self.model_copy(update={"kernel_serve": ks, "lobehub": lh, "onlyboxes": ob})
 
     @property
     def root(self) -> Path:

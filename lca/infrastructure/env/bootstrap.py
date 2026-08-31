@@ -12,7 +12,7 @@ Three constants are exposed:
 - :data:`BOOTSTRAP_NAMES` — exact names whose ambient value may be overridden
   by ``.env`` (Python/venv, shell/locale, VCS hooks, network trust).
 - :data:`BOOTSTRAP_PREFIXES` — name prefixes allowed from ``.env``. The ``LCA_``
-  / ``LLM_`` / ``GATEWAY_`` / ``LOBE_`` etc. coverage mirrors the
+  / ``LLM_`` / ``LCA_KERNEL_SERVE_`` / ``LOBE_`` etc. coverage mirrors the
   ``grep -rhE 'os.environ\[|os\.getenv\(' lca/ scripts/`` inventory captured
   during PR-1 (see plan §C1.1 and ADR-0117 §决定 4).
 - :data:`BOOTSTRAP_FORBIDDEN` — exact names that ``.env`` must NEVER set,
@@ -71,10 +71,9 @@ BOOTSTRAP_NAMES: frozenset[str] = frozenset(
 )
 
 BOOTSTRAP_PREFIXES: tuple[str, ...] = (
-    # Core LCA + deepseek migration
+    # Core LCA env whitelist
     "LCA_",
     "LCA_INTERNAL_",
-    "DSH_",
     # Freedesktop / OS conventions
     "XDG_",
     "DYLD_",
@@ -82,7 +81,9 @@ BOOTSTRAP_PREFIXES: tuple[str, ...] = (
     "BASH_FUNC_",
     # LCA actual deployment env (PR-1 inventory of grep result)
     "LLM_",  # LLM_API_KEY / LLM_BASE_URL / LLM_MODEL / LLM_API_STYLE / ...
-    "GATEWAY_",  # GATEWAY_HOST / GATEWAY_PORT / GATEWAY_BIND
+    "LCA_KERNEL_SERVE_",  # LCA_KERNEL_SERVE_HOST / _PORT / _BIND
+    # Deprecated; preserved until 2026-12-31 per ADR-0119 followup-2.
+    "GATEWAY_",  # GATEWAY_HOST / GATEWAY_PORT / GATEWAY_BIND (compat shim)
     "LOBE_",  # LOBE_HOST / LOBE_DEV_PORT
     "LOBEHUB_",  # LOBEHUB_RELEASE
     "ONLYBOXES_",  # ONLYBOXES_BASE_URL / _ACCESS_TOKEN / _TERMINAL_IMAGE / _WORKER_SERVICE
