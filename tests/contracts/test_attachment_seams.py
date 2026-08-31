@@ -157,6 +157,8 @@ class TestFileRefContract:
             "sandbox_init",
             "inbox_staged",
             "generated",
+            "workspace",
+            "external_url",
         }
         assert set(get_args(FileRefSource)) == {
             "lobehub_upload",

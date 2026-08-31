@@ -10,6 +10,9 @@ from lca.contracts.models.core.sandbox import (
     DEFAULT_SANDBOX_TIMEOUT_S,
 )
 from lca.contracts.protocols import Sandbox
+from lca.contracts.protocols.runtime.attachment_errors import (
+    UnresolvedFileRefError,
+)
 from lca.infrastructure.computer.guest import (
     build_edit_file_script,
     build_glob_files_script,
@@ -98,6 +101,7 @@ class _SandboxComputerBase:
         start_line: int | None = None,
         end_line: int | None = None,
     ) -> ComputerOpResult:
+        path = _resolve_path_arg_or_passthrough(path)
         norm = normalize_sandbox_path(path, self.plane.root)
         return await self._guest_op(
             build_read_file_script(path=norm, start_line=start_line, end_line=end_line)
@@ -226,3 +230,21 @@ def _get_current_run_attachment_ids() -> tuple[str, ...]:
     from lca.infrastructure.tools.run_attachment_scope import get_current_run_attachment_ids
 
     return get_current_run_attachment_ids()
+
+
+def _resolve_path_arg_or_passthrough(path: str) -> str:
+    """Translate ``/files/<aid>`` to the real guest path via FileRef (ADR-0121).
+
+    Falls back to the raw string when the path does not match the known
+    attachment shapes; the downstream ``normalize_sandbox_path`` handles
+    relative / absolute workspace paths unchanged.
+    """
+    try:
+        from lca.infrastructure.tools.seam.file_ref_args import resolve_path_arg
+    except ImportError:  # pragma: no cover - kept for boot-time safety
+        return path
+    try:
+        resolved = resolve_path_arg(path)
+    except UnresolvedFileRefError:
+        return path
+    return resolved.process_path

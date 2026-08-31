@@ -26,7 +26,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-FileRefKind = Literal["user_upload", "sandbox_init", "inbox_staged", "generated"]
+FileRefKind = Literal[
+    "user_upload",
+    "sandbox_init",
+    "inbox_staged",
+    "generated",
+    "workspace",
+    "external_url",
+]
 FileRefSource = Literal[
     "lobehub_upload",
     "sandbox_bootstrap",
