@@ -16,13 +16,16 @@ LCA（Layered Cognitive Agent）是基于 vendored Cordis 的 Python 插件化�
 docs/                         规范、设计、ADR、计划和专题说明
 lca/contracts/                Protocol、枚举、ID、模型、事件和跨层契约
 lca/infrastructure/             LLM、工具、传输、沙箱、文件、观测、插件内核
+lca/infrastructure/env/         进程级 env 白名单 + K7 BOOTSTRAP_NAMES(ADR-0117)
 lca/cognition/         感知、Brain、Reasoner、Critic、Gate、Body、Memory
 lca/runtime/           Runtime、停止、恢复、阶段执行、中间件
 lca/agent/             Agent、Team、委派和编排
 lca/application/               组合根、spawn、runtime factory、team wiring
 lca/harness/                  Profile、Boot、Session、Plugin API、声明式执行
 lca/plugins/                  Seam、Provider、Loop Driver、Strategy、Tool Plugin
-gateway/                      FastAPI、SSE、命令入口、运行执行和 projection
+lca/plugins/transport/        Gateway router + lifespan + 4 routes plugin(ADR-0112)
+lca_kernel/                   顶层包:编译 profile → 运行中进程(ADR-0115 K1–K8)
+gateway/                      FastAPI、SSE、命令入口、运行执行和 projection(thin factory)
 profiles/                     Profile YAML；默认 profiles/web-standard.yaml
 bundles/                      Bundle 和 scenario 配置
 scripts/                      lca-ops、迁移工具和质量门禁
@@ -32,15 +35,21 @@ vendor/                       Cordis、Cosmokit、Schemastery
 
 | 关注点 | 入口 |
 |---|---|
-| Profile 解析/启动 | `lca/harness/profile/{resolve,boot}.py` |
+| Profile 解析/启动 | `lca/harness/profile/{resolve,boot}.py`、`lca_kernel/compile_profile` |
 | Plugin Manifest | `lca/harness/plugin_api.py` |
 | Loop Driver | `gateway/runs/loop_drivers.py` |
 | 声明式阶段图 | `lca/contracts/protocols/declarative_*.py`、`lca/harness/declarative/` |
+| Kernel(compile → run) | `lca_kernel/`(K1–K8;public 面在 `lca_kernel/__init__.py`) |
+| Kernel ↔ Transport 桥 | `lca/plugins/transport/webserver/lifespan_adapter.py` |
+| Gateway router | `lca/contracts/protocols/gateway_router.py`、`lca/plugins/transport/webserver/router.py` |
+| Routes plugin | `lca/plugins/transport/webserver/routes_{health_options,runs_sessions,openai_compat_files,device}.py` |
+| Gateway thin factory | `gateway/app.py`(ADR-0115 决定 6;≤ 60 行) |
+| Env 白名单(K7) | `lca/infrastructure/env/bootstrap.py` |
 | Brain / Prompt | `lca/cognition/brain/` |
 | Body / SafeExecutor | `lca/cognition/body/` |
 | Journal / Projection | `lca/contracts/models/observability/`、`lca/infrastructure/observability/` |
 | Agent / Team | `lca/application/spawn.py`、`lca/agent/` |
-| 平台操作 | `./scripts/lca-ops` |
+| 平台操作 | `./scripts/lca-ops`(含 `kernel {boot,serve,stop,compose}` 子命令) |
 
 ## 3. 架构不变量
 
@@ -128,7 +137,17 @@ uv run vulture lca --min-confidence 80
 
 `real_llm` 默认不运行；需凭证和明确意图时才执行 `uv run pytest -m real_llm -v`。报告结果必须写出实际命令；局部测试通过不能称为全量通过。
 
-关键门禁包括：`check_protocol_impl.py`、`check_plugin_typing.py`、`check_no_any.py`、`check_no_bare_strings.py`、`check_assembly_purity.py`、`check_no_flat_runs.py`、`verify_md_links.py`、`verify_doc_budgets.py`。
+关键门禁包括：`check_protocol_impl.py`、`check_plugin_typing.py`、`check_no_any.py`、`check_no_bare_strings.py`、`check_assembly_purity.py`、`check_no_flat_runs.py`、`verify_md_links.py`、`verify_doc_budgets.py`、`scripts/check_kernel_boundary.py`(PR-5 增)、importlinter 契约 `kernel-domain-isolation` + `transport-isolation`(pyproject.toml;PR-1 ~ PR-4 增)。
+
+| 改动 | 最低要求 |
+|---|---|
+| 仅文档、角色、注释 | `git diff --check`、Markdown 链接检查 |
+| 单模块实现 | Ruff + 相关测试；改签名加局部 mypy |
+| import / 模块移动 | 上一项 + `lint-imports` |
+| Gateway、运行入口、LobeHub patch | Ruff + 对应 gateway/run/lobehub 测试；只改 patch 源 |
+| 删除共享符号 | 相关测试 + `vulture`；影响大时全量 pytest |
+| `lca-kernel/` / `lca/plugins/transport/` / `lca/infrastructure/env/` | `scripts/check_kernel_boundary.py` + importlinter `kernel-domain-isolation` & `transport-isolation` + 53 + 24 + 19 kernel/transport/env 测试 |
+| Contracts、Protocol、枚举、注册表、Journal、Profile | 全量验证 |
 
 | 改动 | 最低要求 |
 |---|---|

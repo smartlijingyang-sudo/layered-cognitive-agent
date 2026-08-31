@@ -14,6 +14,8 @@
 | 查询 Journal、Trace 和运行诊断 | `docs/observability/` | 可观测性子系统规格和调试手册 |
 | 查询角色库、技能包和部署组件说明 | `roles/`、`skills/`、`deploy/` | 与所属组件共同维护的就近文档 |
 | 查询已结束实施、研究和审计的原始记录 | [history](../../history/README.md) | 非现行、仅供追溯的过程材料 |
+| 查询 Kernel / Transport 边界与启动链路 | [ADR-0115](../adr/0115-kernel-transport-boundary.md) · [ADR-0116](../adr/0116-boot-event-observability-convergence.md) · [ADR-0117](../adr/0117-process-lifecycle-env-whitelist.md) · [history/2026-08/adr-0115-0117-kernel-bootstrap-plan/plan.md](../../history/2026-08/adr-0115-0117-kernel-bootstrap-plan/plan.md) | K1–K8 公共面、Boot journal 词表、process lifecycle + env 白名单 |
+| 查询 Gateway routes plugin 化 | [ADR-0112](../adr/0112-gateway-routes-as-plugins.md) | Gateway router + 4 routes plugin |
 
 ## 维护边界
 

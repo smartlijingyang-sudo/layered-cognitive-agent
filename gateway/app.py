@@ -48,7 +48,7 @@ def create_app(
     app = Starlette(routes=[])
     app.state.kernel_profile = resolved
     app.state.gateway_router = gateway_router
-    app.router.lifespan_context = (  # type: ignore[assignment]
+    app.router.lifespan_context = (
         lifespan if lifespan is not None else _kernel_lifespan
     )
     return app

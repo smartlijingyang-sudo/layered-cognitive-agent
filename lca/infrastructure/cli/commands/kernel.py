@@ -68,7 +68,7 @@ def register(app: typer.Typer) -> None:
         as_json: bool = typer.Option(False, "--json", help="Emit canonical JSON"),
     ) -> None:
         """Dump CompiledRunPlan as YAML/JSON for diff/audit."""
-        plan = _kernel_compile_dry_run(profile_path, return_plan=True)
+        plan = _kernel_compile_dry_run(profile_path, return_plan=True) or {}
         if as_json:
             typer.echo(json.dumps(plan, default=str, indent=2))
         else:
@@ -112,12 +112,17 @@ def _kernel_boot(profile_path: Path) -> None:
     except KeyboardInterrupt:
         typer.echo("kernel_stop starting…")
     finally:
-        stop_kernel(ctx)
+        # stop_kernel may become a coroutine in future revisions; await if so.
+        import asyncio
+
+        result = stop_kernel(ctx)
+        if asyncio.iscoroutine(result):
+            asyncio.run(result)
 
 
 def _serialize_plan(plan: object) -> dict[str, object]:
     """Coerce a CompiledRunPlan to a JSON-friendly dict."""
-    if is_dataclass(plan):
+    if is_dataclass(plan) and not isinstance(plan, type):
         data = asdict(plan)
     elif isinstance(plan, dict):
         data = dict(plan)
