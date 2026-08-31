@@ -42,23 +42,23 @@ def skill_preamble(store: FileStore | None = None) -> str:
 
 def plane_system_role(plane: PlaneRef) -> str:
     if plane.kind is PlaneKind.MACHINE:
-        from lca.infrastructure.runtime_plane.preinstall_prompt import render_preinstalled_block
-        from lca.infrastructure.runtime_plane.prompts import load_plane_prompt
-        from lca.infrastructure.sandbox.prompt import format_machine_uploaded_files_prompt
-
-        template = load_plane_prompt("machine_system_role")
-        uploaded = format_machine_uploaded_files_prompt(plane.root)
-        from lca.infrastructure.attachment import get_attachment_policy
-
-        rendered = (
-            template.replace("{{label}}", plane.label)
-            .replace("{{platform}}", plane.platform or "unknown")
-            .replace("{{root}}", plane.root)
-            .replace("{{outputs_dir}}", plane.outputs_dir)
-            .replace("{{attachment_policy}}", get_attachment_policy().machine_policy_text())
-            .replace("{{uploaded_files}}", uploaded)
-            .replace("{{preinstalled}}", render_preinstalled_block(plane=PlaneKind.MACHINE))
+        from lca.infrastructure.attachment.run_file_store_scope import (
+            get_current_run_file_store,
         )
+        from lca.infrastructure.attachment.system_role_renderer import render_system_role
+        from lca.infrastructure.runtime_plane.preinstall_prompt import (
+            render_preinstalled_block,
+        )
+
+        result = render_system_role(
+            plane,
+            template_name="machine_system_role",
+            store=get_current_run_file_store(),
+            extra_placeholders={
+                "{{preinstalled}}": render_preinstalled_block(plane=PlaneKind.MACHINE),
+            },
+        )
+        rendered = result.text
         if plane.home:
             rendered += f"\n- User home (for spoken locations like Desktop only): `{plane.home}`"
         return rendered

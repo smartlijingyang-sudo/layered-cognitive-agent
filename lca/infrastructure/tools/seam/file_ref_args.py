@@ -96,7 +96,7 @@ def resolve_path_arg(
 
 def _resolve_from_store(
     aid: str,
-    store: FileStore,
+    store: FileStore | None,
     raw: str,
     allowed_refs: Iterable[FileRef] | None,
 ) -> ResolvedPathArg:
@@ -106,6 +106,7 @@ def _resolve_from_store(
     if not matches and store is None:
         raise UnresolvedFileRefError(raw, context={"reason": "no_file_store_in_scope"})
     if not matches:
+        assert store is not None  # narrowed above
         resolver = DefaultAttachmentResolver(store=store)
         try:
             resolved = resolver.resolve([aid])
@@ -121,7 +122,7 @@ def _resolve_from_store(
 
 def _resolve_http_url(
     url: str,
-    store: FileStore,
+    store: FileStore | None,
     allowed_refs: Iterable[FileRef] | None,
 ) -> ResolvedPathArg:
     # We don't eagerly download here: the actual fetch happens later in the
