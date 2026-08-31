@@ -116,7 +116,15 @@ class CognitiveRunDriver:
         machine_resolver: Any | None = None,
     ) -> DriverOutcome:
         _record_inbox_followup(session=session, question=question, mode=mode)
-        if llm_resolver is None and machine_resolver is None:
+        # ADR-0115: llm_resolver is the legacy standalone path; ctx is the
+        # plugin-tree path used by RunLifecycleCoordinator. machine_resolver
+        # is unrelated to LLM resolution — it must not influence which branch
+        # picks the LLM. Bug 8d1e40e1 added ``and machine_resolver is None``
+        # to this condition and caused ``AttributeError: NoneType.resolve``
+        # when RunLifecycleCoordinator forwards machine_resolver but not
+        # llm_resolver (the production call shape).
+        del machine_resolver
+        if llm_resolver is None:
             if ctx is None:
                 raise TypeError("CognitiveRunDriver.execute requires ctx or llm_resolver")
             llm = require_capability(ctx, "llm_resolver").resolve()
