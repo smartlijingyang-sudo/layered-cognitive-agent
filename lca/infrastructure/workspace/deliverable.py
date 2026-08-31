@@ -27,23 +27,6 @@ _OFFICE_SUFFIXES = (
     ".odp",
     ".ods",
 )
-_IMMEDIATE_SUFFIXES = (
-    ".png",
-    ".jpg",
-    ".jpeg",
-    ".gif",
-    ".webp",
-    ".svg",
-    ".pdf",
-    ".html",
-    ".htm",
-    ".md",
-    ".markdown",
-    ".txt",
-    ".csv",
-    ".json",
-    ".xml",
-)
 _PUBLISH_TOOLS = frozenset({"exportFile", "writeFile", "write_file_local"})
 _PUBLISH_VERBS = frozenset({"close", "save"})
 
@@ -51,11 +34,6 @@ _PUBLISH_VERBS = frozenset({"close", "save"})
 def is_office_name(name: str) -> bool:
     """True for Office binaries — not FileViewer-native."""
     return PurePosixPath(name).suffix.lower() in _OFFICE_SUFFIXES
-
-
-def is_immediate_product_name(name: str) -> bool:
-    """True for types LobeHub FileViewer can preview in-app."""
-    return PurePosixPath(name).suffix.lower() in _IMMEDIATE_SUFFIXES
 
 
 def is_office_publish_intent(

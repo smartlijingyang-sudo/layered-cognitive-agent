@@ -196,10 +196,6 @@ class AttachmentIdentity(Protocol):
 
     def stage_payload(self, run_id: str, attachment_ids: Sequence[str]) -> dict[str, bytes]: ...
 
-    def listed_paths(
-        self, root: str, run_id: str, attachment_ids: Sequence[str]
-    ) -> tuple[str, ...]: ...
-
 
 @runtime_checkable
 class ToolRegistry(Protocol):

@@ -1,16 +1,19 @@
-"""TextNormalizationService — sanitize user-visible text before prompt injection.
+"""Normalize user-visible text at the prompt boundary (ADR-0121).
 
-This service maps Unicode lookalikes to their ASCII equivalents so that code
-generation never receives characters that break Python syntax or confuse models.
-
-Design principle: normalization is a *pure function* applied only at the prompt
-boundary. Original file bytes in FileStore are never mutated.
+Maps Unicode lookalikes (curly quotes, em dashes, zero-width chars) to their
+ASCII equivalents so downstream code generation never receives syntax-breaking
+characters. Original bytes in FileStore are never mutated.
 
 ADR reference: zero-delivery root-cause #1 (Unicode injection).
+
+The historical ``TextNormalizationService`` class wrapper was removed in
+ADR-0121 PR-D: only the pure :func:`normalize_for_injection` entry point is
+needed by callers, so the class indirection is gone.
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 
@@ -18,7 +21,6 @@ from dataclasses import dataclass, field
 class TextNormalizationRules:
     """Immutable normalization rules. Field names describe the category."""
 
-    # Quotation marks — common sources of SyntaxError in generated Python.
     quote_map: dict[str, str] = field(
         default_factory=lambda: {
             "\u201c": '"',  # LEFT DOUBLE QUOTATION MARK
@@ -39,7 +41,6 @@ class TextNormalizationRules:
         }
     )
 
-    # Dashes and hyphens.
     dash_map: dict[str, str] = field(
         default_factory=lambda: {
             "\u2014": "--",  # EM DASH
@@ -51,7 +52,6 @@ class TextNormalizationRules:
         }
     )
 
-    # Ellipsis and other punctuation that models may copy verbatim.
     punctuation_map: dict[str, str] = field(
         default_factory=lambda: {
             "\u2026": "...",  # HORIZONTAL ELLIPSIS
@@ -73,7 +73,6 @@ class TextNormalizationRules:
         }
     )
 
-    # Characters to strip entirely (zero-width, BOM, soft-hyphen).
     strip_chars: frozenset[str] = field(
         default_factory=lambda: frozenset(
             {
@@ -88,55 +87,26 @@ class TextNormalizationRules:
     )
 
 
-class TextNormalizationService:
-    """Deterministic text normalization for prompt injection boundaries.
-
-    Thread-safe (stateless after init). Rules are applied in fixed order:
-    strip → replace maps → collapse whitespace.
-
-    Usage::
-
-        svc = TextNormalizationService()
-        safe_text = svc.normalize(raw_text)
-    """
-
-    def __init__(self, rules: TextNormalizationRules | None = None) -> None:
-        self._rules = rules if rules is not None else TextNormalizationRules()
-
-    def normalize(self, text: str) -> str:
-        """Apply all normalization rules to *text*. Pure function."""
-        if not text:
-            return text
-
-        # Phase 1: strip invisible / zero-width characters.
-        for ch in self._rules.strip_chars:
-            text = text.replace(ch, "")
-
-        # Phase 2: replace Unicode lookalikes with ASCII equivalents.
-        for mapping in (
-            self._rules.quote_map,
-            self._rules.dash_map,
-            self._rules.punctuation_map,
-        ):
-            for src, dst in mapping.items():
-                if src in text:
-                    text = text.replace(src, dst)
-
-        # Phase 3: collapse runs of whitespace (including residual NBSP) into
-        # single ASCII space. This prevents models from seeing invisible
-        # formatting artifacts.
-        return _collapse_whitespace(text)
+_DEFAULT_RULES = TextNormalizationRules()
+_WHITESPACE_RE = re.compile(r"[ \t]+")
 
 
 def _collapse_whitespace(text: str) -> str:
-    import re
-
-    return re.sub(r"[ \t]+", " ", text)
+    return _WHITESPACE_RE.sub(" ", text)
 
 
-def normalize_for_injection(text: str) -> str:
-    """Module-level convenience — default rules, no object needed."""
-    return _DEFAULT_SVC.normalize(text)
+def normalize_for_injection(text: str, *, rules: TextNormalizationRules | None = None) -> str:
+    """Pure normalization: invisible chars → ASCII equivalents + collapse spaces."""
+    if not text:
+        return text
+    active = rules or _DEFAULT_RULES
+    for ch in active.strip_chars:
+        text = text.replace(ch, "")
+    for mapping in (active.quote_map, active.dash_map, active.punctuation_map):
+        for src, dst in mapping.items():
+            if src in text:
+                text = text.replace(src, dst)
+    return _collapse_whitespace(text)
 
 
-_DEFAULT_SVC = TextNormalizationService()
+__all__ = ["TextNormalizationRules", "normalize_for_injection"]

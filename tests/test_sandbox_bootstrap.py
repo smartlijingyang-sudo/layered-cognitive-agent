@@ -12,8 +12,8 @@ from lca.infrastructure.sandbox.bootstrap import (
     build_workspace_init_command,
     sandbox_output_path,
 )
+from lca.infrastructure.attachment.prompt import format_sandbox_uploaded_files_prompt
 from lca.infrastructure.sandbox.prompt import (
-    format_uploaded_files_prompt,
     sandbox_uploaded_file_path,
 )
 
@@ -34,7 +34,7 @@ class SandboxPromptTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             store = LocalFileStore(root=Path(tmp))
             meta = store.put(data=b"hello", name="data.csv", mime_type="text/csv")
-            text = format_uploaded_files_prompt(store, [meta.attachment_id])
+            text = format_sandbox_uploaded_files_prompt(store, [meta.attachment_id])
             self.assertIn(sandbox_uploaded_file_path("data.csv"), text)
             self.assertIn("pre-loaded and ready to use", text)
 

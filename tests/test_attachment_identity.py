@@ -119,12 +119,14 @@ class TestFileStoreAttachmentIdentity(unittest.TestCase):
             self.assertNotIn("/home/", key)
 
     def test_listed_paths_isolated_per_run(self) -> None:
+        # ``listed_paths`` was removed in ADR-0121 PR-D (only test caller
+        # existed); assert that stage_payload now isolates per-run instead.
         meta = self.store.put(data=b"hello", name="report.md", mime_type="text/markdown")
-        paths_a = self.identity.listed_paths("/home/sandbox-user", "run_a", (meta.attachment_id,))
-        paths_b = self.identity.listed_paths("/home/sandbox-user", "run_b", (meta.attachment_id,))
-        self.assertNotEqual(paths_a, paths_b)
-        self.assertTrue(paths_a[0].startswith("/home/sandbox-user/.lca/inbox/run_a/"))
-        self.assertTrue(paths_b[0].startswith("/home/sandbox-user/.lca/inbox/run_b/"))
+        payload_a = self.identity.stage_payload("run_a", (meta.attachment_id,))
+        payload_b = self.identity.stage_payload("run_b", (meta.attachment_id,))
+        self.assertIn(f".lca/inbox/run_a/{meta.name}", payload_a)
+        self.assertIn(f".lca/inbox/run_b/{meta.name}", payload_b)
+        self.assertNotEqual(list(payload_a), list(payload_b))
 
     def test_unknown_attachment_ids_are_skipped(self) -> None:
         question = self.identity.compose_question("继续", ("nope",))

@@ -19,21 +19,6 @@ sandbox_uploaded_file_path = sandbox_attachment_path
 select_sandbox_init_files = select_attachment_init_files
 
 
-def format_uploaded_files_prompt(
-    store: FileStore,
-    attachment_ids: Sequence[str],
-) -> str:
-    """Render ``{{sandbox_uploaded_files}}`` section for the cloud sandbox system role."""
-    return format_sandbox_uploaded_files_prompt(store, attachment_ids)
-
-
-def format_machine_uploaded_files_prompt(root: str) -> str:
-    """Render ``{{uploaded_files}}`` — run-scoped inbox paths only."""
-    from lca.infrastructure.attachment.prompt import machine_uploaded_files_for_ambient
-
-    return machine_uploaded_files_for_ambient(root)
-
-
 def render_cloud_sandbox_system_role(
     system_role_template: str,
     *,

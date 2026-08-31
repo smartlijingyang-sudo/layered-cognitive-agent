@@ -80,19 +80,6 @@ class FileStoreAttachmentIdentity(AttachmentIdentity):
             payload[self._layout.relative_file(run_id, record.name)] = raw
         return payload
 
-    def listed_paths(
-        self, root: str, run_id: str, attachment_ids: Sequence[str]
-    ) -> tuple[str, ...]:
-        paths: list[str] = []
-        seen: set[str] = set()
-        for record in self.resolve(attachment_ids):
-            path = self._layout.absolute_file(root, run_id, record.name)
-            if path in seen:
-                continue
-            seen.add(path)
-            paths.append(path)
-        return tuple(paths)
-
     def _inline_text(self, attachment_id: str, mime_type: str, name: str) -> str | None:
         if not self._policy.allows_inline(mime_type, name):
             return None
