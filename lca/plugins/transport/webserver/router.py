@@ -1,15 +1,18 @@
-"""GatewayRouter — Starlette 路由表实现(deepseek WebServer 形态)。
+"""RouteRegistry — Starlette 路由表实现(deepseek WebServer 形态)。
 
-ADR-0112 修订版 + ADR-0115:``lca-gateway-router`` 是 L0 SEAM plugin,
-通过 :class:`lca.contracts.protocols.gateway_router.LcaGatewayRouter` Protocol
+ADR-0112 修订版 + ADR-0115:``lca-webserver-router`` 是 L0 SEAM plugin,
+通过 :class:`lca.contracts.protocols.route_registry.RouteRegistryProtocol` Protocol
 对外暴露 register / set_fallback / install 四方法。
 
-命名历史: 此 ``GatewayRouter`` 类 + ``gateway_router`` capability key 与
-ADR-0119 决定 4 之后的 ``kernel_serve`` LCA 后台进程 **无关**。它是
-webserver transport 层的 HTTP route registry,职责是把 plugin 注册的
-Starlette ``Route`` 列表装到 ``app.router.routes``。命名沿用至今以避免
-plugin manifest capability 槽位破坏。完整命名空间历史映射看
-``docs/adr/0119-followup-gateway-name-map.md``。
+ADR-0119 followup-2 (2026-08-31): 原类名 ``GatewayRouter`` → ``RouteRegistry``,
+plugin id ``lca-gateway-router`` → ``lca-webserver-router``,
+capability key ``gateway_router`` → ``route_registry``。重命名遵循
+ADR-0106 §4.1 命名宪法("Registry" 是许可后缀, "Gateway" 不是)。
+旧 capability key 通过 setup 内 alias shim 兼容,过期日 2026-12-31。
+
+本类与 ADR-0119 决定 4 的 ``kernel_serve`` LCA 后台进程 **无关**。
+它是 webserver transport 层的 HTTP route registry,职责是把 plugin 注册的
+Starlette ``Route`` 列表装到 ``app.router.routes``。
 
 借鉴 deepseek ``packages/host/webserver/src/index.ts``:
 
@@ -41,13 +44,13 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.protocols.gateway_router import LcaGatewayRouter
+from lca.contracts.protocols.route_registry import RouteRegistryProtocol
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 @plugin(
-    id="lca-gateway-router",
-    provides=("gateway_router",),
+    id="lca-webserver-router",
+    provides=("route_registry",),
     requires=(),
     layer="L0",
     kind=PluginKind.SEAM,
@@ -63,23 +66,30 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
         lifecycle=LifecycleContract(allowed_scopes=(Scope.PROFILE,)),
         authority=AuthorityContract(grants=("plugin.serve",)),
         observability=EvidenceContract(
-            descriptors=("lca-gateway-router.checked", "lca-gateway-router.served"),
+            descriptors=("lca-webserver-router.checked", "lca-webserver-router.served"),
         ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(
         reads=(),
-        emits=("gateway_router.checked",),
+        emits=("route_registry.checked",),
         state_mutation="forbidden",
     ),
 )
 async def setup(ctx: PluginContext, config: Any) -> None:
-    """Provide ``GatewayRouter`` instance via ``ctx.provide('gateway_router', ...)``."""
-    router = GatewayRouter()
-    ctx.provide("gateway_router", router)
+    """Provide ``RouteRegistry`` instance via ``ctx.provide('route_registry', ...)``.
+
+    Compat shim: 如果 ctx 还没提供 ``route_registry`` 但已提供 ``gateway_router``,
+    把旧 key 上的对象 alias 到新 key。过期日 2026-12-31(ADR-0119 followup-2)。
+    """
+    registry = RouteRegistry()
+    ctx.provide("route_registry", registry)
+    # ADR-0119 followup-2 compat: 旧 key 自动迁移到新 key,直到 2026-12-31 删除。
+    if not ctx.has("route_registry") and ctx.has("gateway_router"):
+        ctx.provide("route_registry", ctx.inject("gateway_router"))
 
 
-class GatewayRouter(LcaGatewayRouter):
+class RouteRegistry(RouteRegistryProtocol):
     """Mutable Starlette route registry. ``register_*`` returns disposers.
 
     Disposers mutate the registry in place;they MUST be handed to
@@ -142,4 +152,4 @@ class GatewayRouter(LcaGatewayRouter):
             app.router.routes.append(upgrade)
 
 
-__all__ = ["GatewayRouter"]
+__all__ = ["RouteRegistry"]

@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 
-from lca.plugins.transport.webserver.router import GatewayRouter
+from lca.plugins.transport.webserver.router import RouteRegistry
 
 
 class _FakeRuntime:
@@ -23,12 +23,12 @@ class _FakeRuntime:
 
 
 class _FakeCtx:
-    def __init__(self, router: GatewayRouter) -> None:
+    def __init__(self, router: RouteRegistry) -> None:
         self._router = router
         self._fake_runtime = _FakeRuntime()
 
     def require(self, key: str) -> Any:
-        assert key == "gateway_router"
+        assert key == "route_registry"
         return self._router
 
     def _runtime(self) -> _FakeRuntime:
@@ -46,7 +46,7 @@ async def test_routes_runs_sessions_register_16_routes() -> None:
     """
     from lca.plugins.transport.webserver.routes_runs_sessions import setup as plugin
 
-    router = GatewayRouter()
+    router = RouteRegistry()
     ctx = _FakeCtx(router)
     await plugin.setup(ctx, None)
 
@@ -58,7 +58,7 @@ async def test_routes_runs_sessions_paths_match_migration_baseline() -> None:
     """迁移后路径覆盖迁移前 ``build_routes`` 的 /runs + /v1/sessions 子树。"""
     from lca.plugins.transport.webserver.routes_runs_sessions import setup as plugin
 
-    router = GatewayRouter()
+    router = RouteRegistry()
     ctx = _FakeCtx(router)
     await plugin.setup(ctx, None)
 
@@ -90,7 +90,7 @@ async def test_routes_runs_sessions_paths_match_migration_baseline() -> None:
 async def test_routes_runs_sessions_effects_tracked() -> None:
     from lca.plugins.transport.webserver.routes_runs_sessions import setup as plugin
 
-    router = GatewayRouter()
+    router = RouteRegistry()
     ctx = _FakeCtx(router)
     await plugin.setup(ctx, None)
 

@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from lca.plugins.transport.webserver.router import GatewayRouter
+from lca.plugins.transport.webserver.router import RouteRegistry
 
 
 class _FakeRuntime:
@@ -22,12 +22,12 @@ class _FakeRuntime:
 class _FakeCtx:
     """Minimal :class:`AuditedPluginContext` for plugin setup unit tests."""
 
-    def __init__(self, router: GatewayRouter) -> None:
+    def __init__(self, router: RouteRegistry) -> None:
         self._router = router
         self._fake_runtime = _FakeRuntime()
 
     def require(self, key: str) -> Any:
-        assert key == "gateway_router"
+        assert key == "route_registry"
         return self._router
 
     def _runtime(self) -> _FakeRuntime:
@@ -38,7 +38,7 @@ class _FakeCtx:
 async def test_routes_health_options_register_three_routes() -> None:
     from lca.plugins.transport.webserver.routes_health_options import setup as plugin
 
-    router = GatewayRouter()
+    router = RouteRegistry()
     ctx = _FakeCtx(router)
     await plugin.setup(ctx, None)
 
@@ -53,7 +53,7 @@ async def test_routes_health_options_register_three_routes() -> None:
 async def test_routes_health_options_effects_tracked() -> None:
     from lca.plugins.transport.webserver.routes_health_options import setup as plugin
 
-    router = GatewayRouter()
+    router = RouteRegistry()
     ctx = _FakeCtx(router)
     await plugin.setup(ctx, None)
 

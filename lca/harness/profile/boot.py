@@ -180,7 +180,7 @@ def _bind_bootstrap_file_store(ctx: Context, store: FileStore | None) -> None:
         return
     if not isinstance(service, FileStoreService):
         return
-    service.register("gateway_bootstrap", store, activate=True)
+    service.register("webserver_bootstrap", store, activate=True)
 
 
 async def _boot_plugin(ctx: Context, definition: PluginDefinition, config: Any) -> None:

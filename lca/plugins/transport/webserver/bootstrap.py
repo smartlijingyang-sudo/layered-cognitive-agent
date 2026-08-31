@@ -1,9 +1,14 @@
-"""lca-gateway-bootstrap plugin — 把 gateway 进程级资源装到 Starlette app.state。
+"""lca-webserver-bootstrap plugin — 把 webserver 进程级资源装到 Starlette app.state。
 
-ADR-0119 决定 2:把原 ``gateway/bootstrap.py:install_gateway_state``(游离函数)
-改造成 L3 Provider plugin。Plugin ``setup`` 阶段提供:
-- ``ctx.provide("gateway_bootstrap_factory", DefaultGatewayBootstrapFactory)``
-- ``ctx.provide("gateway_bootstrap_config", GatewayBootstrapConfig())``
+ADR-0119 决定 2 + ADR-0119 followup-2:把原 ``gateway/bootstrap.py:install_gateway_state``
+改造成 L3 Provider plugin,plugin id 与 capability key 从
+``lca-gateway-bootstrap`` / ``gateway_bootstrap_*`` 改为
+``lca-webserver-bootstrap`` / ``webserver_bootstrap_*``(ADR-0106 §4.1
+命名宪法合规:"webserver" 是 webserver transport 命名空间)。
+
+Plugin ``setup`` 阶段提供:
+- ``ctx.provide("webserver_bootstrap_factory", DefaultWebserverBootstrapFactory)``
+- ``ctx.provide("webserver_bootstrap_config", WebserverBootstrapConfig())``
 - ``ctx.provide("install_bootstrap_state", install_bootstrap_state)`` — 供
   :func:`lca.plugins.transport.webserver.server.setup` 在 K3 完成后
   ``ctx.require("install_bootstrap_state")`` 直接调
@@ -13,7 +18,7 @@ ADR-0119 决定 2:把原 ``gateway/bootstrap.py:install_gateway_state``(游离�
 - ``run_port`` — RegistryRunAdapter
 - ``registry`` — RunRegistry
 - ``devices`` — DeviceRegistry
-- ``device_settings`` — DeviceGatewaySettings
+- ``device_settings`` — DeviceHubSettings
 - ``file_store`` — FileStore(优先 kernel seam,回退 bootstrap 默认根)
 - ``device_hub`` — DeviceHub
 - ``bound_observability`` — kernel-injected observability seam
@@ -44,34 +49,34 @@ from lca.infrastructure.file_store import FileStore, LocalFileStore
 
 
 @dataclass(frozen=True, slots=True)
-class GatewayBootstrapConfig:
+class WebserverBootstrapConfig:
     file_store_root: Path = Path("traces/files")
     file_store_url_prefix: str = "/files"
-    device_settings: Any = None  # Optional[DeviceGatewaySettings];测试用,生产用默认
+    device_settings: Any = None  # Optional[DeviceHubSettings];测试用,生产用默认
 
 
 @dataclass(frozen=True, slots=True)
-class GatewayBootstrap:
+class WebserverBootstrap:
     file_store: FileStore
     devices: Any  # DeviceRegistry
     device_hub: Any  # DeviceHub
     machine_resolver: MachineResolver
-    device_settings: Any  # DeviceGatewaySettings
+    device_settings: Any  # DeviceHubSettings
 
 
 @runtime_checkable
-class GatewayBootstrapFactory(Protocol):
-    def create(self, config: GatewayBootstrapConfig) -> GatewayBootstrap: ...
+class WebserverBootstrapFactory(Protocol):
+    def create(self, config: WebserverBootstrapConfig) -> WebserverBootstrap: ...
 
 
-class DefaultGatewayBootstrapFactory:
-    def create(self, config: GatewayBootstrapConfig) -> GatewayBootstrap:
-        from lca.plugins.transport.device_gateway.bind import DeviceMachineResolver
-        from lca.plugins.transport.device_gateway.hub import DeviceHub
-        from lca.plugins.transport.device_gateway.registry import DeviceRegistry
-        from lca.plugins.transport.device_gateway.settings import DeviceGatewaySettings
+class DefaultWebserverBootstrapFactory:
+    def create(self, config: WebserverBootstrapConfig) -> WebserverBootstrap:
+        from lca.plugins.transport.device_hub.bind import DeviceMachineResolver
+        from lca.plugins.transport.device_hub.hub import DeviceHub
+        from lca.plugins.transport.device_hub.registry import DeviceRegistry
+        from lca.plugins.transport.device_hub.settings import DeviceHubSettings
 
-        settings = config.device_settings or DeviceGatewaySettings()
+        settings = config.device_settings or DeviceHubSettings()
         file_store = LocalFileStore(
             config.file_store_root,
             public_url_prefix=config.file_store_url_prefix,
@@ -79,7 +84,7 @@ class DefaultGatewayBootstrapFactory:
         devices = DeviceRegistry(settings.db_path)
         device_hub = DeviceHub(devices)
         machine_resolver = DeviceMachineResolver(devices, device_hub)
-        return GatewayBootstrap(
+        return WebserverBootstrap(
             file_store=file_store,
             devices=devices,
             device_hub=device_hub,
@@ -92,9 +97,9 @@ def install_bootstrap_state(
     app: Any,
     ctx: Any,
     *,
-    config: GatewayBootstrapConfig | None = None,
+    config: WebserverBootstrapConfig | None = None,
 ) -> None:
-    """把 gateway 进程级资源装到 ``app.state``。从原 ``gateway/bootstrap.py:install_gateway_state`` 迁来。
+    """把 webserver 进程级资源装到 ``app.state``。从原 ``gateway/bootstrap.py:install_gateway_state`` 迁来。
 
     Composition:
     - ``run_port`` = ``RegistryRunAdapter(RunRegistry())``
@@ -109,8 +114,8 @@ def install_bootstrap_state(
             f"install_bootstrap_state requires a Starlette app, got {type(app).__name__}"
         )
 
-    factory: GatewayBootstrapFactory = DefaultGatewayBootstrapFactory()
-    cfg = config or GatewayBootstrapConfig()
+    factory: WebserverBootstrapFactory = DefaultWebserverBootstrapFactory()
+    cfg = config or WebserverBootstrapConfig()
     boot = factory.create(cfg)
 
     from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry
@@ -150,17 +155,17 @@ def install_bootstrap_state(
 
 
 @plugin(
-    id="lca-gateway-bootstrap",
+    id="lca-webserver-bootstrap",
     provides=(
-        "gateway_bootstrap_factory",
-        "gateway_bootstrap_config",
+        "webserver_bootstrap_factory",
+        "webserver_bootstrap_config",
         "install_bootstrap_state",
     ),
     requires=("file_store",),
-    layer="L0",  # SEAM 级别(跟 lca-gateway-router 平级),被 L1 lca-web-server 消费
+    layer="L0",  # SEAM 级别(跟 lca-webserver-router 平级),被 L1 lca-web-server 消费
     kind=PluginKind.PROVIDER,
     effects="none",
-    description="Bootstrap gateway 进程级资源到 Starlette app.state (从 gateway/bootstrap.py 迁来).",
+    description="Bootstrap webserver 进程级资源到 Starlette app.state (从 gateway/bootstrap.py 迁来).",
     test_suite="tests.lca_plugins.transport.webserver.test_bootstrap_plugin",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
@@ -171,18 +176,18 @@ def install_bootstrap_state(
         lifecycle=LifecycleContract(allowed_scopes=(Scope.PROFILE,)),
         authority=AuthorityContract(grants=("plugin.bootstrap",)),
         observability=EvidenceContract(
-            descriptors=("lca-gateway-bootstrap.installed",),
+            descriptors=("lca-webserver-bootstrap.installed",),
         ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(
         reads=("file_store",),
-        emits=("gateway_bootstrap.installed",),
+        emits=("webserver_bootstrap.installed",),
         state_mutation="forbidden",
     ),
 )
 async def setup(ctx: PluginContext, config: Any) -> None:
-    """Provide ``GatewayBootstrapFactory`` + config + install_bootstrap_state。
+    """Provide ``WebserverBootstrapFactory`` + config + install_bootstrap_state。
 
     实际 ``app.state`` 注入由 :func:`lca.plugins.transport.webserver.server.setup`
     在 K3 完成后 ``ctx.require("install_bootstrap_state")`` 触发。
@@ -191,19 +196,19 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     整体迁移过来的(原函数体没动),保持 historical 行为;未来 ADR followup 把
     ``gateway.bootstrap`` 业务搬到 ``lca.runtime.run_*`` 后,本包装层可删。
     """
-    factory = DefaultGatewayBootstrapFactory()
-    ctx.provide("gateway_bootstrap_factory", factory)
-    ctx.provide("gateway_bootstrap_config", GatewayBootstrapConfig())
+    factory = DefaultWebserverBootstrapFactory()
+    ctx.provide("webserver_bootstrap_factory", factory)
+    ctx.provide("webserver_bootstrap_config", WebserverBootstrapConfig())
     # 提供 install_bootstrap_state 函数引用(handler 通过 ctx.require 拿到)
-    # 函数体仍调用 gateway.bootstrap 业务(DeviceRegistry/Hub),属于 ADR-0119 之外的
+    # 函数体仍调用 device_hub 业务(DeviceRegistry/Hub),属于 ADR-0119 之外的
     # 业务搬迁 followup。本 PR 仅做 plugin 包装 + ADR-0119 决定 2 的最小可工作单元。
     ctx.provide("install_bootstrap_state", install_bootstrap_state)
 
 
 __all__ = [
-    "DefaultGatewayBootstrapFactory",
-    "GatewayBootstrap",
-    "GatewayBootstrapConfig",
-    "GatewayBootstrapFactory",
+    "DefaultWebserverBootstrapFactory",
+    "WebserverBootstrap",
+    "WebserverBootstrapConfig",
+    "WebserverBootstrapFactory",
     "install_bootstrap_state",
 ]

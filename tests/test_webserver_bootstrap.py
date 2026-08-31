@@ -1,6 +1,6 @@
 """Gateway startup infrastructure must be explicit and app-scoped.
 
-ADR-0115 决定 6: gateway/app.py 是 thin factory,不再接
+ADR-0115 决定 6: lca/plugins/transport/webserver/server.py 是 thin factory,不再接
 ``bootstrap_factory`` / ``bootstrap_config`` —— 这些关注点迁给 plugins
 (``lca/plugins/transport/webserver/`` 里的 routes plugin 在 lifespan 里
 装配 file_store / devices 等)。
@@ -18,9 +18,9 @@ from typing import cast
 import pytest
 
 from lca.plugins.transport.webserver.bootstrap import (
-    DefaultGatewayBootstrapFactory,
-    GatewayBootstrap,
-    GatewayBootstrapConfig,
+    DefaultWebserverBootstrapFactory,
+    WebserverBootstrap,
+    WebserverBootstrapConfig,
 )
 from lca.plugins.transport.device_gateway.hub import DeviceHub
 from lca.plugins.transport.device_gateway.registry import DeviceRegistry
@@ -56,15 +56,15 @@ def test_gateway_lifespan_reuses_bootstrap_file_store() -> None:
 def test_default_bootstrap_factory_creates_isolated_app_resources() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         root = Path(tmpdir)
-        factory = DefaultGatewayBootstrapFactory()
+        factory = DefaultWebserverBootstrapFactory()
         first = factory.create(
-            GatewayBootstrapConfig(
+            WebserverBootstrapConfig(
                 file_store_root=root / "one-files",
                 device_settings=DeviceGatewaySettings(db_path=str(root / "one-devices.db")),
             )
         )
         second = factory.create(
-            GatewayBootstrapConfig(
+            WebserverBootstrapConfig(
                 file_store_root=root / "two-files",
                 device_settings=DeviceGatewaySettings(db_path=str(root / "two-devices.db")),
             )
@@ -79,6 +79,6 @@ def test_default_bootstrap_factory_creates_isolated_app_resources() -> None:
 # Suppress unused-import warnings for legacy test fixtures.
 _ = cast
 _ = LocalFileStore
-_ = GatewayBootstrap
+_ = WebserverBootstrap
 _ = DeviceRegistry
 _ = DeviceHub

@@ -55,7 +55,7 @@ ROUTES: tuple[Route, ...] = (
 @plugin(
     id="lca-gateway-routes-openai-compat-files",
     provides=(),
-    requires=("gateway_router",),
+    requires=("route_registry",),
     layer="L1",
     kind=PluginKind.PROVIDER,
     effects="none",
@@ -75,16 +75,16 @@ ROUTES: tuple[Route, ...] = (
     ),
     relations=(),
     ownership=OwnershipDeclaration(
-        reads=("gateway_router",),
+        reads=("route_registry",),
         emits=("gateway_openai_compat_files_route.registered",),
         state_mutation="forbidden",
     ),
 )
 async def setup(ctx: PluginContext, config: Any) -> None:
-    router = ctx.require("gateway_router")
+    registry = ctx.require("route_registry")
     # PluginContext Protocol does not expose ``effect()``;the underlying
     # :class:`cordis.Context` does. Reach it through the audited facade.
     inner: Any = ctx._runtime()  # type: ignore[attr-defined]
     for route in ROUTES:
-        dispose = router.register_http(route)
+        dispose = registry.register_http(route)
         inner.effect(dispose, label=f"route:{route.path}")

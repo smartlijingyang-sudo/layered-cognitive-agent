@@ -15,7 +15,7 @@ from lca.infrastructure.openai_compat import (
     normalize_responses_input,
     resolve_upstream_model,
 )
-from tests.support.gateway_app import create_scripted_app
+from tests.support.webserver_app import create_scripted_app
 from tests.support.gateway_scripted import ScriptedLLMResolver
 
 

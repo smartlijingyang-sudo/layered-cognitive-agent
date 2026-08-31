@@ -4,7 +4,7 @@ Replaces deploy.lobehub.stack surface matching. New routes without a
 prefix here fail the test so they cannot silently appear unowned.
 
 ADR-0115 thin factory: routes are installed by the lifespan via
-``gateway_router.install(app)``; we drive the lifespan to enumerate.
+``route_registry.install(app)``; we drive the lifespan to enumerate.
 """
 
 from __future__ import annotations

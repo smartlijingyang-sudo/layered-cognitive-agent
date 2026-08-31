@@ -20,19 +20,19 @@ if TYPE_CHECKING:
 
 
 def _install_routes(app: Starlette) -> None:
-    """Install routes from the booted ctx's gateway_router."""
+    """Install routes from the booted ctx's route_registry."""
     ctx = getattr(app.state, "ctx", None)
     if ctx is None:
         return
     try:
-        router = ctx.inject("gateway_router")
+        router = ctx.inject("route_registry")
         router.install(app)
-        app.state.gateway_router = router
+        app.state.route_registry = router
     except Exception as exc:
         import structlog
 
         structlog.get_logger("tests.support.gateway_app").debug(
-            "gateway_router_install_skipped", error=str(exc)
+            "route_registry_install_skipped", error=str(exc)
         )
 
 
@@ -63,7 +63,7 @@ def create_scripted_app(
                 ctx = state["ctx"]
                 ctx.provide("llm_resolver", resolver)
                 app.state.ctx = ctx
-                ctx.inject("gateway_router").install(app)
+                ctx.inject("route_registry").install(app)
                 install_bootstrap_state(app, ctx)
                 await send({"type": "lifespan.startup.complete"})
                 await receive()

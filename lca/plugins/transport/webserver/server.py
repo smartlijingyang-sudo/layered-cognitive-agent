@@ -1,10 +1,10 @@
 """lca-web-server plugin — 接管 ``gateway/app.py`` 的全部职责。
 
-ADR-0119 决定 1 + 决定 3。``lca-web-server`` 是 L1 SEAM plugin,自我管理:
+ADR-0119 决定 1 + 决定 3 + ADR-0119 followup-2。``lca-web-server`` 是 L1 SEAM plugin,自我管理:
 
 1. 构造 Starlette app(空 routes)
 2. 调 ``ctx.require("install_bootstrap_state")`` 装 ASGI state(run_port / file_store / devices / etc.)
-3. 调 ``ctx.require("gateway_router").install(app)`` 把 4 个 routes plugin 攒的
+3. 调 ``ctx.require("route_registry").install(app)`` 把 4 个 routes plugin 攒的
    Route 列表 append 到 ``app.router.routes``
 4. 调 :func:`lca_kernel.lifespan.make_lifespan` 装 Starlette lifespan 协议
    (test/uvicorn 都用 — 没有 hack、没有 ``app.state.ctx = inner``、没有
@@ -80,8 +80,8 @@ class WebServerHandle:
 @plugin(
     id="lca-web-server",
     provides=("web_server",),
-    requires=("gateway_router", "install_bootstrap_state", "gateway_bootstrap_config"),
-    layer="L1",  # 整合 gateway_router (L0) + gateway_bootstrap (L0) + 装 Starlette + 装 lifespan
+    requires=("route_registry", "install_bootstrap_state", "webserver_bootstrap_config"),
+    layer="L1",  # 整合 route_registry (L0) + webserver_bootstrap (L0) + 装 Starlette + 装 lifespan
     kind=PluginKind.SEAM,
     effects="none",  # ADR-0119 决定 1 提到 binds:host:port;留 followup ADR 在 EffectCatalog 登记
     description="lca-web-server plugin — 装 Starlette + 装 ASGI state + 装 routes + 装 lifespan + provide web_server 句柄(替代 gateway/app.py).",
@@ -100,7 +100,7 @@ class WebServerHandle:
     ),
     relations=(),
     ownership=OwnershipDeclaration(
-        reads=("gateway_router", "install_bootstrap_state", "gateway_bootstrap_config"),
+        reads=("route_registry", "install_bootstrap_state", "webserver_bootstrap_config"),
         emits=("web_server.ready",),
         state_mutation="forbidden",
     ),
@@ -134,12 +134,12 @@ async def setup(ctx: PluginContext, config: Any) -> None:
 
     # 3a. lca-gateway-bootstrap 提供的 install_bootstrap_state 函数
     install_bootstrap_state = ctx.require("install_bootstrap_state")
-    bootstrap_config = ctx.require("gateway_bootstrap_config")
+    bootstrap_config = ctx.require("webserver_bootstrap_config")
     install_bootstrap_state(app, inner, config=bootstrap_config)
 
-    # 3b. lca-gateway-router 提供的 router 实例,装 routes
-    router = ctx.require("gateway_router")
-    router.install(app)
+    # 3b. lca-webserver-router 提供的 registry 实例,装 routes
+    registry = ctx.require("route_registry")
+    registry.install(app)
 
     # 3c. 装 Starlette lifespan 协议(让 TestClient(app).lifespan_context(app) 工作)
     # 长期可维护:lifespan 实现放在 lca_kernel.lifespan,plugin/cli/test 三方都用它

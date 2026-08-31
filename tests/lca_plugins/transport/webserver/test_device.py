@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from lca.plugins.transport.webserver.router import GatewayRouter
+from lca.plugins.transport.webserver.router import RouteRegistry
 
 
 class _FakeRuntime:
@@ -18,12 +18,12 @@ class _FakeRuntime:
 
 
 class _FakeCtx:
-    def __init__(self, router: GatewayRouter) -> None:
+    def __init__(self, router: RouteRegistry) -> None:
         self._router = router
         self._fake_runtime = _FakeRuntime()
 
     def require(self, key: str) -> Any:
-        assert key == "gateway_router"
+        assert key == "route_registry"
         return self._router
 
     def _runtime(self) -> _FakeRuntime:
@@ -34,7 +34,7 @@ class _FakeCtx:
 async def test_routes_device_register_seven_http_routes() -> None:
     from lca.plugins.transport.webserver.routes_device import setup as plugin
 
-    router = GatewayRouter()
+    router = RouteRegistry()
     ctx = _FakeCtx(router)
     await plugin.setup(ctx, None)
 
@@ -45,7 +45,7 @@ async def test_routes_device_register_seven_http_routes() -> None:
 async def test_routes_device_register_one_websocket() -> None:
     from lca.plugins.transport.webserver.routes_device import setup as plugin
 
-    router = GatewayRouter()
+    router = RouteRegistry()
     ctx = _FakeCtx(router)
     await plugin.setup(ctx, None)
 
@@ -57,7 +57,7 @@ async def test_routes_device_register_one_websocket() -> None:
 async def test_routes_device_paths_match_baseline() -> None:
     from lca.plugins.transport.webserver.routes_device import setup as plugin
 
-    router = GatewayRouter()
+    router = RouteRegistry()
     ctx = _FakeCtx(router)
     await plugin.setup(ctx, None)
 
@@ -78,7 +78,7 @@ async def test_routes_device_effects_tracked() -> None:
     """8 routes × 1 effect each = 8 effects(7 HTTP + 1 WS)。"""
     from lca.plugins.transport.webserver.routes_device import setup as plugin
 
-    router = GatewayRouter()
+    router = RouteRegistry()
     ctx = _FakeCtx(router)
     await plugin.setup(ctx, None)
 

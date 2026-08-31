@@ -319,38 +319,38 @@ entries:
     $module: lca.plugins.strategies.graph
     config: {}
 
-  # ── Transport (PR-4): Starlette gateway as 5 plugins (ADR-0112 + ADR-0115) ──
-  # L0 seam provides gateway_router; 4 L3 providers register route groups.
-  # Order matters: gateway-router must boot before routes_* providers.
-  - id: lca-gateway-router
-    name: lca_gateway_router
+  # ── Transport (PR-4): Starlette webserver as 5 plugins (ADR-0112 + ADR-0115 + ADR-0119 followup-2) ──
+  # L0 seam provides route_registry; 4 L3 providers register route groups.
+  # Order matters: webserver-router must boot before routes_* providers.
+  - id: lca-webserver-router
+    name: lca_webserver_router
     $module: lca.plugins.transport.webserver.router
     config: {}
 
-  - id: lca-gateway-routes-health-options
-    name: lca_gateway_routes_health_options
+  - id: lca-webserver-routes-health-options
+    name: lca_webserver_routes_health_options
     $module: lca.plugins.transport.webserver.routes_health_options
     config: {}
 
-  - id: lca-gateway-routes-runs-sessions
-    name: lca_gateway_routes_runs_sessions
+  - id: lca-webserver-routes-runs-sessions
+    name: lca_webserver_routes_runs_sessions
     $module: lca.plugins.transport.webserver.routes_runs_sessions
     config: {}
 
-  - id: lca-gateway-routes-openai-compat-files
-    name: lca_gateway_routes_openai_compat_files
+  - id: lca-webserver-routes-openai-compat-files
+    name: lca_webserver_routes_openai_compat_files
     $module: lca.plugins.transport.webserver.routes_openai_compat_files
     config: {}
 
-  - id: lca-gateway-routes-device
-    name: lca_gateway_routes_device
+  - id: lca-webserver-routes-device
+    name: lca_webserver_routes_device
     $module: lca.plugins.transport.webserver.routes_device
     config: {}
 
-  # ADR-0119: lca-gateway-bootstrap (L0 PROVIDER) 替代 gateway/bootstrap.py
+  # ADR-0119 + ADR-0119 followup-2: lca-webserver-bootstrap (L0 PROVIDER) 替代 gateway/bootstrap.py
   # 游离函数;提供 install_bootstrap_state 给 lca-web-server 在 K3 后调
-  - id: lca-gateway-bootstrap
-    name: lca_gateway_bootstrap
+  - id: lca-webserver-bootstrap
+    name: lca_webserver_bootstrap
     $module: lca.plugins.transport.webserver.bootstrap
     config: {}
 

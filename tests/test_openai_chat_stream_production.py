@@ -27,7 +27,7 @@ from lca.contracts.models.observability.journal import (
     ToolStarted,
 )
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
-from tests.support.gateway_app import create_scripted_app
+from tests.support.webserver_app import create_scripted_app
 
 _SEQ = [0]
 

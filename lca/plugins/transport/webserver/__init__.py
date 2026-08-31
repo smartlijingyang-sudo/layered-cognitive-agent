@@ -1,7 +1,7 @@
 """Starlette-based gateway transport — PR-4 实施(ADR-0112 修订版 + ADR-0115)。
 
 模块清单:
-- :mod:`.router` —— :class:`GatewayRouter` 实现 + ``lca-gateway-router`` L0 SEAM plugin。
+- :mod:`.router` —— :class:`RouteRegistry` 实现 + ``lca-webserver-router`` L0 SEAM plugin。
 - :mod:`.routes_health_options` —— ``lca-gateway-routes-health-options`` plugin(/health + OPTIONS)。
 - :mod:`.routes_runs_sessions` —— ``lca-gateway-routes-runs-sessions`` plugin(/runs + /v1/sessions)。
 - :mod:`.routes_openai_compat_files` —— ``lca-gateway-routes-openai-compat-files`` plugin(/v1/* + /files/*)。

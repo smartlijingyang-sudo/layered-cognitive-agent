@@ -49,7 +49,7 @@ UPGRADE: WebSocketRoute = WebSocketRoute("/api/device/ws", connect_device)
 @plugin(
     id="lca-gateway-routes-device",
     provides=(),
-    requires=("gateway_router",),
+    requires=("route_registry",),
     layer="L1",
     kind=PluginKind.PROVIDER,
     effects="none",
@@ -69,18 +69,18 @@ UPGRADE: WebSocketRoute = WebSocketRoute("/api/device/ws", connect_device)
     ),
     relations=(),
     ownership=OwnershipDeclaration(
-        reads=("gateway_router",),
+        reads=("route_registry",),
         emits=("gateway_device_route.registered",),
         state_mutation="forbidden",
     ),
 )
 async def setup(ctx: PluginContext, config: Any) -> None:
-    router = ctx.require("gateway_router")
+    registry = ctx.require("route_registry")
     # PluginContext Protocol does not expose ``effect()``;the underlying
     # :class:`cordis.Context` does. Reach it through the audited facade.
     inner: Any = ctx._runtime()  # type: ignore[attr-defined]
     for route in ROUTES:
-        dispose = router.register_http(route)
+        dispose = registry.register_http(route)
         inner.effect(dispose, label=f"route:{route.path}")
-    ws_dispose = router.register_websocket(UPGRADE)
+    ws_dispose = registry.register_websocket(UPGRADE)
     inner.effect(ws_dispose, label=f"ws:{UPGRADE.path}")

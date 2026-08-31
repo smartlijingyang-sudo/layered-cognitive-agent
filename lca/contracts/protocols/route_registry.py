@@ -1,16 +1,17 @@
-"""LcaGatewayRouter Protocol — 注册/反注册路由表的唯一入口(ADR-0112 修订版)。
+"""RouteRegistryProtocol — 注册/反注册路由表的唯一入口(ADR-0112 修订版)。
+
+ADR-0119 followup-2 (2026-08-31): 本 Protocol 原名 ``LcaGatewayRouter``,
+改名 ``RouteRegistryProtocol`` 以符合 ADR-0106 §4.1 命名宪法(类名直陈
+职责,后缀必须是 30 个角色后缀之一;"Registry" 是命名宪法许可后缀,
+"Gateway" 不是)。
 
 注意: 本 Protocol 与 ADR-0119 决定 4 的 "kernel serve" LCA 后台进程
 **无关**。它是 webserver transport 层的 HTTP/WebSocket route registry,
 负责把 plugin 注册的 Starlette ``Route`` 列表装到 ``app.router.routes``。
-命名历史: 在 LCA 进程切到 ``lca_kernel serve`` 之前, ":8765" 上的
-Starlette 应用叫 "gateway",这套路由 API 也跟着叫 "GatewayRouter"。
-命名沿用至今以避免 plugin manifest capability 槽位破坏
-(``provides=("gateway_router",)`` / ``requires=("gateway_router",)``,
-4 个 routes plugin + 1 个 server plugin 全部依赖此 key)。
 
-完整命名空间历史映射看
-``docs/adr/0119-followup-gateway-name-map.md``。
+公开 contract key: ``route_registry`` (capability key 字符串;旧 key
+``gateway_router`` 通过 lca-webserver-router plugin setup 内的 alias shim
+兼容,过期日 2026-12-31)。
 
 Public surface
 --------------
@@ -28,7 +29,7 @@ LCA 的 transport layer 通过此 Protocol 跟 kernel 解耦:
 - plugin 通过 register_http() 注册,register_* 必须返回 disposer
 - 调用方必须 ctx.effect(disposer, label=...) 否则 UndeclaredInteractionError
 
-引用 ADR-0112 修订版决定 1 / 决定 3。
+引用 ADR-0112 修订版决定 1 / 决定 3 / ADR-0119 followup-2。
 """
 
 from __future__ import annotations
@@ -40,11 +41,11 @@ from starlette.applications import Starlette
 from starlette.routing import Route, WebSocketRoute
 
 
-class LcaGatewayRouter(Protocol):
+class RouteRegistryProtocol(Protocol):
     """Starlette-based HTTP / WebSocket route registry.
 
     Routes plugin 通过 ``register_http`` / ``register_websocket`` / ``set_fallback``
-    把自己拥有的 Route 推入 router;router 在 ``install(app)`` 时一次性 append 到
+    把自己拥有的 Route 推入 registry;registry 在 ``install(app)`` 时一次性 append 到
     Starlette ``app.router.routes``。每个 ``register_*`` 返回一个 ``() -> None``
     disposer,plugin 必须把它交给 ``ctx.effect(dispose, label=...)`` 让 kernel 收口。
     """
