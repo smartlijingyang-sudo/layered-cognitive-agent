@@ -177,6 +177,7 @@ def _interpolate_str(s: str, scope: Mapping[str, Any]) -> str:
     type-preserving substitution, callers should compose via the dict/list
     recursion in :func:`interpolate`.
     """
+
     def _replace(match: re.Match[str]) -> str:
         path = match.group(1)
         cur: Any = scope

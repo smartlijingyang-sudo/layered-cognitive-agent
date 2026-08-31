@@ -120,9 +120,7 @@ class _MixinAccessor:
 
         return partial(attr, receiver)
 
-    def set(
-        self, _ctx: Context, val: Any, _receiver: Any, _error: Exception
-    ) -> bool:
+    def set(self, _ctx: Context, val: Any, _receiver: Any, _error: Exception) -> bool:
         target_value = self._get_target()
         try:
             setattr(target_value, self.src_key, val)
@@ -235,17 +233,13 @@ class ReflectHandler:
                 if cur_fiber.store is not None and prop in cur_fiber.store:
                     return get_traceable(target, cur_fiber.store[prop].value)
                 if cur_fiber.inject and prop in cur_fiber.inject:
-                    error2 = Exception(
-                        f'cannot get required service "{prop}" in inactive context'
-                    )
+                    error2 = Exception(f'cannot get required service "{prop}" in inactive context')
                     raise _enhance_error(error2)
                 if cur_fiber.runtime is None:
                     raise _enhance_error(error)
                 cur_fiber = getattr(cur_fiber.parent, "fiber", None)
         except Exception as exc:
-            if exc is error or (
-                "without inject" in str(exc) or "without accessor" in str(exc)
-            ):
+            if exc is error or ("without inject" in str(exc) or "without accessor" in str(exc)):
                 raise _enhance_error(error) from None
             raise
         raise _enhance_error(error)
@@ -261,9 +255,7 @@ class ReflectHandler:
 
         defn = target.reflect.props.get(prop)
         if defn is None:
-            raise _enhance_error(
-                Exception(f'cannot set property "{prop}" without provide')
-            )
+            raise _enhance_error(Exception(f'cannot set property "{prop}" without provide'))
 
         if defn.type == "accessor":
             if defn.set is None:
@@ -431,9 +423,7 @@ class ReflectService:
         if existing is None:
             self.props[name] = Property(type="service")
         elif existing.type != "service":
-            raise RuntimeError(
-                f'property "{name}" is already declared as {existing.type}'
-            )
+            raise RuntimeError(f'property "{name}" is already declared as {existing.type}')
         self.props[name] = Property(type="service")
 
         try:
@@ -449,8 +439,7 @@ class ReflectService:
         if key in self.store:
             existing_impl = self.store[key]
             raise RuntimeError(
-                f'service "{name}" has been registered at '
-                f'<{getattr(existing_impl.fiber, "name", "?")}>'
+                f'service "{name}" has been registered at <{getattr(existing_impl.fiber, "name", "?")}>'
             )
         self.store[key] = impl
 
@@ -546,9 +535,7 @@ class ReflectService:
             value = self._get_impl(name, False)
             value = getattr(value, "value", None) if value is not None else None
             try:
-                self.ctx.events.emit(
-                    self.ctx, "internal/service", name, value
-                )
+                self.ctx.events.emit(self.ctx, "internal/service", name, value)
             except Exception:  # pragma: no cover — defensive
                 pass
         return fibers
@@ -583,9 +570,7 @@ class ReflectService:
         """
         defn = self.props.get(name)
         if defn is not None:
-            raise RuntimeError(
-                f'property "{name}" is already declared as {defn.type}'
-            )
+            raise RuntimeError(f'property "{name}" is already declared as {defn.type}')
         self.props[name] = Property(
             type="accessor",
             get=options.get("get"),
@@ -623,9 +608,7 @@ class ReflectService:
             disp = accessor.install()
             disposers.append(disp)
             try:
-                self.ctx.fiber.effect(
-                    lambda d=disp: d, f'ctx.mixin("{value}")'
-                )
+                self.ctx.fiber.effect(lambda d=disp: d, f'ctx.mixin("{value}")')
             except Exception:  # pragma: no cover — fiberless context
                 pass
 

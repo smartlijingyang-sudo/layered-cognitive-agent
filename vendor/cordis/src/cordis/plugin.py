@@ -66,6 +66,7 @@ def plugin(
 
     Mirrors upstream ``@plugin`` decorator.
     """
+
     def _wrap(fn: Callable[..., Any]) -> Plugin:
         return Plugin(
             setup=fn,

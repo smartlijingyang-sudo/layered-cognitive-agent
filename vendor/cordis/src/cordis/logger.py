@@ -79,11 +79,81 @@ c16: list[int] = [6, 2, 3, 4, 5, 1]
 """ANSI 16-color palette indexes used for logger name coloring."""
 
 c256: list[int] = [
-    20, 21, 26, 27, 32, 33, 38, 39, 40, 41, 42, 43, 44, 45, 56, 57, 62,
-    63, 68, 69, 74, 75, 76, 77, 78, 79, 80, 81, 92, 93, 98, 99, 112, 113,
-    129, 134, 135, 148, 149, 160, 161, 162, 163, 164, 165, 166, 167, 168,
-    169, 170, 171, 172, 173, 178, 179, 184, 185, 196, 197, 198, 199, 200,
-    201, 202, 203, 204, 205, 206, 207, 208, 209, 214, 215, 220, 221,
+    20,
+    21,
+    26,
+    27,
+    32,
+    33,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    56,
+    57,
+    62,
+    63,
+    68,
+    69,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    92,
+    93,
+    98,
+    99,
+    112,
+    113,
+    129,
+    134,
+    135,
+    148,
+    149,
+    160,
+    161,
+    162,
+    163,
+    164,
+    165,
+    166,
+    167,
+    168,
+    169,
+    170,
+    171,
+    172,
+    173,
+    178,
+    179,
+    184,
+    185,
+    196,
+    197,
+    198,
+    199,
+    200,
+    201,
+    202,
+    203,
+    204,
+    205,
+    206,
+    207,
+    208,
+    209,
+    214,
+    215,
+    220,
+    221,
 ]
 """ANSI 256-color palette indexes used for logger name coloring."""
 
@@ -319,6 +389,7 @@ class Logger:
         fmt = args.pop(0)
         if not isinstance(fmt, str):
             fmt = str(fmt)
+
         # Replace %X tokens with formatted values
         def _replace(match: Any) -> str:
             ch = match.group(1)
@@ -336,6 +407,7 @@ class Logger:
             return match.group(0)
 
         import re
+
         fmt_str = re.sub(r"%([a-zA-Z%])", _replace, fmt)
         o_formatter: Formatter = (
             exporter.formatters.get("o") if exporter.formatters else None
@@ -399,7 +471,7 @@ class LoggerService:
         def _buffer_export(message: Message) -> None:
             service.buffer.append(message)
             if len(service.buffer) > service.buffer_size:
-                service.buffer = service.buffer[-service.buffer_size:]
+                service.buffer = service.buffer[-service.buffer_size :]
 
         self.exporter(Exporter(export=_buffer_export, colors=3))
 
@@ -440,6 +512,7 @@ class LoggerService:
             return {}
         try:
             from cordis.utils import symbols as _symbols  # local to avoid cycle
+
             intercept = ctx[_symbols.intercept]  # type: ignore[index]
         except Exception:
             return {}
@@ -491,6 +564,7 @@ class LoggerService:
         if ctx is not None:
             try:
                 from cordis.utils import symbols as _symbols
+
                 shadow = ctx[_symbols.shadow]  # type: ignore[index]
                 target = shadow if shadow is not None else ctx
                 fiber = getattr(target, "fiber", None)

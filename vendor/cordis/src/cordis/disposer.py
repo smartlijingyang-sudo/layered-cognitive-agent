@@ -139,9 +139,11 @@ async def dispose_all(values: Iterable[Callable[[], Any]] | AsyncIterable[Callab
     """Run each value's disposer; await if it returns an awaitable."""
     # Duck-typed async-iterable check (Iterable does not declare __aiter__).
     if inspect.isasyncgen(values) or hasattr(values, "__aiter__"):
+
         async def _collect() -> None:
             async for fn in values:  # pragma: no cover
                 await _run_one(fn)
+
         await _collect()
         return
 

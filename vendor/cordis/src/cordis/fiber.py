@@ -210,7 +210,9 @@ class Fiber:
                     parent_intercept = parent[symbols.intercept]  # type: ignore[name-defined]
                 except Exception:
                     parent_intercept = {}
-                new_intercept: dict[str, Any] = dict(parent_intercept) if isinstance(parent_intercept, dict) else {}
+                new_intercept: dict[str, Any] = (
+                    dict(parent_intercept) if isinstance(parent_intercept, dict) else {}
+                )
                 for name, cfg in inject_entries:
                     if cfg is None:
                         continue
@@ -283,6 +285,7 @@ class Fiber:
             # surfaces when the test runner's event loop is torn down before _reload
             # completes.
             import warnings as _w
+
             try:
                 with _w.catch_warnings():
                     _w.simplefilter("ignore", RuntimeWarning)
@@ -733,6 +736,7 @@ def _run_effect_body(fiber: Fiber, runner: _Runner) -> Any:
         return None
 
     if inspect.isawaitable(result):
+
         async def _then() -> None:
             v = await result
             if callable(v):
@@ -743,6 +747,7 @@ def _run_effect_body(fiber: Fiber, runner: _Runner) -> Any:
         return _then()
 
     if hasattr(result, "__aiter__"):
+
         async def _aiter() -> None:
             it = result.__aiter__()
             while True:

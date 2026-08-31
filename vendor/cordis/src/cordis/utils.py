@@ -413,9 +413,7 @@ def _handle_error(
     # Combine the original traceback with the outer caller's frames so the
     # reraised exception's ``cordis_stack`` attribute exposes a
     # user-friendly multi-frame traceback.
-    base_text = "".join(
-        traceback.format_exception(type(reason), reason, reason.__traceback__)
-    ).rstrip("\n")
+    base_text = "".join(traceback.format_exception(type(reason), reason, reason.__traceback__)).rstrip("\n")
     spliced_text = "\n".join([base_text, *outer_lines])
     try:
         reason.__dict__["cordis_stack"] = spliced_text  # type: ignore[attr-defined]

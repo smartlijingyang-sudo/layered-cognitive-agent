@@ -308,6 +308,7 @@ class Context:
         self.isolated[label] = scoped
 
         if inspect.iscoroutinefunction(callback):
+
             async def _runner() -> Any:
                 token = _active_ctx.set(scoped)
                 try:
@@ -428,9 +429,7 @@ class Context:
             except Exception as e:  # noqa: BLE001
                 import logging
 
-                logging.getLogger(__name__).warning(
-                    f"disposer {disp.label!r} raised {type(e).__name__}: {e}"
-                )
+                logging.getLogger(__name__).warning(f"disposer {disp.label!r} raised {type(e).__name__}: {e}")
 
     def emit(self, *args: Any) -> None:
         """Mix-in: ``ctx.emit(...)`` mirrors ``ctx.events.emit(...)``.
@@ -559,7 +558,7 @@ class _ScopeCM:
 
     async def __aexit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
         try:
-            new_disposers = self._scoped.disposers[self._new_disposer_start:]
+            new_disposers = self._scoped.disposers[self._new_disposer_start :]
             for disp in reversed(new_disposers):
                 await run_disposer(disp)
         finally:

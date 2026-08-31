@@ -255,7 +255,7 @@ class RegistryService:
         callback = self.resolve(plugin)
         if not callback:
             raise TypeError(
-                "invalid plugin, expect function or object with an \"apply\" method, "
+                'invalid plugin, expect function or object with an "apply" method, '
                 f"received {type(plugin).__name__}"
             )
 

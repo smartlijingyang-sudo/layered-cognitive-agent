@@ -142,9 +142,7 @@ class EventsService:
     # Dispatch core
     # ------------------------------------------------------------------
 
-    def dispatch(
-        self, mode: str, args: list[Any]
-    ) -> tuple[list[Callable[..., Any]], list[Any], Any]:
+    def dispatch(self, mode: str, args: list[Any]) -> tuple[list[Callable[..., Any]], list[Any], Any]:
         """Resolve listeners for one dispatch.
 
         Returns ``(callbacks, payload_args, this_arg)``.
@@ -160,8 +158,11 @@ class EventsService:
         # Default ``this_arg`` to ``self.ctx`` so listeners see the active
         # context as ``this`` even when the caller doesn't pass one.
         this_arg: Any = self.ctx
-        if args and isinstance(args[0], (object, type)) and callable(args[0]) or (
-            args and isinstance(args[0], object) and not isinstance(args[0], (str, bytes))
+        if (
+            args
+            and isinstance(args[0], (object, type))
+            and callable(args[0])
+            or (args and isinstance(args[0], object) and not isinstance(args[0], (str, bytes)))
         ):
             this_arg = args.pop(0)
         else:
@@ -222,9 +223,7 @@ class EventsService:
             except Exception:  # pragma: no cover — defensive
                 pass
 
-            def _make(
-                c: Callable[..., Any] = cb, ctx: Any = this_arg
-            ) -> Callable[..., Any]:
+            def _make(c: Callable[..., Any] = cb, ctx: Any = this_arg) -> Callable[..., Any]:
                 def _wrapper(*a: Any, **k: Any) -> Any:
                     return c(ctx, *a, **k)
 
@@ -244,6 +243,7 @@ class EventsService:
             # Wrap an empty gather in a coroutine so callers can await us.
             async def _empty() -> None:
                 return None
+
             return _empty()
         # Each callback may be sync or async; wrap sync ones in a coroutine.
         wrappers: list[Any] = []
@@ -251,6 +251,7 @@ class EventsService:
             try:
                 result = cb(*payload)
             except Exception as exc:  # surface immediately on errors
+
                 async def _raise(
                     _ex: BaseException = exc,
                 ) -> None:  # pragma: no cover — already-raised path
@@ -261,6 +262,7 @@ class EventsService:
             if inspect.isawaitable(result):
                 wrappers.append(result)
             else:
+
                 async def _no_await(_r: Any = result) -> None:
                     return None
 
@@ -305,7 +307,9 @@ class EventsService:
         """
         callbacks, payload_with_next, _this = self.dispatch("waterfall", list(args))
         if not args:
-            raise TypeError("waterfall requires at least one argument")  # pragma: no cover — guarded at ctx.waterfall level
+            raise TypeError(
+                "waterfall requires at least one argument"
+            )  # pragma: no cover — guarded at ctx.waterfall level
         # The LAST element of the post-name args is the inner next.
         inner = payload_with_next.pop() if payload_with_next else (lambda: None)
 
@@ -335,7 +339,9 @@ class EventsService:
         hook_obj = Hook(ctx=self.ctx, callback=callback, prepend=options.prepend, global_=options.global_)
 
         def _cleanup() -> bool:
-            return self.unregister(hooks, callback)  # pragma: no cover — runs inside fiber effect cleanup, exercised end-to-end via ctx dispose
+            return self.unregister(
+                hooks, callback
+            )  # pragma: no cover — runs inside fiber effect cleanup, exercised end-to-end via ctx dispose
 
         def _effect() -> Callable[[], bool]:
             if method == "prepend":
@@ -425,7 +431,9 @@ class EventsService:
         def _once(*args: Any, **kwargs: Any) -> Any:
             if dispose_ref:
                 dispose_ref[0]()
-            return listener(*args, **kwargs)  # pragma: no cover — `dispose_ref` is always populated by ``on`` immediately after registration
+            return listener(
+                *args, **kwargs
+            )  # pragma: no cover — `dispose_ref` is always populated by ``on`` immediately after registration
 
         dispose_fn = self.on(name, _once, options)
         dispose_ref.append(dispose_fn)

@@ -55,6 +55,7 @@ __all__ = [
 # `globalThis.__schemastery_refs__` slots.
 # ---------------------------------------------------------------------------
 
+
 class MetaDict(dict):
     """Dict subclass that also supports attribute-style lookup.
 
@@ -293,8 +294,10 @@ class Schema:
         if self.type in ("array", "tuple"):
             result_list: list[Any] = []
             for index, item in enumerate(value):
-                inner_schema = self.inner if self.type == "array" else (
-                    self.list[index] if self.list is not None and index < len(self.list) else None
+                inner_schema = (
+                    self.inner
+                    if self.type == "array"
+                    else (self.list[index] if self.list is not None and index < len(self.list) else None)
                 )
                 simplified = inner_schema.simplify(item) if inner_schema is not None else item
                 result_list.append(simplified)
@@ -331,8 +334,7 @@ class Schema:
             )
         if new.list is not None:
             new.list = [
-                inner.i18n(_list_message_map(messages, index))
-                for index, inner in enumerate(new.list)
+                inner.i18n(_list_message_map(messages, index)) for index, inner in enumerate(new.list)
             ]
         if new.inner is not None:
             new.inner = new.inner.i18n(_inner_message_map(messages))
@@ -470,7 +472,7 @@ def _resolve(
 
     resolver = resolvers.get(schema.type)
     if resolver is None:
-        raise ValidationError(f"unsupported type \"{schema.type}\"", opts)
+        raise ValidationError(f'unsupported type "{schema.type}"', opts)
     try:
         return resolver(data, schema, opts, strict)
     except ValidationError:
@@ -581,7 +583,10 @@ def _is_multiple_of(data: float, minimum: float, step: float) -> bool:
     step_text = f"{step:.20f}".rstrip("0").rstrip(".")
     _, _, frac = step_text.partition(".")
     digits = len(frac)
-    return abs(_decimal_shift(data, digits) - _decimal_shift(minimum, digits)) % _decimal_shift(step, digits) == 0
+    return (
+        abs(_decimal_shift(data, digits) - _decimal_shift(minimum, digits)) % _decimal_shift(step, digits)
+        == 0
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -691,26 +696,30 @@ def _percent_factory() -> Schema:
 
 
 def _date_factory() -> Schema:
-    return _union_factory([
-        _is_factory(_dt.date),
-        _transform_factory(
-            _string_factory().role("datetime"),
-            _date_transform_callback,
-            preserve=True,
-        ),
-    ])
+    return _union_factory(
+        [
+            _is_factory(_dt.date),
+            _transform_factory(
+                _string_factory().role("datetime"),
+                _date_transform_callback,
+                preserve=True,
+            ),
+        ]
+    )
 
 
 def _reg_exp_factory(flag: str = "") -> Schema:
     py_flags = _reg_exp_flags_to_int(flag)
-    return _union_factory([
-        _is_factory(_re.Pattern),
-        _transform_factory(
-            _string_factory().role("regexp", {"flag": flag}),
-            lambda value, options, _flags=py_flags: _reg_exp_transform_callback(value, _flags, options),
-            preserve=True,
-        ),
-    ])
+    return _union_factory(
+        [
+            _is_factory(_re.Pattern),
+            _transform_factory(
+                _string_factory().role("regexp", {"flag": flag}),
+                lambda value, options, _flags=py_flags: _reg_exp_transform_callback(value, _flags, options),
+                preserve=True,
+            ),
+        ]
+    )
 
 
 def _reg_exp_flags_to_int(flag: str) -> int:
@@ -752,7 +761,7 @@ def _date_transform_callback(value: Any, options: Options) -> Any:
     try:
         return _dt.datetime.fromisoformat(value) if isinstance(value, str) else _dt.date.fromisoformat(value)
     except (ValueError, TypeError) as err:
-        raise ValidationError(f"invalid date \"{value}\"", options) from err
+        raise ValidationError(f'invalid date "{value}"', options) from err
 
 
 def _reg_exp_transform_callback(value: str, flags: int, options: Options) -> _re.Pattern[str]:
@@ -842,7 +851,9 @@ def _resolve_boolean(data: Any, _schema: Schema, options: Options, _strict: bool
     raise ValidationError(f"expected boolean but got {data}", options)
 
 
-def _resolve_bitset(data: Any, schema: Schema, options: Options, _strict: bool = False) -> tuple[Any, Any | None]:
+def _resolve_bitset(
+    data: Any, schema: Schema, options: Options, _strict: bool = False
+) -> tuple[Any, Any | None]:
     bits = schema.bits or {}
     value = 0
     keys: list[str] = []
@@ -865,7 +876,9 @@ def _resolve_bitset(data: Any, schema: Schema, options: Options, _strict: bool =
     return (value, keys)
 
 
-def _resolve_function(data: Any, _schema: Schema, options: Options, _strict: bool = False) -> tuple[Any, None]:
+def _resolve_function(
+    data: Any, _schema: Schema, options: Options, _strict: bool = False
+) -> tuple[Any, None]:
     if callable(data):
         return (data, None)
     raise ValidationError(f"expected function but got {data}", options)
@@ -959,13 +972,10 @@ def _resolve_tuple(
     if not isinstance(data, list):
         raise ValidationError(f"expected array but got {data}", options)
     list_ = schema.list or []
-    result = [
-        _resolve_array_index(data, index, inner, options)
-        for index, inner in enumerate(list_)
-    ]
+    result = [_resolve_array_index(data, index, inner, options) for index, inner in enumerate(list_)]
     if strict:
         return (result, None)
-    extras = data[len(list_):]
+    extras = data[len(list_) :]
     result.extend(extras)
     return (result, None)
 
@@ -1045,15 +1055,11 @@ def _resolve_intersect(
         if isNullable(result):
             result = value
         elif type(result) is not type(value):
-            raise ValidationError(
-                f"expected {schema.to_string()} but got {_safe_json(data)}", options
-            )
+            raise ValidationError(f"expected {schema.to_string()} but got {_safe_json(data)}", options)
         elif isinstance(result, dict) and isinstance(value, dict):
             _merge(result, value)
         elif result != value:
-            raise ValidationError(
-                f"expected {schema.to_string()} but got {_safe_json(data)}", options
-            )
+            raise ValidationError(f"expected {schema.to_string()} but got {_safe_json(data)}", options)
     if not strict and isPlainObject(data):
         _merge(result or {}, data)
     return (result, None)
@@ -1151,10 +1157,20 @@ for _name, _resolver in [
     resolvers[_name] = _resolver
 
 # Register built-in formatters.
-_register_method("is", lambda schema, _inline=False: schema.constructor.__name__ if isinstance(schema.constructor, type) else str(schema.constructor))
+_register_method(
+    "is",
+    lambda schema, _inline=False: (
+        schema.constructor.__name__ if isinstance(schema.constructor, type) else str(schema.constructor)
+    ),
+)
 _register_method("any", lambda *_: "any")
 _register_method("never", lambda *_: "never")
-_register_method("const", lambda schema, _inline=False: '"' + str(schema.value) + '"' if isinstance(schema.value, str) else str(schema.value))
+_register_method(
+    "const",
+    lambda schema, _inline=False: (
+        '"' + str(schema.value) + '"' if isinstance(schema.value, str) else str(schema.value)
+    ),
+)
 _register_method("string", lambda *_: "string")
 _register_method("number", lambda *_: "number")
 _register_method("boolean", lambda *_: "boolean")
