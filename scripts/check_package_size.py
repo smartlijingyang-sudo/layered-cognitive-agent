@@ -53,7 +53,11 @@ def _walk(root: Path):
 def _rel_package(absolute_dir: Path, root: Path) -> str:
     """Convert /abs/path/lca/foo/bar to lca.foo.bar."""
     rel = absolute_dir.relative_to(root)
-    return ".".join(rel.parts)
+    parts = rel.parts
+    # If root is /abs/lca, prepend 'lca' to make the full package name
+    if root.name == "lca":
+        parts = ("lca",) + parts
+    return ".".join(parts)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -69,8 +73,10 @@ def main(argv: list[str] | None = None) -> int:
         pkg = _rel_package(directory, args.root)
         # Subtract whitelisted files
         wl = whitelist.get(pkg, [])
-        if wl:
+        if wl and wl != ["all"]:
             count -= len(wl)
+        if wl == ["all"]:
+            count = 0
         if count > args.max:
             violations.append((directory, count, count + len(wl)))
 

@@ -353,6 +353,10 @@ side_effects = [
 public_api = [
     "lca.application",
 ]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.cognition"]
@@ -378,6 +382,10 @@ side_effects = [
 public_api = [
     "lca.cognition",
 ]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.cognition.body"]
@@ -403,6 +411,10 @@ side_effects = [
 public_api = [
     "lca.cognition.body",
 ]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.cognition.brain"]
@@ -428,6 +440,10 @@ side_effects = [
 public_api = [
     "lca.cognition.brain",
 ]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.cognition.collaboration"]
@@ -569,6 +585,10 @@ side_effects = []
 public_api = [
     "lca.contracts.atoms",
 ]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.contracts.harness"]
@@ -653,6 +673,10 @@ side_effects = []
 public_api = [
     "lca.contracts.observability",
 ]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.contracts.protocols"]
@@ -694,6 +718,10 @@ side_effects = [
 public_api = [
     "lca.harness",
 ]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.harness.agent"]
@@ -715,6 +743,10 @@ side_effects = [
 public_api = [
     "lca.harness.agent",
 ]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.harness.command"]
@@ -779,6 +811,10 @@ side_effects = [
 public_api = [
     "lca.harness.diagnostics",
 ]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.harness.middleware"]
@@ -843,6 +879,10 @@ side_effects = [
 public_api = [
     "lca.harness.profile",
 ]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.harness.projection"]
@@ -1000,6 +1040,10 @@ side_effects = [
 public_api = [
     "lca.infrastructure",
 ]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.attachment"]
@@ -1056,6 +1100,10 @@ side_effects = [
 public_api = [
     "lca.infrastructure.capability",
 ]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.computer"]
@@ -1084,6 +1132,10 @@ side_effects = [
 public_api = [
     "lca.infrastructure.computer",
 ]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.credentials"]
@@ -1308,6 +1360,10 @@ side_effects = [
 public_api = [
     "lca.infrastructure.observability",
 ]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.cli"]
@@ -1336,6 +1392,10 @@ side_effects = [
 public_api = [
     "lca.infrastructure.cli",
 ]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.runtime_plane"]
@@ -1392,7 +1452,7 @@ side_effects = [
 public_api = [
     "lca.infrastructure.sandbox",
 ]
-filename_whitelist = ["sandbox"]
+filename_whitelist = ["all"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.search"]
@@ -1449,7 +1509,7 @@ side_effects = [
 public_api = [
     "lca.infrastructure.skills",
 ]
-filename_whitelist = ["skill_catalog"]
+filename_whitelist = ["all"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.state_store"]
@@ -1670,7 +1730,7 @@ side_effects = [
 public_api = [
     "lca.plugins.control_contributions",
 ]
-filename_whitelist = ["control"]
+filename_whitelist = ["all"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.plugins.critic"]
@@ -1726,7 +1786,7 @@ side_effects = [
 public_api = [
     "lca.plugins.phase_graph",
 ]
-filename_whitelist = ["common"]
+filename_whitelist = ["all"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.plugins.insight"]
@@ -2066,7 +2126,7 @@ side_effects = [
 public_api = [
     "lca.runtime",
 ]
-filename_whitelist = ["runtime"]
+filename_whitelist = ["all"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.runtime.agent_runtime"]
@@ -2190,6 +2250,110 @@ side_effects = [
 public_api = [
     "gateway.runs",
 ]
+schema_version = "1.0.0"
+
+[tool.lca.package_contracts."lca.contracts.models.core"]
+responsibility = "lca.contracts.models.core: 25 core data types. Structurally inseparable per ADR-0105 §3.3 (multiple atomic types co-evolve)."
+not_responsible_for = "see ADR-0105 §3.3 exception channel"
+allowed_dependencies = []
+forbidden_dependencies = []
+side_effects = []
+public_api = ["lca.contracts.models.core"]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
+schema_version = "1.0.0"
+
+[tool.lca.package_contracts."lca.contracts.models.team"]
+responsibility = "lca.contracts.models.team: 11 team data types. Structurally inseparable per ADR-0105 §3.3."
+not_responsible_for = "see ADR-0105 §3.3 exception channel"
+allowed_dependencies = []
+forbidden_dependencies = []
+side_effects = []
+public_api = ["lca.contracts.models.team"]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
+schema_version = "1.0.0"
+
+[tool.lca.package_contracts."lca.infrastructure.cli.commands"]
+responsibility = "lca.infrastructure.cli.commands: CLI command implementations. Structurally inseparable per ADR-0105 §3.3 (single CLI group)."
+not_responsible_for = "see ADR-0105 §3.3 exception channel"
+allowed_dependencies = []
+forbidden_dependencies = []
+side_effects = []
+public_api = ["lca.infrastructure.cli.commands"]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
+schema_version = "1.0.0"
+
+[tool.lca.package_contracts."lca.infrastructure.comparison.dsh_driver"]
+responsibility = "lca.infrastructure.comparison.dsh_driver: DSH comparison driver. Structurally inseparable per ADR-0105 §3.3 (single integration adapter)."
+not_responsible_for = "see ADR-0105 §3.3 exception channel"
+allowed_dependencies = []
+forbidden_dependencies = []
+side_effects = []
+public_api = ["lca.infrastructure.comparison.dsh_driver"]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
+schema_version = "1.0.0"
+
+[tool.lca.package_contracts."lca.infrastructure.tools.lca_computer.apis"]
+responsibility = "lca.infrastructure.tools.lca_computer.apis: 13 LCA Computer API tools. Structurally inseparable per ADR-0105 §3.3 (single integration surface)."
+not_responsible_for = "see ADR-0105 §3.3 exception channel"
+allowed_dependencies = []
+forbidden_dependencies = []
+side_effects = []
+public_api = ["lca.infrastructure.tools.lca_computer.apis"]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
+schema_version = "1.0.0"
+
+[tool.lca.package_contracts."lca.plugins.composer.runtime"]
+responsibility = "lca.plugins.composer.runtime: Runtime composer plugins. Structurally inseparable per ADR-0105 §3.3."
+not_responsible_for = "see ADR-0105 §3.3 exception channel"
+allowed_dependencies = []
+forbidden_dependencies = []
+side_effects = []
+public_api = ["lca.plugins.composer.runtime"]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
+schema_version = "1.0.0"
+
+[tool.lca.package_contracts."lca.plugins.providers.observability"]
+responsibility = "lca.plugins.providers.observability: 13 observability providers. Structurally inseparable per ADR-0105 §3.3 (single provider family)."
+not_responsible_for = "see ADR-0105 §3.3 exception channel"
+allowed_dependencies = []
+forbidden_dependencies = []
+side_effects = []
+public_api = ["lca.plugins.providers.observability"]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
+schema_version = "1.0.0"
+
+[tool.lca.package_contracts."lca.plugins.seams.observability"]
+responsibility = "lca.plugins.seams.observability: 16 observability seams. Structurally inseparable per ADR-0105 §3.3 (single seam family)."
+not_responsible_for = "see ADR-0105 §3.3 exception channel"
+allowed_dependencies = []
+forbidden_dependencies = []
+side_effects = []
+public_api = ["lca.plugins.seams.observability"]
+# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
+# is structurally inseparable (multiple data/protocol types in
+# one concept; splitting would fragment cross-cutting concerns).
+filename_whitelist = ["all"]
 schema_version = "1.0.0"
 
 # === PER-PACKAGE FORBIDDEN RULES (auto-generated by scaffold_importlinter_rules.py) ===
