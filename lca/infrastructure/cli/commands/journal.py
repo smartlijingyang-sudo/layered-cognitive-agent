@@ -220,7 +220,10 @@ def _stream_live(
                 client.stream("GET", url, headers=headers) as resp,
             ):
                 if resp.status_code == 404:
-                    print("gateway 还没有 /journal/live，先 ./scripts/lca-ops gateway restart")
+                    print(
+                        "gateway 还没有 /journal/live —— lca-ops 不再管理 LCA 进程。"
+                        " 请确认 `uv run python -m lca_kernel serve --profile profiles/web-standard.yaml` 在跑。"
+                    )
                     projector.close()
                     raise SystemExit(1)
                 if resp.status_code != 200:

@@ -36,6 +36,7 @@ def register(app: typer.Typer) -> None:
                 "  日志    .lca-ops/lobehub.log\n"
                 "  动作    start | stop | restart | status | ensure\n"
                 "  ensure  同步源码、打补丁、写 .env、bun install\n"
+                "  注意    lobehub 自身不带 LCA 后端;后端进程见 ./scripts/lca-ops kernel_serve\n"
                 "  例子    ./scripts/lca-ops lobehub restart\n"
                 "          ./scripts/lca-ops logs lobehub\n"
             )
@@ -68,6 +69,7 @@ def register(app: typer.Typer) -> None:
                 "infra  postgres :25432  redis :6379  s3 按 .env\n"
                 "  动作    start | stop | status\n"
                 "  start   端口不通才 docker compose up，不拆已有 lobe-postgres\n"
+                "  注意    lca-ops 不管 LCA 进程(kernel serve);infra 与 kernel 独立\n"
                 "  例子    ./scripts/lca-ops infra start\n"
             )
             raise typer.Exit(0)
@@ -101,8 +103,8 @@ def register(app: typer.Typer) -> None:
                 "  restart    stop + ensure + start（改完代码用这个）\n"
                 "  整机首次    ./scripts/lca-ops provision\n"
                 "  密码    .lobehub-stack/sudo.pass\n"
-                "  例子    ./scripts/lca-ops daemon start\n"
-                "          ./scripts/lca-ops daemon restart\n"
+                "  注意    daemon 连的是 kernel serve,不是 lca-ops 自身\n"
+                "  例子    ./scripts/lca-ops daemon restart\n"
                 "          ./scripts/lca-ops logs daemon\n"
             )
             raise typer.Exit(0)

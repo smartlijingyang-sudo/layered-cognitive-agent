@@ -39,26 +39,15 @@ LCA 开发平台编排  ./scripts/lca-ops
 全站
 ────────────────────────────────
 status
-  看 infra / gateway / lobehub / daemon / onlyboxes。异常会写出原因。
+  看 infra / lobehub / daemon / onlyboxes。异常会写出原因。
   onlyboxes 未钉 LCA terminal 镜像时会提示 configure-terminal-runtime。
+  注意: status 不包含 LCA 进程;LCA 进程由 lca_kernel serve 自管。
   ./scripts/lca-ops status
   ./scripts/lca-ops status --json          给 agent 用
 
 heal
-  自己把不健康的服务拉起来（复用已有容器、重启过期 gateway、连 daemon）。
+  自己把不健康的服务拉起来（复用已有容器、重启过期 lobehub、连 daemon）。
   ./scripts/lca-ops heal
-
-dev
-  第一次或全停之后：起 infra + gateway + lobehub + daemon。
-  ./scripts/lca-ops dev
-
-restart
-  全停再起。setup 已做好会跳过。日常异常优先 heal，不要先 restart。
-  ./scripts/lca-ops restart
-
-stop
-  停 daemon / lobehub / gateway / infra。
-  ./scripts/lca-ops stop
 
 ────────────────────────────────
 日志  logs
@@ -74,28 +63,49 @@ stop
   模型可见的一切都可从 journal 重建。
 
 ────────────────────────────────
-单服务
+单服务（lca-ops 只管外部平台服务）
 ────────────────────────────────
-gateway    LCA API  :8765     日志 .lca-ops/gateway.log
-  start | stop | restart | status
-  ./scripts/lca-ops gateway restart
-
-lobehub    Next 前端 :3010    日志 .lca-ops/lobehub.log
-  start | stop | restart | status | ensure
-  ensure = 源码 / 补丁 / .env / bun install，不启进程
-  ./scripts/lca-ops lobehub restart
-
 infra      postgres / redis / s3
-  start | stop | status
-  start 只补缺的（已有 lobe-postgres:25432 会复用）
+  动作    start | stop | status
+  start   端口不通才 docker compose up，不拆已有 lobe-postgres
   ./scripts/lca-ops infra start
 
-daemon     sandbox-user 连 gateway
-  start | stop | status | ensure
-  ensure     部署 /opt/lca CLI
-  provision  装包 / venv / 建用户 / 工作区 / CLI（原 lca-host.py）
-  ./scripts/lca-ops daemon start
-  ./scripts/lca-ops provision
+lobehub    Next 前端 :3010    日志 .lca-ops/lobehub.log
+  动作    start | stop | restart | status | ensure
+  ensure  同步源码 / 打补丁 / 写 .env / bun install，不启进程
+  ./scripts/lca-ops lobehub restart
+
+daemon     sandbox-user 连接器
+  日志    /home/sandbox-user/.lca/daemon.log
+  动作    start | stop | restart | status | ensure
+  ensure  感知源码变更 → 自动重建部署 packages/lca-cli
+  整机首次  ./scripts/lca-ops provision
+  ./scripts/lca-ops daemon restart
+
+onlyboxes  worker runtime(只读;无 start/stop 命令)
+  ./scripts/lca-ops status --json  看 onlyboxes 详情
+
+────────────────────────────────
+LCA 进程 (kernel serve)  ADR-0119 决定 4
+────────────────────────────────
+lca-ops 不管理 LCA 进程。LCA API :8765 由 lca_kernel serve 自管,
+SIGTERM/SIGINT 由 K6 ``lca_kernel.lifecycle`` 守护。
+
+  # 启动(前台)
+  uv run python -m lca_kernel serve \\
+      --profile profiles/web-standard.yaml \\
+      --host 0.0.0.0 --port 8765 --allow-unknown-env
+
+  # 打印启动命令(脚本化集成用)
+  ./scripts/lca-ops kernel_serve [--host H] [--port P] [profile_path]
+
+  # 仅 boot profile 并 block 到 SIGINT(无 transport)
+  ./scripts/lca-ops kernel-boot [profile_path]
+
+  # LCA 进程出问题 → 看 journal 而非 restart
+  ./scripts/lca-ops logs
+  ./scripts/lca-ops explain <run_id>
+  ./scripts/lca-ops diagnose <alias>
 
 ────────────────────────────────
 Run 复盘  coding-agent tools(ADR-0065 §六 / PR-9,只读)

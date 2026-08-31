@@ -1,25 +1,22 @@
 #!/usr/bin/env bash
 # LCA Platform Orchestrator — unified service management.
 #
-# This is the single entry point for managing the LCA development platform:
-# - Infrastructure (postgres, redis, s3)
-# - LobeHub (Next.js frontend)
-# - Daemon (sandbox-user CLI connect)
-# - Onlyboxes (worker runtime)
-#
 # ADR-0119 决定 4:lca-ops 不再管 LCA 进程 — LCA 进程入口是
 #   ``uv run python -m lca_kernel serve --profile X --host H --port P``
 # SIGTERM 由 K6 ``lca_kernel.lifecycle`` 守护。详情看 docs/adr/0119-*.
 #
+# 本脚本只管外部平台服务:
+# - Infrastructure (postgres, redis, s3)        lca-ops infra start|stop|status
+# - LobeHub (Next.js frontend)                  lca-ops lobehub start|stop|restart|status|ensure
+# - Daemon (sandbox-user CLI connect)           lca-ops daemon  start|stop|restart|status|ensure
+# - Onlyboxes (worker runtime)                  只读,无 start/stop 命令
+# - LCA 进程 (kernel serve)                     uv run python -m lca_kernel serve ...
+#
 # Usage:
-#     lca-ops dev              # Start full dev environment
-#     lca-ops restart          # Restart all services
-#     lca-ops stop             # Stop all services
-#     lca-ops status           # Show status
-#     lca-ops heal             # Auto-recover unhealthy services
-#     lca-ops lobehub start    # Manage LobeHub
-#     lca-ops infra start      # Manage infrastructure
-#     lca-ops daemon start     # Manage daemon
+#     lca-ops status         # Show status (infra / lobehub / daemon / onlyboxes)
+#     lca-ops status --json  # JSON,给 agent 用
+#     lca-ops heal           # Auto-recover unhealthy services
+#     lca-ops logs           # journal 事实流
 #
 # Use --json for agent-friendly JSON output.
 
