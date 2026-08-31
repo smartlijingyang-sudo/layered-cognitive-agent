@@ -30,7 +30,6 @@ from lca_kernel.boot import (
     install_compile_result,
     run_kernel,
     run_resolved_kernel,
-    spawn_fiber,
     stop_kernel,
 )
 from lca_kernel.errors import (
@@ -103,7 +102,6 @@ __all__ = [
     "run_kernel",
     "run_kernel_lifespan",
     "run_resolved_kernel",
-    "spawn_fiber",
     "stop_kernel",
     "summarize_patch",
     "validate_patch",

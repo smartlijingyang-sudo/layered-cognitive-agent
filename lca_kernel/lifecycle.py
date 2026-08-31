@@ -15,8 +15,9 @@ import asyncio
 import signal
 import sys
 import threading
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager, suppress
+from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 from lca_kernel.errors import FailLoudError, KernelError
@@ -170,11 +171,30 @@ def create_shutdown_coordinator(kernel: Any) -> DefaultShutdownCoordinator:
 
 
 @asynccontextmanager
-async def run_kernel_lifespan(_profiles_dir: Any, profile_path: Any) -> Any:
-    """AsyncContextManager 桥给 ASGI / stdio lifespan。"""
+async def run_kernel_lifespan(
+    profile_path: str | Path,
+    *,
+    bootstrap_file_store: Any = None,
+) -> AsyncIterator[dict[str, Any]]:
+    """Async context manager that boots the kernel and yields ``{"ctx": <Context>}``.
+
+    The single seam every transport (Starlette / JSON-RPC / stdio) uses
+    to enter the booted kernel. On exit the ShutdownCoordinator (K6)
+    disposes the context and exits the process with code 0 — transport
+    callers do not own process lifecycle.
+
+    Parameters
+    ----------
+    profile_path:
+        YAML profile path passed to :func:`lca_kernel.boot.run_kernel`.
+    bootstrap_file_store:
+        Optional FileStore injected into the ``file_store`` seam **before**
+        plugin fibers spawn, mirroring the old ``profile_lifespan`` contract
+        so test fixtures can pre-register an app-owned store.
+    """
     from lca_kernel.boot import run_kernel
 
-    ctx = await run_kernel(profile_path)
+    ctx = await run_kernel(profile_path, bootstrap_file_store=bootstrap_file_store)
     coordinator = create_shutdown_coordinator(ctx)
     install_signal_handlers(coordinator)
     install_fail_loud(coordinator)

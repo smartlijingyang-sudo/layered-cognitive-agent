@@ -57,7 +57,7 @@ from lca.harness.profile.boot_products import (
     resolved_profile_from_scope,
 )
 from lca.harness.profile.boot_projection import BootEntry
-from lca.harness.profile.resolve import ResolvedProfile, resolve_entries, resolve_profile
+from lca.harness.profile.resolve import ResolvedProfile, resolve_entries
 from lca.infrastructure.file_store import FileStore
 from lca_kernel.errors import KernelError, StageError
 from lca_kernel.observability import install_observability
@@ -90,9 +90,17 @@ async def run_kernel(
     *,
     bootstrap_file_store: FileStore | None = None,
 ) -> Context:
-    """主入口:从 profile path 启动 cordis Context。"""
-    resolved = resolve_profile(profile_path)
-    return await run_resolved_kernel(resolved, bootstrap_file_store=bootstrap_file_store)
+    """主入口: 从 profile path 启动 cordis Context.
+
+    Delegates to :func:`lca.harness.profile.boot.boot_profile`, which is
+    the production boot implementation. The kernel is the single seam
+    that compiles a profile into a running Context; it does NOT maintain
+    a parallel boot implementation (the local ``_boot_context`` helper
+    exists only to satisfy unit tests of :func:`_emit_boot_events`).
+    """
+    from lca.harness.profile.boot import boot_profile
+
+    return await boot_profile(profile_path, bootstrap_file_store=bootstrap_file_store)
 
 
 async def run_resolved_kernel(
@@ -101,8 +109,9 @@ async def run_resolved_kernel(
     bootstrap_file_store: FileStore | None = None,
 ) -> Context:
     """Boot an already-resolved profile through the production lifecycle."""
-    products = compile_profile_boot_products(resolved)
-    return await _boot_context(products, bootstrap_file_store=bootstrap_file_store)
+    from lca.harness.profile.boot import boot_resolved_profile
+
+    return await boot_resolved_profile(resolved, bootstrap_file_store=bootstrap_file_store)
 
 
 async def stop_kernel(ctx: Context) -> None:
