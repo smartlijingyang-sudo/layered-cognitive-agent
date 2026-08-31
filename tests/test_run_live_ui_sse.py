@@ -10,7 +10,6 @@ import pytest
 from starlette.applications import Starlette
 from starlette.testclient import TestClient
 
-from gateway.routes import build_routes
 from gateway.runs.session.session import RunRegistry, RunSession
 from gateway.runs.terminal.legacy_adapter import RegistryRunAdapter
 from lca.contracts.models.observability.journal import (
@@ -79,7 +78,24 @@ def _seed_journal(registry: RunRegistry, run_id: str = "run-live-ui") -> RunSess
 
 
 def _app(registry: RunRegistry) -> Starlette:
-    application = Starlette(routes=build_routes())
+    # PR-7:``gateway.routes.build_routes`` 退役,从 4 个 transport plugin
+    # 拼装等价 route catalog;plugin 是 ADR-0115 决定 6 的唯一 route SSOT。
+    from lca.plugins.transport.webserver.routes_device import ROUTES as DEVICE_ROUTES
+    from lca.plugins.transport.webserver.routes_device import UPGRADE
+    from lca.plugins.transport.webserver.routes_health_options import ROUTES as HEALTH_ROUTES
+    from lca.plugins.transport.webserver.routes_openai_compat_files import (
+        ROUTES as OPENAI_ROUTES,
+    )
+    from lca.plugins.transport.webserver.routes_runs_sessions import ROUTES as RUNS_ROUTES
+
+    routes: list[Any] = [
+        *HEALTH_ROUTES,
+        *OPENAI_ROUTES,
+        *RUNS_ROUTES,
+        *DEVICE_ROUTES,
+        UPGRADE,
+    ]
+    application = Starlette(routes=routes)
     application.state.run_port = RegistryRunAdapter(registry)
     return application
 
@@ -110,7 +126,10 @@ async def _drain(bytes_iter: Any) -> list[bytes]:
 
 
 def test_live_route_is_registered() -> None:
-    paths = {route.path for route in build_routes() if hasattr(route, "path")}
+    """PR-7:``/runs/{run_id}/live`` 由 ``routes_runs_sessions`` plugin 注册。"""
+    from lca.plugins.transport.webserver.routes_runs_sessions import ROUTES
+
+    paths = {route.path for route in ROUTES if hasattr(route, "path")}
     assert "/runs/{run_id}/live" in paths
 
 

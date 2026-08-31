@@ -18,10 +18,9 @@ from starlette.testclient import TestClient
 if TYPE_CHECKING:
     import pytest
 
-from lca.infrastructure.observability.backends.run_locator_fs import FilesystemRunLocator
-
 from gateway.runs.api.query_endpoints import get_run_profile
 from lca.contracts.observability.run_locator import RunLocator
+from lca.infrastructure.observability.backends.run_locator_fs import FilesystemRunLocator
 from lca.plugins.providers.profile_snapshot.run_boot import RunBootSnapshot
 
 
@@ -115,7 +114,9 @@ def test_get_profile_500_when_snapshot_is_not_json(tmp_path: Path) -> None:
 
 
 def test_catalog_registers_profile_route() -> None:
-    from gateway.routes import build_routes
+    """PR-7:``/runs/{run_id}/profile`` 从 ``build_routes`` 迁到
+    ``routes_runs_sessions`` plugin。"""
+    from lca.plugins.transport.webserver.routes_runs_sessions import ROUTES
 
-    paths = {route.path for route in build_routes() if hasattr(route, "path")}
+    paths = {route.path for route in ROUTES if hasattr(route, "path")}
     assert "/runs/{run_id}/profile" in paths

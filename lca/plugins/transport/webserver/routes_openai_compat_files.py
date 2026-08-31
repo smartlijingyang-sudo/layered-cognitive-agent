@@ -42,7 +42,7 @@ async def _get_file_meta(request: Request) -> JSONResponse:
     return await get_file_meta(request, request.app.state.file_store)
 
 
-_ROUTES: tuple[Route, ...] = (
+ROUTES: tuple[Route, ...] = (
     Route("/files/{attachment_id}", _download_file, methods=["GET"]),
     Route("/files/{attachment_id}/meta", _get_file_meta, methods=["GET"]),
     Route("/v1/models", list_models, methods=["GET", "OPTIONS"]),
@@ -85,6 +85,6 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     # PluginContext Protocol does not expose ``effect()``;the underlying
     # :class:`cordis.Context` does. Reach it through the audited facade.
     inner: Any = ctx._runtime()  # type: ignore[attr-defined]
-    for route in _ROUTES:
+    for route in ROUTES:
         dispose = router.register_http(route)
         inner.effect(dispose, label=f"route:{route.path}")

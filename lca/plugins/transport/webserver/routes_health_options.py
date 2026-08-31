@@ -42,6 +42,15 @@ async def health(request: Request) -> JSONResponse:
     return JSONResponse(payload, headers=CORS_HEADERS)
 
 
+# PR-7:展平为 module-level ``ROUTES`` (无下划线),``build_routes`` 退役后
+# 测试与 ``lifespan_adapter`` 直接 import 这个常量验证 route catalog。
+ROUTES: tuple[Route, ...] = (
+    Route("/health", health, methods=["GET"]),
+    Route("/context", get_context, methods=["GET", "OPTIONS"]),
+    Route("/journal/live", stream_journal_live, methods=["GET", "OPTIONS"]),
+)
+
+
 @plugin(
     id="lca-gateway-routes-health-options",
     provides=("gateway_health_options_route",),
@@ -75,10 +84,6 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     # PluginContext Protocol does not expose ``effect()``;the underlying
     # :class:`cordis.Context` does. Reach it through the audited facade.
     inner: Any = ctx._runtime()  # type: ignore[attr-defined]
-    for route in (
-        Route("/health", health, methods=["GET"]),
-        Route("/context", get_context, methods=["GET", "OPTIONS"]),
-        Route("/journal/live", stream_journal_live, methods=["GET", "OPTIONS"]),
-    ):
+    for route in ROUTES:
         dispose = router.register_http(route)
         inner.effect(dispose, label=f"route:{route.path}")

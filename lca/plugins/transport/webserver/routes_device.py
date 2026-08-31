@@ -34,7 +34,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
-_ROUTES: tuple[Route, ...] = (
+ROUTES: tuple[Route, ...] = (
     Route("/api/device/status", device_status, methods=["POST", "OPTIONS"]),
     Route("/api/device/devices", list_devices, methods=["POST", "OPTIONS"]),
     Route("/api/device/tool-call", tool_call, methods=["POST", "OPTIONS"]),
@@ -43,7 +43,7 @@ _ROUTES: tuple[Route, ...] = (
     Route("/api/device/agent/run", agent_run, methods=["POST", "OPTIONS"]),
     Route("/api/device/files/upload", upload_files, methods=["POST", "OPTIONS"]),
 )
-_UPGRADE: WebSocketRoute = WebSocketRoute("/api/device/ws", connect_device)
+UPGRADE: WebSocketRoute = WebSocketRoute("/api/device/ws", connect_device)
 
 
 @plugin(
@@ -79,8 +79,8 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     # PluginContext Protocol does not expose ``effect()``;the underlying
     # :class:`cordis.Context` does. Reach it through the audited facade.
     inner: Any = ctx._runtime()  # type: ignore[attr-defined]
-    for route in _ROUTES:
+    for route in ROUTES:
         dispose = router.register_http(route)
         inner.effect(dispose, label=f"route:{route.path}")
-    ws_dispose = router.register_websocket(_UPGRADE)
-    inner.effect(ws_dispose, label=f"ws:{_UPGRADE.path}")
+    ws_dispose = router.register_websocket(UPGRADE)
+    inner.effect(ws_dispose, label=f"ws:{UPGRADE.path}")

@@ -62,3 +62,12 @@ async def test_routes_health_options_effects_tracked() -> None:
     assert "route:/health" in labels
     assert "route:/context" in labels
     assert "route:/journal/live" in labels
+
+
+def test_routes_health_options_exposes_public_routes_constant() -> None:
+    """PR-7:``ROUTES`` 公开常量,供 ``build_routes`` 退役后的 catalog 校验。"""
+    from lca.plugins.transport.webserver.routes_health_options import ROUTES
+
+    assert isinstance(ROUTES, tuple)
+    paths = {r.path for r in ROUTES}
+    assert paths == {"/health", "/context", "/journal/live"}

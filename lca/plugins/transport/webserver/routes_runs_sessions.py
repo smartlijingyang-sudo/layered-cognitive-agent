@@ -19,6 +19,8 @@ from gateway.runs.api.command_endpoints import (
 from gateway.runs.api.query_endpoints import (
     get_run,
     get_run_doctor,
+    get_run_evidence,
+    get_run_profile,
     stream_run_live,
 )
 from gateway.session_routes import (
@@ -45,11 +47,16 @@ from lca.contracts.harness.composition.plugin_contract import (
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
-_ROUTES: tuple[Route, ...] = (
+# PR-7 (本批):把 ``/runs/{run_id}/profile`` 与 ``/runs/{run_id}/evidence/{ref}``
+# 从 ``gateway.routes.build_routes`` 迁过来,build_routes 退役 —— plugin 是
+# 唯一 route catalog SSOT (ADR-0115 §决定 6)。
+ROUTES: tuple[Route, ...] = (
     Route("/runs", create_run, methods=["POST", "OPTIONS"]),
     Route("/runs/{run_id}", get_run, methods=["GET"]),
     Route("/runs/{run_id}/live", stream_run_live, methods=["GET", "OPTIONS"]),
     Route("/runs/{run_id}/doctor", get_run_doctor, methods=["GET"]),
+    Route("/runs/{run_id}/profile", get_run_profile, methods=["GET"]),
+    Route("/runs/{run_id}/evidence/{ref:path}", get_run_evidence, methods=["GET"]),
     Route("/runs/{run_id}/cancel", cancel_run, methods=["POST", "OPTIONS"]),
     Route("/runs/{run_id}/answer", answer_run, methods=["POST", "OPTIONS"]),
     Route("/v1/sessions", create_session, methods=["POST", "OPTIONS"]),
@@ -96,6 +103,6 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     # PluginContext Protocol does not expose ``effect()``;the underlying
     # :class:`cordis.Context` does. Reach it through the audited facade.
     inner: Any = ctx._runtime()  # type: ignore[attr-defined]
-    for route in _ROUTES:
+    for route in ROUTES:
         dispose = router.register_http(route)
         inner.effect(dispose, label=f"route:{route.path}")
