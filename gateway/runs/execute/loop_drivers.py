@@ -54,6 +54,7 @@ from lca.plugins.run_loop_driver_registry import (
 
 if TYPE_CHECKING:
     from cordis import Context
+    from gateway.runs.lifecycle.runnable_assembly import CognitiveRunnableAssembler
 
 
 @dataclass(frozen=True)
