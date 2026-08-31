@@ -1,5 +1,30 @@
 """K6:Process 生命周期 + Fail-loud + Shutdown 协调(ADR-0115 K6 + ADR-0117)。
 
+K6 在启动全景中的位置
+====================
+
+K0 transport 桥  →  K1–K5 boot  →  K6 process 生命周期(本模块)
+                                          │
+                                          ├─ install_signal_handlers
+                                          ├─ install_fail_loud
+                                          └─ run_kernel_lifespan(finally: shutdown)
+
+K6 是启动链路的最后一段。它**不参与** cordis Context 内部装配,只负责
+把已经 boot 完的进程守住:监听 SIGTERM/SIGINT,捕获未处理异常,在
+任何来源触发退出时按 LIFO 反序 dispose 所有 plugin fiber,然后退出
+进程。Transport(Starlette / JSON-RPC / stdio)不拥有进程生命周期,
+只能 ``await run_kernel_lifespan`` 间接拿到 K6 提供的安全保证。
+
+设计约束(ADR-0115 K6)
+---------------------
+1. 多源关闭去重:SIGTERM + unhandledRejection 同时触发只 dispose 一次
+   (``_is_shutting_down`` 单调标志位)。
+2. LIFO dispose 顺序:后注册的 transport 先关,避免上层 transport 关闭后
+   下层资源还在引用已关闭句柄。
+3. Dispose 超时保护:超过 ``FAIL_LOUD_RELEASE_TIMEOUT_MS`` 不再阻塞进程,
+   fail-loud 已被记录。
+4. transport 不持有 exit code:``sys.exit(code)`` 永远在 K6 内部完成。
+
 Public surface
 --------------
 - :data:`FAIL_LOUD_RELEASE_TIMEOUT_MS` —— dispose 必须在 2 秒内完成
@@ -90,28 +115,30 @@ class DefaultShutdownCoordinator:
 
     async def shutdown(self, code: int) -> None:
         if self._is_shutting_down:
-            return
-        self._is_shutting_down = True
+            return  # ↑ K6:多源关闭去重(SIGTERM + unhandledRejection 同时到也只 dispose 一次)
+        self._is_shutting_down = True  # ↑ K6:单调标志位,后续 interrupt 全部 no-op
         self._last_code = code
         # LIFO dispose: last registered transport closes first.
-        for _t, handle in reversed(self._transports):
+        for _t, handle in reversed(
+            self._transports
+        ):  # ↑ K6:后注册 transport 先关(避免上层关闭后下层还在引用)
             with suppress(Exception):
                 if handle is not None:
                     handle.close()
         kernel = self._kernel
         if kernel is None:
-            sys.exit(code)
+            sys.exit(code)  # ↑ K6:无 kernel(测试路径)直接退出
         try:
-            await asyncio.wait_for(
+            await asyncio.wait_for(  # ↑ K6:K3 返回的 cordis Context dispose,2 秒硬超时
                 kernel.dispose(),
                 timeout=FAIL_LOUD_RELEASE_TIMEOUT_MS / 1000,
             )
         except asyncio.TimeoutError:
-            pass
+            pass  # ↑ K6:dispose 超时不再阻塞进程
         except Exception as exc:
             raise KernelError(f"shutdown failed: {exc}") from exc
         finally:
-            sys.exit(code)
+            sys.exit(code)  # ↑ K6:transport 不持有 exit code,本函数收尾
 
 
 def install_fail_loud(coordinator: ShutdownCoordinator) -> None:
@@ -121,26 +148,30 @@ def install_fail_loud(coordinator: ShutdownCoordinator) -> None:
             "install_fail_loud expects DefaultShutdownCoordinator",
         )
 
-    def _on_unhandled(exc_type: Any, exc_value: Any, _exc_tb: Any) -> None:
+    def _on_unhandled(
+        exc_type: Any, exc_value: Any, _exc_tb: Any
+    ) -> None:  # ↑ K6:三道异常通道的共享回调
         if coordinator.is_shutting_down:
-            return
-        coordinator.interrupt(1)
-        raise FailLoudError(f"unhandled {exc_type.__name__}: {exc_value}")
+            return  # ↑ K6:已在关闭中,不再重复触发
+        coordinator.interrupt(1)  # ↓ K6:fire-and-forget 触发 shutdown(异步跑)
+        raise FailLoudError(
+            f"unhandled {exc_type.__name__}: {exc_value}"
+        )  # ↑ K6:留下 fail-loud 痕迹
 
-    sys.excepthook = _on_unhandled
+    sys.excepthook = _on_unhandled  # ↓ K6:同步路径异常 → _on_unhandled
     try:
-        loop = asyncio.get_running_loop()
+        loop = asyncio.get_running_loop()  # ↑ K6:拿当前事件循环(可能尚未启动)
     except RuntimeError:
         loop = None
     if loop is not None:
-        loop.set_exception_handler(
+        loop.set_exception_handler(  # ↓ K6:asyncio 任务未捕获异常 → _on_unhandled
             lambda _l, ctx: _on_unhandled(
                 ctx.get("exception_type", Exception),
                 ctx.get("exception"),
                 None,
             )
         )
-    threading.excepthook = lambda args: _on_unhandled(
+    threading.excepthook = lambda args: _on_unhandled(  # ↓ K6:其他线程异常 → _on_unhandled
         args.exc_type,
         args.exc_value,
         args.exc_traceback,
@@ -150,15 +181,15 @@ def install_fail_loud(coordinator: ShutdownCoordinator) -> None:
 def install_signal_handlers(coordinator: ShutdownCoordinator) -> None:
     """装 SIGTERM(0)/ SIGINT(130) handler(仅主线程有效)。"""
 
-    def _on_sigterm(*_: Any) -> None:
-        coordinator.interrupt(0)
+    def _on_sigterm(*_: Any) -> None:  # ↑ K6:supervisor 重启 / k8s pod 终止 → exit 0
+        coordinator.interrupt(0)  # ↓ K6:fire-and-forget 触发 shutdown
 
-    def _on_sigint(*_: Any) -> None:
-        coordinator.interrupt(130)
+    def _on_sigint(*_: Any) -> None:  # ↑ K6:Ctrl-C → exit 130
+        coordinator.interrupt(130)  # ↓ K6:fire-and-forget 触发 shutdown
 
     try:
-        signal.signal(signal.SIGTERM, _on_sigterm)
-        signal.signal(signal.SIGINT, _on_sigint)
+        signal.signal(signal.SIGTERM, _on_sigterm)  # ↓ K6:装 SIGTERM handler
+        signal.signal(signal.SIGINT, _on_sigint)  # ↓ K6:装 SIGINT handler
     except ValueError:
         # Signal handlers can only be installed from the main thread; tests
         # drive shutdown via explicit ``coordinator.shutdown(...)`` calls.
@@ -176,12 +207,18 @@ async def run_kernel_lifespan(
     *,
     bootstrap_file_store: Any = None,
 ) -> AsyncIterator[dict[str, Any]]:
-    """Async context manager that boots the kernel and yields ``{"ctx": <Context>}``.
+    """K0+K3+K6 联合入口:AsyncContextManager 桥给 ASGI lifespan。
 
-    The single seam every transport (Starlette / JSON-RPC / stdio) uses
-    to enter the booted kernel. On exit the ShutdownCoordinator (K6)
-    disposes the context and exits the process with code 0 — transport
-    callers do not own process lifecycle.
+    每个 transport(Starlette / JSON-RPC / stdio)都只调这一个入口。
+    流程:
+
+    1. ``await run_kernel(profile_path)`` → K1–K5 全套,产出 ``cordis.Context``。
+    2. ``create_shutdown_coordinator(ctx)`` + ``install_signal_handlers`` +
+       ``install_fail_loud`` —— 装好 K6 的三道钩子。
+    3. ``yield {"ctx": ctx}`` —— ASGI lifespan 进入"运行中"状态,transport
+       在此期间可自由 ``ctx.inject(...)`` 拿 plugin 产物。
+    4. ``finally: await coordinator.shutdown(0)`` —— lifespan 退出时
+       LIFO dispose 全部 fiber,``sys.exit(0)`` 收尾。
 
     Parameters
     ----------
@@ -191,17 +228,21 @@ async def run_kernel_lifespan(
         Optional FileStore injected into the ``file_store`` seam **before**
         plugin fibers spawn, mirroring the old ``profile_lifespan`` contract
         so test fixtures can pre-register an app-owned store.
-    """
-    from lca_kernel.boot import run_kernel
 
-    ctx = await run_kernel(profile_path, bootstrap_file_store=bootstrap_file_store)
-    coordinator = create_shutdown_coordinator(ctx)
-    install_signal_handlers(coordinator)
-    install_fail_loud(coordinator)
+    完整 K 链路地图见模块 docstring 的"启动全景"段。
+    """
+    from lca_kernel.boot import run_kernel  # ↓ K3:从 K6 进入 K3 主入口
+
+    ctx = await run_kernel(
+        profile_path, bootstrap_file_store=bootstrap_file_store
+    )  # ↓ K3:跑 K1(解析)+K2(编译)+K3(cordis)+K5(观测),返回 booted ctx
+    coordinator = create_shutdown_coordinator(ctx)  # ↑ K6:把 K3 返回的 ctx 绑给 ShutdownCoordinator
+    install_signal_handlers(coordinator)  # ↓ K6:装 SIGTERM/SIGINT → coordinator.interrupt
+    install_fail_loud(coordinator)  # ↓ K6:装 sys.excepthook + asyncio/threading 异常通道
     try:
-        yield {"ctx": ctx}
+        yield {"ctx": ctx}  # ↓ K0:把 ctx 交回 _lifespan,ASGI 进入"运行中"状态
     finally:
-        await coordinator.shutdown(0)
+        await coordinator.shutdown(0)  # ↑ K6:lifespan 退出时 LIFO dispose + sys.exit(0)
 
 
 __all__ = [
