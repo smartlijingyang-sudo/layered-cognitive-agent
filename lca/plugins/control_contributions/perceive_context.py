@@ -7,8 +7,15 @@ from pydantic import BaseModel, ConfigDict
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ContributionRole,
     PhaseContext,
@@ -69,13 +76,14 @@ class Config(BaseModel):
             aggregation="deny-on-any-deny",
         )
     ],
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G6_DECISION,
-        control_slot=ControlSlot.PERCEIVE_CONTEXT,
-        scope=Scope.TURN,
-        authority=("context.read",),
-        evidence=("control.perceive.context.checked",),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G6_DECISION, control_slots=(ControlSlot.PERCEIVE_CONTEXT,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.TURN,)),
+        authority=AuthorityContract(grants=("context.read",)),
+        observability=EvidenceContract(descriptors=("control.perceive.context.checked",)),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

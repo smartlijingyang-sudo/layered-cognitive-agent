@@ -12,7 +12,14 @@ from pydantic import BaseModel, ConfigDict
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ContributionRole,
     PhaseContext,
@@ -53,13 +60,14 @@ class Config(BaseModel):
             order=2,
         )
     ],
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G6_DECISION,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.TURN,
-        authority=("checkpoint.*",),
-        evidence=("control.observe.wildcard.checked",),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G6_DECISION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.TURN,)),
+        authority=AuthorityContract(grants=("checkpoint.*",)),
+        observability=EvidenceContract(descriptors=("control.observe.wildcard.checked",)),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

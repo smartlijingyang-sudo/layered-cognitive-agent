@@ -8,8 +8,15 @@ from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.models.core.decision import Decision
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ContributionRole,
     PhaseContext,
@@ -99,13 +106,14 @@ class Config(BaseModel):
         )
     ],
     functional_group=FunctionalGroup.G6_DECISION,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G6_DECISION,
-        control_slot=ControlSlot.ACT_AUTHORIZE,
-        scope=Scope.TURN,
-        authority=("decision.read", "action.authorize"),
-        evidence=("control.act.authorize.verified",),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G6_DECISION, control_slots=(ControlSlot.ACT_AUTHORIZE,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.TURN,)),
+        authority=AuthorityContract(grants=("decision.read", "action.authorize")),
+        observability=EvidenceContract(descriptors=("control.act.authorize.verified",)),
     ),
     ownership=OwnershipDeclaration(
         reads=("control.act.authorize",),

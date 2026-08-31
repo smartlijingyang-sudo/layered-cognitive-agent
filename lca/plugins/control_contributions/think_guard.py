@@ -8,11 +8,18 @@ from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.gate_policy import GateDecided
 from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.state import AgentState
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ContributionRole,
     PhaseContext,
@@ -126,13 +133,14 @@ class Config(BaseModel):
             aggregation="deny-on-any-deny",
         )
     ],
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G6_DECISION,
-        control_slot=ControlSlot.THINK_GUARD,
-        scope=Scope.TURN,
-        authority=("decision.read",),
-        evidence=("control.think.guard.checked",),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G6_DECISION, control_slots=(ControlSlot.THINK_GUARD,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.TURN,)),
+        authority=AuthorityContract(grants=("decision.read",)),
+        observability=EvidenceContract(descriptors=("control.think.guard.checked",)),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

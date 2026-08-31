@@ -7,7 +7,14 @@ from pydantic import BaseModel, ConfigDict
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ContributionRole,
     PhaseContext,
@@ -68,13 +75,14 @@ class Config(BaseModel):
         )
     ],
     functional_group=FunctionalGroup.G6_DECISION,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G6_DECISION,
-        control_slot=ControlSlot.ACT_BUDGET,
-        scope=Scope.TURN,
-        authority=("budget.read", "action.budget"),
-        evidence=("control.act.budget.checked",),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G6_DECISION, control_slots=(ControlSlot.ACT_BUDGET,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.TURN,)),
+        authority=AuthorityContract(grants=("budget.read", "action.budget")),
+        observability=EvidenceContract(descriptors=("control.act.budget.checked",)),
     ),
     ownership=OwnershipDeclaration(
         reads=("budget.read", "control.act.budget"),
