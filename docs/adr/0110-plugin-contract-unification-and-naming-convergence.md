@@ -4,9 +4,28 @@
 
 **Partially Accepted — 2026-08-31**
 
-> PR-A / B / F / G / H 已落地（branch `back-ui-821-other-keep`, commits
-> `5727ef5a` & `885bdd43`）；剩余 PR-C / D / E / I 见 §六。本 ADR 在 PR-C
-> 落地后改 Accepted。
+> PR-A / B / C-preview / E / F / G / H 已落地（branch `back-ui-821-other-keep`,
+> commits `5727ef5a` / `885bdd43` / `99010f35` / `506dcb0e`）；剩余 PR-D / I
+> 按 §六 调度（C 完整 rollout 是独立分支）。
+
+### 落地清单
+
+| PR | 提交 | 文件 |
+|---|---|---|
+| **PR-A** | `5727ef5a` | `lca/harness/plugin_declaration.py` × 5 |
+| **PR-B** | `885bdd43` | `lca/contracts/protocols/composition/logic_address.py` |
+| **PR-E** | `99010f35` | `lca/runtime/runtime_bindings.py` × 3 |
+| **PR-C (preview)** | `506dcb0e` | 11 control_contributions/ plugins + `scripts/codegen_plugin_contract.py` |
+| **PR-F** | `885bdd43` | docstring 收紧（无独立 `RuntimeClosure` 类需 rename） |
+| **PR-G** | `885bdd43` | `docs/architecture/functional-group-mapping.md` |
+| **PR-H** | `885bdd43` | `docs/architecture/plugin-check-matrix.md` |
+
+### 待办（显式延后）
+
+- **PR-D** LogicAddress 删除 + Tier 枚举合并：**6 个月后**（ADR 明文）
+- **PR-I** Factory 收敛：API 改动，需独立评审
+- **PR-C (full)** 完整 194 文件 codemod：`scripts/codegen_plugin_contract.py` 是 seed，
+  独立分支 `adr-0110-pr-c-codemod` 上跑（避免 mix PR 评审面）
 
 Refines:
 - ADR-0015（contracts/ 仅类型与接口）
