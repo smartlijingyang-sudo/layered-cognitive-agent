@@ -94,7 +94,7 @@ def _descriptor(
     return EventDescriptor(
         type_name=cls.__name__,
         domain=domain.value,
-        emitter=emitter,
+        emitter=_resolve_emitter(emitter),
         plane=EventPlane(plane or _plane(cls.__name__)),
         durability=EventDurability(durability),
         audience=EventAudience(audience),
@@ -105,6 +105,24 @@ def _descriptor(
         otel_kind=_otel_kind(cls.__name__),  # type: ignore[arg-type]
         payload_class=cls,
     )
+
+
+# ADR-0119 followup-2: emitter wire schema 字面改名,旧字符串通过 alias 兼容老
+# JSONL journal 文件。过期日 2026-12-31(届时删除本表)。
+_EMITTER_ALIASES: dict[str, str] = {
+    "lca.harness.command.gateway": "lca.harness.command.dispatcher",
+    "gateway.plugins.default_modes": "lca.cognition.team.modes.default_modes",
+}
+
+
+def _resolve_emitter(raw: str) -> str:
+    """Return the canonical emitter string, aliasing historical names.
+
+    老 JSONL journal 文件(2026-08-31 之前)写盘时使用 ``lca.harness.command.gateway``
+    与 ``gateway.plugins.default_modes``。本表把它们 alias 到 ADR-0119 followup-2
+    之后的新字符串,reader 在解析期自动归一化,无需重写历史 journal 文件。
+    """
+    return _EMITTER_ALIASES.get(raw, raw)
 
 
 def _plane(type_name: str) -> str:
@@ -169,7 +187,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             TaskCreated,
             domain=VocabDomain.RUN,
-            emitter="lca.harness.command.gateway",
+            emitter="lca.harness.command.dispatcher",
             required=("task_id", "session_id", "objective"),
             description="durable task creation fact",
             durability="required",
@@ -200,7 +218,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             CastingStarted,
             domain=VocabDomain.TEAM,
-            emitter="gateway.plugins.default_modes",
+            emitter="lca.cognition.team.modes.default_modes",
             required=("objective_preview",),
             description="自动组队选角开始",
             durability="best_effort",
@@ -210,7 +228,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             CastingCompleted,
             domain=VocabDomain.TEAM,
-            emitter="gateway.plugins.default_modes",
+            emitter="lca.cognition.team.modes.default_modes",
             required=("governance_kind",),
             description="自动组队选角完成",
             durability="required",
@@ -220,7 +238,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             CastingFailed,
             domain=VocabDomain.TEAM,
-            emitter="gateway.plugins.default_modes",
+            emitter="lca.cognition.team.modes.default_modes",
             required=("error",),
             description="自动组队选角失败",
             durability="required",

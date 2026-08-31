@@ -1,8 +1,12 @@
 # ADR-0119 Followup: "gateway" 命名空间历史映射
 
-**状态:** 决策(Decision)
+**状态:** Superseded(被 [0119-followup-gateway-name-removal.md](0119-followup-gateway-name-removal.md) 覆盖)
 **日期:** 2026-08-31
 **父 ADR:** [0119-webserver-as-plugin.md](0119-webserver-as-plugin.md)
+
+> **2026-08-31:** 本 ADR 后续被 ADR-0119 followup-2 扩展到全 6 类清除。
+> 当时标注"保留"的 B/C/D/E/F 类已经全部改名为符合语境的中性词。本 ADR
+> 仍保留作为历史命名空间映射,但当前实际命名以 followup-2 为准。
 
 ## 背景
 

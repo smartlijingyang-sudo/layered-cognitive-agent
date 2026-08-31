@@ -22,7 +22,7 @@ from lca.contracts.harness.act.command import (
     SessionCreateCommand,
     SteerCommand,
 )
-from lca.harness.command.gateway import SessionCommandCarrier
+from lca.harness.command.dispatcher import SessionCommandCarrier
 from lca.plugins.transport.webserver.handlers.cors import CORS_HEADERS
 from lca.plugins.transport.webserver.handlers.session_payloads import (
     accepted_receipt_payload,
