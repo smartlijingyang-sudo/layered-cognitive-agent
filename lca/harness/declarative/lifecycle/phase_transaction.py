@@ -7,6 +7,10 @@ from dataclasses import dataclass
 
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.protocols.act.command_envelope import RunDelta, RunFact
+from lca.contracts.protocols.declarative.declarative_execution import (
+    PhaseAttemptFailure,
+    PhaseExecutionFailure,
+)
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeRunOutcome,
     DeclarativeValidationError,
@@ -38,6 +42,37 @@ class PhaseTransactionResult:
     effective_payload: object | None
     facts: tuple[RunFact, ...]
     govern_outcome: DeclarativeRunOutcome | None = None
+
+
+def _failure_to_dict(failure: object) -> object:
+    """Best-effort journal payload for :class:`PhaseExecutionFailure`.
+
+    The RunFact payload field is a typed ``Mapping``; :class:`PhaseExecutionFailure`
+    is a frozen dataclass that may not serialize cleanly under the journal's
+    JSON contract. Serializing via ``dataclasses.asdict`` keeps the shape
+    stable while every consumer (RuntimeObserved, reducer fallback, RunFact
+    consumer) sees a regular mapping.
+    """
+    import dataclasses
+
+    if isinstance(failure, PhaseExecutionFailure):
+        return {
+            "node_id": failure.node_id,
+            "attempts": tuple(
+                dataclasses.asdict(attempt)
+                if isinstance(attempt, PhaseAttemptFailure)
+                else {"attempt": getattr(attempt, "attempt", None)}
+                for attempt in failure.attempts
+            ),
+            "attempt_count": len(failure.attempts),
+        }
+    if dataclasses.is_dataclass(failure):
+        return dataclasses.asdict(failure)
+    if isinstance(failure, Mapping):
+        return dict(failure)
+    # Strings and other scalars serialize to a single ``message`` field
+    # so the journal never crashes on ``dict(string)``.
+    return {"message": str(failure)}
 
 
 class PhaseExecutionTransaction:
@@ -126,15 +161,23 @@ class PhaseExecutionTransaction:
 
         result = governance.result
         self._validate_result(semantic_phase, result)
+        # ``result.payload`` carries the typed failure detail
+        # (e.g. :class:`PhaseExecutionFailure` with attempt history) for
+        # ``result_kind == "phase_error"``. Surfacing it on the phase.result
+        # fact keeps RuntimeObserved consumers and reducer fallbacks
+        # informed without requiring a separate journal lookup.
+        phase_payload: dict[str, object] = {
+            "node": node_id,
+            "semantic_phase": semantic_phase.value,
+            "result_kind": result.result_kind,
+        }
+        if result.payload is not None:
+            phase_payload["failure"] = _failure_to_dict(result.payload)
         phase_fact = RunFact(
             fact_id=f"{plan_ref}:{node_id}:{visit_count}",
             plan_ref=plan_ref,
             kind="phase.result",
-            payload={
-                "node": node_id,
-                "semantic_phase": semantic_phase.value,
-                "result_kind": result.result_kind,
-            },
+            payload=phase_payload,
         )
         self._journal.commit_fact(phase_fact, plan_ref=plan_ref, node_ref=node_id)
         facts = [phase_fact]

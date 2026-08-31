@@ -161,6 +161,15 @@ class DefaultReducer(Reducer):
                 kind = TerminalOutcomeKind.COMPLETED
         elif state.status == TaskStatus.FAILED:
             kind = TerminalOutcomeKind.FAILED
+            if not state.last_error:
+                # phase.result fact under the run journal already carries
+                # the typed ``PhaseExecutionFailure`` payload; users dig
+                # into the journal for the cause. The reducer just gives
+                # a single-sentence summary so the run envelope's
+                # ``error`` field is informative rather than opaque.
+                state.last_error = (
+                    "Agent 阶段执行失败。可能原因: phase 异常、模型未响应或工具循环失败。"
+                )
         elif state.status == TaskStatus.INPUT_REQUIRED:
             kind = TerminalOutcomeKind.WAITING_INPUT
         elif state.status == TaskStatus.CANCELED:
