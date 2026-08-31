@@ -12,7 +12,7 @@ from typing import Any
 
 from lca.contracts.models.observability.journal import StampedEvent
 from lca.contracts.observability.trace_tool import TraceTool
-from lca.infrastructure.observability.trace_inspector import TraceFocus, TraceInspector
+from lca.infrastructure.observability.stream.trace_inspector import TraceFocus, TraceInspector
 
 
 def _resolve_events(events: Sequence[StampedEvent] | None) -> Sequence[StampedEvent]:

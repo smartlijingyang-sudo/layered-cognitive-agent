@@ -70,7 +70,7 @@ from lca.contracts.models.observability.journal import (
     ToolStarted,
 )
 from lca.contracts.models.observability.telemetry_catalog import VocabDomain
-from lca.infrastructure.observability.event_descriptor_registry import (
+from lca.infrastructure.observability.events.event_descriptor_registry import (
     InMemoryEventDescriptorRegistry,
 )
 

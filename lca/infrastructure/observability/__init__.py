@@ -78,22 +78,22 @@ from lca.contracts.models.observability.journal_catalog import (
 )
 from lca.contracts.observability.named_registry import NamedRegistry
 from lca.contracts.protocols import JournalProjector
-from lca.infrastructure.observability.event_catalog import (
+from lca.infrastructure.observability.events.event_catalog import (
     EVENT_DESCRIPTOR_REGISTRY,
     descriptor_for,
     may_export_externally,
 )
-from lca.infrastructure.observability.event_descriptor_env import (
+from lca.infrastructure.observability.events.event_descriptor_env import (
     bind_descriptors,
     current_descriptors,
 )
-from lca.infrastructure.observability.event_descriptor_registry import (
+from lca.infrastructure.observability.events.event_descriptor_registry import (
     DuplicateEventDescriptorError,
     InMemoryEventDescriptorRegistry,
     UnknownEventDescriptorError,
 )
-from lca.infrastructure.observability.event_descriptors_data import build_default_registry
-from lca.infrastructure.observability.facade import (  # noqa: F401
+from lca.infrastructure.observability.events.event_descriptors_data import build_default_registry
+from lca.infrastructure.observability.facade.facade import (  # noqa: F401
     BoundObservability,
     EvidenceBinding,
     OperationRecorder,
@@ -136,7 +136,7 @@ from lca.infrastructure.observability.journal.engine.journal_io import (
     stamped_to_record,
 )
 from lca.infrastructure.observability.journal.engine.serialization import stamped_to_journal_record
-from lca.infrastructure.observability.langfuse_conventions import (
+from lca.infrastructure.observability.backends.langfuse_conventions import (
     FRAMEWORK_TAG,
     LANGFUSE_ENVIRONMENT,
     LANGFUSE_OBSERVATION_INPUT,
@@ -152,30 +152,30 @@ from lca.infrastructure.observability.langfuse_conventions import (
     langfuse_span_visible,
 )
 from lca.infrastructure.observability.narrative import plan_steps_joined
-from lca.infrastructure.observability.policy import AttributePolicy, Verbosity
-from lca.infrastructure.observability.projection_registry import EventProjection, ProjectionRegistry
-from lca.infrastructure.observability.run_context import (
+from lca.infrastructure.observability.adapters.policy import AttributePolicy, Verbosity
+from lca.infrastructure.observability.facade.projection_registry import EventProjection, ProjectionRegistry
+from lca.infrastructure.observability.facade.run_context import (
     TEAM_CONTAINER_ROLE,
     adopt_run_scope,
     get_current_run_scope,
     run_scope,
 )
-from lca.infrastructure.observability.settings import ObservabilitySettings
-from lca.infrastructure.observability.team_profile import (
+from lca.infrastructure.observability.facade.settings import ObservabilitySettings
+from lca.infrastructure.observability.facade.team_profile import (
     TeamTraceProfile,
     objective_preview,
     team_id_for,
 )
-from lca.infrastructure.observability.trace_inspector import TraceInspector, TraceReport
-from lca.infrastructure.observability.trace_tool_runner import (
+from lca.infrastructure.observability.stream.trace_inspector import TraceInspector, TraceReport
+from lca.infrastructure.observability.stream.trace_tool_runner import (
     make_explain_failure_tool,
     make_export_minimal_reproduction_tool,
     make_find_optimization_tool,
     make_inspect_trace_tool,
     make_plugin_interaction_graph_tool,
 )
-from lca.infrastructure.observability.tracer_backend import OtelTracer
-from lca.infrastructure.observability.view import SpanView
+from lca.infrastructure.observability.backends.tracer_backend import OtelTracer
+from lca.infrastructure.observability.adapters.view import SpanView
 
 __all__ = [
     "EVENT_DESCRIPTOR_REGISTRY",

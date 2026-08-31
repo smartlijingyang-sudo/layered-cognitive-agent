@@ -21,11 +21,11 @@ from lca.contracts.models.observability.event import (
     EventSensitivity,
 )
 from lca.contracts.models.observability.journal import JournalEvent
-from lca.infrastructure.observability.event_descriptor_env import current_descriptors
-from lca.infrastructure.observability.event_descriptor_registry import (
+from lca.infrastructure.observability.events.event_descriptor_env import current_descriptors
+from lca.infrastructure.observability.events.event_descriptor_registry import (
     UnknownEventDescriptorError,
 )
-from lca.infrastructure.observability.event_descriptors_data import build_default_registry
+from lca.infrastructure.observability.events.event_descriptors_data import build_default_registry
 
 if TYPE_CHECKING:
     from lca.contracts.observability.event_descriptor_registry import EventDescriptorRegistry

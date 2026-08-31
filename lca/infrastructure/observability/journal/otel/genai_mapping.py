@@ -20,7 +20,7 @@ from lca.contracts.atoms.telemetry import (
 )
 from lca.contracts.models.observability.journal import LlmCallCompleted
 from lca.infrastructure.observability.journal.otel.mapping import drop_empty
-from lca.infrastructure.observability.langfuse_conventions import (
+from lca.infrastructure.observability.backends.langfuse_conventions import (
     GEN_AI_INPUT,
     GEN_AI_OPERATION,
     GEN_AI_OPERATION_CHAT,

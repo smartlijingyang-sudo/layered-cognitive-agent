@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from lca.infrastructure.observability.langfuse_conventions import (
+from lca.infrastructure.observability.backends.langfuse_conventions import (
     GEN_AI_INPUT,
     GEN_AI_OPERATION,
     GEN_AI_OPERATION_CHAT,

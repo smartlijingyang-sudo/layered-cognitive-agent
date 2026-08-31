@@ -24,13 +24,13 @@ from lca.contracts.models.observability.journal import (
     StepTextDelta,
 )
 from lca.contracts.protocols import LLMAdapter
-from lca.infrastructure.observability.diagnostic_emitters import record_llm_completion
-from lca.infrastructure.observability.facade import record
-from lca.infrastructure.observability.llm_stream_activity import LlmStreamActivityTracker
-from lca.infrastructure.observability.memory_adapter import (
+from lca.infrastructure.observability.diagnostics.diagnostic_emitters import record_llm_completion
+from lca.infrastructure.observability.facade.facade import record
+from lca.infrastructure.observability.stream.llm_stream_activity import LlmStreamActivityTracker
+from lca.infrastructure.observability.adapters.memory_adapter import (
     TelemetryMemoryAdapter as TelemetryMemoryAdapter,
 )
-from lca.infrastructure.observability.response_text_stream import ResponseTextStreamExtractor
+from lca.infrastructure.observability.stream.response_text_stream import ResponseTextStreamExtractor
 
 _PERF_COUNTER_SCALE = 1000
 """perf_counter 秒 → 毫秒换算。"""

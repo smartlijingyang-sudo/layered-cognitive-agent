@@ -8,7 +8,7 @@ user-visible streaming uses channel ``answer`` and is populated only by
 from __future__ import annotations
 
 from lca.contracts.atoms.enums import StreamChannel
-from lca.infrastructure.observability.response_text_stream import ResponseTextStreamExtractor
+from lca.infrastructure.observability.stream.response_text_stream import ResponseTextStreamExtractor
 
 __all__ = ["ResponseTextStreamExtractor", "StreamChannel", "classify_output_channel"]
 

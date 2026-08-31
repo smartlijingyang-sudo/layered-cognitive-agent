@@ -88,7 +88,7 @@ class DocumentEnricher:
         if not event_type:
             return record
         try:
-            from lca.infrastructure.observability.event_doc import doc_for
+            from lca.infrastructure.observability.events.event_doc import doc_for
         except Exception:
             return record
         doc = doc_for(event_type)

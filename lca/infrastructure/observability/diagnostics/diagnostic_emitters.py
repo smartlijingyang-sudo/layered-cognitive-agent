@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from lca.contracts.models.observability.diagnostic import DiagnosticCategory
-from lca.infrastructure.observability.facade import record_runtime
+from lca.infrastructure.observability.facade.facade import record_runtime
 
 
 def record_llm_completion(

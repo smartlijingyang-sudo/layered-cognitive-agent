@@ -116,7 +116,7 @@ class NarrativeSidecar:
             self._fh.write(f"\n## {section}\n\n")
             self._last_section = section
         try:
-            from lca.infrastructure.observability.event_doc import doc_for
+            from lca.infrastructure.observability.events.event_doc import doc_for
 
             doc = doc_for(event_type)
         except Exception:
@@ -162,7 +162,7 @@ class NarrativeSidecar:
                 self._summary_counts.items(), key=lambda kv: (-kv[1], kv[0])
             ):
                 try:
-                    from lca.infrastructure.observability.event_doc import doc_for
+                    from lca.infrastructure.observability.events.event_doc import doc_for
 
                     doc = doc_for(event_type)
                 except Exception:

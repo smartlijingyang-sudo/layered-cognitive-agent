@@ -23,7 +23,7 @@ from lca.contracts.atoms.telemetry import (
     SpanName,
 )
 from lca.infrastructure.observability.narrative.narrative_utils import attr_text, wrap_words
-from lca.infrastructure.observability.view import SpanView
+from lca.infrastructure.observability.adapters.view import SpanView
 
 _NAME_WIDTH = 22
 

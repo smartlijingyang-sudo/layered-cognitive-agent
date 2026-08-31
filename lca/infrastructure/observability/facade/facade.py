@@ -185,7 +185,7 @@ def span(name: object, **attributes: Any) -> Iterator[Any]:
     bound = _bound.get()
     if bound is None or bound.tracer is None:
         # 无 tracer 时 no-op；callers 拿到的可能是 NullSpanHandle
-        from lca.infrastructure.observability.handles import NullSpanHandle
+        from lca.infrastructure.observability.adapters.handles import NullSpanHandle
 
         with NullSpanHandle() as h:
             yield h
@@ -204,7 +204,7 @@ def detached_span(name: object, **attributes: Any) -> Iterator[Any]:
     """开启不接管 ambient 的计时 span（用于生命周期脚手架）。"""
     bound = _bound.get()
     if bound is None or bound.tracer is None:
-        from lca.infrastructure.observability.handles import NullSpanHandle
+        from lca.infrastructure.observability.adapters.handles import NullSpanHandle
 
         with NullSpanHandle() as h:
             yield h

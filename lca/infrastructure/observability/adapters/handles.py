@@ -18,7 +18,7 @@ from opentelemetry import trace as otel_trace
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 from opentelemetry.trace import StatusCode
 
-from lca.infrastructure.observability.policy import otel_safe_attributes
+from lca.infrastructure.observability.adapters.policy import otel_safe_attributes
 
 if TYPE_CHECKING:
     from opentelemetry.context import Context, Token

@@ -8,8 +8,8 @@ from lca.contracts.models.core.decision import Observation, Reflection
 from lca.contracts.models.core.memory import MemoryRecord
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import MemorySystem
-from lca.infrastructure.observability.diagnostic_emitters import record_memory_operation
-from lca.infrastructure.observability.facade import span
+from lca.infrastructure.observability.diagnostics.diagnostic_emitters import record_memory_operation
+from lca.infrastructure.observability.facade.facade import span
 
 _MEMORY_LAYER_PERCEIVE = "perceive"
 _MEMORY_LAYER_UPDATE = "update"

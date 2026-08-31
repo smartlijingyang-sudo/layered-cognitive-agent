@@ -1360,10 +1360,6 @@ side_effects = [
 public_api = [
     "lca.infrastructure.observability",
 ]
-# filename_whitelist = ["all"]: per ADR-0105 §3.3, this package
-# is structurally inseparable (multiple data/protocol types in
-# one concept; splitting would fragment cross-cutting concerns).
-filename_whitelist = ["all"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.cli"]

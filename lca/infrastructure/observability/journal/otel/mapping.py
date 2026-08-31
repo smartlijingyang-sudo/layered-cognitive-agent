@@ -66,7 +66,7 @@ from lca.contracts.models.observability.journal import (
     ToolDenied,
     ToolInvoked,
 )
-from lca.infrastructure.observability.langfuse_conventions import (
+from lca.infrastructure.observability.backends.langfuse_conventions import (
     FRAMEWORK_TAG,
     LANGFUSE_OBSERVATION_INPUT,
     LANGFUSE_OBSERVATION_METADATA_AGENT_ROLE,

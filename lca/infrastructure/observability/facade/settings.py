@@ -9,7 +9,7 @@ from __future__ import annotations
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from lca.infrastructure.observability.policy import Verbosity
+from lca.infrastructure.observability.adapters.policy import Verbosity
 
 _DEFAULT_BACKENDS = "console"
 _DEFAULT_JSONL_PATH = "traces/lca_journal.jsonl"

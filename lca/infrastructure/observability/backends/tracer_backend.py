@@ -12,8 +12,8 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
 from lca.contracts.observability.ports import AttributePolicyBackend, TracerBackend
-from lca.infrastructure.observability.handles import NullSpanHandle, SpanHandle
-from lca.infrastructure.observability.policy import otel_safe_attributes
+from lca.infrastructure.observability.adapters.handles import NullSpanHandle, SpanHandle
+from lca.infrastructure.observability.adapters.policy import otel_safe_attributes
 
 if TYPE_CHECKING:
     from opentelemetry.trace import Tracer

@@ -14,7 +14,7 @@ from lca.contracts.models.observability.journal import JournalEvent, StampedEven
 from lca.contracts.observability.event_descriptor_registry import EventDescriptorRegistry
 from lca.contracts.observability.ports import AttributePolicyBackend, JournalBackend
 from lca.infrastructure.observability.journal.engine.engine import RunStore
-from lca.infrastructure.observability.projection_registry import EventProjection
+from lca.infrastructure.observability.facade.projection_registry import EventProjection
 
 
 class MemoryJournal(JournalBackend):
