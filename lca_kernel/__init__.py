@@ -33,7 +33,24 @@ from lca_kernel.boot import (
     spawn_fiber,
     stop_kernel,
 )
-from lca_kernel.errors import FailLoudError, KernelError, StageError
+from lca_kernel.errors import (
+    FailLoudError,
+    KernelError,
+    ReloadError,
+    ReloadReason,
+    StageError,
+)
+from lca_kernel.hmr import (
+    DEFAULT_PATCH_PATH,
+    MIN_DEBOUNCE_MS,
+    PATCH_EVENT_KIND,
+    PatchConfig,
+    PatchEvent,
+    PatchWatcher,
+    PollingPatchWatcher,
+    summarize_patch,
+    validate_patch,
+)
 from lca_kernel.lifecycle import (
     FAIL_LOUD_RELEASE_TIMEOUT_MS,
     DefaultShutdownCoordinator,
@@ -61,10 +78,19 @@ def compile_profile(resolved: "ResolvedProfile") -> object:
 
 
 __all__ = [
+    "DEFAULT_PATCH_PATH",
     "FAIL_LOUD_RELEASE_TIMEOUT_MS",
+    "MIN_DEBOUNCE_MS",
+    "PATCH_EVENT_KIND",
     "DefaultShutdownCoordinator",
     "FailLoudError",
     "KernelError",
+    "PatchConfig",
+    "PatchEvent",
+    "PatchWatcher",
+    "PollingPatchWatcher",
+    "ReloadError",
+    "ReloadReason",
     "ShutdownCoordinator",
     "Stage",
     "StageError",
@@ -79,4 +105,6 @@ __all__ = [
     "run_resolved_kernel",
     "spawn_fiber",
     "stop_kernel",
+    "summarize_patch",
+    "validate_patch",
 ]

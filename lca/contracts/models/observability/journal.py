@@ -820,16 +820,17 @@ class BootPluginFiberSpawned(JournalEvent):
     failure_message: str | None = None
 
     def __post_init__(self) -> None:
-        # Lazy import — lca_kernel 是顶层 host 包,避开模块级反向依赖
-        from lca_kernel.stages import Stage
-
-        # Sentinel 路径:默认构造走测试兼容性,生产代码必须显式给 stage
+        # Sentinel 路径:默认构造走测试兼容性,生产代码必须显式给 stage。
+        # 注意:lca_kernel.stages.Stage 是 IntEnum,``isinstance(stage, int)``
+        # 自动通过(IntEnum 继承 int),所以下面用纯 int 校验既接受 Stage 也接受
+        # int,无需反向 import lca_kernel(contracts 层不能依赖 kernel,见
+        # ADR-0115 决定 3 importlinter kernel-domain-isolation)。
         if self.stage == -1:
             return
-        if not isinstance(self.stage, Stage):
-            raise TypeError(f"stage must be Stage enum, got {type(self.stage).__name__}")
-        if int(self.stage) < 1 or int(self.stage) > 6:
-            raise ValueError(f"stage value {self.stage} out of [1, 6] range")
+        if isinstance(self.stage, bool) or not isinstance(self.stage, int):
+            raise TypeError(f"stage must be Stage enum or int in [1, 6], got {type(self.stage).__name__}={self.stage!r}")
+        if not 1 <= int(self.stage) <= 6:
+            raise ValueError(f"stage value {int(self.stage)} out of [1, 6] range")
 
 
 @dataclass(frozen=True, slots=True)
