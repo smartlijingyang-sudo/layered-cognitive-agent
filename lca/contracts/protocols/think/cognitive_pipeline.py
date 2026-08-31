@@ -5,7 +5,7 @@
 组合层显式注入，并且只产生 ``Decision`` 或 ``Reflection`` 候选，不拥有外部
 world effect 权力。
 
-这两个协议有意不包含 Journal、EffectGateway、phase cursor 或 runtime control。
+这两个协议有意不包含 Journal、EffectDispatcher、phase cursor 或 runtime control。
 状态的合法投影仍必须经过 ``Reducer``，而执行、提交和图遍历仍属于声明式运行时
 内核。
 """

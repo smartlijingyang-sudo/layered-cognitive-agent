@@ -2,7 +2,7 @@
 
 An effect handler may legitimately return any domain value, including a mapping
 that happens to contain a ``result`` key.  Only the complete, versioned shape
-written by ``RegistryEffectGateway`` is an idempotency receipt.  This adapter
+written by ``RegistryEffectDispatcher`` is an idempotency receipt.  This adapter
 keeps that distinction explicit before a phase publishes its next artifact.
 """
 

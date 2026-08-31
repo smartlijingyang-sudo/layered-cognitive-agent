@@ -63,7 +63,7 @@ async def test_gateway_reuses_receipt_after_runtime_reconstruction(tmp_path) -> 
 
     from lca.contracts.protocols.act.command_envelope import CapabilityGrant, CommandEnvelope
     from lca.contracts.protocols.declarative.declarative_phase_graph import EffectPolicyPlan
-    from lca.harness.declarative.execute.dispatch import RegistryEffectGateway
+    from lca.harness.declarative.execute.dispatch import RegistryEffectDispatcher
     from lca.plugins.providers.act.effect_handlers import (
         InMemoryEffectHandlerRegistry,
         register_default_effect_handlers,
@@ -96,13 +96,13 @@ async def test_gateway_reuses_receipt_after_runtime_reconstruction(tmp_path) -> 
         return registry
 
     first = SqliteIdempotencyStore(path)
-    first_gateway = RegistryEffectGateway(
+    first_gateway = RegistryEffectDispatcher(
         capabilities, default_effect_handlers(), idempotency_store=first
     )
     first_result = await first_gateway.execute(envelope, policy)
 
     second = SqliteIdempotencyStore(path)
-    second_gateway = RegistryEffectGateway(
+    second_gateway = RegistryEffectDispatcher(
         capabilities, default_effect_handlers(), idempotency_store=second
     )
     second_result = await second_gateway.execute(envelope, policy)

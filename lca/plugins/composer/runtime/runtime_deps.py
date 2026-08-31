@@ -28,7 +28,7 @@ from lca.contracts.protocols.runtime.runtime_composition import (
     CheckpointStateResolverFactory,
     DeclarativeInterpreterFactory,
     DeltaReducerFactory,
-    EffectGatewayFactory,
+    EffectDispatcherFactory,
     ResultFinalizerFactory,
     RuntimeJournalFactory,
 )
@@ -67,7 +67,7 @@ class ProductionRuntimeDeps:
     artifact_closure: ArtifactClosure
     idempotency_store: IdempotencyStore
     resume_input_adapter: ResumeInputAdapter
-    effect_gateway_factory: EffectGatewayFactory
+    effect_dispatcher_factory: EffectDispatcherFactory
     delta_reducer_factory: DeltaReducerFactory
     journal_factory: RuntimeJournalFactory
     interpreter_factory: DeclarativeInterpreterFactory

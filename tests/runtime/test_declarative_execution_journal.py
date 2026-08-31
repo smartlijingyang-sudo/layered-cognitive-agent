@@ -63,7 +63,7 @@ async def test_declarative_execution_uses_the_injected_turn_journal() -> None:
         idempotency_store=MagicMock(),
         resume_input_adapter=MagicMock(),
         state_store=MagicMock(),
-        effect_gateway_factory=MagicMock(),
+        effect_dispatcher_factory=MagicMock(),
         delta_reducer_factory=MagicMock(),
         journal_factory=MagicMock(),
         interpreter_factory=MagicMock(),
@@ -90,7 +90,7 @@ async def test_declarative_execution_uses_the_injected_turn_journal() -> None:
     assert bindings.new_interpreter(journal=journal) is custom_interpreter
     bindings.interpreter_factory.create.assert_called_once_with(
         journal=journal,
-        effect_gateway=bindings.effect_gateway_factory.create.return_value,
+        effect_gateway=bindings.effect_dispatcher_factory.create.return_value,
         reducer=bindings.delta_reducer_factory.create.return_value,
         phase_observer=bindings.phase_observer,
         lifecycle_publisher=bindings.lifecycle_publisher,
@@ -149,7 +149,7 @@ def test_runtime_bindings_reject_missing_phase_executor() -> None:
         idempotency_store=MagicMock(),
         resume_input_adapter=MagicMock(),
         state_store=MagicMock(),
-        effect_gateway_factory=MagicMock(),
+        effect_dispatcher_factory=MagicMock(),
         delta_reducer_factory=MagicMock(),
         journal_factory=MagicMock(),
         interpreter_factory=MagicMock(),

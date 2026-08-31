@@ -35,7 +35,7 @@ from lca.plugins.providers.journal.declarative_runtime_seams import (
     DefaultResultFinalizerFactory,
     ObservabilityRuntimeJournalFactory,
     RegistryDeltaReducerFactory,
-    RegistryEffectGatewayFactory,
+    RegistryEffectDispatcherFactory,
 )
 from lca.runtime.reducer import DefaultReducer
 from lca.runtime.resume_input import HumanAnswerResumeInputAdapter
@@ -70,7 +70,7 @@ def _production_deps() -> ProductionRuntimeDeps:
         artifact_closure=cast("ArtifactClosure", object()),
         idempotency_store=cast("IdempotencyStore", object()),
         resume_input_adapter=cast("ResumeInputAdapter", HumanAnswerResumeInputAdapter()),
-        effect_gateway_factory=RegistryEffectGatewayFactory(),
+        effect_dispatcher_factory=RegistryEffectDispatcherFactory(),
         delta_reducer_factory=RegistryDeltaReducerFactory(),
         journal_factory=ObservabilityRuntimeJournalFactory(),
         interpreter_factory=DefaultDeclarativeInterpreterFactory(),
@@ -91,7 +91,7 @@ def test_production_factory_closes_runtime_from_explicit_dependencies() -> None:
     assert runtime.artifact_closure is deps.artifact_closure
     assert runtime.idempotency_store is deps.idempotency_store
     assert runtime.resume_input_adapter is deps.resume_input_adapter
-    assert runtime.bindings.effect_gateway_factory is deps.effect_gateway_factory
+    assert runtime.bindings.effect_dispatcher_factory is deps.effect_dispatcher_factory
     assert runtime.bindings.delta_reducer_factory is deps.delta_reducer_factory
     assert runtime.bindings.journal_factory is deps.journal_factory
     assert (
@@ -109,15 +109,15 @@ def test_production_binding_uses_selected_runtime_mechanism_factories() -> None:
     effect_gateway = object()
     delta_reducer = object()
     journal = object()
-    effect_gateway_factory = MagicMock()
-    effect_gateway_factory.create.return_value = effect_gateway
+    effect_dispatcher_factory = MagicMock()
+    effect_dispatcher_factory.create.return_value = effect_gateway
     delta_reducer_factory = MagicMock()
     delta_reducer_factory.create.return_value = delta_reducer
     journal_factory = MagicMock()
     journal_factory.create.return_value = journal
     deps = replace(
         _production_deps(),
-        effect_gateway_factory=effect_gateway_factory,
+        effect_dispatcher_factory=effect_dispatcher_factory,
         delta_reducer_factory=delta_reducer_factory,
         journal_factory=journal_factory,
         checkpoint_state_resolver_factory=MagicMock(),
@@ -126,8 +126,8 @@ def test_production_binding_uses_selected_runtime_mechanism_factories() -> None:
 
     bindings = build_cognitive_runtime(deps).bindings
 
-    assert bindings.new_effect_gateway() is effect_gateway
-    effect_gateway_factory.create.assert_called_once_with(
+    assert bindings.new_effect_dispatcher() is effect_gateway
+    effect_dispatcher_factory.create.assert_called_once_with(
         capabilities=bindings.capabilities,
         effect_handler_registry=deps.effect_handler_registry,
         idempotency_store=deps.idempotency_store,
@@ -193,7 +193,7 @@ def test_production_dependency_model_rejects_missing_closure_member() -> None:
             delta_handler_registry=cast("DeltaHandlerRegistry", object()),
             idempotency_store=cast("IdempotencyStore", object()),
             resume_input_adapter=cast("ResumeInputAdapter", HumanAnswerResumeInputAdapter()),
-            effect_gateway_factory=RegistryEffectGatewayFactory(),
+            effect_dispatcher_factory=RegistryEffectDispatcherFactory(),
             delta_reducer_factory=RegistryDeltaReducerFactory(),
             journal_factory=ObservabilityRuntimeJournalFactory(),
             interpreter_factory=DefaultDeclarativeInterpreterFactory(),
@@ -216,7 +216,7 @@ def test_fixture_factory_builds_explicit_in_process_binding() -> None:
     assert runtime.bindings.delta_handler_registry is not None
     assert runtime.bindings.artifact_closure is not None
     assert runtime.bindings.resume_input_adapter is not None
-    assert runtime.bindings.effect_gateway_factory is not None
+    assert runtime.bindings.effect_dispatcher_factory is not None
     assert runtime.bindings.delta_reducer_factory is not None
     assert runtime.bindings.journal_factory is not None
     assert runtime.bindings.checkpoint_state_resolver_factory is not None

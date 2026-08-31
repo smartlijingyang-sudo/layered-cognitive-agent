@@ -54,7 +54,7 @@ _RUNTIME_CLOSURE_CATALOG: tuple[RuntimeClosureRequirement, ...] = (
         "lca.plugins.seams.act.effect_handler",
     ),
     RuntimeClosureRequirement(
-        "effect_gateway_factory",
+        "effect_dispatcher_factory",
         "lca.plugins.providers.journal.declarative_runtime_seams",
     ),
     RuntimeClosureRequirement(

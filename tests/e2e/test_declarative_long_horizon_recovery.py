@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 
 from lca.contracts.protocols.act.command_envelope import CommandEnvelope
-from lca.harness.declarative.execute.dispatch import RegistryEffectGateway
+from lca.harness.declarative.execute.dispatch import RegistryEffectDispatcher
 from lca.plugins.providers.act.effect_handlers import (
     InMemoryEffectHandlerRegistry,
     register_default_effect_handlers,
@@ -105,7 +105,7 @@ class TestEffectIdempotency:
         body = MockBody()
         capabilities = RuntimePhaseCapabilities({"body": body, "memory": MockMemory()})
         store = InMemoryFixtureIdempotencyStore()
-        gateway = RegistryEffectGateway(
+        gateway = RegistryEffectDispatcher(
             capabilities, _default_effect_handlers(), idempotency_store=store
         )
 
@@ -145,7 +145,7 @@ class TestEffectIdempotency:
         body = MockBody()
         capabilities = RuntimePhaseCapabilities({"body": body, "memory": MockMemory()})
         store = InMemoryFixtureIdempotencyStore()
-        gateway = RegistryEffectGateway(
+        gateway = RegistryEffectDispatcher(
             capabilities, _default_effect_handlers(), idempotency_store=store
         )
 
@@ -199,7 +199,7 @@ class TestEffectIdempotency:
         body = FailedBody()
         capabilities = RuntimePhaseCapabilities({"body": body, "memory": MockMemory()})
         store = InMemoryFixtureIdempotencyStore()
-        gateway = RegistryEffectGateway(
+        gateway = RegistryEffectDispatcher(
             capabilities, _default_effect_handlers(), idempotency_store=store
         )
 
@@ -232,7 +232,7 @@ class TestEffectIdempotency:
         body = MockBody()
         capabilities = RuntimePhaseCapabilities({"body": body, "memory": MockMemory()})
         store = InMemoryFixtureIdempotencyStore()
-        gateway = RegistryEffectGateway(
+        gateway = RegistryEffectDispatcher(
             capabilities, _default_effect_handlers(), idempotency_store=store
         )
 

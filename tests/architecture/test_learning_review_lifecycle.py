@@ -270,4 +270,4 @@ def test_learning_review_source_cannot_materialize_skills_or_publish_profiles() 
     assert "write_text(" not in sources
     assert "publish_profile(" not in sources
     assert "AgentState" not in sources
-    assert "EffectGateway" not in sources
+    assert "EffectDispatcher" not in sources

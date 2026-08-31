@@ -72,7 +72,7 @@ RUNTIME_LIFECYCLE_SUBSCRIBER_REGISTRY = Capability[object](
     "runtime_lifecycle_subscriber_registry", cardinality="one"
 )
 """Neutral boot-time registry for independently contributed lifecycle subscribers."""
-EFFECT_GATEWAY_FACTORY = Capability[object]("effect_gateway_factory", cardinality="one")
+EFFECT_DISPATCHER_FACTORY = Capability[object]("effect_dispatcher_factory", cardinality="one")
 """Profile-selected factory for policy-governed declarative effect execution."""
 DELTA_REDUCER_FACTORY = Capability[object]("delta_reducer_factory", cardinality="one")
 """Profile-selected factory for the declared-delta single-writer adapter."""

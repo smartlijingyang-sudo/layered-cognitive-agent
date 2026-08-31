@@ -21,7 +21,7 @@ from lca.contracts.protocols.runtime.runtime_composition import (
     CheckpointStateResolverFactory,
     DeclarativeInterpreterFactory,
     DeltaReducerFactory,
-    EffectGatewayFactory,
+    EffectDispatcherFactory,
     ResultFinalizerFactory,
     RuntimeJournalFactory,
 )
@@ -39,7 +39,7 @@ from lca.plugins.providers.journal.declarative_runtime_seams import (
     DefaultResultFinalizerFactory,
     ObservabilityRuntimeJournalFactory,
     RegistryDeltaReducerFactory,
-    RegistryEffectGatewayFactory,
+    RegistryEffectDispatcherFactory,
 )
 from lca.runtime.reducer import DefaultReducer
 
@@ -72,8 +72,8 @@ class FixtureRuntimeAdapter:
             or fixture_runtime_defaults.idempotency_store(),
             resume_input_adapter=self._deps.resume_input_adapter
             or fixture_runtime_defaults.resume_input_adapter(),
-            effect_gateway_factory=self._deps.effect_gateway_factory
-            or RegistryEffectGatewayFactory(),
+            effect_dispatcher_factory=self._deps.effect_dispatcher_factory
+            or RegistryEffectDispatcherFactory(),
             delta_reducer_factory=self._deps.delta_reducer_factory or RegistryDeltaReducerFactory(),
             journal_factory=self._deps.journal_factory or ObservabilityRuntimeJournalFactory(),
             interpreter_factory=self._deps.interpreter_factory
@@ -104,7 +104,7 @@ class FixtureRuntimeAdapter:
             artifact_closure=cast("ArtifactClosure", resolved.artifact_closure),
             idempotency_store=cast("IdempotencyStore", resolved.idempotency_store),
             resume_input_adapter=cast("ResumeInputAdapter", resolved.resume_input_adapter),
-            effect_gateway_factory=cast("EffectGatewayFactory", resolved.effect_gateway_factory),
+            effect_dispatcher_factory=cast("EffectDispatcherFactory", resolved.effect_dispatcher_factory),
             delta_reducer_factory=cast("DeltaReducerFactory", resolved.delta_reducer_factory),
             journal_factory=cast("RuntimeJournalFactory", resolved.journal_factory),
             interpreter_factory=cast("DeclarativeInterpreterFactory", resolved.interpreter_factory),

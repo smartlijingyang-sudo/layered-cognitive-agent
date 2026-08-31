@@ -23,7 +23,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     EffectPolicyPlan,
 )
 from lca.contracts.protocols.state.delta_handler import DeltaHandler, DeltaHandlerRegistry
-from lca.harness.declarative.execute.dispatch import RegistryEffectGateway
+from lca.harness.declarative.execute.dispatch import RegistryEffectDispatcher
 from lca.plugins.providers.act.action_handlers import (
     DefaultActionHandlerRegistry,
     InMemoryActionHandlerRegistry,
@@ -147,7 +147,7 @@ async def test_replacement_handler_owns_receipt_label() -> None:
 
     registry: EffectHandlerRegistry = InMemoryEffectHandlerRegistry()
     registry.register("custom.effect", _CustomHandler())
-    gateway = RegistryEffectGateway(
+    gateway = RegistryEffectDispatcher(
         RuntimePhaseCapabilities({}),
         registry,
         InMemoryFixtureIdempotencyStore(),
@@ -229,14 +229,14 @@ def test_effect_handler_registry_protocol_exposes_effect_snapshot() -> None:
 def test_runtime_gateway_requires_explicit_effect_registry() -> None:
     """Missing effect bindings must fail at construction, not at side effect time."""
 
-    parameter = inspect.signature(RegistryEffectGateway).parameters["effect_handler_registry"]
+    parameter = inspect.signature(RegistryEffectDispatcher).parameters["effect_handler_registry"]
     assert parameter.default is inspect.Parameter.empty
 
 
 def test_runtime_gateway_requires_explicit_idempotency_store() -> None:
     """The gateway must not silently fall back to process-local idempotency."""
 
-    parameter = inspect.signature(RegistryEffectGateway).parameters["idempotency_store"]
+    parameter = inspect.signature(RegistryEffectDispatcher).parameters["idempotency_store"]
     assert parameter.default is inspect.Parameter.empty
 
 
@@ -255,7 +255,7 @@ def test_runtime_gateway_does_not_construct_handlers_by_name() -> None:
     source = gateway_path.read_text(encoding="utf-8")
     tree = ast.parse(source)
     for node in tree.body:
-        if isinstance(node, ast.ClassDef) and node.name == "RegistryEffectGateway":
+        if isinstance(node, ast.ClassDef) and node.name == "RegistryEffectDispatcher":
             for sub in ast.walk(node):
                 if not isinstance(sub, ast.Call):
                     continue
@@ -381,7 +381,7 @@ async def test_effect_class_rejects_non_string_metadata_before_handler() -> None
 
     registry: EffectHandlerRegistry = InMemoryEffectHandlerRegistry()
     registry.register("custom.effect", _ShouldNotRun())
-    gateway = RegistryEffectGateway(
+    gateway = RegistryEffectDispatcher(
         RuntimePhaseCapabilities({}),
         registry,
         InMemoryFixtureIdempotencyStore(),

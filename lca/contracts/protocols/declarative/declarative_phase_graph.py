@@ -21,7 +21,7 @@ from lca.contracts.protocols.declarative.declarative_common import (
 from lca.contracts.protocols.declarative.declarative_execution import (
     DeclarativeRunOutcome,
     DeltaReducer,
-    EffectGateway,
+    EffectDispatcher,
     JournalCommitter,
     PhaseAttemptFailure,
     PhaseCapabilityReader,
@@ -83,7 +83,7 @@ __all__ = [
     "DeclarativeRunOutcome",
     "DeclarativeValidationError",
     "DeltaReducer",
-    "EffectGateway",
+    "EffectDispatcher",
     "EffectGovernanceDeclaration",
     "EffectPolicyPlan",
     "EvidenceDeclaration",

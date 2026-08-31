@@ -38,7 +38,7 @@ class EffectReceipt:
             raise ValueError("only failed effects can be retryable")
 
 
-def receipt_from_gateway(
+def receipt_from_dispatcher(
     value: object,
     *,
     invocation_id: str,
@@ -63,4 +63,4 @@ def receipt_from_gateway(
     )
 
 
-__all__ = ["EffectOutcome", "EffectReceipt", "receipt_from_gateway"]
+__all__ = ["EffectOutcome", "EffectReceipt", "receipt_from_dispatcher"]

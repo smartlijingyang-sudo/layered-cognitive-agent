@@ -24,7 +24,10 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.mechanisms import HookRegistry
 from lca.contracts.protocols.act.effect_handler import EffectCapabilities, EffectHandlerRegistry
-from lca.contracts.protocols.declarative.declarative_phase_graph import DeltaReducer, EffectGateway
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
+    DeltaReducer,
+    EffectDispatcher,
+)
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.journal.artifact_closure import ArtifactClosure
 from lca.contracts.protocols.journal.idempotency import IdempotencyStore
@@ -35,7 +38,7 @@ from lca.contracts.protocols.runtime.runtime_composition import (
     DeclarativeInterpreter,
     DeclarativeInterpreterFactory,
     DeltaReducerFactory,
-    EffectGatewayFactory,
+    EffectDispatcherFactory,
     ResultFinalizer,
     ResultFinalizerFactory,
     RuntimeJournal,
@@ -45,7 +48,7 @@ from lca.contracts.protocols.runtime.runtime_lifecycle import RuntimeLifecyclePu
 from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.state.reducer import Reducer
 from lca.harness.declarative import GenericPlanInterpreter
-from lca.harness.declarative.execute.dispatch import RegistryDeltaReducer, RegistryEffectGateway
+from lca.harness.declarative.execute.dispatch import RegistryDeltaReducer, RegistryEffectDispatcher
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.runtime.checkpoint_resolution import DeclarativeCheckpointStateResolver
 from lca.runtime.result_finalizer import RuntimeResultFinalizer
@@ -58,7 +61,7 @@ class Config(BaseModel):
     model_config = {"extra": "forbid"}
 
 
-class RegistryEffectGatewayFactory(EffectGatewayFactory):
+class RegistryEffectDispatcherFactory(EffectDispatcherFactory):
     """Create the standard policy and idempotency governed effect gateway."""
 
     def create(
@@ -67,8 +70,8 @@ class RegistryEffectGatewayFactory(EffectGatewayFactory):
         capabilities: EffectCapabilities,
         effect_handler_registry: EffectHandlerRegistry,
         idempotency_store: IdempotencyStore,
-    ) -> EffectGateway:
-        return RegistryEffectGateway(
+    ) -> EffectDispatcher:
+        return RegistryEffectDispatcher(
             capabilities,
             effect_handler_registry,
             idempotency_store,
@@ -123,7 +126,7 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
         self,
         *,
         journal: RuntimeJournal,
-        effect_gateway: EffectGateway,
+        effect_gateway: EffectDispatcher,
         reducer: DeltaReducer,
         phase_observer: object,
         lifecycle_publisher: RuntimeLifecyclePublisher,
@@ -155,7 +158,7 @@ class ObservabilityRuntimeJournalFactory(RuntimeJournalFactory):
         "checkpoint_state_resolver_factory",
         "declarative_interpreter_factory",
         "delta_reducer_factory",
-        "effect_gateway_factory",
+        "effect_dispatcher_factory",
         "result_finalizer_factory",
         "runtime_journal_factory",
     ],
@@ -163,7 +166,7 @@ class ObservabilityRuntimeJournalFactory(RuntimeJournalFactory):
         CheckpointStateResolverFactory,
         DeclarativeInterpreterFactory,
         DeltaReducerFactory,
-        EffectGatewayFactory,
+        EffectDispatcherFactory,
         ResultFinalizerFactory,
         RuntimeJournalFactory,
     ],
@@ -195,7 +198,7 @@ class ObservabilityRuntimeJournalFactory(RuntimeJournalFactory):
             "decision.emit",
             "declarative_interpreter_factory",
             "delta_reducer_factory",
-            "effect_gateway_factory",
+            "effect_dispatcher_factory",
             "result_finalizer_factory",
             "runtime_journal_factory",
         ),
@@ -203,7 +206,7 @@ class ObservabilityRuntimeJournalFactory(RuntimeJournalFactory):
             "checkpoint_state_resolver_factory.checked",
             "declarative_interpreter_factory.checked",
             "delta_reducer_factory.checked",
-            "effect_gateway_factory.checked",
+            "effect_dispatcher_factory.checked",
             "result_finalizer_factory.checked",
             "runtime_journal_factory.checked",
         ),
@@ -220,7 +223,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         DefaultDeclarativeInterpreterFactory(ctx.require("loop_guard_evaluator")),
     )
     ctx.provide("delta_reducer_factory", RegistryDeltaReducerFactory())
-    ctx.provide("effect_gateway_factory", RegistryEffectGatewayFactory())
+    ctx.provide("effect_dispatcher_factory", RegistryEffectDispatcherFactory())
     ctx.provide("result_finalizer_factory", DefaultResultFinalizerFactory())
     ctx.provide("runtime_journal_factory", ObservabilityRuntimeJournalFactory())
 
@@ -232,6 +235,6 @@ __all__ = [
     "DefaultResultFinalizerFactory",
     "ObservabilityRuntimeJournalFactory",
     "RegistryDeltaReducerFactory",
-    "RegistryEffectGatewayFactory",
+    "RegistryEffectDispatcherFactory",
     "setup",
 ]

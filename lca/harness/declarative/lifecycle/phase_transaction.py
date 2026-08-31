@@ -11,7 +11,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeRunOutcome,
     DeclarativeValidationError,
     DeltaReducer,
-    EffectGateway,
+    EffectDispatcher,
     EffectPolicyPlan,
     JournalCommitter,
     PhaseCapabilityReader,
@@ -51,7 +51,7 @@ class PhaseExecutionTransaction:
         self,
         *,
         journal: JournalCommitter,
-        effect_gateway: EffectGateway | None,
+        effect_gateway: EffectDispatcher | None,
         reducer: DeltaReducer | None,
         phase_observer: PhaseObserver,
     ) -> None:
@@ -194,7 +194,7 @@ class PhaseExecutionTransaction:
         if result.command_envelope is None:
             return None
         if self._effect_gateway is None:
-            raise DeclarativeValidationError("PG-003", "effectful result has no EffectGateway")
+            raise DeclarativeValidationError("PG-003", "effectful result has no EffectDispatcher")
         if effect_policy is None:
             raise DeclarativeValidationError("PS-006", "effectful result has no EffectPolicy")
         if result.command_envelope.plan_ref != plan_ref:

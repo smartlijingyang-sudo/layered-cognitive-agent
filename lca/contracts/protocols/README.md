@@ -86,8 +86,8 @@ log:emit
 - `DeltaReducerFactory`
 - `DshRuntime`
 - `EffectCapabilities`
-- `EffectGateway`
-- `EffectGatewayFactory`
+- `EffectDispatcher`
+- `EffectDispatcherFactory`
 - `EffectHandler`
 - `EffectHandlerRegistry`
 - `EffectPolicyPlan`

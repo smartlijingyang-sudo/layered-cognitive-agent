@@ -55,9 +55,9 @@ def test_effect_receipt_rejects_inconsistent_state(kwargs: dict[str, object]) ->
 
 
 def test_gateway_receipt_is_normalized() -> None:
-    from lca.contracts.harness.act.effect_receipt import receipt_from_gateway
+    from lca.contracts.harness.act.effect_receipt import receipt_from_dispatcher
 
-    receipt = receipt_from_gateway(
+    receipt = receipt_from_dispatcher(
         {"idempotency_key": "k-1", "output_ref": "artifact://x"},
         invocation_id="invoke-1",
         provider="crm.update",

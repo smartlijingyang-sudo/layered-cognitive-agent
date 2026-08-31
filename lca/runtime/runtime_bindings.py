@@ -19,7 +19,7 @@ from lca.contracts.protocols.act.effect_handler import EffectHandlerRegistry
 from lca.contracts.protocols.act.embodiment import Body
 from lca.contracts.protocols.declarative.declarative_execution import (
     DeltaReducer,
-    EffectGateway,
+    EffectDispatcher,
     PhaseCapabilityReader,
 )
 from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseExecutor
@@ -33,7 +33,7 @@ from lca.contracts.protocols.runtime.runtime_composition import (
     DeclarativeInterpreter,
     DeclarativeInterpreterFactory,
     DeltaReducerFactory,
-    EffectGatewayFactory,
+    EffectDispatcherFactory,
     ResultFinalizer,
     ResultFinalizerFactory,
     RuntimeJournal,
@@ -128,7 +128,7 @@ class DeclarativeRuntimeBindings:
     idempotency_store: IdempotencyStore
     resume_input_adapter: ResumeInputAdapter
     state_store: StateStore
-    effect_gateway_factory: EffectGatewayFactory
+    effect_dispatcher_factory: EffectDispatcherFactory
     delta_reducer_factory: DeltaReducerFactory
     journal_factory: RuntimeJournalFactory
     interpreter_factory: DeclarativeInterpreterFactory
@@ -154,7 +154,7 @@ class DeclarativeRuntimeBindings:
         idempotency_store: IdempotencyStore,
         resume_input_adapter: ResumeInputAdapter,
         state_store: StateStore,
-        effect_gateway_factory: EffectGatewayFactory,
+        effect_dispatcher_factory: EffectDispatcherFactory,
         delta_reducer_factory: DeltaReducerFactory,
         journal_factory: RuntimeJournalFactory,
         interpreter_factory: DeclarativeInterpreterFactory,
@@ -177,7 +177,7 @@ class DeclarativeRuntimeBindings:
             idempotency_store=idempotency_store,
             resume_input_adapter=resume_input_adapter,
             state_store=state_store,
-            effect_gateway_factory=effect_gateway_factory,
+            effect_dispatcher_factory=effect_dispatcher_factory,
             delta_reducer_factory=delta_reducer_factory,
             journal_factory=journal_factory,
             interpreter_factory=interpreter_factory,
@@ -226,7 +226,7 @@ class DeclarativeRuntimeBindings:
     def new_interpreter(self, *, journal: RuntimeJournal) -> DeclarativeInterpreter:
         interpreter = self.interpreter_factory.create(
             journal=journal,
-            effect_gateway=self.new_effect_gateway(),
+            effect_gateway=self.new_effect_dispatcher(),
             reducer=self.new_delta_reducer(),
             phase_observer=self.phase_observer,
             lifecycle_publisher=self.lifecycle_publisher,
@@ -238,9 +238,9 @@ class DeclarativeRuntimeBindings:
             )
         return interpreter
 
-    def new_effect_gateway(self) -> EffectGateway:
+    def new_effect_dispatcher(self) -> EffectDispatcher:
         """Create the profile-selected effect seam from the frozen binding closure."""
-        return self.effect_gateway_factory.create(
+        return self.effect_dispatcher_factory.create(
             capabilities=self.capabilities,
             effect_handler_registry=self.effect_handler_registry,
             idempotency_store=self.idempotency_store,

@@ -16,7 +16,7 @@ from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols.act.effect_handler import EffectCapabilities, EffectHandlerRegistry
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeltaReducer,
-    EffectGateway,
+    EffectDispatcher,
     JournalCommitter,
 )
 from lca.contracts.protocols.journal.artifact_closure import ArtifactClosure
@@ -81,7 +81,7 @@ class DeclarativeInterpreterFactory(Protocol):
         self,
         *,
         journal: RuntimeJournal,
-        effect_gateway: EffectGateway,
+        effect_gateway: EffectDispatcher,
         reducer: DeltaReducer,
         phase_observer: object,
         lifecycle_publisher: RuntimeLifecyclePublisher,
@@ -130,7 +130,7 @@ class ResultFinalizerFactory(Protocol):
 
 
 @runtime_checkable
-class EffectGatewayFactory(Protocol):
+class EffectDispatcherFactory(Protocol):
     """Create the selected policy-governed effect execution gateway."""
 
     def create(
@@ -139,7 +139,7 @@ class EffectGatewayFactory(Protocol):
         capabilities: EffectCapabilities,
         effect_handler_registry: EffectHandlerRegistry,
         idempotency_store: IdempotencyStore,
-    ) -> EffectGateway: ...
+    ) -> EffectDispatcher: ...
 
 
 @runtime_checkable
@@ -160,7 +160,7 @@ __all__ = [
     "DeclarativeInterpreter",
     "DeclarativeInterpreterFactory",
     "DeltaReducerFactory",
-    "EffectGatewayFactory",
+    "EffectDispatcherFactory",
     "ResultFinalizer",
     "ResultFinalizerFactory",
     "RuntimeFactory",

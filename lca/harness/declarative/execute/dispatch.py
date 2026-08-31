@@ -11,7 +11,7 @@ from lca.contracts.protocols.act.effect_handler import EffectCapabilities, Effec
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeValidationError,
     DeltaReducer,
-    EffectGateway,
+    EffectDispatcher,
     EffectPolicyPlan,
 )
 from lca.contracts.protocols.journal.idempotency import IdempotencyStore
@@ -20,7 +20,7 @@ from lca.contracts.protocols.state.reducer import Reducer
 from lca.infrastructure.component_registry import RegistryKeyError
 
 
-class RegistryEffectGateway(EffectGateway):
+class RegistryEffectDispatcher(EffectDispatcher):
     """Execute plan-authorized effects through profile-provided handlers.
 
     The gateway owns policy enforcement and durable idempotency.  Concrete
@@ -162,4 +162,4 @@ def _receipt_name(handler: object, operation: str) -> str:
     return f"{operation}.completed"
 
 
-__all__ = ["RegistryDeltaReducer", "RegistryEffectGateway"]
+__all__ = ["RegistryDeltaReducer", "RegistryEffectDispatcher"]

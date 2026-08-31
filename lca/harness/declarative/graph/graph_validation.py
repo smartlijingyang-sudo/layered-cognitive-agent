@@ -221,7 +221,7 @@ class PhaseGraphValidator:
                 ValidationIssue("PG-002", "effectful act lacks think/Decision predecessor")
             )
         if effectful_act_nodes and not effect_policy.gateway_capability:
-            issues.append(ValidationIssue("PG-003", "effectful act has no EffectGateway policy"))
+            issues.append(ValidationIssue("PG-003", "effectful act has no EffectDispatcher policy"))
         if not has_path_between_any(
             by_phase[SemanticPhase.REFLECT], by_phase[SemanticPhase.REMEMBER], outgoing
         ):

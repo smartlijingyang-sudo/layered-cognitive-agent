@@ -15,7 +15,7 @@ from lca.contracts.capabilities import (
     CHECKPOINT_STATE_RESOLVER_FACTORY,
     DECLARATIVE_INTERPRETER_FACTORY,
     DELTA_REDUCER_FACTORY,
-    EFFECT_GATEWAY_FACTORY,
+    EFFECT_DISPATCHER_FACTORY,
     LOOP_GUARD_EVALUATOR,
     PHASE_OBSERVER,
     RESULT_FINALIZER_FACTORY,
@@ -47,7 +47,7 @@ if TYPE_CHECKING:
         CheckpointStateResolverFactory,
         DeclarativeInterpreterFactory,
         DeltaReducerFactory,
-        EffectGatewayFactory,
+        EffectDispatcherFactory,
         ResultFinalizerFactory,
         RuntimeFactory,
         RuntimeJournalFactory,
@@ -73,7 +73,7 @@ _RUNTIME_CAPABILITY_KEYS = (
     DECLARATIVE_INTERPRETER_FACTORY.key,
     DELTA_REDUCER_FACTORY.key,
     "delta_handler_registry",
-    EFFECT_GATEWAY_FACTORY.key,
+    EFFECT_DISPATCHER_FACTORY.key,
     "effect_handler_registry",
     LOOP_GUARD_EVALUATOR.key,
     "idempotency_store",
@@ -98,7 +98,7 @@ class RuntimeCapabilityClosure:
     idempotency_store: IdempotencyStore
     resume_input_adapters: ResumeInputAdapterFactory
     phase_observer: PhaseObserver
-    effect_gateway_factory: EffectGatewayFactory
+    effect_dispatcher_factory: EffectDispatcherFactory
     delta_reducer_factory: DeltaReducerFactory
     journal_factory: RuntimeJournalFactory
     interpreter_factory: DeclarativeInterpreterFactory
@@ -144,8 +144,8 @@ def resolve_runtime_capabilities(
             "ResumeInputAdapterFactory", capabilities[RESUME_INPUT_ADAPTERS.key]
         ),
         phase_observer=cast("PhaseObserver", capabilities[PHASE_OBSERVER.key]),
-        effect_gateway_factory=cast(
-            "EffectGatewayFactory", capabilities[EFFECT_GATEWAY_FACTORY.key]
+        effect_dispatcher_factory=cast(
+            "EffectDispatcherFactory", capabilities[EFFECT_DISPATCHER_FACTORY.key]
         ),
         delta_reducer_factory=cast("DeltaReducerFactory", capabilities[DELTA_REDUCER_FACTORY.key]),
         journal_factory=cast("RuntimeJournalFactory", capabilities[RUNTIME_JOURNAL_FACTORY.key]),

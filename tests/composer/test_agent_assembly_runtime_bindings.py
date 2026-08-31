@@ -21,7 +21,7 @@ from lca.contracts.capabilities import (
     CHECKPOINT_STATE_RESOLVER_FACTORY,
     DECLARATIVE_INTERPRETER_FACTORY,
     DELTA_REDUCER_FACTORY,
-    EFFECT_GATEWAY_FACTORY,
+    EFFECT_DISPATCHER_FACTORY,
     RESULT_FINALIZER_FACTORY,
     RESUME_INPUT_ADAPTERS,
     RUNTIME_JOURNAL_FACTORY,
@@ -36,7 +36,7 @@ from lca.contracts.protocols.runtime.runtime_composition import (
     CheckpointStateResolverFactory,
     DeclarativeInterpreterFactory,
     DeltaReducerFactory,
-    EffectGatewayFactory,
+    EffectDispatcherFactory,
     ResultFinalizerFactory,
     RuntimeJournalFactory,
 )
@@ -98,7 +98,7 @@ def test_runtime_binding_adapter_owns_runtime_graph_mapping() -> None:
     assert "resolve_resume_input_adapter" not in assembly_source
 
     assert "RESUME_INPUT_ADAPTERS" in capabilities_source
-    assert "EFFECT_GATEWAY_FACTORY" in capabilities_source
+    assert "EFFECT_DISPATCHER_FACTORY" in capabilities_source
     assert "DELTA_REDUCER_FACTORY" in capabilities_source
     assert "RUNTIME_JOURNAL_FACTORY" in capabilities_source
     assert "CHECKPOINT_STATE_RESOLVER_FACTORY" in capabilities_source
@@ -130,7 +130,7 @@ def test_runtime_binding_adapter_maps_one_complete_graph_to_bindings() -> None:
         idempotency_store=object(),
         resume_input_adapters=object(),
         phase_observer=object(),
-        effect_gateway_factory=object(),
+        effect_dispatcher_factory=object(),
         delta_reducer_factory=object(),
         journal_factory=object(),
         interpreter_factory=object(),
@@ -210,7 +210,7 @@ def test_production_runtime_deps_rejects_conflicting_phase_capabilities() -> Non
         artifact_closure=object(),
         idempotency_store=object(),
         resume_input_adapter=object(),
-        effect_gateway_factory=object(),
+        effect_dispatcher_factory=object(),
         delta_reducer_factory=object(),
         journal_factory=object(),
         interpreter_factory=object(),
@@ -267,7 +267,7 @@ def test_booted_web_profile_resolves_declarative_runtime_factories() -> None:
     assert isinstance(
         ctx.inject(CHECKPOINT_STATE_RESOLVER_FACTORY.key), CheckpointStateResolverFactory
     )
-    assert isinstance(ctx.inject(EFFECT_GATEWAY_FACTORY.key), EffectGatewayFactory)
+    assert isinstance(ctx.inject(EFFECT_DISPATCHER_FACTORY.key), EffectDispatcherFactory)
     assert isinstance(ctx.inject(DELTA_REDUCER_FACTORY.key), DeltaReducerFactory)
     assert isinstance(
         ctx.inject(DECLARATIVE_INTERPRETER_FACTORY.key), DeclarativeInterpreterFactory

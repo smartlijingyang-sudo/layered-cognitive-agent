@@ -175,7 +175,7 @@ class PhaseExecutor(Protocol):
 
 
 @runtime_checkable
-class EffectGateway(Protocol):
+class EffectDispatcher(Protocol):
     async def execute(self, envelope: CommandEnvelope, policy: EffectPolicyPlan) -> object: ...
 
 
@@ -196,7 +196,7 @@ class DeltaReducer(Protocol):
 __all__ = [
     "DeclarativeRunOutcome",
     "DeltaReducer",
-    "EffectGateway",
+    "EffectDispatcher",
     "JournalCommitter",
     "PhaseAttemptFailure",
     "PhaseCapabilityReader",

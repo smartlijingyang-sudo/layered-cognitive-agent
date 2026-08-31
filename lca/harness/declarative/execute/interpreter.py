@@ -16,7 +16,7 @@ from lca.contracts.protocols.act.command_envelope import RunDelta, RunFact
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeValidationError,
     DeltaReducer,
-    EffectGateway,
+    EffectDispatcher,
     JournalCommitter,
     PhaseCapabilityReader,
     PhaseEdge,
@@ -82,7 +82,7 @@ class GenericPlanInterpreter:
         self,
         *,
         journal: JournalCommitter | None = None,
-        effect_gateway: EffectGateway | None = None,
+        effect_gateway: EffectDispatcher | None = None,
         reducer: DeltaReducer | None = None,
         phase_observer: PhaseObserver | None = None,
         loop_guard_evaluator: LoopGuardEvaluator | None = None,
