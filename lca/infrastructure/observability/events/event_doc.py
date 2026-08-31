@@ -23,7 +23,7 @@ class EventDoc:
     summary: str  # 一句话:这条事件是什么
     why: str  # 为何要记:它解决什么可观测问题
     arch: str  # 在五层架构 / 认知闭环 / ADR 中的位置
-    layer: str  # 触发射点所在的层 (L0..L4 / gateway)
+    layer: str  # 触发射点所在的层 (L0..L4)
 
 
 _REGISTRY: dict[str, EventDoc] = {}
@@ -67,7 +67,7 @@ def registered_event_types() -> Mapping[str, EventDoc]:
 # ── 内置词表 ──────────────────────────────────────────────
 # 每条 ``@doc_decorator('EventName')`` 都与 ``event_descriptors_data.py``
 # 中的同事件 ``_descriptor(...)`` 一一对应;``layer`` 字段从 emitter 路径
-# 推导(``lca.layerN_xxx.*`` → ``Lx``,``gateway.*`` → ``gateway``,
+# 推导(``lca.layerN_xxx.*`` → ``Lx``,``kernel_serve.*`` → ``L4``,
 # ``lca.harness.*`` / ``lca.plugins.*`` → ``L4``)。手工复核见 ADR-0065 §六
 # (认知原语宪法) + ADR-0002(认知闭环相位) + ADR-0041(LLM 流式增量)。
 
@@ -88,7 +88,7 @@ def _doc_casting_started() -> EventDoc:
         summary="自动组队选角开始 —— Team 编译前的一次 LLM 调用",
         why="把用户 objective 映射到角色库,产出 CastingPlan 快照",
         arch="L4 default_modes 选角插件入口;ADR-0042/0052 动态选角",
-        layer="gateway",
+        layer="L4",
     )
 
 
@@ -98,7 +98,7 @@ def _doc_casting_completed() -> EventDoc:
         summary="选角完成,记录 governance_kind + lead_role + selected_roles + rationale",
         why="驱动后续 TeamRunStarted.members;白名单校验后的可回放快照",
         arch="L4 default_modes;rationale 用于事后审计选角理由",
-        layer="gateway",
+        layer="L4",
     )
 
 
@@ -108,7 +108,7 @@ def _doc_casting_failed() -> EventDoc:
         summary="选角失败 —— 解析 / 白名单 / 重试耗尽任一原因",
         why="run 无法展开,run_doctor 标记 H1 断裂(0065 §六)",
         arch="L4 default_modes 降级路径",
-        layer="gateway",
+        layer="L4",
     )
 
 
@@ -137,7 +137,7 @@ def _doc_task_created() -> EventDoc:
     return EventDoc(
         summary="session spine 上的 durable task 事实",
         why="把团队 plan_steps 落实成可追踪 / 可恢复的最小任务单元",
-        arch="L4 harness command gateway;ADR-0092 durable session command ledger",
+        arch="L4 harness command (kernel serve);ADR-0092 durable session command ledger",
         layer="L4",
     )
 
@@ -348,7 +348,7 @@ def _doc_attach_started() -> EventDoc:
         summary="附件暂存开始 —— 把上传文件复制到受治理的工作区",
         why="文件不进 prompt 直送,先 sanitized 后被工具引用",
         arch="L4 lca.plugins.transport.webserver.handlers.runs.execute;ADR-0051 run workspace plane",
-        layer="gateway",
+        layer="L4",
     )
 
 
@@ -358,7 +358,7 @@ def _doc_attach_completed() -> EventDoc:
         summary="附件暂存成功,可被工具读取",
         why="审计 + 为下游工具给路径;路径受 sandbox 策略约束",
         arch="L4 lca.plugins.transport.webserver.handlers.runs.execute",
-        layer="gateway",
+        layer="L4",
     )
 
 
@@ -368,7 +368,7 @@ def _doc_attach_failed() -> EventDoc:
         summary="附件暂存失败(权限 / 路径 / 病毒扫描)",
         why="通常意味着 H2 断裂,jsonl 为空",
         arch="L4 lca.plugins.transport.webserver.handlers.runs.execute 错误路径",
-        layer="gateway",
+        layer="L4",
     )
 
 

@@ -2,7 +2,7 @@
 
 Config file: ``lca-host.yaml`` (project root).  One file defines the
 entire host environment: shared resources, per-user workspaces, tool
-chains, and the device gateway connection.
+chains, and the kernel serve connection.
 
 Reading the YAML is reading the architecture.
 """
@@ -35,8 +35,12 @@ class PathConfig(BaseModel):
     )
 
 
-class GatewayConfig(BaseModel):
-    """Device gateway connection."""
+class KernelServeConfig(BaseModel):
+    """Kernel serve connection (host_runtime client view).
+
+    命名统一: ADR-0119 决定 4 后 LCA 进程统称 kernel serve。本类对外
+    等价于过去的 ``GatewayConfig``(host 工具连 sandbox-user 的 SDK)。
+    """
 
     url: str = "ws://127.0.0.1:8765"
     health_url: str = "http://127.0.0.1:8765/health"
@@ -98,7 +102,7 @@ class CLIConfig(BaseModel):
     """LCA CLI (lca-cli) deployment."""
 
     source_dir: str = "packages/lca-cli"
-    gateway_client_dir: str = "packages/gateway-client"
+    kernel_serve_client_dir: str = "packages/gateway-client"
 
 
 # ── user model ────────────────────────────────────────────────────────
@@ -133,7 +137,7 @@ class HostRuntimeConfig(BaseModel):
     """Top-level config — one object, one YAML, one source of truth."""
 
     paths: PathConfig = Field(default_factory=PathConfig)
-    gateway: GatewayConfig = Field(default_factory=GatewayConfig)
+    kernel_serve: KernelServeConfig = Field(default_factory=KernelServeConfig)
     system_packages: SystemPackagesConfig = Field(default_factory=SystemPackagesConfig)
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
     venv: VenvConfig = Field(default_factory=VenvConfig)
@@ -191,7 +195,7 @@ paths:
   venv_dir: /opt/lca/venv
   managed_path: "/opt/lca/venv/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin"
 
-gateway:
+kernel_serve:
   url: "ws://127.0.0.1:8765"
   token: lca-local-host
 
@@ -210,7 +214,7 @@ venv:
 
 cli:
   source_dir: packages/lca-cli
-  gateway_client_dir: packages/gateway-client
+  kernel_serve_client_dir: packages/gateway-client
 
 # ── Users ──────────────────────────────────────────────────────────
 # Each user gets: system account, home dir, outputs/, .lca/ state, daemon

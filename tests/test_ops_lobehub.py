@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from lca.infrastructure.cli.config import GatewayConfig, LobeHubConfig
+from lca.infrastructure.cli.config import KernelServeConfig, LobeHubConfig
 from lca.infrastructure.cli.service import ServiceStatus
 from lca.infrastructure.cli.services.lobehub import LobeHubService
 from lca.infrastructure.cli.state import StateStore
@@ -27,7 +27,7 @@ def lobehub_svc(tmp_path: Path) -> LobeHubService:
     state_dir = tmp_path / "state"
     svc = LobeHubService(
         LobeHubConfig(dir="lobehub-ui", dev_port=3010),
-        GatewayConfig(port=8765),
+        KernelServeConfig(port=8765),
         state_dir,
         root,
     )

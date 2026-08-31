@@ -1,8 +1,11 @@
-"""Architecture boundary guard for the command gateway & session routes.
+"""Architecture boundary guard for the session command carrier & session routes.
 
-The gateway layer must NOT import from concrete cognitive/runtime/agent
-layers (cognition / runtime / agent). It only sees
-the harness contracts and the facade protocols. (N4 constraint)
+历史命名: 此文件名保留 ``test_architecture_gateway.py`` 但内容已迁移
+到 ADR-0119 followup: ``lca.harness.command.gateway`` 模块名沿用,
+``CommandGateway`` 类已改为 ``SessionCommandCarrier`` (此文件内 docstring
+保留旧名以兼容 git history)。N4 constraint: session command carrier 层
+must NOT import from concrete cognitive/runtime/agent layers. It only sees
+the harness contracts and the facade protocols.
 """
 
 from __future__ import annotations
@@ -40,8 +43,12 @@ def _check_file(relative_path: str) -> None:
                 assert forbidden not in module, f"{relative_path} must not import from {module}"
 
 
-def test_gateway_no_concrete_import() -> None:
-    """CommandGateway module must not import layer1/layer2/layer3."""
+def test_session_command_carrier_no_concrete_import() -> None:
+    """SessionCommandCarrier module must not import layer1/layer2/layer3.
+
+    历史命名: 函数原名 ``test_gateway_no_concrete_import``,随
+    ``CommandGateway`` → ``SessionCommandCarrier`` 一起改。
+    """
     _check_file("lca/harness/command/gateway.py")
 
 

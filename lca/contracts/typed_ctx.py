@@ -9,7 +9,7 @@ Constraint: this module is in `lca.contracts/`, which is FORBIDDEN by
 importlinter from importing `lca.infrastructure` / `lca.harness` / `lca.plugins`.
 Therefore TypedContext references ONLY Protocol types already declared in
 `lca/contracts/protocols/`. Concrete service classes (`LlmService`,
-`ToolsService`, `CommandGateway`, etc.) are not imported here.
+`ToolsService`, `SessionCommandCarrier`, etc.) are not imported here.
 """
 
 from __future__ import annotations

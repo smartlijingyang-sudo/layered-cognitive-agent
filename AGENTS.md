@@ -23,9 +23,8 @@ lca/agent/             Agent、Team、委派和编排
 lca/application/               组合根、spawn、runtime factory、team wiring
 lca/harness/                  Profile、Boot、Session、Plugin API、声明式执行
 lca/plugins/                  Seam、Provider、Loop Driver、Strategy、Tool Plugin
-lca/plugins/transport/        Gateway router + lifespan + 4 routes plugin(ADR-0112)
+lca/plugins/transport/        Webserver route registry + lifespan + 4 routes plugin(ADR-0112)
 lca_kernel/                   顶层包:编译 profile → 运行中进程(ADR-0115 K1–K8)
-gateway/                      FastAPI、SSE、命令入口、运行执行和 projection(thin factory)
 profiles/                     Profile YAML；默认 profiles/web-standard.yaml
 bundles/                      Bundle 和 scenario 配置
 scripts/                      lca-ops、迁移工具和质量门禁
@@ -37,13 +36,12 @@ vendor/                       Cordis、Cosmokit、Schemastery
 |---|---|
 | Profile 解析/启动 | `lca/harness/profile/{resolve,boot}.py`、`lca_kernel/compile_profile` |
 | Plugin Manifest | `lca/harness/plugin_api.py` |
-| Loop Driver | `gateway/runs/loop_drivers.py` |
+| Loop Driver | `lca/plugins/transport/webserver/handlers/runs/execute/loop_drivers.py` |
 | 声明式阶段图 | `lca/contracts/protocols/declarative_*.py`、`lca/harness/declarative/` |
 | Kernel(compile → run) | `lca_kernel/`(K1–K8;public 面在 `lca_kernel/__init__.py`) |
 | Kernel ↔ Transport 桥 | `lca/plugins/transport/webserver/lifespan_adapter.py` |
-| Gateway router | `lca/contracts/protocols/gateway_router.py`、`lca/plugins/transport/webserver/router.py` |
+| Webserver route registry | `lca/contracts/protocols/gateway_router.py`(文件路径沿用历史名,内容是 ADR-0119 之后的 webserver route Protocol)、`lca/plugins/transport/webserver/router.py`(实现类名 `GatewayRouter` 沿用历史) — 详见 ADR-0119-followup |
 | Routes plugin | `lca/plugins/transport/webserver/routes_{health_options,runs_sessions,openai_compat_files,device}.py` |
-| Gateway thin factory | `gateway/app.py`(ADR-0115 决定 6;≤ 60 行) |
 | Env 白名单(K7) | `lca/infrastructure/env/bootstrap.py` |
 | Brain / Prompt | `lca/cognition/brain/` |
 | Body / SafeExecutor | `lca/cognition/body/` |
@@ -59,7 +57,7 @@ vendor/                       Cordis、Cosmokit、Schemastery
 contracts → infrastructure → cognition → runtime → agent
 ```
 
-`application` 是组合根，负责装配具体实现；下层不得反向 import 它。Gateway 是 Carrier，只负责 HTTP/SSE、typed command 和 projection，不直接绑定具体 Brain、Body 或 Loop。分层由 `lint-imports` 和 `pyproject.toml` 契约检查。
+`application` 是组合根，负责装配具体实现；下层不得反向 import 它。Webserver transport 是 Carrier，只负责 HTTP/SSE、typed command 和 projection，不直接绑定具体 Brain、Body 或 Loop。分层由 `lint-imports` 和 `pyproject.toml` 契约检查。
 
 ### 认知闭集与双平面
 
@@ -144,7 +142,7 @@ uv run vulture lca --min-confidence 80
 | 仅文档、角色、注释 | `git diff --check`、Markdown 链接检查 |
 | 单模块实现 | Ruff + 相关测试；改签名加局部 mypy |
 | import / 模块移动 | 上一项 + `lint-imports` |
-| Gateway、运行入口、LobeHub patch | Ruff + 对应 gateway/run/lobehub 测试；只改 patch 源 |
+| 路由 + 运行入口 + LobeHub patch | Ruff + 对应 routes/run/lobehub 测试；只改 patch 源 |
 | 删除共享符号 | 相关测试 + `vulture`；影响大时全量 pytest |
 | `lca-kernel/` / `lca/plugins/transport/` / `lca/infrastructure/env/` | `scripts/check_kernel_boundary.py` + importlinter `kernel-domain-isolation` & `transport-isolation` + 87 + 24 + 19 kernel/transport/env 测试 (含本批新增 28 项 K8 HMR + 5 项 boot event emission) |
 | Contracts、Protocol、枚举、注册表、Journal、Profile | 全量验证 |
@@ -154,7 +152,7 @@ uv run vulture lca --min-confidence 80
 | 仅文档、角色、注释 | `git diff --check`、Markdown 链接检查 |
 | 单模块实现 | Ruff + 相关测试；改签名加局部 mypy |
 | import / 模块移动 | 上一项 + `lint-imports` |
-| Gateway、运行入口、LobeHub patch | Ruff + 对应 gateway/run/lobehub 测试；只改 patch 源 |
+| 路由 + 运行入口 + LobeHub patch | Ruff + 对应 routes/run/lobehub 测试；只改 patch 源 |
 | 删除共享符号 | 相关测试 + `vulture`；影响大时全量 pytest |
 | Contracts、Protocol、枚举、注册表、Journal、Profile | 全量验证 |
 

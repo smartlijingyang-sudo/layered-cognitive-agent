@@ -1,7 +1,7 @@
 """Starlette transport adapter for the session command gateway.
 
 Routes translate HTTP requests into harness commands and delegate execution to
-``CommandGateway``. Wire-format construction lives in ``session_payloads`` so
+``SessionCommandCarrier``. Wire-format construction lives in ``session_payloads`` so
 this module has one responsibility: transport orchestration.
 """
 
@@ -22,7 +22,7 @@ from lca.contracts.harness.act.command import (
     SessionCreateCommand,
     SteerCommand,
 )
-from lca.harness.command.gateway import CommandGateway
+from lca.harness.command.gateway import SessionCommandCarrier
 from lca.plugins.transport.webserver.handlers.cors import CORS_HEADERS
 from lca.plugins.transport.webserver.handlers.session_payloads import (
     accepted_receipt_payload,
@@ -32,11 +32,11 @@ from lca.plugins.transport.webserver.handlers.session_payloads import (
 )
 
 
-def _gateway(request: Request) -> CommandGateway:
+def _gateway(request: Request) -> SessionCommandCarrier:
     gw = getattr(request.app.state, "command_gateway", None)
     if gw is None:
         raise RuntimeError("session spine is not bound")
-    return cast("CommandGateway", gw)
+    return cast("SessionCommandCarrier", gw)
 
 
 def _json_response(payload: dict[str, Any], *, status_code: int = 200) -> JSONResponse:

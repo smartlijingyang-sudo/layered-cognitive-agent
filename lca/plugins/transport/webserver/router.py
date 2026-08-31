@@ -4,6 +4,13 @@ ADR-0112 修订版 + ADR-0115:``lca-gateway-router`` 是 L0 SEAM plugin,
 通过 :class:`lca.contracts.protocols.gateway_router.LcaGatewayRouter` Protocol
 对外暴露 register / set_fallback / install 四方法。
 
+命名历史: 此 ``GatewayRouter`` 类 + ``gateway_router`` capability key 与
+ADR-0119 决定 4 之后的 ``kernel_serve`` LCA 后台进程 **无关**。它是
+webserver transport 层的 HTTP route registry,职责是把 plugin 注册的
+Starlette ``Route`` 列表装到 ``app.router.routes``。命名沿用至今以避免
+plugin manifest capability 槽位破坏。完整命名空间历史映射看
+``docs/adr/0119-followup-gateway-name-map.md``。
+
 借鉴 deepseek ``packages/host/webserver/src/index.ts``:
 
 - mutable class(不用 ``@dataclass(frozen=True) + __setattr__`` 反模式)

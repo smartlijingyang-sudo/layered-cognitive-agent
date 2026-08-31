@@ -1,7 +1,7 @@
-"""Device-gateway HTTP client — LobeHub GatewayHttpClient alignment."""
+"""Device → kernel serve HTTP client — LobeHub GatewayHttpClient alignment."""
 
 from __future__ import annotations
 
-from lca.infrastructure.device_gateway.client import GatewayHttpClient
+from lca.infrastructure.device_gateway.client import KernelServeHttpClient
 
-__all__ = ["GatewayHttpClient"]
+__all__ = ["KernelServeHttpClient"]

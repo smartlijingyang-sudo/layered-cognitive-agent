@@ -1,5 +1,17 @@
 """LcaGatewayRouter Protocol — 注册/反注册路由表的唯一入口(ADR-0112 修订版)。
 
+注意: 本 Protocol 与 ADR-0119 决定 4 的 "kernel serve" LCA 后台进程
+**无关**。它是 webserver transport 层的 HTTP/WebSocket route registry,
+负责把 plugin 注册的 Starlette ``Route`` 列表装到 ``app.router.routes``。
+命名历史: 在 LCA 进程切到 ``lca_kernel serve`` 之前, ":8765" 上的
+Starlette 应用叫 "gateway",这套路由 API 也跟着叫 "GatewayRouter"。
+命名沿用至今以避免 plugin manifest capability 槽位破坏
+(``provides=("gateway_router",)`` / ``requires=("gateway_router",)``,
+4 个 routes plugin + 1 个 server plugin 全部依赖此 key)。
+
+完整命名空间历史映射看
+``docs/adr/0119-followup-gateway-name-map.md``。
+
 Public surface
 --------------
 - register_http(route: Route) -> Callable[[], None]   # 返回 disposer

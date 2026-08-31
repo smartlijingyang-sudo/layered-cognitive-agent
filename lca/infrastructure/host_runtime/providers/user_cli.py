@@ -36,14 +36,14 @@ class CLIProvider(Provider):
         """Build available CLI sources and deploy their runtime artifacts."""
         root = Path(".")
         source = root / self.config.cli.source_dir
-        gateway_client = root / self.config.cli.gateway_client_dir
+        kernel_serve_client = root / self.config.cli.kernel_serve_client_dir
         destination = Path(self.config.paths.cli_dir)
         if (source / "src").is_dir():
             self.run(["npx", "tsc"], check=False)
-            if (gateway_client / "src").is_dir():
+            if (kernel_serve_client / "src").is_dir():
                 subprocess.run(
                     ["npx", "tsc"],
-                    cwd=str(gateway_client),
+                    cwd=str(kernel_serve_client),
                     capture_output=True,
                     timeout=60,
                 )
@@ -51,11 +51,11 @@ class CLIProvider(Provider):
             return False
         self.run_sudo(["rm", "-rf", str(destination / "dist")])
         self.run_sudo(["cp", "-r", str(source / "dist"), str(destination)])
-        if (gateway_client / "dist").is_dir():
-            gateway_destination = destination / "node_modules" / "@lca" / "gateway-client"
-            self.run_sudo(["mkdir", "-p", str(gateway_destination)])
-            self.run_sudo(["cp", "-r", str(gateway_client / "dist"), str(gateway_destination)])
-        for module_directory in [source / "node_modules", gateway_client / "node_modules"]:
+        if (kernel_serve_client / "dist").is_dir():
+            client_destination = destination / "node_modules" / "@lca" / "gateway-client"
+            self.run_sudo(["mkdir", "-p", str(client_destination)])
+            self.run_sudo(["cp", "-r", str(kernel_serve_client / "dist"), str(client_destination)])
+        for module_directory in [source / "node_modules", kernel_serve_client / "node_modules"]:
             if module_directory.is_dir():
                 self.run_sudo(
                     ["cp", "-r", str(module_directory / "*"), str(destination / "node_modules")]
@@ -99,7 +99,7 @@ class CLIProvider(Provider):
         return True
 
     def status(self) -> StatusReport:
-        """Report deployment, daemon liveness, and gateway connectivity when user-scoped."""
+        """Report deployment, daemon liveness, and kernel_serve connectivity when user-scoped."""
         report = StatusReport(self.name)
         if self._cli_js.is_file():
             report.ok("deployed", str(self.config.paths.cli_dir))
@@ -107,7 +107,7 @@ class CLIProvider(Provider):
             report.fail("deployed", "CLI not found")
         if self.user:
             self._report_daemon_status(report)
-            self._report_gateway_status(report)
+            self._report_kernel_serve_status(report)
         return report
 
     def heal(self, failed_check: CheckResult) -> bool:
@@ -138,10 +138,10 @@ export VIRTUAL_ENV={self.config.paths.venv_dir}
 export HOME={self.user.home}
 cd {self.user.home}
 exec node {self._cli_js} connect \\
-  --gateway {self.config.gateway.url} \\
+  --gateway {self.config.kernel_serve.url} \\
   --workspace {self.user.home} \\
   --token-type serviceToken \\
-  --token {self.config.gateway.token} \\
+  --token {self.config.kernel_serve.token} \\
   >> "${{HOME}}/.lca/daemon.log" 2>&1
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as file:
@@ -188,22 +188,22 @@ exec node {self._cli_js} connect \\
         else:
             report.fail("daemon", "stale pid file")
 
-    def _report_gateway_status(self, report: StatusReport) -> None:
+    def _report_kernel_serve_status(self, report: StatusReport) -> None:
         try:
             result = subprocess.run(
-                ["curl", "-sf", self.config.gateway.health_url],
+                ["curl", "-sf", self.config.kernel_serve.health_url],
                 capture_output=True,
                 text=True,
                 timeout=5,
             )
             if result.returncode != 0:
-                report.warn("gateway", "unreachable")
+                report.warn("kernel_serve", "unreachable")
                 return
             data = json.loads(result.stdout)
             online = data.get("devices", {}).get("online", 0)
-            report.ok("gateway", f"online={online}")
+            report.ok("kernel_serve", f"online={online}")
         except Exception:
-            report.warn("gateway", "unreachable")
+            report.warn("kernel_serve", "unreachable")
 
     @staticmethod
     def _pid_alive(pid: int) -> bool:

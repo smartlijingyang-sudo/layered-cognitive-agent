@@ -19,8 +19,8 @@ class DeviceToolCallResult:
     error: str = ""
 
 
-class GatewayHttpClient:
-    """Aligns with LobeHub ``GatewayHttpClient``."""
+class KernelServeHttpClient:
+    """Aligns with LobeHub ``GatewayHttpClient`` (legacy alias)."""
 
     def __init__(
         self,

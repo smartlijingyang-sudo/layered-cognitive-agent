@@ -14,7 +14,7 @@ from typing import Any
 
 from lca.contracts.harness.state.projection import SessionProjectionRegistry
 from lca.harness.agent.registry import AgentRegistry
-from lca.harness.command.gateway import CommandGateway
+from lca.harness.command.gateway import SessionCommandCarrier
 from lca.plugins.transport.webserver.handlers import (
     bind_session_spine,
     ctx_provider_from_app,
@@ -30,7 +30,7 @@ class SessionComposition:
     """The gateway's Session Spine object graph (commands + projections)."""
 
     agent_registry: AgentRegistry
-    command_gateway: CommandGateway
+    command_gateway: SessionCommandCarrier
     projections: SessionProjectionRegistry
 
 

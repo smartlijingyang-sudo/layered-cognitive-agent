@@ -22,6 +22,11 @@ Public surface:
 The Tier-1 plugin registers an empty registry on the ctx; the default
 adapters (``solo`` / ``team`` / ``cordis-creator``) are provided by the
 Gateway-owned :mod:`gateway.plugins.default_modes` L4 composition plugin.
+
+命名历史: ``gateway.plugins.default_modes`` 是 plugin id namespace
+字符串,不是真实 Python module 路径。它写进事件 ``emitter`` wire schema
+字段(JSONL journal)。完整命名空间历史映射看
+``docs/adr/0119-followup-gateway-name-map.md``。
 Production profiles replace individual adapters by enabling alternative carrier
 mode plugins; the registry seam and generic assembler never see the change.
 

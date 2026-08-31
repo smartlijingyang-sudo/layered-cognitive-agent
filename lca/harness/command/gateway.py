@@ -1,7 +1,15 @@
-"""CommandGateway — HTTP-facing carrier (spec §3.4).
+"""SessionCommandCarrier — HTTP-facing carrier (spec §3.4).
 
 This module imports only harness command/projection/session contracts
 plus the facade Protocol. It does not import LiveAgent or cognitive layers.
+
+命名历史: 此 ``SessionCommandCarrier`` 与 ADR-0119 决定 4 之后的 ``kernel_serve``
+LCA 后台进程 **无关**。它是 session spine (0090 / 0092) 的命令接收面,
+``/v1/sessions/{id}/commands/*`` 端点背后的命令路由器。模块路径
+``lca.harness.command.gateway`` 是历史命名,改它会破 4 处 import
++ 事件 ``emitter="lca.harness.command.gateway"`` wire schema 字段
+(写进 JSONL journal)。完整命名空间历史映射看
+``docs/adr/0119-followup-gateway-name-map.md``。
 """
 
 from __future__ import annotations
@@ -25,7 +33,7 @@ from lca.contracts.harness.state.projection import (
 )
 
 
-class CommandGateway:
+class SessionCommandCarrier:
     """Validate → dispatch → return receipt / projection."""
 
     def __init__(
