@@ -82,6 +82,7 @@
 | [0107](0107-unimplemented-scenario-modules.md) | scenario plugin modules never implemented (tracked gap) | Proposed |
 | [0108](0108-phase-de-and-e.md) | Phase D (CI gates) + Phase E (README + cleanup) closeout | Accepted |
 | [0109](0109-plugin-metadata-mandate-and-budgetaware-removal.md) | Plugin 4-Element 声明为强契约 + BudgetAware 废弃 + BudgetPolicy 数据签名 | Accepted |
+| [0110](0110-plugin-contract-unification-and-naming-convergence.md) | 插件合约统一化与命名收敛 —— 折叠 LogicAddress，让 PluginContract 真正成为插件侧唯一合约 | Proposed |
 
 ## 维护规则
 - 不改旧文件；新决策用 `Supersedes: ADR-XXXX` 标记
