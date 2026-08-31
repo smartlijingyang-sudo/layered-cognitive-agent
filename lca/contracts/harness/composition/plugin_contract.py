@@ -31,12 +31,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from lca.contracts.atoms.control_slot.control_slot import ControlSlot, validate_slot_iterable
-from lca.contracts.atoms.functional_group.functional_group import (
+from lca.contracts.atoms.control_slot import ControlSlot, validate_slot_iterable
+from lca.contracts.atoms.functional_group import (
     FunctionalGroup,
     parse_functional_group,
 )
-from lca.contracts.atoms.scope.scope import Scope, parse_scope
+from lca.contracts.atoms.scope import Scope, parse_scope
 
 if TYPE_CHECKING:
     from lca.contracts.protocols.composition.logic_address import LogicAddress

@@ -21,7 +21,7 @@ from cordis.plugin import Plugin as CordisPlugin
 from cordis.plugin import plugin as _cordis_plugin
 from pydantic import BaseModel
 
-from lca.contracts.atoms.functional_group.functional_group import FunctionalGroup
+from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.capabilities import Capability
 from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,

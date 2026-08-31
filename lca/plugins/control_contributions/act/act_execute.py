@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
-from lca.contracts.atoms.control_slot.control_slot import ControlSlot
-from lca.contracts.atoms.enums.enums import ActionType
-from lca.contracts.atoms.functional_group.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.enums import ActionType
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     AuthorityContract,
