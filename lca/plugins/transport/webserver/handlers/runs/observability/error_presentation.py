@@ -37,10 +37,17 @@ def sanitize_error(error: str) -> str:
 
 
 def format_user_error(error: str, *, run_id: str, trace_id: str) -> str:
-    """Attach user-safe failure text to the trace context needed for support."""
+    """Return the user-facing failure text.
 
-    user_facing = _strip_internal_exception_prefix(sanitize_error(error))
-    return f"{user_facing}\nrun: {run_id} | trace: {trace_id}"
+    The trace identifiers are intentionally **not** appended to this string:
+    they already appear as first-class fields on the run envelope
+    (``run_id`` / ``trace_id`` / ``status``), and stitching them into the
+    human-readable ``error`` field produces duplicate, brittle display
+    strings in clients that already render the structured fields.
+    """
+
+    del run_id, trace_id  # surface signal that we intentionally ignore them
+    return _strip_internal_exception_prefix(sanitize_error(error))
 
 
 def _strip_internal_exception_prefix(error: str) -> str:

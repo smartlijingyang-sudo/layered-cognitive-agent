@@ -13,7 +13,6 @@ from lca.plugins.transport.webserver.handlers.runs.execute.execute import (
     execute_run,
     llm_status,
     resume_run,
-    sanitize_error,
     schedule_run,
 )
 from lca.plugins.transport.webserver.handlers.runs.lifecycle import RunLifecycleCoordinator
@@ -25,6 +24,5 @@ __all__ = [
     "execute_run",
     "llm_status",
     "resume_run",
-    "sanitize_error",
     "schedule_run",
 ]

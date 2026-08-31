@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import re
 import time
 from collections.abc import Sequence
 from contextlib import nullcontext
@@ -65,6 +64,9 @@ from lca.plugins.run_loop_driver_registry import (
     _UnknownExecutionTargetError as _UnknownExecutionTargetError,
 )
 from lca.plugins.transport.webserver.handlers.runs.doctor import diagnose
+from lca.plugins.transport.webserver.handlers.runs.observability.error_presentation import (
+    format_user_error,
+)
 from lca.plugins.transport.webserver.handlers.runs.observability.identity import AgentRef
 from lca.plugins.transport.webserver.handlers.runs.session.intent import resolve_run_intent
 from lca.plugins.transport.webserver.handlers.runs.session.session import (
@@ -77,24 +79,6 @@ from lca.plugins.transport.webserver.handlers.runs.terminal.live_compat import L
 _log = structlog.get_logger(__name__)
 
 _EXPORT_DISPOSE_TIMEOUT_S = 3.0
-
-_SANITIZE_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
-    (
-        re.compile(
-            r"DataInspectionFailed|content.?filter|inappropriate.?content|content.?safety",
-            re.IGNORECASE,
-        ),
-        "模型输出触发了内容安全策略，请调整输入后重试",
-    ),
-    (
-        re.compile(r"<\d{3}>|APIError|APIConnectionError|APITimeoutError|InternalError"),
-        "模型服务暂时不可用，请稍后重试",
-    ),
-    (
-        re.compile(r"timeout|connection|network", re.IGNORECASE),
-        "网络连接异常，请检查网络后重试",
-    ),
-)
 
 
 def llm_status(ctx: Any) -> dict[str, bool]:
@@ -135,34 +119,6 @@ def set_llm_resolver(resolver: Any) -> None:
             # PluginContext Protocol intentionally omits it. Cast for the
             # narrow binding-teardown path.
             cast("Any", cached).own_bindings.pop("llm_resolver", None)
-
-
-def sanitize_error(error: str) -> str:
-    """Three regexes. No sanitizer protocol theatre."""
-    if not error:
-        return error
-    for pattern, replacement in _SANITIZE_RULES:
-        if pattern.search(error):
-            return replacement
-    return error
-
-
-def format_user_error(error: str, *, run_id: str, trace_id: str) -> str:
-    """结构化错误消息：用户可读原因 + debug 上下文。
-
-    内部异常类名前缀（``_UnknownExecutionTargetError:`` / ``KeyError:`` 等）
-    在拼装之前剥掉——终端用户不应看到 Python 内部符号。
-    """
-    user_facing = _strip_internal_exception_prefix(sanitize_error(error))
-    return f"{user_facing}\nrun: {run_id} | trace: {trace_id}"
-
-
-_INTERNAL_EXCEPTION_PREFIX = re.compile(r"^_*[A-Z][A-Za-z0-9._]*Error:\s*")
-
-
-def _strip_internal_exception_prefix(error: str) -> str:
-    """去掉形如 ``KeyError: foo`` / ``_UnknownExecutionTargetError: bar`` 的前缀。"""
-    return _INTERNAL_EXCEPTION_PREFIX.sub("", error or "", count=1)
 
 
 def assemble_run_hub(
