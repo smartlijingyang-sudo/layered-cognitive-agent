@@ -11,13 +11,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any, cast
 
-from lca.infrastructure.observability.facade.settings import ObservabilitySettings
-
 from gateway.runs.session.session import RunSession
 from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
 from lca.contracts.observability.run_journal import LiveRunProjection, RunJournalFactory
 from lca.contracts.protocols import JournalProjector
 from lca.infrastructure.observability import BoundObservability
+from lca.infrastructure.observability.facade.settings import ObservabilitySettings
 
 
 def assemble_run_hub(
@@ -36,7 +35,6 @@ def assemble_run_hub(
         base: BoundObservability = require_capability(ctx, "observability")
     except MissingCapabilityError:
         from lca.infrastructure.observability.adapters.policy import AttributePolicy
-
         from lca.infrastructure.observability.facade import BoundObservability as FacadeBound
 
         minimal = make_minimal_bound()

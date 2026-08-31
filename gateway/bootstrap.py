@@ -130,6 +130,15 @@ def install_gateway_state(
     app.state.file_store = file_store
     app.state.device_hub = boot.device_hub
 
+    # The /runs/{id}/evidence/{ref} endpoint resolves
+    # ``request.app.state.bound_observability`` (see
+    # ``gateway/runs/api/query_endpoints.py``); expose the kernel-injected
+    # observability seam under the same key. If the seam isn't wired, the
+    # endpoint will surface a 503 with a documented error.
+    if ctx is not None:
+        with contextlib.suppress(Exception):
+            app.state.bound_observability = ctx.inject("observability")
+
     # Bind process-level journal projection so ``/journal/live`` works
     # without requiring a prior run creation. The factory comes from the
     # kernel seam (``lca.plugins.seams.observability.run_ledger`` provides
@@ -138,7 +147,9 @@ def install_gateway_state(
     # a journal factory" error instead).
     if ctx is not None:
         journal_factory: Any = None
-        with contextlib.suppress(Exception):
+        # ``MissingCapabilityError`` inherits from ``KeyError`` (not Exception)
+        # so we must catch both bases here.
+        with contextlib.suppress(Exception, KeyError):
             journal_factory = ctx.inject("run_ledger_factory")
         if journal_factory is not None and hasattr(journal_factory, "create_process_journal"):
             with contextlib.suppress(Exception):

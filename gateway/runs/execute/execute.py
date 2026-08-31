@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Any, cast
 
 import structlog
-from lca.infrastructure.observability.facade.settings import ObservabilitySettings
 
 from gateway.modes import DEFAULT_MODE
 from gateway.runs.doctor import diagnose
@@ -49,6 +48,7 @@ from lca.infrastructure.observability import (
     record_runtime,
     run_scope,
 )
+from lca.infrastructure.observability.facade.settings import ObservabilitySettings
 from lca.infrastructure.observability.journal.engine.reducer import RunStatus as JRunStatus
 from lca.infrastructure.observability.journal.jsonl.projector import JsonlJournalProjector
 from lca.infrastructure.runtime_plane.machine import resolve_machine, resolve_machine_transport
@@ -188,7 +188,6 @@ def assemble_run_hub(
         # boot 未挂 observability（极端测试场景）：退回最小可用 bound，
         # 业务事件仍可写到 local store。
         from lca.infrastructure.observability.adapters.policy import AttributePolicy
-
         from lca.infrastructure.observability.facade import BoundObservability
 
         minimal = make_minimal_bound()

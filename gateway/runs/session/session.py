@@ -108,7 +108,9 @@ class RunRegistry:
         terminal_ttl_s: float = DEFAULT_TERMINAL_TTL_S,
     ) -> None:
         if locator is None:
-            from lca.infrastructure.observability.backends.run_locator_fs import FilesystemRunLocator
+            from lca.infrastructure.observability.backends.run_locator_fs import (
+                FilesystemRunLocator,
+            )
 
             locator = FilesystemRunLocator(root=_RUNS_ROOT)
         self._locator: RunLocator = locator
