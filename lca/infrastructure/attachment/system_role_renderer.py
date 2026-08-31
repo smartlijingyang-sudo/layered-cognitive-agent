@@ -166,11 +166,18 @@ def _environment_note(plane: PlaneRef | None) -> str:
 
 
 def _load_template(name: str) -> str:
-    return (
-        resources.files("lca.cognition.brain.prompts")
-        .joinpath(f"{name}.md")
-        .read_text(encoding="utf-8")
-    )
+    """Load a system-role template by name.
+
+    Templates live under either ``lca.cognition.brain.prompts`` (cloud-sandbox)
+    or ``lca.infrastructure.runtime_plane.prompts`` (machine); the renderer
+    resolves whichever one exists first.
+    """
+    for package in ("lca.cognition.brain.prompts", "lca.infrastructure.runtime_plane.prompts"):
+        try:
+            return resources.files(package).joinpath(f"{name}.md").read_text(encoding="utf-8")
+        except (FileNotFoundError, ModuleNotFoundError):
+            continue
+    raise FileNotFoundError(f"system-role template {name!r} not found in any prompts package")
 
 
 __all__ = ["SystemRoleResult", "render_system_role"]
