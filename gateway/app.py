@@ -1,11 +1,9 @@
 """Gateway web transport — Starlette adapter for a booted kernel context.
 
-This module is a thin factory: it consumes a booted plugin tree and wires
-it into a Starlette application.
-
-Per ADR-0115 决定 6: gateway/app.py 不再调 boot_profile()。所有路由由
-plugin 树通过 ctx.inject('gateway_router') 注册。本模块只剩 thin factory。
+Thin factory: installs routes via ``ctx.inject('gateway_router')`` and wires
+gateway-side singletons into ``app.state`` (PR-7 bootstrap 修复 / ADR-0115)。
 """
+
 from __future__ import annotations
 
 import os
@@ -33,26 +31,29 @@ async def _kernel_lifespan(app: Starlette) -> Any:
                 app.state.gateway_router = router
             except Exception as exc:  # minimal profile may lack router
                 import structlog as _sl
+
                 _sl.get_logger("lca.gateway").debug(
                     "gateway_router_install_skipped", error=str(exc)
                 )
+            from gateway.bootstrap import install_gateway_state
+
+            install_gateway_state(app, ctx)
         yield state
 
 
 def create_app(
     profile_path: str | None = None,
-    *, gateway_router: Any = None, lifespan: Any = None,
+    *,
+    gateway_router: Any = None,
+    lifespan: Any = None,
 ) -> Starlette:
     """Thin factory: Starlette app wired to a kernel lifespan."""
     resolved = profile_path or os.environ.get("LCA_PROFILE") or DEFAULT_PROFILE_PATH
     app = Starlette(routes=[])
     app.state.kernel_profile = resolved
     app.state.gateway_router = gateway_router
-    app.router.lifespan_context = (
-        lifespan if lifespan is not None else _kernel_lifespan
-    )
+    app.router.lifespan_context = lifespan if lifespan is not None else _kernel_lifespan
     return app
 
 
-# uvicorn gateway.app:create_app --factory 入口
 app = create_app()
