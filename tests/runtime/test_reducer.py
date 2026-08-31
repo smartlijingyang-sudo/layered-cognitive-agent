@@ -162,3 +162,73 @@ def test_apply_terminal_outcome_rejects_waiting_input_without_durable_cursor() -
         DefaultReducer().apply_terminal_outcome(
             _state(), stop, plan_ref="plan-hil", journal_seq_end=4
         )
+
+
+# ── ADR-0077 invariant: TerminalOutcome(FAILED) must always carry error_ref ──
+#
+# Regression gate for run_d111c5459031 / run_98ef69d5ff29 / run_697848752aa6 /
+# run_27123ee235ac / run_10503d64d622 / run_93d4a69e3c14 — six runs that all
+# died with ``TerminalOutcome(FAILED) requires error_ref`` because the
+# upstream ``StopDecision`` carries no error string and ``state.last_error``
+# was empty when the loop terminated.
+
+
+class TestFailedTerminalCarriesErrorRef:
+    """Pin the ADR-0077 invariant for ``kind=FAILED``.
+
+    The reducer is the sole constructor of ``TerminalOutcome``; if it ever
+    yields a FAILED outcome without ``error_ref`` the model layer raises
+    ``ValueError`` mid-run, the user sees an opaque status=failed response,
+    and the Journal contains no error context — exactly what run_d111c5459031
+    and its siblings demonstrated.
+    """
+
+    @staticmethod
+    def _state_with_empty_error() -> AgentState:
+        # last_error=None is the realistic case: a StopDecision lands with
+        # status=FAILED and no message (StopDecision has no error field).
+        return AgentState(
+            trace_id="trace-failed-no-msg",
+            task="t",
+            budget=create_budget(max_steps=10),
+        )
+
+    def test_failed_with_empty_state_error_still_builds_error_ref(self) -> None:
+        from lca.contracts.models.core.stop import StopReason
+
+        stop = StopDecision(
+            should_stop=True,
+            reason=StopReason.ERROR,
+            status=TaskStatus.FAILED,
+        )
+        state = self._state_with_empty_error()
+        # Real-world precondition: last_error stays None (StopDecision has no
+        # error field; nobody wrote one before apply_terminal_outcome runs).
+        assert state.last_error is None
+
+        outcome = DefaultReducer().apply_terminal_outcome(
+            state, stop, plan_ref="plan-x", journal_seq_end=2
+        )
+
+        assert outcome.kind.value == "failed"
+        assert outcome.error_ref is not None
+        assert outcome.error_ref.message  # non-empty fallback derived from stop reason
+
+    def test_failed_with_explicit_state_error_preserves_message(self) -> None:
+        from lca.contracts.models.core.stop import StopReason
+
+        stop = StopDecision(
+            should_stop=True,
+            reason=StopReason.ERROR,
+            status=TaskStatus.FAILED,
+        )
+        state = self._state_with_empty_error()
+        state.last_error = "explicit failure: cloud-sandbox unavailable"
+
+        outcome = DefaultReducer().apply_terminal_outcome(
+            state, stop, plan_ref="plan-x", journal_seq_end=2
+        )
+
+        assert outcome.kind.value == "failed"
+        assert outcome.error_ref is not None
+        assert outcome.error_ref.message == "explicit failure: cloud-sandbox unavailable"

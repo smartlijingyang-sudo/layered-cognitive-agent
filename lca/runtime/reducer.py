@@ -179,16 +179,27 @@ class DefaultReducer(Reducer):
             )
             final_output_ref = TextRef(text=output_text, seq=journal_seq_end, cursor="")
 
-        # Build error_ref if we have error
+        # Build error_ref. The ADR-0077 invariant for FAILED requires
+        # ``error_ref`` to be set; upstream ``StopDecision`` does not carry
+        # a structured error field, so a FAILED terminal can land here with
+        # ``state.last_error`` empty (e.g. when stop_reason=ERROR fires
+        # without an explicit failure message). Fall back to the stop
+        # reason value so the invariant always holds and downstream
+        # consumers see a coherent reason.
+        from lca.contracts.models.core.terminal_outcome import ErrorRef
+
+        stop_reason_value = getattr(stop.reason, "value", str(stop.reason))
+
         error_ref = None
         if state.last_error:
-            from lca.contracts.models.core.terminal_outcome import ErrorRef
-
             error_ref = ErrorRef(kind="error", message=state.last_error, source_ref="")
+        elif kind is TerminalOutcomeKind.FAILED:
+            error_ref = ErrorRef(
+                kind="error",
+                message=stop_reason_value or "stop_reason=error",
+                source_ref="",
+            )
         elif kind in (TerminalOutcomeKind.CANCELED, TerminalOutcomeKind.DEGRADED):
-            # ADR-0077 invariant: CANCELED and DEGRADED require error_ref or final_output_ref
-            from lca.contracts.models.core.terminal_outcome import ErrorRef
-
             default_msg = "canceled" if kind == TerminalOutcomeKind.CANCELED else "degraded"
             error_ref = ErrorRef(kind=default_msg, message=default_msg, source_ref="")
 
@@ -200,7 +211,7 @@ class DefaultReducer(Reducer):
                 "waiting-input terminal outcome requires a durable resume cursor",
             )
 
-        stop_reason = getattr(stop.reason, "value", str(stop.reason))
+        stop_reason = stop_reason_value
         return TerminalOutcome(
             kind=kind,
             stop_reason=stop_reason
