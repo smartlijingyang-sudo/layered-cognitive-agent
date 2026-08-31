@@ -8,7 +8,7 @@ ADR-0119 followup-2 (2026-08-31): 原类名 ``GatewayRouter`` → ``RouteRegistr
 plugin id ``lca-gateway-router`` → ``lca-webserver-router``,
 capability key ``gateway_router`` → ``route_registry``。重命名遵循
 ADR-0106 §4.1 命名宪法("Registry" 是许可后缀, "Gateway" 不是)。
-旧 capability key 通过 setup 内 alias shim 兼容,过期日 2026-12-31。
+原计划 2026-12-31 前的 alias shim 已在 2026-08-31 移除(详见 setup 注释)。
 
 本类与 ADR-0119 决定 4 的 ``kernel_serve`` LCA 后台进程 **无关**。
 它是 webserver transport 层的 HTTP route registry,职责是把 plugin 注册的
@@ -79,14 +79,12 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 async def setup(ctx: PluginContext, config: Any) -> None:
     """Provide ``RouteRegistry`` instance via ``ctx.provide('route_registry', ...)``.
 
-    Compat shim: 如果 ctx 还没提供 ``route_registry`` 但已提供 ``gateway_router``,
-    把旧 key 上的对象 alias 到新 key。过期日 2026-12-31(ADR-0119 followup-2)。
+    ADR-0119 followup-2: 旧 capability key ``gateway_router`` 已被全部 plugin /
+    bundle 替换为 ``route_registry``;``lca/`` 与 ``tests/`` 内已无残留引用,
+    compat shim 提前于 2026-12-31 过期日删除。
     """
     registry = RouteRegistry()
     ctx.provide("route_registry", registry)
-    # ADR-0119 followup-2 compat: 旧 key 自动迁移到新 key,直到 2026-12-31 删除。
-    if not ctx.has("route_registry") and ctx.has("gateway_router"):
-        ctx.provide("route_registry", ctx.inject("gateway_router"))
 
 
 class RouteRegistry(RouteRegistryProtocol):

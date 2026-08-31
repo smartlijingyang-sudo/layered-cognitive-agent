@@ -96,7 +96,7 @@ def _make_app_with_bound(
 ):
     """Build a minimal Starlette app with /runs/{id}/evidence/{ref} registered.
 
-    Avoids the full gateway boot path (which depends on dsh runtime + plugins
+    Avoids the full gateway boot path (which depends on plugins
     that aren't in test scope); the route handler reads ``app.state.bound_observability``
     so we only need to wire that one piece of state.
     """

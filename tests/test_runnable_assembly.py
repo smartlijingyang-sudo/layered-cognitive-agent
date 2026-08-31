@@ -6,15 +6,15 @@ import unittest
 from collections.abc import Callable
 from typing import cast
 
+from lca.contracts.protocols import LLMAdapter
+from lca.contracts.protocols.session.run_mode import RunModeRegistryProtocol
+from lca.infrastructure.observability import BoundObservability
 from lca.plugins.transport.webserver.handlers.runs.lifecycle.runnable_assembly import (
     CognitiveRunnableAssembler,
     RunnableAssemblyRequest,
     RunnableBuildRequest,
 )
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
-from lca.contracts.protocols import LLMAdapter
-from lca.contracts.protocols.session.run_mode import RunModeRegistryProtocol
-from lca.infrastructure.observability import BoundObservability
 
 
 class _Resolver:

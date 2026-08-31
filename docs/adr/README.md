@@ -56,7 +56,7 @@
 | [0079](0079-ci-four-layer-test-discipline.md) | CI 四层测试 | Proposed |
 | [0081](0081-audit-implementation.md) | ADR-0075 实施审计 | Audit |
 | [0082](0082-architecture-review-2026-08-24.md) | 分层认知 Agent 架构评估 | Review |
-| [0083](0083-deepseek-harness-plugin-implementation-plan.md) | DeepSeek Harness 插件布局实施计划 | Plan |
+| [0083](0083-deepseek-harness-plugin-implementation-plan.md) | DeepSeek Harness 插件布局实施计划 | Superseded |
 | [0084](0084-plugin-architecture-audit.md) | 插件架构审计 | Audit |
 | [0085](0085-plugin-everything-explained.md) | 插件一切架构说明 | Explained |
 | [0086](0086-retire-unconsumed-loop-topology.md) | 退役未消费的 LoopTopology 生产闭包 | Accepted |
@@ -94,6 +94,7 @@
 | [0119](0119-webserver-as-plugin.md) | Webserver 完全 Plugin 化（对齐 deepseek-harness 范式，删除 `gateway/` 目录） | Proposed |
 | [0102](0102-tool-render-contract.md) | Tool 渲染契约 — 集中 TS 生成（lcaToolRender） + 21 工具 registry | Accepted |
 | [0103](0103-locked-surface-and-port-policy.md) | back-ui-821-other-keep 锁定表面 + 移植策略（hard/soft-lock + lane A/B/C） | Accepted |
+| [0120](0120-retire-dsh-driver.md) | 退役 DSH (DeepSeek Harness) driver 集成路径 — `'dsh'` 执行目标闭集收敛 | Accepted |
 
 > **ADR-0119** 已立项（Proposed），等待 review。后续 ADR 由未来缺口驱动。
 

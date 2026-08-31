@@ -6,6 +6,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from lca.contracts.atoms.enums import StreamChannel
+from lca.infrastructure.file_store import LocalFileStore
 from lca.plugins.transport.webserver.handlers.runs.ingest import (
     FileRef,
     HttpxFileFetcher,
@@ -22,8 +24,6 @@ from lca.plugins.transport.webserver.handlers.runs.ingest.ingress import (
     parse_messages,
     prepare_run_from_messages,
 )
-from lca.contracts.atoms.enums import StreamChannel
-from lca.infrastructure.file_store import LocalFileStore
 
 
 class _StubFetcher:

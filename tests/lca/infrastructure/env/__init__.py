@@ -28,13 +28,13 @@ def test_bootstrap_names_is_frozenset_with_minimum_coverage() -> None:
 
 
 def test_bootstrap_prefixes_is_tuple_with_minimum_coverage() -> None:
-    """The prefix whitelist covers LCA + deepseek + Freedesktop + LCA deployment."""
+    """The prefix whitelist covers LCA + Freedesktop + LCA deployment."""
     assert isinstance(BOOTSTRAP_PREFIXES, tuple)
     assert len(BOOTSTRAP_PREFIXES) >= 10, (
         f"BOOTSTRAP_PREFIXES floor is 10 entries, got {len(BOOTSTRAP_PREFIXES)}"
     )
     # Spot-check the four required buckets.
-    for required_prefix in ("LCA_", "DSH_", "XDG_", "LLM_", "GATEWAY_", "LOBE_"):
+    for required_prefix in ("LCA_", "XDG_", "LLM_", "GATEWAY_", "LOBE_"):
         assert required_prefix in BOOTSTRAP_PREFIXES, (
             f"missing bootstrap prefix {required_prefix!r}"
         )

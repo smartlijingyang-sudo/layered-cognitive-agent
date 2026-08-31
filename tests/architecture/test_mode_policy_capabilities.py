@@ -14,8 +14,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from lca.cognition.team.modes.cordis_creator_mode import build_cordis_creator_agent
 from lca.application.casting import build_from_casting_plan
+from lca.cognition.team.modes.cordis_creator_mode import build_cordis_creator_agent
 from lca.contracts.capabilities import CORDIS_CONTROL_TOOL_FACTORY, CORDIS_CREATOR_ROLE
 from lca.contracts.mechanisms.capability import MissingCapabilityError
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest

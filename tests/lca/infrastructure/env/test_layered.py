@@ -141,14 +141,3 @@ def test_xdg_and_dyld_prefixes_allowed() -> None:
     assert "XDG_CONFIG_HOME" in allowed
     assert "DYLD_FALLBACK_LIBRARY_PATH" in allowed
     assert not blocked
-
-
-def test_dsh_migration_prefix_allowed() -> None:
-    """Deepseek users can keep DSH_ prefix keys after migration."""
-    allowed, blocked = filter_env_keys(
-        raw_env={"DSH_BASE_URL": "https://x", "DSH_API_KEY": "k"},
-        ambient={},
-    )
-    assert "DSH_BASE_URL" in allowed
-    assert "DSH_API_KEY" in allowed
-    assert not blocked

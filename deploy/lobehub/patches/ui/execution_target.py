@@ -66,7 +66,6 @@ def _patch_switcher(text: str) -> str:
             "  const lcaDisplayTarget =\n"
             "    storedExecutionTarget === 'local' ||\n"
             "    storedExecutionTarget === 'device' ||\n"
-            "    storedExecutionTarget === 'dsh' ||\n"
             "    storedExecutionTarget === 'sandbox' ||\n"
             "    storedExecutionTarget === 'auto'\n"
             "      ? storedExecutionTarget\n"
@@ -102,15 +101,6 @@ def _patch_switcher(text: str) -> str:
         "  } else if (lcaDisplayTarget === 'device') {\n",
         1,
     )
-    if "lcaDisplayTarget === 'dsh'" not in text:
-        text = text.replace(
-            "  } else if (lcaDisplayTarget === 'device') {\n",
-            "  } else if (lcaDisplayTarget === 'dsh') {\n"
-            "    chipIcon = <ExecutionTargetIcon target={'dsh'} />;\n"
-            "    chipLabel = t('heteroAgent.executionTarget.dsh');\n"
-            "  } else if (lcaDisplayTarget === 'device') {\n",
-            1,
-        )
 
     text = text.replace(
         "  const isActive = (target: DeviceExecutionTarget, deviceId?: string) => {\n"
@@ -183,16 +173,6 @@ def _patch_switcher(text: str) -> str:
     )
 
     text = text.replace(
-        "      {isDesktop ? (\n"
-        "        <OptionRow\n"
-        "          active={isActive('local')}\n"
-        "          desc={t('heteroAgent.executionTarget.localDesc')}\n"
-        "          icon={<ExecutionTargetIcon target={'local'} />}\n"
-        "          // 本机统一显示「本地设备」，不再带具体设备名称\n"
-        "          label={t('heteroAgent.executionTarget.local')}\n"
-        "          onClick={() => void handleSelect('local')}\n"
-        "        />\n"
-        "      ) : null}\n",
         "      <OptionRow\n"
         "        active={isActive('local')}\n"
         "        desc={t('heteroAgent.executionTarget.localDesc')}\n"
@@ -207,6 +187,16 @@ def _patch_switcher(text: str) -> str:
         "        label={t('heteroAgent.executionTarget.dsh')}\n"
         "        onClick={() => void handleSelect('dsh')}\n"
         "      />\n",
+        "      {isDesktop ? (\n"
+        "        <OptionRow\n"
+        "          active={isActive('local')}\n"
+        "          desc={t('heteroAgent.executionTarget.localDesc')}\n"
+        "          icon={<ExecutionTargetIcon target={'local'} />}\n"
+        "          // 本机统一显示「本地设备」，不再带具体设备名称\n"
+        "          label={t('heteroAgent.executionTarget.local')}\n"
+        "          onClick={() => void handleSelect('local')}\n"
+        "        />\n"
+        "      ) : null}\n",
         1,
     )
 
@@ -225,8 +215,8 @@ def _patch_switcher(text: str) -> str:
 def _patch_types(ctx: PatchContext) -> bool:
     rel = "packages/types/src/agent/agencyConfig.ts"
     text = ctx.read(rel)
-    old = "export type DeviceExecutionTarget = 'auto' | 'device' | 'local' | 'none' | 'sandbox';"
-    new = "export type DeviceExecutionTarget = 'auto' | 'device' | 'dsh' | 'local' | 'none' | 'sandbox';"
+    old = "export type DeviceExecutionTarget = 'auto' | 'device' | 'dsh' | 'local' | 'none' | 'sandbox';"
+    new = "export type DeviceExecutionTarget = 'auto' | 'device' | 'local' | 'none' | 'sandbox';"
     if new in text:
         return False
     if old not in text:
@@ -238,42 +228,9 @@ def _patch_types(ctx: PatchContext) -> bool:
 def _patch_icon(ctx: PatchContext) -> bool:
     rel = "src/features/ExecutionTargetPicker/index.tsx"
     text = ctx.read(rel)
-    if "case 'dsh'" in text:
-        return False
-    if (
-        "  BoxIcon, LaptopIcon, MonitorOffIcon, SparklesIcon," not in text
-        and ("  BoxIcon,\n  LaptopIcon,\n  MonitorOffIcon,\n  SparklesIcon,") not in text
-    ):
-        old_imp = (
-            "import { BoxIcon, LaptopIcon, MonitorOffIcon, SparklesIcon } from 'lucide-react';"
-        )
-        new_imp = "import { BoxIcon, CpuIcon, LaptopIcon, MonitorOffIcon, SparklesIcon } from 'lucide-react';"
-        if old_imp not in text:
-            raise SystemExit("[execution_target] lucide import not found")
-        text = text.replace(old_imp, new_imp, 1)
-    else:
-        text = text.replace(
-            "SparklesIcon } from 'lucide-react';", "CpuIcon, SparklesIcon } from 'lucide-react';", 1
-        )
-        if "CpuIcon" not in text:
-            text = text.replace(
-                "  SparklesIcon,\n} from 'lucide-react';",
-                "  CpuIcon,\n  SparklesIcon,\n} from 'lucide-react';",
-                1,
-            )
-    needle = "      case 'sandbox': {\n        return <Icon icon={BoxIcon} size={size} />;\n      }"
-    insert = (
-        "      case 'dsh': {\n"
-        "        return <Icon icon={CpuIcon} size={size} />;\n"
-        "      }\n"
-        "      case 'sandbox': {\n"
-        "        return <Icon icon={BoxIcon} size={size} />;\n"
-        "      }"
-    )
-    if needle not in text:
-        raise SystemExit("[execution_target] sandbox icon case not found")
-    ctx.write(rel, text.replace(needle, insert, 1))
-    return True
+    # No-op after ADR-0090 retired the DSH execution target.
+    del rel, text
+    return False
 
 
 def _patch_locales(ctx: PatchContext) -> bool:
@@ -316,43 +273,6 @@ def _patch_locales(ctx: PatchContext) -> bool:
             continue
         if old not in text:
             raise SystemExit(f"[execution_target] locale needle missing in {rel}")
-        ctx.write(rel, text.replace(old, new, 1))
-        changed = True
-    changed = _ensure_dsh_locales(ctx) or changed
-    return changed
-
-
-def _ensure_dsh_locales(ctx: PatchContext) -> bool:
-    inserts = (
-        (
-            "locales/zh-CN/chat.json",
-            '"heteroAgent.executionTarget.localDesc": "通过本机 sidecar 操作这台电脑"',
-            '"heteroAgent.executionTarget.localDesc": "通过本机 sidecar 操作这台电脑",\n'
-            '  "heteroAgent.executionTarget.dsh": "用电脑 (DSH)",\n'
-            '  "heteroAgent.executionTarget.dshDesc": "与用电脑相同工作区（sandbox-user）；agent loop 走 DSH SDK"',
-        ),
-        (
-            "locales/en-US/chat.json",
-            '"heteroAgent.executionTarget.localDesc": "Run on this machine through the local sidecar"',
-            '"heteroAgent.executionTarget.localDesc": "Run on this machine through the local sidecar",\n'
-            '  "heteroAgent.executionTarget.dsh": "Use computer (DSH)",\n'
-            '  "heteroAgent.executionTarget.dshDesc": "Same sandbox-user workspace as use-computer; agent loop via DSH SDK"',
-        ),
-        (
-            "packages/locales/src/default/chat.ts",
-            "'heteroAgent.executionTarget.localDesc': 'Run on this machine through the local sidecar'",
-            "'heteroAgent.executionTarget.localDesc': 'Run on this machine through the local sidecar',\n"
-            "    'heteroAgent.executionTarget.dsh': 'Use computer (DSH)',\n"
-            "    'heteroAgent.executionTarget.dshDesc': 'Same sandbox-user workspace as use-computer; agent loop via DSH SDK'",
-        ),
-    )
-    changed = False
-    for rel, old, new in inserts:
-        text = ctx.read(rel)
-        if "heteroAgent.executionTarget.dsh" in text:
-            continue
-        if old not in text:
-            raise SystemExit(f"[execution_target] dsh locale anchor missing in {rel}")
         ctx.write(rel, text.replace(old, new, 1))
         changed = True
     return changed

@@ -170,7 +170,7 @@ provider.sandbox.local
 | G7 Collab | collab.transport / policy / strategy / synthesizer / delegate | `transport.team-message`、`policy.message-acl`、`policy.delegation-budget`、`strategy.debate`、`strategy.fan-out`、`synthesizer.evidence-weighted` | Now / Later | 以消息 / 委派事实协作，不共享私有可变状态。 |
 | G8 Journal | journal.ledger / store / evidence / descriptor / materializer | `ledger.run`、`store.filesystem`、`evidence.filesystem`、`descriptor.registry`、`materializer.manifest` | Now | 唯一事实提交、证据引用和恢复协议。 |
 | G9 Observe | observe.projector / exporter / scorer / inspector / alert | `projector.console`、`projector.sse`、`exporter.otel`、`exporter.langfuse`、`scorer.trace`、`inspector.control-explain` | Now / Later | 对已提交事实生成可丢弃视图。 |
-| G10 Compose | compose.resolver / registry / factory / driver / bundle | `resolver.profile`、`registry.control-slots`、`factory.agent`、`driver.cognitive`、`driver.dsh`、`bundle.safe-tooling` | Now | 解析、装配、生命周期与整段 loop 选择。 |
+| G10 Compose | compose.resolver / registry / factory / driver / bundle | `resolver.profile`、`registry.control-slots`、`factory.agent`、`driver.cognitive`、`bundle.safe-tooling` | Now | 解析、装配、生命周期与整段 loop 选择。 |
 | G11 Provider | provider.llm / sandbox / storage / search / tools / interop | `llm.openai-compatible`、`sandbox.local`、`storage.filesystem`、`search.web`、`bridge.mcp`、`bridge.a2a` | Now / Later | 提供环境能力，不拥有认知策略。 |
 | Reserved | reserved.* 仅登记、不接线 | 见 §9 | Reserved | 为可预见能力占位，防止未来命名冲突和概念漂移。 |
 
@@ -409,7 +409,7 @@ lca/
 │   ├── observe/                       # G9：projector、exporter、scorer、inspector
 │   ├── compose/                       # G10：resolver、registry、factory、driver、bundles
 │   ├── provider/                      # G11：llm、sandbox、storage、search、tools
-│   └── bridge/                        # G11：mcp、a2a、dsh、external transports
+│   └── bridge/                        # G11：mcp、a2a、external transports
 ├── bundles/                           # 声明性装箱单
 ├── profiles/                          # 用户 / 部署选择
 ├── roles/                             # persona 与专业化数据
@@ -434,7 +434,7 @@ lca/
 | `plugins/strategies`、`synthesizer`、`team_lead` | `plugins/collaboration` | 明确 TeamStrategy、transport policy、synthesizer。 |
 | `seam_definitions`、observability 子树 | `plugins/journal`、`observe`、`provider` | 按事实、投影、基础 provider 三分。 |
 | `providers`、`registries` | `plugins/provider`、`plugins/compose` | 只有群装配注册表留在 Compose。 |
-| `dsh`、外部协议接入 | `plugins/bridge` | 明确这是边界适配，不是认知策略。 |
+| 外部协议接入 | `plugins/bridge` | 明确这是边界适配，不是认知策略。 |
 
 ## 9. 预留扩展位：占概念，不占实现
 

@@ -7,7 +7,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from lca.plugins.transport.webserver.handlers.runs.wire.wire import WIRE, resolve
 from lca.infrastructure.computer.constants import COMPUTER_RESULT_BEGIN, COMPUTER_RESULT_END
 from lca.infrastructure.computer.parse_result import parse_computer_stdout
 from lca.infrastructure.file_store import LocalFileStore
@@ -17,6 +16,7 @@ from lca.infrastructure.tools.lca_computer import (
     build_machine_computer_tools,
 )
 from lca.infrastructure.tools.lca_computer.types import MACHINE_APIS, SANDBOX_ONLY_APIS, ApiName
+from lca.plugins.transport.webserver.handlers.runs.wire.wire import WIRE, resolve
 from tests.support.inline_sandbox import InlineSandbox
 
 EXECUTE_CODE = ApiName.EXECUTE_CODE

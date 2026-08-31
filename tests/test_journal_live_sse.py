@@ -23,7 +23,9 @@ from starlette.testclient import TestClient
 from lca.plugins.transport.webserver.handlers.runs.api.query_endpoints import (
     stream_journal_live as query_stream_journal_live,
 )
-from lca.plugins.transport.webserver.handlers.runs.api.routes import stream_journal_live as api_stream_journal_live
+from lca.plugins.transport.webserver.handlers.runs.api.routes import (
+    stream_journal_live as api_stream_journal_live,
+)
 
 
 class _UnboundProcessJournal:
@@ -81,14 +83,19 @@ def test_api_stream_journal_live_unbound_returns_503() -> None:
     client = _client()
     response = client.get("/api/journal/live")
     assert response.status_code == 503, response.text
-    _assert_unavailable(response.json(), where="lca.plugins.transport.webserver.handlers.runs.api.routes")
+    _assert_unavailable(
+        response.json(), where="lca.plugins.transport.webserver.handlers.runs.api.routes"
+    )
 
 
 def test_query_stream_journal_live_unbound_returns_503() -> None:
     client = _client()
     response = client.get("/query/journal/live")
     assert response.status_code == 503, response.text
-    _assert_unavailable(response.json(), where="lca.plugins.transport.webserver.handlers.runs.api.routes.query_endpoints")
+    _assert_unavailable(
+        response.json(),
+        where="lca.plugins.transport.webserver.handlers.runs.api.routes.query_endpoints",
+    )
 
 
 def test_options_request_is_a_noop() -> None:

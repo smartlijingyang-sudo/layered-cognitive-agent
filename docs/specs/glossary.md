@@ -226,10 +226,6 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 |---|---|
 | **BindOptions** | 计划绑定兼容选项；已退役 — 替代：严格的 `bind_plan(request, plan, scope)` |
 | **Console** / **ConsoleConfig** | 旧 observability 控制台 facade；已退役 — 替代：layer0 observability facade + projector |
-| **DshConfig** | DeepSeek Harness 适配器；v2 遗产，已退役 — 替代：lca-ops daemon / native config |
-| **DshNotification** | DSH 桥接；v2 遗产，已退役 — 替代：lca infrastructure observability |
-| **DshProbe** | DSH 桥接；v2 遗产，已退役 — 替代：lca-ops doctor |
-| **DshService** | DSH 桥接；v2 遗产，已退役 — 替代：lca-ops daemon |
 | **ExporterUnavailableError** | observability exporter fallback；已退役 — 替代：None fallback in facade |
 | **LangfuseBridge** | Langfuse 旧版桥接；已退役 — 替代：Layer0 observability 直接 |
 | **LocalMirror** | upstream fork 旧版镜像；已退役 — 替代：Layer0 upstream scan |

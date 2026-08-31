@@ -86,7 +86,6 @@ _CLOSED_SET: frozenset[str] = frozenset(
         "lca-synthesizer-concat",
         "lca-synthesizer-evidence-weighted",
         "lca-loop-cognitive",
-        "lca-loop-dsh-bridge",
         # Run-mode adapters are independently replaceable plugin entries.
         "lca-mode-solo-default",
         "lca-mode-team-default",
@@ -96,7 +95,6 @@ _CLOSED_SET: frozenset[str] = frozenset(
         "lca-gate-repeat-tool-call",
         "lca-gate-loop-breaker",
         "lca-gate-progress-detector",
-        "lca-dsh-bridge",
         "lca-gateway-starlette",
         "lca-run-loop-driver-registry",
         "lca-critic-simple",

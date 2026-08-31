@@ -104,7 +104,9 @@ class FixtureRuntimeAdapter:
             artifact_closure=cast("ArtifactClosure", resolved.artifact_closure),
             idempotency_store=cast("IdempotencyStore", resolved.idempotency_store),
             resume_input_adapter=cast("ResumeInputAdapter", resolved.resume_input_adapter),
-            effect_dispatcher_factory=cast("EffectDispatcherFactory", resolved.effect_dispatcher_factory),
+            effect_dispatcher_factory=cast(
+                "EffectDispatcherFactory", resolved.effect_dispatcher_factory
+            ),
             delta_reducer_factory=cast("DeltaReducerFactory", resolved.delta_reducer_factory),
             journal_factory=cast("RuntimeJournalFactory", resolved.journal_factory),
             interpreter_factory=cast("DeclarativeInterpreterFactory", resolved.interpreter_factory),

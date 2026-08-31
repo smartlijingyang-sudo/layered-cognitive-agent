@@ -50,7 +50,7 @@ a warning otherwise.
   `gateway/runs/*` (gated by soft-lock), `profiles/*`, `bundles/*`,
   `scripts/*`.
 - Skip-lane (C) clusters: chore/cleanup/format, fix(lobehub*),
-  feat(lobehub-patches/*), DSH-only changes, YAGNI cleanup unless the
+  feat(lobehub-patches/*), YAGNI cleanup unless the
   alias exists on this branch.
 - One commit per cluster on this branch; source commit(s) attributed in
   the body.

@@ -78,7 +78,6 @@ TaskContract（实例级："本次 run 做什么"）
 
 | 框架 | 哲学 | v3 关系 |
 |---|---|---|
-| **DSH（DeepSeek Harness）** | 自由主义扩展（哪里都能加 hook）| v3 给**宪法主义纪律**，但复用 cordis 微内核 |
 | **Hermes Agent** | 离线 fine-tune + 工具调用 | v3 自进化是**在线 + 闭环** |
 | **OpenAI Agents** | 单层框架（agent + tools）| v3 是**5 层配置** |
 | **LangGraph** | 图作为默认循环 | v3 中图是 Brain 内部 / Team Graph，非默认 |
@@ -92,19 +91,6 @@ TaskContract（实例级："本次 run 做什么"）
 2 小时   →  §13.1–§13.6 典型用例
 持续     →  §14–§32 业界概念、ADR、测试、CI、PR
 ```
-
-### 与 DSH / Hermes / OpenAI 的关键差异
-
-| DSH | Hermes Agent | OpenAI Agents | **v3** |
-|---|---|---|---|
-| 60+ 事件 hook | 离线 fine-tune | 单层 agent | **8 群 × 30 原语 + 5 层配置** |
-| 30+ ctx key | 用户主导 prompt | hardcoded tools | **PluginMeta TypedDict** |
-| baseline 默认装载 | 无显式 skill 库 | 无 memory 分层 | **每个原语 Null 默认 + procedural memory** |
-| 无 TaskContract | 无自进化 | 无审计 | **TaskContract + GoalStack + Journal** |
-
-**v3 不是替代 DSH / Hermes Agent，而是它们的"宪法层"**——DSH 提供可扩展内核，v3 在认知层加纪律。
-
----
 
 ## 目录
 
@@ -144,7 +130,6 @@ TaskContract（实例级："本次 run 做什么"）
 ### 典型用例（§13）
 
 - §13 Creator：组合而非隐式控制流
-- §13.1 Creator 等价物（DSH 创造模式在我们的体系下）
 - §13.2 4 个 Preset 的实现（minimal / standard / code / cordis）
 - §13.3 创造模式实现细节（Composer.mount / CordisControlTool / PluginMeta）
 - §13.4 Ralph Loop（工作流自动化的典型用例）
@@ -204,7 +189,6 @@ TaskContract（实例级："本次 run 做什么"）
 | 未对照代码核实「plugin 驱动循环 / Journal 可重建 prompt」 | 明确：两者都不成立。 |
 | `DecisionGate.evaluate` 新名字 | 复用现网 `DecisionGate.enforce`；返回值演进为 `DecisionVerdict`。 |
 | Journal 信封另起一套 `event_id/stream_kind/...` | **扩展** 现网 `StampedEvent` + `RunScope` + `JournalSchemaMeta`，不换信封。 |
-| DSH loop 叙述含糊 | DSH 是 `execution_target` / 整段 `loop:` 插件替换，不是第七步。 |
 
 ### 0.4 代码现实清单（禁止文过饰非）
 
@@ -218,7 +202,7 @@ TaskContract（实例级："本次 run 做什么"）
 | 生产 HIL ≠ LLM 原生 `ASK_HUMAN` | `build_decision_from_response` 只出 `USE_TOOL` / `DELEGATE` / `RESPOND`。HIL = `askUserQuestion` tool + `ApprovalPendingError`。`resume` 才补一条 `ASK_HUMAN` Turn |
 | `Decision.rationale` 通常为空 | `llm_result.py` 成功路径 `rationale=""` |
 | Journal 不重建 prompt | `LlmCallCompleted.prompt_preview` 截断/脱敏；下一轮 Think 由活 `AgentState` + `PromptReasoner` + `build_tool_history` 重拼。Checkpoint = `StateStore`，不是 journal replay。`fold_run_state` 只折 `RunStatus` |
-| 记忆四层 **名字** 在，检索是拼接覆盖 | `SimpleMemorySystem.perceive` 把四层 list 全部写入 `retrieved_context`。Compaction 包是 DSH `NotImplementedError` stub。`TeamSpec.shared_memory_layers` 默认 `()`；只有 semantic+procedural 可共享 |
+| 记忆四层 **名字** 在，检索是拼接覆盖 | `SimpleMemorySystem.perceive` 把四层 list 全部写入 `retrieved_context`。Compaction 包尚未提供生产实现。`TeamSpec.shared_memory_layers` 默认 `()`；只有 semantic+procedural 可共享 |
 | Team XOR 扎实；无 blackboard / TeamMessage | `TeamSpec.governance: LeadSpec \| Coordination`。通信 = `send_and_wait` + prompt 里的 `TeamAwareness` |
 | Inbox 在 harness，**未被 `_loop` claim** | `lca/harness/session/inbox.py` 三投递存在；`CognitiveLiveAgent` 只在 harness 测试路径。生产 `/runs` 走 `CognitiveRunDriver` → `Agent.run(question)` |
 | Prompt 无 `ContextManifest` | `PromptReasoner.generate_thoughts`：模板 + WM + `retrieved_context` + skills + team awareness + `loop_warning` + **自己的** `current_date` |
@@ -234,7 +218,7 @@ TaskContract（实例级："本次 run 做什么"）
 
 原宪法的洞是对的，也是不够的。
 
-**原宪法钉死了不该再长的东西：** 认知控制不能再靠 `agent.before_*` / `agent.after_*` 无限生长；循环闭集六步；Team 不是超级 Agent；DSH 的 I/O seam（手）留下，DSH 的 pre-step 挂钩式认知（脑）禁止再长。这些全部保留。
+**原宪法钉死了不该再长的东西：** 认知控制不能再靠 `agent.before_*` / `agent.after_*` 无限生长；循环闭集六步；Team 不是超级 Agent；外部 I/O seam（手）保留;pre-step 挂钩式认知（脑）禁止再长。这些全部保留。
 
 **原宪法没承载、v2 补上的四项基础设施** 是长程 Agent、审批、重放、Creator、群聊真正的承重结构：
 
@@ -274,11 +258,11 @@ TaskContract（实例级："本次 run 做什么"）
 ### 2.2 非目标
 
 - 不强迫同一 Brain / 模型 / 向量库 / Transport / UI。
-- 不把 DSH、LangGraph、任一工作流引擎、任一种多 Agent 拓扑做成默认循环。
+- 不把 LangGraph、任一工作流引擎、任一种多 Agent 拓扑做成默认循环。
 - 不承诺自动解决幻觉、业务正确性、组织治理。
 - 不把调度、会话标题、telemetry exporter 升格为认知原语。
 - 不在本期改 LobeHub UI 交互模型（群聊 UI 只消费 Journal 投影，另开产品 PR）。
-- 不 port DSH 包本体（compaction-basic 等）；只吸收其 I/O seam 与「手可换」的价值。
+- 不 port 外部 harness 包本体;只吸收其 I/O seam 与「手可换」的价值。
 - 不把 `ctx` 做成 L1–L3 Service Locator。
 - 不把 ToT/Graph/MAP 做成 L2 阶段。
 
@@ -342,7 +326,7 @@ flowchart TB
 | Context Lifecycle | 预算、检索、压缩、渲染 | Retrieval / Compaction / MemoryPolicy | 从未记录的全局状态直接拼 prompt |
 | Collaboration | 委派、消息、blackboard、ACL、租约、冲突 | Transport、TeamStrategy、Synthesizer、消息策略 | 直接写其他 Agent 的 State 或私有记忆 |
 
-**DSH loop 落点：** `gateway/runs/loop_drivers.py` 的 `execution_target="dsh"` 换的是 **整段运行时**（`DshRunDriver`），等价于替换整个 `loop:` 插件。它不在六步旁边加阶段。比较驱动（compare-driver）同样是 execution_target，不是认知原语。
+**driver 落点：** `gateway/runs/loop_drivers.py` 的不同 `execution_target` 换的是**整段运行时**，等价于替换整个 `loop:` 插件(参见 [ADR-0120](0120-retire-dsh-driver.md))。它不在六步旁边加阶段。比较驱动（compare-driver）同样是 execution_target，不是认知原语。
 
 **Spawn 落点：** 生产对象图由 `spawn_agent` / `spawn_team` 闭合（`lca/application/spawn.py`）。群服务组装投稿（`PerceiveService.assemble` 等）；L4 禁止点名 `sensor.*` / `gate.*` 钥匙，禁止 Composer 类。装配纪律见 [ADR-0056](../adr/0056-plugin-group-contribution.md)。插件 **不得** `ctx.events.on("agent.*")` 做控制。
 
@@ -463,7 +447,7 @@ stop      = 群 State（Reducer.apply_stop）
 
 ### 3.4 最小化原则：每个原语默认无动作
 
-v3 的另一条核心命题：**每个原语默认 no-op**，行为是显式 plugin。这是 DSH "everything is a plugin" 的极致纯净版。
+v3 的另一条核心命题：**每个原语默认 no-op**，行为是显式 plugin。这是 "everything is a plugin" 的极致纯净版。
 
 ```text
 原语（Primitive）   不可再分。看名字知道职责。必有 Null 实现。
@@ -550,158 +534,6 @@ bundle:
   - id: turn-counter         # 加计数
 ```
 
-**DSH vs v3**：
-
-| 维度 | DSH | v3（本节） |
-|---|---|---|
-| 默认行为 | baseline plugin 提供（`compaction-basic` 等默认装载）| **每个原语 Null**（baseline 几乎零行为）|
-| 可观测 | 60+ 事件 hook | 每个原语 **1 个**观察 hook |
-| 可配置 | `disabled: !!js ...` | 同 |
-| 可替换 | ctx 注册替换 | Protocol 替换 |
-| 纯净度 | 90%（baseline 行为存在）| 100%（baseline 几乎零行为）|
-| 调试粒度 | 事件级 | **原语级 + 事件级** |
-
-DSH 给"哪里都能加 hook"的自由主义灵活性；v3 给"每个原语默认 no-op + 观察 hook"的纯净度，**调试粒度更细、改动范围更可控、开发可逐步累加观测点**。
-
----
-
-### 3.5 整体链路与插件依赖
-
-新人读完 §3.1–§3.4 后建立概念地图。本节给**整体链路**和**依赖关系**，让读者能在脑中走一次完整 Turn。
-
-#### 3.5.1 整体链路（一次 Turn，6 步循环）
-
-```text
-Turn 入口
- ↓
-Composer 构造（每个原语默认 Null/Standard 实现）
- ↓
-Runtime.run 启动
- ↓
-for step in range(state.step, max_steps):
- ↓
- 1. Perceive（群 Perceive）
-   Hub.perceive(view, cursor)
-     Sensor × N → Delta
-     Hub Budgeter 策略：挑候选
-     Hub fold GateDecided → PolicyFact
-     record(PerceptionMerged)
-     record(ContextManifested)
-   reducer.apply_delta(state, delta)
- ↓
- 2. Think（群 Think）
-   Brain.think(view, manifest)
-     PromptRenderer.render(manifest) → prompt
-     Reasoner.call(prompt) → response
-     Critic.refine(response) → response'
-     Decision = build_decision(response')
- ↓
- 3. Gate（群 Think 内 — 确定性收尾）
-   Gate.enforce(view, decision)
-     LoopBreaker / SafetyGate / DegradationPolicy
-   record(GateDecided)
- ↓
- 4. Act（群 Act）
-   Body.act(decision, view)
-     ActionRegistry.get(action_type)
-     构造 ExecutionEnvelope
-     幂等检查 / 审批检查
-     SafeExecutor.execute (策略 + Sandbox)
-   record(ToolStarted / ToolInvoked | ToolDenied)
- ↓
- 5. Reflect（群 Think）
-   Brain.reflect(view, observation) → Reflection
-   record(ReflectionCreated)
- ↓
- 6. Remember（群 Memory）
-   Memory.propose(view, observation, reflection) → WriteSet
-   MemoryPolicy.commit(writes) → CommitResult
-   record(MemoryCommitted | MemoryWriteRejected)
- ↓
- Stop（群 State）
-   reducer.apply_turn(state, Turn)
-   reducer.apply_activation(state, skills)
-   checkpoint
-   StopRule.decide → StopDecision
-   if should_stop: reducer.apply_stop(state, stop) → break
- ↓
-Turn 出口
- record(turn/end)
- agent/turn-stopping
-
-观察 hook（每原语 1 个，emit 模式，纯观察）：
- perceive.sensor.completed
- perceive.hub.completed
- brain.think.completed
- gate.enforced
- body.act.completed
- reflect.completed
- remember.completed
- stop.decided
-```
-
-**链路稳定**：每个 Turn 都走 6 步 + 1 stop 决策；每个原语有对应观察 hook。
-
-#### 3.5.2 插件交互矩阵
-
-| 原语 | 调谁 | 被谁调 | 写入 |
-|---|---|---|---|
-| `Sensor` | （禁止 ctx.inject） | `PerceiveHub` | 无（只返回 Delta） |
-| `PerceiveHub` | `Sensor × N`、`JournalStore.get` 读 `GateDecided` | `CognitiveRuntime._loop` | `record(PerceptionMerged, ContextManifested)` |
-| `Brain` | `PromptRenderer`、`Reasoner`、`Critic` | `CognitiveRuntime._loop` | 无（返回 Decision） |
-| `DecisionGate` | `LoopBreaker`、`SafetyGate`、`DegradationPolicy` | `Brain.think` 内部 | `record(GateDecided)` |
-| `Body` | `ActionRegistry`、`SafeExecutor`、`ApprovalProcessor` | `CognitiveRuntime._loop` | `record(ToolStarted, ToolInvoked, ToolDenied)` |
-| `Memory` | `MemoryPolicy`、`CompactionPolicy` | `CognitiveRuntime._loop` | `record(MemoryCommitted, MemoryWriteRejected)` |
-| `StopRule` | `StopOutcomePolicy` | `CognitiveRuntime._loop` | `record(StopDecided)` |
-| `Reducer` | （纯函数） | `CognitiveRuntime._loop` | **写 `AgentState`**（唯一） |
-| `Journal` | `JournalStore` | 所有 `record()` 调用 | 持久化事件 |
-
-**关键观察**：每个原语的写入只有两类——`record()` 到 Journal，或 `Reducer.apply_*()` 到 State。**没有第三种写入**（C3 + C4 硬约束）。
-
-#### 3.5.3 依赖关系（三层）
-
-```text
-CognitiveRuntime._loop（编排者）
-  ↓ 依赖 Protocol（不依赖具体类）
-
-┌─────────────────── 核心原语层 ───────────────────┐
-│ Sensor · PerceiveHub · Brain · Gate · Body ·      │
-│ Memory · StopRule · Reducer                        │
-└───────────────────────────────────────────────────┘
-  ↑ 实现（注入具名工厂或 Null）
-  │
-┌─────────────────── 策略层 ────────────────────────┐
-│ Hub 内：Budgeter, ConflictResolver                 │
-│ Brain 内：PromptRenderer, Reasoner, Critic         │
-│ Gate 内：LoopBreaker, SafetyGate, DegradationPolicy│
-│ Body 内：SafeExecutor (策略), Sandbox, Approval    │
-│ Memory 内：MemoryPolicy, CompactionPolicy           │
-│ StopRule 内：StopOutcomePolicy                     │
-└───────────────────────────────────────────────────┘
-  ↑ 被观察（emit hook，每原语 1 个）
-  │
-┌─────────────────── 观察层 ────────────────────────┐
-│ 8 个 hook（见 §3.5.1）                              │
-└───────────────────────────────────────────────────┘
-```
-
-**依赖倒置**：`_loop` 只调 Protocol，不知道具体实现。群服务 `assemble()` 产出 Protocol 对象；L4 闭合进 Runtime（[ADR-0056](../adr/0056-plugin-group-contribution.md)）。
-
-#### 3.5.4 Profile + Bundle + Plugin 三层组合
-
-```text
-Profile（用户选择："我要用哪种 agent"）
- ↓ 引用
-Bundle（共享组合："这一类原语的标准实现"）
-   ↓ 引用
-Plugin（最小实现单元："这一个原语或一个 hook"）
-```
-
-DSH 的 `agent.cordis.yml` 把三层混在一起。我们分开是因为**最小化原则**（§3.4）——每个 plugin 是最小可观测单元。
-
-#### 3.5.5 三档 Profile 示例
-
-```yaml
 # profiles/minimal.yaml —— baseline 全 Null
 bundle:
   - id: null-baseline           # 全部原语 Null
@@ -749,9 +581,9 @@ bundle:
 
 ### 3.7 配置驱动的系统：让配置 = 系统理解
 
-**目的**：**通过读配置就能理解整个系统的内部行为逻辑**——不需要读代码、不需要跟踪事件、不需要查文档。这是 v3 对 DSH"乱成一锅粥"的核心回应。
+**目的**：**通过读配置就能理解整个系统的内部行为逻辑**——不需要读代码、不需要跟踪事件、不需要查文档。这是 v3 对外部 harness 配置混乱问题的核心回应。
 
-**DSH 的问题**（v3 要解决的）：
+**历史参考**(v3 要解决的外部 harness 配置痛点):
 - 60+ 事件 hook，新人不知道该听哪个
 - 30+ ctx key，配置分散
 - baseline plugin 默认装载（`compaction-basic` 等），行为不透明
@@ -1047,86 +879,6 @@ lca/templates/
 
 **每个排查步骤都是读配置**——无需查代码、无需追事件、无需 log grep。
 
-#### 3.7.9 与 DSH 的根本差异
-
-| DSH 问题 | v3 解决 |
-|---|---|
-| 60+ 事件 hook，新人不知道听哪个 | 8 个观察 hook，每个原语 1 个，命名清晰（§3.5.1） |
-| 30+ ctx key，配置分散 | 8 个群 + 30 原语，按群分组（§3.2） |
-| baseline plugin 默认装载，行为不透明 | **默认 Null，行为完全显式**（§3.4） |
-| `agent.cordis.yml` 把"基础设施"和"行为定制"混在一起 | **Profile + Bundle + Role + Contract 5 层分离** |
-| 改了配置不知道影响什么 | 每层都是 plugin 组合的快照，blast radius 明确 |
-| 新人不知道从哪入手 | **读 Profile = 理解系统**（无代码跳读） |
-| 多 agent 关系乱（共享什么、谁能调谁） | **Team XOR + TeamMessagePolicy + MemoryPolicy** 显式 |
-| 调试靠 grep event log | **§24.5 诊断模式库**：常见问题 → 看哪些事件 |
-| Plugin author 不知道我的 plugin 会改什么 | **PluginMeta TypedDict** 强制声明 capability / side_effects / policy_class |
-
-#### 3.7.10 v3 的"清晰可控"承诺
-
-**DSH 的混乱 → v3 的清晰**：
-
-- **8 群 × 30 原语**：明确分区
-- **5 层配置**：明确层次
-- **5 种覆盖语义**：明确变更
-- **默认 Null**：明确行为
-- **每个 plugin 最小**：明确单元
-- **读配置 = 理解系统**：明确可发现性
-- **通过配置排查问题**：明确可调试性
-- **PluginMeta TypedDict**：明确可审计性
-
-**v3 = 配置驱动的系统。任何东西都是插件，任何东西都能配置。任何行为都是显式选择的结果，没有暗中行为。**
-
-#### 3.7.11 配置仓库目录结构
-
-```
-lca/
-├── profiles/                       # 5 层最上层：用户选择
-│   ├── minimal.yaml
-│   ├── standard.yaml
-│   ├── code.yaml
-│   ├── cordis.yaml
-│   └── research-debate.yaml
-├── bundles/                        # 第 3 层：共享组合
-│   ├── null-baseline.yaml          # 全部 Null（默认）
-│   ├── standard-baseline.yaml      # 标准原语实现
-│   ├── standard-tools.yaml         # 全套工具
-│   ├── standard-memory.yaml        # 四层记忆
-│   ├── standard-skills.yaml        # Skills
-│   ├── standard-collaboration.yaml # 子代理、工作流
-│   ├── code-mode.yaml              # SafeExecutor 策略
-│   ├── lead-debate.yaml            # Lead Agent 工具集
-│   ├── researcher-doc.yaml         # doc 调研工具
-│   ├── researcher-code.yaml        # code 调研工具
-│   └── researcher-web.yaml         # web 调研工具
-├── roles/                          # 第 4 层：个性化
-│   ├── default.yaml
-│   ├── lead-debate.yaml
-│   ├── cordis-creator.yaml
-│   ├── researcher-doc.yaml
-│   ├── researcher-code.yaml
-│   └── researcher-web.yaml
-├── plugins/                        # 第 2 层：最小单元（38 个 @plugin）
-│   ├── sensors/                    # 群 Perceive
-│   ├── brains/                     # 群 Think
-│   ├── gates/                      # 群 Gate
-│   ├── bodies/                     # 群 Act
-│   ├── memories/                   # 群 Memory
-│   ├── collaborations/             # 群 Collaboration
-│   ├── composers/                  # 群 Composition
-│   └── observers/                  # 观察层
-└── templates/                      # 默认模板（每类 plugin 的基线）
-    ├── agents/
-    ├── roles/
-    ├── bundles/
-    └── profiles/
-```
-
-**读任何一层都能独立理解**——`profiles/research-debate.yaml` 让你理解 Debate 协作；`plugins/gates/loop-breaker.py` 让你理解 LoopBreaker 行为；`roles/researcher-doc.yaml` 让你理解 doc 调研者的角色。
-
-**无耦合、无暗中行为、无理解死角**。
-
----
-
 ## 4. 宪法：闭集、开放原语、扩展法、控制口 vs 观察口
 
 改下列任一闭集必须单独 ADR，默认否决。ADR 必须包含兼容策略、事件迁移、trace 对比、安全影响和回滚。
@@ -1367,7 +1119,7 @@ return PerceptionDelta(candidates=candidates)   # 丢弃 tmp 上的其它原地�
 | `clock` | UTC 时间 | `PromptReasoner` 的 `current_date` | clock item；缺席则模板去日期 | PR3b |
 | `workspace-artifacts` | 账本快照 | Reasoner `_with_artifact_context` 与 Gate `get_run_workspace()` | `artifact` items | PR3b |
 | `inbox-facts` | journal 用户/steer/inject 事实 | driver claim 认知部分 | 按 `actor`/`target`/`priority` | PR8 |
-| `workspace-instructions` | AGENTS.md | DSH agent-instructions | 带 version/hash 的规范项 | PR13 |
+| `workspace-instructions` | AGENTS.md | external agent-instructions | 带 version/hash 的规范项 | PR13 |
 | `skill-catalog` | 可激活技能摘要 | 全量技能塞 prompt；`source="pre_step"` | 技能项 + 激活原因 | PR14 |
 | `team-inbox` | 可见 TeamMessage | 无 | team items | PR9 |
 
@@ -1827,7 +1579,7 @@ LLM 上下文是有限资源。`ContextBudgeter` 先锁不可丢失锚点，剩�
 
 成功标准不是 token 变少，而是关键事实召回、任务成功率、工具正确性、成本 **同时** 不回退。策略变更必须在 golden traces 上前后比较。
 
-现网：`SimpleMemorySystem.compress` 只截 episodic 列表；`lca/packages/compaction/` 是 DSH 表面 stub。产品级 compaction **第三期/PR7** 进入 `Memory.perceive` 内部，不设 compaction Sensor。先 shadow（只记录候选摘要与分数）再切模型 surface。
+现网：`SimpleMemorySystem.compress` 只截 episodic 列表；`lca/packages/compaction/` 是表面 stub。产品级 compaction **第三期/PR7** 进入 `Memory.perceive` 内部，不设 compaction Sensor。先 shadow（只记录候选摘要与分数）再切模型 surface。
 
 ### 7.3 进入 `execute_llm_turn` 的每一段字符串
 
@@ -2075,7 +1827,7 @@ stop: 检查所有 goal.status == "completed" 或 "abandoned"
 - blocked 状态必须含 `failure_reason`；escalate per TaskContract.escalation
 - 失败 goal 不可继续 retry 超过 TaskContract.budget
 
-**vs todo_write（DSH 类比）**：DSH 的 `todo/write` 是 whole-list snapshot（无层次、无依赖）。GoalStack 是 LIFO + 父子依赖 + 验收标准，是更强结构。
+**vs todo_write 类比**:外部 harness 的 `todo/write` 是 whole-list snapshot（无层次、无依赖）。GoalStack 是 LIFO + 父子依赖 + 验收标准，是更强结构。
 
 ---
 
@@ -2446,103 +2198,6 @@ Creator 是 L4 产品，不是运行时后门。原则：**创造组合，不创
 | Compare | 标准 vs 候选 profile 跑 trace/eval | 质量/成本/延迟/副作用/安全判决 |
 | Publish | 经验证组合发为 profile/bundle | 策略检查、测试、签名、canary、flag、回滚 |
 
-### 13.1 Creator 等价物（DSH 创造模式在我们的体系下）
-
-DSH 的 `cordis` preset 是 Creator 的产品实例。它让 agent 自己读运行时、挂载临时插件、卸载、创作新 preset。我们用同样的能力覆盖，但用更严格的约束。
-
-**DSH `cordis` preset 的关键能力 → 在我们体系下的位置**：
-
-| DSH 能力 | 在 DSH 中的实现 | 在我们体系下的位置 | 状态 |
-|---|---|---|---|
-| 读取实时运行时 | `tool-cordis.inspect` | 群 **Composition**：`Composer.inspect()` 返回派生能力图（`@plugin.meta` + bundle + Journal catalog） | ✅ v3 §13 已有 |
-| 挂载临时插件 | `tool-cordis.mount(plugin)` | 群 **Act**：Tool(`cordis_control.mount`) → 群 **Composition**：`Composer.mount(name, factory)` | ⚠️ 需新增 Tool + Composer API |
-| 卸载插件 | `tool-cordis.unmount(plugin)` | 群 **Act**：Tool(`cordis_control.unmount`) → 群 **Composition**：`Composer.unmount(name)` | ⚠️ 同上 |
-| 解释 HOST vs AGENT PRESET 两平面 | persona 文本 | 群 **Think** / `RoleProfile.text`（含 persona 渲染模式） | ✅ |
-| preset 创作指导 | skill `editing-cordis-compositions` | 群 **Memory**：procedural layer + `activated_skills` | ✅ |
-| 信任边界 = shell access | capability grant | 群 **Act** C5：`ExecutionEnvelope.capability_grant` 来自父 grant | ✅ |
-
-**关键澄清：`tool-cordis` 不破坏认知纪律**
-
-DSH 的 `tool-cordis` 让 agent 动态增删运行时插件。但这不是认知 Hook：
-
-```
-agent.Think → Decision(use_tool, tool=cordis_control.mount)
-Body.act → SafeExecutor → Tool 执行 mount
-```
-
-- **Act 阶段的 Tool 调用**，不是认知阶段的控制监听
-- 不监听 `agent.pre_step` 改 Decision
-- 不写 AgentState
-- 经 Body.act → SafeExecutor → Tool 的正规管道
-- Tool 的执行是副作用（mount 改变的是 Composition 状态，不是个体 Agent 的 AgentState）
-
-**关键约束**：
-
-- mount 的范围必须受 Capability grant 约束——agent 不能 mount 自己没有 grant 的 plugin（C5 不可扩大）
-- mount/unmount 必须经 Composer（群 Composition 唯一组装者），不允许 ctx.inject 列表
-- Tool(`cordis_control`) 本身必须经 v3 §23.2 CI 门禁 + PR12 PluginMeta TypedDict 登记
-
-**DSH preset 4 模式 → 我们的对应**：
-
-| DSH preset | 描述 | 在我们体系下 |
-|---|---|---|
-| `minimal`（极简模式） | 仅 bash + str_replace_editor 双工具 | bundle 只注册两个 Tool 的最小 Bundle（群 Act 装配差异，不是宪法差异） |
-| `standard`（标准模式） | 文件编辑 / Shell / Skills / 计划 / 目标 / 子代理 / 工作流 | 现网 LCA 已是该模式（基于 AGENTS.md 描述） |
-| `code`（PTC 模式） | standard + Code Mode SDK | 群 **Act**：SafeExecutor 增加 `CodeModeStrategy`（群内策略，不是新原语） |
-| `cordis`（创造模式） | standard + 运行时检查 + 插件实验 + preset 创作 | 见 §13.1 表格 |
-
-**Persona 不列为单独原语**（按 §3.1 分层）：
-
-DSH persona = `text` + `complete` + `includeRuntimeContext`，渲染到 system prompt 的 `deployment:persona` section。我们的等价物：
-
-```python
-@dataclass
-class RoleProfile:
-    role: str
-    goal: str
-    backstory: str
-    tone: str | None = None
-    values: list[str]
-    render_mode: str = 'shadow'      # 'shadow' | 'complete'，替代 DSH persona.complete
-    include_context: bool = True    # 替代 DSH persona.includeRuntimeContext
-    tool_permission_manifest: ToolPermissionManifest
-    extra: dict[str, Any]
-```
-
-Persona 渲染属于 **群 Think 内 PromptRenderer 的内部策略**（`PersonaRenderingPolicy`），不是新原语。把它列为单独原语 = v3 之前把 `Budgeter` / `CompactionPolicy` 提升为原语的同类错误。
-
----
-
-**不发明 `PrimitiveManifest` 文件格式。** cordis 已有：
-
-```python
-@plugin(name="lca-sensor-clock", inject=[], meta={...})
-```
-
-PR12 在 `lca/contracts/harness/plugin_meta.py` 增加版本化 `PluginMeta` `TypedDict`（下列键）。**此前 Composer 不得因缺 meta 拒绝加载**——今日 `lca/plugins` **没有任何** `meta=`，拒绝 unknown 会把整棵树判死刑。PR12 之前 inspect 把缺 meta 标 `unknown` 仅作显示。
-
-| meta 键 | 含义 |
-|---|---|
-| `implements` | Protocol 名列表，如 `["Sensor"]` |
-| `emitted_events` | Journal 类名 |
-| `consumed_events` | Journal 类名 |
-| `context_fields` | Manifest item keys |
-| `capabilities` | 需要的 grant |
-| `side_effects` | `none \| tools \| memory \| world` |
-| `policy_class` | `observe \| control \| execute` |
-| `test_suite` | pytest 节点 id 前缀 |
-
-能力图 = bundle 装箱单 + 插件函数签名派生的 inject 图 + 群服务登记。YAML 顶层不新增 `sensors:` / `gates:` schema。装配：投稿到群服务，L4 闭合 Runtime（[ADR-0056](../adr/0056-plugin-group-contribution.md)）。不发明第三套 PluginManifest。
-
----
-
-### 13.2 4 个 Preset 的实现（minimal / standard / code / cordis）
-
-DSH 的 `minimal` / `standard` / `code` / `cordis` 四个 preset 在我们体系下通过 **Profile + Bundle**（§3.5.4）实现。每个 preset 是 Bundle 的不同组合。
-
-#### 13.2.1 minimal（极简模式）
-
-```yaml
 # profiles/minimal.yaml
 name: minimal
 description: 仅 bash + str_replace_editor 双工具编码 Agent
@@ -2635,7 +2290,7 @@ Two planes decide where an edit belongs:
 - AGENT PRESET: per-session (tools, persona, prompt sections)
 
 A service row belongs in HOST, or in PRESET behind an isolate scope.
-Presets you author live at $DSH_HOME/.agent-presets/<id>/
+Presets you author live at $LCA_HOME/.agent-presets/<id>/
     """
     backstory = ""
     render_mode = "shadow"        # persona 渲染模式（§13.1）
@@ -2870,142 +2525,6 @@ Step 9: Body.act → JsonFieldReader.execute()
        → record(ToolInvoked(json_field_reader))
 ```
 
-#### 13.3.5 与 DSH `tool-cordis` 的关键差异
-
-| 维度 | DSH `tool-cordis` | 我们 `cordis_control` |
-|---|---|---|
-| 路径 | `tool.execute → ctx.inject` | `tool.execute → Composer.mount` |
-| 装配 | 投稿自挂 | 群服务 `add` + L4 闭合（[ADR-0056](../adr/0056-plugin-group-contribution.md)） |
-| Capability 检查 | ❌ 默认无 | ✅ 必须（C5） |
-| PluginMeta 强制 | ⚠️ 可选 | ✅ 强制（PR12） |
-| 写 Journal | ⚠️ session/event | ✅ `record(PluginMounted)` 强制 |
-| Trust 边界 | persona 提示 | `capability_grant` 强制 |
-| 监听 agent.* 改 Decision | ❌ 不允许 | ❌ 不允许（C4） |
-
-**关键差异**：DSH 给自由（plugin 作者负责），我们给约束（C3/C4/C5/PR12/§23.2）。安全边界更明确，开发流程相同。
-
-#### 13.3.6 自我进化的边界
-
-**agent 能做的**：
-- ✅ Inspect 运行时（能力图）
-- ✅ Mount 临时 plugin（受 capability grant 约束）
-- ✅ Unmount 临时 plugin
-- ✅ Write 文件（创建 plugin 源）
-- ✅ Publish（持久化新 preset）
-
-**agent 不能做的**：
-- ❌ 监听 `agent.*` 改 Decision（C4）
-- ❌ 写 AgentState（C4）
-- ❌ 扩大 capability grant（C5）
-- ❌ 绕过群服务 `add` / L4 闭合（[ADR-0056](../adr/0056-plugin-group-contribution.md)）
-- ❌ 跳过 PluginMeta 登记（PR12）
-- ❌ 跳过 invariant check（§23.2）
-
-#### 13.3.7 与人类开发者写插件的对比
-
-| 步骤 | 人类开发者（离线） | Agent 自我进化（运行时） |
-|---|---|---|
-| 1. 写 plugin 文件 | 编辑器 / IDE | `use_tool(tool_fs, write)` |
-| 2. 写 PluginMeta + tests | 手写 | 必须（PR12 强制） |
-| 3. 在 profile.yaml 引用 | 编辑 yaml | `use_tool(cordis_control, mount)` |
-| 4. CI 跑 invariant + tests | PR 流程触发 | Composer.mount 自动跑 |
-| 5. 合并 / 加载 | PR 合并 | `ctx.provide` + `record(PluginMounted)` |
-
-**两者本质相同**：都经 Composer.mount + PluginMeta + invariant + Journal。区别只在"谁触发"——人类在 PR 流程中触发，Agent 在 Body.act 中触发。
-
-#### 13.3.8 实施路径（4 个 Phase）
-
-**Phase 1（基础）**
-- [ ] Composer 实现 `mount / unmount / inspect` API
-- [ ] CordisControlTool 实现 4 个 action
-- [ ] `PluginMounted` / `PluginUnmounted` Journal 事件
-- [ ] PluginMeta TypedDict（PR12）
-
-**Phase 2（观测）**
-- [ ] BrainObserver / BodyObserver
-- [ ] Invariant：每次 mount 必查 PluginMeta
-- [ ] 观察 hook：mount 必发 `plugin.mount.completed`
-
-**Phase 3（持久化）**
-- [ ] cordis preset 创作 skill（`editing-cordis-compositions`）
-- [ ] `preset copy` / `preset diff` CLI
-- [ ] publish workflow（写 `$DSH_HOME/.agent-presets/`）
-
-**Phase 4（安全）**
-- [ ] mount/unmount 审批（可选）
-- [ ] mount 后必须跑 tests
-- [ ] capability_grant 衰减规则
-- [ ] creator publish 必须 capability graph diff
-
----
-
-### 13.4 Ralph Loop（工作流自动化的典型用例）
-
-**目的**：证明 Ralph loop（Geoffrey Huntley 风格：patch-then-test 循环）完全由 v3 现有原语组合实现，零新增原语。这是"工作流自动化"在 v3 中的标准实现模板。
-
-#### 13.4.1 Ralph loop 核心组件 → v3 原语映射
-
-| Ralph 特性 | v3 对应 | 位置 |
-|---|---|---|
-| 自然语言任务 | `TaskContract.goal` | §8.3 |
-| Patch 输出（不是直编辑） | `ActionType.USE_TOOL`（写 patch 文件） | §4.1 六行动 |
-| 沙箱执行 | `Sandbox`（群 Act 策略） | §3.2 / §9 |
-| 测试验证 | `SuccessCriteria` + Tool `test_run` | §8.3 |
-| 循环检测 | `LoopBreakerGate`（群 Gate 策略） | §5.6 |
-| 重试 | `GoalStack.max_retries` + `Reducer.apply_*` | §8.4 |
-| 退出条件 | `StopRule`（§5.1 + §3.4） | §5 |
-| 预算 | `TaskContract.budget` | §8.3 |
-| 审批 | `ApprovalToken` + `RiskLevel.HIGH` | §9.3 |
-| 记忆 | `MemoryPolicy`（working + episodic + semantic） | §8 |
-| 可观测 | 8 个观察 hook + Journal + 诊断模式 | §3.5 / §24.5 |
-| 幂等 | `ExecutionEnvelope.idempotency_key` | §9.1 |
-| Trace | `trace_id` + 龙骨模式 | §6.5 |
-
-**完全覆盖，零新增原语**。
-
-#### 13.4.2 Ralph loop 的认知流程
-
-```text
-User: "修复 bug #123"
- ↓
-Composer 注入 TaskContract + GoalStack
- ↓
-┌─ Step N ──────────────────────────────────────┐
-│ 1. Perceive（群 Perceive）                    │
-│   - Sensor(workspace-instructions) 读 AGENTS.md │
-│   - Sensor(git-status) 读 git status           │
-│   - Sensor(test-results) 读上次测试结果        │
-│   - Sensor(prev-patches) 读历史 patches         │
-│                                                 │
-│ 2. Think（群 Think）                          │
-│   - Brain: "先跑测试看当前状态"                 │
-│   - Decision: use_tool(tool-test-run)            │
-│                                                 │
-│ 3. Gate（群 Gate 内）                          │
-│   - LoopBreaker: 检测是否死循环                 │
-│   - SafetyGate: 检测危险命令                   │
-│                                                 │
-│ 4. Act（群 Act）                               │
-│   - Tool(test-run): 在 sandbox 跑测试           │
-│   - Tool(patch-write): 写 diff                  │
-│   - Tool(shell-exec): 执行命令（sandbox 内）   │
-│                                                 │
-│ 5. Reflect（群 Think）                         │
-│   - Brain: "测试通过了吗？patch合理吗？" │
-│                                                 │
-│ 6. Remember（群 Memory）                        │
-│   - Patch 历史写入 episodic                      │
-│   - 关键决策写入 semantic                       │
-│                                                 │
-│ 7. Stop（群 State）                             │
-│   - StopRule.decide → continue / success / fail │
-└─────────────────────────────────────────────────┘
- ↓ (循环)
-```
-
-#### 13.4.3 完整 Profile YAML
-
-```yaml
 # lca/profiles/ralph-loop.yaml
 name: ralph-loop
 description: Geoffrey Huntley 风格的 AI 编程循环（patch-then-test）
@@ -3852,45 +3371,6 @@ memory_policy:
 | 遗传 / 进化算法 | Population 原语 | 不在 v3 范围 |
 | Voice / 实时流式 | Transport streaming + stop_rule 改造 | v2+（本节说明） |
 
-#### 13.5.10 与 DSH 对比
-
-| 维度 | DSH | v3 |
-|---|---|---|
-| **插件化深度** | cordis plugin（细粒度） | 5 层配置 + 30 原语 + PluginMeta（更细） |
-| **多 Agent** | subagent provider seam | Team XOR + 多原语组合 |
-| **自定义工作流** | workflow engine + tool | Team XOR Graph + 完整原语 |
-| **记忆分层** | ctx.storage | 4 层 memory + MemoryPolicy + CompactionPolicy |
-| **技能习得** | skill provider | procedural memory + MemoryPolicy |
-
----
-
-### 13.6 自进化体系：v3 的系统级能力
-
-**目的**：v3 不只是静态 agent 框架，更是**自进化系统**。本节总结 v3 在自进化方面的完整能力，与 Hermes Agent 的"离线 fine-tune"形成对照。
-
-**核心命题**：v3 是**在线 + agent 主导 + 完整闭环**的自进化系统；Hermes Agent 是**离线 + 用户主导**的微调系统。
-
-#### 13.6.1 四个自进化层面
-
-**层面 1：Procedural Memory 自动习得**
-
-```
-agent 完成任务 T
-  ↓
-Critic 评估：success + reusable + evidence ≥ threshold
-  ↓
-提炼为 Skill（procedure + preconditions + effects + evidence_refs + confidence）
-  ↓
-MemoryPolicy.commit(layer=procedural, authority=model_inference)
-  ↓
-record(SkillAcquired) 进入 Journal
-  ↓
-下次遇到类似 task → Memory.query(procedural) → 自动调用
-```
-
-**实现**：
-
-```python
 # lca/plugins/skills/auto_acquire/__init__.py
 @plugin(name="lca-skill-auto-acquire")
 class AutoAcquireSkillPlugin:
@@ -4233,7 +3713,7 @@ Metrics + SLO 监控（§6.7）
 | Router / 小模型分流 | SkillRouter 或 Gate.`try_shortcut` |
 | Mixture of Agents | Team FanOut + Synthesizer |
 | LangGraph | Team `Graph` **或** Brain 内部图 **或** 确定性 Brain。禁止第四个图运行时 |
-| OpenAI Agents / Claude Code / DSH loop | 手 + 默认 ReAct Brain；DSH 整环 = `execution_target`/`loop:` 替换 |
+| OpenAI Agents / Claude Code loop | 手 + 默认 ReAct Brain;整环 = `execution_target`/`loop:` 替换 |
 | Workflow / cron | L4 往 Inbox `followup`。调度不是认知原语 |
 | Voice / 实时 | Transport + LLM 流式；数据仍是四种 |
 | 多模态 | `Observation` 已有 image/audio |
@@ -5111,13 +4591,6 @@ lca-ops diagnose --trace trace-001 --problem "approval_rejected"
 - test_metrics_drift_caught_by_release_pipeline
 ```
 
-**vs DSH 比较**：
-
-- DSH 的日志分散在 session/event + agent/* + tools/*，新人需要知道每个事件的语义
-- v3 的诊断模式库把"常见问题 → 看哪些事件"显式记录在文档
-
----
-
 ## 25. 实施路线图（阶段 0–7）
 
 禁止大爆炸。每阶段允许事件变细，不允许同一输入/配置下出现未解释的 Action、世界副作用、权限扩大或终态改变。行为变化必须 feature flag / shadow。Flags 家园：`lca/infrastructure/cognitive_loop_settings.py` `CognitiveLoopSettings`（pydantic-settings，env 前缀 `LCA_LOOP_`）。**禁止**放 L2：L1 的 Hub / `context_manifest` helper / SafeExecutor 需要读旗，不能 import L2。L4 Composer 也可把旗注入构造参数。
@@ -5181,7 +4654,7 @@ v3「架构迁移完成」时 A1–A7 同时成立。早期 PR 只验收其切�
 
 ### A. 继续 waterfall 挂钩（`COGNITIVE_PHASES` + `_emit` 赋 State）
 
-- 优点：现网已通；插件作者熟悉 `ctx.events.on`；DSH 同构。
+- 优点：现网已通；插件作者熟悉 `ctx.events.on`;同构。
 - 缺点：控制口伪装成观察口；G1 失败；三路径 loop warning 就是产物；无法重建「模型为何看见这句话」。
 - **拒绝。** 手平面 pipeline 可留 waterfall；认知不行。
 
@@ -5277,7 +4750,7 @@ v3「架构迁移完成」时 A1–A7 同时成立。早期 PR 只验收其切�
 | D7 | 模型可见 ⇒ 已记录；Clock 缺席则模板去掉 `CURRENT_DATE`；已配置 `now()` 抛错 = 非致命 Sensor drop | 与「必须有 clock item」且「抛错无 item」同时成立矛盾 | 第三条时钟；Hub 因 clock 失败整步 |
 | D8 | 不发明 PrimitiveManifest 文件；PR12 `PluginMeta` TypedDict 进 contracts。此前 Composer **不**拒绝 unknown | 现网零 `meta=` | 未类型化却要求 Composer 拒绝 |
 | D9 | Composer **唯一**组装 `SequentialPerceiveHub(sensors)`；插件只 provide 具名工厂 `sensor.<id>` | 列表 provide 后写覆盖 | `ctx.inject("sensors")` 在 `Sensor.sense` 里 |
-| D10 | DSH / compare-driver = `execution_target` 整环替换 | `loop_drivers.py` 已如此 | DSH 阶段塞进六步旁边 |
+| D10 | compare-driver = `execution_target` 整环替换 | `loop_drivers.py` 已如此 | driver 阶段塞进六步旁边 |
 | D11 | 保留 Inbox 三投递、编译表、问题表、有意不命名、扩展法、控制口/观察口 | v2 丢掉的操作黄金 | 用「新架构」覆盖原宪法已拍板的产品语义 |
 | D12 | 废止 ADR-0002 控制面「只能 Hook」；**PR1 前向引用** | 与 G1 直接矛盾 | 十个 PR 两套法律 |
 | D13 | `enforce` 名保留；v1 Verdict = `allow\|rewrite\|deny`；PR4 链仍返回 Decision | 审批不是 Gate 通道 | `require_approval`/`defer`；平行 pause |
@@ -5414,7 +4887,7 @@ v3「架构迁移完成」时 A1–A7 同时成立。早期 PR 只验收其切�
 ### PR7 — MemoryPolicy + compaction shadow
 
 - **标题：** MemoryPolicy and shadowed compaction inside Memory.perceive
-- **文件：** `memory.py` Protocol；`simple_memory.py`；journal `ContextCompacted`/`MemoryCommitted`；`WORKING_MEMORY_KEYS` CI；**不**新建 `working_memory_keys.py`；**不**填 DSH stub
+- **文件：** `memory.py` Protocol；`simple_memory.py`；journal `ContextCompacted`/`MemoryCommitted`；`WORKING_MEMORY_KEYS` CI；**不**新建 `working_memory_keys.py`;**不**填 stub
 - **依赖：** PR2、PR3a
 - **验证：** `uv run pytest --no-cov tests/test_shared_memory_isolation.py tests/test_memory*.py -q`
 

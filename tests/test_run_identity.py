@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import unittest
 
-from lca.plugins.transport.webserver.handlers.runs.observability.identity import default_agent_ref, parse_agent_ref
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunSession, RunStatus, run_dedup_key
 from lca.contracts.atoms.ids import RunId, TraceId
 from lca.contracts.models.observability.journal import RunScope
 from lca.infrastructure.observability.facade.run_context import (
@@ -14,6 +12,16 @@ from lca.infrastructure.observability.facade.run_context import (
     run_scope,
 )
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
+from lca.plugins.transport.webserver.handlers.runs.observability.identity import (
+    default_agent_ref,
+    parse_agent_ref,
+)
+from lca.plugins.transport.webserver.handlers.runs.session.session import (
+    RunRegistry,
+    RunSession,
+    RunStatus,
+    run_dedup_key,
+)
 
 
 class TestParseAgentRef(unittest.TestCase):

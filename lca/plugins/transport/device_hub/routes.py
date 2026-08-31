@@ -275,8 +275,6 @@ async def connect_device(websocket: WebSocket) -> None:
                 hub.complete(request_id, result if isinstance(result, dict) else {})
             elif kind == "agent_run_ack":
                 hub.complete(str(msg.get("operationId") or ""), msg)
-            elif kind in {"dsh_notification", "dsh_turn_finished"}:
-                hub.handle_dsh_inbound(msg)
     except WebSocketDisconnect:
         pass
     finally:

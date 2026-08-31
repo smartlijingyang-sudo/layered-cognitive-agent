@@ -308,7 +308,9 @@ async def test_gateway_api_iter_live_sse_emits_frames() -> None:
     gateway-local generator directly so a future signature drift cannot
     silently regress the wire.
     """
-    from lca.plugins.transport.webserver.handlers.runs.api.routes import iter_live_sse as gateway_iter_live_sse
+    from lca.plugins.transport.webserver.handlers.runs.api.routes import (
+        iter_live_sse as gateway_iter_live_sse,
+    )
 
     tail = LiveTail()
     stamped = _stamped(1, ReasoningDelta(step=0, text_delta="hello", seq=0))

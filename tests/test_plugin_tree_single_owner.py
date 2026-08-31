@@ -6,8 +6,6 @@ from typing import Any
 
 import pytest
 
-from lca.plugins.transport.webserver.handlers.runs.execute import create_run_session, execute_run
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunStatus
 from lca.application.api import Agent
 from lca.application.spawn import spawn_agent
 from lca.contracts.atoms.enums import ActionScope
@@ -18,6 +16,8 @@ from lca.harness.profile.resolve import ProfileResolveError
 from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
 from lca.infrastructure.llm_resolver import live_credential
 from lca.plugins.composer.perceive.perceive import build_perceive_hub
+from lca.plugins.transport.webserver.handlers.runs.execute import create_run_session, execute_run
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunStatus
 
 DEFAULT_PROFILE = "profiles/web-standard.yaml"
 
@@ -217,7 +217,9 @@ async def test_omitting_tools_provider_skips_g2a_not_fallback(
         raise AssertionError("build_g2a_chat_tools must not run when tools-provider is omitted")
 
     monkeypatch.setattr("lca.infrastructure.tools.default_set.build_g2a_chat_tools", _boom)
-    from lca.plugins.transport.webserver.handlers.runs.lifecycle.runnable_assembly import tools_from_scope
+    from lca.plugins.transport.webserver.handlers.runs.lifecycle.runnable_assembly import (
+        tools_from_scope,
+    )
 
     tools = tools_from_scope(ctx, None)
     tool_names = [t.name for t in tools]

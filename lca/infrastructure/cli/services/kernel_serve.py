@@ -15,7 +15,6 @@ ADR-0119 决定 4 把 LCA 进程入口切到 ``uv run python -m lca_kernel serve
 
 from __future__ import annotations
 
-import os
 import subprocess
 import time
 from pathlib import Path
@@ -140,9 +139,7 @@ class KernelServeService:
         )
 
     def restart(self) -> ServiceState:  # pragma: no cover - intentional stub
-        raise NotImplementedError(
-            "lca-ops 不 restart kernel serve。改完代码跑 heal,新进程会起来。"
-        )
+        raise NotImplementedError("lca-ops 不 restart kernel serve。改完代码跑 heal,新进程会起来。")
 
 
 __all__ = ["KernelServeService"]

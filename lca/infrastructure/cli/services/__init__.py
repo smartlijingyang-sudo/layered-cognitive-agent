@@ -37,7 +37,9 @@ def build_registry(config: OpsConfig) -> ServiceRegistry:
     registry = ServiceRegistry()
     registry.register(KernelServeService(config.kernel_serve, config.root))
     registry.register(InfraService(config.infra, config.state_dir))
-    registry.register(LobeHubService(config.lobehub, config.kernel_serve, config.state_dir, config.root))
+    registry.register(
+        LobeHubService(config.lobehub, config.kernel_serve, config.state_dir, config.root)
+    )
 
     sudo = Sudo(config.root / config.sudo_pass_file)
     registry.register(

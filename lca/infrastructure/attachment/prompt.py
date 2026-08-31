@@ -141,20 +141,6 @@ def format_sandbox_uploaded_files_prompt(
     )
 
 
-def render_dsh_workspace_context(
-    root: str,
-    run_id: str,
-    attachment_ids: Sequence[str],
-    store: FileStore,
-) -> str:
-    """Machine-plane workspace block for DSH harness system prompt."""
-    policy = get_attachment_policy()
-    file_list = format_machine_uploaded_files_prompt(root, run_id, attachment_ids, store)
-    if not file_list:
-        return ""
-    return f"<uploaded_files>\n{policy.machine_policy_text()}\n\n{file_list}\n</uploaded_files>"
-
-
 def format_skill_attachment_block(store: FileStore | None = None) -> str:
     """Same staged paths as system role — injected on ``activate_skill``."""
     ids = get_current_run_attachment_ids()

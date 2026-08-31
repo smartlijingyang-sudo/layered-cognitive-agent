@@ -208,7 +208,6 @@ export function planeFieldsFromAgent(agentId: string | undefined): {
       ? { device_id: deviceId, plane: 'machine', execution_target: 'device' }
       : { plane: 'machine', execution_target: 'device' };
   }
-  if (target === 'dsh') return { plane: 'machine', execution_target: 'dsh' };
   if (target === 'sandbox') return { plane: 'sandbox', execution_target: 'sandbox' };
   if (target === 'auto') return { execution_target: 'auto' };
   if (target === 'none') return { execution_target: 'none' };

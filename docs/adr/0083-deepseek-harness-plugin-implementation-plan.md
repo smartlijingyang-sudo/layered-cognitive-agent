@@ -1,5 +1,10 @@
 # LCA 插件能力布局详细实施计划
 
+> **Status: Superseded by [ADR-0120](0120-retire-dsh-driver.md) (2026-08-31).**
+> 本计划中的 DSH (DeepSeek Harness) driver 路径 A 已退役;非 DSH 部分(plugin 树、capability seam、profile/bundle layering)继续作为 LCA 整体架构参考保留。
+>
+> 仅作为历史研究记录,不在新设计中引用。
+
 ## 0. 计划元信息
 
 | 项目 | 内容 |

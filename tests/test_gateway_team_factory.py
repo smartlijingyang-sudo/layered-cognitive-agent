@@ -5,16 +5,16 @@ from __future__ import annotations
 import json
 import unittest
 
-from lca.cognition.team.modes_catalog import ALL_MODES
+from lca.agent.role_library import FileRoleLibrary
+from lca.application.api import Agent, Team
+from lca.application.casting import LLMTeamCaster
 from lca.cognition.team.modes.default_modes import (
     build_runnable_team,
     build_solo_agent,
     resolve_team_casting_dependencies,
 )
 from lca.cognition.team.modes.solo_mode import filter_solo_tools
-from lca.agent.role_library import FileRoleLibrary
-from lca.application.api import Agent, Team
-from lca.application.casting import LLMTeamCaster
+from lca.cognition.team.modes_catalog import ALL_MODES
 from lca.contracts.capabilities import TEAM_CASTER, TEAM_ROLE_LIBRARY
 from lca.contracts.mechanisms.capability import MissingCapabilityError
 from lca.contracts.models.core.llm import LLMResponse

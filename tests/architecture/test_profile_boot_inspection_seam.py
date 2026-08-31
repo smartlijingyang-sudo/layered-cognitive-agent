@@ -8,7 +8,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from lca.plugins.transport.webserver.handlers.runs.session.setup import plugin_inventory_from_boot_products
 from lca.contracts.mechanisms.capability import MissingCapabilityError
 from lca.harness.diagnostics.inspect import format_capability_graph, format_plugin_tree
 from lca.harness.profile.boot import boot_entries, boot_profile, load_profile_entries
@@ -16,6 +15,9 @@ from lca.harness.profile.boot_products import (
     compiled_plan_from_scope,
     profile_boot_products_from_scope,
     resolved_profile_from_scope,
+)
+from lca.plugins.transport.webserver.handlers.runs.session.setup import (
+    plugin_inventory_from_boot_products,
 )
 
 REPO = Path(__file__).resolve().parents[2]

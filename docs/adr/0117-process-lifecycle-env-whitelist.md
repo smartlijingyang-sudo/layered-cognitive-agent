@@ -76,7 +76,7 @@ const BOOTSTRAP_NAMES = new Set([
   'REQUESTS_CA_BUNDLE', 'CURL_CA_BUNDLE',
   'NODE_TLS_REJECT_UNAUTHORIZED',
 ])
-const BOOTSTRAP_PREFIXES = ['DSH_', 'XDG_', 'DYLD_', 'BASH_FUNC_']
+const BOOTSTRAP_PREFIXES = ['XDG_', 'DYLD_', 'BASH_FUNC_']
 
 function loadLayeredEnv(binName, dir = process.cwd()): { [k: string]: string } {
   // 读 .env 但只覆盖 BOOTSTRAP_NAMES ∪ (任何 *_PREFIXES) ∩ (env 内存在的)
@@ -266,7 +266,6 @@ BOOTSTRAP_NAMES: frozenset[str] = frozenset({
 BOOTSTRAP_PREFIXES: tuple[str, ...] = (
     "LCA_",            # LCA 自身配置(LCA_PROFILE 走黑名单单独禁)
     "LCA_INTERNAL_",   # LCA 内部 flag(K6/K7/K8 状态)
-    "DSH_",            # deepseek 兼容(用户从 DSH 迁移)
     "XDG_",            # freedesktop standard
     "DYLD_",           # macOS dynamic linker
     "LD_",             # Linux dynamic linker

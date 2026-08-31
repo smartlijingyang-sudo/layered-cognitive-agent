@@ -1,7 +1,7 @@
 # LCA Harness Spine Spec：从第一原理到可执行重构
 
 **版本：v1.1-draft（评审修订版）**
-**基于：main @ `8e552cc` 实际代码 + DSH reference architecture**
+**基于: main @ `8e552cc` 实际代码**
 **定位：可执行的技术规格，不是愿景文档**
 **修订：整合 plugin-everything 自洽性审查——Seam 统一、phase middleware、ContextVar scope 传递、Gateway 依赖边界、Phase B 详细设计**
 
@@ -31,72 +31,6 @@ LCA 当前有三个独立的事实 owner，它们在运行期各自维护状态�
 4. **N4 — Gateway 是纯 Carrier**：Gateway 只做 HTTP/SSE → typed command → projection snapshot。Gateway 不 import 任何 concrete loop、brain、body。
 5. **N5 — Plugin tree 驱动装配**：生产环境通过 profile → bundles → patch 解析 plugin tree，不用 `boot_capabilities()` 硬编码。
 6. **N6 — 前端消费 whole-value projection**：前端不 fold raw domain events。前端接收 `(projection_key, version, seq, whole_value)`，保持高水位 seq。
-
-### 0.3 从 DSH 学到什么（以及什么不能照搬）
-
-DSH 是 TypeScript + Cordis 生态。Cordis 提供 declaration merging、service tracing、fiber-scoped effect、AsyncLocalStorage-based initiator tracking 等 Python 没有的原语。
-
-**必须吸收的结构性模式**（与语言无关）：
-
-| 模式 | DSH 实现 | Python 对应方案 |
-|---|---|---|
-| Agent 是一等实体 + Handle ownership | `AgentHandle { agent, dispose() }` | 同构 dataclass + async dispose |
-| AgentFactory 可替换 loop | `AgentFactory.createAgent/resume` | Protocol + registry |
-| Session = append-only event log | `SessionEventMap` merge-extensible | versioned frozen dataclass registry |
-| Session Projection | `ProjectionDefinition { init, apply, view }` | 同构 Protocol |
-| Scoped plugin tree | Cordis `Context.fork()` with service shadow | `PluginHost` 扩展 parent delegation + `ContextVar` 传递（§3.1） |
-| Single live activation | `AgentRegistry` per-id entry | 同构 |
-| Command → fact → projection | Gateway submits typed commands | 同构 |
-| Setup-commit-publish | 事务性 Agent 创建 | 同构 async transaction |
-| **Waterfall middleware** | `waterfall('agent/pre-step', ...)` | `MiddlewareRegistry.run(seam_key, ...)` (§2.2.5, §3.8) |
-| **Extension point declaration** | Cordis declaration merging | `PluginManifest.extension_points` + `DEFINITION` kind (§2.2.1) |
-| **Seam completeness** | TypeScript type checking | `Loader._check_seam_completeness()` (§3.7) |
-| **Fiber-scoped service tracing** | `AsyncLocalStorage` | `contextvars.ContextVar` + `ScopedPluginHost.current()` (§3.1.2) |
-
-**不能照搬的**：
-
-- Cordis declaration merging → Python 用显式注册表 + namespace
-- TypeScript type-level session event map → Python 用 `@session_event` decorator + registry
-- Cordis fiber/effect 系统 → Python 用现有 `PluginContext.effect()` + async context manager
-- AsyncLocalStorage initiator tracking → Python 用 `contextvars.ContextVar`
-
-### 0.4 终极目标：DSH 级架构自洽性
-
-本次重构不只是解决"三个 fact owner 不一致"的当前问题，而是将 LCA 的**架构范式**从"分层认知组装"升级为 **plugin-everything 运行时**。
-
-DSH 达到的架构自洽性（我们的北极星）：
-
-```
-系统   = kernel + 0 个 plugin           ← kernel 自身无业务逻辑
-行为   = plugin₁ + plugin₂ + ...        ← 所有行为来自 plugin
-配置   = profile YAML                    ← 不写代码，只组合 plugin
-扩展   = 写一个 plugin                   ← 唯一的扩展方式
-替换   = 换一个 plugin                   ← 唯一的替换方式
-```
-
-**自洽性检验**：任何"不走 plugin 路径的硬编码"都是架构缺陷——要么是迁移过渡期的妥协（必须有明确消除计划），要么是 spec 的遗漏。
-
-具体地，LCA 达到自洽后：
-
-| 当前硬编码 | 目标 |
-|---|---|
-| `boot_capabilities()` 硬编码 mount | Profile YAML → Loader → reconcile |
-| `CognitiveRuntime` 内部 hook 硬编码调用 | Phase middleware waterfall（plugin 注册） |
-| Gateway `if is_dsh_driver` 分支 | Profile/preset 选择 loop provider |
-| `register_seam_catalog()` 独立校验 | Loader reconcile 的 seam-completeness pass |
-| `AgentComposer.compose()` 直接 new | AgentRegistry.create() 从 plugin tree 解析 |
-
-### 0.5 关于 "Harness" 命名
-
-DSH 自身就叫 "DeepSeek Harness"，本 spec 沿用 `harness` 作为**内部技术术语**，表示"Agent 运行时的核心骨架层"。但在以下对外场景中避免使用：
-
-- **产品/用户文档**：使用 "LCA Runtime" 或 "Agent Session"
-- **对外 API**：`/v1/sessions/*`，不暴露 harness 概念
-- **内部代码**：`lca/harness/` 包名保留，与 DSH 术语对齐，便于团队对照阅读
-
-如果未来团队认为 `harness` 容易引起"这只是测试脚手架"的误解，可在 Phase A 稳定后统一重命名为 `runtime`。这不阻塞当前 spec 的执行。
-
----
 
 ## 1. 代码基线：main 分支的真实状态
 
@@ -167,102 +101,6 @@ return CognitiveAgent(runtime, profile, hub, ...)
 3. `hooks` 硬编码 journal + logging，不是 plugin 注册
 4. `SimpleBody` 直接 new，tool pipeline 不可替换
 
-### 1.4 Gateway 执行（DSH 分叉）
-
-**`gateway/runs/execute.py`** — `execute_run()`:
-```python
-dsh = is_dsh_driver(session.execution_target)
-if dsh:
-    await execute_dsh_session(session)     # DSH 路径
-else:
-    if mode == SOLO_MODE_KEY:
-        runnable = build_solo_agent(...)   # LCA solo 路径
-    else:
-        runnable = await build_runnable_team(...)  # LCA team 路径
-    result = await runnable.run(question)
-```
-
-问题：
-1. Gateway 知道 runtime engine（DSH vs LCA）
-2. `RunSession.runnable` 持有 live Python 引用
-3. resume 依赖 `session.runnable.resume()` — 进程重启不可能
-4. HIL answer 通过 `session.runnable` 而非 durable command
-
-### 1.5 Journal / RunStore（最强资产）
-
-已有：append-only、seq 连续、frozen event、scope stamping、redaction、JSONL/SSE/OTel/Langfuse projectors、doctor。
-
-缺失：
-1. 事件词表不够丰富（缺 turn/step/context/tool-call/skill/subagent 细粒度事件）
-2. 不是 Agent Session 的驱动源——只是观测
-3. 没有 Projection Registry——projector 各自订阅
-4. 没有 SessionHeader（parent/fork/delegationDepth/presetDigest）
-
-### 1.6 CognitiveRuntime（成熟的认知闭环）
-
-**`lca/runtime/runtime_loop.py`**:
-```
-perceive → think → act → reflect → record → checkpoint → stop
-```
-
-优势：
-- 清晰的 7-phase 闭环
-- Hook registry 在每 phase 前后触发
-- StopPolicy 作为 State 群策略完全分离，并仅由 Stop 阶段消费
-- HIL resume via `state_store.load(snapshot)`
-- Loop intervention（连续相同工具检测）
-
-这些**都必须保留**。改变的是它获取依赖和写事实的方式。
-
-### 1.7 关键发现：两套并行扩展机制必须统一
-
-代码审计揭示了一个架构断层：**LCA 实际有两套并行的扩展机制**，它们解决同一个问题但方式完全不同：
-
-| 维度 | Capability Seam（`capability_boot.py`） | Plugin Kernel（`plugin/kernel/`） |
-|---|---|---|
-| **激活时机** | 每次 `compose()` 调用时同步执行 | Gateway boot 时一次加载，运行时 reconcile |
-| **配置方式** | Python 硬编码 `mount_default_providers()` | YAML profile → bundles → patch |
-| **依赖解析** | 直接 `ctx.require(SeamKey.X)` | 拓扑排序 + 迭代收敛（`reconcile()`） |
-| **生命周期** | 无（临时 object graph） | 完整状态机：PENDING → LOADING → ACTIVE → DISPOSED |
-| **卸载能力** | 无 | LIFO effect disposal + cascade deactivation |
-| **可观测** | 无 | `PluginHandle.state`、effect count、service table |
-| **使用方** | `AgentComposer`（生产路径） | `tests/plugin/`（测试路径） |
-
-**问题本质**：Plugin kernel 是完整的 DSH Cordis Python 移植（service table + event bus 5种dispatch模式 + lifecycle state machine + YAML profile loader + cascade deactivation），但**生产代码从未真正使用它**。`boot_capabilities()` 是一个绕过 plugin kernel 的硬编码快捷路径。
-
-同时，Capability Seam 的 `register_seam_catalog()` + `consume()` 模式有独立的价值——它是 **composition-time gate**，在组装阶段验证 Definition/Provider/Consumer 三角完整性。这个模式应该**融入** plugin kernel 而不是被替代。
-
-**Spec 的统一策略**：
-
-```
-当前：
-  boot_capabilities() → CapabilityHub（硬编码，每次 compose 新建）
-  register_seam_catalog() → seam 元数据注册（仅校验，不驱动）
-  Plugin kernel → 测试用，生产不用
-
-目标：
-  Plugin kernel 成为唯一运行时 → Profile → Loader → reconcile → ScopedPluginHost
-  Seam 元数据融入 PluginManifest（requires/provides/kind）
-  boot_capabilities() → 仅作为兼容 adapter，内部调用 Loader.load(base_spine_bundle)
-  consume() → 编译期校验工具，不影响运行期
-```
-
-这解释了为什么蓝图说"plugin kernel 已存在但生产不用"——**不是因为它不好，而是因为 `boot_capabilities()` 先存在且被 Composer 直接依赖，后来加的 plugin kernel 没有机会接管**。迁移的核心工作就是让 plugin kernel 接管 boot_capabilities 的职责。
-
-### 1.8 其他代码级发现
-
-**Journal 事件词表已比蓝图描述的更丰富**：`journal_catalog.py` 有 26 种事件类型，每种带 `JournalSchemaMeta`（durability、audience、sensitivity、retention_class）。Spec §2.2.3 的事件词表应视为对这 26 种的**分类整理和命名统一**，不是从零开始。
-
-**`RunStore.derive_events()` 已是 projection 原型**：它缓存 predicate → events 映射，首次全量扫描，后续增量扩展。这就是 DSH `ProjectionDefinition { init, apply, view }` 的简化版。迁移方向是将其泛化为 registry-driven 的多 projection 模型。
-
-**`RunSession` 有请求去重**：`run_dedup_key()` 用 SHA-256 从 `(mode, agent_id, user_text, attachment_ids)` 生成指纹，合并重复请求。新 Command 模型必须保留等价的幂等机制。
-
-**`ingress.py` 净化 LobeHub XML 污染**：`parse_messages()` 剥离 LobeHub 注入的 `<available_tools>`、`<agent_management_context>` 等 XML。这是 carrier 层关注点，新 Gateway carrier plugin 应保留此能力。
-
-**`InsightEngine` 是 domain projection 贡献者**：它在 `TeamRunFinished`/`AgentRunFinished` 时运行 insight rules 并发射 `RunInsight` 事件回 `store.append()`。这就是 DSH Session Projection 的 domain contributor 模式。
-
----
-
 ## 2. 目标架构：精确接口定义
 
 ### 2.1 包结构演进
@@ -308,7 +146,6 @@ lca/
 │   │   ├── __init__.py              # PluginManifest
 │   │   ├── factory.py               # CognitiveLoopFactory(AgentLoopFactory)
 │   │   └── adapter.py               # 薄适配：CognitiveRuntime → LiveAgent
-│   ├── loop_dsh_bridge/             # DSH adapter as loop provider
 │   ├── loop_replay/                 # Deterministic replay loop
 │   ├── gateway_starlette/           # HTTP/SSE carrier plugin
 │   ├── session_jsonl/               # JSONL persistence plugin
@@ -317,7 +154,6 @@ lca/
 │   ├── tool_skill/                  # skill(name) tool
 │   ├── subagent_inprocess/          # In-process child agent provider
 │   ├── subagent_team/               # Team composer as subagent provider
-│   ├── subagent_dsh/                # DSH as subagent provider
 │   ├── workflow_dag/                # 声明式 DAG workflow engine
 │   ├── seam_definitions/            # 原 register_seam_catalog() 的声明式替代
 │   ├── budget_policy/               # Budget check middleware plugin
@@ -328,7 +164,6 @@ lca/
 │   ├── python-cognitive.yaml        # loop_cognitive + brain/body/memory
 │   ├── web-gateway.yaml             # gateway_starlette + projections_web
 │   ├── observability.yaml           # OTel + Langfuse + JSONL projectors
-│   └── dsh-bridge.yaml              # loop_dsh_bridge + subagent_dsh
 ├── profiles/                        # deployment & agent profiles
 │   ├── web-standard.yaml            # 默认部署 profile
 │   ├── solo-cognitive.yaml          # 单 agent 认知
@@ -336,7 +171,7 @@ lca/
 │   └── creator.yaml                 # 开发者工具
 ├── presets/                         # agent presets
 │   ├── researcher/profile.yaml      # extends: web-standard + plan_graph loop
-│   └── coder/profile.yaml           # extends: web-standard + dsh bridge
+│   └── coder/profile.yaml           # extends: web-standard
 ├── infrastructure/                    # 保留，逐步 re-export 到 harness
 ├── cognition/                # 保留 Brain/Body/Memory 算法
 ├── runtime/                  # 过渡期保留 → 最终成为 loop_cognitive 实现源
@@ -379,7 +214,7 @@ class ProviderMode(Enum):
 class ExtensionPoint:
     """
     声明一个 plugin 暴露的扩展点。
-    对应 DSH 的 waterfall/serial event name，对应 LCA 原 Seam Definition。
+    对应 waterfall/serial event name，对应 LCA 原 Seam Definition。
     
     语义：
     - 其他 plugin 可以通过注册 middleware 介入此扩展点
@@ -756,7 +591,7 @@ class MiddlewareRegistration:
 class PhaseMiddleware(Protocol):
     """
     可阻断的 middleware：返回 None 表示放行，返回修改后的 state 表示拦截/改写。
-    对应 DSH waterfall 中间件。
+    对应 waterfall 中间件。
     """
     async def __call__(self, phase: str, state: Any, context: "PhaseContext") -> Any: ...
 
@@ -934,7 +769,7 @@ class SubagentCapabilities:
     supports_persona: bool = False
     supports_continuation: bool = False
     max_delegation_depth: int = 0
-    supported_providers: tuple[str, ...] = ()    # "inprocess", "a2a", "dsh"
+    supported_providers: tuple[str, ...] = ()    # "inprocess", "a2a"
 
 class SubagentProvider(Protocol):
     name: str
@@ -971,7 +806,7 @@ class SubagentRun(Protocol):
 # lca/harness/kernel/scope.py
 import contextvars
 
-# ── Async scope 传递（Python 等价于 DSH 的 AsyncLocalStorage + fiber-scoped tracing）──
+# ── Async scope 传递 ──
 _current_scope: contextvars.ContextVar["ScopedPluginHost | None"] = contextvars.ContextVar(
     "plugin_scope", default=None
 )
@@ -1003,7 +838,7 @@ class ScopedPluginHost:
         self._middleware_registry = MiddlewareRegistry()  # §2.2.5 扩展点
 
     def resolve(self, service_key: str) -> Any:
-        """层级解析：先查自己，再查 parent（DSH 的 nearest-layer-wins）"""
+        """层级解析：先查自己，再查 parent(nearest-layer-wins)"""
         record = self._services.get(service_key)
         if record is not None and record.available:
             return record.value
@@ -1023,7 +858,7 @@ class ScopedPluginHost:
 
     async def run_in_scope(self, coro: Any) -> Any:
         """
-        在 async task 中自动传递 scope —— Python 等价于 DSH 的 fiber-scoped Context。
+        在 async task 中自动传递 scope —— Python 等价于 fiber-scoped Context。
         
         用法：
             scope = parent_scope.fork(ScopeKind.SESSION, session_id)
@@ -1378,189 +1213,6 @@ class CognitiveLoopFactory:
         return CognitiveAgentHandle(agent=live, scope=scope)
 ```
 
-### 3.6 DSH 深度分析补充：必须精确移植的模式
-
-> 以下来自 DSH 源码逐行分析（packages/core/agent、core/session、core/agent-loop、core/tools、session/session-projection），是对上述设计的关键精度补充。
-
-#### 3.6.1 Inbox 双队列模型
-
-DSH 的 Inbox 不是一个列表，是**两个**：
-
-```
-Inbox
-├── next-turn:  UserMessage[]    # followup 消息，开启新 turn
-└── next-step:  UserMessage[]    # steer/inject 消息，在下一个 step 边界消费
-```
-
-**每次变更都是 durable 事实** — append、prepend、splice、claim、clear 都通过 `session.append('agent/inbox/spliced', ...)` 写入 journal。Resume 时从 session log 重建 inbox。
-
-Python 对应：
-
-```python
-@dataclass
-class InboxState:
-    next_turn: list[UserMessage]     # followup → 新 turn
-    next_step: list[UserMessage]     # steer/inject → 下一个 step 边界消费
-
-class Inbox:
-    """Durable FIFO projection over agent/inbox/spliced events"""
-    async def followup(self, msg: UserMessage) -> None:
-        """添加下一 turn 消息，唤醒 agent"""
-        await self._session.append(InboxSpliced(
-            op="append", target="next_turn", messages=(msg,)
-        ))
-        self._wake_driver()
-
-    async def steer(self, msg: UserMessage) -> None:
-        """添加 step 边界干预，唤醒 agent"""
-        await self._session.append(InboxSpliced(
-            op="append", target="next_step", messages=(msg,)
-        ))
-        self._wake_driver()
-
-    async def inject(self, msg: UserMessage) -> None:
-        """添加上下文但不唤醒"""
-        await self._session.append(InboxSpliced(
-            op="append", target="next_step", messages=(msg,)
-        ))
-        # 不唤醒 driver
-
-    def claim_next_turn(self) -> list[UserMessage] | None:
-        """Claim next-turn messages for a new turn"""
-        if not self._state.next_turn:
-            return None
-        msgs = list(self._state.next_turn)
-        self._state.next_turn.clear()
-        return msgs
-
-    def claim_next_step(self) -> list[UserMessage] | None:
-        """Claim next-step messages at step boundary"""
-        if not self._state.next_step:
-            return None
-        msgs = list(self._state.next_step)
-        self._state.next_step.clear()
-        return msgs
-```
-
-#### 3.6.2 Surface：模型可见的有序事件子集
-
-DSH 的 Session 有一个 **Surface** — 只有三种事件类型可以出现在模型可见表面：
-
-| Surface 事件类型 | 含义 |
-|---|---|
-| `user/message` | 用户输入 / inject 的上下文 / skill body |
-| `assistant/message` | 模型完整输出（非流式 chunk） |
-| `tool/result` | 工具执行结果 |
-
-其他事件（`turn/start`、`tool/call`、`assistant/chunk`）是 log-only，不出现在 Surface。
-
-两种 Surface 操作：
-- `'append'` — 正常追加到末尾
-- `{ op: 'replace', start, end }` — 位置替换（compaction 用）
-
-Python 对应：
-
-```python
-SURFACE_EVENT_TYPES = frozenset({"user/message", "assistant/message", "tool/result"})
-
-class SurfaceManager:
-    """跟踪模型可见的有序消息表面"""
-    def __init__(self):
-        self._nodes: list[SessionEvent] = []
-
-    def apply(self, event: SessionEvent) -> None:
-        if event.type not in SURFACE_EVENT_TYPES:
-            return
-        surface_op = event.data.get("surface_op", "append")
-        if surface_op == "append":
-            self._nodes.append(event)
-        elif isinstance(surface_op, dict) and surface_op["op"] == "replace":
-            start, end = surface_op["start"], surface_op["end"]
-            self._nodes[start:end+1] = [event]
-
-    def model_messages(self) -> list[dict]:
-        """生成模型可见的消息列表"""
-        messages = []
-        for event in self._nodes:
-            if event.type == "user/message":
-                messages.append({"role": "user", "content": event.data["content"]})
-            elif event.type == "assistant/message":
-                messages.append({"role": "assistant", "content": event.data["content"]})
-            elif event.type == "tool/result":
-                messages.append({"role": "tool", **event.data["message"]})
-        return messages
-```
-
-#### 3.6.3 Waterfall 中间件扩展点
-
-DSH 的扩展点是命名 waterfall/serial 事件，不是 callback list。关键 waterfall：
-
-| 事件 | 模式 | 用途 | Python 对应 |
-|---|---|---|---|
-| `agent/pre-step` | waterfall | 拒绝/重写进入 step 的消息 | `AgentEventMiddleware.before_step()` |
-| `agent/request` | waterfall | 替换 LLM 请求配置 | `AgentEventMiddleware.before_request()` |
-| `agent/request-error` | waterfall | 自定义重试/恢复 | `AgentEventMiddleware.on_request_error()` |
-| `agent/turn-stopping` | serial | 最后机会添加 steering | `AgentEventMiddleware.before_turn_end()` |
-| `tools/pre-execute` | waterfall | allow/deny/ask 审批 | `ToolPipeline.pre_execute()` |
-| `tools/execute` | waterfall | around-dispatch | `ToolPipeline.around_execute()` |
-| `tools/post-execute` | waterfall | accept/block/replace/add context | `ToolPipeline.post_execute()` |
-
-#### 3.6.4 工具调度：并行 vs 独占
-
-DSH 的工具调度器：
-- **exclusive tools** 形成 barrier，一次只运行一个
-- **parallel tools** 有界滚动池 (`max_parallel_tool_calls`)
-- 结果按**模型顺序**提交，不论实际执行顺序
-- abort 时 drain 已启动的调用，为跳过的生成合成错误结果
-
-#### 3.6.5 Two-Phase Publication：enter → announce
-
-DSH 的 Agent 注册分两步，允许 setup 失败时回滚：
-
-```
-enter(agent) → setup → commit → announce(agent)
-                 ↓ fail
-              detach() (rollback, 不发射 agent.created)
-```
-
-Python 对应已在 3.3 节 AgentRegistry 中体现：setup 失败 → scope drain → 不 publish。
-
-#### 3.6.6 ScopedLayers：层级注册解析
-
-```
-ScopedLayers
-├── Global Layer      # 部署级工具（全局可见）
-├── Per-Preset Layer  # preset 级（该 preset 的 agent 可见）
-└── Per-Agent Layer   # agent 级（只该 agent 可见）
-```
-
-解析规则：nearest layer wins、rank-based dedup、allow/deny intersection。
-
-### 3.7 Seam 统一：从独立注册表到 Loader reconcile pass
-
-#### 3.7.1 问题
-
-当前 LCA 有两套并行扩展机制：
-
-```
-独立机制 A：Seam Catalog
-  register_seam(Definition, key, DEFINITION)
-  register_seam(Provider, key, PROVIDER)
-  register_seam(Consumer, key, CONSUMER)
-  require_complete(*keys)  ← 三角完整性校验
-
-独立机制 B：Plugin Kernel
-  PluginHandle → service table → lifecycle reconcile
-  不感知 Seam 三角关系
-```
-
-两套机制解决同一问题（"谁提供什么、谁消费什么、是否完整"），但互相不知道对方的存在。
-
-#### 3.7.2 统一方案：Seam 成为 Loader 的校验 pass
-
-**不删除 Seam，而是将其语义融入 PluginManifest + Loader reconcile**：
-
-```python
 # 统一后的 Loader.reconcile()
 class Loader:
     async def reconcile(self, handles: list[PluginHandle]) -> ReconcileResult:
@@ -2455,62 +2107,6 @@ class ReplayLiveAgent:
 2. 替换为 test loop/replay loop 不改 Gateway
 3. golden journal 复跑结果确定
 
----
-
-### Phase D：DSH Bridge Provider 化
-
-**目标**：DSH 是 loop/subagent provider，不是网关特殊分支。
-**风险**：中——需要映射 DSH 事件到 LCA 事件词表。
-**预计工作量**：1-2 周。
-
-#### D.1 消除 Gateway if/else
-
-```python
-# 旧：
-if is_dsh_driver(session.execution_target):
-    await execute_dsh_session(session)
-else:
-    runnable = build_solo_agent(...)
-
-# 新：profile/preset 决定 loop provider
-# profiles/dsh-bridge.yaml
-# patch:
-#   - id: agent-loop
-#     config:
-#       provider: lca.loop.dsh_bridge
-```
-
-#### D.2 DSH → SessionEvent 映射
-
-```python
-# lca/plugins/loop_dsh_bridge/event_mapping.py
-DSH_EVENT_MAP = {
-    "agent/created": "session.created.v1",
-    "turn/start": "turn.started.v1",
-    "turn/end": "turn.ended.v1",
-    "step/start": "step.started.v1",
-    "step/end": "step.ended.v1",
-    "user/message": "message.accepted.v1",
-    "assistant/message": "model.completed.v1",
-    "tool/call": "tool.called.v1",
-    "tool/result": "tool.completed.v1",
-}
-
-class DshJournalProjector:
-    """将 DSH notification 转换为 LCA SessionEvent"""
-    def project(self, dsh_event):
-        lca_type = DSH_EVENT_MAP.get(dsh_event.type)
-        if lca_type is None:
-            return  # unknown → skip with warning
-        return SessionEvent(type=lca_type, ...)
-```
-
-**Phase D 验收**：
-1. 同一 UI 和 SSE 不因 loop 选择而改变
-2. parent/child session tree 可以混用 Cognitive 与 DSH provider
-
----
-
 ### Phase E：Tool Pipeline、Skills、Subagents 收敛
 
 **目标**：所有扩展能力进入同一 Session/Scope/Policy 模型。
@@ -2587,101 +2183,6 @@ async def test_shadow_mode_no_divergence():
 
 `layer0` → `layer3` 的物理目录承载了团队心智模型和 import lint 规则。第一步只在逻辑层建立新 spine（`lca/harness/`、`lca/plugins/`），通过 re-export 和 adapter 连接旧目录。等 spine 稳定后再渐进收敛物理结构。
 
-### 6.4 为什么 Python 不依赖 DSH 的 Cordis ABI
-
-- Cordis 是 TypeScript-only，依赖 declaration merging、template literal types、conditional types 等 Python 无法直接复制的类型系统特性
-- LCA 是 Python 项目，应该有自己稳定的 Python SPI
-- DSH 是设计标杆和可选的外部 provider，不是编译依赖
-
-### 6.5 为什么 SessionStore 包装 RunStore 而不是重写
-
-`RunStore` 已经有 append-only、seq、frozen event、scope stamping、redaction、projectors、JSONL/SSE/OTel/Langfuse reader。这是最难后来补上的资产。重写会丢失所有已验证的不变量。
-
-### 6.6 Agent 与 Session 的 1:1 关系：当前选择
-
-**决策**：在 Phase B/C/D 期间，Agent 与 Session 保持 **1:1** 关系。`AgentRegistry` 以 `session_id` 为 key，每个 session 恰好一个 live agent。
-
-**理由**：
-- DSH 也是 1:1（AgentHandle 持有唯一 Agent，绑定唯一 Session）
-- 1:N（一个 Agent 跨多个 Session）的场景在 LCA 当前产品中不存在
-- 过早引入 N:M 会增加概念负担和实现复杂度
-
-**未来扩展路径**：
-- 如果需要"Agent 模板"概念（跨 session 复用），引入 `AgentTemplate = Profile + Preset + Options`
-- `AgentTemplate` 是配置，不是运行实体
-- `AgentInstance = Session + Handle` 仍然是 1:1
-- 届时 `AgentRegistry` 可以拆为 `TemplateRegistry` + `SessionRegistry`
-
-**不变量**：只要 1:1 成立，`AgentRegistry` 等价于 `SessionRegistry`，不需要为 "Agent 在哪里" 这个问题维护额外的查找表。
-
-### 6.7 物理目录 deprecation 时间线
-
-**决策**：不在第一步物理重组目录，但明确 deprecation 时间线，避免"以后再说"变成"永远不说"。
-
-| Phase | `layer0`~`layer4` 状态 | `lca/harness/` 状态 | 动作 |
-|---|---|---|---|
-| Phase A 完成 | 保留，import lint 仍生效 | 新建，通过 re-export 连接 | `infrastructure/plugin/kernel` 标记为 `lca/harness/kernel` 的实现源 |
-| Phase B 完成 | 保留 | 稳定 | 旧 `RunStore`、`RunRegistry` 标记 `@deprecated` |
-| Phase C 完成 | `runtime/runtime_loop.py` 标记 `@deprecated` | `loop_cognitive` 成为唯一入口 | `CognitiveRuntime` 移入 `lca/plugins/loop_cognitive/` 内部 |
-| Phase D 完成 | `gateway/runs/dsh_execute.py` 删除 | `loop_dsh_bridge` 成为唯一入口 | Gateway 不再有 DSH 分支 |
-| Phase E 完成 | `cognition` 保留（Brain/Body/Memory 算法） | `lca/plugins/` 承载所有运行时扩展 | `capability_boot.py` 删除 |
-| **收敛期**（Phase E 后 1-2 月） | 逐步将 re-export 转为物理移动 | 物理目录成为主要结构 | import lint 规则更新 |
-| **终态** | `layer0`~`layer4` 只保留算法代码（Brain/Body/Memory/Team/roles） | `lca/harness/` + `lca/plugins/` 承载所有运行时 | `layer` 目录不再包含运行时/装配逻辑 |
-
-**强制约束**：每个 Phase 完成时，必须更新此表，记录哪些旧路径被标记 `@deprecated`、哪些被删除。
-
-### 6.8 SessionStore.append() 并发安全
-
-**决策**：`SessionStore.append()` 使用 `_seq_lock: asyncio.Lock` 保证 seq 分配的原子性。
-
-**理由**：
-- 两个 command 可能同时到达（如 user message + tool approval answer）
-- seq 必须单调递增且无间隙，需要原子 read-then-increment
-- Python asyncio 是单线程协作式，但在 `await` 点可能被切换
-- 不使用数据库级 CAS 或乐观锁——单进程内 asyncio.Lock 足够
-
-```python
-class SessionStore:
-    def __init__(self, ...):
-        self._seq = -1
-        self._seq_lock = asyncio.Lock()
-    
-    async def append(self, event_data, **kwargs) -> SessionEvent:
-        async with self._seq_lock:
-            self._seq += 1
-            seq = self._seq
-        # seq 已分配，后续操作可并发
-        event = SessionEvent(seq=seq, ...)
-        await self._persistence.write(event)
-        await self._notify_projectors(event)  # projector 可以并发 fold
-        return event
-```
-
-**ProjectionRegistry 并发**：
-- 多个 projector 可以并发 fold 同一个 event（只读）
-- 但 projector 的 checkpoint 写入必须串行（通过 `_checkpoint_lock`）
-- 如果某个 projector 落后超过 N 个 event，触发 backpressure warning
-
-### 6.9 Plugin 热替换安全域定义
-
-**决策**：`reload` 字段的三种模式有明确定义：
-
-| reload 模式 | 含义 | 安全条件 |
-|---|---|---|
-| `never` | 替换需要重启进程 | 无安全条件 |
-| `restart_scope` | 替换需要 drain 并重建当前 scope | scope 内无 live agent |
-| `hot_safe` | 替换不影响正在运行的 agent/session | 见下 |
-
-**`hot_safe` 的严格定义**：一个 plugin 是 hot-safe 的，当且仅当：
-1. 它不持有 per-session 可变状态（所有状态在 SessionStore/journal 中）
-2. 它的 config 变更不影响已创建的 agent 的行为（只影响新创建的）
-3. 它的 service 接口向后兼容（新版本实现旧 Protocol）
-4. 它不在 middleware 调用链的关键路径上（或者 middleware 注册/注销是 atomic 的）
-
-**违反任何条件 → 该 plugin 不能标记 `hot_safe`**。
-
----
-
 ## 7. 最终验收标准
 
 | 问题 | 达标标准 |
@@ -2691,7 +2192,7 @@ class SessionStore:
 | 前端状态是否由 raw token/event 猜测？ | 不会；由 server-side projection 提供 |
 | 模型上下文是否能完全重建？ | 能；每一段都有 durable event/source reference |
 | 现有认知闭环和 Team 优势是否仍在？ | 在；它们分别是 default loop 和 team provider |
-| DSH 是否仍需 Gateway 特例？ | 不需；它是 loop/subagent provider |
+
 | Skill 是否能被模型发现 + 用户显式调用 + 重放？ | 能；catalog/activation/result 都是 Session facts |
 | 子代理是否可恢复、可取消、可追溯？ | 能；durable child session + SubagentActivationCoordinator |
 | Plugin 是否可安全卸载/回滚？ | 能；scope-bound effects + drain |
@@ -2729,7 +2230,7 @@ N projections × M events/turn = O(N×M) fold per turn
 
 高风险场景：
 - 100+ events/turn（大量工具调用）→ fold 可能 > 500ms
-- 解决方案：checkpoint + tail replay（DSH 模式）
+- 解决方案:checkpoint + tail replay
   - 每 100 events 写一次 projection checkpoint
   - fold 时从最近 checkpoint 开始，只 replay tail
   - checkpoint 写入与 fold 异步（不影响 append 延迟）
@@ -2824,174 +2325,6 @@ async def test_concurrent_append_seq_monotonic():
     ...
 ```
 
-## 9. 未纳入当前 Phase 的 DSH 子系统清单（暂不实施，备忘）
-
-> 本节逐个记录 `~/deepseek-harness/packages/` 和 `~/deepseek-harness/docs/subsystems/` 中存在、但本 spec 当前版本未详细设计的子系统。
-> 目的：做到 Phase D/E 时不再需要重新对照 DSH 源码。每一项标注了对 LCA 的相关性等级和一句话处理建议。
-> **不阻塞 Phase A–C 的执行。**
-
-### 9.1 LLM 全栈（5 包）
-
-DSH 包：`llm/llm`、`llm/llm-deepseek`、`llm/llm-pi-ai`、`llm/llm-retry`、`llm/token-meter`
-
-| 子能力 | DSH 实现 | Spec 当前状态 | LCA 处理建议 |
-|---|---|---|---|
-| **LLM 核心协议** | `llm/llm`：Message/StreamChunk/ContentBlock/ToolSchema/GenerateOptions/PreparedLlmCall，assembler（流式块拼装），retry-policy，adapter-failure 分类，call-config 冻结语义，attribution（provider/model 溯源） | §2.2.1 `lca.llm.service` 基本覆盖 | 现有 `LlmService` 已有此模式，Phase A 接入即可 |
-| **多 Provider Adapter** | `llm-deepseek`（SSE 流式 + translate）、`llm-pi-ai`（catalog + discovery + context + replay + stream）：每个 provider 是独立 Cordis plugin，通过 `prepareCall()` 协议可 override config（adapterDefaults） | spec 只写了 `ProviderMode.REGISTRY` | Phase E 需要：每个 LLM provider 拆为独立 plugin module，实现 `prepareCall()` → `PreparedLlmCall` 协议 |
-| **Retry 策略** | `llm-retry`：transport recovery + exponential backoff + history tracking，独立于 agent-loop 的 plugin | 未提及 | **建议纳入 Phase E**：作为 `agent.request_error` middleware 实现，与 `llm-retry` 等价 |
-| **Token Meter** | `llm/token-meter`：session projection，surface-fold（按 surface 节点统计 token）、usage-projection（per-model/per-provider 用量）、breakdown-projection（per-section 上下文 token 分布） | 未提及 | **建议纳入 Phase E**：作为 3 个 ProjectionDefinition 实现，驱动 `bundles/observability.yaml` |
-
-### 9.2 Compaction 子系统（4 包）
-
-DSH 包：`compaction/compaction`（Definition）、`compaction/compaction-basic`（Provider）、`compaction/compaction-tool-result-pruner`（裁剪策略）、`compaction/command-compact`（Consumer）
-
-| 子能力 | DSH 实现 | Spec 当前状态 | LCA 处理建议 |
-|---|---|---|---|
-| **Capability Seam 三件套** | Definition（`ctx.compaction`）+ Provider（`compaction-basic`，tokenizer/template 可替换后端）+ Consumer（`command-compact`，人类命令触发） | §3.6.2 提到 SurfaceOp replace 用于 compaction；§4 Phase E 提了一句 | 需要拆为 3 个 plugin module：`seam_compaction`（DEFINITION）、`compaction_basic`（PROVIDER）、`command_compact`（CONSUMER） |
-| **Compaction 事件词表** | `compaction/start`（获取锁）→ `compaction/summary`（安全摘要投影 + LLM 调用 envelope + shadowed range/seqs/token count）→ `compaction/end`（释放锁）；全部 log-only，不扩展 SurfaceEventType | 未定义 | 需要对应的 3 个 `@session_event` 装饰器 |
-| **Tool Result Pruner** | 独立 plugin，在 compaction 前裁剪过大的 tool/result 事件，减少摘要输入 | 未提及 | **建议作为 compaction_basic 的内部策略**，不作为独立 seam |
-| **Crash-orphaned Lock 恢复** | unmatched `compaction/start`（无对应 end）在 resume 时检测并清理 | 未提及 | SessionStore resume 时需要处理 |
-
-### 9.3 Context 动态注入子系统（4 包）
-
-DSH 包：`context/agent-instructions`、`context/session-reference`、`context/time-context`、`context/tmux-context`
-
-| 子能力 | DSH 实现 | Spec 当前状态 | LCA 处理建议 |
-|---|---|---|---|
-| **Prompt Section 注册机制** | 每个 context plugin 通过 `ctx.systemPrompt.section()` 向 prompt 注册命名 section，带 order 优先级 | §3.5 提到 prompt assembly service，但没设计 section 注册协议 | **高优先级**：需要在 `systemPrompt` service 上增加 `register_section(key, renderer, order)` 接口 |
-| **AGENTS.md 注入** | `agent-instructions`：读取 cwd 及父目录的 AGENTS.md 文件，作为 prompt section 注入；digest 追踪变更 | 未提及 | **建议 Phase E**：LCA 的 roles/ 目录已有类似概念，可映射为 section provider |
-| **跨 Session 引用** | `session-reference`：URI scheme（`session://<id>/...`）引用其他 session 的内容，projection 追踪 | 未提及 | **中优先级**：多 agent 协作场景需要，Phase D subagent 完成后考虑 |
-| **时间上下文** | `time-context`：时区感知的日期/时间注入，request-zone 计算 | 未提及 | **低优先级**：structlog 已有时间戳，可按需添加 |
-| **终端状态注入** | `tmux-context`：捕获 tmux pane 内容注入 prompt | 未提及 | **不做**：LCA 不是 coding agent |
-
-### 9.4 Goal 目标追踪子系统（3 包）
-
-DSH 包：`goal/goal`、`goal/tool-goal`、`goal/command-goal`
-
-| 子能力 | DSH 实现 | Spec 当前状态 | LCA 处理建议 |
-|---|---|---|---|
-| **事件溯源目标** | `GoalRef { id, revision }`（CAS revision），`GoalSnapshot { objective, phase, blockReason? }`，`GoalPhase = active \| paused \| blocked \| complete` | 未提及 | **建议 Phase E**：LCA 的 Task/Project 管理可借鉴此模式；作为 session projection 实现 |
-| **Goal 工具** | `set_goal` / `update_goal` / `complete_goal` 等工具，模型可主动管理目标 | 未提及 | 需要对应的 tool plugin |
-| **Goal Projection** | `foldGoal(events)` → 最新 GoalSnapshot，纯函数 fold | 未提及 | ProjectionDefinition 实现 |
-
-### 9.5 Plan Mode 规划模式子系统（2 包）
-
-DSH 包：`plan/plan-mode`、`plan/tool-exit-plan-mode`
-
-| 子能力 | DSH 实现 | Spec 当前状态 | LCA 处理建议 |
-|---|---|---|---|
-| **软引导模式** | `plan/mode` log-only 事件（whole-value replace），`foldPlanMode(events)` 恢复状态；active 时注入 `plan:policy` prompt section | 未提及 | **中优先级**：LCA 可以有等价的「规划模式」，作为 policy plugin 实现 |
-| **Exit 工具** | `exit_plan_mode` tool：要求模型输出完整 markdown plan，通过 user-questions seam 让用户审批 | 未提及 | 需要 interaction seam（§9.7）先就位 |
-| **/plan 命令** | `/plan [off\|message]`：裸 `/plan` 进入模式，`/plan off` 退出，`/plan <msg>` 进入并 steer | 未提及 | LCA 的命令系统需要等价能力 |
-
-### 9.6 Schedule 会话内调度子系统（2 包）
-
-DSH 包：`schedule/schedule`、`schedule/tool-schedule`
-
-| 子能力 | DSH 实现 | Spec 当前状态 | LCA 处理建议 |
-|---|---|---|---|
-| **持久提醒** | 三种变体：`AfterScheduleRecord`（延迟）、`AtScheduleRecord`（绝对时间）、`EveryScheduleRecord`（固定间隔，≥5min）；全部 session-local，durable | 未提及 | **中优先级**：LCA 的 cron/定时场景可用，作为独立 schedule plugin |
-| **会话内投递** | 到时间后作为新 turn 的 user/message 投递到原 session | 未提及 | Inbox.followup() 已支持 |
-
-### 9.7 Interaction 用户交互子系统
-
-DSH 包：`interaction/`（user-questions seam + approval seam）
-
-| 子能力 | DSH 实现 | Spec 当前状态 | LCA 处理建议 |
-|---|---|---|---|
-| **User Questions** | 统一的「向用户提问」seam：模型通过 tool 发起问题，通过 interaction channel 呈现给用户，用户回答后 tool 返回 | §2.2.7 AnswerCommand/SteerCommand 覆盖了 HIL，但没设计「模型主动提问」的 seam | **高优先级**：Plan Mode、HIL approval 都依赖此 seam |
-| **Approval** | `tools.pre_execute` waterfall 中的 allow/deny/ask 决策，与 user-questions 联动 | §2.2.5 `tools.pre_execute` waterfall 覆盖了 | 已有，但需要与 user-questions seam 联动 |
-
-### 9.8 Attachment 大内容管理
-
-DSH 包：`attachment/`
-
-| 子能力 | DSH 实现 | Spec 当前状态 | LCA 处理建议 |
-|---|---|---|---|
-| **ContentRef 抽象** | 大内容不内联在事件中，通过 `ContentRef` 引用外部存储 | §2.2.3 事件词表中有 `content_ref: str` 字段 | **高优先级**：需要设计 Attachment Store 后端（文件系统 / SQLite / S3） |
-| **分块 + 去重 + 引用计数** | 内容按块存储，相同内容去重，引用计数管理生命周期 | 未提及 | Attachment Store 实现细节，Phase B 设计接口，Phase E 实现 |
-| **Surface 引用** | `sourceEventSeqs` 追踪哪些 chunk 构建了哪个 message | §3.6.2 Surface 设计覆盖了 append 和 replace | 需要补充 sourceEventSeqs 到 SessionEvent |
-
-### 9.9 Session 周边子系统（6 包）
-
-| 包 | 作用 | Spec 状态 | LCA 处理建议 |
-|---|---|---|---|
-| `session-checkpoint-policy` | Crash recovery：per-request durability checkpoint，决定何时 fsync | 未提及 | **建议 Phase B**：在 SessionStore 的 persistence 层实现 checkpoint 策略 |
-| `session-projection-cache` | Projection 持久化缓存：避免冷启动全量 replay | §8.1 提到 checkpoint + tail replay 但未设计 | **建议 Phase B**：ProjectionRegistry 需要 checkpoint 持久化 |
-| `session-telemetry` | Redaction + telemetry coordinator | 现有 RunStore 已有 redaction | 保持现有机制，适配新 SessionEvent 格式 |
-| `session-telemetry-otel` | OpenTelemetry 投影 | 现有 projectors 已支持 OTel | 保持现有机制 |
-| `session-stats` | 统计 projection（event count, turn count, tool call count 等） | 未提及 | **低优先级**：作为 ProjectionDefinition 实现 |
-| `session-title` | LLM 驱动的会话标题生成（3 种策略：first-prompt / all-prompts） | 未提及 | **低优先级**：UI 增强，作为 session projection + LLM consumer 实现 |
-| `session-query` | 结构化 session 日志查询（不是原始遍历，是带索引的查询接口） | `SessionStore.read_from()` 只是顺序读取 | **中优先级**：当 session 日志量大时需要，Phase E 考虑 |
-
-### 9.10 Workflow 工作流子系统（4 包）
-
-DSH 包：`workflow/workflow`（Definition）、`workflow/workflow-worker-thread`（Provider）、`workflow/tool-workflow`（Consumer）、`workflow/tool-ralph`
-
-| 子能力 | DSH 实现 | Spec 当前状态 | LCA 处理建议 |
-|---|---|---|---|
-| **Workflow SPI** | `WorkflowStartRequest { script, meta, args, parent, signal }`：模型写脚本 → engine 执行；`WorkflowMeta { name, description, phases }` | §4 Phase E 提了 `workflow_dag` 名字，无 SPI | 需要完整 SPI 定义 |
-| **Worker Thread 隔离** | Node `worker_threads`：每个 run 一个 worker，脚本的 vm context 在 worker 内 | 未提及 | Python 等价：`asyncio.Task` 隔离 或 `multiprocessing.Process` 隔离 |
-| **Agent() / Phase() 脚本 API** | 脚本内 `agent()` 启动子代理，`phase()` 声明进度 | 未提及 | 需要 Python 版脚本 API |
-| **Ralph Tool** | Agent 在 workflow 内协作的专用工具 | 未提及 | **暂不做** |
-
-### 9.11 其他低相关性子系统
-
-| DSH 子系统 | 包 | 作用 | LCA 处理建议 |
-|---|---|---|---|
-| **Feedback** | `feedback/` | 结构化用户反馈（thumbs up/down） | **暂不做**：LCA 的 InsightEngine 已有等价能力 |
-| **Spill** | `spill/` | 长输出渐进式释放 | **不做** |
-| **LSP** | `lsp/` | Language Server Protocol 集成 | **不做**：coding agent 专用 |
-| **Code Runtime** | `code-runtime/` | 代码执行沙箱类型系统 | **暂不做**：LCA 的 sandbox 用不同方案 |
-| **Terminal** | `terminal/` | PTY 终端管理 | **不做**：coding agent 专用 |
-| **Subprocess** | `subprocess/` | 子进程生命周期管理 | **暂不做**：LCA 用 asyncio subprocess |
-| **Credentials** | `credentials/` | API key 安全存储和注入 | **已有**：LCA 的 pydantic-settings + 环境变量 |
-| **Identity** | `identity/` | 用户身份识别 | **已有**：LCA 的 user/auth 系统 |
-| **Typert** | `typert/` | DI 类型安全协议注册 | **已有**：Python Protocol + 注册表替代 |
-| **Settings** | `settings/` | Plugin-scoped 配置覆盖 | **已有**：`PluginManifest.config_model` + pydantic |
-| **Storage** | `storage/` | 域对象持久化抽象 | **中优先级**：当 LCA 需要域对象存储时考虑 |
-| **Extensions** | `extensions/` | Tool/Command/Prompt section 高层注册 API | **Phase A**：通过 PluginManifest + middleware 覆盖 |
-| **Runtime Diagnostics** | `runtime-diagnostics/invariants/` | 运行期不变量检查 | **建议 Phase B**：在 SessionStore/AgentRegistry 内置 invariant 检查 |
-
-### 9.12 结构性模式差距汇总
-
-以下不是缺某个包，而是 DSH 有但 Spec 没有的**结构性模式**：
-
-| 模式 | DSH 做法 | Spec 差距 | 建议时机 |
-|---|---|---|---|
-| **Capability Seam 三件套拆分** | 每个非 spine 能力都拆为 Definition + Provider + Consumer 独立包 | §3.7 把 Seam 融入了 PluginManifest，但没有为每个扩展能力拆出独立 plugin module | Phase E：为 compaction、workflow、goal 等拆分 |
-| **prepareCall 协议** | LLM adapter 可通过 `prepareCall()` override config（adapterDefaults），agent-loop 据此调整 reasoning effort / max tokens | 未设计 | Phase E：LLM provider 拆分时一并实现 |
-| **Session Projection 生态** | 6+ 个独立 projection（conversation / activity / status / token-usage / breakdown / title / stats） | §2.2.6 定义了 ProjectionDefinition SPI，但没有列出 LCA 需要的具体 projection 清单 | Phase B 末尾：列出第一批 projection |
-| **Dynamic Context Provider 注册** | context plugin 通过 `ctx.systemPrompt.section()` 注册命名 section | 未设计 section 注册协议 | Phase E：system-prompt 插件化时实现 |
-| **ContentRef + Attachment Store** | 大内容走外部存储，事件只存引用 | 事件词表有 `content_ref` 字段但无存储后端设计 | Phase B：定义 AttachmentStore Protocol |
-
-### 9.13 相关性速查矩阵
-
-```
-相关性     子系统                               建议 Phase
-─────────────────────────────────────────────────────────
-🔴 高     Prompt Section 注册协议               E
-🔴 高     Attachment Store（ContentRef 后端）    B
-🔴 高     User Questions seam                   E
-🟡 中     Compaction（上下文压缩）               E
-🟡 中     Workflow engine                       E
-🟡 中     LLM retry middleware                  E
-🟡 中     Token meter projections               E
-🟡 中     Goal tracking                         E
-🟡 中     Plan mode                             E
-🟡 中     Schedule（会话内调度）                 E
-🟡 中     Session checkpoint policy             B
-🟡 中     Session projection cache              B
-🟡 中     Session query                         E
-🟡 中     Runtime diagnostics invariants        B
-🟢 低     Session title                         —
-🟢 低     Session stats                         —
-🟢 低     Time context                          —
-⚫ 不做   LSP / Terminal / Spill / Code Runtime  —
-```
-
----
-
 ## 附录：关键代码对照
 
 ### A. 旧 vs 新：创建 Agent
@@ -3026,21 +2359,7 @@ receipt = await command_gateway.handle_answer(
 # 进程重启后也能恢复——AgentRegistry.resume() 从 durable session 恢复
 ```
 
-### C. 旧 vs 新：DSH 执行
-
-```python
-# 旧
-if is_dsh_driver(session.execution_target):
-    await execute_dsh_session(session)
-else:
-    runnable = build_solo_agent(...)
-
-# 新 — profile 决定
-# profiles/dsh-standard.yaml
-# patch:
-#   - id: agent-loop
-#     config: { provider: lca.loop.dsh_bridge }
-# Gateway 无分支
+# Gateway 无分支,driver 选择由 `agent_loop.select(execution_target)` 完成(参见 [ADR-0120](0120-retire-dsh-driver.md))
 ```
 
 ### D. 完整 Plugin 示例：Seam Definition + Provider + Consumer

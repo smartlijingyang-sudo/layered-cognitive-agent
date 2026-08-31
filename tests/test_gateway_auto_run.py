@@ -5,10 +5,10 @@ from __future__ import annotations
 import json
 import unittest
 
-from lca.plugins.transport.webserver.handlers.runs.execute import create_run_session, execute_run
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunStatus
 from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.protocols import LLMAdapter
+from lca.plugins.transport.webserver.handlers.runs.execute import create_run_session, execute_run
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunStatus
 from lca_kernel import run_kernel_lifespan as profile_lifespan
 from tests.harness.scripted_llm import ScriptedLLMAdapter
 
@@ -30,9 +30,9 @@ class _ScriptedResolver:
 def _journal_event_types(session: object) -> set[str]:
     from typing import cast
 
-    from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
     from lca.infrastructure.observability.journal.engine.engine import RunStore
     from lca.infrastructure.observability.journal.engine.journal_io import read_journal
+    from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
 
     assert isinstance(session, RunSession)
     if session.hub is not None and session.hub.journal is not None:

@@ -35,14 +35,14 @@
 | 名字使用过时 jargon（`seam_definitions`, `control_contributions`） | 跨上下文含义漂移 | 名字使用九群关键词 + 角色后缀 |
 | 同概念在多层各取一个近义词（`event` vs `journal_event` vs `trace_span`） | 读者需要查 ADR 才知道是否同一个东西 | 同概念在所有层使用同一组名词 |
 | 类名 / 文件名 / 目录名各说各话 | 看到 `BrainStrategy` 却找不到对应文件 | 文件名 = 类名 snake_case；目录名 = 群 + 角色 |
-| 缩写 / 单字 / 行业 jargon（`dsh`, `plane`, `face`, `text`） | 外部读者零信息 | 只保留白名单缩写，其他必须展开 |
+| 缩写 / 单字 / 行业 jargon（`plane`, `face`, `text`） | 外部读者零信息 | 只保留白名单缩写，其他必须展开 |
 
 ### 1.1 命名失败的 5 种典型模式
 
 | 模式 | 例子 | 修复 |
 |---|---|---|
 | 概念词不明 | `utils.py`, `common.py` | 拆解到具体的 v3 群 + 角色 |
-| 缩写无字典 | `dsh.py`, `lca_computer.py` | 展开为 `comparison/dsh_driver.py` |
+| 缩写无字典 | `lca_computer.py` | 展开为具名（按 v3 群 + 角色） |
 | 名实分离 | `state/` 目录里只有 `stop_policy.py` | 改名为 `phase_policies/stop_policy.py` |
 | 群归属不明 | `composer/`、`registries/`、`factories/` 三个目录都在 plugin 下 | 强制按 v3 群命名，jargon 目录只能放"角色词" |
 | 角色后缀混杂 | `JournalReducer` vs `journal_reducer_factory.py` | 文件名 = snake_case 化的类名 |
@@ -434,7 +434,7 @@ Subject 必须是该群内的领域对象，避免泛词。**禁止 subject**：
 
 | 现路径 | 现名 | 建议路径 | 理由 |
 |---|---|---|---|
-| `lca/infrastructure/dsh/` | 缩写 jargon | `lca/infrastructure/comparison/dsh_driver/` | 缩写 → `comparison/` 命名空间；`dsh` 仅作 vendor 前缀 |
+| `lca/infrastructure/plane/` | 名实冲突 | `lca/infrastructure/runtime_plane/` | 避免与"双平面"含义冲突；明确"执行环境类型" |
 | `lca/infrastructure/plane/` | 名实冲突 | `lca/infrastructure/runtime_plane/` | 避免与"双平面"含义冲突；明确"执行环境类型" |
 | `lca/infrastructure/text/` | 名实不符 | 删除或迁到 `lca/infrastructure/observability/narrative/text_utils.py` | 目录名与内容不符 |
 | `lca/infrastructure/ops/` | 含义重叠 | `lca/infrastructure/cli/` | 与 `gateway/`、`scripts/` 的 ops 概念分离 |
@@ -460,7 +460,7 @@ Subject 必须是该群内的领域对象，避免泛词。**禁止 subject**：
 | `lca/packages/runtime_diagnostics/invariants/src/` | 完全空 | 删除 | 死代码 |
 | `lca/infrastructure/observability/exporters/` | 0 文件 + 已声明迁移 | 删除 | ADR-0055 迁移完成 |
 | `lca/infrastructure/observability/narrative/` | 4 文件 + 大部分已迁 | 评估保留理由或合并到 `journal/stream/narrative_sidecar.py` | 文档已说"仅存 span 诊断" |
-| `gateway/runs/` | 57 平铺 | `gateway/runs/{api,lifecycle,session,ingest,execute,terminal,doctor,wire,observability,dsh}/` | 按职责切 |
+| `gateway/runs/` | 57 平铺 | `gateway/runs/{api,lifecycle,session,ingest,execute,terminal,doctor,wire,observability}/` | 按职责切 |
 
 ### 10.2 文件 / 类重命名（精选）
 
@@ -571,7 +571,6 @@ Subject 必须是该群内的领域对象，避免泛词。**禁止 subject**：
 
 ### Phase C（2 周）—— 命名规范化收敛
 
-- `dsh/` → `comparison/dsh_driver/`
 - `plane/` → `runtime_plane/`
 - `creator/faces/` → `composer/personas/`
 - 5 个 `phase_*` + `graph_nodes/` → `phase_graph/`

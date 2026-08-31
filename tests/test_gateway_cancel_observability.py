@@ -9,10 +9,10 @@ from unittest.mock import patch
 
 import pytest
 
-from lca.plugins.transport.webserver.handlers.runs.execute import create_run_session, schedule_run
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunStatus
 from lca.agent.cognitive_agent import CognitiveAgent
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
+from lca.plugins.transport.webserver.handlers.runs.execute import create_run_session, schedule_run
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunStatus
 from tests.support.gateway_scripted import ScriptedLLMResolver
 
 

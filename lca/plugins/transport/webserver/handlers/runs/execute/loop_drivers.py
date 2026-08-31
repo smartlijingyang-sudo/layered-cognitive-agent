@@ -49,7 +49,6 @@ from lca.plugins.run_loop_driver_registry import (
 from lca.plugins.run_loop_driver_registry import (
     _UnknownExecutionTargetError as _UnknownExecutionTargetError,
 )
-from lca.plugins.transport.webserver.handlers.runs.dsh.execute import execute_dsh_session
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
 
 if TYPE_CHECKING:
@@ -170,33 +169,6 @@ class CognitiveRunDriver:
             result=result,
             error=result.error or "",
         )
-
-
-class DshRunDriver:
-    """DSH sub-process driver (production path).
-
-    Plane hint must arrive as ``plane: 'machine'`` from the wire; the driver
-    never overrides the request.
-    """
-
-    async def execute(
-        self,
-        session: RunSession,
-        *,
-        question: str,
-        mode: str,
-        hub: BoundObservability,
-        bindings: Any,
-        run_context: RunContext,
-        ctx: Context,
-        machine_resolver: Any | None = None,
-    ) -> DriverOutcome:
-        # Soft-locked per ADR-0103 §2. Main's RunLifecycleCoordinator
-        # forwards machine_resolver to the driver. Accept it and ignore
-        # for the DSH-bridge branch (branch's driver uses bindings).
-        del question, mode, hub, bindings, run_context, ctx, machine_resolver
-        await execute_dsh_session(session)
-        return DriverOutcome(success=not session.error, error=session.error)
 
 
 # ── Helpers (private; nothing else in the gateway constructs an Agent/Team) ──

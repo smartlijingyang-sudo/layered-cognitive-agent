@@ -105,7 +105,6 @@
 
 | 现名 | 问题 | 建议 |
 |---|---|---|
-| `lca/infrastructure/dsh/` | 3 字母缩写，外部不可读 | `lca/infrastructure/comparison/dsh_driver/`（拆出 `comparison/` 命名空间，让 dsh 只是一种 driver） |
 | `lca/infrastructure/plane/` | "plane" 在认知框架中是双平面概念，此处含义冲突 | `lca/infrastructure/runtime_plane/`（执行环境类型：machine/sandbox/office） |
 | `lca/infrastructure/text/` | 与本目录真实内容（两个字符串截断工具）不符 | 把 `safe_boundary.py` + `truncate.py` 合并到 `lca/infrastructure/text_util.py` 单文件，或归并到 `lca/infrastructure/observability/narrative/` |
 | `lca/infrastructure/ops/` | "ops" 与 `gateway/`、`scripts/` 含义重叠 | 改 `lca/infrastructure/cli/`（明确它是 CLI 命令框架） |
@@ -120,7 +119,7 @@
 | `lca/infrastructure/observability/coding_agent_tools/` | 9 个独立工具混在一个目录 | 改 `lca/plugins/tools/diagnostics/`（既然是工具而不是基础设施） |
 | `lca/contracts/protocols/` | 53 文件平铺 + 314 行 barrel | 把 8 个 `declarative_*.py` 收到 `declarative/` 子包；`__init__.py` 改成显式 `__all__` |
 | `lca/contracts/harness/` | 37 文件平铺 | 按 v3 九群分子目录（`harness/{state,act,collaboration,journal,composition}.py`） |
-| `gateway/runs/` | 57 文件平铺 | 拆为 `runs/{api,lifecycle,session,ingest,execute,terminal,doctor,wire,observability,dsh}/` 9 个子包 |
+| `gateway/runs/` | 57 文件平铺 | 拆为 `runs/{api,lifecycle,session,ingest,execute,terminal,doctor,wire,observability}/` 9 个子包 |
 | `lca/infrastructure/observability/journal/` | 23 文件平铺 | 拆为 `journal/{engine,otel,console,jsonl,sse,stream,enrichment,backends}/` 8 个子包 |
 
 ### 5.2 命名原则（与 `naming-conventions.md` 并行）
@@ -129,7 +128,7 @@
 
 1. **优先名词或动名词**：`gateway/runs/` 比 `gateway/runner/` 清晰；`journal/otel/` 比 `journal/otel_mapping/` 清晰（后者是文件名）。
 2. **避免双重否定和被动语态**：`no_double_encoding.py` → `single_encoding.py`；`unregistered_journal_event_error.py` → `journal_event_must_be_registered.py`（先描述期望态，再加 `Error` 后缀）。
-3. **缩写只在领域通用时使用**：`LLM`、`JSONL`、`OTel`、`SSE`、`A2A`、`MCP` 保留；其他缩写必须展开。`dsh`、`lca_computer`、`lca_sandbox`、`plane`、`text` 全部展开。
+3. **缩写只在领域通用时使用**：`LLM`、`JSONL`、`OTel`、`SSE`、`A2A`、`MCP` 保留；其他缩写必须展开。`lca_computer`、`lca_sandbox`、`plane`、`text` 全部展开。
 4. **同名不歧义**：`sandbox/` 与 `lca_sandbox/` 共存是历史债；新代码禁止 "lca_" 前缀。
 5. **导出符号与目录一一对应**：目录下导出 `JournalReducer` 时，目录至少要叫 `journal/` 或包含 `journal` 关键字。
 
@@ -257,7 +256,7 @@ first_level_submodule_max: 10  # 任一包下一级子模块数
 
 | 路径 | 直接 .py | 拆分目标 |
 |---|---|---|
-| `gateway/runs/` | **57** | `runs/{api,lifecycle,session,ingest,execute,terminal,doctor,wire,observability,dsh}/` 10 个子包 |
+| `gateway/runs/` | **57** | `runs/{api,lifecycle,session,ingest,execute,terminal,doctor,wire,observability}/` 9 个子包 |
 | `lca/plugins/providers/` | **55** | `providers/{llm,journal,observability,session,phase,runtime,tools,evidence,fact_readers,fact_scorers,event_identity,profile_snapshot,run_ui_encoder,openai_stream_encoder}/`（按协议名分组） |
 | `lca/contracts/protocols/` | **53** | `protocols/{declarative,phase_graph,execution,session,observability,journal,memory,team,tool,infra}/` 10 个子包；8 个 `declarative_*.py` 收到 `declarative/` |
 | `tests/` | **~165 直接** | `tests/{unit,contract,architecture,integration,scenario,fixtures,smoke}/` 7 个桶；直接 `test_*.py` 不超过 30 |
@@ -284,7 +283,6 @@ first_level_submodule_max: 10  # 任一包下一级子模块数
 
 | 现路径 | 现名 | 建议 |
 |---|---|---|
-| `lca/infrastructure/dsh/` | 缩写 | `lca/infrastructure/comparison/dsh_driver/` |
 | `lca/infrastructure/plane/` | 名实冲突 | `lca/infrastructure/runtime_plane/` |
 | `lca/infrastructure/text/` | 无 `__init__.py` + 名实不符 | 删目录或合并到 `observability/narrative/` |
 | `lca/infrastructure/observability/cost/` | 无 `__init__.py` | 修复或迁到 `journal/cost/` |
@@ -451,9 +449,6 @@ gateway/runs/
 │   ├── legacy.py
 │   ├── models.py
 │   └── session.py
-├── dsh/                        # DSH driver
-│   ├── __init__.py
-│   └── execute.py              # dsh_execute.py
 ├── observability/              # 观测绑定
 │   ├── __init__.py
 │   ├── binding.py
@@ -554,8 +549,7 @@ lca/contracts/protocols/
 1. 删除 5 个空目录树：`lca/packages/identity/anonymous_user_id/`、`lca/packages/runtime_diagnostics/invariants/src/`、`lca/runtime/completion/`、`lca/runtime/outcome_policies/`、`lca/harness/sdk/`。
 2. 删除 3 个 README-only 包：`lca/plugins/team_lead/`、`lca/plugins/creator/`（迁出仅有的 2 文件）、`lca/infrastructure/observability/exporters/`。
 3. 修复 3 个损坏包：`lca/infrastructure/text/`、`lca/infrastructure/observability/cost/`、`lca/plugins/memory/`（补 `__init__.py` 或迁出）。
-4. 改名 `lca/infrastructure/dsh/` → `lca/infrastructure/comparison/dsh_driver/`（同时更新所有 import；先做灰度 rename plan）。
-5. `lca/contracts/protocols/__init__.py` 改显式 `__all__`。
+4. `lca/contracts/protocols/__init__.py` 改显式 `__all__`。
 
 **预期**：认知负担热点消失 60%；越线目录减少 5 个。
 

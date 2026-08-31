@@ -10,8 +10,6 @@ import pytest
 from starlette.applications import Starlette
 from starlette.testclient import TestClient
 
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunSession
-from lca.plugins.transport.webserver.handlers.runs.terminal.legacy_adapter import RegistryRunAdapter
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     ReasoningDelta,
@@ -23,6 +21,8 @@ from lca.contracts.models.observability.journal import (
     ToolStarted,
 )
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunSession
+from lca.plugins.transport.webserver.handlers.runs.terminal.legacy_adapter import RegistryRunAdapter
 
 _SEQ = [0]
 

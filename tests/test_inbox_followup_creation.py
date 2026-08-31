@@ -45,11 +45,15 @@ def _run_driver(driver, session, hub, *, question, mode):
 class TestInboxFollowupCreation:
     def test_run_creation_emits_inbox_followup(self, tmp_path: Path) -> None:
         """``CognitiveRunDriver.execute`` MUST emit InboxFollowupCreated."""
-        from lca.plugins.transport.webserver.handlers.runs.execute.loop_drivers import CognitiveRunDriver
-        from lca.plugins.transport.webserver.handlers.runs.lifecycle.runnable_assembly import CognitiveRunnableAssembler
-        from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
         from lca.contracts.models.observability.journal import InboxFollowupCreated, RunScope
         from lca.infrastructure.observability import bind_backends, run_scope
+        from lca.plugins.transport.webserver.handlers.runs.execute.loop_drivers import (
+            CognitiveRunDriver,
+        )
+        from lca.plugins.transport.webserver.handlers.runs.lifecycle.runnable_assembly import (
+            CognitiveRunnableAssembler,
+        )
+        from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
         from tests.support.observability_helpers import make_test_bound
 
         hub = make_test_bound()
@@ -87,11 +91,15 @@ class TestInboxFollowupCreation:
 
     def test_inbox_followup_carries_question(self, tmp_path: Path) -> None:
         """The first ``InboxFollowupCreated`` MUST carry the question."""
-        from lca.plugins.transport.webserver.handlers.runs.execute.loop_drivers import CognitiveRunDriver
-        from lca.plugins.transport.webserver.handlers.runs.lifecycle.runnable_assembly import CognitiveRunnableAssembler
-        from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
         from lca.contracts.models.observability.journal import InboxFollowupCreated, RunScope
         from lca.infrastructure.observability import bind_backends, run_scope
+        from lca.plugins.transport.webserver.handlers.runs.execute.loop_drivers import (
+            CognitiveRunDriver,
+        )
+        from lca.plugins.transport.webserver.handlers.runs.lifecycle.runnable_assembly import (
+            CognitiveRunnableAssembler,
+        )
+        from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
         from tests.support.observability_helpers import make_test_bound
 
         question = "帮我总结这份文档的关键点"

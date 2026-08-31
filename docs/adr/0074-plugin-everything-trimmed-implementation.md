@@ -153,7 +153,7 @@ ADR-0066 / 0067 / 0068 / 0069 由同一作者（远程 `smartlijingyang-sudo`）
 
 | 项 | 内容 |
 |---|---|
-| 目标 | 在 PR-1 起步前清空历史测试债（journal v2 envelope 错配 / DSH 删除遗留 / plugin context boot 三类） |
+| 目标 | 在 PR-1 起步前清空历史测试债（journal v2 envelope 错配 / 早期 driver 迁移遗留 / plugin context boot 三类） |
 | 范围 | 仅修复，不重构；与本计划无直接耦合的失败另起 ADR |
 | 验证 | `uv run pytest --no-cov` 零失败（已知 flaky test 除外） |
 | 删除 | 无（仅修测试 fixture / env / 注释漂移） |

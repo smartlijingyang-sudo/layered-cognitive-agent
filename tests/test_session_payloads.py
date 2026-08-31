@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+from lca.contracts.harness.act.command import CommandReceipt
+from lca.contracts.harness.state.projection import ProjectionChange, ProjectionSnapshot
 from lca.plugins.transport.webserver.handlers.session_payloads import (
     accepted_receipt_payload,
     command_receipt_payload,
     snapshot_payload,
     sse_change_payload,
 )
-from lca.contracts.harness.act.command import CommandReceipt
-from lca.contracts.harness.state.projection import ProjectionChange, ProjectionSnapshot
 
 
 def test_command_receipt_projection_preserves_client_identity() -> None:

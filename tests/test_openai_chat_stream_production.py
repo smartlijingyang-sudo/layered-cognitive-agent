@@ -14,9 +14,6 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from starlette.testclient import TestClient
 
-from lca_kernel.cli import create_app
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunSession
-from lca.plugins.transport.webserver.handlers.runs.terminal.legacy_adapter import RegistryRunAdapter
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     ReasoningDelta,
@@ -27,6 +24,9 @@ from lca.contracts.models.observability.journal import (
     ToolStarted,
 )
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunSession
+from lca.plugins.transport.webserver.handlers.runs.terminal.legacy_adapter import RegistryRunAdapter
+from lca_kernel.cli import create_app
 from tests.support.webserver_app import create_scripted_app
 
 _SEQ = [0]
@@ -87,7 +87,9 @@ async def test_session_run_adapter_is_not_on_the_chat_path() -> None:
     import importlib
 
     with pytest.raises(ModuleNotFoundError):
-        importlib.import_module("lca.plugins.transport.webserver.handlers.runs.session.session_adapter")
+        importlib.import_module(
+            "lca.plugins.transport.webserver.handlers.runs.session.session_adapter"
+        )
 
 
 @pytest.mark.asyncio

@@ -180,7 +180,7 @@ jsonl replay 是 `path.read_text(...).splitlines()`,大 run 全量驻内存。�
 
 ### 32. `make_journal_emitting_hook` 的 waterfall 与 EventBus 同义
 
-DSH-inspired 的拦截/修改/过滤链——同一概念(EventBus)在两个文件里各自实现,文档说"不再经 EventBus 中转"但模块未删除。
+早期借鉴的拦截/修改/过滤链——同一概念(EventBus)在两个文件里各自实现,文档说"不再经 EventBus 中转"但模块未删除。
 
 ### 33. `diagnose_*` 4 个 if-else 分支
 

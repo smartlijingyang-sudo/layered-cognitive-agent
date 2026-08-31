@@ -9,7 +9,7 @@
 仓库内 Python 包目录普遍存在三类问题：
 
 1. **平铺过载**：`gateway/runs/`（57 文件）、`lca/infrastructure/observability/journal/`（23 文件）、`lca/contracts/protocols/`（53 文件）等单目录直接堆 20+ 个 `.py`。
-2. **命名混乱**：3 字母缩写（`dsh`）、单字（`plane`/`text`/`state`/`face`）、jargon（`seam_definitions`/`seams`）、1 字母差重名（`compose` vs `composer`）。
+2. **命名混乱**：3 字母缩写（除白名单）、单字（`plane`/`text`/`state`/`face`）、jargon（`seam_definitions`/`seams`）、1 字母差重名（`compose` vs `composer`）。
 3. **结构 bug**：空包（`lca/plugins/team_lead/`）、损坏包（`lca/plugins/memory/` 无 `__init__.py`）、空目录树（`lca/packages/identity/anonymous_user_id/`）、自动 barrel（`lca/contracts/protocols/__init__.py` 314 行用 `globals()` 自动 `__all__`）。
 
 这些问题导致：
@@ -101,7 +101,7 @@
 
 详见 `package-organization-discipline.md` §12：
 
-- **Phase A**（1 周）：删除空目录、修复损坏包、改 dsh 命名、修 barrel。
+- **Phase A**（1 周）：删除空目录、修复损坏包、修 barrel。
 - **Phase B**（3 周）：拆分 8 个超大目录（每个一个 PR）。
 - **Phase C**（2 周）：命名规范收敛。
 - **Phase D**（1 周）：CI 门禁落地。

@@ -57,5 +57,4 @@ log:emit
 - `lca/plugins/transport/device_hub/registry.py`
 - `lca/plugins/transport/device_hub/routes.py`
 - `lca/plugins/transport/device_hub/settings.py`
-- `lca/plugins/transport/device_hub/streaming_dsh_runtime.py`
 - `lca/plugins/transport/device_hub/transport.py`

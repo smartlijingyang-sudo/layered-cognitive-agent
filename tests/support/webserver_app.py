@@ -8,8 +8,8 @@ resolver injection before yielding.
 """
 
 from __future__ import annotations
-import asyncio
 
+import asyncio
 from typing import TYPE_CHECKING, Any
 
 from lca_kernel import run_kernel_lifespan
@@ -49,8 +49,8 @@ def create_scripted_app(
     so existing call sites don't have to be reworked; production
     create_app dropped these parameters.
     """
-    from lca_kernel.cli import create_app
     from lca.plugins.transport.webserver.bootstrap import install_bootstrap_state
+    from lca_kernel.cli import create_app
 
     app = asyncio.run(create_app(profile_path=profile_path))
     resolver = llm_resolver if llm_resolver is not None else ScriptedLLMResolver()

@@ -51,7 +51,7 @@ deepseek-harness 已实现该范式(`packages/host/webserver/src/index.ts:WebSer
 
 | 步骤 | deepseek `runProfile` 做了 | `lca_kernel/cli.py:serve` 应做 | 当前 LCA 状态 |
 |---|---|---|---|
-| 1. 装 env 快照 | `loadLayeredEnv('dsh')` → `EnvSnapshot` → `hostCtx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, ...)` | 调 `lca.infrastructure.env.bootstrap.load_layered_env(bin_name="lca_kernel", dir=cwd)` → `hostCtx.provide("env_snapshot", snapshot)`(**插件可 `ctx.inject("env_snapshot")` 读 .env 值**) | ⚠️ K7 已有 facade 但**没人调** |
+| 1. 装 env 快照 | `loadLayeredEnv('lca_kernel')` → `EnvSnapshot` → `hostCtx.provide("env_snapshot", snapshot)` | 调 `lca.infrastructure.env.bootstrap.load_layered_env(bin_name="lca_kernel", dir=cwd)` → `hostCtx.provide("env_snapshot", snapshot)`(**插件可 `ctx.inject("env_snapshot")` 读 .env 值**) | ⚠️ K7 已有 facade 但**没人调** |
 | 2. 解析 profile | `composeProfile(profile, patchFiles)` | `run_kernel` 内部 `load_profile_source + resolve_profile` | ✅ |
 | 3. 装 cordis Context | `new Context()` + `await ctx.plugin(Loader)` + `mountRootInclude(...)` | `run_kernel_lifespan` 内部 `boot_resolved_profile + _boot_context` | ✅ |
 | 4. host provide 钩子 | `prepare(hostCtx)` 在 plugin 装载**之前**调 | **新增** `lca_kernel.cli._host_prepare(ctx, profile_path, env_snapshot, args)`——在 `run_kernel_lifespan` 启动之前 `ctx.provide("env_snapshot", ...)`,然后 lifecycle 内部 `ctx` 创建后调一次 prepare | ❌ **缺** |
@@ -167,7 +167,7 @@ def serve(profile_path: str, host: str, port: int) -> int:
 ```
 
 **为什么 `lca-ops` 不再管 LCA 进程**(对齐 deepseek 哲学):
-- deepseek 的 `dsh` 命令既是 CLI 也是 LCA 进程的入口;LCA 进程 = bin 进程,SIGTERM 自然退
+- 外部 harness CLI既是 CLI 也是 LCA 进程的入口;LCA 进程 = bin 进程,SIGTERM 自然退
 - LCA 现状是 "LCA 进程" 被 "uvicorn 进程" 套娃包装,所以需要 `lca-ops` 当中间人协调两个进程的生死
 - **重构后 uvicorn 不再是外壳**——它是 `lca-web-server` plugin 内部细节,LCA 进程 = 唯一进程
 - 一个进程 = 一个入口 = 用户的 shell 管生命周期。不需要 ops 工具介入
@@ -204,7 +204,6 @@ def serve(profile_path: str, host: str, port: int) -> int:
 | `packages/host/webserver/` | `gateway/app.py` + `lca/plugins/transport/webserver/` | **`lca/plugins/transport/webserver/server.py`**(webserver 升格为主) |
 | `class WebServer extends Service` | 散落在 `gateway/app.py` + `gateway/bootstrap.py` | **`LcaWebServer` 类**(单文件单一类) |
 | `ctx.webServer` | `app.state.ctx` + `app.state.gateway_router` | **`ctx.web_server: LcaWebServer`**(module augmentation) |
-| `{id: webserver, name: '@deepseek-ai/dsh-host-webserver'}` | 5 个独立 entry | **新增 `{id: lca-web-server}` + `{id: lca-gateway-bootstrap}`** |
 | `apps/cli/src/profile-boot.ts` | `scripts/serve_observability.py` | **`lca_kernel/cli.py`**(python 镜像,类比 `apps/cli/src/bin.ts` + `profile-boot.ts:runProfile` 合一) |
 | `Service.init` 生命周期钩子 | uvicorn 命令行起 server | **`LcaWebServer.serve()` 协程** |
 

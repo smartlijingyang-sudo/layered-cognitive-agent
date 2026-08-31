@@ -13,7 +13,7 @@ ADR-0037 确立了 Journal-as-Truth 的哲学：叙事平面为唯一真相，sp
 但 ADR-0037 的实现路径在三个点上不够彻底：
 
 1. **写入顺序不保证持久先于观察**：`ExecutionJournal.record()` 内存 append → fan-out 所有 projector。若 JsonlProjector 写入失败，SSE/OTel 已观察到该事件。对调试日志可接受；对需要可恢复、可审计的业务 Agent Runtime，这是正确性边界问题。
-2. **终态双 owner**：`execute_dsh_session()` 的 `finally` 调用 `projector.finish()`，gateway `finalize()` 调用 `_write_terminal_status()`。两条路径独立设置终态，可漂移。
+2. **终态双 owner**：machine-plane driver 的 `finally` 调用 `projector.finish()`，gateway `finalize()` 调用 `_write_terminal_status()`。两条路径独立设置终态，可漂移。
 3. **InsightEngine 在 fan-out 路径内回写**：`drain_followups()` 在所有 projector 看到事件后 `record(RunInsight)`——读路径反向修改写路径的结构性例外。
 
 更深层的问题是：**我们没有从 Agent 运行的本质出发设计日志，而是在「更好的 observability」框架内打补丁。**
@@ -41,7 +41,7 @@ Agent 的复杂性不来自「日志量大」，而来自执行具有异步性�
 | `facade.record()` ambient API | **优雅**：业务层唯一发射面，Null Object 降级 | **保留** |
 | `ExecutionJournal.record()` 流水线 | **结构性缺陷**：append-before-observe 不保证 | **重建为 RunStore** |
 | `InsightEngine.drain_followups()` | **结构性缺陷**：读路径回写事实流 | **重建为普通 subscriber** |
-| `DshJournalProjector.finish()` | **结构性缺陷**：终态双 owner | **删除，终态由 reducer 推导** |
+| `MachineJournalProjector.finish()` | **结构性缺陷**：终态双 owner | **删除，终态由 reducer 推导** |
 | `FacadeJournalSink` + ContextVar | **结构性缺陷**：跨线程 ContextVar 不可靠 | **重建为显式 RunHandle** |
 
 **结论**：contracts 层的 dataclass、词表治理、属性策略是真正的架构资产，一行不改。engine 层的写入流水线、fan-out 模型、终态管理和上下文传递需要按第一性原理重建。
@@ -81,7 +81,7 @@ Agent 运行不是单一 HTTP 请求。系统必须原生存储三层因果关�
 ┌─────────────────────────────────────────────────────────────────┐
 │  生产面：Telemetry Facade（facade.record / span / event）        │
 │  ├── 业务层只依赖一个稳定门面，不知道后端                         │
-│  ├── DSH Adapter：DshJournalProjector → RunHandle.store.append  │
+│  ├── Machine Adapter：MachineJournalProjector → RunHandle.store.append  │
 │  └── Native Adapter：facade.record(JournalEvent)                │
 ├─────────────────────────────────────────────────────────────────┤
 │  写入面：RunStore（唯一写入仲裁）                                 │
@@ -111,7 +111,7 @@ Agent 运行不是单一 HTTP 请求。系统必须原生存储三层因果关�
 class RunStore:
     """Append-only run fact log。不变量 N1 + N2。
 
-    设计来源：DSH Session.append()（同步原子 + post-commit 通知）、
+    设计来源：append-only session log（同步原子 + post-commit 通知，借鉴 deepseek harness）、
     EventStore expected-version CAS（并发控制）、
     Kafka consumer-managed offset（观察者自拉）。
     """
@@ -317,14 +317,14 @@ def fold_run_state(events: Sequence[StampedEvent]) -> RunState:
 
 **取代的代码**：
 - `_write_terminal_status()` —— 不再独立写 status，由 reducer 推导
-- `DshJournalProjector.finish()` —— 不再由 projector 写终态，由 driver 通过 `append(AgentRunFinished(...))` 写入
+- `MachineJournalProjector.finish()` —— 不再由 projector 写终态，由 driver 通过 `append(AgentRunFinished(...))` 写入
 - `RunSession.status` 的直接赋值 —— 改为 `session.status = fold_run_state(hub.store.events).status`
 
 ### 六、单一终态写入点 —— 消灭双 owner
 
-**问题根源**：DSH 路径有两个终态写入点：
+**问题根源**：machine-plane driver 路径有两个终态写入点：
 
-1. `execute_dsh_session()` 的 `finally` → `projector.finish(status=...)` → `FacadeJournalSink.emit(AgentRunFinished)`
+1. machine driver 的 `finally` → `projector.finish(status=...)` → `FacadeJournalSink.emit(AgentRunFinished)`
 2. `execute.py` 的 `finalize()` → `_write_terminal_status(session, success)` → 直接设置 `session.status`
 
 两者独立判断 status，可漂移。
@@ -332,8 +332,8 @@ def fold_run_state(events: Sequence[StampedEvent]) -> RunState:
 **修复**：
 
 ```python
-async def execute_dsh_session(session: RunSession) -> None:
-    """DSH driver。终态通过 append 写入，不通过 projector.finish。"""
+async def execute_machine_session(session: RunSession) -> None:
+    """Machine-plane driver。终态通过 append 写入，不通过 projector.finish。"""
     ...
     # 在 execute 完成后：
     final_status = "failed" if session.error else "completed"
@@ -412,7 +412,7 @@ class InsightEngine(JournalProjector):
 
 ### 八、RunHandle —— 显式传递替代 ContextVar
 
-**问题**：DSH 在子线程 + 新 event loop 中运行，`ContextVar` 传播不可靠，导致主 journal 0 字节（P0）。当前 workaround 是 `FacadeJournalSink` 接受显式 `hub` 参数。
+**问题**：machine-plane driver 在子线程 + 新 event loop 中运行，`ContextVar` 传播不可靠，导致主 journal 0 字节（P0）。当前 workaround 是 `FacadeJournalSink` 接受显式 `hub` 参数。
 
 **根本修复**：引入 `RunHandle`，在 run 边界构造，显式传递到所有需要写入的组件。
 
@@ -421,7 +421,7 @@ class InsightEngine(JournalProjector):
 class RunHandle:
     """Run 的执行上下文——显式传递，不依赖 ContextVar。
 
-    DSH 跨线程 ContextVar 丢失的根因是 ContextVar 绑定到 event loop。
+    machine-plane 跨线程 ContextVar 丢失的根因是 ContextVar 绑定到 event loop。
     RunHandle 是普通对象引用，可安全跨线程/跨 loop 传递。
     """
     run_id: str
@@ -432,9 +432,9 @@ class RunHandle:
 
 **ContextVar 保留为便利层**：主线程的 `facade.record()` 仍通过 ContextVar 获取当前 hub/store（因为主线程传播没问题）。但**任何可能跨线程的写入必须使用显式 RunHandle**。
 
-### 九、DSH 边界 —— 从 observability 子树迁出
+### 九、machine-plane driver 边界 —— 从 observability 子树迁出
 
-当前 `lca/infrastructure/dsh/` 与 `observability/journal/` 并列，暗示 DSH 是可观测性组件。实际 DSH 是 **execution driver**。
+当前 `lca/infrastructure/` 与 `observability/journal/` 并列，machine-plane driver 路径属于 **execution driver**(见 [ADR-0120](0120-retire-dsh-driver.md))。
 
 ```
 目标布局（渐进迁移）：
@@ -451,15 +451,15 @@ lca/infrastructure/
 
   adapters/
     drivers/
-      dsh/
-        projector.py     → DshFolder（纯函数 fold）
+      <driver>/
+        projector.py     → DriverFolder（纯函数 fold）
         archive.py       → 不变
         sink.py          → HandleJournalSink（显式 RunHandle）
         mapping.py       → 不变
         models.py        → 不变
 ```
 
-**Phase 0 不做目录迁移**——只修代码路径。目录迁移在 Phase 3（当 DshJournalProjector 重构为 DshFolder 时一并迁移）。
+**Phase 0 不做目录迁移**——只修代码路径。目录迁移在 Phase 3（当 MachineJournalProjector 重构为 DriverFolder 时一并迁移）。
 
 ### 十、Schema 演进纪律
 
@@ -531,7 +531,7 @@ Prompt、模型输出、工具参数可能包含敏感信息。借鉴 Manus 指�
 - **N3 保证**：run status 永远与 journal 一致。不存在「journal 说 completed，session 说 failed」的漂移。
 - **N4 保证**：subscriber 是纯读者。InsightEngine 的回写走正常 append 路径，因果链清晰。
 - **N6 保证**：数据分类在 catalog 声明，驱动投递保证、SSE 过滤和保留策略，不靠各 projector 重复 `if isinstance`。
-- **P0 修复**：显式 RunHandle 消除 DSH 跨线程 ContextVar 丢失。
+- **P0 修复**：显式 RunHandle 消除 machine-plane 跨线程 ContextVar 丢失。
 - **向后兼容**：`JournalProjector` Protocol 签名不变，现有 projector 实现只需改名为 subscriber 语义。`ExecutionJournal` 保留为别名，渐进迁移。
 - **认知负荷降低**：4 字段 envelope + catalog 声明式元数据，比 15 字段 envelope + 实例级分类字段更简洁。
 
@@ -539,7 +539,7 @@ Prompt、模型输出、工具参数可能包含敏感信息。借鉴 Manus 指�
 
 - `drain_followups` 路径删除需要 InsightEngine 重写（小，~30 行）。
 - `_write_terminal_status` 被 `fold_run_state` 替代，需要确保 reducer 覆盖所有终态路径（测试保证）。
-- `DshJournalProjector.finish()` 删除后，DSH 终态写入路径需要重构为 `store.append(AgentRunFinished(...))`（已在 execute_dsh_session 中控制）。
+- `MachineJournalProjector.finish()` 删除后，machine-plane 终态写入路径需要重构为 `store.append(AgentRunFinished(...))`（已在 machine driver 中控制）。
 - `JOURNAL_CATALOG_META` 需要为所有 29 个事件逐一声明分类元数据（一次性工作，约 60 行）。
 
 ### 风险
@@ -556,12 +556,12 @@ Prompt、模型输出、工具参数可能包含敏感信息。借鉴 Manus 指�
 **目标**：消灭 P0 bug，不改数据流。
 
 - [x] `FacadeJournalSink` 显式 hub 传递（**已完成**）
-- [ ] **单一 finish owner**：删除 `DshJournalProjector.finish()` 中的终态写入；DSH 终态只在 `execute_dsh_session()` 中通过 `hub.journal.record(AgentRunFinished(...))` 写入
+- [ ] **单一 finish owner**：删除 `MachineJournalProjector.finish()` 中的终态写入；machine-plane 终态只在 machine driver 中通过 `hub.journal.record(AgentRunFinished(...))` 写入
 - [ ] `_write_terminal_status()` 改为**读取 journal 最后一个 finish 事件**推导 status（最小改动版 fold_run_state）
-- [ ] `DshJournalProjector` 在 DSH 线程中使用显式 sink（不依赖 ContextVar）
+- [ ] `MachineJournalProjector` 在 machine-plane 线程中使用显式 sink（不依赖 ContextVar）
 
 **验收**：
-- DSH fixture 主 journal 非空
+- machine-plane fixture 主 journal 非空
 - 双退出路径只产生一个 `AgentRunFinished`
 - `session.status` 与 journal 最后一个 finish 事件的 status 一致
 
@@ -600,18 +600,15 @@ Prompt、模型输出、工具参数可能包含敏感信息。借鉴 Manus 指�
 - 新增测试：InsightEngine 不通过 drain 路径写入
 - 新增测试：每个已登记事件有 `JournalSchemaMeta` 声明
 
-### Phase 3 — RunHandle + DSH 迁移
+### Phase 3 — RunHandle 迁移
 
-**目标**：显式上下文传递，DSH 归位。
+**目标**：显式上下文传递。
 
 - [ ] 引入 `RunHandle` dataclass
 - [ ] `HandleJournalSink` 替代 `FacadeJournalSink`（显式 store 引用）
-- [ ] `lca/infrastructure/dsh/` 迁至 `lca/infrastructure/adapters/drivers/dsh/`
-- [ ] `DshJournalProjector` 重命名为 `DshFolder`（纯函数 fold 语义）
 
 **验收**：
-- DSH 跨线程零 ContextVar 依赖
-- `import lca.infrastructure.dsh` 有 deprecation warning 指向新路径
+- machine-plane 跨线程零 ContextVar 依赖
 - lint-imports 通过
 
 ## 架构检验清单
@@ -634,7 +631,7 @@ Prompt、模型输出、工具参数可能包含敏感信息。借鉴 Manus 指�
 - **取代**：ADR-0037 的实现路径（保留 Journal-as-Truth 哲学，升级写入架构）
 - **保持**：ADR-0015（contracts 无行为类）、ADR-0030（领域语言）、ADR-0034（封闭团队）、ADR-0038（LLM stream event contract）、ADR-0045（canonical intent shape）
 - **借鉴**：
-  - DSH Harness Session/Persistence（append-only + post-commit + pure function derive）
+  - deepseek harness Session/Persistence（append-only + post-commit + pure function derive）
   - EventStore（expected-version CAS）
   - Temporal（history as truth, state as replay）
   - Kafka（consumer-managed offset）

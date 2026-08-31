@@ -16,7 +16,7 @@ ADR-0119 followup 已经把 "gateway" 命名按 6 类分类,并决定 A 类(进�
 
 触发条件:
 1. 用户要求"将 gateway 名字从项目彻底清理,换成符合语境的名词"。
-2. 同期 `deploy/dsh/` 与顶层 `gateway/` 目录已经被 retire,意味着 D 类保留路径(`gateway/plugins/default_modes.py`)**已经不可能物理保留**;原 commit 的"保留 namespace"语义被本批 PR 推翻。
+2. 顶层 `gateway/` 目录已经被 retire(`deploy/dsh/` 同批,见 [ADR-0120](0120-retire-dsh-driver.md)),意味着 D 类保留路径(`gateway/plugins/default_modes.py`)**已经不可能物理保留**;原 commit 的"保留 namespace"语义被本批 PR 推翻。
 3. C 类 `CommandGateway` 命名与命名宪法 §4.1("角色后缀必须是 30 个之一")冲突:`Gateway` 不是 §4.1 任何后缀。
 4. B 类 `GatewayRouter` 同上。
 5. E 类 emitter 是 wire schema 字段,但只在 journal v2 envelope 里写盘,可以加 aliases 兼容老文件。
@@ -44,7 +44,7 @@ ADR-0119 followup 已经把 "gateway" 命名按 6 类分类,并决定 A 类(进�
 | `lca/harness/command/gateway.py` (module) | `lca/harness/command/dispatcher.py` | C | 文件↔类一一对应 |
 | `emitter="lca.harness.command.gateway"` (wire field) | `emitter="lca.harness.command.dispatcher"` | E | reader aliases 兼容老 journal |
 | `lca.harness.command.gateway` (Python module path,被 4 处 import) | `lca.harness.command.dispatcher` | C+E | import shim 模块留 1 release |
-| `gateway/plugins/default_modes.py` (module path) | 物理已删除,emitter 改为 `lca.cognition.team.modes.default_modes` | D | retire dsh 后目录已无,emitter 跟着改 |
+| `gateway/plugins/default_modes.py` (module path) | 物理已删除,emitter 改为 `lca.cognition.team.modes.default_modes` | D | `gateway/` 顶层目录已 retire(见 ADR-0120),emitter 跟着改 |
 | `emitter="gateway.plugins.default_modes"` (wire field) | `emitter="lca.cognition.team.modes.default_modes"` | D | reader aliases 兼容老 journal |
 | `EffectGateway` (Protocol) | `EffectDispatcher` | Effect | 命名宪法 §4.1 |
 | `EffectGatewayFactory` (Protocol) | `EffectDispatcherFactory` | Effect | 同上 |

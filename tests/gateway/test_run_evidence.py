@@ -5,17 +5,17 @@ from pathlib import Path
 
 import pytest
 
+from lca.contracts.observability.evidence import (
+    Classification,
+    EvidenceIntegrityError,
+    EvidenceRef,
+)
 from lca.plugins.transport.webserver.handlers.runs.observability.evidence import (
     EvidencePayloadDecodeError,
     InvalidEvidenceDigestError,
     RunEvidenceNotFoundError,
     RunEvidenceReader,
     normalize_evidence_digest,
-)
-from lca.contracts.observability.evidence import (
-    Classification,
-    EvidenceIntegrityError,
-    EvidenceRef,
 )
 
 

@@ -1,10 +1,9 @@
 """Patch: guard WriteFile Render against undefined args / args.path.
 
-DSH (and any journal-driven path) can surface tool messages whose
-``plugin.arguments`` is undefined or empty after DB reload.  The sibling
-Intervention and Streaming components already guard with ``|| ''``;
-the Render component was the only one that called ``path.parse(undefined)``
-and crashed.
+Journal-driven paths can surface tool messages whose ``plugin.arguments``
+is undefined or empty after DB reload.  The sibling Intervention and
+Streaming components already guard with ``|| ''``; the Render component
+was the only one that called ``path.parse(undefined)`` and crashed.
 """
 
 from __future__ import annotations

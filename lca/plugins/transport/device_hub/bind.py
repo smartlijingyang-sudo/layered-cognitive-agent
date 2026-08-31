@@ -49,15 +49,7 @@ _hub: DeviceHub | None = None
 
 
 def device_hub() -> DeviceHub | None:
-    """Bound device hub (gateway process). Used by DSH streaming runtime.
-
-    Branch-side helper preserved for the soft-locked ``gateway/runs/loop_drivers.py``
-    which calls ``execute_dsh_session`` from the restored ``gateway/runs/dsh_execute.py``.
-    The DSH runtime needs access to the active DeviceHub to issue
-    StreamEvents on the right hub. Main refactored this away; the branch
-    keeps it because the loop_drivers soft-lock surface still references
-    DSH execution paths.
-    """
+    """Bound device hub (gateway process)."""
     return _hub
 
 

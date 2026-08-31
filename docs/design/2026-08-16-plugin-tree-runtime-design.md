@@ -4,14 +4,13 @@
 **状态**: Draft（评审一轮：Issues Found，本版已回填）
 **关联**:
 - [2026-08-14-deepseek-harness-integration-analysis.md](./2026-08-14-deepseek-harness-integration-analysis.md)（借鉴全景；本文**修订**其中「Cordis 插件树替换五层 — 不做」：五层 import 图仍不做，**组合/启动层**改为插件树）
-- DSH 子进程对照跑道保留，是树上的一个可替换 loop 插件
 - ADR-0004 Protocol-First、ADR-0005 L4 组合根、ADR-0002 认知循环、ADR-0037 Journal-as-Truth
 
 ---
 
 ## 0. 一句话
 
-DSH SDK 的做法是：进程启动时把 `cordis.yml` 里的**全部插件加载一遍**，JSON-RPC 服务器只是树上的一个插件；之后 `session/prompt` 不再组装系统，只是往已经活着的 `ctx.agents` 投一条用户消息。
+外部 SDK 的做法是:进程启动时把 `cordis.yml` 里的**全部插件加载一遍**,JSON-RPC 服务器只是树上的一个插件;之后 `session/prompt` 不再组装系统,只是往已经活着的 `ctx.agents` 投一条用户消息。
 
 LCA 做同一件事：Gateway 进程启动时加载 `profiles/lobehub-run.yaml` 里的**全部插件**；LobeHub 的 `POST /runs` 不再在 `execute.py` 里手写组装，只是往已经活着的树投一条用户消息。主流程通 = 树加载成功。
 
@@ -23,47 +22,15 @@ LCA 做同一件事：Gateway 进程启动时加载 `profiles/lobehub-run.yaml` 
 
 | 以后要加的东西 | 挂在哪 | 不改什么 |
 |---|---|---|
-| 换一种 subagent（进程内 / DSH / ACP） | `subagent` seam 的新 Provider 插件 | loop、Team 策略、LobeHub |
+| 换一种 subagent（进程内 / ACP） | `subagent` seam 的新 Provider 插件 | loop、Team 策略、LobeHub |
 | 一个 Skill 包或新的 skill 来源 | `skills` Provider + 可选 `tool-skill` | Brain、Runtime |
 | 一段固定 SOP / workflow | `workflow` 插件注册引擎 + 一个 model-facing tool | 认知循环本体 |
-| 换 loop（CognitiveRuntime ↔ DshTurnDriver） | 加载 `loop-dsh` + 请求 `execution_target=dsh`（`agent_loop.select`） | HTTP、Journal、卡片 |
+| 换 loop（driver 选择） | 通过 `agent_loop.select(execution_target)` | HTTP、Journal、卡片 |
 | 换 LLM / 沙箱 / 搜索 | 对应 seam 的 Provider 行 | Consumer |
 
-不会变强的做法：把 Cordis 的 `ctx` 做成 L1–L3 运行时 Service Locator（违反 ADR-0005）、用插件树拆掉五层单向依赖、把 DSH Web 换掉 LobeHub、把 DSH 的 TS 包搬进来。那些是第二套内核，不是扩展面。
+不会变强的做法：把 Cordis 的 `ctx` 做成 L1–L3 运行时 Service Locator（违反 ADR-0005）、用插件树拆掉五层单向依赖、把外部 Web 换掉 LobeHub、把外部 TS 包搬进来。那些是第二套内核，不是扩展面。
 
-本文抄的是 DSH 的**启动思想**，不是 Cordis 运行时。
-
----
-
-## 2. DSH SDK 实际怎么跑（对照源）
-
-Python SDK 自己不装插件。它 spawn `dsh-jsonrpc-agent`，把一份 Cordis 配置注入子进程（默认内置组合，或 `cordis=` / `DSH_CORDIS_CONFIG`）。
-
-默认/示例组合（`examples/jsonrpc-agent/cordis.yml` + spine）加载后树上有：
-
-```
-sdk-jsonrpc-server     inject: ['agents']     # 入口：stdio JSON-RPC
-llm + llm-deepseek                            # 模型 seam + Provider
-session + session-persistence-jsonl           # 只追加日志
-system-prompt + tools                         # 提示词段 + 带守卫的工具管线
-skill + skill-filesystem + tool-skill         # 技能目录 + 模型工具
-agent + agent-loop                            # 注册表 + 具体循环
-subprocess + bash + fs-local + tool-fs        # 执行世界
-subagent + spawn-in-process + tool-subagent   # 子 agent
-tool-todo + token-meter + compaction-basic    # 其余能力
-```
-
-加载语义（`packages/boot/app-boot` + Cordis Loader）：
-
-1. 读配置条目列表。**行顺序不决定加载顺序**；激活由 `inject` 的服务是否就绪驱动。
-2. 每个插件导出 `name` / `inject` / `Config` / `apply(ctx, config)`。没有 default export，以免冲掉这些字段。
-3. `apply` 里的注册都是可逆副作用（`ctx.effect`）；卸载时撤销。
-4. 树结算后 `assertEntriesLoaded` + `assertEntriesActivated`：已启用却没挂上、或还在等一个永远不来的服务 → **启动失败，进程退出**。
-5. 之后协议只做三件事：`initialize`（cwd / provider / model）→ `session/prompt`（投用户消息）→ 收 `session.event`。
-
-产品级组合（`packages/bundle/base/cordis.patch.yml`）是同一机制的更大一棵树：在空列表上 insert 全套行；profile 再叠 web/headless；用户 `cordis.patch.yml` 按 **id 整行替换 config**（不深合并）。
-
-LCA 要对齐的是上面 1–5，不是 HMR、Fiber、isolate realm、`!!js` 表达式。
+本文借鉴外部 harness 的**启动思想**,不是 Cordis 运行时。
 
 ---
 
@@ -72,7 +39,7 @@ LCA 要对齐的是上面 1–5，不是 HMR、Fiber、isolate realm、`!!js` �
 1. **每个组合根 boot 一次。** Gateway 生产进程一次；每个 `AgentComposer` 一次（§18）。今天 `compose` 每次 `boot_capabilities()`，每造一个 Agent 就重建 ctx。树加载必须发生在第一次 create 之前，不能发生在每次 create 里。
 2. **插件是扩展单位。** 一个插件 = 声明依赖 + 一次 `apply` + 可撤销的注册。不是「又一个 Registry 字典」。
 3. **服务键上只有 Definition。** Provider 挂到 Definition 上（已有 `ProviderDispatch`）。Consumer（Reasoner / Body / Runtime）构造函数拿 Definition，运行期不查表（ADR-0005）。
-4. **一次 Run 是根 ctx 的子作用域。** 工具 schema、LLM 适配器、Skill 目录是进程级的；plane 绑定、workspace、附件、LiveTail、这一次的 Agent 实例是 Run 级的。DSH 用 `agent.ctx`（`dsh-scope`）做这件事。没有子作用域，computer 工具无法绑对这一次的机器/沙箱。
+4. **一次 Run 是根 ctx 的子作用域。** 工具 schema、LLM 适配器、Skill 目录是进程级的；plane 绑定、workspace、附件、LiveTail、这一次的 Agent 实例是 Run 级的。外部 harness 用 `agent.ctx` (`scope`) 做这件事。没有子作用域，computer 工具无法绑对这一次的机器/沙箱。
 5. **Journal 仍是对外事实源。** 插件可以往 Journal 记，不能另开一条 LobeHub 协议。卡片继续走现有 `WIRE` / `plugin_state` / SSE。
 6. **五层单向依赖不动。** 插件源码住在自己那一层；只有 L4 / Gateway 知道整棵树。
 
@@ -90,19 +57,18 @@ LCA 要对齐的是上面 1–5，不是 HMR、Fiber、isolate realm、`!!js` �
 | `SimpleEventBus` 的 emit / waterfall / serial | 插件扩展点 |
 | `DefaultToolExecutionPipeline` | `tools` 插件拥有的管线 |
 | `AgentComposer` / `TeamComposer` | 变成 `agent-loop` / `team` 插件内部的闭包工厂，不再每次 boot |
-| `DshTurnDriver` | 可选的另一个 `agent-loop` Provider，不是第三种 plane |
 
 要消掉的耦合：
 
 - `composer.py` 里的 `ctx = boot_capabilities()`
-- `gateway/runs/execute.py` 里手写 `build_solo_agent` / `build_runnable_team` / `is_dsh_driver` 三分支（改为问树上的 loop 工厂）
+- `gateway/runs/execute.py` 里手写 `build_solo_agent` / `build_runnable_team` 三分支（改为问树上的 loop 工厂）
 - `gateway/app.py` 里零散单例（`RunRegistry` / `FileStore` / `DeviceHub`）改为 boot 后挂到 `app.state.ctx`
 
 ---
 
 ## 5. 插件内核
 
-### 5.1 形状（对齐 DSH 导出约定 + Cordis 三种形态）
+### 5.1 形状(对齐 Cordis 三种形态)
 
 #### 5.1.1 函数式插件（最常用）
 
@@ -197,7 +163,7 @@ inject = {
 
 Loader 在创建 Fiber 时，dict 形式的值被合并到 child ctx 的 intercept overlay。
 
-禁止 default 成「整个模块就是 apply」——和 DSH 一样，具名导出才能让 Loader 读到 `inject` / `Config`。
+禁止 default 成「整个模块就是 apply」——具名导出才能让 Loader 读到 `inject` / `Config`。
 
 `Plugin` Protocol 放 `lca/contracts/mechanisms/plugin.py`，实现类显式继承（`check_protocol_impl.py`）。函数式模块由 Loader 包成 `ModulePlugin`。
 
@@ -433,7 +399,7 @@ class BootedTree:
 | `apply` 抛异常 | dispose 已 apply 的插件，再抛，带该 id |
 | 运行期插件内部错误 | 不拆树；记 Journal；该 Run 失败 |
 
-Gateway `lifespan`：boot 失败则进程以非零退出（和 DSH `installFailLoud` 一样，启动期不听请求）。
+Gateway `lifespan`:boot 失败则进程以非零退出(启动期不听请求)。
 
 ### 5.5 三条核心调用链（对照 Cordis Fiber + Reflect + Loader）
 
@@ -1299,9 +1265,8 @@ MyPlugin(BasePlugin)
 | `lca/application/bundles/lca-base.yaml` | 能力 Definition + 默认 Provider + 工具/技能/Journal |
 | `lca/application/bundles/lca-cognitive.yaml` | Brain / Body / Memory / Hook / Loop / Agent 工厂 |
 | `lca/application/bundles/lca-gateway.yaml` | HTTP、ingress、execute、live、openai-shim |
-| `lca/application/bundles/lca-dsh-loop.yaml` | 启用 `loop-dsh` 插件（登记 DshTurnDriver）。`lobehub-run` 默认已含该行且 `disabled: false` 也可——select 才决定用不用 |
 
-组合算法与 DSH `composeEntries` 相同：从空列表开始，按 profile 声明的 bundle 顺序把每个 bundle 的 `insert` 追加进去，再应用 profile 自己的 `patch`（按 `id` **整行替换** `config`，或 `insert` 新行，或 `disabled: true`）。不深合并。
+组合算法:从空列表开始，按 profile 声明的 bundle 顺序把每个 bundle 的 `insert` 追加进去，再应用 profile 自己的 `patch`（按 `id` **整行替换** `config`，或 `insert` 新行，或 `disabled: true`）。不深合并。
 
 `lca-ops dump-profile`（或 `python -m lca.application.profile dump lobehub-run`）打印展开后的行列表，每行标注来自哪个 bundle。输出必须与 `boot()` 实际加载的集合一致。
 
@@ -1375,7 +1340,7 @@ MyPlugin(BasePlugin)
 
 ### 7.2 Bundle `lca-cognitive`（默认 agent 脊柱）
 
-对应 DSH 的 `dsh-agent-spine-demo`：**所有入口共用的脊柱**；LLM Provider 和 HTTP 入口不在这里。
+对应外部 harness 的 `agent-spine-demo`:**所有入口共用的脊柱**；LLM Provider 和 HTTP 入口不在这里。
 
 **分层硬约束：** L2 插件不得 import L3（`lint-imports`）。因此 `agents.set_factory` **不属于** L2。`CognitiveRuntime` 住 L2；把 Runtime 接到 `CognitiveAgent` 的闭包住 L3 `agent` 插件。
 
@@ -1386,13 +1351,12 @@ MyPlugin(BasePlugin)
 | system-prompt | `lca.cognition.plugins.system_prompt` | `system_prompt` | `tools` | 组装 **函数/服务**（`render(profile, tools, plane) -> str`），不是一份全局字符串 |
 | agent | `lca.agent.plugins.agent` | `agents` | `llm`, `memory`, `state_store`, `hooks`, `observability`, `tools`, `transport`, `system_prompt` | Agent 注册表 + `create(spec, run_ctx)`。**内部**用 L1 `SimpleBrainFactory` / `SimpleBody` 和 L2 `CognitiveRuntime` 接线。`ComponentRegistry`（gates、budget）作为该插件的**私有**表，不另开 ctx 键 |
 | loop-cognitive | `lca.runtime.plugins.cognitive_loop` | — | — | 只把 `CognitiveRuntime` **类/工厂**登记到 L2 可被 L3 import 的既有模块（今天就是 `runtime_loop.py`）。它**不** `provides agent_loop`，也**不** `set_factory` |
-| loop-dsh | `lca.infrastructure.plugins.dsh_loop` | — | — | 登记 `DshTurnDriver`。默认 `disabled: true`；请求 `execution_target=dsh` 时由 `run-execute` 选用 |
-| agent-loop | `lca.agent.plugins.agent_loop` | `agent_loop` | `agents` | **L3** 服务：`select(execution_target) -> LoopDriver`。内置 `cognitive`；`dsh` 仅当 `loop-dsh` 已 apply。一次 Run 问一次，**不是**改 profile 行换掉全进程 |
+| agent-loop | `lca.agent.plugins.agent_loop` | `agent_loop` | `agents` | **L3** 服务：`select(execution_target) -> LoopDriver`。内置 `cognitive`。一次 Run 问一次,**不是**改 profile 行换掉全进程 |
 | team | `lca.agent.plugins.team` | `teams` | `agents`, `transport` | 今天 `TeamComposer` + orchestration 私有注册表（pipeline/fan-out/lead/…） |
 | role-library | `lca.agent.plugins.role_library` | `roles` | — | `FileRoleLibrary` |
 | team-caster | `lca.application.plugins.team_caster` | — | `teams`, `roles`, `llm` | `LLMTeamCaster` |
 
-`brain` / `body` **不是**进程级 `provides` 键。它们是每个 `agents.create` 闭包里 new 出来的实例。`loop-cognitive` 与 `loop-dsh` 可以同时加载；选谁是请求级的 `agent_loop.select`，禁止用 profile overlay 换掉全 Gateway 的 loop（否则同进程不能一个 chip 走认知、一个 chip 走 DSH）。
+`brain` / `body` **不是**进程级 `provides` 键。它们是每个 `agents.create` 闭包里 new 出来的实例。`loop-cognitive` 可以加载;选谁是请求级的 `agent_loop.select`,禁止用 profile overlay 换掉全 Gateway 的 loop。
 
 ### 7.3 Bundle `lca-gateway`（产品入口，对应 SDK 的 jsonrpc-server）
 
@@ -1410,7 +1374,7 @@ MyPlugin(BasePlugin)
 
 ### 7.4 刻意不进默认树（以后一行加上）
 
-这些是 DSH base 有、LCA 默认产品**现在没有**的。扩展点已在内核里，不预建空壳。
+这些是外部 harness base 有、LCA 默认产品**现在没有**的。扩展点已在内核里，不预建空壳。
 
 | 能力 | 以后的插件 id | 挂载点 |
 |---|---|---|
@@ -1419,7 +1383,6 @@ MyPlugin(BasePlugin)
 | Compaction | `compaction` | 听 `agent/pre-step` waterfall 或 journal 压力 |
 | Permission preset | `permission` | Run 首帧写入 Journal；sandbox/approval 读取 |
 | 持久 PTY / jobs | `jobs`, `tool-jobs` | 新 seam |
-| DSH 对照 loop | `loop-dsh` 插件（默认可加载） | `agent_loop.select("dsh")` |
 
 ---
 
@@ -1454,12 +1417,12 @@ LobeHub executeClientAgent
   run-execute                 # 业务步骤与今天 execute_run 相同，只换调用位置
        │  1. 解析 plane（失败 = 记错返回，不 create agent）
        │  2. ctx.child(key=run_id)：fork tools / 挂 bindings / workspace / attachments
-       │  3. 绑定 sandbox runtime（非 dsh 且有沙箱主环境时）
+       │  3. 绑定 sandbox runtime(有沙箱主环境时)
        │  4. staging 机器附件
        │  5. search_run_scope
        │  6. driver = agent_loop.select(session.execution_target)
-       │  7. 非 dsh：agents.create 或 teams.cast+run（构造函数注入本 child 的 llm/tools）
-       │     dsh：driver 即 DshTurnDriver，不 create CognitiveAgent
+       │  7. agents.create 或 teams.cast+run(构造函数注入本 child 的 llm/tools)
+       │     driver 由 `agent_loop.select` 返回,不走 CognitiveAgent
        │  8. result = await runnable.run(question)
        │  9. INPUT_REQUIRED → 保活 child + runnable，不 finalize
        │  10. 否则 finalize（顺序见 §12）
@@ -1471,7 +1434,7 @@ LobeHub executeClientAgent
 
 `mode=team|auto`：步骤 7 走 `teams` 而不是 `agents`。Casting 仍是 `team-caster` 插件，Journal 事件 `CastingStarted/Completed` 不变。
 
-`execution_target=dsh`：`agent_loop.select("dsh")` 返回已登记的 DSH driver。Ingress / Live / harvest **同一条管道**。同进程里另一次 `execution_target=""` 仍走 cognitive。禁止用改 YAML 一行换掉全进程 loop。
+不同 `execution_target` 通过 `agent_loop.select(execution_target)` 选取已登记的 driver(参见 [ADR-0120](0120-retire-dsh-driver.md))。Ingress / Live / harvest **同一条管道**。同进程里不同 Run 可走不同 loop。禁止用改 YAML 一行换掉全进程 loop。
 
 管家面 `POST /v1/chat/completions`：`openai-shim` 插件直连 `llm`，不创建 Run、不进 loop。
 
@@ -1580,7 +1543,7 @@ self.llm = get_ctx().llm     # Service Locator
 
 think 路径：`PromptReasoner` 持有 **create 时传入的** `LLMAdapter`（已经是 `llm_resolver.resolve` 或 `Agent(llm=)` 的那一个），不是 `ctx.require("llm")`。
 
-这是 DSH 与 LCA 的故意差异：DSH 的 loop 满树 `ctx.tools`；LCA 的 loop 是普通对象，由插件在 apply/create 时接线。效果是「换 driver = 换 select 结果」，不是「领域对象去查表」。
+这是与外部 harness 的故意差异:外部 loop 满树 `ctx.tools`；LCA 的 loop 是普通对象，由插件在 apply/create 时接线。效果是「换 driver = 换 select 结果」，不是「领域对象去查表」。
 
 ---
 
@@ -1665,9 +1628,8 @@ HIL 路径今天就不调 `finalize`；插件化后这条不变量不变。docto
 其他不变的非目标（非 Cordis 范畴）：
 
 - 不让 L1–L3 领域类依赖 `PluginContext`。
-- 不替换 LobeHub，不搬 DSH Web。
-- 不在第一棵默认树里实现 DSH 的 workflow / compaction / subagent / 持久 PTY。只留挂载点。
-- 不把 DSH 子进程对照跑道删掉；它变成可换的 `agent-loop`。
+- 不替换 LobeHub。
+- 不在第一棵默认树里实现外部 harness 的 workflow / compaction / subagent / 持久 PTY。只留挂载点。
 - 不把 `execute.py` 的平面绑定、附件 staging、artifact harvest 的**业务规则**改掉；只改它们的**调用位置**（从神文件搬进插件 `apply` / run child）。
 
 ---
@@ -1692,7 +1654,7 @@ S3 完成 = 「加载全部插件，默认 agent 主流程通」。S4 证明以�
 1. Gateway 启动只调用一次 `Loader.boot("lobehub-run")`。日志或 Journal 有 `PluginTreeBooted`，`plugin_ids` 等于 dump-profile 快照。
 2. LobeHub 默认 solo（`mode=solo`，本机或沙箱 plane）从发消息到工具卡/最终文本，走现有 Run Live 协议，不改前端补丁。
 3. `composer.py` 不再调用 `boot_capabilities()`。
-4. `execute_run` 不再内部分叉拼装对象图。它开 child、做与今天相同的 staging/bind，然后 `driver = agent_loop.select(execution_target)`，再 `agents.create` / `teams.*` / `driver.run`。`if dsh` 只允许出现在 `agent_loop.select` 内部。
+4. `execute_run` 不再内部分叉拼装对象图。它开 child、做与今天相同的 staging/bind，然后 `driver = agent_loop.select(execution_target)`，再 `agents.create` / `teams.*` / `driver.run`。分支判断只允许出现在 `agent_loop.select` 内部。
 5. 新增一个测试插件不修改 `execute.py` / `composer.py` / `defaults.py`。
 6. 下列命令在实现切片对应范围内绿（S3 时跑 gateway + 脊柱相关测试，提交前按 AGENTS.md 升全量）：
 
@@ -1717,8 +1679,6 @@ S3 改了 contracts 机制与组合根，提交前再跑 AGENTS.md 全量序列�
 |---|---|
 | 「Cordis 插件树替换五层 — 不做」 | **组合层做插件树**；五层 import 与领域 DI **仍不做** Service Locator |
 | CapabilityHub 每次 compose 新建 | 进程一次 boot |
-| 路径 A：DSH 当 driver | 保留，降为 `agent-loop` 的一个 Provider |
-| 路径 C：认知层挂 DSH 插件 | 不采用（不把 TS 插件挂进 Python） |
 | 只抄 seam / waterfall / pipeline | 那些是零件；本设计补上**缺的单位：Plugin + Profile + 一次加载** |
 
 ---
@@ -1775,7 +1735,7 @@ def create_app(
 
 ```python
 class LoopDriver(Protocol):
-    name: str  # "cognitive" | "dsh"
+    name: str  # "cognitive" | <other driver>
     async def start(self, session: RunSession, child: PluginContext) -> RunnableHandle: ...
 
 class RunnableHandle(Protocol):
@@ -1784,7 +1744,7 @@ class RunnableHandle(Protocol):
 ```
 
 - `select("")` / `select("cognitive")` / 缺省 → cognitive：`start` 内部 `agents.create` 或 `teams.*`，返回包着 `CognitiveAgent`/`Team` 的 handle。
-- `select("dsh")` → 若 `loop-dsh` 未 apply，抛明确错误（与今天缺 runtime 一致）。`start` 不 create CognitiveAgent。
+- `select(execution_target)` → 若该 driver 未 apply,抛明确错误(与今天缺 runtime 一致)。`start` 不 create CognitiveAgent。
 - 两个 driver **都加载**时，select 只读 `execution_target`，不改根 ctx。
 
 ---

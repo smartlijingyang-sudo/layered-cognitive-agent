@@ -1,9 +1,9 @@
 from types import SimpleNamespace
 
+from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.plugins.transport.webserver.handlers.runs.execute.loop_drivers import DriverOutcome
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession, RunStatus
 from lca.plugins.transport.webserver.handlers.runs.terminal.outcome import RunOutcomeApplier
-from lca.contracts.models.core.lifecycle import TaskStatus
 
 
 def _session() -> RunSession:

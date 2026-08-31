@@ -84,7 +84,6 @@ log:emit
 - `DeclarativeValidationError`
 - `DeltaReducer`
 - `DeltaReducerFactory`
-- `DshRuntime`
 - `EffectCapabilities`
 - `EffectDispatcher`
 - `EffectDispatcherFactory`

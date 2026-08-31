@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, patch
 
 from starlette.testclient import TestClient
 
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunSession, RunStatus, run_dedup_key
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 from lca.infrastructure.openai_compat import (
     extract_json_schema_format,
@@ -15,8 +14,14 @@ from lca.infrastructure.openai_compat import (
     normalize_responses_input,
     resolve_upstream_model,
 )
-from tests.support.webserver_app import create_scripted_app
+from lca.plugins.transport.webserver.handlers.runs.session.session import (
+    RunRegistry,
+    RunSession,
+    RunStatus,
+    run_dedup_key,
+)
 from tests.support.gateway_scripted import ScriptedLLMResolver
+from tests.support.webserver_app import create_scripted_app
 
 
 class TestOpenAiCompatGateway(unittest.TestCase):

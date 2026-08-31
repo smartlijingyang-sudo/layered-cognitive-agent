@@ -123,6 +123,7 @@ class TestModeCatalogKeyParity(unittest.TestCase):
 
     def test_harness_modes_match_gateway_catalog(self) -> None:
         import gateway.modes as gateway_catalog
+
         import tests.harness.modes as harness_modes_mod
 
         self.assertEqual(set(gateway_catalog.ALL_MODES), set(harness_modes_mod.ALL_MODES))

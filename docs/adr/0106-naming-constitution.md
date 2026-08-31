@@ -10,7 +10,7 @@
 
 仓库内命名存在三类问题：
 
-1. **目录命名沿用 jargon 与缩写**：`dsh/`、`plane/`、`text/`、`face/`、`seam_definitions/`、`control_contributions/` 等无 v3 概念群归属。
+1. **目录命名沿用 jargon 与缩写**：`plane/`、`text/`、`face/`、`seam_definitions/`、`control_contributions/` 等无 v3 概念群归属。
 2. **角色后缀混杂**：同一概念用 `*Impl` / `*Manager` / `*Wrapper` / `*Helper` 等无信息后缀；类名 / 文件名 / 目录名各说各话。
 3. **既有规范只覆盖语义后缀**：[`docs/specs/naming-conventions.md`](../specs/naming-conventions.md) 只规定 `Protocol/Adapter/Coordinator/Registry/Manifest/Plan` 六个后缀，没覆盖目录命名、文件命名、函数命名、变量命名、枚举命名、跨群协作命名。
 
@@ -31,7 +31,7 @@
 2. **角色后缀**：必须从 [naming-constitution §4.1](../design/naming-constitution.md) 角色后缀表（30 个）选一个；新增后缀需 ADR。
 3. **函数动词前缀**：必须从 [naming-constitution §8.1](../design/naming-constitution.md) 函数前缀表（14 个）选一个；无前缀的函数禁止合并。
 4. **文件 ↔ 类一一对应**：`foo_bar.py` 必须定义 `FooBar`；`__init__.py` 必须显式 `__all__`，禁止 `__all__ = list(globals())`。
-5. **禁止词**：`utils/helpers/common/misc/Impl/Manager/Wrapper/Helper/Info/Data` 等无信息后缀；`dsh/plane/text/face` 等 jargon 目录名（除 `LLM/JSONL/OTel/SSE/A2A/MCP` 白名单缩写）。
+5. **禁止词**：`utils/helpers/common/misc/Impl/Manager/Wrapper/Helper/Info/Data` 等无信息后缀；`plane/text/face` 等 jargon 目录名（除 `LLM/JSONL/OTel/SSE/A2A/MCP` 白名单缩写）。
 
 ## 与既有规范的关系
 
@@ -46,7 +46,7 @@
 
 执行迁移时不分两份：
 
-- **Phase A**（1 周）：零风险清扫（删空包、修 barrel、改 dsh 命名）。
+- **Phase A**（1 周）：零风险清扫（删空包、修 barrel）。
 - **Phase B**（3 周）：拆 8 个超大目录（每个 1 PR，自带 import 映射表 + 迁移脚本 + 命名合规检查）。
 - **Phase C**（2 周）：命名规范化收敛（plane/runtime_plane、face/personas、5 个 phase_*/phase_graph 等）。
 - **Phase D**（1 周）：CI 门禁落地（10 个 `scripts/check_*.py`）。
