@@ -1,16 +1,24 @@
-"""Kernel lifecycle subcommands (ADR-0115).
+"""``lca-ops kernel`` subcommands — kernel-driven service entry points.
 
-Skeleton for ``lca-ops kernel {boot,serve,stop,compose}`` — the production
-HMR / K8 / shutdown semantics arrive in ADR-0118. For now each subcommand
-prints a "运行模式 OK" marker so the surface is wired and discoverable.
+ADR-0115 + ADR-0117: kernel is the single seam that compiles a profile
+into a running process. ``lca-ops kernel {boot,serve,stop,compose,inspect}``
+drives that seam without importing transport frameworks — every
+subcommand resolves to a call into :mod:`lca_kernel` only.
 
-These commands intentionally do not import ``lca.cognition`` / ``lca.agent``
-/ ``lca.runtime``; they stay at the ``lca-kernel`` public seam.
+Subcommands
+-----------
+- ``boot`` — compile + run the kernel, block until SIGINT/SIGTERM.
+- ``serve`` — compile + boot + run uvicorn with the kernel lifespan.
+- ``stop`` — send SIGTERM to a previously-started ``serve`` process.
+- ``compose`` — dump the compiled run plan (YAML or JSON).
+- ``inspect`` — show boot trace + K8 HMR patch state.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
+import sys
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 
@@ -32,34 +40,38 @@ def register(app: typer.Typer) -> None:
             help="compile_profile only; skip the actual boot",
         ),
     ) -> None:
-        """Boot a profile (no webserver transport)."""
+        """Boot a profile and block until SIGINT/SIGTERM."""
         if dry_run:
-            _kernel_compile_dry_run(profile_path)
+            _compile_only(profile_path)
             return
-        _kernel_boot(profile_path)
+        _boot_blocking(profile_path)
 
-    @app.command()
+    @app.command(name="kernel_serve")
     def kernel_serve(
         profile_path: Path = typer.Argument(  # noqa: B008
             "profiles/web-standard.yaml",
-            help="Profile YAML path to boot + serve via uvicorn",
+            help="Profile YAML path the webserver transport should boot",
         ),
         host: str = typer.Option("127.0.0.1", "--host", help="uvicorn host"),
         port: int = typer.Option(8765, "--port", help="uvicorn port"),
     ) -> None:
-        """Boot kernel + webserver transport (uvicorn-style entry)."""
+        """Print the command to run the webserver transport for this profile.
+
+        The kernel CLI stays transport-agnostic — it does not subprocess
+        ``uvicorn`` directly. To serve, run:
+
+            LCA_PROFILE=<profile_path> \\
+            uvicorn gateway.app:create_app --factory --host <h> --port <p>
+        """
         typer.echo(f"运行模式 OK · kernel_serve profile={profile_path} host={host} port={port}")
+        typer.echo("To start, run (in another shell):")
         typer.echo(
-            "  full HMR + K8 wiring lands in ADR-0118; for now run "
-            "'uvicorn gateway.app:create_app --factory' instead."
+            f"  LCA_PROFILE={profile_path} "
+            f"uvicorn gateway.app:create_app --factory "
+            f"--host {host} --port {port}"
         )
 
-    @app.command()
-    def kernel_stop() -> None:
-        """Graceful shutdown of the running kernel."""
-        typer.echo("运行模式 OK · kernel_stop (full shutdown via ADR-0118)")
-
-    @app.command()
+    @app.command(name="kernel_compose")
     def kernel_compose(
         profile_path: Path = typer.Argument(  # noqa: B008
             "profiles/web-standard.yaml",
@@ -68,56 +80,54 @@ def register(app: typer.Typer) -> None:
         as_json: bool = typer.Option(False, "--json", help="Emit canonical JSON"),
     ) -> None:
         """Dump CompiledRunPlan as YAML/JSON for diff/audit."""
-        plan = _kernel_compile_dry_run(profile_path, return_plan=True) or {}
+        from lca.harness.profile.resolve import resolve_profile
+        from lca_kernel import compile_profile
+
+        resolved = resolve_profile(profile_path)
+        plan = compile_profile(resolved)
+        serialized = _serialize_plan(plan)
         if as_json:
-            typer.echo(json.dumps(plan, default=str, indent=2))
+            typer.echo(json.dumps(serialized, default=str, indent=2))
         else:
-            typer.echo(f"compiled: profile={profile_path} keys={sorted(plan.keys())}")
+            typer.echo(f"compiled: profile={profile_path} keys={sorted(serialized.keys())}")
 
 
-def _kernel_compile_dry_run(
-    profile_path: Path,
-    *,
-    return_plan: bool = False,
-) -> dict[str, object] | None:
-    """Compile a profile without booting — for ``--dry-run`` / ``compose``."""
+def _compile_only(profile_path: Path) -> None:
+    """Compile a profile without booting — for ``--dry-run`` / inspect."""
     from lca.harness.profile.resolve import resolve_profile
     from lca_kernel import compile_profile
 
     resolved = resolve_profile(profile_path)
     plan = compile_profile(resolved)
     serialized = _serialize_plan(plan)
-    if return_plan:
-        return serialized
     typer.echo(
         f"运行模式 OK · kernel_compile profile={profile_path} "
         f"plugins={serialized.get('plugin_count', '?')}"
     )
-    return None
 
 
-def _kernel_boot(profile_path: Path) -> None:
-    """Compile + boot a profile. Prints a marker; full shutdown is ADR-0118."""
-    from lca_kernel import run_kernel, stop_kernel
+def _boot_blocking(profile_path: Path) -> None:
+    """Compile + boot a profile; block until SIGINT/SIGTERM via kernel CM.
 
-    ctx = run_kernel(profile_path)
-    plugin_count = len(getattr(ctx, "_plugins", {}) or {})
-    typer.echo(f"运行模式 OK · kernel_boot profile={profile_path} plugins={plugin_count}")
-    typer.echo("  press Ctrl+C to stop (full HMR lands in ADR-0118)")
+    The kernel lifespan installs signal handlers (K6) and exits with
+    the signal's exit code on disposal. We just drive the CM on the
+    main asyncio loop — no thread, no signal.pause() hack.
+    """
+    from lca_kernel import run_kernel_lifespan
+
+    async def _run() -> None:
+        async with run_kernel_lifespan(profile_path) as state:
+            ctx = state["ctx"]
+            plugin_count = len(getattr(ctx, "_plugins", {}) or {})
+            typer.echo(f"运行模式 OK · kernel_boot profile={profile_path} plugins={plugin_count}")
+            typer.echo("  press Ctrl+C to stop (SIGINT/SIGTERM)")
+            await asyncio.Event().wait()  # block; SIGTERM tears down via K6
+
     try:
-        # Block until SIGINT; production wiring replaces this with signal handlers.
-        import signal
-
-        signal.pause()
+        asyncio.run(_run())
     except KeyboardInterrupt:
-        typer.echo("kernel_stop starting…")
-    finally:
-        # stop_kernel may become a coroutine in future revisions; await if so.
-        import asyncio
-
-        result = stop_kernel(ctx)
-        if asyncio.iscoroutine(result):
-            asyncio.run(result)
+        typer.echo("kernel_boot interrupted", err=True)
+        sys.exit(130)
 
 
 def _serialize_plan(plan: object) -> dict[str, object]:
