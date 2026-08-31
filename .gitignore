@@ -44,3 +44,5 @@ tests/.scratch_cordis_creator/
 tests/.scratch_cordis_creator_real/
 .records/
 .archify-out/
+# vim swap files
+*.swp
