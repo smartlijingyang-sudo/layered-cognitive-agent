@@ -21,6 +21,8 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from lca.infrastructure.observability.journal_backend import MemoryJournal
+from lca.infrastructure.observability.policy import AttributePolicy
 
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
@@ -45,8 +47,6 @@ from lca.infrastructure.observability.journal.engine.journal_io import (
 from lca.infrastructure.observability.journal.jsonl.projector import (
     JsonlJournalProjector,
 )
-from lca.infrastructure.observability.journal_backend import MemoryJournal
-from lca.infrastructure.observability.policy import AttributePolicy
 
 # ADR-0097 / MVA-2 Task 4: engine fills event_id via StableUlidIdentity;
 # journal_io prefers stamped.event_id over the MVA-1 hash fallback.

@@ -12,8 +12,6 @@
 from __future__ import annotations
 
 import pytest
-
-from lca.contracts.models.observability.journal import LlmCallCompleted
 from lca.infrastructure.observability.event_catalog import descriptor_for
 from lca.infrastructure.observability.event_descriptor_env import (
     bind_descriptors,
@@ -22,6 +20,8 @@ from lca.infrastructure.observability.event_descriptor_env import (
 from lca.infrastructure.observability.event_descriptor_registry import (
     InMemoryEventDescriptorRegistry,
 )
+
+from lca.contracts.models.observability.journal import LlmCallCompleted
 
 
 @pytest.fixture

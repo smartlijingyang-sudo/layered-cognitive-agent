@@ -13,6 +13,8 @@ import tempfile
 from pathlib import Path
 
 import typer.testing
+from lca.infrastructure.observability.journal_backend import MemoryJournal
+from lca.infrastructure.observability.policy import AttributePolicy
 
 from lca.contracts.observability.evidence import (
     EvidenceStore,
@@ -32,8 +34,6 @@ from lca.infrastructure.observability.evidence.store import (
 from lca.infrastructure.observability.journal.jsonl.projector import (
     JsonlJournalProjector,
 )
-from lca.infrastructure.observability.journal_backend import MemoryJournal
-from lca.infrastructure.observability.policy import AttributePolicy
 
 _RUNNER = typer.testing.CliRunner()
 

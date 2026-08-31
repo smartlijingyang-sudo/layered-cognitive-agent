@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 import structlog
+from lca.infrastructure.observability.event_descriptor_env import bind_descriptors
 
 from gateway.runs.api.attachment_staging import (
     stage_machine_attachments as _stage_machine_attachments,
@@ -38,7 +39,6 @@ from lca.contracts.models.observability.journal import RunScope
 from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols.runtime.infra import MachineResolver
 from lca.infrastructure.observability import BoundObservability, bind_backends, run_scope
-from lca.infrastructure.observability.event_descriptor_env import bind_descriptors
 from lca.infrastructure.runtime_plane.scope import plane_bindings_scope
 from lca.infrastructure.sandbox.runtime_scope import bind_sandbox_runtime
 from lca.infrastructure.search.scope import search_run_scope

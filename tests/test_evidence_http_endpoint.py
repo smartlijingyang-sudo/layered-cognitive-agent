@@ -20,6 +20,8 @@ import json
 import tempfile
 from pathlib import Path
 
+from lca.infrastructure.observability.journal_backend import MemoryJournal
+from lca.infrastructure.observability.policy import AttributePolicy
 from starlette.testclient import TestClient
 
 from lca.contracts.observability.evidence import (
@@ -43,8 +45,6 @@ from lca.infrastructure.observability.evidence.store import (
 from lca.infrastructure.observability.journal.jsonl.projector import (
     JsonlJournalProjector,
 )
-from lca.infrastructure.observability.journal_backend import MemoryJournal
-from lca.infrastructure.observability.policy import AttributePolicy
 
 
 # A minimal evidence store wrapper that lets tests inject specific failure modes.

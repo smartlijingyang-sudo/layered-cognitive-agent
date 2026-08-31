@@ -7,6 +7,8 @@ shorthand must both be foldable into the canonical 9-section
 
 from __future__ import annotations
 
+from lca.harness.plugin.plugin_api import plugin
+from lca.harness.plugin.plugin_manifest import PluginDefinition, PluginKind
 from pydantic import BaseModel
 
 from lca.contracts.atoms.control_slot import ControlSlot
@@ -24,8 +26,6 @@ from lca.contracts.harness.composition.plugin_contract import (
     logic_address_to_plugin_contract,
 )
 from lca.contracts.protocols.composition.logic_address import LogicAddress
-from lca.harness.plugin.plugin_api import plugin
-from lca.harness.plugin.plugin_manifest import PluginDefinition, PluginKind
 
 
 class _Cfg(BaseModel):

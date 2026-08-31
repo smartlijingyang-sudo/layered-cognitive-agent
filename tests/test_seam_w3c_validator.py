@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import asyncio
 
-from lca.contracts.observability.w3c_trace_context import W3CTraceContextValidator
 from lca.infrastructure.observability.w3c_validator import DefaultW3CValidator
+
+from lca.contracts.observability.w3c_trace_context import W3CTraceContextValidator
 
 
 def _invoke_seam_setup() -> dict[str, object]:

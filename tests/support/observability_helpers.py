@@ -13,6 +13,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+from lca.infrastructure.observability.policy import AttributePolicy, Verbosity
+
 from lca.contracts.models.observability.journal import (
     JournalEvent,
     RuntimeObserved,
@@ -24,7 +26,6 @@ from lca.infrastructure.observability import (
     RunStore,
 )
 from lca.infrastructure.observability.facade import BoundObservability
-from lca.infrastructure.observability.policy import AttributePolicy, Verbosity
 
 
 def make_test_bound(

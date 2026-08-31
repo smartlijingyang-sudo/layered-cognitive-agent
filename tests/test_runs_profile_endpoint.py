@@ -18,9 +18,10 @@ from starlette.testclient import TestClient
 if TYPE_CHECKING:
     import pytest
 
+from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
+
 from gateway.runs.api.query_endpoints import get_run_profile
 from lca.contracts.observability.run_locator import RunLocator
-from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
 from lca.plugins.providers.profile_snapshot.run_boot import RunBootSnapshot
 
 

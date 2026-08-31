@@ -12,11 +12,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
+
 from gateway.runs.observability.identity import parse_agent_ref
 from gateway.runs.session.session import RunRegistry, RunSession
 from lca.contracts.observability.run_locator import RunLocator
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
-from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
 
 
 class _FakeLocator(RunLocator):

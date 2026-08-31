@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+from lca.infrastructure.observability.event_catalog import EVENT_DESCRIPTOR_REGISTRY
+
 from lca.contracts.models.observability.event import (
     EventAudience,
     EventDurability,
@@ -25,7 +27,6 @@ from lca.contracts.models.observability.journal import (
 from lca.contracts.models.observability.journal_catalog import (
     JOURNAL_EVENT_CLASSES,
 )
-from lca.infrastructure.observability.event_catalog import EVENT_DESCRIPTOR_REGISTRY
 from lca.infrastructure.observability.journal.engine.reducer import (
     RunStatus,
     fold_run_state,

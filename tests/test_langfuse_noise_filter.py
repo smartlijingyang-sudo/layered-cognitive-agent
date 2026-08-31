@@ -10,6 +10,12 @@ from __future__ import annotations
 from typing import ClassVar
 
 import pytest
+from lca.infrastructure.observability.langfuse_conventions import (
+    LANGFUSE_HIDDEN_SPAN_NAMES,
+    LANGFUSE_HIDDEN_SPAN_PREFIXES,
+)
+from lca.infrastructure.observability.tracer_backend import OtelTracer
+from lca.infrastructure.observability.view import view_of
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -20,12 +26,6 @@ from lca.infrastructure.observability import (
     langfuse_span_visible,
     span,
 )
-from lca.infrastructure.observability.langfuse_conventions import (
-    LANGFUSE_HIDDEN_SPAN_NAMES,
-    LANGFUSE_HIDDEN_SPAN_PREFIXES,
-)
-from lca.infrastructure.observability.tracer_backend import OtelTracer
-from lca.infrastructure.observability.view import view_of
 from tests.support.observability_helpers import make_test_bound
 
 # ── 词表判定 ─────────────────────────────────────────────

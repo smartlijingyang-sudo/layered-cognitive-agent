@@ -8,6 +8,8 @@ import unittest
 from pathlib import Path
 from typing import Any
 
+from lca.infrastructure.observability.settings import ObservabilitySettings
+
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     AgentRunStarted,
@@ -30,7 +32,6 @@ from lca.infrastructure.observability.journal.engine.journal_io import (
     read_journal,
 )
 from lca.infrastructure.observability.journal.jsonl.projector import JsonlJournalProjector
-from lca.infrastructure.observability.settings import ObservabilitySettings
 
 
 def _journal_hub(tmpdir: str, filename: str = "journal.jsonl") -> tuple[BoundObservability, Path]:

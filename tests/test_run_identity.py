@@ -4,16 +4,17 @@ from __future__ import annotations
 
 import unittest
 
-from gateway.runs.observability.identity import default_agent_ref, parse_agent_ref
-from gateway.runs.session.session import RunRegistry, RunSession, RunStatus, run_dedup_key
-from lca.contracts.atoms.ids import RunId, TraceId
-from lca.contracts.models.observability.journal import RunScope
-from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 from lca.infrastructure.observability.run_context import (
     TEAM_CONTAINER_ROLE,
     adopt_run_scope,
     run_scope,
 )
+
+from gateway.runs.observability.identity import default_agent_ref, parse_agent_ref
+from gateway.runs.session.session import RunRegistry, RunSession, RunStatus, run_dedup_key
+from lca.contracts.atoms.ids import RunId, TraceId
+from lca.contracts.models.observability.journal import RunScope
+from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 
 
 class TestParseAgentRef(unittest.TestCase):

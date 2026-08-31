@@ -50,6 +50,9 @@ def test_default_profile_exposes_ledger_factory() -> None:
 
 def test_run_session_consumes_profile_selected_journal_factory(tmp_path: Path) -> None:
     """Gateway must not select journal writer, tail, or process projection itself."""
+    from lca.infrastructure.observability.journal_backend import MemoryJournal
+    from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
+
     from gateway.runs.execute import create_run_session
     from gateway.runs.session.session import RunRegistry
     from lca.contracts.observability.run_journal import RunJournalComponents
@@ -57,8 +60,6 @@ def test_run_session_consumes_profile_selected_journal_factory(tmp_path: Path) -
     from lca.infrastructure.observability.journal.engine.process import ProcessJournal
     from lca.infrastructure.observability.journal.jsonl.projector import JsonlJournalProjector
     from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
-    from lca.infrastructure.observability.journal_backend import MemoryJournal
-    from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
 
     class _SpyFactory:
         def __init__(self) -> None:

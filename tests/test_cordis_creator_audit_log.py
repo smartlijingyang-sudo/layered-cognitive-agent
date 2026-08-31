@@ -21,6 +21,8 @@ import json
 from contextlib import contextmanager
 from pathlib import Path
 
+from lca.infrastructure.observability.journal_backend import MemoryJournal
+
 from lca.contracts.models.observability.journal import (
     PluginAuthored,
     PluginInspected,
@@ -36,7 +38,6 @@ from lca.infrastructure.observability.journal.engine.journal_io import (
     read_journal,
     stamped_to_record,
 )
-from lca.infrastructure.observability.journal_backend import MemoryJournal
 from lca.plugins.providers.think.composition_composer import (
     CordisComposer,
     build_default_invariant_checker,
