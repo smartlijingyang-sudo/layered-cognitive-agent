@@ -1,4 +1,10 @@
-"""Default cordis ctx must boot on a running loop without run_until_complete."""
+"""Default cordis ctx must boot on a running loop without run_until_complete.
+
+ADR-0115 决定 7: ``set_default_ctx`` is **deprecated**; retire 2027-02-28.
+Tests in this file target the legacy cache lifecycle and are skipped pending
+migration to ``lca_kernel.run_kernel()`` explicit scope. New tests live in
+``tests/lca_application/test_set_default_ctx_deprecated.py``.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +13,15 @@ import threading
 import unittest
 from unittest.mock import patch
 
+import pytest
+
 import lca.application.api as api
+
+pytestmark = pytest.mark.skip(
+    reason="set_default_ctx is deprecated by ADR-0115 决定 7; retire 2027-02-28. "
+    "Tests target the legacy cache lifecycle; migration path tests live in "
+    "tests/lca_application/test_set_default_ctx_deprecated.py"
+)
 
 
 class TestDefaultCtxOnRunningLoop(unittest.IsolatedAsyncioTestCase):

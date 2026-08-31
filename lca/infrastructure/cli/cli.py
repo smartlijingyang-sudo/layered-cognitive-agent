@@ -19,6 +19,7 @@ from lca.infrastructure.cli.commands import (
     declarative,
     diagnostics,
     journal,
+    kernel,
     package_organization,
     profile_inspect,
     services,
@@ -167,6 +168,7 @@ package_organization.register(app)
 audit.register(app)
 creator_plan.register(app)
 declarative.register(app)
+kernel.register(app)
 
 
 def main() -> None:

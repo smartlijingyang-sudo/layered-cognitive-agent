@@ -23,7 +23,6 @@ from typing import TYPE_CHECKING, Any
 from lca.application.default_context import (
     ensure_default_ctx,
     get_or_create_default_ctx,
-    set_default_ctx,
 )
 from lca.application.default_context import holder as _default_ctx_holder
 from lca.application.spawn import spawn_agent, spawn_team
@@ -74,7 +73,11 @@ __all__ = [
     "TeamLead",
     "ensure_default_ctx",
     "get_or_create_default_ctx",
-    "set_default_ctx",
+    # NOTE: ``set_default_ctx`` is **deprecated** by ADR-0115 决定 7;
+    # retire 2027-02-28. It is still importable from
+    # ``lca.application.default_context`` for the deprecation window but
+    # is intentionally omitted from the public ``__all__`` so new code
+    # cannot pick it up via ``from lca.application.api import *``.
 ]
 
 if TYPE_CHECKING:
@@ -84,6 +87,15 @@ if TYPE_CHECKING:
 def __getattr__(name: str) -> object:
     """Preserve the historical cache alias while lifecycle ownership lives elsewhere."""
     if name == "_cached_default_ctx":
+        import warnings
+
+        warnings.warn(
+            "_cached_default_ctx is deprecated by ADR-0115 决定 7; "
+            "pass an explicit cordis Context obtained from lca_kernel.run_kernel() "
+            "as Agent(scope=...) / Team(scope=...). Retire 2027-02-28.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return _default_ctx_holder.ctx
     raise AttributeError(name)
 

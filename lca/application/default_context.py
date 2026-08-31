@@ -3,12 +3,21 @@
 This module concentrates the only mutable process-wide lifecycle needed by the
 Layer-4 developer facade: a default Context may be booted once by either sync
 or async callers, while concurrent event loops wait for the same result.
+
+ADR-0115 决定 7: ``set_default_ctx`` is **deprecated** as of 2026-08-31 and
+will be **removed by 2027-02-28**. Library callers should migrate to the
+explicit ``lca_kernel.run_kernel()`` (or :func:`ensure_default_ctx`) and
+receive the booted :class:`cordis.Context` as the ``scope=`` argument of
+:class:`Agent` / :class:`Team`. ``set_default_ctx`` remains importable for
+the deprecation window so that existing call sites still load, but it
+emits a ``DeprecationWarning`` on every invocation.
 """
 
 from __future__ import annotations
 
 import asyncio
 import threading
+import warnings
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -18,6 +27,13 @@ if TYPE_CHECKING:
     from lca.harness.plugin_api import PluginContext
 
 _DEFAULT_PROFILE = "profiles/web-standard.yaml"
+
+# Public deprecation metadata (ADR-0115 决定 7).
+SET_DEFAULT_CTX_DEPRECATION_REASON = (
+    "set_default_ctx is deprecated; pass an explicit cordis Context as "
+    "Agent(scope=...) / Team(scope=...) obtained from lca_kernel.run_kernel() "
+    "or ensure_default_ctx(). Retire 2027-02-28."
+)
 
 
 @dataclass
@@ -55,7 +71,19 @@ def _publish(ctx: Context | None) -> None:
 
 
 def set_default_ctx(ctx: Context) -> None:
-    """Bind an already-booted Cordis Context as the process default."""
+    """Bind an already-booted Cordis Context as the process default.
+
+    .. deprecated:: 2026-08-31
+        ``set_default_ctx`` is deprecated by ADR-0115 决定 7 and will be
+        removed on **2027-02-28**. Use ``lca_kernel.run_kernel()`` (or
+        :func:`ensure_default_ctx`) and pass the result as ``scope=`` to
+        :class:`Agent` / :class:`Team` constructors.
+    """
+    warnings.warn(
+        SET_DEFAULT_CTX_DEPRECATION_REASON,
+        DeprecationWarning,
+        stacklevel=2,
+    )
     with holder.boot_lock:
         existing = holder.ctx
         if existing is not None and existing is not ctx:
@@ -119,10 +147,22 @@ def get_or_create_default_ctx() -> Context:
     )
 
 
+# Emit a single deprecation notice on module import so existing apps
+# surface the upcoming removal in their logs at startup.
+warnings.warn(
+    SET_DEFAULT_CTX_DEPRECATION_REASON,
+    DeprecationWarning,
+    stacklevel=2,
+)
+
 __all__ = [
+    "SET_DEFAULT_CTX_DEPRECATION_REASON",
     "DefaultContextHolder",
     "ensure_default_ctx",
     "get_or_create_default_ctx",
     "holder",
-    "set_default_ctx",
+    # NOTE: ``set_default_ctx`` is intentionally not exported. It remains
+    # importable for the deprecation window but disappears from ``__all__``
+    # so star-imports (``from lca.application.default_context import *``)
+    # cannot bring it into new call sites by accident.
 ]
