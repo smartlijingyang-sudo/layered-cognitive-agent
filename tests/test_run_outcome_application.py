@@ -1,8 +1,8 @@
 from types import SimpleNamespace
 
-from gateway.runs.execute.loop_drivers import DriverOutcome
-from gateway.runs.session.session import RunSession, RunStatus
-from gateway.runs.terminal.outcome import RunOutcomeApplier
+from lca.plugins.transport.webserver.handlers.runs.execute.loop_drivers import DriverOutcome
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession, RunStatus
+from lca.plugins.transport.webserver.handlers.runs.terminal.outcome import RunOutcomeApplier
 from lca.contracts.models.core.lifecycle import TaskStatus
 
 

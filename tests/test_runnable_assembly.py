@@ -6,12 +6,12 @@ import unittest
 from collections.abc import Callable
 from typing import cast
 
-from gateway.runs.lifecycle.runnable_assembly import (
+from lca.plugins.transport.webserver.handlers.runs.lifecycle.runnable_assembly import (
     CognitiveRunnableAssembler,
     RunnableAssemblyRequest,
     RunnableBuildRequest,
 )
-from gateway.runs.session.session import RunSession
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
 from lca.contracts.protocols import LLMAdapter
 from lca.contracts.protocols.session.run_mode import RunModeRegistryProtocol
 from lca.infrastructure.observability import BoundObservability

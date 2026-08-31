@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gateway.modes import LCA_UI_MODELS
+from lca.cognition.team.modes_catalog import LCA_UI_MODELS
 
 _CATALOG = Path("deploy/lobehub/patches/provider/lca_model_catalog.py").read_text(encoding="utf-8")
 _DRIVER = Path("deploy/lobehub/patches/runtime/lca_run_driver.py").read_text(encoding="utf-8")

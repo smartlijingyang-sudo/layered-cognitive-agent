@@ -7,7 +7,7 @@ from importlib import import_module
 from typing import Any, cast
 from unittest.mock import patch
 
-from gateway.runs.session.session import RunRegistry, RunSession
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunSession
 
 
 class _Coordinator:
@@ -27,7 +27,7 @@ class TestRunExecutionFacade(unittest.IsolatedAsyncioTestCase):
         registry = RunRegistry()
         coordinator = _Coordinator()
         context = object()
-        execution_module = import_module("gateway.runs.execute")
+        execution_module = import_module("lca.plugins.transport.webserver.handlers.runs.execute")
 
         with patch.object(
             execution_module,
@@ -59,7 +59,7 @@ class TestRunExecutionFacade(unittest.IsolatedAsyncioTestCase):
         registry = RunRegistry()
         coordinator = _Coordinator()
         session = cast("RunSession", object())
-        execution_module = import_module("gateway.runs.execute")
+        execution_module = import_module("lca.plugins.transport.webserver.handlers.runs.execute")
 
         with patch.object(
             execution_module,

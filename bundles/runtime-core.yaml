@@ -22,6 +22,6 @@ entries:
 
   - id: lca-loop-cognitive
     name: lca_loop_cognitive
-    $module: gateway.plugins.cognitive_loop
+    $module: lca.cognition.team.modes.cognitive_loop
     config:
       target: cognitive

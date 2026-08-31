@@ -103,7 +103,7 @@ def _make_app_with_bound(
     from starlette.applications import Starlette
     from starlette.routing import Route
 
-    from gateway.runs.api.query_endpoints import get_run_evidence
+    from lca.plugins.transport.webserver.handlers.runs.api.query_endpoints import get_run_evidence
 
     application = Starlette(
         routes=[
@@ -225,7 +225,7 @@ def test_evidence_endpoint_missing_store_404() -> None:
     from starlette.applications import Starlette
     from starlette.routing import Route
 
-    from gateway.runs.api.query_endpoints import get_run_evidence
+    from lca.plugins.transport.webserver.handlers.runs.api.query_endpoints import get_run_evidence
 
     app = Starlette(
         routes=[

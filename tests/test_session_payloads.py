@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from gateway.session_payloads import (
+from lca.plugins.transport.webserver.handlers.session_payloads import (
     accepted_receipt_payload,
     command_receipt_payload,
     snapshot_payload,

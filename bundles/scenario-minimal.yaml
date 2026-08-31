@@ -19,5 +19,5 @@ entries:
   # Loop driver (Tier-3) — cognitive runtime is the only assembly path.
   - id: lca-loop-cognitive
     name: lca_loop_cognitive
-    $module: gateway.plugins.cognitive_loop
+    $module: lca.cognition.team.modes.cognitive_loop
     config: {}

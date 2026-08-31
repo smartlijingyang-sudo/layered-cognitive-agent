@@ -420,7 +420,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             AttachmentStagingStarted,
             domain=VocabDomain.RESOURCE,
-            emitter="gateway.runs.execute",
+            emitter="lca.plugins.transport.webserver.handlers.runs.execute",
             required=("plane_id", "file_count"),
             description="附件暂存开始（host → machine bootstrap channel）",
             durability="best_effort",
@@ -430,7 +430,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             AttachmentStagingCompleted,
             domain=VocabDomain.RESOURCE,
-            emitter="gateway.runs.execute",
+            emitter="lca.plugins.transport.webserver.handlers.runs.execute",
             required=("plane_id", "file_count"),
             description="附件暂存完成",
             durability="best_effort",
@@ -440,7 +440,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             AttachmentStagingFailed,
             domain=VocabDomain.RESOURCE,
-            emitter="gateway.runs.execute",
+            emitter="lca.plugins.transport.webserver.handlers.runs.execute",
             required=("plane_id", "error"),
             description="附件暂存失败（路径拒绝、传输超时、IO 错误）",
             durability="required",

@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 from starlette.testclient import TestClient
 
-from gateway.runs.session.session import RunRegistry, RunSession, RunStatus, run_dedup_key
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunSession, RunStatus, run_dedup_key
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 from lca.infrastructure.openai_compat import (
     extract_json_schema_format,

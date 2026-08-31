@@ -22,7 +22,7 @@ from typing import Any
 
 import pytest
 
-from gateway.plugins.default_modes import (
+from lca.cognition.team.modes.default_modes import (
     _CordisCreatorModeAdapter,
     _SoloModeAdapter,
     _TeamModeAdapter,
@@ -72,9 +72,9 @@ def test_builtin_mode_plugins_are_entry_local() -> None:
     different Creator adapter without editing a shared defaults registrar.
     """
 
-    from gateway.plugins.cordis_creator_mode import setup as creator_setup
-    from gateway.plugins.solo_mode import setup as solo_setup
-    from gateway.plugins.team_mode import setup as team_setup
+    from lca.cognition.team.modes.cordis_creator_mode import setup as creator_setup
+    from lca.cognition.team.modes.solo_mode import setup as solo_setup
+    from lca.cognition.team.modes.team_mode import setup as team_setup
 
     solo = definition_from_plugin(solo_setup)
     team = definition_from_plugin(team_setup)
@@ -240,7 +240,7 @@ def test_default_must_reference_a_registered_adapter() -> None:
 def test_gateway_resolve_lca_mode_uses_registry_when_provided() -> None:
     """``resolve_lca_mode(model, registry=...)`` consults the registry."""
 
-    from gateway.modes import (
+    from lca.cognition.team.modes_catalog import (
         CORDIS_CREATOR_MODE_KEY,
         SOLO_MODE_KEY,
         resolve_lca_mode,
@@ -262,7 +262,7 @@ def test_gateway_resolve_lca_mode_uses_registry_when_provided() -> None:
 def test_profile_mode_requires_a_bound_mode_registry() -> None:
     """Production profile resolution rejects a missing mode capability."""
 
-    from gateway.modes import resolve_profile_mode
+    from lca.cognition.team.modes_catalog import resolve_profile_mode
 
     class _MissingRegistryContext:
         def inject(self, key: str) -> object:
@@ -275,7 +275,7 @@ def test_profile_mode_requires_a_bound_mode_registry() -> None:
 def test_profile_mode_uses_the_bound_mode_registry() -> None:
     """Production profile resolution delegates all matching to the registry."""
 
-    from gateway.modes import resolve_profile_mode
+    from lca.cognition.team.modes_catalog import resolve_profile_mode
 
     registry = RunModeRegistry()
     registry.register(_SoloModeAdapter())
@@ -293,7 +293,7 @@ def test_profile_mode_uses_the_bound_mode_registry() -> None:
 def test_gateway_resolve_lca_mode_falls_back_without_registry() -> None:
     """Without a registry, the function uses the static fallback map."""
 
-    from gateway.modes import (
+    from lca.cognition.team.modes_catalog import (
         CORDIS_CREATOR_MODE_KEY,
         SOLO_MODE_KEY,
         resolve_lca_mode,

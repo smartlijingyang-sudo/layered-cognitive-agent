@@ -15,8 +15,8 @@ import pytest
 from starlette.testclient import TestClient
 
 from lca_kernel.cli import create_app
-from gateway.runs.session.session import RunRegistry, RunSession
-from gateway.runs.terminal.legacy_adapter import RegistryRunAdapter
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunSession
+from lca.plugins.transport.webserver.handlers.runs.terminal.legacy_adapter import RegistryRunAdapter
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     ReasoningDelta,
@@ -87,7 +87,7 @@ async def test_session_run_adapter_is_not_on_the_chat_path() -> None:
     import importlib
 
     with pytest.raises(ModuleNotFoundError):
-        importlib.import_module("gateway.runs.session.session_adapter")
+        importlib.import_module("lca.plugins.transport.webserver.handlers.runs.session.session_adapter")
 
 
 @pytest.mark.asyncio

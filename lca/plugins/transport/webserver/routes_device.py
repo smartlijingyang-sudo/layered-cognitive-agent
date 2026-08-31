@@ -10,16 +10,6 @@ from typing import Any
 
 from starlette.routing import Route, WebSocketRoute
 
-from gateway.device_gateway.routes import (
-    agent_run,
-    connect_device,
-    device_status,
-    list_devices,
-    rpc,
-    system_info,
-    tool_call,
-    upload_files,
-)
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -33,6 +23,16 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.transport.device_gateway.routes import (
+    agent_run,
+    connect_device,
+    device_status,
+    list_devices,
+    rpc,
+    system_info,
+    tool_call,
+    upload_files,
+)
 
 ROUTES: tuple[Route, ...] = (
     Route("/api/device/status", device_status, methods=["POST", "OPTIONS"]),

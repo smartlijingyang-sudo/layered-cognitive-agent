@@ -66,10 +66,10 @@ class GatewayBootstrapFactory(Protocol):
 
 class DefaultGatewayBootstrapFactory:
     def create(self, config: GatewayBootstrapConfig) -> GatewayBootstrap:
-        from gateway.device_gateway.bind import DeviceMachineResolver
-        from gateway.device_gateway.hub import DeviceHub
-        from gateway.device_gateway.registry import DeviceRegistry
-        from gateway.device_gateway.settings import DeviceGatewaySettings
+        from lca.plugins.transport.device_gateway.bind import DeviceMachineResolver
+        from lca.plugins.transport.device_gateway.hub import DeviceHub
+        from lca.plugins.transport.device_gateway.registry import DeviceRegistry
+        from lca.plugins.transport.device_gateway.settings import DeviceGatewaySettings
 
         settings = config.device_settings or DeviceGatewaySettings()
         file_store = LocalFileStore(
@@ -113,8 +113,10 @@ def install_bootstrap_state(
     cfg = config or GatewayBootstrapConfig()
     boot = factory.create(cfg)
 
-    from gateway.runs.session.session import RunRegistry
-    from gateway.runs.terminal.legacy_adapter import RegistryRunAdapter
+    from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry
+    from lca.plugins.transport.webserver.handlers.runs.terminal.legacy_adapter import (
+        RegistryRunAdapter,
+    )
 
     run_registry = RunRegistry()
     run_port = RegistryRunAdapter(run_registry, machine_resolver=boot.machine_resolver)
@@ -185,7 +187,7 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     实际 ``app.state`` 注入由 :func:`lca.plugins.transport.webserver.server.setup`
     在 K3 完成后 ``ctx.require("install_bootstrap_state")`` 触发。
 
-    长期可维护:``install_bootstrap_state`` 是从 ``gateway.bootstrap.install_gateway_state``
+    长期可维护:``install_bootstrap_state`` 是从 ``lca.plugins.transport.webserver.bootstrap.install_bootstrap_state``
     整体迁移过来的(原函数体没动),保持 historical 行为;未来 ADR followup 把
     ``gateway.bootstrap`` 业务搬到 ``lca.runtime.run_*`` 后,本包装层可删。
     """

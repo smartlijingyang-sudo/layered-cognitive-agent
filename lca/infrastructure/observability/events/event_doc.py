@@ -347,7 +347,7 @@ def _doc_attach_started() -> EventDoc:
     return EventDoc(
         summary="附件暂存开始 —— 把上传文件复制到受治理的工作区",
         why="文件不进 prompt 直送,先 sanitized 后被工具引用",
-        arch="L4 gateway.runs.execute;ADR-0051 run workspace plane",
+        arch="L4 lca.plugins.transport.webserver.handlers.runs.execute;ADR-0051 run workspace plane",
         layer="gateway",
     )
 
@@ -357,7 +357,7 @@ def _doc_attach_completed() -> EventDoc:
     return EventDoc(
         summary="附件暂存成功,可被工具读取",
         why="审计 + 为下游工具给路径;路径受 sandbox 策略约束",
-        arch="L4 gateway.runs.execute",
+        arch="L4 lca.plugins.transport.webserver.handlers.runs.execute",
         layer="gateway",
     )
 
@@ -367,7 +367,7 @@ def _doc_attach_failed() -> EventDoc:
     return EventDoc(
         summary="附件暂存失败(权限 / 路径 / 病毒扫描)",
         why="通常意味着 H2 断裂,jsonl 为空",
-        arch="L4 gateway.runs.execute 错误路径",
+        arch="L4 lca.plugins.transport.webserver.handlers.runs.execute 错误路径",
         layer="gateway",
     )
 

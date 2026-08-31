@@ -469,12 +469,12 @@ entries:
 
   - id: lca-mode-solo-default
     name: lca_mode_solo_default
-    $module: gateway.plugins.solo_mode
+    $module: lca.cognition.team.modes.solo_mode
     config: {}
 
   - id: lca-mode-team-default
     name: lca_mode_team_default
-    $module: gateway.plugins.team_mode
+    $module: lca.cognition.team.modes.team_mode
     config: {}
 
   # ── ADR-0065 / W1: Evidence store seam ──

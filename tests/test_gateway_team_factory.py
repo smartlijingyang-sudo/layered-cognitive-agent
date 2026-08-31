@@ -5,13 +5,13 @@ from __future__ import annotations
 import json
 import unittest
 
-from gateway.modes import ALL_MODES
-from gateway.plugins.default_modes import (
+from lca.cognition.team.modes_catalog import ALL_MODES
+from lca.cognition.team.modes.default_modes import (
     build_runnable_team,
     build_solo_agent,
     resolve_team_casting_dependencies,
 )
-from gateway.plugins.solo_mode import filter_solo_tools
+from lca.cognition.team.modes.solo_mode import filter_solo_tools
 from lca.agent.role_library import FileRoleLibrary
 from lca.application.api import Agent, Team
 from lca.application.casting import LLMTeamCaster

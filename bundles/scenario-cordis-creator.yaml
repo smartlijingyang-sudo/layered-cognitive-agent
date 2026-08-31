@@ -43,7 +43,7 @@ entries:
   # replace or remove it without editing the base Gateway mode configuration.
   - id: lca-mode-cordis-creator-default
     name: lca_mode_cordis_creator_default
-    $module: gateway.plugins.cordis_creator_mode
+    $module: lca.cognition.team.modes.cordis_creator_mode
     config: {}
 
   # File + bash — creator needs to author bundles on disk.

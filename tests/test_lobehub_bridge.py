@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from gateway.runs.ingest import (
+from lca.plugins.transport.webserver.handlers.runs.ingest import (
     FileRef,
     HttpxFileFetcher,
     IngestCache,
@@ -17,7 +17,7 @@ from gateway.runs.ingest import (
     reset_ingest_cache_for_tests,
     select_ingest_files,
 )
-from gateway.runs.ingest.ingress import (
+from lca.plugins.transport.webserver.handlers.runs.ingest.ingress import (
     compose_run_question,
     parse_messages,
     prepare_run_from_messages,

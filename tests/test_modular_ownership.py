@@ -9,14 +9,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gateway.plugins.cordis_creator_mode import _CordisCreatorModeAdapter
-from gateway.plugins.default_modes import (
+from lca.cognition.team.modes.cordis_creator_mode import _CordisCreatorModeAdapter
+from lca.cognition.team.modes.default_modes import (
     _CordisCreatorModeAdapter as CompatibilityCreatorAdapter,
 )
-from gateway.plugins.default_modes import _SoloModeAdapter as CompatibilitySoloAdapter
-from gateway.plugins.default_modes import _TeamModeAdapter as CompatibilityTeamAdapter
-from gateway.plugins.solo_mode import _SoloModeAdapter
-from gateway.plugins.team_mode import _TeamModeAdapter
+from lca.cognition.team.modes.default_modes import _SoloModeAdapter as CompatibilitySoloAdapter
+from lca.cognition.team.modes.default_modes import _TeamModeAdapter as CompatibilityTeamAdapter
+from lca.cognition.team.modes.solo_mode import _SoloModeAdapter
+from lca.cognition.team.modes.team_mode import _TeamModeAdapter
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -40,8 +40,8 @@ def test_execution_environment_only_coordinates_scope_order() -> None:
     """Binding resolution and attachment effects must stay outside the coordinator."""
     source = _source("gateway/runs/execute/execution_environment.py")
 
-    assert "gateway.runs.execute.environment_bindings" in source
-    assert "gateway.runs.api.attachment_staging" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.execute.environment_bindings" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.api.attachment_staging" in source
     assert "resolve_plane_bindings(" not in source
     assert "FileStoreAttachmentIdentity" not in source
     assert "AttachmentStagingStarted" not in source
@@ -51,9 +51,9 @@ def test_default_mode_facade_keeps_backward_imports_without_owning_behavior() ->
     """Each mode owns its builder and adapter; the old module only re-exports them."""
     source = _source("gateway/plugins/default_modes.py")
 
-    assert "from gateway.plugins.solo_mode import" in source
-    assert "from gateway.plugins.team_mode import" in source
-    assert "from gateway.plugins.cordis_creator_mode import" in source
+    assert "from lca.cognition.team.modes.solo_mode import" in source
+    assert "from lca.cognition.team.modes.team_mode import" in source
+    assert "from lca.cognition.team.modes.cordis_creator_mode import" in source
     assert "class _" not in source
     assert "def build_" not in source
     assert CompatibilitySoloAdapter is _SoloModeAdapter
@@ -65,9 +65,9 @@ def test_ingress_only_orchestrates_text_history_and_file_reference_parsing() -> 
     """Message ingress must not regain its platform-specific parsing implementations."""
     source = _source("gateway/runs/ingest/ingress.py")
 
-    assert "gateway.runs.session.message_history" in source
-    assert "gateway.runs.session.message_text" in source
-    assert "gateway.runs.api.file_reference_parsing" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.session.message_history" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.session.message_text" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.api.file_reference_parsing" in source
     assert "re.compile(" not in source
     assert "def _collect_file_refs" not in source
 
@@ -76,10 +76,10 @@ def test_ingest_facade_keeps_policy_cache_transport_and_mirroring_separate() -> 
     """The stable ingest path must not become a second implementation container."""
     source = _source("gateway/runs/ingest/ingest.py")
 
-    assert "gateway.runs.ingest.cache" in source
-    assert "gateway.runs.ingest.integrity" in source
-    assert "gateway.runs.ingest.policy" in source
-    assert "gateway.runs.ingest.service" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.ingest.cache" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.ingest.integrity" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.ingest.policy" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.ingest.service" in source
     assert "class IngestCache" not in source
     assert "async def ingest_file_refs" not in source
 
@@ -88,13 +88,13 @@ def test_doctor_facade_separates_legacy_and_session_spine_read_models() -> None:
     """Legacy journal hops and Session Spine projections must retain separate owners."""
     source = _source("gateway/runs/doctor/doctor.py")
 
-    assert "gateway.runs.doctor.legacy" in source
-    assert "gateway.runs.doctor.session_check" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.doctor.legacy" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.doctor.session_check" in source
     assert "def _scan_jsonl" not in source
     assert "def _hop_h2" not in source
 
     legacy_source = _source("gateway/runs/doctor/legacy.py")
-    assert "gateway.runs.doctor.journal" in legacy_source
+    assert "lca.plugins.transport.webserver.handlers.runs.doctor.journal" in legacy_source
 
 
 def test_temporal_memory_store_delegates_schema_and_record_codec() -> None:
@@ -112,10 +112,10 @@ def test_terminalizer_only_coordinates_terminal_transition_order() -> None:
     """Terminal status, artifact closure, manifest, and exporter cleanup have owners."""
     source = _source("gateway/runs/terminal/terminalizer.py")
 
-    assert "gateway.runs.terminal.status" in source
-    assert "gateway.runs.observability.artifact_closure" in source
-    assert "gateway.runs.terminal.materialization" in source
-    assert "gateway.runs.lifecycle.export_disposal" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.terminal.status" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.observability.artifact_closure" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.terminal.materialization" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.lifecycle.export_disposal" in source
     assert "def _derive_terminal_status" not in source
     assert "def _record_terminal_materialization" not in source
 

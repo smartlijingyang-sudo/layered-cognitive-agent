@@ -186,7 +186,7 @@ entries:
   # are loaded; nothing in gateway hard-codes drivers.
   - id: lca-loop-cognitive
     name: lca_loop_cognitive
-    $module: gateway.plugins.cognitive_loop
+    $module: lca.cognition.team.modes.cognitive_loop
     config:
       target: cognitive
   # Cognitive is the default loop driver; the bundle decides whether to load

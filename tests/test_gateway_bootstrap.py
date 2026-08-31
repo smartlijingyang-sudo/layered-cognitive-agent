@@ -22,9 +22,9 @@ from lca.plugins.transport.webserver.bootstrap import (
     GatewayBootstrap,
     GatewayBootstrapConfig,
 )
-from gateway.device_gateway.hub import DeviceHub
-from gateway.device_gateway.registry import DeviceRegistry
-from gateway.device_gateway.settings import DeviceGatewaySettings
+from lca.plugins.transport.device_gateway.hub import DeviceHub
+from lca.plugins.transport.device_gateway.registry import DeviceRegistry
+from lca.plugins.transport.device_gateway.settings import DeviceGatewaySettings
 from lca.contracts.models.core.plane import PlaneRef
 from lca.contracts.protocols.runtime.infra import MachineResolver, MachineTransport
 from lca.infrastructure.file_store import LocalFileStore

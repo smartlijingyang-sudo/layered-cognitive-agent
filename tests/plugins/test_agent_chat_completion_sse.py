@@ -12,8 +12,8 @@ from typing import Any
 
 import pytest
 
-from gateway.runs.session.session import RunRegistry, RunSession
-from gateway.runs.terminal.legacy_adapter import RegistryRunAdapter
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunSession
+from lca.plugins.transport.webserver.handlers.runs.terminal.legacy_adapter import RegistryRunAdapter
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     ReasoningDelta,

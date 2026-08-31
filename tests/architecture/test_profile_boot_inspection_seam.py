@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from gateway.runs.session.setup import plugin_inventory_from_boot_products
+from lca.plugins.transport.webserver.handlers.runs.session.setup import plugin_inventory_from_boot_products
 from lca.contracts.mechanisms.capability import MissingCapabilityError
 from lca.harness.diagnostics.inspect import format_capability_graph, format_plugin_tree
 from lca.harness.profile.boot import boot_entries, boot_profile, load_profile_entries

@@ -10,8 +10,8 @@ import pytest
 from starlette.applications import Starlette
 from starlette.testclient import TestClient
 
-from gateway.runs.session.session import RunRegistry, RunSession
-from gateway.runs.terminal.legacy_adapter import RegistryRunAdapter
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunSession
+from lca.plugins.transport.webserver.handlers.runs.terminal.legacy_adapter import RegistryRunAdapter
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     ReasoningDelta,

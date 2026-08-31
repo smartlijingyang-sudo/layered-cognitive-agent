@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from gateway.runs.doctor import diagnose
-from gateway.runs.session.session import RunSession, RunStatus
+from lca.plugins.transport.webserver.handlers.runs.doctor import diagnose
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession, RunStatus
 from lca.infrastructure.observability.journal.engine.journal_io import JOURNAL_SCHEMA_VERSION
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 

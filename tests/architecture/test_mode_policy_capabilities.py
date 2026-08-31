@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from gateway.plugins.cordis_creator_mode import build_cordis_creator_agent
+from lca.cognition.team.modes.cordis_creator_mode import build_cordis_creator_agent
 from lca.application.casting import build_from_casting_plan
 from lca.contracts.capabilities import CORDIS_CONTROL_TOOL_FACTORY, CORDIS_CREATOR_ROLE
 from lca.contracts.mechanisms.capability import MissingCapabilityError

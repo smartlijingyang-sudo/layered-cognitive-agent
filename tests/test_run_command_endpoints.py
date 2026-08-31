@@ -8,9 +8,9 @@ from starlette.applications import Starlette
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from gateway.runs.api.command_endpoints import create_run
-from gateway.runs.ingest.ingress import LobeHubRunInput
-from gateway.runs.terminal.port import RunReceipt
+from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import create_run
+from lca.plugins.transport.webserver.handlers.runs.ingest.ingress import LobeHubRunInput
+from lca.plugins.transport.webserver.handlers.runs.terminal.port import RunReceipt
 
 
 def _identity_mode(_ctx: object, key: str) -> str:
@@ -31,15 +31,15 @@ _INPUT = LobeHubRunInput(user_text="hello", question="hello")
 def _post_runs(spy: AsyncMock, payload: dict[str, object]) -> object:
     with (
         patch(
-            "gateway.runs.api.routes.command_endpoints.llm_status",
+            "lca.plugins.transport.webserver.handlers.runs.api.routes.command_endpoints.llm_status",
             return_value={"llm_available": True},
         ),
         patch(
-            "gateway.runs.api.routes.command_endpoints.resolve_profile_mode",
+            "lca.plugins.transport.webserver.handlers.runs.api.routes.command_endpoints.resolve_profile_mode",
             side_effect=_identity_mode,
         ),
         patch(
-            "gateway.runs.api.routes.command_endpoints.prepare_run_from_messages",
+            "lca.plugins.transport.webserver.handlers.runs.api.routes.command_endpoints.prepare_run_from_messages",
             new=AsyncMock(return_value=_INPUT),
         ),
     ):

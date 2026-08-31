@@ -12,13 +12,6 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
-from gateway.files import download_file, get_file_meta
-from gateway.openai_shim import (
-    chat_completions,
-    embeddings_create,
-    list_models,
-    responses_create,
-)
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -32,6 +25,13 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.transport.webserver.handlers.files import download_file, get_file_meta
+from lca.plugins.transport.webserver.handlers.openai_shim import (
+    chat_completions,
+    embeddings_create,
+    list_models,
+    responses_create,
+)
 
 
 async def _download_file(request: Request) -> Response:

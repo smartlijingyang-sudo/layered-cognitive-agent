@@ -1,6 +1,6 @@
 """Register the ``/health`` + OPTIONS handlers (PR-4 routes-health-options).
 
-handler 内部继续复用 ``gateway.runs.api.routes`` 现有实现;本 PR 只关注
+handler 内部继续复用 ``lca.plugins.transport.webserver.handlers.runs.api.routes`` 现有实现;本 PR 只关注
 plugin 化路由注册,不重构 handler 内部(留给 PR-5 清理跨层 import)。
 """
 
@@ -12,8 +12,6 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
-from gateway.cors import CORS_HEADERS
-from gateway.runs.api.query_endpoints import get_context, health_payload, stream_journal_live
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -27,6 +25,12 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.transport.webserver.handlers.cors import CORS_HEADERS
+from lca.plugins.transport.webserver.handlers.runs.api.query_endpoints import (
+    get_context,
+    health_payload,
+    stream_journal_live,
+)
 
 
 async def _options(_request: Request) -> JSONResponse:

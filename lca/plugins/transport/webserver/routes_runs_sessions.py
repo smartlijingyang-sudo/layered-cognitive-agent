@@ -1,7 +1,7 @@
 """Register ``/runs`` + ``/v1/sessions`` route groups (PR-4 routes-runs-sessions).
 
-handler 内部继续复用 ``gateway.runs.api.command_endpoints`` /
-``gateway.runs.api.query_endpoints`` / ``gateway.session_routes`` 的现有
+handler 内部继续复用 ``lca.plugins.transport.webserver.handlers.runs.api.command_endpoints`` /
+``lca.plugins.transport.webserver.handlers.runs.api.query_endpoints`` / ``gateway.session_routes`` 的现有
 实现;本 PR 只 plugin 化路由注册,不重构 handler 内部(留给 PR-5 清理跨层 import)。
 """
 
@@ -11,28 +11,6 @@ from typing import Any
 
 from starlette.routing import Route
 
-from gateway.runs.api.command_endpoints import (
-    answer_run,
-    cancel_run,
-    create_run,
-)
-from gateway.runs.api.query_endpoints import (
-    get_run,
-    get_run_doctor,
-    get_run_evidence,
-    get_run_profile,
-    stream_run_live,
-)
-from gateway.session_routes import (
-    command_answer,
-    command_cancel,
-    command_inject,
-    command_steer,
-    create_session,
-    get_snapshot,
-    send_message,
-    stream_events,
-)
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -46,6 +24,28 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import (
+    answer_run,
+    cancel_run,
+    create_run,
+)
+from lca.plugins.transport.webserver.handlers.runs.api.query_endpoints import (
+    get_run,
+    get_run_doctor,
+    get_run_evidence,
+    get_run_profile,
+    stream_run_live,
+)
+from lca.plugins.transport.webserver.handlers.session_routes import (
+    command_answer,
+    command_cancel,
+    command_inject,
+    command_steer,
+    create_session,
+    get_snapshot,
+    send_message,
+    stream_events,
+)
 
 # PR-7 (本批):把 ``/runs/{run_id}/profile`` 与 ``/runs/{run_id}/evidence/{ref}``
 # 从 ``gateway.routes.build_routes`` 迁过来,build_routes 退役 —— plugin 是

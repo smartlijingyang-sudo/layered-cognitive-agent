@@ -64,7 +64,7 @@ def create_scripted_app(
                 ctx.provide("llm_resolver", resolver)
                 app.state.ctx = ctx
                 ctx.inject("gateway_router").install(app)
-                install_gateway_state(app, ctx)
+                install_bootstrap_state(app, ctx)
                 await send({"type": "lifespan.startup.complete"})
                 await receive()
                 await send({"type": "lifespan.shutdown.complete"})

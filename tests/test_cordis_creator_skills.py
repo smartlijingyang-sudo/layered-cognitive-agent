@@ -315,7 +315,7 @@ class TestFilterCreatorTools(unittest.TestCase):
     """
 
     def test_keeps_creator_subset_in_input_order(self) -> None:
-        from gateway.plugins.default_modes import filter_creator_tools
+        from lca.cognition.team.modes.default_modes import filter_creator_tools
 
         pool = [
             _fake_tool("file_write"),
@@ -342,7 +342,7 @@ class TestFilterCreatorTools(unittest.TestCase):
 
     def test_returns_empty_when_input_is_none(self) -> None:
         """Empty pool must raise so misconfiguration is loud."""
-        from gateway.plugins.default_modes import filter_creator_tools
+        from lca.cognition.team.modes.default_modes import filter_creator_tools
 
         with self.assertRaises(RuntimeError) as ctx:
             filter_creator_tools(None, allowed_tools={"activate_skill"})
@@ -350,7 +350,7 @@ class TestFilterCreatorTools(unittest.TestCase):
 
     def test_fails_loud_when_activate_skill_missing(self) -> None:
         """Pool without activate_skill is a profile bug; raise clearly."""
-        from gateway.plugins.default_modes import filter_creator_tools
+        from lca.cognition.team.modes.default_modes import filter_creator_tools
 
         pool = [_fake_tool("file_write"), _fake_tool("bash")]
         with self.assertRaises(RuntimeError) as ctx:
@@ -363,7 +363,7 @@ class TestFilterCreatorTools(unittest.TestCase):
         self.assertIn("lca-ops", msg)
 
     def test_fails_loud_when_pool_is_empty_list(self) -> None:
-        from gateway.plugins.default_modes import filter_creator_tools
+        from lca.cognition.team.modes.default_modes import filter_creator_tools
 
         with self.assertRaises(RuntimeError):
             filter_creator_tools([], allowed_tools={"activate_skill"})
