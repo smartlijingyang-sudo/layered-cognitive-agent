@@ -42,12 +42,13 @@ log:emit
 - `boot_profile`
 - `boot_resolved_profile`
 - `dump_resolved`
-- `install_profile_lifespan`
 - `load_profile_entries`
-- `noop_lifespan`
-- `profile_lifespan`
 - `resolve_profile`
-- `starlette_profile_lifespan`
+
+> Lifespan 已迁移到 kernel 公共面（ADR-0115 K6 + ADR-0117 K6）。
+> 使用 :func:`lca_kernel.run_kernel_lifespan` 作为单一入口，
+> 不再在本模块导出 ``install_profile_lifespan`` / ``profile_lifespan``
+> / ``starlette_profile_lifespan`` / ``noop_lifespan``。
 
 **模块清单**:
 
