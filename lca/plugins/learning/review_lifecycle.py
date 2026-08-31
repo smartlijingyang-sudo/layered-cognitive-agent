@@ -19,8 +19,15 @@ from lca.contracts.capabilities import (
     LEARNING_SKILL_ACQUIRER,
     RUNTIME_LIFECYCLE_SUBSCRIBER_REGISTRY,
 )
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.runtime.runtime_lifecycle import (
     RuntimeLifecycleSubscriber,
@@ -93,16 +100,19 @@ _REVIEWABLE_STATUSES = frozenset(
     description="Queue terminal evidence references for candidate-only learning review.",
     test_suite="tests/architecture/test_learning_review_lifecycle.py",
     kind=PluginKind.PROVIDER,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G4_PERCEPTION,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.RUN,
-        authority=("plugin.serve",),
-        evidence=(
-            "lca-learning-review-lifecycle-subscriber.checked",
-            "lca-learning-review-lifecycle-subscriber.served",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G4_PERCEPTION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
         ),
-        revision="v1",
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=(
+                "lca-learning-review-lifecycle-subscriber.checked",
+                "lca-learning-review-lifecycle-subscriber.served",
+            )
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

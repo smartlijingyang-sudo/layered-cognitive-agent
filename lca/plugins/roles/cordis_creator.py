@@ -19,11 +19,18 @@ from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.capabilities import CORDIS_CREATOR_ROLE
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.models.team.role_team import (
     RoleProfile,
     ToolPermissionManifest,
 )
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
@@ -116,13 +123,16 @@ def build_cordis_creator_role_profile() -> RoleProfile:
     description="Creator §13.3 cordis-creator role persona + tool permission manifest",
     test_suite="tests/test_cordis_creator_e2e.py",
     kind=PluginKind.PRIMITIVE,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G8_COLLAB,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.PROFILE,
-        authority=("plugin.serve",),
-        evidence=("lca-role-cordis-creator.checked", "lca-role-cordis-creator.served"),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G8_COLLAB, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.PROFILE,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=("lca-role-cordis-creator.checked", "lca-role-cordis-creator.served")
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

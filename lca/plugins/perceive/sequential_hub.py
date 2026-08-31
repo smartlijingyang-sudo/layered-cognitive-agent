@@ -8,8 +8,15 @@ from lca.cognition.perceive_hub import SequentialPerceiveHub
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.protocols import MemorySystem, PerceiveHub, Sensor
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.think.cognition import PerceiveHubAssembler
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
@@ -41,13 +48,14 @@ class SequentialPerceiveHubAssembler(PerceiveHubAssembler):
     test_suite="tests/test_cognitive_group_assembly.py",
     kind=PluginKind.PRIMITIVE,
     functional_group=FunctionalGroup.G4_PERCEPTION,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G4_PERCEPTION,
-        control_slot=ControlSlot.PERCEIVE_CONTEXT,
-        scope=Scope.AGENT,
-        authority=("perceive.assemble",),
-        evidence=("perceive.hub.sequential.assembled",),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G4_PERCEPTION, control_slots=(ControlSlot.PERCEIVE_CONTEXT,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.AGENT,)),
+        authority=AuthorityContract(grants=("perceive.assemble",)),
+        observability=EvidenceContract(descriptors=("perceive.hub.sequential.assembled",)),
     ),
     ownership=OwnershipDeclaration(
         reads=("plugin.serve",),

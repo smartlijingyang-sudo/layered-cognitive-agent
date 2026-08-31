@@ -14,8 +14,15 @@ from lca.contracts.capabilities import (
     RESUME_INPUT_ADAPTERS,
     STRATEGIES,
 )
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.mechanisms.factory_registry import FactoryRegistry
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
@@ -39,13 +46,16 @@ class Config(BaseModel):
     effects="none",
     description=("Empty BODIES/BRAINS/HOOKS/RESUME_INPUT_ADAPTERS/STRATEGIES registry seams."),
     test_suite="tests/test_plugin_alignment.py::test_factory_registry_seams",
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G10_COMPOSITION,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.RUN,
-        authority=("plugin.serve",),
-        evidence=("lca-factory-seams-default.checked", "lca-factory-seams-default.served"),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G10_COMPOSITION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=("lca-factory-seams-default.checked", "lca-factory-seams-default.served")
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

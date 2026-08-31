@@ -9,7 +9,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     CapabilityDeclaration,
     EvidenceDeclaration,
@@ -103,16 +110,19 @@ SPEC = PluginSpec(
     effects=EffectClass.NONE,
     test_suite="tests/declarative/test_phase_execution_policy.py",
     spec=SPEC,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G7_EXECUTION,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.RUN,
-        authority=("plugin.serve",),
-        evidence=(
-            "phase_execution_policy_resilient.checked",
-            "phase_execution_policy_resilient.served",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G7_EXECUTION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
         ),
-        revision="v1",
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=(
+                "phase_execution_policy_resilient.checked",
+                "phase_execution_policy_resilient.served",
+            )
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

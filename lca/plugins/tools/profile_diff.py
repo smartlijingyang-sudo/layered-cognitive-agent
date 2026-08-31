@@ -12,10 +12,17 @@ from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.atoms.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.tool import ParameterSpec, ToolApi, ToolManifest, ToolMeta
 from lca.contracts.protocols import Tool
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
@@ -139,13 +146,16 @@ MANIFEST = ToolManifest(
     description="Register a read-only profile candidate diff Tool.",
     test_suite="tests/architecture/test_self_improving_plugins.py",
     kind=PluginKind.PRIMITIVE,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G7_EXECUTION,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.TURN,
-        authority=("tool.invoke",),
-        evidence=("lca-tool-profile-diff.checked", "lca-tool-profile-diff.served"),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G7_EXECUTION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.TURN,)),
+        authority=AuthorityContract(grants=("tool.invoke",)),
+        observability=EvidenceContract(
+            descriptors=("lca-tool-profile-diff.checked", "lca-tool-profile-diff.served")
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

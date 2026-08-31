@@ -13,7 +13,14 @@ from lca.contracts.atoms.enums import ComponentKind
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.capabilities import COMPONENT_REGISTRY
-from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.journal.spec import MEMORY_CHOICE_SIMPLE, MEMORY_CHOICE_TEMPORAL
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
@@ -32,16 +39,19 @@ class Config(BaseModel):
     effects="none",
     description="Register simple and temporal MemorySystem implementations into the ComponentRegistry.",
     test_suite="tests/architecture/test_component_registry_seam.py",
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G10_COMPOSITION,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.RUN,
-        authority=("plugin.serve",),
-        evidence=(
-            "lca-component-memory-contributor.checked",
-            "lca-component-memory-contributor.served",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G10_COMPOSITION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
         ),
-        revision="v1",
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=(
+                "lca-component-memory-contributor.checked",
+                "lca-component-memory-contributor.served",
+            )
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

@@ -16,7 +16,14 @@ from typing import Any
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
@@ -96,13 +103,19 @@ def _looks_like_driver(obj: object) -> bool:
     description="Empty run-loop driver registry; loop plugins fill it in.",
     test_suite="tests/test_plugin_tree_single_owner.py::test_empty_execution_target_uses_profile_default",
     kind=PluginKind.PRIMITIVE,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G6_DECISION,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.RUN,
-        authority=("plugin.serve",),
-        evidence=("lca-run-loop-driver-registry.checked", "lca-run-loop-driver-registry.served"),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G6_DECISION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=(
+                "lca-run-loop-driver-registry.checked",
+                "lca-run-loop-driver-registry.served",
+            )
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

@@ -12,6 +12,14 @@ from pydantic import BaseModel, ConfigDict
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.observability.coding_agent_tools import (
     DiffContextTool,
     FailureExplainerTool,
@@ -21,7 +29,6 @@ from lca.contracts.observability.coding_agent_tools import (
     RunDiffTool,
     TraceInspectorTool,
 )
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
@@ -56,13 +63,19 @@ class Config(BaseModel):
     description="Coding Agent Tools bundle (7 read-only tools). ADR-0065 §六 / PR-8.",
     test_suite="tests/test_coding_agent_tools_bundle.py::test_bundle_registers_seven_tools",
     kind=PluginKind.BRIDGE,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G10_COMPOSITION,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.RUN,
-        authority=("context.read",),
-        evidence=("lca-coding-agent-tools-bundle.checked", "lca-coding-agent-tools-bundle.served"),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G10_COMPOSITION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("context.read",)),
+        observability=EvidenceContract(
+            descriptors=(
+                "lca-coding-agent-tools-bundle.checked",
+                "lca-coding-agent-tools-bundle.served",
+            )
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

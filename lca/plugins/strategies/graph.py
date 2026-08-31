@@ -10,12 +10,19 @@ from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.capabilities import GRAPH_NODE_EXECUTORS, STRATEGIES
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.models.team.team_coordination import STRATEGY_KEY_GRAPH, Graph
 from lca.contracts.protocols import (
     GraphNodeExecutorRegistryProtocol,
     TeamAssembly,
 )
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
@@ -54,13 +61,16 @@ class Config(BaseModel):
     effects="none",
     description="Register graph TeamStrategy factory.",
     test_suite="tests/test_graph_strategy.py",
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G7_EXECUTION,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.RUN,
-        authority=("plugin.serve",),
-        evidence=("strategy_graph.checked", "strategy_graph.served"),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G7_EXECUTION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=("strategy_graph.checked", "strategy_graph.served")
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

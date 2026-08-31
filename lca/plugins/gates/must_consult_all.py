@@ -8,8 +8,15 @@ from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.enums import DecisionGateName
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.protocols import DecisionGate
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
@@ -28,13 +35,14 @@ class Config(BaseModel):
     description="DecisionGate that forces lead to consult every team member before responding.",
     test_suite="tests/test_refactor_guards.py::TestProgressiveDisclosureVocabulary::test_must_consult_all_rewrites_early_respond",
     functional_group=FunctionalGroup.G6_DECISION,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G6_DECISION,
-        control_slot=ControlSlot.THINK_GUARD,
-        scope=Scope.TURN,
-        authority=("team.progress.read", "decision.rewrite"),
-        evidence=("gate.must-consult-all.enforced",),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G6_DECISION, control_slots=(ControlSlot.THINK_GUARD,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.TURN,)),
+        authority=AuthorityContract(grants=("team.progress.read", "decision.rewrite")),
+        observability=EvidenceContract(descriptors=("gate.must-consult-all.enforced",)),
     ),
     ownership=OwnershipDeclaration(
         reads=("plugin.serve",),

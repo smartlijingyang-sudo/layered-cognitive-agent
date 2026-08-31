@@ -26,6 +26,14 @@ from lca.contracts.capabilities import (
     TEAM_SEAM,
     TEAM_SHARED_MEMORY_RESOLVER,
 )
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.mechanisms.capability import require_capability
 from lca.contracts.models.core.memory import MemoryLayer
 from lca.contracts.protocols.collaboration.agent import AgentUnit
@@ -34,7 +42,6 @@ from lca.contracts.protocols.collaboration.team_seam import (
     TeamSeamFactoryProtocol,
     TeamSharedMemoryResolverProtocol,
 )
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.journal.spec import TeamSpec
 from lca.contracts.protocols.runtime.infra import AgentTransport
@@ -67,13 +74,16 @@ class TeamSeam:
     description="Provide the TeamSeam Definition service for TeamComposer.",
     test_suite="tests/test_plugin_alignment.py::test_tier1_plugin_shape",
     kind=PluginKind.SEAM,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G10_COMPOSITION,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.RUN,
-        authority=("plugin.serve",),
-        evidence=("lca-team-seam-seam.checked", "lca-team-seam-seam.served"),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G10_COMPOSITION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=("lca-team-seam-seam.checked", "lca-team-seam-seam.served")
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

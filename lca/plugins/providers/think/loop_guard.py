@@ -7,7 +7,14 @@ from pydantic import BaseModel
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.gate.loop_guard import LoopGuardEvaluator
 from lca.harness.declarative.execute.loop_guard import DeclarativeLoopGuardEvaluator
@@ -32,13 +39,16 @@ class Config(BaseModel):
         "Provide the default declarative LoopGuard evaluator so profiles can replace "
         "loop re-entry policy without changing the graph interpreter."
     ),
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G10_COMPOSITION,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.RUN,
-        authority=("plugin.serve",),
-        evidence=("lca-declarative-loop-guard.checked", "lca-declarative-loop-guard.served"),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G10_COMPOSITION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=("lca-declarative-loop-guard.checked", "lca-declarative-loop-guard.served")
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

@@ -9,7 +9,14 @@ from pydantic import BaseModel
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.session.session_turn import SessionFollowupPolicy
 from lca.harness.agent.followup_policy import EnqueueFollowupPolicy, RejectFollowupPolicy
@@ -35,13 +42,19 @@ class Config(BaseModel):
         "Provide a pure, profile-selected policy for admitting follow-up messages "
         "while a Session turn is active."
     ),
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G10_COMPOSITION,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.RUN,
-        authority=("plugin.serve",),
-        evidence=("lca-session-followup-policy.checked", "lca-session-followup-policy.served"),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G10_COMPOSITION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=(
+                "lca-session-followup-policy.checked",
+                "lca-session-followup-policy.served",
+            )
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

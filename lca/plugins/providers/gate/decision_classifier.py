@@ -10,9 +10,16 @@ from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.atoms.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.models.core.decision import Decision, DelegationSpec, ToolCall
 from lca.contracts.models.core.llm import LLMResponse
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.gate.decision_classifier import DecisionClassifier
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
@@ -99,16 +106,19 @@ class DefaultDecisionClassifier(DecisionClassifier):
     description="Provide the default DecisionClassifier implementation.",
     test_suite="tests/test_plugin_alignment.py::test_tier2_plugin_shape",
     kind=PluginKind.PROVIDER,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G10_COMPOSITION,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.RUN,
-        authority=("plugin.serve",),
-        evidence=(
-            "lca-decision-classifier-provider.checked",
-            "lca-decision-classifier-provider.served",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G10_COMPOSITION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
         ),
-        revision="v1",
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=(
+                "lca-decision-classifier-provider.checked",
+                "lca-decision-classifier-provider.served",
+            )
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

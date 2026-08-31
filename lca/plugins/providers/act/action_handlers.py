@@ -17,11 +17,18 @@ from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.capabilities import ACTION_HANDLERS, TOOL_BATCH_EXECUTION_POLICY
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.protocols import SafeExecutor, ToolRegistry, TransportRegistryProtocol
 from lca.contracts.protocols.act.action import Action
 from lca.contracts.protocols.act.action_handler import ActionHandler, ActionHandlerRegistry
 from lca.contracts.protocols.act.tool_batch_execution import ToolBatchExecutionPolicy
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.handler_registry import UniqueOperationRegistry
@@ -268,13 +275,14 @@ def _compatibility_safe_batch_policy() -> ToolBatchExecutionPolicy:
     kind=PluginKind.PROVIDER,
     test_suite="tests/test_plugin_alignment.py::test_tier2_plugin_shape",
     functional_group=FunctionalGroup.G7_EXECUTION,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G7_EXECUTION,
-        control_slot=ControlSlot.ACT_EXECUTE,
-        scope=Scope.AGENT,
-        authority=(ACTION_HANDLERS.key, TOOL_BATCH_EXECUTION_POLICY.key),
-        evidence=("action.handler.registered",),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G7_EXECUTION, control_slots=(ControlSlot.ACT_EXECUTE,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.AGENT,)),
+        authority=AuthorityContract(grants=(ACTION_HANDLERS.key, TOOL_BATCH_EXECUTION_POLICY.key)),
+        observability=EvidenceContract(descriptors=("action.handler.registered",)),
     ),
     ownership=OwnershipDeclaration(
         reads=("plugin.serve",),

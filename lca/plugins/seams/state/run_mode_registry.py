@@ -39,7 +39,14 @@ from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.capabilities import RUN_MODE_REGISTRY
-from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.session.run_mode import (
     ModeAdapter,
@@ -137,13 +144,16 @@ class RunModeRegistry(RunModeRegistryProtocol):
     description="Provide the run_mode_registry capability for ADR-0076 §六.",
     test_suite="tests/architecture/test_run_mode_registry.py::test_seam_provides_empty_registry",
     kind=PluginKind.SEAM,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G10_COMPOSITION,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.RUN,
-        authority=("plugin.serve",),
-        evidence=("lca-run-mode-registry-seam.checked", "lca-run-mode-registry-seam.served"),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G10_COMPOSITION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=("lca-run-mode-registry-seam.checked", "lca-run-mode-registry-seam.served")
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

@@ -16,8 +16,15 @@ from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.capabilities import TOOL_BATCH_EXECUTION_POLICY
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.protocols.act.tool_batch_execution import ToolBatchExecutionPolicy
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
@@ -59,13 +66,14 @@ def build_tool_batch_execution_policy(mode: str) -> ToolBatchExecutionPolicy:
     ),
     test_suite="tests/cognition/body/test_tool_batch_execution.py",
     functional_group=FunctionalGroup.G7_EXECUTION,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G7_EXECUTION,
-        control_slot=ControlSlot.ACT_EXECUTE,
-        scope=Scope.TURN,
-        authority=(TOOL_BATCH_EXECUTION_POLICY.key,),
-        evidence=("tool.batch.execution.planned",),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G7_EXECUTION, control_slots=(ControlSlot.ACT_EXECUTE,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.TURN,)),
+        authority=AuthorityContract(grants=(TOOL_BATCH_EXECUTION_POLICY.key,)),
+        observability=EvidenceContract(descriptors=("tool.batch.execution.planned",)),
     ),
     ownership=OwnershipDeclaration(
         reads=("plugin.serve",),

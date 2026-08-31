@@ -29,16 +29,32 @@ from collections.abc import Sequence
 # Capture: fg_value, slot_value, scope_value, authority_value, evidence_value, revision_value.
 # Note: ``authority`` / ``evidence`` are tuples containing commas (``("a", "b")``),
 # so the inner capture must allow ``,`` but NOT ``\n`` — capture to end-of-line.
+# Match the column-aligned full-blocks pattern, supporting multi-line tuples
+# for ``evidence=`` and ``authority=`` (some plugin files have parenthesised
+# continuation like:
+#     evidence=(
+#         "name.checked",
+#         "name-2.checked",
+#     ),
+# ).
+#
+# Strategy: capture each kwarg value to the closing "," / ")" at the same
+# indent column. Multi-line values use a greedy match into subsequent
+# parenthesised body lines.
 _BLOCK_RE = re.compile(
     r"^(?P<indent>[ \t]*)logic_address=LogicAddress\("
     r"\n[ \t]+functional_group=(?P<fg>[^,\n]+),"
     r"\n[ \t]+control_slot=(?P<slot>[^,\n]+),"
     r"\n[ \t]+scope=(?P<scope>[^,\n]+),"
-    r"\n[ \t]+authority=(?P<authority>[^\n]+),"
-    r"\n[ \t]+evidence=(?P<evidence>[^\n]+),"
+    r"\n[ \t]+authority=(?P<authority>"
+    r"(?:\([^)]*\)|[^\n]+)"  # either single-line tuple or scalar
+    r"),"
+    r"\n[ \t]+evidence=(?P<evidence>"
+    r"(?:\((?:[^()]|\([^()]*\))*\)|[^\n]+)"  # nested or single-line tuple, or scalar
+    r"),"
     r"\n[ \t]+revision=(?P<revision>[^\n]+),"
     r"\n[ \t]*\),",
-    re.MULTILINE,
+    re.MULTILINE | re.VERBOSE,
 )
 
 _PLUGIN_CONTRACT_IMPORT = (

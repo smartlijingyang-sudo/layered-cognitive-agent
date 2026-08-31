@@ -7,7 +7,14 @@ from pydantic import BaseModel
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.session.session_turn import SessionTurnControllerFactory
 from lca.harness.agent.turn_controller import InProcessSessionTurnController
@@ -39,16 +46,19 @@ class InProcessSessionTurnControllerFactory(SessionTurnControllerFactory):
         "Provide isolated session-turn task ownership so a Profile may replace "
         "cancellation and serialization behavior without changing a loop or carrier."
     ),
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G10_COMPOSITION,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.RUN,
-        authority=("plugin.serve",),
-        evidence=(
-            "lca-session-turn-controller-factory.checked",
-            "lca-session-turn-controller-factory.served",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G10_COMPOSITION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
         ),
-        revision="v1",
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=(
+                "lca-session-turn-controller-factory.checked",
+                "lca-session-turn-controller-factory.served",
+            )
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

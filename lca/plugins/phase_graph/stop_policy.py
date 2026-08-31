@@ -14,12 +14,19 @@ from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.enums import ActionType, ReflectionVerdict
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.models.core.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.core.stop import StopDecision, StopReason
 from lca.contracts.protocols import ArtifactClosure, StopPolicy
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
@@ -141,13 +148,14 @@ class DefaultStopPolicy(StopPolicy):
     test_suite="tests/plugins/state/test_stop_policy.py",
     kind=PluginKind.PROVIDER,
     functional_group=FunctionalGroup.G3_FACTS,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G3_FACTS,
-        control_slot=ControlSlot.STOP_DECIDE,
-        scope=Scope.RUN,
-        authority=("stop_policy.read",),
-        evidence=("policy.stop.default.stopped",),
-        revision="v2",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v2"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G3_FACTS, control_slots=(ControlSlot.STOP_DECIDE,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("stop_policy.read",)),
+        observability=EvidenceContract(descriptors=("policy.stop.default.stopped",)),
     ),
     ownership=OwnershipDeclaration(
         reads=("stop_policy",),

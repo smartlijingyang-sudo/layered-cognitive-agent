@@ -12,7 +12,14 @@ from pydantic import BaseModel
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.runtime.infra import ToolRegistry
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
@@ -38,13 +45,16 @@ def build_tools_service_compose() -> ToolRegistry:
     description="Compose-time ToolsService factory (one fresh instance per compose).",
     test_suite="tests/test_plugin_alignment.py::test_compose_root_no_inline_instantiation",
     kind=PluginKind.PRIMITIVE,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G10_COMPOSITION,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.RUN,
-        authority=("tool.invoke",),
-        evidence=("tools_compose_service.checked", "tools_compose_service.served"),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G10_COMPOSITION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("tool.invoke",)),
+        observability=EvidenceContract(
+            descriptors=("tools_compose_service.checked", "tools_compose_service.served")
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

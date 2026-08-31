@@ -17,8 +17,15 @@ from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.capabilities import LEARNING_PROFILE_EVOLVER
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.harness.think.eval_comparison import EvalComparison
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
@@ -146,13 +153,16 @@ class Config(BaseModel):
     description="Evaluate profile candidates from frozen results; never auto-apply or publish.",
     test_suite="tests/architecture/test_self_improving_plugins.py",
     kind=PluginKind.PRIMITIVE,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G10_COMPOSITION,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.PROFILE,
-        authority=("plugin.serve",),
-        evidence=("lca-profile-evolver.checked", "lca-profile-evolver.served"),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G10_COMPOSITION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.PROFILE,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=("lca-profile-evolver.checked", "lca-profile-evolver.served")
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

@@ -8,7 +8,14 @@ from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.capabilities import RUNTIME_LIFECYCLE_SUBSCRIBER_REGISTRY
-from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.runtime.runtime_lifecycle import (
     RuntimeLifecycleSubscriber,
@@ -37,16 +44,19 @@ class Config(BaseModel):
     description="Contribute structured Agent Loop lifecycle logging without control access.",
     test_suite="tests/runtime/test_runtime_lifecycle_plugins.py",
     kind=PluginKind.PROVIDER,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G10_COMPOSITION,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.RUN,
-        authority=("plugin.serve",),
-        evidence=(
-            "lca-runtime-lifecycle-logging-provider.checked",
-            "lca-runtime-lifecycle-logging-provider.served",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G10_COMPOSITION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
         ),
-        revision="v1",
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=(
+                "lca-runtime-lifecycle-logging-provider.checked",
+                "lca-runtime-lifecycle-logging-provider.served",
+            )
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

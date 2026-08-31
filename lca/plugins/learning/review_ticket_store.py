@@ -10,7 +10,14 @@ from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.capabilities import LEARNING_REVIEW_TICKET_STORE
-from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.think.learning import LearningReviewTicketStore
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
@@ -36,16 +43,19 @@ class Config(BaseModel):
     description="Provide durable SQLite storage and leasing for learning-review tickets.",
     test_suite="tests/architecture/test_learning_review_ticket_store.py",
     kind=PluginKind.PROVIDER,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G4_PERCEPTION,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.RUN,
-        authority=("plugin.serve",),
-        evidence=(
-            "lca-learning-review-ticket-store.checked",
-            "lca-learning-review-ticket-store.served",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G4_PERCEPTION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
         ),
-        revision="v1",
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=(
+                "lca-learning-review-ticket-store.checked",
+                "lca-learning-review-ticket-store.served",
+            )
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

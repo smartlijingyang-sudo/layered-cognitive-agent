@@ -7,8 +7,15 @@ from pydantic import BaseModel
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.protocols import Critic
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
@@ -26,13 +33,16 @@ class Config(BaseModel):
     description="Provide NullCritic as ``critic.null`` (ADR-0068 default).",
     test_suite="tests/test_plugin_alignment.py",
     kind=PluginKind.PRIMITIVE,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G5_COGNITION,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.TURN,
-        authority=("plugin.serve",),
-        evidence=("lca-critic-null.checked", "lca-critic-null.served"),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G5_COGNITION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.TURN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=("lca-critic-null.checked", "lca-critic-null.served")
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

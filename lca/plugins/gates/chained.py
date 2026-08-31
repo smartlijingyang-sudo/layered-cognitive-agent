@@ -8,8 +8,15 @@ from lca.cognition.brain.decision_gates.chained import ChainedDecisionGate
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.protocols import DecisionGate
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.think.cognition import DecisionGateAssembler
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
@@ -36,13 +43,14 @@ class ChainedDecisionGateAssembler(DecisionGateAssembler):
     test_suite="tests/test_cognitive_group_assembly.py",
     kind=PluginKind.PRIMITIVE,
     functional_group=FunctionalGroup.G6_DECISION,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G6_DECISION,
-        control_slot=ControlSlot.THINK_GUARD,
-        scope=Scope.AGENT,
-        authority=("gates.assemble",),
-        evidence=("gates.chain.sequential.assembled",),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G6_DECISION, control_slots=(ControlSlot.THINK_GUARD,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.AGENT,)),
+        authority=AuthorityContract(grants=("gates.assemble",)),
+        observability=EvidenceContract(descriptors=("gates.chain.sequential.assembled",)),
     ),
     ownership=OwnershipDeclaration(
         reads=("plugin.serve",),

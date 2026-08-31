@@ -7,7 +7,14 @@ from pydantic import BaseModel, ConfigDict
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.composer.act.body_composer import BodyComposer
@@ -33,13 +40,16 @@ class Config(BaseModel):
     description="Plan-bound AgentGraph and TeamGraph composers with narrow interfaces.",
     test_suite="tests/application/test_spawn_bind_plan.py",
     kind=PluginKind.PROVIDER,
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G10_COMPOSITION,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.RUN,
-        authority=("context.read",),
-        evidence=("lca-plan-sub-composers.checked", "lca-plan-sub-composers.served"),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G10_COMPOSITION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("context.read",)),
+        observability=EvidenceContract(
+            descriptors=("lca-plan-sub-composers.checked", "lca-plan-sub-composers.served")
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(

@@ -8,6 +8,14 @@ from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.capabilities import GRAPH_NODE_EXECUTORS
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import Result
 from lca.contracts.models.core.state import Budget
@@ -16,7 +24,6 @@ from lca.contracts.protocols.collaboration.graph_node_executor import (
     GraphNodeExecutionContext,
     GraphNodeExecutor,
 )
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 
@@ -71,13 +78,19 @@ class AggregatorGraphNodeExecutor(GraphNodeExecutor):
     effects=EffectClass.NONE,
     description="Register the default predecessor-result aggregation primitive for graph nodes.",
     test_suite="tests/test_graph_node_executors.py",
-    logic_address=LogicAddress(
-        functional_group=FunctionalGroup.G7_EXECUTION,
-        control_slot=ControlSlot.OBSERVE_WILDCARD,
-        scope=Scope.RUN,
-        authority=("plugin.serve",),
-        evidence=("graph-node_aggregator_default.checked", "graph-node_aggregator_default.served"),
-        revision="v1",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G7_EXECUTION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=(
+                "graph-node_aggregator_default.checked",
+                "graph-node_aggregator_default.served",
+            )
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(
