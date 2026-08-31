@@ -1,7 +1,8 @@
 """Patch: copy Journal projector TS; hook executeClientAgent.
 
 Implementation lives in the sibling .ts files. This module only copies
-them, generates lcaWire.ts from gateway.runs.wire, and shorts the
+them, generates lcaWire.ts from the WIRE table at
+``lca.plugins.transport.webserver.handlers.runs.wire``, and shorts the
 LobeHub AgentRuntime entry.
 """
 
@@ -11,7 +12,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from deploy.lobehub.engine import PatchContext, PatchMeta
-from gateway.runs.wire import WIRE
+from lca.plugins.transport.webserver.handlers.runs.wire import WIRE
 
 _HERE = Path(__file__).resolve().parent
 _UI_TRANSPORTS = "src/store/chat/agents/transports"
@@ -45,7 +46,7 @@ meta = PatchMeta(
 
 def render_wire_ts(wire: Mapping[str, tuple[str, str]]) -> str:
     lines = [
-        "/** Generated from gateway.runs.wire.WIRE. Do not edit. */",
+        "/** Generated from lca.plugins.transport.webserver.handlers.runs.wire.WIRE. Do not edit. */",
         "",
         "export const WIRE: Record<string, readonly [string, string]> = {",
     ]
