@@ -14,6 +14,8 @@ from lca.contracts.protocols.runtime.infra import MachineResolver
 from lca.plugins.transport.webserver.handlers.runs.execute.execute import (
     create_run_session,
     resume_run,
+)
+from lca.plugins.transport.webserver.handlers.runs.execute.scheduling import (
     schedule_run,
 )
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunStatus
