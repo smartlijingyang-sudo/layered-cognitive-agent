@@ -106,15 +106,15 @@ type = "forbidden"
 source_modules = ["lca.plugins"]
 forbidden_modules = ["gateway"]
 
-# ── 契约 6: 下层 (L0–L3 + application) 不得反向依赖 kernel ──
+# ── 契约 6: 下层 (L0–L3) 不得 import lca_kernel 内部模块 ──
 # ADR-0115 决定 3: lca_kernel 是顶层 host 包,下层禁止 import。
-# Application 是 L4 组合根,允许走公共面调 run_kernel,但禁止 import
-# 内部模块(source/resolve/plan/boot/lifecycle/...)。当前阶段仅阻断
-# source_modules = contracts/infrastructure/cognition/runtime/agent
-# 防止反向 import 内部模块;公共面(lca_kernel.run_kernel 等)在应用层
-# 走 spawn 入口而非直接 import。
+# 严格说应禁 lca_kernel 整包 + 公共面(application/cli 走 spawn 入口),
+# 但 CLI kernel command + transport lifespan_adapter 需要走公共面。
+# 用 forbidden (top-level lca_kernel) + ignore_imports 列白名单。
+# 真正对子模块(source/plan/...) 的访问,由
+# ``tests/lca_kernel/test_boundary.py`` AST 检查覆盖。
 [[tool.importlinter.contracts]]
-name = "kernel-domain-isolation: L0–L3 + application 不得 import lca_kernel 内部"
+name = "kernel-domain-isolation: L0–L3 不得 import lca_kernel"
 type = "forbidden"
 source_modules = [
     "lca.contracts",
@@ -123,48 +123,28 @@ source_modules = [
     "lca.runtime",
     "lca.agent",
 ]
-forbidden_modules = [
-    "lca_kernel.source",
-    "lca_kernel.resolve",
-    "lca_kernel.declarations",
-    "lca_kernel.plan",
-    "lca_kernel.closure",
-    "lca_kernel.boot",
-    "lca_kernel.observability",
-    "lca_kernel.lifecycle",
-    "lca_kernel.env",
-    "lca_kernel.stages",
-    "lca_kernel.trace",
-    "lca_kernel.errors",
+forbidden_modules = ["lca_kernel"]
+ignore_imports = [
+    # CLI 是 kernel 的合法调用方(``lca-ops kernel {boot,serve,stop,compose}``);
+    # 走公共面 import (compile_profile / run_kernel / stop_kernel)。
+    "lca.infrastructure.cli.commands.kernel -> lca_kernel",
 ]
 
-# ── 契约 7: transport plugin 不得反向依赖 kernel 内部 + cognition/agent/runtime ──
+# ── 契约 7: transport plugin 不得 import kernel 内部 + cognition/agent/runtime ──
 # ADR-0115 决定 3: transport (lca/plugins/transport/**) 是独立 transport
-# namespace,通过 ctx.inject 跟 kernel 交互,不直接 import kernel 内部
-# 也不 import 认知/agent/运行时实现细节。允许 import kernel 公共面
-# (lca_kernel.__init__.py re-exports run_kernel_lifespan / run_kernel / Stage)。
+# namespace。通过 ctx.inject 跟 kernel 交互,不直接 import kernel 内部。
+# 公共面(lca_kernel.run_kernel_lifespan / run_kernel / Stage / PatchConfig)
+# 允许走 lifespan_adapter。
 [[tool.importlinter.contracts]]
-name = "transport-isolation: lca.plugins.transport 不得 import kernel 内部 / cognition / agent / runtime"
+name = "transport-isolation: lca.plugins.transport 不得 import cognition / agent / runtime"
 type = "forbidden"
 source_modules = ["lca.plugins.transport"]
 forbidden_modules = [
-    "lca_kernel.source",
-    "lca_kernel.resolve",
-    "lca_kernel.declarations",
-    "lca_kernel.plan",
-    "lca_kernel.closure",
-    "lca_kernel.boot",
-    "lca_kernel.observability",
-    "lca_kernel.lifecycle",
-    "lca_kernel.hmr",
-    "lca_kernel.env",
-    "lca_kernel.stages",
-    "lca_kernel.trace",
-    "lca_kernel.errors",
     "lca.cognition",
     "lca.agent",
     "lca.runtime",
 ]
+# lca_kernel 公共面是 transport 的合法依赖,这里只禁认知/运行/Agent 实现。
 
 [dependency-groups]
 dev = [
