@@ -17,7 +17,11 @@ from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.team.team_awareness import TeamAwareness
 from lca.contracts.protocols.act.effect_handler import EffectHandlerRegistry
 from lca.contracts.protocols.act.embodiment import Body
-from lca.contracts.protocols.declarative.declarative_execution import PhaseCapabilityReader
+from lca.contracts.protocols.declarative.declarative_execution import (
+    DeltaReducer,
+    EffectGateway,
+    PhaseCapabilityReader,
+)
 from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseExecutor
 from lca.contracts.protocols.journal.artifact_closure import ArtifactClosure
 from lca.contracts.protocols.journal.idempotency import IdempotencyStore
@@ -234,7 +238,7 @@ class DeclarativeRuntimeBindings:
             )
         return interpreter
 
-    def new_effect_gateway(self):
+    def new_effect_gateway(self) -> EffectGateway:
         """Create the profile-selected effect seam from the frozen binding closure."""
         return self.effect_gateway_factory.create(
             capabilities=self.capabilities,
@@ -242,7 +246,7 @@ class DeclarativeRuntimeBindings:
             idempotency_store=self.idempotency_store,
         )
 
-    def new_delta_reducer(self):
+    def new_delta_reducer(self) -> DeltaReducer:
         """Create the profile-selected delta seam from the frozen binding closure."""
         return self.delta_reducer_factory.create(
             reducer=self.reducer,
