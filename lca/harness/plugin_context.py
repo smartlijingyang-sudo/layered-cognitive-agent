@@ -62,7 +62,7 @@ class AuditedPluginContext:
     """Wraps a Context and expose only Manifest-audited setup interactions."""
 
     __inner: object
-    _definition: PluginDefinition
+    _definition: PluginDefinition[Any]
     provided: set[str] = field(default_factory=set)
     required: set[str] = field(default_factory=set)
     registered: set[tuple[str, str]] = field(default_factory=set)

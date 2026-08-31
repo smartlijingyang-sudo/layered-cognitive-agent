@@ -34,9 +34,7 @@ from lca.contracts.protocols.runtime.attachment_errors import (
     UnresolvedFileRefError,
 )
 from lca.infrastructure.attachment.default_provider import DefaultAttachmentResolver
-from lca.infrastructure.attachment.run_file_store_scope import (
-    get_current_run_file_store,
-)
+from lca.infrastructure.observability.facade.run_ambit import current_file_store as get_current_run_file_store
 from lca.infrastructure.file_store import FileStore
 
 _LCA_FILE_URL: Final = re.compile(r"^/files/([A-Za-z0-9_-]+)/?$")

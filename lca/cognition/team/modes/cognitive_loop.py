@@ -7,9 +7,10 @@ entry belongs to the outer composition root.  It still consumes the LCA
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import cast
 
 import structlog
+from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.capabilities import (
     RUN_MODE_REGISTRY,
@@ -28,6 +29,13 @@ from lca.plugins.transport.webserver.handlers.runs.lifecycle.runnable_assembly i
 _log = structlog.get_logger(__name__)
 
 
+class Config(BaseModel):
+    """Pydantic config for ``lca-loop-cognitive``."""
+
+    model_config = ConfigDict(extra="forbid")
+    target: str = "cognitive"
+
+
 def _cognitive_driver_factory(ctx: object) -> CognitiveRunDriver:
     """Build the Gateway driver with the Profile's declared mode registry.
 
@@ -43,6 +51,7 @@ def _cognitive_driver_factory(ctx: object) -> CognitiveRunDriver:
 
 @plugin(
     id="lca-loop-cognitive",
+    Config=Config,
     requires=[
         "run_loop_driver_registry",
         RUN_MODE_REGISTRY.key,
@@ -57,14 +66,13 @@ def _cognitive_driver_factory(ctx: object) -> CognitiveRunDriver:
     test_suite="tests/test_plugin_tree_single_owner.py",
     kind=PluginKind.PRIMITIVE,
 )
-async def setup(ctx: PluginContext, config: dict[str, Any]) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     """Mount the cognitive live-agent factory and profile-aware run driver."""
 
-    target = (config or {}).get("target", "cognitive") if isinstance(config, dict) else "cognitive"
     registry = ctx.require("run_loop_driver_registry")
-    registry.register(target, lambda: _cognitive_driver_factory(ctx))
+    registry.register(config.target, lambda: _cognitive_driver_factory(ctx))
     ctx.provide("agent_loop", build_cognitive_live_agent)
-    _log.debug("agent_loop_registered", target=target)
+    _log.debug("agent_loop_registered", target=config.target)
 
 
-__all__ = ["setup"]
+__all__ = ["Config", "setup"]

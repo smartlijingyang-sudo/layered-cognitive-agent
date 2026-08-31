@@ -11,7 +11,7 @@ module-level singleton.
 
 from __future__ import annotations
 
-from typing import Any
+from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
@@ -93,8 +93,16 @@ def _looks_like_driver(obj: object) -> bool:
     return callable(getattr(obj, "execute", None))
 
 
+class Config(BaseModel):
+    """Pydantic config for ``lca-run-loop-driver-registry``."""
+
+    model_config = ConfigDict(extra="forbid")
+    default: str | None = None
+
+
 @plugin(
     id="lca-run-loop-driver-registry",
+    Config=Config,
     provides=["run_loop_driver_registry"],
     requires=[],
     implements=[],
@@ -124,14 +132,11 @@ def _looks_like_driver(obj: object) -> bool:
         state_mutation="forbidden",
     ),
 )
-async def setup(ctx: PluginContext, config: dict[str, Any]) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     """Provide an empty driver registry; loop plugins fill it in.
 
     Config shape::
 
         default: cognitive   # fallback target when request omits one
     """
-    default = None
-    if isinstance(config, dict):
-        default = config.get("default")
-    ctx.provide("run_loop_driver_registry", RunLoopDriverRegistry(default=default))
+    ctx.provide("run_loop_driver_registry", RunLoopDriverRegistry(default=config.default))

@@ -15,7 +15,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, replace
 from enum import Enum
-from typing import TYPE_CHECKING, TypeAlias
+from typing import TYPE_CHECKING, Generic, TypeAlias, TypeVar
 
 from pydantic import BaseModel
 
@@ -39,12 +39,21 @@ __all__ = [
 ]
 
 
+# ``C`` is the bound for a plugin's concrete pydantic ``Config``. Every
+# ``@plugin`` setup declares ``config: MyConfig`` (a subclass of BaseModel),
+# so ``PluginSetupFn[C]`` lets the decorator preserve that specificity instead
+# of erasing it to ``Callable[..., BaseModel]`` (which mypy would reject via
+# the contravariant argument position of ``Callable``).
+C = TypeVar("C", bound=BaseModel)
+
 # A plugin's ``setup`` callable MUST match this signature. The constraint
 # lives at the decorator entry point on purpose: mypy enforces it for every
 # ``@plugin``-decorated function, so untyped ``async def setup(ctx, config)``
-# is rejected at decoration time, not at use time. ``BaseModel`` is the
-# abstract bound for the pydantic Config; concrete subclasses satisfy it.
-PluginSetupFn = Callable[["PluginContext", BaseModel], Awaitable[None]]
+# is rejected at decoration time, not at use time. ``PluginSetupFn[C]`` is
+# invariant across C (it's both read and passed back), so concrete ``Config``
+# subclasses remain valid as long as ``C`` is bound consistently with the
+# adjacent ``Config: type[C]`` field on ``PluginDefinition``.
+PluginSetupFn = Callable[["PluginContext", C], Awaitable[None]]
 
 # These aliases mark the only intentionally open payloads at the declaration
 # seam. Runtime resolution turns them into closed plan entries before a plan
@@ -75,16 +84,21 @@ _LAYER_VALUES = frozenset({"L0", "L1", "L2", "L3", "L4"})
 
 
 @dataclass(frozen=True, slots=True)
-class PluginDefinition:
+class PluginDefinition(Generic[C]):
     """连接原生声明目录与 Cordis 启动载体的深模块。
 
     ``spec`` 是插件身份、能力、层级、效果和验证信息的唯一事实源；``Config`` 与
     ``setup`` 则是启动期不可序列化载体。调用方必须通过 ``provided_capability_keys``
     和 ``required_capability_keys`` 读取审计能力，不能重新解析装饰器元数据。
+
+    泛型参数 ``C`` 与 ``Config: type[C]`` 与 ``setup: PluginSetupFn[C]`` 共享同一
+    个 TypeVar，使得调用方在静态层面知道 ``definition.setup`` 期望的 config
+    类型；保留 ``Config: type[C] | None`` 是因为某些插件（譬如 L1 启动器、
+    兜底 stub）没有具体 Config schema。
     """
 
-    Config: type[BaseModel] | None
-    setup: PluginSetupFn
+    Config: type[C] | None
+    setup: PluginSetupFn[C]
     spec: PluginSpec
     description: str
     relations: tuple[RawRelationEntry, ...] = ()
@@ -113,7 +127,7 @@ class PluginDefinition:
         """Return the closed dependency catalog used by Resolve and boot audit."""
         return tuple(capability.key for capability in self.spec.requires)
 
-    def with_config(self, config: type[BaseModel]) -> PluginDefinition:
+    def with_config(self, config: type[C]) -> PluginDefinition[C]:
         """Attach a resolved Config carrier while keeping its native schema truthful."""
         schema = f"{config.__module__}.{config.__name__}"
         return replace(
@@ -125,7 +139,7 @@ class PluginDefinition:
             ),
         )
 
-    def with_module(self, module: str) -> PluginDefinition:
+    def with_module(self, module: str) -> PluginDefinition[C]:
         """Attribute the executable implementation to the module Resolve imported."""
         return replace(
             self,

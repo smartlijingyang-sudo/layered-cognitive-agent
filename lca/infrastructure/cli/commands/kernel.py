@@ -50,25 +50,29 @@ def register(app: typer.Typer) -> None:
     def kernel_serve(
         profile_path: Path = typer.Argument(  # noqa: B008
             "profiles/web-standard.yaml",
-            help="Profile YAML path the webserver transport should boot",
+            help="Profile YAML path the LCA kernel should boot",
         ),
-        host: str = typer.Option("127.0.0.1", "--host", help="uvicorn host"),
-        port: int = typer.Option(8765, "--port", help="uvicorn port"),
+        host: str = typer.Option("127.0.0.1", "--host", help="lca_kernel serve host"),
+        port: int = typer.Option(8765, "--port", help="lca_kernel serve port"),
     ) -> None:
-        """Print the command to run the webserver transport for this profile.
+        """Print the command to start the LCA kernel (ADR-0119 决定 4).
 
-        The kernel CLI stays transport-agnostic — it does not subprocess
-        ``uvicorn`` directly. To serve, run:
+        ``lca-ops`` 不再管理 LCA 进程 — LCA :8765 由 ``lca_kernel serve`` 自管,
+        SIGTERM/SIGINT 由 K6 ``lca_kernel.lifecycle`` 守护。本子命令只打印
+        启动命令供脚本化集成使用;要拉起进程请直接运行打印的命令,或跑
+        ``./scripts/lca-ops heal`` 让 KernelServeService 自愈。
 
-            LCA_PROFILE=<profile_path> \\
-            uvicorn gateway.app:create_app --factory --host <h> --port <p>
+        命令:
+
+            uv run python -m lca_kernel serve \\
+                --profile <profile_path> --host <h> --port <p> --allow-unknown-env
         """
         typer.echo(f"运行模式 OK · kernel_serve profile={profile_path} host={host} port={port}")
         typer.echo("To start, run (in another shell):")
         typer.echo(
-            f"  LCA_PROFILE={profile_path} "
-            f"uvicorn gateway.app:create_app --factory "
-            f"--host {host} --port {port}"
+            f"  uv run python -m lca_kernel serve "
+            f"--profile {profile_path} "
+            f"--host {host} --port {port} --allow-unknown-env"
         )
 
     @app.command(name="kernel_compose")

@@ -7,6 +7,8 @@ shorthand must both be foldable into the canonical 9-section
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel
 
 from lca.contracts.atoms.control_slot import ControlSlot
@@ -197,8 +199,8 @@ class TestContractSnapshot:
 
 
 class TestPluginDecoratorAliases:
-    def _resolve(self, fn) -> PluginDefinition:
-        return fn._lca_definition  # type: ignore[attr-defined]
+    def _resolve(self, fn) -> PluginDefinition[Any]:
+        return fn._lca_definition  # type: ignore[attr-defined, no-any-return]
 
     def test_contract_key_wins_over_logic_address(self) -> None:
         @plugin(

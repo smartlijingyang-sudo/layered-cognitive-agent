@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from cordis.plugin import Plugin as CordisPlugin
 from cordis.plugin import plugin as _cordis_plugin
@@ -100,7 +100,7 @@ __all__ = ["PluginCarrier", "definition_from_plugin", "plugin"]
 class PluginCarrier(Protocol):
     """Profile Resolve 读取 Manifest 时所需的最小 Cordis 载体形状。"""
 
-    setup: PluginSetupFn
+    setup: PluginSetupFn[Any]
     Config: type[BaseModel] | None
     name: str | None
     inject: Sequence[str] | None
@@ -108,7 +108,7 @@ class PluginCarrier(Protocol):
 
 
 def plugin(
-    setup: PluginSetupFn | None = None,
+    setup: PluginSetupFn[Any] | None = None,
     *,
     id: str,
     Config: type[BaseModel] | None = None,  # noqa: N803
@@ -128,7 +128,7 @@ def plugin(
     contract: PluginContract | None = None,
     spec: PluginSpec | None = None,
     ownership: OwnershipDeclaration | None = None,
-) -> CordisPlugin | Callable[[PluginSetupFn], CordisPlugin]:
+) -> CordisPlugin | Callable[[PluginSetupFn[Any]], CordisPlugin]:
     """Declare a plugin Manifest and adapt it to the Cordis carrier.
 
     Required: ``id``, ``layer`` (``L0``–``L4``), ``kind``. Optional declaration
@@ -136,7 +136,7 @@ def plugin(
     ``PluginDefinition`` cached on the carrier.
     """
 
-    def _wrap(fn: PluginSetupFn) -> CordisPlugin:
+    def _wrap(fn: PluginSetupFn[Any]) -> CordisPlugin:
         resolved_layer, resolved_kind = resolve_layer_kind(layer=layer, kind=kind)
         config_cls = Config or config_from_annotations(fn)
         provide_keys = normalize_keys(provides)
@@ -192,7 +192,7 @@ def plugin(
         object.__setattr__(
             cordis_plugin,
             "_lca_definition",
-            PluginDefinition(
+            PluginDefinition[Any](
                 Config=config_cls,
                 setup=fn,
                 spec=spec
@@ -280,11 +280,11 @@ def definition_from_plugin(
     kind = PluginKind(kind_raw)
     effects = normalize_effects(effects_raw)
     test_suite = str(meta.get("test_suite") or "")
-    setup_fn = cast("PluginSetupFn", raw_setup)
+    setup_fn = cast("PluginSetupFn[Any]", raw_setup)
     module_name = module or getattr(raw_setup, "__module__", "__main__")
     if not isinstance(module_name, str):
         module_name = "__main__"
-    return PluginDefinition(
+    return PluginDefinition[Any](
         Config=config_cls,
         setup=setup_fn,
         spec=native_spec_from_declaration(

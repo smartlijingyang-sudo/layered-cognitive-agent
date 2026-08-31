@@ -236,9 +236,9 @@ def dump_resolved(
 def _disabled_stub(plugin_id: str, module: str) -> PluginDefinition:
     from lca.harness.plugin_api import EffectClass, PluginKind
 
-    return PluginDefinition(
+    return PluginDefinition[Any](
         Config=None,
-        setup=cast("PluginSetupFn", lambda *_args, **_kwargs: None),
+        setup=cast("PluginSetupFn[Any]", lambda *_args, **_kwargs: None),
         spec=native_spec_from_declaration(
             plugin_id=plugin_id,
             config_cls=None,
