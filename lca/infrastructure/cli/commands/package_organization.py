@@ -36,7 +36,7 @@ def register(app: typer.Typer) -> None:
 
     @app.command(name="diagnose-package-organization")
     def diagnose_package_organization(
-        gate: list[str] = typer.Option(
+        gate: list[str] = typer.Option(  # noqa: B008
             None,
             "--gate",
             help="Limit to specific gate names; default = run all",
@@ -62,7 +62,7 @@ def register(app: typer.Typer) -> None:
                 print(f"  ✗ {name}: missing {script}")
                 failures.append(name)
                 continue
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: S603
                 [sys.executable, str(script)],
                 capture_output=True,
                 text=True,

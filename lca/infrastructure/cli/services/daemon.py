@@ -11,6 +11,7 @@ against the last snapshot. ``status`` shows exactly which files changed.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import subprocess
 import time
@@ -114,14 +115,12 @@ class DaemonService:
     def stop(self) -> ServiceState:
         """Stop the daemon."""
         # Kill by user process match
-        try:
-            subprocess.run(
-                ["pkill", "-u", self._config.user, "-f", "node.*index.js.*connect"],
+        with contextlib.suppress(Exception):
+            subprocess.run(  # noqa: S603
+                ["pkill", "-u", self._config.user, "-f", "node.*index.js.*connect"],  # noqa: S607
                 capture_output=True,
                 timeout=5,
             )
-        except Exception:
-            pass
 
         self._sudo.rm(self._user_state / "connect.pid")
 
@@ -250,7 +249,7 @@ class DaemonService:
         for src in (gw_src, cli_src):
             try:
                 subprocess.run(
-                    ["npx", "tsc"],
+                    ["npx", "tsc"],  # noqa: S607
                     cwd=src,
                     capture_output=True,
                     timeout=60,
@@ -261,7 +260,7 @@ class DaemonService:
 
         try:
             subprocess.run(
-                ["npm", "install"],
+                ["npm", "install"],  # noqa: S607
                 cwd=cli_src,
                 capture_output=True,
                 timeout=120,
@@ -344,8 +343,8 @@ class DaemonService:
             return False
         self._sudo.run(["chmod", "-R", "a+rX", str(python_root)])
         try:
-            deps = subprocess.run(
-                [
+            deps = subprocess.run(  # noqa: S603
+                [  # noqa: S607
                     "uv",
                     "pip",
                     "install",
@@ -366,7 +365,7 @@ class DaemonService:
             return False
         if deps.returncode != 0:
             return False
-        verify = subprocess.run(
+        verify = subprocess.run(  # noqa: S603
             [
                 str(venv_py),
                 "-c",
@@ -417,8 +416,8 @@ exec node {cli_js} connect \\
             return None
 
         time.sleep(1)
-        pid_result = subprocess.run(
-            ["pgrep", "-u", owner, "-f", "node.*index.js.*connect"],
+        pid_result = subprocess.run(  # noqa: S603
+            ["pgrep", "-u", owner, "-f", "node.*index.js.*connect"],  # noqa: S607
             capture_output=True,
             text=True,
             timeout=5,

@@ -307,7 +307,7 @@ def create_app(
     # ownership bundle on the app (per main's API). The factory decides
     # how to source file_store / devices / device_hub etc.
     if bootstrap_factory is not None:
-        from gateway.bootstrap import GatewayBootstrapConfig as _GBC
+        from gateway.bootstrap import GatewayBootstrapConfig as _GBC  # noqa: N814
 
         product = bootstrap_factory.create(
             bootstrap_config
@@ -349,7 +349,7 @@ def create_app(
     # booted ctx so handlers + tests can resolve them via ctx.inject.
     # Soft-lock per ADR-0103 §2.
     if bootstrap_factory is not None:
-        from gateway.bootstrap import GatewayBootstrapConfig as _GBC
+        from gateway.bootstrap import GatewayBootstrapConfig as _GBC  # noqa: N814
 
         product = bootstrap_factory.create(
             bootstrap_config

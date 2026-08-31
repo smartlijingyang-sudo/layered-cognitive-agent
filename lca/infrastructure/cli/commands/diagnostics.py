@@ -32,7 +32,7 @@ def register(app: typer.Typer) -> None:
         window: int = typer.Option(
             10, "--window", help="For loop-stuck: the recent-tool window to inspect"
         ),
-        journal: Path = typer.Option(
+        journal: Path = typer.Option(  # noqa: B008
             None,
             "--journal",
             help=(
@@ -105,7 +105,7 @@ def register(app: typer.Typer) -> None:
         expected_kind: str = typer.Option(
             "", "--expected-kind", help="Manifest kind the model should have seen"
         ),
-        journal: Path = typer.Option(None, "--journal"),
+        journal: Path = typer.Option(None, "--journal"),  # noqa: B008
     ) -> None:
         """Alias for ``diagnose model-not-seen``."""
         diagnose(
@@ -119,7 +119,7 @@ def register(app: typer.Typer) -> None:
     def diagnose_loop_stuck_alias(
         trace_id: str = typer.Option(None, "--trace-id"),
         window: int = typer.Option(10, "--window"),
-        journal: Path = typer.Option(None, "--journal"),
+        journal: Path = typer.Option(None, "--journal"),  # noqa: B008
     ) -> None:
         """Alias for ``diagnose loop-stuck``."""
         diagnose(
@@ -131,14 +131,14 @@ def register(app: typer.Typer) -> None:
 
     @app.command(name="diagnose-memory-poisoned")
     def diagnose_memory_poisoned_alias(
-        journal: Path = typer.Option(None, "--journal"),
+        journal: Path = typer.Option(None, "--journal"),  # noqa: B008
     ) -> None:
         """Alias for ``diagnose memory-poisoned``."""
         diagnose(problem="memory-poisoned", journal=journal)
 
     @app.command(name="diagnose-approval-rejected")
     def diagnose_approval_rejected_alias(
-        journal: Path = typer.Option(None, "--journal"),
+        journal: Path = typer.Option(None, "--journal"),  # noqa: B008
     ) -> None:
         """Alias for ``diagnose approval-rejected``."""
         diagnose(problem="approval-rejected", journal=journal)

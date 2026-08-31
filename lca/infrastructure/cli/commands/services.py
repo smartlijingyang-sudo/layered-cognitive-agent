@@ -18,7 +18,7 @@ def register(app: typer.Typer) -> None:
         action: str = typer.Argument(None, help="start | stop | restart | status"),
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
+        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
     ) -> None:
         """LCA API :8765。日志 .lca-ops/gateway.log。动作：start stop restart status。"""
         if action is None:
@@ -49,7 +49,7 @@ def register(app: typer.Typer) -> None:
         action: str = typer.Argument(None, help="start | stop | restart | status | ensure"),
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
+        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
     ) -> None:
         """Next 前端 :3010。日志 .lca-ops/lobehub.log。ensure=源码补丁依赖，不启进程。"""
         if action is None:
@@ -82,7 +82,7 @@ def register(app: typer.Typer) -> None:
         action: str = typer.Argument(None, help="start | stop | status"),
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
+        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
     ) -> None:
         """postgres / redis / s3。start 只补缺的，已有容器会复用。"""
         if action is None:
@@ -111,7 +111,7 @@ def register(app: typer.Typer) -> None:
         action: str = typer.Argument(None, help="start | stop | restart | status | ensure"),
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
+        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
     ) -> None:
         """sandbox-user 连 gateway。日志 /home/sandbox-user/.lca/daemon.log。"""
         if action is None:

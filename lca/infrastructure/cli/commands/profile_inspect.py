@@ -17,7 +17,7 @@ def register(app: typer.Typer) -> None:
 
     @app.command()
     def inspect_tree(
-        profile: Path = typer.Argument(
+        profile: Path = typer.Argument(  # noqa: B008
             Path("profiles/web-standard.yaml"),
             help="Profile YAML path to inspect",
         ),
@@ -46,7 +46,7 @@ def register(app: typer.Typer) -> None:
 
     @app.command()
     def dump_profile(
-        profile: Path = typer.Argument(
+        profile: Path = typer.Argument(  # noqa: B008
             Path("profiles/web-standard.yaml"),
             help="Profile YAML path to dump the resolved Manifest for",
         ),
@@ -87,7 +87,7 @@ def register(app: typer.Typer) -> None:
     @app.command("why")
     def why_cmd(
         capability: str = typer.Argument(..., help="Capability key to explain"),
-        profile: Path = typer.Option(
+        profile: Path = typer.Option(  # noqa: B008
             Path("profiles/web-standard.yaml"), "--profile", "-p", help="Profile YAML"
         ),
     ) -> None:
@@ -100,7 +100,7 @@ def register(app: typer.Typer) -> None:
     @app.command("why-plugin")
     def why_plugin_cmd(
         plugin_id: str = typer.Argument(..., help="Plugin id to explain"),
-        profile: Path = typer.Option(
+        profile: Path = typer.Option(  # noqa: B008
             Path("profiles/web-standard.yaml"), "--profile", "-p", help="Profile YAML"
         ),
     ) -> None:
@@ -112,7 +112,7 @@ def register(app: typer.Typer) -> None:
 
     @app.command()
     def graph(
-        profile: Path = typer.Argument(
+        profile: Path = typer.Argument(  # noqa: B008
             Path("profiles/web-standard.yaml"),
             help="Profile YAML path",
         ),
@@ -125,14 +125,14 @@ def register(app: typer.Typer) -> None:
     @app.command()
     def debug(
         sub: str = typer.Argument(..., help="debug sub-subcommand: tree | run | scope | trace"),
-        profile: Path = typer.Option(
+        profile: Path = typer.Option(  # noqa: B008
             Path("profiles/web-standard.yaml"),
             "--profile",
             "-p",
             help="Profile YAML to boot",
         ),
         run_id: str = typer.Option(None, "--run-id", help="Run ID for `debug run` / `debug trace`"),
-        diagnostic: Path = typer.Option(
+        diagnostic: Path = typer.Option(  # noqa: B008
             None, "--diagnostic", help="Explicit diagnostic JSONL path"
         ),
         category: str = typer.Option("", "--category", help="Filter `debug trace` by category"),

@@ -17,7 +17,7 @@ def register(app: typer.Typer) -> None:
     def dev(
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
+        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
     ) -> None:
         """第一次或全停之后：起 infra + gateway + lobehub + daemon。"""
         ctx = make_context(json_mode, quiet, config)
@@ -35,7 +35,7 @@ def register(app: typer.Typer) -> None:
     def restart(
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
+        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
     ) -> None:
         """全停再起。日常异常用 heal，不要先 restart。"""
         ctx = make_context(json_mode, quiet, config)
@@ -60,7 +60,7 @@ def register(app: typer.Typer) -> None:
     def stop(
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
+        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
     ) -> None:
         """停 daemon / lobehub / gateway / infra。"""
         ctx = make_context(json_mode, quiet, config)
@@ -72,7 +72,7 @@ def register(app: typer.Typer) -> None:
     def status(
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
+        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
     ) -> None:
         """看五个服务现在怎样。异常会写出原因。heal 会自己修。"""
         ctx = make_context(json_mode, quiet, config)
@@ -84,7 +84,7 @@ def register(app: typer.Typer) -> None:
     def heal(
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
+        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
     ) -> None:
         """自己修：缺的容器拉起、过期 gateway 重启、daemon 连上。不用再拆命令。"""
         ctx = make_context(json_mode, quiet, config)
@@ -99,7 +99,7 @@ def register(app: typer.Typer) -> None:
     def provision(
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
+        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
     ) -> None:
         """装系统包、venv、sandbox 用户、工作区、CLI。新机器跑一次。"""
         ctx = make_context(json_mode, quiet, config)

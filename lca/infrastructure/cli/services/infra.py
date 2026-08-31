@@ -7,6 +7,7 @@ Setup: ensure compose file exists, copy .env if needed.
 
 from __future__ import annotations
 
+import contextlib
 import socket
 import subprocess
 from pathlib import Path
@@ -55,8 +56,8 @@ class InfraService:
         for name in wanted:
             service = self._compose_service(name)
             try:
-                result = subprocess.run(
-                    ["docker", "compose", "up", "-d", service],
+                result = subprocess.run(  # noqa: S603
+                    ["docker", "compose", "up", "-d", service],  # noqa: S607
                     cwd=compose_dir,
                     capture_output=True,
                     text=True,
@@ -89,15 +90,13 @@ class InfraService:
         """Stop infrastructure services."""
         compose_dir = self._compose_dir()
         if compose_dir:
-            try:
+            with contextlib.suppress(Exception):
                 subprocess.run(
-                    ["docker", "compose", "down"],
+                    ["docker", "compose", "down"],  # noqa: S607
                     cwd=compose_dir,
                     capture_output=True,
                     timeout=30,
                 )
-            except Exception:
-                pass
 
         return ServiceState(status=ServiceStatus.STOPPED)
 

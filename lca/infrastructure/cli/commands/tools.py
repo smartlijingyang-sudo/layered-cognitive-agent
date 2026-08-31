@@ -22,7 +22,7 @@ def register(app: typer.Typer) -> None:
     @app.command(name="trace")
     def trace(
         run_id: str = typer.Argument(..., help="Run id"),
-        jsonl: Path = typer.Option(
+        jsonl: Path = typer.Option(  # noqa: B008
             None, "--jsonl", help="journal.jsonl 路径(默认 traces/lca_journal.jsonl)"
         ),
         json_mode: bool = typer.Option(False, "--json", help="JSON 输出,给 agent"),
@@ -46,10 +46,10 @@ def register(app: typer.Typer) -> None:
         slot: str | None = typer.Argument(
             None, help="Semantic phase (only when target is control)"
         ),
-        jsonl: Path = typer.Option(None, "--jsonl"),
+        jsonl: Path = typer.Option(None, "--jsonl"),  # noqa: B008
         json_mode: bool = typer.Option(False, "--json"),
         depth: int = typer.Option(24, "--depth"),
-        profile: Path = typer.Option(
+        profile: Path = typer.Option(  # noqa: B008
             Path("profiles/web-standard.yaml"),
             "--profile",
             "-p",
@@ -120,7 +120,7 @@ def register(app: typer.Typer) -> None:
     @app.command(name="optimize")
     def optimize(
         run_id: str = typer.Argument(..., help="Run id"),
-        jsonl: Path = typer.Option(None, "--jsonl"),
+        jsonl: Path = typer.Option(None, "--jsonl"),  # noqa: B008
         json_mode: bool = typer.Option(False, "--json"),
         limit: int = typer.Option(5, "--limit", "-n"),
     ) -> None:
@@ -138,7 +138,7 @@ def register(app: typer.Typer) -> None:
     @app.command(name="graph-run")
     def graph_run(
         run_id: str = typer.Argument(..., help="Run id"),
-        jsonl: Path = typer.Option(None, "--jsonl"),
+        jsonl: Path = typer.Option(None, "--jsonl"),  # noqa: B008
     ) -> None:
         """Mermaid 插件交互图(写到 stdout;供 docs / dashboard 嵌入)。"""
         from lca.plugins.tools.diagnostics.plugin_graph_renderer import (
@@ -152,7 +152,7 @@ def register(app: typer.Typer) -> None:
     @app.command(name="minimal-repro")
     def minimal_repro(
         run_id: str = typer.Argument(..., help="Run id"),
-        jsonl: Path = typer.Option(None, "--jsonl"),
+        jsonl: Path = typer.Option(None, "--jsonl"),  # noqa: B008
         json_mode: bool = typer.Option(False, "--json"),
     ) -> None:
         """失败因果链 + 必要 evidence refs(供离线复现)。"""
@@ -176,7 +176,7 @@ def register(app: typer.Typer) -> None:
     @app.command(name="diff-context")
     def diff_context(
         run_id: str = typer.Argument(..., help="Run id"),
-        jsonl: Path = typer.Option(None, "--jsonl"),
+        jsonl: Path = typer.Option(None, "--jsonl"),  # noqa: B008
         json_mode: bool = typer.Option(False, "--json"),
         step: int = typer.Option(0, "--step", help="DiffContext.diff 的 step 参数"),
     ) -> None:
@@ -200,7 +200,7 @@ def register(app: typer.Typer) -> None:
     def diff_runs(
         run_id_a: str = typer.Argument(..., help="Run id A"),
         run_id_b: str = typer.Argument(..., help="Run id B"),
-        jsonl: Path = typer.Option(None, "--jsonl"),
+        jsonl: Path = typer.Option(None, "--jsonl"),  # noqa: B008
         json_mode: bool = typer.Option(False, "--json"),
         step: int = typer.Option(0, "--step"),
     ) -> None:
@@ -224,7 +224,7 @@ def register(app: typer.Typer) -> None:
     @app.command(name="cost")
     def cost(
         run_id: str = typer.Argument(..., help="Run id"),
-        jsonl: Path = typer.Option(None, "--jsonl"),
+        jsonl: Path = typer.Option(None, "--jsonl"),  # noqa: B008
         json_mode: bool = typer.Option(False, "--json"),
         pricing_ref: str = typer.Option("", "--pricing-ref", help="按 pricing_ref 过滤"),
     ) -> None:
@@ -250,7 +250,7 @@ def register(app: typer.Typer) -> None:
     def evidence(
         run_id: str = typer.Argument(..., help="Run id"),
         ref: str = typer.Argument(..., help="EvidenceRef digest (sha256:<hex> 或裸 64-hex)"),
-        jsonl: Path = typer.Option(None, "--jsonl"),
+        jsonl: Path = typer.Option(None, "--jsonl"),  # noqa: B008
         json_mode: bool = typer.Option(False, "--json", help="JSON 输出,给 agent"),
     ) -> None:
         """Look up an arguments_ref / output_ref → evidence payload by digest.

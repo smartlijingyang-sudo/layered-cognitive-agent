@@ -28,7 +28,7 @@ def register(app: typer.Typer) -> None:
 
     @plugin_app.command("check")
     def plugin_check(
-        profile: Path = typer.Argument(..., help="Profile YAML"),
+        profile: Path = typer.Argument(..., help="Profile YAML"),  # noqa: B008
         strict: bool = typer.Option(False, "--strict", help="将任何声明缺失视为失败"),
         json_mode: bool = typer.Option(False, "--json", help="输出 JSON"),
     ) -> None:
@@ -90,11 +90,11 @@ def register(app: typer.Typer) -> None:
 
     @plan_app.command("compile")
     def plan_compile(
-        profile: Path = typer.Argument(..., help="Profile YAML"),
-        task_contract: Path | None = typer.Option(
+        profile: Path = typer.Argument(..., help="Profile YAML"),  # noqa: B008
+        task_contract: Path | None = typer.Option(  # noqa: B008
             None, "--task-contract", help="TaskContract 文件"
         ),
-        output: Path | None = typer.Option(None, "--output", "-o", help="写入 canonical JSON"),
+        output: Path | None = typer.Option(None, "--output", "-o", help="写入 canonical JSON"),  # noqa: B008
         json_mode: bool = typer.Option(False, "--json", help="输出 JSON"),
     ) -> None:
         """编译 Profile 为 canonical CompiledRunPlan v2。"""
@@ -111,7 +111,7 @@ def register(app: typer.Typer) -> None:
 
     @plan_app.command("validate")
     def plan_validate(
-        plan_file: Path = typer.Argument(..., help="由 plan compile 写出的 JSON"),
+        plan_file: Path = typer.Argument(..., help="由 plan compile 写出的 JSON"),  # noqa: B008
         json_mode: bool = typer.Option(False, "--json", help="输出 JSON"),
     ) -> None:
         """验证已序列化计划中记录的 schema、phase graph、effect 与 evidence 状态。"""
@@ -137,7 +137,7 @@ def register(app: typer.Typer) -> None:
     @plan_app.command("relations")
     def plan_relations(
         plugin: str = typer.Option(..., "--plugin", "-p", help="plugin id"),
-        profile: Path = typer.Option(
+        profile: Path = typer.Option(  # noqa: B008
             Path("profiles/web-standard.yaml"),
             "--profile",
             help="Profile YAML to compile for relations lookup",

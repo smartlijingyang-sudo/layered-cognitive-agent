@@ -154,7 +154,7 @@ class GatewayService:
 
         try:
             log_handle = log_path.open("a")
-            proc = subprocess.Popen(
+            proc = subprocess.Popen(  # noqa: S603
                 [
                     *self._config.entry,
                     "--host",

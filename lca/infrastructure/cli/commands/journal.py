@@ -43,7 +43,7 @@ def register(app: typer.Typer) -> None:
         replay: bool = typer.Option(
             False, "--replay", "-r", help="从 traces/lca_journal.jsonl 回放（不连 SSE）"
         ),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
+        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
     ) -> None:
         """事实流。默认是 journal（思考/工具/步/洞察），不是 gateway.log。"""
         ops_config = OpsConfig.load(config)
@@ -63,7 +63,7 @@ def register(app: typer.Typer) -> None:
         if not log_file.exists():
             print(f"No log yet: {log_file}")
             raise typer.Exit(1)
-        subprocess.run(["/usr/bin/tail", "-f", str(log_file)])
+        subprocess.run(["/usr/bin/tail", "-f", str(log_file)])  # noqa: S603
 
 
 def _follow_journal(

@@ -67,8 +67,8 @@ class SystemOnlyboxesProbe:
         if not script.is_file():
             return False
         try:
-            result = subprocess.run(
-                ["bash", str(script)],
+            result = subprocess.run(  # noqa: S603
+                ["bash", str(script)],  # noqa: S607
                 cwd=self._root,
                 capture_output=True,
                 text=True,
@@ -87,7 +87,7 @@ class SystemOnlyboxesProbe:
     @staticmethod
     def _cmd_ok(cmd: list[str]) -> bool:
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)  # noqa: S603
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return False
         return result.returncode == 0
@@ -95,7 +95,7 @@ class SystemOnlyboxesProbe:
     @staticmethod
     def _cmd_out(cmd: list[str]) -> str:
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)  # noqa: S603
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return ""
         return result.stdout if result.returncode == 0 else result.stdout or ""

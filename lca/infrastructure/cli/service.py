@@ -12,6 +12,7 @@ Three concerns, clearly separated:
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass
 from enum import Enum
 from typing import Protocol, runtime_checkable
@@ -151,8 +152,8 @@ def kill_tree(pid: int, sig: int = 15) -> None:
     try:
         import subprocess
 
-        children = subprocess.run(
-            ["pgrep", "-P", str(pid)],
+        children = subprocess.run(  # noqa: S603
+            ["pgrep", "-P", str(pid)],  # noqa: S607
             capture_output=True,
             text=True,
             timeout=5,
@@ -160,27 +161,23 @@ def kill_tree(pid: int, sig: int = 15) -> None:
         for child_pid in children.stdout.strip().split("\n"):
             if child_pid.strip():
                 kill_tree(int(child_pid.strip()), sig)
-    except Exception:
+    except Exception:  # noqa: S110
         pass
 
-    try:
+    with contextlib.suppress(ProcessLookupError):
         os.kill(pid, sig)
-    except ProcessLookupError:
-        pass
 
 
 def free_port(port: int) -> None:
     """Release a port from any holder."""
     import subprocess
 
-    try:
-        subprocess.run(
-            ["fuser", "-k", f"{port}/tcp"],
+    with contextlib.suppress(Exception):
+        subprocess.run(  # noqa: S603
+            ["fuser", "-k", f"{port}/tcp"],  # noqa: S607
             capture_output=True,
             timeout=5,
         )
-    except Exception:
-        pass
 
 
 def pid_alive(pid: int) -> bool:
@@ -208,8 +205,8 @@ def pid_on_port(port: int) -> int | None:
     import subprocess
 
     try:
-        result = subprocess.run(
-            ["lsof", "-ti", f"tcp:{port}"],
+        result = subprocess.run(  # noqa: S603
+            ["lsof", "-ti", f"tcp:{port}"],  # noqa: S607
             capture_output=True,
             text=True,
             timeout=5,
@@ -222,7 +219,7 @@ def pid_on_port(port: int) -> int | None:
 
     try:
         result = subprocess.run(
-            ["ss", "-tlnp"],
+            ["ss", "-tlnp"],  # noqa: S607
             capture_output=True,
             text=True,
             timeout=5,
@@ -247,8 +244,8 @@ def http_ready(url: str, timeout: float = 2.0) -> bool:
     import subprocess
 
     try:
-        r = subprocess.run(
-            ["curl", "-sS", "--max-time", str(timeout), "-o", "/dev/null", url],
+        r = subprocess.run(  # noqa: S603
+            ["curl", "-sS", "--max-time", str(timeout), "-o", "/dev/null", url],  # noqa: S607
             capture_output=True,
             timeout=timeout + 1,
         )

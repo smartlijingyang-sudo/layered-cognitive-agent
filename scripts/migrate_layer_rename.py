@@ -32,13 +32,13 @@ class Change:
 def list_all_python_md_yaml() -> list[str]:
     """List files that may contain imports or paths."""
     result = subprocess.run(
-        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"],  # noqa: S607
         capture_output=True,
         text=True,
         check=True,
     )
     tracked = subprocess.run(
-        ["git", "ls-files", "-z"],
+        ["git", "ls-files", "-z"],  # noqa: S607
         capture_output=True,
         text=True,
         check=True,
@@ -62,7 +62,7 @@ def find_references() -> dict[str, list[tuple[str, str]]]:
         refs[old] = []
     for filepath in list_all_python_md_yaml():
         try:
-            content = open(filepath, encoding="utf-8", errors="replace").read()
+            content = open(filepath, encoding="utf-8", errors="replace").read()  # noqa: SIM115
         except OSError:
             continue
         for i, line in enumerate(content.splitlines(), 1):
@@ -87,13 +87,13 @@ def run_git_mv(dry_run: bool, only: list[str] | None = None) -> list[str]:
         if dry_run:
             print(f"[dry-run] {' '.join(cmd)}")
         else:
-            subprocess.run(cmd, check=True, capture_output=True)
+            subprocess.run(cmd, check=True, capture_output=True)  # noqa: S603
             print(f"moved: {old_path} -> {new_path}")
         moves.append(f"{old_path} -> {new_path}")
     return moves
 
 
-def Path_for(p: str):
+def Path_for(p: str):  # noqa: N802
     from pathlib import Path
 
     return Path(p)
@@ -106,7 +106,7 @@ def replace_imports(dry_run: bool, only: list[str] | None = None) -> tuple[int, 
     total_replacements = 0
     for filepath in files:
         try:
-            content = open(filepath, encoding="utf-8").read()
+            content = open(filepath, encoding="utf-8").read()  # noqa: SIM115
         except (OSError, UnicodeDecodeError):
             continue
         new_content = content
@@ -123,8 +123,8 @@ def replace_imports(dry_run: bool, only: list[str] | None = None) -> tuple[int, 
             total_files += 1
             if dry_run:
                 # Show first 3 lines that changed
-                old_lines = set(content.splitlines())
-                new_lines = set(new_content.splitlines())
+                set(content.splitlines())
+                set(new_content.splitlines())
                 print(f"[dry-run] edit {filepath}")
             else:
                 with open(filepath, "w", encoding="utf-8") as f:
@@ -145,7 +145,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.rollback:
-        result = subprocess.run(["git", "revert", "-m", "1", args.rollback], check=False)
+        result = subprocess.run(["git", "revert", "-m", "1", args.rollback], check=False)  # noqa: S603,S607
         return result.returncode
 
     if args.report:

@@ -58,7 +58,7 @@ def _rel_package(absolute_dir: Path, root: Path) -> str:
     parts = rel.parts
     # If root is /abs/lca, prepend 'lca' to make the full package name
     if root.name == "lca":
-        parts = ("lca",) + parts
+        parts = ("lca", *parts)
     return ".".join(parts)
 
 

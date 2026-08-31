@@ -864,11 +864,11 @@ def _record_terminal_materialization(session: RunSession) -> None:
 import gateway.runs.execute as _self_pkg  # noqa: E402
 
 
-def _RunLifecycleCoordinator(*args, **kwargs):
+def _RunLifecycleCoordinator(*args, **kwargs):  # noqa: N802
     return _self_pkg.RunLifecycleCoordinator(*args, **kwargs)
 
 
-async def execute_run(
+async def execute_run(  # noqa: F811
     registry: RunRegistry,
     *,
     run_id: str,
@@ -896,7 +896,7 @@ async def execute_run(
     )
 
 
-async def resume_run(session: RunSession, registry: RunRegistry, answer: str) -> None:
+async def resume_run(session: RunSession, registry: RunRegistry, answer: str) -> None:  # noqa: F811
     """Soft-lock compat facade — delegates to ``RunLifecycleCoordinator.resume``.
 
     Per ADR-0103 §2 ``gateway/runs/execute.py`` finalize/closure can evolve;

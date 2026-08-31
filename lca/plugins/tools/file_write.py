@@ -169,13 +169,13 @@ __all__ = ["IDENTIFIER", "MANIFEST", "FileWriteTool", "build_file_write_tool"]
 # ── Plugin manifest setup ─────────────────────────────────────
 
 
-from pydantic import BaseModel, ConfigDict  # noqa: E402
+from pydantic import BaseModel, ConfigDict  # noqa: E402,I001
 
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.atoms.control_slot import ControlSlot  # noqa: E402
+from lca.contracts.atoms.functional_group import FunctionalGroup  # noqa: E402
+from lca.contracts.atoms.scope import Scope  # noqa: E402
+from lca.contracts.protocols.composition.logic_address import LogicAddress  # noqa: E402
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration  # noqa: E402
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin  # noqa: E402
 
 

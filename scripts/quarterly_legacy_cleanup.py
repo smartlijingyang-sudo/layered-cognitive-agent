@@ -53,8 +53,8 @@ def parse_legacy() -> list[Entry]:
 def get_last_touch(path: str) -> str | None:
     """Get the last commit SHA that touched this path."""
     try:
-        result = subprocess.run(
-            ["git", "log", "--format=%h %ai", "-n", "1", "--", path],
+        result = subprocess.run(  # noqa: S603
+            ["git", "log", "--format=%h %ai", "-n", "1", "--", path],  # noqa: S607
             cwd=ROOT,
             capture_output=True,
             text=True,

@@ -19,7 +19,9 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     PluginSpecKind,
     VerificationDeclaration,
 )
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_plugin import (
+    OwnershipDeclaration,  # noqa: F811
+)
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 
 

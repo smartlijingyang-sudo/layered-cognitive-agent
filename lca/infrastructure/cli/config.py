@@ -127,7 +127,7 @@ class OpsConfig(BaseModel):
     daemon: DaemonConfig = Field(default_factory=DaemonConfig)
     onlyboxes: OnlyboxesConfig = Field(default_factory=OnlyboxesConfig)
     run_dir: str = ".lca-ops"
-    sudo_pass_file: str = ".lobehub-stack/sudo.pass"
+    sudo_pass_file: str = ".lobehub-stack/sudo.pass"  # noqa: S105
 
     @classmethod
     def load(cls, path: Path | str | None = None) -> Self:

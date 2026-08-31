@@ -26,7 +26,7 @@ class Sudo:
         prefix = ["sudo", "-S", "-p", ""]
         if user:
             prefix.extend(["-u", user])
-        return subprocess.run(
+        return subprocess.run(  # noqa: S603
             [*prefix, *cmd],
             input=self._password(),
             capture_output=True,

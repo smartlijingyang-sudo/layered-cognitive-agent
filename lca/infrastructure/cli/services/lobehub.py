@@ -236,8 +236,8 @@ class LobeHubService:
             return False
 
         try:
-            subprocess.run(
-                ["bash", str(sync_script)],
+            subprocess.run(  # noqa: S603
+                ["bash", str(sync_script)],  # noqa: S607
                 env={"LOBEHUB_RELEASE": self._config.release},
                 cwd=self._root,
                 capture_output=True,
@@ -272,8 +272,8 @@ class LobeHubService:
             return False
 
         try:
-            subprocess.run(
-                ["python3", str(patch_script)],
+            subprocess.run(  # noqa: S603
+                ["python3", str(patch_script)],  # noqa: S607
                 cwd=self._root,
                 capture_output=True,
                 timeout=60,
@@ -329,7 +329,7 @@ class LobeHubService:
 
         try:
             subprocess.run(
-                ["bun", "install"],
+                ["bun", "install"],  # noqa: S607
                 cwd=self._dir,
                 capture_output=True,
                 timeout=300,
@@ -399,8 +399,8 @@ class LobeHubService:
             log_path = self._state.log_file(log_name)
             log_path.parent.mkdir(parents=True, exist_ok=True)
             log_handle = log_path.open("a")
-            proc = subprocess.Popen(
-                ["bun", "run", script],
+            proc = subprocess.Popen(  # noqa: S603
+                ["bun", "run", script],  # noqa: S607
                 cwd=self._dir,
                 env=self._child_env(),
                 stdout=log_handle,
