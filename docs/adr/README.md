@@ -91,10 +91,11 @@
 | [0116](0116-boot-event-observability-convergence.md) | 启动事件词表与可观测性收敛（合并原 0113 + 0114） | Accepted |
 | [0117](0117-process-lifecycle-env-whitelist.md) | Process 生命周期 + Fail-loud + Env 白名单（K6 + K7） | Accepted |
 | [0118](0118-kernel-hmr-patch-watcher.md) | Kernel HMR —— cordis.patch.yml watcher + ReloadError + run_kernel 集成（K8） | Accepted |
+| [0119](0119-webserver-as-plugin.md) | Webserver 完全 Plugin 化（对齐 deepseek-harness 范式，删除 `gateway/` 目录） | Proposed |
 | [0102](0102-tool-render-contract.md) | Tool 渲染契约 — 集中 TS 生成（lcaToolRender） + 21 工具 registry | Accepted |
 | [0103](0103-locked-surface-and-port-policy.md) | back-ui-821-other-keep 锁定表面 + 移植策略（hard/soft-lock + lane A/B/C） | Accepted |
 
-> **ADR-0119** 未立项。K8 HMR 由 [ADR-0118](./0118-kernel-hmr-patch-watcher.md) 覆盖;下一份 ADR 由未来缺口驱动。
+> **ADR-0119** 已立项（Proposed），等待 review。后续 ADR 由未来缺口驱动。
 
 ## 维护规则
 - 不改旧文件；新决策用 `Supersedes: ADR-XXXX` 标记
