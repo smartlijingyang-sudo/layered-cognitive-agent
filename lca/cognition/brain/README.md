@@ -20,7 +20,14 @@ tool 选型策略、记忆检索、prompt 元数据管理（这些是 memory/ �
 —
 
 ## 6. 禁止依赖
-—
+**pyproject.toml `[tool.lca.package_contracts.lca.cognition.brain].forbidden_dependencies`**:
+
+- `gateway`
+- `lca.agent`
+- `lca.application`
+- `lca.harness`
+- `lca.plugins`
+- `lca.runtime`
 
 ## 7. 副作用
 log:emit

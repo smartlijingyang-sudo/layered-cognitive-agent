@@ -20,7 +20,12 @@ LCA 框架的组成部分。具体职责参见同目录下各子包的 README �
 —
 
 ## 6. 禁止依赖
-—
+**pyproject.toml `[tool.lca.package_contracts.lca.harness.profile].forbidden_dependencies`**:
+
+- `lca.agent`
+- `lca.application`
+- `lca.cognition`
+- `lca.runtime`
 
 ## 7. 副作用
 log:emit

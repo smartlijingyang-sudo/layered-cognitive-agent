@@ -20,7 +20,15 @@
 —
 
 ## 6. 禁止依赖
-—
+**pyproject.toml `[tool.lca.package_contracts.lca.contracts].forbidden_dependencies`**:
+
+- `lca.agent`
+- `lca.application`
+- `lca.cognition`
+- `lca.harness`
+- `lca.infrastructure`
+- `lca.plugins`
+- `lca.runtime`
 
 ## 7. 副作用
 log:emit
