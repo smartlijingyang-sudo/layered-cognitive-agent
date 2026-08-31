@@ -138,6 +138,34 @@ forbidden_modules = [
     "lca_kernel.errors",
 ]
 
+# ── 契约 7: transport plugin 不得反向依赖 kernel 内部 + cognition/agent/runtime ──
+# ADR-0115 决定 3: transport (lca/plugins/transport/**) 是独立 transport
+# namespace,通过 ctx.inject 跟 kernel 交互,不直接 import kernel 内部
+# 也不 import 认知/agent/运行时实现细节。允许 import kernel 公共面
+# (lca_kernel.__init__.py re-exports run_kernel_lifespan / run_kernel / Stage)。
+[[tool.importlinter.contracts]]
+name = "transport-isolation: lca.plugins.transport 不得 import kernel 内部 / cognition / agent / runtime"
+type = "forbidden"
+source_modules = ["lca.plugins.transport"]
+forbidden_modules = [
+    "lca_kernel.source",
+    "lca_kernel.resolve",
+    "lca_kernel.declarations",
+    "lca_kernel.plan",
+    "lca_kernel.closure",
+    "lca_kernel.boot",
+    "lca_kernel.observability",
+    "lca_kernel.lifecycle",
+    "lca_kernel.hmr",
+    "lca_kernel.env",
+    "lca_kernel.stages",
+    "lca_kernel.trace",
+    "lca_kernel.errors",
+    "lca.cognition",
+    "lca.agent",
+    "lca.runtime",
+]
+
 [dependency-groups]
 dev = [
     { include-group = "lint" },
@@ -212,11 +240,13 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101"]
+"tests/lca_plugins/transport/**/*.py" = ["TC002"]
 "gateway/*" = ["TC002"]
 "scripts/*" = ["S101"]
-"lca/contracts/protocols/**/*.py" = ["ARG002"]
+"lca/contracts/protocols/**/*.py" = ["ARG002", "TC002"]
 "lca/contracts/mechanisms.py" = ["ARG002"]
 "lca/contracts/action.py" = ["ARG002"]
+"lca/plugins/transport/**/*.py" = ["TC002"]
 "lca.infrastructure.cli/cli.py" = ["B008", "S603"]  # typer defaults + tail logs
 "lca.infrastructure.cli/commands/*.py" = ["B008", "S603"]  # typer defaults + tail logs
 "lca.infrastructure.cli/config.py" = ["S105"]  # sudo_pass_file is a path, not a secret
@@ -2131,6 +2161,31 @@ side_effects = [
 ]
 public_api = [
     "lca.plugins.tools",
+]
+schema_version = "1.0.0"
+
+[tool.lca.package_contracts."lca.plugins.transport"]
+responsibility = "lca.plugins.transport: 外部 transport 适配（Starlette webserver / ACP / CLI）。本 README 由脚手架生成，待包负责人补充具体细节。"
+not_responsible_for = "认知决策、阶段编排、组合根、kernel 内部实现"
+allowed_dependencies = [
+    "lca.contracts",
+    "lca.infrastructure",
+    "lca.plugins",
+]
+forbidden_dependencies = [
+    "lca.cognition",
+    "lca.agent",
+    "lca.runtime",
+    "lca.application",
+    "lca.harness",
+    "gateway",
+]
+side_effects = [
+    "log:emit",
+    "http:listen",
+]
+public_api = [
+    "lca.plugins.transport",
 ]
 schema_version = "1.0.0"
 
