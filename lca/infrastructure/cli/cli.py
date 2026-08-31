@@ -86,6 +86,16 @@ onlyboxes  worker runtime(只读;无 start/stop 命令)
   ./scripts/lca-ops status --json  看 onlyboxes 详情
 
 ────────────────────────────────
+工作流(全站)
+────────────────────────────────
+status     看上面四个服务 + onlyboxes,JSON 加 --json
+heal       自己修不健康的服务(优先用这个;不是 restart)
+stop       停外部平台服务(daemon / lobehub / infra),不含 LCA 进程
+provision  整机首次:装包 / venv / sandbox 用户 / 工作区 / CLI
+
+  注: dev / restart 已删除(引用了 gateway 死 step,跑必崩)。
+
+────────────────────────────────
 LCA 进程 (kernel serve)  ADR-0119 决定 4
 ────────────────────────────────
 lca-ops 不管理 LCA 进程。LCA API :8765 由 lca_kernel serve 自管,

@@ -1,4 +1,11 @@
-"""Development workflow commands: dev, restart, stop, status, heal, provision."""
+"""Development workflow commands: stop, status, heal, provision.
+
+ADR-0119 决定 4: ``dev`` 与 ``restart`` 已删除 —— 这两个子命令引用
+``gateway.ensure`` / ``gateway.restart`` 死 step,跑必崩。LCA 进程入口
+已切到 ``uv run python -m lca_kernel serve ...``,详见 GUIDE banner 的
+"LCA 进程 (kernel serve)" 章节。``stop`` 仍保留:它只停外部平台服务
+(daemon / lobehub / infra),不含 LCA 进程。
+"""
 
 from __future__ import annotations
 
@@ -14,59 +21,16 @@ def register(app: typer.Typer) -> None:
     """Register workflow commands on the typer app."""
 
     @app.command()
-    def dev(
-        json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
-        quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
-    ) -> None:
-        """第一次或全停之后：起 infra + gateway + lobehub + daemon。"""
-        ctx = make_context(json_mode, quiet, config)
-        pipeline = build_pipeline(
-            "dev",
-            ["infra.ensure", "gateway.ensure", "lobehub.ensure", "lobehub.start", "daemon.start"],
-        )
-        pipeline.execute(ctx)
-        if ctx.failed:
-            ctx.console.verdict(False, "Development environment failed to start")
-            raise typer.Exit(1)
-        ctx.console.verdict(True, "Development environment ready")
-
-    @app.command()
-    def restart(
-        json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
-        quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
-    ) -> None:
-        """全停再起。日常异常用 heal，不要先 restart。"""
-        ctx = make_context(json_mode, quiet, config)
-        pipeline = build_pipeline(
-            "restart",
-            [
-                "stack.stop",
-                "infra.ensure",
-                "gateway.restart",
-                "lobehub.ensure",
-                "lobehub.start",
-                "daemon.restart",
-            ],
-        )
-        pipeline.execute(ctx)
-        if ctx.failed:
-            ctx.console.verdict(False, "Restart failed")
-            raise typer.Exit(1)
-        ctx.console.verdict(True, "All services restarted")
-
-    @app.command()
     def stop(
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
         config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
     ) -> None:
-        """停 daemon / lobehub / gateway / infra。"""
+        """停 daemon / lobehub / infra。不含 LCA 进程(kernel serve 自管)。"""
         ctx = make_context(json_mode, quiet, config)
         pipeline = build_pipeline("stop", ["stack.stop"])
         pipeline.execute(ctx)
-        ctx.console.verdict(True, "All services stopped")
+        ctx.console.verdict(True, "All external services stopped")
 
     @app.command()
     def status(

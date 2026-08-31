@@ -43,45 +43,9 @@ def infra_stop(ctx: PipelineContext) -> None:
 
 
 # ── Gateway Steps ─────────────────────────────────────────────────────
-
-
-@register_step("gateway.ensure")
-def gateway_ensure(ctx: PipelineContext) -> None:
-    """Ensure gateway is ready."""
-    svc = ctx.registry.get("gateway")
-    state = svc.state()
-    if not state.is_running:
-        ctx.console.info("Starting gateway...")
-        svc.start()
-
-
-@register_step("gateway.start")
-def gateway_start(ctx: PipelineContext) -> None:
-    """Start gateway."""
-    svc = ctx.registry.get("gateway")
-    state = svc.start()
-    ctx.console.service_state("gateway", state)
-    if not state.is_running:
-        ctx.fail("Gateway failed to start")
-
-
-@register_step("gateway.restart")
-def gateway_restart(ctx: PipelineContext) -> None:
-    """Restart gateway."""
-    svc = ctx.registry.get("gateway")
-    ctx.console.info("Restarting gateway...")
-    state = svc.restart()
-    ctx.console.service_state("gateway", state)
-    if not state.is_running:
-        ctx.fail("Gateway failed to restart")
-
-
-@register_step("gateway.stop")
-def gateway_stop(ctx: PipelineContext) -> None:
-    """Stop gateway."""
-    svc = ctx.registry.get("gateway")
-    state = svc.stop()
-    ctx.console.service_state("gateway", state)
+# ADR-0119 决定 4:Gateway 进程不归 lca-ops 管 (lca_kernel serve 自管)。
+# 旧的 gateway.ensure/start/restart/stop step 已删除,对应 service 也已
+# 从 registry 移除。保留本节标题便于 git history 比对。
 
 
 # ── LobeHub Steps ─────────────────────────────────────────────────────

@@ -93,8 +93,8 @@ def register_step(name: str) -> Callable[[Step], Step]:
     """Decorator to register a step function.
 
     Usage:
-        @register_step("gateway.start")
-        def start_gateway(context: PipelineContext) -> None:
+        @register_step("lobehub.start")
+        def start_lobehub(context: PipelineContext) -> None:
             ...
     """
 
