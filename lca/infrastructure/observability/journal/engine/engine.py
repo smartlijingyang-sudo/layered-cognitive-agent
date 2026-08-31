@@ -44,11 +44,14 @@ from lca.contracts.observability.ledger import (
     LedgerUnregisteredError,
 )
 from lca.contracts.observability.ports import AttributePolicyBackend
-from lca.infrastructure.observability.events.event_catalog import descriptor_for
-from lca.infrastructure.observability.journal.backends.memory import InMemoryJournalStore
 from lca.infrastructure.observability.adapters.policy import AttributePolicy, redact_restricted
-from lca.infrastructure.observability.facade.projection_registry import EventProjection, ProjectionRegistry
+from lca.infrastructure.observability.events.event_catalog import descriptor_for
+from lca.infrastructure.observability.facade.projection_registry import (
+    EventProjection,
+    ProjectionRegistry,
+)
 from lca.infrastructure.observability.facade.run_context import get_current_run_scope
+from lca.infrastructure.observability.journal.backends.memory import InMemoryJournalStore
 from lca.plugins.providers.event_identity.stable_ulid import StableUlidIdentity
 
 

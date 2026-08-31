@@ -36,11 +36,11 @@ from lca.contracts.models.observability.journal import (
     ToolInvoked,
 )
 from lca.contracts.protocols import JournalProjector
+from lca.infrastructure.observability.adapters.policy import Verbosity
 from lca.infrastructure.observability.journal.console import render as render
 from lca.infrastructure.observability.journal.console.sequence_diagram import (
     render_sequence_diagram,
 )
-from lca.infrastructure.observability.adapters.policy import Verbosity
 
 if TYPE_CHECKING:
     from typing import TextIO

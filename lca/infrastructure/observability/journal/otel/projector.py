@@ -49,16 +49,16 @@ from lca.contracts.models.observability.journal import (
     ToolInvoked,
 )
 from lca.contracts.protocols import JournalProjector
-from lca.infrastructure.observability.events.event_catalog import may_export_externally
-from lca.infrastructure.observability.journal.otel import genai_mapping as genai
-from lca.infrastructure.observability.journal.otel import mapping as mapping
-from lca.infrastructure.observability.journal.otel.mapping import EVENT_PROJECTIONS
-from lca.infrastructure.observability.journal.otel.span_index import SpanContainerIndex
 from lca.infrastructure.observability.backends.langfuse_conventions import (
     LANGFUSE_OBSERVATION_INPUT,
     LANGFUSE_OBSERVATION_TYPE,
     OBSERVATION_TYPE_EVENT,
 )
+from lca.infrastructure.observability.events.event_catalog import may_export_externally
+from lca.infrastructure.observability.journal.otel import genai_mapping as genai
+from lca.infrastructure.observability.journal.otel import mapping as mapping
+from lca.infrastructure.observability.journal.otel.mapping import EVENT_PROJECTIONS
+from lca.infrastructure.observability.journal.otel.span_index import SpanContainerIndex
 
 if TYPE_CHECKING:
     from opentelemetry.trace import Span, Tracer

@@ -78,6 +78,24 @@ from lca.contracts.models.observability.journal_catalog import (
 )
 from lca.contracts.observability.named_registry import NamedRegistry
 from lca.contracts.protocols import JournalProjector
+from lca.infrastructure.observability.adapters.policy import AttributePolicy, Verbosity
+from lca.infrastructure.observability.adapters.view import SpanView
+from lca.infrastructure.observability.backends.langfuse_conventions import (
+    FRAMEWORK_TAG,
+    LANGFUSE_ENVIRONMENT,
+    LANGFUSE_OBSERVATION_INPUT,
+    LANGFUSE_OBSERVATION_METADATA_AGENT_ROLE,
+    LANGFUSE_OBSERVATION_MODEL_NAME,
+    LANGFUSE_OBSERVATION_OUTPUT,
+    LANGFUSE_OBSERVATION_TYPE,
+    LANGFUSE_OBSERVATION_USAGE_DETAILS,
+    LANGFUSE_TRACE_TAGS,
+    OBSERVATION_TYPE_AGENT,
+    OBSERVATION_TYPE_GENERATION,
+    OBSERVATION_TYPE_TOOL,
+    langfuse_span_visible,
+)
+from lca.infrastructure.observability.backends.tracer_backend import OtelTracer
 from lca.infrastructure.observability.events.event_catalog import (
     EVENT_DESCRIPTOR_REGISTRY,
     descriptor_for,
@@ -115,6 +133,22 @@ from lca.infrastructure.observability.facade.facade import (  # noqa: F401
     span,
     traced,
 )
+from lca.infrastructure.observability.facade.projection_registry import (
+    EventProjection,
+    ProjectionRegistry,
+)
+from lca.infrastructure.observability.facade.run_context import (
+    TEAM_CONTAINER_ROLE,
+    adopt_run_scope,
+    get_current_run_scope,
+    run_scope,
+)
+from lca.infrastructure.observability.facade.settings import ObservabilitySettings
+from lca.infrastructure.observability.facade.team_profile import (
+    TeamTraceProfile,
+    objective_preview,
+    team_id_for,
+)
 from lca.infrastructure.observability.genai import (
     LlmGenAIMapper,
     ToolGenAIMapper,
@@ -136,36 +170,7 @@ from lca.infrastructure.observability.journal.engine.journal_io import (
     stamped_to_record,
 )
 from lca.infrastructure.observability.journal.engine.serialization import stamped_to_journal_record
-from lca.infrastructure.observability.backends.langfuse_conventions import (
-    FRAMEWORK_TAG,
-    LANGFUSE_ENVIRONMENT,
-    LANGFUSE_OBSERVATION_INPUT,
-    LANGFUSE_OBSERVATION_METADATA_AGENT_ROLE,
-    LANGFUSE_OBSERVATION_MODEL_NAME,
-    LANGFUSE_OBSERVATION_OUTPUT,
-    LANGFUSE_OBSERVATION_TYPE,
-    LANGFUSE_OBSERVATION_USAGE_DETAILS,
-    LANGFUSE_TRACE_TAGS,
-    OBSERVATION_TYPE_AGENT,
-    OBSERVATION_TYPE_GENERATION,
-    OBSERVATION_TYPE_TOOL,
-    langfuse_span_visible,
-)
 from lca.infrastructure.observability.narrative import plan_steps_joined
-from lca.infrastructure.observability.adapters.policy import AttributePolicy, Verbosity
-from lca.infrastructure.observability.facade.projection_registry import EventProjection, ProjectionRegistry
-from lca.infrastructure.observability.facade.run_context import (
-    TEAM_CONTAINER_ROLE,
-    adopt_run_scope,
-    get_current_run_scope,
-    run_scope,
-)
-from lca.infrastructure.observability.facade.settings import ObservabilitySettings
-from lca.infrastructure.observability.facade.team_profile import (
-    TeamTraceProfile,
-    objective_preview,
-    team_id_for,
-)
 from lca.infrastructure.observability.stream.trace_inspector import TraceInspector, TraceReport
 from lca.infrastructure.observability.stream.trace_tool_runner import (
     make_explain_failure_tool,
@@ -174,8 +179,6 @@ from lca.infrastructure.observability.stream.trace_tool_runner import (
     make_inspect_trace_tool,
     make_plugin_interaction_graph_tool,
 )
-from lca.infrastructure.observability.backends.tracer_backend import OtelTracer
-from lca.infrastructure.observability.adapters.view import SpanView
 
 __all__ = [
     "EVENT_DESCRIPTOR_REGISTRY",

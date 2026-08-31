@@ -19,17 +19,6 @@ from typing import TYPE_CHECKING, Protocol, cast
 
 from cordis.plugin import Plugin as CordisPlugin
 from cordis.plugin import plugin as _cordis_plugin
-from pydantic import BaseModel
-
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.capabilities import Capability
-from lca.contracts.harness.composition.plugin_contract import (
-    PluginContract,
-    compose_plugin_contract,
-    contract_snapshot_for_meta,
-)
-from lca.contracts.protocols.composition.logic_address import LogicAddress
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin.plugin_declaration_normalization import (
     config_from_annotations,
     normalize_contributes,
@@ -50,6 +39,17 @@ from lca.harness.plugin.plugin_manifest import (
     RawRelationEntry,
 )
 from lca.harness.plugin.plugin_spec_projection import native_spec_from_declaration
+from pydantic import BaseModel
+
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.capabilities import Capability
+from lca.contracts.harness.composition.plugin_contract import (
+    PluginContract,
+    compose_plugin_contract,
+    contract_snapshot_for_meta,
+)
+from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 
 if TYPE_CHECKING:
     from lca.contracts.protocols.declarative.declarative_phase_graph import PluginSpec
