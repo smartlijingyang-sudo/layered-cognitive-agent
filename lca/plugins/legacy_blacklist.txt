@@ -1,0 +1,12 @@
+# Legacy plugin blacklist — plugins exempted from check_plugin_metadata's
+# logic_address critical gate.
+#
+# Format: one plugin id per line, '#' starts a comment.
+# Each entry requires a justification (one-line comment after the id).
+#
+# Examples:
+#   my-factory-only-plugin  # test fixture, never deployed to runtime
+#
+# Currently empty: all 194 plugins declare logic_address.
+# Add entries only when a plugin genuinely cannot have logic_address
+# (e.g. test fixtures, factory-only modules with no runtime instance).
