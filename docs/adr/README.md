@@ -83,6 +83,10 @@
 | [0108](0108-phase-de-and-e.md) | Phase D (CI gates) + Phase E (README + cleanup) closeout | Accepted |
 | [0109](0109-plugin-metadata-mandate-and-budgetaware-removal.md) | Plugin 4-Element 声明为强契约 + BudgetAware 废弃 + BudgetPolicy 数据签名 | Accepted |
 | [0110](0110-plugin-contract-unification-and-naming-convergence.md) | 插件合约统一化与命名收敛 —— 折叠 LogicAddress，让 PluginContract 真正成为插件侧唯一合约 | Proposed |
+| [0111](0111-startup-compilation-as-subpackage.md) | 启动编译化为 `lca-kernel/` 顶层包（被 ADR-0115 修订） | Proposed |
+| [0115](0115-kernel-transport-boundary.md) | Kernel / Transport 边界 + lint-imports 门禁 + 8 大职责 | Proposed |
+| [0116](0116-boot-event-observability-convergence.md) | 启动事件词表与可观测性收敛（合并原 0113 + 0114） | Proposed |
+| [0117](0117-process-lifecycle-env-whitelist.md) | Process 生命周期 + Fail-loud + Env 白名单（K6 + K7） | Proposed |
 
 ## 维护规则
 - 不改旧文件；新决策用 `Supersedes: ADR-XXXX` 标记
