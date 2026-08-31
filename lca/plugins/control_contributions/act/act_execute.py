@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.atoms.control_slot import ControlSlot
@@ -27,6 +26,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
+from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 
 
 class ActExecuteExecutor:

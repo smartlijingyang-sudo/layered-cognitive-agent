@@ -1,4 +1,8 @@
-"""LogicAddress 6 维契约（ADR-0069 §二 + tracker §15）。
+"""LogicAddress 6 维契约（ADR-0069 §二 + tracker §15 + ADR-0110 D2）。
+
+DEPRECATED — ADR-0110 D2 标记：本类型进入退役期，6 个月后（PR-D）删除。
+新代码请使用 ``lca.contracts.harness.composition.plugin_contract.PluginContract``；
+迁移辅助见 ``compose_plugin_contract`` / ``logic_address_to_plugin_contract``。
 
 6 维 LogicAddress = FunctionalGroup × ControlSlot × Scope × Authority
 × Evidence × Revision。每个 production plugin 必须能完整表达 6 维
@@ -21,12 +25,19 @@ ADR-0015 contracts 纯类型契约：``LogicAddress`` / ``LogicAddressScore``
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from typing import Any
 
 from lca.contracts.atoms.control_slot import ControlSlot, parse_slot
 from lca.contracts.atoms.functional_group import FunctionalGroup, parse_functional_group
 from lca.contracts.atoms.scope import Scope, canonical_scope, parse_scope
+
+_DEPRECATION_MSG = (
+    "LogicAddress(...) is deprecated per ADR-0110 D2; "
+    "use PluginContract (lca.contracts.harness.composition.plugin_contract) "
+    "or compose_plugin_contract() to migrate."
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +63,10 @@ class LogicAddress:
     revision: str | None = None  # plan / artifact / release version 标签
 
     def __post_init__(self) -> None:
+        # ADR-0110 D2: emit deprecation warning at construction time only,
+        # not at import time — imported-by-transitive-dependency callers
+        # should not see noise, only authors still constructing LogicAddress.
+        warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
         # Type narrowing: control_slot / functional_group / scope 通过 parser
         # 容错（None 仍合法）
         if self.functional_group is not None and not isinstance(
