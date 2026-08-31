@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from lca.contracts.protocols.gate.gate_chain_composer import GateChainComposer
 from lca.contracts.protocols.think.cognition import DecisionGate
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -87,6 +88,12 @@ class DefaultGateChainComposer(GateChainComposer):
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('decision.emit', 'gate_chain_composer'),
+        emits=('gate_chain_composer.checked',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Register the default GateChainComposer provider."""

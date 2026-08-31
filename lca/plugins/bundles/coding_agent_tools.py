@@ -19,6 +19,7 @@ from lca.contracts.observability.coding_agent_tools import (
     TraceInspectorTool,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -66,6 +67,12 @@ class Config(BaseModel):
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('coding_agent_diff_context', 'coding_agent_failure_explainer', 'coding_agent_minimal_reproduction', 'coding_agent_optimization_finder', 'coding_agent_plugin_graph_renderer', 'coding_agent_run_diff', 'coding_agent_trace_inspector'),
+        emits=('coding_agent_trace_inspector.checked', 'coding_agent_failure_explainer.checked', 'coding_agent_optimization_finder.checked', 'coding_agent_plugin_graph_renderer.checked', 'coding_agent_minimal_reproduction.checked', 'coding_agent_diff_context.checked', 'coding_agent_run_diff.checked'),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.plugins.tools.diagnostics.diff_context import (

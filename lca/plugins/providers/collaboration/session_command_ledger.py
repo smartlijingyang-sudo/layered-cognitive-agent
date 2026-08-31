@@ -11,6 +11,7 @@ from lca.contracts.protocols.session.session_command_ledger import (
     SessionCommandLedger,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -127,6 +128,12 @@ class EventSourcedSessionCommandLedger(SessionCommandLedger):
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('session_command_ledger',),
+        emits=('session_command_ledger.checked',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: object) -> None:
     """Expose the default pure ledger to the booted Profile."""

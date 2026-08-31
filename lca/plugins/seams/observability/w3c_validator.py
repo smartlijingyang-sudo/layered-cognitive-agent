@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from lca.contracts.observability.w3c_trace_context import W3CTraceContextValidator
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -40,6 +41,12 @@ class Config(BaseModel):
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('w3c_trace_context_validator',),
+        emits=('w3c_trace_context_validator.checked',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.infrastructure.observability.w3c_validator import DefaultW3CValidator

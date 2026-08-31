@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from lca.contracts.protocols.runtime.infra import Tool
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -52,6 +53,12 @@ def _g2a_factory(run: object | None = None) -> list:
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('plugin.serve',),
+        emits=('plugin.served',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     if "g2a" in config.factories:

@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from lca.contracts.protocols.journal.artifact_closure import ArtifactClosure
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -60,6 +61,12 @@ class DefaultArtifactClosure(ArtifactClosure):
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('artifact_closure',),
+        emits=('artifact_closure.checked',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     ctx.provide("artifact_closure", DefaultArtifactClosure())

@@ -18,6 +18,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
 )
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 
 
 class ActConstrainExecutor:
@@ -103,6 +104,12 @@ class Config(BaseModel):
         authority=("decision.read", "action.constrain"),
         evidence=("control.act.constrain.verified",),
         revision="v1",
+    ),
+
+    ownership=OwnershipDeclaration(
+        reads=('control.act.constrain',),
+        emits=('control.act.constrain.checked',),
+        state_mutation="forbidden",
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:

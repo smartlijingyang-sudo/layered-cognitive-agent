@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from lca.contracts.protocols.session.session_turn import SessionTurnControllerFactory
 from lca.harness.agent.turn_controller import InProcessSessionTurnController
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -49,6 +50,12 @@ class InProcessSessionTurnControllerFactory(SessionTurnControllerFactory):
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('session_turn_controller_factory',),
+        emits=('session_turn_controller_factory.checked',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: object) -> None:
     """Expose the default in-process controller factory to the booted Profile."""

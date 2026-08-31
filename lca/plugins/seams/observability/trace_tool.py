@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from lca.contracts.observability.trace_tool import TraceTool
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -41,6 +42,12 @@ class Config(BaseModel):
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('tool.invoke', 'trace_inspector_tools'),
+        emits=('trace_inspector_tools.checked',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.infrastructure.observability import NamedRegistry

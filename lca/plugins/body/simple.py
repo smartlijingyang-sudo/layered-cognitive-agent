@@ -11,6 +11,7 @@ from lca.contracts.capabilities import BODIES
 from lca.contracts.protocols import Body
 from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 
 
 class Config(BaseModel):
@@ -34,6 +35,12 @@ class Config(BaseModel):
         authority=(BODIES.key,),
         evidence=("body.act.completed",),
         revision="v1",
+    ),
+
+    ownership=OwnershipDeclaration(
+        reads=('plugin.serve',),
+        emits=('plugin.served',),
+        state_mutation="forbidden",
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:

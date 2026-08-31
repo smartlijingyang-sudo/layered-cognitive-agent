@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
     from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseContribution, PluginSpec
+    from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 
 
 def native_spec_from_declaration(
@@ -28,6 +29,7 @@ def native_spec_from_declaration(
     functional_group: FunctionalGroup | None,
     module: str,
     contributes: tuple[PhaseContribution, ...] = (),
+    ownership: OwnershipDeclaration | None = None,
 ) -> PluginSpec:
     """Create the baseline typed spec at plugin declaration time.
 
@@ -92,7 +94,7 @@ def native_spec_from_declaration(
             for key in requires
         ),
         effects=effect_values,
-        ownership=OwnershipDeclaration(state_mutation="forbidden"),
+        ownership=ownership or OwnershipDeclaration(state_mutation="forbidden"),
         lifecycle=LifecycleDeclaration(
             scopes=("profile", "run"), activation="true", disposal="required"
         ),

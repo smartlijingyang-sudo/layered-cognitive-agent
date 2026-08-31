@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -106,6 +107,12 @@ def _looks_like_driver(obj: object) -> bool:
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('run_loop_driver_registry',),
+        emits=('run_loop_driver_registry.checked',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: dict[str, Any]) -> None:
     """Provide an empty driver registry; loop plugins fill it in.

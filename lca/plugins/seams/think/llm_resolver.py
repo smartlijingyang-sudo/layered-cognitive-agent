@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field, SecretStr
 
 from lca.contracts.protocols import LLMAdapter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -106,6 +107,12 @@ def _parse_api_style(raw: str | None) -> LLMApiStyle | None:
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('llm_resolver',),
+        emits=('llm_resolver.checked',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: BaseModel) -> None:
     from lca.infrastructure.llm.config import (

@@ -9,6 +9,7 @@ from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 
 
 class Config(BaseModel):
@@ -32,6 +33,12 @@ class Config(BaseModel):
         authority=("gates.contribute",),
         evidence=("gates.group.assembled",),
         revision="v1",
+    ),
+
+    ownership=OwnershipDeclaration(
+        reads=('decision.emit', 'gates'),
+        emits=('gates.checked',),
+        state_mutation="forbidden",
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:

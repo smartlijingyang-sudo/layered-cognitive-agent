@@ -21,6 +21,7 @@ from lca.contracts.models.team.role_team import (
     ToolPermissionManifest,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -126,6 +127,12 @@ def build_cordis_creator_role_profile() -> RoleProfile:
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('plugin.serve',),
+        emits=('plugin.served',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """把角色画像挂到 ``role.cordis_creator`` 的类型化 capability seam。"""

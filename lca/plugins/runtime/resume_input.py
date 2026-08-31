@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from lca.contracts.capabilities import RESUME_INPUT_ADAPTERS
 from lca.contracts.protocols.session.resume_input import ResumeInputAdapter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -54,6 +55,12 @@ def build_human_answer_resume_input_adapter() -> ResumeInputAdapter:
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('plugin.serve',),
+        emits=('plugin.served',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Register the default resume-input normalization strategy."""

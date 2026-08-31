@@ -14,6 +14,7 @@ from lca.contracts.capabilities import COMPONENT_REGISTRY, LEAD_BUDGET_POLICY_RE
 from lca.contracts.mechanisms import ComponentRegistryProtocol
 from lca.contracts.protocols import BudgetPolicy, LeadBudgetPolicyResolver
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -63,6 +64,12 @@ class ComponentRegistryLeadBudgetPolicyResolver(LeadBudgetPolicyResolver):
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('plugin.serve',),
+        emits=('plugin.served',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config

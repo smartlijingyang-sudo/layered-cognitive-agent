@@ -12,6 +12,7 @@ from lca.contracts.models.team.team_coordination import STRATEGY_KEY_LEAD, LeadM
 from lca.contracts.protocols import TeamAssembly
 from lca.contracts.protocols.journal.spec import LeadSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.protocols.composition.logic_address import LogicAddress
@@ -66,6 +67,12 @@ class Config(BaseModel):
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('plugin.serve',),
+        emits=('plugin.served',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config

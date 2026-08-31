@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.observability.cli_debug_command import CliDebugCommand
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -116,6 +117,12 @@ def _render_event(stamped: Any) -> dict[str, Any]:
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('plugin.serve',),
+        emits=('plugin.served',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.infrastructure.observability import NamedRegistry

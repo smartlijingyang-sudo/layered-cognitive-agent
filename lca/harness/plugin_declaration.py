@@ -41,6 +41,7 @@ if TYPE_CHECKING:
     from lca.contracts.harness.composition.plugin_contract import PluginContract
     from lca.contracts.protocols.declarative.declarative_phase_graph import PluginSpec
     from lca.contracts.protocols.composition.logic_address import LogicAddress
+    from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 
 
 __all__ = ["PluginCarrier", "definition_from_plugin", "plugin"]
@@ -76,6 +77,7 @@ def plugin(
     logic_address: LogicAddress | None = None,
     contract: PluginContract | None = None,
     spec: PluginSpec | None = None,
+    ownership: OwnershipDeclaration | None = None,
 ) -> CordisPlugin | Callable[[PluginSetupFn], CordisPlugin]:
     """Declare a plugin Manifest and adapt it to the Cordis carrier.
 
@@ -140,12 +142,14 @@ def plugin(
                     functional_group=functional_group_value,
                     module=fn.__module__,
                     contributes=contributes_tuple,
+                    ownership=ownership,
                 ),
                 description=desc,
                 relations=relation_tuple,
                 functional_group=functional_group_value,
                 logic_address=logic_address,
                 contract=contract,
+                ownership=ownership,
             ),
         )
         return cordis_plugin

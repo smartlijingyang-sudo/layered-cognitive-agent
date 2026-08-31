@@ -8,6 +8,7 @@ from lca.contracts.atoms.enums import HookEvent
 from lca.contracts.capabilities import HOOKS
 from lca.contracts.protocols import HookRegistry
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -55,6 +56,12 @@ def build_simple_hook_registry(ctx: PluginContext) -> HookRegistry:
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('plugin.serve',),
+        emits=('plugin.served',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config

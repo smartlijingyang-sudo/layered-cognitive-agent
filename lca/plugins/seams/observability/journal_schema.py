@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from lca.contracts.observability.schemas.v2 import JournalSchema
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -62,6 +63,12 @@ class JournalSchemaRegistry:
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('journal_schemas',),
+        emits=('journal_schemas.checked',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.plugins.providers.journal_schema.v2 import EnvelopeV2Schema

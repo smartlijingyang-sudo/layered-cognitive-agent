@@ -26,6 +26,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     SemanticPhase,
 )
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -153,6 +154,12 @@ def _intent_signature(decision: Decision) -> tuple[object, ...]:
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('control.stop.focus',),
+        emits=('control.stop.focus.checked',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Mount the profile-configured, read-only focus governance executor."""

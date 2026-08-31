@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict
 from lca.contracts.capabilities import COMPOSITION_COMPOSE_FACTORY, COMPOSITION_INVARIANT_CHECKER
 from lca.contracts.mechanisms.composition import InvariantChecker
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -78,6 +79,12 @@ class Config(BaseModel):
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('composition.compose_factory',),
+        emits=('composition.compose_factory.checked',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """注册 CordisComposer 命名工厂到 ``composition.compose_factory``。"""

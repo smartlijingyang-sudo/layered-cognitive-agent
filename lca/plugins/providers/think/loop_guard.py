@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from lca.contracts.protocols.gate.loop_guard import LoopGuardEvaluator
 from lca.harness.declarative.execute.loop_guard import DeclarativeLoopGuardEvaluator
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -42,6 +43,12 @@ class Config(BaseModel):
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('loop_guard_evaluator',),
+        emits=('loop_guard_evaluator.checked',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Expose the default pure loop-guard evaluator to runtime assembly."""

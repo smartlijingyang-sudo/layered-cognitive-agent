@@ -13,6 +13,7 @@ from lca.agent.role_library import FileRoleLibrary
 from lca.contracts.capabilities import TEAM_ROLE_LIBRARY
 from lca.contracts.protocols.collaboration.casting import RoleLibrary
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -47,6 +48,12 @@ class Config(BaseModel):
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('plugin.serve',),
+        emits=('plugin.served',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: BaseModel) -> None:
     """Expose the profile-selected role library to the Team mode adapter."""

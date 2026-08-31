@@ -11,6 +11,7 @@ from lca.contracts.protocols import DecisionGate
 from lca.contracts.protocols.think.cognition import DecisionGateAssembler
 from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.cognition.brain.decision_gates.chained import ChainedDecisionGate
 
 
@@ -42,6 +43,12 @@ class ChainedDecisionGateAssembler(DecisionGateAssembler):
         authority=("gates.assemble",),
         evidence=("gates.chain.sequential.assembled",),
         revision="v1",
+    ),
+
+    ownership=OwnershipDeclaration(
+        reads=('plugin.serve',),
+        emits=('plugin.served',),
+        state_mutation="forbidden",
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:

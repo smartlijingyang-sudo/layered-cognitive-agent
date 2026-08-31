@@ -23,6 +23,7 @@ from lca.contracts.protocols.act.action_handler import ActionHandler, ActionHand
 from lca.contracts.protocols.act.tool_batch_execution import ToolBatchExecutionPolicy
 from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.infrastructure.handler_registry import UniqueOperationRegistry
 
 
@@ -274,6 +275,12 @@ def _compatibility_safe_batch_policy() -> ToolBatchExecutionPolicy:
         authority=(ACTION_HANDLERS.key, TOOL_BATCH_EXECUTION_POLICY.key),
         evidence=("action.handler.registered",),
         revision="v1",
+    ),
+
+    ownership=OwnershipDeclaration(
+        reads=('plugin.serve',),
+        emits=('plugin.served',),
+        state_mutation="forbidden",
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:

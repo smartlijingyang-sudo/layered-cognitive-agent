@@ -10,6 +10,7 @@ from lca.contracts.atoms.scope import Scope
 from lca.contracts.protocols import Sensor
 from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 
 
 class Config(BaseModel):
@@ -33,6 +34,12 @@ class Config(BaseModel):
         authority=("workspace.instructions.read",),
         evidence=("perceive.workspace-instructions.collected",),
         revision="v1",
+    ),
+
+    ownership=OwnershipDeclaration(
+        reads=('plugin.serve',),
+        emits=('plugin.served',),
+        state_mutation="forbidden",
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:

@@ -18,6 +18,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
 )
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 
 
 class ActBudgetExecutor:
@@ -74,6 +75,12 @@ class Config(BaseModel):
         authority=("budget.read", "action.budget"),
         evidence=("control.act.budget.checked",),
         revision="v1",
+    ),
+
+    ownership=OwnershipDeclaration(
+        reads=('budget.read', 'control.act.budget'),
+        emits=('control.act.budget.checked',),
+        state_mutation="forbidden",
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:

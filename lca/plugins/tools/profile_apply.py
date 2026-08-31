@@ -13,6 +13,7 @@ from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.tool import ParameterSpec, ToolApi, ToolManifest, ToolMeta
 from lca.contracts.protocols import Tool
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -157,6 +158,12 @@ MANIFEST = ToolManifest(
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('tool.invoke', 'tools.profile_apply'),
+        emits=('tools.profile_apply.checked',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Register only when the scenario explicitly enables this safe preview tool."""

@@ -11,6 +11,7 @@ from lca.contracts.protocols.collaboration.graph_node_executor import (
     GraphNodeExecutor,
 )
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -62,6 +63,12 @@ class TopologyGraphNodeExecutor(GraphNodeExecutor):
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('plugin.serve',),
+        emits=('plugin.served',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Contribute all topology-marker primitives to the selected registry."""

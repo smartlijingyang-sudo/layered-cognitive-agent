@@ -11,6 +11,7 @@ from lca.contracts.models.core.decision import Decision, DelegationSpec, ToolCal
 from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.protocols.gate.decision_classifier import DecisionClassifier
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -109,6 +110,12 @@ class DefaultDecisionClassifier(DecisionClassifier):
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('decision_classifier',),
+        emits=('decision_classifier.checked',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     ctx.provide("decision_classifier", DefaultDecisionClassifier())

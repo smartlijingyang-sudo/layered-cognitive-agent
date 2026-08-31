@@ -218,6 +218,7 @@ __all__ = ["IDENTIFIER", "MANIFEST", "BashTool", "build_bash_tool"]
 from pydantic import BaseModel, ConfigDict  # noqa: E402
 
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin  # noqa: E402
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -249,6 +250,12 @@ class Config(BaseModel):
         revision="v1",
     ),
     relations=(),
+
+    ownership=OwnershipDeclaration(
+        reads=('tool.invoke', 'tools.bash'),
+        emits=('tools.bash.checked',),
+        state_mutation="forbidden",
+    ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """把 bash Tool 注册到 tools 服务（供单 port cordis-creator 使用）。
