@@ -47,7 +47,7 @@ from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any
 
-from lca.infrastructure.observability.journal_backend import MemoryJournal
+from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
 
 from lca.application.preset_authoring import PresetAuthoring
 from lca.contracts.atoms.enums import LLMStreamEventType

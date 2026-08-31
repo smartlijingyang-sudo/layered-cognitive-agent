@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 from cordis import Context
-from lca.infrastructure.observability.policy import Verbosity
+from lca.infrastructure.observability.adapters.policy import Verbosity
 from typer.testing import CliRunner
 
 from lca.cognition.hook_registry import CordisHookRegistry

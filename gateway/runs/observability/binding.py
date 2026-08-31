@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any, cast
 
-from lca.infrastructure.observability.settings import ObservabilitySettings
+from lca.infrastructure.observability.facade.settings import ObservabilitySettings
 
 from gateway.runs.session.session import RunSession
 from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
@@ -35,7 +35,7 @@ def assemble_run_hub(
     try:
         base: BoundObservability = require_capability(ctx, "observability")
     except MissingCapabilityError:
-        from lca.infrastructure.observability.policy import AttributePolicy
+        from lca.infrastructure.observability.adapters.policy import AttributePolicy
 
         from lca.infrastructure.observability.facade import BoundObservability as FacadeBound
 

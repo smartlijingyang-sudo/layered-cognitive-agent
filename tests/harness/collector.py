@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from lca.infrastructure.observability.tracer_backend import OtelTracer
-from lca.infrastructure.observability.view import view_of
+from lca.infrastructure.observability.backends.tracer_backend import OtelTracer
+from lca.infrastructure.observability.adapters.view import view_of
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter

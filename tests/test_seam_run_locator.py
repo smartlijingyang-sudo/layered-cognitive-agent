@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
+from lca.infrastructure.observability.backends.run_locator_fs import FilesystemRunLocator
 
 from lca.contracts.observability.run_locator import RunLocator
 

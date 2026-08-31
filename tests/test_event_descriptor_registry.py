@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from lca.infrastructure.observability.event_catalog import (
+from lca.infrastructure.observability.events.event_catalog import (
     EVENT_DESCRIPTOR_REGISTRY,
     descriptor_for,
     may_export_externally,
 )
-from lca.infrastructure.observability.event_descriptor_registry import (
+from lca.infrastructure.observability.events.event_descriptor_registry import (
     DuplicateEventDescriptorError,
     InMemoryEventDescriptorRegistry,
     UnknownEventDescriptorError,

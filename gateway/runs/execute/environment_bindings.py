@@ -91,7 +91,7 @@ def resolve_descriptor_registry(ctx: Any) -> Any:
     registry = ctx.inject("event_descriptor_registry", default=None)
     if registry is not None:
         return registry
-    from lca.infrastructure.observability.event_catalog import EVENT_DESCRIPTOR_REGISTRY
+    from lca.infrastructure.observability.events.event_catalog import EVENT_DESCRIPTOR_REGISTRY
 
     return EVENT_DESCRIPTOR_REGISTRY
 

@@ -11,7 +11,7 @@ import asyncio
 from typing import Any
 
 import pytest
-from lca.infrastructure.observability.team_profile import TeamTraceProfile
+from lca.infrastructure.observability.facade.team_profile import TeamTraceProfile
 
 from lca.agent.cognitive_agent import CognitiveAgent
 from lca.agent.team_handle import TeamHandle

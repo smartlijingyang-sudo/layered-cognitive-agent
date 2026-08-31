@@ -229,6 +229,7 @@ ignore_missing_imports = true
 asyncio_mode = "auto"
 addopts = "-ra --cov=lca --cov-report=term-missing -m 'not real_llm'"
 testpaths = ["tests"]
+pythonpath = ["."]
 markers = [
     "real_llm: 需要 LLM_API_KEY 才会执行的真实 LLM 集成测试",
 ]

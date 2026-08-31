@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
-from lca.infrastructure.observability.journal_backend import MemoryJournal
+from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
 
 from lca.application.preset_authoring import PresetAuthoring
 from lca.contracts.mechanisms.composition import ComposerErrorCode

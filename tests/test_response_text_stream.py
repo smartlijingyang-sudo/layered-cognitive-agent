@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from lca.infrastructure.observability.response_text_stream import (
+from lca.infrastructure.observability.stream.response_text_stream import (
     ResponseTextStreamExtractor,
     extract_user_facing_answer,
 )

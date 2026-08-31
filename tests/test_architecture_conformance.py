@@ -416,7 +416,7 @@ class TestIgnoreEmitReturn:
 
 class TestJournalCatalogMeta:
     def test_all_event_classes_have_descriptor(self) -> None:
-        from lca.infrastructure.observability.event_catalog import EVENT_DESCRIPTOR_REGISTRY
+        from lca.infrastructure.observability.events.event_catalog import EVENT_DESCRIPTOR_REGISTRY
 
         from lca.contracts.models.observability.journal_catalog import (
             JOURNAL_EVENT_CLASSES,
@@ -428,7 +428,7 @@ class TestJournalCatalogMeta:
         assert not missing, f"events without EventDescriptor: {missing}"
 
     def test_schema_fields_valid(self) -> None:
-        from lca.infrastructure.observability.event_catalog import EVENT_DESCRIPTOR_REGISTRY
+        from lca.infrastructure.observability.events.event_catalog import EVENT_DESCRIPTOR_REGISTRY
 
         from lca.contracts.models.observability.event import EventAudience, EventDurability
 

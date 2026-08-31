@@ -280,7 +280,7 @@ def _execute_plan(*, root: Path, plan: MigrationPlan) -> dict[str, int]:
 
     # latest.json 原子更新
     if latest_run_id is not None:
-        from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
+        from lca.infrastructure.observability.backends.run_locator_fs import FilesystemRunLocator
 
         locator = FilesystemRunLocator(root=root)
         locator.update_latest_pointer(latest_run_id)

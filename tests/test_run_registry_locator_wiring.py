@@ -12,7 +12,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
+from lca.infrastructure.observability.backends.run_locator_fs import FilesystemRunLocator
 
 from gateway.runs.observability.identity import parse_agent_ref
 from gateway.runs.session.session import RunRegistry, RunSession

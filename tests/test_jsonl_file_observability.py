@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from typing import Any
 
-from lca.infrastructure.observability.settings import ObservabilitySettings
+from lca.infrastructure.observability.facade.settings import ObservabilitySettings
 
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
@@ -216,14 +216,14 @@ class TestHookSpanAttributes(unittest.TestCase):
 
     def test_sanitize_secrets(self) -> None:
         """Secret-like patterns are redacted."""
-        from lca.infrastructure.observability.policy import sanitize
+        from lca.infrastructure.observability.adapters.policy import sanitize
 
         self.assertNotIn("sk-1234567890abcdef", sanitize("key=sk-1234567890abcdef"))
         self.assertIn("[REDACTED]", sanitize("key=sk-1234567890abcdef"))
 
     def test_truncate_long_text(self) -> None:
         """Long text is truncated."""
-        from lca.infrastructure.observability.policy import truncate
+        from lca.infrastructure.observability.adapters.policy import truncate
 
         long_text = "a" * 500
         result = truncate(long_text, 200)

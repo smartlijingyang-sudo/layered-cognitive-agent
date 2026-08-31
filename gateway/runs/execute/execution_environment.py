@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 import structlog
-from lca.infrastructure.observability.event_descriptor_env import bind_descriptors
+from lca.infrastructure.observability.events.event_descriptor_env import bind_descriptors
 
 from gateway.runs.api.attachment_staging import (
     stage_machine_attachments as _stage_machine_attachments,

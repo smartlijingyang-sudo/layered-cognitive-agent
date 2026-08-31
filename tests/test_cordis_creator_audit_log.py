@@ -21,7 +21,7 @@ import json
 from contextlib import contextmanager
 from pathlib import Path
 
-from lca.infrastructure.observability.journal_backend import MemoryJournal
+from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
 
 from lca.contracts.models.observability.journal import (
     PluginAuthored,

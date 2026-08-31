@@ -9,7 +9,7 @@ import ast
 import unittest
 from pathlib import Path
 
-from lca.infrastructure.observability.event_catalog import EVENT_DESCRIPTOR_REGISTRY
+from lca.infrastructure.observability.events.event_catalog import EVENT_DESCRIPTOR_REGISTRY
 
 from lca.contracts.atoms.telemetry import EventName, SpanName
 from lca.contracts.models.observability.journal_catalog import (
@@ -146,9 +146,9 @@ class TestRedactionBackstop(unittest.TestCase):
     """脱敏在写入期强制兜底——发射点不自觉也会被拦。"""
 
     def test_secret_in_preview_is_redacted(self) -> None:
-        from lca.infrastructure.observability.policy import AttributePolicy
-        from lca.infrastructure.observability.tracer_backend import OtelTracer
-        from lca.infrastructure.observability.view import view_of
+        from lca.infrastructure.observability.adapters.policy import AttributePolicy
+        from lca.infrastructure.observability.backends.tracer_backend import OtelTracer
+        from lca.infrastructure.observability.adapters.view import view_of
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import SimpleSpanProcessor
         from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
@@ -182,8 +182,8 @@ class TestExporterFaultIsolation(unittest.TestCase):
     """单个导出器故障不中断 run，不影响其余导出器。"""
 
     def test_failing_exporter_does_not_break_run(self) -> None:
-        from lca.infrastructure.observability.handles import _IsolatedExporter
-        from lca.infrastructure.observability.tracer_backend import OtelTracer
+        from lca.infrastructure.observability.adapters.handles import _IsolatedExporter
+        from lca.infrastructure.observability.backends.tracer_backend import OtelTracer
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExporter
         from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
@@ -216,9 +216,9 @@ class TestVerbosityLevels(unittest.TestCase):
     """verbosity 档位控制预览长度。"""
 
     def _preview_len(self, verbosity: str) -> int:
-        from lca.infrastructure.observability.policy import AttributePolicy, Verbosity
-        from lca.infrastructure.observability.tracer_backend import OtelTracer
-        from lca.infrastructure.observability.view import view_of
+        from lca.infrastructure.observability.adapters.policy import AttributePolicy, Verbosity
+        from lca.infrastructure.observability.backends.tracer_backend import OtelTracer
+        from lca.infrastructure.observability.adapters.view import view_of
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import SimpleSpanProcessor
         from opentelemetry.sdk.trace.export.in_memory_span_exporter import (

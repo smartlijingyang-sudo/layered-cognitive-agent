@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from lca.infrastructure.observability.event_descriptors_data import build_default_registry
-from lca.infrastructure.observability.event_doc import (
+from lca.infrastructure.observability.events.event_descriptors_data import build_default_registry
+from lca.infrastructure.observability.events.event_doc import (
     EVENT_DOCS,
     EventDoc,
     doc_for,

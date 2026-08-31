@@ -18,7 +18,7 @@ import unittest
 from pathlib import Path
 from typing import Any
 
-from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
+from lca.infrastructure.observability.backends.run_locator_fs import FilesystemRunLocator
 
 from gateway.runs.doctor import diagnose
 from gateway.runs.execute import _record_terminal_materialization

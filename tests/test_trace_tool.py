@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from lca.infrastructure.observability.trace_inspector import TraceInspector
-from lca.infrastructure.observability.trace_tool_runner import (
+from lca.infrastructure.observability.stream.trace_inspector import TraceInspector
+from lca.infrastructure.observability.stream.trace_tool_runner import (
     make_explain_failure_tool,
     make_export_minimal_reproduction_tool,
     make_find_optimization_tool,

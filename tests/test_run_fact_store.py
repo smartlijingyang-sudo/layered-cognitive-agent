@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 
-from lca.infrastructure.observability.event_catalog import EVENT_DESCRIPTOR_REGISTRY
+from lca.infrastructure.observability.events.event_catalog import EVENT_DESCRIPTOR_REGISTRY
 
 from lca.contracts.models.observability.event import (
     EventAudience,

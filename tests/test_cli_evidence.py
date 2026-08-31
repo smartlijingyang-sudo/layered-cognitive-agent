@@ -13,8 +13,8 @@ import tempfile
 from pathlib import Path
 
 import typer.testing
-from lca.infrastructure.observability.journal_backend import MemoryJournal
-from lca.infrastructure.observability.policy import AttributePolicy
+from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
+from lca.infrastructure.observability.adapters.policy import AttributePolicy
 
 from lca.contracts.observability.evidence import (
     EvidenceStore,

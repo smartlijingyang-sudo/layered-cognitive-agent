@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from lca.infrastructure.observability.policy import AttributePolicy, Verbosity
+from lca.infrastructure.observability.adapters.policy import AttributePolicy, Verbosity
 
 from lca.contracts.models.observability.journal import (
     DelegationIssued,

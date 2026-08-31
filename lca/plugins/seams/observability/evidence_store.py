@@ -61,7 +61,7 @@ class Config(BaseModel):
 async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.infrastructure.observability.evidence.policy import DefaultEvidencePolicy
     from lca.infrastructure.observability.evidence.store import FilesystemEvidenceStore
-    from lca.infrastructure.observability.settings import ObservabilitySettings
+    from lca.infrastructure.observability.facade.settings import ObservabilitySettings
 
     del config
     settings = ObservabilitySettings()

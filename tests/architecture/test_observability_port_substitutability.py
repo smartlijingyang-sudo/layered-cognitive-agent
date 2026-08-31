@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.infrastructure.observability.journal_backend import MemoryJournal
+from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
 
 from lca.contracts.models.observability.journal import RuntimeObserved, StampedEvent
 from lca.contracts.observability.ports import AttributePolicyBackend

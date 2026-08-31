@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from lca.infrastructure.observability.run_context import (
+from lca.infrastructure.observability.facade.run_context import (
     TEAM_CONTAINER_ROLE,
     adopt_run_scope,
     run_scope,

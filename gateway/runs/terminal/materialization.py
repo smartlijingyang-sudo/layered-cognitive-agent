@@ -67,7 +67,7 @@ def session_locator(session: RunSession) -> RunLocator:
     """Resolve the configured locator or derive a filesystem fallback for direct tests."""
     if session.locator is not None:
         return session.locator
-    from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
+    from lca.infrastructure.observability.backends.run_locator_fs import FilesystemRunLocator
 
     return FilesystemRunLocator(root=session.jsonl_path.parent.parent.parent)
 

@@ -20,8 +20,8 @@ import json
 import tempfile
 from pathlib import Path
 
-from lca.infrastructure.observability.journal_backend import MemoryJournal
-from lca.infrastructure.observability.policy import AttributePolicy
+from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
+from lca.infrastructure.observability.adapters.policy import AttributePolicy
 from starlette.testclient import TestClient
 
 from lca.contracts.observability.evidence import (

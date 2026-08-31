@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import structlog
-from lca.infrastructure.observability.settings import ObservabilitySettings
+from lca.infrastructure.observability.facade.settings import ObservabilitySettings
 
 from gateway.modes import DEFAULT_MODE
 from gateway.runs.doctor import diagnose
@@ -187,7 +187,7 @@ def assemble_run_hub(
     except MissingCapabilityError:
         # boot 未挂 observability（极端测试场景）：退回最小可用 bound，
         # 业务事件仍可写到 local store。
-        from lca.infrastructure.observability.policy import AttributePolicy
+        from lca.infrastructure.observability.adapters.policy import AttributePolicy
 
         from lca.infrastructure.observability.facade import BoundObservability
 

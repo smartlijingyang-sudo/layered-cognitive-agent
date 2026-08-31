@@ -9,7 +9,7 @@ from __future__ import annotations
 import io
 
 import pytest
-from lca.infrastructure.observability.policy import Verbosity
+from lca.infrastructure.observability.adapters.policy import Verbosity
 
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,

@@ -9,7 +9,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from lca.contracts.models.observability.journal import StampedEvent
-from lca.infrastructure.observability.trace_inspector import TraceInspector
+from lca.infrastructure.observability.stream.trace_inspector import TraceInspector
 
 
 def _load_inspector_from_jsonl(jsonl_path: Path) -> TraceInspector:

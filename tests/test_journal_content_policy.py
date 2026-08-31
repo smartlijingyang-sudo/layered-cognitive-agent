@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from lca.infrastructure.observability.policy import (
+from lca.infrastructure.observability.adapters.policy import (
     AttributePolicy,
     Verbosity,
     redact_restricted,

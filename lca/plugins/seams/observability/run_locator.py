@@ -57,7 +57,7 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
+    from lca.infrastructure.observability.backends.run_locator_fs import FilesystemRunLocator
 
     del config
     root = Path("traces")

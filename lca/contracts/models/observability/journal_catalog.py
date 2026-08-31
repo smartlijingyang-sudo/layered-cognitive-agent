@@ -1,7 +1,7 @@
 """journal 事件词表登记簿 —— ADR-0063 PR-7 source inversion 后的最小入口。
 
 历史双表 ``JOURNAL_CATALOG`` + ``JOURNAL_CATALOG_META`` 已并入
-``EventDescriptorRegistry``（``lca.infrastructure.observability.event_descriptors_data.build_default_registry``）。
+``EventDescriptorRegistry``（``lca.infrastructure.observability.events.event_descriptors_data.build_default_registry``）。
 
 本模块仅保留：
 - ``JOURNAL_EVENT_CLASSES``：class registry（事件名 → payload 类）。
