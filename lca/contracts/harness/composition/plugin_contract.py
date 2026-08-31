@@ -272,7 +272,7 @@ def contract_snapshot_for_meta(contract: PluginContract) -> dict[str, object]:
     legacy key (functional_group / logic_address) the author used.
 
     The snapshot is informational; runtime code should keep reading via
-    ``lca.harness.plugin.plugin_manifest.PluginDefinition.contract`` (the
+    ``lca.harness.plugin_manifest.PluginDefinition.contract`` (the
     typed PluginContract), not by parsing this dict.
     """
     return {

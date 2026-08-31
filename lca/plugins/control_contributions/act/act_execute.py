@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.harness.plugin.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.atoms.control_slot import ControlSlot

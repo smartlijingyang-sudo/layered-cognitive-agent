@@ -3,6 +3,13 @@
 ``@plugin`` 是开放装饰器参数进入不可变 ``PluginDefinition`` 的唯一接缝。输入字段
 规范化委派给 ``plugin_declaration_normalization``，类型化 ``PluginSpec`` 构造委派给
 ``plugin_spec_projection``；本模块仅负责载体创建与已装饰插件的 Manifest 提取。
+
+**ADR-0110 PR-A：** ``@plugin(...)`` 当前接收三入口
+``functional_group=`` / ``logic_address=`` / ``contract=`` 表达同一概念；
+本模块通过 ``compose_plugin_contract`` 归一到单一 ``PluginContract``，
+并把 canonical snapshot 写入 ``meta["contract_snapshot"]``。其中
+``functional_group=`` 与 ``logic_address=`` 是 **alias 键**（D3），
+新代码建议直接传 ``contract=PluginContract(...)``。
 """
 
 from __future__ import annotations
@@ -12,10 +19,6 @@ from typing import TYPE_CHECKING, Protocol, cast
 
 from cordis.plugin import Plugin as CordisPlugin
 from cordis.plugin import plugin as _cordis_plugin
-from pydantic import BaseModel
-
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.capabilities import Capability
 from lca.harness.plugin_declaration_normalization import (
     config_from_annotations,
     normalize_contributes,
@@ -36,12 +39,59 @@ from lca.harness.plugin_manifest import (
     RawRelationEntry,
 )
 from lca.harness.plugin_spec_projection import native_spec_from_declaration
+from pydantic import BaseModel
+
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.capabilities import Capability
+from lca.contracts.harness.composition.plugin_contract import (
+    PluginContract,
+    compose_plugin_contract,
+    contract_snapshot_for_meta,
+)
+from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 
 if TYPE_CHECKING:
-    from lca.contracts.harness.composition.plugin_contract import PluginContract
-    from lca.contracts.protocols.composition.logic_address import LogicAddress
     from lca.contracts.protocols.declarative.declarative_phase_graph import PluginSpec
-    from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+
+
+def _resolve_plugin_contract(
+    canonical_contract: PluginContract,
+) -> LogicAddress | None:
+    """Synthesize the legacy ``LogicAddress`` view from the canonical contract.
+
+    ADR-0110 D3 promises a deprecation window where readers using
+    ``definition.logic_address`` keep working even after the author migrates
+    to ``contract=PluginContract(...)``. This shim folds the canonical 5
+    sections back into the 6-dim flat struct that pre-ADR-0110 readers
+    expect; PR-D (six months out) deletes this and the corresponding field.
+    """
+    has_content = (
+        canonical_contract.architecture.group is not None
+        or bool(canonical_contract.architecture.control_slots)
+        or bool(canonical_contract.lifecycle.allowed_scopes)
+        or bool(canonical_contract.authority.grants)
+        or bool(canonical_contract.observability.descriptors)
+        or bool(canonical_contract.identity.version)
+    )
+    if not has_content:
+        return None
+    return LogicAddress(
+        functional_group=canonical_contract.architecture.group,
+        control_slot=(
+            canonical_contract.architecture.control_slots[0]
+            if canonical_contract.architecture.control_slots
+            else None
+        ),
+        scope=(
+            canonical_contract.lifecycle.allowed_scopes[0]
+            if canonical_contract.lifecycle.allowed_scopes
+            else None
+        ),
+        authority=tuple(canonical_contract.authority.grants),
+        evidence=tuple(canonical_contract.observability.descriptors),
+        revision=canonical_contract.identity.version or None,
+    )
 
 
 __all__ = ["PluginCarrier", "definition_from_plugin", "plugin"]
@@ -115,6 +165,23 @@ def plugin(
         )
         if functional_group_value is not None:
             merged_meta["functional_group"] = functional_group_value.value
+
+        # ADR-0110 PR-A: unify the 3 declaration keys into one canonical contract.
+        # ``contract=`` wins over ``logic_address=`` and ``functional_group=``;
+        # the resulting PluginContract is stored on PluginDefinition and as
+        # ``contract_snapshot`` on the cordis meta for downstream readers.
+        canonical_contract = compose_plugin_contract(
+            functional_group=functional_group_value,
+            logic_address=logic_address,
+            contract=contract,
+        )
+        merged_meta["contract_snapshot"] = contract_snapshot_for_meta(canonical_contract)
+
+        # ADR-0110 D3 back-compat shim: when the author migrates to
+        # ``contract=`` we still synthesize ``logic_address`` so pre-ADR-0110
+        # readers (e.g. ``definition.logic_address``) keep working during the
+        # deprecation window. PR-D removes this and the corresponding field.
+        legacy_logic_address = logic_address or _resolve_plugin_contract(canonical_contract)
         cordis_plugin = _cordis_plugin(
             fn,
             Config=config_cls,
@@ -147,8 +214,8 @@ def plugin(
                 description=desc,
                 relations=relation_tuple,
                 functional_group=functional_group_value,
-                logic_address=logic_address,
-                contract=contract,
+                logic_address=legacy_logic_address,
+                contract=canonical_contract,
                 ownership=ownership,
             ),
         )
