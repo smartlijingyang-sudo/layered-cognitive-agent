@@ -15,16 +15,18 @@ from pydantic import BaseModel, Field
 
 
 class GatewayConfig(BaseModel):
-    """LCA API gateway (Starlette)."""
+    """LCA API gateway (Starlette) network config — ADR-0119 决定 4。
+
+    LCA 进程本身**不**由本配置驱动(spawn 命令、`watch` 路径在 ADR-0119
+    决定 4 中删除);LCA 进程入口是 ``python -m lca_kernel serve``,SIGTERM
+    由 K6 ``lca_kernel.lifecycle`` 守护。本类仅保留 daemon 等其他服务需要
+    的网络配置(host / port / health_path),用于构造 ``base_url`` /
+    ``health_url``。
+    """
 
     host: str = "127.0.0.1"
     port: int = 8765
-    bind: str = "0.0.0.0"  # noqa: S104
     health_path: str = "/health"
-    entry: list[str] = Field(
-        default_factory=lambda: ["uv", "run", "python", "scripts/serve_observability.py"]
-    )
-    watch: list[str] = Field(default_factory=lambda: ["gateway", "lca"])
 
     @property
     def base_url(self) -> str:

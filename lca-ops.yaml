@@ -5,16 +5,15 @@
 #
 # Load order: defaults → this file → environment variables.
 
-# ── Gateway (LCA API server) ──────────────────────────────────────────
+# ── Gateway (LCA API network config) ──────────────────────────────────
+# ADR-0119 决定 4:lca-ops 不再管 LCA 进程 — LCA 进程入口是
+#   ``uv run python -m lca_kernel serve --profile X --host H --port P``
+# SIGTERM 由 K6 lca_kernel.lifecycle 守护。
+# 本段只保留 host/port/health_path 给 daemon 派生 ws_url 用。
 gateway:
   host: "127.0.0.1"
   port: 8765
-  bind: "0.0.0.0"
   health_path: /health
-  entry: ["uv", "run", "python", "scripts/serve_observability.py"]
-  watch:
-    - gateway
-    - lca
 
 # ── LobeHub (Next.js frontend) ────────────────────────────────────────
 lobehub:

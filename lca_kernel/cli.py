@@ -145,12 +145,20 @@ async def _serve_async(
     host: str,
     port: int,
     coordinator: Any,
+    allow_unknown_env: bool = False,
 ) -> int:
-    """LCA 进程主体。镜像 deepseek runProfile 9 步。"""
+    """LCA 进程主体。镜像 deepseek runProfile 9 步。
+
+    Args:
+        allow_unknown_env: 允许 .env 含 BOOTSTRAP_NAMES 之外的 key。``serve()`` 入口通过
+            ``--allow-unknown-env`` CLI flag 传入;默认 False(K6 fail-loud 守护严格性)。
+    """
     # 步骤 1: 装 env 快照
     from lca_kernel.env import load_layered_env
 
-    env_snapshot = load_layered_env(bin_name="lca_kernel", dir=os.getcwd())
+    env_snapshot = load_layered_env(
+        bin_name="lca_kernel", dir=os.getcwd(), allow_unknown=allow_unknown_env
+    )
 
     async def main() -> int:
         async with run_kernel_lifespan(profile_path) as state:  # 步骤 2+3: K1-K6 装 plugin 树
@@ -192,19 +200,26 @@ async def _serve_async(
     return await main()
 
 
-def serve(profile_path: str, host: str, port: int) -> int:
+def serve(profile_path: str, host: str, port: int, *, allow_unknown_env: bool = False) -> int:
     """LCA 进程入口(对齐 deepseek ``runProfile`` 9 步)。
 
     步骤 5+6(装 SIGTERM/fail-loud)**在 run_kernel_lifespan 之前**(覆盖 startup
     window,跟 deepseek runProfile 一致)。K6 内部 ``run_kernel_lifespan`` 会
     再装一次(同 coordinator,idempotent)。
+
+    Args:
+        profile_path: YAML profile 路径(必填)。
+        host: 监听 host,默认 127.0.0.1。
+        port: 监听端口,默认 8765。
+        allow_unknown_env: 允许 ``.env`` 含 ``BOOTSTRAP_NAMES`` 之外的 key。
+            开发 / 集成场景用;生产建议保持 ``False``(K6 fail-loud 守护)。
     """
     # 步骤 5+6: 装 SIGTERM/SIGINT + fail-loud(在 boot 之前)
     coordinator = create_shutdown_coordinator(kernel=None)
     install_signal_handlers(coordinator)
     install_fail_loud(coordinator)
 
-    return asyncio.run(_serve_async(profile_path, host, port, coordinator))
+    return asyncio.run(_serve_async(profile_path, host, port, coordinator, allow_unknown_env))
 
 
 # ── CLI parser(``python -m lca_kernel serve ...``)────────────────────────
@@ -221,11 +236,26 @@ def main() -> NoReturn:
     serve_p.add_argument("--profile", required=True, help="YAML profile 路径")
     serve_p.add_argument("--host", default="127.0.0.1")
     serve_p.add_argument("--port", type=int, default=8765)
+    serve_p.add_argument(
+        "--allow-unknown-env",
+        action="store_true",
+        help=(
+            "允许 .env 含 BOOTSTRAP_NAMES 之外的 key(开发 / 集成场景用;"
+            "生产建议保持严格,由 K6 fail-loud 守护)"
+        ),
+    )
 
     args = parser.parse_args()
     if args.cmd == "serve":
         with contextlib.suppress(KeyboardInterrupt):
-            sys.exit(serve(args.profile, args.host, args.port))
+            sys.exit(
+                serve(
+                    args.profile,
+                    args.host,
+                    args.port,
+                    allow_unknown_env=args.allow_unknown_env,
+                )
+            )
         sys.exit(130)  # Ctrl-C exit 130
     raise SystemExit(f"unknown cmd: {args.cmd}")
 

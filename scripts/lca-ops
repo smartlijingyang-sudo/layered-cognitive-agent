@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # LCA Platform Orchestrator — unified service management.
 #
-# This is the single entry point for managing the entire LCA development platform:
+# This is the single entry point for managing the LCA development platform:
 # - Infrastructure (postgres, redis, s3)
-# - Gateway (LCA API server)
 # - LobeHub (Next.js frontend)
 # - Daemon (sandbox-user CLI connect)
+# - Onlyboxes (worker runtime)
+#
+# ADR-0119 决定 4:lca-ops 不再管 LCA 进程 — LCA 进程入口是
+#   ``uv run python -m lca_kernel serve --profile X --host H --port P``
+# SIGTERM 由 K6 ``lca_kernel.lifecycle`` 守护。详情看 docs/adr/0119-*.
 #
 # Usage:
 #     lca-ops dev              # Start full dev environment
@@ -13,7 +17,6 @@
 #     lca-ops stop             # Stop all services
 #     lca-ops status           # Show status
 #     lca-ops heal             # Auto-recover unhealthy services
-#     lca-ops gateway start    # Manage gateway
 #     lca-ops lobehub start    # Manage LobeHub
 #     lca-ops infra start      # Manage infrastructure
 #     lca-ops daemon start     # Manage daemon

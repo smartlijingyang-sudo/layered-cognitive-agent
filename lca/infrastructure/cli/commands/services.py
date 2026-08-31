@@ -1,4 +1,9 @@
-"""Individual service management commands: gateway, lobehub, infra, daemon."""
+"""Individual service management commands: lobehub, infra, daemon, onlyboxes.
+
+ADR-0119 决定 4:lca-ops 不再管 LCA 进程 — LCA 进程入口是
+``python -m lca_kernel serve``,SIGTERM 由 K6 ``lca_kernel.lifecycle`` 守护。
+本模块只管 lobehub / infra / daemon / onlyboxes 等外部平台服务。
+"""
 
 from __future__ import annotations
 
@@ -11,38 +16,11 @@ from lca.infrastructure.cli.pipeline import build_pipeline
 
 
 def register(app: typer.Typer) -> None:
-    """Register service commands on the typer app."""
+    """Register service commands on the typer app.
 
-    @app.command()
-    def gateway(
-        action: str = typer.Argument(None, help="start | stop | restart | status"),
-        json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
-        quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
-    ) -> None:
-        """LCA API :8765。日志 .lca-ops/gateway.log。动作：start stop restart status。"""
-        if action is None:
-            typer.echo(
-                "gateway  LCA API  :8765\n"
-                "  日志    .lca-ops/gateway.log\n"
-                "  动作    start | stop | restart | status\n"
-                "  例子    ./scripts/lca-ops gateway restart\n"
-                "          ./scripts/lca-ops logs\n"
-            )
-            raise typer.Exit(0)
-        ctx = make_context(json_mode, quiet, config)
-        step_map = {
-            "start": "gateway.start",
-            "stop": "gateway.stop",
-            "restart": "gateway.restart",
-            "status": "stack.status",
-        }
-        if action not in step_map:
-            ctx.console.error(f"未知动作 {action}。用: start stop restart status")
-            raise typer.Exit(1)
-        pipeline = build_pipeline(f"gateway.{action}", [step_map[action]])
-        pipeline.execute(ctx)
-        ctx.console.flush()
+    ADR-0119 决定 4:``gateway`` 子命令已删除 —— LCA 进程由
+    ``python -m lca_kernel serve`` 直管,不需要 ``lca-ops gateway start/stop/restart``。
+    """
 
     @app.command()
     def lobehub(
