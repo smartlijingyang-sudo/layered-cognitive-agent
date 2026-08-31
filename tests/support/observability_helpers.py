@@ -13,8 +13,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from lca.infrastructure.observability.adapters.policy import AttributePolicy, Verbosity
-
 from lca.contracts.models.observability.journal import (
     JournalEvent,
     RuntimeObserved,
@@ -25,6 +23,7 @@ from lca.contracts.protocols import JournalProjector
 from lca.infrastructure.observability import (
     RunStore,
 )
+from lca.infrastructure.observability.adapters.policy import AttributePolicy, Verbosity
 from lca.infrastructure.observability.facade import BoundObservability
 
 
