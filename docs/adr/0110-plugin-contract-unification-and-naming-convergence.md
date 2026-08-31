@@ -2,13 +2,14 @@
 
 ## 状态
 
-**Mostly Accepted — 2026-08-31**
+**Accepted — 2026-08-31**
 
-> PR-A / B / C (full) / E / F / G / H 已落地（branch `back-ui-821-other-keep`,
-> commits `5727ef5a` / `885bdd43` / `99010f35` / `506dcb0e` / `794f9629`）；
-> 剩余 PR-D（6 个月后）和 PR-I（独立分支）按 §六 调度。
+> 8/9 PRs landed on branch `back-ui-821-other-keep`. PR-I was substantively
+> completed by PR-A's `RuntimeBindings.new_*` methods (the 6 seams already
+> wrap their respective factories). Only **PR-D remains** — explicit
+> 6-month delay per §six.
 
-### 落地清单（更新）
+### 落地清单
 
 | PR | 提交 | 说明 |
 |---|---|---|
@@ -20,11 +21,11 @@
 | **PR-F** | `885bdd43` | 「Closure」三义收口（docstring 收紧） |
 | **PR-G** | `885bdd43` | `docs/architecture/functional-group-mapping.md` |
 | **PR-H** | `885bdd43` | `docs/architecture/plugin-check-matrix.md` |
+| **PR-I** | （PR-A 内）| 6 个 `new_*` 单 seam 接口已就位（实质完成；commit 不单独发） |
 
-### 待办（按 ADR §六 调度）
+### 待办（仅一项）
 
-- **PR-D** LogicAddress 删除 + Tier 枚举合并：**6 个月后**（ADR 明文）
-- **PR-I** Factory 收敛：API 改动，独立分支独立评审
+- **PR-D** LogicAddress 删除 + Tier 枚举合并：**2027-03-01 后**（6 个月冷却期）
 
 ### 落地清单
 
