@@ -2,7 +2,11 @@
 
 ## 状态
 
-**Proposed — 2026-08-31**
+**Partially Accepted — 2026-08-31**
+
+> PR-A / B / F / G / H 已落地（branch `back-ui-821-other-keep`, commits
+> `5727ef5a` & `885bdd43`）；剩余 PR-C / D / E / I 见 §六。本 ADR 在 PR-C
+> 落地后改 Accepted。
 
 Refines:
 - ADR-0015（contracts/ 仅类型与接口）

@@ -108,4 +108,13 @@ class DeclarativeCheckpointStateResolver(CheckpointStateResolver):
             object.__setattr__(state, "phase_cursor", cursor)
 
 
-__all__ = ["DeclarativeCheckpoint", "DeclarativeCheckpointStateResolver"]
+# ── ADR-0110 D5 / PR-E:「Declarative」前缀公开 re-export ────────────
+RuntimeCheckpoint = DeclarativeCheckpoint
+"""Public alias for ``DeclarativeCheckpoint`` (ADR-0110 D5)."""
+
+
+__all__ = [
+    "DeclarativeCheckpoint",
+    "DeclarativeCheckpointStateResolver",
+    "RuntimeCheckpoint",
+]

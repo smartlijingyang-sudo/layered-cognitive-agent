@@ -283,4 +283,22 @@ class DeclarativeRuntimeBindings:
         )
 
 
-__all__ = ["DeclarativeRuntimeBindings", "RuntimePhaseCapabilities"]
+# ── ADR-0110 D5 / PR-E:「Declarative」前缀公开 re-export ────────────
+#
+# 这些别名给新代码提供去前缀的入口；类型本身不动（PR-E 是 Phase 1 / 仅
+# re-export，文件级 rename 留到后续独立 PR）。旧 import
+# (``DeclarativeRuntimeBindings``) 仍合法；新代码请用 ``RuntimeBindings``。
+RuntimeBindings = DeclarativeRuntimeBindings
+"""Public alias for ``DeclarativeRuntimeBindings`` (ADR-0110 D5).
+
+The ``Declarative`` prefix is the framework's rename-line, not a
+type-specifying word: every type the framework exposes is declarative.
+New code should reach the constructor via this alias.
+"""
+
+
+__all__ = [
+    "DeclarativeRuntimeBindings",
+    "RuntimeBindings",
+    "RuntimePhaseCapabilities",
+]

@@ -104,6 +104,21 @@ __all__ = [
     "DeclarativeCheckpoint",
     "DeclarativeExecution",
     "DeclarativeRuntimeDriver",
+    "RuntimeDriver",
     "RuntimeJournalCommitter",
     "RuntimePhaseCapabilities",
+    "TurnExecutor",
 ]
+
+
+# ── ADR-0110 D5 / PR-E:「Declarative」前缀公开 re-export ────────────
+#
+# 这些别名给新代码提供去前缀的入口；类型本身不动。内部 ``Declarative``
+# 仍合法（过渡期 alias）；新代码请用 ``RuntimeDriver`` / ``TurnExecutor``。
+# (``RuntimeCheckpoint`` alias lives in ``checkpoint_resolution.py`` where
+# its source class is defined.)
+RuntimeDriver = DeclarativeRuntimeDriver
+"""Public alias for ``DeclarativeRuntimeDriver`` (ADR-0110 D5)."""
+
+TurnExecutor = DeclarativeExecution
+"""Public alias for ``DeclarativeExecution`` (ADR-0110 D5)."""
