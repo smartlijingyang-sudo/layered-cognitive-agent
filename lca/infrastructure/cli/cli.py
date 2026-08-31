@@ -93,7 +93,7 @@ heal       自己修不健康的服务(优先用这个;不是 restart)
 stop       停外部平台服务(daemon / lobehub / infra),不含 LCA 进程
 provision  整机首次:装包 / venv / sandbox 用户 / 工作区 / CLI
 
-  注: dev / restart 已删除(引用了 gateway 死 step,跑必崩)。
+  注: dev / restart 已删除(ADR-0119 决定 4:lca-ops 不再管 kernel_serve 进程)。
 
 ────────────────────────────────
 LCA 进程 (kernel serve)  ADR-0119 决定 4

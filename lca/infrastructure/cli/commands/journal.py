@@ -46,9 +46,9 @@ def register(app: typer.Typer) -> None:
         ),
         config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
     ) -> None:
-        """事实流。默认是 journal（思考/工具/步/洞察），不是 gateway.log。"""
+        """事实流。默认是 journal（思考/工具/步/洞察），不是 kernel_serve.log。"""
         ops_config = OpsConfig.load(config)
-        if target in {"", "journal", "gateway"}:
+        if target in {"", "journal", "kernel_serve"}:
             _follow_journal(ops_config, verbose=verbose, show_deltas=deltas, replay=replay)
             return
         import subprocess
@@ -143,12 +143,12 @@ def _read_response_body(resp: httpx.Response) -> str:
 def _print_journal_refusal(status_code: int, body: str) -> None:
     """Render a precise, actionable refusal message for non-200 journal responses.
 
-    Prefers the ``error.code`` taxonomy from the gateway JSON body so the
+    Prefers the ``error.code`` taxonomy from the kernel_serve JSON body so the
     operator sees a directive matched to the actual refusal reason rather
     than a generic "rejected" line.
     """
     code, message = _extract_refusal(body)
-    print(f"gateway 拒绝 journal 订阅（HTTP {status_code}）")
+    print(f"kernel_serve 拒绝 journal 订阅（HTTP {status_code}）")
     directive = _KERNEL_SERVE_REFUSAL_CODES.get(code or "")
     if directive is not None:
         head, hints = directive
@@ -161,7 +161,7 @@ def _print_journal_refusal(status_code: int, body: str) -> None:
 
 
 def _extract_refusal(body: str) -> tuple[str | None, str | None]:
-    """Return ``(error.code, error.message)`` from a gateway JSON error body."""
+    """Return ``(error.code, error.message)`` from a kernel_serve JSON error body."""
     if not body:
         return None, None
     try:
@@ -222,7 +222,7 @@ def _stream_live(
             ):
                 if resp.status_code == 404:
                     print(
-                        "gateway 还没有 /journal/live —— lca-ops 不再管理 LCA 进程。"
+                        "kernel_serve 还没有 /journal/live —— lca-ops 不再管理 LCA 进程 (ADR-0119 决定 4)。"
                         " 请确认 `uv run python -m lca_kernel serve --profile profiles/web-standard.yaml` 在跑。"
                     )
                     projector.close()
@@ -257,7 +257,7 @@ def _stream_live(
                         break
 
         except httpx.ConnectError:
-            print(f"\n⚠ gateway 连接失败，{backoff:.0f}s 后重试...")
+            print(f"\n⚠ kernel_serve 连接失败，{backoff:.0f}s 后重试...")
         except httpx.RemoteProtocolError:
             print(f"\n⚠ SSE 协议错误，{backoff:.0f}s 后重试...")
         except (httpx.ReadError, httpx.ReadTimeout, httpx.StreamError) as exc:

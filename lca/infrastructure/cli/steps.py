@@ -42,8 +42,8 @@ def infra_stop(ctx: PipelineContext) -> None:
     ctx.console.service_state("infra", state)
 
 
-# ── Gateway Steps ─────────────────────────────────────────────────────
-# ADR-0119 决定 4:Gateway 进程不归 lca-ops 管 (lca_kernel serve 自管)。
+# ── Kernel serve Steps ────────────────────────────────────────────────
+# ADR-0119 决定 4:kernel_serve 进程不归 lca-ops 管 (lca_kernel serve 自管)。
 # 旧的 gateway.ensure/start/restart/stop step 已删除,对应 service 也已
 # 从 registry 移除。保留本节标题便于 git history 比对。
 

@@ -1,4 +1,4 @@
-"""HTTP client for /api/device/*.  Layer0 never imports gateway."""
+"""HTTP client for /api/device/*.  Layer0 never imports webserver transport."""
 
 from __future__ import annotations
 

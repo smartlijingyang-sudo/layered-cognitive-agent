@@ -1,7 +1,7 @@
 """LCA Ops — unified platform orchestration.
 
 One package manages the entire LCA development platform:
-gateway, LobeHub frontend, infrastructure, and agent daemon.
+kernel_serve (lca_kernel serve, ADR-0119 决定 4), LobeHub frontend, infrastructure, and agent daemon.
 
 Architecture:
     Service Protocol  — every managed component implements the same interface

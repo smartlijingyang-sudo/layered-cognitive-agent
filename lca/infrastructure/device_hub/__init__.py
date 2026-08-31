@@ -1,4 +1,4 @@
-"""Device → kernel serve HTTP client — LobeHub GatewayHttpClient alignment."""
+"""Device → kernel serve HTTP client — LobeHub ``GatewayHttpClient`` legacy alias alignment."""
 
 from __future__ import annotations
 

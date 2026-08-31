@@ -1,6 +1,6 @@
 """Service Protocol — the core abstraction.
 
-Every managed component (gateway, lobehub, infra, daemon) implements
+Every managed component (lobehub, infra, daemon; ADR-0119 followup-2: kernel_serve 已下线) implements
 this interface. The CLI never talks to processes directly — it always
 goes through a Service.
 
@@ -118,7 +118,7 @@ class CliShippingService(Protocol):
     """Services that ship a managed CLI binary on disk.
 
     Currently only ``DaemonService`` satisfies this; the CLI is the
-    sandbox-user daemon. Other services (``GatewayService``,
+    sandbox-user daemon. Other services (``LobehubService``, ``InfraService``,
     ``InfraService`` etc.) do not own a CLI and must not be type-checked
     against this Protocol.
     """
