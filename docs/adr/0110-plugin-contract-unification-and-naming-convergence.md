@@ -2,11 +2,29 @@
 
 ## 状态
 
-**Partially Accepted — 2026-08-31**
+**Mostly Accepted — 2026-08-31**
 
-> PR-A / B / C-preview / E / F / G / H 已落地（branch `back-ui-821-other-keep`,
-> commits `5727ef5a` / `885bdd43` / `99010f35` / `506dcb0e`）；剩余 PR-D / I
-> 按 §六 调度（C 完整 rollout 是独立分支）。
+> PR-A / B / C (full) / E / F / G / H 已落地（branch `back-ui-821-other-keep`,
+> commits `5727ef5a` / `885bdd43` / `99010f35` / `506dcb0e` / `794f9629`）；
+> 剩余 PR-D（6 个月后）和 PR-I（独立分支）按 §六 调度。
+
+### 落地清单（更新）
+
+| PR | 提交 | 说明 |
+|---|---|---|
+| **PR-A** | `5727ef5a` | 3-key 归一 + back-compat shim + 17 单测 + 1 试刀 |
+| **PR-B** | `885bdd43` | `LogicAddress(...)` 构造期 `DeprecationWarning` |
+| **PR-C (preview)** | `506dcb0e` | 11 试刀 + `scripts/codegen_plugin_contract.py` seed |
+| **PR-C (full)** | `794f9629` | 184 plugin 文件 codemod 到 `contract=PluginContract` |
+| **PR-E** | `99010f35` | 4 个去前缀公开 re-export 别名 + 7 单测 |
+| **PR-F** | `885bdd43` | 「Closure」三义收口（docstring 收紧） |
+| **PR-G** | `885bdd43` | `docs/architecture/functional-group-mapping.md` |
+| **PR-H** | `885bdd43` | `docs/architecture/plugin-check-matrix.md` |
+
+### 待办（按 ADR §六 调度）
+
+- **PR-D** LogicAddress 删除 + Tier 枚举合并：**6 个月后**（ADR 明文）
+- **PR-I** Factory 收敛：API 改动，独立分支独立评审
 
 ### 落地清单
 
