@@ -1,7 +1,8 @@
 # ADR-0111: 启动链路编译化为 `lca-kernel/` 顶层包
 
-> **状态：** Proposed(被 [ADR-0115](./0115-kernel-transport-boundary.md) 修订)
+> **状态：** Accepted (Superseded by [ADR-0115](./0115-kernel-transport-boundary.md))
 > **修订日期：** 2026-08-31
+> **落地：** `lca-kernel/` 顶层包 14 文件,`lca/harness/profile/compilation/` 子包方向被 ADR-0115 修订为顶层包;6 个月兼容期到 2027-02-28。
 > **配套 ADR：** [ADR-0083](./0083-deepseek-harness-plugin-implementation-plan.md) W1 主链收紧 · [ADR-0085](./0085-plugin-everything-explained.md) 插件哲学 · [ADR-0103](./0103-locked-surface-and-port-policy.md) Gateway/Adapter 锁定面 · [ADR-0105](./0105-package-organization-discipline.md) 包组织纪律 · [ADR-0106](./0106-naming-constitution.md) 命名宪法 · **优先 ADR:**[ADR-0115](./0115-kernel-transport-boundary.md) Kernel/Transport 边界
 >
 > ⚠️ **本文初版(2026-08-31 上午)规划 `lca/harness/profile/compilation/` 子包 + boot→compile 改名 + 6 文件拆分;被 [ADR-0115](./0115-kernel-transport-boundary.md) 修订方向:kernel 应为 `lca-kernel/` 顶层包,12 文件,保留 `boot_profile` 公共 API(不强制改名)。本 ADR 是新架构方向的执行细则,顶层设计见 [ADR-0115](./0115-kernel-transport-boundary.md)。**

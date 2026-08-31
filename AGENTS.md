@@ -137,7 +137,7 @@ uv run vulture lca --min-confidence 80
 
 `real_llm` 默认不运行；需凭证和明确意图时才执行 `uv run pytest -m real_llm -v`。报告结果必须写出实际命令；局部测试通过不能称为全量通过。
 
-关键门禁包括：`check_protocol_impl.py`、`check_plugin_typing.py`、`check_no_any.py`、`check_no_bare_strings.py`、`check_assembly_purity.py`、`check_no_flat_runs.py`、`verify_md_links.py`、`verify_doc_budgets.py`、`scripts/check_kernel_boundary.py`(PR-5 增)、importlinter 契约 `kernel-domain-isolation` + `transport-isolation`(pyproject.toml;PR-1 ~ PR-4 增)。
+关键门禁包括：`check_protocol_impl.py`、`check_plugin_typing.py`、`check_no_any.py`、`check_no_bare_strings.py`、`check_assembly_purity.py`、`check_no_flat_runs.py`、`verify_md_links.py`、`verify_doc_budgets.py`、`scripts/check_kernel_boundary.py`(本批 PR-7 增,聚合 `tests/lca_kernel/test_boundary.py` AST + 全量 kernel 测试 + importlinter `kernel-domain-isolation` / `transport-isolation`)、importlinter 契约 `kernel-domain-isolation` + `transport-isolation`(pyproject.toml;PR-7 重配为 forbidden top-level `lca_kernel` + `ignore_imports` 白名单,因 importlinter 2.13 不支持 forbid 外部包子模块)。
 
 | 改动 | 最低要求 |
 |---|---|
@@ -146,7 +146,7 @@ uv run vulture lca --min-confidence 80
 | import / 模块移动 | 上一项 + `lint-imports` |
 | Gateway、运行入口、LobeHub patch | Ruff + 对应 gateway/run/lobehub 测试；只改 patch 源 |
 | 删除共享符号 | 相关测试 + `vulture`；影响大时全量 pytest |
-| `lca-kernel/` / `lca/plugins/transport/` / `lca/infrastructure/env/` | `scripts/check_kernel_boundary.py` + importlinter `kernel-domain-isolation` & `transport-isolation` + 53 + 24 + 19 kernel/transport/env 测试 |
+| `lca-kernel/` / `lca/plugins/transport/` / `lca/infrastructure/env/` | `scripts/check_kernel_boundary.py` + importlinter `kernel-domain-isolation` & `transport-isolation` + 87 + 24 + 19 kernel/transport/env 测试 (含本批新增 28 项 K8 HMR + 5 项 boot event emission) |
 | Contracts、Protocol、枚举、注册表、Journal、Profile | 全量验证 |
 
 | 改动 | 最低要求 |

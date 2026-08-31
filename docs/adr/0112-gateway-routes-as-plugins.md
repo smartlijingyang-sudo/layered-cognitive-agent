@@ -1,7 +1,8 @@
 # ADR-0112: Gateway 路由 Plugin 化(借鉴 deepseek host/webserver)
 
-> **状态：** Proposed(被 [ADR-0115](./0115-kernel-transport-boundary.md) 修订)
+> **状态：** Accepted (Superseded by [ADR-0115](./0115-kernel-transport-boundary.md))
 > **修订日期：** 2026-08-31
+> **落地：** `lca/plugins/transport/webserver/` + `LcaGatewayRouter` Protocol + 4 个 routes plugin (`routes_health_options` / `routes_runs_sessions` / `routes_openai_compat_files` / `routes_device`);`gateway/app.py` 削到 58 行 thin factory。
 > **配套 ADR：** [ADR-0083](./0083-deepseek-harness-plugin-implementation-plan.md) W6 Team/Mode · [ADR-0103](./0103-locked-surface-and-port-policy.md) wire-shape 锁定 · [ADR-0106](./0106-naming-constitution.md) 命名宪法 · **优先 ADR:**[ADR-0115](./0115-kernel-transport-boundary.md) Kernel/Transport 边界
 >
 > ⚠️ **本文初版(2026-08-31 上午)规划 `lca/plugins/gateway/` 目录 + `LcaGatewayServer` Protocol + 8 个 routes plugin;被 [ADR-0115](./0115-kernel-transport-boundary.md) 修订方向:gateway 应迁到 `lca/plugins/transport/webserver/` 独立 transport namespace;`GatewayServer` → `GatewayRouter`(ADR-0106 §4.1 合规);8 个 routes plugin 减到 4 个。**

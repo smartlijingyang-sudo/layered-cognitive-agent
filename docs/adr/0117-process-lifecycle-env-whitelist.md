@@ -1,7 +1,14 @@
 # ADR-0117: Process 生命周期 + Fail-loud + 环境变量白名单
 
-> **状态：** Proposed
+> **状态：** Accepted
 > **日期：** 2026-08-31
+> **落地证据：**
+> - **K6** `lca_kernel/lifecycle.py`:`ShutdownCoordinator` Protocol + `DefaultShutdownCoordinator` 实现(LIFO dispose, is_shutting_down 去重);`install_fail_loud` 装 sys.excepthook + asyncio handler + threading.excepthook;`install_signal_handlers` 装 SIGTERM(0) / SIGINT(130);`FAIL_LOUD_RELEASE_TIMEOUT_MS = 2000`(deepseek 借鉴)
+> - **K7** `lca/infrastructure/env/bootstrap.py`:`BOOTSTRAP_NAMES`(46 个:Python/venv / shell/locale / VCS / 网络信任)+ `BOOTSTRAP_PREFIXES`(13 个,LCA_/LLM_/GATEWAY_/...)+ `BOOTSTRAP_FORBIDDEN`(LCA_PROFILE / LCA_KERNEL_KEY / LCA_INTERNAL_INJECTION)
+> - **K7** `lca/infrastructure/env/layered.py`:`filter_env_keys` 三层模型(ambient / .env / profile refs)
+> - **K7** `lca_kernel/env.py`:kernel facade `load_layered_env(bin_name, dir, allow_unknown=False)` + `EnvSnapshot`(ambient + filtered dotenv + allowed/blocked keys)
+> - **D5** `LCA_PROFILE` 通过 argv 而非 .env 决策(由 `BOOTSTRAP_FORBIDDEN` 强制)
+> - **K8** 见 [ADR-0118](./0118-kernel-hmr-patch-watcher.md)
 > **配套 ADR：** [ADR-0115](./0115-kernel-transport-boundary.md) Kernel/Transport 边界 · K6 + K7 专项落地
 >
 > **范围**:本 ADR 是 [ADR-0115](./0115-kernel-transport-boundary.md) 决定 1 中 **K6**(Process 生命周期 + Fail-loud)与 **K7**(环境变量加载 + 白名单)的具体落地。K8 HMR 单独在 [ADR-0118](./0118-cordis-patch-hmr.md) 中立项。

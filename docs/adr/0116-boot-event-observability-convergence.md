@@ -1,7 +1,14 @@
 # ADR-0116: 启动事件词表与可观测性收敛(合并原 ADR-0113 + 0114)
 
-> **状态：** Proposed
+> **状态：** Accepted
 > **日期：** 2026-08-31
+> **落地证据：**
+> - `lca/contracts/models/observability/journal.py` 3 个 frozen dataclass: `BootProfileResolved` / `BootPluginFiberSpawned` / `BootObservabilityAssembled`
+> - `BootPluginFiberSpawned.stage` 强引用 `lca_kernel.stages.Stage(IntEnum)` 范围 [1, 6]
+> - `event_descriptors_data.py` 注册 3 行 `_descriptor(...)`;`journal_catalog.py` JOURNAL_EVENT_CLASSES 3 个 entry
+> - `lca_kernel/boot.py` 在 fiber spawn 期间 buffer `BootPluginFiberSpawned`,observability 第二次 install 后 flush + emit `BootProfileResolved` + `BootObservabilityAssembled`
+> - 测试 `tests/lca_kernel/test_boot_events_emitted.py` 5 项 + `tests/test_journal_catalog_boot_events.py` 形状守卫
+> - ADR-0116 §决定 2 的"BootTraceFlushed → RuntimeObserved(operation='boot.trace.flush')" 与 "BootLifecycleFailed → RuntimeObserved(operation='kernel.lifecycle.fail')" 两个 RuntimeObserved 路径留给运行期消费方(K6 + K7);boot 路径不直接 emit,改由 `lca_kernel/lifecycle.py` 在 dispose() / shutdown() 中触发(下个 PR 扩展)
 > **配套 ADR：** [ADR-0063](./0063-run-trace-ssot.md) 运行事件账本 SSOT · [ADR-0085](./0085-plugin-everything-explained.md) 插件哲学 · [ADR-0115](./0115-kernel-transport-boundary.md) Kernel/Transport 边界
 >
 > **Supersedes:** [ADR-0113](./0113-boot-trace-first-class-citizen.md) 启动 Trace 第一公民 · [ADR-0114](./0114-boot-event-catalog-increment.md) 启动事件词表增量

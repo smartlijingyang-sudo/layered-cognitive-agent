@@ -1,7 +1,14 @@
 # ADR-0115: Kernel / Transport 边界 — `lca-kernel` 顶层包与 lint-imports 门禁
 
-> **状态：** Proposed
+> **状态：** Accepted (K1–K8 全部落地)
 > **日期：** 2026-08-31
+> **落地证据：**
+> - `lca_kernel/` 14 文件,`lca_kernel/__init__.py` 公共面 re-export K1–K8 接口
+> - K1–K7 由 PR-2 (commit `90dd2c87`) 实现;K8 HMR 由 ADR-0118 + PR-7 (本批)
+> - `lca/plugins/transport/webserver/` 独立 transport namespace;`lca-gateway-router` + 4 routes plugin
+> - `scripts/check_kernel_boundary.py` 跑 AST 边界 + 全量 kernel 测试 + importlinter
+> - `tests/lca_kernel/test_boundary.py` AST 守 (12 项)
+> - `pyproject.toml` importlinter `kernel-domain-isolation` + `transport-isolation` 重新配置为 forbidden top-level `lca_kernel` + ignore_imports 白名单(importlinter 2.13 不支持 forbid 外部包子模块)
 > **配套 ADR：** [ADR-0083](./0083-deepseek-harness-plugin-implementation-plan.md) W1 主链 · [ADR-0085](./0085-plugin-everything-explained.md) 插件哲学 · [ADR-0105](./0105-package-organization-discipline.md) 包组织纪律 · [ADR-0106](./0106-naming-constitution.md) 命名宪法 · [ADR-0111](./0111-startup-compilation-as-subpackage.md) 启动编译化(本次修订)· [ADR-0112](./0112-gateway-routes-as-plugins.md) Gateway 路由(本次修订) · [ADR-0117](./0117-process-lifecycle-env-whitelist.md) Process 生命周期(本次新立项)
 >
 > **本 ADR 是新架构顶层设计,优先于 ADR-0111 / 0112 / 0113 / 0114;它们在本文 §"对既有 ADR 的修订" 一节被引用并锁定方向。**

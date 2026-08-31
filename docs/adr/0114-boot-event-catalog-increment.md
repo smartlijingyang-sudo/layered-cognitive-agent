@@ -2,6 +2,7 @@
 
 > **状态：** Superseded by [ADR-0116](./0116-boot-event-observability-convergence.md)
 > **日期：** 2026-08-31
+> **说明：** 初版提议 5 个新 JournalEvent (`BootProfileResolved / BootPluginFiberSpawned / BootObservabilityAssembled / BootTraceFlushed / BootLifecycleFailed`),被 ADR-0116 收敛为 3 typed event + 2 RuntimeObserved 复用 ADR-0063;本文档未直接落地任何代码,所有内容由 ADR-0116 接管。
 > **配套 ADR：** [ADR-0063](./0063-run-trace-ssot.md) 运行事件账本 SSOT · [ADR-0085](./0085-plugin-everything-explained.md) SessionEventMap 模式 · [ADR-0111](./0111-startup-compilation-as-subpackage.md) 启动编译化 · [ADR-0113](./0113-boot-trace-first-class-citizen.md) 启动 Trace 第一公民
 >
 > ⚠️ **本文被 [ADR-0116](./0116-boot-event-observability-convergence.md) 合并/精简。5 个 typed event 砍到 3 个,2 个走 RuntimeObserved 复用 ADR-0063。详见 ADR-0116 §"对既有 ADR 的精简"。**

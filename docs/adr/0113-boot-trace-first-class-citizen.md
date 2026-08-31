@@ -2,6 +2,7 @@
 
 > **状态：** Superseded by [ADR-0116](./0116-boot-event-observability-convergence.md)
 > **日期：** 2026-08-31
+> **说明：** 初版提议 `TraceSink / JsonlFileSink / JournalSink` 三概念,被 3 个 subagent 评审一致 YAGNI;`bundles/observability-default.yaml` + `traces/lca_trace.jsonl` + `JournalEngine` 已覆盖 boot 可观测。ADR-0116 收敛后,本文档所有概念全部由 ADR-0116 接管,**未实现任何代码**。
 > **配套 ADR：** [ADR-0083](./0083-deepseek-harness-plugin-implementation-plan.md) W7 Evidence/Replay · [ADR-0063](./0063-run-trace-ssot.md) 运行事件账本 SSOT · [ADR-0065](./0065-recoverable-evidence-ledger.md) 证据保真 · [ADR-0111](./0111-startup-compilation-as-subpackage.md) 启动编译化
 >
 > ⚠️ **本文被 [ADR-0116](./0116-boot-event-observability-convergence.md) 合并/废弃。3 个 subagent 评审一致认为 `TraceSink / JsonlFileSink / JournalSink` 是 YAGNI(已有 `bundles/observability-default.yaml` + `traces/lca_trace.jsonl` 覆盖),`lca-ops trace boot` 跟 `lca-ops logs --replay` 80% 重叠。详见 ADR-0116 §"为什么砍掉"。**
