@@ -12,18 +12,18 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
 from lca.contracts.capabilities import PHASE_OBSERVER, PHASE_OBSERVER_REGISTRY
+from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.journal.phase_observation import PhaseObserver, PhaseObserverRegistry
 from lca.harness.declarative.lifecycle.phase_observation import (
     CompositePhaseObserver,
     ObserverFailureMode,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class Config(BaseModel):
@@ -44,21 +44,18 @@ class Config(BaseModel):
     description="Freeze contributed read-only phase observers into the runtime observer.",
     test_suite="tests/declarative/test_phase_observer_plugins.py",
     kind=PluginKind.COMPOSITE,
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G10_COMPOSITION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('lca-phase-observer-provider.checked', 'lca-phase-observer-provider.served'),
+        authority=("plugin.serve",),
+        evidence=("lca-phase-observer-provider.checked", "lca-phase-observer-provider.served"),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('plugin.serve',),
-        emits=('plugin.served',),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

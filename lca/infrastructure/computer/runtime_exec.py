@@ -277,7 +277,7 @@ class ComputerRuntimeExecMixin:
                     f"exit_code={terminal_result.exit_code}" if terminal_result.exit_code else ""
                 )
                 state["error_summary"] = terminal_result.error_summary or terminal_result.error
-                state["error_kind"] = getattr(terminal_result.error_kind, 'value', None) or 'none'
+                state["error_kind"] = getattr(terminal_result.error_kind, "value", None) or "none"
             generated = terminal_result.generated_files
             if is_office_publish_intent(tool_name="runCommand", command=command):
                 scanned = await runtime.scan_output_files(invocation_id=f"{inv}_office_pub")
@@ -395,8 +395,10 @@ def _re_get(kind: str) -> Any:
     """Lazy import to break circular import (computer ↔ tools)."""
     if kind == "attachment_ids":
         from lca.infrastructure.tools.run_attachment_scope import get_current_run_attachment_ids
+
         return get_current_run_attachment_ids()
     if kind == "inv":
         from lca.infrastructure.tools.tool_invocation_scope import get_current_tool_invocation_id
+
         return get_current_tool_invocation_id()
     raise ValueError(kind)

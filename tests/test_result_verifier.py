@@ -64,12 +64,12 @@ def test_verification_projects_to_existing_task_status() -> None:
 
 
 def test_artifact_manifest_verification_requires_task_ownership() -> None:
+    from lca.contracts.harness.gate.result_verifier import verify_artifact_manifest
     from lca.contracts.harness.journal.artifact_manifest import (
         ArtifactEntry,
         ArtifactKind,
         ArtifactManifest,
     )
-    from lca.contracts.harness.gate.result_verifier import verify_artifact_manifest
 
     entry = ArtifactEntry(
         "a1", "report.md", ArtifactKind.REPORT, "sha256:x", "text/markdown", "artifact://a1", 1

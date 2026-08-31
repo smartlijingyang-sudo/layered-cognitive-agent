@@ -93,13 +93,13 @@ def _follow_journal(
 
 def _replay_from_jsonl(*, verbose: bool, show_deltas: bool) -> None:
     """Read the durable jsonl journal file and project every event."""
-    from lca.infrastructure.observability.journal.stream.fact_stream import (
-        FactStreamProjector,
-    )
     from lca.infrastructure.observability.journal.engine.journal_io import (
         JOURNAL_SCHEMA_VERSION,
         load_journal_records,
         record_to_stamped,
+    )
+    from lca.infrastructure.observability.journal.stream.fact_stream import (
+        FactStreamProjector,
     )
 
     jsonl_path = Path("traces/lca_journal.jsonl")
@@ -193,13 +193,13 @@ def _stream_live(
     """
     import time as _time
 
-    from lca.infrastructure.observability.journal.stream.fact_stream import (
-        FactStreamProjector,
-    )
     from lca.infrastructure.cli.journal_log import (
         extract_seq_from_record,
         parse_sse_block,
         sse_record_to_stamped,
+    )
+    from lca.infrastructure.observability.journal.stream.fact_stream import (
+        FactStreamProjector,
     )
 
     url = f"{ops_config.gateway.base_url}/journal/live"

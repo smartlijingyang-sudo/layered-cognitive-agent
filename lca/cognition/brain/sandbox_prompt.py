@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from lca.cognition.brain.prompts import load_builtin_prompt
 from lca.contracts.models.core.plane import PlaneKind
 from lca.contracts.protocols import Tool
 from lca.infrastructure.file_store import FileStore
@@ -18,7 +19,6 @@ from lca.infrastructure.sandbox.surface import plane_system_role
 from lca.infrastructure.tools.lca_computer.manifest import LOCAL_SYSTEM_ID as _LOCAL_SYSTEM_ID
 from lca.infrastructure.tools.lca_computer.types import CLOUD_SANDBOX_APIS, MACHINE_APIS
 from lca.infrastructure.tools.lca_sandbox import IDENTIFIER as _CLOUD_SANDBOX_ID
-from lca.cognition.brain.prompts import load_builtin_prompt
 
 _CLOUD_SANDBOX_TOOL_NAME = _CLOUD_SANDBOX_ID
 _LOCAL_SYSTEM_TOOL_NAME = _LOCAL_SYSTEM_ID

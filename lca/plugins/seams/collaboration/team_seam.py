@@ -18,6 +18,9 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
 from lca.contracts.capabilities import (
     TEAM_COMMUNICATION,
     TEAM_SEAM,
@@ -31,14 +34,11 @@ from lca.contracts.protocols.collaboration.team_seam import (
     TeamSeamFactoryProtocol,
     TeamSharedMemoryResolverProtocol,
 )
+from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.journal.spec import TeamSpec
 from lca.contracts.protocols.runtime.infra import AgentTransport
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 if TYPE_CHECKING:
     from lca.contracts.protocols import MemberInvoker, SharedMemoryStore
@@ -67,21 +67,18 @@ class TeamSeam:
     description="Provide the TeamSeam Definition service for TeamComposer.",
     test_suite="tests/test_plugin_alignment.py::test_tier1_plugin_shape",
     kind=PluginKind.SEAM,
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G10_COMPOSITION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('lca-team-seam-seam.checked', 'lca-team-seam-seam.served'),
+        authority=("plugin.serve",),
+        evidence=("lca-team-seam-seam.checked", "lca-team-seam-seam.served"),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('plugin.serve',),
-        emits=('plugin.served',),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

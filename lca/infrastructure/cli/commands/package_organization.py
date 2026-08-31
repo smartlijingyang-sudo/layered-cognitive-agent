@@ -8,6 +8,7 @@ organization`` job.
 Each gate script is a thin wrapper that imports a single lca check
 function. ``main(argv)`` returns 0 on success / non-zero on violation.
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -19,14 +20,14 @@ import typer
 SCRIPTS_DIR = Path(__file__).resolve().parents[4] / "scripts"
 
 GATES: list[tuple[str, Path]] = [
-    ("package-size",          SCRIPTS_DIR / "check_package_size.py"),
-    ("no-barrel-glob",        SCRIPTS_DIR / "check_no_barrel_glob.py"),
-    ("no-utility-modules",    SCRIPTS_DIR / "check_no_utility_modules.py"),
-    ("package-noun",          SCRIPTS_DIR / "check_package_noun.py"),
-    ("known-abbrev",          SCRIPTS_DIR / "check_known_abbrev.py"),
-    ("package-integrity",     SCRIPTS_DIR / "check_package_integrity.py"),
-    ("tests-layout",          SCRIPTS_DIR / "check_tests_layout.py"),
-    ("readme-filled",         SCRIPTS_DIR / "check_readme_filled.py"),
+    ("package-size", SCRIPTS_DIR / "check_package_size.py"),
+    ("no-barrel-glob", SCRIPTS_DIR / "check_no_barrel_glob.py"),
+    ("no-utility-modules", SCRIPTS_DIR / "check_no_utility_modules.py"),
+    ("package-noun", SCRIPTS_DIR / "check_package_noun.py"),
+    ("known-abbrev", SCRIPTS_DIR / "check_known_abbrev.py"),
+    ("package-integrity", SCRIPTS_DIR / "check_package_integrity.py"),
+    ("tests-layout", SCRIPTS_DIR / "check_tests_layout.py"),
+    ("readme-filled", SCRIPTS_DIR / "check_readme_filled.py"),
 ]
 
 
@@ -50,9 +51,7 @@ def register(app: typer.Typer) -> None:
         per-gate pass/fail; --verbose includes the full output of
         each gate.
         """
-        targets = GATES if not gate else [
-            g for g in GATES if g[0] in gate
-        ]
+        targets = GATES if not gate else [g for g in GATES if g[0] in gate]
         if not targets:
             print(f"Unknown gate(s): {gate}. Known: {[g[0] for g in GATES]}")
             raise typer.Exit(2)

@@ -8,8 +8,6 @@ Gate 链的默认实现由组合层的 ``gate_chain_composer`` seam 提供。此
 不再拥有默认装配权；兼容辅助函数仅消费调用方明确传入的 composer。
 """
 
-from lca.contracts.protocols.think.cognition import DecisionGate
-from lca.contracts.protocols.gate.gate_chain_composer import GateChainComposer
 from lca.cognition.brain.decision_gates.artifact_respond_injector import (
     ArtifactRespondInjector,
 )
@@ -29,6 +27,8 @@ from lca.cognition.brain.decision_gates.progress_loop_detector import (
 from lca.cognition.brain.decision_gates.repeat_tool_call import RepeatToolCallGate
 from lca.cognition.brain.decision_gates.terminal_respond import TerminalRespondGate
 from lca.cognition.brain.decision_gates.tool_loop_breaker import ToolLoopBreakerGate
+from lca.contracts.protocols.gate.gate_chain_composer import GateChainComposer
+from lca.contracts.protocols.think.cognition import DecisionGate
 
 
 def build_workspace_agent_gate() -> DecisionGate:

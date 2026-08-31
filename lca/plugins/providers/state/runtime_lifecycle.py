@@ -11,20 +11,20 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
 from lca.contracts.capabilities import (
     RUNTIME_LIFECYCLE_PUBLISHER,
     RUNTIME_LIFECYCLE_SUBSCRIBER_REGISTRY,
 )
+from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.runtime.runtime_lifecycle import (
     RuntimeLifecyclePublisher,
     RuntimeLifecycleSubscriberRegistry,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.runtime.runtime_event_publisher import (
     CompositeRuntimeLifecyclePublisher,
     LifecyclePublisherFailureMode,
@@ -49,21 +49,21 @@ class Config(BaseModel):
     description="Freeze passive lifecycle subscribers into the Agent Loop event publisher.",
     test_suite="tests/runtime/test_runtime_lifecycle_plugins.py",
     kind=PluginKind.COMPOSITE,
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G10_COMPOSITION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('lca-runtime-lifecycle-publisher.checked', 'lca-runtime-lifecycle-publisher.served'),
+        authority=("plugin.serve",),
+        evidence=(
+            "lca-runtime-lifecycle-publisher.checked",
+            "lca-runtime-lifecycle-publisher.served",
+        ),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('plugin.serve',),
-        emits=('plugin.served',),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

@@ -18,9 +18,9 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     PhaseResult,
     SemanticPhase,
 )
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 
 
 class ActSafeBoundaryExecutor:
@@ -88,10 +88,9 @@ class Config(BaseModel):
         evidence=("control.act.safe-boundary.verified",),
         revision="v1",
     ),
-
     ownership=OwnershipDeclaration(
-        reads=('control.act.safe-boundary',),
-        emits=('control.act.safe-boundary.checked',),
+        reads=("control.act.safe-boundary",),
+        emits=("control.act.safe-boundary.checked",),
         state_mutation="forbidden",
     ),
 )

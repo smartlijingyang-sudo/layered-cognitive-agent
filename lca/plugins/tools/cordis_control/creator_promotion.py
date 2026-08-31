@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from lca.application.preset_authoring import PresetAuthoring
 from lca.contracts.atoms.artifact_state import ArtifactState
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.harness.journal.artifact import (
@@ -25,7 +26,6 @@ from lca.contracts.models.observability.journal import (
     PluginUnmounted,
 )
 from lca.infrastructure.observability import record, record_runtime
-from lca.application.preset_authoring import PresetAuthoring
 from lca.plugins.tools.cordis_control.creator_artifacts import (
     AuthoredPlugin,
     require_artifact,

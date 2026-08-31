@@ -5,14 +5,11 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import pytest
-
 ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from _filename_rules import (  # noqa: E402
     DEFAULT_BLACKLIST,
-    DEFAULT_WHITELIST,
     is_blacklisted,
     is_whitelisted,
 )

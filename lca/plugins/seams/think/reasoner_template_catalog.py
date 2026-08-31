@@ -8,14 +8,14 @@ from dataclasses import dataclass
 from pydantic import BaseModel, ConfigDict, Field
 
 from lca.cognition.brain.prompts import load_builtin_prompt
-from lca.contracts.capabilities import REASONER_TEMPLATE_CATALOG
-from lca.contracts.protocols.think.cognition import ReasonerTemplateCatalog
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
+from lca.contracts.capabilities import REASONER_TEMPLATE_CATALOG
 from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.think.cognition import ReasonerTemplateCatalog
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 _REQUIRED_TEMPLATES: frozenset[str] = frozenset(
     {"react_prompt", "hierarchical_prompt", "routing_prompt"}
@@ -60,21 +60,21 @@ class Config(BaseModel):
     description="Provide the profile-selected bundled PromptReasoner templates.",
     test_suite="tests/architecture/test_reasoner_template_catalog_capability.py",
     kind=PluginKind.PRIMITIVE,
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G10_COMPOSITION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('lca-reasoner-template-catalog-builtin.checked', 'lca-reasoner-template-catalog-builtin.served'),
+        authority=("plugin.serve",),
+        evidence=(
+            "lca-reasoner-template-catalog-builtin.checked",
+            "lca-reasoner-template-catalog-builtin.served",
+        ),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('plugin.serve',),
-        emits=('plugin.served',),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

@@ -43,7 +43,8 @@ def test_status_running_when_dev_up_but_stored_pid_stale(lobehub_svc: LobeHubSer
         patch("lca.infrastructure.cli.services.lobehub.http_ready", return_value=True),
         patch("lca.infrastructure.cli.services.lobehub.pid_on_port", return_value=42_001),
         patch(
-            "lca.infrastructure.cli.services.lobehub.pid_alive", side_effect=lambda pid: pid == 42_001
+            "lca.infrastructure.cli.services.lobehub.pid_alive",
+            side_effect=lambda pid: pid == 42_001,
         ),
     ):
         state = lobehub_svc.state()
@@ -122,10 +123,12 @@ def test_next_up_spa_down_is_degraded_not_stopped(lobehub_svc: LobeHubService) -
     with (
         patch("lca.infrastructure.cli.services.lobehub.http_ready", return_value=True),
         patch(
-            "lca.infrastructure.cli.services.lobehub.pid_on_port", side_effect=_port_pid(42_001, None)
+            "lca.infrastructure.cli.services.lobehub.pid_on_port",
+            side_effect=_port_pid(42_001, None),
         ),
         patch(
-            "lca.infrastructure.cli.services.lobehub.pid_alive", side_effect=lambda pid: pid == 42_001
+            "lca.infrastructure.cli.services.lobehub.pid_alive",
+            side_effect=lambda pid: pid == 42_001,
         ),
     ):
         state = lobehub_svc.state()

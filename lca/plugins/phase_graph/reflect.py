@@ -10,19 +10,19 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import cast
 
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
 from lca.contracts.models.core.decision import Observation
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     PhaseContext,
     PhaseInput,
     PhaseResult,
     SemanticPhase,
 )
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 from lca.plugins.phase_graph.capabilities import StandardPhaseCapabilities
 from lca.plugins.phase_graph.common import (
     StandardPhaseConfig,
@@ -94,21 +94,18 @@ class RecoveryReflectExecutor:
     effects=EffectClass.NONE,
     test_suite="tests/declarative/test_phase_graph.py",
     spec=SPEC,
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G7_EXECUTION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('phase_reflect_standard.checked', 'phase_reflect_standard.served'),
+        authority=("plugin.serve",),
+        evidence=("phase_reflect_standard.checked", "phase_reflect_standard.served"),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('plugin.serve',),
-        emits=('plugin.served',),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

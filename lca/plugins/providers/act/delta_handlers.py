@@ -21,20 +21,20 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
 from lca.contracts.models.core.activation import ActivatedSkill
 from lca.contracts.models.core.decision import Turn
 from lca.contracts.models.core.perception import ContextManifest
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.core.stop import StopDecision
 from lca.contracts.protocols.act.command_envelope import RunDelta
+from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.state.delta_handler import DeltaHandler, DeltaHandlerRegistry
 from lca.contracts.protocols.state.reducer import Reducer
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.plugins.providers.act.delta_handler_registry import (
     DefaultDeltaHandlerRegistry,
     InMemoryDeltaHandlerRegistry,
@@ -225,21 +225,18 @@ class PausedDeltaHandler(DeltaHandler):
     ),
     test_suite="tests/test_plugin_alignment.py::test_tier2_plugin_shape",
     kind=PluginKind.PROVIDER,
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G10_COMPOSITION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('lca-delta-handler-provider.checked', 'lca-delta-handler-provider.served'),
+        authority=("plugin.serve",),
+        evidence=("lca-delta-handler-provider.checked", "lca-delta-handler-provider.served"),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('plugin.serve',),
-        emits=('plugin.served',),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

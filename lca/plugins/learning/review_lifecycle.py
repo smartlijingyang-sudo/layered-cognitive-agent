@@ -9,6 +9,9 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
 from lca.contracts.capabilities import (
     LEARNING_FAILURE_ANALYZER,
     LEARNING_REVIEW_SERVICE,
@@ -17,22 +20,19 @@ from lca.contracts.capabilities import (
     RUNTIME_LIFECYCLE_SUBSCRIBER_REGISTRY,
 )
 from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.protocols.think.learning import (
-    FailureAnalyzer,
-    LearningReviewTicketStore,
-    SkillAcquirer,
-)
+from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.runtime.runtime_lifecycle import (
     RuntimeLifecycleSubscriber,
     RuntimeLifecycleSubscriberContribution,
     RuntimeLifecycleSubscriberRegistry,
 )
+from lca.contracts.protocols.think.learning import (
+    FailureAnalyzer,
+    LearningReviewTicketStore,
+    SkillAcquirer,
+)
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.plugins.learning.review_service import (
     LearningReviewAssessment,
     LearningReviewService,
@@ -93,21 +93,21 @@ _REVIEWABLE_STATUSES = frozenset(
     description="Queue terminal evidence references for candidate-only learning review.",
     test_suite="tests/architecture/test_learning_review_lifecycle.py",
     kind=PluginKind.PROVIDER,
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G4_PERCEPTION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('lca-learning-review-lifecycle-subscriber.checked', 'lca-learning-review-lifecycle-subscriber.served'),
+        authority=("plugin.serve",),
+        evidence=(
+            "lca-learning-review-lifecycle-subscriber.checked",
+            "lca-learning-review-lifecycle-subscriber.served",
+        ),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('plugin.serve',),
-        emits=('plugin.served',),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

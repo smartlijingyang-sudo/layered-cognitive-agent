@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -26,21 +26,21 @@ class Config(BaseModel):
     kind=PluginKind.SEAM,
     description="Provide the DeltaHandlerRegistry Definition service.",
     test_suite="tests/test_plugin_alignment.py::test_tier1_plugin_shape",
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G10_COMPOSITION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('lca-delta-handler-registry-seam.checked', 'lca-delta-handler-registry-seam.served'),
+        authority=("plugin.serve",),
+        evidence=(
+            "lca-delta-handler-registry-seam.checked",
+            "lca-delta-handler-registry-seam.served",
+        ),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('delta_handler_registry',),
-        emits=('delta_handler_registry.checked',),
+        reads=("delta_handler_registry",),
+        emits=("delta_handler_registry.checked",),
         state_mutation="forbidden",
     ),
 )

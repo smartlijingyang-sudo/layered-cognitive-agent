@@ -20,10 +20,10 @@ from starlette.applications import Starlette
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from gateway.runs.api.routes import stream_journal_live as api_stream_journal_live
 from gateway.runs.api.query_endpoints import (
     stream_journal_live as query_stream_journal_live,
 )
+from gateway.runs.api.routes import stream_journal_live as api_stream_journal_live
 
 
 class _UnboundProcessJournal:
@@ -31,9 +31,7 @@ class _UnboundProcessJournal:
 
     @property
     def tail(self) -> Any:
-        raise RuntimeError(
-            "process journal is not bound; create a run through a journal factory"
-        )
+        raise RuntimeError("process journal is not bound; create a run through a journal factory")
 
 
 class _UnboundRegistry:
@@ -75,9 +73,7 @@ def _assert_unavailable(payload: dict[str, Any], *, where: str) -> None:
     assert err.get("code") == "legacy_process_journal_unavailable", (
         f"{where}: code mismatch ({err.get('code')!r})"
     )
-    assert err.get("type") == "service_unavailable", (
-        f"{where}: type mismatch ({err.get('type')!r})"
-    )
+    assert err.get("type") == "service_unavailable", f"{where}: type mismatch ({err.get('type')!r})"
     assert "process-wide journal streaming is unavailable" in err.get("message", ""), where
 
 

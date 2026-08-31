@@ -4,13 +4,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TypeAlias
 
-from lca.contracts.protocols import DecisionGate
-from lca.contracts.protocols.think.cognition import DecisionGateAssembler
 from lca.cognition.group_assembly import (
     AssemblyStrategy,
     OrderedContributionCatalog,
     SingleAssemblyStrategy,
 )
+from lca.contracts.protocols import DecisionGate
+from lca.contracts.protocols.think.cognition import DecisionGateAssembler
 
 
 @dataclass(frozen=True, slots=True)

@@ -172,8 +172,7 @@ def test_runtime_assembly_uses_the_shared_scope_adapter_for_all_plan_reads() -> 
         Path(__file__).resolve().parents[2] / "lca/plugins/composer/runtime/runtime_assembly.py"
     ).read_text(encoding="utf-8")
     runtime_capabilities = (
-        Path(__file__).resolve().parents[2]
-        / "lca/plugins/composer/runtime/runtime_capabilities.py"
+        Path(__file__).resolve().parents[2] / "lca/plugins/composer/runtime/runtime_capabilities.py"
     ).read_text(encoding="utf-8")
 
     assert "resolve_runtime_capabilities" in runtime_assembly

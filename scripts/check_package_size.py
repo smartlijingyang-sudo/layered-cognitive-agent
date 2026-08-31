@@ -9,13 +9,14 @@ Usage::
 
     python scripts/check_package_size.py [--root PATH] [--max N]
 """
+
 from __future__ import annotations
 
 import argparse
-import re
 import sys
-import tomllib
 from pathlib import Path
+
+import tomllib
 
 ROOT = Path(__file__).resolve().parent.parent
 SKIP_DIRS = {"__pycache__", ".git", ".venv", "node_modules", "traces"}
@@ -43,7 +44,8 @@ def _walk(root: Path):
         if not path.is_dir():
             continue
         py_files = [
-            p for p in path.iterdir()
+            p
+            for p in path.iterdir()
             if p.is_file() and p.suffix == ".py" and p.name != "__init__.py"
         ]
         if py_files:
@@ -85,7 +87,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     for path, count, raw in violations:
         rel = path.relative_to(args.root)
-        print(f"  ✗ {rel}: {count} files (cap {args.max}, {raw} raw w/o whitelist)", file=sys.stderr)
+        print(
+            f"  ✗ {rel}: {count} files (cap {args.max}, {raw} raw w/o whitelist)", file=sys.stderr
+        )
     print(
         f"package-size: {len(violations)} package(s) exceed {args.max}-file cap. "
         "Move overflowing .py into a sibling subpackage or register an exempt in "

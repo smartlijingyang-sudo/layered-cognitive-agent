@@ -20,6 +20,13 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
+from lca.application.default_context import (
+    ensure_default_ctx,
+    get_or_create_default_ctx,
+    set_default_ctx,
+)
+from lca.application.default_context import holder as _default_ctx_holder
+from lca.application.spawn import spawn_agent, spawn_team
 from lca.contracts.atoms.enums import MemoryLayer
 from lca.contracts.models.core.budget import DEFAULT_MAX_STEPS, DEFAULT_MAX_WALL_CLOCK_SECONDS
 from lca.contracts.models.core.message import AgentMessage
@@ -60,13 +67,6 @@ from lca.contracts.protocols.journal.spec import (
     LeadSpec,
     TeamSpec,
 )
-from lca.application.default_context import (
-    ensure_default_ctx,
-    get_or_create_default_ctx,
-    set_default_ctx,
-)
-from lca.application.default_context import holder as _default_ctx_holder
-from lca.application.spawn import spawn_agent, spawn_team
 
 __all__ = [
     "Agent",

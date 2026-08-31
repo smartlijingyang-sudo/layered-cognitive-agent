@@ -13,14 +13,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.team.member_status import MemberStatus
-from lca.contracts.models.team.team_awareness import ConsultDuty
 from lca.cognition.member_status.consult_policy import (
     ConsultNextAction,
     compute_consult_next,
     compute_required_action_from_duty,
 )
+from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.team.member_status import MemberStatus
+from lca.contracts.models.team.team_awareness import ConsultDuty
 
 
 @dataclass(frozen=True)

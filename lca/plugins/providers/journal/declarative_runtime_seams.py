@@ -11,9 +11,14 @@ from typing import cast
 
 from pydantic import BaseModel
 
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
 from lca.contracts.mechanisms import HookRegistry
 from lca.contracts.protocols.act.effect_handler import EffectCapabilities, EffectHandlerRegistry
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_phase_graph import DeltaReducer, EffectGateway
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.journal.artifact_closure import ArtifactClosure
 from lca.contracts.protocols.journal.idempotency import IdempotencyStore
 from lca.contracts.protocols.runtime.infra import StateStore
@@ -35,11 +40,6 @@ from lca.contracts.protocols.state.reducer import Reducer
 from lca.harness.declarative import GenericPlanInterpreter
 from lca.harness.declarative.execute.dispatch import RegistryDeltaReducer, RegistryEffectGateway
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.runtime.checkpoint_resolution import DeclarativeCheckpointStateResolver
 from lca.runtime.result_finalizer import RuntimeResultFinalizer
 from lca.runtime.runtime_journal import RuntimeJournalCommitter
@@ -167,21 +167,36 @@ class ObservabilityRuntimeJournalFactory(RuntimeJournalFactory):
         "Provide the default checkpoint, terminal, Gateway, DeltaReducer, and per-turn "
         "Journal factories for declarative runtime assembly."
     ),
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G10_COMPOSITION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('decision.emit',),
-        evidence=('lca-declarative-runtime-seams-provider.checked', 'lca-declarative-runtime-seams-provider.served'),
+        authority=("decision.emit",),
+        evidence=(
+            "lca-declarative-runtime-seams-provider.checked",
+            "lca-declarative-runtime-seams-provider.served",
+        ),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('checkpoint_state_resolver_factory', 'decision.emit', 'declarative_interpreter_factory', 'delta_reducer_factory', 'effect_gateway_factory', 'result_finalizer_factory', 'runtime_journal_factory'),
-        emits=('checkpoint_state_resolver_factory.checked', 'declarative_interpreter_factory.checked', 'delta_reducer_factory.checked', 'effect_gateway_factory.checked', 'result_finalizer_factory.checked', 'runtime_journal_factory.checked'),
+        reads=(
+            "checkpoint_state_resolver_factory",
+            "decision.emit",
+            "declarative_interpreter_factory",
+            "delta_reducer_factory",
+            "effect_gateway_factory",
+            "result_finalizer_factory",
+            "runtime_journal_factory",
+        ),
+        emits=(
+            "checkpoint_state_resolver_factory.checked",
+            "declarative_interpreter_factory.checked",
+            "delta_reducer_factory.checked",
+            "effect_gateway_factory.checked",
+            "result_finalizer_factory.checked",
+            "runtime_journal_factory.checked",
+        ),
         state_mutation="forbidden",
     ),
 )

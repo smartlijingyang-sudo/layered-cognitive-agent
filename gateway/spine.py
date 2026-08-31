@@ -57,6 +57,7 @@ class LazySessionProjectionRegistry(SessionProjectionRegistry):
                 from lca.harness.projection.registry import (
                     InMemoryProjectionRegistry as InMemorySessionProjectionRegistry,
                 )
+
                 factory = InMemorySessionProjectionRegistry()
             if hasattr(factory, "create"):
                 self._delegate_registry = factory.create()

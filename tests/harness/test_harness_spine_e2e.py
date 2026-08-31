@@ -37,10 +37,10 @@ class TestHarnessSpineE2E:
         """build_live_agent() must not use MockLLMAdapter when credentials exist."""
         import time
 
+        from lca.application.harness_bridge import build_live_agent
         from lca.contracts.harness.tasks.session import SESSION_FORMAT_VERSION, SessionHeader
         from lca.harness.session.inbox import Inbox
         from lca.harness.session.store import SessionStore
-        from lca.application.harness_bridge import build_live_agent
 
         _require_profile_llm(client)
 

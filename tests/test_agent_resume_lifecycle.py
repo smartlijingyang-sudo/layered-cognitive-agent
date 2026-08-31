@@ -4,6 +4,7 @@ from typing import Any
 
 import pytest
 
+from lca.agent.cognitive_agent import CognitiveAgent
 from lca.contracts.atoms.ids import RunId, TraceId
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import Result
@@ -14,7 +15,6 @@ from lca.contracts.models.observability.journal import (
     RunResumed,
 )
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
-from lca.agent.cognitive_agent import CognitiveAgent
 from tests.support.observability_helpers import _RunStoreBackend, make_test_bound
 
 

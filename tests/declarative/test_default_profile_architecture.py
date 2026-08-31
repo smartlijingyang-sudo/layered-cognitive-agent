@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
 from lca.application.api import ensure_default_ctx
 from lca.application.spawn import spawn_agent
+from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
 from tests.support.agent_specs import make_spec
 
 

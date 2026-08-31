@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.composer.perceive.perceive_composer import PerceiveComposer
 
 
@@ -29,21 +29,18 @@ class Config(BaseModel):
     description="Plan-bound perceive composer with a narrow context-and-state interface.",
     test_suite="tests/composer/test_composer_consumes_compiled_capability.py",
     kind=PluginKind.PROVIDER,
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G10_COMPOSITION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('context.read',),
-        evidence=('lca-plan-perceive-composer.checked', 'lca-plan-perceive-composer.served'),
+        authority=("context.read",),
+        evidence=("lca-plan-perceive-composer.checked", "lca-plan-perceive-composer.served"),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('composer.perceive',),
-        emits=('composer.perceive.checked',),
+        reads=("composer.perceive",),
+        emits=("composer.perceive.checked",),
         state_mutation="forbidden",
     ),
 )

@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
+from lca.application.api import Agent, Team, TeamLead
+from lca.application.role_suggest import suggest_for_auto_repair, suggest_from_paths
 from lca.contracts.models.team.team_coordination import (
     STRATEGY_KEY_DEBATE,
     STRATEGY_KEY_FAN_OUT,
@@ -42,11 +44,9 @@ from lca.contracts.protocols.collaboration.casting import (
     SelectedRole,
     TeamCaster,
 )
-from lca.contracts.protocols.runtime.infra import LLMAdapter, Tool
 from lca.contracts.protocols.journal.observability import ObservabilityBackend
 from lca.contracts.protocols.journal.spec import OBSERVABILITY_CHOICE_CONSOLE
-from lca.application.api import Agent, Team, TeamLead
-from lca.application.role_suggest import suggest_for_auto_repair, suggest_from_paths
+from lca.contracts.protocols.runtime.infra import LLMAdapter, Tool
 
 if TYPE_CHECKING:
     from cordis import Context

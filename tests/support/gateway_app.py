@@ -12,9 +12,9 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
+from gateway.runs.session.session import RunRegistry
 from gateway.runs.terminal.legacy_adapter import RegistryRunAdapter
 from gateway.runs.terminal.port import RunPort
-from gateway.runs.session.session import RunRegistry
 from lca.harness.profile.lifespan import profile_lifespan
 from tests.support.gateway_scripted import ScriptedLLMResolver
 

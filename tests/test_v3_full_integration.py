@@ -17,19 +17,6 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
-from lca.contracts.models.core.execution import (
-    ExecutionEnvelope,
-    envelope_from_decision,
-    find_terminal_tool_invoked,
-)
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.observability.journal import (
-    InboxFollowupCreated,
-    TeamMessagePublished,
-)
-from lca.infrastructure.observability.journal.engine.engine import RunStore
 from lca.cognition.brain.context_manifest import digest_manifest
 from lca.cognition.brain.decision_gates import (
     ChainedDecisionGate,
@@ -44,6 +31,19 @@ from lca.cognition.sensors import (
     build_clock_sensor,
     build_workspace_artifacts_sensor,
 )
+from lca.contracts.atoms.ids import new_id
+from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
+from lca.contracts.models.core.execution import (
+    ExecutionEnvelope,
+    envelope_from_decision,
+    find_terminal_tool_invoked,
+)
+from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.observability.journal import (
+    InboxFollowupCreated,
+    TeamMessagePublished,
+)
+from lca.infrastructure.observability.journal.engine.engine import RunStore
 
 
 class TestFullV3Integration:

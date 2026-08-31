@@ -27,13 +27,13 @@ ADR reference: zero-delivery root-cause #2 (multi-tool loop detection).
 
 from __future__ import annotations
 
+from lca.cognition.brain.decision_gates.chained import record_gate_decided
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.decision import Decision, Turn
 from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import DecisionGate
-from lca.cognition.brain.decision_gates.chained import record_gate_decided
 
 _PROGRESS_WARNING_THRESHOLD = 3
 _PROGRESS_BREAK_THRESHOLD = 6

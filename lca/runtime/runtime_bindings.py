@@ -15,19 +15,14 @@ from typing import TYPE_CHECKING, cast
 from lca.contracts.mechanisms import HookRegistry
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.team.team_awareness import TeamAwareness
-from lca.contracts.protocols.journal.artifact_closure import ArtifactClosure
-from lca.contracts.protocols.think.cognition import Brain, PerceiveHub
-from lca.contracts.protocols.declarative.declarative_execution import PhaseCapabilityReader
-from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseExecutor
-from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.act.effect_handler import EffectHandlerRegistry
 from lca.contracts.protocols.act.embodiment import Body
+from lca.contracts.protocols.declarative.declarative_execution import PhaseCapabilityReader
+from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseExecutor
+from lca.contracts.protocols.journal.artifact_closure import ArtifactClosure
 from lca.contracts.protocols.journal.idempotency import IdempotencyStore
-from lca.contracts.protocols.runtime.infra import StateStore
 from lca.contracts.protocols.memory.memory import MemorySystem
-from lca.contracts.protocols.state.plan import CompiledRunPlan
-from lca.contracts.protocols.state.reducer import Reducer
-from lca.contracts.protocols.session.resume_input import ResumeInputAdapter
+from lca.contracts.protocols.runtime.infra import StateStore
 from lca.contracts.protocols.runtime.runtime_composition import (
     CheckpointStateResolver,
     CheckpointStateResolverFactory,
@@ -41,6 +36,11 @@ from lca.contracts.protocols.runtime.runtime_composition import (
     RuntimeJournalFactory,
 )
 from lca.contracts.protocols.runtime.runtime_lifecycle import RuntimeLifecyclePublisher
+from lca.contracts.protocols.session.resume_input import ResumeInputAdapter
+from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
+from lca.contracts.protocols.state.plan import CompiledRunPlan
+from lca.contracts.protocols.state.reducer import Reducer
+from lca.contracts.protocols.think.cognition import Brain, PerceiveHub
 from lca.harness.declarative import MappingRestrictedScope
 from lca.harness.declarative.lifecycle.phase_observation import PhaseObserver
 from lca.harness.plan import compiled_run_plan_ref

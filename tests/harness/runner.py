@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from lca.application.api import Agent, Team, TeamLead
 from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.models.core.result import Result
 from lca.contracts.models.team.team_coordination import (
@@ -16,7 +17,6 @@ from lca.contracts.models.team.team_coordination import (
     Pipeline,
 )
 from lca.contracts.protocols import LLMAdapter
-from lca.application.api import Agent, Team, TeamLead
 from tests.harness.collector import InMemoryObservability, TraceBundle
 from tests.harness.scripted_llm import ScriptedLLMAdapter, multi_delegate, respond
 from tests.support.scenario_loader import build_agent, load_scenario

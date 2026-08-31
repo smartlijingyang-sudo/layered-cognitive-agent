@@ -7,12 +7,12 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from lca.application.api import Agent, Team
 from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.team.team_coordination import Debate
 from lca.contracts.protocols import LLMAdapter
-from lca.application.api import Agent, Team
 
 
 def _decision(**kwargs):

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unittest
 
+from lca.cognition.memory.simple_memory import SimpleMemorySystem
 from lca.contracts.atoms.enums import MemoryLayer, MemoryRecordKind, ReflectionVerdict
 from lca.contracts.atoms.semantic_keys import (
     META_ROLE,
@@ -15,7 +16,6 @@ from lca.contracts.atoms.semantic_keys import (
 from lca.contracts.models.core.budget import create_budget
 from lca.contracts.models.core.decision import Observation, Reflection
 from lca.contracts.models.core.state import AgentState
-from lca.cognition.memory.simple_memory import SimpleMemorySystem
 
 
 def _state(step: int = 0) -> AgentState:

@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import unittest
 
+from lca.cognition.body.tool_registry import SimpleToolRegistry
 from lca.contracts.models.core.decision import (
     Decision,
     DelegationSpec,
@@ -17,7 +18,6 @@ from lca.infrastructure.transport.transport_registry import (
     TransportNotFoundError,
     TransportRegistry,
 )
-from lca.cognition.body.tool_registry import SimpleToolRegistry
 from tests.support.action_authority import build_test_body
 from tests.support.unimplemented_transport import UnimplementedTransport
 

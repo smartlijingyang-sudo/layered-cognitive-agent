@@ -48,7 +48,10 @@ async def main() -> int:
     # ── Step 2: Compile plan ──────────────────────────────────────
     print("\n[2/6] compile_plan (declarative projection) ...")
     try:
-        from lca.harness.declarative.controls.validation import is_validation_valid, validation_errors
+        from lca.harness.declarative.controls.validation import (
+            is_validation_valid,
+            validation_errors,
+        )
         from lca.harness.plan import compiled_run_plan_ref
         from lca.harness.profile.plan_compiler import compile_plan
 
@@ -120,12 +123,12 @@ async def main() -> int:
     # ── Step 5: Spawn Agent ───────────────────────────────────────
     print("\n[5/6] spawn_agent (plan-bound assembly) ...")
     try:
+        from lca.application.spawn import spawn_agent
         from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
         from lca.contracts.protocols.journal.spec import AgentSpec
 
         # Use mock LLM to avoid needing a real key
         from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
-        from lca.application.spawn import spawn_agent
 
         spec = AgentSpec(
             profile=RoleProfile(

@@ -10,6 +10,14 @@ import json
 import unittest
 from typing import Any
 
+from lca.agent.role_library import FileRoleLibrary
+from lca.application.api import Team
+from lca.application.casting import (
+    LLMTeamCaster,
+    build_from_casting_plan,
+    parse_casting_output,
+    repair_invalid_role_ids,
+)
 from lca.contracts.models.team.team_coordination import LeadMandate, Pipeline
 from lca.contracts.protocols.collaboration.casting import (
     CastingError,
@@ -20,15 +28,9 @@ from lca.contracts.protocols.collaboration.casting import (
     SelectedRole,
 )
 from lca.contracts.protocols.journal.spec import LeadSpec
-from lca.agent.role_library import FileRoleLibrary
-from lca.application.api import Team
-from lca.application.casting import (
-    LLMTeamCaster,
-    build_from_casting_plan,
-    parse_casting_output,
-    repair_invalid_role_ids,
+from lca.plugins.seams.collaboration.team_casting_prompt_renderer import (
+    BuiltinCastingPromptRenderer,
 )
-from lca.plugins.seams.collaboration.team_casting_prompt_renderer import BuiltinCastingPromptRenderer
 from tests.harness.collector import InMemoryObservability
 from tests.harness.scripted_llm import ScriptedLLMAdapter
 

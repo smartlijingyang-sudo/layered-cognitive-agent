@@ -5,6 +5,13 @@ from typing import Any, ClassVar
 
 import pytest
 
+from lca.cognition.body.action_handlers import UseToolOperation
+from lca.cognition.body.tool_batch_execution import (
+    ParallelToolBatchExecutionPolicy,
+    SafeToolBatchExecutionPolicy,
+    SegmentedSafeToolBatchExecutionPolicy,
+    SequentialToolBatchExecutionPolicy,
+)
 from lca.contracts.atoms.enums import ActionType, MemoryRecordKind
 from lca.contracts.atoms.semantic_keys import OBS_RESULT_KIND
 from lca.contracts.models.core.budget import create_budget
@@ -15,13 +22,6 @@ from lca.contracts.protocols.act.tool_batch_execution import (
     ToolBatchEntry,
     ToolBatchExecutionMode,
     ToolBatchExecutionSegment,
-)
-from lca.cognition.body.action_handlers import UseToolOperation
-from lca.cognition.body.tool_batch_execution import (
-    ParallelToolBatchExecutionPolicy,
-    SafeToolBatchExecutionPolicy,
-    SegmentedSafeToolBatchExecutionPolicy,
-    SequentialToolBatchExecutionPolicy,
 )
 from lca.plugins.providers.act.tool_batch_execution_policy import build_tool_batch_execution_policy
 

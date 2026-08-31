@@ -2,9 +2,9 @@
 
 import pytest
 
+from lca.cognition.memory.null_retrieval_policy import NullRetrievalPolicy
 from lca.contracts.atoms.enums import MemoryLayer
 from lca.contracts.models.core.memory import MemoryRecord
-from lca.cognition.memory.null_retrieval_policy import NullRetrievalPolicy
 
 
 @pytest.fixture()

@@ -54,9 +54,9 @@ def test_run_session_consumes_profile_selected_journal_factory(tmp_path: Path) -
     from gateway.runs.session.session import RunRegistry
     from lca.contracts.observability.run_journal import RunJournalComponents
     from lca.infrastructure.observability.facade import BoundObservability
+    from lca.infrastructure.observability.journal.engine.process import ProcessJournal
     from lca.infrastructure.observability.journal.jsonl.projector import JsonlJournalProjector
     from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
-    from lca.infrastructure.observability.journal.engine.process import ProcessJournal
     from lca.infrastructure.observability.journal_backend import MemoryJournal
     from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
 

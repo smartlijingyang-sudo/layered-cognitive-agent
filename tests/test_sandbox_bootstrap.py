@@ -12,7 +12,10 @@ from lca.infrastructure.sandbox.bootstrap import (
     build_workspace_init_command,
     sandbox_output_path,
 )
-from lca.infrastructure.sandbox.prompt import format_uploaded_files_prompt, sandbox_uploaded_file_path
+from lca.infrastructure.sandbox.prompt import (
+    format_uploaded_files_prompt,
+    sandbox_uploaded_file_path,
+)
 
 
 class SandboxBootstrapTests(unittest.TestCase):

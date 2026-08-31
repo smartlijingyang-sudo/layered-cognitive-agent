@@ -12,6 +12,24 @@ from __future__ import annotations
 
 import asyncio
 
+from lca.cognition.body.delegation_cache import (
+    cached_delegation_observation,
+    tag_delegation_extra,
+)
+from lca.cognition.body.delegation_target import resolve_delegation_target
+from lca.cognition.body.tool_batch_executor import ToolBatchExecutor
+from lca.cognition.body.tool_wire_gate import tool_wire_block_observation
+from lca.cognition.member_status.consult_policy import (
+    classify_synthesis,
+    run_wall_clock_remaining_s,
+)
+from lca.cognition.member_status.required_action import compute_required_action
+from lca.cognition.member_status.tracking import (
+    duty_board,
+    duty_consult,
+    record_delegation_return,
+)
+from lca.cognition.transport_envelope import delegate_via_envelope, handoff_via_envelope
 from lca.contracts.atoms.enums import MemoryRecordKind
 from lca.contracts.atoms.ids import new_id, remaining_seconds
 from lca.contracts.atoms.semantic_keys import (
@@ -46,24 +64,6 @@ from lca.contracts.protocols.act.action import Action
 from lca.contracts.protocols.act.command_envelope import command_envelope_to_dict
 from lca.contracts.protocols.act.tool_batch_execution import ToolBatchExecutionPolicy
 from lca.infrastructure.observability import record
-from lca.cognition.body.delegation_cache import (
-    cached_delegation_observation,
-    tag_delegation_extra,
-)
-from lca.cognition.body.delegation_target import resolve_delegation_target
-from lca.cognition.body.tool_batch_executor import ToolBatchExecutor
-from lca.cognition.body.tool_wire_gate import tool_wire_block_observation
-from lca.cognition.member_status.consult_policy import (
-    classify_synthesis,
-    run_wall_clock_remaining_s,
-)
-from lca.cognition.member_status.required_action import compute_required_action
-from lca.cognition.member_status.tracking import (
-    duty_board,
-    duty_consult,
-    record_delegation_return,
-)
-from lca.cognition.transport_envelope import delegate_via_envelope, handoff_via_envelope
 
 _ERR_DEADLINE_EXPIRED = "delegate 超时(deadline 已过期)"
 _ERR_TIMEOUT = "delegate 超时"

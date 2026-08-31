@@ -21,15 +21,15 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.models.core.budget import Budget
-from lca.contracts.models.core.decision import Decision, Observation, Turn
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.team.role_team import ToolPermissionManifest
 from lca.cognition.body.action_registry import ActionRegistry
 from lca.cognition.body.safe_executor import SimpleSafeExecutor
 from lca.cognition.body.simple_body import SimpleBody
 from lca.cognition.body.tool_registry import SimpleToolRegistry
 from lca.cognition.transport_registry_factory import build_transport_registry
+from lca.contracts.models.core.budget import Budget
+from lca.contracts.models.core.decision import Decision, Observation, Turn
+from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.team.role_team import ToolPermissionManifest
 from lca.plugins.providers.gate.gate_chain_composer import DefaultGateChainComposer
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

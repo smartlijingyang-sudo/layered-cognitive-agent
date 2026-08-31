@@ -855,6 +855,7 @@ def _record_terminal_materialization(session: RunSession) -> None:
     ``execute.py`` boundary.
     """
     from gateway.runs.terminal.materialization import record_terminal_materialization
+
     record_terminal_materialization(session)
 
 

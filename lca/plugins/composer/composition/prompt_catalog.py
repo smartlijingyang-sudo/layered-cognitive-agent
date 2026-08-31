@@ -12,16 +12,16 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, ConfigDict
 
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
 from lca.contracts.capabilities import BRAIN_PROMPT_CATALOG_FACTORY
+from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.memory.operational_skills import SkillIndexEntry, SkillPackageStore
 from lca.contracts.protocols.runtime.infra import Tool
 from lca.contracts.protocols.think.cognition import BrainPromptCatalog, BrainPromptCatalogFactory
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 _EMPTY_SKILLS = "（无可用技能；可使用 search_skill 查找）"
 _EMPTY_BRAIN_SKILLS = "（无可用技能）"
@@ -108,21 +108,21 @@ class Config(BaseModel):
     description="Provide the profile-selected skills and tools catalog for Brain factories.",
     test_suite="tests/architecture/test_brain_prompt_catalog_capability.py",
     kind=PluginKind.PRIMITIVE,
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G10_COMPOSITION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('lca-brain-prompt-catalog-default.checked', 'lca-brain-prompt-catalog-default.served'),
+        authority=("plugin.serve",),
+        evidence=(
+            "lca-brain-prompt-catalog-default.checked",
+            "lca-brain-prompt-catalog-default.served",
+        ),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('plugin.serve',),
-        emits=('plugin.served',),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

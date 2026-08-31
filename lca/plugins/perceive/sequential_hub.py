@@ -4,15 +4,15 @@ from collections.abc import Sequence
 
 from pydantic import BaseModel
 
+from lca.cognition.perceive_hub import SequentialPerceiveHub
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.protocols import MemorySystem, PerceiveHub, Sensor
-from lca.contracts.protocols.think.cognition import PerceiveHubAssembler
 from lca.contracts.protocols.composition.logic_address import LogicAddress
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.cognition.perceive_hub import SequentialPerceiveHub
+from lca.contracts.protocols.think.cognition import PerceiveHubAssembler
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -49,10 +49,9 @@ class SequentialPerceiveHubAssembler(PerceiveHubAssembler):
         evidence=("perceive.hub.sequential.assembled",),
         revision="v1",
     ),
-
     ownership=OwnershipDeclaration(
-        reads=('plugin.serve',),
-        emits=('plugin.served',),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

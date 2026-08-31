@@ -23,9 +23,6 @@ from lca.contracts.protocols.runtime.runtime_lifecycle import (
 from lca.harness.profile.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
 from lca.infrastructure.learning.review_ticket_store import InMemoryLearningReviewTicketStore
-from lca.runtime.runtime_event_publisher import (
-    InMemoryRuntimeLifecycleSubscriberRegistry,
-)
 from lca.plugins.insight.failure_analyzer import FailureAnalyzerService
 from lca.plugins.learning import review_lifecycle
 from lca.plugins.learning.review_lifecycle import (
@@ -33,6 +30,9 @@ from lca.plugins.learning.review_lifecycle import (
     LearningReviewTicketStatus,
 )
 from lca.plugins.skill.auto_acquire import AutoAcquireSkillService
+from lca.runtime.runtime_event_publisher import (
+    InMemoryRuntimeLifecycleSubscriberRegistry,
+)
 
 REPO = Path(__file__).resolve().parents[2]
 

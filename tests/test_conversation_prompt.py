@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import unittest
 
+from lca.cognition.brain.conversation_prompt import format_prior_conversation
+from lca.cognition.brain.reasoner import _prior_conversation_text
 from lca.contracts.models.core.budget import create_budget
 from lca.contracts.models.core.conversation import PRIOR_CONVERSATION_WM_KEY, ConversationTurn
 from lca.contracts.models.core.state import AgentState
-from lca.cognition.brain.conversation_prompt import format_prior_conversation
-from lca.cognition.brain.reasoner import _prior_conversation_text
 
 
 class TestConversationPrompt(unittest.TestCase):

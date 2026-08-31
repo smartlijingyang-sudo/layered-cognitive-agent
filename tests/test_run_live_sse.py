@@ -16,13 +16,13 @@ from lca.contracts.models.observability.journal import (
     ToolStarted,
 )
 from lca.infrastructure.observability.journal.engine.journal_io import stamped_to_record
+from lca.infrastructure.observability.journal.sse.frames import stamped_to_sse_frame
 from lca.infrastructure.observability.journal.stream.live_tail import (
     LiveGap,
     LiveTail,
     encode_live_gap,
     iter_live_sse,
 )
-from lca.infrastructure.observability.journal.sse.frames import stamped_to_sse_frame
 
 
 def _stamped(seq: int, event: object) -> StampedEvent:

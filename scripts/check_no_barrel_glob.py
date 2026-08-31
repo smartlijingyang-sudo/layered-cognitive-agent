@@ -9,6 +9,7 @@ Usage::
 
     python scripts/check_no_barrel_glob.py [--root PATH]
 """
+
 from __future__ import annotations
 
 import argparse

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from lca.contracts.protocols.runtime.infra import AgentTransport
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.runtime.infra import AgentTransport
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -27,21 +27,18 @@ class Config(BaseModel):
     description="Register AgentTransport providers on the TransportService Definition.",
     test_suite="tests/test_plugin_alignment.py",
     kind=PluginKind.PROVIDER,
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G10_COMPOSITION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('lca-transport-provider.checked', 'lca-transport-provider.served'),
+        authority=("plugin.serve",),
+        evidence=("lca-transport-provider.checked", "lca-transport-provider.served"),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('plugin.serve',),
-        emits=('plugin.served',),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

@@ -107,5 +107,3 @@ def test_default_bootstrap_factory_creates_isolated_app_resources() -> None:
     assert first.devices is not second.devices
     assert first.device_hub is not second.device_hub
     assert first.machine_resolver is not second.machine_resolver
-
-

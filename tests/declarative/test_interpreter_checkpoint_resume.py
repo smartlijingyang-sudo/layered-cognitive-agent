@@ -12,7 +12,6 @@ from dataclasses import replace
 import pytest
 
 from lca.contracts.models.core.result import ApprovalPendingError
-from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     PhaseEdge,
     PhaseInput,
@@ -21,6 +20,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     PhaseRunCursor,
     SemanticPhase,
 )
+from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.harness.declarative import GenericPlanInterpreter, GraphAssembler, MappingRestrictedScope
 from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.profile.plan_compiler import compile_plan
@@ -190,7 +190,9 @@ async def test_resume_from_terminal_cursor_is_noop(standard_plan) -> None:
 @pytest.mark.asyncio
 async def test_resume_rejects_cursor_from_different_plan(standard_plan) -> None:
     """Resume must reject a cursor whose plan_ref doesn't match the executable plan."""
-    from lca.contracts.protocols.declarative.declarative_phase_graph import DeclarativeValidationError
+    from lca.contracts.protocols.declarative.declarative_phase_graph import (
+        DeclarativeValidationError,
+    )
 
     executable = GraphAssembler().assemble(
         standard_plan, MappingRestrictedScope(_capabilities_for(standard_plan))

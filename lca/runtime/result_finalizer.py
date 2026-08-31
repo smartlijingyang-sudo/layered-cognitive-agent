@@ -3,14 +3,14 @@ from __future__ import annotations
 from lca.contracts.mechanisms import HookRegistry
 from lca.contracts.models.core.result import Result
 from lca.contracts.models.core.terminal_outcome import ResumeCursor
-from lca.contracts.protocols.journal.artifact_closure import ArtifactClosure
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeRunOutcome,
     DeclarativeValidationError,
 )
+from lca.contracts.protocols.journal.artifact_closure import ArtifactClosure
 from lca.contracts.protocols.runtime.infra import StateStore
-from lca.contracts.protocols.state.reducer import Reducer
 from lca.contracts.protocols.runtime.runtime_composition import ResultFinalizer
+from lca.contracts.protocols.state.reducer import Reducer
 from lca.harness.declarative.execute.interpreter import InterpretationResult
 from lca.runtime.result_projection import TerminalResultProjection
 

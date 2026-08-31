@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import unittest
 
+from lca.application.api import Agent, Team, TeamLead
+from lca.cognition.memory.simple_memory import SimpleMemorySystem
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.decision import Decision, Reflection
 from lca.contracts.models.core.state import AgentState
@@ -11,8 +13,6 @@ from lca.contracts.models.team.team_coordination import LeadMandate, Pipeline
 from lca.contracts.protocols import AgentUnit, Brain, TeamUnit
 from lca.contracts.protocols.journal.spec import AgentSpec, LeadSpec
 from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
-from lca.cognition.memory.simple_memory import SimpleMemorySystem
-from lca.application.api import Agent, Team, TeamLead
 
 
 class _StubBrain(Brain):

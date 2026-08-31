@@ -94,7 +94,12 @@ def test_plan_bound_agent_assembly_consumes_only_lead_policy_resolver() -> None:
     """Lead assembly must not leak registry taxonomy or policy naming details."""
 
     source = (
-        Path(__file__).resolve().parents[2] / "lca" / "plugins" / "composer" / "composition" / "agent_assembly.py"
+        Path(__file__).resolve().parents[2]
+        / "lca"
+        / "plugins"
+        / "composer"
+        / "composition"
+        / "agent_assembly.py"
     ).read_text(encoding="utf-8")
 
     assert "LEAD_BUDGET_POLICY_RESOLVER.key" in source

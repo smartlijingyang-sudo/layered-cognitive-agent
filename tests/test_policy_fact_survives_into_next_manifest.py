@@ -14,11 +14,11 @@ from __future__ import annotations
 
 import pytest
 
+from lca.cognition.brain.decision_gates import RepeatToolCallGate
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.decision import Decision, ToolCall, Turn
 from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.state import AgentState, Budget
-from lca.cognition.brain.decision_gates import RepeatToolCallGate
 
 
 def _state() -> AgentState:

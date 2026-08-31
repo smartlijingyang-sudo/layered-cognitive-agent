@@ -23,7 +23,10 @@ _LAZY_IMPORTS = {
     "DshTurnResult": ("lca.infrastructure.comparison.dsh_driver.models", "DshTurnResult"),
     "compose_dsh_prompt": ("lca.infrastructure.comparison.dsh_driver.prompt", "compose_dsh_prompt"),
     "is_dsh_driver": ("lca.infrastructure.comparison.dsh_driver.routing", "is_dsh_driver"),
-    "run_dsh_machine_turn": ("lca.infrastructure.comparison.dsh_driver.run", "run_dsh_machine_turn"),
+    "run_dsh_machine_turn": (
+        "lca.infrastructure.comparison.dsh_driver.run",
+        "run_dsh_machine_turn",
+    ),
     "DshSettings": ("lca.infrastructure.comparison.dsh_driver.settings", "DshSettings"),
 }
 

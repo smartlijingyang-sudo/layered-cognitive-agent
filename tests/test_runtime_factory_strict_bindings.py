@@ -14,16 +14,14 @@ from lca.contracts.protocols import (
     PerceiveHub,
     StateStore,
 )
-from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseExecutor
-from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.act.effect_handler import EffectHandlerRegistry
+from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseExecutor
 from lca.contracts.protocols.journal.idempotency import IdempotencyStore
+from lca.contracts.protocols.session.resume_input import ResumeInputAdapter
+from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.state.plan import CompiledRunPlan
 from lca.contracts.protocols.state.reducer import Reducer
-from lca.contracts.protocols.session.resume_input import ResumeInputAdapter
 from lca.harness.declarative.lifecycle.phase_observation import PhaseObserver
-from lca.runtime.reducer import DefaultReducer
-from lca.runtime.resume_input import HumanAnswerResumeInputAdapter
 from lca.plugins.composer.runtime.fixture_runtime_adapter import FixtureRuntimeAdapter
 from lca.plugins.composer.runtime.runtime_factory import (
     ProductionRuntimeDeps,
@@ -39,6 +37,8 @@ from lca.plugins.providers.journal.declarative_runtime_seams import (
     RegistryDeltaReducerFactory,
     RegistryEffectGatewayFactory,
 )
+from lca.runtime.reducer import DefaultReducer
+from lca.runtime.resume_input import HumanAnswerResumeInputAdapter
 
 
 def _fixture_deps() -> RuntimeDeps:

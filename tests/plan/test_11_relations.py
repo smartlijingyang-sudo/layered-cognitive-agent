@@ -29,6 +29,11 @@ from lca.contracts.atoms.relation import (
     validate_relations,
 )
 from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.relation import (
+    TypedRelation,
+    typed_relation_to_dict,
+    typed_relations_from_iter,
+)
 from lca.contracts.protocols.perceive.capability_plan import (
     CapabilityPlan,
     ProviderBinding,
@@ -37,11 +42,6 @@ from lca.contracts.protocols.perceive.capability_plan import (
     relations_from_plugin,
     relations_of_kind,
     relations_to_plugin,
-)
-from lca.contracts.protocols.composition.relation import (
-    TypedRelation,
-    typed_relation_to_dict,
-    typed_relations_from_iter,
 )
 from lca.harness.profile.capability_plan_resolver import (
     CapabilityPlanOptions,

@@ -35,11 +35,13 @@ __all__ = [
 """
 """
 
+from gateway.runs.ingest.cache import (
+    reset_ingest_cache_for_tests,
+)
 from gateway.runs.ingest.models import (
     FILE_DOWNLOAD_TIMEOUT_S,
-    MAX_INGEST_FILES,
     MAX_INGEST_FILE_BYTES,
-    FileIntegrityError,
+    MAX_INGEST_FILES,
     FileRef,
     IngestResult,
     IngestUrlPolicyError,
@@ -48,12 +50,4 @@ from gateway.runs.ingest.models import (
 from gateway.runs.ingest.policy import (
     assert_ingest_url_allowed,
     is_private_or_loopback,
-)
-
-from gateway.runs.ingest.cache import (
-    IngestCache,
-    IngestCacheEntry,
-    cache_key,
-    get_ingest_cache,
-    reset_ingest_cache_for_tests,
 )

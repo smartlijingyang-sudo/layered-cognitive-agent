@@ -6,13 +6,13 @@ import unittest
 from collections.abc import AsyncIterator
 from typing import Any
 
+from lca.cognition.brain.reasoner import PromptReasoner
 from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.infrastructure.search.constants import WEB_SEARCH_TOOL
-from lca.cognition.brain.reasoner import PromptReasoner
 
 
 def _empty_manifest() -> ToolPermissionManifest:

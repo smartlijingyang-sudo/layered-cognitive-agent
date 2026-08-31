@@ -15,23 +15,18 @@ from pathlib import Path
 
 import pytest
 
+from lca.cognition.brain.decision_gates.artifact_respond_injector import (
+    ArtifactRespondInjector,
+)
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.perception import ContextItem, ContextManifest
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.protocols import DecisionGate
-from lca.cognition.brain.decision_gates.artifact_respond_injector import (
-    ArtifactRespondInjector,
-)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 INJECTOR_PATH = (
-    REPO_ROOT
-    / "lca"
-    / "cognition"
-    / "brain"
-    / "decision_gates"
-    / "artifact_respond_injector.py"
+    REPO_ROOT / "lca" / "cognition" / "brain" / "decision_gates" / "artifact_respond_injector.py"
 )
 
 

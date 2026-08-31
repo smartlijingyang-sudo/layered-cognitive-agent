@@ -36,8 +36,8 @@ def _has_ancestor_named(bundle: TraceBundle, span, *names: str) -> bool:
 class TestTraceCoherence(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         from lca import Agent
-        from lca.contracts.models.team.team_coordination import Pipeline
         from lca.application.api import ensure_default_ctx
+        from lca.contracts.models.team.team_coordination import Pipeline
 
         # Boot default plugin context for tests that need Agent construction
         scope = await ensure_default_ctx()

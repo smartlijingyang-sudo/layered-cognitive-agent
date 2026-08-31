@@ -34,11 +34,11 @@ from typing import Any
 from lca.contracts.atoms.relation import (
     Relation,
 )
-from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan, ProviderBinding
 from lca.contracts.protocols.composition.relation import (
     TypedRelation,
     typed_relations_from_iter,
 )
+from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan, ProviderBinding
 from lca.harness.profile.projection import ResolvedProfileProjection
 from lca.harness.profile.resolve import ResolvedPlugin, ResolvedProfile
 from lca.harness.profile.runtime_closure import (

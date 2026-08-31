@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from lca.cognition.body.safe_executor import SimpleSafeExecutor
 from lca.contracts.models.core.sandbox import (
     SANDBOX_MOUNT_ROOT,
     SANDBOX_OUTPUT_SUBDIR,
@@ -32,7 +33,6 @@ from lca.infrastructure.tools.sandbox_runtime_tools import (
     SandboxExecuteTool,
     SandboxInspectTool,
 )
-from lca.cognition.body.safe_executor import SimpleSafeExecutor
 from tests.support.inline_sandbox import InlineSandbox
 from tests.support.observability_helpers import make_test_bound
 
@@ -188,7 +188,9 @@ class SandboxRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
                 os.environ, {"ONLYBOXES_BASE_URL": "http://x", "ONLYBOXES_ACCESS_TOKEN": "obx_x"}
             ),
             patch("lca.infrastructure.sandbox.factory.onlyboxes_base_url", return_value="http://x"),
-            patch("lca.infrastructure.sandbox.factory.onlyboxes_access_token", return_value="obx_x"),
+            patch(
+                "lca.infrastructure.sandbox.factory.onlyboxes_access_token", return_value="obx_x"
+            ),
         ):
             tools = build_default_tools(self.store)
         names = {t.name for t in tools}

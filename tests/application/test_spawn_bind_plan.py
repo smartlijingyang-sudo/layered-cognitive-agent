@@ -355,9 +355,9 @@ class TestStrictTeamBinding:
 class TestDefaultProfilePlanBinding:
     @pytest.mark.asyncio
     async def test_default_profile_binds_plan_to_solo_agent(self) -> None:
-        from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
         from lca.application.api import ensure_default_ctx
         from lca.application.spawn import spawn_agent
+        from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
         from tests.support.agent_specs import make_spec
 
         scope = await ensure_default_ctx()
@@ -388,7 +388,6 @@ def _plan(
     composers from the compiled plan (ADR-0074/0075 cutover).
     """
     from lca.contracts.atoms.scope import Scope
-    from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan, ProviderBinding
     from lca.contracts.protocols.declarative.declarative_phase_graph import (
         ActionAuthorityPlan,
         CognitivePhaseGraphPlan,
@@ -396,6 +395,7 @@ def _plan(
         PhaseNode,
         SemanticPhase,
     )
+    from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan, ProviderBinding
     from lca.contracts.protocols.state.plan import CompiledRunPlan
     from lca.contracts.protocols.state.scope_plan import BudgetCeiling, ScopePlan
 

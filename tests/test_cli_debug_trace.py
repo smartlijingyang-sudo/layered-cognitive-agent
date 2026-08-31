@@ -15,7 +15,10 @@ from lca.contracts.models.observability.journal import (
 )
 from lca.infrastructure.observability import TraceInspector
 from lca.infrastructure.observability.journal.engine.engine import RunStore
-from lca.infrastructure.observability.journal.engine.journal_io import read_journal, stamped_to_record
+from lca.infrastructure.observability.journal.engine.journal_io import (
+    read_journal,
+    stamped_to_record,
+)
 from lca.plugins.providers.observability.cli_debug_trace import _DebugTraceCommand
 
 

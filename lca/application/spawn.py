@@ -5,10 +5,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, cast
 
+from lca.agent.team_handle import TeamHandle
 from lca.contracts.atoms.enums import ActionScope, MemoryLayer
 from lca.contracts.models.team.team_coordination import Coordination, LeadMandate
 from lca.contracts.protocols import SharedMemoryStore, TeamUnit
-from lca.contracts.protocols.runtime.infra import AgentTransport
 from lca.contracts.protocols.journal.spec import (
     DEFAULT_DELEGATE_MAX_ATTEMPTS,
     AgentSpec,
@@ -16,20 +16,20 @@ from lca.contracts.protocols.journal.spec import (
     LeadSpec,
     TeamSpec,
 )
+from lca.contracts.protocols.runtime.infra import AgentTransport
 from lca.infrastructure.observability import BoundObservability
-from lca.agent.team_handle import TeamHandle
-from lca.plugins.composer.composition.agent_assembly import PlanBoundAgentAssembler, promote_lead
-from lca.plugins.composer.perceive.perceive import build_perceive_hub
-from lca.plugins.composer.composition.skill_store import active_skill_store
 from lca.plugins.composer.collaboration.team import resolve_observability, team_trace_profile
+from lca.plugins.composer.composition.agent_assembly import PlanBoundAgentAssembler, promote_lead
 from lca.plugins.composer.composition.plan_binding import bind_team_from_scope
 from lca.plugins.composer.composition.prompt_catalog import ModelPromptCatalog
+from lca.plugins.composer.composition.skill_store import active_skill_store
+from lca.plugins.composer.perceive.perceive import build_perceive_hub
 
 if TYPE_CHECKING:
     from cordis import Context
 
-    from lca.contracts.protocols import DecisionGate
     from lca.agent.cognitive_agent import CognitiveAgent
+    from lca.contracts.protocols import DecisionGate
 
 
 __all__ = [

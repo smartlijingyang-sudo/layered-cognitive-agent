@@ -7,17 +7,17 @@ from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict
 
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.ids import new_id
+from lca.contracts.atoms.scope import Scope
 from lca.contracts.atoms.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.tool import ParameterSpec, ToolApi, ToolManifest, ToolMeta
 from lca.contracts.protocols import Tool
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
 from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class ProfileDiffTool(Tool):
@@ -139,21 +139,18 @@ MANIFEST = ToolManifest(
     description="Register a read-only profile candidate diff Tool.",
     test_suite="tests/architecture/test_self_improving_plugins.py",
     kind=PluginKind.PRIMITIVE,
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G7_EXECUTION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.TURN,
-        authority=('tool.invoke',),
-        evidence=('lca-tool-profile-diff.checked', 'lca-tool-profile-diff.served'),
+        authority=("tool.invoke",),
+        evidence=("lca-tool-profile-diff.checked", "lca-tool-profile-diff.served"),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('tool.invoke', 'tools.profile_diff'),
-        emits=('tools.profile_diff.checked',),
+        reads=("tool.invoke", "tools.profile_diff"),
+        emits=("tools.profile_diff.checked",),
         state_mutation="forbidden",
     ),
 )

@@ -10,8 +10,6 @@ from lca.plugins.providers.act.action_handlers import (
     RespondActionHandler,
     UseToolActionHandler,
 )
-from lca.plugins.providers.journal.artifact_closure import DefaultArtifactClosure
-from lca.plugins.providers.gate.decision_classifier import DefaultDecisionClassifier
 from lca.plugins.providers.act.delta_handlers import (
     ActivationDeltaHandler,
     ArtifactClosureDeltaHandler,
@@ -32,7 +30,9 @@ from lca.plugins.providers.act.effect_handlers import (
     MemoryUpdateEffectHandler,
     register_default_effect_handlers,
 )
+from lca.plugins.providers.gate.decision_classifier import DefaultDecisionClassifier
 from lca.plugins.providers.gate.gate_chain_composer import DefaultGateChainComposer
+from lca.plugins.providers.journal.artifact_closure import DefaultArtifactClosure
 
 
 class TestDefaultDecisionClassifier:

@@ -6,15 +6,15 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from lca.contracts.capabilities import MEMORY_COMPACTION_POLICY
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.cognition.memory.policy import CompactionPolicy
+from lca.cognition.memory.semantic_compaction import SemanticCompactionPolicy
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
+from lca.contracts.capabilities import MEMORY_COMPACTION_POLICY
 from lca.contracts.protocols.composition.logic_address import LogicAddress
-from lca.cognition.memory.policy import CompactionPolicy
-from lca.cognition.memory.semantic_compaction import SemanticCompactionPolicy
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -43,21 +43,21 @@ class Config(BaseModel):
     description="Provide an auditable semantic compaction policy for memory context views.",
     test_suite="tests/test_memory_policy.py",
     kind=PluginKind.PRIMITIVE,
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G3_FACTS,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('lca-memory-compaction-policy-simple.checked', 'lca-memory-compaction-policy-simple.served'),
+        authority=("plugin.serve",),
+        evidence=(
+            "lca-memory-compaction-policy-simple.checked",
+            "lca-memory-compaction-policy-simple.served",
+        ),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('plugin.serve',),
-        emits=('plugin.served',),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

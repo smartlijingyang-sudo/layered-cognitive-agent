@@ -12,11 +12,19 @@ from __future__ import annotations
 
 import argparse
 import re
-import sys
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
-EXCLUDE_DIRS = {"lobehub-ui", "vendor", "node_modules", ".git", "__pycache__", "build", "dist", ".venv"}
+EXCLUDE_DIRS = {
+    "lobehub-ui",
+    "vendor",
+    "node_modules",
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    ".venv",
+}
 
 
 def discover_packages_with_readme() -> list[Path]:

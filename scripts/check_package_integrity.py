@@ -12,6 +12,7 @@ Usage::
 
     python scripts/check_package_integrity.py [--root PATH]
 """
+
 from __future__ import annotations
 
 import argparse
@@ -39,8 +40,7 @@ def _all_from_init(init: Path) -> set[str] | None:
         return None
     for node in tree.body:
         if isinstance(node, ast.Assign) and any(
-            isinstance(target, ast.Name) and target.id == "__all__"
-            for target in node.targets
+            isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets
         ):
             value = node.value
             if isinstance(value, (ast.List, ast.Tuple)):
@@ -94,8 +94,10 @@ def main(argv: list[str] | None = None) -> int:
             violations.append(f"{pkg}: declared contract but directory not found")
 
     if not violations:
-        print("package-integrity: every package has __init__.py + __all__; "
-              "every declared contract exists.")
+        print(
+            "package-integrity: every package has __init__.py + __all__; "
+            "every declared contract exists."
+        )
         return 0
     for line in violations:
         print(f"  ✗ {line}", file=sys.stderr)

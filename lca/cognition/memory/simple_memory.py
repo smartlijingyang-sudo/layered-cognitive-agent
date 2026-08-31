@@ -5,6 +5,17 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
+# v3 §8 / PR7.D.6/7: the system is wired
+from lca.cognition.memory.null_retrieval_policy import NullRetrievalPolicy
+from lca.cognition.memory.policy import (
+    CompactionPolicy,
+    MemoryCommitResult,
+    MemoryPolicy,
+    MemoryWrite,
+    SimpleCompactionPolicy,
+    SimpleMemoryPolicy,
+)
+from lca.cognition.memory.semantic_compaction import CompactionReport
 from lca.contracts.atoms.enums import MemoryLayer, MemoryRecordKind
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.atoms.semantic_keys import (
@@ -21,18 +32,6 @@ from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.journal import ContextCompacted, MemoryCommitted
 from lca.contracts.protocols import MemorySystem, RetrievalPolicy, SharedMemoryStore
 from lca.infrastructure.observability import record
-
-# v3 §8 / PR7.D.6/7: the system is wired
-from lca.cognition.memory.null_retrieval_policy import NullRetrievalPolicy
-from lca.cognition.memory.policy import (
-    CompactionPolicy,
-    MemoryCommitResult,
-    MemoryPolicy,
-    MemoryWrite,
-    SimpleCompactionPolicy,
-    SimpleMemoryPolicy,
-)
-from lca.cognition.memory.semantic_compaction import CompactionReport
 
 _DEFAULT_MAX_WORKING = 20
 _DEFAULT_MAX_EPISODIC = 50

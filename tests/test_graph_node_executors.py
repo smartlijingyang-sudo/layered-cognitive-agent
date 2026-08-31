@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import unittest
 
+from lca.agent.orchestration_strategies import GraphStrategy
 from lca.contracts.models.core.result import Result
 from lca.contracts.models.core.state import Budget
 from lca.contracts.models.team.graph import ExecutionGraph, GraphEdge, GraphNode, NodeType
 from lca.contracts.protocols import GraphNodeExecutionContext, GraphNodeExecutor
-from lca.agent.orchestration_strategies import GraphStrategy
 from lca.plugins.phase_graph.aggregator import AggregatorGraphNodeExecutor
 from lca.plugins.phase_graph.registry import GraphNodeExecutorRegistry
 from lca.plugins.phase_graph.topology import TopologyGraphNodeExecutor

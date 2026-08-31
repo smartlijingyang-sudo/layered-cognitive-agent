@@ -61,12 +61,14 @@ class SessionActivator:
             self._live_builder_provider = lambda: _StubSessionLiveBuilder()
         else:
             _orig_live = live_builder_provider
-            self._live_builder_provider = lambda: (_orig_live() or _StubSessionLiveBuilder())
+            self._live_builder_provider = lambda: _orig_live() or _StubSessionLiveBuilder()
         if persistence_factory_provider is None:
             self._persistence_factory_provider = lambda: JsonlSessionPersistenceFactory()
         else:
             _orig_pers = persistence_factory_provider
-            self._persistence_factory_provider = lambda: (_orig_pers() or JsonlSessionPersistenceFactory())
+            self._persistence_factory_provider = lambda: (
+                _orig_pers() or JsonlSessionPersistenceFactory()
+            )
         self._live: dict[str, LiveSession] = {}
 
     def get(self, session_id: str) -> LiveAgent | None:
@@ -187,7 +189,6 @@ class SessionActivator:
 
 
 __all__ = ["LiveSession", "SessionActivator"]
-
 
 
 class _StubSessionLiveBuilder:

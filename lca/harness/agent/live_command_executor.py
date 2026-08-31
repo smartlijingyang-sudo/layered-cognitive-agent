@@ -12,8 +12,8 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 
-from lca.contracts.harness.collaboration.agent import LiveAgent, MessageReceipt
 from lca.contracts.harness.act.command import CommandReceipt
+from lca.contracts.harness.collaboration.agent import LiveAgent, MessageReceipt
 from lca.harness.agent.activation import SessionActivator
 
 LiveCommand = Callable[[LiveAgent], Awaitable[MessageReceipt | None]]

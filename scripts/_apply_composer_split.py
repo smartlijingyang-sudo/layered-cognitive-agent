@@ -28,6 +28,7 @@ belong with the runtime closure rather than in a separate subpackage):
                        sub_composers, prompt_catalog,
                        skill_store (was internal/skill_store.py)
 """
+
 import re
 import shutil
 from contextlib import suppress
@@ -89,9 +90,7 @@ for old, pkg in INTERNAL_MOVES:
     OLD_TO_NEW.setdefault(old[:-3], pkg)
 
 
-def _rewrite_with_boundary(
-    text: str, prefix: str, old_mod: str, new_tail: str
-) -> str:
+def _rewrite_with_boundary(text: str, prefix: str, old_mod: str, new_tail: str) -> str:
     """Rewrite module references at module boundaries.
 
     Two forms are supported:
@@ -104,13 +103,9 @@ def _rewrite_with_boundary(
     subpackage (``lca.plugins.composer.<pkg>.X``) is not re-expanded into
     a doubled prefix.
     """
-    dotted_pat = re.compile(
-        rf"{re.escape(prefix)}\.{re.escape(old_mod)}(?![\w.])"
-    )
+    dotted_pat = re.compile(rf"{re.escape(prefix)}\.{re.escape(old_mod)}(?![\w.])")
     text = dotted_pat.sub(f"{prefix}.{new_tail}", text)
-    bare_pat = re.compile(
-        rf"from {re.escape(prefix)} import {re.escape(old_mod)}(?![\w.])"
-    )
+    bare_pat = re.compile(rf"from {re.escape(prefix)} import {re.escape(old_mod)}(?![\w.])")
     return bare_pat.sub(f"from {prefix}.{new_tail} import {old_mod}", text)
 
 
@@ -118,9 +113,7 @@ def _rewrite_with_boundary(
 # becomes think/brain.py). They must be rewritten in a separate pre-pass
 # BEFORE the regular pass, so the word-boundary guard cannot be defeated
 # by a sibling path that already has the target subpackage prefix.
-SELF_NAMED_MODS = sorted(
-    {mod for mod, pkg in OLD_TO_NEW.items() if mod == pkg}
-)
+SELF_NAMED_MODS = sorted({mod for mod, pkg in OLD_TO_NEW.items() if mod == pkg})
 
 
 def main() -> None:
@@ -180,9 +173,7 @@ def main() -> None:
             if old_mod in SELF_NAMED_MODS:
                 continue
             pkg = OLD_TO_NEW[old_mod]
-            new_text = _rewrite_with_boundary(
-                new_text, new_prefix, old_mod, f"{pkg}.{old_mod}"
-            )
+            new_text = _rewrite_with_boundary(new_text, new_prefix, old_mod, f"{pkg}.{old_mod}")
         if new_text != text:
             f.write_text(new_text, encoding="utf-8")
             count += 1
@@ -199,9 +190,7 @@ def main() -> None:
             if old_mod in SELF_NAMED_MODS:
                 continue
             pkg = OLD_TO_NEW[old_mod]
-            new_text = _rewrite_with_boundary(
-                new_text, new_prefix, old_mod, f"{pkg}.{old_mod}"
-            )
+            new_text = _rewrite_with_boundary(new_text, new_prefix, old_mod, f"{pkg}.{old_mod}")
         if new_text != text:
             f.write_text(new_text, encoding="utf-8")
             yaml_count += 1

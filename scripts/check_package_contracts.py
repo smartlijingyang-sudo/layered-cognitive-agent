@@ -18,14 +18,25 @@ ROOT = Path(__file__).parent.parent
 PYPROJECT = ROOT / "pyproject.toml"
 
 REQUIRED_SECTIONS = [
-    "## 1. 职责", "## 2. 不负责", "## 3. 输入", "## 4. 输出",
-    "## 5. 允许依赖", "## 6. 禁止依赖", "## 7. 副作用",
-    "## 8. 失败语义", "## 9. 公共入口",
+    "## 1. 职责",
+    "## 2. 不负责",
+    "## 3. 输入",
+    "## 4. 输出",
+    "## 5. 允许依赖",
+    "## 6. 禁止依赖",
+    "## 7. 副作用",
+    "## 8. 失败语义",
+    "## 9. 公共入口",
 ]
 
 REQUIRED_L2_FIELDS = [
-    "responsibility", "not_responsible_for", "allowed_dependencies",
-    "forbidden_dependencies", "side_effects", "public_api", "schema_version",
+    "responsibility",
+    "not_responsible_for",
+    "allowed_dependencies",
+    "forbidden_dependencies",
+    "side_effects",
+    "public_api",
+    "schema_version",
 ]
 
 EXCLUDE_DIRS = {"lobehub-ui", "vendor", "node_modules", ".git", "__pycache__", "build", "dist"}
@@ -92,7 +103,7 @@ def check_l2_pyproject_section(packages: list[str]) -> list[Issue]:
     for pkg in packages:
         section = contracts.get(pkg)
         if section is None:
-            issues.append(Issue(pkg, "L2", f"missing [tool.lca.package_contracts.\"{pkg}\"]"))
+            issues.append(Issue(pkg, "L2", f'missing [tool.lca.package_contracts."{pkg}"]'))
             continue
         for field in REQUIRED_L2_FIELDS:
             if field not in section:

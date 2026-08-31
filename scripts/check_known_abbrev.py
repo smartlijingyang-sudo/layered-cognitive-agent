@@ -14,6 +14,7 @@ Usage::
 
     python scripts/check_known_abbrev.py [--root PATH] [--strict]
 """
+
 from __future__ import annotations
 
 import argparse
@@ -26,17 +27,56 @@ SKIP_DIRS = {"__pycache__", ".git", ".venv", "node_modules", "traces"}
 
 # Conservative whitelist; expand only via ADR.
 APPROVED_ABBREV: set[str] = {
-    "cfg", "ctx", "env", "err", "msg", "info",
-    "doc", "docs", "db", "id", "idempotency", "old", "new",
-    "impl", "util", "pkg", "repo", "src", "ops", "ref", "refs",
-    "tx", "var", "cli", "run", "stub", "spec",
+    "cfg",
+    "ctx",
+    "env",
+    "err",
+    "msg",
+    "info",
+    "doc",
+    "docs",
+    "db",
+    "id",
+    "idempotency",
+    "old",
+    "new",
+    "impl",
+    "util",
+    "pkg",
+    "repo",
+    "src",
+    "ops",
+    "ref",
+    "refs",
+    "tx",
+    "var",
+    "cli",
+    "run",
+    "stub",
+    "spec",
 }
 
 # Tokens that look abbreviated but are established domain names.
 DOMAIN_EXCEPTIONS: set[str] = {
-    "lca", "rfc", "guid", "uuid", "id", "json", "yaml",
-    "toml", "sqlite", "sse", "url", "uri", "html", "css",
-    "api", "sdk", "adr", "evp", "mvp",
+    "lca",
+    "rfc",
+    "guid",
+    "uuid",
+    "id",
+    "json",
+    "yaml",
+    "toml",
+    "sqlite",
+    "sse",
+    "url",
+    "uri",
+    "html",
+    "css",
+    "api",
+    "sdk",
+    "adr",
+    "evp",
+    "mvp",
 }
 
 WORD_RE = re.compile(r"[A-Za-z0-9_]+")
@@ -53,8 +93,7 @@ def _tokenize(name: str) -> list[str]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT / "lca")
-    parser.add_argument("--strict", action="store_true",
-                        help="treat tokens ≤3 chars as suspicious")
+    parser.add_argument("--strict", action="store_true", help="treat tokens ≤3 chars as suspicious")
     args = parser.parse_args(argv)
 
     violations: list[str] = []

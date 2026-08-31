@@ -4,7 +4,6 @@ from dataclasses import replace
 
 import pytest
 
-from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     PhaseEdge,
     PhaseInput,
@@ -13,13 +12,14 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     RelationType,
     SemanticPhase,
 )
+from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.harness.declarative import GenericPlanInterpreter, GraphAssembler, MappingRestrictedScope
-from lca.harness.declarative.graph.phase_graph_compiler import compile_phase_graph_projection
 from lca.harness.declarative.controls.validation import (
     PhaseGraphValidator,
     is_validation_valid,
     validation_errors,
 )
+from lca.harness.declarative.graph.phase_graph_compiler import compile_phase_graph_projection
 from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.profile.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
@@ -233,7 +233,10 @@ class _PrepareContribution:
 
 @pytest.mark.asyncio
 async def test_prepare_contribution_is_resolved_and_executed(standard_plan) -> None:
-    from lca.contracts.protocols.declarative.declarative_phase_graph import ContributionRole, PhaseContribution
+    from lca.contracts.protocols.declarative.declarative_phase_graph import (
+        ContributionRole,
+        PhaseContribution,
+    )
 
     prepare = _PrepareContribution()
     bindings = tuple(

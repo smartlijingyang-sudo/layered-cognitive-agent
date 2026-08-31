@@ -11,11 +11,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import re
 import subprocess
-import sys
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
@@ -113,13 +111,17 @@ def main() -> int:
 
     print(f"\n=== STABLE ({len(stable)} entries, candidate for rename) ===")
     for entry in stable:
-        print(f"  {entry.path:60s} last: {entry.last_touched}  ({entry.days_since} days)" if entry.days_since else f"  {entry.path:60s} last: {entry.last_touched}")
+        print(
+            f"  {entry.path:60s} last: {entry.last_touched}  ({entry.days_since} days)"
+            if entry.days_since
+            else f"  {entry.path:60s} last: {entry.last_touched}"
+        )
 
     print(f"\n=== ACTIVE ({len(active)} entries, keep in legacy) ===")
     for entry in active:
         print(f"  {entry.path:60s} last: {entry.last_touched}  ({entry.days_since} days)")
 
-    print(f"\n=== Summary ===")
+    print("\n=== Summary ===")
     print(f"  total: {len(entries)}")
     print(f"  stable: {len(stable)} (rename candidates)")
     print(f"  active: {len(active)} (keep)")

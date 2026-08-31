@@ -17,6 +17,7 @@ import typer.testing
 from lca.contracts.observability.evidence import (
     EvidenceStore,
 )
+from lca.infrastructure.cli.cli import app
 from lca.infrastructure.observability import (
     BoundObservability,
     bind_backends,
@@ -33,7 +34,6 @@ from lca.infrastructure.observability.journal.jsonl.projector import (
 )
 from lca.infrastructure.observability.journal_backend import MemoryJournal
 from lca.infrastructure.observability.policy import AttributePolicy
-from lca.infrastructure.cli.cli import app
 
 _RUNNER = typer.testing.CliRunner()
 
@@ -76,12 +76,12 @@ class _ScriptableEvidenceStore(EvidenceStore):
 
 def _drive_run(jsonl_path: Path, ev_root: Path) -> tuple[str, dict, str]:
     """drive a ToolStarted with state_ref through public record() path."""
+    from lca.cognition.body.tool_journal_emit import (
+        emit_tool_started,
+    )
     from lca.contracts.models.observability.journal import (
         RunScope,
         ToolStarted,
-    )
-    from lca.cognition.body.tool_journal_emit import (
-        emit_tool_started,
     )
 
     class _MockTool:

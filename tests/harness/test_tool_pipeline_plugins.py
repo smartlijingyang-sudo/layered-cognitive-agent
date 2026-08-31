@@ -6,6 +6,7 @@ from typing import ClassVar
 
 import pytest
 
+from lca.cognition.body.pipeline_safe_executor import PipelineSafeExecutor
 from lca.contracts.atoms.enums import ContentType
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
@@ -18,7 +19,6 @@ from lca.contracts.protocols.act.tool_pipeline import (
     ToolPreDecision,
 )
 from lca.infrastructure.tool_pipeline import DefaultToolExecutionPipeline
-from lca.cognition.body.pipeline_safe_executor import PipelineSafeExecutor
 
 
 class _EchoProvider:

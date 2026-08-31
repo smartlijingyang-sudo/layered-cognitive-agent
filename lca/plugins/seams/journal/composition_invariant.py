@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
-from lca.contracts.capabilities import COMPOSITION_INVARIANT_CHECKER
-from lca.contracts.mechanisms.composition import InvariantChecker
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
+from lca.contracts.capabilities import COMPOSITION_INVARIANT_CHECKER
+from lca.contracts.mechanisms.composition import InvariantChecker
 from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.providers.think.composition_composer import build_default_invariant_checker
 
 
@@ -31,21 +31,21 @@ class Config(BaseModel):
     description="Provide the default invariant gate for Cordis Composer mount operations.",
     test_suite="tests/architecture/test_composition_invariant_capability.py",
     kind=PluginKind.PRIMITIVE,
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G10_COMPOSITION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('lca-composition-invariant-default.checked', 'lca-composition-invariant-default.served'),
+        authority=("plugin.serve",),
+        evidence=(
+            "lca-composition-invariant-default.checked",
+            "lca-composition-invariant-default.served",
+        ),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('plugin.serve',),
-        emits=('plugin.served',),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

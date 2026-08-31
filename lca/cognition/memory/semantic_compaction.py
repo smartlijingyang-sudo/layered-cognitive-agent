@@ -7,9 +7,9 @@ from hashlib import sha256
 from re import sub
 from typing import Literal
 
+from lca.cognition.memory.policy import CompactionPolicy, SimpleCompactionPolicy
 from lca.contracts.atoms.enums import MemoryLayer, MemoryRecordKind
 from lca.contracts.models.core.memory import MemoryRecord, MemoryTrust
-from lca.cognition.memory.policy import CompactionPolicy, SimpleCompactionPolicy
 
 
 @dataclass(frozen=True)

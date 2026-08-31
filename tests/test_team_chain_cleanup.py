@@ -7,6 +7,12 @@ import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
+from lca.agent.orchestration_strategies import (
+    HandoffStrategy,
+    SequentialStrategy,
+    SwarmStrategy,
+)
+from lca.application.api import Agent, Team, ensure_default_ctx
 from lca.contracts.atoms.enums import DecisionGateName
 from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.lifecycle import TaskStatus
@@ -17,12 +23,6 @@ from lca.contracts.models.team.graph import ExecutionGraph, GraphEdge, GraphNode
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.models.team.team_coordination import Graph, PeerRelay, PeerSwarm, Pipeline
 from lca.contracts.protocols import TeamAssembly
-from lca.agent.orchestration_strategies import (
-    HandoffStrategy,
-    SequentialStrategy,
-    SwarmStrategy,
-)
-from lca.application.api import Agent, Team, ensure_default_ctx
 from tests.support.strategy_registry import build_strategy_registry
 from tests.support.team_stage import stage_with_invoker
 

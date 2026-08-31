@@ -29,16 +29,6 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
-from lca.contracts.models.core.perceive_state import PerceiveState
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.observability.journal import (
-    ContextManifested,
-    InboxFollowupCreated,
-    TeamMessagePublished,
-)
-from lca.infrastructure.observability.journal.engine.engine import RunStore
 from lca.cognition.brain.decision_gates import (
     ChainedDecisionGate,
     RepeatToolCallGate,
@@ -54,6 +44,16 @@ from lca.cognition.sensors import (
     build_clock_sensor,
     build_workspace_artifacts_sensor,
 )
+from lca.contracts.atoms.ids import new_id
+from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
+from lca.contracts.models.core.perceive_state import PerceiveState
+from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.observability.journal import (
+    ContextManifested,
+    InboxFollowupCreated,
+    TeamMessagePublished,
+)
+from lca.infrastructure.observability.journal.engine.engine import RunStore
 
 
 def _bucket(state: AgentState) -> list:

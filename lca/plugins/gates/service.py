@@ -8,8 +8,8 @@ from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.protocols.composition.logic_address import LogicAddress
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -34,10 +34,9 @@ class Config(BaseModel):
         evidence=("gates.group.assembled",),
         revision="v1",
     ),
-
     ownership=OwnershipDeclaration(
-        reads=('decision.emit', 'gates'),
-        emits=('gates.checked',),
+        reads=("decision.emit", "gates"),
+        emits=("gates.checked",),
         state_mutation="forbidden",
     ),
 )

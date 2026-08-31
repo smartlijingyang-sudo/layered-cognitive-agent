@@ -6,6 +6,16 @@ import asyncio
 import unittest
 from unittest.mock import MagicMock
 
+from lca.cognition.body.action_handlers import resolve_spec_timeout_s
+from lca.cognition.body.tool_registry import SimpleToolRegistry
+from lca.cognition.brain.decision_gates.must_consult_all import MustConsultAllMembers
+from lca.cognition.member_status import (
+    InMemoryMemberStatus,
+    classify_synthesis,
+    compute_required_action_from_duty,
+    record_delegation_return,
+)
+from lca.cognition.member_status.tracking import duty_consult
 from lca.contracts.atoms.enums import RoleStatus
 from lca.contracts.atoms.semantic_keys import (
     COMPLETION_PARTIAL,
@@ -35,16 +45,6 @@ from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
 from lca.contracts.protocols.journal.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
 from lca.infrastructure.transport.agent_transport import InternalTransport
 from lca.infrastructure.transport.transport_registry import TransportRegistry
-from lca.cognition.body.action_handlers import resolve_spec_timeout_s
-from lca.cognition.body.tool_registry import SimpleToolRegistry
-from lca.cognition.brain.decision_gates.must_consult_all import MustConsultAllMembers
-from lca.cognition.member_status import (
-    InMemoryMemberStatus,
-    classify_synthesis,
-    compute_required_action_from_duty,
-    record_delegation_return,
-)
-from lca.cognition.member_status.tracking import duty_consult
 from tests.support.action_authority import build_test_body
 
 

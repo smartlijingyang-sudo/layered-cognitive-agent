@@ -57,31 +57,27 @@ def main(argv: list[str] | None = None) -> int:
 
     plugins = scan(args.root)
     blacklist = load_blacklist()
-    critical = [
-        p for p in plugins
-        if p.gap_severity == "critical" and p.plugin_id not in blacklist
-    ]
-    warning = [
-        p for p in plugins
-        if p.gap_severity == "warning" and p.plugin_id not in blacklist
-    ]
-    exempted = [
-        p for p in plugins
-        if p.plugin_id in blacklist
-    ]
+    critical = [p for p in plugins if p.gap_severity == "critical" and p.plugin_id not in blacklist]
+    warning = [p for p in plugins if p.gap_severity == "warning" and p.plugin_id not in blacklist]
+    exempted = [p for p in plugins if p.plugin_id in blacklist]
 
     if args.json:
         import json
-        print(json.dumps({
-            "total": len(plugins),
-            "critical": len(critical),
-            "warning": len(warning),
-            "blacklisted": len(exempted),
-            "critical_plugins": [
-                {"id": p.plugin_id, "file": p.file, "line": p.line}
-                for p in critical
-            ],
-        }, indent=2))
+
+        print(
+            json.dumps(
+                {
+                    "total": len(plugins),
+                    "critical": len(critical),
+                    "warning": len(warning),
+                    "blacklisted": len(exempted),
+                    "critical_plugins": [
+                        {"id": p.plugin_id, "file": p.file, "line": p.line} for p in critical
+                    ],
+                },
+                indent=2,
+            )
+        )
         return 1 if critical else 0
 
     if not critical and not warning:
@@ -91,11 +87,13 @@ def main(argv: list[str] | None = None) -> int:
         print(msg + ".")
         return 0
 
-    print(f"plugin-metadata: {len(plugins)} scanned, "
-          f"{len(critical)} critical (missing logic_address), "
-          f"{len(warning)} warning, "
-          f"{len(exempted)} exempted via blacklist",
-          file=sys.stderr)
+    print(
+        f"plugin-metadata: {len(plugins)} scanned, "
+        f"{len(critical)} critical (missing logic_address), "
+        f"{len(warning)} warning, "
+        f"{len(exempted)} exempted via blacklist",
+        file=sys.stderr,
+    )
     if critical:
         print("\nCRITICAL plugins (logic_address missing, not in blacklist):", file=sys.stderr)
         for p in critical[:20]:

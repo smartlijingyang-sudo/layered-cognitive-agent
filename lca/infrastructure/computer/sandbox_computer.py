@@ -224,4 +224,5 @@ __all__ = ["SandboxComputer", "normalize_sandbox_path"]
 def _get_current_run_attachment_ids() -> tuple[str, ...]:
     """Lazy import to break circular import (sandbox_computer ↔ tools)."""
     from lca.infrastructure.tools.run_attachment_scope import get_current_run_attachment_ids
+
     return get_current_run_attachment_ids()

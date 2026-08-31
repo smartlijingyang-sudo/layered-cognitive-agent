@@ -8,13 +8,13 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from lca.cognition.memory.simple_memory import SimpleMemorySystem
+from lca.cognition.memory.team_shared_memory import TeamSharedMemoryStore
 from lca.contracts.atoms.enums import MemoryLayer
 from lca.contracts.models.core.decision import Decision, Observation, Reflection, Turn
 from lca.contracts.models.core.memory import MemoryRecord
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.team.team_coordination import TeamAssignment
-from lca.cognition.memory.simple_memory import SimpleMemorySystem
-from lca.cognition.memory.team_shared_memory import TeamSharedMemoryStore
 
 
 class TestSharedMemorySinglePath(unittest.IsolatedAsyncioTestCase):

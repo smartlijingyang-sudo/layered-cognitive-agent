@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from lca.cognition.body.action_handlers import record_decision_made
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.semantic_keys import OBS_DEGRADED_FROM
 from lca.contracts.models.core.decision import Decision, Observation
@@ -13,7 +14,6 @@ from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import Body, SafeExecutor, ToolRegistry, TransportRegistryProtocol
 from lca.contracts.protocols.act.action import ActionRegistryProtocol
 from lca.infrastructure.component_registry import RegistryKeyError
-from lca.cognition.body.action_handlers import record_decision_made
 
 
 class SimpleBody(Body):

@@ -9,12 +9,12 @@ from typing import Any
 
 import pytest
 
+from lca.cognition.body.tool_result_preview import tool_files
 from lca.contracts.models.core.plane import PlaneKind, PlaneRef
 from lca.contracts.models.core.result import ApprovalPendingError
 from lca.infrastructure.computer.machine import MachineComputer
 from lca.infrastructure.file_store import LocalFileStore
 from lca.infrastructure.tools.lca_computer.observations import build_computer_observation
-from lca.cognition.body.tool_result_preview import tool_files
 
 
 class _FakeTransport:

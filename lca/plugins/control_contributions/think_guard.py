@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
+from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.enums import ActionType
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
 from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.gate_policy import GateDecided
 from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.state import AgentState
-from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ContributionRole,
     PhaseContext,
@@ -18,12 +21,9 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     PhaseResult,
     SemanticPhase,
 )
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
+from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 
 _GATE_CONTRIBUTIONS = {
     "gate.repeat-tool-call": "RepeatToolCallGate",
@@ -135,10 +135,9 @@ class Config(BaseModel):
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('control.think.guard',),
-        emits=('control.think.guard.checked',),
+        reads=("control.think.guard",),
+        emits=("control.think.guard.checked",),
         state_mutation="forbidden",
     ),
 )

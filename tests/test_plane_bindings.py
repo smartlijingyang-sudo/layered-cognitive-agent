@@ -111,9 +111,9 @@ def test_tmp_no_approval() -> None:
 def test_machine_tools_inject_local_system_role() -> None:
     from types import SimpleNamespace
 
+    from lca.cognition.brain.sandbox_prompt import build_cloud_sandbox_prompt
     from lca.infrastructure.runtime_plane.resolve import PlaneBindings
     from lca.infrastructure.runtime_plane.scope import plane_bindings_scope
-    from lca.cognition.brain.sandbox_prompt import build_cloud_sandbox_prompt
 
     plane = _machine()
     with plane_bindings_scope(PlaneBindings(primary=plane)):

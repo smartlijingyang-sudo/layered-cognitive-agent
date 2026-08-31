@@ -15,15 +15,6 @@ v3 §5.5 splits memory updates into a two-phase pipeline:
 
 from __future__ import annotations
 
-from lca.contracts.atoms.enums import MemoryLayer
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.models.core.decision import Observation, Reflection
-from lca.contracts.models.core.memory import MemoryRecord, MemoryTrust
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.observability.journal import (
-    ContextCompacted,
-    MemoryCommitted,
-)
 from lca.cognition.memory import SimpleMemorySystem
 from lca.cognition.memory.policy import (
     CompactionPolicy,
@@ -36,6 +27,15 @@ from lca.cognition.memory.policy import (
     SimpleMemoryPolicy,
 )
 from lca.cognition.memory.semantic_compaction import SemanticCompactionPolicy
+from lca.contracts.atoms.enums import MemoryLayer
+from lca.contracts.atoms.ids import new_id
+from lca.contracts.models.core.decision import Observation, Reflection
+from lca.contracts.models.core.memory import MemoryRecord, MemoryTrust
+from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.observability.journal import (
+    ContextCompacted,
+    MemoryCommitted,
+)
 
 
 def _agent_state() -> AgentState:

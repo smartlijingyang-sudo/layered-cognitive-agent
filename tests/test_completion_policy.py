@@ -7,6 +7,17 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from lca.cognition.brain.critic import SimpleCritic
+from lca.cognition.brain.decision_gates.must_consult_all import (
+    MustConsultAllMembers,
+)
+from lca.cognition.brain.modular_brain import ModularBrain
+from lca.cognition.member_status import (
+    InMemoryMemberStatus,
+    compute_required_action,
+    record_delegation_return,
+)
+from lca.cognition.member_status.tracking import _next_role_status
 from lca.contracts.atoms.enums import RoleStatus
 from lca.contracts.atoms.ids import elapsed_seconds, remaining_seconds, utc_now
 from lca.contracts.atoms.semantic_keys import (
@@ -20,19 +31,8 @@ from lca.contracts.models.team.role_status_rules import is_success_status, is_te
 from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
 from lca.contracts.protocols import SupportsShortcut
 from lca.contracts.protocols.journal.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
-from lca.cognition.brain.critic import SimpleCritic
-from lca.cognition.brain.decision_gates.must_consult_all import (
-    MustConsultAllMembers,
-)
-from lca.cognition.brain.modular_brain import ModularBrain
-from lca.cognition.member_status import (
-    InMemoryMemberStatus,
-    compute_required_action,
-    record_delegation_return,
-)
-from lca.cognition.member_status.tracking import _next_role_status
-from lca.runtime.reducer import DefaultReducer
 from lca.plugins.providers.gate.decision_classifier import DefaultDecisionClassifier
+from lca.runtime.reducer import DefaultReducer
 
 # ── helpers ──
 

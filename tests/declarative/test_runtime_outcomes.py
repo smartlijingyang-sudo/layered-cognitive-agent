@@ -13,13 +13,13 @@ import pytest
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.stop import StopDecision, StopReason
 from lca.contracts.protocols.act.command_envelope import RunDelta
-from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeRunOutcome,
     PhaseInput,
     PhaseResult,
     PhaseRunCursor,
 )
+from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.harness.declarative import GenericPlanInterpreter, GraphAssembler, MappingRestrictedScope
 from lca.harness.declarative.compile.phase_governance import classify_control_verdict
 from lca.harness.plan import compiled_run_plan_ref
@@ -94,7 +94,9 @@ def test_govern_verdict_uses_closed_typed_vocabulary(kind, expected) -> None:
 
 def test_govern_verdict_rejects_legacy_dictionary_payload() -> None:
     """A malformed control result must fail closed rather than silently allow."""
-    from lca.contracts.protocols.declarative.declarative_phase_graph import DeclarativeValidationError
+    from lca.contracts.protocols.declarative.declarative_phase_graph import (
+        DeclarativeValidationError,
+    )
 
     with pytest.raises(DeclarativeValidationError, match="ControlVerdict") as exc_info:
         classify_control_verdict({"verdict": "allow"})
@@ -104,7 +106,9 @@ def test_govern_verdict_rejects_legacy_dictionary_payload() -> None:
 
 def test_interpreter_rejects_state_delta_without_reducer() -> None:
     """A state-changing phase cannot run without the only permitted writer."""
-    from lca.contracts.protocols.declarative.declarative_phase_graph import DeclarativeValidationError
+    from lca.contracts.protocols.declarative.declarative_phase_graph import (
+        DeclarativeValidationError,
+    )
 
     with pytest.raises(DeclarativeValidationError, match="no DeltaReducer") as exc_info:
         GenericPlanInterpreter()._apply_delta(

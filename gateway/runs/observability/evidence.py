@@ -101,9 +101,7 @@ class RunEvidenceReader:
             # ADR-0101 PR-2:tool 事件带 arguments_ref / output_ref;
             # state_ref 字段已废弃但保留兼容读。
             data = normalized.get("data", {})
-            ref_raw = (
-                data.get("arguments_ref") or data.get("output_ref") or data.get("state_ref")
-            )
+            ref_raw = data.get("arguments_ref") or data.get("output_ref") or data.get("state_ref")
             if not isinstance(ref_raw, dict):
                 continue
             try:

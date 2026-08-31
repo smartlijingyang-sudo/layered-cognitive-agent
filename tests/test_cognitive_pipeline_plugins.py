@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from lca.cognition.brain.modular_brain import ModularBrain
 from lca.contracts.atoms.enums import ReflectionVerdict
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.capabilities import (
@@ -21,7 +22,6 @@ from lca.contracts.protocols import (
 )
 from lca.harness.plugin_declaration import definition_from_plugin
 from lca.harness.profile.resolve import resolve_profile
-from lca.cognition.brain.modular_brain import ModularBrain
 from lca.plugins.brain._standard_factory import STANDARD_COGNITIVE_BRAIN_FACTORY_REQUIREMENTS
 
 REPO = Path(__file__).resolve().parents[1]

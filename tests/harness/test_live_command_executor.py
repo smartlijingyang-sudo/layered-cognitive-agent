@@ -6,8 +6,8 @@ from dataclasses import dataclass
 
 import pytest
 
-from lca.contracts.harness.collaboration.agent import MessageReceipt
 from lca.contracts.harness.act.command import CommandReceipt
+from lca.contracts.harness.collaboration.agent import MessageReceipt
 from lca.harness.agent.live_command_executor import LiveCommandExecutor
 
 

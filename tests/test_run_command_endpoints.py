@@ -30,8 +30,14 @@ _INPUT = LobeHubRunInput(user_text="hello", question="hello")
 
 def _post_runs(spy: AsyncMock, payload: dict[str, object]) -> object:
     with (
-        patch("gateway.runs.api.routes.command_endpoints.llm_status", return_value={"llm_available": True}),
-        patch("gateway.runs.api.routes.command_endpoints.resolve_profile_mode", side_effect=_identity_mode),
+        patch(
+            "gateway.runs.api.routes.command_endpoints.llm_status",
+            return_value={"llm_available": True},
+        ),
+        patch(
+            "gateway.runs.api.routes.command_endpoints.resolve_profile_mode",
+            side_effect=_identity_mode,
+        ),
         patch(
             "gateway.runs.api.routes.command_endpoints.prepare_run_from_messages",
             new=AsyncMock(return_value=_INPUT),

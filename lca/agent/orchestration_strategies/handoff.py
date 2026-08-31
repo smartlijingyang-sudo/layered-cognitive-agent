@@ -6,9 +6,9 @@
 
 from __future__ import annotations
 
+from lca.agent.member_invoke import invoke_members_sequential
 from lca.contracts.models.core.result import Result
 from lca.contracts.protocols import TeamStage, TeamStrategy
-from lca.agent.member_invoke import invoke_members_sequential
 
 
 class RaceStrategy(TeamStrategy):

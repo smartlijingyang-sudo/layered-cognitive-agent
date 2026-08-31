@@ -11,6 +11,7 @@ PR6: the gate reads workspace artifacts **exclusively** from the typed
 
 from __future__ import annotations
 
+from lca.cognition.brain.decision_gates.chained import record_gate_decided
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.budget import TERMINAL_RESERVE_STEPS
@@ -19,7 +20,6 @@ from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import DecisionGate
-from lca.cognition.brain.decision_gates.chained import record_gate_decided
 
 _TERMINAL_RATIONALE = "终态步：必须向用户收口；产物已从工作区账本合成摘要。"
 

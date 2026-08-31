@@ -10,7 +10,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -34,16 +33,21 @@ def list_all_python_md_yaml() -> list[str]:
     """List files that may contain imports or paths."""
     result = subprocess.run(
         ["git", "ls-files", "--others", "--exclude-standard", "-z"],
-        capture_output=True, text=True, check=True,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     tracked = subprocess.run(
         ["git", "ls-files", "-z"],
-        capture_output=True, text=True, check=True,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     all_files = set(result.stdout.split("\0")) | set(tracked.stdout.split("\0"))
     all_files.discard("")
     relevant = [
-        f for f in all_files
+        f
+        for f in all_files
         if f.endswith((".py", ".md", ".yaml", ".yml", ".toml", ".txt", ".json"))
         and not f.startswith(("vendor/", "lobehub-ui/", "node_modules/", ".git/"))
         and "__pycache__" not in f
@@ -91,6 +95,7 @@ def run_git_mv(dry_run: bool, only: list[str] | None = None) -> list[str]:
 
 def Path_for(p: str):
     from pathlib import Path
+
     return Path(p)
 
 
@@ -132,7 +137,9 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--execute", action="store_true")
-    parser.add_argument("--only", help="only process layers matching this (e.g. 'layer0' or 'layer')")
+    parser.add_argument(
+        "--only", help="only process layers matching this (e.g. 'layer0' or 'layer')"
+    )
     parser.add_argument("--rollback", help="git revert commit SHA")
     parser.add_argument("--report", action="store_true", help="just show reference counts")
     args = parser.parse_args()

@@ -260,12 +260,12 @@ def test_emit_tool_started_returns_ref_when_evidence_bound() -> None:
     evidence_store.prepare() 真的被调用并返回 ref。
     """
 
+    from lca.cognition.body.tool_journal_emit import emit_tool_started
     from lca.contracts.observability.evidence import (
         Classification,
         EvidenceReceipt,
         RetentionClass,
     )
-    from lca.cognition.body.tool_journal_emit import emit_tool_started
 
     class _Tool:
         name = "demo"
@@ -314,11 +314,11 @@ def test_inline_path_activated_by_should_inline_true() -> None:
     互斥:V2(同时只能有一个非空)。
     """
 
+    from lca.cognition.body.tool_journal_emit import emit_tool_started
     from lca.contracts.observability.evidence import (
         Classification,
         RetentionClass,
     )
-    from lca.cognition.body.tool_journal_emit import emit_tool_started
 
     class _Tool:
         name = "demo"

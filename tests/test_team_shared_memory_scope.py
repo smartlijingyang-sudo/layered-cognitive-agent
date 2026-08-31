@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from lca.contracts.atoms.enums import MemoryLayer
 from lca.cognition.memory.team_shared_memory import TeamSharedMemoryStore
+from lca.contracts.atoms.enums import MemoryLayer
 
 
 def test_team_shared_memory_exposes_scope() -> None:

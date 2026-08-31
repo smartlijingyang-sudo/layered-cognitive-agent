@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 
+from lca.cognition.body.action_handlers import DelegateOperation
 from lca.contracts.atoms.enums import ActionType, MemoryRecordKind
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.atoms.semantic_keys import (
@@ -33,7 +34,6 @@ from lca.contracts.models.core.decision import (
 )
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.infrastructure.transport.transport_registry import TransportRegistry
-from lca.cognition.body.action_handlers import DelegateOperation
 
 
 def _state() -> AgentState:

@@ -14,17 +14,25 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
-import re
-import sys
-import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+
+import tomllib
 
 ROOT = Path(__file__).parent.parent
 PYPROJECT = ROOT / "pyproject.toml"
 LEGACY = ROOT / "legacy_blacklist.txt"
 
-EXCLUDE_DIRS = {"lobehub-ui", "vendor", "node_modules", ".git", "__pycache__", "build", "dist", ".venv"}
+EXCLUDE_DIRS = {
+    "lobehub-ui",
+    "vendor",
+    "node_modules",
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    ".venv",
+}
 
 
 @dataclass
@@ -107,6 +115,7 @@ def check_file(rel_path: str, pkg_overrides: dict[str, dict[str, list[str]]]) ->
             return None
     # Default whitelist
     from _filename_rules import is_blacklisted, is_whitelisted
+
     if is_whitelisted(rel_path):
         return None
     # Per-package blacklist extra
@@ -115,11 +124,17 @@ def check_file(rel_path: str, pkg_overrides: dict[str, dict[str, list[str]]]) ->
         extra_bl = pkg_overrides[pkg].get("blacklist_extra", [])
     if is_blacklisted(rel_path, extra_blacklist=extra_bl):
         from _filename_rules import DEFAULT_BLACKLIST
+
         patterns = DEFAULT_BLACKLIST + extra_bl
         from fnmatch import fnmatch
+
         matched = [p for p in patterns if fnmatch(rel_path, p)]
         pat_str = ", ".join(matched) if matched else "blacklist"
-        return Issue(rel_path, "new_violation", f"filename matches blacklist ({pat_str}); rename or add to legacy_blacklist.txt")
+        return Issue(
+            rel_path,
+            "new_violation",
+            f"filename matches blacklist ({pat_str}); rename or add to legacy_blacklist.txt",
+        )
     return None
 
 
@@ -144,7 +159,9 @@ def main() -> int:
         if issue is None:
             continue
         if rel in legacy:
-            legacy_warnings.append(Issue(rel, "legacy_warning", "filename matches blacklist (in legacy_blacklist.txt)"))
+            legacy_warnings.append(
+                Issue(rel, "legacy_warning", "filename matches blacklist (in legacy_blacklist.txt)")
+            )
         else:
             new_violations.append(issue)
 

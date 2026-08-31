@@ -4,14 +4,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal, TypeAlias
 
-from lca.contracts.mechanisms.capability import MissingCapabilityError
-from lca.contracts.protocols import MemorySystem, PerceiveHub, Sensor
-from lca.contracts.protocols.think.cognition import PerceiveHubAssembler
 from lca.cognition.group_assembly import (
     AssemblyStrategy,
     OrderedContributionCatalog,
     SingleAssemblyStrategy,
 )
+from lca.contracts.mechanisms.capability import MissingCapabilityError
+from lca.contracts.protocols import MemorySystem, PerceiveHub, Sensor
+from lca.contracts.protocols.think.cognition import PerceiveHubAssembler
 
 Needs = Literal["none", "store", "skills"]
 

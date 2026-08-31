@@ -8,6 +8,8 @@ import pytest
 
 from gateway.runs.execute import create_run_session, execute_run
 from gateway.runs.session.session import RunRegistry, RunStatus
+from lca.application.api import Agent
+from lca.application.spawn import spawn_agent
 from lca.contracts.atoms.enums import ActionScope
 from lca.contracts.mechanisms.capability import MissingCapabilityError
 from lca.harness.profile.boot import boot_entries, boot_profile, load_profile_entries
@@ -15,8 +17,6 @@ from lca.harness.profile.boot_products import resolved_profile_from_scope
 from lca.harness.profile.resolve import ProfileResolveError
 from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
 from lca.infrastructure.llm_resolver import live_credential
-from lca.application.api import Agent
-from lca.application.spawn import spawn_agent
 from lca.plugins.composer.perceive.perceive import build_perceive_hub
 
 DEFAULT_PROFILE = "profiles/web-standard.yaml"

@@ -13,13 +13,13 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field, SecretStr
 
-from lca.contracts.protocols import LLMAdapter
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols import LLMAdapter
 from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.llm.config import DEFAULT_CHAT_MODEL
 
 if TYPE_CHECKING:
@@ -96,21 +96,18 @@ def _parse_api_style(raw: str | None) -> LLMApiStyle | None:
     effects="none",
     description="Load .env, register a Profile-selected resilient chat adapter, provide llm_resolver.",
     test_suite="tests/test_plugin_tree_single_owner.py::test_llm_single_owner_without_key",
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G10_COMPOSITION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('lca-llm-resolver.checked', 'lca-llm-resolver.served'),
+        authority=("plugin.serve",),
+        evidence=("lca-llm-resolver.checked", "lca-llm-resolver.served"),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('llm_resolver',),
-        emits=('llm_resolver.checked',),
+        reads=("llm_resolver",),
+        emits=("llm_resolver.checked",),
         state_mutation="forbidden",
     ),
 )

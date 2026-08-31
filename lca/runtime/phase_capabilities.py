@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from lca.contracts.protocols.think.cognition import Brain, PerceiveHub
 from lca.contracts.protocols.act.embodiment import Body
 from lca.contracts.protocols.memory.memory import MemorySystem
+from lca.contracts.protocols.think.cognition import Brain, PerceiveHub
 from lca.runtime.runtime_bindings import RuntimePhaseCapabilities
 
 

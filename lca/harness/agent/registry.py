@@ -12,8 +12,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from lca.contracts.harness.collaboration.agent import AgentHandle, LiveAgent, SessionLiveBuilder
 from lca.contracts.harness.act.command import CommandReceipt
+from lca.contracts.harness.collaboration.agent import AgentHandle, LiveAgent, SessionLiveBuilder
 from lca.contracts.harness.state.projection import SessionProjectionRegistry
 from lca.contracts.protocols.session.session_command_ledger import SessionCommandLedger
 from lca.contracts.protocols.session.session_persistence import SessionPersistenceFactory

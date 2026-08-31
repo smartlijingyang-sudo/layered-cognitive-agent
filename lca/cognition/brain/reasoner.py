@@ -14,6 +14,8 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 
+from lca.cognition.brain.conversation_prompt import format_prior_conversation
+from lca.cognition.brain.llm_turn import execute_llm_turn
 from lca.contracts.atoms.enums import MemoryLayer, MemoryRecordKind
 from lca.contracts.atoms.telemetry import ATTR_PROMPT_TEMPLATE
 from lca.contracts.models.core.conversation import (
@@ -30,8 +32,6 @@ from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.models.team.team_awareness import TeamAwareness
 from lca.contracts.protocols import LLMAdapter, Reasoner, Tool
 from lca.infrastructure.observability import annotate
-from lca.cognition.brain.conversation_prompt import format_prior_conversation
-from lca.cognition.brain.llm_turn import execute_llm_turn
 
 _DEFAULT_TEMPLATE = "react_prompt"
 _HIERARCHICAL_TEMPLATE = "hierarchical_prompt"

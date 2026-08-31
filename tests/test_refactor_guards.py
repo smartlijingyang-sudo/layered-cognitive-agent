@@ -98,10 +98,10 @@ class TestLeadWallClockPropagation(unittest.TestCase):
     def test_lead_wall_clock_preserved(self) -> None:
         from unittest.mock import MagicMock
 
-        from lca.harness.observability.assemble import make_minimal_bound
         from lca.agent.cognitive_agent import CognitiveAgent
         from lca.application.policies import LeadBudgetPolicy
         from lca.application.spawn import promote_lead
+        from lca.harness.observability.assemble import make_minimal_bound
 
         runtime = MagicMock()
         role_profile = MagicMock()
@@ -160,9 +160,9 @@ class TestAdrIndexMatchesFilesystem(unittest.TestCase):
 
 class TestProgressiveDisclosureVocabulary(unittest.TestCase):
     def test_agent_state_uses_team_awareness_not_progress_text(self) -> None:
+        from lca.cognition.member_status import InMemoryMemberStatus
         from lca.contracts.models.core.state import AgentState, Budget
         from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
-        from lca.cognition.member_status import InMemoryMemberStatus
 
         board = InMemoryMemberStatus(role_order=("a",))
         state = AgentState(
@@ -194,11 +194,11 @@ class TestProgressiveDisclosureVocabulary(unittest.TestCase):
     def test_must_consult_all_rewrites_early_respond(self) -> None:
         import asyncio
 
+        from lca.cognition.brain.decision_gates import MustConsultAllMembers
+        from lca.cognition.member_status import InMemoryMemberStatus
         from lca.contracts.models.core.decision import Decision
         from lca.contracts.models.core.state import AgentState, Budget
         from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
-        from lca.cognition.brain.decision_gates import MustConsultAllMembers
-        from lca.cognition.member_status import InMemoryMemberStatus
 
         board = InMemoryMemberStatus(role_order=("analyst",))
         state = AgentState(

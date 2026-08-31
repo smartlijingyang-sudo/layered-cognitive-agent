@@ -8,13 +8,13 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
-from lca.contracts.observability.event_descriptor_registry import EventDescriptorRegistry
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
+from lca.contracts.observability.event_descriptor_registry import EventDescriptorRegistry
 from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -30,21 +30,21 @@ class Config(BaseModel):
     description="Bootstrap 49 builtin EventDescriptor into the registry.",
     test_suite="tests/test_event_descriptor_registry.py::test_bootstrap_registers_builtin_descriptors",
     kind=PluginKind.PROVIDER,
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G10_COMPOSITION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('lca-event-descriptor-bootstrap.checked', 'lca-event-descriptor-bootstrap.served'),
+        authority=("plugin.serve",),
+        evidence=(
+            "lca-event-descriptor-bootstrap.checked",
+            "lca-event-descriptor-bootstrap.served",
+        ),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('plugin.serve',),
-        emits=('plugin.served',),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

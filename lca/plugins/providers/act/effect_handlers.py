@@ -12,6 +12,9 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
 from lca.contracts.models.core.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols.act.effect_handler import (
@@ -19,16 +22,13 @@ from lca.contracts.protocols.act.effect_handler import (
     EffectHandler,
     EffectHandlerRegistry,
 )
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     CommandEnvelope,
     EffectPolicyPlan,
 )
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.handler_registry import UniqueOperationRegistry
 
 
@@ -127,21 +127,18 @@ def register_default_effect_handlers(registry: EffectHandlerRegistry) -> None:
     kind=PluginKind.PROVIDER,
     description="Register the standard body and memory EffectHandler implementations.",
     test_suite="tests/test_plugin_alignment.py::test_tier2_plugin_shape",
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G10_COMPOSITION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('lca-effect-handler-provider.checked', 'lca-effect-handler-provider.served'),
+        authority=("plugin.serve",),
+        evidence=("lca-effect-handler-provider.checked", "lca-effect-handler-provider.served"),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('plugin.serve',),
-        emits=('plugin.served',),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

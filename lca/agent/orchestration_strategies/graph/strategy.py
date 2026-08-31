@@ -21,6 +21,14 @@ import asyncio
 from collections import deque
 from dataclasses import dataclass, field
 
+from lca.agent.orchestration_strategies.graph._finalize import (
+    finalize_graph_result,
+)
+from lca.agent.orchestration_strategies.graph.topology import (
+    cascade_skip,
+    compute_in_degree,
+    resolve_successor,
+)
 from lca.contracts.models.core.budget import create_budget
 from lca.contracts.models.core.result import Result
 from lca.contracts.models.core.state import AgentState
@@ -32,14 +40,6 @@ from lca.contracts.protocols import (
     Synthesizer,
     TeamStage,
     TeamStrategy,
-)
-from lca.agent.orchestration_strategies.graph._finalize import (
-    finalize_graph_result,
-)
-from lca.agent.orchestration_strategies.graph.topology import (
-    cascade_skip,
-    compute_in_degree,
-    resolve_successor,
 )
 
 

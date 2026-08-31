@@ -11,7 +11,10 @@ from lca.harness.plugin_manifest import EffectClass, PluginKind
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
-    from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseContribution, PluginSpec
+    from lca.contracts.protocols.declarative.declarative_phase_graph import (
+        PhaseContribution,
+        PluginSpec,
+    )
     from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 
 

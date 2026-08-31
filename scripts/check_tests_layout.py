@@ -11,6 +11,7 @@ Usage::
 
     python scripts/check_tests_layout.py [--tests PATH] [--src PATH]
 """
+
 from __future__ import annotations
 
 import argparse
@@ -20,11 +21,21 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SKIP_DIRS = {"__pycache__", ".git", ".venv", "node_modules", "scripts"}
 ALLOWED_TOP_LEVEL = {
-    "plugins", "e2e", "conftest.py", "test_*.py",
+    "plugins",
+    "e2e",
+    "conftest.py",
+    "test_*.py",
     # Phase-D allow-list: cross-cutting test surfaces whose fixture
     # data / scenarios don't belong under one production package.
-    "golden", "golden_traces", "scenarios", "support", "tools",
-    "journal", "observability", "plan", "simulation_env",
+    "golden",
+    "golden_traces",
+    "scenarios",
+    "support",
+    "tools",
+    "journal",
+    "observability",
+    "plan",
+    "simulation_env",
 }
 
 
@@ -52,9 +63,7 @@ def main(argv: list[str] | None = None) -> int:
         if td in ALLOWED_TOP_LEVEL or td.startswith("test_"):
             continue
         if td not in src_pkgs:
-            violations.append(
-                f"tests/{td}: no matching lca/{td}/ package"
-            )
+            violations.append(f"tests/{td}: no matching lca/{td}/ package")
 
     if not violations:
         print("tests-layout: every tests/<dir>/ mirrors an lca/<dir>/ package.")

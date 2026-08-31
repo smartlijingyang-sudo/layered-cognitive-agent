@@ -6,17 +6,17 @@ ADR-0049：短路与强制改写均挂载 DelegationBudget（timeout_s），
 
 from __future__ import annotations
 
-from lca.contracts.atoms.enums import ActionType
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.models.core.decision import Decision, DelegationSpec
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.protocols import DecisionGate
 from lca.cognition.member_status.consult_policy import (
     ConsultNextAction,
     compute_required_action_from_duty,
 )
 from lca.cognition.member_status.required_action import compute_required_action
 from lca.cognition.member_status.tracking import duty_board, duty_consult
+from lca.contracts.atoms.enums import ActionType
+from lca.contracts.atoms.ids import new_id
+from lca.contracts.models.core.decision import Decision, DelegationSpec
+from lca.contracts.models.core.state import AgentState
+from lca.contracts.protocols import DecisionGate
 
 _CONSULT_SUBTASK_TEMPLATE = "请从 {role} 的视角，针对以下任务提供你的专业意见：{task}"
 _RATIONALE_SHORTCUT_SINGLE = "[框架短路] 唯一待咨询角色已确定，跳过本轮 LLM 调用"

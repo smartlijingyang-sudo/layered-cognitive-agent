@@ -9,6 +9,10 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ContributionRole,
     PhaseContext,
@@ -17,12 +21,8 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     PhaseResult,
     SemanticPhase,
 )
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 
 
 class ObserveWildcardExecutor:
@@ -62,10 +62,9 @@ class Config(BaseModel):
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('control.observe.wildcard',),
-        emits=('control.observe.wildcard.checked',),
+        reads=("control.observe.wildcard",),
+        emits=("control.observe.wildcard.checked",),
         state_mutation="forbidden",
     ),
 )

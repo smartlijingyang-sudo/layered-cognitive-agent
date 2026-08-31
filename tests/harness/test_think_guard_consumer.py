@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 import pytest
 
+from lca.cognition.brain.modular_brain import ModularBrain
 from lca.contracts.models.core.budget import create_budget
 from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.state import AgentState
@@ -23,9 +24,8 @@ from lca.contracts.protocols import (
     Reducer,
     SkillRouter,
 )
-from lca.cognition.brain.modular_brain import ModularBrain
-from lca.runtime.reducer import DefaultReducer
 from lca.plugins.providers.gate.decision_classifier import DefaultDecisionClassifier
+from lca.runtime.reducer import DefaultReducer
 
 # ── Test doubles ─────────────────────────────────────────────────────
 

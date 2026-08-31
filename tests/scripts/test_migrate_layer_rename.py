@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import subprocess
 import sys
 from pathlib import Path
-
-import pytest
 
 ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -52,6 +49,7 @@ def test_find_references_finds_real_imports():
 def test_replace_imports_signature_has_dry_run():
     """Check the function signature for the dry_run parameter."""
     import inspect
+
     sig = inspect.signature(replace_imports)
     assert "dry_run" in sig.parameters
 
@@ -59,5 +57,6 @@ def test_replace_imports_signature_has_dry_run():
 def test_run_git_mv_signature():
     """Check the function signature for the dry_run parameter."""
     import inspect
+
     sig = inspect.signature(run_git_mv)
     assert "dry_run" in sig.parameters

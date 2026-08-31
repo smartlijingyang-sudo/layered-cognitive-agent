@@ -4,6 +4,12 @@ from __future__ import annotations
 
 import pytest
 
+from lca.cognition.brain.decision_gates.artifact_respond_injector import (
+    ArtifactRespondInjector,
+)
+from lca.cognition.brain.decision_gates.office_works_sealer import OfficeWorksSealer
+from lca.cognition.brain.decision_gates.terminal_respond import TerminalRespondGate
+from lca.cognition.brain.decision_gates.tool_loop_breaker import ToolLoopBreakerGate
 from lca.contracts.models.core.budget import TOOL_LOOP_BREAK_THRESHOLD
 from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
 from lca.contracts.models.core.state import AgentState, Budget
@@ -15,12 +21,6 @@ from lca.infrastructure.workspace.artifact_ledger import (
     rewrite_artifact_markdown,
 )
 from lca.infrastructure.workspace.scope import effective_agent_wall_clock, run_workspace_scope
-from lca.cognition.brain.decision_gates.artifact_respond_injector import (
-    ArtifactRespondInjector,
-)
-from lca.cognition.brain.decision_gates.office_works_sealer import OfficeWorksSealer
-from lca.cognition.brain.decision_gates.terminal_respond import TerminalRespondGate
-from lca.cognition.brain.decision_gates.tool_loop_breaker import ToolLoopBreakerGate
 from lca.plugins.providers.journal.artifact_closure import DefaultArtifactClosure
 
 
@@ -312,8 +312,8 @@ class TestArtifactClosure:
 @pytest.mark.asyncio
 class TestArtifactRespondInjector:
     async def test_rewrites_relative_images_and_appends_links(self) -> None:
-        from lca.contracts.models.core.perceive_state import PerceiveState
         from lca.cognition.brain.context_manifest import build_manifest_from_items
+        from lca.contracts.models.core.perceive_state import PerceiveState
 
         gate = ArtifactRespondInjector()
         with run_workspace_scope("run_inj", wall_clock_seconds=60) as workspace:
@@ -364,8 +364,8 @@ class TestArtifactRespondInjector:
         assert "[📥 01_绩效总分排名.png](/files/file_aaa)" in text
 
     async def test_keeps_ledger_urls_and_drops_unknown_ones(self) -> None:
-        from lca.contracts.models.core.perceive_state import PerceiveState
         from lca.cognition.brain.context_manifest import build_manifest_from_items
+        from lca.contracts.models.core.perceive_state import PerceiveState
 
         gate = ArtifactRespondInjector()
         with run_workspace_scope("run_inj2", wall_clock_seconds=60) as workspace:

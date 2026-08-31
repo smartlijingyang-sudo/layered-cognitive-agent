@@ -50,9 +50,7 @@ COMPOSER_PATHS = (
     COMPOSER_DIRECTORY / "collaboration" / "team_composer.py",
 )
 TEAM_TRANSPORT_PATH = COMPOSER_DIRECTORY / "collaboration" / "team_transport.py"
-GRAPH_STRATEGY_PATH = (
-    REPO / "lca" / "agent" / "orchestration_strategies" / "graph" / "strategy.py"
-)
+GRAPH_STRATEGY_PATH = REPO / "lca" / "agent" / "orchestration_strategies" / "graph" / "strategy.py"
 GATEWAY_MODE_PATH = REPO / "gateway" / "modes.py"
 GATEWAY_LOOP_PATH = REPO / "gateway" / "runs" / "execute/loop_drivers.py"
 

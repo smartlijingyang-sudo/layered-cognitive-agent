@@ -396,19 +396,19 @@ class TestCordisCreatorEndToEndPrompt(unittest.TestCase):
 
     def _render_full_prompt(self) -> str:
         """Compose the exact prompt the cordis-creator agent sees at step 0."""
-        from lca.contracts.atoms.ids import new_id
-        from lca.contracts.models.core.budget import Budget
-        from lca.contracts.models.core.state import AgentState
+        from lca.application.spawn import (
+            _format_tools_xml,
+            _render_available_skills,
+        )
         from lca.cognition.brain.prompts._loader import load_builtin_prompt
         from lca.cognition.brain.reasoner import (
             _context_lines,
             _role_prompt_vars,
         )
         from lca.cognition.sensors.skill_catalog import SkillCatalogSensor
-        from lca.application.spawn import (
-            _format_tools_xml,
-            _render_available_skills,
-        )
+        from lca.contracts.atoms.ids import new_id
+        from lca.contracts.models.core.budget import Budget
+        from lca.contracts.models.core.state import AgentState
         from lca.plugins.roles.cordis_creator import build_cordis_creator_role_profile
 
         profile = build_cordis_creator_role_profile()

@@ -6,12 +6,12 @@ import unittest
 from collections.abc import AsyncIterator
 from typing import Any
 
+from lca.cognition.brain.llm_turn import execute_llm_turn
 from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent, NativeToolCall
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.infrastructure.search.constants import WEB_SEARCH_TOOL
-from lca.cognition.brain.llm_turn import execute_llm_turn
 from lca.plugins.providers.gate.decision_classifier import DefaultDecisionClassifier
 
 

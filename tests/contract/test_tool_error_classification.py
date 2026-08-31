@@ -9,13 +9,13 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
 
+from lca.cognition.body.safe_executor import SimpleSafeExecutor
+from lca.cognition.brain.critic import SimpleCritic
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.result import ToolExecutionError, ToolInputError
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.infrastructure.tools.calculator import build_tools as build_calculator_tools
-from lca.cognition.body.safe_executor import SimpleSafeExecutor
-from lca.cognition.brain.critic import SimpleCritic
 
 # ---------------------------------------------------------------------------
 # 1. 错误分类协议本身

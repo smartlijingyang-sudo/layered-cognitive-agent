@@ -94,7 +94,9 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/contracts/models/observability/journal.py": (
         "Journal 叙事词表单文件（ADR-0037）；ToolInvoked.plugin_state UI 一等字段（ADR-0053）"
     ),
-    "lca/infrastructure/skills/marketplace.py": ("Skill marketplace 单模块承载发现/加载/注册全链路"),
+    "lca/infrastructure/skills/marketplace.py": (
+        "Skill marketplace 单模块承载发现/加载/注册全链路"
+    ),
     "lca/application/casting.py": ("Team casting 单模块承载角色映射与团队组装"),
     "lca/infrastructure/sandbox/runtime.py": (
         "Sandbox Protocol 单模块承载 session/ready/exec 全链路（ADR-0043~0047）"
@@ -123,9 +125,7 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/harness/declarative/execute/outcome_projection.py": (
         "ADR-0075 outcome projection 中心化（plan_ref × Journal 绑定）"
     ),
-    "lca/harness/declarative/compile/phase_governance.py": (
-        "ADR-0075 phase governance 中心化"
-    ),
+    "lca/harness/declarative/compile/phase_governance.py": ("ADR-0075 phase governance 中心化"),
     "lca/infrastructure/observability/event_doc.py": (
         "Observability event_doc 词表 — ADR-0065 L1~L9 不变量清单"
     ),
@@ -205,7 +205,9 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca.infrastructure.cli/services/lobehub.py": (
         "LobeHub deploy service 单模块承载 dev/prod/restart/logs/upgrade"
     ),
-    "lca.infrastructure.cli/services/daemon.py": ("Daemon 单模块承载 process 管理 + uptime + health"),
+    "lca.infrastructure.cli/services/daemon.py": (
+        "Daemon 单模块承载 process 管理 + uptime + health"
+    ),
     "lca/infrastructure/openai_compat.py": (
         "OpenAI compat 单模块承载 chat / completion / embedding 适配"
     ),

@@ -14,6 +14,7 @@ def __getattr__(name: str):
             RunLifecycleCoordinator,
             ensure_session_hub,
         )
+
         # Bind onto the module so subsequent attribute access is fast.
         globals()["RunLifecycleCoordinator"] = RunLifecycleCoordinator
         globals()["ensure_session_hub"] = ensure_session_hub

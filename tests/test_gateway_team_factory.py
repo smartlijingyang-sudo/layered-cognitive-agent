@@ -12,13 +12,15 @@ from gateway.plugins.default_modes import (
     resolve_team_casting_dependencies,
 )
 from gateway.plugins.solo_mode import filter_solo_tools
-from lca.contracts.capabilities import TEAM_CASTER, TEAM_ROLE_LIBRARY
-from lca.contracts.mechanisms.capability import MissingCapabilityError
-from lca.contracts.models.core.llm import LLMResponse
 from lca.agent.role_library import FileRoleLibrary
 from lca.application.api import Agent, Team
 from lca.application.casting import LLMTeamCaster
-from lca.plugins.seams.collaboration.team_casting_prompt_renderer import BuiltinCastingPromptRenderer
+from lca.contracts.capabilities import TEAM_CASTER, TEAM_ROLE_LIBRARY
+from lca.contracts.mechanisms.capability import MissingCapabilityError
+from lca.contracts.models.core.llm import LLMResponse
+from lca.plugins.seams.collaboration.team_casting_prompt_renderer import (
+    BuiltinCastingPromptRenderer,
+)
 from tests.harness.collector import InMemoryObservability
 from tests.harness.scripted_llm import ScriptedLLMAdapter
 

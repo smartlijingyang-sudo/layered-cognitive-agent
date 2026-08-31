@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -24,21 +24,18 @@ class Config(BaseModel):
     description="Provide RunStore class as ``journal_store``; Composer instantiates per-run.",
     test_suite="tests/test_plugin_alignment.py::test_compose_root_no_inline_instantiation",
     kind=PluginKind.PRIMITIVE,
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G10_COMPOSITION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('lca-journal-store.checked', 'lca-journal-store.served'),
+        authority=("plugin.serve",),
+        evidence=("lca-journal-store.checked", "lca-journal-store.served"),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('journal_store',),
-        emits=('journal_store.checked',),
+        reads=("journal_store",),
+        emits=("journal_store.checked",),
         state_mutation="forbidden",
     ),
 )

@@ -7,9 +7,9 @@ from pathlib import Path
 
 from lca.harness.profile.boot import boot_profile
 from lca.plugins.composer.act.body_composer import BodyComposer
-from lca.plugins.composer.think.brain_composer import BrainComposer
-from lca.plugins.composer.perceive.perceive_composer import PerceiveComposer
 from lca.plugins.composer.collaboration.team_composer import TeamComposer
+from lca.plugins.composer.perceive.perceive_composer import PerceiveComposer
+from lca.plugins.composer.think.brain_composer import BrainComposer
 
 REPO = Path(__file__).resolve().parents[2]
 WEB_APP_BUNDLE_PATH = REPO / "bundles" / "web-app.yaml"

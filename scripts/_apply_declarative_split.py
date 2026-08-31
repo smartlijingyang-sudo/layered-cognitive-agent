@@ -23,6 +23,7 @@ New structure:
                   phase_observation_snapshot, phase_context
   controls/   (3) approval, validation, effect_receipt
 """
+
 import re
 import shutil
 from pathlib import Path
@@ -64,9 +65,7 @@ MOVES: list[tuple[str, str]] = [
 OLD_TO_NEW = {old[:-3]: pkg for old, pkg in MOVES}
 
 
-def _rewrite_with_boundary(
-    text: str, prefix: str, old_mod: str, new_tail: str
-) -> str:
+def _rewrite_with_boundary(text: str, prefix: str, old_mod: str, new_tail: str) -> str:
     """Rewrite module references at module boundaries.
 
     Two forms are supported:
@@ -79,13 +78,9 @@ def _rewrite_with_boundary(
     subpackage (``lca.harness.declarative.<pkg>.X``) is not re-expanded into
     a doubled prefix.
     """
-    dotted_pat = re.compile(
-        rf"{re.escape(prefix)}\.{re.escape(old_mod)}(?![\w.])"
-    )
+    dotted_pat = re.compile(rf"{re.escape(prefix)}\.{re.escape(old_mod)}(?![\w.])")
     text = dotted_pat.sub(f"{prefix}.{new_tail}", text)
-    bare_pat = re.compile(
-        rf"from {re.escape(prefix)} import {re.escape(old_mod)}(?![\w.])"
-    )
+    bare_pat = re.compile(rf"from {re.escape(prefix)} import {re.escape(old_mod)}(?![\w.])")
     return bare_pat.sub(f"from {prefix}.{new_tail} import {old_mod}", text)
 
 
@@ -140,9 +135,7 @@ def main() -> None:
             if old_mod in SELF_NAMED_MODS:
                 continue
             pkg = OLD_TO_NEW[old_mod]
-            new_text = _rewrite_with_boundary(
-                new_text, new_prefix, old_mod, f"{pkg}.{old_mod}"
-            )
+            new_text = _rewrite_with_boundary(new_text, new_prefix, old_mod, f"{pkg}.{old_mod}")
         if new_text != text:
             f.write_text(new_text, encoding="utf-8")
             count += 1
@@ -159,9 +152,7 @@ def main() -> None:
             if old_mod in SELF_NAMED_MODS:
                 continue
             pkg = OLD_TO_NEW[old_mod]
-            new_text = _rewrite_with_boundary(
-                new_text, new_prefix, old_mod, f"{pkg}.{old_mod}"
-            )
+            new_text = _rewrite_with_boundary(new_text, new_prefix, old_mod, f"{pkg}.{old_mod}")
         if new_text != text:
             f.write_text(new_text, encoding="utf-8")
             yaml_count += 1

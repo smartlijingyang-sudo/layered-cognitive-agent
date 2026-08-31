@@ -4,15 +4,15 @@ from collections.abc import Sequence
 
 from pydantic import BaseModel
 
+from lca.cognition.brain.decision_gates.chained import ChainedDecisionGate
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.protocols import DecisionGate
-from lca.contracts.protocols.think.cognition import DecisionGateAssembler
 from lca.contracts.protocols.composition.logic_address import LogicAddress
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.cognition.brain.decision_gates.chained import ChainedDecisionGate
+from lca.contracts.protocols.think.cognition import DecisionGateAssembler
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -44,10 +44,9 @@ class ChainedDecisionGateAssembler(DecisionGateAssembler):
         evidence=("gates.chain.sequential.assembled",),
         revision="v1",
     ),
-
     ownership=OwnershipDeclaration(
-        reads=('plugin.serve',),
-        emits=('plugin.served',),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

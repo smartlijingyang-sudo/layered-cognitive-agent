@@ -18,8 +18,8 @@ from lca.contracts.atoms.scope import Scope
 from lca.contracts.capabilities import TOOL_BATCH_EXECUTION_POLICY
 from lca.contracts.protocols.act.tool_batch_execution import ToolBatchExecutionPolicy
 from lca.contracts.protocols.composition.logic_address import LogicAddress
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -67,10 +67,9 @@ def build_tool_batch_execution_policy(mode: str) -> ToolBatchExecutionPolicy:
         evidence=("tool.batch.execution.planned",),
         revision="v1",
     ),
-
     ownership=OwnershipDeclaration(
-        reads=('plugin.serve',),
-        emits=('plugin.served',),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

@@ -14,13 +14,13 @@ a threshold of consecutive failures), this gate is a warning emitter:
 
 from __future__ import annotations
 
+from lca.cognition.brain.decision_gates.chained import record_gate_decided
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.decision import Decision, Turn
 from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import DecisionGate
-from lca.cognition.brain.decision_gates.chained import record_gate_decided
 
 _THRESHOLD = 3
 _FACT_KIND = "repeat_tool_call"

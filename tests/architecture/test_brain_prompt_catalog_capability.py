@@ -16,8 +16,8 @@ from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.protocols.journal.spec import AgentSpec
 from lca.harness.profile.resolve import resolve_profile
-from lca.plugins.composer.think import brain
 from lca.plugins.composer.composition.prompt_catalog import DefaultBrainPromptCatalogFactory
+from lca.plugins.composer.think import brain
 
 REPO = Path(__file__).resolve().parents[2]
 

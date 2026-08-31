@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from lca.cognition.brain.llm_turn.mode import LlmTurnMode
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.models.core.state import AgentState
 from lca.infrastructure.search.constants import WEB_SEARCH_TOOL
 from lca.infrastructure.search.router import resolve_llm_search_kwargs
-from lca.cognition.brain.llm_turn.mode import LlmTurnMode
 
 _POST_SEARCH_TOOL_CHOICE = "none"
 

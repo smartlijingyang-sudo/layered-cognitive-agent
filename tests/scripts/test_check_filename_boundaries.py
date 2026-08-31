@@ -5,8 +5,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import pytest
-
 ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
@@ -31,7 +29,10 @@ def test_package_for_path_one_level():
 
 
 def test_package_for_path_two_levels():
-    assert package_for_path("lca/agent/orchestration_strategies/swarm.py") in ("lca.agent.orchestration_strategies", "lca.agent")
+    assert package_for_path("lca/agent/orchestration_strategies/swarm.py") in (
+        "lca.agent.orchestration_strategies",
+        "lca.agent",
+    )
 
 
 def test_package_for_path_outside_lca():

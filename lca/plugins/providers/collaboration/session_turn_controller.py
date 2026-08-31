@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.contracts.protocols.session.session_turn import SessionTurnControllerFactory
-from lca.harness.agent.turn_controller import InProcessSessionTurnController
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.session.session_turn import SessionTurnControllerFactory
+from lca.harness.agent.turn_controller import InProcessSessionTurnController
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -39,21 +39,21 @@ class InProcessSessionTurnControllerFactory(SessionTurnControllerFactory):
         "Provide isolated session-turn task ownership so a Profile may replace "
         "cancellation and serialization behavior without changing a loop or carrier."
     ),
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G10_COMPOSITION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('lca-session-turn-controller-factory.checked', 'lca-session-turn-controller-factory.served'),
+        authority=("plugin.serve",),
+        evidence=(
+            "lca-session-turn-controller-factory.checked",
+            "lca-session-turn-controller-factory.served",
+        ),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('session_turn_controller_factory',),
-        emits=('session_turn_controller_factory.checked',),
+        reads=("session_turn_controller_factory",),
+        emits=("session_turn_controller_factory.checked",),
         state_mutation="forbidden",
     ),
 )

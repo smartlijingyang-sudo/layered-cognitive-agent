@@ -35,18 +35,18 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
 from lca.contracts.capabilities import RUN_MODE_REGISTRY
+from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.session.run_mode import (
     ModeAdapter,
     RegisteredMode,
     RunModeRegistryProtocol,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class Config(BaseModel):
@@ -137,21 +137,18 @@ class RunModeRegistry(RunModeRegistryProtocol):
     description="Provide the run_mode_registry capability for ADR-0076 §六.",
     test_suite="tests/architecture/test_run_mode_registry.py::test_seam_provides_empty_registry",
     kind=PluginKind.SEAM,
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G10_COMPOSITION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('lca-run-mode-registry-seam.checked', 'lca-run-mode-registry-seam.served'),
+        authority=("plugin.serve",),
+        evidence=("lca-run-mode-registry-seam.checked", "lca-run-mode-registry-seam.served"),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('plugin.serve',),
-        emits=('plugin.served',),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

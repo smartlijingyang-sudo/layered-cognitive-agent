@@ -15,13 +15,13 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
-from lca.contracts.observability.trace_tool import TraceTool
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
+from lca.contracts.observability.trace_tool import TraceTool
 from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -37,21 +37,18 @@ class Config(BaseModel):
     description="Register 5 TraceInspector tools (PR-9).",
     test_suite="tests/test_trace_tool.py::test_provider_registers_all_tools",
     kind=PluginKind.PROVIDER,
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G10_COMPOSITION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('lca-trace-tool-provider.checked', 'lca-trace-tool-provider.served'),
+        authority=("plugin.serve",),
+        evidence=("lca-trace-tool-provider.checked", "lca-trace-tool-provider.served"),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('plugin.serve',),
-        emits=('plugin.served',),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

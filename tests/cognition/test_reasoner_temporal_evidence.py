@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+from lca.cognition.brain.reasoner import _context_lines
 from lca.contracts.atoms.enums import MemoryLayer
 from lca.contracts.models.core.memory import MemoryRecord, MemoryTrust
 from lca.contracts.models.core.state import AgentState, Budget
-from lca.cognition.brain.reasoner import _context_lines
 
 
 def test_untrusted_historical_memory_has_a_dedicated_non_instruction_framing() -> None:

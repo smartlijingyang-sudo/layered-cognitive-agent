@@ -18,12 +18,12 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ContributionRole,
     PhaseContribution,
     SemanticPhase,
 )
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.harness.plugin_api import (
     PluginContext,
     PluginKind,

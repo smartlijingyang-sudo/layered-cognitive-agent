@@ -9,6 +9,10 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     CapabilityDeclaration,
     EvidenceDeclaration,
@@ -20,12 +24,8 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     PluginSpecKind,
     VerificationDeclaration,
 )
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 
 
 class PhaseNodeConfig(BaseModel):
@@ -93,21 +93,18 @@ SPEC = PluginSpec(
     effects=EffectClass.NONE,
     test_suite="tests/declarative/test_phase_graph.py",
     spec=SPEC,
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G7_EXECUTION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('phase_topology_standard.checked', 'phase_topology_standard.served'),
+        authority=("plugin.serve",),
+        evidence=("phase_topology_standard.checked", "phase_topology_standard.served"),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('plugin.serve',),
-        emits=('plugin.served',),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

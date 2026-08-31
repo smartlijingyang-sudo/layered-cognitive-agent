@@ -9,13 +9,13 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from lca.contracts.observability.ports import TracerBackend
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
+from lca.contracts.observability.ports import TracerBackend
 from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -31,21 +31,18 @@ class Config(BaseModel):
     description="Register OtelTracer factory as tracer_backends['otel'].",
     test_suite="tests/test_tracer_plugin.py::test_provider_registers_otel_tracer",
     kind=PluginKind.PROVIDER,
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G10_COMPOSITION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('lca-tracer-otel-factory.checked', 'lca-tracer-otel-factory.served'),
+        authority=("plugin.serve",),
+        evidence=("lca-tracer-otel-factory.checked", "lca-tracer-otel-factory.served"),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('plugin.serve',),
-        emits=('plugin.served',),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

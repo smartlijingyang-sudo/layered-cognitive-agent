@@ -12,14 +12,14 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from lca.contracts.capabilities import MEMORY_RETRIEVAL_POLICY
-from lca.contracts.protocols import RetrievalPolicy
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
+from lca.contracts.capabilities import MEMORY_RETRIEVAL_POLICY
+from lca.contracts.protocols import RetrievalPolicy
 from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -44,21 +44,18 @@ class Config(BaseModel):
     ),
     test_suite="tests/test_memory_policy.py",
     kind=PluginKind.PRIMITIVE,
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G3_FACTS,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('memory.read',),
-        evidence=('lca-memory-tree-cache.checked', 'lca-memory-tree-cache.served'),
+        authority=("memory.read",),
+        evidence=("lca-memory-tree-cache.checked", "lca-memory-tree-cache.served"),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('memory.read', 'memory.tree_cache'),
-        emits=('memory.tree_cache.checked',),
+        reads=("memory.read", "memory.tree_cache"),
+        emits=("memory.tree_cache.checked",),
         state_mutation="forbidden",
     ),
 )

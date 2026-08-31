@@ -233,6 +233,3 @@ class LocalFileStore:
         if len(text) > max_chars:
             return text[:max_chars] + "…"
         return text
-
-
-

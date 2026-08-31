@@ -7,11 +7,11 @@ import pytest
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.core.stop import StopDecision, StopReason
-from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseResult
-from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
+from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.harness.declarative.compile.phase_governance import interpret_control_verdict
 from lca.harness.declarative.graph.traversal import PhaseTraversal
+from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
 
 
 @pytest.mark.parametrize(
@@ -216,8 +216,8 @@ async def test_phase_governance_keeps_rewrite_nonblocking_and_stops_explicitly(
     )
     from lca.harness.declarative.compile.assembler import ExecutableContribution, ExecutableNode
     from lca.harness.declarative.compile.phase_capabilities import MappingPhaseCapabilities
-    from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
     from lca.harness.declarative.compile.phase_governance import PhaseGovernance
+    from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
 
     journal = _Journal()
     state = AgentState(trace_id="trace:test", task="test", budget=Budget())
@@ -299,8 +299,8 @@ async def test_phase_governance_uses_semantic_phase_when_node_name_is_custom() -
     )
     from lca.harness.declarative.compile.assembler import ExecutableContribution, ExecutableNode
     from lca.harness.declarative.compile.phase_capabilities import MappingPhaseCapabilities
-    from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
     from lca.harness.declarative.compile.phase_governance import PhaseGovernance
+    from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
 
     journal = _Journal()
     state = AgentState(trace_id="trace:test", task="test", budget=Budget())

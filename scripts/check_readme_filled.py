@@ -10,6 +10,7 @@ Usage::
 
     python scripts/check_readme_filled.py [--root PATH]
 """
+
 from __future__ import annotations
 
 import argparse
@@ -20,9 +21,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 PLACEHOLDER_PATTERNS = (
-    r"\{\{[a-z_]+\}\}",                # {{placeholder}}
-    r"lca\.[a-z_]+: .* 由脚手架生成",    # "X: 由脚手架生成，待包负责人补充具体细节。"
-    r"^（无显式 __all__）",            # empty __all__ placeholder
+    r"\{\{[a-z_]+\}\}",  # {{placeholder}}
+    r"lca\.[a-z_]+: .* 由脚手架生成",  # "X: 由脚手架生成，待包负责人补充具体细节。"
+    r"^（无显式 __all__）",  # empty __all__ placeholder
 )
 PLACEHOLDER_RE = [re.compile(p) for p in PLACEHOLDER_PATTERNS]
 

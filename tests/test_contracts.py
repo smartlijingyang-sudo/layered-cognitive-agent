@@ -102,8 +102,8 @@ class TestLLMStreamEventContract(unittest.TestCase):
 
 class TestEndToEnd(unittest.TestCase):
     def test_single_agent_qa(self):
-        from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
         from lca.application.api import Agent
+        from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
 
         agent = Agent(
             role="测试助手",

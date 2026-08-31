@@ -171,12 +171,12 @@ __all__ = ["IDENTIFIER", "MANIFEST", "FileWriteTool", "build_file_write_tool"]
 
 from pydantic import BaseModel, ConfigDict  # noqa: E402
 
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin  # noqa: E402
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin  # noqa: E402
 
 
 class Config(BaseModel):
@@ -193,21 +193,18 @@ class Config(BaseModel):
     description="file_write Tool — Creator §13.3 file/shell primitive",
     test_suite="tests/test_cordis_creator_real_scenario.py",
     kind=PluginKind.PRIMITIVE,
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G7_EXECUTION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.TURN,
-        authority=('tool.invoke',),
-        evidence=('lca-tool-file-write.checked', 'lca-tool-file-write.served'),
+        authority=("tool.invoke",),
+        evidence=("lca-tool-file-write.checked", "lca-tool-file-write.served"),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('tool.invoke', 'tools.file_write'),
-        emits=('tools.file_write.checked',),
+        reads=("tool.invoke", "tools.file_write"),
+        emits=("tools.file_write.checked",),
         state_mutation="forbidden",
     ),
 )

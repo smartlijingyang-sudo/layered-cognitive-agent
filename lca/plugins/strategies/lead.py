@@ -6,23 +6,23 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
 from lca.contracts.capabilities import STRATEGIES
 from lca.contracts.models.team.team_coordination import STRATEGY_KEY_LEAD, LeadMandate
 from lca.contracts.protocols import TeamAssembly
+from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.journal.spec import LeadSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 _DUTY_MANDATES: frozenset[LeadMandate] = frozenset({LeadMandate.CONSULT, LeadMandate.BOARD})
 
 
 def build_lead_strategy(assembly: TeamAssembly) -> Any:
-    from lca.cognition.member_status import InMemoryMemberStatus
     from lca.agent.orchestration_strategies import LeadStrategy
+    from lca.cognition.member_status import InMemoryMemberStatus
 
     governance = assembly.governance
     if not isinstance(governance, LeadSpec) or assembly.lead is None:
@@ -56,21 +56,18 @@ class Config(BaseModel):
     functional_group=FunctionalGroup.G8_COLLAB,
     description="Register lead TeamStrategy factory.",
     test_suite="tests/test_orchestration_coverage.py",
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G7_EXECUTION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('strategy_lead.checked', 'strategy_lead.served'),
+        authority=("plugin.serve",),
+        evidence=("strategy_lead.checked", "strategy_lead.served"),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('plugin.serve',),
-        emits=('plugin.served',),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

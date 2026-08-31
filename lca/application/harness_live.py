@@ -4,6 +4,13 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from typing import TypeVar
 
+from lca.application.api import Agent
+from lca.application.followup_dispatch import FollowupTurnDispatcher
+from lca.application.live_session_state import (
+    resume_point_from_result,
+    status_from_task,
+    turn_end_reason,
+)
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.harness.collaboration.agent import (
     ApprovalResumePoint,
@@ -20,7 +27,10 @@ from lca.contracts.harness.memory.events import (
     TurnEnded,
     TurnStarted,
 )
-from lca.contracts.protocols.session.session_turn import SessionFollowupPolicy, SessionTurnController
+from lca.contracts.protocols.session.session_turn import (
+    SessionFollowupPolicy,
+    SessionTurnController,
+)
 from lca.harness.agent.followup_policy import EnqueueFollowupPolicy
 from lca.harness.session.inbox import Inbox
 from lca.harness.session.resume_point import (
@@ -28,13 +38,6 @@ from lca.harness.session.resume_point import (
     serialize_resume_point,
 )
 from lca.harness.session.store import SessionStore
-from lca.application.api import Agent
-from lca.application.followup_dispatch import FollowupTurnDispatcher
-from lca.application.live_session_state import (
-    resume_point_from_result,
-    status_from_task,
-    turn_end_reason,
-)
 
 ResultT = TypeVar("ResultT")
 
@@ -193,7 +196,6 @@ class CognitiveLiveAgent:
 
     async def _record_result(self, message_id: str, result: object) -> MessageReceipt:
         status = getattr(result, "status", None)
-
 
         live_status = status_from_task(status)
         pending = (

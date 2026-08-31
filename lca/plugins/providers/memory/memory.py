@@ -6,18 +6,18 @@ from functools import partial
 
 from pydantic import BaseModel, Field
 
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
 from lca.contracts.capabilities import (
     MEMORY_COMPACTION_POLICY,
     MEMORY_RETRIEVAL_POLICY,
     MEMORY_WRITE_POLICY,
 )
 from lca.contracts.protocols import MemorySystem
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
 from lca.contracts.protocols.composition.logic_address import LogicAddress
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -44,21 +44,18 @@ class Config(BaseModel):
     description="Register simple and optional temporal MemorySystem providers on the Memory service.",
     test_suite="tests/test_plugin_tree_single_owner.py",
     kind=PluginKind.PROVIDER,
-
-
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G10_COMPOSITION,
         control_slot=ControlSlot.OBSERVE_WILDCARD,
         scope=Scope.RUN,
-        authority=('plugin.serve',),
-        evidence=('lca-memory-provider.checked', 'lca-memory-provider.served'),
+        authority=("plugin.serve",),
+        evidence=("lca-memory-provider.checked", "lca-memory-provider.served"),
         revision="v1",
     ),
     relations=(),
-
     ownership=OwnershipDeclaration(
-        reads=('plugin.serve',),
-        emits=('plugin.served',),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

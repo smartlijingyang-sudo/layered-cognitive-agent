@@ -9,15 +9,15 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from lca.agent.cognitive_agent import CognitiveAgent
+from lca.application.policies import LeadBudgetPolicy
+from lca.application.spawn import promote_lead
 from lca.contracts.models.core.budget import (
     DEFAULT_MAX_STEPS,
     DEFAULT_MAX_WALL_CLOCK_SECONDS,
     LEAD_MIN_MAX_STEPS,
 )
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
-from lca.agent.cognitive_agent import CognitiveAgent
-from lca.application.policies import LeadBudgetPolicy
-from lca.application.spawn import promote_lead
 
 _policy = LeadBudgetPolicy()
 
@@ -122,10 +122,10 @@ class TestNoPersistencePath:
     """
 
     def test_memory_record_is_in_memory_only(self) -> None:
-        from lca.contracts.atoms.enums import MemoryLayer
-        from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
         from lca.cognition.memory.simple_memory import SimpleMemorySystem
         from lca.cognition.memory.team_shared_memory import TeamSharedMemoryStore
+        from lca.contracts.atoms.enums import MemoryLayer
+        from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
 
         # SimpleMemorySystem uses plain Python lists
         mem = SimpleMemorySystem()

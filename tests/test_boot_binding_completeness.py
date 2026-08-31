@@ -236,9 +236,7 @@ def test_missing_binding_error_exposes_diagnostic_fields() -> None:
     assert error.capability == "effect_handler_registry"
     assert error.fallback_policy is FallbackPolicy.PRODUCTION
     assert error.provider_hint == "lca.plugins.seams.act.effect_handler"
-    assert error.additional == (
-        ("reducer", FallbackPolicy.PRODUCTION, "lca.runtime.reducer"),
-    )
+    assert error.additional == (("reducer", FallbackPolicy.PRODUCTION, "lca.runtime.reducer"),)
 
 
 def test_fallback_policy_test_default_relaxes_validator(tmp_path: Path) -> None:

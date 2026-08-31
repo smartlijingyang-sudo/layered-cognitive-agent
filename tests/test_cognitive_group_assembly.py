@@ -4,12 +4,12 @@ from dataclasses import dataclass
 
 import pytest
 
+from lca.cognition.gate_service import GateService
+from lca.cognition.perceive_service import PerceiveService
 from lca.contracts.mechanisms.capability import MissingCapabilityError
 from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.perception import ContextManifest
 from lca.contracts.protocols.think.cognition import DecisionGateAssembler, PerceiveHubAssembler
-from lca.cognition.gate_service import GateService
-from lca.cognition.perceive_service import PerceiveService
 
 
 @dataclass
@@ -140,9 +140,7 @@ class TestCognitiveGroupPluginWiring:
         from pathlib import Path
 
         root = Path(__file__).resolve().parent.parent
-        perceive_source = (root / "lca/cognition/perceive_service.py").read_text(
-            encoding="utf-8"
-        )
+        perceive_source = (root / "lca/cognition/perceive_service.py").read_text(encoding="utf-8")
         gate_source = (root / "lca/cognition/gate_service.py").read_text(encoding="utf-8")
 
         assert "SequentialPerceiveHub" not in perceive_source

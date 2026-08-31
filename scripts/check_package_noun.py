@@ -16,6 +16,7 @@ Usage::
 
     python scripts/check_package_noun.py [--root PATH]
 """
+
 from __future__ import annotations
 
 import argparse

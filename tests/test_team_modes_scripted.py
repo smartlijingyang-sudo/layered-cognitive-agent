@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import pytest
 
+from lca.application.api import Agent, Team, TeamLead, ensure_default_ctx
 from lca.contracts.atoms.telemetry import SpanName
 from lca.contracts.models.team.team_coordination import (
     STRATEGY_KEY_DEBATE,
@@ -23,7 +24,6 @@ from lca.contracts.models.team.team_coordination import (
     PeerSwarm,
     Pipeline,
 )
-from lca.application.api import Agent, Team, TeamLead, ensure_default_ctx
 from tests.harness.collector import InMemoryObservability
 from tests.harness.modes import ALL_MODES, scripted_llm_for_mode
 from tests.harness.report import format_case_digest

@@ -14,18 +14,16 @@ from pathlib import Path
 
 import pytest
 
+from lca.cognition.body.tool_batch_execution import SafeToolBatchExecutionPolicy
 from lca.contracts.protocols.act.action_handler import ActionHandlerRegistry
 from lca.contracts.protocols.act.command_envelope import CapabilityGrant, CommandEnvelope
+from lca.contracts.protocols.act.effect_handler import EffectHandler, EffectHandlerRegistry
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeValidationError,
     EffectPolicyPlan,
 )
 from lca.contracts.protocols.state.delta_handler import DeltaHandler, DeltaHandlerRegistry
-from lca.contracts.protocols.act.effect_handler import EffectHandler, EffectHandlerRegistry
 from lca.harness.declarative.execute.dispatch import RegistryEffectGateway
-from lca.cognition.body.tool_batch_execution import SafeToolBatchExecutionPolicy
-from lca.runtime.declarative_runtime import RuntimePhaseCapabilities
-from lca.runtime.idempotency_fixtures import InMemoryFixtureIdempotencyStore
 from lca.plugins.providers.act.action_handlers import (
     DefaultActionHandlerRegistry,
     InMemoryActionHandlerRegistry,
@@ -39,6 +37,8 @@ from lca.plugins.providers.act.delta_handlers import (
 from lca.plugins.providers.act.effect_handlers import (
     InMemoryEffectHandlerRegistry,
 )
+from lca.runtime.declarative_runtime import RuntimePhaseCapabilities
+from lca.runtime.idempotency_fixtures import InMemoryFixtureIdempotencyStore
 
 REPO = Path(__file__).resolve().parents[2]
 

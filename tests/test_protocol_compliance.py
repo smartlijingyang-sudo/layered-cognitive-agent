@@ -57,8 +57,8 @@ from lca.plugins.composer.runtime.runtime_factory import (
     build_fixture_cognitive_runtime,
 )
 from lca.plugins.phase_graph.stop_policy import DefaultStopPolicy
-from lca.plugins.providers.journal.artifact_closure import DefaultArtifactClosure
 from lca.plugins.providers.gate.decision_classifier import DefaultDecisionClassifier
+from lca.plugins.providers.journal.artifact_closure import DefaultArtifactClosure
 
 # L2
 from lca.runtime.reducer import DefaultReducer
@@ -105,7 +105,9 @@ class TestL0ProtocolCompliance(unittest.TestCase):
 
     def test_default_registry_resolves_all_delegation_protocols(self):
         """DelegationSpec.protocol 的每个取值都能在默认 registry 中 resolve 到非空实现。"""
-        from lca.plugins.composer.collaboration.team_transport import build_default_transport_registry
+        from lca.plugins.composer.collaboration.team_transport import (
+            build_default_transport_registry,
+        )
 
         registry = build_default_transport_registry()
         for protocol in ("internal", "a2a", "mcp"):

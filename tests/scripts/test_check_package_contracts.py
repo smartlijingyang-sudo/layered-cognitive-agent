@@ -69,7 +69,9 @@ def test_discover_packages_in_repo():
 
 def test_check_l2_pyproject_section_finds_real_sections():
     """Smoke test: L2 section detection works on real pyproject.toml."""
-    issues = check_l2_pyproject_section(["lca.contracts", "lca.contracts.atoms", "nonexistent.package"])
+    issues = check_l2_pyproject_section(
+        ["lca.contracts", "lca.contracts.atoms", "nonexistent.package"]
+    )
     real_pkg_issues = [i for i in issues if i.package in ("lca.contracts", "lca.contracts.atoms")]
     assert real_pkg_issues == []
 

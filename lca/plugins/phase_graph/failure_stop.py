@@ -5,7 +5,10 @@ from __future__ import annotations
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.stop import StopDecision, StopReason
 from lca.contracts.protocols.act.command_envelope import RunDelta
-from lca.contracts.protocols.declarative.declarative_execution import PhaseExecutionFailure, PhaseResult
+from lca.contracts.protocols.declarative.declarative_execution import (
+    PhaseExecutionFailure,
+    PhaseResult,
+)
 
 
 def phase_failure_stop_result(

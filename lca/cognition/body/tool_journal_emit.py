@@ -20,6 +20,7 @@ import logging
 from collections.abc import Mapping
 from typing import Any
 
+from lca.cognition.body.tool_result_preview import tool_files
 from lca.contracts.models.core.decision import Observation, ToolCall  # noqa: F401
 from lca.contracts.models.observability.diagnostic import DiagnosticCategory
 from lca.contracts.models.observability.journal import (
@@ -35,7 +36,6 @@ from lca.contracts.observability.evidence import (
 from lca.contracts.protocols.runtime.infra import Tool
 from lca.infrastructure.observability import record, record_runtime
 from lca.infrastructure.tools.contract.project import project_tool_state
-from lca.cognition.body.tool_result_preview import tool_files
 
 _log = logging.getLogger(__name__)
 

@@ -27,8 +27,8 @@ from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManif
 from lca.contracts.models.team.team_coordination import Debate
 from lca.contracts.protocols import LLMAdapter
 from lca.contracts.protocols.act.action import ActionRegistryProtocol
-from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseInput, PhaseResult
+from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.harness.profile.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
 from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
@@ -39,8 +39,8 @@ from lca.plugins.composer.runtime.runtime_factory import (
     build_fixture_cognitive_runtime,
 )
 from lca.plugins.phase_graph.stop_policy import DefaultStopPolicy
-from lca.plugins.providers.journal.artifact_closure import DefaultArtifactClosure
 from lca.plugins.providers.gate.decision_classifier import DefaultDecisionClassifier
+from lca.plugins.providers.journal.artifact_closure import DefaultArtifactClosure
 from lca.runtime.reducer import DefaultReducer
 from tests.phase_executors import standard_phase_executors
 

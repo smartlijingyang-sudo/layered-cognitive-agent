@@ -23,6 +23,11 @@ from collections.abc import Sequence
 
 import structlog
 
+from lca.cognition.brain.context_manifest import (
+    build_manifest_from_items,
+    digest_manifest,
+)
+from lca.cognition.perceive_sink import ManifestSink, default_sink
 from lca.contracts.models.core.gate_policy import GateDecided
 from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.perception import ContextItem, ContextManifest
@@ -31,11 +36,6 @@ from lca.contracts.models.observability.diagnostic import DiagnosticCategory, Di
 from lca.contracts.protocols import MemorySystem, PerceiveHub, Sensor
 from lca.contracts.protocols.think.cognition import SensorDisabledError
 from lca.infrastructure.observability import record_runtime
-from lca.cognition.brain.context_manifest import (
-    build_manifest_from_items,
-    digest_manifest,
-)
-from lca.cognition.perceive_sink import ManifestSink, default_sink
 
 _log = structlog.get_logger("lca.perceive_hub")
 

@@ -138,12 +138,12 @@ def _drive_run_with_evidence(jsonl_path: Path, ev_root: Path) -> tuple[str, dict
         journal=journal,
     )
 
+    from lca.cognition.body.tool_journal_emit import (
+        emit_tool_started,
+    )
     from lca.contracts.models.observability.journal import (
         RunScope,
         ToolStarted,
-    )
-    from lca.cognition.body.tool_journal_emit import (
-        emit_tool_started,
     )
 
     class _MockTool:

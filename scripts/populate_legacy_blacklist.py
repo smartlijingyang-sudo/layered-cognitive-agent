@@ -3,6 +3,7 @@
 Usage:
     uv run python scripts/check_filename_boundaries.py 2>&1 | uv run python scripts/populate_legacy_blacklist.py
 """
+
 import re
 import sys
 from pathlib import Path

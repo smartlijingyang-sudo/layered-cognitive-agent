@@ -58,9 +58,9 @@ class TestOrchestrationCoverage(unittest.IsolatedAsyncioTestCase):
             GraphStrategy(stage_with_invoker([]))  # type: ignore[call-arg]
 
     async def test_debate_strategy_is_functional(self) -> None:
+        from lca.agent.orchestration_strategies import DebateStrategy
         from lca.contracts.models.core.result import Result
         from lca.contracts.models.core.state import Budget
-        from lca.agent.orchestration_strategies import DebateStrategy
 
         agent = MagicMock()
         agent.role_profile = MagicMock()

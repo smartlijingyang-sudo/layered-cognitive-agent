@@ -6,6 +6,12 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+from lca.cognition.memory.policy import (
+    MemoryAuthority,
+    MemoryPolicy,
+    MemoryWrite,
+    SimpleMemoryPolicy,
+)
 from lca.contracts.atoms.enums import MemoryLayer, MemoryRecordKind
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.decision import Observation, Reflection
@@ -13,12 +19,6 @@ from lca.contracts.models.core.memory import MemoryRecord, MemoryRelationKind, M
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import MemorySystem, TemporalMemoryStore
 from lca.infrastructure.state_store.sqlite_temporal_memory import SqliteTemporalMemoryStore
-from lca.cognition.memory.policy import (
-    MemoryAuthority,
-    MemoryPolicy,
-    MemoryWrite,
-    SimpleMemoryPolicy,
-)
 
 _DEFAULT_SCOPE = "local:default"
 _DEFAULT_RECALL_LIMIT = 8

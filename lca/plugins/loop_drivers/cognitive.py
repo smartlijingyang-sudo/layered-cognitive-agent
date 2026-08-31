@@ -59,9 +59,9 @@ def build_cognitive_live_agent(
     llm = _resolve_llm(opts, cordis_ctx)
     tools = opts.get("tools") or ()
 
-    from lca.harness.agent.handle import OwnerAgentHandle
     from lca.application.api import Agent
     from lca.application.harness_live import CognitiveLiveAgent
+    from lca.harness.agent.handle import OwnerAgentHandle
 
     agent = Agent(
         role=opts.get("role", identity_id),

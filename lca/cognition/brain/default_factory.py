@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 
+from lca.cognition.brain.modular_brain import ModularBrain
+from lca.cognition.brain.reasoner import PromptReasoner
 from lca.contracts.mechanisms import consume
 from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.protocols import (
@@ -19,13 +21,11 @@ from lca.contracts.protocols import (
     LLMAdapter,
     Tool,
 )
+from lca.contracts.protocols.gate.decision_classifier import DecisionClassifier
 from lca.contracts.protocols.think.cognitive_pipeline import (
     CognitiveReflectionPipeline,
     CognitiveThinkPipeline,
 )
-from lca.contracts.protocols.gate.decision_classifier import DecisionClassifier
-from lca.cognition.brain.modular_brain import ModularBrain
-from lca.cognition.brain.reasoner import PromptReasoner
 
 
 class SimpleBrainFactory:

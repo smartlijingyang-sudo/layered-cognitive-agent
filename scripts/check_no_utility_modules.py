@@ -11,6 +11,7 @@ Usage::
 
     python scripts/check_no_utility_modules.py [--root PATH]
 """
+
 from __future__ import annotations
 
 import argparse
