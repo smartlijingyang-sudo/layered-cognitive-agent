@@ -43,7 +43,7 @@ async def health(request: Request) -> JSONResponse:
 
 
 # PR-7:展平为 module-level ``ROUTES`` (无下划线),``build_routes`` 退役后
-# 测试与 ``lifespan_adapter`` 直接 import 这个常量验证 route catalog。
+# 测试与 ``gateway.app`` 直接 import 这个常量验证 route catalog。
 ROUTES: tuple[Route, ...] = (
     Route("/health", health, methods=["GET"]),
     Route("/context", get_context, methods=["GET", "OPTIONS"]),

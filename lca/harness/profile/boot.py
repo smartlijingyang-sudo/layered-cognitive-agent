@@ -161,13 +161,25 @@ async def _boot_context(
     return ctx
 
 
-def _bind_bootstrap_file_store(ctx: Context, store: FileStore) -> None:
-    """Register the app-owned store before ordinary FileStore providers boot."""
+def _bind_bootstrap_file_store(ctx: Context, store: FileStore | None) -> None:
+    """Register the app-owned store before ordinary FileStore providers boot.
+
+    The kernel/transport boundary is profile-agnostic: if the active
+    profile does not wire the ``file_store`` seam (``lca-file-store-service``
+    plugin), the argument is silently ignored. This lets the lifespan
+    accept a bootstrap store without coupling to a specific capability
+    plugin being present.
+    """
+    if store is None:
+        return
     from lca.infrastructure.capability.files import FileStoreService
 
-    service = ctx.inject("file_store")
+    try:
+        service = ctx.inject("file_store")
+    except KeyError:
+        return
     if not isinstance(service, FileStoreService):
-        raise TypeError("file_store seam did not provide FileStoreService")
+        return
     service.register("gateway_bootstrap", store, activate=True)
 
 
