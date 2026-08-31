@@ -13,6 +13,10 @@ from lca.agent.role_library import FileRoleLibrary
 from lca.contracts.capabilities import TEAM_ROLE_LIBRARY
 from lca.contracts.protocols.collaboration.casting import RoleLibrary
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class Config(BaseModel):
@@ -32,6 +36,17 @@ class Config(BaseModel):
     Config=Config,
     test_suite="tests/test_gateway_team_factory.py",
     kind=PluginKind.PRIMITIVE,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('lca-team-role-library-default.checked', 'lca-team-role-library-default.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: BaseModel) -> None:
     """Expose the profile-selected role library to the Team mode adapter."""

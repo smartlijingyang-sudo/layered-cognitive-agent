@@ -16,6 +16,10 @@ from lca.contracts.protocols.collaboration.orchestration import SharedMemoryStor
 from lca.contracts.protocols.collaboration.team_seam import TeamSharedMemoryResolverProtocol
 from lca.contracts.protocols.journal.spec import TeamSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class Config(BaseModel):
@@ -51,6 +55,17 @@ class DefaultTeamSharedMemoryResolver(TeamSharedMemoryResolverProtocol):
     description="Provide the default Team shared-memory resolver.",
     test_suite="tests/composer/test_composer_consumes_compiled_capability.py",
     kind=PluginKind.PRIMITIVE,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('lca-team-shared-memory-default.checked', 'lca-team-shared-memory-default.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Expose the profile-selected shared-memory resolver to the Team seam."""

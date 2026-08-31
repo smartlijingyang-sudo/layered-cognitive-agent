@@ -8,6 +8,9 @@ from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.capabilities import COGNITIVE_REFLECTION_PIPELINE
 from lca.contracts.protocols.think.cognitive_pipeline import CognitiveReflectionPipeline
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class Config(BaseModel):
@@ -30,6 +33,17 @@ class Config(BaseModel):
         "critic/fallback semantics without replacing the Brain or Agent Loop."
     ),
     test_suite="tests/test_cognitive_pipeline_plugins.py",
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('lca-cognitive-reflection-pipeline-standard.checked', 'lca-cognitive-reflection-pipeline-standard.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Bind the standard, stateless Reflect pipeline to the capability graph."""

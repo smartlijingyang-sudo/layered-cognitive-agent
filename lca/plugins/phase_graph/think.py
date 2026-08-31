@@ -11,6 +11,10 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     SemanticPhase,
 )
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.plugins.phase_graph.capabilities import StandardPhaseCapabilities
 from lca.plugins.phase_graph.common import (
     StandardPhaseConfig,
@@ -49,6 +53,17 @@ class StandardThinkExecutor:
     effects=EffectClass.NONE,
     test_suite="tests/declarative/test_phase_graph.py",
     spec=SPEC,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G7_EXECUTION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('phase_think_standard.checked', 'phase_think_standard.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: StandardPhaseConfig) -> None:
     ctx.provide("phase.think.standard", StandardThinkExecutor())

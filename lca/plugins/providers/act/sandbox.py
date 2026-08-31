@@ -6,6 +6,10 @@ from pydantic import BaseModel, Field
 
 from lca.contracts.protocols.runtime.infra import Sandbox
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class Config(BaseModel):
@@ -22,6 +26,17 @@ class Config(BaseModel):
     description="Register Sandbox providers on the SandboxService Definition.",
     test_suite="tests/test_plugin_tree_single_owner.py",
     kind=PluginKind.PROVIDER,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('lca-sandbox-provider.checked', 'lca-sandbox-provider.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.infrastructure.sandbox.factory import resolve_sandbox

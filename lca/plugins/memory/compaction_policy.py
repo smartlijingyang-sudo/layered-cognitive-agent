@@ -8,6 +8,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from lca.contracts.capabilities import MEMORY_COMPACTION_POLICY
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.cognition.memory.policy import CompactionPolicy
 from lca.cognition.memory.semantic_compaction import SemanticCompactionPolicy
 
@@ -38,6 +42,17 @@ class Config(BaseModel):
     description="Provide an auditable semantic compaction policy for memory context views.",
     test_suite="tests/test_memory_policy.py",
     kind=PluginKind.PRIMITIVE,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G3_FACTS,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('lca-memory-compaction-policy-simple.checked', 'lca-memory-compaction-policy-simple.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: BaseModel) -> None:
     """Provide the Profile-selected semantic compactor to memory assemblers."""

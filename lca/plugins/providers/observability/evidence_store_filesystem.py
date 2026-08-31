@@ -13,6 +13,10 @@ from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.observability.evidence import EvidenceStore
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class Config(BaseModel):
@@ -28,6 +32,17 @@ class Config(BaseModel):
     description="Test-only: replace fs backend with in-memory CAS via ctx._inner.provide.",
     test_suite="tests/test_evidence_store_plugin.py::test_provider_overrides_with_inmemory",
     kind=PluginKind.PROVIDER,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('lca-evidence-store-inmemory-override.checked', 'lca-evidence-store-inmemory-override.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """No-op 默认行为 —— 不在生产挂载;测试用 ``register_override()`` 手工替换。"""

@@ -12,6 +12,10 @@ from lca.contracts.atoms.enums import ComponentKind
 from lca.contracts.capabilities import COMPONENT_REGISTRY
 from lca.contracts.protocols.journal.spec import STATE_STORE_CHOICE_MEMORY
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class Config(BaseModel):
@@ -27,6 +31,17 @@ class Config(BaseModel):
     effects="none",
     description="Register InMemoryStateStore into the shared ComponentRegistry.",
     test_suite="tests/architecture/test_component_registry_seam.py",
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('lca-component-state-store-contributor.checked', 'lca-component-state-store-contributor.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config

@@ -12,6 +12,10 @@ from lca.contracts.protocols.collaboration.graph_node_executor import (
     GraphNodeExecutor,
 )
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class Config(BaseModel):
@@ -77,6 +81,17 @@ def _task_for_node(context: GraphNodeExecutionContext) -> str:
     effects=EffectClass.NONE,
     description="Register the default Team-member execution primitive for graph Agent nodes.",
     test_suite="tests/test_graph_node_executors.py",
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G7_EXECUTION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('graph-node_agent_default.checked', 'graph-node_agent_default.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Contribute the Agent-node primitive to the profile-selected registry."""

@@ -13,6 +13,10 @@ from lca.contracts.protocols import (
     TeamAssembly,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 if TYPE_CHECKING:
     from lca.agent.orchestration_strategies import GraphStrategy
@@ -49,6 +53,17 @@ class Config(BaseModel):
     effects="none",
     description="Register graph TeamStrategy factory.",
     test_suite="tests/test_graph_strategy.py",
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G7_EXECUTION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('strategy_graph.checked', 'strategy_graph.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config

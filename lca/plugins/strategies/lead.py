@@ -12,6 +12,9 @@ from lca.contracts.models.team.team_coordination import STRATEGY_KEY_LEAD, LeadM
 from lca.contracts.protocols import TeamAssembly
 from lca.contracts.protocols.journal.spec import LeadSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 _DUTY_MANDATES: frozenset[LeadMandate] = frozenset({LeadMandate.CONSULT, LeadMandate.BOARD})
 
@@ -52,6 +55,17 @@ class Config(BaseModel):
     functional_group=FunctionalGroup.G8_COLLAB,
     description="Register lead TeamStrategy factory.",
     test_suite="tests/test_orchestration_coverage.py",
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G7_EXECUTION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('strategy_lead.checked', 'strategy_lead.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config

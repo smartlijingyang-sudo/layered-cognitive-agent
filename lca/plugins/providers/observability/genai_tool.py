@@ -9,6 +9,10 @@ from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.observability.genai_semantic import GenAISemanticMapper
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class Config(BaseModel):
@@ -24,6 +28,17 @@ class Config(BaseModel):
     description="ToolInvoked → gen_ai.tool.* attribute mapper (PR-10).",
     test_suite="tests/test_genai_semantic.py::test_tool_mapper_registered",
     kind=PluginKind.PROVIDER,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('lca-genai-tool-mapper.checked', 'lca-genai-tool-mapper.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.infrastructure.observability import NamedRegistry, ToolGenAIMapper

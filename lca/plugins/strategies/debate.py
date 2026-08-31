@@ -10,6 +10,10 @@ from lca.contracts.capabilities import STRATEGIES
 from lca.contracts.models.team.team_coordination import STRATEGY_KEY_DEBATE, Debate
 from lca.contracts.protocols import TeamAssembly
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 def build_debate_strategy(assembly: TeamAssembly) -> Any:
@@ -33,6 +37,17 @@ class Config(BaseModel):
     effects="none",
     description="Register debate TeamStrategy factory.",
     test_suite="tests/test_debate_strategy.py",
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G7_EXECUTION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('strategy_debate.checked', 'strategy_debate.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config

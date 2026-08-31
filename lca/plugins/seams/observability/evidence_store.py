@@ -13,6 +13,10 @@ from pydantic import BaseModel
 
 from lca.contracts.observability.evidence import EvidencePolicy, EvidenceStore
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class Config(BaseModel):
@@ -28,6 +32,17 @@ class Config(BaseModel):
     description="Provide evidence_store + evidence_policy capability seams (ADR-0065 L5 / L8).",
     test_suite="tests/test_seam_evidence_store.py::test_seam_provides_both",
     kind=PluginKind.SEAM,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('lca-evidence-store-seam.checked', 'lca-evidence-store-seam.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.infrastructure.observability.evidence.policy import DefaultEvidencePolicy

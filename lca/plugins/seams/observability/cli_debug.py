@@ -10,6 +10,10 @@ from pydantic import BaseModel
 
 from lca.contracts.observability.cli_debug_command import CliDebugCommand
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class Config(BaseModel):
@@ -25,6 +29,17 @@ class Config(BaseModel):
     description="Provide the cli_debug_command seam (PR-9).",
     test_suite="tests/test_cli_debug_trace.py::test_seam_provides_debug_registry",
     kind=PluginKind.SEAM,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('lca-cli-debug-command-seam.checked', 'lca-cli-debug-command-seam.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.infrastructure.observability import NamedRegistry

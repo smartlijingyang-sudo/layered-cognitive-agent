@@ -9,6 +9,10 @@ from lca.contracts.harness.state.projection import (
     SessionProjectionRegistryFactory,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.harness.projection.registry import InMemoryProjectionRegistry
 from lca.harness.projection.web import ActivityProjection, ConversationProjection, TaskProjection
 from lca.harness.skills import SkillsProjection
@@ -41,6 +45,17 @@ class InMemoryWebProjectionRegistryFactory(SessionProjectionRegistryFactory):
     effects="memory",
     kind=PluginKind.PROVIDER,
     description="Provide in-memory Session projections for Gateway conversation, activity, task, and skills views.",
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('lca-session-projection-memory-provider.checked', 'lca-session-projection-memory-provider.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Register the default Session projection-registry factory."""

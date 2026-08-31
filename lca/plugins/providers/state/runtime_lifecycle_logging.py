@@ -11,6 +11,10 @@ from lca.contracts.protocols.runtime.runtime_lifecycle import (
     RuntimeLifecycleSubscriberRegistry,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.runtime.runtime_event_publisher import StructuredLogRuntimeLifecycleSubscriber
 
 
@@ -32,6 +36,17 @@ class Config(BaseModel):
     description="Contribute structured Agent Loop lifecycle logging without control access.",
     test_suite="tests/runtime/test_runtime_lifecycle_plugins.py",
     kind=PluginKind.PROVIDER,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('lca-runtime-lifecycle-logging-provider.checked', 'lca-runtime-lifecycle-logging-provider.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: BaseModel) -> None:
     """Register lifecycle logging without becoming the runtime publisher itself."""

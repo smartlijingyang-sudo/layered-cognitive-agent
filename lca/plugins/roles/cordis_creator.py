@@ -21,6 +21,10 @@ from lca.contracts.models.team.role_team import (
     ToolPermissionManifest,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class Config(BaseModel):
@@ -111,6 +115,17 @@ def build_cordis_creator_role_profile() -> RoleProfile:
     description="Creator §13.3 cordis-creator role persona + tool permission manifest",
     test_suite="tests/test_cordis_creator_e2e.py",
     kind=PluginKind.PRIMITIVE,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G8_COLLAB,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.PROFILE,
+        authority=('plugin.serve',),
+        evidence=('lca-role-cordis-creator.checked', 'lca-role-cordis-creator.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """把角色画像挂到 ``role.cordis_creator`` 的类型化 capability seam。"""

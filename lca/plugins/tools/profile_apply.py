@@ -13,6 +13,10 @@ from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.tool import ParameterSpec, ToolApi, ToolManifest, ToolMeta
 from lca.contracts.protocols import Tool
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class ProfileApplyTool(Tool):
@@ -142,6 +146,17 @@ MANIFEST = ToolManifest(
     description="Register a dry-run-only profile candidate promotion preview Tool.",
     test_suite="tests/architecture/test_self_improving_plugins.py",
     kind=PluginKind.PRIMITIVE,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G7_EXECUTION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.TURN,
+        authority=('tool.invoke',),
+        evidence=('lca-tool-profile-apply.checked', 'lca-tool-profile-apply.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Register only when the scenario explicitly enables this safe preview tool."""

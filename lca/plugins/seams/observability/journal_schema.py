@@ -10,6 +10,10 @@ from pydantic import BaseModel
 
 from lca.contracts.observability.schemas.v2 import JournalSchema
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class Config(BaseModel):
@@ -47,6 +51,17 @@ class JournalSchemaRegistry:
     description="Provide the journal_schemas registry (ADR-0096 MVA-1).",
     test_suite="tests/test_journal_schema_seam.py::test_journal_schema_seam_provides_registry",
     kind=PluginKind.SEAM,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('lca-journal-schema-seam.checked', 'lca-journal-schema-seam.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.plugins.providers.journal_schema.v2 import EnvelopeV2Schema

@@ -12,6 +12,10 @@ from pydantic import BaseModel
 from lca.contracts.capabilities import RESUME_INPUT_ADAPTERS
 from lca.contracts.protocols.session.resume_input import ResumeInputAdapter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.runtime.resume_input import HumanAnswerResumeInputAdapter
 
 
@@ -39,6 +43,17 @@ def build_human_answer_resume_input_adapter() -> ResumeInputAdapter:
     ),
     test_suite="tests/runtime/test_resume_input.py",
     kind=PluginKind.PRIMITIVE,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('resume_input_human_answer.checked', 'resume_input_human_answer.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Register the default resume-input normalization strategy."""

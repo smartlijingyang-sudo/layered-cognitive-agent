@@ -28,6 +28,10 @@ from lca.contracts.protocols.runtime.runtime_lifecycle import (
     RuntimeLifecycleSubscriberRegistry,
 )
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.plugins.learning.review_service import (
     LearningReviewAssessment,
     LearningReviewService,
@@ -88,6 +92,17 @@ _REVIEWABLE_STATUSES = frozenset(
     description="Queue terminal evidence references for candidate-only learning review.",
     test_suite="tests/architecture/test_learning_review_lifecycle.py",
     kind=PluginKind.PROVIDER,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G4_PERCEPTION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('lca-learning-review-lifecycle-subscriber.checked', 'lca-learning-review-lifecycle-subscriber.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: BaseModel) -> None:
     """Mount the review service and contribute it as a passive terminal subscriber."""

@@ -5,6 +5,10 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
 
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.plugins.composer.act.body_composer import BodyComposer
 from lca.plugins.composer.collaboration.team_composer import TeamComposer
 from lca.plugins.composer.composition.agent_assembly import PlanBoundAgentAssembler
@@ -28,6 +32,17 @@ class Config(BaseModel):
     description="Plan-bound AgentGraph and TeamGraph composers with narrow interfaces.",
     test_suite="tests/application/test_spawn_bind_plan.py",
     kind=PluginKind.PROVIDER,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('context.read',),
+        evidence=('lca-plan-sub-composers.checked', 'lca-plan-sub-composers.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Provide the complete set of plan composers to the booted Profile scope."""

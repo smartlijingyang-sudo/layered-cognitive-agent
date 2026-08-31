@@ -11,6 +11,10 @@ from lca.contracts.protocols.collaboration.graph_node_executor import (
     GraphNodeExecutorRegistryProtocol,
 )
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class Config(BaseModel):
@@ -70,6 +74,17 @@ class GraphNodeExecutorRegistry(GraphNodeExecutorRegistryProtocol):
     effects=EffectClass.NONE,
     description="Provide the closed registry for collaboration graph-node primitives.",
     test_suite="tests/test_graph_node_executors.py",
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G7_EXECUTION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('lca_graph-node-executor-registry.checked', 'lca_graph-node-executor-registry.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Provide an empty registry for independent node primitive contributors."""

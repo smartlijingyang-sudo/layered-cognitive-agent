@@ -16,6 +16,10 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     VerificationDeclaration,
 )
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class RecoveryLoopConfig(BaseModel):
@@ -84,6 +88,17 @@ SPEC = PluginSpec(
     effects=EffectClass.NONE,
     test_suite="tests/declarative/test_recovery_edge.py",
     spec=SPEC,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G7_EXECUTION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('phase_edge_reflect_to_think_recovery.checked', 'phase_edge_reflect_to_think_recovery.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: RecoveryEdgeConfig) -> None:
     """Expose the selected recovery edge as immutable plan data."""

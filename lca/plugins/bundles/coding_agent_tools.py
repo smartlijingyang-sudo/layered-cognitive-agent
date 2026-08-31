@@ -19,6 +19,10 @@ from lca.contracts.observability.coding_agent_tools import (
     TraceInspectorTool,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class Config(BaseModel):
@@ -51,6 +55,17 @@ class Config(BaseModel):
     description="Coding Agent Tools bundle (7 read-only tools). ADR-0065 §六 / PR-8.",
     test_suite="tests/test_coding_agent_tools_bundle.py::test_bundle_registers_seven_tools",
     kind=PluginKind.BRIDGE,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('context.read',),
+        evidence=('lca-coding-agent-tools-bundle.checked', 'lca-coding-agent-tools-bundle.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.plugins.tools.diagnostics.diff_context import (

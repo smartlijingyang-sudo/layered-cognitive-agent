@@ -7,6 +7,10 @@ from pydantic import BaseModel
 from lca.contracts.protocols.gate.loop_guard import LoopGuardEvaluator
 from lca.harness.declarative.execute.loop_guard import DeclarativeLoopGuardEvaluator
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class Config(BaseModel):
@@ -27,6 +31,17 @@ class Config(BaseModel):
         "Provide the default declarative LoopGuard evaluator so profiles can replace "
         "loop re-entry policy without changing the graph interpreter."
     ),
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('lca-declarative-loop-guard.checked', 'lca-declarative-loop-guard.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Expose the default pure loop-guard evaluator to runtime assembly."""

@@ -6,6 +6,10 @@ from pydantic import BaseModel
 
 from lca.contracts.protocols.journal.artifact_closure import ArtifactClosure
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.infrastructure.workspace import get_run_workspace
 
 
@@ -45,6 +49,17 @@ class DefaultArtifactClosure(ArtifactClosure):
     kind=PluginKind.PROVIDER,
     description="Provide the default ArtifactClosure implementation.",
     test_suite="tests/test_plugin_alignment.py::test_tier2_plugin_shape",
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('lca-artifact-closure-provider.checked', 'lca-artifact-closure-provider.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     ctx.provide("artifact_closure", DefaultArtifactClosure())

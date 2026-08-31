@@ -12,6 +12,10 @@ from pydantic import BaseModel
 from lca.contracts.capabilities import RUNTIME_LIFECYCLE_SUBSCRIBER_REGISTRY
 from lca.contracts.protocols.runtime.runtime_lifecycle import RuntimeLifecycleSubscriberRegistry
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.runtime.runtime_event_publisher import InMemoryRuntimeLifecycleSubscriberRegistry
 
 
@@ -32,6 +36,17 @@ class Config(BaseModel):
     description="Provide the neutral registry for passive Agent Loop lifecycle subscribers.",
     test_suite="tests/runtime/test_runtime_lifecycle_plugins.py",
     kind=PluginKind.SEAM,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('lca-runtime-lifecycle-subscriber-registry-seam.checked', 'lca-runtime-lifecycle-subscriber-registry-seam.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: BaseModel) -> None:
     """Mount an empty registry; contributor providers register all behavior."""

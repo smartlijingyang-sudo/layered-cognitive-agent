@@ -16,6 +16,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from lca.contracts.capabilities import LEARNING_PROFILE_EVOLVER
 from lca.contracts.harness.think.eval_comparison import EvalComparison
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,6 +145,17 @@ class Config(BaseModel):
     description="Evaluate profile candidates from frozen results; never auto-apply or publish.",
     test_suite="tests/architecture/test_self_improving_plugins.py",
     kind=PluginKind.PRIMITIVE,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.PROFILE,
+        authority=('plugin.serve',),
+        evidence=('lca-profile-evolver.checked', 'lca-profile-evolver.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Provide the profile-candidate evaluator selected by the scenario bundle."""

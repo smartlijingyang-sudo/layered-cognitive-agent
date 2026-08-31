@@ -18,6 +18,10 @@ from lca.contracts.protocols.collaboration.team_seam import (
 )
 from lca.contracts.protocols.journal.spec import TeamSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class Config(BaseModel):
@@ -58,6 +62,17 @@ class DefaultTeamCommunicationAssembler(TeamCommunicationAssemblerProtocol):
     description="Provide the default in-process Team transport and invoker pair.",
     test_suite="tests/composer/test_composer_consumes_compiled_capability.py",
     kind=PluginKind.PRIMITIVE,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('lca-team-communication-default.checked', 'lca-team-communication-default.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Expose the default communication assembler to the Team seam factory."""

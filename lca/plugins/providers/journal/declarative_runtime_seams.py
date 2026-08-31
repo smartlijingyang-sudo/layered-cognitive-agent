@@ -35,6 +35,10 @@ from lca.contracts.protocols.state.reducer import Reducer
 from lca.harness.declarative import GenericPlanInterpreter
 from lca.harness.declarative.execute.dispatch import RegistryDeltaReducer, RegistryEffectGateway
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.runtime.checkpoint_resolution import DeclarativeCheckpointStateResolver
 from lca.runtime.result_finalizer import RuntimeResultFinalizer
 from lca.runtime.runtime_journal import RuntimeJournalCommitter
@@ -162,6 +166,17 @@ class ObservabilityRuntimeJournalFactory(RuntimeJournalFactory):
         "Provide the default checkpoint, terminal, Gateway, DeltaReducer, and per-turn "
         "Journal factories for declarative runtime assembly."
     ),
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('decision.emit',),
+        evidence=('lca-declarative-runtime-seams-provider.checked', 'lca-declarative-runtime-seams-provider.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Register default factory choices as independently replaceable capabilities."""

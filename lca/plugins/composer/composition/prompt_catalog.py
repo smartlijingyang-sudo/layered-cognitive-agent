@@ -17,6 +17,10 @@ from lca.contracts.protocols.memory.operational_skills import SkillIndexEntry, S
 from lca.contracts.protocols.runtime.infra import Tool
 from lca.contracts.protocols.think.cognition import BrainPromptCatalog, BrainPromptCatalogFactory
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 _EMPTY_SKILLS = "（无可用技能；可使用 search_skill 查找）"
 _EMPTY_BRAIN_SKILLS = "（无可用技能）"
@@ -103,6 +107,17 @@ class Config(BaseModel):
     description="Provide the profile-selected skills and tools catalog for Brain factories.",
     test_suite="tests/architecture/test_brain_prompt_catalog_capability.py",
     kind=PluginKind.PRIMITIVE,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('lca-brain-prompt-catalog-default.checked', 'lca-brain-prompt-catalog-default.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: BaseModel) -> None:
     """Expose the default catalog factory without selecting ambient composition state."""

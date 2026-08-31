@@ -9,6 +9,10 @@ from pydantic import BaseModel, Field
 from lca.contracts.harness.tasks.continuous import ContinuousControlPlaneFactory
 from lca.harness.continuous import SqliteContinuousControlPlaneFactory
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class Config(BaseModel):
@@ -33,6 +37,17 @@ class Config(BaseModel):
         "Provide durable trigger de-duplication, work leasing and bounded Session dispatch "
         "outside the closed cognitive phase graph."
     ),
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('lca-continuous-control-plane-factory.checked', 'lca-continuous-control-plane-factory.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Expose a factory so Profile selection owns control-plane storage policy."""

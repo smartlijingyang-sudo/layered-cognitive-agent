@@ -8,6 +8,9 @@ from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.capabilities import BRAINS
 from lca.contracts.protocols import BrainFactory
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.plugins.brain._standard_factory import (
     STANDARD_COGNITIVE_BRAIN_FACTORY_REQUIREMENTS,
     build_standard_cognitive_brain_factory,
@@ -29,6 +32,17 @@ class Config(BaseModel):
     functional_group=FunctionalGroup.G5_COGNITION,
     description="Register the standard cognitive Brain factory as brains['modular'].",
     test_suite="tests/test_plugin_alignment.py",
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G5_COGNITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.TURN,
+        authority=('plugin.serve',),
+        evidence=('lca-brain-modular.checked', 'lca-brain-modular.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config

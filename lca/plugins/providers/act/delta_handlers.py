@@ -30,6 +30,10 @@ from lca.contracts.protocols.act.command_envelope import RunDelta
 from lca.contracts.protocols.state.delta_handler import DeltaHandler, DeltaHandlerRegistry
 from lca.contracts.protocols.state.reducer import Reducer
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.plugins.providers.act.delta_handler_registry import (
     DefaultDeltaHandlerRegistry,
     InMemoryDeltaHandlerRegistry,
@@ -220,6 +224,17 @@ class PausedDeltaHandler(DeltaHandler):
     ),
     test_suite="tests/test_plugin_alignment.py::test_tier2_plugin_shape",
     kind=PluginKind.PROVIDER,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G10_COMPOSITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.RUN,
+        authority=('plugin.serve',),
+        evidence=('lca-delta-handler-provider.checked', 'lca-delta-handler-provider.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """注册 11 个默认 DeltaHandler 到 registry。

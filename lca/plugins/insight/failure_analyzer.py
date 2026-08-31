@@ -14,6 +14,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from lca.contracts.capabilities import LEARNING_FAILURE_ANALYZER
 from lca.contracts.protocols.think.learning import FailureAnalysis, FailureAnalyzer
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +75,17 @@ class Config(BaseModel):
     description="Derive evidence-linked failure analyses without changing profiles or capabilities.",
     test_suite="tests/architecture/test_self_improving_plugins.py",
     kind=PluginKind.PRIMITIVE,
+
+
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G5_COGNITION,
+        control_slot=ControlSlot.OBSERVE_WILDCARD,
+        scope=Scope.TURN,
+        authority=('plugin.serve',),
+        evidence=('lca-failure-analyzer.checked', 'lca-failure-analyzer.served'),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Provide the configured read-only failure analyzer."""
