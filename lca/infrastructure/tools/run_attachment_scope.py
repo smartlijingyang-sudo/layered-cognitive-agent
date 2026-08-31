@@ -41,9 +41,20 @@ def merge_attachment_ids(
 
 
 @contextmanager
-def run_attachment_scope(attachment_ids: Sequence[str]) -> Iterator[tuple[str, ...]]:
-    """绑定本 run 的用户附件 id，供沙箱工具自动挂载。"""
-    cleaned = tuple(merge_attachment_ids(list(attachment_ids), ambient=()))
+def run_attachment_scope(
+    attachment_ids: str | Sequence[str],
+) -> Iterator[tuple[str, ...]]:
+    """绑定本 run 的用户附件 id,供沙箱工具自动挂载。
+
+    A single :class:`str` is accepted for ergonomic call sites but wrapped in a
+    one-element tuple so it is not iterated character-by-character (which is
+    what :func:`list` does to a bare string).
+    """
+    if isinstance(attachment_ids, str):
+        normalized: Sequence[str] = (attachment_ids,)
+    else:
+        normalized = attachment_ids
+    cleaned = tuple(merge_attachment_ids(list(normalized), ambient=()))
     token: Token[tuple[str, ...]] = _run_attachment_ids.set(cleaned)
     try:
         yield cleaned
