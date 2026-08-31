@@ -17,7 +17,7 @@ from typing import cast
 
 import pytest
 
-from gateway.bootstrap import (
+from lca.plugins.transport.webserver.bootstrap import (
     DefaultGatewayBootstrapFactory,
     GatewayBootstrap,
     GatewayBootstrapConfig,

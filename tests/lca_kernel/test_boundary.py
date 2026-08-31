@@ -81,13 +81,13 @@ def test_kernel_directory_has_no_transport_subdir() -> None:
             )
 
 
-def test_kernel_module_count_is_at_most_14() -> None:
-    """ADR-0115 §决定 1 锁定 12 文件;ADR-0118 K8 HMR 增到 1 文件 → 上限 14。
+def test_kernel_module_count_is_at_most_17() -> None:
+    """ADR-0115 §决定 1 锁定 12 文件;ADR-0118 K8 HMR 增到 1 文件 → 上限 14;ADR-0119 决定 3 增 cli.py + __main__.py + lifespan.py → 上限 17。
 
-    12 (K1–K7 +公共面) + 1 (K8 HMR) = 13;加上 __init__.py 公共面 = 14。
+    12 (K1–K7 +公共面) + 1 (K8 HMR) + 3 (ADR-0119 cli + __main__ + lifespan) = 16;加上 __init__.py 公共面 = 17。
     """
     py_files = list(LCA_KERNEL_DIR.glob("*.py"))
-    assert len(py_files) <= 14, f"expected ≤14 files, got {len(py_files)}"
+    assert len(py_files) <= 17, f"expected ≤17 files, got {len(py_files)}"
 
 
 def test_kernel_modules_have_no_module_level_singletons() -> None:

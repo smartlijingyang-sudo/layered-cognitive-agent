@@ -54,9 +54,9 @@ ROUTES: tuple[Route, ...] = (
 
 @plugin(
     id="lca-gateway-routes-openai-compat-files",
-    provides=("gateway_openai_compat_files_route",),
+    provides=(),
     requires=("gateway_router",),
-    layer="L3",
+    layer="L1",
     kind=PluginKind.PROVIDER,
     effects="none",
     description="Register /v1/models + /v1/chat/completions + /v1/embeddings + /v1/responses + /files/{id}.",

@@ -18,14 +18,15 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-from starlette.applications import Starlette
-from starlette.testclient import TestClient
 
-from gateway.app import create_app
 from lca_kernel import run_kernel_lifespan
+from lca_kernel.cli import create_app
+
+if TYPE_CHECKING:
+    from starlette.applications import Starlette
 
 
 async def _drive_lifespan(app: Starlette) -> dict[str, Any]:
@@ -69,31 +70,38 @@ async def test_bad_profile_path_raises_in_kernel_lifespan() -> None:
 
 @pytest.mark.asyncio
 async def test_starlette_lifespan_propagates_boot_failure() -> None:
-    """A bad profile makes the ASGI lifespan raise on entry."""
-    app = create_app(profile_path="profiles/__missing__.yaml")
-    with pytest.raises(Exception):
-        await _drive_lifespan(app)
+    """A bad profile makes ``create_app`` raise — K3 boot fails before lifespan runs.
 
-
-def test_testclient_refuses_to_serve_when_boot_fails() -> None:
-    """TestClient entering must raise if boot fails — no silent 503."""
-    app = create_app(profile_path="profiles/__missing__.yaml")
-    with pytest.raises(Exception), TestClient(app):
-        pytest.fail("TestClient must raise when lifespan startup fails")
-
-
-def test_failed_boot_does_not_leak_module_singletons() -> None:
-    """Failed boot must not write module-level globals.
-
-    ADR-0115 thin factory: ``create_app()`` itself does not boot, so it
-    cannot raise on a bad profile path. The boot happens in the
-    kernel lifespan, which is driven by Starlette at startup time.
-    No module-level state should be polluted by either the failed
-    boot or the prior module load.
+    ADR-0119 决定 3 新设计:boot 在 K3 阶段,create_app 内部 K3 抛
+    FileNotFoundError(读 profile YAML 失败),lifespan 还没机会驱动。
     """
-    import gateway.app as gateway_app_module
+    with pytest.raises(Exception):
+        await create_app(profile_path="profiles/__missing__.yaml")
 
-    app = create_app(profile_path="profiles/__missing__.yaml")
+
+@pytest.mark.asyncio
+async def test_testclient_refuses_to_serve_when_boot_fails() -> None:
+    """create_app() itself must raise if profile_path is invalid — no silent 503.
+
+    ADR-0119 决定 3 新设计:create_app 在 K3 阶段就 boot,boot 失败立即 raise
+    (FileNotFoundError 来自 load_profile_source 读 YAML),TestClient 拿不到 app。
+    """
+    with pytest.raises(Exception):
+        await create_app(profile_path="profiles/__missing__.yaml")
+
+
+@pytest.mark.asyncio
+async def test_failed_boot_does_not_leak_module_singletons() -> None:
+    """Failed boot must not write module-level globals on ``lca_kernel.cli``.
+
+    ADR-0119 决定 3 新设计:create_app 在 K3 阶段 boot,boot 失败抛
+    FileNotFoundError(读 profile YAML 失败);验证 lca_kernel.cli 模块本身
+    不被 boot 失败污染。
+    """
+    import lca_kernel.cli as cli_module
+
+    with pytest.raises(Exception):
+        await create_app(profile_path="profiles/__missing__.yaml")
     for forbidden in (
         "get_file_store",
         "_module_file_store",
@@ -101,10 +109,4 @@ def test_failed_boot_does_not_leak_module_singletons() -> None:
         "_file_store",
         "_devices",
     ):
-        assert not hasattr(gateway_app_module, forbidden), forbidden
-
-    async def _drive() -> None:
-        await _drive_lifespan(app)
-
-    with pytest.raises(Exception):
-        asyncio.run(_drive())
+        assert not hasattr(cli_module, forbidden), forbidden

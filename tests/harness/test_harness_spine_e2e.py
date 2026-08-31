@@ -12,14 +12,14 @@ from __future__ import annotations
 import pytest
 from starlette.testclient import TestClient
 
-from gateway.app import create_app
+from lca_kernel.cli import create_app
 
 
 @pytest.fixture()
-def client():
-    app = create_app()
-    with TestClient(app) as client:
-        yield client
+async def client():
+    app = await create_app()
+    with TestClient(app) as c:
+        yield c
 
 
 def _require_profile_llm(client: TestClient) -> None:

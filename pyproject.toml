@@ -105,6 +105,20 @@ name = "plugins: 不得依赖 gateway"
 type = "forbidden"
 source_modules = ["lca.plugins"]
 forbidden_modules = ["gateway"]
+# ADR-0119 决定 2 + 决定 followup:4 个 routes plugin + lca-gateway-bootstrap 是 plugin-everything 重构的
+# 过渡产物,业务层仍在 gateway/ 目录(95 个文件 10341 LOC,搬迁 followup ADR);
+# 当前 plugin 必须引用 gateway.* 才能调用原业务实现。完成 ADR-0119 决定 2 范围内的"plugin 包装层"工作。
+# 严格收紧待 ADR-0119-followup 把 gateway.runs.* / gateway.device_gateway.* / gateway.plugins.*
+# 搬到 lca.runtime.run_* / lca.plugins.transport.device_gateway / lca.cognition.team.modes 后再做。
+ignore_imports = [
+    # ADR-0119 决定 2: lca-gateway-bootstrap 包装 gateway.bootstrap.install_gateway_state
+    "lca.plugins.transport.webserver.bootstrap -> gateway",
+    # ADR-0112 决定 6: 4 个 routes plugin 引用 gateway.* handler 业务
+    "lca.plugins.transport.webserver.routes_health_options -> gateway",
+    "lca.plugins.transport.webserver.routes_runs_sessions -> gateway",
+    "lca.plugins.transport.webserver.routes_openai_compat_files -> gateway",
+    "lca.plugins.transport.webserver.routes_device -> gateway",
+]
 
 # ── 契约 6: 下层 (L0–L3) 不得 import lca_kernel 内部模块 ──
 # ADR-0115 决定 3: lca_kernel 是顶层 host 包,下层禁止 import。

@@ -17,7 +17,7 @@ from typing import Any
 
 import pytest
 
-from gateway.app import create_app
+from lca_kernel.cli import create_app
 
 
 async def _drive_lifespan(app: Any, hold: asyncio.Event | None = None) -> None:
@@ -37,8 +37,8 @@ async def _drive_lifespan(app: Any, hold: asyncio.Event | None = None) -> None:
 @pytest.mark.asyncio
 async def test_two_create_app_calls_boot_independently() -> None:
     """Two apps in one process each boot their own kernel context."""
-    app1 = create_app()
-    app2 = create_app()
+    app1 = await create_app()
+    app2 = await create_app()
     assert getattr(app1.state, "ctx", None) is None
     assert getattr(app2.state, "ctx", None) is None
 
@@ -57,8 +57,8 @@ async def test_two_create_app_calls_boot_independently() -> None:
 @pytest.mark.asyncio
 async def test_dispose_one_app_does_not_affect_other() -> None:
     """Disposing app1's ctx does not affect app2's booted state."""
-    app1 = create_app()
-    app2 = create_app()
+    app1 = await create_app()
+    app2 = await create_app()
 
     async with app2.router.lifespan_context(app2) as state2:
         ctx2 = state2["ctx"]
@@ -82,7 +82,7 @@ async def test_ensure_default_ctx_caches_across_calls() -> None:
 @pytest.mark.asyncio
 async def test_lifespan_attaches_ctx_to_app_state() -> None:
     """Driving the lifespan populates ``app.state.ctx``."""
-    app = create_app()
+    app = await create_app()
     async with app.router.lifespan_context(app) as state:
         assert state["ctx"] is not None
         assert app.state.ctx is state["ctx"]

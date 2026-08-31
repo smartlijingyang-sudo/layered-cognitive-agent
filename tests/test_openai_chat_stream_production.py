@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from starlette.testclient import TestClient
 
-from gateway.app import create_app
+from lca_kernel.cli import create_app
 from gateway.runs.session.session import RunRegistry, RunSession
 from gateway.runs.terminal.legacy_adapter import RegistryRunAdapter
 from lca.contracts.models.observability.journal import (
@@ -82,20 +82,22 @@ def _seed_journal(registry: RunRegistry, run_id: str = "run-prod-sse") -> RunSes
     return session
 
 
-def test_session_run_adapter_is_not_on_the_chat_path() -> None:
+@pytest.mark.asyncio
+async def test_session_run_adapter_is_not_on_the_chat_path() -> None:
     import importlib
 
     with pytest.raises(ModuleNotFoundError):
         importlib.import_module("gateway.runs.session.session_adapter")
 
 
-def test_default_create_app_run_port_is_registry_not_session_stub() -> None:
+@pytest.mark.asyncio
+async def test_default_create_app_run_port_is_registry_not_session_stub() -> None:
     pytest.skip(
         "app.state.run_port / run_registry removed by ADR-0115 决定 6; "
         "production owner lives in run_loop_driver_registry now (see "
         "tests/lca_plugins/transport/webserver/test_router.py for the new shape)"
     )
-    application = create_app(lifespan=lambda _app: None)
+    application = await create_app(lifespan=lambda _app: None)
     port = application.state.run_port
     assert type(port).__name__ == "RegistryRunAdapter"
     assert isinstance(port, RegistryRunAdapter)
@@ -109,7 +111,7 @@ async def test_production_owner_stream_run_live_is_not_empty() -> None:
         "app.state.run_port / run_registry removed by ADR-0115 决定 6; "
         "test moved to tests/lca_plugins/transport/webserver/ scope"
     )
-    application = create_app(lifespan=lambda _app: None)
+    application = await create_app(lifespan=lambda _app: None)
     registry = application.state.run_registry
     session = _seed_journal(registry, run_id="run-owner-stream")
     frames: list[bytes] = []
@@ -128,7 +130,8 @@ async def test_production_owner_stream_run_live_is_not_empty() -> None:
     assert "chat.completion" not in body
 
 
-def test_production_v1_chat_completions_stream_is_housekeeping() -> None:
+@pytest.mark.asyncio
+async def test_production_v1_chat_completions_stream_is_housekeeping() -> None:
     pytest.skip(
         "app.state.run_port removed by ADR-0115 决定 6; housekeeping "
         "verification still holds in tests/test_openai_compat_gateway.py"

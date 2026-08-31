@@ -48,9 +48,9 @@ UPGRADE: WebSocketRoute = WebSocketRoute("/api/device/ws", connect_device)
 
 @plugin(
     id="lca-gateway-routes-device",
-    provides=("gateway_device_route",),
+    provides=(),
     requires=("gateway_router",),
-    layer="L3",
+    layer="L1",
     kind=PluginKind.PROVIDER,
     effects="none",
     description="Register /api/device/* (7 HTTP + 1 WebSocket) routes.",

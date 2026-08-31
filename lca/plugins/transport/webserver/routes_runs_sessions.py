@@ -72,9 +72,9 @@ ROUTES: tuple[Route, ...] = (
 
 @plugin(
     id="lca-gateway-routes-runs-sessions",
-    provides=("gateway_runs_sessions_route",),
+    provides=(),
     requires=("gateway_router",),
-    layer="L3",
+    layer="L1",
     kind=PluginKind.PROVIDER,
     effects="none",
     description="Register /runs (7) + /v1/sessions (8) routes.",

@@ -1,12 +1,14 @@
 from __future__ import annotations
+import pytest
 
 from pathlib import Path
 
-from gateway.app import create_app
+from lca_kernel.cli import create_app
 from gateway.profile import resolve_profile_path
 
 
-def test_profile_resolution_has_explicit_precedence(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_profile_resolution_has_explicit_precedence(tmp_path: Path) -> None:
     default = tmp_path / "profiles" / "web-standard.yaml"
     default.parent.mkdir()
     default.write_text("profile: test\n")
@@ -31,11 +33,13 @@ def test_profile_resolution_has_explicit_precedence(tmp_path: Path) -> None:
     )
 
 
-def test_profile_resolution_returns_none_without_fallback(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_profile_resolution_returns_none_without_fallback(tmp_path: Path) -> None:
     assert resolve_profile_path(environ={}, working_directory=tmp_path) is None
 
 
-def test_create_app_publishes_one_session_object_graph() -> None:
+@pytest.mark.asyncio
+async def test_create_app_publishes_one_session_object_graph() -> None:
     import pytest
 
     pytest.skip(
@@ -45,7 +49,7 @@ def test_create_app_publishes_one_session_object_graph() -> None:
     )
     from gateway.runs.terminal.legacy_adapter import RegistryRunAdapter
 
-    application = create_app(lifespan=lambda app: None)
+    application = await create_app(lifespan=lambda app: None)
 
     assert application.state.agent_registry is not None
     assert application.state.command_gateway is not None

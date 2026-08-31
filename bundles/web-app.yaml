@@ -346,3 +346,20 @@ entries:
     name: lca_gateway_routes_device
     $module: lca.plugins.transport.webserver.routes_device
     config: {}
+
+  # ADR-0119: lca-gateway-bootstrap (L0 PROVIDER) 替代 gateway/bootstrap.py
+  # 游离函数;提供 install_bootstrap_state 给 lca-web-server 在 K3 后调
+  - id: lca-gateway-bootstrap
+    name: lca_gateway_bootstrap
+    $module: lca.plugins.transport.webserver.bootstrap
+    config: {}
+
+  # ADR-0119: lca-web-server (L1 SEAM) 替代 gateway/app.py 的 thin factory
+  # 装 Starlette + 装 routes + 装 ASGI state + 装 lifespan;cli.py:serve await web_server.serve() 监听
+  - id: lca-web-server
+    name: lca_web_server
+    $module: lca.plugins.transport.webserver.server
+    config:
+      host: "0.0.0.0"
+      port: 8765
+      log_level: "info"

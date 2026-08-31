@@ -9,12 +9,12 @@ ADR-0115 thin factory: routes are installed by the lifespan via
 
 from __future__ import annotations
 
-import asyncio
 import re
 
+import pytest
 from starlette.routing import Route, WebSocketRoute
 
-from gateway.app import create_app
+from lca_kernel.cli import create_app
 
 # Prefix / exact owners. Keep this list next to the routes plugins
 # in lca/plugins/transport/webserver/.
@@ -40,20 +40,21 @@ def _iter_paths(app) -> list[str]:
     return sorted(paths)
 
 
-def _paths_after_lifespan() -> list[str]:
+async def _paths_after_lifespan() -> list[str]:
     """Drive the Starlette lifespan so routes get installed."""
-    app = create_app()
+    app = await create_app()
 
     async def _go() -> None:
         async with app.router.lifespan_context(app):
             pass
 
-    asyncio.run(_go())
+    await _go()
     return _iter_paths(app)
 
 
-def test_every_live_route_has_an_owner() -> None:
-    paths = _paths_after_lifespan()
+@pytest.mark.asyncio
+async def test_every_live_route_has_an_owner() -> None:
+    paths = await _paths_after_lifespan()
     assert paths, "create_app() must expose routes after lifespan startup"
     compiled = [(name, re.compile(pattern)) for name, pattern in SURFACES]
     orphan = [
@@ -62,8 +63,9 @@ def test_every_live_route_has_an_owner() -> None:
     assert orphan == [], f"add a SURFACES prefix for: {orphan}"
 
 
-def test_known_prefixes_still_match_core_paths() -> None:
-    paths = set(_paths_after_lifespan())
+@pytest.mark.asyncio
+async def test_known_prefixes_still_match_core_paths() -> None:
+    paths = set(await _paths_after_lifespan())
     assert "/health" in paths
     assert any(path.startswith("/runs") for path in paths)
     assert any(path.startswith("/v1/") for path in paths)

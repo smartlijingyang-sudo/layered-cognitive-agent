@@ -53,9 +53,9 @@ ROUTES: tuple[Route, ...] = (
 
 @plugin(
     id="lca-gateway-routes-health-options",
-    provides=("gateway_health_options_route",),
+    provides=(),
     requires=("gateway_router",),
-    layer="L3",
+    layer="L1",
     kind=PluginKind.PROVIDER,
     effects="none",
     description="Register /health + OPTIONS for /context and /journal/live.",
