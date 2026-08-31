@@ -3,8 +3,11 @@
 A plugin must declare all 4 elements:
   1. Identity   — id, layer, kind (already required)
   2. Capability — provides, requires (already required)
-  3. Interaction — logic_address (functional_group, control_slot, scope,
-                     authority, evidence, revision) + relations + ownership
+  3. Interaction — ``contract=PluginContract(...)`` per ADR-0110 D1
+                   (canonical 9-section form), or the legacy shorthand
+                   ``functional_group=`` / ``logic_address=`` keys
+                   (both still tolerated during the 6-month deprecation
+                   window per ADR-0110 §one) + relations + ownership
   4. Verification — test_suite, properties, fixtures
 
 Currently this gate covers element #3 (interaction). Element #4 is covered
@@ -17,7 +20,10 @@ Usage:
   python scripts/check_plugin_metadata.py [--root PATH] [--json]
 Exit code: 1 if any plugin missing required metadata (and not in blacklist).
 
-Refs: docs/superpowers/specs/2026-08-30-comprehensive-cleanup-execution.md §3.4
+Reference: docs/architecture/plugin-check-matrix.md (the single source of
+truth for hard vs soft gate behavior; matches ``lca plugin check`` output).
+For full project rationale see ADR-0110 (Plugin Contract Unification and
+Naming Convergence, accepted 2026-08-31).
 """
 
 from __future__ import annotations
@@ -89,17 +95,26 @@ def main(argv: list[str] | None = None) -> int:
 
     print(
         f"plugin-metadata: {len(plugins)} scanned, "
-        f"{len(critical)} critical (missing logic_address), "
+        f"{len(critical)} critical (missing contract=PluginContract), "
         f"{len(warning)} warning, "
         f"{len(exempted)} exempted via blacklist",
         file=sys.stderr,
     )
     if critical:
-        print("\nCRITICAL plugins (logic_address missing, not in blacklist):", file=sys.stderr)
+        print("\nCRITICAL plugins (no contract=, not in blacklist):", file=sys.stderr)
         for p in critical[:20]:
             print(f"  {p.plugin_id:<48} {p.file}:{p.line}", file=sys.stderr)
         if len(critical) > 20:
             print(f"  ... and {len(critical) - 20} more", file=sys.stderr)
+
+    if critical or warning:
+        # ADR-0110 §八 acceptance item #4: surface the matrix as the single
+        # source of truth for what these signals mean.
+        print(
+            "\nSee docs/architecture/plugin-check-matrix.md for what each "
+            "warning / critical means and how to resolve.",
+            file=sys.stderr,
+        )
 
     return 1 if critical else 0
 
