@@ -162,9 +162,10 @@ def daemon_stop(ctx: PipelineContext) -> None:
 
 # ── Composite Steps ───────────────────────────────────────────────────
 
-# ADR-0119 决定 4:lca-ops 不再管 LCA 进程。gateway (LCA 进程) 入口是
-# ``python -m lca_kernel serve`` 直管,K6 SIGTERM/SIGINT/fail-loud 守护。
-# lca-ops status / stop 仍管理 lobehub / infra / daemon / onlyboxes 外部服务。
+# ADR-0119 决定 4 + PR-3:lca-ops 不再管 LCA 进程的 start/stop/restart
+# (SIGTERM 由 K6 lca_kernel.lifecycle 守护)。但 heal 仍能自愈 —— 先
+# KernelServeService.heal() 把 LCA 进程拉起,再走外部平台服务循环。
+# status 不包含 kernel_serve(只读观察), heal 才触发拉起。
 STATUS_SERVICES = ("infra", "lobehub", "daemon", "onlyboxes")
 STOP_SERVICES = ("daemon", "lobehub", "infra")
 
@@ -201,9 +202,27 @@ def stack_status(ctx: PipelineContext) -> None:
 
 @register_step("stack.heal")
 def stack_heal(ctx: PipelineContext) -> None:
-    """Heal every service. Do the work here — do not bounce the operator."""
+    """Heal every service. Do the work here — do not bounce the operator.
+
+    PR-3: 先 KernelServeService.heal() 把 LCA 进程(若不在)拉起;再走
+    STATUS_SERVICES 修外部服务。kernel_serve 不在 STATUS_SERVICES 里,
+    因为 status 只观察不拉起(那是 heal 的工作)。
+    """
     ctx.console.info("Healing services...")
     leftover: list[str] = []
+    # 1) LCA 进程自愈 (ADR-0119 决定 4 + PR-3)
+    try:
+        ks = ctx.registry.get("kernel_serve")
+        ks_state = ks.heal()
+        ctx.console.service_state("kernel_serve", ks_state)
+        if not ks_state.is_running:
+            leftover.append(f"kernel_serve: {ks_state.why or ks_state.detail}")
+            ctx.failed = True
+    except Exception as exc:
+        ctx.console.error(f"kernel_serve heal crashed: {exc}")
+        leftover.append("kernel_serve: crashed — see error above")
+        ctx.failed = True
+    # 2) 外部平台服务
     for name in STATUS_SERVICES:
         svc = ctx.registry.get(name)
         try:

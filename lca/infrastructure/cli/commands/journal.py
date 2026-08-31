@@ -202,7 +202,7 @@ def _stream_live(
         FactStreamProjector,
     )
 
-    url = f"{ops_config.gateway.base_url}/journal/live"
+    url = f"{ops_config.kernel_serve.base_url}/journal/live"
     projector = FactStreamProjector(verbose=verbose, show_deltas=show_deltas)
     last_seq = 0
     last_frame_ts = _time.monotonic()

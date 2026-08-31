@@ -13,7 +13,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from lca.infrastructure.cli.config import GatewayConfig, LobeHubConfig
+from lca.infrastructure.cli.config import KernelServeConfig, LobeHubConfig
 from lca.infrastructure.cli.service import (
     HealthCheck,
     ServiceState,
@@ -39,13 +39,13 @@ class LobeHubService:
     def __init__(
         self,
         config: LobeHubConfig,
-        gateway: GatewayConfig,
+        gateway: KernelServeConfig,
         state_dir: Path,
         root: Path,
     ) -> None:
         self.name = "lobehub"
         self._config = config
-        self._gateway = gateway
+        self._kernel_serve = gateway
         self._state = StateStore(state_dir)
         self._root = root
         self._dir = root / config.dir
@@ -295,21 +295,21 @@ class LobeHubService:
         if not env_file.exists():
             env_file.write_text(template.read_text())
 
-        # Update gateway proxy URLs
-        gateway_url = f"{self._gateway.base_url}/v1"
+        # Update kernel_serve proxy URLs
+        kernel_serve_url = f"{self._kernel_serve.base_url}/v1"
         lines = env_file.read_text().splitlines()
         updated = []
         changed = False
 
         for line in lines:
             if line.startswith("OPENAI_PROXY_URL="):
-                updated.append(f"OPENAI_PROXY_URL={gateway_url}")
+                updated.append(f"OPENAI_PROXY_URL={kernel_serve_url}")
                 changed = True
             elif line.startswith("OPENAI_API_KEY="):
                 updated.append("OPENAI_API_KEY=lca-local")
                 changed = True
             elif line.startswith("QWEN_PROXY_URL="):
-                updated.append(f"QWEN_PROXY_URL={gateway_url}")
+                updated.append(f"QWEN_PROXY_URL={kernel_serve_url}")
                 changed = True
             elif line.startswith("QWEN_API_KEY="):
                 updated.append("QWEN_API_KEY=lca-local")
@@ -389,7 +389,7 @@ class LobeHubService:
             "PORT": str(self._config.dev_port),
             "SPA_PORT": str(self._config.spa_port),
             "VITE_DEV_PORT": str(self._config.spa_port),
-            "OPENAI_PROXY_URL": f"{self._gateway.base_url}/v1",
+            "OPENAI_PROXY_URL": f"{self._kernel_serve.base_url}/v1",
             "OPENAI_API_KEY": "lca-local",
             "ENABLED_OPENAI": "1",
         }

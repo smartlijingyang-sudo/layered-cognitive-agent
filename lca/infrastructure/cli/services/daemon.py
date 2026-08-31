@@ -17,7 +17,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from lca.infrastructure.cli.config import DaemonConfig, GatewayConfig
+from lca.infrastructure.cli.config import DaemonConfig, KernelServeConfig
 from lca.infrastructure.cli.service import (
     HealthCheck,
     ServiceState,
@@ -32,21 +32,21 @@ from lca.infrastructure.cli.sudo import Sudo
 class DaemonService:
     """Sandbox-user CLI daemon.
 
-    Manages the node process that connects sandbox-user to the gateway
+    Manages the node process that connects sandbox-user to the kernel serve
     via WebSocket, receiving and executing tool calls.
     """
 
     def __init__(
         self,
         config: DaemonConfig,
-        gateway: GatewayConfig,
+        kernel_serve: KernelServeConfig,
         state_dir: Path,
         root: Path,
         sudo: Sudo,
     ) -> None:
         self.name = "daemon"
         self._config = config
-        self._gateway = gateway
+        self._kernel_serve = kernel_serve
         self._state = StateStore(state_dir)
         self._root = root
         self._sudo = sudo
@@ -54,20 +54,20 @@ class DaemonService:
         self._user_state = Path(f"/home/{self._config.user}/.lca")
 
     @property
-    def _gateway_ws_url(self) -> str:
-        """Resolve gateway WebSocket URL from config."""
-        if self._config.gateway_ws_url:
-            return self._config.gateway_ws_url
-        return f"ws://{self._gateway.host}:{self._gateway.port}"
+    def _kernel_serve_ws_url(self) -> str:
+        """Resolve kernel serve WebSocket URL from config."""
+        if self._config.kernel_serve_ws_url:
+            return self._config.kernel_serve_ws_url
+        return f"ws://{self._kernel_serve.host}:{self._kernel_serve.port}"
 
     @property
-    def _gateway_health_url(self) -> str:
-        """Resolve gateway health check URL."""
-        return f"{self._gateway.base_url}{self._gateway.health_path}"
+    def _kernel_serve_health_url(self) -> str:
+        """Resolve kernel serve health check URL."""
+        return f"{self._kernel_serve.base_url}{self._kernel_serve.health_path}"
 
-    def _is_gateway_healthy(self) -> bool:
-        """Check if gateway is accepting connections."""
-        return http_ready(self._gateway_health_url, timeout=1.0)
+    def _is_kernel_serve_healthy(self) -> bool:
+        """Check if kernel serve is accepting connections."""
+        return http_ready(self._kernel_serve_health_url, timeout=1.0)
 
     # ── Lifecycle ─────────────────────────────────────────────────────
 

@@ -14,17 +14,21 @@ import yaml
 from pydantic import BaseModel, Field
 
 
-class GatewayConfig(BaseModel):
-    """LCA API gateway (Starlette) network config — ADR-0119 决定 4。
+class KernelServeConfig(BaseModel):
+    """LCA kernel serve (Starlette :8765) 网络配置 — ADR-0119 决定 4。
 
     LCA 进程本身**不**由本配置驱动(spawn 命令、`watch` 路径在 ADR-0119
     决定 4 中删除);LCA 进程入口是 ``python -m lca_kernel serve``,SIGTERM
     由 K6 ``lca_kernel.lifecycle`` 守护。本类仅保留 daemon 等其他服务需要
     的网络配置(host / port / health_path),用于构造 ``base_url`` /
-    ``health_url``。
+    ``health_url`` 与 ``lca-ops heal`` 自动拉起 LCA 进程。
+
+    ``host`` 默认 ``0.0.0.0`` 让 kernel serve 在局域网可访问;daemon 走
+    ``ws://127.0.0.1:8765`` (``DaemonConfig.kernel_serve_ws_url`` 默认
+    loopback)与本字段无关。
     """
 
-    host: str = "127.0.0.1"
+    host: str = "0.0.0.0"
     port: int = 8765
     health_path: str = "/health"
 
@@ -105,16 +109,16 @@ class OnlyboxesConfig(BaseModel):
 class DaemonConfig(BaseModel):
     """Agent CLI daemon (sandbox-user connect)."""
 
-    gateway_ws_url: str = ""  # empty = derive from gateway config at runtime
+    kernel_serve_ws_url: str = ""  # empty = derive from kernel_serve config at runtime
     user: str = "sandbox-user"
     workspace: str = "/home/sandbox-user"
     host_config: str = "lca-host.yaml"
 
-    def resolve_gateway_url(self, gateway_host: str, gateway_port: int) -> str:
-        """Resolve gateway WebSocket URL, defaulting to gateway config."""
-        if self.gateway_ws_url:
-            return self.gateway_ws_url
-        return f"ws://{gateway_host}:{gateway_port}"
+    def resolve_kernel_serve_url(self, host: str, port: int) -> str:
+        """Resolve kernel serve WebSocket URL, defaulting to kernel_serve config."""
+        if self.kernel_serve_ws_url:
+            return self.kernel_serve_ws_url
+        return f"ws://{host}:{port}"
 
 
 class OpsConfig(BaseModel):
@@ -123,7 +127,7 @@ class OpsConfig(BaseModel):
     Load order: defaults → YAML file → environment variables.
     """
 
-    gateway: GatewayConfig = Field(default_factory=GatewayConfig)
+    kernel_serve: KernelServeConfig = Field(default_factory=KernelServeConfig)
     lobehub: LobeHubConfig = Field(default_factory=LobeHubConfig)
     infra: InfraConfig = Field(default_factory=InfraConfig)
     daemon: DaemonConfig = Field(default_factory=DaemonConfig)
