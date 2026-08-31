@@ -7,17 +7,22 @@ Public surface
   into ``process.exit(1)`` after teardown (see ADR-0117 §决定 2).
 - :exc:`StageError` — K3 boot stage error; carries which :class:`~lca_kernel.stages.Stage`
   failed so the failure trace can pinpoint the offending phase.
+- :exc:`ReloadError` — K8 HMR path; carries ``path`` + ``reason`` for supervisor
+  decision (see ADR-0118 §决定 4).
 """
 
 from __future__ import annotations
+
+from pathlib import Path
+from typing import Literal
 
 
 class KernelError(Exception):
     """Base class for every kernel-raised exception.
 
-    Plugin setup failures, ``.env`` whitelist violations, and shutdown
-    coordination errors all derive from this type so a single ``except
-    KernelError`` clause catches them at the transport / CLI boundary.
+        Plugin setup failures, ``.env`` whitelist violations, and shutdown
+        coordination errors all derive from this type so a single ``except
+    20→ KernelError`` clause catches them at the transport / CLI boundary.
     """
 
 
@@ -37,4 +42,21 @@ class StageError(KernelError):
         self.stage = stage
 
 
-__all__ = ["FailLoudError", "KernelError", "StageError"]
+ReloadReason = Literal["missing", "shape", "empty", "io"]
+
+
+class ReloadError(KernelError):
+    """K8 HMR: reload path raised by ``PatchWatcher.reload_now()``.
+
+    Carries the offending ``path`` and a coarse ``reason`` so the
+    supervisor (uvicorn --reload / k8s readiness / lca-ops restart) can
+    log + decide. See ADR-0118 §决定 4.
+    """
+
+    def __init__(self, path: Path, reason: ReloadReason, message: str) -> None:
+        super().__init__(f"[reload:{reason}] {path}: {message}")
+        self.path = path
+        self.reason = reason
+
+
+__all__ = ["FailLoudError", "KernelError", "ReloadError", "ReloadReason", "StageError"]
