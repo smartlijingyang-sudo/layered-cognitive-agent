@@ -1,4 +1,13 @@
-"""Gateway startup infrastructure must be explicit and app-scoped."""
+"""Gateway startup infrastructure must be explicit and app-scoped.
+
+ADR-0115 决定 6: gateway/app.py 是 thin factory,不再接
+``bootstrap_factory`` / ``bootstrap_config`` —— 这些关注点迁给 plugins
+(``lca/plugins/transport/webserver/`` 里的 routes plugin 在 lifespan 里
+装配 file_store / devices 等)。
+
+The legacy bootstrap tests are skipped pending ADR-0118 / K8 transition
+that will define the new composition shape.
+"""
 
 from __future__ import annotations
 
@@ -8,12 +17,10 @@ from typing import cast
 
 import pytest
 
-from gateway.app import create_app
 from gateway.bootstrap import (
     DefaultGatewayBootstrapFactory,
     GatewayBootstrap,
     GatewayBootstrapConfig,
-    GatewayBootstrapFactory,
 )
 from gateway.device_gateway.hub import DeviceHub
 from gateway.device_gateway.registry import DeviceRegistry
@@ -33,57 +40,17 @@ class _EmptyMachineResolver(MachineResolver):
         return None
 
 
-class _FixedBootstrapFactory(GatewayBootstrapFactory):
-    def __init__(self, product: GatewayBootstrap) -> None:
-        self.product = product
-        self.received: GatewayBootstrapConfig | None = None
-
-    def create(self, config: GatewayBootstrapConfig) -> GatewayBootstrap:
-        self.received = config
-        return self.product
-
-
+@pytest.mark.skip(
+    reason="bootstrap_factory/ bootstrap_config removed by ADR-0115 决定 6; "
+    "see ADR-0118 K8 / HMR plan for replacement"
+)
 def test_create_app_installs_exact_bootstrap_product_instances() -> None:
-    with tempfile.TemporaryDirectory() as tmpdir:
-        store = LocalFileStore(Path(tmpdir) / "files")
-        resolver = _EmptyMachineResolver()
-        product = GatewayBootstrap(
-            file_store=store,
-            devices=cast("DeviceRegistry", object()),
-            device_hub=cast("DeviceHub", object()),
-            machine_resolver=resolver,
-            device_settings=DeviceGatewaySettings(db_path=str(Path(tmpdir) / "devices.db")),
-        )
-        factory = _FixedBootstrapFactory(product)
-        config = GatewayBootstrapConfig(file_store_root=Path(tmpdir) / "configured-files")
-
-        app = create_app(profile_path=None, bootstrap_factory=factory, bootstrap_config=config)
-
-    assert factory.received is config
-    assert app.state.bootstrap is product
-    assert app.state.file_store is store
-    assert app.state.devices is product.devices
-    assert app.state.device_hub is product.device_hub
-    assert app.state.machine_resolver is resolver
+    pass
 
 
-@pytest.mark.asyncio
-async def test_gateway_lifespan_reuses_bootstrap_file_store() -> None:
-    with tempfile.TemporaryDirectory() as tmpdir:
-        store = LocalFileStore(Path(tmpdir) / "files")
-        product = GatewayBootstrap(
-            file_store=store,
-            devices=cast("DeviceRegistry", object()),
-            device_hub=cast("DeviceHub", object()),
-            machine_resolver=_EmptyMachineResolver(),
-            device_settings=DeviceGatewaySettings(db_path=str(Path(tmpdir) / "devices.db")),
-        )
-        app = create_app(
-            profile_path="profiles/web-standard.yaml",
-            bootstrap_factory=_FixedBootstrapFactory(product),
-        )
-        async with app.router.lifespan_context(app):
-            assert app.state.ctx.inject("file_store").current() is store
+@pytest.mark.skip(reason="bootstrap_factory removed by ADR-0115 决定 6")
+def test_gateway_lifespan_reuses_bootstrap_file_store() -> None:
+    pass
 
 
 def test_default_bootstrap_factory_creates_isolated_app_resources() -> None:
@@ -107,3 +74,11 @@ def test_default_bootstrap_factory_creates_isolated_app_resources() -> None:
     assert first.devices is not second.devices
     assert first.device_hub is not second.device_hub
     assert first.machine_resolver is not second.machine_resolver
+
+
+# Suppress unused-import warnings for legacy test fixtures.
+_ = cast
+_ = LocalFileStore
+_ = GatewayBootstrap
+_ = DeviceRegistry
+_ = DeviceHub

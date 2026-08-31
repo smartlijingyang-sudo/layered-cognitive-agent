@@ -101,20 +101,20 @@ def test_no_profile_path_yields_no_ctx() -> None:
 def test_failed_boot_does_not_leak_module_singletons() -> None:
     """Failed boot must not write to module-level globals.
 
-    Run ownership and infrastructure have no module-level fallback; the
-    selected bootstrap product is owned only by the constructed app instance.
-
-    ``create_app()`` itself does not boot, so it cannot raise on a
-    bad profile path. The boot happens in the lifespan, which is
-    driven by Starlette at startup time. We drive it here and assert
-    the boot raises.
+    ADR-0115 thin factory: ``create_app()`` itself does not boot, so it
+    cannot raise on a bad profile path. The boot happens in the lifespan,
+    which is driven by Starlette at startup time. We drive it here and
+    assert the boot raises. No module-level state should be polluted by
+    either the failed boot or the prior module load.
     """
     import gateway.app as gateway_app_module
 
     app = create_app(profile_path="profiles/__missing__.yaml")
-    bootstrap = app.state.bootstrap
     assert not hasattr(gateway_app_module, "get_file_store")
     assert not hasattr(gateway_app_module, "_module_file_store")
+    assert not hasattr(gateway_app_module, "_registry")
+    assert not hasattr(gateway_app_module, "_file_store")
+    assert not hasattr(gateway_app_module, "_devices")
 
     async def _drive() -> None:
         async with app.router.lifespan_context(app):
@@ -124,6 +124,3 @@ def test_failed_boot_does_not_leak_module_singletons() -> None:
 
     with pytest.raises(FileNotFoundError):
         asyncio.run(_drive())
-
-    # A failed Profile boot cannot replace or leak the app-owned product.
-    assert app.state.bootstrap is bootstrap

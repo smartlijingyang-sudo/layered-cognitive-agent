@@ -36,6 +36,13 @@ def test_profile_resolution_returns_none_without_fallback(tmp_path: Path) -> Non
 
 
 def test_create_app_publishes_one_session_object_graph() -> None:
+    import pytest
+
+    pytest.skip(
+        "agent_registry / command_gateway / run_registry / run_port moved to "
+        "lifespan-driven ctx injection under ADR-0115 决定 6 (thin factory); "
+        "see tests/test_thin_factory.py for new shape"
+    )
     from gateway.runs.terminal.legacy_adapter import RegistryRunAdapter
 
     application = create_app(lifespan=lambda app: None)

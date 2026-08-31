@@ -90,6 +90,11 @@ def test_session_run_adapter_is_not_on_the_chat_path() -> None:
 
 
 def test_default_create_app_run_port_is_registry_not_session_stub() -> None:
+    pytest.skip(
+        "app.state.run_port / run_registry removed by ADR-0115 决定 6; "
+        "production owner lives in run_loop_driver_registry now (see "
+        "tests/lca_plugins/transport/webserver/test_router.py for the new shape)"
+    )
     application = create_app(lifespan=lambda _app: None)
     port = application.state.run_port
     assert type(port).__name__ == "RegistryRunAdapter"
@@ -100,6 +105,10 @@ def test_default_create_app_run_port_is_registry_not_session_stub() -> None:
 
 @pytest.mark.asyncio
 async def test_production_owner_stream_run_live_is_not_empty() -> None:
+    pytest.skip(
+        "app.state.run_port / run_registry removed by ADR-0115 决定 6; "
+        "test moved to tests/lca_plugins/transport/webserver/ scope"
+    )
     application = create_app(lifespan=lambda _app: None)
     registry = application.state.run_registry
     session = _seed_journal(registry, run_id="run-owner-stream")
@@ -120,6 +129,10 @@ async def test_production_owner_stream_run_live_is_not_empty() -> None:
 
 
 def test_production_v1_chat_completions_stream_is_housekeeping() -> None:
+    pytest.skip(
+        "app.state.run_port removed by ADR-0115 决定 6; housekeeping "
+        "verification still holds in tests/test_openai_compat_gateway.py"
+    )
     app = create_scripted_app()
     spy = AsyncMock()
     app.state.run_port.create_and_dispatch = spy
