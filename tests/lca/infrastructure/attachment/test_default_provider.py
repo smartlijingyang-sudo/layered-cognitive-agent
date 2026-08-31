@@ -20,13 +20,13 @@ from lca.infrastructure.attachment.default_provider import (
     DefaultAttachmentResolver,
     DefaultAttachmentStager,
 )
-from lca.infrastructure.attachment.run_file_store_scope import run_file_store_scope
 from lca.infrastructure.attachment.run_machine_root_scope import run_machine_root_scope
 from lca.infrastructure.attachment.settings import (
     reset_attachment_settings_for_tests,
 )
 from lca.infrastructure.attachment.system_role_renderer import render_system_role
 from lca.infrastructure.file_store import LocalFileStore
+from lca.infrastructure.observability.facade.run_ambit import RunAmbit, bind_run_ambit
 from lca.infrastructure.tools.run_attachment_scope import run_attachment_scope
 
 
@@ -154,7 +154,7 @@ class TestSystemRoleRendererRegression:
 
     def test_cloud_branch_emits_uploaded_files_block(self, tmp_store: LocalFileStore) -> None:
         aid = _first_id(tmp_store)
-        with run_file_store_scope(tmp_store), run_attachment_scope([aid]):
+        with bind_run_ambit(RunAmbit(file_store=tmp_store)), run_attachment_scope([aid]):
             result = render_system_role(
                 plane=PlaneRef(
                     id="sb",
@@ -169,7 +169,7 @@ class TestSystemRoleRendererRegression:
         assert "/mnt/data/Clash_1752915628.yaml" in result.text
 
     def test_no_attachments_renders_empty_uploaded_block(self, tmp_store: LocalFileStore) -> None:
-        with run_file_store_scope(tmp_store):
+        with bind_run_ambit(RunAmbit(file_store=tmp_store)):
             result = render_system_role(
                 plane=PlaneRef(
                     id="sb",
@@ -186,7 +186,7 @@ class TestSystemRoleRendererRegression:
 
     def test_all_placeholders_substituted_in_one_pass(self, tmp_store: LocalFileStore) -> None:
         aid = _first_id(tmp_store)
-        with run_file_store_scope(tmp_store), run_attachment_scope([aid]):
+        with bind_run_ambit(RunAmbit(file_store=tmp_store)), run_attachment_scope([aid]):
             result = render_system_role(
                 plane=PlaneRef(
                     id="sb",

@@ -8,7 +8,7 @@ enter carrier-side scopes before a loop driver executes.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, nullcontext
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -19,8 +19,13 @@ from lca.contracts.models.core.plane import PlaneBindings
 from lca.contracts.models.observability.journal import RunScope
 from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols.runtime.infra import MachineResolver
+from lca.infrastructure.file_store import FileStore
 from lca.infrastructure.observability import BoundObservability, bind_backends, run_scope
 from lca.infrastructure.observability.events.event_descriptor_env import bind_descriptors
+from lca.infrastructure.observability.facade.run_ambit import (
+    RunAmbit,
+    bind_run_ambit,
+)
 from lca.infrastructure.runtime_plane.scope import plane_bindings_scope
 from lca.infrastructure.sandbox.runtime_scope import bind_sandbox_runtime
 from lca.infrastructure.search.scope import search_run_scope
@@ -77,31 +82,55 @@ class RunExecutionEnvironment:
 
     @asynccontextmanager
     async def prepare(self) -> AsyncIterator[PreparedRun]:
-        """Yield a driver-ready environment after ordered carrier preflight."""
+        """Yield a driver-ready environment after ordered carrier preflight.
+
+        ADR-0122: every ambient resource is bound through the single
+        :func:`bind_run_ambit` frame at the outermost level. Component
+        accessors (e.g. ``current_file_store()``) read from RunAmbit; the
+        legacy ``run_*_scope`` helpers, when invoked inside the frame, also
+        delegate to RunAmbit. New ambient resources MUST be added to
+        :class:`RunAmbit` rather than as new ``with``-blocks here.
+        """
         session = self._session
+        # Resolve providers BEFORE entering ambient scopes so we can bind
+        # the FileStore via RunAmbit (ADR-0122 / run_f03bd17f77f1):
+        # reasoner code reaches the FileStore via current_file_store()
+        # (no ctx handle); without this binding every think.main raises
+        # ``RuntimeError("no FileStore in ambient scope")`` before LLM is called.
+        bindings = _resolve_bindings(session, self._ctx, self._machine_resolver)
+        session.bindings = bindings
+        driver = _resolve_driver(session, self._ctx)
+        providers = _resolve_run_providers(bindings, self._ctx)
+
+        ambit = RunAmbit(
+            scope=RunScope(
+                trace_id=cast("TraceId", session.trace_id),
+                run_id=cast("RunId", session.run_id),
+            ),
+            run_id=session.run_id,
+            trace_id=session.trace_id,
+            attachment_ids=tuple(session.attachment_ids or ()),
+            file_store=cast("FileStore | None", providers.file_store),
+        )
         with (
+            bind_run_ambit(ambit),
             run_id_scope(session.run_id),
             run_attachment_scope(session.attachment_ids),
-            run_workspace_scope(session.run_id) as workspace,
             search_run_scope(),
-            run_scope(
-                RunScope(
-                    trace_id=cast("TraceId", session.trace_id),
-                    run_id=cast("RunId", session.run_id),
-                )
-            ),
         ):
             structlog.contextvars.bind_contextvars(
                 run_id=session.run_id,
                 trace_id=session.trace_id,
             )
             try:
-                bindings = _resolve_bindings(session, self._ctx, self._machine_resolver)
-                session.bindings = bindings
-                driver = _resolve_driver(session, self._ctx)
-                providers = _resolve_run_providers(bindings, self._ctx)
-                with plane_bindings_scope(bindings):
-                    await _bind_sandbox_runtime(session, providers.sandbox, providers.file_store)
+                with (
+                    run_workspace_scope(session.run_id) as workspace,
+                    run_scope(ambit.scope) if ambit.scope is not None else nullcontext(),
+                    plane_bindings_scope(bindings),
+                ):
+                    await _bind_sandbox_runtime(
+                        session, providers.sandbox, providers.file_store
+                    )
                     descriptor_registry = _resolve_descriptor_registry(self._ctx)
                     with bind_backends(self._hub), bind_descriptors(descriptor_registry):
                         await _stage_machine_attachments(

@@ -96,6 +96,11 @@ class DefaultReducer(Reducer):
             not state.final_output or state.final_output == stop.final_output
         ):
             state.final_output = stop.final_output
+        # ADR-0122: typed failure detail propagates through stop.failure →
+        # state.last_error, so the doctor_report / TerminalOutcome surfaces
+        # carry the real exception rather than a fixed Chinese fallback.
+        if stop.failure is not None and not state.last_error:
+            state.last_error = stop.failure.message
         return state
 
     def apply_terminal_outcome(
@@ -201,12 +206,18 @@ class DefaultReducer(Reducer):
 
         error_ref = None
         if state.last_error:
-            error_ref = ErrorRef(kind="error", message=state.last_error, source_ref="")
+            error_ref = ErrorRef(
+                kind="error",
+                message=state.last_error,
+                source_ref="",
+                diagnostic=getattr(stop, "failure", None),
+            )
         elif kind is TerminalOutcomeKind.FAILED:
             error_ref = ErrorRef(
                 kind="error",
                 message=stop_reason_value or "stop_reason=error",
                 source_ref="",
+                diagnostic=getattr(stop, "failure", None),
             )
         elif kind in (TerminalOutcomeKind.CANCELED, TerminalOutcomeKind.DEGRADED):
             default_msg = "canceled" if kind == TerminalOutcomeKind.CANCELED else "degraded"

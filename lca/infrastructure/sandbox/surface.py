@@ -42,9 +42,7 @@ def skill_preamble(store: FileStore | None = None) -> str:
 
 def plane_system_role(plane: PlaneRef) -> str:
     if plane.kind is PlaneKind.MACHINE:
-        from lca.infrastructure.attachment.run_file_store_scope import (
-            get_current_run_file_store,
-        )
+        from lca.infrastructure.observability.facade.run_ambit import current_file_store as get_current_run_file_store
         from lca.infrastructure.attachment.system_role_renderer import render_system_role
         from lca.infrastructure.runtime_plane.preinstall_prompt import (
             render_preinstalled_block,

@@ -1,14 +1,12 @@
 """execute subpackage of lca.plugins.transport.webserver.handlers.runs — split per ADR-0105 §11.2.
 
-Re-exports RunLifecycleCoordinator FIRST so that execute.py can
-``from lca.plugins.transport.webserver.handlers.runs.execute import RunLifecycleCoordinator`` without
-triggering a circular import. Then imports the facade module.
+Re-exports the carrier surface from the facade module so handlers can keep
+their existing import paths. The legacy ``_record_terminal_materialization``
+shim is gone in ADR-0122 — the real implementation lives in
+``lca.plugins.transport.webserver.handlers.runs.terminal.materialization``.
 """
 
-# 1. lifecycle first (so execute.py can re-import via this package)
-# 2. facade module last
 from lca.plugins.transport.webserver.handlers.runs.execute.execute import (
-    _record_terminal_materialization,
     create_run_session,
     execute_run,
     llm_status,
@@ -19,7 +17,6 @@ from lca.plugins.transport.webserver.handlers.runs.lifecycle import RunLifecycle
 
 __all__ = [
     "RunLifecycleCoordinator",
-    "_record_terminal_materialization",
     "create_run_session",
     "execute_run",
     "llm_status",

@@ -19,6 +19,52 @@ from lca.infrastructure.cli.commands._shared import emit_report, resolve_journal
 def register(app: typer.Typer) -> None:
     """Register coding-agent tool commands on the typer app."""
 
+    @app.command(name="debug-run")
+    def debug_run_cmd(
+        run_id: str = typer.Argument(..., help="Run id"),
+        json_mode: bool = typer.Option(False, "--json"),
+    ) -> None:
+        """One-shot 8-section diagnostic for one run (ADR-0122).
+
+        \b
+        Examples:
+            lca-ops debug-run <run_id>
+            lca-ops debug-run <run_id> --json
+        """
+        from lca.plugins.tools.diagnostics.debug_run import DebugRunToolAdapter
+
+        adapter = DebugRunToolAdapter.from_locator_root("traces")
+        report = adapter.debug_run(run_id)
+        if json_mode:
+            emit_report(report.to_dict(), json_mode=True)
+        else:
+            typer.echo(report.render_text())
+
+    @app.command(name="debug-env")
+    def debug_env_cmd(
+        run_id: str = typer.Argument(..., help="Run id"),
+        json_mode: bool = typer.Option(False, "--json"),
+    ) -> None:
+        """Dump RunAmbit + diagnostic summary for one run."""
+        from lca.plugins.tools.diagnostics.debug_run import DebugRunToolAdapter
+
+        adapter = DebugRunToolAdapter.from_locator_root("traces")
+        report = adapter.debug_run(run_id)
+        env = {
+            "run_id": report.run_id,
+            "manifest_path": report.manifest_path,
+            "phase_cursor": report.phase_cursor,
+            "failure_node_id": report.failure_node_id,
+            "error_message": report.error_message,
+            "error_type": report.error_type,
+            "attempts": list(report.attempts),
+            "suggested_action": report.suggested_action,
+        }
+        if json_mode:
+            emit_report(env, json_mode=True)
+        else:
+            typer.echo(json.dumps(env, indent=2, ensure_ascii=False))
+
     @app.command(name="trace")
     def trace(
         run_id: str = typer.Argument(..., help="Run id"),

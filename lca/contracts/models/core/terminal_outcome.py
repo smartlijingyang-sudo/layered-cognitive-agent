@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 
 class TerminalOutcomeKind(str, Enum):
@@ -104,11 +105,18 @@ class ResumeCursor:
 
 @dataclass(frozen=True)
 class ErrorRef:
-    """错误引用；``kind`` 形如 'crash' | 'approval_timeout' | 'cancel'。"""
+    """错误引用；``kind`` 形如 'crash' | 'approval_timeout' | 'cancel'。
+
+    ADR-0122: ``diagnostic`` carries the typed :class:`RunDiagnostic` when
+    set; ``message`` remains the canonical short summary for non-agent
+    consumers (UI / doctor_report). The diagnostic field is the
+    authoritative source for stack/attempts/suggested_action.
+    """
 
     kind: str = ""
     message: str = ""
     source_ref: str = ""  # journal ref 到引发错误的事件
+    diagnostic: Any | None = None  # RunDiagnostic; typed as Any to avoid contracts→runtime import
 
 
 @dataclass(frozen=True)

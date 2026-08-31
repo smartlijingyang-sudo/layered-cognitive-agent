@@ -364,17 +364,28 @@ def _is_empty_default(value: Any) -> bool:
 
 
 def _omit_empty(value: Any) -> Any:
-    """Drop null / empty-string / empty-collection defaults from nested dicts."""
+    """Drop null / empty-string / empty-collection defaults from nested dicts.
+
+    Pure generator + comprehension — no scope ambiguity (see ADR-0122):
+    the previous list-branch used ``[pruned for ...]`` where ``pruned`` was
+    only ever assigned in the Mapping branch, causing ``UnboundLocalError``
+    the moment any non-empty list was reached.
+    """
     if isinstance(value, Mapping):
-        out: dict[str, Any] = {}
-        for key, item in value.items():
-            pruned = _omit_empty(item)
-            if _is_empty_default(pruned):
-                continue
-            out[str(key)] = pruned
-        return out
+        pruned_items = (
+            (str(k), _omit_empty(item)) for k, item in value.items()
+        )
+        return {
+            k: v
+            for k, v in pruned_items
+            if not _is_empty_default(v)
+        }
     if isinstance(value, list):
-        return [pruned for item in value if not _is_empty_default(_omit_empty(item))]
+        return [
+            pruned
+            for pruned in (_omit_empty(item) for item in value)
+            if not _is_empty_default(pruned)
+        ]
     return value
 
 

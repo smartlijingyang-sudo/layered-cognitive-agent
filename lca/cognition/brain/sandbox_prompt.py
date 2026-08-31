@@ -19,9 +19,7 @@ from collections.abc import Sequence
 
 from lca.contracts.models.core.plane import PlaneKind, PlaneRef
 from lca.contracts.protocols import Tool
-from lca.infrastructure.attachment.run_file_store_scope import (
-    get_current_run_file_store,
-)
+from lca.infrastructure.observability.facade.run_ambit import current_file_store as get_current_run_file_store
 from lca.infrastructure.attachment.system_role_renderer import render_system_role
 from lca.infrastructure.file_store import FileStore
 from lca.infrastructure.sandbox.paths import ONLYBOXES

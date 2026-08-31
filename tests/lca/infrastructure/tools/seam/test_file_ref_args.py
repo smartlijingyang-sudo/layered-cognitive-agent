@@ -14,8 +14,8 @@ from lca.contracts.protocols.runtime.attachment_errors import (
     AmbiguousFileRefError,
     UnresolvedFileRefError,
 )
-from lca.infrastructure.attachment.run_file_store_scope import run_file_store_scope
 from lca.infrastructure.file_store import LocalFileStore
+from lca.infrastructure.observability.facade.run_ambit import RunAmbit, bind_run_ambit
 from lca.infrastructure.tools.seam.file_ref_args import resolve_path_arg
 
 
@@ -35,7 +35,7 @@ def _first_id(store: LocalFileStore) -> str:
 class TestResolvePathArg:
     def test_lca_url_maps_to_filestore_attachment(self, store_with_file: LocalFileStore) -> None:
         aid = _first_id(store_with_file)
-        with run_file_store_scope(store_with_file):
+        with bind_run_ambit(RunAmbit(file_store=store_with_file)):
             result = resolve_path_arg(f"/files/{aid}")
         assert result.attachment_id == aid
         # Workspace path returned for the host; the dispatch layer wraps with
@@ -46,7 +46,7 @@ class TestResolvePathArg:
     def test_http_url_is_passthrough_with_external_kind(
         self, store_with_file: LocalFileStore
     ) -> None:
-        with run_file_store_scope(store_with_file):
+        with bind_run_ambit(RunAmbit(file_store=store_with_file)):
             result = resolve_path_arg("https://example.com/x.yaml")
         assert result.file_ref.kind == "user_upload"  # temporary; sandbox curl resolves
         assert result.process_path == "https://example.com/x.yaml"
@@ -62,11 +62,11 @@ class TestResolvePathArg:
 
     def test_unknown_lca_url_is_unresolved(self, tmp_path: Path) -> None:
         store = LocalFileStore(root=tmp_path)
-        with run_file_store_scope(store), pytest.raises(UnresolvedFileRefError):
+        with bind_run_ambit(RunAmbit(file_store=store)), pytest.raises(UnresolvedFileRefError):
             resolve_path_arg("/files/file_does_not_exist")
 
     def test_empty_string_is_unresolved(self, store_with_file: LocalFileStore) -> None:
-        with run_file_store_scope(store_with_file), pytest.raises(UnresolvedFileRefError):
+        with bind_run_ambit(RunAmbit(file_store=store_with_file)), pytest.raises(UnresolvedFileRefError):
             resolve_path_arg("")
 
     def test_ambiguous_attachment_id_raises(self) -> None:

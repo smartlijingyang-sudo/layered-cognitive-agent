@@ -19,9 +19,9 @@ from pathlib import Path
 
 from lca.contracts.models.core.file_ref import FileRef
 from lca.contracts.models.core.plane import PlaneKind, PlaneRef
-from lca.infrastructure.attachment.run_file_store_scope import run_file_store_scope
 from lca.infrastructure.attachment.system_role_renderer import render_system_role
 from lca.infrastructure.file_store import LocalFileStore
+from lca.infrastructure.observability.facade.run_ambit import RunAmbit, bind_run_ambit
 from lca.infrastructure.tools.run_attachment_scope import run_attachment_scope
 
 
@@ -39,7 +39,7 @@ def test_trace_run_75e88a76899b_does_not_recur(tmp_path: Path) -> None:
         mime_type="text/plain",
     )
     aid = _first_id(store)
-    with run_file_store_scope(store), run_attachment_scope([aid]):
+    with bind_run_ambit(RunAmbit(file_store=store)), run_attachment_scope([aid]):
         result = render_system_role(
             plane=PlaneRef(
                 id="sb",
