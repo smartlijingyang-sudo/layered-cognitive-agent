@@ -11,7 +11,6 @@ import asyncio
 from typing import Any
 
 import pytest
-from lca.infrastructure.observability.facade.team_profile import TeamTraceProfile
 
 from lca.agent.cognitive_agent import CognitiveAgent
 from lca.agent.team_handle import TeamHandle
@@ -19,6 +18,7 @@ from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import Result
 from lca.contracts.models.observability.journal import AgentRunFinished, TeamRunFinished
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
+from lca.infrastructure.observability.facade.team_profile import TeamTraceProfile
 from tests.support.observability_helpers import make_test_bound
 
 

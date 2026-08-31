@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import unittest
 
-from lca.infrastructure.observability.stream.stream_channel import classify_output_channel
-
 from lca.contracts.atoms.enums import StreamChannel
+from lca.infrastructure.observability.stream.stream_channel import classify_output_channel
 
 
 class TestStreamChannel(unittest.TestCase):

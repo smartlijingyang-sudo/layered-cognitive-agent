@@ -21,8 +21,6 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
-from lca.infrastructure.observability.adapters.policy import AttributePolicy
 
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
@@ -40,6 +38,8 @@ from lca.infrastructure.observability import (
     record,
     run_scope,
 )
+from lca.infrastructure.observability.adapters.policy import AttributePolicy
+from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
 from lca.infrastructure.observability.journal.engine.journal_io import (
     load_journal_records,
     read_journal,

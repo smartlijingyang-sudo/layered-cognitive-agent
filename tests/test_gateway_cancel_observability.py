@@ -57,7 +57,7 @@ class _LazyHubAgent:
 
 @pytest.mark.asyncio
 async def test_execute_run_cancel_no_otel_detach_noise(caplog: pytest.LogCaptureFixture) -> None:
-    from lca.harness.profile.lifespan import profile_lifespan
+    from lca_kernel import run_kernel_lifespan as profile_lifespan
 
     registry = RunRegistry()
     async with profile_lifespan("profiles/web-standard.yaml") as state:

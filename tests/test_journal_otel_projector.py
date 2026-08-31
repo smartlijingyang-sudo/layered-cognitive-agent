@@ -8,7 +8,6 @@ delegation span 下（而非 0 秒 transport 化石），delegation span 的生�
 from __future__ import annotations
 
 import pytest
-from lca.infrastructure.observability.adapters.view import view_of
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -30,6 +29,7 @@ from lca.contracts.models.observability.journal import (
     ToolInvoked,
 )
 from lca.infrastructure.observability import OtelProjector, SpanView
+from lca.infrastructure.observability.adapters.view import view_of
 
 _BASE_TS = 1_000_000.0
 

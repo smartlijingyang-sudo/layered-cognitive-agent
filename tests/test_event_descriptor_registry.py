@@ -2,6 +2,13 @@
 
 from __future__ import annotations
 
+from lca.contracts.models.observability.event import (
+    EventAudience,
+    EventDescriptor,
+    EventDurability,
+    EventSensitivity,
+)
+from lca.contracts.models.observability.journal import LlmCallCompleted
 from lca.infrastructure.observability.events.event_catalog import (
     EVENT_DESCRIPTOR_REGISTRY,
     descriptor_for,
@@ -12,14 +19,6 @@ from lca.infrastructure.observability.events.event_descriptor_registry import (
     InMemoryEventDescriptorRegistry,
     UnknownEventDescriptorError,
 )
-
-from lca.contracts.models.observability.event import (
-    EventAudience,
-    EventDescriptor,
-    EventDurability,
-    EventSensitivity,
-)
-from lca.contracts.models.observability.journal import LlmCallCompleted
 
 
 def test_bootstrap_registers_builtin_descriptors() -> None:

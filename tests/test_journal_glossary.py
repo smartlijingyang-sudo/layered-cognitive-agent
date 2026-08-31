@@ -3,6 +3,12 @@
 from __future__ import annotations
 
 import pytest
+
+from lca.contracts.models.observability.event import (
+    EventAudience,
+    EventSensitivity,
+)
+from lca.contracts.models.observability.journal_catalog import JOURNAL_EVENT_CLASSES
 from lca.infrastructure.observability.events.event_descriptors_data import build_default_registry
 from lca.infrastructure.observability.events.event_doc import (
     EVENT_DOCS,
@@ -10,12 +16,6 @@ from lca.infrastructure.observability.events.event_doc import (
     doc_for,
     register_doc,
 )
-
-from lca.contracts.models.observability.event import (
-    EventAudience,
-    EventSensitivity,
-)
-from lca.contracts.models.observability.journal_catalog import JOURNAL_EVENT_CLASSES
 
 
 def _infer_layer(emitter: str) -> str:

@@ -11,11 +11,11 @@
 from __future__ import annotations
 
 import pytest
-from lca.infrastructure.observability.events.w3c_validator import DefaultW3CValidator
 
 from lca.contracts.observability.w3c_trace_context import (
     TraceparentParts,
 )
+from lca.infrastructure.observability.events.w3c_validator import DefaultW3CValidator
 
 
 @pytest.fixture

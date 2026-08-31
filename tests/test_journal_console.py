@@ -9,7 +9,6 @@ from __future__ import annotations
 import io
 
 import pytest
-from lca.infrastructure.observability.adapters.policy import Verbosity
 
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
@@ -23,6 +22,7 @@ from lca.contracts.models.observability.journal import (
     TeamRunStarted,
     ToolInvoked,
 )
+from lca.infrastructure.observability.adapters.policy import Verbosity
 from lca.infrastructure.observability.journal.console.projector import ConsoleJournalProjector
 
 _BASE_TS = 2_000_000.0

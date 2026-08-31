@@ -9,7 +9,7 @@ from gateway.runs.execute import create_run_session, execute_run
 from gateway.runs.session.session import RunRegistry, RunStatus
 from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.protocols import LLMAdapter
-from lca.harness.profile.lifespan import profile_lifespan
+from lca_kernel import run_kernel_lifespan as profile_lifespan
 from tests.harness.scripted_llm import ScriptedLLMAdapter
 
 

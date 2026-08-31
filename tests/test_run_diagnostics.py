@@ -8,7 +8,6 @@ from typing import Any
 
 import pytest
 from cordis import Context
-from lca.infrastructure.observability.adapters.policy import Verbosity
 from typer.testing import CliRunner
 
 from lca.cognition.hook_registry import CordisHookRegistry
@@ -24,6 +23,7 @@ from lca.infrastructure.observability import (
     record_runtime,
     run_scope,
 )
+from lca.infrastructure.observability.adapters.policy import Verbosity
 from lca.infrastructure.observability.facade import RunContext, bind
 from lca.infrastructure.observability.journal.engine.journal_io import load_journal_records
 from lca.infrastructure.observability.journal.jsonl.projector import JsonlJournalProjector

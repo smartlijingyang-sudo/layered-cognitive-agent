@@ -29,7 +29,6 @@ What is asserted
 
 from __future__ import annotations
 
-import asyncio
 import time
 from typing import Any
 
@@ -101,7 +100,11 @@ class _FakeProducts:
 def test_journal_event_classes_catalog_registers_three_boot_events() -> None:
     """Guard against accidental removal from JOURNAL_EVENT_CLASSES."""
     catalog_names = set(JOURNAL_EVENT_CLASSES.keys())
-    assert {"BootProfileResolved", "BootPluginFiberSpawned", "BootObservabilityAssembled"} <= catalog_names
+    assert {
+        "BootProfileResolved",
+        "BootPluginFiberSpawned",
+        "BootObservabilityAssembled",
+    } <= catalog_names
 
 
 def test_emit_boot_events_does_nothing_when_journal_missing() -> None:
@@ -157,7 +160,9 @@ def test_emit_boot_events_writes_three_event_kinds_in_order() -> None:
         "BootProfileResolved",
         "BootObservabilityAssembled",
     ]
-    fiber_events = [e.event for e in capture.captured if isinstance(e.event, BootPluginFiberSpawned)]
+    fiber_events = [
+        e.event for e in capture.captured if isinstance(e.event, BootPluginFiberSpawned)
+    ]
     assert len(fiber_events) == 2
     for ev in fiber_events:
         assert ev.status == "ok"

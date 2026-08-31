@@ -10,7 +10,6 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from lca.infrastructure.observability.adapters.policy import AttributePolicy, Verbosity
 
 from lca.contracts.models.observability.journal import (
     DelegationIssued,
@@ -30,6 +29,7 @@ from lca.infrastructure.observability import (
     record,
     run_scope,
 )
+from lca.infrastructure.observability.adapters.policy import AttributePolicy, Verbosity
 from tests.support.observability_helpers import make_test_bound
 
 

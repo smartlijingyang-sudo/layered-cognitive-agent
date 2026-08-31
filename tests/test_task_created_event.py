@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from lca.infrastructure.observability.events.event_descriptors_data import build_default_registry
-
 from lca.contracts.models.observability.journal import TaskCreated
 from lca.contracts.models.observability.journal_catalog import JOURNAL_EVENT_CLASSES
+from lca.infrastructure.observability.events.event_descriptors_data import build_default_registry
 
 
 def test_task_created_is_registered_as_durable_fact() -> None:

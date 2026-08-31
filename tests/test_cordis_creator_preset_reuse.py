@@ -34,7 +34,6 @@ from pathlib import Path
 from typing import Any
 
 from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
-
 from lca.infrastructure.observability.facade import BoundObservability, bind_backends
 from lca.plugins.providers.think.composition_composer import (
     CordisComposer,

@@ -47,12 +47,11 @@ from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any
 
-from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
-
 from lca.application.preset_authoring import PresetAuthoring
 from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent, NativeToolCall
 from lca.contracts.protocols import LLMAdapter
+from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
 from lca.infrastructure.observability.facade import BoundObservability, bind_backends
 from lca.plugins.providers.think.composition_composer import (
     CordisComposer,

@@ -263,7 +263,7 @@ def test_summarize_patch_handles_settings_kind() -> None:
 
 def test_module_exports_are_stable() -> None:
     """ADR-0118 §决定 2 / §决定 4 列出的常量与符号必须稳定可 import。"""
-    assert DEFAULT_PATCH_PATH == Path("cordis.patch.yml")
+    assert Path("cordis.patch.yml") == DEFAULT_PATCH_PATH
     assert MIN_DEBOUNCE_MS == 50
     assert PATCH_EVENT_KIND == "kernel.hmr.patch"
 

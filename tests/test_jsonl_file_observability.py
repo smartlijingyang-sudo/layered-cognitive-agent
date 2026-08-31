@@ -8,8 +8,6 @@ import unittest
 from pathlib import Path
 from typing import Any
 
-from lca.infrastructure.observability.facade.settings import ObservabilitySettings
-
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     AgentRunStarted,
@@ -26,6 +24,7 @@ from lca.infrastructure.observability import (
     bind_backends,
     record,
 )
+from lca.infrastructure.observability.facade.settings import ObservabilitySettings
 from lca.infrastructure.observability.journal.engine.journal_io import (
     JOURNAL_SCHEMA_VERSION,
     load_journal_records,

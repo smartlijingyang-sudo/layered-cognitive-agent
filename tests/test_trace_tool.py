@@ -2,15 +2,6 @@
 
 from __future__ import annotations
 
-from lca.infrastructure.observability.stream.trace_inspector import TraceInspector
-from lca.infrastructure.observability.stream.trace_tool_runner import (
-    make_explain_failure_tool,
-    make_export_minimal_reproduction_tool,
-    make_find_optimization_tool,
-    make_inspect_trace_tool,
-    make_plugin_interaction_graph_tool,
-)
-
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     AgentRunStarted,
@@ -18,6 +9,14 @@ from lca.contracts.models.observability.journal import (
     RunScope,
     StampedEvent,
     ToolInvoked,
+)
+from lca.infrastructure.observability.stream.trace_inspector import TraceInspector
+from lca.infrastructure.observability.stream.trace_tool_runner import (
+    make_explain_failure_tool,
+    make_export_minimal_reproduction_tool,
+    make_find_optimization_tool,
+    make_inspect_trace_tool,
+    make_plugin_interaction_graph_tool,
 )
 
 

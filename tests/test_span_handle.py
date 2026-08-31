@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from lca.infrastructure.observability.adapters.handles import NullSpanHandle, SpanHandle
-from lca.infrastructure.observability.backends.tracer_backend import OtelTracer
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from lca.infrastructure.observability import AttributePolicy, Verbosity
+from lca.infrastructure.observability.adapters.handles import NullSpanHandle, SpanHandle
+from lca.infrastructure.observability.backends.tracer_backend import OtelTracer
 from tests.support.observability_helpers import make_test_bound
 
 

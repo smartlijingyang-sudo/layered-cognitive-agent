@@ -21,8 +21,6 @@ import json
 from contextlib import contextmanager
 from pathlib import Path
 
-from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
-
 from lca.contracts.models.observability.journal import (
     PluginAuthored,
     PluginInspected,
@@ -33,6 +31,7 @@ from lca.contracts.models.observability.journal import (
     RuntimeObserved,
     StampedEvent,
 )
+from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
 from lca.infrastructure.observability.facade import BoundObservability, bind_backends
 from lca.infrastructure.observability.journal.engine.journal_io import (
     read_journal,
