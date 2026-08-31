@@ -240,16 +240,21 @@ def _patch_icon(ctx: PatchContext) -> bool:
     text = ctx.read(rel)
     if "case 'dsh'" in text:
         return False
-    if "  BoxIcon, LaptopIcon, MonitorOffIcon, SparklesIcon," not in text and (
-        "  BoxIcon,\n  LaptopIcon,\n  MonitorOffIcon,\n  SparklesIcon,"
-    ) not in text:
-        old_imp = "import { BoxIcon, LaptopIcon, MonitorOffIcon, SparklesIcon } from 'lucide-react';"
+    if (
+        "  BoxIcon, LaptopIcon, MonitorOffIcon, SparklesIcon," not in text
+        and ("  BoxIcon,\n  LaptopIcon,\n  MonitorOffIcon,\n  SparklesIcon,") not in text
+    ):
+        old_imp = (
+            "import { BoxIcon, LaptopIcon, MonitorOffIcon, SparklesIcon } from 'lucide-react';"
+        )
         new_imp = "import { BoxIcon, CpuIcon, LaptopIcon, MonitorOffIcon, SparklesIcon } from 'lucide-react';"
         if old_imp not in text:
             raise SystemExit("[execution_target] lucide import not found")
         text = text.replace(old_imp, new_imp, 1)
     else:
-        text = text.replace("SparklesIcon } from 'lucide-react';", "CpuIcon, SparklesIcon } from 'lucide-react';", 1)
+        text = text.replace(
+            "SparklesIcon } from 'lucide-react';", "CpuIcon, SparklesIcon } from 'lucide-react';", 1
+        )
         if "CpuIcon" not in text:
             text = text.replace(
                 "  SparklesIcon,\n} from 'lucide-react';",

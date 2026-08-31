@@ -828,7 +828,9 @@ class BootPluginFiberSpawned(JournalEvent):
         if self.stage == -1:
             return
         if isinstance(self.stage, bool) or not isinstance(self.stage, int):
-            raise TypeError(f"stage must be Stage enum or int in [1, 6], got {type(self.stage).__name__}={self.stage!r}")
+            raise TypeError(
+                f"stage must be Stage enum or int in [1, 6], got {type(self.stage).__name__}={self.stage!r}"
+            )
         if not 1 <= int(self.stage) <= 6:
             raise ValueError(f"stage value {int(self.stage)} out of [1, 6] range")
 
