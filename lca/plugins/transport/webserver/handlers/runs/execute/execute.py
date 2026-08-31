@@ -34,6 +34,7 @@ from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols import JournalProjector
 from lca.contracts.protocols.runtime.infra import Sandbox
 from lca.infrastructure.attachment import FileStoreAttachmentIdentity
+from lca.infrastructure.attachment.run_file_store_scope import run_file_store_scope
 from lca.infrastructure.file_store import FileStore
 from lca.infrastructure.observability import (
     BoundObservability,
@@ -340,6 +341,9 @@ async def execute_run(
                     trace_id=cast("TraceId", session.trace_id),
                     run_id=cast("RunId", session.run_id),
                 )
+            ),
+            run_file_store_scope(
+                cast("FileStore", provider_current(require_capability(ctx, "file_store")))
             ),
         ):
             structlog.contextvars.bind_contextvars(

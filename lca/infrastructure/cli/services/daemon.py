@@ -65,8 +65,8 @@ class DaemonService:
         """Resolve kernel serve health check URL."""
         return f"{self._kernel_serve.base_url}{self._kernel_serve.health_path}"
 
-    def _is_kernel_serve_healthy(self) -> bool:
-        """Check if kernel serve is accepting connections."""
+    def _is_gateway_healthy(self) -> bool:
+        """Check if kernel serve (gateway) is accepting connections."""
         return http_ready(self._kernel_serve_health_url, timeout=1.0)
 
     # ── Lifecycle ─────────────────────────────────────────────────────
@@ -107,7 +107,7 @@ class DaemonService:
             return ServiceState(
                 status=ServiceStatus.RUNNING,
                 pid=pid,
-                detail=f"connected to {self._gateway_ws_url}",
+                detail=f"connected to {self._kernel_serve_ws_url}",
             )
 
         return ServiceState(status=ServiceStatus.STOPPED, detail="process died")
@@ -397,7 +397,7 @@ export PYTHONPATH="/opt/lca/python"
 export HOME=/home/{owner}
 cd {self._config.workspace}
 exec node {cli_js} connect \\
-  --gateway {self._gateway_ws_url} \\
+  --gateway {self._kernel_serve_ws_url} \\
   --workspace {self._config.workspace} \\
   --token-type serviceToken \\
   --token lca-local-host \\

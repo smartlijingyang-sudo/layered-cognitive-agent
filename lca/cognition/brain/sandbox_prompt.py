@@ -4,17 +4,27 @@ Aligned with LobeHub ``ToolSystemRoleProvider`` + ``pluginPrompts``:
 the cloud sandbox system role is wrapped as a ``<tool>`` with
 ``<tool.instructions>`` inside the ``<tools>`` block, matching the
 format used by ``@lobechat/prompts`` ``toolPrompt()``.
+
+ADR-0121 PR-B: the cloud branch now resolves its ``FileStore`` from the
+run-scope ambient (``run_file_store_scope``) instead of relying on the
+caller passing ``store=``. The previous ``store is not None`` guard was the
+exact reason today's user-upload trace lost its ``<files_info>`` /
+``<uploaded_files>`` blocks. There is one entry point — ``render_system_role``
+— for every plane; this function only decides *which* template to render.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 
-from lca.cognition.brain.prompts import load_builtin_prompt
-from lca.contracts.models.core.plane import PlaneKind
+from lca.contracts.models.core.plane import PlaneKind, PlaneRef
 from lca.contracts.protocols import Tool
+from lca.infrastructure.attachment.run_file_store_scope import (
+    get_current_run_file_store,
+)
+from lca.infrastructure.attachment.system_role_renderer import render_system_role
 from lca.infrastructure.file_store import FileStore
-from lca.infrastructure.sandbox.prompt import render_cloud_sandbox_system_role
+from lca.infrastructure.sandbox.paths import ONLYBOXES
 from lca.infrastructure.sandbox.surface import plane_system_role
 from lca.infrastructure.tools.lca_computer.manifest import LOCAL_SYSTEM_ID as _LOCAL_SYSTEM_ID
 from lca.infrastructure.tools.lca_computer.types import CLOUD_SANDBOX_APIS, MACHINE_APIS
@@ -29,16 +39,39 @@ def build_cloud_sandbox_prompt(tools: Sequence[Tool], store: FileStore | None = 
     names = {t.name for t in tools}
     blocks: list[str] = []
     cloud_values = {api.value for api in CLOUD_SANDBOX_APIS}
-    if any(name in cloud_values for name in names) and store is not None:
-        template = load_builtin_prompt("cloud_sandbox_system_role")
-        rendered = render_cloud_sandbox_system_role(template, store=store)
-        blocks.append(_tool_block(_CLOUD_SANDBOX_TOOL_NAME, rendered))
+    if any(name in cloud_values for name in names):
+        effective_store = store if store is not None else get_current_run_file_store()
+        rendered = _render_cloud_sandbox_block(effective_store)
+        if rendered:
+            blocks.append(_tool_block(_CLOUD_SANDBOX_TOOL_NAME, rendered))
     machine_values = {f"local_{api.value}" for api in MACHINE_APIS}
     if any(name in machine_values for name in names):
         rendered = _machine_role()
         if rendered:
             blocks.append(_tool_block(_LOCAL_SYSTEM_TOOL_NAME, rendered))
     return "\n".join(blocks)
+
+
+def _render_cloud_sandbox_block(store: FileStore | None) -> str:
+    plane = _current_sandbox_plane()
+    result = render_system_role(
+        plane,
+        template_name="cloud_sandbox_system_role",
+        store=store,
+    )
+    return result.text
+
+
+def _current_sandbox_plane() -> PlaneRef:
+    """Return a :class:`PlaneRef` for the active sandbox, defaulting to Onlyboxes."""
+    return PlaneRef(
+        id="onlyboxes-default",
+        label="Cloud Sandbox",
+        kind=PlaneKind.SANDBOX,
+        root=ONLYBOXES.root,
+        outputs_dir=ONLYBOXES.outputs_dir,
+        platform="onlyboxes",
+    )
 
 
 def _machine_role() -> str:
