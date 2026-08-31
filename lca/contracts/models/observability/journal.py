@@ -771,6 +771,81 @@ class PresetPublished(JournalEvent):
     step: int = 0
 
 
+# ── Kernel 启动事件（ADR-0116）───────────────────────────────────────
+#
+# 三个 typed JournalEvent 收敛 boot 期可观测性（ADR-0116 决定 2 + 决定 8）。
+# ``BootPluginFiberSpawned.stage`` 强引用 ``lca_kernel.stages.Stage(IntEnum)``，
+# 是 ADR-0115 §决定 1 C1 闭集流程下 Stage 词汇的唯一权威来源。
+# ``lca_kernel`` 是顶层 host 包（ADR-0115 决定 3），由 contracts 层经
+# ``__post_init__`` 内 lazy import 引用 —— 避开模块级 import 反向依赖。
+
+
+@dataclass(frozen=True, slots=True)
+class BootProfileResolved(JournalEvent):
+    """Boot stage K1+K2:profile 解析完成 + ResolvedProfile 哈希。
+
+    Stage: SOURCE+RESOLVE+TOPO+PLAN
+    Producer: lca_kernel.source_resolve
+    """
+
+    profile_path: str = ""
+    manifest_hash: str = ""
+    plugin_count: int = 0
+    bundle_count: int = 0
+    duration_ms: float = 0.0
+    topo_order: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class BootPluginFiberSpawned(JournalEvent):
+    """Boot stage K3:每个 plugin 的 Fiber spawn 开始/结束(成对 emit)。
+
+    Stage: BOOT
+    Producer: lca_kernel.boot
+    关键字段 ``stage`` 强引用 ``lca_kernel.stages.Stage(IntEnum)``,不允许 None。
+
+    ``stage`` 默认 sentinel ``-1`` 表示"未设置",使 ``cls()`` 默认构造合法,
+    满足 ``test_catalog_classes_are_constructible_defaults``;发射点必须用
+    关键字参数显式提供 ``Stage`` 值,绕过 sentinel 后 ``__post_init__`` 强制
+    类型 + 值域。
+    """
+
+    plugin_id: str = ""
+    layer: str = ""  # L0/L1/L2/L3/L4
+    kind: str = ""  # seam/provider/primitive/bridge
+    stage: "Stage" = -1  # type: ignore[name-defined]  # noqa: F821, UP037
+    duration_ms: float = 0.0
+    status: Literal["started", "ok", "failed"] = "started"
+    failure_kind: str | None = None
+    failure_message: str | None = None
+
+    def __post_init__(self) -> None:
+        # Lazy import — lca_kernel 是顶层 host 包,避开模块级反向依赖
+        from lca_kernel.stages import Stage
+
+        # Sentinel 路径:默认构造走测试兼容性,生产代码必须显式给 stage
+        if self.stage == -1:
+            return
+        if not isinstance(self.stage, Stage):
+            raise TypeError(f"stage must be Stage enum, got {type(self.stage).__name__}")
+        if int(self.stage) < 1 or int(self.stage) > 6:
+            raise ValueError(f"stage value {self.stage} out of [1, 6] range")
+
+
+@dataclass(frozen=True, slots=True)
+class BootObservabilityAssembled(JournalEvent):
+    """Boot stage K5:BoundObservability 装配完成。
+
+    Stage: OBSERVABILITY
+    Producer: lca_kernel.observability
+    """
+
+    bound_seams: tuple[str, ...] = ()
+    evidence_store_kind: str = ""
+    journal_enabled: bool = False
+    duration_ms: float = 0.0
+
+
 # ── ADR-0065 §三 / PR-3: JournalRecord v2 envelope ──────────────────
 #
 # 引入 JournalRecord 作为 StampedEvent 的下替代身;不立即删除 StampedEvent。

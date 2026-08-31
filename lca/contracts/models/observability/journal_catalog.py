@@ -29,6 +29,9 @@ from lca.contracts.models.observability.journal import (
     AttachmentStagingCompleted,
     AttachmentStagingFailed,
     AttachmentStagingStarted,
+    BootObservabilityAssembled,
+    BootPluginFiberSpawned,
+    BootProfileResolved,
     CastingCompleted,
     CastingFailed,
     CastingStarted,
@@ -123,8 +126,23 @@ JOURNAL_EVENT_CLASSES: dict[str, type[JournalEvent]] = {
         PluginUnmounted,
         PluginInspected,
         PresetPublished,
+        BootProfileResolved,
+        BootPluginFiberSpawned,
+        BootObservabilityAssembled,
     )
 }
+
+# ── ADR-0116 PR-3: boot 事件登记 ───────────────────────────
+# 三个 typed JournalEvent 收敛 boot 期可观测性;BootPluginFiberSpawned.stage
+# 强引用 lca_kernel.stages.Stage(IntEnum),是 ADR-0115 §决定 1 C1 闭集
+# 流程下的 Stage 词汇唯一权威来源。
+JOURNAL_EVENT_CLASSES.update(
+    {
+        "BootProfileResolved": BootProfileResolved,
+        "BootPluginFiberSpawned": BootPluginFiberSpawned,
+        "BootObservabilityAssembled": BootObservabilityAssembled,
+    }
+)
 
 
 # ── 兼容：JournalSchemaMeta dataclass 保留以备迁移期类型注解 ──
