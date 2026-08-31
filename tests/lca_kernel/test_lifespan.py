@@ -89,7 +89,7 @@ async def test_lifespan_disposes_context_on_exit(block_sys_exit: None) -> None:
 async def test_lifespan_propagates_boot_failure(block_sys_exit: None) -> None:
     """Bad profile path → raise before yielding state, no half-boot."""
     bad_path = Path("profiles/does-not-exist.yaml")
-    with pytest.raises(Exception):
+    with pytest.raises(FileNotFoundError):
         async with run_kernel_lifespan(bad_path) as state:
             pytest.fail(f"lifespan yielded state despite bad profile: {state!r}")
 

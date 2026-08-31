@@ -194,7 +194,10 @@ target-version = "py310"
 line-length = 100
 # SKILL.md files embed Python code blocks; ruff 0.16+ misinterprets the file as
 # Python when the embedded block parses cleanly. Treat all .md as out of scope.
-extend-exclude = ["*.md"]
+# vendor/ holds upstream Cordis/Cosmokit/Schemastery we patch locally; we import
+# them as packages (``from cordis import ...``) and treat the source as read-only
+# (AGENTS.md §7). Lint scope is the ``lca*/`` tree plus this file's own deps.
+extend-exclude = ["*.md", "vendor/*"]
 
 [tool.ruff.lint]
 select = [

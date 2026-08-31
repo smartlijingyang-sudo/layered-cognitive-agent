@@ -28,7 +28,7 @@ class KernelServeConfig(BaseModel):
     loopback)与本字段无关。
     """
 
-    host: str = "0.0.0.0"
+    host: str = "0.0.0.0"  # noqa: S104 — default bind all interfaces for LAN access
     port: int = 8765
     health_path: str = "/health"
 

@@ -153,7 +153,7 @@ def test_reload_now_emits_event_on_valid_patch(tmp_path: Path) -> None:
     config = PatchConfig(path=tmp_path / "patch.yml")
     received: list[PatchEvent] = []
     watcher = PollingPatchWatcher(config, on_change=received.append)
-    event = watcher.reload_now()
+    watcher.reload_now()
     assert len(received) == 1
     assert received[0].patch_kind == "user"
     # YAML parses ``version: 1`` as int; both int 1 and str "1" are acceptable.

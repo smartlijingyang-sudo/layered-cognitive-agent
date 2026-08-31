@@ -116,7 +116,9 @@ class DefaultAttachmentResolver:
             new_process = _sandbox_path(ref.display_path)
         else:
             new_process = _machine_path(ref)
-        new_kind: FileRefKind = "sandbox_init" if plane.kind is PlaneKind.SANDBOX else "inbox_staged"
+        new_kind: FileRefKind = (
+            "sandbox_init" if plane.kind is PlaneKind.SANDBOX else "inbox_staged"
+        )
         return FileRef(
             kind=new_kind,
             target_key=ref.target_key,
@@ -158,10 +160,10 @@ def _machine_path(ref: FileRef) -> str:
 
 
 def _machine_root() -> str:
-    from lca.infrastructure.tools.run_finalizer import get_current_run_id
     from lca.infrastructure.attachment.run_machine_root_scope import (
         get_current_machine_root,
     )
+    from lca.infrastructure.tools.run_finalizer import get_current_run_id
 
     override = get_current_machine_root()
     if override:

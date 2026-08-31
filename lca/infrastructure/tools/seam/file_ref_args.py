@@ -106,7 +106,8 @@ def _resolve_from_store(
     if not matches and store is None:
         raise UnresolvedFileRefError(raw, context={"reason": "no_file_store_in_scope"})
     if not matches:
-        assert store is not None  # narrowed above
+        if store is None:
+            raise UnresolvedFileRefError(raw, context={"reason": "no_file_store_in_scope"})
         resolver = DefaultAttachmentResolver(store=store)
         try:
             resolved = resolver.resolve([aid])

@@ -36,7 +36,7 @@ class KernelServeService:
 
     _SPAWN_TIMEOUT_S = 30.0
     _SPAWN_POLL_S = 0.5
-    _LOG_PATH = Path("/tmp/lca-kernel.log")
+    _LOG_PATH = Path("/tmp/lca-kernel.log")  # noqa: S108 — stable path for self-heal logs
 
     def __init__(self, config: KernelServeConfig, root: Path) -> None:
         self._config = config
@@ -89,7 +89,7 @@ class KernelServeService:
         log = self._LOG_PATH.open("ab", buffering=0)
         try:
             proc = subprocess.Popen(  # noqa: S603
-                [
+                [  # noqa: S607 — controlled argv, not user-provided
                     "uv",
                     "run",
                     "python",

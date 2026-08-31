@@ -63,7 +63,7 @@ async def _drive_lifespan(app: Starlette) -> dict[str, Any]:
 async def test_bad_profile_path_raises_in_kernel_lifespan() -> None:
     """A non-existent profile path makes :func:`run_kernel_lifespan` raise."""
     bad = Path("profiles/__definitely_does_not_exist__.yaml")
-    with pytest.raises(Exception):
+    with pytest.raises(FileNotFoundError):
         async with run_kernel_lifespan(bad) as state:
             pytest.fail(f"unexpected yield: {state!r}")
 
@@ -75,7 +75,7 @@ async def test_starlette_lifespan_propagates_boot_failure() -> None:
     ADR-0119 决定 3 新设计:boot 在 K3 阶段,create_app 内部 K3 抛
     FileNotFoundError(读 profile YAML 失败),lifespan 还没机会驱动。
     """
-    with pytest.raises(Exception):
+    with pytest.raises(FileNotFoundError):
         await create_app(profile_path="profiles/__missing__.yaml")
 
 
@@ -86,7 +86,7 @@ async def test_testclient_refuses_to_serve_when_boot_fails() -> None:
     ADR-0119 决定 3 新设计:create_app 在 K3 阶段就 boot,boot 失败立即 raise
     (FileNotFoundError 来自 load_profile_source 读 YAML),TestClient 拿不到 app。
     """
-    with pytest.raises(Exception):
+    with pytest.raises(FileNotFoundError):
         await create_app(profile_path="profiles/__missing__.yaml")
 
 
@@ -100,7 +100,7 @@ async def test_failed_boot_does_not_leak_module_singletons() -> None:
     """
     import lca_kernel.cli as cli_module
 
-    with pytest.raises(Exception):
+    with pytest.raises(FileNotFoundError):
         await create_app(profile_path="profiles/__missing__.yaml")
     for forbidden in (
         "get_file_store",

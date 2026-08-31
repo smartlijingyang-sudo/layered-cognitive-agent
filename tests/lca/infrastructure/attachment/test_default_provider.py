@@ -152,9 +152,7 @@ class TestSystemRoleRendererRegression:
     These tests assert that — given any ambient scope — both blocks appear.
     """
 
-    def test_cloud_branch_emits_uploaded_files_block(
-        self, tmp_store: LocalFileStore
-    ) -> None:
+    def test_cloud_branch_emits_uploaded_files_block(self, tmp_store: LocalFileStore) -> None:
         aid = _first_id(tmp_store)
         with run_file_store_scope(tmp_store), run_attachment_scope([aid]):
             result = render_system_role(

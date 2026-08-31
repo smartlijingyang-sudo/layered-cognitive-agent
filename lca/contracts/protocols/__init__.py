@@ -293,7 +293,7 @@ from lca.contracts.protocols.think.cognitive_pipeline import (
     CognitiveThinkPipeline,
 )
 
-__all__ = [
+__all__ = [  # noqa: RUF022 — discovery order matches tests/contracts/test_protocols_package_contract.py::test_all_derived_from_explicit_reexports
     "ActionAuthorityPlan",
     "ActionHandler",
     "ActionHandlerRegistry",
