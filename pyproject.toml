@@ -33,7 +33,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["lca*", "gateway*"]
+include = ["lca*", "gateway*", "lca-kernel"]
 exclude = ["tests*", "skills*", "roles*", "profiles*", "bundles*", "history*", "packages*", "deploy*", "vendor*"]
 
 [tool.importlinter]
