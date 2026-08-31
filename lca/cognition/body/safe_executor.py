@@ -45,6 +45,17 @@ _DETERMINISTIC_EXCEPTIONS: tuple[type[BaseException], ...] = (
     NotImplementedError,
     OverflowError,
     ZeroDivisionError,
+    # OS-level failures against a fixed (path, args) tuple never resolve by
+    # retrying — re-running write_bytes() into the same directory produces the
+    # same PermissionError.  Without this, /mnt/data-style inputs cause the
+    # agent to burn through retry_policy.max_retries=3 + 1 = 4 attempts
+    # before surfacing the obvious cause.  Bare OSError is intentionally left
+    # out so transient subclasses (BlockingIOError / InterruptedError / etc.)
+    # stay retryable.
+    PermissionError,
+    IsADirectoryError,
+    FileExistsError,
+    FileNotFoundError,
 )
 
 

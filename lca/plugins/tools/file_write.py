@@ -25,7 +25,11 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from lca.contracts.atoms.ids import new_id
-from lca.contracts.atoms.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
+from lca.contracts.atoms.semantic_keys import (
+    FAILURE_KIND,
+    FAILURE_KIND_EXECUTION,
+    FAILURE_KIND_VALIDATION,
+)
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     AuthorityContract,
@@ -37,6 +41,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.tool import ParameterSpec, ToolApi, ToolManifest, ToolMeta
 from lca.contracts.protocols import Tool
+from lca.infrastructure.path_policy import validate_writable_file
 
 IDENTIFIER = "file-write"
 
@@ -48,8 +53,10 @@ MANIFEST = ToolManifest(
         ToolApi(
             name="fileWrite",
             description=(
-                "把文本内容写到指定路径（相对当前工作目录或绝对路径）。"
-                "Creator 流程用它写 plugin 源码文件。"
+                "Creator §13.3 专用:把文本内容写到 host 进程 CWD 的指定路径,"
+                "用于向 preset 目录落 plugin 源码。路径必须是文件,"
+                "不能是已存在目录或 sandbox guest 路径 (例如 /mnt/data)。"
+                "Solo / 通用场景请改用 sandbox 的 computer 目录工具。"
             ),
             parameters={
                 "type": "object",
@@ -128,9 +135,27 @@ class FileWriteTool(Tool):
             )
 
         path = Path(args["path"]).expanduser()  # noqa: ASYNC240 — Creator Tool 同步 fs 可接受
+        # validate_writable_file is the host-fs path policy seam: rejects
+        # empty paths and existing-directory targets up front, and creates
+        # parent directories on demand.  Keeping this single source of truth
+        # ensures /mnt/data-style inputs fail fast with a clear message
+        # instead of being passed through to write_bytes().
         mkdir_parents = bool(args.get("mkdir_parents", True))
-        if mkdir_parents and not path.parent.exists():
-            path.parent.mkdir(parents=True, exist_ok=True)
+        if mkdir_parents:
+            decision = validate_writable_file(path)
+            if not decision.accept:
+                return Observation(
+                    observation_id=new_id("obs"),
+                    success=False,
+                    payload=None,
+                    error=decision.error,
+                    latency_ms=int((time.monotonic() - start) * 1000),
+                    extra=(
+                        {FAILURE_KIND: FAILURE_KIND_EXECUTION}
+                        if decision.failure_kind == "execution"
+                        else {FAILURE_KIND: FAILURE_KIND_VALIDATION}
+                    ),
+                )
 
         try:
             data = args["content"].encode("utf-8")
@@ -142,6 +167,7 @@ class FileWriteTool(Tool):
                 payload=None,
                 error=f"写入失败：{exc}",
                 latency_ms=int((time.monotonic() - start) * 1000),
+                extra={FAILURE_KIND: FAILURE_KIND_EXECUTION},
             )
 
         latency_ms = int((time.monotonic() - start) * 1000)
