@@ -8,6 +8,7 @@ process-wide projection implementation.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
@@ -70,16 +71,49 @@ class FilesystemRunLedgerFactory(RunLedgerFactory, RunJournalFactory):
         return cast("RunLedger", RunStore(backend=backend, run_id=safe_run_id))
 
     def create_run_components(self, *, jsonl_path: Path) -> RunJournalComponents:
-        """Create the durable writer and live tail for one resolved run path."""
-        from lca.infrastructure.observability.journal.jsonl.projector import (
-            JsonlJournalProjector,
+        """Create the durable writer and live tail for one resolved run path.
+
+        ADR-0164 Phase 7 端到端:
+            - 不再创建 JsonlJournalProjector(主路径不再写 jsonl stream)
+            - jsonl_path 仍被 rename 到 ``journal.raw.jsonl``(旧 run 数据保留)
+            - step-tree backend 写到 ``journal.json`` (lca.journal/3)
+            - narrative writer 写到 ``journal.narrative.md``(terminalize 时)
+            - RunJournalComponents.writer 改成 LiveTail( SSE 投影需要 JournalProjector)
+        """
+        from lca.infrastructure.observability.journal.step.backend import (
+            StepGroupedBackend,
+        )
+        from lca.infrastructure.observability.journal.step.narrative_writer import (
+            StepNarrativeWriter,
         )
         from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
+        from lca.runtime import step_lifecycle
 
-        jsonl_path.parent.mkdir(parents=True, exist_ok=True)
+        # 旧 jsonl 文件 rename 到 journal.raw.jsonl(回放兜底, 不删)
+        raw_path = jsonl_path.with_name("journal.raw.jsonl")
+        if jsonl_path.exists() and not raw_path.exists():
+            jsonl_path.rename(raw_path)
+        raw_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # step-tree 主存储
+        step_tree_backend: StepGroupedBackend | None = None
+        lifecycle_store = step_lifecycle.get_lifecycle_store()
+        if lifecycle_store is not None:
+            journal_step_path = raw_path.parent / "journal.json"
+            step_tree_backend = StepGroupedBackend(
+                output_path=journal_step_path,
+                lifecycle_store=lifecycle_store,
+            )
+
+        narrative_writer = StepNarrativeWriter(raw_path.parent / "journal.narrative.md")
+
         return RunJournalComponents(
-            writer=JsonlJournalProjector(jsonl_path),
+            writer=LiveTail(),  # 仍需 JournalProjector 占位;SSE 投影消费
             tail=LiveTail(),
+            step_tree_writer=_StepTreeBundle(
+                backend=step_tree_backend,
+                narrative_writer=narrative_writer,
+            ),
         )
 
     def create_process_journal(self) -> ProcessJournalProjection:
@@ -87,6 +121,19 @@ class FilesystemRunLedgerFactory(RunLedgerFactory, RunJournalFactory):
         from lca.infrastructure.observability.journal.engine.process import ProcessJournal
 
         return ProcessJournal()
+
+
+@dataclass(frozen=True)
+class _StepTreeBundle:
+    """ADR-0164 step-tree 写入 bundle(boot 装好, terminalizer 时调用)。"""
+
+    backend: object | None  # StepGroupedBackend | None
+    narrative_writer: object  # StepNarrativeWriter
+
+    def flush(self) -> None:
+        """写 step-tree journal.json + narrative.md。"""
+        if self.backend is not None and hasattr(self.backend, "flush"):
+            self.backend.flush()
 
 
 @plugin(

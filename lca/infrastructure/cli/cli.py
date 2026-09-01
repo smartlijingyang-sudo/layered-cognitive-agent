@@ -19,6 +19,8 @@ from lca.infrastructure.cli.commands import (
     declarative,
     diagnostics,
     journal,
+    journal_migrate,
+    journal_steps,
     kernel,
     package_organization,
     profile_inspect,
@@ -188,6 +190,13 @@ package_organization.register(app)
 audit.register(app)
 creator_plan.register(app)
 declarative.register(app)
+# journal 注册逻辑: journal.py 建 journal group + logs 子命令;
+# journal_steps 增 steps / narrative / raw 子命令。两者共用同一 group
+# 以避免双 add_typer。
+_journal_group = journal.create_journal_group(app)
+journal.register(app, group=_journal_group)
+journal_steps.register(_journal_group)
+journal_migrate.register(_journal_group)
 kernel.register(app)
 
 

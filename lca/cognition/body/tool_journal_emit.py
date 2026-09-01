@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
 from lca.cognition.body.tool_result_preview import tool_files
@@ -131,7 +132,31 @@ def emit_tool_started(
             idempotency_key=idempotency_key,
         )
     )
+    # ADR-0164 Phase 3 双写:写 step.tool_call(无 step_lifecycle 时 silent 跳过)
+    try:
+        from lca.runtime.step_emitter import bridge_tool_started
+
+        # args 可能很大(arguments_summary 限 200 字符), 由 reader 自己读完整 arguments
+        bridge_tool_started(
+            tool_name=tool.name,
+            invocation_id=invocation_id,
+            arguments=args_dict,
+            arguments_summary=_summarize_args(args_dict),
+        )
+    except ImportError:
+        pass
     return arguments_ref
+
+
+def _summarize_args(args: dict[str, Any], limit: int = 200) -> str:
+    """生成 args 的一行人话摘要(进入 step.tool_call.arguments_summary)。"""
+    if not args:
+        return ""
+    keys = list(args.keys())[:5]
+    head = ", ".join(f"{k}={repr(args[k])[:32]}" for k in keys)
+    if len(head) > limit:
+        return head[:limit] + "…"
+    return head
 
 
 def emit_tool_denied(tool: Tool, reason: str) -> None:
@@ -143,6 +168,13 @@ def emit_tool_denied(tool: Tool, reason: str) -> None:
         attributes={"tool_name": tool.name, "reason": reason},
     )
     record(ToolDenied(tool_name=tool.name, reason=reason))
+    # ADR-0164 Phase 3 双写:ToolDenied 折叠为 step span
+    try:
+        from lca.runtime.step_emitter import bridge_tool_denied
+
+        bridge_tool_denied(tool_name=tool.name, reason=reason)
+    except ImportError:
+        pass
 
 
 def emit_tool_invoked(
@@ -225,3 +257,43 @@ def emit_tool_invoked(
             projected_state=projected_state_dict,
         )
     )
+    # ADR-0164 Phase 3 双写:写 step.tool_result
+    try:
+        from lca.runtime.step_emitter import bridge_tool_invoked
+
+        files = tool_files(obs)
+        bridge_tool_invoked(
+            tool_name=tool.name,
+            invocation_id=resolved_id,
+            ok=obs.success,
+            latency_ms=latency_ms,
+            error="" if obs.success else (obs.error or None),
+            files_created=tuple(files),
+            delta_summary=_delta_summary_from_obs(obs, inline_output_text, output_ref),
+            stdout_head=(inline_output_text or "")[:500],
+            stdout_chars_total=len(inline_output_text or ""),
+            stdout_truncated=output_ref is not None,
+            stderr=str(obs.error or "") if not obs.success else "",
+        )
+    except ImportError:
+        pass
+
+
+def _delta_summary_from_obs(
+    obs: Observation,
+    inline_output_text: str | None,
+    output_ref: Any | None,
+) -> str:
+    """从 Observation 生成 step.tool_result.delta_summary(< 200 字符人话)。"""
+    if not obs.success:
+        err = (obs.error or "unknown")[:120]
+        return f"❌ {type(err).__name__ if hasattr(err, '__class__') else 'err'}: {err}"
+    files = tool_files(obs)
+    if files:
+        return f"✅ 写出 {len(files)} 个文件: {', '.join(Path(f).name for f in files[:3])}"
+    if inline_output_text:
+        head = inline_output_text[:80].replace("\n", "⏎")
+        return f"✅ stdout[:80] = {head}"
+    if output_ref is not None:
+        return f"✅ 已落 evidence (ref={getattr(output_ref, 'algorithm', '?')})"
+    return "✅ ok"

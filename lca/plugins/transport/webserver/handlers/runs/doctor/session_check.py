@@ -57,14 +57,15 @@ def diagnose_session_projection(
     broken = next((name for name, hop in hops.items() if hop.ok is False), None)
     summary = "ok" if broken is None else hops[broken].detail or "session diagnostic failed"
     return DoctorReport(
-        schema="doctor.v2",
+        schema="doctor.v3",
         run_id=run_id,
         trace_id=run_id,
         status=status,
         broken_hop=broken,
         summary=summary,
+        mode="backend",
         hops=hops,
-        jsonl_path=persistence_ref,
+        journal_path=persistence_ref,
         consistency={
             "projection_seq": snapshot.as_of_seq,
             "persisted_seq": persisted_seq,

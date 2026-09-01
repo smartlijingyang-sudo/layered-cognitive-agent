@@ -26,10 +26,27 @@ _KERNEL_SERVE_REFUSAL_CODES = {
 }
 
 
-def register(app: typer.Typer) -> None:
-    """Register the logs command on the typer app."""
+def create_journal_group(app: typer.Typer) -> typer.Typer:
+    """Create the ``journal`` sub-Typer and attach it to ``app``.
 
-    @app.command()
+    Returns the journal Typer so other modules can register commands on the
+    same group (e.g. ``journal_steps`` adds ``steps`` / ``narrative`` / ``raw``).
+    """
+    journal_app = typer.Typer(help="Journal facts / steps / narrative viewer")
+    app.add_typer(journal_app, name="journal")
+    return journal_app
+
+
+def register(app: typer.Typer, group: typer.Typer | None = None) -> None:
+    """Register the ``logs`` command under the ``journal`` group.
+
+    ``group`` 应是 ``create_journal_group(app)`` 的返回值。 兼容旧签名:
+    传 ``app`` 时自动 add_typer 一次(单文件测试场景)。
+    """
+    if group is None:
+        group = create_journal_group(app)
+
+    @group.command(name="logs")
     def logs(
         target: str = typer.Argument(
             "",

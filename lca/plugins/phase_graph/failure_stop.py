@@ -27,6 +27,24 @@ def _attempts_to_summaries(failure: PhaseExecutionFailure) -> tuple[PhaseAttempt
     )
 
 
+def _summarize_attempts(failure: PhaseExecutionFailure) -> str:
+    """Compact machine-readable summary of all attempts.
+
+    ADR-clean-truths 决策 一:替代原 ``The agent could not complete a required
+    {node_id} step after {n} attempt(s).`` 文学化句式。格式固定为
+    ``node={node_id} error_kind={error_kind} attempts={n}[cat:type,…]``,
+    便于 UI / LobeHub / run-doctor 直接按字段解析,不再被英文长句绑死。
+    categories = ",".join(
+        f"{a.attempt}:{a.category}:{a.error_type}" for a in failure.attempts
+    )
+    return (
+        f"node={failure.node_id} "
+        f"error_kind={failure.error_kind} "
+        f"attempts={len(failure.attempts)}"
+        f"[{categories}]"
+    )
+
+
 def phase_failure_stop_result(
     failure: PhaseExecutionFailure,
     *,
@@ -43,6 +61,9 @@ def phase_failure_stop_result(
     :class:`RunDiagnostic` and bind it to ``StopDecision.failure``. The
     reducer then reads ``failure.message`` / ``failure.attempts`` directly
     rather than scanning a string.
+
+    ADR-clean-truths 决策 一:``message`` 现在是机读摘要(节点+错误分类+attempts),
+    UI / LobeHub 优先读 ``error_kind`` 字段做展示,不再依赖自由文本。
     """
     attempts = _attempts_to_summaries(failure)
     last = failure.attempts[-1] if failure.attempts else None
@@ -52,14 +73,12 @@ def phase_failure_stop_result(
         phase="stop",
         node_id=failure.node_id,
         error_type=last.error_type if last is not None else "UnknownError",
-        message=(
-            f"The agent could not complete a required {failure.node_id} "
-            f"step after {len(failure.attempts)} attempt(s)."
-        ),
+        message=_summarize_attempts(failure),
         stack=(),
         causation=(),
         attempts=attempts,
         suggested_action=suggested_action,
+        extra=(("error_kind", failure.error_kind),),
     )
     stop = StopDecision(
         should_stop=True,

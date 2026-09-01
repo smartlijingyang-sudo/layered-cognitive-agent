@@ -24,7 +24,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from functools import wraps
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar
 
 import structlog
 from opentelemetry import trace as otel_trace
@@ -40,6 +40,19 @@ from lca.contracts.models.observability.journal import (
     JournalEvent,
     RuntimeObserved,
     StampedEvent,
+)
+from lca.contracts.models.observability.journal_doc import JournalDocument
+from lca.contracts.models.observability.journal_step import (
+    ReflectTrace,
+    SpanRecord,
+    StepContext,
+    StepPhase,
+    ThinkingTrace,
+    ToolCallRecord,
+    ToolResult,
+)
+from lca.contracts.models.observability.journal_step import (
+    StepOutcome as StepLifecycleOutcome,
 )
 from lca.contracts.observability.evidence import (
     EvidencePolicy,
@@ -453,6 +466,126 @@ def get_span_context() -> SpanContextInfo:
 _log = structlog.get_logger("lca.observability")
 
 
+# ── Step-tree API(ADR-0164 草案 Phase 2 facade 入口) ─────────────
+#
+# 设计: facade 不持有 step 状态, 直接转发给 step_lifecycle 模块 facade。
+# 业务层调 ``facade.open_step(...)`` 等价于调 ``step_lifecycle.open_step(...)``,
+# 唯一区别是 facade 额外检查 _run_context 是否绑定(防御: 不绑 context 就
+# 没有当前 run 的身份, open_step 没意义)。
+#
+# 增 facade 这一层的理由: 保持业务层"只看到 4 个动词"的契约; 但 step 不是
+# "record / span / annotate / score" 中任何一个, 应当显式扩展 facade API。
+# Phase 4 之后 facade 的 record_runtime / record_operation 也收敛到 record_span,
+# 全部进 step-tree。
+#
+# **延迟 import**: step_lifecycle 在 runtime 包内, runtime 包顶层 import
+# facade, 引入即循环。 故所有 step API 在函数体内延迟 import; 函数签名
+# 保持类型完整, 调用方从 type hints 看出契约。
+
+
+def _require_run_bound() -> RunContext:
+    """step API 要求 context 已 bind(否则不知道当前 run)。"""
+    ctx = _run_context.get()
+    if ctx is None:
+        raise RuntimeError(
+            "step API requires bound run context; "
+            "call facade.bind(RunContext(run_id=..., trace_id=...)) first"
+        )
+    return ctx
+
+
+def step_open(
+    phase: StepPhase,
+    *,
+    subagent_role: str | None = None,
+    context: StepContext | None = None,
+    parent_step_id: str | None = None,
+):
+    """开 step(5 原语: 上下文)。"""
+    _require_run_bound()
+    from lca.runtime import step_lifecycle as _step_lifecycle
+
+    return _step_lifecycle.open_step(
+        phase,
+        subagent_role=subagent_role,
+        context=context,
+        parent_step_id=parent_step_id,
+    )
+
+
+def step_record_thinking(trace: ThinkingTrace) -> None:
+    """5 原语: 思考。"""
+    _require_run_bound()
+    from lca.runtime import step_lifecycle as _step_lifecycle
+
+    _step_lifecycle.record_thinking(trace)
+
+
+def step_record_tool_call(call: ToolCallRecord) -> None:
+    """5 原语: 工具调用。"""
+    _require_run_bound()
+    from lca.runtime import step_lifecycle as _step_lifecycle
+
+    _step_lifecycle.record_tool_call(call)
+
+
+def step_record_tool_result(result: ToolResult) -> None:
+    """5 原语: 工具结果。"""
+    _require_run_bound()
+    from lca.runtime import step_lifecycle as _step_lifecycle
+
+    _step_lifecycle.record_tool_result(result)
+
+
+def step_record_reflect(reflect: ReflectTrace) -> None:
+    """5 原语: 反思。"""
+    _require_run_bound()
+    from lca.runtime import step_lifecycle as _step_lifecycle
+
+    _step_lifecycle.record_reflect(reflect)
+
+
+def step_record_span(span: SpanRecord) -> None:
+    """折叠诊断(RuntimeObserved / ToolRetryProgress / ContextCompacted)。"""
+    _require_run_bound()
+    from lca.runtime import step_lifecycle as _step_lifecycle
+
+    _step_lifecycle.record_span(span)
+
+
+def step_close(
+    outcome: StepLifecycleOutcome,
+    *,
+    error: str | None = None,
+):
+    """闭 step。"""
+    _require_run_bound()
+    from lca.runtime import step_lifecycle as _step_lifecycle
+
+    return _step_lifecycle.close_step(outcome, error=error)
+
+
+def step_close_document(
+    *,
+    outcome: Literal["completed", "failed", "paused", "stopped"],
+    closed_at: float | None = None,
+) -> JournalDocument | None:
+    """闭 run document。 必须所有 step 都已 close_step。"""
+    from lca.runtime import step_lifecycle as _step_lifecycle
+
+    store = _step_lifecycle.get_lifecycle_store()
+    if store is None:
+        return None
+    return store.close_document(outcome=outcome, closed_at=closed_at)
+
+
+def step_get_lifecycle_store():
+    """拿到当前 task 的 lifecycle store(给 boot 装配用)。"""
+    from lca.runtime import step_lifecycle as _step_lifecycle
+
+    return _step_lifecycle.get_lifecycle_store()
+
+
 __all__ = [
     "BoundObservability",
     "EvidenceBinding",
@@ -473,5 +606,14 @@ __all__ = [
     "set_actor",
     "set_session",
     "span",
+    "step_close",
+    "step_close_document",
+    "step_get_lifecycle_store",
+    "step_open",
+    "step_record_reflect",
+    "step_record_span",
+    "step_record_thinking",
+    "step_record_tool_call",
+    "step_record_tool_result",
     "traced",
 ]

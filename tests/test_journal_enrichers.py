@@ -21,9 +21,6 @@ from lca.infrastructure.observability.journal.enrichment.event_enrichers import 
     TimestampEnricher,
     default_enrichers,
 )
-from lca.infrastructure.observability.journal.jsonl.projector import (
-    JsonlJournalProjector,
-)
 
 
 def _stamped(seq: int, event, *, ts: float | None = None, role: str = "solo"):
@@ -190,46 +187,62 @@ def test_default_enrichers_contain_doc_and_causation() -> None:
     assert {"doc", "timestamp", "causation", "phase_lift", "redaction_marker"} <= names
 
 
-def test_projector_writes_chinese_doc_and_narrative(tmp_path: Path) -> None:
-    """集成:projector 跑一遍,看 jsonl 有 _doc + 时间字段,sidecar 有叙事。"""
-    path = tmp_path / "j.jsonl"
-    projector = JsonlJournalProjector(path)
-    projector.on_event(_stamped(1, DecisionMade(step=1, action_type="respond", response_text="hi")))
-    projector.on_event(_stamped(2, StepTextDelta(step=1, text_delta="你", seq=0, channel="answer")))
-    projector.on_event(_stamped(3, StepTextDelta(step=1, text_delta="好", seq=1, channel="answer")))
-    projector.close()
+def test_enrichment_pipeline_no_longer_attached_to_step_tree(tmp_path: Path) -> None:
+    """ADR-0164 Phase 7: enricher pipeline 已随 JsonlJournalProjector 删除。
 
-    text = path.read_text(encoding="utf-8")
-    assert "_doc" in text
-    assert "occurred_at_iso" in text
+    step-tree 不需要 enricher(每原语已经是结构化字段)。
+    这个测试保留 enricher pipeline unit test 范畴 — 通过 EnrichmentPipeline
+    直接调用验证 _doc / timestamp / causation 注入逻辑,不需要 projector。
+    """
+    # pipeline 直接调用 enrichment, 不需要 projector 落盘
+    pipeline = EnrichmentPipeline(enrichers=default_enrichers())
+    ctx = EnrichmentContext(run_id="r1", trace_id="t1")
+    # 需要 descriptor.type 才能触发 DocumentEnricher / CausationEnricher
+    # 需要 occurred_at (epoch float) 触发 TimestampEnricher
+    record = {
+        "descriptor": {"type": "AgentRunStarted"},
+        "occurred_at": 1000.0,
+        "data": {"objective": "测试", "objective_preview": "测试"},
+        "scope": {"agent_role": "x", "step": 1},
+    }
+    enriched = pipeline.run(record)
+    ctx.note_event(enriched)
+    # _doc / occurred_at_iso 应该被注入
+    assert "_doc" in enriched
+    assert "occurred_at_iso" in enriched
 
-    narrative = path.with_name(path.name + ".narrative.md")
-    assert narrative.exists()
-    md = narrative.read_text(encoding="utf-8")
-    assert "DecisionMade" in md
-    assert "StepTextDelta" in md
-    assert "事件类型分布" in md
 
-
-def test_projector_coalesces_interleaved_deltas(tmp_path: Path) -> None:
-    path = tmp_path / "j.jsonl"
-    projector = JsonlJournalProjector(path)
-    projector.on_event(
-        _stamped(1, StepTextDelta(step=1, text_delta="哈", seq=0, channel="decision"))
+def test_step_tree_does_not_emit_narrative_sidecar(tmp_path: Path) -> None:
+    """ADR-0164: step-tree 路径不写 narrative.md(由 StepNarrativeWriter 接管)。"""
+    from lca.contracts.models.observability import (
+        JournalMetadata,
+        empty_document,
     )
-    projector.on_event(_stamped(2, StepTextDelta(step=1, text_delta="哈", seq=1, channel="answer")))
-    projector.on_event(
-        _stamped(3, StepTextDelta(step=1, text_delta="好", seq=2, channel="decision"))
+    from lca.infrastructure.observability.journal.step.projector import (
+        StepGroupedProjector,
     )
-    projector.on_event(_stamped(4, StepTextDelta(step=1, text_delta="好", seq=3, channel="answer")))
-    projector.close()
-    text = path.read_text(encoding="utf-8")
-    # decision 通道两条合并:"哈" + "好" = "哈好";answer 通道同理
-    assert '"text_delta": "哈好"' in text
+
+    path = tmp_path / "j.json"
+    meta = JournalMetadata(
+        agent_role="x",
+        strategy_key="solo",
+        plan_ref="",
+        objective="t",
+    )
+    doc = empty_document(run_id="r", trace_id="t", metadata=meta, started_at=0.0)
+    StepGroupedProjector(path).write(doc)
+
+    # step-tree 不应自动产出 narrative.md
+    assert not (tmp_path / "j.narrative.md").exists()
+    # 写 journal.json 即可
+    assert path.exists()
 
 
-def test_custom_enricher_chain_is_honoured(tmp_path: Path) -> None:
-    """传入自定义 enrichers 时,默认 enricher 不再附加。"""
+def test_custom_enricher_pipeline_still_works_via_direct_call(tmp_path: Path) -> None:
+    """自定义 enricher 通过 EnrichmentPipeline.run 直接调用测试。
+
+    不依赖 projector(已删除)。
+    """
 
     @dataclass
     class TagEnricher:
@@ -240,11 +253,21 @@ def test_custom_enricher_chain_is_honoured(tmp_path: Path) -> None:
             out["custom_tag"] = "ok"
             return out
 
-    path = tmp_path / "j.jsonl"
-    projector = JsonlJournalProjector(path, enrichers=(TagEnricher(),), sidecars=())
-    projector.on_event(_stamped(1, DecisionMade(step=1, action_type="respond")))
-    projector.close()
-    text = path.read_text(encoding="utf-8")
-    assert '"custom_tag": "ok"' in text
-    # 默认 enricher 不再注入 _doc
-    assert '"_doc"' not in text
+    pipeline = EnrichmentPipeline(enrichers=(TagEnricher(),))
+    record = {"data": {}}
+    enriched = pipeline.run(record)
+    assert enriched["custom_tag"] == "ok"
+
+    # 对照: 默认 enricher 链会注入 _doc / occurred_at_iso
+    default_pipeline = EnrichmentPipeline(enrichers=default_enrichers())
+    ctx = EnrichmentContext(run_id="r", trace_id="t")
+    default_record = {
+        "descriptor": {"type": "AgentRunStarted"},
+        "occurred_at": 1000.0,
+        "data": {"objective": "测试"},
+        "scope": {"agent_role": "x", "step": 1},
+    }
+    default_enriched = default_pipeline.run(default_record)
+    ctx.note_event(default_enriched)
+    assert "_doc" in default_enriched
+    assert "occurred_at_iso" in default_enriched

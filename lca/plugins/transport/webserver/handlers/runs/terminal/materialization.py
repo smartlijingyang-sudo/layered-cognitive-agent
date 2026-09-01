@@ -24,9 +24,16 @@ _log = structlog.get_logger(__name__)
 
 
 def record_terminal_materialization(session: RunSession) -> None:
-    """Write a terminal manifest and update its navigation pointer without owning facts."""
+    """Write a terminal manifest and update its navigation pointer without owning facts.
+
+    ADR-0164 Phase 6: 在写 manifest 之前 flush step-tree bundle(写
+    journal.json + narrative.md)。 让 step-tree 是主存储, 旧 stream 是 raw。
+    """
     locator = session_locator(session)
     try:
+        # ADR-0164: terminalize 时 step-tree flush(写 journal.json + narrative.md)
+        _flush_step_tree(session)
+
         report = diagnose(session, session.jsonl_path)
         if report.broken_hop or not report.factory["ok"]:
             _log.error(
@@ -58,6 +65,25 @@ def record_terminal_materialization(session: RunSession) -> None:
         _log.warning(
             "run_terminal_materialization_failed",
             hop="H2",
+            run_id=session.run_id,
+            exc_info=True,
+        )
+
+
+def _flush_step_tree(session: RunSession) -> None:
+    """从 session 拿 step-tree bundle 并 flush(写 journal.json + narrative.md)。
+
+    bundle 在 ``create_run_components`` 阶段构造并挂到 session 上(若有
+    step_lifecycle_store); terminalizer 这里负责落盘。
+    """
+    bundle = getattr(session, "step_tree_bundle", None)
+    if bundle is None:
+        return
+    try:
+        bundle.flush()
+    except Exception:
+        _log.warning(
+            "step_tree_flush_failed",
             run_id=session.run_id,
             exc_info=True,
         )

@@ -63,10 +63,16 @@ class ProcessJournalProjection(Protocol):
 
 @dataclass(frozen=True)
 class RunJournalComponents:
-    """Run-scoped writer and live tail created as one coherent unit."""
+    """Run-scoped writer and live tail created as one coherent unit.
+
+    ADR-0164 Phase 6: 增 ``step_tree_writer`` 字段(可空), boot 把
+    StepGroupedBackend + StepNarrativeWriter 装进来, 让 terminalizer
+    在 close 时写 journal.json + narrative.md。 旧 writer 仍写 journal.raw.jsonl。
+    """
 
     writer: JournalProjector
     tail: LiveRunProjection
+    step_tree_writer: object | None = None  # StepGroupedBackend 实例(none 表示未启 step-tree)
 
 
 @runtime_checkable

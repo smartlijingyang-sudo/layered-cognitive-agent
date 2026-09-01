@@ -17,6 +17,15 @@ from lca.infrastructure.observability.facade.facade import (
     set_actor,
     set_session,
     span,
+    step_close,
+    step_close_document,
+    step_get_lifecycle_store,
+    step_open,
+    step_record_reflect,
+    step_record_span,
+    step_record_thinking,
+    step_record_tool_call,
+    step_record_tool_result,
 )
 
 __all__ = [
@@ -36,4 +45,13 @@ __all__ = [
     "set_actor",
     "set_session",
     "span",
+    "step_close",
+    "step_close_document",
+    "step_get_lifecycle_store",
+    "step_open",
+    "step_record_reflect",
+    "step_record_span",
+    "step_record_thinking",
+    "step_record_tool_call",
+    "step_record_tool_result",
 ]

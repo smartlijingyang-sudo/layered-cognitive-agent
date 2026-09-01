@@ -65,6 +65,8 @@ def ensure_session_hub(
     journal_factory = cast("RunJournalFactory", require_capability(ctx, "run_ledger_factory"))
     components = journal_factory.create_run_components(jsonl_path=session.jsonl_path)
     session.tail = components.tail
+    # ADR-0164 Phase 6: 把 step-tree bundle 挂到 session(terminalizer 用)
+    session.step_tree_bundle = components.step_tree_writer
     hub = assemble_run_hub(
         jsonl_writer=components.writer,
         tail=components.tail,

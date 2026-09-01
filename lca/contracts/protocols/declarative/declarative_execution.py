@@ -94,6 +94,37 @@ class PhaseInput:
 PhaseErrorCategory = Literal["timeout", "transient", "permanent"]
 
 
+# Outer phase error kind (ADR-clean-truths 决策 一).
+# 区别于 PhaseErrorCategory（attempt 内部失败分类）,
+# 这里表达的是 PhaseExecutionFailure 这个 boundary 事件的根因。
+# UI / LobeHub / run-doctor 只读 error_kind,不再拼接文学化 message。
+PhaseErrorKind = Literal[
+    "timeout",          # wait_for / asyncio timeout
+    "contract",         # 类型/参数/状态 contract violation
+    "cancelled",        # 上层取消
+    "provider",         # LLM/provider 上游故障
+    "internal",         # 未分类内部错误
+]
+
+
+def _derive_error_kind(attempts: tuple["PhaseAttemptFailure", ...]) -> str:
+    """从最后一次 attempt 的 category 推导 outer error_kind。
+
+    PhaseErrorCategory 与 PhaseErrorKind 的映射:
+      timeout   → timeout
+      transient → provider
+      permanent → internal（永久错误被默认视为契约/语义错误,除非显式归类）
+    """
+    if not attempts:
+        return "internal"
+    last_category = attempts[-1].category
+    if last_category == "timeout":
+        return "timeout"
+    if last_category == "transient":
+        return "provider"
+    return "internal"
+
+
 @dataclass(frozen=True, slots=True)
 class PhaseAttemptFailure:
     """Sanitized, replay-safe metadata for one failed phase attempt."""
@@ -110,6 +141,12 @@ class PhaseExecutionFailure:
     node_id: str
     attempts: tuple[PhaseAttemptFailure, ...]
     last_tool_call_id: str | None = None
+    # ADR-clean-truths 决策 一:PhaseExecutionFailure 自身携带结构化错误分类,
+    # 下游不再依赖 message 字符串里的"the agent could not complete a required
+    # {node_id} step after {n} attempt(s)"这种文学化叙述。默认从 attempts[-1]
+    # 推导(timeout → "timeout",transient → "provider",其他 → "internal"),
+    # 显式传入可覆盖。
+    error_kind: PhaseErrorKind = ""
 
     def __post_init__(self) -> None:
         if not self.node_id:
@@ -120,6 +157,12 @@ class PhaseExecutionFailure:
             raise DeclarativeValidationError(
                 "PG-010", "phase execution failure requires at least one attempt"
             )
+        if not self.error_kind:
+            object.__setattr__(self, "error_kind", _derive_error_kind(self.attempts))
+
+    def is_retryable(self) -> bool:
+        """外部策略可读的最小信号:是否值得重试。"""
+        return self.error_kind in ("timeout", "provider")
 
 
 @dataclass(frozen=True, slots=True)
@@ -203,6 +246,7 @@ __all__ = [
     "PhaseCapabilityReader",
     "PhaseContext",
     "PhaseErrorCategory",
+    "PhaseErrorKind",
     "PhaseExecutionFailure",
     "PhaseExecutor",
     "PhaseInput",

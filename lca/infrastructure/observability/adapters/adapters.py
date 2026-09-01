@@ -161,6 +161,16 @@ class TelemetryLLMAdapter(LLMAdapter):
                                 seq=reasoning_seq,
                             )
                         )
+                        # ADR-0164 Phase 3 双写:reasoning 增量 → step span
+                        try:
+                            from lca.runtime.step_emitter import bridge_llm_reasoning_delta
+
+                            bridge_llm_reasoning_delta(
+                                text_delta=delta_text,
+                                started_at=time.time(),
+                            )
+                        except ImportError:
+                            pass
                         reasoning_seq += 1
                 elif event.type == LLMStreamEventType.OUTPUT_TEXT_DELTA:
                     delta_text = event.text or ""
@@ -173,6 +183,17 @@ class TelemetryLLMAdapter(LLMAdapter):
                             channel=StreamChannel.DECISION.value,
                         )
                     )
+                    # ADR-0164 Phase 3 双写:step text 增量 → step span
+                    try:
+                        from lca.runtime.step_emitter import bridge_llm_step_text_delta
+
+                        bridge_llm_step_text_delta(
+                            text_delta=delta_text,
+                            channel=StreamChannel.DECISION.value,
+                            started_at=time.time(),
+                        )
+                    except ImportError:
+                        pass
                     delta_seq += 1
                     answer_delta = answer_extractor.feed(delta_text)
                     if answer_delta:
@@ -184,6 +205,18 @@ class TelemetryLLMAdapter(LLMAdapter):
                                 channel=StreamChannel.ANSWER.value,
                             )
                         )
+                        try:
+                            from lca.runtime.step_emitter import (
+                                bridge_llm_step_text_delta,
+                            )
+
+                            bridge_llm_step_text_delta(
+                                text_delta=answer_delta,
+                                channel=StreamChannel.ANSWER.value,
+                                started_at=time.time(),
+                            )
+                        except ImportError:
+                            pass
                         delta_seq += 1
                 yield event
         except Exception:
@@ -258,3 +291,18 @@ class TelemetryLLMAdapter(LLMAdapter):
                 reasoning_preview=reasoning_text[:1024],
             )
         )
+        # ADR-0164 Phase 3 双写:写 step.thinking
+        try:
+            from lca.runtime.step_emitter import bridge_llm_completed
+
+            bridge_llm_completed(
+                model=model,
+                latency_ms=latency_ms,
+                reasoning_preview=reasoning_text[:1024],
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                response_preview=(response_text or "")[:1024],
+                decision="respond" if ok else "error",
+            )
+        except ImportError:
+            pass

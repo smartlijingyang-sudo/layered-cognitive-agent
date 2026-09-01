@@ -65,9 +65,7 @@ class RunAmbit:
     role: str = ""
 
 
-_run_ambit: ContextVar[RunAmbit | None] = ContextVar(
-    "lca_run_ambit", default=None
-)
+_run_ambit: ContextVar[RunAmbit | None] = ContextVar("lca_run_ambit", default=None)
 
 
 @contextmanager

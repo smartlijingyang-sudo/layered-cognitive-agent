@@ -1,14 +1,24 @@
-"""Typed data contracts shared by legacy and Session Spine run diagnostics."""
+"""Typed data contracts shared by step-tree and Session Spine run diagnostics.
+
+ADR-0164 Phase 4 升级 doctor.v3:
+  - ``schema`` 从 "doctor.v2" → "doctor.v3"。
+  - 增 ``mode: Literal["backend", "ui"]`` —— backend 跳过 H4/H5;ui 全检。
+  - 增 H8 "步骤因果链完整性" —— step_tree mode 下基于 prior_summary_chain
+    检查每 step 是否引用上一 step 的 reflect 摘要。
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 TERMINAL_STATUSES = frozenset({"completed", "failed", "canceled"})
 OPEN_STATUSES = frozenset({"running", "waiting_input"})
 TOOL_TERMINAL_EVENTS = frozenset({"ToolInvoked", "ToolDenied"})
 RUN_FINISHED_EVENTS = frozenset({"AgentRunFinished", "TeamRunFinished"})
+
+DoctorMode = Literal["backend", "ui"]
+"""doctor 模式:backend = 没浏览器/UI 不可视,跳过 H4/H5;ui = 完整流程检查。"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,7 +40,13 @@ class HopVerdict:
 
 @dataclass(frozen=True, slots=True)
 class DoctorReport:
-    """Stable doctor.v2 response assembled from one diagnostic read model."""
+    """doctor.v3 response — step-tree 主路径 + mode 区分。
+
+    字段变更:
+      - ``schema`` 永远 "doctor.v3"。
+      - ``mode`` 显式标记("backend" / "ui"), reader 据此理解 H4/H5。
+      - ``journal_path`` 取代 ``jsonl_path``(可能是 .json step-tree 或 .jsonl legacy)。
+    """
 
     schema: str
     run_id: str
@@ -38,8 +54,9 @@ class DoctorReport:
     status: str
     broken_hop: str | None
     summary: str
+    mode: DoctorMode
     hops: dict[str, HopVerdict]
-    jsonl_path: str
+    journal_path: str
     consistency: dict[str, Any]
     factory: dict[str, Any]
 
@@ -52,8 +69,9 @@ class DoctorReport:
             "status": self.status,
             "broken_hop": self.broken_hop,
             "summary": self.summary,
+            "mode": self.mode,
             "hops": {name: hop.as_dict() for name, hop in self.hops.items()},
-            "jsonl_path": self.jsonl_path,
+            "journal_path": self.journal_path,
             "consistency": self.consistency,
             "factory": self.factory,
         }
@@ -80,12 +98,34 @@ class JsonlScan:
     has_attachment: bool
 
 
+@dataclass(frozen=True, slots=True)
+class StepScan:
+    """Facts derived from one run's step-tree journal (lca.journal/3)。"""
+
+    exists: bool
+    total_steps: int
+    tool_total: int
+    tool_success: int
+    tool_failure_steps: tuple[int, ...]  # step_index 列表
+    max_consecutive_fail: int
+    closed_at: float | None
+    started_at: float | None
+    duration_ms: int | None
+    objective: str
+    failed_chain_steps: tuple[int, ...]  # H8 失败: 因果链不一致的 step_index
+    has_output: bool
+    outcome: str
+    schema_version: str | None  # None → 文件不存在
+
+
 __all__ = [
     "OPEN_STATUSES",
     "RUN_FINISHED_EVENTS",
     "TERMINAL_STATUSES",
     "TOOL_TERMINAL_EVENTS",
+    "DoctorMode",
     "DoctorReport",
     "HopVerdict",
     "JsonlScan",
+    "StepScan",
 ]

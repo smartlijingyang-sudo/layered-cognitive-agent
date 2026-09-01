@@ -20,8 +20,33 @@ def emit_artifact_closure_if_needed(
     session: RunSession,
     hub: BoundObservability,
 ) -> None:
-    """Append a text closure when the workspace contains materialized artifacts."""
+    """Append a text closure when the workspace contains materialized artifacts.
+
+    ADR-clean-truths 决策 二:fail / cancel 的 run 不再向 channel=answer 推产物闭合。
+    仅 COMPLETED / DEGRADED 才发;其他状态(session.error 非空,或 status 已收敛到
+    FAILED / CANCELED)直接 return。这样 run_fa054a09475f 那种 "已生成 PDF" 假成功
+    答卷从源头消失。
+    """
     if workspace is None:
+        return
+    # 决策 二:FAILED / CANCELED / session.error 非空 → 不再向 answer 推文本。
+    if session.status.value in ("FAILED", "CANCELED"):
+        _log.info(
+            "artifact_closure_suppressed",
+            hop="H2",
+            run_id=session.run_id,
+            status=session.status.value,
+            reason="run failed or canceled",
+        )
+        return
+    if session.error:
+        _log.info(
+            "artifact_closure_suppressed",
+            hop="H2",
+            run_id=session.run_id,
+            status=session.status.value,
+            reason="session.error non-empty",
+        )
         return
     artifacts = workspace.artifacts.snapshot().artifacts
     if not artifacts:

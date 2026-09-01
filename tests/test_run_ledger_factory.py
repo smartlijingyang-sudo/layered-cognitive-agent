@@ -55,7 +55,6 @@ def test_run_session_consumes_profile_selected_journal_factory(tmp_path: Path) -
     from lca.infrastructure.observability.backends.run_locator_fs import FilesystemRunLocator
     from lca.infrastructure.observability.facade import BoundObservability
     from lca.infrastructure.observability.journal.engine.process import ProcessJournal
-    from lca.infrastructure.observability.journal.jsonl.projector import JsonlJournalProjector
     from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
     from lca.plugins.transport.webserver.handlers.runs.execute import create_run_session
     from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry
@@ -71,8 +70,10 @@ def test_run_session_consumes_profile_selected_journal_factory(tmp_path: Path) -
             self.paths.append(jsonl_path)
             tail = LiveTail()
             self.tails.append(tail)
+            # ADR-0164 Phase 7: 不再创建 JsonlJournalProjector(主路径不写 jsonl)
+            # writer 字段需 JournalProjector, LiveTail 占位(SSE 投影)。
             return RunJournalComponents(
-                writer=JsonlJournalProjector(jsonl_path),
+                writer=LiveTail(),
                 tail=tail,
             )
 

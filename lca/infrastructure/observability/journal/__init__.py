@@ -8,7 +8,7 @@
 - console/     ConsoleProjector + sequence diagram + table renderer
 - jsonl/       JsonlProjector
 - sse/         SSE frames
-- stream/      LiveTail + FactStream + NarrativeSidecar
+- stream/      LiveTail + FactStream + SidecarHook Protocol (NarrativeSidecar 已删除, 由 StepNarrativeWriter 接管)
 - backends/    Filesystem + InMemory journal stores
 
 外部一律经本 ``__init__`` 使用公共入口（边界守卫强制）。

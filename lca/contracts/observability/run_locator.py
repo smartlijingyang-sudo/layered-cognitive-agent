@@ -1,4 +1,4 @@
-"""RunLocator contract —— ADR-0065 §七 / PR-5。
+"""RunLocator contract —— ADR-0065 §七 / PR-5 / ADR-0164。
 
 ``RunLocator`` 把 ``run_id → run_dir`` 的解析封装成 capability;fs / s3 /
 multi-host layout 都通过实现该契约提供。目录命名:
@@ -6,6 +6,11 @@ multi-host layout 都通过实现该契约提供。目录命名:
 - 跨 OS 差异(Linux/macOS/Windows)封装在实现内,调用方只见 capability
 
 默认实现:``FilesystemRunLocator``(``lca/infrastructure/observability/run_locator_fs.py``)。
+
+ADR-0164 增 step-tree 路径:
+  - ``journal_step_path`` → step-tree 主存储 (lca.journal/3)
+  - ``journal_narrative_path`` → StepNarrativeWriter 写出的 markdown
+  - 旧的 ``journal_path`` 指向 ``journal.raw.jsonl``(回放兜底)
 """
 
 from __future__ import annotations
@@ -22,7 +27,13 @@ class RunLocator(Protocol):
         """返回 run 的物理目录;若目录不存在也返回路径(写时再创建)。"""
 
     def journal_path(self, run_id: str) -> Path:
-        """返回该 run 的 journal.jsonl 路径。"""
+        """返回该 run 的 journal.raw.jsonl 路径(legacy 流式,回放用)。"""
+
+    def journal_step_path(self, run_id: str) -> Path:
+        """返回该 run 的 journal.json 路径(ADR-0164 step-tree 主存储)。"""
+
+    def journal_narrative_path(self, run_id: str) -> Path:
+        """返回该 run 的 journal.narrative.md 路径(StepNarrativeWriter)。"""
 
     def evidence_dir(self, run_id: str) -> Path:
         """返回该 run 的 evidence 子目录路径。"""

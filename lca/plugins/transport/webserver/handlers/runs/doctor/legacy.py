@@ -16,12 +16,18 @@ from lca.plugins.transport.webserver.handlers.runs.doctor.models import (
 
 
 def diagnose_legacy(session: Any | None, jsonl_path: Path) -> DoctorReport:
-    """Build doctor.v2 from a legacy live session and its append-only journal."""
+    """Build doctor.v3 from a legacy live session and its append-only JSONL journal.
+
+    ADR-0164 Phase 4: schema 升级到 doctor.v3。 仍接受 legacy 路径(.jsonl),
+    但报告 shape 跟 step-tree 一致(jsonl_path → journal_path, mode 默认 backend)。
+    不产生 H8(legacy 无 step-tree 概念)。
+    """
     scan = scan_jsonl(jsonl_path)
     run_id, trace_id, status, tail_seq, closed, subscribers, evicted = session_view(
         session,
         jsonl_path,
     )
+
     hops: dict[str, HopVerdict] = {
         "H1": hop_h1(session, scan),
         "H2": hop_h2(status, scan),
@@ -34,8 +40,8 @@ def diagnose_legacy(session: Any | None, jsonl_path: Path) -> DoctorReport:
             subscribers=subscribers,
             evicted=evicted,
         ),
-        "H4": HopVerdict(ok=None, detail="server cannot see browser"),
-        "H5": HopVerdict(ok=None, detail="server cannot see UI"),
+        "H4": HopVerdict(ok=None, detail="mode=legacy (H4 not applicable)"),
+        "H5": HopVerdict(ok=None, detail="mode=legacy (H5 not applicable)"),
         "H6": hop_h6(scan),
         "H7": hop_h7(scan),
     }
@@ -43,14 +49,15 @@ def diagnose_legacy(session: Any | None, jsonl_path: Path) -> DoctorReport:
     factory = {"ok": not missing_state, "tools_missing_plugin_state": missing_state}
     broken = next((name for name, hop in hops.items() if hop.ok is False), None)
     return DoctorReport(
-        schema="doctor.v2",
+        schema="doctor.v3",
         run_id=run_id,
         trace_id=trace_id,
         status=status,
         broken_hop=broken,
         summary=summary(broken, hops, factory, scan, tail_seq, evicted),
+        mode="backend",
         hops=hops,
-        jsonl_path=str(jsonl_path),
+        journal_path=str(jsonl_path),
         consistency={
             "jsonl_seq_eq_tail_seq": scan.last_seq == tail_seq if session is not None else None
         },

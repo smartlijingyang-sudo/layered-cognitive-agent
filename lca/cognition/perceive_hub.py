@@ -60,6 +60,19 @@ class SequentialPerceiveHub(PerceiveHub):
         self._sink: ManifestSink = sink if sink is not None else default_sink()
 
     async def perceive(self, state: AgentState) -> ContextManifest:
+        # ADR-0164 Phase 3:开 perceive step + close 围绕 _fold + emit
+        try:
+            from lca.runtime.step_emitter import (
+                bridge_perceive_closed,
+                bridge_perceive_opened,
+            )
+
+            bridge_perceive_opened(
+                objective=state.objective or "perceive",
+            )
+        except ImportError:
+            pass
+
         items = await self._fold(state)
         manifest = build_manifest_from_items(items)
         # Write the typed slot — the Reasoner reads this.
@@ -77,6 +90,18 @@ class SequentialPerceiveHub(PerceiveHub):
             persist_full_prompt=False,
         )
         self._sink.emit(event, manifest)
+
+        # close perceive step(默认 ok, 失败由 _fold 内部异常上抛, bridge 不接管)
+        try:
+            from lca.runtime.step_emitter import bridge_perceive_closed
+
+            kinds = ", ".join(item.kind for item in items)
+            bridge_perceive_closed(
+                outcome="ok",
+                summary=f"感知 {len(items)} 项 ({kinds})",
+            )
+        except ImportError:
+            pass
         return manifest
 
     async def _fold(self, state: AgentState) -> list[ContextItem]:

@@ -22,8 +22,10 @@ from lca.infrastructure.observability.backends.run_locator_fs import FilesystemR
 from lca.infrastructure.observability.journal.engine.journal_io import JOURNAL_SCHEMA_VERSION
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 from lca.plugins.transport.webserver.handlers.runs.doctor import diagnose
-from lca.plugins.transport.webserver.handlers.runs.execute import _record_terminal_materialization
 from lca.plugins.transport.webserver.handlers.runs.observability.identity import parse_agent_ref
+from lca.plugins.transport.webserver.handlers.runs.terminal.materialization import (
+    record_terminal_materialization,
+)
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession, RunStatus
 
 
@@ -90,7 +92,7 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
                 run_id=run_id, jsonl_path=jsonl_path, status=RunStatus.COMPLETED
             )
 
-            _record_terminal_materialization(session)
+            record_terminal_materialization(session)
 
             manifest_path = root / "runs" / run_id / "manifest.json"
             self.assertTrue(manifest_path.exists(), "manifest.json must exist")
@@ -105,7 +107,7 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
             self.assertEqual(payload["started_at"], 1000.0)
             self.assertEqual(payload["closed_at"], 1100.0)
             self.assertIn("doctor_report", payload["extra"])
-            self.assertEqual(payload["extra"]["doctor_report"]["schema"], "doctor.v2")
+            self.assertEqual(payload["extra"]["doctor_report"]["schema"], "doctor.v3")
 
     def test_latest_json_atomically_written(self) -> None:
         with self._fresh_root() as root:
@@ -130,7 +132,7 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
                 run_id=run_id, jsonl_path=jsonl_path, status=RunStatus.COMPLETED
             )
 
-            _record_terminal_materialization(session)
+            record_terminal_materialization(session)
 
             latest = root / "latest.json"
             self.assertTrue(latest.exists(), "latest.json must exist")
@@ -161,7 +163,7 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
                 closed_at=2.0,
                 # locator=None —— 推断路径
             )
-            _record_terminal_materialization(session)
+            record_terminal_materialization(session)
             self.assertTrue((root / "runs" / run_id / "manifest.json").exists())
 
     def test_terminal_event_seq_picks_finished(self) -> None:
@@ -178,7 +180,7 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
             session = _make_session(
                 run_id=run_id, jsonl_path=jsonl_path, status=RunStatus.COMPLETED
             )
-            _record_terminal_materialization(session)
+            record_terminal_materialization(session)
             payload = json.loads(
                 (root / "runs" / run_id / "manifest.json").read_text(encoding="utf-8")
             )
@@ -198,7 +200,7 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
                 run_id=run_id, jsonl_path=jsonl_path, status=RunStatus.COMPLETED
             )
 
-            _record_terminal_materialization(session)
+            record_terminal_materialization(session)
 
             payload = json.loads(
                 (root / "runs" / run_id / "manifest.json").read_text(encoding="utf-8")
@@ -242,7 +244,7 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
                 run_id=run_id, jsonl_path=jsonl_path, status=RunStatus.COMPLETED
             )
 
-            _record_terminal_materialization(session)
+            record_terminal_materialization(session)
 
             payload = json.loads(
                 (root / "runs" / run_id / "manifest.json").read_text(encoding="utf-8")
@@ -270,7 +272,7 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
                 locator=FilesystemRunLocator(root=root),
             )
             # 不抛
-            _record_terminal_materialization(session)
+            record_terminal_materialization(session)
             # journal 不存在 → manifest.json 不写(找不到 ledger_summary / watermark),
             # latest.json 也不更新 —— 因为 manifest_path.parent.mkdir(parents=True) + 写失败
             # 我们只要求不抛
@@ -292,7 +294,7 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
                 run_id=run_id, jsonl_path=jsonl_path, status=RunStatus.COMPLETED
             )
             report = diagnose(session, jsonl_path)
-            self.assertEqual(report.schema, "doctor.v2")
+            self.assertEqual(report.schema, "doctor.v3")
             self.assertEqual(report.run_id, run_id)
             self.assertGreaterEqual(report.hops["H2"].ok, True)  # type: ignore[arg-type]
 

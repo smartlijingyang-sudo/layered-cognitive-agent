@@ -259,11 +259,6 @@ entries:
     $module: lca.plugins.providers.observability.fact_reader_console
     config: {}
 
-  - id: lca-fact-reader-jsonl-factory
-    name: lca_providers_fact_reader_jsonl
-    $module: lca.plugins.providers.observability.fact_reader_jsonl
-    config: {}
-
   - id: lca-fact-reader-otel-factory
     name: lca_providers_fact_reader_otel
     $module: lca.plugins.providers.observability.fact_reader_otel

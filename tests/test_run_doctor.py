@@ -1,4 +1,4 @@
-"""doctor.v2 predicates — broken_hop is the first false hop."""
+"""doctor.v3 predicates — broken_hop is the first false hop."""
 
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ def test_doctor_flags_h3_when_tail_closes_while_running(tmp_path: Path) -> None:
     session = _session(status=RunStatus.RUNNING, tail=tail, jsonl_path=path)
     tail.close()
     report = diagnose(session, path)
-    assert report.schema == "doctor.v2"
+    assert report.schema == "doctor.v3"
     assert report.broken_hop == "H3"
     assert report.hops["H3"].ok is False
 

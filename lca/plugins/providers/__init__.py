@@ -30,7 +30,7 @@ Seam-mirror subpackages (each provider joins its seam's group):
   ``fact_store_memory``, ``runtime_factory``.
 * ``observability`` — ``attribute_policy``, ``cli_debug_trace``,
   ``event_descriptor``, ``evidence_store_filesystem``,
-  ``fact_reader_console``, ``fact_reader_jsonl``,
+  ``fact_reader_console``,
   ``fact_reader_langfuse``, ``fact_reader_otel``,
   ``fact_scorer_langfuse``, ``genai_llm``, ``genai_tool``,
   ``tracer_otel``, ``trace_tool``.

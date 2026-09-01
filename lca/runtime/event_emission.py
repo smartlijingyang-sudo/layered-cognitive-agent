@@ -67,6 +67,15 @@ def _derive_action_degraded(state: AgentState, kwargs: dict[str, Any]) -> Journa
 
 def _derive_step_completed(state: AgentState, kwargs: dict[str, Any]) -> JournalEvent | None:
     status = state.status
+    # ADR-0164 Phase 3 双写:StepCompleted 收口也关闭当前 step
+    try:
+        from lca.runtime.step_emitter import bridge_step_completed_emitted
+
+        bridge_step_completed_emitted(
+            status=getattr(status, "value", str(status)),
+        )
+    except ImportError:
+        pass
     return StepCompleted(
         step=state.step,
         status=getattr(status, "value", str(status)),
