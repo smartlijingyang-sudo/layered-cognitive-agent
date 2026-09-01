@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.state import Budget
@@ -86,49 +85,11 @@ class Result:
             error=observation.error,
         )
 
-    @classmethod
-    def from_state(cls, state: AgentState) -> Result:
-        """Summarize a final AgentState into a Result.
 
-        Zero-output guard: a state that is still WORKING with no final_output
-        means the loop exhausted its budget without producing anything — that
-        is FAILED, not COMPLETED.  Silent failure is worse than explicit failure.
-        """
-        status = TaskStatus.COMPLETED if state.status == TaskStatus.WORKING else state.status
-        final_output = state.final_output
-        output: str | None
-        if isinstance(final_output, str) or final_output is None:
-            output = final_output
-        else:
-            output = str(final_output)
-        if (
-            status == TaskStatus.COMPLETED
-            and not (output or "").strip()
-            and not _is_handoff_completion(state)
-        ):
-            status = TaskStatus.FAILED
-            state.last_error = (
-                "Agent 运行结束但未产生任何输出。"
-                "可能原因: 工具循环失败、代码执行错误、模型未正确响应。"
-            )
-        return cls(
-            trace_id=state.trace_id,
-            status=status,
-            output=output,
-            final_state_ref=f"mem://{state.trace_id}/{state.step}",
-            total_steps=state.step + 1,
-            budget_used=state.budget,
-            error=state.last_error,
-        )
-
-
-def _is_handoff_completion(state: AgentState) -> bool:
-    """HANDOFF is a valid terminal action even when response_text is empty."""
-    if not state.history:
-        return False
-    last = state.history[-1]
-    decision = getattr(last, "decision", None)
-    return decision is not None and decision.action_type == ActionType.HANDOFF
+# ADR-0158 决策 五:Result.from_state 整段删除,Result.output 改由
+# TerminalOutcome.final_output_ref 解析(ADR-0077 §三「Result 只读 TerminalOutcome
+# 与 projection」)。原方法占位 50 行被清除,AgentState.final_output 读取方
+# 同步迁移(后续 commit)。
 
 
 class ApprovalPendingError(Exception):
