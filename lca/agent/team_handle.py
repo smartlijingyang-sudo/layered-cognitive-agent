@@ -55,6 +55,22 @@ class TeamHandle(TeamUnit):
         )
         set_session(self._profile.team_id)
         scope, _ = adopt_run_scope(role=TEAM_CONTAINER_ROLE)
+        # PR-3.1: spine envelope for the agent_loop.iteration execution
+        # point on the team entry. The team is a closed strategy; one
+        # ``TeamHandle.run`` is one iteration (the cognitive loop sits
+        # inside each member agent).
+        from lca.plugins.observability.spine.reflectors.agent_spawn import (
+            emit_agent_loop_iteration_end,
+            emit_agent_loop_iteration_start,
+        )
+
+        iteration_trace_id = scope.trace_id
+        iteration_role = f"team:{self._profile.team_id}"
+        emit_agent_loop_iteration_start(
+            trace_id=iteration_trace_id,
+            role=iteration_role,
+            iteration_kind="fresh",
+        )
         with bind_backends(self._observability), run_scope(scope):
             record(
                 TeamRunStarted(
@@ -74,6 +90,7 @@ class TeamHandle(TeamUnit):
             finish_output = ""
             finish_steps = 0
             finish_error = ""
+            iteration_outcome: str = "success"
             try:
                 result = await self._strategy.run(text)
                 finish_status = (
@@ -87,6 +104,7 @@ class TeamHandle(TeamUnit):
             except Exception as err:
                 finish_status = TaskStatus.FAILED.value
                 finish_error = f"{type(err).__name__}: {err}"
+                iteration_outcome = "failure"
                 raise
             finally:
                 record(
@@ -96,4 +114,10 @@ class TeamHandle(TeamUnit):
                         steps=finish_steps,
                         error=finish_error,
                     )
+                )
+                emit_agent_loop_iteration_end(
+                    trace_id=iteration_trace_id,
+                    role=iteration_role,
+                    iteration_kind="fresh",
+                    outcome=iteration_outcome,  # type: ignore[arg-type]
                 )

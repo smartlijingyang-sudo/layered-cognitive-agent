@@ -140,6 +140,22 @@ class CognitiveAgent(AgentUnit):
         but must not omit the durable start/resume/finish facts that make its
         model-visible work and recovery path auditable.
         """
+        # PR-3.1: spine envelope for the agent_loop.iteration execution point.
+        from lca.plugins.observability.spine.reflectors.agent_spawn import (
+            emit_agent_loop_iteration_end,
+            emit_agent_loop_iteration_start,
+        )
+
+        iteration_kind = "resume" if resumed_snapshot is not None else "fresh"
+        iteration_trace_id = scope.trace_id or (
+            resumed_snapshot.trace_id if resumed_snapshot else ""
+        )
+        emit_agent_loop_iteration_start(
+            trace_id=iteration_trace_id,
+            role=role,
+            iteration_kind=iteration_kind,
+        )
+
         partial_token = begin_partial_buffer()
         record(
             AgentRunStarted(
@@ -156,6 +172,7 @@ class CognitiveAgent(AgentUnit):
         finish_output = ""
         finish_steps = 0
         finish_error = ""
+        iteration_outcome: str = "success"
         try:
             result = await execute()
             self._stamp_resumable_snapshot(result, scope)
@@ -170,11 +187,13 @@ class CognitiveAgent(AgentUnit):
             finish_status = TaskStatus.CANCELED.value
             finish_output = drain_run_partial()
             finish_error = "canceled"
+            iteration_outcome = "cancelled"
             raise
         except Exception as err:
             finish_status = TaskStatus.FAILED.value
             finish_output = drain_run_partial()
             finish_error = f"{type(err).__name__}: {err}"
+            iteration_outcome = "failure"
             raise
         finally:
             record(
@@ -186,6 +205,12 @@ class CognitiveAgent(AgentUnit):
                 )
             )
             reset_partial_buffer(partial_token)
+            emit_agent_loop_iteration_end(
+                trace_id=iteration_trace_id,
+                role=role,
+                iteration_kind=iteration_kind,
+                outcome=iteration_outcome,  # type: ignore[arg-type]
+            )
 
     @staticmethod
     def _stamp_resumable_snapshot(result: Result, scope: RunScope) -> None:
