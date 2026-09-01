@@ -93,6 +93,7 @@
 | [0118](0118-kernel-hmr-patch-watcher.md) | Kernel HMR —— cordis.patch.yml watcher + ReloadError + run_kernel 集成（K8） | Accepted |
 | [0119](0119-webserver-as-plugin.md) | Webserver 完全 Plugin 化（对齐 deepseek-harness 范式，删除 `gateway/` 目录） | Proposed |
 | [0102](0102-tool-render-contract.md) | Tool 渲染契约 — 集中 TS 生成（lcaToolRender） + 21 工具 registry | Accepted |
+| [0102-followup](0102-followup-tool-args-chip-order.md) | Tool args 顺序约束 —— LcaRunDriver.pickArgs 让 long-text key 落到末尾，Inspector header chip 不再与 Render body 重复 | Accepted |
 | [0103](0103-locked-surface-and-port-policy.md) | back-ui-821-other-keep 锁定表面 + 移植策略（hard/soft-lock + lane A/B/C） | Accepted |
 | [0120](0120-retire-dsh-driver.md) | 退役 DSH (DeepSeek Harness) driver 集成路径 — `'dsh'` 执行目标闭集收敛 | Accepted |
 
