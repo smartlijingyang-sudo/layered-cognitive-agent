@@ -37,18 +37,14 @@ const LCA_TOKEN = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
 const TERMINAL = new Set(['canceled', 'completed', 'failed']);
 const PAUSED = new Set(['waiting_input']);
 
-/** Invocation arguments only. Result fields never become plugin.arguments.
- *
- * Ordered: short-value keys first (used by Inspector header chip via
- * `Object.entries(args).slice(0, MAX_PARAMS)`); long-text keys pushed
- * to the end so the chip shows e.g. `description` instead of the
- * multi-hundred-char `code` body, while the Render still reads
- * `args.code` correctly.  See `notes/adr-0102-followup-chip-order.md`.
- */
-const ARG_KEYS_SHORT: readonly string[] = [
+/** Invocation arguments only. Result fields never become plugin.arguments. */
+const ARG_KEYS = new Set([
   'path',
+  'content',
+  'command',
   'description',
   'language',
+  'code',
   'skill_id',
   'query',
   'directoryPath',
@@ -60,23 +56,17 @@ const ARG_KEYS_SHORT: readonly string[] = [
   'createDirectories',
   'create_directories',
   'file_path',
-  'pattern',
-  'glob',
-  'scope',
-  'replace_all',
-];
-const ARG_KEYS_LONG: readonly string[] = [
-  'content',
-  'command',
-  'code',
-  'search',
-  'replace',
   'old_string',
   'new_string',
   'old_str',
   'new_str',
-];
-const ARG_KEYS: ReadonlySet<string> = new Set([...ARG_KEYS_SHORT, ...ARG_KEYS_LONG]);
+  'replace_all',
+  'search',
+  'replace',
+  'pattern',
+  'glob',
+  'scope',
+]);
 
 type WireFile = { id?: string; mime_type?: string; name: string; size?: number; url: string };
 
@@ -89,32 +79,12 @@ type TurnTool = {
 
 function pickArgs(state: Record<string, unknown> | undefined): Record<string, unknown> {
   if (!state) return {};
-  // The projected state from projectJournalFrame nests the LLM tool args
-  // under ``state.arguments`` (see ToolStarted/ToolInvoked envelope in
-  // ``lca.journal/2``); the legacy shape passed here used to be the args
-  // dict itself. Probe both shapes so we keep working in the streaming
-  // preview path (where ``state.arguments_preview`` carries the partial
-  // dict directly) and the post-ToolStarted path (where it is nested).
-  const source: Record<string, unknown> =
-    (state.arguments as Record<string, unknown> | undefined) ??
-    (state.arguments_preview as Record<string, unknown> | undefined) ??
-    state;
-  // Iterate short keys first so the resulting object's own-keys order has
-  // them in front; long-text keys appended after.  The Inspector chip reads
-  // `Object.entries(args)[0]`; pushing `code`/`command`/`content` to the
-  // tail keeps the chip free of duplicated body content.
   const args: Record<string, unknown> = {};
-  for (const key of ARG_KEYS_SHORT) {
-    if (source[key] !== undefined) args[key] = source[key];
-  }
-  for (const key of ARG_KEYS_LONG) {
-    if (source[key] !== undefined) args[key] = source[key];
+  for (const key of ARG_KEYS) {
+    if (state[key] !== undefined) args[key] = state[key];
   }
   return args;
 }
-
-// Exported for unit tests only; not part of the runtime public surface.
-export const __test__ = { pickArgs, ARG_KEYS_SHORT, ARG_KEYS_LONG };
 
 function mergeInvocationArgs(
   previous: string,
