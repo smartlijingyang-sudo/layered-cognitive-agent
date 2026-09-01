@@ -139,6 +139,26 @@ def _resolve_pipeline() -> Any:
         return None
 
 
+def resolve_active_pipeline() -> Any:
+    """Return the installed ``emit_pipeline`` or ``None`` when unwired.
+
+    Public counterpart of :func:`_resolve_pipeline` for the
+    ``ctx_effect`` / ``ctx_intercept`` wrap plugins, which must resolve
+    the same pipeline through the same seam rather than reach into this
+    module's private helpers or install a second accessor.
+    """
+    return _resolve_pipeline()
+
+
+def resolve_active_spine() -> EventSpine | None:
+    """Return the installed ``EventSpine`` or ``None`` when unwired.
+
+    Public counterpart of :func:`_resolve_spine`; see
+    :func:`resolve_active_pipeline` for why the wrap plugins need it.
+    """
+    return _resolve_spine()
+
+
 def _fingerprint_value(value: Any) -> str:
     """Stable, short fingerprint of a return value for the ``.end`` payload."""
     try:
@@ -452,6 +472,8 @@ __all__ = [
     "DEFAULT_START_EXECUTION_POINT",
     "WRAP_INSTRUMENTED_ATTR",
     "InstrumentedPhaseExecutor",
+    "resolve_active_pipeline",
+    "resolve_active_spine",
     "set_active_pipeline_accessor",
     "set_active_spine_accessor",
     "wrap_executor",
