@@ -13,6 +13,7 @@ import json
 import subprocess
 import time
 from contextlib import suppress
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -28,6 +29,70 @@ from lca.infrastructure.cli.service import (
     pid_on_port,
 )
 from lca.infrastructure.cli.state import StateStore
+
+
+@dataclass(frozen=True, slots=True)
+class _VerifySummary:
+    """Structured result from ``patch_lobehub.py verify``.
+
+    ``total`` is the number of patches the engine actually checked.
+    ``ok`` patches have their verify marker present in the target file.
+    ``broken`` patches are missing or carry a stale marker.
+    ``names`` lists broken patch names so the status can name them.
+    ``error`` is non-empty when the verify subprocess itself failed
+    (script missing, timeout, etc.) — in that case the other fields
+    are zero/empty and the caller should report "unknown".
+    """
+
+    ok: int
+    broken: int
+    names: tuple[str, ...]
+    error: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class _VerifyCache:
+    ts: float
+    summary: _VerifySummary
+
+
+def _parse_verify_output(stdout: str) -> _VerifySummary:
+    """Parse the ``[verify] N ok, M broken/missing`` summary line.
+
+    Falls back to scanning per-patch OK/BROKEN/MISS lines when the
+    summary line is missing (older engine versions). Names listed as
+    SKIP are not counted as broken — they simply have no verify marker.
+    """
+    broken_names: list[str] = []
+    ok_count = 0
+    broken_count = 0
+
+    for line in stdout.splitlines():
+        # Per-patch lines look like: "[patch] OK     dev_auth_files"
+        if line.startswith("[patch]"):
+            parts = line.split()
+            if len(parts) < 3:
+                continue
+            verdict, name = parts[1], parts[2]
+            if verdict == "OK":
+                ok_count += 1
+            elif verdict in {"BROKEN", "MISS"}:
+                broken_count += 1
+                broken_names.append(name)
+            # SKIP / WARNING are not counted (no verify marker).
+            continue
+        # Summary line: "[verify] 18 ok, 0 broken/missing"
+        if line.startswith("[verify]"):
+            tokens = line.split()
+            for i, tok in enumerate(tokens):
+                if tok == "ok," and i > 0:
+                    with suppress(ValueError):
+                        ok_count = int(tokens[i - 1])
+                if tok == "broken/missing" and i > 0:
+                    with suppress(ValueError):
+                        broken_count = int(tokens[i - 1])
+
+    return _VerifySummary(ok=ok_count, broken=broken_count, names=tuple(broken_names))
 
 
 class LobeHubService:
@@ -52,6 +117,8 @@ class LobeHubService:
         self._state = StateStore(state_dir)
         self._root = root
         self._dir = root / config.dir
+        # Verify subprocess is ~1s; cache 30s so status stays snappy.
+        self._verify_cache: _VerifyCache | None = None
 
     # ── Lifecycle ─────────────────────────────────────────────────────
 
@@ -145,53 +212,78 @@ class LobeHubService:
         source_ok = self._dir.exists() and (self._dir / "package.json").exists()
         checks.append(HealthCheck("source", source_ok, str(self._dir)))
 
-        # Patches applied?
+        # Patches applied? — verify is the source of truth, not file counts.
+        # ``.lca-patched`` only proves *some* apply once ran; ``verify`` proves
+        # every patch marker is still present in the target file.
         deploy_dir = self._root / "deploy" / "lobehub"
-        patches_ok = (self._dir / ".lca-patched").exists()
-        patch_count = self._count_patches(deploy_dir)
+        verify = self._run_patch_verify()
         patch_drift = self._state.detect_changes("patches", [deploy_dir], "*")
-        if not patches_ok:
-            patch_detail = f"{patch_count} patches, NOT applied"
+        if verify.error:
+            patch_detail = f"verify unavailable ({verify.error})"
+            patches_ok = False
+        elif verify.broken:
+            patch_detail = (
+                f"{verify.ok}/{verify.ok + verify.broken} verified, "
+                f"broken: {', '.join(verify.names)}"
+            )
+            patches_ok = False
         elif patch_drift.has_changes:
-            patch_detail = f"{patch_count} patches, stale ({patch_drift.summary})"
+            patch_detail = (
+                f"{verify.ok} verified, patch source changed "
+                f"({patch_drift.summary}) — re-run `patch_lobehub.py`"
+            )
+            patches_ok = False
+        elif verify.ok == 0:
+            patch_detail = "no patches registered"
+            patches_ok = True
         else:
-            patch_detail = f"{patch_count} patches, up-to-date"
-        checks.append(
-            HealthCheck("patches", patches_ok and not patch_drift.has_changes, patch_detail)
-        )
+            patch_detail = f"{verify.ok}/{verify.ok} verified"
+            patches_ok = True
+        checks.append(HealthCheck("patches", patches_ok, patch_detail))
 
-        # Pnpm patchedDependencies check(ADR-0163)
+        # Pnpm patchedDependencies check(ADR-0163). Marker encodes the
+        # last attempt: ``patched_count`` applied cleanly,
+        # ``failed`` names drift hunk(s) that no longer fit upstream.
         pnpm_marker = self._state._dir / "lobehub-pnpm-patches.marker"
         if pnpm_marker.exists():
             try:
                 marker_payload = json.loads(pnpm_marker.read_text())
             except (json.JSONDecodeError, OSError):
                 marker_payload = {}
-            if marker_payload.get("failed"):
-                failed_pkgs = ", ".join(
-                    f.split(":", 1)[0] for f in marker_payload["failed"]
-                )
-                pnpm_detail = (
-                    f"stale patch ({marker_payload.get('patched_count', 0)}/"
-                    f"{marker_payload.get('patched_count', 0) + len(marker_payload['failed'])} "
-                    f"failed: {failed_pkgs})"
-                )
-                checks.append(
-                    HealthCheck("pnpm-patches", False, pnpm_detail)
-                )
-            elif marker_payload.get("patched_count", 0) > 0:
+            applied = int(marker_payload.get("patched_count", 0) or 0)
+            failed_raw = marker_payload.get("failed") or []
+            if failed_raw:
+                failed_pkgs = ", ".join(f.split(":", 1)[0] for f in failed_raw)
+                # Drift = hunk(s) the upstream no longer matches. This is a
+                # upstream dependency bump, not an LCA misconfiguration —
+                # call it that so operators stop chasing it with `ensure`.
+                if applied > 0:
+                    pnpm_detail = (
+                        f"drift ({applied} applied, "
+                        f"{len(failed_raw)} drift: {failed_pkgs}) — "
+                        f"upstream patch hunk no longer fits; regenerate "
+                        f"`lobehub-ui/patches/*.patch` from upstream"
+                    )
+                else:
+                    pnpm_detail = (
+                        f"drift (0 applied, {len(failed_raw)} drift: "
+                        f"{failed_pkgs}) — regenerate "
+                        f"`lobehub-ui/patches/*.patch` from upstream"
+                    )
+                checks.append(HealthCheck("pnpm-patches", False, pnpm_detail))
+            elif applied > 0:
                 checks.append(
                     HealthCheck(
                         "pnpm-patches",
                         True,
-                        f"{marker_payload['patched_count']} pnpm patches applied",
+                        f"{applied} pnpm patches applied",
                     )
                 )
 
         why = ""
         next_action = ""
-        patches_stale = patches_ok and patch_drift.has_changes
-        patches_missing = not patches_ok
+        patches_drift = patch_drift.has_changes  # source changed since snapshot
+        patches_broken = verify.broken > 0  # markers missing in target files
         if dev_ok and not spa_ok:
             status = ServiceStatus.DEGRADED
             detail = "Next up, Vite sidecar down"
@@ -203,8 +295,15 @@ class LobeHubService:
         elif dev_ok:
             status = ServiceStatus.RUNNING
             detail = "healthy"
-            if patches_stale or patches_missing:
-                detail = f"healthy (patches need reapply — {patch_detail})"
+            if patches_broken:
+                detail = f"healthy ({patch_detail})"
+                why = (
+                    "patch markers missing in target files — "
+                    "run `python3 deploy/lobehub/patch_lobehub.py`"
+                )
+                next_action = "python3 deploy/lobehub/patch_lobehub.py"
+            elif patches_drift:
+                detail = f"healthy (patch source drifted — {patch_drift.summary})"
                 why = "patch source changed since last apply"
                 next_action = "./scripts/lca-ops lobehub ensure"
         elif process_ok:
@@ -238,6 +337,21 @@ class LobeHubService:
         current = self.state()
         if current.is_running and not current.next_action:
             return current
+
+        # Patch drift/broken → run the patch engine in place; do NOT stop Next.
+        # The dev server will HMR the patched files.
+        if current.is_running and current.next_action.startswith("python3 "):
+            patch_script = self._root / "deploy" / "lobehub" / "patch_lobehub.py"
+            if patch_script.exists():
+                with suppress(subprocess.SubprocessError, OSError):
+                    subprocess.run(  # noqa: S603
+                        ["python3", str(patch_script)],  # noqa: S607
+                        cwd=self._root,
+                        capture_output=True,
+                        timeout=60,
+                    )
+                self._verify_cache = None
+                return self.state()
 
         spa_down = not any(c.name == "spa" and c.ok for c in current.checks)
         next_up = any(c.name == "dev" and c.ok for c in current.checks)
@@ -281,7 +395,11 @@ class LobeHubService:
 
     @staticmethod
     def _count_patches(deploy_dir: Path) -> int:
-        """Count patch module files (excluding __init__ and __pycache__)."""
+        """Count patch module files (excluding __init__ and __pycache__).
+
+        Kept for legacy callers; the authoritative count comes from
+        ``patch_lobehub.py verify`` (``_run_patch_verify``).
+        """
         patches_dir = deploy_dir / "patches"
         if not patches_dir.is_dir():
             return 0
@@ -290,6 +408,37 @@ class LobeHubService:
             for f in patches_dir.rglob("*.py")
             if f.name != "__init__.py" and "__pycache__" not in f.parts
         )
+
+    def _run_patch_verify(self) -> _VerifySummary:
+        """Run ``patch_lobehub.py verify`` and return a structured summary.
+
+        Result is cached for 30s because ``state()`` may be called several
+        times in a single CLI invocation (e.g. status then heal). The cache
+        is invalidated by ``ensure_patches()`` after a successful apply.
+        """
+        now = time.monotonic()
+        if self._verify_cache and now - self._verify_cache.ts < 30:
+            return self._verify_cache.summary
+
+        patch_script = self._root / "deploy" / "lobehub" / "patch_lobehub.py"
+        if not patch_script.exists() or not self._dir.exists():
+            summary = _VerifySummary(0, 0, (), error="script or ui source missing")
+        else:
+            try:
+                proc = subprocess.run(  # noqa: S603
+                    ["python3", str(patch_script), "verify"],  # noqa: S607
+                    cwd=self._root,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+            except (subprocess.SubprocessError, OSError) as exc:
+                summary = _VerifySummary(0, 0, (), error=f"{type(exc).__name__}: {exc}")
+            else:
+                summary = _parse_verify_output(proc.stdout)
+
+        self._verify_cache = _VerifyCache(ts=now, summary=summary)
+        return summary
 
     def _ensure_patches(self) -> bool:
         """Apply patches if source changed."""
@@ -311,6 +460,7 @@ class LobeHubService:
                 timeout=60,
             )
             self._state.save_snapshot("patches", [deploy_dir], "*")
+            self._verify_cache = None
             return True
         except Exception:
             return False
