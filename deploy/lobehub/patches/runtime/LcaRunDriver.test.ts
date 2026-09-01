@@ -72,4 +72,47 @@ describe('pickArgs — Inspector chip keeps long-text keys out of the first slot
     });
     expect(args).toEqual({ path: '/x' });
   });
+
+  // ── end-to-end: real projected state shape from projectJournalFrame ──
+
+  it('post-ToolStarted state nests args under .arguments — chip should pick description', () => {
+    // Real shape: projectJournalFrame ToolStarted branch produces
+    //   state = {tool_name, invocation_id, arguments, arguments_ref, ...}
+    // pickArgs must descend into state.arguments to find the LLM args.
+    const args = pickArgs({
+      tool_name: 'executeCode',
+      invocation_id: 'toolu_abc',
+      idempotency_key: '',
+      arguments: {
+        code: 'import openpyxl\n\nwb = openpyxl.load_workbook("/mnt/data/x.xlsx")',
+        description: 'Read Excel file structure and content',
+        language: 'python',
+      },
+      arguments_ref: null,
+    });
+    expect(Object.keys(args)).toEqual(['description', 'language', 'code']);
+  });
+
+  it('streaming state nests args under .arguments_preview — chip should pick partial code as preview', () => {
+    // During streaming the partial dict lives at arguments_preview.
+    // For the chip to render any header text at all we must descend into
+    // it too. (The chip may show only "code" here, which is still an
+    // improvement over an empty tag.)
+    const args = pickArgs({
+      tool_name: 'execute_code',
+      tool_call_id: 'toolu_abc',
+      arguments_preview: { code: 'import open' },
+      arguments_ref: null,
+    });
+    expect(Object.keys(args)).toEqual(['code']);
+  });
+
+  it('flat (legacy) state still works — backwards compatibility', () => {
+    // Some legacy call paths (and tests) pass the args dict directly.
+    const args = pickArgs({
+      path: '/mnt/data/x.xlsx',
+      content: '<blob>',
+    });
+    expect(Object.keys(args)).toEqual(['path', 'content']);
+  });
 });

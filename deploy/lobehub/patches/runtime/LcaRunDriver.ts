@@ -89,16 +89,26 @@ type TurnTool = {
 
 function pickArgs(state: Record<string, unknown> | undefined): Record<string, unknown> {
   if (!state) return {};
+  // The projected state from projectJournalFrame nests the LLM tool args
+  // under ``state.arguments`` (see ToolStarted/ToolInvoked envelope in
+  // ``lca.journal/2``); the legacy shape passed here used to be the args
+  // dict itself. Probe both shapes so we keep working in the streaming
+  // preview path (where ``state.arguments_preview`` carries the partial
+  // dict directly) and the post-ToolStarted path (where it is nested).
+  const source: Record<string, unknown> =
+    (state.arguments as Record<string, unknown> | undefined) ??
+    (state.arguments_preview as Record<string, unknown> | undefined) ??
+    state;
   // Iterate short keys first so the resulting object's own-keys order has
   // them in front; long-text keys appended after.  The Inspector chip reads
   // `Object.entries(args)[0]`; pushing `code`/`command`/`content` to the
   // tail keeps the chip free of duplicated body content.
   const args: Record<string, unknown> = {};
   for (const key of ARG_KEYS_SHORT) {
-    if (state[key] !== undefined) args[key] = state[key];
+    if (source[key] !== undefined) args[key] = source[key];
   }
   for (const key of ARG_KEYS_LONG) {
-    if (state[key] !== undefined) args[key] = state[key];
+    if (source[key] !== undefined) args[key] = source[key];
   }
   return args;
 }
