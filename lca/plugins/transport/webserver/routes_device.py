@@ -1,14 +1,14 @@
-"""Register ``/api/device/*`` route family (PR-4 routes-device).
+"""Register ``/api/device/*`` route family (PR-4 routes-device + ADR-0163 决策 5).
 
-handler 内部继续复用 ``lca.plugins.transport.device_hub.routes`` 现有实现;本 PR
-只 plugin 化路由注册,不重构 handler 内部(留给 PR-5 清理跨层 import)。
+Declarative :class:`RouteSpec` catalog shared with the rest of the
+transport route plugins via :func:`register_routes`. The
+``device_hub`` capability gates this family: when it is absent the
+family is silent (no 503 down the line).
 """
 
 from __future__ import annotations
 
 from typing import Any
-
-from starlette.routing import Route, WebSocketRoute
 
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
@@ -22,6 +22,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.routing import RouteSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.transport.device_hub.routes import (
     agent_run,
@@ -33,17 +34,20 @@ from lca.plugins.transport.device_hub.routes import (
     tool_call,
     upload_files,
 )
+from lca.plugins.transport.webserver.route_register import register_routes
 
-ROUTES: tuple[Route, ...] = (
-    Route("/api/device/status", device_status, methods=["POST", "OPTIONS"]),
-    Route("/api/device/devices", list_devices, methods=["POST", "OPTIONS"]),
-    Route("/api/device/tool-call", tool_call, methods=["POST", "OPTIONS"]),
-    Route("/api/device/system-info", system_info, methods=["POST", "OPTIONS"]),
-    Route("/api/device/rpc", rpc, methods=["POST", "OPTIONS"]),
-    Route("/api/device/agent/run", agent_run, methods=["POST", "OPTIONS"]),
-    Route("/api/device/files/upload", upload_files, methods=["POST", "OPTIONS"]),
+ROUTE_SPECS: tuple[RouteSpec, ...] = (
+    RouteSpec("/api/device/status", device_status, ("POST", "OPTIONS")),
+    RouteSpec("/api/device/devices", list_devices, ("POST", "OPTIONS")),
+    RouteSpec("/api/device/tool-call", tool_call, ("POST", "OPTIONS")),
+    RouteSpec("/api/device/system-info", system_info, ("POST", "OPTIONS")),
+    RouteSpec("/api/device/rpc", rpc, ("POST", "OPTIONS")),
+    RouteSpec("/api/device/agent/run", agent_run, ("POST", "OPTIONS")),
+    RouteSpec("/api/device/files/upload", upload_files, ("POST", "OPTIONS")),
 )
-UPGRADE: WebSocketRoute = WebSocketRoute("/api/device/ws", connect_device)
+
+# WebSocket path stays literal:RouteSpec is HTTP-only.
+_WS_PATH = "/api/device/ws"
 
 
 @plugin(
@@ -76,11 +80,12 @@ UPGRADE: WebSocketRoute = WebSocketRoute("/api/device/ws", connect_device)
 )
 async def setup(ctx: PluginContext, config: Any) -> None:
     registry = ctx.require("route_registry")
-    # PluginContext Protocol does not expose ``effect()``;the underlying
-    # :class:`cordis.Context` does. Reach it through the audited facade.
+    register_routes(registry, ctx, ROUTE_SPECS, plugin_id="lca-gateway-routes-device")
+
+    # WebSocket:RouteSpec covers HTTP only;register it via the same registry
+    # primitive so disposal still flows through ``ctx.effect``.
+    from starlette.routing import WebSocketRoute
+
+    ws_dispose = registry.register_websocket(WebSocketRoute(_WS_PATH, connect_device))
     inner: Any = ctx._runtime()  # type: ignore[attr-defined]
-    for route in ROUTES:
-        dispose = registry.register_http(route)
-        inner.effect(dispose, label=f"route:{route.path}")
-    ws_dispose = registry.register_websocket(UPGRADE)
-    inner.effect(ws_dispose, label=f"ws:{UPGRADE.path}")
+    inner.effect(ws_dispose, label=f"ws:{_WS_PATH}")

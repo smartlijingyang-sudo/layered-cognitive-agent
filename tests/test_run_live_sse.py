@@ -297,19 +297,15 @@ async def test_text_channel_none_disables_filter() -> None:
 
 @pytest.mark.asyncio
 async def test_gateway_api_iter_live_sse_emits_frames() -> None:
-    """Regression: ``lca.plugins.transport.webserver.handlers.runs.api.routes.iter_live_sse`` must not pass ``redact``.
-
-    The local copy of ``iter_live_sse`` in ``gateway/runs/api.py`` historically
-    called ``stamped_to_sse_frame(item, redact=redact)`` even though the
-    serializer signature no longer accepts ``redact``. The TypeError surfaced
-    in the streaming generator crashed the ASGI app and produced empty
-    responses for ``/runs/{id}/live`` — the LobeHub frontend then saw
-    "Empty reply from server" and treated it as 500. This test exercises the
-    gateway-local generator directly so a future signature drift cannot
-    silently regress the wire.
+    """ADR-0163 决策 5:the runs/api carrier SSE helper is now a sibling re-export
+    stub. The live SSE generator lives at
+    :func:`lca.plugins.transport.webserver.handlers.runs.terminal.live_compat.iter_live_sse`
+    (a forwarder over :mod:`lca.infrastructure.observability.journal.stream.live_tail`).
+    This regression confirms the carrier-facing surface still yields frames
+    without the legacy ``redact=`` parameter drift.
     """
-    from lca.plugins.transport.webserver.handlers.runs.api.routes import (
-        iter_live_sse as gateway_iter_live_sse,
+    from lca.plugins.transport.webserver.handlers.runs.terminal.live_compat import (
+        iter_live_sse as carrier_iter_live_sse,
     )
 
     tail = LiveTail()
@@ -317,8 +313,8 @@ async def test_gateway_api_iter_live_sse_emits_frames() -> None:
     tail.on_event(stamped)
     tail.close()
 
-    frames = [frame async for frame in gateway_iter_live_sse(tail, after_seq=0, heartbeat_s=30)]
-    assert frames, "gateway iter_live_sse yielded no frames"
+    frames = [frame async for frame in carrier_iter_live_sse(tail, after_seq=0, heartbeat_s=30)]
+    assert frames, "carrier iter_live_sse yielded no frames"
     frame_id, event_name, payload = _parse_frame(frames[0])
     _ = frame_id
     assert event_name == "ReasoningDelta"

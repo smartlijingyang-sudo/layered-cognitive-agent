@@ -18,8 +18,7 @@ from lca.contracts.mechanisms.capability import MissingCapabilityError, require_
 from lca.contracts.observability.run_locator import RunLocator
 from lca.infrastructure.observability.journal.sse.frames import parse_last_event_id
 from lca.plugins.transport.webserver.handlers.cors import cors_headers
-from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import _err, _run_port_of
-from lca.plugins.transport.webserver.handlers.runs.execute.execute import llm_status
+from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import _run_port_of
 from lca.plugins.transport.webserver.handlers.runs.observability.evidence import (
     EvidencePayloadDecodeError,
     InvalidEvidenceDigestError,
@@ -93,18 +92,22 @@ async def get_context(request: Request) -> JSONResponse:
 
 
 async def stream_journal_live(request: Request) -> StreamingResponse | JSONResponse:
-    """GET /journal/live — process-wide compatibility SSE for lca-ops logs."""
+    """``GET /journal/live`` — process-wide compatibility SSE.
+
+    The route is bound at boot only when the ``process_journal`` capability
+    is present (ADR-0163 决策 3). Reaching this handler implies
+    ``RunPort.stream_process_journal_live`` must produce frames. Returning
+    ``None`` here is a real port bug, not a service-shaped 503.
+    """
     if request.method == "OPTIONS":
         return JSONResponse({}, headers=cors_headers())
     after = parse_last_event_id(request.headers.get("last-event-id"))
     frames = _run_port_of(request).stream_process_journal_live(after)
     if frames is None:
-        return _err(
-            "process-wide journal streaming is unavailable on the Session Spine; "
-            "use the per-run live stream instead.",
-            status_code=503,
-            error_type="service_unavailable",
-            code="legacy_process_journal_unavailable",
+        return JSONResponse(
+            {"error": "run owner lacks process journal streaming"},
+            status_code=500,
+            headers=cors_headers(),
         )
     return StreamingResponse(
         frames,
@@ -267,10 +270,14 @@ async def get_run_evidence(request: Request) -> JSONResponse:
 
 
 def health_payload(run_port: RunPort, *, ctx: Any) -> dict[str, Any]:
-    """Build a health projection from the composition-selected run owner."""
+    """Build a health projection from the composition-selected run owner.
+
+    Boot-period readiness is enforced by the routes plugin and the LLM
+    resolver plugin; this projection is now run-port-only and fits inside
+    the carrier surface.
+    """
     return {
         "status": "ok",
-        **llm_status(ctx),
         "runs": run_port.status_counts(),
         "live": run_port.live_totals(),
     }

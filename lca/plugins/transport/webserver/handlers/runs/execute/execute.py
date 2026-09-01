@@ -49,19 +49,9 @@ from lca.plugins.transport.webserver.handlers.runs.session.session import (
 __all__ = [
     "create_run_session",
     "execute_run",
-    "llm_status",
     "resume_run",
     "schedule_run",
 ]
-
-
-def llm_status(ctx: Any) -> dict[str, bool]:
-    """Whether the boot tree's resolver can hand out a real adapter."""
-    try:
-        resolver = ctx.inject("llm_resolver")
-    except KeyError:
-        return {"llm_available": False}
-    return {"llm_available": resolver.is_available()}
 
 
 def create_run_session(

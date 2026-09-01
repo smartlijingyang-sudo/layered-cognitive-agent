@@ -1,7 +1,8 @@
-"""Register OpenAI-compatible + /files routes (PR-4 routes-openai-compat-files).
+"""Register OpenAI-compatible + /files routes (PR-4 + ADR-0163 决策 5).
 
-handler 内部继续复用 ``gateway.openai_shim`` / ``gateway.files`` 现有实现;
-本 PR 只 plugin 化路由注册,不重构 handler 内部(留给 PR-5 清理跨层 import)。
+Declarative :class:`RouteSpec` catalog. The OpenAI-compat POST routes
+declare ``requires=("llm_resolver",)``; a boot that did not resolve the
+LLM adapter fails fast at registration rather than at the first request.
 """
 
 from __future__ import annotations
@@ -10,7 +11,6 @@ from typing import Any
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
-from starlette.routing import Route
 
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
@@ -24,6 +24,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.routing import RouteSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.transport.webserver.handlers.files import download_file, get_file_meta
 from lca.plugins.transport.webserver.handlers.openai_shim import (
@@ -32,6 +33,9 @@ from lca.plugins.transport.webserver.handlers.openai_shim import (
     list_models,
     responses_create,
 )
+from lca.plugins.transport.webserver.route_register import register_routes
+
+_LLM_REQUIRES: tuple[str, ...] = ("llm_resolver",)
 
 
 async def _download_file(request: Request) -> Response:
@@ -42,20 +46,35 @@ async def _get_file_meta(request: Request) -> JSONResponse:
     return await get_file_meta(request, request.app.state.file_store)
 
 
-ROUTES: tuple[Route, ...] = (
-    Route("/files/{attachment_id}", _download_file, methods=["GET"]),
-    Route("/files/{attachment_id}/meta", _get_file_meta, methods=["GET"]),
-    Route("/v1/models", list_models, methods=["GET", "OPTIONS"]),
-    Route("/v1/chat/completions", chat_completions, methods=["POST", "OPTIONS"]),
-    Route("/v1/embeddings", embeddings_create, methods=["POST", "OPTIONS"]),
-    Route("/v1/responses", responses_create, methods=["POST", "OPTIONS"]),
+ROUTE_SPECS: tuple[RouteSpec, ...] = (
+    RouteSpec("/files/{attachment_id}", _download_file, ("GET",)),
+    RouteSpec("/files/{attachment_id}/meta", _get_file_meta, ("GET",)),
+    RouteSpec("/v1/models", list_models, ("GET", "OPTIONS")),
+    RouteSpec(
+        "/v1/chat/completions",
+        chat_completions,
+        ("POST", "OPTIONS"),
+        requires=_LLM_REQUIRES,
+    ),
+    RouteSpec(
+        "/v1/embeddings",
+        embeddings_create,
+        ("POST", "OPTIONS"),
+        requires=_LLM_REQUIRES,
+    ),
+    RouteSpec(
+        "/v1/responses",
+        responses_create,
+        ("POST", "OPTIONS"),
+        requires=_LLM_REQUIRES,
+    ),
 )
 
 
 @plugin(
     id="lca-gateway-routes-openai-compat-files",
     provides=(),
-    requires=("route_registry",),
+    requires=("route_registry", "llm_resolver"),
     layer="L1",
     kind=PluginKind.PROVIDER,
     effects="none",
@@ -82,9 +101,9 @@ ROUTES: tuple[Route, ...] = (
 )
 async def setup(ctx: PluginContext, config: Any) -> None:
     registry = ctx.require("route_registry")
-    # PluginContext Protocol does not expose ``effect()``;the underlying
-    # :class:`cordis.Context` does. Reach it through the audited facade.
-    inner: Any = ctx._runtime()  # type: ignore[attr-defined]
-    for route in ROUTES:
-        dispose = registry.register_http(route)
-        inner.effect(dispose, label=f"route:{route.path}")
+    register_routes(
+        registry,
+        ctx,
+        ROUTE_SPECS,
+        plugin_id="lca-gateway-routes-openai-compat-files",
+    )

@@ -1,15 +1,14 @@
-"""Register ``/runs`` + ``/v1/sessions`` route groups (PR-4 routes-runs-sessions).
+"""Register ``/runs`` + ``/v1/sessions`` route groups (PR-4 routes-runs-sessions + ADR-0163 决策 5).
 
-handler 内部继续复用 ``lca.plugins.transport.webserver.handlers.runs.api.command_endpoints`` /
-``lca.plugins.transport.webserver.handlers.runs.api.query_endpoints`` / ``gateway.session_routes`` 的现有
-实现;本 PR 只 plugin 化路由注册,不重构 handler 内部(留给 PR-5 清理跨层 import)。
+Declarative :class:`RouteSpec` catalog. All handler implementations live
+in ``lca.plugins.transport.webserver.handlers.runs.api.command_endpoints``
+and the matching query handlers in
+``lca.plugins.transport.webserver.handlers.runs.api.query_endpoints``.
 """
 
 from __future__ import annotations
 
 from typing import Any
-
-from starlette.routing import Route
 
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
@@ -23,6 +22,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.routing import RouteSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import (
     answer_run,
@@ -46,27 +46,33 @@ from lca.plugins.transport.webserver.handlers.session_routes import (
     send_message,
     stream_events,
 )
+from lca.plugins.transport.webserver.route_register import register_routes
 
-# PR-7 (本批):把 ``/runs/{run_id}/profile`` 与 ``/runs/{run_id}/evidence/{ref}``
-# 从 ``gateway.routes.build_routes`` 迁过来,build_routes 退役 —— plugin 是
-# 唯一 route catalog SSOT (ADR-0115 §决定 6)。
-ROUTES: tuple[Route, ...] = (
-    Route("/runs", create_run, methods=["POST", "OPTIONS"]),
-    Route("/runs/{run_id}", get_run, methods=["GET"]),
-    Route("/runs/{run_id}/live", stream_run_live, methods=["GET", "OPTIONS"]),
-    Route("/runs/{run_id}/doctor", get_run_doctor, methods=["GET"]),
-    Route("/runs/{run_id}/profile", get_run_profile, methods=["GET"]),
-    Route("/runs/{run_id}/evidence/{ref:path}", get_run_evidence, methods=["GET"]),
-    Route("/runs/{run_id}/cancel", cancel_run, methods=["POST", "OPTIONS"]),
-    Route("/runs/{run_id}/answer", answer_run, methods=["POST", "OPTIONS"]),
-    Route("/v1/sessions", create_session, methods=["POST", "OPTIONS"]),
-    Route("/v1/sessions/{session_id}/messages", send_message, methods=["POST", "OPTIONS"]),
-    Route("/v1/sessions/{session_id}/snapshot", get_snapshot, methods=["GET", "OPTIONS"]),
-    Route("/v1/sessions/{session_id}/events", stream_events, methods=["GET", "OPTIONS"]),
-    Route("/v1/sessions/{session_id}/commands/answer", command_answer, methods=["POST", "OPTIONS"]),
-    Route("/v1/sessions/{session_id}/commands/cancel", command_cancel, methods=["POST", "OPTIONS"]),
-    Route("/v1/sessions/{session_id}/commands/steer", command_steer, methods=["POST", "OPTIONS"]),
-    Route("/v1/sessions/{session_id}/commands/inject", command_inject, methods=["POST", "OPTIONS"]),
+ROUTE_SPECS: tuple[RouteSpec, ...] = (
+    RouteSpec("/runs", create_run, ("POST", "OPTIONS")),
+    RouteSpec("/runs/{run_id}", get_run, ("GET",)),
+    RouteSpec("/runs/{run_id}/live", stream_run_live, ("GET", "OPTIONS")),
+    RouteSpec("/runs/{run_id}/doctor", get_run_doctor, ("GET",)),
+    RouteSpec("/runs/{run_id}/profile", get_run_profile, ("GET",)),
+    RouteSpec("/runs/{run_id}/evidence/{ref:path}", get_run_evidence, ("GET",)),
+    RouteSpec("/runs/{run_id}/cancel", cancel_run, ("POST", "OPTIONS")),
+    RouteSpec("/runs/{run_id}/answer", answer_run, ("POST", "OPTIONS")),
+    RouteSpec("/v1/sessions", create_session, ("POST", "OPTIONS")),
+    RouteSpec("/v1/sessions/{session_id}/messages", send_message, ("POST", "OPTIONS")),
+    RouteSpec("/v1/sessions/{session_id}/snapshot", get_snapshot, ("GET", "OPTIONS")),
+    RouteSpec("/v1/sessions/{session_id}/events", stream_events, ("GET", "OPTIONS")),
+    RouteSpec(
+        "/v1/sessions/{session_id}/commands/answer", command_answer, ("POST", "OPTIONS")
+    ),
+    RouteSpec(
+        "/v1/sessions/{session_id}/commands/cancel", command_cancel, ("POST", "OPTIONS")
+    ),
+    RouteSpec(
+        "/v1/sessions/{session_id}/commands/steer", command_steer, ("POST", "OPTIONS")
+    ),
+    RouteSpec(
+        "/v1/sessions/{session_id}/commands/inject", command_inject, ("POST", "OPTIONS")
+    ),
 )
 
 
@@ -77,7 +83,7 @@ ROUTES: tuple[Route, ...] = (
     layer="L1",
     kind=PluginKind.PROVIDER,
     effects="none",
-    description="Register /runs (7) + /v1/sessions (8) routes.",
+    description="Register /runs (8) + /v1/sessions (8) routes.",
     test_suite="tests.lca_plugins.transport.webserver.test_runs_sessions",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
@@ -100,9 +106,9 @@ ROUTES: tuple[Route, ...] = (
 )
 async def setup(ctx: PluginContext, config: Any) -> None:
     registry = ctx.require("route_registry")
-    # PluginContext Protocol does not expose ``effect()``;the underlying
-    # :class:`cordis.Context` does. Reach it through the audited facade.
-    inner: Any = ctx._runtime()  # type: ignore[attr-defined]
-    for route in ROUTES:
-        dispose = registry.register_http(route)
-        inner.effect(dispose, label=f"route:{route.path}")
+    register_routes(
+        registry,
+        ctx,
+        ROUTE_SPECS,
+        plugin_id="lca-gateway-routes-runs-sessions",
+    )

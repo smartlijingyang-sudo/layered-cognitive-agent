@@ -21,10 +21,19 @@ class _FakeCtx:
     def __init__(self, router: RouteRegistry) -> None:
         self._router = router
         self._fake_runtime = _FakeRuntime()
+        self._capabilities = {"route_registry", "llm_resolver"}
 
     def require(self, key: str) -> Any:
-        assert key == "route_registry"
-        return self._router
+        if key == "route_registry":
+            return self._router
+        if key in self._capabilities:
+            return object()
+        raise AssertionError(f"unexpected required capability {key!r}")
+
+    def inject(self, key: str, *, default: Any = None) -> Any:
+        if key in self._capabilities:
+            return object()
+        return default
 
     def _runtime(self) -> _FakeRuntime:
         return self._fake_runtime

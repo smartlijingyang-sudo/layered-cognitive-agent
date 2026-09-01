@@ -1,4 +1,12 @@
-"""HTTP endpoint adapters for the Gateway OpenAI-compatible housekeeper API."""
+"""HTTP endpoint adapters for the Gateway OpenAI-compatible housekeeper API.
+
+Three live routes:``/v1/models``, ``/v1/chat/completions``,
+``/v1/embeddings``, ``/v1/responses``. The POST routes depend on the
+``llm_resolver`` capability (declared via :class:`RouteSpec.requires` in
+``routes_openai_compat_files``); boot fails fast if the resolver is
+absent, so each handler is now a thin glue over ``chat_completions_from_body``
+and friends.
+"""
 
 from __future__ import annotations
 
@@ -28,7 +36,6 @@ from lca.plugins.transport.webserver.handlers.openai_protocol import (
     error_response,
     lca_models_payload,
 )
-from lca.plugins.transport.webserver.handlers.runs.execute.execute import llm_status
 
 
 async def list_models(request: Request) -> JSONResponse:
@@ -39,39 +46,27 @@ async def list_models(request: Request) -> JSONResponse:
 
 
 async def chat_completions(request: Request) -> JSONResponse | StreamingResponse:
-    """Serve a housekeeper Chat Completion after validating boot and LLM availability.
+    """``POST /v1/chat/completions`` — housekeeper chat completion proxy.
 
-    ADR-0100: this route never starts an Agent run. Mode catalog ids still
-    ``resolve_upstream_model`` through ``chat_completions_from_body``.
+    Boot-period readiness is enforced by the routes plugin; reaching this
+    handler means the LLM resolver is bound. Mode catalog ids still go
+    through :func:`chat_completions_from_body`.
     """
     if request.method == "OPTIONS":
         return JSONResponse({}, headers=cors_headers())
-    body = await request_json_body(request)
+    body = await _decode_json_object(request)
     if isinstance(body, JSONResponse):
         return body
-    ctx = getattr(request.app.state, "ctx", None)
-    if ctx is None:
-        return error_response(
-            "gateway boot 未加载 profile，无法执行 LCA run。",
-            status_code=503,
-            error_type="service_unavailable",
-            code="lca_plugin_ctx_missing",
-        )
-    if not llm_status(ctx)["llm_available"]:
-        return llm_unavailable_response("LCA run")
-
     return await chat_completions_from_body(body)
 
 
 async def embeddings_create(request: Request) -> JSONResponse:
-    """Proxy an OpenAI-compatible embeddings request through the configured LLM."""
+    """``POST /v1/embeddings`` — proxy embeddings through the bound LLM."""
     if request.method == "OPTIONS":
         return JSONResponse({}, headers=cors_headers())
-    body = await request_json_body(request)
+    body = await _decode_json_object(request)
     if isinstance(body, JSONResponse):
         return body
-    if not llm_status(getattr(request.app.state, "ctx", None))["llm_available"]:
-        return llm_unavailable_response("embeddings")
     raw_input = body.get("input")
     if raw_input is None:
         return error_response("input is required", status_code=400)
@@ -94,14 +89,12 @@ async def embeddings_create(request: Request) -> JSONResponse:
 
 
 async def responses_create(request: Request) -> JSONResponse | StreamingResponse:
-    """Serve LobeHub AgentSignal structured output through OpenAI Responses semantics."""
+    """``POST /v1/responses`` — housekeeper Responses API through OpenAI semantics."""
     if request.method == "OPTIONS":
         return JSONResponse({}, headers=cors_headers())
-    body = await request_json_body(request)
+    body = await _decode_json_object(request)
     if isinstance(body, JSONResponse):
         return body
-    if not llm_status(getattr(request.app.state, "ctx", None))["llm_available"]:
-        return llm_unavailable_response("structured output")
     model = str(body.get("model", DEFAULT_MODE))
     messages = normalize_responses_input(body.get("input"))
     if not messages:
@@ -139,8 +132,8 @@ async def responses_create(request: Request) -> JSONResponse | StreamingResponse
     return JSONResponse(payload, headers=cors_headers())
 
 
-async def request_json_body(request: Request) -> dict[str, Any] | JSONResponse:
-    """Decode a JSON object, returning a wire-valid error for malformed request bodies."""
+async def _decode_json_object(request: Request) -> dict[str, Any] | JSONResponse:
+    """Decode a JSON object body, returning a wire-valid 400 envelope on failure."""
     try:
         body = await request.json()
     except json.JSONDecodeError:
@@ -148,16 +141,6 @@ async def request_json_body(request: Request) -> dict[str, Any] | JSONResponse:
     if not isinstance(body, dict):
         return error_response("request body must be a JSON object", status_code=400)
     return body
-
-
-def llm_unavailable_response(operation: str) -> JSONResponse:
-    """Return the stable service-unavailable response for missing LLM configuration."""
-    return error_response(
-        f"LLM_API_KEY 未配置，无法执行 {operation}。",
-        status_code=503,
-        error_type="service_unavailable",
-        code="lca_llm_unavailable",
-    )
 
 
 __all__ = ["chat_completions", "embeddings_create", "list_models", "responses_create"]

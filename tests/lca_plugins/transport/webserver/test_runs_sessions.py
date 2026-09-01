@@ -98,9 +98,10 @@ async def test_routes_runs_sessions_effects_tracked() -> None:
 
 
 def test_routes_runs_sessions_exposes_public_routes_constant() -> None:
-    """PR-7:``ROUTES`` 公开常量,供 ``build_routes`` 退役后的测试/诊断直接 import。"""
-    from lca.plugins.transport.webserver.routes_runs_sessions import ROUTES
+    """ADR-0163 决策 5:``ROUTE_SPECS`` 是路径 catalog 的 SSOT,供 build_routes 退役后的测试/诊断直接 import。"""
+    from lca.plugins.transport.webserver.routes_runs_sessions import ROUTE_SPECS
 
-    assert isinstance(ROUTES, tuple)
-    assert any(r.path == "/runs/{run_id}/profile" for r in ROUTES)
-    assert any(r.path == "/runs/{run_id}/evidence/{ref:path}" for r in ROUTES)
+    assert isinstance(ROUTE_SPECS, tuple)
+    paths = {spec.path for spec in ROUTE_SPECS}
+    assert "/runs/{run_id}/profile" in paths
+    assert "/runs/{run_id}/evidence/{ref:path}" in paths

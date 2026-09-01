@@ -1,7 +1,9 @@
-"""Register the ``/health`` + OPTIONS handlers (PR-4 routes-health-options).
+"""Register the ``/health`` + OPTIONS handlers (PR-4 + ADR-0163 决策 3).
 
-handler 内部继续复用 ``lca.plugins.transport.webserver.handlers.runs.api.routes`` 现有实现;本 PR 只关注
-plugin 化路由注册,不重构 handler 内部(留给 PR-5 清理跨层 import)。
+Declarative :class:`RouteSpec` catalog. ``/journal/live`` declares the
+``process_journal`` capability as **optional**; when the capability is
+absent on the boot ``ctx`` the spec is skipped and Starlette returns 404
+for the path. No 503 down the line.
 """
 
 from __future__ import annotations
@@ -10,7 +12,6 @@ from typing import Any
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-from starlette.routing import Route
 
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
@@ -24,6 +25,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.routing import RouteSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.transport.webserver.handlers.cors import CORS_HEADERS
 from lca.plugins.transport.webserver.handlers.runs.api.query_endpoints import (
@@ -31,6 +33,7 @@ from lca.plugins.transport.webserver.handlers.runs.api.query_endpoints import (
     health_payload,
     stream_journal_live,
 )
+from lca.plugins.transport.webserver.route_register import register_routes
 
 
 async def _options(_request: Request) -> JSONResponse:
@@ -46,12 +49,15 @@ async def health(request: Request) -> JSONResponse:
     return JSONResponse(payload, headers=CORS_HEADERS)
 
 
-# PR-7:展平为 module-level ``ROUTES`` (无下划线),``build_routes`` 退役后
-# 测试与 ``gateway.app`` 直接 import 这个常量验证 route catalog。
-ROUTES: tuple[Route, ...] = (
-    Route("/health", health, methods=["GET"]),
-    Route("/context", get_context, methods=["GET", "OPTIONS"]),
-    Route("/journal/live", stream_journal_live, methods=["GET", "OPTIONS"]),
+ROUTE_SPECS: tuple[RouteSpec, ...] = (
+    RouteSpec("/health", health, ("GET",)),
+    RouteSpec("/context", get_context, ("GET", "OPTIONS")),
+    RouteSpec(
+        "/journal/live",
+        stream_journal_live,
+        ("GET", "OPTIONS"),
+        optional=("process_journal",),
+    ),
 )
 
 
@@ -62,7 +68,7 @@ ROUTES: tuple[Route, ...] = (
     layer="L1",
     kind=PluginKind.PROVIDER,
     effects="none",
-    description="Register /health + OPTIONS for /context and /journal/live.",
+    description="Register /health + OPTIONS for /context + optional /journal/live.",
     test_suite="tests.lca_plugins.transport.webserver.test_routes_health_options",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
@@ -85,9 +91,6 @@ ROUTES: tuple[Route, ...] = (
 )
 async def setup(ctx: PluginContext, config: Any) -> None:
     registry = ctx.require("route_registry")
-    # PluginContext Protocol does not expose ``effect()``;the underlying
-    # :class:`cordis.Context` does. Reach it through the audited facade.
-    inner: Any = ctx._runtime()  # type: ignore[attr-defined]
-    for route in ROUTES:
-        dispose = registry.register_http(route)
-        inner.effect(dispose, label=f"route:{route.path}")
+    register_routes(
+        registry, ctx, ROUTE_SPECS, plugin_id="lca-gateway-routes-health-options"
+    )

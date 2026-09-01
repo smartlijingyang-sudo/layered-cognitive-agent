@@ -9,7 +9,6 @@ shim is gone in ADR-0122 — the real implementation lives in
 from lca.plugins.transport.webserver.handlers.runs.execute.execute import (
     create_run_session,
     execute_run,
-    llm_status,
     resume_run,
     schedule_run,
 )
@@ -19,7 +18,6 @@ __all__ = [
     "RunLifecycleCoordinator",
     "create_run_session",
     "execute_run",
-    "llm_status",
     "resume_run",
     "schedule_run",
 ]

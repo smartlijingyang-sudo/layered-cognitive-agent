@@ -1,4 +1,10 @@
-"""POST /runs command decoding (ADR-0100 mode vs model alias)."""
+"""``POST /runs`` command decoding (ADR-0100 mode vs model alias).
+
+ADR-0163 决策 2:``llm_status(ctx)`` 调用从 handler 中删除,readiness
+由 routes plugin ``RouteSpec.requires=("llm_resolver",)`` 在 boot
+期强制。本测试用 scripted ``RunPort`` 注入,默认视为 capability 已
+挂载;只验证 payload-shape 与 mode/model 别名解析。
+"""
 
 from __future__ import annotations
 
@@ -31,15 +37,11 @@ _INPUT = LobeHubRunInput(user_text="hello", question="hello")
 def _post_runs(spy: AsyncMock, payload: dict[str, object]) -> object:
     with (
         patch(
-            "lca.plugins.transport.webserver.handlers.runs.api.routes.command_endpoints.llm_status",
-            return_value={"llm_available": True},
-        ),
-        patch(
-            "lca.plugins.transport.webserver.handlers.runs.api.routes.command_endpoints.resolve_profile_mode",
+            "lca.plugins.transport.webserver.handlers.runs.api.command_endpoints.resolve_profile_mode",
             side_effect=_identity_mode,
         ),
         patch(
-            "lca.plugins.transport.webserver.handlers.runs.api.routes.command_endpoints.prepare_run_from_messages",
+            "lca.plugins.transport.webserver.handlers.runs.api.command_endpoints.prepare_run_from_messages",
             new=AsyncMock(return_value=_INPUT),
         ),
     ):
