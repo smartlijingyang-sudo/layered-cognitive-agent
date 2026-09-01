@@ -16,7 +16,8 @@
 | 命令 | 用途 |
 |---|---|
 | `cost <run_id> [--by model\|phase\|tool]` | 按 pricing_ref 重算 cost |
-| `trace <run_id> [--format mermaid]` | trace 报告 |
+| `trace <run_id> [--format mermaid]` | trace 报告 (legacy `journal.jsonl`) |
+| `journal trace <run_id> [--locals] [--source] [--json]` | spine `events.jsonl` 轨迹(PR-9 I17 起生效);`--locals` 追加 `next_frame` + `locals_snapshot` 列 |
 | `explain <run_id>` | 失败因果链 |
 | `graph <run_id>` | 插件交互图 |
 | `minimal-repro <run_id>` | 最小复现包 |

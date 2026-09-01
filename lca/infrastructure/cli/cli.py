@@ -21,6 +21,7 @@ from lca.infrastructure.cli.commands import (
     journal,
     journal_migrate,
     journal_steps,
+    journal_trace,
     kernel,
     package_organization,
     profile_inspect,
@@ -200,6 +201,7 @@ _journal_group = journal.create_journal_group(app)
 journal.register(app, group=_journal_group)
 journal_steps.register(_journal_group)
 journal_migrate.register(_journal_group)
+journal_trace.register(_journal_group)
 kernel.register(app)
 
 
