@@ -41,9 +41,9 @@ LCA 开发平台编排  ./scripts/lca-ops
 全站
 ────────────────────────────────
 status
-  看 infra / lobehub / daemon / onlyboxes。异常会写出原因。
+  看 kernel_serve / infra / lobehub / daemon / onlyboxes。异常会写出原因。
   onlyboxes 未钉 LCA terminal 镜像时会提示 configure-terminal-runtime。
-  注意: status 不包含 LCA 进程;LCA 进程由 lca_kernel serve 自管。
+  kernel_serve 是 LCA 进程 (lca_kernel serve :8765),只观察不拉起 — heal 自愈。
   ./scripts/lca-ops status
   ./scripts/lca-ops status --json          给 agent 用
 
@@ -90,12 +90,12 @@ onlyboxes  worker runtime(只读;无 start/stop 命令)
 ────────────────────────────────
 工作流(全站)
 ────────────────────────────────
-status     看上面四个服务 + onlyboxes,JSON 加 --json
-heal       自己修不健康的服务(优先用这个;不是 restart)
+status     看 kernel_serve + infra / lobehub / daemon / onlyboxes,JSON 加 --json
+heal       自己修不健康的服务(优先用这个;不是 restart)。含 kernel_serve 自愈。
 stop       停外部平台服务(daemon / lobehub / infra),不含 LCA 进程
 provision  整机首次:装包 / venv / sandbox 用户 / 工作区 / CLI
 
-  注: dev / restart 已删除(ADR-0119 决定 4:lca-ops 不再管 kernel_serve 进程)。
+  注: dev / restart / compose 已删除(ADR-0119 决定 4:lca-ops 不再管 LCA 进程)。
 
 ────────────────────────────────
 LCA 进程 (kernel serve)  ADR-0119 决定 4

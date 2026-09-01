@@ -13,9 +13,9 @@
 # - LCA 进程 (kernel serve)                     uv run python -m lca_kernel serve ...
 #
 # Usage:
-#     lca-ops status         # Show status (infra / lobehub / daemon / onlyboxes)
+#     lca-ops status         # Show status (kernel_serve / infra / lobehub / daemon / onlyboxes)
 #     lca-ops status --json  # JSON,给 agent 用
-#     lca-ops heal           # Auto-recover unhealthy services
+#     lca-ops heal           # Auto-recover unhealthy services (含 kernel_serve 自愈)
 #     lca-ops logs           # journal 事实流
 #
 # Use --json for agent-friendly JSON output.

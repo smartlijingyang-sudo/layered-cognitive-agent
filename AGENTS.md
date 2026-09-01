@@ -47,7 +47,7 @@ vendor/                       Cordis、Cosmokit、Schemastery
 | Body / SafeExecutor | `lca/cognition/body/` |
 | Journal / Projection | `lca/contracts/models/observability/`、`lca/infrastructure/observability/` |
 | Agent / Team | `lca/application/spawn.py`、`lca/agent/` |
-| 平台操作 | `./scripts/lca-ops`(含 `kernel {boot,serve,stop,compose}` 子命令) |
+| 平台操作 | `./scripts/lca-ops`(含 `kernel {boot,serve}` 子命令;`stop / compose / dev / restart` 已删) |
 
 ## 3. 架构不变量
 
@@ -113,7 +113,7 @@ Fact → State → Decision / Plan → Verdict → Effect → Observation / Jour
 
 ## 6. 命令与验证
 
-`./scripts/lca-ops` 不带参数打印手册。常用命令：`status/heal/dev/restart/stop` 管理生命周期；`logs [-v] [-d] [--replay]` 查看 Journal；`inspect-tree <profile>` 查看插件树；`dump-profile <profile>` 展开配置；`debug tree|run|scope` 查看 Context；`diagnose <alias>` 运行诊断；`provision` 部署 daemon。需要给脚本消费时使用 `--json`。
+`./scripts/lca-ops` 不带参数打印手册。常用命令：`status/heal/stop` 管理外部服务生命周期(`dev/restart` 已删;kernel 进程由 `kernel_serve` 自管,`heal` 会自愈);`logs [-v] [-d] [--replay]` 查看 Journal;`inspect-tree <profile>` 查看插件树;`dump-profile <profile>` 展开配置;`debug tree|run|scope` 查看 Context;`diagnose <alias>` 运行诊断;`provision` 部署 daemon。需要给脚本消费时使用 `--json`。
 
 默认循环：
 

@@ -170,7 +170,8 @@ record(event) →
 ## 7. 验收
 
 ```bash
-./scripts/lca-ops dev
+./scripts/lca-ops status          # 看 kernel_serve 是否 healthy
+./scripts/lca-ops heal            # 若 kernel 没起,heal 会自动拉起
 
 # 端到端 smoke test
 curl -N -H "Authorization: Bearer lca-local" \

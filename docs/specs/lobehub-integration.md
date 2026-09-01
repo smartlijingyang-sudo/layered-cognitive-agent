@@ -38,7 +38,8 @@ LCA Agent/Team
 
 ```bash
 ./scripts/sync_lobehub_ui.sh   # 拉取 v2.2.13 到 lobehub-ui/
-./scripts/lca-ops dev          # infra + gateway + LobeHub + daemon
+./scripts/lca-ops lobehub ensure   # 同步源码 / 打补丁 / 写 .env / bun install
+./scripts/lca-ops heal             # 拉起 infra / lobehub / daemon / kernel_serve
 ```
 
 环境模板：`deploy/lobehub/.env.lca` → 自动复制为 `lobehub-ui/.env`
@@ -51,11 +52,10 @@ LCA Agent/Team
 | `.lobehub-upstream/` | 官方 git 克隆缓存（gitignore） |
 | `scripts/sync_lobehub_ui.sh` | 拉取并 rsync 官方 release |
 | `lca-ops.yaml` | 栈配置 SSOT：端口、路径、服务 |
-| `lca/infrastructure/ops/` | 编排实现 |
-| `scripts/lca-ops` | 唯一入口：status / heal / logs / dev |
+| `lca/infrastructure/cli/` | 编排实现(services + commands + steps) |
+| `scripts/lca-ops` | 唯一入口：status / heal / stop / logs / inspect-tree / dump-profile / debug / diagnose / provision |
 | `deploy/lobehub/.env.lca` | LobeHub 本地 env 模板 |
-| `gateway/openai_shim.py` | OpenAI 兼容管家面：标题 / embeddings / responses。不开 Agent |
-| `gateway/runs/` | 命令 `POST /runs`；观察 `GET /runs/{id}/live`；cancel / answer / doctor |
-| `deploy/lobehub/patches/runtime/lca_run_driver.py` | 唯一协议补丁：回车 → POST /runs → GET live（注入 `runLcaJournal` + `finishLcaChat` 到 LobeHub transports） |
+| `lca/plugins/transport/webserver/handlers/runs/` | LCA API:`POST /runs`、`GET /runs/{id}`、`GET /runs/{id}/live`、`/v1/chat/completions` |
+| `deploy/lobehub/patches/runtime/LcaRunDriver.ts` | LobeHub 侧补丁:`POST /lca-api/runs` → SSE live loop(注入 LcaRunDriver 到 transports) |
 
 升级：`LOBEHUB_RELEASE=v2.2.14 ./scripts/sync_lobehub_ui.sh`
