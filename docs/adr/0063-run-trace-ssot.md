@@ -38,7 +38,7 @@ LCA 已拥有 `JournalEvent → RunStore.append()` 的事实记录路径，但�
 | **I3** | **事件序列不可重铸** | `seq` 是所属 run 账本的提交顺序。跨 run 实时聚合必须使用独立 transport cursor 或 `(trace_id, run_id, seq)`，绝不覆写 `seq`。 |
 | **I4** | **投影永不回写** | 投影、摘要、洞察、SSE、OTel 与 JSONL 不得向同一账本追加“跟随事件”。 |
 | **I5** | **策略先于持久化和外送** | 文本脱敏、截断、可见性和敏感等级在追加边界统一执行；外部投影不得重新自行猜测安全策略。 |
-| **I6** | **动态扩展不扩张核心原语** | 新插件可发 `RuntimeObserved` 或新增已登记类型；不得再建立第二个 EventBus、第二条诊断序列或自建 JSONL。 |
+| **I6** | **动态扩展不扩张核心原语，新增事件需走三准则判别** | 新插件可发 `RuntimeObserved` 或新增已登记类型；不得再建立第二个 EventBus、第二条诊断序列或自建 JSONL。新增 JournalEvent 必须回答三问：① 用户能感知？ ② 重放后状态语义一致？ ③ 高频低成本？ 三问答案为「事实 / 事实 / 进度」任一组合即按对应语义配置（`durability` + `_delta_key` 合并）。详见 [ADR-0162](0162-fact-vs-progress-judgment-criterion.md)。 |
 | **I7** | **分析按需派生** | 失败路径、成本、瓶颈、交互图和最小复现由只读检查器生成；不在写路径维护 predicate 缓存或 mini store。 |
 
 ## 目标架构
