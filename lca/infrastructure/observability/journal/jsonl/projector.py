@@ -40,6 +40,7 @@ from lca.contracts.models.observability.journal import (
     StampedEvent,
     StepTextDelta,
     ToolAbandonedBeforeInvoke,
+    ToolCallStreaming,
     ToolRetryProgress,
 )
 from lca.contracts.protocols import JournalProjector
@@ -88,6 +89,12 @@ def _delta_key(stamped: StampedEvent) -> _DeltaKey | None:
         return ("ReasoningDelta", event.step)
     if isinstance(event, SandboxOutputDelta):
         return ("SandboxOutputDelta", event.invocation_id, event.stream)
+    # ADR-0157 决策 一:ToolCallStreaming 按 tool_call_id 合并,使同 tool_call_id
+    # 的多 chunk 累积为一次落盘;空 tool_call_id 不合并(返回 None,避免串桶)。
+    if isinstance(event, ToolCallStreaming):
+        if not event.tool_call_id:
+            return None
+        return ("ToolCallStreaming", event.tool_call_id)
     if isinstance(event, ToolRetryProgress):
         return ("ToolRetryProgress", event.phase_id)
     if isinstance(event, ToolAbandonedBeforeInvoke):
