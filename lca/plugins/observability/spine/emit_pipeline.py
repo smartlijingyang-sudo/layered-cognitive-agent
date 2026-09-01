@@ -49,7 +49,7 @@ Module contract
 from __future__ import annotations
 
 import logging
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
@@ -297,10 +297,20 @@ class EmitPipeline:
 # ── plugin manifest ──────────────────────────────────────────────────
 
 
+def _looks_like_field_producer(value: object) -> bool:
+    """Return True when ``value`` exposes the FieldProducer structural surface."""
+    return (
+        hasattr(value, "produce")
+        and hasattr(value, "priority")
+        and hasattr(value, "enabled")
+        and callable(getattr(value, "produce", None))
+    )
+
+
 @plugin(
     id="spine.emit_pipeline",
     provides=("emit_pipeline",),
-    requires=("field_producer.*",),
+    requires=("field_producer.*", "deriver.anomaly"),
     layer="L1",
     kind=PluginKind.SEAM,
     effects=EffectClass.NONE,
@@ -325,7 +335,7 @@ class EmitPipeline:
     ),
     relations=(),
     ownership=OwnershipDeclaration(
-        reads=("field_producer.*", "spine.deriver.anomaly"),
+        reads=("field_producer.*", "deriver.anomaly"),
         emits=("emit_pipeline",),
         state_mutation="forbidden",
     ),
@@ -333,28 +343,32 @@ class EmitPipeline:
 async def setup(ctx: PluginContext, config: Any) -> None:
     """Materialise an ``EmitPipeline`` from the wired L0 producer plugins.
 
-    The plugin reads the bound ``spine.deriver.anomaly`` capability
-    (provided by Task 7.7) plus every ``field_producer.*`` capability
-    from the profile, sorts them, and publishes the assembled pipeline
-    under the ``emit_pipeline`` capability so ``spine.core`` (L2) can
-    fetch it.
-
-    The config schema is profile-driven; this setup accepts both an
-    explicit ``producers`` list and the implicit "all wired
-    field_producer.*" default. Unknown keys are ignored — the plugin
-    is config-tolerant by design so adding new producer plugins does
-    not require editing every existing profile.
-
-    Task 7.8 publishes the ``EmitPipeline`` class; the live boot wiring
-    is delivered by PR-8 (spine.core), so this setup raises a
-    ``NotImplementedError`` until that PR lands. Tests instantiate
-    ``EmitPipeline`` directly and do not invoke setup.
+    Collects every ``field_producer.*`` capability plus the bound
+    ``deriver.anomaly`` detector, assembles :class:`EmitPipeline`, and
+    publishes it under ``emit_pipeline`` for ``spine.core`` (L2).
     """
-    del ctx, config  # accepted for protocol conformance; deferred to PR-8.
-    raise NotImplementedError(
-        "spine.emit_pipeline.setup is wired by PR-8 (spine.core); Task 7.8 "
-        "publishes the class so PR-8 can declare() it. Tests inject "
-        "EmitPipeline directly without going through setup."
+    del config  # profile-tolerant; producers come from wired capabilities.
+
+    matched = ctx.require_matching("field_producer.")
+    producers: list[FieldProducer] = [
+        cast("FieldProducer", value)
+        for value in matched.values()
+        if _looks_like_field_producer(value)
+    ]
+    anomaly = ctx.require("deriver.anomaly")
+    pipeline = EmitPipeline(producers=producers, anomaly=anomaly)
+    ctx.provide("emit_pipeline", pipeline)
+
+    from lca.harness.declarative.compile.instrument_wrap import (
+        set_active_pipeline_accessor,
+    )
+
+    set_active_pipeline_accessor(lambda: pipeline)
+
+    log.debug(
+        "spine.emit_pipeline: setup complete producers=%d anomaly=%s",
+        len(producers),
+        getattr(anomaly, "name", type(anomaly).__name__),
     )
 
 

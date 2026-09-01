@@ -81,10 +81,12 @@ class _StubPluginContext:
         *,
         emit_pipeline: Any,
         file_sink: EventSink,
+        optional: dict[str, Any] | None = None,
     ) -> None:
         self._capabilities: dict[str, Any] = {
             "emit_pipeline": emit_pipeline,
             "file_sink": file_sink,
+            **(optional or {}),
         }
         self.provided: dict[str, Any] = {}
 
@@ -93,13 +95,14 @@ class _StubPluginContext:
             raise KeyError(f"missing capability {key!r}")
         return self._capabilities[key]
 
+    def soft_get(self, key: str) -> Any | None:
+        return self._capabilities.get(key)
+
     def provide(self, key: str, value: object, **kwargs: object) -> None:
         del kwargs
         self.provided[key] = value
 
-    def register(
-        self, seam: str, name: str, value: object, **kwargs: object
-    ) -> None:
+    def register(self, seam: str, name: str, value: object, **kwargs: object) -> None:
         del seam, name, value, kwargs
 
 
@@ -265,6 +268,44 @@ def test_setup_requires_file_sink_capability() -> None:
 
     with pytest.raises(KeyError):
         asyncio.run(setup.setup(ctx, config={}))
+
+
+def test_setup_soft_subscribes_optional_derivers_and_console_sink() -> None:
+    """Optional derivers / console_sink are wired when present; missing is fine."""
+    from lca.plugins.observability.spine.core import setup
+
+    class _CountingDeriver:
+        def __init__(self) -> None:
+            self.calls: list[EventRecord] = []
+
+        def on_event(self, event: EventRecord) -> None:
+            self.calls.append(event)
+
+    deriver = _CountingDeriver()
+    console = _CaptureSink()
+    file_sink = _CaptureSink()
+    ctx = _StubPluginContext(
+        emit_pipeline=_CountingProducer(),
+        file_sink=file_sink,
+        optional={"step_tree": deriver, "console_sink": console},
+    )
+
+    import asyncio
+
+    asyncio.run(setup.setup(ctx, config={}))
+
+    spine_core = ctx.provided["event_spine"]
+    record = spine_core.event_spine.append(
+        execution_point="brain.perceive.start",
+        channel="fact",
+        caller_payload={"marker": True},
+    )
+
+    assert len(file_sink.records) == 1
+    assert len(console.records) == 1
+    assert console.records[0] is record
+    assert len(deriver.calls) == 1
+    assert deriver.calls[0] is record
 
 
 # ── SpineCore holder shape ───────────────────────────────────────────

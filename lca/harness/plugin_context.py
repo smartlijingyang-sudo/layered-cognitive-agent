@@ -18,6 +18,8 @@ __all__ = [
     "PluginContext",
     "PluginEventBus",
     "UndeclaredInteractionError",
+    "collect_context_bindings",
+    "requirement_covers_key",
 ]
 
 
@@ -39,6 +41,41 @@ class UndeclaredInteractionError(RuntimeError):
     """setup() used a capability key not listed in Manifest provides/requires."""
 
 
+def requirement_covers_key(requirement: str, key: str) -> bool:
+    """Return True if a Manifest requirement covers ``key``.
+
+    Exact matches always cover. A trailing ``.*`` wildcard (e.g.
+    ``field_producer.*``) covers any key that shares the dotted prefix
+    — same rule as ``_requirement_matches`` in profile resolve.
+    """
+    if requirement == key:
+        return True
+    if requirement.endswith(".*"):
+        prefix = requirement[:-2] + "."
+        return key.startswith(prefix)
+    return False
+
+
+def collect_context_bindings(carrier: object) -> dict[str, Any]:
+    """Walk Cordis ``own_bindings`` along the parent chain.
+
+    Later (child) bindings overwrite earlier (parent) ones so the
+    nearest scope wins — matching Cordis ``inject`` resolution order
+    when collecting by prefix rather than by exact key.
+    """
+    collected: dict[str, Any] = {}
+    chain: list[object] = []
+    node: object | None = carrier
+    while node is not None:
+        chain.append(node)
+        node = getattr(node, "parent", None)
+    for scope in reversed(chain):
+        own = getattr(scope, "own_bindings", None)
+        if isinstance(own, dict):
+            collected.update(own)
+    return collected
+
+
 @runtime_checkable
 class PluginContext(Protocol):
     """Audited interaction surface for plugin setup (ADR-0061 §七)."""
@@ -46,6 +83,10 @@ class PluginContext(Protocol):
     def provide(self, key: Capability[object] | str, value: object, **kwargs: object) -> None: ...
 
     def require(self, key: Capability[object] | str) -> Any: ...  # 动态能力注入边界
+
+    def require_matching(self, prefix: str) -> dict[str, Any]: ...
+
+    def soft_get(self, key: str) -> Any | None: ...
 
     def register(
         self, seam: Capability[object] | str, name: str, value: object, **kwargs: object
@@ -72,15 +113,24 @@ class AuditedPluginContext:
         """Return the narrow operational surface without exposing it to plugins."""
         return cast("_PluginRuntimeCarrier", self.__inner)
 
+    def _inner_carrier(self) -> object:
+        """Return the Cordis carrier behind the name-mangled ``__inner`` field."""
+        return object.__getattribute__(self, "_AuditedPluginContext__inner")
+
     def _assert_declared(
         self,
         key: str,
         operation: str,
         allowed: Sequence[str],
         declaration: str | None = None,
+        *,
+        allow_wildcard: bool = False,
     ) -> None:
         """Enforce one audited interaction against its manifest declaration."""
-        if key not in allowed:
+        covered = key in allowed or (
+            allow_wildcard and any(requirement_covers_key(pattern, key) for pattern in allowed)
+        )
+        if not covered:
             declared_as = declaration or f"{operation}s"
             raise UndeclaredInteractionError(
                 f"plugin {self._definition.id!r} {operation}({key!r}) not in native "
@@ -103,9 +153,44 @@ class AuditedPluginContext:
             capability_key,
             "require",
             self._definition.required_capability_keys,
+            allow_wildcard=True,
         )
         self.required.add(capability_key)
         return self._runtime().inject(capability_key)
+
+    def require_matching(self, prefix: str) -> dict[str, Any]:
+        """Collect every bound capability whose key starts with ``prefix``.
+
+        The plugin must declare the corresponding ``prefix*`` wildcard
+        (e.g. ``field_producer.*`` for prefix ``field_producer.``). Cordis
+        cannot ``inject`` a wildcard key, so this walks ``own_bindings``
+        along the parent chain instead.
+        """
+        if not prefix.endswith("."):
+            raise ValueError(f"require_matching prefix must end with '.'; got {prefix!r}")
+        wildcard = prefix + "*"
+        allowed = self._definition.required_capability_keys
+        if wildcard not in allowed:
+            raise UndeclaredInteractionError(
+                f"plugin {self._definition.id!r} require_matching({prefix!r}) needs "
+                f"{wildcard!r} in PluginSpec requires={list(allowed)}"
+            )
+        matches = {
+            key: value
+            for key, value in collect_context_bindings(self._inner_carrier()).items()
+            if isinstance(key, str) and key.startswith(prefix)
+        }
+        self.required.update(matches)
+        return matches
+
+    def soft_get(self, key: str) -> Any | None:
+        """Return an optional binding without Manifest audit.
+
+        Used by composers that subscribe optional derivers / sinks when
+        present without declaring them as hard requires.
+        """
+        bindings = collect_context_bindings(self._inner_carrier())
+        return bindings.get(key)
 
     def register(
         self,
@@ -118,6 +203,10 @@ class AuditedPluginContext:
         if (
             capability_key not in self._definition.required_capability_keys
             and capability_key not in self._definition.provided_capability_keys
+            and not any(
+                requirement_covers_key(pattern, capability_key)
+                for pattern in self._definition.required_capability_keys
+            )
         ):
             raise UndeclaredInteractionError(
                 f"plugin {self._definition.id!r} register({capability_key!r}, {name!r}) needs seam in "

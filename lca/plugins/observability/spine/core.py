@@ -108,6 +108,22 @@ class SpineCore:
 # ── plugin manifest ──────────────────────────────────────────────────
 
 
+_OPTIONAL_DERIVER_KEYS: tuple[str, ...] = (
+    "step_tree",
+    "narrative",
+    "graph",
+    "live_tail",
+)
+
+
+def _soft_get(ctx: PluginContext, key: str) -> Any | None:
+    """Return an optional capability when the context supports soft lookup."""
+    soft_get = getattr(ctx, "soft_get", None)
+    if callable(soft_get):
+        return soft_get(key)
+    return None
+
+
 @plugin(
     id="spine.core",
     provides=("event_spine", "spine_context"),
@@ -151,6 +167,10 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     boot — a misconfigured profile must never silently fall back to a
     no-op spine (I4: single entrypoint for framework events).
 
+    Optional derivers (``step_tree``, ``narrative``, ``graph``,
+    ``live_tail``) and ``console_sink`` are soft-looked-up: when present
+    they are subscribed / appended without failing partial profiles.
+
     The assembled :class:`EventSpine` is published under
     ``event_spine``; the process-local :class:`SpineContext` class
     itself is published under ``spine_context`` (the ContextVars are
@@ -163,7 +183,18 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     emit_pipeline = ctx.require("emit_pipeline")
     file_sink = ctx.require("file_sink")
 
-    event_spine = EventSpine(sinks=[file_sink])
+    sinks: list[EventSink] = [file_sink]
+    console_sink = _soft_get(ctx, "console_sink")
+    if console_sink is not None and isinstance(console_sink, EventSink):
+        sinks.append(console_sink)
+
+    event_spine = EventSpine(sinks=sinks)
+
+    for deriver_key in _OPTIONAL_DERIVER_KEYS:
+        deriver = _soft_get(ctx, deriver_key)
+        on_event = getattr(deriver, "on_event", None) if deriver is not None else None
+        if callable(on_event):
+            event_spine.subscribe(on_event)
 
     spine_core = SpineCore(
         event_spine=event_spine,

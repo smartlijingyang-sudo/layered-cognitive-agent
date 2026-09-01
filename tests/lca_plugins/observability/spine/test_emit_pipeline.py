@@ -378,8 +378,10 @@ def test_plugin_manifest_declares_expected_metadata() -> None:
     assert definition.id == "spine.emit_pipeline"
     assert definition.spec.layer == "L1"
     assert definition.provided_capability_keys == ("emit_pipeline",)
-    # Layer-1 integration plugin must require the producer surface.
-    assert any(req.key.startswith("field_producer") for req in definition.spec.requires)
+    required = set(definition.required_capability_keys)
+    # Layer-1 integration plugin must require producers + anomaly.
+    assert "field_producer.*" in required
+    assert "deriver.anomaly" in required
 
 
 def test_module_export_surface() -> None:
@@ -392,6 +394,77 @@ def test_module_export_surface() -> None:
     assert "EmitPipeline" in emit_pipeline_module.__all__
     assert "setup" in emit_pipeline_module.__all__
     assert "I17Violation" in emit_pipeline_module.__all__
+
+
+# ── setup wiring ─────────────────────────────────────────────────────
+
+
+class _StubEmitPipelineContext:
+    """Stub PluginContext with require_matching for emit_pipeline.setup tests."""
+
+    def __init__(
+        self,
+        *,
+        producers: dict[str, Any],
+        anomaly: Any,
+    ) -> None:
+        self._capabilities: dict[str, Any] = {
+            **producers,
+            "deriver.anomaly": anomaly,
+        }
+        self.provided: dict[str, Any] = {}
+
+    def require(self, key: str) -> Any:
+        if key not in self._capabilities:
+            raise KeyError(f"missing capability {key!r}")
+        return self._capabilities[key]
+
+    def require_matching(self, prefix: str) -> dict[str, Any]:
+        return {key: value for key, value in self._capabilities.items() if key.startswith(prefix)}
+
+    def soft_get(self, key: str) -> Any | None:
+        return self._capabilities.get(key)
+
+    def provide(self, key: str, value: object, **kwargs: object) -> None:
+        del kwargs
+        self.provided[key] = value
+
+    def register(self, seam: str, name: str, value: object, **kwargs: object) -> None:
+        del seam, name, value, kwargs
+
+
+def test_setup_assembles_pipeline_from_producers_and_anomaly() -> None:
+    """``setup`` collects field_producer.* + deriver.anomaly and provides EmitPipeline."""
+    import asyncio
+
+    from lca.harness.declarative.compile.instrument_wrap import (
+        set_active_pipeline_accessor,
+    )
+    from lca.plugins.observability.spine.emit_pipeline import EmitPipeline, setup
+
+    p_low = _constant_producer("low", 10, {"a": 1})
+    p_high = _constant_producer("high", 30, {"b": 2})
+    anomaly = _CountingAnomaly()
+    ctx = _StubEmitPipelineContext(
+        producers={
+            "field_producer.low": p_low,
+            "field_producer.high": p_high,
+            "unrelated": object(),
+        },
+        anomaly=anomaly,
+    )
+
+    set_active_pipeline_accessor(None)
+    try:
+        asyncio.run(setup.setup(ctx, config={}))
+
+        pipeline = ctx.provided["emit_pipeline"]
+        assert isinstance(pipeline, EmitPipeline)
+        assert pipeline.anomaly is anomaly
+        # Sorted by priority; unrelated non-producer binding is filtered out.
+        assert [p.name for p in pipeline.producers] == ["low", "high"]
+    finally:
+        set_active_pipeline_accessor(None)
 
 
 # ── EventSink protocol conformance for the capture sink ──────────────
