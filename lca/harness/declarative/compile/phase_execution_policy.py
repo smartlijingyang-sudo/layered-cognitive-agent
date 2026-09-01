@@ -228,7 +228,8 @@ def _phase_error_result(failure: PhaseExecutionFailure, *, plan_ref: str) -> Pha
     """Create the sole replay-safe result for a retry-exhausted phase execution.
 
     ADR-0159 决策 三:失败路径必须 emit ``ToolLifecycleEnded`` 收口 journal
-    上的 ToolCallStreaming 占位(若有 last_tool_call_id);否则不发射,避免空事件。
+    上的 ToolCallResolved 帧(若有 last_tool_call_id);否则不发射,避免空事件。
+    (本批: ToolCallResolved 取代了旧的 ToolCallStreaming 占位语义)
     """
 
     attempts = tuple(

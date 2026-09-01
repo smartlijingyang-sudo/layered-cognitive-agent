@@ -394,26 +394,31 @@ class LlmCallCompleted(JournalEvent):
 
 
 @dataclass(frozen=True)
-class ToolCallStreaming(JournalEvent):
-    """LLM 正在流式生成工具调用参数（tool call arguments still streaming）。
+class ToolCallResolved(JournalEvent):
+    """LLM 完成一次工具调用参数的流式生成（args 收齐即发）。
 
-    在 LLM 响应完成前发出，让前端尽早渲染工具卡片占位——消除思考结束到
-    工具执行之间的空白期。与 ``ToolStarted``（执行前、参数完整）互补。
-    ``tool_call_id`` 即后续 ToolStarted/Invoked 的 ``invocation_id``（同一张卡）。
+    替换旧的 ``ToolCallStreaming`` —— 旧实现把"打字机中间态"当成事实事件
+    一帧帧发（一次 executeCode 产生 N 帧 arguments_preview prefix），
+    污染 journal / jsonl / SSE 三条事实流。
 
-    ADR-0101 PR-2 + ADR-0101 followup (2026-09-01):
-    - ``tool_name`` / ``tool_call_id`` —— 关联 ToolStarted 的 invocation_id
-    - ``arguments_preview`` —— best-effort partial dict (``parse_partial_tool_args``
-      在累积到 160 字符时计算);仅作 SSE live preview hint,**replay 工具不得依赖
-      此字段,ToolStarted.arguments 才是事实**;不视为 view-only,允许写入 disk
-      以便诊断
-    - ``arguments_ref`` —— ADR §5.3 设想的 streaming 累积引用,当前未启用,
-      保留字段以备 future 实现
+    新语义:args 累积完整那一刻 emit **一次**,载荷为完整 ``arguments``
+    dict。 ``tool_call_id`` 与后续 ToolStarted / ToolInvoked 的
+    ``invocation_id`` 同号,前端据此把工具卡片从"准备中"切到"执行"。
+
+    ADR 决策 (本批): 一次工具调用的事实账本 = ``ToolCallResolved``
+    + ``ToolStarted`` + ``ToolInvoked`` (≤ 3 帧);中间 delta 是
+    LLM provider 的传输细节,**不属于 LCA 事实层**;前端若需"打字机"
+    体验,前端在 ToolCallResolved 拿到完整 args 后做本地 prefix 截断
+    渲染,或订阅 provider 的 hint 通道。
+
+    - ``tool_name`` / ``tool_call_id`` —— 关联 ToolStarted.invocation_id
+    - ``arguments`` —— 完整 dict (与 ToolStarted.arguments 同 shape);
+      与 ``arguments_ref`` 二选一非空互斥 (inline vs evidence 平面)
     """
 
     tool_name: str = ""
     tool_call_id: str = ""
-    arguments_preview: Mapping[str, object] = field(default_factory=dict)
+    arguments: Mapping[str, object] = field(default_factory=dict)
     arguments_ref: EvidenceRef | None = None
 
 
@@ -500,8 +505,9 @@ class ToolLifecycleEnded(JournalEvent):
     """Tool 调用生命周期终结（事实，phase 退出时）。
 
     仅在 phase_execution_policy 已尝试但 ToolInvoked 未能落地的情况下发射。
-    配合 ADR-0157 的 ``_delta_key`` 合并,ToolCallStreaming 占位在 journal
-    中即可被收口。durability="required"(用户能感知,见 ADR-0063 §I6 三准则)。
+    配合 ADR-0157 的 ``_delta_key`` 合并,ToolCallResolved 帧在 journal
+    中即可被收口(若 phase 在 ToolStarted/ToolInvoked 落地前退出)。
+    durability="required"(用户能感知,见 ADR-0063 §I6 三准则)。
     """
 
     tool_call_id: str = ""

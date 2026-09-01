@@ -24,7 +24,7 @@ import pytest
 from lca.contracts.models.observability.journal import (
     RunScope,
     StampedEvent,
-    ToolCallStreaming,
+    ToolCallResolved,
     ToolInvoked,
     ToolStarted,
 )
@@ -44,10 +44,9 @@ from lca.infrastructure.observability.journal.engine.journal_io import (
 # longer view-only). `projected_state` is renderer-facing (SSE-only; stripped
 # from disk by JsonlJournalProjector). Both live on ToolInvoked as proper
 # dataclass fields and are excluded from the V1 forbidden set.
-# `arguments_preview` was a view-only field under ADR-0101 PR-2, but
-# ADR-0101 followup (2026-09-01) restores it as a best-effort streaming
-# preview for ToolCallStreaming only — it is no longer view-only but a
-# non-authoritative preview hint.
+# 本批 (fix/strip-tool-call-streaming): ToolCallResolved 取代
+# ToolCallStreaming;完整 arguments 走 inline (or evidence 平面),
+# 不再有 best-effort partial preview 字段。
 _V1_FORBIDDEN_FIELDS = (
     "code",
     "language",
@@ -72,7 +71,7 @@ def _journal_event_field_names(cls: type) -> set[str]:
 def test_v1_no_typed_or_preview_fields() -> None:
     """V1:tool 事件 dataclass 不再有 typed 6-key / *_preview / plugin_state /
     state_ref 字段。"""
-    for cls in (ToolCallStreaming, ToolStarted, ToolInvoked):
+    for cls in (ToolCallResolved, ToolStarted, ToolInvoked):
         present = _journal_event_field_names(cls)
         for forbidden in _V1_FORBIDDEN_FIELDS:
             assert forbidden not in present, f"{cls.__name__} 不应保留 view-only 字段 {forbidden!r}"
@@ -84,14 +83,15 @@ def test_v1_dataclass_field_count() -> None:
     ADR-XXXX adds ``output_text`` (inline output) and ``projected_state``
     (renderer-facing projection) to ToolInvoked.
 
-    ADR-0101 followup adds ``arguments_preview`` (best-effort partial dict)
-    to ToolCallStreaming.
+    本批 (fix/strip-tool-call-streaming): ToolCallResolved 取代 ToolCallStreaming
+    —— ``arguments`` 字段是完整 dict (与 ToolStarted.arguments 同 shape),
+    不再带 ``arguments_preview`` 中间态字段。
     """
-    streaming_fields = _journal_event_field_names(ToolCallStreaming)
-    assert streaming_fields == {
+    resolved_fields = _journal_event_field_names(ToolCallResolved)
+    assert resolved_fields == {
         "tool_name",
         "tool_call_id",
-        "arguments_preview",
+        "arguments",
         "arguments_ref",
     }
     started_fields = _journal_event_field_names(ToolStarted)
@@ -136,11 +136,11 @@ def test_v1_dataclass_rejects_legacy_fields() -> None:
             invocation_id="i",
             plugin_state={"code": "x"},  # type: ignore[call-arg]
         )
-    # ToolCallStreaming.arguments_preview 是 dict 类型,接受 dict,不接受 str
-    ToolCallStreaming(
+    # ToolCallResolved.arguments 是 dict 类型,接受 dict(完整 args)
+    ToolCallResolved(
         tool_name="t",
         tool_call_id="c",
-        arguments_preview={"code": "ls"},  # valid per ADR-0101 followup
+        arguments={"code": "ls"},  # 完整 args,不再有 preview
     )
 
 
@@ -372,59 +372,43 @@ def test_inline_path_activated_by_should_inline_true() -> None:
     assert prepare_called["count"] == 0
 
 
-# ── ADR-0101 followup (2026-09-01): streaming partial preview ─────────────
+# ── 本批 (fix/strip-tool-call-streaming): ToolCallResolved 取代 preview ────
 
 
-def test_followup_streaming_preview_incremental() -> None:
-    """ToolCallStreaming.arguments_preview 是 best-effort partial dict。
+def test_resolved_carries_full_arguments_dict() -> None:
+    """ToolCallResolved.arguments 是完整 dict (与 ToolStarted.arguments 同 shape)。
 
-    模拟 21 个 streaming delta,验证:
-    1. 每个 emit 都携带 arguments_preview (即使 partial)
-    2. arguments_preview 是 dict (不是 str)
-    3. partial 解析失败时 preview 为空 dict 但事件正常 emit
-    4. 字段在 ToolStarted 上不存在 (仅 ToolCallStreaming 拥有)
+    验证:
+    1. arguments 字段是 dict
+    2. 完整 dict 可携带 code/language 等所有 keys
+    3. ToolStarted 不携带 streaming 中间态字段 (无 arguments_preview)
     """
-    # 完整 JSON 可解析 → preview 是完整 dict
-    complete = ToolCallStreaming(
+    complete = ToolCallResolved(
         tool_name="executeCode",
         tool_call_id="c1",
-        arguments_preview={"code": "print(2)", "language": "python"},
+        arguments={"code": "print(2)", "language": "python"},
     )
-    assert complete.arguments_preview == {"code": "print(2)", "language": "python"}
+    assert complete.arguments == {"code": "print(2)", "language": "python"}
 
-    # partial JSON 可解析 → preview 是部分 dict
-    raw_partial = '{"code": "print('
-    # parse_partial_tool_args 应对 partial 做 regex 提取
-    from lca.cognition.brain.tool_call_stream import parse_partial_tool_args
-
-    partial = parse_partial_tool_args(raw_partial)
-    assert isinstance(partial, dict)
-    # partial 解析可能拿到 code prefix,可能空 dict —— 两种都合法
-    assert "code" in partial or partial == {}
-
-    # 部分字段提取场景
-    raw_string_key = r"""{"code": "import os\ncode = \'\'\'#!/usr/bin/..."}"""
-    parsed = parse_partial_tool_args(raw_string_key)
-    assert parsed.get("code", "").startswith("import os")
-
-    # ToolStarted 不携带 arguments_preview 字段
     started = ToolStarted(tool_name="executeCode", invocation_id="c1")
-    assert "arguments_preview" not in {f.name for f in dataclasses.fields(started)}
+    started_fields = {f.name for f in dataclasses.fields(started)}
+    assert "arguments_preview" not in started_fields
+    assert "arguments" in started_fields
 
 
-def test_followup_streaming_preview_serializes_to_disk() -> None:
-    """ADR-0101 §4.1 例外:ToolCallStreaming.arguments_preview 写入 disk。
+def test_resolved_serializes_full_arguments_to_disk() -> None:
+    """ToolCallResolved.arguments 完整 dict 写入 jsonl (与 ToolStarted 同路径)。
 
-    V3 验证:journal_io 不再剥离 view-only 字段,preview 作为事实写入 jsonl。
+    V3 验证:journal_io 不剥离 arguments,inline dict 作为事实写入 disk。
     """
     from lca.infrastructure.observability.journal.engine.journal_io import (
         stamped_to_record,
     )
 
-    record_in = ToolCallStreaming(
+    record_in = ToolCallResolved(
         tool_name="executeCode",
         tool_call_id="c1",
-        arguments_preview={"code": "print(2)", "language": "python"},
+        arguments={"code": "print(2)", "language": "python"},
     )
     stamped = StampedEvent(
         event=record_in,
@@ -433,6 +417,16 @@ def test_followup_streaming_preview_serializes_to_disk() -> None:
         ts=1.0,
     )
     out = stamped_to_record(stamped)
-    # data.arguments_preview 应该出现在 disk 记录里
     data = out.get("data", {})
-    assert data.get("arguments_preview") == {"code": "print(2)", "language": "python"}
+    assert data.get("arguments") == {"code": "print(2)", "language": "python"}
+
+
+def test_resolved_has_no_partial_preview_field() -> None:
+    """ToolCallResolved 不再有 arguments_preview (本批移除)。
+
+    旧 ToolCallStreaming 的 arguments_preview 是 UI 中间态,已废。
+    """
+    resolved_fields = {f.name for f in dataclasses.fields(ToolCallResolved)}
+    assert "arguments_preview" not in resolved_fields, (
+        "ToolCallResolved.arguments_preview 已废;UI 打字机是前端层职责"
+    )

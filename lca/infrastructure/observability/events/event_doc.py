@@ -302,12 +302,12 @@ def _doc_sandbox_delta() -> EventDoc:
     )
 
 
-@doc_decorator("ToolCallStreaming")
+@doc_decorator("ToolCallResolved")
 def _doc_tool_streaming() -> EventDoc:
     return EventDoc(
-        summary="LLM 正在流式生成工具调用参数 —— 在响应完成前发出",
-        why="前端尽早渲染工具卡片占位,消除 '思考完→工具卡' 的空白期",
-        arch="L1 brain.llm_turn.executor;ADR-0099 runs-live-openai-stream",
+        summary="LLM 完成一次工具调用参数的流式生成 —— args 收齐即发,载荷完整",
+        why="事实账本只发一次完整 args;旧 ToolCallStreaming 把 UI 中间态误入事实流已废",
+        arch="L1 brain.llm_turn.executor;replaces ADR-0099 runs-live-openai-stream 的多帧 preview",
         layer="L1",
     )
 
@@ -347,7 +347,7 @@ def _doc_tool_denied() -> EventDoc:
 def _doc_tool_lifecycle_ended() -> EventDoc:
     return EventDoc(
         summary="Phase 退出时 Tool 调用生命周期终结(事实)——失败 / 取消 / 被替换",
-        why="收口 ToolCallStreaming 占位;前端 UI 显示工具调用失败/取消状态,spinner 不再永转",
+        why="收口 ToolCallResolved 帧;前端 UI 显示工具调用失败/取消状态,spinner 不再永转",
         arch="L4 lca.harness.declarative.compile.phase_execution_policy;ADR-0159 + ADR-0063 §I6 三准则(用户能感知)",
         layer="L4",
     )

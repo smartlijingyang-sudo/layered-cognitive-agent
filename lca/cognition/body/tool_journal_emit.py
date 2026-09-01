@@ -58,7 +58,7 @@ def prepare_state_evidence(
 
     默认 policy(DefaultEvidencePolicy.inline_threshold_bytes=64 KiB)对小
     public payload 直接 inline;restricted/confidential 永不 inline。
-    调用方负责把 ref 写到对应 ToolStarted / ToolInvoked / ToolCallStreaming
+    调用方负责把 ref 写到对应 ToolStarted / ToolInvoked / ToolCallResolved
     的 ``arguments_ref`` / ``output_ref``。
     """
     if evidence_store is None or evidence_policy is None:

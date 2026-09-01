@@ -1,4 +1,11 @@
-"""Partial JSON tool-call arguments become started plugin_state."""
+"""Partial JSON tool-call arguments parser + stream accumulator.
+
+本批 (fix/strip-tool-call-streaming) 改造后,executor 不再为每 delta emit
+journal 事件,但 ``parse_partial_tool_args`` 与 ``push_tool_call_stream``
+仍存在 —— 前者是 hint 通道(若前端订阅)所需,后者是 slot 累积核心。
+ToolCallResolved 直接对完整 raw 调 ``parse_completed_slot_args`` (新),
+``parse_partial_tool_args`` 仅供 partial preview 场景。
+"""
 
 from __future__ import annotations
 
@@ -60,8 +67,8 @@ class TestPushToolCallStream(unittest.TestCase):
         self.assertIsNone(third)
 
     def test_slot_raw_accumulates_deltas(self) -> None:
-        """ADR-0101 followup: slot['raw'] 累积所有 delta,emit 周期内供
-        parse_partial_tool_args 还原 partial dict 给 ToolCallStreaming.emit."""
+        """slot['raw'] 累积所有 delta,供 executor 在 COMPLETED 前
+        emit ToolCallResolved 时取完整 args。"""
         slots: dict = {}
         # 第一次 emit 触发
         first = push_tool_call_stream(

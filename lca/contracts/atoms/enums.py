@@ -171,6 +171,7 @@ class LLMStreamEventType(str, Enum):
     OUTPUT_TEXT_DELTA = "response.output_text.delta"
     REASONING_TEXT_DELTA = "response.reasoning_text.delta"
     FUNCTION_CALL_ARGUMENTS_DELTA = "response.function_call_arguments.delta"
+    FUNCTION_CALL_ARGUMENTS_DONE = "response.function_call_arguments.done"
     COMPLETED = "response.completed"
 
 

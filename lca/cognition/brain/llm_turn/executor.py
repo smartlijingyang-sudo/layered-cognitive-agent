@@ -13,12 +13,17 @@ import structlog
 
 from lca.cognition.brain.llm_turn.mode import LlmTurnMode
 from lca.cognition.brain.llm_turn.policy import build_llm_call_kwargs, resolve_llm_turn_mode
-from lca.cognition.brain.tool_call_stream import parse_partial_tool_args, push_tool_call_stream
+from lca.cognition.brain.tool_call_stream import (
+    mark_slot_done,
+    parse_completed_slot_args,
+    pop_completed_slots,
+    push_tool_call_stream,
+)
 from lca.cognition.brain.tool_conversation import build_tool_history
 from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.observability.journal import ToolCallStreaming
+from lca.contracts.models.observability.journal import ToolCallResolved
 from lca.contracts.models.team.partial_buffer import append_run_partial
 from lca.contracts.protocols import LLMAdapter, Tool
 from lca.infrastructure.observability import record
@@ -99,29 +104,29 @@ async def _stream_turn(
             accumulated += chunk
             append_run_partial(chunk)
         elif event.type == LLMStreamEventType.FUNCTION_CALL_ARGUMENTS_DELTA:
-            frame = push_tool_call_stream(
+            push_tool_call_stream(
                 tool_slots,
                 tool_name=event.tool_name,
                 tool_call_id=event.tool_call_id,
                 arguments_delta=event.arguments_delta or "",
             )
-            if frame is not None:
-                # ADR-0101 followup (2026-09-01):emit best-effort partial preview
-                # so LobeHub paints the tool card while arguments are still streaming.
-                # ToolStarted.arguments 仍然是事实账本的唯一真相源;此 preview 仅
-                # 作 SSE live hint,前端 replay 工具不得依赖。
-                slot = tool_slots[str(frame["tool_call_id"])]
-                partial = parse_partial_tool_args(str(slot.get("raw", "")))
-                record(
-                    ToolCallStreaming(
-                        tool_name=str(frame["tool_name"]),
-                        tool_call_id=str(frame["tool_call_id"]),
-                        arguments_preview=dict(partial) if partial else {},
-                    )
-                )
+        elif event.type == LLMStreamEventType.FUNCTION_CALL_ARGUMENTS_DONE:
+            if event.tool_call_id:
+                mark_slot_done(tool_slots, str(event.tool_call_id))
         elif event.type == LLMStreamEventType.COMPLETED and event.response is not None:
             stream_response = event.response
             break
+
+    # args 收齐才 emit 一次 ToolCallResolved;旧"每 delta 一次 ToolCallStreaming"
+    # 是 UI 信号误入事实账本,本批废 (前置步骤 ToolCallStreaming 已被删除)。
+    for slot in pop_completed_slots(tool_slots):
+        record(
+            ToolCallResolved(
+                tool_name=str(slot["tool_name"]),
+                tool_call_id=str(slot["tool_call_id"]),
+                arguments=parse_completed_slot_args(str(slot["raw"])),
+            )
+        )
 
     if stream_response is not None:
         return _merge_stream_response(stream_response, accumulated)

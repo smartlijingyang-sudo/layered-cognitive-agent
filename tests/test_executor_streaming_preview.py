@@ -1,9 +1,15 @@
-"""End-to-end smoke test for executor + ToolCallStreaming preview pipeline.
+"""End-to-end smoke test for executor + ToolCallResolved pipeline.
 
-ADR-0101 followup (2026-09-01): executor should emit partial ``arguments_preview``
-on every ``ToolCallStreaming`` event so LobeHub paints the tool card while
-arguments are still streaming. This test patches LLMAdapter to drive
-``FUNCTION_CALL_ARGUMENTS_DELTA`` events and verifies journal emission.
+本批改造 (fix/strip-tool-call-streaming): executor 在 args 收齐那一刻
+对每个 tool_call_id emit **恰好一次** ToolCallResolved (载荷完整
+arguments dict)。旧"每 delta 一帧 ToolCallStreaming preview"已废 —
+journal 是事实流,不是 UI 中间态。
+
+测试 patch LLMAdapter 驱动 ``FUNCTION_CALL_ARGUMENTS_DELTA`` →
+``FUNCTION_CALL_ARGUMENTS_DONE`` → ``COMPLETED``,验证:
+1. 整个 stream 仅产生 1 个 ToolCallResolved (不是 N 个)
+2. 该 Resolved.arguments 是完整 dict,code 字段含整段代码
+3. 不再有 ToolCallStreaming 事件落账
 """
 
 from __future__ import annotations
@@ -14,7 +20,11 @@ import pytest
 
 from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.llm import LLMResponse
-from lca.contracts.models.observability.journal import StampedEvent, ToolCallStreaming
+from lca.contracts.models.observability.journal import (
+    RunScope,
+    StampedEvent,
+    ToolCallResolved,
+)
 from lca.infrastructure.observability import bind_backends
 
 
@@ -26,28 +36,31 @@ class _FakeLLMEvent:
 
 
 class _FakeLLM:
-    """Streams ``FUNCTION_CALL_ARGUMENTS_DELTA`` then COMPLETED with empty text."""
+    """Streams ``FUNCTION_CALL_ARGUMENTS_DELTA`` chunks then DONE then COMPLETED."""
 
-    def __init__(self, deltas: list[str]):
+    def __init__(self, deltas: list[str], tool_call_id: str = "toolu_smoke"):
         self._deltas = deltas
+        self._tool_call_id = tool_call_id
 
     async def stream(self, *_, **__) -> AsyncIterator[_FakeLLMEvent]:
-        # emit name first
         yield _FakeLLMEvent(
             LLMStreamEventType.FUNCTION_CALL_ARGUMENTS_DELTA,
             tool_name="executeCode",
-            tool_call_id="toolu_smoke",
+            tool_call_id=self._tool_call_id,
             arguments_delta="",
         )
-        # then chunks
         for d in self._deltas:
             yield _FakeLLMEvent(
                 LLMStreamEventType.FUNCTION_CALL_ARGUMENTS_DELTA,
                 tool_name="executeCode",
-                tool_call_id="toolu_smoke",
+                tool_call_id=self._tool_call_id,
                 arguments_delta=d,
             )
-        # finally COMPLETED with tool_calls (so _merge_stream_response returns early)
+        yield _FakeLLMEvent(
+            LLMStreamEventType.FUNCTION_CALL_ARGUMENTS_DONE,
+            tool_name="executeCode",
+            tool_call_id=self._tool_call_id,
+        )
         yield _FakeLLMEvent(
             LLMStreamEventType.COMPLETED,
             response=LLMResponse(text="", tool_calls=[]),
@@ -55,31 +68,23 @@ class _FakeLLM:
 
 
 @pytest.mark.asyncio
-async def test_executor_emits_arguments_preview_on_streaming() -> None:
-    """ToolCallStreaming event 必须携带 partial arguments_preview。
-
-    验证:
-    1. 每个 emit (累计 160 字符) 都产生 ToolCallStreaming 事件
-    2. arguments_preview 是 dict,不是 None
-    3. arguments_preview 的 'code' 字段逐步累积
-    """
+async def test_executor_emits_exactly_one_resolved_per_tool_call() -> None:
+    """Args 完整时仅 emit 一次 ToolCallResolved,不再有 ToolCallStreaming。"""
     from lca.cognition.brain.llm_turn import executor
     from lca.contracts.models.team.partial_buffer import begin_partial_buffer, reset_partial_buffer
 
-    # collect emitted events
-    captured: list[ToolCallStreaming] = []
+    captured_resolved: list[ToolCallResolved] = []
+    captured_all_kinds: list[str] = []
 
     class _CapturingJournal:
         def write(self, event):
-            if isinstance(event, ToolCallStreaming):
-                captured.append(event)
+            captured_all_kinds.append(type(event).__name__)
+            if isinstance(event, ToolCallResolved):
+                captured_resolved.append(event)
             return StampedEvent(
                 event=event,
-                scope=__import__(
-                    "lca.contracts.models.observability.journal",
-                    fromlist=["RunScope"],
-                ).RunScope(run_id="r", trace_id="t"),
-                seq=len(captured) + 1,
+                scope=RunScope(run_id="r", trace_id="t"),
+                seq=len(captured_all_kinds),
                 ts=0.0,
             )
 
@@ -89,28 +94,15 @@ async def test_executor_emits_arguments_preview_on_streaming() -> None:
     ).BoundObservability(journal=_CapturingJournal())
 
     with bind_backends(bound):
-        # build 21-delta stream simulating a real LLM
+        # 构造可严格 JSON 解析的 raw —— LLM 把代码内容做 JSON 转义
+        # (Python 字符串里的双引号 → \", 三引号 → \"\"\)。
         deltas = [
-            r'{"code": "import os',
-            r"\n",
-            r"code = '''#!/usr/bin/env python3\n",
-            r"# -*- coding: utf-8 -*-\n",
-            r'"""\n',
-            "鸡兔同笼问题求解器\n",
-            "=",
-            "*",
-            "*",
-            "x",
-            " ",
-            "50\n",
-            r'"""\n',
-            r"\ndef s",
-            "olve(heads: int, feet: int):\n",
-            "    if feet % 2 != 0:\n",
-            "        return None\n",
-            "    rabbits = (feet - 2 * heads) // 2\n",
-            "    return heads - rabbits, rabbits\n",
-            '\nprint("finished")',
+            r'{"code": "import os\n',
+            r"code = \'hello world\'\n",
+            r"def solve(heads, feet):\n",
+            r"    return heads, feet\n",
+            r"\nprint(\'finished\')",
+            r'", "language": "python"}',
         ]
 
         llm = _FakeLLM(deltas)
@@ -127,25 +119,27 @@ async def test_executor_emits_arguments_preview_on_streaming() -> None:
         finally:
             reset_partial_buffer(tok)
 
-    # Verify at least one ToolCallStreaming was emitted
-    assert len(captured) >= 1, f"expected >=1 ToolCallStreaming, got {len(captured)}"
+    # 1) 不再 emit 任何 ToolCallStreaming (以及任何其他 ToolCall* 中间态事件)
+    streaming_kinds = [
+        k
+        for k in captured_all_kinds
+        if "Streaming" in k or "Streaming" in k.replace("Resolved", "")
+    ]
+    assert streaming_kinds == [], f"ToolCall*Streaming 已废,不应 emit;got {streaming_kinds}"
 
-    # Print what we got for debugging
-    for i, ev in enumerate(captured):
-        print(f"  emit#{i + 1} preview={ev.arguments_preview!r}")
+    # 2) 恰好 emit 一次 ToolCallResolved
+    assert len(captured_resolved) == 1, (
+        f"expected exactly 1 ToolCallResolved per tool_call, got {len(captured_resolved)}"
+    )
 
-    # Verify arguments_preview is dict on every event
-    for ev in captured:
-        assert isinstance(ev.arguments_preview, dict), (
-            f"ToolCallStreaming.arguments_preview must be dict, got {type(ev.arguments_preview)}"
-        )
+    resolved = captured_resolved[0]
+    assert resolved.tool_name == "executeCode"
+    assert resolved.tool_call_id == "toolu_smoke"
 
-    # Verify 'code' is progressively populated if any code prefix is found
-    code_progressions = [ev.arguments_preview.get("code", "") for ev in captured]
-    if any(code_progressions):
-        first_code = code_progressions[0]
-        last_code = code_progressions[-1]
-        assert last_code, "last preview should have non-empty code if any preview had code"
-        assert len(last_code) >= len(first_code), (
-            f"code should grow: first={len(first_code)} last={len(last_code)}"
-        )
+    # 3) arguments 完整: code 字段含整段代码(包含 'finished')
+    args = resolved.arguments
+    assert isinstance(args, dict)
+    code = args.get("code") or ""
+    assert "finished" in code, (
+        f"Resolved.arguments.code must contain full code, got tail={code[-80:]!r}"
+    )
