@@ -87,8 +87,8 @@ def _doc_casting_started() -> EventDoc:
     return EventDoc(
         summary="自动组队选角开始 —— Team 编译前的一次 LLM 调用",
         why="把用户 objective 映射到角色库,产出 CastingPlan 快照",
-        arch="L4 default_modes 选角插件入口;ADR-0042/0052 动态选角",
-        layer="L4",
+        arch="L1 default_modes 选角插件入口;ADR-0042/0052 动态选角(emitter 在 lca.cognition.* 故 layer=L1)",
+        layer="L1",
     )
 
 
@@ -97,8 +97,8 @@ def _doc_casting_completed() -> EventDoc:
     return EventDoc(
         summary="选角完成,记录 governance_kind + lead_role + selected_roles + rationale",
         why="驱动后续 TeamRunStarted.members;白名单校验后的可回放快照",
-        arch="L4 default_modes;rationale 用于事后审计选角理由",
-        layer="L4",
+        arch="L1 default_modes;rationale 用于事后审计选角理由",
+        layer="L1",
     )
 
 
@@ -107,8 +107,8 @@ def _doc_casting_failed() -> EventDoc:
     return EventDoc(
         summary="选角失败 —— 解析 / 白名单 / 重试耗尽任一原因",
         why="run 无法展开,run_doctor 标记 H1 断裂(0065 §六)",
-        arch="L4 default_modes 降级路径",
-        layer="L4",
+        arch="L1 default_modes 降级路径",
+        layer="L1",
     )
 
 
@@ -342,6 +342,37 @@ def _doc_tool_denied() -> EventDoc:
     )
 
 
+# ADR-0159 + ADR-0162 新增闭集事件
+@doc_decorator("ToolLifecycleEnded")
+def _doc_tool_lifecycle_ended() -> EventDoc:
+    return EventDoc(
+        summary="Phase 退出时 Tool 调用生命周期终结(事实)——失败 / 取消 / 被替换",
+        why="收口 ToolCallStreaming 占位;前端 UI 显示工具调用失败/取消状态,spinner 不再永转",
+        arch="L4 lca.harness.declarative.compile.phase_execution_policy;ADR-0159 + ADR-0063 §I6 三准则(用户能感知)",
+        layer="L4",
+    )
+
+
+@doc_decorator("ToolAbandonedBeforeInvoke")
+def _doc_tool_abandoned_before_invoke() -> EventDoc:
+    return EventDoc(
+        summary="Tool 占位存在但 phase 在 ToolInvoked 发射前已退出(best_effort)",
+        why="重试期占位回收,用户感知弱;走 best_effort 流避免事实污染",
+        arch="L4 lca.harness.declarative.compile.phase_execution_policy;ADR-0162 决策 一,NOT_INVOKED_AFTER_STREAM 迁出",
+        layer="L4",
+    )
+
+
+@doc_decorator("ToolRetryProgress")
+def _doc_tool_retry_progress() -> EventDoc:
+    return EventDoc(
+        summary="Phase 重试进度(实时驱动,best_effort)——attempt 入口 emit",
+        why="UI 显示「正在重试 attempt 2/3」;spinner 不冻结;不复写 state.step",
+        arch="L4 lca.harness.declarative.compile.phase_execution_policy;ADR-0162 决策 二 + ADR-0161 撤销修复",
+        layer="L4",
+    )
+
+
 @doc_decorator("AttachmentStagingStarted")
 def _doc_attach_started() -> EventDoc:
     return EventDoc(
@@ -538,6 +569,37 @@ def _doc_preset_published() -> EventDoc:
         summary="plugin 源码 + bundle YAML 写入 preset 目录(Creator Step 6)",
         why="下一次 boot 加载该 bundle 时 plugin 自动挂入,无需 cordis_control",
         arch="L4 preset_authoring;ADR-0074 §13.3.4",
+        layer="L4",
+    )
+
+
+# ADR-0116: Kernel K1-K8 Boot 事件登记(ADR-0114 提议,ADR-0116 收敛)
+@doc_decorator("BootProfileResolved")
+def _doc_boot_profile_resolved() -> EventDoc:
+    return EventDoc(
+        summary="Boot K1+K2:profile 解析完成 + ResolvedProfile 哈希固化",
+        why="后续 boot 阶段都依赖 manifest_hash 做 diff / 灰度判断",
+        arch="L4 lca_kernel.source_resolve;ADR-0114 + ADR-0116 PR-3",
+        layer="L4",
+    )
+
+
+@doc_decorator("BootPluginFiberSpawned")
+def _doc_boot_plugin_fiber_spawned() -> EventDoc:
+    return EventDoc(
+        summary="Boot K3:每个 plugin 的 Fiber spawn 开始/结束(成对 emit)",
+        why="观察哪个 plugin 慢 / 卡住;Fiber 是 ADR-0118 HMR 的最小调度单元",
+        arch="L4 lca_kernel.boot;ADR-0118 HMR patch watcher + ADR-0116 PR-3",
+        layer="L4",
+    )
+
+
+@doc_decorator("BootObservabilityAssembled")
+def _doc_boot_observability_assembled() -> EventDoc:
+    return EventDoc(
+        summary="Boot K5:BoundObservability 装配完成 — journal/tracer/policy/scorers 全部 ready",
+        why="后续 run 写入的 journal 事件都依赖这套装配;observability gate",
+        arch="L4 lca_kernel.observability;ADR-0116 PR-3",
         layer="L4",
     )
 

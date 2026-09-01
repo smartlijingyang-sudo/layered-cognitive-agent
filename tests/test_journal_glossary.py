@@ -19,7 +19,11 @@ from lca.infrastructure.observability.events.event_doc import (
 
 
 def _infer_layer(emitter: str) -> str:
-    """Layer 推导与 ``event_doc.py`` 内置词表保持一致。"""
+    """Layer 推导与 ``event_doc.py`` 内置词表保持一致。
+
+    ADR-0115:K1–K8 是 kernel host 层,语义上等同于 L4 顶层装配,
+    故 lca_kernel.* 与 lca.application./lca.harness./lca.plugins. 同归 L4。
+    """
     if emitter.startswith("gateway."):
         return "gateway"
     if emitter.startswith("lca.infrastructure."):
@@ -34,20 +38,22 @@ def _infer_layer(emitter: str) -> str:
         emitter.startswith("lca.application.")
         or emitter.startswith("lca.harness.")
         or emitter.startswith("lca.plugins.")
+        or emitter.startswith("lca_kernel.")
     ):
         return "L4"
     return f"?({emitter})"
 
 
 def test_glossary_covers_every_catalog_event() -> None:
-    """catalog 里 47 个事件类型,glossary 必须全覆盖。"""
+    """catalog 与 glossary 必须双向全覆盖(总数动态,不做硬编码)。"""
     catalog = set(JOURNAL_EVENT_CLASSES.keys())
     documented = set(EVENT_DOCS.keys())
     missing = catalog - documented
     extra = documented - catalog
     assert not missing, f"events without Chinese doc: {sorted(missing)}"
     assert not extra, f"doc entries not in catalog: {sorted(extra)}"
-    assert len(catalog) == 47
+    # 数字硬编码会导致新增闭集事件时错误;改为「两者相等即可」
+    assert len(catalog) == len(documented)
 
 
 @pytest.mark.parametrize("event_type", sorted(JOURNAL_EVENT_CLASSES.keys()))

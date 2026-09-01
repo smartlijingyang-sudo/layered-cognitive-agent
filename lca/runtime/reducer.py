@@ -161,6 +161,9 @@ class DefaultReducer(Reducer):
                     )
             else:
                 kind = TerminalOutcomeKind.COMPLETED
+                # ADR-0158 决策 四:final_output_ref 来源是 output_text 本地变量
+                # (含 handoff 占位 materialization),不读 state.final_output 字段
+                response_text = output_text
         elif state.status == TaskStatus.FAILED:
             kind = TerminalOutcomeKind.FAILED
             if not state.last_error:
