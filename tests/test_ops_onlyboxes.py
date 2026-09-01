@@ -117,3 +117,22 @@ def test_stack_status_includes_onlyboxes() -> None:
         "onlyboxes"
         not in __import__("lca.infrastructure.cli.steps", fromlist=["STOP_SERVICES"]).STOP_SERVICES
     )
+
+
+def test_stack_status_includes_kernel_serve() -> None:
+    """Regression: ``lca-ops status`` 必须报 kernel_serve,不能漏 LCA 进程。
+
+    历史背景:``STATUS_SERVICES`` 之前只有 ``infra/lobehub/daemon/onlyboxes``,
+    kernel 死了 status 看不到 → 浏览器报 500 时 operator 不知道 kernel 没在跑。
+    加 kernel_serve 后 operator 一眼能看到 LCA 进程状态 + next_action。
+    """
+    from lca.infrastructure.cli.steps import STATUS_SERVICES
+
+    assert "kernel_serve" in STATUS_SERVICES, (
+        f"kernel_serve must be in STATUS_SERVICES so lca-ops status reports "
+        f"LCA process health; got {STATUS_SERVICES!r}"
+    )
+    # kernel_serve 在最前 — LCA 是核心依赖,operator 应先看到它。
+    assert STATUS_SERVICES.index("kernel_serve") == 0, (
+        f"kernel_serve should be first in STATUS_SERVICES; got {STATUS_SERVICES!r}"
+    )

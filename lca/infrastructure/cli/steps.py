@@ -165,8 +165,10 @@ def daemon_stop(ctx: PipelineContext) -> None:
 # ADR-0119 决定 4 + PR-3:lca-ops 不再管 LCA 进程的 start/stop/restart
 # (SIGTERM 由 K6 lca_kernel.lifecycle 守护)。但 heal 仍能自愈 —— 先
 # KernelServeService.heal() 把 LCA 进程拉起,再走外部平台服务循环。
-# status 不包含 kernel_serve(只读观察), heal 才触发拉起。
-STATUS_SERVICES = ("infra", "lobehub", "daemon", "onlyboxes")
+# kernel_serve 只读观察(``state()`` 只 ping /health),拉起是 heal 的工作。
+# 把 kernel_serve 放在最前 — LCA 是核心依赖,operator 看 status 时应先
+# 知道 kernel 在不在,再去看 lobehub / daemon 之类的下游。
+STATUS_SERVICES = ("kernel_serve", "infra", "lobehub", "daemon", "onlyboxes")
 STOP_SERVICES = ("daemon", "lobehub", "infra")
 
 
