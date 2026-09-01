@@ -12,6 +12,9 @@ import asyncio
 from collections.abc import Awaitable, Callable, Mapping
 from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from lca.infrastructure.observability.spine.event_record import Outcome
+
 from lca.contracts.atoms.enums import HookEvent
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.budget import DEFAULT_MAX_STEPS, create_budget
@@ -207,6 +210,20 @@ class CognitiveRuntime(Runtime):
             plan_ref=phase_cursor.plan_ref,
             resume_state=state,
         )
+        # PR-3.4: bracket the resumed Turn with runtime.resume.start and
+        # runtime.resume.end. The start event fires after the checkpoint is
+        # materialised so the event payload reflects the plan_ref / node_id
+        # the driver is about to interpret. The end event is emitted from
+        # inside _run_driver's exception/finally envelope.
+        from lca.plugins.observability.spine.reflectors.runtime import (
+            emit_runtime_resume_start,
+        )
+
+        emit_runtime_resume_start(
+            plan_ref=phase_cursor.plan_ref,
+            state_ref=snapshot.state_ref,
+            node_id=phase_cursor.node_id,
+        )
         await self._lifecycle.publish(
             RuntimeLifecycleEventType.RESUMED,
             state,
@@ -216,6 +233,7 @@ class CognitiveRuntime(Runtime):
             state,
             runner=lambda: self._bindings.new_driver().resume(checkpoint),
             phase_cursor=phase_cursor.node_id,
+            resume_envelope=True,
         )
 
     async def _run_driver(
@@ -224,9 +242,32 @@ class CognitiveRuntime(Runtime):
         *,
         runner: Callable[[], Awaitable[Result]],
         phase_cursor: str | None = None,
+        resume_envelope: bool = False,
     ) -> Result:
         """Own driver lifecycle projection for both fresh and resumed turns."""
         lifecycle_context = {"phase_cursor": phase_cursor} if phase_cursor else {}
+        # PR-3.4: capture the resume envelope metadata so we can emit
+        # ``runtime.resume.end`` after the driver returns or raises.
+        resume_envelope_meta: dict[str, str] | None = None
+        if resume_envelope and phase_cursor is not None:
+            resume_envelope_meta = {
+                "plan_ref": self._bindings.plan_ref(),
+                "state_ref": (
+                    getattr(state, "snapshot_state_ref", "") or getattr(state, "state_ref", "")
+                ),
+                "node_id": phase_cursor,
+            }
+        from lca.plugins.observability.spine.reflectors.runtime import (
+            emit_exception_caught,
+            emit_exception_finally,
+            emit_runtime_resume_end,
+        )
+
+        trace_id = str(getattr(state, "trace_id", ""))
+        boundary = "resume" if resume_envelope else "terminal_driver"
+        # Mutable holder so the except branches can update the outcome
+        # that the finally block reads when emitting resume.end / finally.
+        outcome_holder: dict[str, Outcome] = {"value": "success"}
         try:
             result = await runner()
         except asyncio.CancelledError:
@@ -236,15 +277,38 @@ class CognitiveRuntime(Runtime):
                 status=TaskStatus.CANCELED,
                 **lifecycle_context,
             )
+            emit_exception_caught(
+                boundary=boundary,
+                exc_type="asyncio.CancelledError",
+                message="driver cancelled",
+                trace_id=trace_id,
+            )
+            outcome_holder["value"] = "cancelled"
             raise
-        except Exception:
+        except Exception as exc:
             await self._lifecycle.publish(
                 RuntimeLifecycleEventType.FAILED,
                 state,
                 status=TaskStatus.FAILED,
                 **lifecycle_context,
             )
+            emit_exception_caught(
+                boundary=boundary,
+                exc_type=type(exc).__qualname__,
+                message=str(exc),
+                trace_id=trace_id,
+            )
+            outcome_holder["value"] = "failure"
             raise
+        finally:
+            if resume_envelope_meta is not None:
+                emit_runtime_resume_end(
+                    plan_ref=resume_envelope_meta["plan_ref"],
+                    state_ref=resume_envelope_meta["state_ref"],
+                    node_id=resume_envelope_meta["node_id"],
+                    outcome=outcome_holder["value"],
+                )
+            emit_exception_finally(boundary=boundary, trace_id=trace_id)
         await self._lifecycle.publish_terminal(state, result)
         return result
 

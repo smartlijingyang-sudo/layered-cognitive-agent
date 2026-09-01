@@ -6,6 +6,9 @@ mutation 集中在此模块；``CognitiveRuntime._loop`` 不再直接写 state�
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import TYPE_CHECKING, ParamSpec, TypeVar, overload
+
 from pydantic import BaseModel
 
 from lca.contracts.models.core.activation import ActivatedSkill
@@ -24,9 +27,101 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import Declarat
 from lca.contracts.protocols.state.reducer import Reducer
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
+if TYPE_CHECKING:
+    from lca.infrastructure.observability.spine.event_record import Outcome
+
 
 class Config(BaseModel):
     model_config = {"extra": "forbid"}
+
+
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+
+
+@overload
+def _instrument_apply(method_name_or_fn: Callable[_P, _R]) -> Callable[_P, _R]: ...
+
+
+@overload
+def _instrument_apply(
+    method_name_or_fn: str,
+) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]: ...
+
+
+def _instrument_apply(
+    method_name_or_fn: str | Callable[_P, _R],
+) -> Callable[_P, _R] | Callable[[Callable[_P, _R]], Callable[_P, _R]]:
+    """Wrap an ``apply_*`` body with spine ``runtime.reducer.apply`` start/end.
+
+    The wrapper is the additive middleware that the PR-3.4 brief asks
+    for: every reducer fold now emits one ``runtime.reducer.apply`` start
+    event and one end event (with ``outcome="success"`` or ``"failure"``).
+    The helpers are silent no-ops when no spine is wired; existing
+    Reducer contracts and test surface are unchanged.
+
+    Two call patterns supported:
+
+    - ``@_instrument_apply`` — uses ``fn.__name__`` as the method tag.
+    - ``@_instrument_apply("custom_name")`` — explicit method tag.
+    """
+
+    if callable(method_name_or_fn):
+        method_name: str = method_name_or_fn.__name__
+        fn: Callable[_P, _R] = method_name_or_fn
+
+        def wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+            from lca.plugins.observability.spine.reflectors.runtime import (
+                emit_runtime_reducer_apply_end,
+                emit_runtime_reducer_apply_start,
+            )
+
+            emit_runtime_reducer_apply_start(method=method_name)
+            outcome: Outcome = "success"
+            try:
+                return fn(*args, **kwargs)
+            except BaseException:
+                outcome = "failure"
+                raise
+            finally:
+                emit_runtime_reducer_apply_end(
+                    method=method_name,
+                    outcome=outcome,
+                )
+
+        wrapped.__name__ = fn.__name__
+        wrapped.__qualname__ = getattr(fn, "__qualname__", fn.__name__)
+        wrapped.__doc__ = fn.__doc__
+        return wrapped
+
+    method_name = method_name_or_fn
+
+    def decorator(fn: Callable[_P, _R]) -> Callable[_P, _R]:
+        def wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+            from lca.plugins.observability.spine.reflectors.runtime import (
+                emit_runtime_reducer_apply_end,
+                emit_runtime_reducer_apply_start,
+            )
+
+            emit_runtime_reducer_apply_start(method=method_name)
+            outcome: Outcome = "success"
+            try:
+                return fn(*args, **kwargs)
+            except BaseException:
+                outcome = "failure"
+                raise
+            finally:
+                emit_runtime_reducer_apply_end(
+                    method=method_name,
+                    outcome=outcome,
+                )
+
+        wrapped.__name__ = fn.__name__
+        wrapped.__qualname__ = getattr(fn, "__qualname__", fn.__name__)
+        wrapped.__doc__ = fn.__doc__
+        return wrapped
+
+    return decorator
 
 
 class DefaultReducer(Reducer):
@@ -37,13 +132,17 @@ class DefaultReducer(Reducer):
       但本类把 mutation 集中在同一文件，未来 AgentState 转 frozen 后只
       改这一处）。
     - 每个方法是纯函数（除 await 内 yield）；无 side effect。
+    - 公共 ``apply_*`` 方法通过 ``_instrument_apply`` 包装,每次调用发射
+      ``runtime.reducer.apply`` 事件(start/end);spine 未连接时静默 no-op。
     """
 
+    @_instrument_apply
     def apply_step_advanced(self, state: AgentState, step: int) -> AgentState:
         state.step = step
         state.budget.used_steps = step
         return state
 
+    @_instrument_apply
     def apply_perception(self, state: AgentState, manifest: ContextManifest) -> AgentState:
         """fold ContextManifest 到 state。
 
@@ -54,20 +153,23 @@ class DefaultReducer(Reducer):
         state.extra["manifest_digest"] = manifest.digest
         return state
 
+    @_instrument_apply
     def apply_turn(self, state: AgentState, turn: Turn) -> AgentState:
         state.history.append(turn)
         return state
 
+    @_instrument_apply
     def apply_skill_route(self, state: AgentState, active_template: str | None) -> AgentState:
         """fold SkillRouter.route(state) 返回的 active_template 到 state。
 
-        PR-4 think.guard 原子化迁移：ModularBrain 不再直接写
-        ``state.active_template``；通过 reducer 收口（C4 兑现）。
-        active_template 是 prompt template 名字；空 = use default。
+        PR-4 think.guard 原子化迁移:ModularBrain 不再直接写
+        ``state.active_template``;通过 reducer 收口(C4 兑现)。
+        active_template 是 prompt template 名字;空 = use default。
         """
         state.active_template = active_template
         return state
 
+    @_instrument_apply
     def apply_activation(
         self, state: AgentState, activated: tuple[ActivatedSkill, ...]
     ) -> AgentState:
@@ -76,16 +178,18 @@ class DefaultReducer(Reducer):
         state.activated_skills.extend(activated)
         return state
 
+    @_instrument_apply
     def apply_memory(self, state: AgentState, writes: object) -> AgentState:
-        """fold MemoryWriteSet 到 state（无副作用版本）。
+        """fold MemoryWriteSet 到 state(无副作用版本)。
 
-        Memory 写入由 Memory 协议自身负责（``memory.propose`` /
-        ``memory.commit``）；reducer 不直接动 memory 层。本方法为 seam
+        Memory 写入由 Memory 协议自身负责(``memory.propose`` /
+        ``memory.commit``);reducer 不直接动 memory 层。本方法为 seam
         完整性保留——plugin 可注入 reducer 在 commit 后做衍生 fold
-        （例如 budget.used_tokens 累计）。
+        (例如 budget.used_tokens 累计)。
         """
         return state
 
+    @_instrument_apply
     def apply_stop(self, state: AgentState, stop: StopDecision) -> AgentState:
         if stop.status is not None:
             state.status = stop.status
@@ -270,11 +374,13 @@ class DefaultReducer(Reducer):
         text = getattr(decision, "response_text", None)
         return text if isinstance(text, str) and text else None
 
+    @_instrument_apply
     def apply_error(self, state: AgentState, error: BaseException) -> AgentState:
         state.status = TaskStatus.FAILED
         state.last_error = repr(error)
         return state
 
+    @_instrument_apply
     def apply_resume(
         self,
         state: AgentState,
@@ -289,6 +395,7 @@ class DefaultReducer(Reducer):
             state.step += 1
         return state
 
+    @_instrument_apply
     def apply_paused(self, state: AgentState, snapshot_ref: object) -> AgentState:
         state.status = TaskStatus.INPUT_REQUIRED
         return state

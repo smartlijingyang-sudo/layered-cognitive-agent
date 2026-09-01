@@ -42,6 +42,19 @@ class DeclarativeCheckpoint:
         snapshot_cursor = self.state_snapshot.phase_cursor
         if snapshot_cursor is not None and snapshot_cursor.plan_ref != self.plan_ref:
             raise ValueError("checkpoint snapshot and plan_ref must match")
+        # PR-3.4: emit the canonical runtime.checkpoint.create event after the
+        # checkpoint materialises. The helper is a silent no-op when no spine
+        # is wired (default in unit tests), so legacy callers are unchanged.
+        from lca.plugins.observability.spine.reflectors.runtime import (
+            emit_runtime_checkpoint_create,
+        )
+
+        emit_runtime_checkpoint_create(
+            plan_ref=self.plan_ref,
+            state_ref=self.state_snapshot.state_ref,
+            node_id=self.cursor.node_id,
+            outcome="success",
+        )
 
 
 class DeclarativeCheckpointStateResolver(CheckpointStateResolver):

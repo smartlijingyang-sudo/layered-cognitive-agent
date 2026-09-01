@@ -7,6 +7,8 @@ for fresh/resume orchestration and delegates event construction here.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import Result
 from lca.contracts.protocols.runtime.runtime_lifecycle import (
@@ -15,6 +17,9 @@ from lca.contracts.protocols.runtime.runtime_lifecycle import (
     RuntimeLifecycleEventType,
 )
 from lca.runtime.runtime_bindings import DeclarativeRuntimeBindings
+
+if TYPE_CHECKING:
+    from lca.infrastructure.observability.spine.event_record import Outcome
 
 
 class RuntimeLifecycleEmitter:
@@ -70,7 +75,28 @@ class RuntimeLifecycleEmitter:
             phase_cursor=phase_cursor,
             journal_sequence=journal_sequence,
         )
-        await self._bindings.lifecycle_publisher.publish(event)
+        # PR-3.4: emit runtime.event_publisher.publish before forwarding to
+        # the legacy lifecycle subscriber chain. The helper is a silent
+        # no-op when no spine is wired (default in unit tests), so the
+        # existing DI seam to the legacy RuntimeLifecyclePublisher is
+        # preserved untouched.
+        from lca.plugins.observability.spine.reflectors.runtime import (
+            emit_runtime_event_publisher_publish,
+        )
+
+        resolved_trace_id = trace_id or str(getattr(state, "trace_id", ""))
+        outcome: Outcome = "success"
+        try:
+            await self._bindings.lifecycle_publisher.publish(event)
+        except BaseException:
+            outcome = "failure"
+            raise
+        finally:
+            emit_runtime_event_publisher_publish(
+                event_type=event_type.value,
+                trace_id=resolved_trace_id,
+                outcome=outcome,
+            )
 
 
 def _event_type_for_result(result: Result) -> RuntimeLifecycleEventType:
