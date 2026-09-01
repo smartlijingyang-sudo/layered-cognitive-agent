@@ -155,6 +155,27 @@ ignore_imports = [
     "lca.plugins.transport.webserver.handlers.runs.observability.binding -> lca.runtime.journal_setup",
 ]
 
+# ADR-0165.1: business-event-isolation (PR-1 dry-run, PR-5 hard-fail)
+# Business code (cognition / runtime / agent / application) must NOT
+# import the legacy journal backends or spine derivers directly. All
+# emission goes through EventSpine.
+[[tool.importlinter.contracts]]
+name = "business-event-isolation"
+type = "forbidden"
+source_modules = [
+    "lca.cognition",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
+]
+forbidden_modules = [
+    "lca.infrastructure.observability.journal.engine",
+    "lca.infrastructure.observability.journal.backends",
+    "lca.infrastructure.observability.journal.stream",
+    "lca.infrastructure.observability.journal.step",
+    "lca.infrastructure.observability.spine.derivers",
+]
+
 [dependency-groups]
 dev = [
     { include-group = "lint" },
