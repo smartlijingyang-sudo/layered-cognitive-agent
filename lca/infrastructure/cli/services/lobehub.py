@@ -9,8 +9,11 @@ tracks what's been done via stamps so restart doesn't redo setup.
 
 from __future__ import annotations
 
+import json
 import subprocess
 import time
+from contextlib import suppress
+from datetime import datetime, timezone
 from pathlib import Path
 
 from lca.infrastructure.cli.config import KernelServeConfig, LobeHubConfig
@@ -106,6 +109,7 @@ class LobeHubService:
         worked = False
         worked |= self._ensure_source()
         worked |= self._ensure_patches()
+        worked |= self._ensure_pnpm_patches()
         worked |= self._ensure_env()
         worked |= self._ensure_deps()
         return worked
@@ -155,6 +159,34 @@ class LobeHubService:
         checks.append(
             HealthCheck("patches", patches_ok and not patch_drift.has_changes, patch_detail)
         )
+
+        # Pnpm patchedDependencies check(ADR-0163)
+        pnpm_marker = self._state._dir / "lobehub-pnpm-patches.marker"
+        if pnpm_marker.exists():
+            try:
+                marker_payload = json.loads(pnpm_marker.read_text())
+            except (json.JSONDecodeError, OSError):
+                marker_payload = {}
+            if marker_payload.get("failed"):
+                failed_pkgs = ", ".join(
+                    f.split(":", 1)[0] for f in marker_payload["failed"]
+                )
+                pnpm_detail = (
+                    f"stale patch ({marker_payload.get('patched_count', 0)}/"
+                    f"{marker_payload.get('patched_count', 0) + len(marker_payload['failed'])} "
+                    f"failed: {failed_pkgs})"
+                )
+                checks.append(
+                    HealthCheck("pnpm-patches", False, pnpm_detail)
+                )
+            elif marker_payload.get("patched_count", 0) > 0:
+                checks.append(
+                    HealthCheck(
+                        "pnpm-patches",
+                        True,
+                        f"{marker_payload['patched_count']} pnpm patches applied",
+                    )
+                )
 
         why = ""
         next_action = ""
@@ -282,6 +314,108 @@ class LobeHubService:
             return True
         except Exception:
             return False
+
+    def _ensure_pnpm_patches(self) -> bool:
+        """Apply pnpm-style patchedDependencies to bun-installed node_modules.
+
+        LobeHub 上游声明 pnpm-workspace.yaml ``patchedDependencies``(如
+        ``@upstash/qstash``),LCA 用 ``bun install`` 但 bun 不读 pnpm-workspace.yaml,
+        导致上游 patch 永不 apply。本方法用 Python stdlib ``git apply`` 兼容风格
+        把 pnpm patch 文件 apply 到 bun-installed node_modules 的对应路径。
+
+        触发条件: ``lobehub-ui/package.json`` 含 ``patchedDependencies`` 字段 +
+        ``lobehub-ui/patches/*.patch`` 存在 + bun node_modules 含对应包。
+        No-op 条件: 已 apply(marker 文件存在)+ 无 patchedDependencies。
+        """
+        pkg_json = self._dir / "package.json"
+        if not pkg_json.exists():
+            return False
+        try:
+            data = json.loads(pkg_json.read_text())
+        except (json.JSONDecodeError, OSError):
+            return False
+        # patchedDependencies 位置:pnpm 子对象(标准 pnpm v10 风格)+ 顶层 fallback
+        patched = data.get("pnpm", {}).get("patchedDependencies") or data.get("patchedDependencies")
+        if not isinstance(patched, dict) or not patched:
+            return False
+
+        patches_dir = self._dir / "patches"
+        if not patches_dir.is_dir():
+            return False
+
+        # marker: 同一组 patched deps 全 apply 后写一次,避免每次 ensure 都全 apply
+        marker = self._state._dir / "lobehub-pnpm-patches.marker"
+        if marker.exists():
+            return False
+
+        worked = False
+        failed: list[str] = []
+        for pkg_name, rel_path in patched.items():
+            patch_file = self._dir / rel_path
+            if not patch_file.exists():
+                failed.append(f"{pkg_name}: patch file missing ({rel_path})")
+                continue
+            bun_pkg_root = _find_bun_pkg_root(self._dir, pkg_name)
+            if bun_pkg_root is None:
+                failed.append(f"{pkg_name}: bun pkg root not found")
+                continue
+            try:
+                import subprocess
+
+                # git apply 不接受绝对 --directory;必须 cwd=ui_dir + 相对路径
+                rel_dir = bun_pkg_root.resolve().relative_to(self._dir.resolve())
+                # --reject: 让 git 把 apply 不上的 hunk 写到 .rej 文件方便诊断
+                result = subprocess.run(  # noqa: S603
+                    [  # noqa: S607
+                        "git",
+                        "apply",
+                        "--reject",
+                        "--whitespace=nowarn",
+                        "--directory",
+                        str(rel_dir),
+                        str(patch_file),
+                    ],
+                    capture_output=True,
+                    cwd=str(self._dir),
+                    timeout=30,
+                )
+                stderr_text = result.stderr.decode(errors="replace")
+                # git apply 在 skip 不能 fit 的 hunk 时会输出 "Skipped patch '...'"
+                # 到 stderr 但 exit 仍为 0(设计如此)。必须显式检测。
+                skipped = "Skipped patch" in stderr_text
+                if result.returncode == 0 and not skipped:
+                    worked = True
+                else:
+                    # 清理可能的 .rej 文件(下个 ensure 会重试)
+                    with suppress(OSError):
+                        for rej in bun_pkg_root.glob("*.rej"):
+                            rej.unlink()
+                    detail = stderr_text.strip()[:200] or f"rc={result.returncode}"
+                    failed.append(f"{pkg_name}: git apply failed ({detail})")
+            except (subprocess.SubprocessError, FileNotFoundError, ValueError) as exc:
+                failed.append(f"{pkg_name}: {type(exc).__name__}: {exc}")
+
+        if worked:
+            marker_payload = {
+                "applied_at": datetime.now(timezone.utc).isoformat(),
+                "patched_count": len(patched),
+            }
+            if failed:
+                # 部分失败:不写 marker,下次 ensure 重试;但记 failed 到 log
+                marker_payload["failed"] = failed
+            marker.write_text(json.dumps(marker_payload))
+        elif failed:
+            # 全部失败:写 marker 记录失败状态,避免无限 retry 噪音
+            marker.write_text(
+                json.dumps(
+                    {
+                        "applied_at": datetime.now(timezone.utc).isoformat(),
+                        "patched_count": 0,
+                        "failed": failed,
+                    }
+                )
+            )
+        return worked
 
     def _ensure_env(self) -> bool:
         """Configure .env for LobeHub."""
@@ -423,3 +557,29 @@ class LobeHubService:
             if port_pid:
                 pids.append(port_pid)
         return list(set(pids))
+
+
+def _find_bun_pkg_root(ui_dir: Path, pkg_name: str) -> Path | None:
+    """Return the bun-installed package root for ``pkg_name``, or None.
+
+    Bun 解压 npm 包到 ``node_modules/.bun/<scope>+<name>@<version>/node_modules/<pkg_name>``。
+    Scope 形式(@scope/name))→ bun 目录前缀 ``@scope+name@<version>``;
+    无 scope(name 直接是 foo))→ ``foo@<version>``。
+    本函数扫一遍 ``.bun/`` 找到匹配的子目录。
+    """
+    bun_root = ui_dir / "node_modules" / ".bun"
+    if not bun_root.is_dir():
+        return None
+    # 把 pkg_name 归一化为前缀: "@scope/foo" -> "@scope+foo"; "foo" -> "foo"
+    if pkg_name.startswith("@"):
+        scope, name = pkg_name[1:].split("/", 1)
+        prefix = f"@{scope}+{name}@"
+    else:
+        prefix = f"{pkg_name}@"
+    for entry in bun_root.iterdir():
+        if entry.name.startswith(prefix):
+            # 包实际解压在 <entry>/node_modules/<pkg_name>
+            candidate = entry / "node_modules" / pkg_name
+            if candidate.is_dir():
+                return candidate
+    return None
