@@ -12,37 +12,21 @@ from collections.abc import Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from itertools import count
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol
 
 from lca.agent.role_library import FileRoleLibrary
 from lca.application.api import Agent, Team
-from lca.application.casting import LLMTeamCaster, build_from_casting_plan
+from lca.application.casting import LLMTeamCaster
+from lca.cognition.team.modes.team_mode import build_runnable_team
 from lca.cognition.team.modes_catalog import SOLO_MODE_KEY, SOLO_ROLE
-from lca.contracts.atoms.ids import RunId, TraceId
 from lca.contracts.mechanisms.capability import provider_current, require_capability
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.plane import PlaneBindings
-from lca.contracts.models.observability.journal import (
-    CastingCompleted,
-    CastingFailed,
-    CastingStarted,
-    InboxFollowupCreated,
-    RunScope,
-)
+from lca.contracts.models.observability.journal import InboxFollowupCreated
 from lca.contracts.models.team.run_context import RunContext
-from lca.contracts.protocols.collaboration.casting import (
-    CastingError,
-    RoleLibrary,
-    TeamCaster,
-)
+from lca.contracts.protocols.collaboration.casting import RoleLibrary, TeamCaster
 from lca.contracts.protocols.runtime.infra import Tool
-from lca.infrastructure.observability import (
-    BoundObservability,
-    bind_backends,
-    objective_preview,
-    record,
-    run_scope,
-)
+from lca.infrastructure.observability import BoundObservability, record
 from lca.plugins.run_loop_driver_registry import (
     RunLoopDriverRegistry as RunLoopDriverRegistry,
 )
@@ -223,7 +207,14 @@ async def _build_team(
     caster: TeamCaster | None = None,
     tools: Sequence[Tool] | None = None,
 ) -> Team:
-    """Team LLM casting — select roles + governance, then build Team."""
+    """Team LLM casting — select roles + governance, then build Team.
+
+    Delegates to ``team_mode.build_runnable_team`` so ``CastingStarted`` /
+    ``CastingCompleted`` / ``CastingFailed`` are emitted from a single
+    emitter (``lca.cognition.team.modes.team_mode``), keeping the catalog
+    single-emitter constraint intact.
+    """
+    del bindings  # 已由 build_runnable_team 透传
     resolved_library = library if library is not None else FileRoleLibrary()
     if caster is not None:
         resolved_caster = caster
@@ -233,40 +224,25 @@ async def _build_team(
         )
 
         resolved_caster = LLMTeamCaster(prompt_renderer=BuiltinCastingPromptRenderer())
-    record_scope = RunScope(trace_id=cast("TraceId", trace_id), run_id=cast("RunId", run_id))
-    with bind_backends(observability), run_scope(record_scope):
-        record(CastingStarted(objective_preview=objective_preview(objective)))
-        try:
-            plan = await resolved_caster.cast(objective, resolved_library, llm)
-        except CastingError as exc:
-            record(CastingFailed(error=str(exc)))
-            raise
-        selected_roles = tuple(
-            resolved_library.get(chosen.role_id).title for chosen in plan.selected
-        )
-        record(
-            CastingCompleted(
-                governance_kind=plan.governance_kind,
-                lead_role=plan.lead_role_id or "",
-                selected_roles=selected_roles,
-                rationale=plan.rationale,
-            )
-        )
-    return build_from_casting_plan(
-        plan,
-        resolved_library,
+    return await build_runnable_team(
+        objective,
         llm,
-        observability=observability,  # type: ignore[arg-type]
+        observability=observability,
+        trace_id=trace_id,
+        run_id=run_id,
+        library=resolved_library,
+        caster=resolved_caster,
         scope=scope,
-        tools=tools,
+        tools=tools or (),
     )
 
 
-# Public aliases — kept so tests (and any third-party caller) can still
-# import ``build_solo_agent`` / ``build_runnable_team`` from
-# ``lca.plugins.transport.webserver.handlers.runs.execute.loop_drivers`` after the assemble.py removal.
+# Public alias — kept so tests (and any third-party caller) can still
+# import ``build_solo_agent`` from
+# ``lca.plugins.transport.webserver.handlers.runs.execute.loop_drivers``
+# after the assemble.py removal. ``build_runnable_team`` is imported above
+# and used directly; callers should now import it from ``team_mode``.
 build_solo_agent = _build_solo_agent
-build_runnable_team = _build_team
 
 
 # ── Inbox followup (PR8.E.1 / D24) ────────────────────────────────

@@ -29,12 +29,12 @@ from lca.infrastructure.attachment.default_provider import (
     DefaultAttachmentResolver,
     DefaultAttachmentStager,
 )
-from lca.infrastructure.observability.facade.run_ambit import current_file_store as get_current_run_file_store
 from lca.infrastructure.attachment.settings import (
     AttachmentPolicyDocument,
     get_attachment_policy,
 )
 from lca.infrastructure.file_store import FileStore
+from lca.infrastructure.observability import current_file_store as get_current_run_file_store
 from lca.infrastructure.sandbox.paths import ONLYBOXES
 
 

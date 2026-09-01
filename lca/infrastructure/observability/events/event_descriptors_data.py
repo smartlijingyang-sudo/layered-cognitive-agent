@@ -221,7 +221,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             CastingStarted,
             domain=VocabDomain.TEAM,
-            emitter="lca.cognition.team.modes.default_modes",
+            emitter="lca.cognition.team.modes.team_mode",
             required=("objective_preview",),
             description="自动组队选角开始",
             durability="best_effort",
@@ -231,7 +231,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             CastingCompleted,
             domain=VocabDomain.TEAM,
-            emitter="lca.cognition.team.modes.default_modes",
+            emitter="lca.cognition.team.modes.team_mode",
             required=("governance_kind",),
             description="自动组队选角完成",
             durability="required",
@@ -241,7 +241,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             CastingFailed,
             domain=VocabDomain.TEAM,
-            emitter="lca.cognition.team.modes.default_modes",
+            emitter="lca.cognition.team.modes.team_mode",
             required=("error",),
             description="自动组队选角失败",
             durability="required",
@@ -474,7 +474,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             AttachmentStagingStarted,
             domain=VocabDomain.RESOURCE,
-            emitter="lca.plugins.transport.webserver.handlers.runs.execute",
+            emitter="lca.plugins.transport.webserver.handlers.runs.api.attachment_staging",
             required=("plane_id", "file_count"),
             description="附件暂存开始（host → machine bootstrap channel）",
             durability="best_effort",
@@ -484,7 +484,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             AttachmentStagingCompleted,
             domain=VocabDomain.RESOURCE,
-            emitter="lca.plugins.transport.webserver.handlers.runs.execute",
+            emitter="lca.plugins.transport.webserver.handlers.runs.api.attachment_staging",
             required=("plane_id", "file_count"),
             description="附件暂存完成",
             durability="best_effort",
@@ -494,7 +494,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             AttachmentStagingFailed,
             domain=VocabDomain.RESOURCE,
-            emitter="lca.plugins.transport.webserver.handlers.runs.execute",
+            emitter="lca.plugins.transport.webserver.handlers.runs.api.attachment_staging",
             required=("plane_id", "error"),
             description="附件暂存失败（路径拒绝、传输超时、IO 错误）",
             durability="required",
@@ -547,7 +547,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             InboxFollowupCreated,
             domain=VocabDomain.EVENT,
-            emitter="lca.harness.session",
+            emitter="lca.plugins.transport.webserver.handlers.runs.execute.loop_drivers",
             required=("inbox_id",),
             description="用户输入经 Inbox 注入",
             durability="required",

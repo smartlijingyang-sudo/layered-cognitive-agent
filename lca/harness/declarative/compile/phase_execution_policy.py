@@ -28,7 +28,7 @@ from lca.contracts.protocols.declarative.declarative_execution import (
     PhaseResult,
 )
 from lca.contracts.protocols.declarative.declarative_fault_tolerance import PhaseExecutionPolicy
-from lca.infrastructure.observability.facade.facade import record
+from lca.infrastructure.observability import record
 
 
 class PhaseExecutionExhaustedError(RuntimeError):

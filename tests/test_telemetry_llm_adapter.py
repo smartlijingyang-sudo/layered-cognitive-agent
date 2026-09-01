@@ -55,8 +55,11 @@ class _FakeInner(LLMAdapter):
 class TestTelemetryLLMAdapter(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.recorded: list[Any] = []
+        # adapters.adapters 模块通过 ``from facade.facade import record`` 把
+        # record 绑在自己的命名空间；mock 这个属性就能拦截装饰器内部的 record(...)
+        # 调用。Python 3.14 的 mock.patch 在属性不存在时不再默认 create=True。
         self.record_patcher = mock.patch(
-            "lca.infrastructure.observability.adapters.record",
+            "lca.infrastructure.observability.adapters.adapters.record",
             side_effect=lambda event: self.recorded.append(event),
         )
         self.record_patcher.start()
@@ -144,7 +147,7 @@ class TestTelemetryLLMAdapter(unittest.IsolatedAsyncioTestCase):
     async def test_stream_missing_completed_degrades_with_warning(self) -> None:
         inner = _FakeInner()
         inner.omit_completed = True
-        with mock.patch("lca.infrastructure.observability.adapters._log") as log_mock:
+        with mock.patch("lca.infrastructure.observability.adapters.adapters._log") as log_mock:
             adapter = TelemetryLLMAdapter(inner)
             events = [e async for e in adapter.stream("prompt")]
         self.assertEqual(len(events), 2)

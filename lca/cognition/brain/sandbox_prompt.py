@@ -19,9 +19,9 @@ from collections.abc import Sequence
 
 from lca.contracts.models.core.plane import PlaneKind, PlaneRef
 from lca.contracts.protocols import Tool
-from lca.infrastructure.observability.facade.run_ambit import current_file_store as get_current_run_file_store
 from lca.infrastructure.attachment.system_role_renderer import render_system_role
 from lca.infrastructure.file_store import FileStore
+from lca.infrastructure.observability import current_file_store as get_current_run_file_store
 from lca.infrastructure.sandbox.paths import ONLYBOXES
 from lca.infrastructure.sandbox.surface import plane_system_role
 from lca.infrastructure.tools.lca_computer.manifest import LOCAL_SYSTEM_ID as _LOCAL_SYSTEM_ID
