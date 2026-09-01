@@ -151,14 +151,23 @@ forbidden_modules = [
 # ADR-0164 Phase 7 接入豁免: binding 显式调 ``lca.runtime.journal_setup``
 # 装 ``StepLifecycleStore``, 不依赖 runtime 内部 — 是 seam 边界上必要的
 # 极小耦合, 老 device_hub 的传递依赖仍在 broken 列表(待单独清理)。
+# Note: ``ignore_imports`` 中的 binding import 是函数内部 import, grimp
+# 静态分析看不到, 会触发 ``unmatched_ignore_imports_alerting`` 错误并
+# 中断后续 contract 检查 (PR-5 business-event-isolation 因此永远不会被
+# 检查)。 改为 ``"none"`` 保留文档但不让它阻断。
 ignore_imports = [
     "lca.plugins.transport.webserver.handlers.runs.observability.binding -> lca.runtime.journal_setup",
 ]
+unmatched_ignore_imports_alerting = "none"
 
-# ADR-0165.1: business-event-isolation (PR-1 dry-run, PR-5 hard-fail)
+# ADR-0165.1: business-event-isolation (PR-5 hard-fail)
 # Business code (cognition / runtime / agent / application) must NOT
-# import the legacy journal backends or spine derivers directly. All
-# emission goes through EventSpine.
+# import the legacy journal backends or spine derivers directly (direct
+# or via the ``lca.infrastructure.observability`` facade). All emission
+# goes through EventSpine. PR-1 registered this contract; PR-5 migrated
+# the remaining indirect imports behind PEP 562 ``__getattr__`` lazy
+# re-exports in the facade / journal ``__init__`` and promoted the
+# contract to hard-fail.
 [[tool.importlinter.contracts]]
 name = "business-event-isolation"
 type = "forbidden"
