@@ -18,7 +18,6 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Mapping
-from pathlib import Path
 from typing import Any
 
 from lca.cognition.body.tool_result_preview import tool_files
@@ -262,13 +261,17 @@ def emit_tool_invoked(
         from lca.runtime.step_emitter import bridge_tool_invoked
 
         files = tool_files(obs)
+        # ``files`` are file-part dicts (A2A metadata shape); ``ToolResult.files_created``
+        # is typed as ``tuple[str, ...]`` of display paths — keep that contract so
+        # downstream ``cumulative_files`` / ``Path(f).name`` don't blow up.
+        files_created = tuple(str(f.get("name") or "") for f in files)
         bridge_tool_invoked(
             tool_name=tool.name,
             invocation_id=resolved_id,
             ok=obs.success,
             latency_ms=latency_ms,
             error="" if obs.success else (obs.error or None),
-            files_created=tuple(files),
+            files_created=files_created,
             delta_summary=_delta_summary_from_obs(obs, inline_output_text, output_ref),
             stdout_head=(inline_output_text or "")[:500],
             stdout_chars_total=len(inline_output_text or ""),
@@ -290,7 +293,11 @@ def _delta_summary_from_obs(
         return f"❌ {type(err).__name__ if hasattr(err, '__class__') else 'err'}: {err}"
     files = tool_files(obs)
     if files:
-        return f"✅ 写出 {len(files)} 个文件: {', '.join(Path(f).name for f in files[:3])}"
+        # ``files`` are file-part dicts; extract ``name`` rather than coercing the
+        # dict through ``Path(...)`` (which raises ``TypeError: argument should be
+        # a str or an os.PathLike object where __fspath__ returns a str, not 'dict'``).
+        names = [str(f.get("name") or "") for f in files[:3]]
+        return f"✅ 写出 {len(files)} 个文件: {', '.join(names)}"
     if inline_output_text:
         head = inline_output_text[:80].replace("\n", "⏎")
         return f"✅ stdout[:80] = {head}"
