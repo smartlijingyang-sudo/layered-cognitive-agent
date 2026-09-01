@@ -390,6 +390,7 @@ class LlmCallCompleted(JournalEvent):
     prompt_tokens: int = 0
     completion_tokens: int = 0
     stream: bool = False
+    reasoning_preview: str = ""  # 思维链累计文本（≤1024 chars），默认空以向后兼容
 
 
 @dataclass(frozen=True)

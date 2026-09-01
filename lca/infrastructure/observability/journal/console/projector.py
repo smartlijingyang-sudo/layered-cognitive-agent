@@ -38,6 +38,13 @@ from lca.contracts.models.observability.journal import (
 from lca.contracts.protocols import JournalProjector
 from lca.infrastructure.observability.adapters.policy import Verbosity
 from lca.infrastructure.observability.journal.console import render as render
+from lca.infrastructure.observability.journal.console.fields import (
+    INDENT,
+    join_parts,
+    labeled,
+    mapping_repr,
+    truncate,
+)
 from lca.infrastructure.observability.journal.console.sequence_diagram import (
     render_sequence_diagram,
 )
@@ -229,29 +236,60 @@ class ConsoleJournalProjector(JournalProjector):
 
     def _render_llm_completed(self, stamped: StampedEvent, event: LlmCallCompleted) -> str:
         self._observe_llm(stamped, event)
-        tokens = (
-            f" · tokens {event.prompt_tokens}/{event.completion_tokens}"
-            if event.prompt_tokens or event.completion_tokens
-            else ""
-        )
-        line = f"llm.chat {event.model} · {event.latency_ms}ms{tokens}"
-        if self._verbosity is Verbosity.VERBOSE and event.prompt_preview:
-            line += (
-                f"\n    ┌ prompt: {event.prompt_preview}\n    └ response: {event.response_preview}"
-            )
-        return line if event.ok else f"{line} · FAIL"
+        head_parts = [f"llm.chat {event.model}", f"{event.latency_ms}ms"]
+        if event.prompt_tokens or event.completion_tokens:
+            head_parts.append(f"tokens {event.prompt_tokens}/{event.completion_tokens}")
+        head = join_parts(head_parts)
+        if not event.ok:
+            head += " · FAIL"
+        blocks = [head]
+        if event.reasoning_preview:
+            blocks.append(labeled("think", event.reasoning_preview))
+        if self._verbosity is Verbosity.VERBOSE:
+            if event.prompt_preview:
+                blocks.append(labeled("prompt", event.prompt_preview))
+            if event.response_preview:
+                blocks.append(labeled("response", event.response_preview))
+        return "\n".join(b for b in blocks if b)
 
     def _render_tool_invoked(self, stamped: StampedEvent, event: ToolInvoked) -> str:
         self._observe_tool(stamped)
         mark = "ok" if event.ok else "FAIL"
-        return f"tool {event.tool_name} · {mark} · {event.latency_ms}ms"
+        head = f"tool {event.tool_name} · {mark} · {event.latency_ms}ms"
+        blocks: list[str] = [head]
+        if event.arguments:
+            blocks.append(labeled("args", mapping_repr(event.arguments)))
+        if event.output_text:
+            blocks.append(labeled("output", truncate(event.output_text, 400)))
+        elif event.output_ref is not None:
+            blocks.append(
+                f"{INDENT}output: <evidence:{event.output_ref.algorithm}:{event.output_ref.digest[:12]}>"
+            )
+        if event.files:
+            paths = ", ".join(str(f.get("path", "?")) for f in event.files[:3])
+            suffix = f" +{len(event.files) - 3} more" if len(event.files) > 3 else ""
+            blocks.append(labeled("files", paths + suffix))
+        if not event.ok and event.error:
+            blocks.append(labeled("error", truncate(event.error, 200)))
+        return "\n".join(blocks)
 
     def _render_tool_denied(self, stamped: StampedEvent, event: ToolDenied) -> str:
         return f"⛔ tool denied: {event.tool_name} ({event.reason})"
 
     def _render_decision_made(self, stamped: StampedEvent, event: DecisionMade) -> str:
-        target = f" → {event.delegate_target}" if event.delegate_target else ""
-        return f"decision: {event.action_type}{target}"
+        head_parts = [f"decision: {event.action_type}"]
+        if event.tool_name:
+            head_parts.append(f"tool={event.tool_name}")
+        if event.confidence:
+            head_parts.append(f"confidence={event.confidence:.2f}")
+        if event.delegate_target:
+            head_parts.append(f"→ {event.delegate_target}")
+        blocks = [join_parts(head_parts)]
+        if event.rationale_preview:
+            blocks.append(labeled("rationale", event.rationale_preview))
+        if event.response_text:
+            blocks.append(labeled("response", truncate(event.response_text, 300)))
+        return "\n".join(blocks)
 
     def _render_synthesis_completed(self, stamped: StampedEvent, event: SynthesisCompleted) -> str:
         run = self._state_of(stamped).runs.get(stamped.scope.run_id)

@@ -145,6 +145,7 @@ class TelemetryLLMAdapter(LLMAdapter):
                             prompt_tokens,
                             completion_tokens,
                             stream=True,
+                            reasoning_text=reasoning_text,
                         )
                         recorded = True
                 elif event.type == LLMStreamEventType.REASONING_TEXT_DELTA:
@@ -188,7 +189,17 @@ class TelemetryLLMAdapter(LLMAdapter):
         except Exception:
             if not recorded:
                 preview = final_response.text if final_response is not None else accumulated_text
-                self._record(model, prompt, preview, False, started, 0, 0, stream=True)
+                self._record(
+                    model,
+                    prompt,
+                    preview,
+                    False,
+                    started,
+                    0,
+                    0,
+                    stream=True,
+                    reasoning_text=reasoning_text,
+                )
             raise
         finally:
             await activity.close()
@@ -207,6 +218,7 @@ class TelemetryLLMAdapter(LLMAdapter):
                 0,
                 0,
                 stream=True,
+                reasoning_text=reasoning_text,
             )
 
     @staticmethod
@@ -220,6 +232,7 @@ class TelemetryLLMAdapter(LLMAdapter):
         completion_tokens: int,
         *,
         stream: bool,
+        reasoning_text: str = "",
     ) -> None:
         latency_ms = int((time.perf_counter() - started) * _PERF_COUNTER_SCALE)
         record_llm_completion(
@@ -242,5 +255,6 @@ class TelemetryLLMAdapter(LLMAdapter):
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
                 stream=stream,
+                reasoning_preview=reasoning_text[:1024],
             )
         )

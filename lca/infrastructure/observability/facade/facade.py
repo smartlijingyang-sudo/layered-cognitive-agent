@@ -256,6 +256,9 @@ _KIND_BY_CATEGORY: dict[DiagnosticCategory, RuntimeKind] = {
     DiagnosticCategory.JOURNAL: RuntimeKind.PLUGIN,
 }
 
+_DEFAULT_KIND = RuntimeKind.PLUGIN
+"""未知 DiagnosticCategory 的兜底 kind；保证 record_runtime 不抛 KeyError。"""
+
 _OUTCOME_BY_STATUS: dict[DiagnosticStatus, OperationOutcome] = {
     DiagnosticStatus.INFO: OperationOutcome.OK,
     DiagnosticStatus.STARTED: OperationOutcome.STARTED,
@@ -281,9 +284,16 @@ def record_runtime(
         for ref in causation_refs
         if ref.removeprefix("journal:").isdigit()
     )
+    if isinstance(category, DiagnosticCategory):
+        kind = _KIND_BY_CATEGORY.get(category, _DEFAULT_KIND)
+    else:
+        try:
+            kind = _KIND_BY_CATEGORY[DiagnosticCategory(category)]
+        except (KeyError, ValueError):
+            kind = _DEFAULT_KIND
     return record(
         RuntimeObserved(
-            kind=_KIND_BY_CATEGORY[DiagnosticCategory(category)],
+            kind=kind,
             operation=operation,
             source=plugin or ctx.agent_role or "runtime",
             outcome=_OUTCOME_BY_STATUS[status],
