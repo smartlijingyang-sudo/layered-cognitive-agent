@@ -34,9 +34,8 @@ def _summarize_attempts(failure: PhaseExecutionFailure) -> str:
     {node_id} step after {n} attempt(s).`` 文学化句式。格式固定为
     ``node={node_id} error_kind={error_kind} attempts={n}[cat:type,…]``,
     便于 UI / LobeHub / run-doctor 直接按字段解析,不再被英文长句绑死。
-    categories = ",".join(
-        f"{a.attempt}:{a.category}:{a.error_type}" for a in failure.attempts
-    )
+    """
+    categories = ",".join(f"{a.attempt}:{a.category}:{a.error_type}" for a in failure.attempts)
     return (
         f"node={failure.node_id} "
         f"error_kind={failure.error_kind} "

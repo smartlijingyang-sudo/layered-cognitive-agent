@@ -46,3 +46,4 @@ tests/.scratch_cordis_creator_real/
 .archify-out/
 # vim swap files
 *.swp
+.lca-run/

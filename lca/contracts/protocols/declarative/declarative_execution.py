@@ -99,15 +99,15 @@ PhaseErrorCategory = Literal["timeout", "transient", "permanent"]
 # 这里表达的是 PhaseExecutionFailure 这个 boundary 事件的根因。
 # UI / LobeHub / run-doctor 只读 error_kind,不再拼接文学化 message。
 PhaseErrorKind = Literal[
-    "timeout",          # wait_for / asyncio timeout
-    "contract",         # 类型/参数/状态 contract violation
-    "cancelled",        # 上层取消
-    "provider",         # LLM/provider 上游故障
-    "internal",         # 未分类内部错误
+    "timeout",  # wait_for / asyncio timeout
+    "contract",  # 类型/参数/状态 contract violation
+    "cancelled",  # 上层取消
+    "provider",  # LLM/provider 上游故障
+    "internal",  # 未分类内部错误
 ]
 
 
-def _derive_error_kind(attempts: tuple["PhaseAttemptFailure", ...]) -> str:
+def _derive_error_kind(attempts: tuple[PhaseAttemptFailure, ...]) -> str:
     """从最后一次 attempt 的 category 推导 outer error_kind。
 
     PhaseErrorCategory 与 PhaseErrorKind 的映射:

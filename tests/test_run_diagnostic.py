@@ -88,18 +88,27 @@ def test_phase_failure_stop_result_binds_diagnostic_not_final_output() -> None:
 def test_reducer_apply_stop_propagates_diagnostic_message() -> None:
     """``state.last_error`` must be filled from the RunDiagnostic, not fall back."""
     from lca.contracts.models.core.state import AgentState, Budget
+    from lca.plugins.phase_graph.failure_stop import _summarize_attempts
     from lca.runtime.reducer import DefaultReducer
 
+    # ADR-clean-truths 决策 一:用真构造路径(phase_failure_stop_result 用的
+    # 摘要生成器)造 message,而不是直接写字面量。这样 reducer 透传测试与
+    # 摘要格式测试共享同一生成器。
+    failure = PhaseExecutionFailure(
+        node_id="think.main",
+        attempts=(PhaseAttemptFailure(attempt=1, category="permanent", error_type="RuntimeError"),),
+    )
     diag = RunDiagnostic(
         run_id="r",
         trace_id="t",
         phase="think",
         node_id="think.main",
         error_type="RuntimeError",
-        message="The agent could not complete a required think.main step after 1 attempt(s).",
+        message=_summarize_attempts(failure),
         stack=(),
         causation=(),
         attempts=(),
+        extra=(("error_kind", failure.error_kind),),
     )
     stop = StopDecision(
         should_stop=True,
@@ -109,8 +118,8 @@ def test_reducer_apply_stop_propagates_diagnostic_message() -> None:
     )
     state = AgentState(trace_id="t", task="x", budget=Budget())
     DefaultReducer().apply_stop(state, stop)
-    # The diagnostic message replaces what used to be a fixed Chinese fallback.
-    assert "think.main step after 1 attempt" in (state.last_error or "")
+    # reducer.apply_stop 透传原 message,不私自改成 fallback Chinese 句式。
+    assert state.last_error == diag.message
     # ADR-0158 决策 四:AgentState.final_output 字段已删除;final output
     # 走 TerminalOutcome.final_output_ref。apply_stop 不再尝试写入 final_output,
     # 故无需断言;改断言 stop.failure 仍透传到 state.last_error。
@@ -121,15 +130,20 @@ def test_terminal_outcome_error_ref_carries_diagnostic() -> None:
     """TerminalOutcome.error_ref.diagnostic preserves the typed failure."""
     from lca.contracts.models.core.state import AgentState, Budget
     from lca.contracts.models.core.terminal_outcome import ErrorRef
+    from lca.plugins.phase_graph.failure_stop import _summarize_attempts
     from lca.runtime.reducer import DefaultReducer
 
+    failure = PhaseExecutionFailure(
+        node_id="think.main",
+        attempts=(PhaseAttemptFailure(attempt=1, category="permanent", error_type="RuntimeError"),),
+    )
     diag = RunDiagnostic(
         run_id="r",
         trace_id="t",
         phase="think",
         node_id="think.main",
         error_type="RuntimeError",
-        message="The agent could not complete a required think.main step after 1 attempt(s).",
+        message=_summarize_attempts(failure),
         stack=(),
         causation=(),
         attempts=(),
@@ -150,7 +164,10 @@ def test_terminal_outcome_error_ref_carries_diagnostic() -> None:
         diagnostic=getattr(stop, "failure", None),
     )
     assert err.diagnostic is diag
-    assert err.message == diag.message
+    # ADR-clean-truths 决策 一:err.message 是机读摘要,至少带 node= 与 attempts=。
+    assert err.message is not None
+    assert "node=think.main" in err.message
+    assert "attempts=" in err.message
 
 
 def test_phase_failure_stop_result_no_final_output_when_only_failure() -> None:

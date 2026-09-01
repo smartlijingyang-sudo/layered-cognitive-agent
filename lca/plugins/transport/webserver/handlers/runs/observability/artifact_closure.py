@@ -30,7 +30,7 @@ def emit_artifact_closure_if_needed(
     if workspace is None:
         return
     # 决策 二:FAILED / CANCELED / session.error 非空 → 不再向 answer 推文本。
-    if session.status.value in ("FAILED", "CANCELED"):
+    if session.status.value in ("failed", "canceled"):
         _log.info(
             "artifact_closure_suppressed",
             hop="H2",
