@@ -39,8 +39,6 @@ from __future__ import annotations
 import time
 from typing import Any
 
-import structlog
-
 from lca.contracts.models.observability.journal_step import (
     ReflectTrace,
     SpanRecord,
@@ -49,68 +47,68 @@ from lca.contracts.models.observability.journal_step import (
     ToolResult,
     compute_duration_ms,
 )
+from lca.runtime.observability_firewall import bridge_firewall
 
-_log = structlog.get_logger(__name__)
-
-# ── 内部: step_lifecycle 句柄 ──
+# ── 内部: step_lifecycle 句柄(全部走 firewall, 不再各自 try/except) ──
 
 
-def _try_get_current_step():
+def _safe_get_current_step():
     """silent helper —— step_lifecycle 没绑定返回 None, 调用方决定是否走 fallback。"""
-    try:
+    with bridge_firewall("step_emitter.get_current_step"):
         from lca.infrastructure.observability.facade import step_get_lifecycle_store
 
         store = step_get_lifecycle_store()
         if store is None:
             return None
         return store.get_current_step()
-    except (RuntimeError, ImportError):
-        return None
+    return None
+
+
+# 旧 API 别名 —— 旧测试和老调用方用,新代码请用 _safe_get_current_step
+_try_get_current_step = _safe_get_current_step
 
 
 def _safe_record_thinking(trace: ThinkingTrace) -> None:
-    try:
+    with bridge_firewall("step_record_thinking", attributes={"trace_model": trace.model}):
         from lca.infrastructure.observability.facade import step_record_thinking
 
         step_record_thinking(trace)
-    except (RuntimeError, ImportError):
-        return None
 
 
 def _safe_record_tool_call(call: ToolCallRecord) -> None:
-    try:
+    with bridge_firewall(
+        "step_record_tool_call",
+        attributes={"tool_name": call.name, "invocation_id": call.invocation_id},
+    ):
         from lca.infrastructure.observability.facade import step_record_tool_call
 
         step_record_tool_call(call)
-    except (RuntimeError, ImportError):
-        return None
 
 
 def _safe_record_tool_result(result: ToolResult) -> None:
-    try:
+    with bridge_firewall(
+        "step_record_tool_result",
+        attributes={"ok": result.ok, "latency_ms": result.latency_ms},
+    ):
         from lca.infrastructure.observability.facade import step_record_tool_result
 
         step_record_tool_result(result)
-    except (RuntimeError, ImportError):
-        return None
 
 
 def _safe_record_span(span: SpanRecord) -> None:
-    try:
+    with bridge_firewall("step_record_span", attributes={"span_kind": span.kind}):
         from lca.infrastructure.observability.facade import step_record_span
 
         step_record_span(span)
-    except (RuntimeError, ImportError):
-        return None
 
 
 def _safe_record_reflect(reflect: ReflectTrace) -> None:
-    try:
+    with bridge_firewall(
+        "step_record_reflect", attributes={"summary_len": len(reflect.summary or "")}
+    ):
         from lca.infrastructure.observability.facade import step_record_reflect
 
         step_record_reflect(reflect)
-    except (RuntimeError, ImportError):
-        return None
 
 
 def _safe_open_step(
@@ -119,8 +117,8 @@ def _safe_open_step(
     context: Any | None = None,
     subagent_role: str | None = None,
 ):
-    """silent open step —— facade RuntimeError 也吞(没绑 _run_context 等)。"""
-    try:
+    """silent open step —— firewall 接住一切异常 + 写入 journal。"""
+    with bridge_firewall("step_open", attributes={"phase": phase, "subagent_role": subagent_role}):
         from lca.infrastructure.observability.facade import step_open
 
         return step_open(
@@ -128,25 +126,15 @@ def _safe_open_step(
             subagent_role=subagent_role,
             context=context,
         )
-    except RuntimeError as exc:
-        # facade 守卫: _require_run_bound 抛 RuntimeError → silent 跳过
-        _log.debug(
-            "step_open_skipped",
-            phase=phase,
-            reason=str(exc),
-        )
-        return None
-    except ImportError:
-        return None
+    return None
 
 
 def _safe_close_step(outcome: str, *, error: str | None = None):
-    try:
+    with bridge_firewall("step_close", attributes={"outcome": outcome}):
         from lca.infrastructure.observability.facade import step_close
 
         return step_close(outcome, error=error)
-    except (RuntimeError, ImportError):
-        return None
+    return None
 
 
 # ── LLM bridge: emit LlmCallCompleted → step.thinking ──
@@ -351,7 +339,8 @@ def bridge_step_completed_emitted(*, status: str) -> None:
 
 __all__ = [
     # 内部 helper(测试可能用到)
-    "_try_get_current_step",
+    "_safe_get_current_step",
+    "_try_get_current_step",  # 旧 API 别名,新代码请用 _safe_get_current_step
     "bridge_act_closed",
     "bridge_act_opened",
     # LLM

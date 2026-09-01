@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
+import traceback
 from pathlib import Path
 
 import structlog
@@ -26,14 +27,21 @@ _log = structlog.get_logger(__name__)
 def record_terminal_materialization(session: RunSession) -> None:
     """Write a terminal manifest and update its navigation pointer without owning facts.
 
-    ADR-0164 Phase 6: 在写 manifest 之前 flush step-tree bundle(写
+    ADR-0164 Phase 7: 在写 manifest 之前 flush step-tree bundle(写
     journal.json + narrative.md)。 让 step-tree 是主存储, 旧 stream 是 raw。
+
+    异常收口(per "工程思维:追问前提" 原则):
+        任何 flush / diagnose / write_text 异常都不再静默吞掉 —
+        全部收集到 ``extra.flush_errors``, 写进 manifest。 这样
+        ``lca-ops debug-run <run_id>`` 一眼能看见哪一步、什么异常。
     """
     locator = session_locator(session)
-    try:
-        # ADR-0164: terminalize 时 step-tree flush(写 journal.json + narrative.md)
-        _flush_step_tree(session)
+    flush_errors: list[dict[str, str]] = []
 
+    # ADR-0164: terminalize 时 step-tree flush(写 journal.json + narrative.md)
+    flush_errors.extend(_flush_step_tree(session))
+
+    try:
         report = diagnose(session, session.jsonl_path)
         if report.broken_hop or not report.factory["ok"]:
             _log.error(
@@ -54,15 +62,28 @@ def record_terminal_materialization(session: RunSession) -> None:
             evidence_integrity=evidence_integrity_for(locator, session.run_id),
             started_at=session.started_at,
             closed_at=session.closed_at if session.closed_at is not None else time.time(),
-            extra={"doctor_report": report.as_dict()},
+            extra={
+                "doctor_report": report.as_dict(),
+                "flush_errors": tuple(flush_errors),
+            },
         )
         manifest_path.write_text(
             json.dumps(manifest.to_dict(), ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         locator.update_latest_pointer(session.run_id)
-    except Exception:
-        _log.warning(
+    except Exception as exc:
+        # manifest 自身写失败 —— 已无法写到 disk, 把异常也收进 flush_errors
+        # 让上游 / debug-run 通过 structlog 看得到
+        flush_errors.append(
+            {
+                "operation": "manifest_write",
+                "error_type": type(exc).__name__,
+                "error_message": str(exc)[:500],
+                "traceback": traceback.format_exc(limit=4),
+            }
+        )
+        _log.error(
             "run_terminal_materialization_failed",
             hop="H2",
             run_id=session.run_id,
@@ -70,23 +91,38 @@ def record_terminal_materialization(session: RunSession) -> None:
         )
 
 
-def _flush_step_tree(session: RunSession) -> None:
+def _flush_step_tree(session: RunSession) -> list[dict[str, str]]:
     """从 session 拿 step-tree bundle 并 flush(写 journal.json + narrative.md)。
 
     bundle 在 ``create_run_components`` 阶段构造并挂到 session 上(若有
     step_lifecycle_store); terminalizer 这里负责落盘。
+
+    返回值: ``flush_errors`` 列表 —— 每条失败以 ``{operation, error_type,
+    error_message, traceback}`` 形态返回, 由 ``record_terminal_materialization``
+    写进 manifest.extra.flush_errors。 即便落盘失败, 下一次 debug-run 也能
+    拿到完整现场。
     """
     bundle = getattr(session, "step_tree_bundle", None)
     if bundle is None:
-        return
+        return []
+    errors: list[dict[str, str]] = []
     try:
         bundle.flush()
-    except Exception:
-        _log.warning(
+    except Exception as exc:
+        errors.append(
+            {
+                "operation": "step_tree.flush",
+                "error_type": type(exc).__name__,
+                "error_message": str(exc)[:500],
+                "traceback": traceback.format_exc(limit=4),
+            }
+        )
+        _log.error(
             "step_tree_flush_failed",
             run_id=session.run_id,
             exc_info=True,
         )
+    return errors
 
 
 def session_locator(session: RunSession) -> RunLocator:

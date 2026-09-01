@@ -125,15 +125,59 @@ class FilesystemRunLedgerFactory(RunLedgerFactory, RunJournalFactory):
 
 @dataclass(frozen=True)
 class _StepTreeBundle:
-    """ADR-0164 step-tree 写入 bundle(boot 装好, terminalizer 时调用)。"""
+    """ADR-0164 step-tree 写入 bundle(boot 装好, terminalizer 时调用)。
+
+    flush() 必须**同时**触发:
+      - ``backend.flush()`` —— 写 journal.json(step-tree 主存储)
+      - ``narrative_writer.write(document)`` —— 写 journal.narrative.md
+
+    flush() 主动保证 document.closed_at != None: 调 ``step_close_document``
+    best-effort; 失败 swallow 不冒泡(已收集到 manifest.extra.flush_errors)。
+    这样 terminalizer 不需要先 close_document 也能让 step-tree 落盘,
+    防止"现场消失"的老 bug(per AGENTS.md "工程思维:追问前提")。
+
+    失败语义: flush 抛 → terminalizer 捕获, 写进 manifest.extra.flush_errors,
+    供 ``lca-ops debug-run <run_id>`` 立刻看见。
+    """
 
     backend: object | None  # StepGroupedBackend | None
     narrative_writer: object  # StepNarrativeWriter
 
     def flush(self) -> None:
-        """写 step-tree journal.json + narrative.md。"""
+        """写 step-tree journal.json + narrative.md。失败抛 → terminalizer 接管。"""
+        document = self._ensure_document_closed()
         if self.backend is not None and hasattr(self.backend, "flush"):
             self.backend.flush()
+        if (
+            document is not None
+            and self.narrative_writer is not None
+            and hasattr(self.narrative_writer, "write")
+        ):
+            self.narrative_writer.write(document)
+
+    def _ensure_document_closed(self) -> object | None:
+        """主动 close_document (best-effort) → 返回当前 document 供 narrative 复用。"""
+        lifecycle_store = getattr(self.backend, "lifecycle_store", None)
+        if lifecycle_store is None:
+            return None
+        document = getattr(lifecycle_store, "document", None)
+        if document is None:
+            return None
+        if document.closed_at is not None:
+            return document
+        try:
+            from lca.infrastructure.observability.facade import step_close_document
+
+            step_close_document(outcome="stopped")
+        except BaseException as exc:  # firewall 风格 — 不能反向 throw
+            import structlog
+
+            structlog.get_logger("lca.step_bundle").warning(
+                "step_bundle_close_document_failed",
+                error_type=type(exc).__name__,
+                error=str(exc)[:200],
+            )
+        return getattr(lifecycle_store, "document", None)
 
 
 @plugin(

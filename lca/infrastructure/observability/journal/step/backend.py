@@ -74,13 +74,23 @@ class StepGroupedBackend(JournalBackend):
     def flush(self) -> None:
         """把 lifecycle_store 当前 document 落盘(若已 close_document)。
 
-        safe to call 多次: 第二次发现 store 没 document → no-op。
+        行为契约(per test_step_grouped_backend_flush_only_when_closed):
+          - 重复 flush 安全(发现 store 没 document → no-op)。
+          - ``document.closed_at is None`` → 不写半截,直接返回。
+            主动 ``close_document`` 的责任在调用方(terminalizer /
+            :class:`_StepTreeBundle`), 让 backend 保持"无副作用" 语义,
+            便于在测试 / 中间过程中重复 flush。
+
+        不做的事:
+          - 不抛 — terminalizer 用 ``except Exception`` 接管任何 flush 错误,
+            并把 traceback 写进 manifest.extra.flush_errors。 见
+            ``plugins/transport/webserver/handlers/runs/terminal/materialization.py``。
         """
         doc = self.lifecycle_store.document
         if doc is None:
             return
         if doc.closed_at is None:
-            # 还没 close_document → 不写半截
+            # 还没 close_document → 不写半截(契约: 调用方必须先 close)
             return
         self._projector.write(doc)
 
