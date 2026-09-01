@@ -22,6 +22,7 @@ meta = PatchMeta(
     description="Project Journal SSE; LCA owns the loop",
     files=(
         f"{_UI_TRANSPORTS}/LcaRunDriver.ts",
+        f"{_UI_TRANSPORTS}/LcaRunDriver.test.ts",
         f"{_UI_TRANSPORTS}/lcaChatRow.ts",
         f"{_UI_TRANSPORTS}/lcaFinishChat.ts",
         f"{_UI_TRANSPORTS}/lcaJournal.ts",
@@ -113,6 +114,7 @@ def apply(ctx: PatchContext) -> bool:
     changed = False
     for name in (
         "LcaRunDriver.ts",
+        "LcaRunDriver.test.ts",
         "lcaChatRow.ts",
         "lcaFinishChat.ts",
         "lcaJournal.ts",
