@@ -400,13 +400,19 @@ class ToolCallStreaming(JournalEvent):
     工具执行之间的空白期。与 ``ToolStarted``（执行前、参数完整）互补。
     ``tool_call_id`` 即后续 ToolStarted/Invoked 的 ``invocation_id``（同一张卡）。
 
-    ADR-0101 PR-2:tool 事件回归事实账本。流式累积由调用方在 ToolCall
-    周期内多次 emit 同一 ``arguments_ref`` 完成;tool 渲染面通过 ref
-    走 EvidenceStore 平面。
+    ADR-0101 PR-2 + ADR-0101 followup (2026-09-01):
+    - ``tool_name`` / ``tool_call_id`` —— 关联 ToolStarted 的 invocation_id
+    - ``arguments_preview`` —— best-effort partial dict (``parse_partial_tool_args``
+      在累积到 160 字符时计算);仅作 SSE live preview hint,**replay 工具不得依赖
+      此字段,ToolStarted.arguments 才是事实**;不视为 view-only,允许写入 disk
+      以便诊断
+    - ``arguments_ref`` —— ADR §5.3 设想的 streaming 累积引用,当前未启用,
+      保留字段以备 future 实现
     """
 
     tool_name: str = ""
     tool_call_id: str = ""
+    arguments_preview: Mapping[str, object] = field(default_factory=dict)
     arguments_ref: EvidenceRef | None = None
 
 

@@ -39,7 +39,12 @@ class TestPushToolCallStream(unittest.TestCase):
         self.assertEqual(frame["tool_name"], "execute_code")
         self.assertEqual(frame["tool_call_id"], "toolu_1")
 
-    def test_same_id_throttles_tiny_deltas(self) -> None:
+    def test_same_id_emits_per_growing_chunk(self) -> None:
+        """ADR-0101 followup (2026-09-01): emit on every chunk that grows raw.
+
+        旧逻辑按 160 字符节流,小 payload (e.g. ``{"code": "print(2)"}`` ~20 chars)
+        永远走不到阈值,LobeHub 拿不到任何 preview。新逻辑:每次 raw 增长就 emit。
+        """
         slots: dict = {}
         first = push_tool_call_stream(
             slots, tool_name="execute_code", tool_call_id="c1", arguments_delta='{"c'
@@ -48,4 +53,49 @@ class TestPushToolCallStream(unittest.TestCase):
             slots, tool_name=None, tool_call_id="c1", arguments_delta="ode"
         )
         self.assertIsNotNone(first)
-        self.assertIsNone(second)
+        # 新行为:raw 增长了就 emit (5 chars → 8 chars)
+        self.assertIsNotNone(second)
+        # 但 raw 不变就不 emit (de-dup)
+        third = push_tool_call_stream(slots, tool_name=None, tool_call_id="c1", arguments_delta="")
+        self.assertIsNone(third)
+
+    def test_slot_raw_accumulates_deltas(self) -> None:
+        """ADR-0101 followup: slot['raw'] 累积所有 delta,emit 周期内供
+        parse_partial_tool_args 还原 partial dict 给 ToolCallStreaming.emit."""
+        slots: dict = {}
+        # 第一次 emit 触发
+        first = push_tool_call_stream(
+            slots,
+            tool_name="executeCode",
+            tool_call_id="c2",
+            arguments_delta='{"code": "import os',
+        )
+        assert first is not None
+        # 累积 delta (不触发 emit 因为 < 160 字符)
+        push_tool_call_stream(
+            slots,
+            tool_name=None,
+            tool_call_id="c2",
+            arguments_delta="\ncode = '''#!/usr/bin/env python3",
+        )
+        # slot["raw"] 必须累积
+        assert slots["c2"]["raw"].startswith('{"code": "import os')
+        assert "python3" in slots["c2"]["raw"]
+        # 第三次凑够 160 字符阈值 → 第二次 emit
+        # 补足到至少 160 字符
+        more = "x" * (200 - len(slots["c2"]["raw"]))
+        third = push_tool_call_stream(
+            slots,
+            tool_name=None,
+            tool_call_id="c2",
+            arguments_delta=more,
+        )
+        # third 应触发 emit (返回非 None)
+        assert third is not None
+        assert len(slots["c2"]["raw"]) >= 160
+
+        # raw 可以被 parse_partial_tool_args 还原 partial dict
+        from lca.cognition.brain.tool_call_stream import parse_partial_tool_args
+
+        partial = parse_partial_tool_args(slots["c2"]["raw"])
+        assert isinstance(partial, dict)

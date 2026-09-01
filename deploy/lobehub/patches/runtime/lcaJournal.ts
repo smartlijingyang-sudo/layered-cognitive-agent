@@ -95,13 +95,17 @@ export function projectJournalFrame(frame: JournalFrame): Projected {
       return { kind: 'text', text: String(payload.text_delta ?? '') };
     case 'ToolCallStreaming':
     case 'ToolStarted': {
-      // ADR-0101 PR-2: tool events return to facts. ``arguments`` lives at
-      // payload.arguments (top-level fact), not in plugin_state. Merge it
-      // into the projected state so pickArgs / mergeInvocationArgs in
+      // ADR-0101 PR-2 + ADR-0101 followup (2026-09-01): tool events return to
+      // facts; ``arguments`` lives at payload.arguments (ToolStarted) or
+      // ``arguments_preview`` (ToolCallStreaming, best-effort partial dict
+      // emitted while LLM is still streaming tool-call arguments). Merge
+      // either into projected state so pickArgs / mergeInvocationArgs in
       // LcaRunDriver find it; the renderer also reads args from there.
+      // ToolStarted.arguments is the source of truth; ToolCallStreaming
+      // preview is a hint and gets overwritten once ToolStarted arrives.
       const baseState =
         (payload.plugin_state as Record<string, unknown> | undefined) ?? {};
-      const rawArgs = payload.arguments;
+      const rawArgs = payload.arguments ?? payload.arguments_preview;
       const merged =
         rawArgs && typeof rawArgs === 'object' && !Array.isArray(rawArgs)
           ? { ...baseState, ...(rawArgs as Record<string, unknown>) }

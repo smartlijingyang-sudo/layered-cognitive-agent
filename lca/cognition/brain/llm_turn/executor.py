@@ -13,7 +13,7 @@ import structlog
 
 from lca.cognition.brain.llm_turn.mode import LlmTurnMode
 from lca.cognition.brain.llm_turn.policy import build_llm_call_kwargs, resolve_llm_turn_mode
-from lca.cognition.brain.tool_call_stream import push_tool_call_stream
+from lca.cognition.brain.tool_call_stream import parse_partial_tool_args, push_tool_call_stream
 from lca.cognition.brain.tool_conversation import build_tool_history
 from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.llm import LLMResponse
@@ -106,13 +106,17 @@ async def _stream_turn(
                 arguments_delta=event.arguments_delta or "",
             )
             if frame is not None:
-                # ADR-0101 PR-2:ToolCallStreaming 不再有 arguments_preview /
-                # plugin_state 字段(0065 §四 L1);arguments 走 evidence 平面
-                # (ToolCall 周期内多次 emit 同一 arguments_ref 即可)。
+                # ADR-0101 followup (2026-09-01):emit best-effort partial preview
+                # so LobeHub paints the tool card while arguments are still streaming.
+                # ToolStarted.arguments 仍然是事实账本的唯一真相源;此 preview 仅
+                # 作 SSE live hint,前端 replay 工具不得依赖。
+                slot = tool_slots[str(frame["tool_call_id"])]
+                partial = parse_partial_tool_args(str(slot.get("raw", "")))
                 record(
                     ToolCallStreaming(
                         tool_name=str(frame["tool_name"]),
                         tool_call_id=str(frame["tool_call_id"]),
+                        arguments_preview=dict(partial) if partial else {},
                     )
                 )
         elif event.type == LLMStreamEventType.COMPLETED and event.response is not None:

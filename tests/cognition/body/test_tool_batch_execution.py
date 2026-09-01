@@ -300,6 +300,34 @@ async def test_batch_executor_resolves_every_tool_before_dispatch() -> None:
 
 
 @pytest.mark.asyncio
+async def test_batch_executor_falls_back_to_canonicalised_name() -> None:
+    """LLM 偶尔 emit snake_case name (e.g. ``export_file``);registry 是 camelCase
+    (``exportFile``)。ToolBatchExecutor 必须做 snake↔camel 容错 lookup,以避免
+    误报 ``未注册工具: export_file``。
+
+    这是 LLM name hallucination 的实际修复 —— 不修改 wire name(仍然 emit
+    snake_case 进 journal),只在 dispatch 前 normalize 解析。
+    """
+
+    from lca.cognition.body.tool_batch_executor import ToolBatchExecutor
+
+    camel_tool = _Tool("exportFile", is_idempotent=True)
+    safe_executor = _RecordingSafeExecutor()
+    batch_executor = ToolBatchExecutor(
+        _ToolRegistry(camel_tool),
+        safe_executor,
+        policy=SafeToolBatchExecutionPolicy(),
+    )
+
+    # LLM emits snake_case; resolver must find the camelCase tool.
+    decision = _decision("export_file")
+    observation = await batch_executor.execute(decision.tool_calls)
+
+    assert observation.success
+    assert safe_executor.invocations == ["exportFile"]
+
+
+@pytest.mark.asyncio
 async def test_batch_executor_marks_single_result_as_tool_result() -> None:
     """单工具路径与批次路径共享工具结果类别这一测试表面。"""
 

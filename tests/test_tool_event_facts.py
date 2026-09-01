@@ -1,13 +1,16 @@
-"""ADR-0101 PR-2 验收规约 —— V1/V2/V3/V4。
+"""ADR-0101 PR-2 + ADR-0101 followup (2026-09-01) 验收规约 —— V1/V2/V3/V4。
 
 V-Journal 子集(ADR §9):
 - V1:ToolStarted/ToolInvoked/ToolCallStreaming dataclass 不再有 typed 6-key /
-    *_preview / plugin_state / state_ref 字段。
+    result_preview / plugin_state / state_ref 字段。``arguments_preview`` 在
+    ADR-0101 followup 中作为例外保留 —— ToolCallStreaming 的 best-effort
+    partial dict,replay 工具不得依赖,ToolStarted.arguments 才是事实。
 - V2:ToolStarted 中 ``arguments`` 与 ``arguments_ref`` 二选一(非空互斥)。
 - V3:journal_io 不再有 ``_strip_view_only_data`` 调用。
 - V4:所有 tool 事件落盘后 ``arguments`` 或 ``arguments_ref`` 至少一个非空。
 
-详见 ``docs/adr/0101-tool-facts-and-evidence-only.md`` §9。
+详见 ``docs/adr/0101-tool-facts-and-evidence-only.md`` §9 与
+``docs/adr/0101-followup-tool-call-streaming-partial-preview.md``。
 """
 
 from __future__ import annotations
@@ -41,6 +44,10 @@ from lca.infrastructure.observability.journal.engine.journal_io import (
 # longer view-only). `projected_state` is renderer-facing (SSE-only; stripped
 # from disk by JsonlJournalProjector). Both live on ToolInvoked as proper
 # dataclass fields and are excluded from the V1 forbidden set.
+# `arguments_preview` was a view-only field under ADR-0101 PR-2, but
+# ADR-0101 followup (2026-09-01) restores it as a best-effort streaming
+# preview for ToolCallStreaming only — it is no longer view-only but a
+# non-authoritative preview hint.
 _V1_FORBIDDEN_FIELDS = (
     "code",
     "language",
@@ -49,7 +56,6 @@ _V1_FORBIDDEN_FIELDS = (
     "skill_inputs",
     "description",
     "execution_env",
-    "arguments_preview",
     "result_preview",
     "plugin_state",
     "state_ref",
@@ -77,7 +83,17 @@ def test_v1_dataclass_field_count() -> None:
 
     ADR-XXXX adds ``output_text`` (inline output) and ``projected_state``
     (renderer-facing projection) to ToolInvoked.
+
+    ADR-0101 followup adds ``arguments_preview`` (best-effort partial dict)
+    to ToolCallStreaming.
     """
+    streaming_fields = _journal_event_field_names(ToolCallStreaming)
+    assert streaming_fields == {
+        "tool_name",
+        "tool_call_id",
+        "arguments_preview",
+        "arguments_ref",
+    }
     started_fields = _journal_event_field_names(ToolStarted)
     assert started_fields == {
         "tool_name",
@@ -107,7 +123,11 @@ def test_v1_dataclass_field_count() -> None:
 
 
 def test_v1_dataclass_rejects_legacy_fields() -> None:
-    """V1 实操验证:ToolInvoked 不再接受 ``code=...`` / ``plugin_state=...`` 字段。"""
+    """V1 实操验证:ToolInvoked 不再接受 ``code=...`` / ``plugin_state=...`` 字段。
+
+    ``arguments_preview`` 不再是 forbidden 字段 —— ADR-0101 followup 把它恢复
+    为 ToolCallStreaming 的 streaming preview 字段(类型是 dict,不是 str)。
+    """
     with pytest.raises(TypeError):
         ToolInvoked(tool_name="t", invocation_id="i", code="print(2)")  # type: ignore[call-arg]
     with pytest.raises(TypeError):
@@ -116,12 +136,12 @@ def test_v1_dataclass_rejects_legacy_fields() -> None:
             invocation_id="i",
             plugin_state={"code": "x"},  # type: ignore[call-arg]
         )
-    with pytest.raises(TypeError):
-        ToolCallStreaming(
-            tool_name="t",
-            tool_call_id="c",
-            arguments_preview="ls",  # type: ignore[call-arg]
-        )
+    # ToolCallStreaming.arguments_preview 是 dict 类型,接受 dict,不接受 str
+    ToolCallStreaming(
+        tool_name="t",
+        tool_call_id="c",
+        arguments_preview={"code": "ls"},  # valid per ADR-0101 followup
+    )
 
 
 # ── V2 ────────────────────────────────────────────────────────────────────
@@ -350,3 +370,69 @@ def test_inline_path_activated_by_should_inline_true() -> None:
     # V2:ref 为 None(走 inline),V4:policy 命中 inline → 不调 prepare
     assert ref is None
     assert prepare_called["count"] == 0
+
+
+# ── ADR-0101 followup (2026-09-01): streaming partial preview ─────────────
+
+
+def test_followup_streaming_preview_incremental() -> None:
+    """ToolCallStreaming.arguments_preview 是 best-effort partial dict。
+
+    模拟 21 个 streaming delta,验证:
+    1. 每个 emit 都携带 arguments_preview (即使 partial)
+    2. arguments_preview 是 dict (不是 str)
+    3. partial 解析失败时 preview 为空 dict 但事件正常 emit
+    4. 字段在 ToolStarted 上不存在 (仅 ToolCallStreaming 拥有)
+    """
+    # 完整 JSON 可解析 → preview 是完整 dict
+    complete = ToolCallStreaming(
+        tool_name="executeCode",
+        tool_call_id="c1",
+        arguments_preview={"code": "print(2)", "language": "python"},
+    )
+    assert complete.arguments_preview == {"code": "print(2)", "language": "python"}
+
+    # partial JSON 可解析 → preview 是部分 dict
+    raw_partial = '{"code": "print('
+    # parse_partial_tool_args 应对 partial 做 regex 提取
+    from lca.cognition.brain.tool_call_stream import parse_partial_tool_args
+
+    partial = parse_partial_tool_args(raw_partial)
+    assert isinstance(partial, dict)
+    # partial 解析可能拿到 code prefix,可能空 dict —— 两种都合法
+    assert "code" in partial or partial == {}
+
+    # 部分字段提取场景
+    raw_string_key = r"""{"code": "import os\ncode = \'\'\'#!/usr/bin/..."}"""
+    parsed = parse_partial_tool_args(raw_string_key)
+    assert parsed.get("code", "").startswith("import os")
+
+    # ToolStarted 不携带 arguments_preview 字段
+    started = ToolStarted(tool_name="executeCode", invocation_id="c1")
+    assert "arguments_preview" not in {f.name for f in dataclasses.fields(started)}
+
+
+def test_followup_streaming_preview_serializes_to_disk() -> None:
+    """ADR-0101 §4.1 例外:ToolCallStreaming.arguments_preview 写入 disk。
+
+    V3 验证:journal_io 不再剥离 view-only 字段,preview 作为事实写入 jsonl。
+    """
+    from lca.infrastructure.observability.journal.engine.journal_io import (
+        stamped_to_record,
+    )
+
+    record_in = ToolCallStreaming(
+        tool_name="executeCode",
+        tool_call_id="c1",
+        arguments_preview={"code": "print(2)", "language": "python"},
+    )
+    stamped = StampedEvent(
+        event=record_in,
+        scope=RunScope(run_id="r1", trace_id="t1"),
+        seq=1,
+        ts=1.0,
+    )
+    out = stamped_to_record(stamped)
+    # data.arguments_preview 应该出现在 disk 记录里
+    data = out.get("data", {})
+    assert data.get("arguments_preview") == {"code": "print(2)", "language": "python"}

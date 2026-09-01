@@ -11,6 +11,7 @@ effect.
 from __future__ import annotations
 
 import asyncio
+import re
 from collections.abc import Sequence
 from typing import cast
 
@@ -75,11 +76,21 @@ class ToolBatchExecutor:
         return self._combine_observations(observations, tool_calls)
 
     def _resolve_tools(self, tool_calls: Sequence[ToolCall]) -> list[tuple[ToolCall, Tool]]:
-        """Resolve every tool before dispatching any world effect."""
+        """Resolve every tool before dispatching any world effect.
+
+        Includes a tolerant fallback: when the LLM emits a snake_case name
+        like ``export_file`` while the registered name is camelCase
+        (``exportFile``), fall back to a normalised lookup. LLM name
+        hallucination across case styles is observed in production; this
+        keeps the wire-name stable (we still log the canonical tool name)
+        without surfacing a noisy ``未注册工具`` error.
+        """
 
         resolved: list[tuple[ToolCall, Tool]] = []
         for tool_call in tool_calls:
             tool = self._tool_registry.get(tool_call.tool_name)
+            if tool is None:
+                tool = self._tool_registry.get(_canonicalise_tool_name(tool_call.tool_name))
             if tool is None:
                 raise ToolExecutionError(f"未注册工具: {tool_call.tool_name}")
             resolved.append((tool_call, tool))
@@ -187,3 +198,32 @@ class ToolBatchExecutor:
 
 
 __all__ = ["ToolBatchExecutor"]
+
+
+_CAMEL_BOUNDARY_RE = re.compile(r"(?<!^)(?=[A-Z])")
+
+
+def _canonicalise_tool_name(name: str) -> str:
+    """Return a snake/camel-equivalent candidate for a tool name.
+
+    Examples:
+      ``export_file`` → ``exportFile``
+      ``ExportFile`` → ``export_file``
+      ``run_command`` → ``runCommand``
+      ``execute_code`` → ``executeCode``
+
+    The lookup is purely string-level: the LLM tends to emit either
+    snake_case or camelCase depending on prompt context, but the
+    registry keeps one canonical form (camelCase, per LobeHub wire
+    convention — see ``lca/infrastructure/tools/lca_computer/types.py``).
+    """
+    if not name:
+        return name
+    if "_" in name:
+        # snake_case → camelCase: export_file → exportFile
+        parts = name.split("_")
+        return parts[0] + "".join(p.capitalize() for p in parts[1:] if p)
+    if any(ch.isupper() for ch in name[1:]):
+        # camelCase → snake_case: exportFile → export_file
+        return _CAMEL_BOUNDARY_RE.sub("_", name).lower()
+    return name

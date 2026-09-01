@@ -33,9 +33,17 @@ def push_tool_call_stream(
     tool_call_id: str | None,
     arguments_delta: str,
 ) -> dict[str, Any] | None:
-    """Update ``slots``; return a snapshot dict when the card should refresh."""
+    """Update ``slots``; return a snapshot dict when the card should refresh.
+
+    ADR-0101 followup (2026-09-01): emit on every chunk that grows ``raw``
+    so LobeHub can paint the tool card continuously while arguments are
+    still streaming. The legacy 160-char throttle caused small payloads
+    (e.g. ``{"code": "print(2)"}``) to never emit a partial preview.
+    De-duplicates against the last-emitted raw value to avoid duplicate
+    frames when the LLM emits an empty delta after the name event.
+    """
     key = (tool_call_id or "").strip() or (tool_name or "").strip() or "_"
-    slot = slots.setdefault(key, {"name": "", "raw": "", "emitted": -1})
+    slot = slots.setdefault(key, {"name": "", "raw": "", "emitted_raw": ""})
     if tool_name:
         slot["name"] = tool_name
     if arguments_delta:
@@ -44,10 +52,13 @@ def push_tool_call_stream(
     if not name:
         return None
     raw = str(slot["raw"] or "")
-    emitted = int(slot["emitted"])
-    if emitted >= 0 and len(raw) - emitted < _EMIT_EVERY_CHARS:
+    # First emit (slot has never emitted) always fires so the card appears.
+    # Subsequent emits fire only when raw grew.
+    has_emitted = slot.setdefault("emitted", False)
+    if has_emitted and raw == slot["emitted_raw"]:
         return None
-    slot["emitted"] = len(raw)
+    slot["emitted"] = True
+    slot["emitted_raw"] = raw
     return {
         "tool_name": name,
         "tool_call_id": (tool_call_id or key),
