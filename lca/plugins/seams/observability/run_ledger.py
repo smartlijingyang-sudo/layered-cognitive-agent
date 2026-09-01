@@ -70,7 +70,12 @@ class FilesystemRunLedgerFactory(RunLedgerFactory, RunJournalFactory):
         )
         return cast("RunLedger", RunStore(backend=backend, run_id=safe_run_id))
 
-    def create_run_components(self, *, jsonl_path: Path) -> RunJournalComponents:
+    def create_run_components(
+        self,
+        *,
+        jsonl_path: Path,
+        lifecycle_store: object | None = None,
+    ) -> RunJournalComponents:
         """Create the durable writer and live tail for one resolved run path.
 
         ADR-0164 Phase 7 端到端:
@@ -79,6 +84,13 @@ class FilesystemRunLedgerFactory(RunLedgerFactory, RunJournalFactory):
             - step-tree backend 写到 ``journal.json`` (lca.journal/3)
             - narrative writer 写到 ``journal.narrative.md``(terminalize 时)
             - RunJournalComponents.writer 改成 LiveTail( SSE 投影需要 JournalProjector)
+
+        参数:
+            jsonl_path: durable journal 路径(由 RunLocator 决定)
+            lifecycle_store: 已 bind_run 的 ``StepLifecycleStore``。 优先
+                            使用此注入; 为 None 时回退到 ContextVar
+                            (供单元测试 + offline 脚本使用, 生产路径
+                            必须显式注入 —— 这是 ADR-0164 Phase 7 接入点)
         """
         from lca.infrastructure.observability.journal.step.backend import (
             StepGroupedBackend,
@@ -95,14 +107,16 @@ class FilesystemRunLedgerFactory(RunLedgerFactory, RunJournalFactory):
             jsonl_path.rename(raw_path)
         raw_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # step-tree 主存储
+        # step-tree 主存储 —— 优先用注入的 store; 无则 ContextVar 兜底
         step_tree_backend: StepGroupedBackend | None = None
-        lifecycle_store = step_lifecycle.get_lifecycle_store()
-        if lifecycle_store is not None:
+        store = (
+            lifecycle_store if lifecycle_store is not None else step_lifecycle.get_lifecycle_store()
+        )
+        if store is not None:
             journal_step_path = raw_path.parent / "journal.json"
             step_tree_backend = StepGroupedBackend(
                 output_path=journal_step_path,
-                lifecycle_store=lifecycle_store,
+                lifecycle_store=store,
             )
 
         narrative_writer = StepNarrativeWriter(raw_path.parent / "journal.narrative.md")
@@ -131,10 +145,11 @@ class _StepTreeBundle:
       - ``backend.flush()`` —— 写 journal.json(step-tree 主存储)
       - ``narrative_writer.write(document)`` —— 写 journal.narrative.md
 
-    flush() 主动保证 document.closed_at != None: 调 ``step_close_document``
-    best-effort; 失败 swallow 不冒泡(已收集到 manifest.extra.flush_errors)。
-    这样 terminalizer 不需要先 close_document 也能让 step-tree 落盘,
-    防止"现场消失"的老 bug(per AGENTS.md "工程思维:追问前提")。
+    flush() 通过 ``store.close_and_finalize()`` 拿到已 finalize 的
+    ``JournalDocument``: idempotent close, 后端拿到 document 就落盘。
+    这一路径替换了之前依赖 facade ``step_close_document`` 的 magic 调用
+    (违反 transport 不依赖具体 facade 的原则), 改成显式调 store 自身的
+    idempotent finalizer。
 
     失败语义: flush 抛 → terminalizer 捕获, 写进 manifest.extra.flush_errors,
     供 ``lca-ops debug-run <run_id>`` 立刻看见。
@@ -145,7 +160,7 @@ class _StepTreeBundle:
 
     def flush(self) -> None:
         """写 step-tree journal.json + narrative.md。失败抛 → terminalizer 接管。"""
-        document = self._ensure_document_closed()
+        document = self._finalize_document()
         if self.backend is not None and hasattr(self.backend, "flush"):
             self.backend.flush()
         if (
@@ -155,29 +170,23 @@ class _StepTreeBundle:
         ):
             self.narrative_writer.write(document)
 
-    def _ensure_document_closed(self) -> object | None:
-        """主动 close_document (best-effort) → 返回当前 document 供 narrative 复用。"""
+    def _finalize_document(self) -> object | None:
+        """通过 store 的 idempotent finalizer 拿到 closed ``JournalDocument``。
+
+        优于旧 ``_ensure_document_closed``: 不依赖 facade step_close_document
+        (单写者 store 已经持有 document; facade 只是 ContextVar 路径的薄壳)。
+        """
+        if self.backend is None:
+            return None
         lifecycle_store = getattr(self.backend, "lifecycle_store", None)
         if lifecycle_store is None:
             return None
-        document = getattr(lifecycle_store, "document", None)
-        if document is None:
-            return None
-        if document.closed_at is not None:
+        finalize = getattr(lifecycle_store, "close_and_finalize", None)
+        if finalize is None:
+            # 老 store 没有 close_and_finalize —— 兜底读已闭合的 document
+            document = getattr(lifecycle_store, "document", None)
             return document
-        try:
-            from lca.infrastructure.observability.facade import step_close_document
-
-            step_close_document(outcome="stopped")
-        except BaseException as exc:  # firewall 风格 — 不能反向 throw
-            import structlog
-
-            structlog.get_logger("lca.step_bundle").warning(
-                "step_bundle_close_document_failed",
-                error_type=type(exc).__name__,
-                error=str(exc)[:200],
-            )
-        return getattr(lifecycle_store, "document", None)
+        return finalize(outcome="stopped")
 
 
 @plugin(

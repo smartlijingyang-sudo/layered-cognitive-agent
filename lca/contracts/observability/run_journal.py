@@ -82,10 +82,27 @@ class RunJournalFactory(Protocol):
     ``RunLocator`` remains the sole owner of physical path derivation.  The
     factory receives the resolved durable path and selects the writer, live
     tail and process-wide projection implementation without involving Gateway.
+
+    ``create_run_components`` 的 ``lifecycle_store`` 形参是可空注入:
+    transport 在 run 启动期用 ``lca.runtime.journal_setup.build_step_lifecycle_store``
+    构造好 store,显式注入到 factory。 factory 把它绑到 step-tree backend
+    (让 ``journal.json`` 真的被写)。 不传时回退到 ContextVar 路径
+    (供单元测试和 offline 脚本使用;生产路径必须传)。
     """
 
-    def create_run_components(self, *, jsonl_path: Path) -> RunJournalComponents:
-        """Create the durable writer and live tail for one run."""
+    def create_run_components(
+        self,
+        *,
+        jsonl_path: Path,
+        lifecycle_store: object | None = None,
+    ) -> RunJournalComponents:
+        """Create the durable writer and live tail for one run.
+
+        参数:
+            jsonl_path:    durable journal 路径(由 RunLocator 决定)
+            lifecycle_store: 已 bind_run 的 StepLifecycleStore; 传 None
+                           时回退到 ContextVar (legacy 单元测试用)
+        """
         ...
 
     def create_process_journal(self) -> ProcessJournalProjection:

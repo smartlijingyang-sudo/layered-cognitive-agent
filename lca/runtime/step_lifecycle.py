@@ -248,6 +248,52 @@ class StepLifecycleStore:
             )
             return self.document
 
+    def close_and_finalize(
+        self,
+        *,
+        outcome: Literal["completed", "failed", "paused", "stopped"] = "stopped",
+        closed_at: float | None = None,
+    ) -> JournalDocument | None:
+        """Idempotent document finalizer for downstream sinks (backend.flush).
+
+        行为:
+            - 未 bind_run / 无 document → 返回 ``None``(便于 backend 兜底)。
+            - 已 closed (closed_at != None) → 直接返回当前 document。
+            - 仍有 open step (rare, caller forgot close_step) → best-effort
+              把当前 step 以 ``fail`` 闭合, 再 finalize document。
+            - 全部 step 已 close → 直接 finalize document。
+            - 内部锁内完成, 不会和 open_step / close_step 产生 race。
+
+        不会抛 RuntimeError —— 落盘路径不该因"少调一次 close_step" 失败。
+        真实异常(锁异常、dataclass 构造异常)向上抛, 由 backend flush
+        的 try/except 收口。
+        """
+        with self._lock:
+            if self.document is None:
+                return None
+            if self.document.closed_at is not None:
+                return self.document
+            if self._current is not None:
+                # 兜底:有 step 没显式 close → 以 fail 闭合, 防 document 卡住
+                now = time.time()
+                finalized = replace(
+                    self._current,
+                    exited_at=now,
+                    duration_ms=compute_duration_ms(self._current.entered_at, now),
+                    outcome="fail",
+                    error=(self._current.error or "step_tree_bundle: dangling open step"),
+                )
+                self._closed_steps = (*self._closed_steps, finalized)
+                if self.document is not None:
+                    self.document = append_step(self.document, finalized)
+                self._current = None
+            self.document = close_document(
+                self.document,
+                outcome=outcome,
+                closed_at=closed_at if closed_at is not None else time.time(),
+            )
+            return self.document
+
     def reset_run(self) -> None:
         """清空 store(测试 / 跨 run 复用)。"""
         with self._lock:

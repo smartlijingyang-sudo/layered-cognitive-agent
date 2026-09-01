@@ -148,6 +148,12 @@ forbidden_modules = [
     "lca.runtime",
 ]
 # lca_kernel 公共面是 transport 的合法依赖,这里只禁认知/运行/Agent 实现。
+# ADR-0164 Phase 7 接入豁免: binding 显式调 ``lca.runtime.journal_setup``
+# 装 ``StepLifecycleStore``, 不依赖 runtime 内部 — 是 seam 边界上必要的
+# 极小耦合, 老 device_hub 的传递依赖仍在 broken 列表(待单独清理)。
+ignore_imports = [
+    "lca.plugins.transport.webserver.handlers.runs.observability.binding -> lca.runtime.journal_setup",
+]
 
 [dependency-groups]
 dev = [

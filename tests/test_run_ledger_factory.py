@@ -65,9 +65,16 @@ def test_run_session_consumes_profile_selected_journal_factory(tmp_path: Path) -
             self.process_creations = 0
             self.process = ProcessJournal()
             self.tails: list[LiveTail] = []
+            self.stores: list[object | None] = []
 
-        def create_run_components(self, *, jsonl_path: Path) -> RunJournalComponents:
+        def create_run_components(
+            self,
+            *,
+            jsonl_path: Path,
+            lifecycle_store: object | None = None,
+        ) -> RunJournalComponents:
             self.paths.append(jsonl_path)
+            self.stores.append(lifecycle_store)
             tail = LiveTail()
             self.tails.append(tail)
             # ADR-0164 Phase 7: 不再创建 JsonlJournalProjector(主路径不写 jsonl)
@@ -110,3 +117,21 @@ def test_run_session_consumes_profile_selected_journal_factory(tmp_path: Path) -
     assert factory.process_creations == 1
     assert registry.journal is factory.process
     assert registry.live_totals()["journal_subscribers"] == 0
+
+    # ADR-0164 Phase 7 回归: builder 必须把 lifecycle store 注入 factory,
+    # 不然 step-tree backend 为 None, journal.json 永不落盘。
+    assert factory.stores == [first.lifecycle_store, second.lifecycle_store]
+    assert first.lifecycle_store is not None
+    assert second.lifecycle_store is not None
+    assert first.lifecycle_store is not second.lifecycle_store, (
+        "每个 run 必须有独立的 store —— 共享会跨 run 串台"
+    )
+    assert first.lifecycle_store.run_id == first.run_id
+    assert second.lifecycle_store.run_id == second.run_id
+    assert first.lifecycle_store.document.metadata.objective == "first"
+    assert second.lifecycle_store.document.metadata.objective == "second"
+    assert first.lifecycle_store.document.metadata.strategy_key == "solo"
+    # bundle 来自 spy factory 的返回值(spy 没造 bundle); 真实 factory 注入
+    # 后 step_tree_bundle.backend 必为非 None —— 这由
+    # tests/test_runtime_journal_binding_integration.py::test_create_run_components_with_injected_store_produces_backend
+    # 用真 FilesystemRunLedgerFactory 验证
