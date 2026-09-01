@@ -23,6 +23,20 @@ The wrapper is **safe to compose**:
 * the emission path tolerates a missing active spine — the assembler
   runs in unit tests where no spine is wired, and instrumentation
   must not change observable behaviour in that mode
+
+Emission routing (PR-7.1)
+-------------------------
+When an ``emit_pipeline`` is installed via
+:func:`set_active_pipeline_accessor`, every event goes through
+``EmitPipeline.emit(...)`` so all enabled ``FieldProducer`` plugins
+(signature / source / spantree / context / runtime) contribute their
+keys to ``EventRecord.payload``. With no pipeline installed the wrapper
+falls back to a direct ``EventSpine.append(...)``, keeping the PR-4
+assembler contract intact for pre-boot and unit-test paths.
+
+``lca.harness`` must not statically import ``lca.plugins``, so the
+pipeline is reached duck-typed via the accessor rather than by
+importing ``EmitPipeline``.
 """
 
 from __future__ import annotations
@@ -33,7 +47,7 @@ import hashlib
 import inspect
 import logging
 from collections.abc import Awaitable, Callable
-from typing import Any, Optional, TypeVar, overload
+from typing import Any, TypeVar, overload
 
 from lca.infrastructure.observability.spine.context import (
     SpanContext,
@@ -59,11 +73,12 @@ _F = TypeVar("_F", bound=Callable[..., Any])
 # fall back to ``None`` in unit tests.
 
 _active_spine_getter: Callable[[], EventSpine | None] | None = None
+_active_pipeline_getter: Callable[[], Any] | None = None
 
 
 def set_active_spine_accessor(
     getter: Callable[[], EventSpine | None] | None,
-) -> Optional[Callable[[], Optional[EventSpine]]]:
+) -> Callable[[], EventSpine | None] | None:
     """Install a process-local spine accessor used by :func:`wrap_instrument`.
 
     Returns the previous accessor so callers can restore it (typically
@@ -75,6 +90,26 @@ def set_active_spine_accessor(
     return previous
 
 
+def set_active_pipeline_accessor(
+    getter: Callable[[], Any] | None,
+) -> Callable[[], Any] | None:
+    """Install a process-local EmitPipeline accessor for :func:`wrap_instrument`.
+
+    When a pipeline is installed, ``wrap_instrument`` routes every
+    emission through ``EmitPipeline.emit(...)`` so enabled
+    ``FieldProducer`` plugins contribute their keys to
+    ``EventRecord.payload``. With no pipeline installed, the wrapper
+    falls back to the direct ``EventSpine.append`` path so PR-4
+    assembler contracts still hold under unit tests.
+
+    Returns the previous accessor so callers can restore it.
+    """
+    global _active_pipeline_getter
+    previous = _active_pipeline_getter
+    _active_pipeline_getter = getter
+    return previous
+
+
 def _resolve_spine() -> EventSpine | None:
     if _active_spine_getter is None:
         return None
@@ -82,6 +117,25 @@ def _resolve_spine() -> EventSpine | None:
         return _active_spine_getter()
     except Exception as exc:  # pragma: no cover — defensive only
         log.warning("wrap_instrument: spine accessor raised %r", exc)
+        return None
+
+
+def _resolve_pipeline() -> Any:
+    """Return the active ``EmitPipeline`` (structural Protocol), or ``None``.
+
+    The protocol is structural: we never import :class:`EmitPipeline`
+    here because ``lca.harness`` must not statically import
+    ``lca.plugins`` (plugin tree is an optional boot-time layer). The
+    pipeline accessor is registered by the boot path via
+    :func:`set_active_pipeline_accessor` and the wrapper calls the
+    duck-typed ``emit(...)`` method.
+    """
+    if _active_pipeline_getter is None:
+        return None
+    try:
+        return _active_pipeline_getter()
+    except Exception as exc:  # pragma: no cover — defensive only
+        log.warning("wrap_instrument: pipeline accessor raised %r", exc)
         return None
 
 
@@ -104,7 +158,39 @@ def _safe_append(
     outcome: OutcomeT | None,
     span: SpanContext | None,
 ) -> None:
-    """Emit a spine event without letting a broken helper block the caller."""
+    """Emit a spine event without letting a broken helper block the caller.
+
+    When a process-local EmitPipeline accessor is installed (PR-7.1),
+    the emission is routed through it so enabled ``FieldProducer``
+    plugins may merge their keys into the payload before the
+    ``EventRecord`` is sealed. When no pipeline is installed this
+    function falls back to the direct ``EventSpine.append`` path so
+    PR-4 assembler contracts still hold under unit tests.
+    """
+    pipeline = _resolve_pipeline()
+    if pipeline is not None and spine is not None:
+        try:
+            pipeline.emit(
+                execution_point=execution_point,
+                channel=channel,
+                span_ctx=span,
+                caller_payload=payload,
+                spine=spine,
+                outcome=outcome,
+            )
+        except ValueError as exc:
+            log.warning(
+                "wrap_instrument: drop invalid event ep=%s err=%s",
+                execution_point,
+                exc,
+            )
+        except Exception as exc:
+            log.warning(
+                "wrap_instrument: pipeline emit failed ep=%s err=%s",
+                execution_point,
+                exc,
+            )
+        return
     if spine is None:
         return
     try:
@@ -366,6 +452,7 @@ __all__ = [
     "DEFAULT_START_EXECUTION_POINT",
     "WRAP_INSTRUMENTED_ATTR",
     "InstrumentedPhaseExecutor",
+    "set_active_pipeline_accessor",
     "set_active_spine_accessor",
     "wrap_executor",
     "wrap_instrument",
