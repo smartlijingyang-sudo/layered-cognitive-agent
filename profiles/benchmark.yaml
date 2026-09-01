@@ -1,0 +1,24 @@
+# benchmark profile — minimal spine composition for cost studies.
+#
+# Per §7.6.6, this profile strips the spine to the producer/sink minimum
+# required to exercise EventSpine itself: spine.core (L2 composer),
+# spine.sink.file (L0 ground-truth sink), and spine.spantree (L0 span
+# identity for causal sequencing). The reflectors / classifiers /
+# derivers / wraps are intentionally absent — only the pipeline spine
+# is on the cost ledger.
+#
+# No anomaly detector (I15/I16 omitted), no classifiers (unclassified
+# exceptions propagate as hard fails by design), no source attacher.
+
+bundles:
+  - bundles/base.yaml
+  - bundles/web-app.yaml
+  - bundles/scenario-cordis-creator.yaml
+  - bundles/declarative-phase-graph.yaml
+  - bundles/spine-benchmark-minimal.yaml
+
+patch:
+  - id: lca-llm-resolver
+    config:
+      default_model: qwen3.7-plus
+      load_dotenv: true

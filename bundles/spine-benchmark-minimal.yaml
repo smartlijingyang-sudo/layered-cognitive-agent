@@ -1,0 +1,40 @@
+# bundles/spine-benchmark-minimal.yaml — minimal spine for benchmarking (PR-8 §7.6.6).
+#
+# Only the producer / sink minimum needed to exercise EventSpine itself.
+# No anomaly detector, no classifiers (Layer-A / Layer-C both off — every
+# unclassified exception becomes a hard fail by design), no source-level
+# introspection, no derivers (the cost study excludes derived projections).
+#
+# Used by profiles/benchmark.yaml; not loaded by web-standard.
+
+name: spine-benchmark-minimal
+description: |
+  Minimal spine composition for benchmark cost studies. Only the L2
+  composer + L0 file sink + L0 span tree are wired; everything else is
+  intentionally absent so the only EventSpine path cost is the pipeline
+  itself.
+
+# Informational: which spine-side plugins this bundle wires.
+plugins:
+  - spine.core
+  - spine.spantree
+  - spine.sink.file
+
+entries:
+  - id: spine.core
+    name: spine_core
+    $module: lca.plugins.observability.spine.core
+    disabled: true   # forward-looking; PR-8 spine.core
+    config: {}
+
+  - id: spine.spantree
+    name: spine_spantree
+    $module: lca.plugins.observability.spine.spantree
+    config: {}
+
+  - id: spine.sink.file
+    name: spine_sink_file
+    $module: lca.plugins.observability.spine.sinks.file
+    disabled: true   # forward-looking; PR-8 sinks (provides file_sink)
+    config:
+      path: .lca/spine/benchmark-events.jsonl
