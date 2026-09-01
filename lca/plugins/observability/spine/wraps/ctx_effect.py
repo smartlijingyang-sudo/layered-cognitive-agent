@@ -29,7 +29,9 @@ from lca.plugins.observability.spine.runtime_hooks import install_ctx_effect_hoo
 @plugin(
     id="spine.wrap.ctx_effect",
     provides=("ctx_effect_wrap",),
-    requires=("emit_pipeline",),
+    # Pipeline is resolved at emit-time via set_active_pipeline_accessor
+    # (installed by spine.emit_pipeline); setup only publishes the installer.
+    requires=(),
     layer="L0",
     kind=PluginKind.SEAM,
     effects=EffectClass.NONE,
@@ -51,7 +53,7 @@ from lca.plugins.observability.spine.runtime_hooks import install_ctx_effect_hoo
     ),
     relations=(),
     ownership=OwnershipDeclaration(
-        reads=("emit_pipeline", "spine_context"),
+        reads=(),
         emits=("ctx_effect_wrap",),
         state_mutation="forbidden",
     ),

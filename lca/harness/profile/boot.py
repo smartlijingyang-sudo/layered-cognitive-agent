@@ -229,8 +229,20 @@ def _validate_audited_interactions(
 ) -> None:
     """Defend the declaration-to-interaction subset invariant after Fiber boot."""
 
-    undeclared_provide = audited.provided - set(definition.provided_capability_keys)
-    undeclared_require = audited.required - set(definition.required_capability_keys)
+    from lca.harness.plugin_context import requirement_covers_key
+
+    declared_provide = set(definition.provided_capability_keys)
+    declared_require = set(definition.required_capability_keys)
+    undeclared_provide = audited.provided - declared_provide
+    # Concrete keys collected via require_matching("field_producer.") are
+    # covered by a declared ``field_producer.*`` wildcard — same rule as
+    # AuditedPluginContext.require(allow_wildcard=True).
+    undeclared_require = {
+        key
+        for key in audited.required
+        if key not in declared_require
+        and not any(requirement_covers_key(pattern, key) for pattern in declared_require)
+    }
     if undeclared_provide or undeclared_require:
         raise ProfileResolveError(
             f"plugin {definition.spec.id}: undeclared interaction "

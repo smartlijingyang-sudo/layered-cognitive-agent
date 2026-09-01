@@ -2,15 +2,7 @@
 #
 # Per ADR-0165 + ADR-0165.1, the EventSpine is composed from 18 close-set
 # plugins (L2 spine.core + L1 emit_pipeline + 15 L0 producers / classifiers /
-# derivers / sinks / wraps). Profile decides which subset is enabled;
-# this bundle declares the full set with:
-#
-# - plugins already implemented under lca/plugins/observability/spine/
-#   (PR-1 .. PR-7 landing): enabled.
-# - plugins whose module path is not yet present in the tree: declared
-#   ``disabled: true`` so the profile boots today without missing-import
-#   errors. PR-8 / follow-up PRs remove the disabled flag once the module
-#   lands.
+# derivers / sinks / wraps). Profile decides which subset is enabled.
 #
 # The 19th spine plugin — `spine.reflector.source` (source-level
 # introspection, PR-9) — is intentionally omitted here. oii-debug.yaml
@@ -23,9 +15,9 @@
 
 name: spine-default
 description: |
-  Spine 18-plugin composition (PR-7 + PR-8 §7.6.6). Enabled plugins match
-  the spec; unimplemented modules are declared disabled for forward
-  compatibility. Profile overrides via `patch:` per spine design §7.6.6.
+  Spine 18-plugin composition (PR-7 + PR-8 §7.6.6). All modules are
+  present and enabled. Profile overrides via `patch:` per spine design
+  §7.6.6.
 
 # Informational: which spine-side plugins this bundle wires.
 # Source-level attacher (spine.reflector.source) is omitted here per
@@ -56,14 +48,12 @@ entries:
   - id: spine.core
     name: spine_core
     $module: lca.plugins.observability.spine.core
-    disabled: true   # forward-looking; lands with PR-8 spine.core
     config: {}
 
   # ── L1 pipeline ────────────────────────────────────────────────
   - id: spine.emit_pipeline
     name: spine_emit_pipeline
     $module: lca.plugins.observability.spine.emit_pipeline
-    disabled: true   # Task 7.8 publishes the class; live wiring deferred to PR-8.
     config: {}
 
   # ── L0 reflectors (4) ───────────────────────────────────────────
@@ -108,56 +98,47 @@ entries:
   - id: spine.deriver.step_tree
     name: spine_deriver_step_tree
     $module: lca.plugins.observability.spine.derivers.step_tree
-    disabled: true   # forward-looking; PR-8 derivers
     config: {}
 
   - id: spine.deriver.narrative
     name: spine_deriver_narrative
     $module: lca.plugins.observability.spine.derivers.narrative
-    disabled: true   # forward-looking; PR-8 derivers
     config: {}
 
   - id: spine.deriver.graph
     name: spine_deriver_graph
     $module: lca.plugins.observability.spine.derivers.graph
-    disabled: true   # forward-looking; PR-8 derivers
     config: {}
 
   - id: spine.deriver.live_tail
     name: spine_deriver_live_tail
     $module: lca.plugins.observability.spine.derivers.live_tail
-    disabled: true   # forward-looking; PR-8 derivers (requires webserver_bootstrap)
     config: {}
 
   # ── L0 sinks (2) ────────────────────────────────────────────────
   - id: spine.sink.file
     name: spine_sink_file
     $module: lca.plugins.observability.spine.sinks.file
-    disabled: true   # forward-looking; PR-8 sinks (provides file_sink)
     config:
       path: .lca/spine/events.jsonl
 
   - id: spine.sink.console
     name: spine_sink_console
     $module: lca.plugins.observability.spine.sinks.console
-    disabled: true   # forward-looking; PR-8 sinks
     config: {}
 
   # ── L0 wraps (3) ────────────────────────────────────────────────
   - id: spine.wrap.ctx_effect
     name: spine_wrap_ctx_effect
     $module: lca.plugins.observability.spine.wraps.ctx_effect
-    disabled: true   # forward-looking; PR-8 wraps
     config: {}
 
   - id: spine.wrap.ctx_intercept
     name: spine_wrap_ctx_intercept
     $module: lca.plugins.observability.spine.wraps.ctx_intercept
-    disabled: true   # forward-looking; PR-8 wraps
     config: {}
 
   - id: spine.wrap.assembler
     name: spine_wrap_assembler
     $module: lca.plugins.observability.spine.wraps.assembler
-    disabled: true   # forward-looking; PR-8 wraps (requires compile_profile)
     config: {}

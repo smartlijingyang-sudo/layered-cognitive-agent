@@ -30,7 +30,8 @@ from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugi
 @plugin(
     id="spine.wrap.assembler",
     provides=("assembler_wrap",),
-    requires=("emit_pipeline",),
+    # Pipeline is resolved at emit-time via set_active_pipeline_accessor.
+    requires=(),
     layer="L0",
     kind=PluginKind.SEAM,
     effects=EffectClass.NONE,
@@ -52,7 +53,7 @@ from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugi
     ),
     relations=(),
     ownership=OwnershipDeclaration(
-        reads=("emit_pipeline", "spine_context"),
+        reads=(),
         emits=("assembler_wrap",),
         state_mutation="forbidden",
     ),

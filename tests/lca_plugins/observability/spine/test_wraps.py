@@ -21,7 +21,8 @@ def test_ctx_effect_plugin_declares_expected_metadata() -> None:
     assert definition.spec.layer == "L0"
     assert definition.spec.kind == PluginKind.SEAM
     assert definition.provided_capability_keys == ("ctx_effect_wrap",)
-    assert any(req.key == "emit_pipeline" for req in definition.spec.requires)
+    # Pipeline is resolved at emit-time via accessor; no hard require.
+    assert definition.required_capability_keys == ()
 
 
 def test_ctx_intercept_plugin_declares_expected_metadata() -> None:
@@ -32,7 +33,7 @@ def test_ctx_intercept_plugin_declares_expected_metadata() -> None:
     assert definition.spec.layer == "L0"
     assert definition.spec.kind == PluginKind.SEAM
     assert definition.provided_capability_keys == ("ctx_intercept_wrap",)
-    assert any(req.key == "emit_pipeline" for req in definition.spec.requires)
+    assert definition.required_capability_keys == ()
 
 
 def test_assembler_plugin_declares_expected_metadata() -> None:
@@ -43,7 +44,7 @@ def test_assembler_plugin_declares_expected_metadata() -> None:
     assert definition.spec.layer == "L0"
     assert definition.spec.kind == PluginKind.SEAM
     assert definition.provided_capability_keys == ("assembler_wrap",)
-    assert any(req.key == "emit_pipeline" for req in definition.spec.requires)
+    assert definition.required_capability_keys == ()
 
 
 def test_runtime_hooks_no_longer_registers_wrap_plugins() -> None:

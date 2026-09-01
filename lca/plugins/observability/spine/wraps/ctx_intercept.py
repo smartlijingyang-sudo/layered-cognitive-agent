@@ -29,7 +29,8 @@ from lca.plugins.observability.spine.runtime_hooks import install_ctx_intercept_
 @plugin(
     id="spine.wrap.ctx_intercept",
     provides=("ctx_intercept_wrap",),
-    requires=("emit_pipeline",),
+    # Pipeline is resolved at emit-time via set_active_pipeline_accessor.
+    requires=(),
     layer="L0",
     kind=PluginKind.SEAM,
     effects=EffectClass.NONE,
@@ -51,7 +52,7 @@ from lca.plugins.observability.spine.runtime_hooks import install_ctx_intercept_
     ),
     relations=(),
     ownership=OwnershipDeclaration(
-        reads=("emit_pipeline", "spine_context"),
+        reads=(),
         emits=("ctx_intercept_wrap",),
         state_mutation="forbidden",
     ),
