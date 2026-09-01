@@ -19,6 +19,8 @@ Wrap kind            What it instruments
 The third kind (``assembler``) lives in
 :mod:`lca.harness.declarative.compile.instrument_wrap` and is already
 routed through the pipeline by :func:`~lca.harness.declarative.compile.instrument_wrap.wrap_instrument`.
+Plugin Manifests for all three wrap kinds live under
+:mod:`lca.plugins.observability.spine.wraps`.
 
 Single emission seam
 --------------------
@@ -58,23 +60,10 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
-from lca.contracts.harness.composition.plugin_contract import (
-    ArchitectureContract,
-    AuthorityContract,
-    EvidenceContract,
-    LifecycleContract,
-    PluginContract,
-    PluginIdentity,
-)
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.declarative.compile.instrument_wrap import (
     set_active_pipeline_accessor,
     set_active_spine_accessor,
 )
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 from lca.infrastructure.observability.spine.context import SpineContext
 from lca.infrastructure.observability.spine.event_record import Channel
 from lca.infrastructure.observability.spine.event_record import Outcome as OutcomeT
@@ -375,87 +364,6 @@ def install_ctx_intercept_hook(
     return _restore
 
 
-# ── plugin manifests ─────────────────────────────────────────────────
-
-
-@plugin(
-    id="spine.wrap.ctx_effect",
-    provides=("ctx_effect_wrap",),
-    requires=("emit_pipeline",),
-    layer="L0",
-    kind=PluginKind.SEAM,
-    effects=EffectClass.NONE,
-    description=(
-        "ctx_effect wrap kind — emits a context-lifecycle start event on "
-        "install and an end event from a ctx.effect disposer, both routed "
-        "through emit_pipeline so every enabled FieldProducer contributes."
-    ),
-    test_suite="tests.lca_plugins.observability.spine.test_runtime_hooks",
-    contract=PluginContract(
-        identity=PluginIdentity(version="v1"),
-        architecture=ArchitectureContract(
-            group=FunctionalGroup.G12_EVIDENCE,
-            control_slots=(ControlSlot.OBSERVE_WILDCARD,),
-        ),
-        lifecycle=LifecycleContract(allowed_scopes=(Scope.PROFILE,)),
-        authority=AuthorityContract(grants=("plugin.read_span_context",)),
-        observability=EvidenceContract(descriptors=("spine.wrap.ctx_effect",)),
-    ),
-    relations=(),
-    ownership=OwnershipDeclaration(
-        reads=("emit_pipeline", "spine_context"),
-        emits=("ctx_effect_wrap",),
-        state_mutation="forbidden",
-    ),
-)
-async def setup_ctx_effect(ctx: PluginContext, config: Any) -> None:
-    """Publish the ``ctx_effect`` installer under ``ctx_effect_wrap``.
-
-    The plugin provides the *installer*, not an installed hook: which
-    execution points get a lifecycle bracket is a profile decision made
-    by ``spine.core`` at boot, so this setup stays free of I/O and of any
-    hard-coded execution point.
-    """
-    del config  # config-free; execution points are chosen by the caller.
-    ctx.provide("ctx_effect_wrap", install_ctx_effect_hook)
-
-
-@plugin(
-    id="spine.wrap.ctx_intercept",
-    provides=("ctx_intercept_wrap",),
-    requires=("emit_pipeline",),
-    layer="L0",
-    kind=PluginKind.SEAM,
-    effects=EffectClass.NONE,
-    description=(
-        "ctx_intercept wrap kind — replaces a named host attribute with a "
-        "start/end bracketing wrapper routed through emit_pipeline; the "
-        "un-patch is registered via ctx.effect so the kernel owns teardown."
-    ),
-    test_suite="tests.lca_plugins.observability.spine.test_runtime_hooks",
-    contract=PluginContract(
-        identity=PluginIdentity(version="v1"),
-        architecture=ArchitectureContract(
-            group=FunctionalGroup.G12_EVIDENCE,
-            control_slots=(ControlSlot.OBSERVE_WILDCARD,),
-        ),
-        lifecycle=LifecycleContract(allowed_scopes=(Scope.PROFILE,)),
-        authority=AuthorityContract(grants=("plugin.read_span_context",)),
-        observability=EvidenceContract(descriptors=("spine.wrap.ctx_intercept",)),
-    ),
-    relations=(),
-    ownership=OwnershipDeclaration(
-        reads=("emit_pipeline", "spine_context"),
-        emits=("ctx_intercept_wrap",),
-        state_mutation="forbidden",
-    ),
-)
-async def setup_ctx_intercept(ctx: PluginContext, config: Any) -> None:
-    """Publish the ``ctx_intercept`` installer under ``ctx_intercept_wrap``."""
-    del config  # config-free; targets are chosen by the caller.
-    ctx.provide("ctx_intercept_wrap", install_ctx_intercept_hook)
-
-
 __all__ = [
     "CTX_EFFECT_PROVENANCE",
     "CTX_INTERCEPT_PROVENANCE",
@@ -464,7 +372,5 @@ __all__ = [
     "install_ctx_intercept_hook",
     "resolve_active_pipeline",
     "resolve_active_spine",
-    "setup_ctx_effect",
-    "setup_ctx_intercept",
     "wrap_ctx_intercept",
 ]
