@@ -122,6 +122,30 @@ def _constant_producer(name: str, priority: int, fields: dict[str, Any]) -> Fiel
     return p
 
 
+def _source_attacher_producer() -> FieldProducer:
+    """Return a stub SourceAttacher that injects ``source_location``.
+
+    Task 9.2 introduces I17 enforcement: every ``*.start`` event MUST
+    carry ``source_location`` (ADR-0165.1 §96). Tests focused on other
+    behaviour (merge order, anomaly wiring, producer isolation) use
+    this stub so they can keep emitting ``brain.perceive.start``
+    without satisfying the real SourceAttacher machinery. The dedicated
+    I17 tests in ``tests/observability/spine/test_i17_enforcement.py``
+    pin the enforcement itself.
+    """
+    return _constant_producer(
+        "spine.reflector.source",
+        8,
+        {
+            "source_location": {
+                "file": "stub",
+                "line": 0,
+                "function": "stub",
+            }
+        },
+    )
+
+
 class _CountingAnomaly:
     """Counts ``on_event`` invocations and records the events seen."""
 
@@ -142,9 +166,10 @@ def test_three_producers_merge_in_priority_order_without_overlap() -> None:
     p_low = _constant_producer("low", 10, {"a": 1, "shared_low": "low-wins"})
     p_mid = _constant_producer("mid", 20, {"b": 2, "shared_mid": "mid"})
     p_high = _constant_producer("high", 30, {"c": 3, "shared_high": "high-loses"})
+    p_src = _source_attacher_producer()
 
     anomaly = _CountingAnomaly()
-    pipeline = EmitPipeline(producers=[p_low, p_mid, p_high], anomaly=anomaly)
+    pipeline = EmitPipeline(producers=[p_low, p_mid, p_high, p_src], anomaly=anomaly)
     spine = _make_spine()
 
     record = pipeline.emit(
@@ -174,10 +199,11 @@ def test_producers_are_sorted_by_priority_each_emit() -> None:
 
     p_low = _constant_producer("low", 10, {"order_low": "ten"})
     p_high = _constant_producer("high", 30, {"order_high": "thirty"})
+    p_src = _source_attacher_producer()
 
     anomaly = _CountingAnomaly()
     # Supply high-first; pipeline must sort ascending before merging.
-    pipeline = EmitPipeline(producers=[p_high, p_low], anomaly=anomaly)
+    pipeline = EmitPipeline(producers=[p_high, p_low, p_src], anomaly=anomaly)
     spine = _make_spine()
 
     record = pipeline.emit(
@@ -199,8 +225,9 @@ def test_disabled_producers_are_skipped() -> None:
     p_off = _constant_producer("off", 10, {"ghost": "should-not-appear"})
     p_off.enabled = False
     p_on = _constant_producer("on", 20, {"live": "kept"})
+    p_src = _source_attacher_producer()
 
-    pipeline = EmitPipeline(producers=[p_off, p_on], anomaly=_CountingAnomaly())
+    pipeline = EmitPipeline(producers=[p_off, p_on, p_src], anomaly=_CountingAnomaly())
     spine = _make_spine()
 
     record = pipeline.emit(
@@ -223,8 +250,9 @@ def test_anomaly_detector_is_called_once_per_emit() -> None:
     from lca.plugins.observability.spine.emit_pipeline import EmitPipeline
 
     p = _constant_producer("only", 10, {"k": "v"})
+    p_src = _source_attacher_producer()
     anomaly = _CountingAnomaly()
-    pipeline = EmitPipeline(producers=[p], anomaly=anomaly)
+    pipeline = EmitPipeline(producers=[p, p_src], anomaly=anomaly)
     spine = _make_spine()
 
     pipeline.emit(
@@ -258,7 +286,8 @@ def test_anomaly_detector_exception_is_contained() -> None:
             raise RuntimeError("anomaly boom")
 
     p = _constant_producer("only", 10, {"k": "v"})
-    pipeline = EmitPipeline(producers=[p], anomaly=_BoomAnomaly())
+    p_src = _source_attacher_producer()
+    pipeline = EmitPipeline(producers=[p, p_src], anomaly=_BoomAnomaly())
     spine = _make_spine()
 
     record = pipeline.emit(
@@ -284,9 +313,10 @@ def test_producer_exception_does_not_stop_other_producers() -> None:
     boom = _failing_producer("boom", 10)
     survivor = _constant_producer("survivor", 20, {"survived": True})
     late = _constant_producer("late", 30, {"late_field": 1})
+    p_src = _source_attacher_producer()
 
     anomaly = _CountingAnomaly()
-    pipeline = EmitPipeline(producers=[boom, survivor, late], anomaly=anomaly)
+    pipeline = EmitPipeline(producers=[boom, survivor, late, p_src], anomaly=anomaly)
     spine = _make_spine()
 
     record = pipeline.emit(
@@ -358,8 +388,10 @@ def test_module_export_surface() -> None:
 
     assert hasattr(emit_pipeline_module, "EmitPipeline")
     assert hasattr(emit_pipeline_module, "setup")
+    assert hasattr(emit_pipeline_module, "I17Violation")
     assert "EmitPipeline" in emit_pipeline_module.__all__
     assert "setup" in emit_pipeline_module.__all__
+    assert "I17Violation" in emit_pipeline_module.__all__
 
 
 # ── EventSink protocol conformance for the capture sink ──────────────

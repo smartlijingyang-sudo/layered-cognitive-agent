@@ -20,7 +20,10 @@ required by ADR-0165 / ADR-0165.1 §7.5.7. Every call to
    auto-source).
 4. ``EventRecord`` is constructed through ``EventSpine.append`` which
    enforces I12 (close-set ``execution_point`` / ``channel`` /
-   ``outcome`` / ``phase``).
+   ``outcome`` / ``phase``). The pipeline additionally enforces I17
+   (ADR-0165.1 §96): every ``*.start`` event MUST carry
+   ``source_location`` or ``I17Violation`` is raised before the
+   ``EventRecord`` is appended.
 5. The bound ``AnomalyDetector.on_event`` is invoked on the sealed
    ``EventRecord``. Its exceptions are contained (FD-2 — best-effort
    anomaly detection must never block emission).
@@ -79,6 +82,21 @@ from lca.infrastructure.observability.spine.event_spine import EventSpine
 from lca.infrastructure.observability.spine.manifest import EXECUTION_POINTS
 
 log = logging.getLogger(__name__)
+
+
+# ── exceptions ───────────────────────────────────────────────────────
+
+
+class I17Violation(Exception):  # noqa: N818 — name mandated by Task 9.2 brief
+    """Raised when a ``*.start`` event is emitted without ``source_location``.
+
+    I17 (ADR-0165.1 §96) requires every ``*.start`` execution point to
+    carry a ``source_location`` field produced by the SourceAttacher
+    plugin (Task 9.1). The check lives in ``EmitPipeline.emit`` so a
+    pipeline wired without SourceAttacher cannot silently append a
+    non-compliant record; the failure surfaces to the caller with the
+    offending execution_point for log triage.
+    """
 
 
 # ── contracts ────────────────────────────────────────────────────────
@@ -234,6 +252,19 @@ class EmitPipeline:
                 f"UnknownExecutionPoint({execution_point!r}): not in EXECUTION_POINTS whitelist"
             )
 
+        # Step 3a: I17 — every ``*.start`` event MUST carry a
+        # ``source_location`` field (ADR-0165.1 §96). Check happens
+        # after the producer + caller_payload merge so a
+        # ``source_location`` injected by either side satisfies the
+        # invariant; raising here keeps non-compliant emissions out of
+        # the spine entirely (fail-fast at the seam).
+        if execution_point.endswith(".start") and "source_location" not in merged:
+            raise I17Violation(
+                f"I17: execution_point={execution_point!r} requires "
+                f"'source_location' in payload (ADR-0165.1 §96); "
+                f"SourceAttacher producer missing or disabled"
+            )
+
         record = spine.append(
             execution_point=execution_point,
             channel=channel,
@@ -327,4 +358,4 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     )
 
 
-__all__ = ["EmitPipeline", "setup"]
+__all__ = ["EmitPipeline", "I17Violation", "setup"]
