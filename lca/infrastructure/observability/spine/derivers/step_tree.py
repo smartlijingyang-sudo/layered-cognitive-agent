@@ -51,7 +51,14 @@ class StepTreeDeriver(Deriver):
         (logs a warning pointing callers at ``step_lifecycle.*`` facade).
         Forwarding keeps the wrap contractually honest: every event the
         spine produces still reaches the backend's surface.
+
+        Orphan events (``phase="orphan"``) are skipped — they have no
+        step to attach to, must not enter the step-tree projection, and
+        are still visible via the append-only ``events.jsonl`` sink
+        (ADR-0165.1 §19, PR-6).
         """
+        if event.phase != "live":
+            return
         try:
             self._backend.write(_wrap(event))  # type: ignore[arg-type]
         except Exception as exc:
