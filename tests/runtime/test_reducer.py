@@ -70,7 +70,14 @@ def test_apply_activation_extends_skills() -> None:
     assert out.activated_skills == [activated[0]]
 
 
-def test_apply_stop_writes_status_and_output() -> None:
+def test_apply_stop_writes_status_only() -> None:
+    """ADR-0158 决策 四:apply_stop 只折叠 status / last_error;final_output 由
+    StopDecision 携带并由 apply_terminal_outcome 转入 TerminalOutcome.final_output_ref。
+
+    旧 test_apply_stop_writes_status_and_output 断言 state.final_output == "done"
+    已不适用(字段已删除)。
+    """
+
     state = _state()
     stop = StopDecision(
         should_stop=True,
@@ -80,22 +87,25 @@ def test_apply_stop_writes_status_and_output() -> None:
     )
     out = DefaultReducer().apply_stop(state, stop)
     assert out.status == TaskStatus.COMPLETED
-    assert out.final_output == "done"
+    # final_output 不在 AgentState 上;StopDecision.final_output 由
+    # apply_terminal_outcome 读走,见 test_apply_terminal_outcome_uses_stop_final_output
 
 
-def test_apply_stop_preserves_artifact_closed_output() -> None:
+def test_apply_stop_does_not_mutate_state_final_output_field() -> None:
+    """ADR-0158 决策 四:AgentState 已无 final_output 字段;apply_stop 不再尝试写入。"""
+
     state = _state()
-    state.final_output = "done\n\n[artifact closure]"
     stop = StopDecision(
         should_stop=True,
         reason="completed",  # type: ignore[arg-type]
         status=TaskStatus.COMPLETED,
-        final_output="done",
+        final_output="done\n\n[artifact closure]",
     )
 
     out = DefaultReducer().apply_stop(state, stop)
-
-    assert out.final_output == "done\n\n[artifact closure]"
+    # 既无 final_output 字段可断言;改断言 stop.final_output 透传(stop 不可变)
+    assert stop.final_output == "done\n\n[artifact closure]"
+    assert "final_output" not in out.__annotations__
 
 
 def test_apply_error_marks_failed() -> None:

@@ -110,8 +110,9 @@ class AgentStateProjection:
             # Update status from checkpoint
             status_str = data.get("status", "working")
             state.status = _parse_status(status_str)
-            if data.get("answer"):
-                state.final_output = data["answer"]
+            # ADR-0158 决策 四:AgentState.final_output 字段已删除。
+            # answer 文本走 TerminalOutcome.final_output_ref 通道
+            # (projection 反序列化仅折叠 status / error)。
             if data.get("error"):
                 state.last_error = data["error"]
 
@@ -136,7 +137,8 @@ class AgentStateProjection:
             "task": state.task,
             "step": state.step,
             "status": state.status.value,
-            "final_output": state.final_output,
+            # ADR-0158 决策 四:final_output 不再是 agentState 字段;
+            # view 不导出该键;调用方改读 TerminalOutcome.final_output_ref。
             "last_error": state.last_error,
             "working_memory_keys": list(state.working_memory.keys()),
             "history_length": len(state.history),

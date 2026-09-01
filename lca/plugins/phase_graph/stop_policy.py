@@ -110,10 +110,11 @@ class DefaultStopPolicy(StopPolicy):
     ) -> StopDecision:
         last_ok = observation is not None and observation.success
         final_output = self._artifact_closure.synthesize()
+        # ADR-0158 决策 四:AgentState.final_output 字段已删除;
+        # fallback 链改为 Stop决策.last_output_ref(预留)或 observation.payload。
         if (
             final_output is None
             and last_ok
-            and state.final_output is None
             and observation is not None
             and isinstance(observation.payload, str)
         ):

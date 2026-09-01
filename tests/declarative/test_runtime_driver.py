@@ -133,4 +133,7 @@ async def test_cognitive_runtime_executes_compiled_phase_graph() -> None:
     assert body.calls == 1
     assert memory.updates == 1
     assert result.status is TaskStatus.COMPLETED
-    assert result.output == "done\n\n[artifact closure]"
+    # ADR-0158 决策 四 + 二:Result.output 仅来自 TerminalOutcome.final_output_ref
+    # (= stop.final_output = "done");artifact_closure 不再拼到 state.final_output,
+    # 改走 transport projection 通道(answer channel)。
+    assert result.output == "done"

@@ -63,7 +63,10 @@ class Reducer(Protocol):
         ...
 
     def apply_stop(self, state: AgentState, stop: StopDecision) -> AgentState:
-        """fold ``StopDecision`` 到 state.final_output / state.status。"""
+        """fold ``StopDecision`` 到 state.status / state.last_error。
+        final_output 走 StopDecision.final_output → TerminalOutcome.final_output_ref
+        (ADR-0077 sole terminal truth);AgentState.final_output 字段已删除
+        (ADR-0158 决策 四)。"""
         ...
 
     def apply_terminal_outcome(

@@ -153,7 +153,9 @@ class StopDeltaHandler(DeltaHandler):
     """处理 ``stop`` delta：调用 ``reducer.apply_stop``。
 
     ADR-0074：从 ``delta.metadata["stop"]`` 提取 StopDecision，折叠到
-    state.final_output / state.status。
+    state.status / state.last_error。final_output 由 TerminalOutcome
+    final_output_ref 通道流通(ADR-0077);AgentState.final_output 字段已删除
+    (ADR-0158 决策 四)。
     """
 
     def apply(self, state: AgentState, delta: RunDelta, reducer: Reducer) -> AgentState:

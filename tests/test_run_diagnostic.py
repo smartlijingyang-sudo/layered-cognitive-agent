@@ -49,6 +49,7 @@ def test_run_diagnostic_is_frozen_and_serialisable() -> None:
     )
     # Frozen
     import pytest
+
     with pytest.raises(FrozenInstanceError):
         diag.error_type = "Other"
     # JSON-friendly
@@ -61,11 +62,7 @@ def test_run_diagnostic_is_frozen_and_serialisable() -> None:
 def test_phase_failure_stop_result_binds_diagnostic_not_final_output() -> None:
     failure = PhaseExecutionFailure(
         node_id="think.main",
-        attempts=(
-            PhaseAttemptFailure(
-                attempt=1, category="permanent", error_type="RuntimeError"
-            ),
-        ),
+        attempts=(PhaseAttemptFailure(attempt=1, category="permanent", error_type="RuntimeError"),),
     )
     res = phase_failure_stop_result(
         failure,
@@ -114,8 +111,10 @@ def test_reducer_apply_stop_propagates_diagnostic_message() -> None:
     DefaultReducer().apply_stop(state, stop)
     # The diagnostic message replaces what used to be a fixed Chinese fallback.
     assert "think.main step after 1 attempt" in (state.last_error or "")
-    # And final_output stays None — no string conflation with the success slot.
-    assert state.final_output is None
+    # ADR-0158 决策 四:AgentState.final_output 字段已删除;final output
+    # 走 TerminalOutcome.final_output_ref。apply_stop 不再尝试写入 final_output,
+    # 故无需断言;改断言 stop.failure 仍透传到 state.last_error。
+    assert stop.failure is not None
 
 
 def test_terminal_outcome_error_ref_carries_diagnostic() -> None:
@@ -162,9 +161,7 @@ def test_phase_failure_stop_result_no_final_output_when_only_failure() -> None:
     """
     failure = PhaseExecutionFailure(
         node_id="think.main",
-        attempts=(
-            PhaseAttemptFailure(attempt=1, category="permanent", error_type="E"),
-        ),
+        attempts=(PhaseAttemptFailure(attempt=1, category="permanent", error_type="E"),),
     )
     res = phase_failure_stop_result(failure, plan_ref="p", run_id="r", trace_id="t")
     stop: StopDecision = res.payload

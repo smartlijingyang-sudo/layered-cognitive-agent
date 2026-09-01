@@ -107,7 +107,11 @@ class AgentState:
     from_role: str = ""
     team_awareness: TeamAwareness | None = None
     history: list[Turn] = field(default_factory=list)
-    final_output: Any | None = None
+    # ADR-0158 决策 四:final_output 字段已删除(原 line 110)。事实答案
+    # 改走 TerminalOutcome.final_output_ref(ADR-0077 sole terminal truth)。
+    # 旧字段名引用统计:reducer.py 4 处 + agent_state.py 2 处 +
+    # stop_policy.py 1 处 + delta_handlers.py docstring 1 处,
+    # 本 commit 同步迁移。
     last_error: str | None = None
     active_template: str | None = None
     activated_skills: list[ActivatedSkill] = field(default_factory=list)

@@ -89,13 +89,8 @@ class DefaultReducer(Reducer):
     def apply_stop(self, state: AgentState, stop: StopDecision) -> AgentState:
         if stop.status is not None:
             state.status = stop.status
-        # Terminal outcome construction may fold the same stop twice: once
-        # through the stop delta and once after artifact closure.  Preserve the
-        # richer closed output instead of replacing it with the raw response.
-        if stop.final_output is not None and (
-            not state.final_output or state.final_output == stop.final_output
-        ):
-            state.final_output = stop.final_output
+        # ADR-0158 决策 四:AgentState.final_output 字段已删除;stop 输出经
+        # TerminalOutcome.final_output_ref 流通(本函数仅折叠 status / last_error)。
         # ADR-0122: typed failure detail propagates through stop.failure →
         # state.last_error, so the doctor_report / TerminalOutcome surfaces
         # carry the real exception rather than a fixed Chinese fallback.
@@ -119,15 +114,25 @@ class DefaultReducer(Reducer):
         the TerminalOutcome from the resulting state. The caller (DeclarativeRuntimeDriver)
         must use the returned TerminalOutcome as the sole source of terminal truth
         instead of calling Result.from_state(state).
+
+        ADR-0158 决策 四 + 决策 十:AgentState.final_output 字段已删除;
+        final_output 来源改为:(a) StopDecision.final_output 显式传入;
+        (b) state.history[-1].decision.response_text(decision 的载体文本);
+        (c) handoff completion 走 "handoff completed" 占位(仅在 output_text
+        为空时 materialization)。
         """
         # Apply stop to state first (legacy compatibility)
         state = self.apply_stop(state, stop)
+
+        # ADR-0158 决策 四:final_output 来源整合(不再读 state.final_output)。
+        # 优先级:StopDecision.final_output > last_turn.decision.response_text
+        response_text = self._extract_response_text(state, stop)
 
         # Determine outcome kind from state.status. A terminal stop carrying
         # output is authoritative even when older StopDecision producers omit
         # the optional status field; otherwise the output would be discarded by
         # the zero-output guard.
-        if state.status == TaskStatus.WORKING and stop.should_stop and bool(state.final_output):
+        if state.status == TaskStatus.WORKING and stop.should_stop and bool(response_text):
             state.status = TaskStatus.COMPLETED
 
         if state.status == TaskStatus.WORKING:
@@ -143,17 +148,9 @@ class DefaultReducer(Reducer):
             # A handoff is a valid completion even when its carrier has no
             # response text. Materialize a stable terminal marker so the
             # ADR-0077 TerminalOutcome still has the required output ref.
-            final_output = state.final_output
-            output_text = (
-                final_output
-                if isinstance(final_output, str)
-                else str(final_output)
-                if final_output
-                else ""
-            )
+            output_text = response_text or ""
             if not output_text.strip() and self._is_handoff_completion(state):
                 output_text = "handoff completed"
-                state.final_output = output_text
             if not output_text.strip():
                 kind = TerminalOutcomeKind.FAILED
                 state.status = TaskStatus.FAILED
@@ -183,15 +180,11 @@ class DefaultReducer(Reducer):
             # DEGRADED or unknown status
             kind = TerminalOutcomeKind.DEGRADED
 
-        # Build final_output_ref if we have output
+        # Build final_output_ref if we have output(ADR-0158 决策 四:
+        # 输出文本从 response_text local 变量来,不再读 state.final_output 字段)
         final_output_ref = None
-        if kind == TerminalOutcomeKind.COMPLETED and state.final_output:
-            output_text = (
-                state.final_output
-                if isinstance(state.final_output, str)
-                else str(state.final_output)
-            )
-            final_output_ref = TextRef(text=output_text, seq=journal_seq_end, cursor="")
+        if kind == TerminalOutcomeKind.COMPLETED and response_text:
+            final_output_ref = TextRef(text=response_text, seq=journal_seq_end, cursor="")
 
         # Build error_ref. The ADR-0077 invariant for FAILED requires
         # ``error_ref`` to be set; upstream ``StopDecision`` does not carry
@@ -253,6 +246,26 @@ class DefaultReducer(Reducer):
         last = state.history[-1]
         decision = getattr(last, "decision", None)
         return decision is not None and decision.action_type == ActionType.HANDOFF
+
+    def _extract_response_text(self, state: AgentState, stop: StopDecision) -> str | None:
+        """Resolve terminal response text without touching AgentState.final_output.
+
+        ADR-0158 决策 四:AgentState.final_output 字段已删除;final output 改由
+        StopDecision.final_output 显式传入,或回退到 state.history[-1].decision.response_text。
+
+        返回值:non-empty str 表示有 carrier;空/None 表示走 handoff 占位或
+        失败回退。
+        """
+        if stop.final_output:
+            return stop.final_output
+        if not state.history:
+            return None
+        last = state.history[-1]
+        decision = getattr(last, "decision", None)
+        if decision is None:
+            return None
+        text = getattr(decision, "response_text", None)
+        return text if isinstance(text, str) and text else None
 
     def apply_error(self, state: AgentState, error: BaseException) -> AgentState:
         state.status = TaskStatus.FAILED
