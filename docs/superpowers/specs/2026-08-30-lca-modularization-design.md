@@ -13,7 +13,7 @@ LCA 现有架构基础较强：五层单向分层（`contracts → infrastructur
 
 但当前状态在三个具体方面没有强约束，导致新贡献者上手成本依然偏高：
 
-1. **包职责不外显**：开发者必须先读 AGENTS.md §3 + 多个 ADR + `docs/specs/structured-cognition-guide.md` 才能判断"这个包能放什么、不能放什么"。每个包没有机器可读的契约。
+1. **包职责不外显**：开发者必须先读 AGENTS.md §3 + 多个 ADR + `docs/specs/lca-structured-cognition-guide.md` 才能判断"这个包能放什么、不能放什么"。每个包没有机器可读的契约。
 2. **层名是编号不是语义**：`lca.infrastructure` / `lca.cognition` / `lca.runtime` / `lca.agent` / `lca.application` 表达顺序清晰，但表达职责模糊；新人需要"先背 L0–L4 顺序 → 再查 ADR-0001 才知道每个层做什么"。
 3. **命名规范只在文档**：`docs/specs/naming-conventions.md` 已经明确禁 `Impl / Manager / Helper / Common`，但仓库仍有历史违规文件（如 `trace_tool.py` 一类的"tool" 后缀），且无 CI 强约束，新代码仍可能继续引入模糊命名。
 
@@ -547,7 +547,7 @@ lca/infrastructure/observability/trace_tool.py  # 历史命名，Phase 3 不强�
 - ADR-0001（五层单向）、ADR-0004（Protocol-First）、ADR-0005（Composition Root L4）、ADR-0072（Null 默认纪律）
 - `docs/specs/naming-conventions.md`（命名规范）
 - `docs/specs/documentation-map.md`（文档地图）
-- `docs/specs/structured-cognition-guide.md`（结构化认知）
+- `docs/specs/lca-structured-cognition-guide.md`（结构化认知）
 - `docs/design/2026-08-19-cognitive-primitive-constitution-v3.md`（认知原语宪法）
 - Python Packaging User Guide — [src layout vs flat layout](https://packaging.python.org/en/latest/discussions/src-layout-vs-flat-layout/)
 - import-linter — [Contract types](https://import-linter.readthedocs.io/en/stable/contract_types/)

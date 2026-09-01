@@ -526,4 +526,4 @@ act.main 节点
 - **control entry** —— 计划里治理/观测贡献的唯一事实源。
 - **plan_ref** —— `CompiledRunPlan` 的 SHA-256 短摘要，跨进程身份证。
 - **control slot** —— 插件级声明，标明它占据哪个治理位置（架构级）。
-- **seam / provider / adapter / registry / plugin / profile / bundle** —— 见 [structured-cognition-guide.md](structured-cognition-guide.md)。
+- **seam / provider / adapter / registry / plugin / profile / bundle** —— 见 [lca-structured-cognition-guide.md](lca-structured-cognition-guide.md)。

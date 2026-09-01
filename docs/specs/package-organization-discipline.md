@@ -85,7 +85,7 @@
 
 ## 5. 概念群映射（v3 八群对齐）
 
-按照 [v3 认知原语宪法 §3.2](../design/2026-08-19-cognitive-primitive-constitution-v3.md) 与 [结构化认知指南 §3](./structured-cognition-guide.md)，业务包目录优先按以下九群命名。每个群代表一条职责边界：
+按照 [v3 认知原语宪法 §3.2](../design/2026-08-19-cognitive-primitive-constitution-v3.md) 与 [结构化认知指南 §3](./lca-structured-cognition-guide.md)，业务包目录优先按以下九群命名。每个群代表一条职责边界：
 
 | 群 | 关键字 | 典型内容 | 当前样例 |
 |---|---|---|---|
@@ -618,7 +618,7 @@ lca/contracts/protocols/
 | 运行时骨架 | `docs/specs/harness-spine-spec.md` |
 | 认知原语宪法 | `docs/design/2026-08-19-cognitive-primitive-constitution-v3.md` |
 | 声明式阶段图 | `docs/specs/declarative-phase-graph-spec.md` |
-| 结构化认知指南 | `docs/specs/structured-cognition-guide.md` |
+| 结构化认知指南 | `docs/specs/lca-structured-cognition-guide.md` |
 | Run 实时流 | `docs/specs/run-live.md` |
 | 工具失败恢复 | `docs/specs/tool-failure-recovery.md` |
 | 术语表 | `docs/specs/glossary.md` |

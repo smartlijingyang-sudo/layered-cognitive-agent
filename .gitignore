@@ -27,6 +27,7 @@ lobehub-ui/
 output/
 .coverage.*.pid*
 web/
+.lca/
 
 # Node modules
 packages/*/node_modules/

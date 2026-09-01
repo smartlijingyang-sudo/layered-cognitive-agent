@@ -5,7 +5,7 @@
 | 命令 | 用途 |
 |---|---|
 | `status` | 全站状态(kernel_serve / infra / lobehub / daemon / onlyboxes) |
-| `heal` / `stop` | 外部服务(`infra/lobehub/daemon`)的生命周期自愈与停止;`restart`/`compose`/`dev` 已删;LCA 进程入口是 `uv run python -m lca_kernel serve`,由 `lca_kernel.lifecycle` 守护 |
+| `heal` / `stop` | 生命周期(`restart` 已删;kernel 进程由 `kernel_serve` 自管,`heal` 会自愈) |
 | `logs` | journal 事实流(可加 `--replay` 从 materialization 重放) |
 | `inspect-tree <profile.yaml>` | 解析后的插件树 + capability 图 |
 | `dump-profile <profile.yaml>` | 展开 bundle + patch 的 entries |
@@ -16,8 +16,7 @@
 | 命令 | 用途 |
 |---|---|
 | `cost <run_id> [--by model\|phase\|tool]` | 按 pricing_ref 重算 cost |
-| `trace <run_id> [--format mermaid]` | trace 报告 (legacy `journal.jsonl`) |
-| `journal trace <run_id> [--locals] [--source] [--json]` | spine `events.jsonl` 轨迹(PR-9 I17 起生效);`--locals` 追加 `next_frame` + `locals_snapshot` 列 |
+| `trace <run_id> [--format mermaid]` | trace 报告 |
 | `explain <run_id>` | 失败因果链 |
 | `graph <run_id>` | 插件交互图 |
 | `minimal-repro <run_id>` | 最小复现包 |

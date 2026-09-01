@@ -1,6 +1,6 @@
 # Layered Cognitive Agent（LCA）Coding Agent 指南
 
-LCA（Layered Cognitive Agent）是基于 vendored Cordis 的 Python 插件化认知 Agent 框架。它把**事实、状态、认知、治理、执行、记忆、协作和组合**分成可替换、可验证的层次。本文件面向 coding agent，说明项目上下文、代码位置、架构边界、编码规范和验证方式；完整术语与认知模型见[《LCA 技术名词与结构化层次认知指南》](docs/specs/structured-cognition-guide.md)。
+LCA（Layered Cognitive Agent）是基于 vendored Cordis 的 Python 插件化认知 Agent 框架。它把**事实、状态、认知、治理、执行、记忆、协作和组合**分成可替换、可验证的层次。本文件面向 coding agent，说明项目上下文、代码位置、架构边界、编码规范和验证方式；完整术语与认知模型见[《LCA 技术名词与结构化层次认知指南》](docs/specs/lca-structured-cognition-guide.md)。
 
 ## 1. 开始前必须知道
 
@@ -47,7 +47,7 @@ vendor/                       Cordis、Cosmokit、Schemastery
 | Body / SafeExecutor | `lca/cognition/body/` |
 | Journal / Projection | `lca/contracts/models/observability/`、`lca/infrastructure/observability/` |
 | Agent / Team | `lca/application/spawn.py`、`lca/agent/` |
-| 平台操作(外部服务) | `./scripts/lca-ops`(只管 `infra/lobehub/daemon/onlyboxes`,进程入口是 `uv run python -m lca_kernel serve --profile X`,详见 §6 与 ADR-0119) |
+| 平台操作 | `./scripts/lca-ops`(含 `kernel {boot,serve}` 子命令;`stop / compose / dev / restart` 已删) |
 
 ## 3. 架构不变量
 
@@ -113,7 +113,7 @@ Fact → State → Decision / Plan → Verdict → Effect → Observation / Jour
 
 ## 6. 命令与验证
 
-`./scripts/lca-ops` 不带参数打印手册。常用命令:`status/heal` 查/自愈外部服务(`infra/lobehub/daemon`,无 `stop/compose/dev/restart`);`logs [-v] [-d] [--replay]` 查看 Journal;`inspect-tree <profile>` 查看插件树;`dump-profile <profile>` 展开配置;`diagnose <alias>` 运行内置诊断。给脚本消费时使用 `--json`。LCA 进程入口是 `uv run python -m lca_kernel serve --profile <yaml> --host H --port P`(SIGTERM 由 `lca_kernel.lifecycle` 守护),不在 `lca-ops` 管辖范围,详见 ADR-0119。
+`./scripts/lca-ops` 不带参数打印手册。常用命令：`status/heal/stop` 管理外部服务生命周期(`dev/restart` 已删;kernel 进程由 `kernel_serve` 自管,`heal` 会自愈);`logs [-v] [-d] [--replay]` 查看 Journal;`inspect-tree <profile>` 查看插件树;`dump-profile <profile>` 展开配置;`debug tree|run|scope` 查看 Context;`diagnose <alias>` 运行诊断;`provision` 部署 daemon。需要给脚本消费时使用 `--json`。
 
 默认循环：
 
@@ -135,7 +135,7 @@ uv run vulture lca --min-confidence 80
 
 `real_llm` 默认不运行；需凭证和明确意图时才执行 `uv run pytest -m real_llm -v`。报告结果必须写出实际命令；局部测试通过不能称为全量通过。
 
-关键门禁(`scripts/check_*.py`、`verify_md_links.py`、`verify_doc_budgets.py`、`check_doc_layering.py`、`check_kernel_boundary.py`)索引见 [docs/architecture/checks.md](docs/architecture/checks.md)。importlinter 契约定义在 `pyproject.toml`,包括 `kernel-domain-isolation`、`transport-isolation`(kernel/transport 边界)。
+关键门禁包括：`check_protocol_impl.py`、`check_plugin_typing.py`、`check_no_any.py`、`check_no_bare_strings.py`、`check_assembly_purity.py`、`check_no_flat_runs.py`、`verify_md_links.py`、`verify_doc_budgets.py`、`scripts/check_kernel_boundary.py`(本批 PR-7 增,聚合 `tests/lca_kernel/test_boundary.py` AST + 全量 kernel 测试 + importlinter `kernel-domain-isolation` / `transport-isolation`)、importlinter 契约 `kernel-domain-isolation` + `transport-isolation`(pyproject.toml;PR-7 重配为 forbidden top-level `lca_kernel` + `ignore_imports` 白名单,因 importlinter 2.13 不支持 forbid 外部包子模块)。
 
 | 改动 | 最低要求 |
 |---|---|
@@ -147,7 +147,6 @@ uv run vulture lca --min-confidence 80
 | `lca-kernel/` / `lca/plugins/transport/` / `lca/infrastructure/env/` | `scripts/check_kernel_boundary.py` + importlinter `kernel-domain-isolation` & `transport-isolation` + 87 + 24 + 19 kernel/transport/env 测试 (含本批新增 28 项 K8 HMR + 5 项 boot event emission) |
 | Contracts、Protocol、枚举、注册表、Journal、Profile | 全量验证 |
 
-
 ## 7. Git 与禁止事项
 
 使用 Conventional Commits：`<type>(<scope>): <subject>`，正文说明做了什么和为什么；常用类型为 `feat`、`fix`、`docs`、`refactor`、`test`、`chore`、`perf`。一个提交只包含一个主题；不要使用 `--no-verify`，不要提交密钥、运行产物或环境文件；远程更新优先 `git pull --rebase`。
@@ -155,7 +154,3 @@ uv run vulture lca --min-confidence 80
 禁止反向依赖 `application`、无 ADR 扩大闭集、绕过 Reducer 改 State、绕过 Body 执行副作用、Gateway 绑定具体认知实现、插件自行读取凭证、通过新事件词表或新 schema 绕过现有机制。不要直接改生成的 `lobehub-ui/` 或 vendor；LobeHub 改 `deploy/lobehub/patches/` 后重新应用，vendor 改动必须有明确升级或修复理由。
 
 根级 AGENTS.md 只保留 coding agent 高频需要的上下文、判断规则、强制约束、命令和验证矩阵；详细解释放专题文档，架构原因放 ADR，实施状态放计划或报告。
-
-## 8. 文档分层与归位
-
-文档归属、写作要求和 word budget 见 [docs/AGENTS.md](docs/AGENTS.md);目录导航见 [docs/specs/documentation-map.md](docs/specs/documentation-map.md)。新写文档前先判断:实施过程/审计/计划 → `history/`;当前契约/操作 → `docs/specs/`;架构决策 → `docs/adr/`;长期设计 → `docs/design/`;角色/技能/部署组件就近。
