@@ -63,6 +63,7 @@ entries:
   - id: spine.emit_pipeline
     name: spine_emit_pipeline
     $module: lca.plugins.observability.spine.emit_pipeline
+    disabled: true   # Task 7.8 publishes the class; live wiring deferred to PR-8.
     config: {}
 
   # ── L0 reflectors (4) ───────────────────────────────────────────
