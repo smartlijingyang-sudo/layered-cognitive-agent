@@ -116,6 +116,65 @@ BrainThinkingFinished {
 
 profile **只需要声明 expected behavior**(timeout_ms、retry 策略、circuit breaker 阈值),这是 profile 已经在做的事,不是新增。
 
+**D12. — spine 自身也是 plugin 化的(子系统的子系统)**
+
+**核心反驳**:本 spec 第一轮把 6 个反射器 / classifier / deriver 堆进 `lca/infrastructure/observability/spine/instrumentation/` 包,这是反模式。
+
+LCA 自己设计原则说:**Protocol → Seam → Provider → Adapter → Registry → Plugin**。一个高度模块化的子系统,它的**内部部件本身应该也是 plugin**。如果 spine 内部 6 个部件写死成一个 monolith,那么:
+
+- 替换 SignatureReflector 实现(比如换成 inspect.get_source)必须改 spine 内部
+- 给 Production 加 OII-Debug 信息(profile 不同)不可行
+- 业务方扩展"自定义异常分类"必须改 framework
+- 测试不能单独替换部件 mock
+
+**正确方向**:spine 内部**每一个反射器、classifier、deriver、sink 都是一个 plugin**。spine 自己也是一个 plugin。Profile 决定装配:
+
+```yaml
+# profiles/web-standard.yaml(示意)
+spine:
+  reflectors:     # 提供 auto_source 字段的部件
+    - spine.reflector.signature       # 必
+    - spine.reflector.context         # 必
+    - spine.reflector.budget          # 必
+    - spine.reflector.circuit_breaker # 必
+  classifiers:
+    - spine.classifier.exception.builtin    # Layer-A 已知异常分类
+    - spine.classifier.exception.unclass    # Layer-C 兜底
+  derivers:
+    - spine.deriver.step_tree        # 派生 journal.json
+    - spine.deriver.narrative        # 派生 narrative.md
+    - spine.deriver.graph            # 派生 graph.dot
+    - spine.deriver.live_tail        # SSE
+    - spine.deriver.anomaly          # I15/I16 anomaly
+  sinks:
+    - spine.sink.file                # events.jsonl 真值
+    - spine.sink.console             # 开发用
+  wraps:                             # 织入方式
+    - spine.wrap.ctx_effect          # 监听 plugin lifecycle
+    - spine.wrap.ctx_intercept       # 拦截 cognition 方法
+    - spine.wrap.assembler           # phase graph 节点包
+```
+
+**为什么不"一个 spine 包搞定"**:因为 wiring 决策是 **runtime composition decision**,profile 之间可差很大。Production 装最小子集;OII-Debug 装 introspection profile;Local-Trace 装 console sink;Benchmark 关所有 deriver。
+
+**为什么不是"一个 plugin 包所有反射器"**:测试隔离、版本升级、A/B 都要求部件独立可换。LCA 自己的 `webserver-4-routes-plugin` 之所以拆四个 plugin,就是为了任意组合。
+
+**LCA 是模块化的,它的 spine 应该更模块化** —— 因为 spine 是系统级关注点,粒度更小、复用诉求更高。
+
+**D13. — Source-level trace:文件 + 行号 + 函数 + 变量值(第四轮修订)**
+
+前三轮 spec 的事件**只能告诉你执行协议**(ep = brain.think.start),**不能告诉你代码位置**(`modular_brain.py:142`)、**不能告诉你当时的变量**(`ctx`、`self`、`memory` 的值)。trace 命令拿到的 metadata 是「函数级」,不是「源码级」。**生产事故排查中,这是核心缺失**。
+
+**承诺**:每个 `*.start` 事件**强制**携带**真正的源码位置**(file:line:fn) + **调用栈**(10 帧)+ **locals 的 repr**(`'ctx': CognitiveContext(messages=[...])`,截断到 4KB)。
+
+**关键性质**:
+- 框架强制默认开 —— 业务方不写一行代码
+- 安全第一 —— `repr()` 不 pickle,不会爆;secret 字段自动 redact
+- profile 可调 `max_locals_bytes`,可加 `redact_patterns`
+- 与 D11/D12 协同 —— SourceAttacher 是 `spine.reflector.source` plugin,profile 决定装配
+
+详见 § 19 (新章节)。这是 spec 第四轮修订要点。
+
 ---
 
 ## 2. 不变量(Invariants)
@@ -138,6 +197,7 @@ profile **只需要声明 expected behavior**(timeout_ms、retry 策略、circui
 | I14 | 每个 event 的 `failure_envelope`(若 outcome≠success)**必须**含 `what_was_tried`、`what_was_NOT_tried`、`recoverable`、`retry_recommended`;否则 spine fail-fast | EnvelopeCompleteness check | PR-7 |
 | I15 | 框架维护一个**可生长的** edge case catalog;新 case 出现时无需事先全列举 —— 异常 classifier 兜底 + AnomalyDeriver 自检发现未见过的模式 | EdgeCaseDiscoveryRuntime + AnomalyDeriver | PR-7 |
 | I16 | AnomalyDeriver 必派生 stuck/cycle/over-budget 信号;UI 默认显示 anomaly banner | AnomalyDeriver build-time 装载 | PR-7 |
+| I17 | 每个 `*.start` 事件强制包含 `source_location` / `call_frames` / `locals_snapshot`;`*.end` 包含 `locals_diff`;缺则 fail-fast | SourceAttacher plugin + I17 schema check | PR-9 |
 
 ---
 
@@ -691,53 +751,81 @@ def wrap_instrument(runnable: Callable, node_id: str, *,
     return wrapper
 ```
 
-### 7.5 反射式自动字段装配(I12 落地)
+### 7.5 反射式自动字段装配(I12 落地) + Plugin 化部件(§ 7.6 / D12)
 
-wrap 函数**不允许业务方手工填字段**;全部由 **5 个自动装配器**在 wrap 时注入:
+> **本节第一版把所有反射器写成单包内的类。这违反 D12,已重写。**
 
-#### 7.5.1 SignatureReflector
+wrap 函数**不允许业务方手工填字段**;全部由 **field producers** 在 wrap 时注入。这些 field producers **每一个都是独立的 plugin**(§ 7.6),不是单包内 monolith。
+
+**Seam 协议**(在 `lca/contracts/observability/spine/`):
 
 ```python
-# lca/infrastructure/observability/spine/instrumentation/signature_reflector.py
-class SignatureReflector:
-    """从可调用对象抽取全部 signature 信息(D11 TypeAnnotation 来源)。"""
+# lca/contracts/observability/spine/producer.py
+class FieldProducer(Protocol):
+    """任何一个能往事件注入 (key, value) 的部件。"""
 
-    def snapshot(self, fn: Callable) -> SignatureInfo:
-        sig = inspect.signature(fn)
-        hints = typing.get_type_hints(fn)
-        return SignatureInfo(
-            signature_fingerprint=sha256(repr(sig).encode()).hexdigest(),
-            input_params=[
-                ParamSpec(name=p.name,
-                          type_annotation=hints.get(p.name, Any),
-                          default_repr=repr(p.default) if p.default is not p.empty else None)
-                for p in sig.parameters.values()
-            ],
-            output_schema=hints.get("return", None),
-            docstring=inspect.getdoc(fn),
-            is_async=inspect.iscoroutinefunction(fn),
-        )
+    name: str                          # 用于 debug + assembly order
+    priority: int                      # 数值小 → 早注入
+    enabled: bool                      # profile 可关
 
-    def preconditions_from_sig(self, info: SignatureInfo,
-                                ctx: Any) -> dict[str, Any]:
-        """把 sig 参数 + ctx 快照 → preconditions dict。"""
-        return {
-            "input_params": [p.name for p in info.input_params],
-            "ctx_class": type(ctx).__name__,
-            "ctx_attrs_at_entry": ctx.snapshot_attrs(),  # safe copy
-            "invariants_passed": self._check_invariants(info, ctx),
-        }
-
-    def output_schema_str(self, info: SignatureInfo) -> str:
-        return str(info.output_schema)
+    def produce(self, *, fn: Callable,
+                args: tuple, kwargs: dict,
+                ctx: Any, span: SpanContext,
+                phase: Literal["pre", "post", "exception"]
+                ) -> dict[str, Any]:
+        """返回要注入的字段 dict;空 dict 表示本事件不产生字段。"""
+        ...
 ```
 
-#### 7.5.2 ExceptionClassifier
+每个 reflector / classifier / deriver 都满足 FieldProducer。
+
+#### 7.5.1 Signature Reflector plugin — 提供 signature_fingerprint / output_schema / preconditions
 
 ```python
-# lca/infrastructure/observability/spine/instrumentation/exception_classifier.py
-class ExceptionClassifier:
-    """把 stdlib 异常 + framework 已知异常 → outcome + edge_case_id + failure_envelope。"""
+# lca/plugins/observability/spine/reflectors/signature.py
+from lca.contracts.observability.spine.producer import FieldProducer
+from lca.harness.plugin_api import plugin, PluginContext
+
+class SignatureFieldProducer(FieldProducer):
+    name = "spine.reflector.signature"
+    priority = 10  # 早
+    enabled = True
+
+    def produce(self, *, fn, args, kwargs, ctx, span, phase):
+        if phase != "pre":
+            return {}
+        sig = inspect.signature(fn)
+        hints = typing.get_type_hints(fn)
+        return {
+            "signature_fingerprint": sha256(repr(sig).encode()).hexdigest(),
+            "input_params": [p.name for p in sig.parameters.values()],
+            "input_fingerprint": sha256(pickle_safe(args) + pickle_safe(kwargs)).hexdigest(),
+            "output_schema": str(hints.get("return", None)),
+            "docstring_captured": inspect.getdoc(fn),
+            "is_async": inspect.iscoroutinefunction(fn),
+        }
+
+@plugin(
+    id="spine.reflector.signature",
+    provides=("field_producer.signature",),
+    requires=(),
+    layer="L0",
+    kind=PluginKind.SEAM,
+    description="auto-source: TypeAnnotation. provides signature_*, output_schema, docstring, input/output fingerprint.",
+    test_suite="tests.lca_plugins.observability.spine.test_reflector_signature",
+)
+async def setup(ctx: PluginContext, config: Any) -> None:
+    ctx.provide("field_producer.signature", SignatureFieldProducer())
+```
+
+#### 7.5.2 Exception Classifier plugin — 提供 outcome / failure_envelope
+
+```python
+# lca/plugins/observability/spine/classifiers/exception_builtin.py
+class ExceptionBuiltinClassifier(FieldProducer):
+    name = "spine.classifier.exception.builtin"
+    priority = 30
+    enabled = True
 
     BUILTIN_MAP = {
         asyncio.TimeoutError: ("timeout", "Timeout"),
@@ -747,347 +835,413 @@ class ExceptionClassifier:
         # ... 60+ 异常类型
     }
 
-    @classmethod
-    def classify(cls, exc: BaseException, fn: Callable,
-                 args, kwargs, edge_cases: tuple) -> FailureEnvelope:
+    def produce(self, *, fn, args, kwargs, ctx, span, phase):
+        if phase != "exception":
+            return {}
+        exc = ctx.current_exception
         exc_type = type(exc)
-        outcome, edge_id = cls.BUILTIN_MAP.get(
-            exc_type, ("failure", "Unknown"))
-        tb = traceback.format_exception(exc)[:10]
-        return FailureEnvelope(
-            exception_type=exc_type.__name__,
-            exception_message=str(exc),
-            traceback_last_10_frames=tb,
-            input_fingerprint=sha256(pickle_safe(args) + pickle_safe(kwargs)),
-            what_was_tried=SafeExecutor.get_retry_chain(),  # framework maintained
-            what_was_NOT_tried=cls._pending_fallbacks(fn),
-            downstream_blast_radius=SpineContext.downstream_pending(),
-            recoverable=outcome not in ("cancelled", "rejected"),
-            retry_recommended=outcome in ("timeout", "failure"),
-            circuit_breaker_state=CircuitBreakerRegistry.get(fn),
-            edge_case_id=edge_id,
-        )
-
-    @classmethod
-    def to_outcome(cls, exc) -> str:
-        return cls.BUILTIN_MAP.get(type(exc), ("failure", None))[0]
-```
-
-#### 7.5.3 ContextSnapshotter
-
-```python
-# lca/infrastructure/observability/spine/instrumentation/context_snapshotter.py
-class ContextSnapshotter:
-    """框架层 context(side_effects / budget / circuit_breaker)一次性快照。"""
-
-    def pre(self, fn, args, kwargs) -> dict:
+        outcome, edge_id = self.BUILTIN_MAP.get(exc_type, (None, None))
+        if outcome is None:
+            return {}  # 本 producer 不覆盖;留给 unclass
         return {
-            "budget_at_entry": BudgetContext.snapshot(),
-            "circuit_breaker_state": CircuitBreakerRegistry.get(fn),
-            "side_effects_before": FrameworkObserver.snapshot(),
+            "outcome": outcome,
+            "edge_case_id": edge_id,
+            "failure_envelope": self._build_envelope(exc, fn, args, kwargs, edge_id),
         }
 
-    def post(self, pre_snap: dict, ctx_after, result) -> dict:
-        return {
-            "budget_consumed": BudgetContext.diff(pre_snap["budget_at_entry"]),
-            "circuit_breaker_state": CircuitBreakerRegistry.get(ctx_after),
-            "side_effects_added": FrameworkObserver.diff(pre_snap["side_effects_before"]),
-            "post_state_delta": ContextDiffer.diff(pre_snap, ctx_after),
-            "return_value_fingerprint": sha256(pickle_safe(result)),
-        }
-
-    def progress_during(self, fn, ctx) -> Iterator[ProgressEvent]:
-        """长 run 中 framework observer 主动 yield progress。"""
-        return FrameworkObserver.watch_during(fn, ctx)
+@plugin(
+    id="spine.classifier.exception.builtin",
+    provides=("field_producer.classifier_builtin",),
+    requires=("safe_executor",),
+    layer="L0",
+    kind=PluginKind.SEAM,
+    description="Layer-A known exception classifier. 60+ stdlib types → outcome + envelope.",
+    test_suite="tests.lca_plugins.observability.spine.test_classifier_builtin",
+)
+async def setup(ctx, config): ctx.provide(...)
 ```
 
-#### 7.5.4 EdgeCaseDiscovery(原 EdgeCaseBinder — 重写)
+#### 7.5.3 Context Reflector plugin — 提供 budget_consumed / circuit_breaker / side_effects
 
 ```python
-# lca/infrastructure/observability/spine/instrumentation/edge_case_binder.py
-class EdgeCaseDiscovery:
-    """不列举 edge case;在异常发生时**自动捕获并分类**(I15 重写)。"""
+# lca/plugins/observability/spine/reflectors/context.py
+class ContextFieldProducer(FieldProducer):
+    name = "spine.reflector.context"
+    priority = 20
+    enabled = True
 
-    def __init__(self, spine, anomaly_deriver):
-        self.spine = spine
-        self.anomaly_deriver = anomaly_deriver
-        self._seen_signatures: dict[str, EdgeCaseRecord] = {}
+    def produce(self, *, fn, args, kwargs, ctx, span, phase):
+        if phase == "pre":
+            return {
+                "preconditions": self._capture_preconditions(ctx, fn),
+                "budget_at_entry": BudgetContext.snapshot(),
+                "circuit_breaker_state_entry": CircuitBreakerRegistry.get(fn),
+            }
+        if phase == "post":
+            return {
+                "post_state_delta": ContextDiffer.diff(...),
+                "budget_consumed": BudgetContext.diff(...),
+                "circuit_breaker_state": CircuitBreakerRegistry.get(ctx),
+                "side_effects_added": FrameworkObserver.diff(...),
+            }
+        return {}
 
-    def on_exception(self, exc, fn, ctx, args, kwargs, span) -> None:
-        """所有异常统一入口。运行时 anomaly 检测 + 自动归类。"""
+@plugin(id="spine.reflector.context", provides=("field_producer.context",), ...)
+async def setup(ctx, config): ...
+```
 
-        # Layer-A: 已知异常直接 emit typed event
-        if exc.__class__ in ExceptionClassifier.BUILTIN_MAP:
-            outcome, edge_id = ExceptionClassifier.BUILTIN_MAP[type(exc)]
-            self.spine.emit(
-                cls=self._lookup_event_cls(edge_id),  # Timeout / NetworkUnavailable / ...
-                outcome=outcome,
-                failure_envelope=ExceptionClassifier.classify(exc, fn, args, kwargs, edge_id),
-                span=span,
-            )
-            return
+#### 7.5.4 Edge Case Discovery plugin — Layer-C 兜底异常捕获
 
-        # Layer-C: 未知异常 → UnclassifiedError + similarity lookup
+```python
+# lca/plugins/observability/spine/classifiers/exception_unclass.py
+class UnclassClassifier(FieldProducer):
+    """Layer-C: 任何不在 builtin map 的异常 → UnclassifiedError + 全 context。"""
+
+    name = "spine.classifier.exception.unclass"
+    priority = 99  # 兜底,最后
+    enabled = True
+
+    def produce(self, *, fn, args, kwargs, ctx, span, phase):
+        if phase != "exception":
+            return {}
+        exc = ctx.current_exception
+        # builtin 已经被前面的 7.5.2 抢答 → 这里只接住它的空 produce
+        # 但我们要做的是发 UnclassifiedError 事件本身,不是填 failure envelope
         sig = self._exception_signature(exc, fn, ctx)
         similar = self._find_similar(sig)
-        record = EdgeCaseRecord(
+        record = self._seen_signatures.setdefault(sig, EdgeCaseRecord(
             exception_signature=sig,
             first_seen=similar is None,
             seen_count=(similar.seen_count + 1) if similar else 1,
-            first_seen_run_id=(ctx.run_id if similar is None else similar.first_seen_run_id),
-            last_seen_run_id=ctx.run_id,
-            last_seen_at=now(),
-            recommended_action=("add_to_BUILTIN_MAP" if (similar and similar.seen_count >= 3) else None),
-        )
-        self._seen_signatures[sig] = record
-        self.spine.emit(
-            cls=UnclassifiedError,
-            outcome="failure",
-            failure_envelope=self._unclassified_envelope(exc, fn, ctx, args, kwargs, span, similar, record),
-            span=span,
-        )
-
-        # Layer-B: 不变量违例(self-anomaly)交给 AnomalyDeriver
-        # (wrap phase 框架已 emit start/end,所以 AnomalyDeriver 是事后扫的)
-
-    def _exception_signature(self, exc, fn, ctx) -> str:
-        return sha256((
-            type(exc).__module__ + "." + type(exc).__qualname__ +
-            json(traceback.extract_tb(exc.__traceback__)[:5], default=str)
-        ).encode()).hexdigest()
-
-    def _find_similar(self, sig) -> EdgeCaseRecord | None:
-        if sig in self._seen_signatures:
-            return self._seen_signatures[sig]
-        # 相似度查最近 5 个同 module + 同 frame depth
-        # 简化:字典查 + 当前 run 内全 sig
-        # 生产可加 minhashing,但 spec 不卷
-        return None
-
-    def _unclassified_envelope(self, exc, fn, ctx, args, kwargs,
-                                span, similar, record) -> FailureEnvelope:
-        return FailureEnvelope(
-            exception_type=type(exc).__qualname__,
-            exception_module=type(exc).__module__,
-            exception_message=str(exc),
-            traceback_last_10_frames=traceback.format_list(
-                traceback.extract_tb(exc.__traceback__)[:10]),
-            frames_signature=record.exception_signature,
-            similar_to=similar.exception_signature if similar else None,
+        ))
+        # 关键:UnclassifiedError 是事件本身,不是 failure_envelope 字段
+        self.spine.emit(UnclassifiedError(
+            exception_signature=record.exception_signature,
             first_seen=record.first_seen,
             seen_count=record.seen_count,
-            recommended_clinical_trial=record.recommended_action,
-            context_at_exception={
-                "tool_called": ctx.current_tool(),
-                "llm_call_id": ctx.current_llm_call_id(),
-                "budget_at_exc": BudgetContext.snapshot(),
-                "circuit_breaker_state": CircuitBreakerRegistry.get(fn),
-                "side_effects_before_exc": FrameworkObserver.snapshot(),
-                "frames_near_exc": [
-                    f"{f.filename}:{f.lineno} in {f.name}"
-                    for f in traceback.extract_tb(exc.__traceback__)[:5]
-                ],
-            },
-            recoverable=None,        # 未知异常不能妄定
-            retry_recommended=False, # 默认保守
-            edge_case_id=None,       # 未归类
-        )
+            context_at_exception=self._capture_full_context(exc, fn, ctx),
+            recommended_action=("add_to_BUILTIN_MAP" if record.seen_count >= 3 else None),
+            span=span,
+        ))
+        return {"outcome": "failure"}  # 兜底 outcome
+
+@plugin(id="spine.classifier.exception.unclass", provides=("field_producer.classifier_unclass",), ...)
+async def setup(ctx, config): ...
 ```
 
-**关键性质**:
-
-- 不预定义 case 列表;**所有异常**走这一入口
-- 每次新异常 → 全 context 捕获 + 自动落索引
-- 同种异常第二次出现 → 继承历史 envelope + seen_count++
-- 第三次出现 → 自动发"建议加到 BUILTIN_MAP"的运营消息
-- **永远不静默** —— 任何异常必有事件
-
-#### 7.5.4.1 AnomalyDeriver(配套)
+#### 7.5.4.1 AnomalyDetector plugin(I15 Layer-B)
 
 ```python
-# lca/infrastructure/observability/spine/derivers/anomaly_deriver.py
-class AnomalyDeriver:
-    """事后扫 events.jsonl,检测不变量违例(I15 Layer-B)。"""
+# lca/plugins/observability/spine/derivers/anomaly.py
+class AnomalyDetector(FieldProducer):
+    """8 类不变量违例检测(I15 Layer-B)。订到 spine 流,产出 AnomalyDetected 事件。"""
 
-    def __init__(self, profile_decls: dict[str, Any]):
-        self.profile = profile_decls
-        self._sliding_window: dict[SpanContext, list[EventRecord]] = {}
+    name = "spine.deriver.anomaly"
+    priority = 50
+    enabled = True
+
+    # I16 校验要求:8 类 detector 全有
+    DETECTORS = (
+        "near_timeout",         # duration_ms > declared.timeout_ms × 0.94
+        "cycle",                # 同 ep 在同 span 内 repeats > MAX_REPEATS
+        "stuck",                # start 没 end,since_ms > expected_window_ms
+        "stalled",              # progress event 跨窗口停止更新
+        "state_machine_violation",  # 应该 exit / pause 但没
+        "near_budget",          # budget_consumed / limit > 0.94
+        "collision",            # 多次相邻 input_fingerprint 相同
+        "orphan_side_effect",   # side_effects.added 但无对应 end event
+    )
+
+    def produce(self, *, fn, args, kwargs, ctx, span, phase):
+        if phase not in ("pre", "post"):
+            return {}
+        # 实际处理由 spine.subscribe 调 on_event(...)
+        return {}
 
     def on_event(self, event: EventRecord) -> None:
-        """先占窗,run end 后批量出 anomaly 报告。"""
+        for detector_name in self.DETECTORS:
+            fn_detector = getattr(self, f"_check_{detector_name}")
+            anomaly = fn_detector(event)
+            if anomaly:
+                self.spine.emit(AnomalyDetected(
+                    kind=detector_name,
+                    execution_point=event.execution_point,
+                    span_id=event.span_id,
+                    evidence_hash=sha256(event.serialize()).hexdigest(),
+                    **anomaly,
+                ))
 
-        # 8 类不变量违例检测
-        self._check_near_timeout(event)
-        self._check_cycle(event)
-        self._check_stuck(event)
-        self._check_stalled(event)
-        self._check_state_machine(event)
-        self._check_near_budget(event)
-        self._check_collision(event)
-        self._check_orphan_side_effect(event)
-
-    def _check_cycle(self, event):
-        # 同 execution_point 在同 span 内 N 次重复
-        # ...
-        pass
-
-    def _check_stuck(self, event):
-        # start 出现但 end 没出现
-        if event.kind == "started" and \
-           not self._has_end_for(event.span_id, event.execution_point) and \
-           (now() - event.when).total_seconds() > \
-                self.profile[event.execution_point].get("expected_window_ms", 30000) / 1000:
-            self.spine.emit(AnomalyDetected(
-                kind="stuck",
-                execution_point=event.execution_point,
-                since_ms=int((now() - event.when).total_seconds() * 1000),
-                span_id=event.span_id,
-                evidence=[event.serialize()],
-                recommend="check downstream / check cancellation propagation",
-            ))
+@plugin(
+    id="spine.deriver.anomaly",
+    provides=("field_producer.anomaly",),
+    requires=(),
+    layer="L0",
+    kind=PluginKind.SEAM,
+    description="I15/I16 invariant violation detection (8 detectors). Emits AnomalyDetected events.",
+    test_suite="tests.lca_plugins.observability.spine.test_anomaly_detector",
+)
+async def setup(ctx, config): ...
 ```
 
-**AnomalyDeriver 与 spine 的关系**:subscribe 到 spine.append,所有事件先经过它再进 FileSink。
+**I16 校验**:AnomalyDetector plugin 必须 subscribed;缺则 build fail。8 类 detector 必须每类对应一个 `_check_*` 方法;缺则 build fail。
 
-**I16 校验**:AnomalyDeriver 必须 subscribebuild-time 装载,UI 默认显示 anomaly banner(默默无问题。AnomalyDeriver 主动暴露问题)。
-
-#### 7.5.5 SpanTreeAssembler
+#### 7.5.5 SpanTree plugin — 提供 sequence / span_id / parent_span_id(I13)
 
 ```python
-# lca/infrastructure/observability/spine/instrumentation/span_tree_assembler.py
-class SpanTreeAssembler:
-    """SpanTree 推导与 visibility(I13 sequence 链保证)。"""
+# lca/plugins/observability/spine/spantree.py
+class SpanTreeProducer(FieldProducer):
+    name = "spine.spantree"
+    priority = 5   # 最先注入:其他 producer 依赖
+    enabled = True
 
-    def __init__(self):
-        self._stack: list[str] = []
-        self._ep_counts: dict[str, int] = {}  # 用于 cycle detection
+    def produce(self, *, fn, args, kwargs, ctx, span, phase):
+        if phase == "pre" and not span.span_id:
+            span.span_id = self._gen_id(span.execution_point)
+            span.parent_span_id = self._stack_top_or_none()
+            self._stack_push(span)
+        if phase == "post":
+            span.pop_match = self._stack_pop_match(span.execution_point)
+        return {
+            "span_id": span.span_id,
+            "parent_span_id": span.parent_span_id,
+            "sequence": self._next_sequence(span.span_id),
+            "epoch": self._next_epoch(),
+            "prev_event_hash": self._last_hash_or_zero(),
+            "cycle_count": self._cycle_count(span.execution_point),
+        }
 
-    def push_span(self, ep: str) -> SpanContext:
-        if self._stack:
-            self._stack.append(self._gen_span_id(ep))
-        else:
-            self._stack.append(self._gen_root_span_id(ep))
-        return self.current_span()
-
-    def pop_span(self, ep: str) -> SpanContext:
-        span = self._stack.pop()
-        # I13 校验:pop 必须匹配 push 的 ep
-        if span.ep != ep:
-            raise PhaseMachineViolation(
-                f"end {ep} without matching start {span.ep}")
-        return span
-
-    def record_event(self, event: JournalEvent) -> None:
-        # I13 校验:start → N×progress → end 严格链
-        event.sequence = self._next_sequence(event.span_id)
-        event.epoch = self._next_epoch()
-        event.prev_event_hash = sha256(self._last_serialize())
-
-        # cycle detection
-        ep = event.execution_point
-        self._ep_counts[ep] = self._ep_counts.get(ep, 0) + 1
-        if self._ep_counts[ep] > self.MAX_REPEATS:
-            self._emit_anomaly_cycle(ep, self._ep_counts[ep])
-
-        self._events.append(event)
+@plugin(id="spine.spantree", provides=("field_producer.spantree",), ...)
+async def setup(ctx, config): ...
 ```
 
-#### 7.5.6 装配顺序
+#### 7.5.6 装配顺序(由 EmitPipeline plugin 完成)
 
-wrap 函数执行时,装配器按固定顺序工作:
+wrap 函数执行时,**所有 enabled producer plugins 按 priority 顺序产出字段**,最后 EmitPipeline 合并:
 
 ```text
 wrap_instrument(fn, ep_start, ep_end, edge_cases)
-  ├─ 1. SignatureReflector.snapshot(fn)               # 一次性,缓存
-  ├─ 2. ContextSnapshotter.pre(...)                    # 入口快照
-  ├─ 3. SpanTreeAssembler.push_span(ep_start)         # span 入栈
-  ├─ 4. emit(Started, fields=∅)                       # 空 payload
-  │    → EmitPipeline 自动注入 (§ 7.5.7):
-  │         preconditions = SignatureReflector.preconditions_from_sig(...)
-  │                  + ContextSnapshotter.pre(...)
-  │         outcome       = pending
-  │         sequence      = SpanTreeAssembler.next_sequence()
-  │         causality_id  = hash(signature + ctx_fingerprint)
-  │         ... 全部由 D11 装配器产生
-  ├─ 5. result = fn(*args, **kwargs)
-  │    └─ 中间异常 → EdgeCaseDiscovery.on_exception(...)  # § 7.5.4 重写版
-  ├─ 6. ContextSnapshotter.post(...)                  # 出口快照
-  ├─ 7. SpanTreeAssembler.pop_span(ep_end)           # span 出栈
-  └─ 8. emit(Finished, fields=∅)
-       → EmitPipeline 自动注入:
-         outcome      = pending → success (from return)
-         duration_ms  = (now - start)
-         post_state_delta = ContextSnapshotter.post(...)
-         ... 其余自动
+  ├─ 1. EmitPipeline plugin 拉取所有 enabled producer
+  │     ├─ 按 priority 升序
+  │     ├─ phase="pre" 时一并调 produce(...)
+  │     └─ 合并 dict,冲突时 low-priority 优先(早写胜)
+  ├─ 2. emit Started 事件(空 payload + producer 注入的字段)
+  ├─ 3. result = fn(*args, **kwargs)
+  │     └─ 异常时 phase="exception" → builtin + unclass producer 抢答
+  ├─ 4. phase="post" 调 produce(...) 合并 post_state_delta 等字段
+  └─ 5. emit Finished 事件
 ```
 
-#### 7.5.7 EmitPipeline
+**注意**:没有任何 `if name == "main"` 找具体类的逻辑——producer list 来自 plugin registry,profile 可关可加。
+
+#### 7.5.7 EmitPipeline plugin(装配车间本身也是 plugin)
 
 ```python
-# lca/infrastructure/observability/spine/instrumentation/emit_pipeline.py
+# lca/plugins/observability/spine/emit_pipeline.py
 class EmitPipeline:
-    """spine.append 前的最后一道装配线;字段全部自动注入。"""
+    """spine.append 前的最后一道装配车间;按 priority 拉所有 producer,合并字段。"""
 
-    def __init__(self, sig: SignatureReflector,
-                 ctx: ContextSnapshotter,
-                 span: SpanTreeAssembler,
-                 cls: ExceptionClassifier):
-        self.sig = sig
-        self.ctx = ctx
-        self.span = span
-        self.cls = cls
+    def __init__(self, producers: list[FieldProducer], assembler: AnomalyDetector):
+        self.producers = sorted(producers, key=lambda p: p.priority)
+        self.assembler = assembler
 
-    def emit(self, event_cls: type[JournalEvent], *,
-             execution_point: str, span_ctx: SpanContext,
-             caller_payload: dict = None) -> EventRecord:
-        # 1. 装配 pre / post / progress / failure_envelope
-        assembled = self._assemble(event_cls, execution_point,
-                                   span_ctx, caller_payload)
-        # 2. 校验 I12 / I13 / I14
-        self._validate(assembled)
-        # 3. 入 spine 真值流
-        return spine.append(assembled)
-
-    def _assemble(self, event_cls, ep, span_ctx, caller_payload):
-        return EventFactory.create(
+    def emit(self, event_cls, *, execution_point, span_ctx, caller_payload=None):
+        # 1. 拉所有 producer(pre / post / exception 各自一次)
+        pre_fields = {}
+        for p in self.producers:
+            if not p.enabled: continue
+            pre_fields.update(p.produce(phase="pre", span=span_ctx, ...))
+        # 2. 异常时
+        exc_fields = {}
+        if span_ctx.current_exception:
+            for p in self.producers:
+                if not p.enabled: continue
+                exc_fields.update(p.produce(phase="exception", span=span_ctx, ...))
+        # 3. 装配 event
+        assembled = EventFactory.create(
             event_cls=event_cls,
-            execution_point=ep,
-            span_id=span_ctx.span_id,
-            parent_span_id=span_ctx.parent_span_id,
-            sequence=self.span.next_sequence(span_ctx),
-            epoch=self.span.next_epoch(),
-            causality_id=self.sig.causality_id(),
-            when=datetime.utcnow(),
-            when_corrected=ntp_corrected_now(),
-            auto_fields=self._derive_auto_fields(span_ctx),
-            payload=caller_payload or {},
+            execution_point=execution_point,
+            span=span_ctx,
+            auto_fields={**pre_fields, **exc_fields, **(caller_payload or {})},
         )
-
-    def _derive_auto_fields(self, span_ctx):
-        """20+ 自动字段一次派生。"""
-        return {
-            "preconditions": self.sig.preconditions_from_sig(...),
-            "signature_fingerprint": self.sig.signature_fingerprint(),
-            "docstring_captured": self.sig.docstring(),
-            "output_schema": self.sig.output_schema_str(),
-            "budget_consumed": self.ctx.budget_consumed(),
-            "circuit_breaker_state": self.ctx.circuit_breaker_state(),
-            "side_effects": self.ctx.side_effects_added(),
-            "post_state_delta": self.ctx.post_state_delta(),
-            "duration_ms": self.ctx.duration_ms(),
-            "return_value_fingerprint": self.ctx.return_value_fingerprint(),
-            "input_fingerprint": self.ctx.input_fingerprint(),
-            "cycle_count": self.span.cycle_count(span_ctx.execution_point),
-            "prev_event_hash": self.span.prev_event_hash(),
-        }
+        # 4. I12/I13/I14 校验
+        self._validate(assembled)
+        # 5. 入 spine 真值流 + 触发 AnomalyDetector.on_event
+        record = spine.append(assembled)
+        self.assembler.on_event(record)  # 8 类不变量检测
+        return record
 
     def _validate(self, event):
-        # I12 / I13 / I14
-        FieldSourceRule.check(event, auto_only=True)
-        PhaseMachine.check(event)  # start→N×progress→end
-        EnvelopeCompleteness.check(event)  # outcome≠success → failure_envelope 全
+        FieldSourceRule.check(event)         # I12
+        PhaseMachine.check(event)            # I13
+        EnvelopeCompleteness.check(event)    # I14
         assert event.execution_point in EXECUTION_POINTS, "UnknownExecutionPoint"
+
+@plugin(
+    id="spine.emit_pipeline",
+    provides=("emit_pipeline",),
+    requires=("field_producer.*",),  # 等待所有 producer 装好
+    layer="L1",  # 整合 producer plugins
+    kind=PluginKind.SEAM,
+    description="emit pipeline: pulls all enabled FieldProducer plugins by priority, merges, validates I12/I13/I14.",
+    test_suite="tests.lca_plugins.observability.spine.test_emit_pipeline",
+)
+async def setup(ctx, config):
+    producer_ids = config["reflectors"] + config["classifiers"]  # 来自 profile
+    producers = [ctx.require(pid) for pid in producer_ids]
+    anomaly = ctx.require("spine.deriver.anomaly")
+    ctx.provide("emit_pipeline", EmitPipeline(producers, anomaly))
 ```
+
+### 7.6 Spine = composition of plugins(D12 核心)
+
+#### 7.6.1 Spine 顶层 plugin
+
+```python
+# lca/plugins/observability/spine/core.py
+@plugin(
+    id="spine",
+    provides=("event_spine", "spine_context"),
+    requires=(
+        "emit_pipeline",           # 等所有 producer + assembler 装好
+        "file_sink",               # 必
+        # optional derivers 由 profile 决定:
+        # "step_tree", "narrative", "graph", "live_tail"
+    ),
+    layer="L2",  # 整合 emit_pipeline + sinks
+    kind=PluginKind.SEAM,
+    description="LCA Spine core. Composes emit_pipeline + sinks + optional derivers into single EventSpine instance.",
+    test_suite="tests.lca_plugins.observability.spine.test_core",
+)
+async def setup(ctx, config):
+    pipeline = ctx.require("emit_pipeline")
+    sinks = [ctx.require(sid) for sid in config["sinks"]]
+    deriver_ids = config.get("derivers", [])
+    derivers = [ctx.require(did) for did in deriver_ids]
+    spine = EventSpine(pipeline=pipeline, sinks=sinks, derivers=derivers)
+    ctx.provide("event_spine", spine)
+    ctx.provide("spine_context", SpineContext(spine))
+```
+
+#### 7.6.2 Deriver 也是 plugin
+
+```python
+# lca/plugins/observability/spine/derivers/step_tree.py
+class StepTreeDeriver:
+    name = "spine.deriver.step_tree"
+    def on_event(self, event): self.step_tree_writer.write(event)
+
+@plugin(id="spine.deriver.step_tree", provides=("step_tree",), layer="L0",
+       kind=PluginKind.SEAM, ...)
+async def setup(ctx, config):
+    ctx.provide("step_tree", StepTreeDeriver(...))
+```
+
+每种 deriver(narrative / graph / live_tail / anomaly)都是独立 plugin,profile 可独立开关。
+
+#### 7.6.3 Sink 也是 plugin
+
+```python
+# lca/plugins/observability/spine/sinks/file.py
+class FileSink:
+    name = "spine.sink.file"
+    def write(self, event): ...
+
+@plugin(id="spine.sink.file", provides=("file_sink",), layer="L0",
+       kind=PluginKind.PRODUCER, ...)
+async def setup(ctx, config):
+    ctx.provide("file_sink", FileSink(path=config["path"], ...))
+```
+
+#### 7.6.4 Wrap 函数也是 plugin
+
+```python
+# lca/plugins/observability/spine/wraps/ctx_effect.py
+@plugin(id="spine.wrap.ctx_effect", provides=("ctx_effect_wrap",),
+       requires=("event_spine",), layer="L0", kind=PluginKind.SEAM, ...)
+async def setup(ctx, config):
+    spine = ctx.require("event_spine")
+    ctx.effect(lambda: spine.emit(PluginMounted, ...))
+    # dispose goes to ctx.effect(call=...)
+```
+
+#### 7.6.5 完整 plugin 列表(PR-8 抽出)
+
+| Plugin ID | Layer | provides | requires |
+|---|---|---|---|
+| `spine.core` | L2 | `event_spine`, `spine_context` | `emit_pipeline`, `file_sink` |
+| `spine.emit_pipeline` | L1 | `emit_pipeline` | 各 field_producer |
+| `spine.reflector.signature` | L0 | `field_producer.signature` | - |
+| `spine.reflector.context` | L0 | `field_producer.context` | `safe_executor`, `circuit_breaker_registry` |
+| `spine.reflector.runtime` | L0 | `field_producer.runtime` | - |
+| `spine.classifier.exception.builtin` | L0 | `field_producer.classifier_builtin` | `safe_executor` |
+| `spine.classifier.exception.unclass` | L0 | `field_producer.classifier_unclass` | - |
+| `spine.spantree` | L0 | `field_producer.spantree` | - |
+| `spine.deriver.anomaly` | L0 | `field_producer.anomaly` | - |
+| `spine.deriver.step_tree` | L0 | `step_tree` | - |
+| `spine.deriver.narrative` | L0 | `narrative` | - |
+| `spine.deriver.graph` | L0 | `graph` | - |
+| `spine.deriver.live_tail` | L0 | `live_tail` | `webserver_bootstrap` |
+| `spine.sink.file` | L0 | `file_sink` | - |
+| `spine.sink.console` | L0 | `console_sink` | - |
+| `spine.wrap.ctx_effect` | L0 | `ctx_effect_wrap` | `event_spine` |
+| `spine.wrap.ctx_intercept` | L0 | `ctx_intercept_wrap` | `event_spine` |
+| `spine.wrap.assembler` | L0 | `assembler_wrap` | `event_spine`, `compile_profile` |
+
+**总数 ~18 plugins,每个 ~50-200 行,职责单一,profile 任意组合**。
+
+#### 7.6.6 Profile 决定装配
+
+```yaml
+# profiles/web-standard.yaml(spine 段)
+spine:
+  reflectors:
+    - spine.reflector.signature
+    - spine.reflector.context
+    - spine.reflector.runtime
+    - spine.spantree
+  classifiers:
+    - spine.classifier.exception.builtin
+    - spine.classifier.exception.unclass
+  derivers:
+    - spine.deriver.anomaly
+    - spine.deriver.step_tree
+    - spine.deriver.narrative
+    - spine.deriver.graph
+    - spine.deriver.live_tail
+  sinks:
+    - spine.sink.file
+  wraps:
+    - spine.wrap.ctx_effect
+    - spine.wrap.ctx_intercept
+    - spine.wrap.assembler
+
+# profiles/oii-debug.yaml(spine 段)—— 加深度 introspection
+spine:
+  reflectors: [..., spine.reflector.debug]
+  classifiers: [..., spine.classifier.exception.third_party, ...]
+  derivers: [..., spine.deriver.metrics, ...]
+  sinks: [..., spine.sink.console, ...]
+
+# profiles/benchmark.yaml(spine 段)—— 最小
+spine:
+  reflectors: [spine.reflector.signature]   # 最小子集
+  classifiers: [spine.classifier.exception.unclass]  # 只有兜底
+  derivers: []   # benchmark 关掉 deriver 开销
+  sinks: [spine.sink.file]
+  wraps: [spine.wrap.assembler]  # 只在 phase graph 包
+```
+
+#### 7.6.7 为什么必须 plugin 化(防御性论据)
+
+| 反对 plugin 化(infra 包写死) | 事实 |
+|---|---|
+| "反正没人会替换" | 测试要替换 mock;不同 profile 要不同行为;第三方要用 —— **不是假设** |
+| "performance 开销" | plugin 装配一次性,运行时 producer list 固定;overhead 与包结构相同 |
+| "代码分散难查" | 每个 plugin ~50-200 行,职责单一,**反而好查**;新增 plugin 不改 framework |
+| "plugin registration 开销" | cordis 已经解决(参见 ADR-0119 webserver plugin template);LCA 自身模式 |
+| "难理解" | LCA 整个代码库用 plugin pattern;**spine 例外反而不一致** |
+
+**核心论据**:LCA 自己原则 "Protocol → Seam → Provider → Plugin" 强调**横切关注点必须可插拔**。spine 是横切关注点的典范,**它本身不插拔 = 违反自己原则**。
 
 ---
 
@@ -1238,10 +1392,12 @@ spine:
 | **PR-4** spine-phase-graph-wrap | assembler 强制 wrap + wrap_provenance + 测试补 | 中 | 3-5 天 |
 | **PR-5** spine-lint-hardfail | importlinter hard fail + 旧 import 清理 + vulture | 中 | 3-5 天 |
 | **PR-6** spine-orphan-events | OrphanEventType + cancel pre-boot 跑通 | 中 | 3-5 天 |
-| **PR-7** spine-auto-fields | D9-D11 全部落地 — EdgeCaseBinder + ExceptionClassifier + ContextSnapshotter + SignatureReflector + SpanTreeAssembler + EmitPipeline + AnomalyDeriver + I12-I16 校验 | 中-高(改 5 个新模块) | 5-8 天 |
-| **PR-7.1** spine-auto-fields-wiring | 把 PR-7 五个反射装配器接入 ctx.intercept / assembler wrap / plugin lifecycle;全部已有 wrap 改用 EmitPipeline | 中 | 2-4 天 |
+| **PR-7** spine-auto-fields | D9-D11 全部落地 — 反射器 / classifier / deriver / sink / wrap 全部以 plugin 形式定义,Profile 配置 | 中-高 | 5-8 天 |
+| **PR-7.1** spine-auto-fields-wiring | 把 PR-7 各种 producer plugin 接入 ctx.intercept / assembler wrap / plugin lifecycle;全部已有 wrap 改用 EmitPipeline | 中 | 2-4 天 |
+| **PR-8** spine-plugin-extraction | D12 落地 — 把 § 7.6 表格 18+ plugins 全部装出来;`lca/infrastructure/observability/spine/instrumentation/` 整个包删掉;全 framework 一致 plugin 模式 | 中 | 3-5 天 |
+| **PR-9** spine-source-attacher | D13 / I17 落地 — `spine.reflector.source` plugin,每个 `*.start` 必带 source_location + call_frames + locals_snapshot;redact 默认开;OII-Debug profile 开 source_snippet | 中 | 3-5 天 |
 
-**总计:18-32 天(单线),5-7 周(双线)**
+**总计:24-42 天(单线),7-9 周(双线)**
 
 ### 11.1 兼容性矩阵
 
@@ -1255,6 +1411,8 @@ spine:
 | PR-6 后 | 新 + orphan | 无 | Deriver 派生 | LiveTailDeriver | 孤儿事件可查 |
 | PR-7 后 | 新 + 全自动字段 | 无 | Deriver 派生 | LiveTailDeriver + AnomalyDeriver | `anomaly_report.json` 显式 stuck/cycle/over-budget |
 | PR-7.1 后 | 新 + 反射装配线接入 | 无 | Deriver 派生 | LiveTail + Anomaly | 业务方零字段声明,全 framework auto-derive |
+| PR-8 后 | 同上,全 framework 一致 plugin 模式 | 无 | Deriver 派生 | LiveTail + Anomaly | `lca/plugins/observability/spine/` 下 ~18 plugins,profile 任意组合 |
+| PR-9 后 | 同上,每个 `*.start` 自动含 source_location + call_frames + locals_snapshot | 无 | Deriver 派生 | LiveTail + Anomaly | `trace --locals` 直接看每事件当时的文件/行/变量 |
 
 ### 11.2 上线阶段
 
@@ -1312,6 +1470,8 @@ uv run lint-imports --include business-event-isolation
 - **不**要求业务方手写埋点字段(I12 / D11);所有字段从 reflect / runtime / context / manifest 自动派生
 - **不**允许业务方写 `@declarative_emit` / `@instrument` / StructuredDiagnostic 装饰器或 raise;framework wrap 接管
 - **不**允许 profile YAML 写 payload schema;profile 只声明 expected behavior(timeout/retry/CB threshold)
+- **不**让 spine 子系统自成一体的 monolith:每个 Reflector / Classifier / Deriver / Sink 都是独立 plugin,profile 决定装配(§ 7.6 / D12)
+- **不**在 `lca/infrastructure/observability/spine/instrumentation/` 单包堆 6 个不同职责类;**全部 plugin 化**(§ 7.5 重构 / D12)
 
 ---
 
@@ -1387,3 +1547,265 @@ uv run lint-imports --include business-event-isolation
 - I12-I16 把承诺转为可校验的不变量
 - § 4.5 / § 7.5.4 / § 7.5.4.1 给出三层发现的具体实现
 - § 17 记录设计原意变更,防后人误读
+
+## 18. Spine 内部插件化原则(D12 / 第三轮修订)
+
+**用户原话追问**:**"这个本来是高度模块化,职责清晰,边界清晰,本身也要做出插件最好。"**
+
+这一追问**修正了本 spec 第二轮的核心设计**。原 § 7.5 把 6 个反射器 / classifier / deriver 堆在 `lca/infrastructure/observability/spine/instrumentation/` 单一包内,这是**违反 LCA 自己设计的扩展路径**。LCA 的原则:`Protocol → Seam → Provider → Registry → Plugin`,每个横切关注点都要 pluggable。spine 是系统中**最横切的关注点**(所有路径必经),它自己**不**可插拔 = 原则违背。
+
+**正确方向**(已写入 § 7.6 / D12):
+
+| 旧(第二轮) | 新(第三轮) |
+|---|---|
+| 6 个反射器在 `lca/infrastructure/observability/spine/instrumentation/` 单一包 | 18+ plugin 在 `lca/plugins/observability/spine/` 下 |
+| `class SignatureReflector: ...` | `@plugin(id="spine.reflector.signature") async def setup(ctx, config): ...` |
+| `context.require("field_producer.signature")` | 同样拿,plugin 装配一次,profile 控制开关 |
+| 测试中替换具体类时 patch import | 测试中替换 `ctx.require` 的返回值 |
+| 替换实现 = 改 framework 内部 | 替换实现 = 写新 plugin + profile 引用 |
+| Profile 写死装配清单 | Profile 自由组合 reflectors / classifiers / derivers / sinks / wraps |
+
+**6 个原反射器 / deriver 全部重写为 plugin**:
+
+| 旧类 | 新 plugin |
+|---|---|
+| `SignatureReflector` | `spine.reflector.signature` |
+| `ContextSnapshotter` | `spine.reflector.context` |
+| `ExceptionClassifier` | `spine.classifier.exception.builtin` + `spine.classifier.exception.unclass` |
+| `EdgeCaseDiscovery` | 拆为 builtin + unclass 两个 plugin(职责分裂) |
+| `SpanTreeAssembler` | `spine.spantree` |
+| `AnomalyDeriver` | `spine.deriver.anomaly` |
+
+**新 plugin(原 monolith 没有)**:`spine.emit_pipeline`、`spine.core`、`spine.deriver.step_tree`、`spine.deriver.narrative`、`spine.deriver.graph`、`spine.deriver.live_tail`、`spine.sink.file`、`spine.sink.console`、`spine.wrap.ctx_effect`、`spine.wrap.ctx_intercept`、`spine.wrap.assembler`。
+
+**新增 PR-8 `spine-plugin-extraction`**:把 § 7.6 表格 18+ plugins 全部 install,删掉整个 `infrastructure/observability/spine/instrumentation/` 包,framework 一致 plugin 模式。
+
+**Plugin 化防御性论据(反驳常见反对意见)**:
+- "反正没人会替换" → 测试、profile、第三方,**会替换**
+- "performance 开销" → plugin 装配一次性,运行时 producer list 固定;与 monolith 开销相同
+- "代码分散难查" → 每个 plugin ~50-200 行,职责单一,**反而好查**
+- "注册开销" → cordis 已解决(参见 ADR-0119 webserver plugin template)
+- "难理解" → LCA 全 codebase 用 plugin pattern;**spine 例外反而不一致**
+
+**§ 7.6 的 5 个核心子节**:
+- § 7.6.1 `spine.core` 顶层 L2 整合 plugin
+- § 7.6.2 deriver 也 plugin(每个一种独立)
+- § 7.6.3 sink 也 plugin(file / console 等)
+- § 7.6.4 wrap 也 plugin(ctx_effect / ctx_intercept / assembler)
+- § 7.6.5 18+ plugin 完整表格
+- § 7.6.6 profile 决定装配(web-standard / oii-debug / benchmark 三个示意 profile)
+- § 7.6.7 防御性论据
+
+---
+
+## 19. Source-level trace:行号 + 变量值 + 调用栈(第四轮修订)
+
+**用户原话追问**:**"能不能做到记录到哪一个文件、哪一行代码、哪个函数、当时的变量值、这个维度 trace 也有?"**
+
+这一追问修正了本 spec 第三轮的核心盲点。前三轮做的事:
+
+- 知道执行了哪些 execution_point(协议层)
+- 知道事件因果链(SpanTree 视图)
+- 知道 outcome / failure_envelope(异常层)
+
+**遗漏**:每个 execution_point 进入时**真正的代码位置**(`file.py:42`)、**当前所有变量值**(`locals()`)、**调用栈**(`frames[:10]`)。光知道"brain.think.start" 不够,还要知道"在 `modular_brain.py:142` 的 `think()` 函数里、`ctx.user_input="..."`、`self.memory=...`,这是第几层栈"。
+
+**正确方向**(新增 D13 + I17):
+
+### 19.1 新增承诺 D13
+
+每个 `start` 事件**强制**携带执行时的源位置、调用栈、变量快照。这条不是 plugin 可关 —— 框架强制的默认行为,对应事件基础事实。
+
+### 19.2 新增不变量 I17
+
+每个 `*.start` 事件必含 `source_location` / `call_frames` / `locals_snapshot` 三个字段,缺失则 fail-fast。`*.end` 携带 `return_locals_diff`(变量变化 diff)。
+
+### 19.3 字段定义
+
+```python
+class SourceLocation:
+    file: str                    # "lca/cognition/brain/modular_brain.py"
+    line: int                    # 142
+    function: str                # "ModularBrain.think"
+    class_name: str | None       # "ModularBrain",module 函数为 None
+    method_qualifier: str        # "lca.cognition.brain.ModularBrain.think"
+    source_snippet: str | None   # 该行原始源码(可选,debug-only profile)
+
+class CallFrame:
+    file: str
+    line: int
+    function: str
+    local_var_keys: tuple[str, ...]    # 仅 keys,不存值,默认
+    local_var_summary: dict[str, str]  # key → repr(value),截断
+
+class LocalsSnapshot:
+    pre_call: dict[str, str]     # 入口时 locals 的 key→repr(value),截断
+    post_call: dict[str, str]    # 出口时 locals
+    diff_added: tuple[str, ...]  # 新增 keys
+    diff_changed: tuple[str, ...]  # 变化 keys
+    diff_removed: tuple[str, ...]  # 删除 keys
+```
+
+### 19.4 实现:SourceAttacher plugin
+
+```python
+# lca/plugins/observability/spine/reflectors/source.py
+class SourceAttacher(FieldProducer):
+    name = "spine.reflector.source"
+    priority = 8                  # 比 spantree 早一点
+    enabled = True                # 默认必开
+
+    def produce(self, *, fn, args, kwargs, ctx, span, phase):
+        if phase == "pre":
+            frame = inspect.currentframe().f_back
+            return {
+                "source_location": self._capture_source(frame, fn),
+                "call_frames": self._capture_frames(inspect.stack()[1:11]),
+                "locals_snapshot": LocalsSnapshot(
+                    pre_call=self._safe_locals_repr(frame, max_bytes=4096),
+                    post_call=None, diff_added=(), diff_changed=(), diff_removed=()
+                ),
+            }
+        if phase == "post":
+            frame = inspect.currentframe().f_back
+            # 与 pre_call diff
+            return {
+                "locals_snapshot": LocalsSnapshot(
+                    pre_call=None, post_call=None,
+                    diff_added=self._diff_keys(...),
+                    diff_changed=self._diff_changed(...),
+                    diff_removed=self._diff_removed(...),
+                ),
+            }
+        return {}
+
+    def _capture_source(self, frame, fn) -> SourceLocation:
+        return SourceLocation(
+            file=frame.f_code.co_filename,
+            line=frame.f_lineno,
+            function=frame.f_code.co_name,
+            class_name=self._enclosing_class(frame),
+            method_qualifier=f"{frame.f_globals.get('__name__')}.{frame.f_code.co_qualname}",
+            source_snippet=None if not self.config.debug_profile
+                       else linecache.getline(frame.f_code.co_filename, frame.f_lineno).strip(),
+        )
+
+    def _safe_locals_repr(self, frame, max_bytes: int) -> dict[str, str]:
+        """截断 + 防爆 —— 防 memory blowup,防 pickle 失败"""
+        out = {}
+        total = 0
+        for k, v in frame.f_locals.items():
+            try:
+                r = repr(v)
+                if len(r) > 256:
+                    r = r[:253] + "..."
+                if total + len(r) > max_bytes:
+                    out[f"__truncated__"] = f"budget={max_bytes}b"
+                    break
+                out[k] = r
+                total += len(r)
+            except Exception:
+                out[k] = f"<unreprable:{type(v).__name__}>"
+        return out
+
+@plugin(id="spine.reflector.source", provides=("field_producer.source",),
+       layer="L0", kind=PluginKind.SEAM,
+       description="I17: attach source_location + call_frames + locals_snapshot to every start event.",
+       test_suite="tests.lca_plugins.observability.spine.test_source_attacher",)
+async def setup(ctx, config):
+    ctx.provide("field_producer.source", SourceAttacher(
+        debug_profile=config.get("debug_profile", False),
+        max_locals_bytes=config.get("max_locals_bytes", 4096),
+    ))
+```
+
+### 19.5 trace 命令扩展
+
+```sh
+lca-ops journal trace run_c9fd294e5371 --include-orphan --locals
+```
+
+输出新增 4 列数据:
+
+```text
+[trace] run_id=c9fd294e5371, span_count=14
+
+  sequence 142  BrainThinkingStarted
+    ep            : brain.think.start
+    source        : lca/cognition/brain/modular_brain.py:142 in ModularBrain.think
+    call_frames   : 10
+      ├─ modular_brain.py:142 think    (locals: ctx, self)
+      ├─ modular_brain.py:78  iterate  (locals: iteration)
+      ├─ runtime_loop.py:203 _step    (locals: run_state)
+      └─ ...
+    locals at entry:
+      ctx           : CognitiveContext(messages=[...15 items...], user_input="写一个python笑话", ...)
+      self          : <ModularBrain reasoner=PromptReasoner critic=SimpleCritic ...>
+      memory        : <MemoryBackend size=42 entries>
+
+  sequence 143  BrainThinkingFinished
+    ep            : brain.think.end
+    source        : lca/cognition/brain/modular_brain.py:142 in ModularBrain.think
+    duration_ms   : 230
+    locals diff   : +{'decision': Decision(action='respond', text='...')}
+                    -{'pending_reasoning': <list of 3>}
+                    ~{'iteration': 3 → 4}
+
+  sequence 144  LlmCallStarted
+    source        : lca/infrastructure/llm/resolver.py:78 in LlmResolver.call
+    call_frames   : [...]
+    locals at entry:
+      model         : 'deepseek-chat'
+      prompt        : str(len=1240, head='You are a friendly assistant...')
+      temperature   : 0.7
+```
+
+### 19.6 安全边界(D13 关键)
+
+| 类别 | 处理 |
+|---|---|
+| 包含 secret 的字段(密码、token、key) | `redact_in_locals` 用正则 + SecretDetector 替换为 `<redacted:reason>` |
+| 包含 PII(用户输入、邮箱、手机) | `redact_pii` profile-level config;默认关,合规 profile 开 |
+| 大对象(binary buffer、image) | `repr()` 自动截断到 256 字符,加上 `<binary:len=N>` |
+| 不可 pickle 对象(numpy、asyncio.Task) | fallback `<unreprable:ClassName>` |
+| 内存爆 | `max_locals_bytes` 截断(默认 4KB);超限标 `__truncated__` |
+| 死循环(self-reference) | 检测 `repr()` 内部 `__repr__` 长度 > 5KB → 截断 |
+| 嵌套对象 | 浅一层 dict;不再下钻(spec 不卷 deep serialization) |
+
+**没有不安全的字段** —— `repr()` 永远不出错,只是可能不准。
+
+### 19.7 与 D11 / D12 / 第三轮的协同
+
+| 维度 | 字段来源 | plugin |
+|---|---|---|
+| 协议层 ep | manifest | framework |
+| 字段层 metadata | signature / runtime / context / manifest_decl | producer plugins |
+| 异常层 | builtin / unclass classifier | classifier plugins |
+| **源层(本节)** | **frame inspect + locals** | **`spine.reflector.source` plugin** |
+
+每层都是独立 plugin + I 不变量,profile 仍可独立关。
+
+### 19.8 关键设计取舍
+
+| 决策 | 取向 | 理由 |
+|---|---|---|
+| locals 是 `repr()` 还是 pickle | `repr()` | 安全第一;不可 pickle 不爆;UI 调试够用 |
+| 默认最大 4KB | 4KB | 多事件叠加不会让 events.jsonl 爆炸 |
+| 默认包含所有 locals? | 是 + 截断 | 默认安全;profile `enabled=false` 全关 |
+| post_call 完整 locals? | 否,只 diff | pre 已全;post 给 diff 即可;爆量控制 |
+| source_snippet 默认开? | 否 | 大文件不必要;OII-Debug profile 开 |
+| frame capture 深度 | 10 | 太深没意义,默认 10 与异常 traceback 一致 |
+| redactor profile 默认开? | 否 | 由 profile 控制;合规 profile 必开 |
+| 全 frame 重写为 SourceContext Snapshot | 否(且建议真值发生) | frame 在切栈时已失;必须在 wrap 内 capture |
+
+### 19.9 修正 § 13 不做的事
+
+- ❌ 不让业务方关 `spine.reflector.source`(`I17` 强制);但允许业务方**配置** `max_locals_bytes` 和 `redact_patterns`
+- ❌ 不在生产默认开 `source_snippet` 原文;只在 OII-Debug profile 开
+- ❌ 不做 deep serialization(只 repr + 浅 dict)
+
+### 19.10 PR-9:spine reflector source
+
+新增 PR-9:实现 `spine.reflector.source` plugin + I17 不变量校验 + 测试 `test_source_attacher` 覆盖 frame/locals/redact 三路径。
+
+PR-8 之后;估时 3-5 天。
