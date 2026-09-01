@@ -5,7 +5,7 @@
 | 命令 | 用途 |
 |---|---|
 | `status` | 全站状态(kernel_serve / infra / lobehub / daemon / onlyboxes) |
-| `heal` / `stop` | 生命周期(`restart` 已删;kernel 进程由 `kernel_serve` 自管,`heal` 会自愈) |
+| `heal` / `stop` | 外部服务(`infra/lobehub/daemon`)的生命周期自愈与停止;`restart`/`compose`/`dev` 已删;LCA 进程入口是 `uv run python -m lca_kernel serve`,由 `lca_kernel.lifecycle` 守护 |
 | `logs` | journal 事实流(可加 `--replay` 从 materialization 重放) |
 | `inspect-tree <profile.yaml>` | 解析后的插件树 + capability 图 |
 | `dump-profile <profile.yaml>` | 展开 bundle + patch 的 entries |

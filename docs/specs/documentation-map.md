@@ -5,7 +5,7 @@
 | 需求 | 权威位置 | 说明 |
 |---|---|---|
 | 了解开发约束、仓库地图和验证命令 | [根 AGENTS.md](../../AGENTS.md) | 每次开发会话的高频入口 |
-| 查询术语、数据所有权和结构化认知模型 | [LCA structured cognition guide](lca-structured-cognition-guide.md) | Fact、State、Decision、Verdict、Effect、Journal 等词汇 |
+| 查询术语、数据所有权和结构化认知模型 | [LCA structured cognition guide](structured-cognition-guide.md) | Fact、State、Decision、Verdict、Effect、Journal 等词汇 |
 | 查询现行协议与操作说明 | `docs/specs/` | Harness、阶段图、运行时投影、工具恢复、命名与包组织规范、集成规范 |
 | 查询包目录规模、命名与拆分规则 | [package-organization-discipline.md](package-organization-discipline.md) | 8/10/15 规则、概念群映射、代码体量硬约束 |
 | 查询命名宪法（目录/文件/类/函数/变量/枚举全维度） | [naming-constitution.md](../design/naming-constitution.md) | v3 九群归属、四维分解、角色后缀强制词表 |
@@ -16,6 +16,7 @@
 | 查询已结束实施、研究和审计的原始记录 | [history](../../history/README.md) | 非现行、仅供追溯的过程材料 |
 | 查询 Kernel / Transport 边界与启动链路 | [ADR-0115](../adr/0115-kernel-transport-boundary.md) · [ADR-0116](../adr/0116-boot-event-observability-convergence.md) · [ADR-0117](../adr/0117-process-lifecycle-env-whitelist.md) · [history/2026-08/adr-0115-0117-kernel-bootstrap-plan/plan.md](../../history/2026-08/adr-0115-0117-kernel-bootstrap-plan/plan.md) | K1–K8 公共面、Boot journal 词表、process lifecycle + env 白名单 |
 | 查询 Gateway routes plugin 化 | [ADR-0112](../adr/0112-gateway-routes-as-plugins.md) | Gateway router + 4 routes plugin |
+| 查询 LCA 进程入口与服务边界 | [`./scripts/lca-ops`](../../scripts/lca-ops) 头部注释 · [lca_kernel/](../../lca_kernel/) · [ADR-0119-followup](../adr/0119-followup-gateway-name-map.md) | lca-ops 只管外部服务;LCA 入口是 `uv run python -m lca_kernel serve` |
 
 ## 维护边界
 

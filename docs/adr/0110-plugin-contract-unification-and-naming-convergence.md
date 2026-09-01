@@ -437,7 +437,7 @@ ADR-0069 §六给的是**概念**——可填可空、与 `PluginDefinition` 并
 
 | 项 | 后续 ADR |
 |---|---|
-| `v3 9 群 vs 13 群` 文档收敛（PR-G 已含） | 与 `docs/specs/lca-structured-cognition-guide.md` 单向对齐 |
+| `v3 9 群 vs 13 群` 文档收敛（PR-G 已含） | 与 `docs/specs/structured-cognition-guide.md` 单向对齐 |
 | `ControlSlot` 11 槽是否合并到 9 槽 | 单独 ADR（**不是本 ADR 范围**） |
 | `AuthorityContract.grants` 与 `EffectClass` 是否能合一 | 单独 ADR（**不是本 ADR 范围**） |
 | `PluginContract.contribution` 段是否要删 | 待看 ADR-0085 后续采纳情况再说 |
@@ -473,7 +473,7 @@ ADR-0069 §六给的是**概念**——可填可空、与 `PluginDefinition` 并
 - ADR-0106 命名宪法：本 ADR 的命名收敛需符合该宪法术语级别
 - ADR-0103 Locked-Surface：`lca/plugins/seams/` / `lca/plugins/providers/` 边界保持
 - `docs/design/2026-08-21-cognitive-primitive-constitution-v3-1.md`：v3 9 群与 13 群映射文件
-- `docs/specs/lca-structured-cognition-guide.md`：作者面向的术语表
+- `docs/specs/structured-cognition-guide.md`：作者面向的术语表
 - `lca/contracts/harness/composition/plugin_contract.py`：9 段类型定义（已存在，未启用）
 - `lca/contracts/protocols/composition/logic_address.py`：6 维扁平（待退役）
 - `lca/runtime/runtime_bindings.py`：冻结闭包定义（不动，保留 `new_*` 单 seam）

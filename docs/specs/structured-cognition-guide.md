@@ -1,8 +1,10 @@
-# Layered Cognitive Agent：技术名词与结构化层次认知指南
+# 结构化认知与数据所有权指南
 
-**作者：Manus AI**  
-**分析对象：** `smartlijingyang-sudo/layered-cognitive-agent`  ￼
-**分析基线：** `main` 分支当前代码与仓库内架构文档 ￼
+> 本文档由 [Manus AI](https://manus.im) 在 2026-08 对 `smartlijingyang-sudo/layered-cognitive-agent` `main` 分支的代码与文档做外部分析,后被本仓库采纳为结构化认知模型与数据所有权链路的权威 spec,改名为 `structured-cognition-guide.md`。维护者补正了死链和过期 commit 引用;权威边界见 [根 AGENTS.md §4](../AGENTS.md) 与 [术语表](./glossary.md)。
+
+**作者：Manus AI**(原分析)
+**维护者补正:** LCA 工作组
+**分析基线:** `main` 分支 2026-08 快照
 
 ## 1. 先给出结论：这个项目是什么
 
@@ -405,8 +407,8 @@ LCA 的完整技术认知可以用下面五句话记忆：
 
 ## References
 
-[1]: `../AGENTS.md` — 项目工程约束、五层依赖、六步闭集、双平面与插件机制  
-[2]: `../ARCHITECTURE_OPTIMIZATION_SUMMARY_2026-08-25.md` — 声明式计划、阶段图、执行契约和终态投影优化总结  
-[3]: [GitHub 仓库最新提交 `6ce374e3`](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/commit/6ce374e3) — 架构术语命名重构  
-[4]: `harness-spine-spec.md` — Harness Spine 的 Agent、Session、Journal、Projection 与 Plugin Kernel 设计规约  
-[5]: `design/2026-08-19-cognitive-primitive-constitution-v3.md` — 认知原语宪法 v3：六步闭集、双平面、Reducer、Journal、能力衰减和配置层次
+[1]: [`../AGENTS.md`](../AGENTS.md) — 项目工程约束、五层依赖、六步闭集、双平面与插件机制  
+[2]: [`../../history/2026-08/architecture-reviews/optimization-summary.md`](../../history/2026-08/architecture-reviews/optimization-summary.md) — 声明式计划、阶段图、执行契约和终态投影优化总结  
+[3]: 架构术语命名重构的当时 commit 详见 `optimization-summary.md` 引用  
+[4]: [`./harness-spine-spec.md`](./harness-spine-spec.md) — Harness Spine 的 Agent、Session、Journal、Projection 与 Plugin Kernel 设计规约  
+[5]: [`../design/2026-08-19-cognitive-primitive-constitution-v3.md`](../design/2026-08-19-cognitive-primitive-constitution-v3.md) — 认知原语宪法 v3：六步闭集、双平面、Reducer、Journal、能力衰减和配置层次

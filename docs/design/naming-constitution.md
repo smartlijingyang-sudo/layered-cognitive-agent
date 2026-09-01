@@ -6,7 +6,7 @@
 > - [v3 认知原语宪法](./2026-08-19-cognitive-primitive-constitution-v3.md) — 九群归属来源
 > - [包组织纪律](../specs/package-organization-discipline.md) — 规模与目录层级约束
 > - [命名规范（旧）](../specs/naming-conventions.md) — 语义后缀术语表
-> - [结构化认知指南](../specs/lca-structured-cognition-guide.md) — 数据所有权模型
+> - [结构化认知指南](../specs/structured-cognition-guide.md) — 数据所有权模型
 >
 > **适用范围：** `lca/`、`gateway/`、`tests/`、`scripts/`、所有 Python 源码及其测试、迁移脚本与 CI 工具。
 
@@ -671,8 +671,8 @@ Q3. 拼起来
 | 认知原语宪法 | `docs/design/2026-08-19-cognitive-primitive-constitution-v3.md` |
 | 声明式阶段图 | `docs/specs/declarative-phase-graph-spec.md` |
 | 运行时骨架 | `docs/specs/harness-spine-spec.md` |
-| 结构化认知指南 | `docs/specs/lca-structured-cognition-guide.md` |
-| 数据所有权 | `docs/specs/lca-structured-cognition-guide.md` §4 |
+| 结构化认知指南 | `docs/specs/structured-cognition-guide.md` |
+| 数据所有权 | `docs/specs/structured-cognition-guide.md` §4 |
 | ADR 索引 | `docs/adr/` |
 | 术语表 | `docs/specs/glossary.md` |
 
