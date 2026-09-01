@@ -86,15 +86,29 @@ class ModularBrain(Brain):
     async def think(self, state: AgentState) -> Decision:
         """Delegate one Think phase to the selected cognitive primitive."""
 
-        return await self._think_pipeline.decide(
-            state=state,
-            reasoner=self.reasoner,
-            classifier=self.classifier,
-            skill_router=self.skill_router,
-            decision_gate=self._decision_gate,
-            agent_gates=self._agent_gates,
-            reducer=self.reducer,
+        # PR-3.2: spine envelope for the brain.think execution point.
+        from lca.plugins.observability.spine.reflectors.cognition import (
+            emit_brain_think_end,
+            emit_brain_think_start,
         )
+
+        state_id = state.trace_id
+        emit_brain_think_start(state_id=state_id)
+        try:
+            decision = await self._think_pipeline.decide(
+                state=state,
+                reasoner=self.reasoner,
+                classifier=self.classifier,
+                skill_router=self.skill_router,
+                decision_gate=self._decision_gate,
+                agent_gates=self._agent_gates,
+                reducer=self.reducer,
+            )
+        except BaseException:
+            emit_brain_think_end(state_id=state_id, outcome="failure")
+            raise
+        emit_brain_think_end(state_id=state_id, outcome="success")
+        return decision
 
     async def reflect(self, state: AgentState, observation: Observation) -> Reflection:
         """Delegate one Reflect phase to the selected cognitive primitive."""

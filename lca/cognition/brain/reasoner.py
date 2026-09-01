@@ -386,11 +386,25 @@ class PromptReasoner(Reasoner):
         prompt = _strip_empty_prompt_fields(prompt)
         annotate(**{ATTR_PROMPT_TEMPLATE: template_name})
         task = variables.get("task", "")
-        return await execute_llm_turn(
-            self.llm,
-            self.tools,
-            prompt,
-            step=state.step,
-            state=state,
-            task=task,
+        # PR-3.2: spine envelope for the reasoner.reason execution point.
+        from lca.plugins.observability.spine.reflectors.cognition import (
+            emit_reasoner_reason_end,
+            emit_reasoner_reason_start,
         )
+
+        state_id = state.trace_id
+        emit_reasoner_reason_start(state_id=state_id)
+        try:
+            response = await execute_llm_turn(
+                self.llm,
+                self.tools,
+                prompt,
+                step=state.step,
+                state=state,
+                task=task,
+            )
+        except BaseException:
+            emit_reasoner_reason_end(state_id=state_id, outcome="failure")
+            raise
+        emit_reasoner_reason_end(state_id=state_id, outcome="success")
+        return response

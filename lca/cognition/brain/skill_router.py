@@ -29,11 +29,35 @@ class KeywordSkillRouter(SkillRouter):
         self._default = default_template
 
     async def route(self, state: AgentState) -> str:
-        task_lower = state.task.lower()
-        for template_name, keywords in self._rules.items():
-            if any(kw.lower() in task_lower for kw in keywords):
-                return template_name
-        return self._default
+        # PR-3.2: spine envelope for the skill_router.route execution point.
+        from lca.plugins.observability.spine.reflectors.cognition import (
+            emit_skill_router_route,
+        )
+
+        try:
+            task_lower = state.task.lower()
+            for template_name, keywords in self._rules.items():
+                if any(kw.lower() in task_lower for kw in keywords):
+                    emit_skill_router_route(
+                        state_id=state.trace_id,
+                        template=template_name,
+                        outcome="success",
+                    )
+                    return template_name
+            template = self._default
+        except BaseException:
+            emit_skill_router_route(
+                state_id=state.trace_id,
+                template=self._default,
+                outcome="failure",
+            )
+            raise
+        emit_skill_router_route(
+            state_id=state.trace_id,
+            template=template,
+            outcome="success",
+        )
+        return template
 
 
 class StaticSkillRouter(SkillRouter):
@@ -43,4 +67,15 @@ class StaticSkillRouter(SkillRouter):
         self._template = template_name
 
     async def route(self, state: AgentState) -> str:
-        return self._template
+        # PR-3.2: spine envelope for the skill_router.route execution point.
+        from lca.plugins.observability.spine.reflectors.cognition import (
+            emit_skill_router_route,
+        )
+
+        template = self._template
+        emit_skill_router_route(
+            state_id=state.trace_id,
+            template=template,
+            outcome="success",
+        )
+        return template

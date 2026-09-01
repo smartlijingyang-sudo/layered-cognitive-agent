@@ -27,6 +27,23 @@ class SimpleCritic(Critic):
     """基于执行结果生成反思。"""
 
     async def critique(self, state: AgentState, observation: Observation) -> Reflection:
+        # PR-3.2: spine envelope for the critic.eval execution point.
+        from lca.plugins.observability.spine.reflectors.cognition import (
+            emit_critic_eval_end,
+            emit_critic_eval_start,
+        )
+
+        state_id = state.trace_id
+        emit_critic_eval_start(state_id=state_id)
+        try:
+            reflection = self._evaluate(state, observation)
+        except BaseException:
+            emit_critic_eval_end(state_id=state_id, outcome="failure")
+            raise
+        emit_critic_eval_end(state_id=state_id, outcome="success")
+        return reflection
+
+    def _evaluate(self, state: AgentState, observation: Observation) -> Reflection:
         if observation.success:
             tool_name = self._last_tool_name(state)
             if tool_name:

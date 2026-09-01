@@ -18,11 +18,25 @@ class NullCritic(Critic):
     """Default null Critic (ADR-0068 / 宪法 §3.4)."""
 
     async def critique(self, state: AgentState, observation: Observation) -> Reflection:
-        return Reflection(
-            reflection_id=new_id("refl"),
-            verdict=ReflectionVerdict.ON_TRACK,
-            lesson=None,
+        # PR-3.2: spine envelope (consistent instrumentation across critics).
+        from lca.plugins.observability.spine.reflectors.cognition import (
+            emit_critic_eval_end,
+            emit_critic_eval_start,
         )
+
+        state_id = state.trace_id
+        emit_critic_eval_start(state_id=state_id)
+        try:
+            reflection = Reflection(
+                reflection_id=new_id("refl"),
+                verdict=ReflectionVerdict.ON_TRACK,
+                lesson=None,
+            )
+        except BaseException:
+            emit_critic_eval_end(state_id=state_id, outcome="failure")
+            raise
+        emit_critic_eval_end(state_id=state_id, outcome="success")
+        return reflection
 
 
 __all__ = ["NullCritic"]

@@ -83,6 +83,13 @@ class SimpleMemorySystem(MemorySystem):
 
     async def perceive(self, state: AgentState) -> AgentState:
         """Return a context-enriched state value without mutating the input instance."""
+        # PR-3.2: spine envelope for the memory.read execution point.
+        from lca.plugins.observability.spine.reflectors.cognition import (
+            emit_memory_read,
+        )
+
+        state_id = state.trace_id
+        emit_memory_read(state_id=state_id)
         # PR7.D.7: fold each layer's records; emit ContextCompacted with
         # original vs kept kinds.  Empty compaction is still journaled
         # (every Perceive gets an audit trail).
@@ -145,6 +152,16 @@ class SimpleMemorySystem(MemorySystem):
         records are appended to their target layers; ``rejected`` writes
         are not stored.  Both sides journal via ``record()``.
         """
+        # PR-3.2: spine envelope for the memory.write execution point
+        # (one event per accepted write — the close-set intent of
+        # memory.write is per-record, not per-batch).
+        from lca.plugins.observability.spine.reflectors.cognition import (
+            emit_memory_write,
+        )
+
+        state_id = "memory-system"
+        if writes and writes[0].metadata.get("source_trace_id"):
+            state_id = str(writes[0].metadata["source_trace_id"])
         result = self.policy.commit(writes)
         for rec in result.accepted:
             self._append_record(rec.memory_type, rec)
@@ -157,6 +174,12 @@ class SimpleMemorySystem(MemorySystem):
                     record_id=rec.record_id,
                 )
             )
+            emit_memory_write(
+                state_id=state_id,
+                layer=rec.memory_type.value,
+                record_id=rec.record_id,
+                outcome="success",
+            )
         for rej in result.rejected:
             record(
                 MemoryCommitted(
@@ -164,6 +187,12 @@ class SimpleMemorySystem(MemorySystem):
                     record_id=rej.write.record_id,
                     record_kind="rejected",
                 )
+            )
+            emit_memory_write(
+                state_id=state_id,
+                layer=rej.write.layer.value,
+                record_id=rej.write.record_id,
+                outcome="rejected",
             )
         return result
 
