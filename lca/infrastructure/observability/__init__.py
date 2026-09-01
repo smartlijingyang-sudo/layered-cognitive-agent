@@ -21,10 +21,6 @@
 包外禁止 import 任何子模块（守卫测试强制）；本 ``__init__`` 是唯一表面。
 """
 
-from __future__ import annotations
-
-from typing import Any
-
 from lca.contracts.models.observability.diagnostic import (
     DiagnosticCategory,
     DiagnosticEvent,
@@ -170,6 +166,20 @@ from lca.infrastructure.observability.genai import (
 from lca.infrastructure.observability.genai import (
     build_default_registry as build_default_genai_registry,
 )
+from lca.infrastructure.observability.journal import (
+    OtelProjector,
+    RunState,
+    RunStatus,
+    RunStore,
+    UnregisteredJournalEventError,
+    fold_run_state,
+)
+from lca.infrastructure.observability.journal.backends import InMemoryJournalStore
+from lca.infrastructure.observability.journal.engine.journal_io import (
+    read_journal,
+    stamped_to_record,
+)
+from lca.infrastructure.observability.journal.engine.serialization import stamped_to_journal_record
 from lca.infrastructure.observability.narrative import plan_steps_joined
 from lca.infrastructure.observability.stream.trace_inspector import TraceInspector, TraceReport
 from lca.infrastructure.observability.stream.trace_tool_runner import (
@@ -317,70 +327,3 @@ __all__ = [
     "team_id_for",
     "traced",
 ]
-
-
-# Lazy re-exports (PR-5 / ADR-0165.1).
-# These facade symbols are sourced from forbidden subpackages
-# (``journal.engine.*``, ``journal.backends``, ``journal.otel.projector``).
-# Eager imports would create a static ``lca.infrastructure.observability`` ->
-# forbidden edge, breaking the ``business-event-isolation`` importlinter
-# contract for any business-layer module (cognition / runtime / agent /
-# application) that imports the facade. PEP 562 ``__getattr__`` keeps the
-# public surface stable (``from lca.infrastructure.observability import
-# RunStore``) while hiding the edge from static analysers (grimp /
-# import-linter).
-_LAZY_EXPORTS: dict[str, tuple[str, str]] = {
-    "RunStore": (
-        "lca.infrastructure.observability.journal.engine.engine",
-        "RunStore",
-    ),
-    "UnregisteredJournalEventError": (
-        "lca.infrastructure.observability.journal.engine.engine",
-        "UnregisteredJournalEventError",
-    ),
-    "RunState": (
-        "lca.infrastructure.observability.journal.engine.reducer",
-        "RunState",
-    ),
-    "RunStatus": (
-        "lca.infrastructure.observability.journal.engine.reducer",
-        "RunStatus",
-    ),
-    "fold_run_state": (
-        "lca.infrastructure.observability.journal.engine.reducer",
-        "fold_run_state",
-    ),
-    "OtelProjector": (
-        "lca.infrastructure.observability.journal.otel.projector",
-        "OtelProjector",
-    ),
-    "InMemoryJournalStore": (
-        "lca.infrastructure.observability.journal.backends",
-        "InMemoryJournalStore",
-    ),
-    "read_journal": (
-        "lca.infrastructure.observability.journal.engine.journal_io",
-        "read_journal",
-    ),
-    "stamped_to_record": (
-        "lca.infrastructure.observability.journal.engine.journal_io",
-        "stamped_to_record",
-    ),
-    "stamped_to_journal_record": (
-        "lca.infrastructure.observability.journal.engine.serialization",
-        "stamped_to_journal_record",
-    ),
-}
-
-
-def __getattr__(name: str) -> Any:
-    """PEP 562 lazy load for facade symbols sourced from forbidden subpackages."""
-    import importlib as _importlib
-
-    target = _LAZY_EXPORTS.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    module = _importlib.import_module(target[0])
-    value = getattr(module, target[1])
-    globals()[name] = value
-    return value

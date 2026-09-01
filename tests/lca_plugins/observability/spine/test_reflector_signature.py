@@ -140,9 +140,7 @@ def test_docstring_captured_is_first_line_of_doc() -> None:
         phase="pre",
     )
 
-    expected_first_line = (
-        _example.__doc__.splitlines()[0].strip() if _example.__doc__ else ""
-    )
+    expected_first_line = _example.__doc__.splitlines()[0].strip() if _example.__doc__ else ""
     assert payload["docstring_captured"] == expected_first_line
 
 
