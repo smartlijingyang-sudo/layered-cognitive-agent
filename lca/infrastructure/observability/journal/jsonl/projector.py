@@ -39,6 +39,8 @@ from lca.contracts.models.observability.journal import (
     SandboxOutputDelta,
     StampedEvent,
     StepTextDelta,
+    ToolAbandonedBeforeInvoke,
+    ToolRetryProgress,
 )
 from lca.contracts.protocols import JournalProjector
 from lca.infrastructure.observability.journal.engine.journal_io import (
@@ -86,6 +88,10 @@ def _delta_key(stamped: StampedEvent) -> _DeltaKey | None:
         return ("ReasoningDelta", event.step)
     if isinstance(event, SandboxOutputDelta):
         return ("SandboxOutputDelta", event.invocation_id, event.stream)
+    if isinstance(event, ToolRetryProgress):
+        return ("ToolRetryProgress", event.phase_id)
+    if isinstance(event, ToolAbandonedBeforeInvoke):
+        return ("ToolAbandonedBeforeInvoke", event.phase_id)
     return None
 
 

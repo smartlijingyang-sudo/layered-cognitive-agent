@@ -68,9 +68,12 @@ from lca.contracts.models.observability.journal import (
     TeamMessagePublished,
     TeamRunFinished,
     TeamRunStarted,
+    ToolAbandonedBeforeInvoke,
     ToolCallStreaming,
     ToolDenied,
     ToolInvoked,
+    ToolLifecycleEnded,
+    ToolRetryProgress,
     ToolStarted,
 )
 
@@ -105,6 +108,9 @@ JOURNAL_EVENT_CLASSES: dict[str, type[JournalEvent]] = {
         ToolStarted,
         ToolInvoked,
         ToolDenied,
+        ToolAbandonedBeforeInvoke,
+        ToolLifecycleEnded,
+        ToolRetryProgress,
         AttachmentStagingStarted,
         AttachmentStagingCompleted,
         AttachmentStagingFailed,

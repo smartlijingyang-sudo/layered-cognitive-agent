@@ -67,9 +67,12 @@ from lca.contracts.models.observability.journal import (
     TeamMessagePublished,
     TeamRunFinished,
     TeamRunStarted,
+    ToolAbandonedBeforeInvoke,
     ToolCallStreaming,
     ToolDenied,
     ToolInvoked,
+    ToolLifecycleEnded,
+    ToolRetryProgress,
     ToolStarted,
 )
 from lca.contracts.models.observability.telemetry_catalog import VocabDomain
@@ -433,6 +436,39 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
             durability="required",
             audience="auditor",
             sensitivity="internal",
+        ),
+        # ── Phase 退出收口(ADR-0159 / ADR-0162) ──
+        _descriptor(
+            ToolLifecycleEnded,
+            domain=VocabDomain.RESOURCE,
+            emitter="lca.harness.declarative.compile.phase_execution_policy",
+            required=("tool_call_id", "end_kind", "phase_id"),
+            description="Tool call lifecycle ended without completion",
+            durability="required",
+            audience="end_user",
+            sensitivity="public",
+        ),
+        _descriptor(
+            ToolAbandonedBeforeInvoke,
+            domain=VocabDomain.RESOURCE,
+            emitter="lca.harness.declarative.compile.phase_execution_policy",
+            required=("tool_call_id", "phase_id", "reason"),
+            description="Tool call placeholder abandoned before ToolInvoked",
+            durability="best_effort",
+            audience="operator",
+            sensitivity="internal",
+            retention="short",
+        ),
+        _descriptor(
+            ToolRetryProgress,
+            domain=VocabDomain.RESOURCE,
+            emitter="lca.harness.declarative.compile.phase_execution_policy",
+            required=("tool_call_id", "phase_id", "attempt", "of"),
+            description="Phase retry progress (live UI driver)",
+            durability="best_effort",
+            audience="end_user",
+            sensitivity="public",
+            retention="short",
         ),
         # ── 附件暂存 ──
         _descriptor(
