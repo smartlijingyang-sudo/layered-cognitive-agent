@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,7 @@ from lca.contracts.models.observability.journal import (
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunSession
 from lca.plugins.transport.webserver.handlers.runs.terminal.legacy_adapter import RegistryRunAdapter
+from lca.plugins.transport.webserver.router import RouteRegistry
 
 _SEQ = [0]
 
@@ -80,24 +82,62 @@ def _seed_journal(registry: RunRegistry, run_id: str = "run-live-ui") -> RunSess
 def _app(registry: RunRegistry) -> Starlette:
     # PR-7:``gateway.routes.build_routes`` 退役,从 4 个 transport plugin
     # 拼装等价 route catalog;plugin 是 ADR-0115 决定 6 的唯一 route SSOT。
-    from lca.plugins.transport.webserver.routes_device import ROUTES as DEVICE_ROUTES
-    from lca.plugins.transport.webserver.routes_device import UPGRADE
-    from lca.plugins.transport.webserver.routes_health_options import ROUTES as HEALTH_ROUTES
+    # 各 plugin 暴露 ``async setup(ctx, config)`` 把 starlette Route 直接注册到
+    # ``RouteRegistry``;测试不再 import 旧 ``ROUTES`` 常量(plugin 重构后已退役)。
+    from lca.plugins.transport.webserver.routes_device import setup as setup_device
+    from lca.plugins.transport.webserver.routes_health_options import setup as setup_health
     from lca.plugins.transport.webserver.routes_openai_compat_files import (
-        ROUTES as OPENAI_ROUTES,
+        setup as setup_openai,
     )
-    from lca.plugins.transport.webserver.routes_runs_sessions import ROUTES as RUNS_ROUTES
+    from lca.plugins.transport.webserver.routes_runs_sessions import setup as setup_runs
 
-    routes: list[Any] = [
-        *HEALTH_ROUTES,
-        *OPENAI_ROUTES,
-        *RUNS_ROUTES,
-        *DEVICE_ROUTES,
-        UPGRADE,
-    ]
-    application = Starlette(routes=routes)
+    router = RouteRegistry()
+    ctx = _FakeCtx(router)
+    asyncio.run(setup_health.setup(ctx, None))
+    asyncio.run(setup_openai.setup(ctx, None))
+    asyncio.run(setup_runs.setup(ctx, None))
+    asyncio.run(setup_device.setup(ctx, None))
+
+    application = Starlette()
+    router.install(application)
     application.state.run_port = RegistryRunAdapter(registry)
     return application
+
+
+class _FakeRuntime:
+    def __init__(self) -> None:
+        self.effects: list[tuple[Any, str]] = []
+
+    def effect(self, dispose: Any, *, label: str = "effect") -> None:
+        self.effects.append((dispose, label))
+
+
+class _FakeCtx:
+    """Plugin context stub; resolves every requested capability to a sentinel.
+
+    Lifecycle-only fixture: the runs-sessions SSE test only exercises
+    ``GET /runs/{run_id}/live``, so handler-level capabilities (``llm_resolver``,
+    ``runtime_factory``, …) never actually run. The sentinel keeps
+    ``register_routes._require_present`` happy without spinning up the kernel.
+    """
+
+    def __init__(self, router: RouteRegistry) -> None:
+        self._router = router
+        self._fake_runtime = _FakeRuntime()
+
+    def require(self, key: str) -> Any:
+        if key == "route_registry":
+            return self._router
+        return _CAPABILITY_SENTINEL
+
+    def inject(self, key: str, *, default: Any = None) -> Any:
+        return default
+
+    def _runtime(self) -> _FakeRuntime:
+        return self._fake_runtime
+
+
+_CAPABILITY_SENTINEL: Any = object()
 
 
 def _parse_sse(body: bytes) -> list[dict[str, Any]]:
@@ -127,9 +167,9 @@ async def _drain(bytes_iter: Any) -> list[bytes]:
 
 def test_live_route_is_registered() -> None:
     """PR-7:``/runs/{run_id}/live`` 由 ``routes_runs_sessions`` plugin 注册。"""
-    from lca.plugins.transport.webserver.routes_runs_sessions import ROUTES
+    from lca.plugins.transport.webserver.routes_runs_sessions import ROUTE_SPECS
 
-    paths = {route.path for route in ROUTES if hasattr(route, "path")}
+    paths = {spec.path for spec in ROUTE_SPECS}
     assert "/runs/{run_id}/live" in paths
 
 
