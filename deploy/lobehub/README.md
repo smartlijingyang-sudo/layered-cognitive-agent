@@ -25,6 +25,36 @@
 
 `dev`：补丁 + gateway :8765 + LobeHub :3010 + daemon。日常用 `heal`，不要先 `restart`。
 
+## 状态与补丁：status 字段语义
+
+`./scripts/lca-ops status` 的 lobehub 块有两层补丁检查，含义不同：
+
+| 字段 | 看的是 | 健康标准 | 异常时怎么办 |
+|---|---|---|---|
+| `patches` | `deploy/lobehub/patches/**/*.py` 实际写到 lobehub-ui 的 anchor/marker | 全部 `verify` OK | 直接跑 `python3 deploy/lobehub/patch_lobehub.py`（不需要 restart，HMR 自动生效） |
+| `pnpm-patches` | lobehub-ui 上游声明的 `pnpm.patchedDependencies`（用 bun 装的 node_modules，要手工 `git apply`） | marker 文件存在 + 无 drift | **几乎总是上游依赖漂移** —— 不是 LCA 配错；去 lobehub-ui/patches/ 重新从上游生成 patch 文件 |
+
+### `ensure` 是 short-circuit，不是"全量重打"
+
+`./scripts/lca-ops lobehub ensure` 会按顺序跑 `_ensure_source / _ensure_patches / _ensure_pnpm_patches / _ensure_env / _ensure_deps`，但**每一项都是 no-op-when-up-to-date**：
+
+- `_ensure_patches` 只在 `deploy/lobehub/patches/` 的 hash 变了时才重新打。改了一次 patch 后快照会更新，下次 ensure 看到 hash 没变就什么都不做。
+- `_ensure_pnpm_patches` 只在 `.lca-ops/lobehub-pnpm-patches.marker` 不存在时才尝试 apply，写了 marker 之后永远 short-circuit。
+
+也就是说 `ensure` 不等于"重新打一遍补丁"。要**强制重打**：
+
+```bash
+# 重打源码补丁（从 .lobehub-upstream/ 恢复目标文件 + 重放所有 patch）
+python3 deploy/lobehub/patch_lobehub.py --reset
+
+# 仅检查现状（不改任何东西，输出每个 patch 的 OK/BROKEN/SKIP）
+python3 deploy/lobehub/patch_lobehub.py verify
+
+# 强制重试 pnpm patches（删 marker + 跑 ensure）
+rm .lca-ops/lobehub-pnpm-patches.marker
+./scripts/lca-ops lobehub ensure
+```
+
 ## 补丁机制
 
 ### 铁律：永远不要直接编辑 `lobehub-ui/`

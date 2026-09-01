@@ -75,6 +75,9 @@ infra      postgres / redis / s3
 lobehub    Next 前端 :3010    日志 .lca-ops/lobehub.log
   动作    start | stop | restart | status | ensure
   ensure  同步源码 / 打补丁 / 写 .env / bun install，不启进程
+          ⚠ ensure 是 short-circuit（hash 没变就不重打）；
+            强制重打源码补丁 → python3 deploy/lobehub/patch_lobehub.py
+            强制重打 pnpm patches → rm .lca-ops/lobehub-pnpm-patches.marker && ensure
   ./scripts/lca-ops lobehub restart
 
 daemon     sandbox-user 连接器
