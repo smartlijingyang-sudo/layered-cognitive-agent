@@ -109,6 +109,7 @@ class PhaseExecutionFailure:
 
     node_id: str
     attempts: tuple[PhaseAttemptFailure, ...]
+    last_tool_call_id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.node_id:

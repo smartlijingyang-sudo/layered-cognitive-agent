@@ -165,6 +165,7 @@ async def test_timeout_exhaustion_becomes_a_typed_and_auditable_phase_error() ->
             {"attempt": 2, "category": "timeout", "error_type": "TimeoutError"},
         ),
         "final_category": "timeout",
+        "last_tool_call_id": None,  # ADR-0162: phase execution failure carries last_tool_call_id
     }
 
 

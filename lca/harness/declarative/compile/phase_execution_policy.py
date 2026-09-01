@@ -14,6 +14,12 @@ from collections.abc import Awaitable, Callable
 from lca.contracts.atoms.ids import elapsed_seconds
 from lca.contracts.models.core.result import ApprovalPendingError
 from lca.contracts.models.core.state import Budget
+from lca.contracts.models.observability.journal import (
+    ToolAbandonedBeforeInvoke,
+    ToolLifecycleEnded,
+    ToolLifecycleEndKind,
+    ToolRetryProgress,
+)
 from lca.contracts.protocols.act.command_envelope import RunFact
 from lca.contracts.protocols.declarative.declarative_execution import (
     PhaseAttemptFailure,
@@ -22,6 +28,7 @@ from lca.contracts.protocols.declarative.declarative_execution import (
     PhaseResult,
 )
 from lca.contracts.protocols.declarative.declarative_fault_tolerance import PhaseExecutionPolicy
+from lca.infrastructure.observability.facade.facade import record
 
 
 class PhaseExecutionExhaustedError(RuntimeError):
@@ -50,6 +57,7 @@ class PhaseExecutionRunner:
         policy: PhaseExecutionPolicy,
         execute_attempt: Callable[[], Awaitable[PhaseResult]],
         budget: Budget | None = None,
+        last_known_tool_call_id: str | None = None,
     ) -> PhaseResult:
         """Run attempts until success or policy-bounded exhaustion.
 
@@ -60,10 +68,27 @@ class PhaseExecutionRunner:
 
         Cancellations and approval pauses are ownership signals, not retryable
         infrastructure failures, and must cross this seam unchanged.
+
+        Lifecycle emissions (ADR-0159 / ADR-0162):
+
+        - attempt 入口 emit ``ToolRetryProgress`` (best_effort;不依赖 state.step)
+        - phase 失败时 ``PhaseExecutionFailure.last_tool_call_id`` 透传给
+          ``_phase_error_result``,由其 emit ``ToolLifecycleEnded``(事实)
+        - phase 重试期间 tool 调用占位被回收时 emit ``ToolAbandonedBeforeInvoke``
+          (best_effort,合并键)
         """
 
         failures: list[PhaseAttemptFailure] = []
+        last_tool_call_id = last_known_tool_call_id
         for attempt in range(1, policy.max_attempts + 1):
+            record(
+                ToolRetryProgress(
+                    tool_call_id=last_tool_call_id or "",
+                    phase_id=node_id,
+                    attempt=attempt,
+                    of=policy.max_attempts,
+                )
+            )
             try:
                 timeout_seconds = _effective_timeout(policy.timeout_seconds, budget)
                 if timeout_seconds is not None and timeout_seconds <= 0:
@@ -80,13 +105,29 @@ class PhaseExecutionRunner:
                     error_type=type(error).__name__,
                 )
                 failures.append(failure)
+                # ADR-0162 决策 一:重试期内占位回收,emit best_effort 增量。
+                # best_effort 走 _delta_key 合并键,不污染事实流。
+                if last_tool_call_id is not None:
+                    record(
+                        ToolAbandonedBeforeInvoke(
+                            tool_call_id=last_tool_call_id,
+                            phase_id=node_id,
+                            reason="phase_retried"
+                            if attempt < policy.max_attempts
+                            else "phase_failed_fast",
+                        )
+                    )
                 if (
                     isinstance(error, RunDeadlineExceededError)
                     or attempt == policy.max_attempts
                     or failure.category not in policy.retry_on
                 ):
                     raise PhaseExecutionExhaustedError(
-                        PhaseExecutionFailure(node_id=node_id, attempts=tuple(failures))
+                        PhaseExecutionFailure(
+                            node_id=node_id,
+                            attempts=tuple(failures),
+                            last_tool_call_id=last_tool_call_id,
+                        )
                     ) from error
                 delay = policy.initial_backoff_seconds * policy.backoff_multiplier ** (attempt - 1)
                 if delay:
@@ -100,7 +141,11 @@ class PhaseExecutionRunner:
                             )
                         )
                         raise PhaseExecutionExhaustedError(
-                            PhaseExecutionFailure(node_id=node_id, attempts=tuple(failures))
+                            PhaseExecutionFailure(
+                                node_id=node_id,
+                                attempts=tuple(failures),
+                                last_tool_call_id=last_tool_call_id,
+                            )
                         ) from error
                     await asyncio.sleep(delay)
         raise AssertionError("phase execution policy must exhaust or return")
@@ -180,7 +225,11 @@ async def execute_with_policy(
 
 
 def _phase_error_result(failure: PhaseExecutionFailure, *, plan_ref: str) -> PhaseResult:
-    """Create the sole replay-safe result for a retry-exhausted phase execution."""
+    """Create the sole replay-safe result for a retry-exhausted phase execution.
+
+    ADR-0159 决策 三:失败路径必须 emit ``ToolLifecycleEnded`` 收口 journal
+    上的 ToolCallStreaming 占位(若有 last_tool_call_id);否则不发射,避免空事件。
+    """
 
     attempts = tuple(
         {
@@ -190,6 +239,16 @@ def _phase_error_result(failure: PhaseExecutionFailure, *, plan_ref: str) -> Pha
         }
         for attempt in failure.attempts
     )
+    if failure.last_tool_call_id is not None:
+        last_attempt = failure.attempts[-1]
+        record(
+            ToolLifecycleEnded(
+                tool_call_id=failure.last_tool_call_id,
+                end_kind=ToolLifecycleEndKind.FAILED,
+                error=last_attempt.error_type,
+                phase_id=failure.node_id,
+            )
+        )
     return PhaseResult(
         result_kind="phase_error",
         payload=failure,
@@ -202,6 +261,7 @@ def _phase_error_result(failure: PhaseExecutionFailure, *, plan_ref: str) -> Pha
                     "node_id": failure.node_id,
                     "attempts": attempts,
                     "final_category": failure.attempts[-1].category,
+                    "last_tool_call_id": failure.last_tool_call_id,
                 },
             ),
         ),
