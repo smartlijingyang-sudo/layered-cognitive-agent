@@ -12,7 +12,6 @@ from lca.plugins.providers.act.action_handlers import (
 )
 from lca.plugins.providers.act.delta_handlers import (
     ActivationDeltaHandler,
-    ArtifactClosureDeltaHandler,
     DefaultDeltaHandlerRegistry,
     ErrorDeltaHandler,
     MemoryDeltaHandler,
@@ -188,12 +187,20 @@ class TestDeltaHandlers:
         handler = ResumeDeltaHandler()
         assert isinstance(handler, DeltaHandler)
 
-    def test_artifact_closure_handler_implements_protocol(self):
-        """ArtifactClosureDeltaHandler should implement DeltaHandler Protocol."""
-        from lca.contracts.protocols.state.delta_handler import DeltaHandler
+    def test_artifact_closure_handler_removed(self):
+        """ADR-0158 决策 二:ArtifactClosureDeltaHandler 类删除(closure 走 transport 投影)。
 
-        handler = ArtifactClosureDeltaHandler()
-        assert isinstance(handler, DeltaHandler)
+        这条 test 守门:ArtifactClosureDeltaHandler 必须不再存在;若重新引入,
+        应配套 transport projection 通道,不可走 reducer.apply_artifact_closure。
+        """
+        try:
+            from lca.plugins.providers.act.delta_handlers import ArtifactClosureDeltaHandler  # type: ignore[attr-defined]
+        except ImportError:
+            return  # 已删除 ✓
+        raise AssertionError(
+            "ArtifactClosureDeltaHandler 必须删除 (ADR-0158 决策 二);"
+            f" 当前存在: {ArtifactClosureDeltaHandler!r}"
+        )
 
     def test_paused_handler_implements_protocol(self):
         """PausedDeltaHandler should implement DeltaHandler Protocol."""
@@ -209,8 +216,12 @@ class TestDeltaHandlers:
         registry = DefaultDeltaHandlerRegistry()
         assert isinstance(registry, DeltaHandlerRegistry)
 
-    def test_registry_has_all_11_handlers(self):
-        """兼容性工厂应集中安装全部 11 个默认 Reducer 操作。"""
+    def test_registry_has_all_default_handlers(self):
+        """兼容性工厂应集中安装全部默认 Reducer 操作。
+
+        ADR-0158 决策 二:artifact_closure 已从 reducer 流迁出,改走 transport
+        projection 通道;registry 不再注册对应 handler。
+        """
         registry = DefaultDeltaHandlerRegistry()
 
         for operation in [
@@ -223,7 +234,6 @@ class TestDeltaHandlers:
             "stop",
             "error",
             "resume",
-            "artifact_closure",
             "paused",
         ]:
             assert registry.resolve(operation) is not None, f"Missing handler for {operation}"
@@ -246,7 +256,6 @@ class TestDeltaHandlers:
             StopDeltaHandler(),
             ErrorDeltaHandler(),
             ResumeDeltaHandler(),
-            ArtifactClosureDeltaHandler(),
             PausedDeltaHandler(),
         ]
         for handler in handlers:

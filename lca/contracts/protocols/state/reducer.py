@@ -97,10 +97,6 @@ class Reducer(Protocol):
         """恢复已加载状态；可选地折叠人工输入对应的 ``Turn``。"""
         ...
 
-    def apply_artifact_closure(self, state: AgentState, closure: str) -> AgentState:
-        """折叠交付物闭合文本并在仍工作时标记完成。"""
-        ...
-
     def apply_paused(self, state: AgentState, snapshot_ref: object) -> AgentState:
         """标记 INPUT_REQUIRED（HIL 等待审批）。"""
         ...

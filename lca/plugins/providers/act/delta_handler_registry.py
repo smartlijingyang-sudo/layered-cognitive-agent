@@ -34,7 +34,6 @@ def register_default_delta_handlers(registry: DeltaHandlerRegistry) -> None:
     """Register the provider-owned handlers on ``registry``."""
     from lca.plugins.providers.act.delta_handlers import (
         ActivationDeltaHandler,
-        ArtifactClosureDeltaHandler,
         ErrorDeltaHandler,
         MemoryDeltaHandler,
         PausedDeltaHandler,
@@ -55,7 +54,6 @@ def register_default_delta_handlers(registry: DeltaHandlerRegistry) -> None:
     registry.register("stop", StopDeltaHandler())
     registry.register("error", ErrorDeltaHandler())
     registry.register("resume", ResumeDeltaHandler())
-    registry.register("artifact_closure", ArtifactClosureDeltaHandler())
     registry.register("paused", PausedDeltaHandler())
 
 

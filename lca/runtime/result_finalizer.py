@@ -30,11 +30,14 @@ class RuntimeResultFinalizer(ResultFinalizer):
         *,
         reducer: Reducer,
         hooks: HookRegistry,
-        artifact_closure: ArtifactClosure,
+        artifact_closure: ArtifactClosure | None = None,
         state_store: StateStore | None,
     ) -> None:
         self._reducer = reducer
         self._hooks = hooks
+        # ADR-0158 决策 二:artifact_closure 不再被 reducer 流消费;
+        # closure 改走 transport projection 通道。参数保留(deprecated)以兼容
+        # 既有 caller;后续 commit 删字段时同步删 caller 端 artifact_closure。
         self._artifact_closure = artifact_closure
         self._result_projection = TerminalResultProjection(state_store)
 
@@ -45,11 +48,13 @@ class RuntimeResultFinalizer(ResultFinalizer):
         plan_ref: str,
         journal_sequence: int,
     ) -> Result:
-        """Close one execution path and project its carrier-safe result."""
+        """Close one execution path and project its carrier-safe result.
+
+        ADR-0158 决策 二:closure 不再经 reducer 流,改走 transport projection
+        通道。reducer 仍是 state 唯一 writer(ADR-0070 C4)。
+        """
         final_state = interpretation.state
         await self._hooks.trigger("on_complete", final_state)
-        closure = self._artifact_closure.synthesize()
-        final_state = self._reducer.apply_artifact_closure(final_state, closure or "")
 
         outcome = interpretation.outcome
         if outcome is None:

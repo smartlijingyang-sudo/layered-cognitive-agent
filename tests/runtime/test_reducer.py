@@ -133,15 +133,17 @@ def test_apply_resume_records_input_turn_and_restores_working_status() -> None:
     assert out.step == 1
 
 
-def test_apply_artifact_closure_appends_once_and_completes_working_state() -> None:
-    state = _state()
-    state.final_output = "answer"
+def test_apply_artifact_closure_method_is_removed() -> None:
+    """ADR-0158 决策 六:apply_artifact_closure 整段删除;Reducer 不再折叠 closure。
 
-    out = DefaultReducer().apply_artifact_closure(state, "[artifact](sandbox:/out.txt)")
-    duplicate = DefaultReducer().apply_artifact_closure(out, "[artifact](sandbox:/out.txt)")
+    closure 改走 transport projection 通道(artifact_closure.py / SSE);
+    reducer 仍是 state 唯一 writer(ADR-0070 C4)。
+    """
 
-    assert out.status == TaskStatus.COMPLETED
-    assert duplicate.final_output.count("sandbox:/out.txt") == 1
+    reducer = DefaultReducer()
+    assert not hasattr(reducer, "apply_artifact_closure"), (
+        "DefaultReducer.apply_artifact_closure 必须被删除(ADR-0158 决策 六)"
+    )
 
 
 def test_apply_terminal_outcome_rejects_waiting_input_without_durable_cursor() -> None:

@@ -191,18 +191,6 @@ class ResumeDeltaHandler(DeltaHandler):
         return reducer.apply_resume(state, input_value, turn)
 
 
-class ArtifactClosureDeltaHandler(DeltaHandler):
-    """处理 ``artifact_closure`` delta：调用 ``reducer.apply_artifact_closure``。
-
-    ADR-0074：从 ``delta.metadata["closure"]``
-    提取闭合文本（str），折叠交付物闭合文本并标记完成。
-    """
-
-    def apply(self, state: AgentState, delta: RunDelta, reducer: Reducer) -> AgentState:
-        closure: str = delta.metadata.get("closure", "")
-        return reducer.apply_artifact_closure(state, closure)
-
-
 class PausedDeltaHandler(DeltaHandler):
     """处理 ``paused`` delta：调用 ``reducer.apply_paused``。
 
@@ -262,7 +250,6 @@ async def setup(ctx: PluginContext, config: Config) -> None:
 
 __all__ = [
     "ActivationDeltaHandler",
-    "ArtifactClosureDeltaHandler",
     "Config",
     "DefaultDeltaHandlerRegistry",
     "ErrorDeltaHandler",
