@@ -479,6 +479,64 @@ class ToolDenied(JournalEvent):
     reason: str = ""
 
 
+# ── Phase 退出收口（ADR-0159 / ADR-0162）─────────────────
+
+
+class ToolLifecycleEndKind(str, Enum):
+    """Tool 调用生命周期终结原因（用户能感知的事实）。
+
+    ADR-0162 决策 一:NOT_INVOKED_AFTER_STREAM 迁出至独立
+    ToolAbandonedBeforeInvoke 事件(best_effort 流)。本枚举仅保留三类。
+    """
+
+    CANCELLED = "cancelled"
+    FAILED = "failed"
+    SUPERSEDED = "superseded"
+
+
+@dataclass(frozen=True)
+class ToolLifecycleEnded(JournalEvent):
+    """Tool 调用生命周期终结（事实，phase 退出时）。
+
+    仅在 phase_execution_policy 已尝试但 ToolInvoked 未能落地的情况下发射。
+    配合 ADR-0157 的 ``_delta_key`` 合并,ToolCallStreaming 占位在 journal
+    中即可被收口。durability="required"(用户能感知,见 ADR-0063 §I6 三准则)。
+    """
+
+    tool_call_id: str = ""
+    end_kind: ToolLifecycleEndKind = ToolLifecycleEndKind.FAILED
+    error: str = ""
+    phase_id: str = ""
+
+
+@dataclass(frozen=True)
+class ToolAbandonedBeforeInvoke(JournalEvent):
+    """Tool 调用占位存在但 phase 在 ToolInvoked 发射前已退出(best_effort)。
+
+    ADR-0162 决策 一:用户感知弱(没看到这次调用,只看到「X」),与
+    ToolLifecycleEnded 拆开。三准则 ①「用户能感知」不通过,故 durability=
+    best_effort + _delta_key 合并 + 不入 narrative sidecar。
+    """
+
+    tool_call_id: str = ""
+    phase_id: str = ""
+    reason: str = "phase_retried"  # "phase_retried" | "phase_failed_fast" | "phase_cancelled"
+
+
+@dataclass(frozen=True)
+class ToolRetryProgress(JournalEvent):
+    """Phase 重试进度(实时驱动,best_effort)。
+
+    ADR-0162 决策 二:phase_retry 不动 state.step,只 emit best_effort 增量,
+    LobeHub 订阅 LiveTail 显示「正在重试 attempt 2/3」;spinner 不冻结。
+    """
+
+    tool_call_id: str = ""
+    phase_id: str = ""
+    attempt: int = 0
+    of: int = 0
+
+
 # ── 基础设施事件（附件暂存 / bootstrap）───────────────────
 
 
