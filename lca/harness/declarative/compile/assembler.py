@@ -1,4 +1,11 @@
-"""ADR-0075 GraphAssembler：只解释已编译 binding，不选择业务实现。"""
+"""ADR-0075 GraphAssembler：只解释已编译 binding，不选择业务实现。
+
+Every executor attached to an ``ExecutableNode`` is funneled through
+:func:`wrap_instrument` so the spine Layer-3 invariant holds
+(``node.executor.__lca_instrumented__`` is ``True`` and the wrapper's
+``wrap_provenance`` is ``"assembler"``). ``assert_all_instrumented`` is the
+build-time hard-fail that rejects any plan that escaped the assembler wrap.
+"""
 
 from __future__ import annotations
 
@@ -14,6 +21,12 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     SemanticPhase,
 )
 from lca.contracts.protocols.state.plan import CompiledRunPlan
+from lca.harness.declarative.compile.instrument_wrap import (
+    ASSEMBLER_PROVENANCE,
+    WRAP_INSTRUMENTED_ATTR,
+    wrap_executor,
+    wrap_instrument,  # noqa: F401  re-exported for tests and external wrap sites
+)
 from lca.harness.declarative.controls.validation import require_valid
 
 
@@ -58,6 +71,74 @@ class ExecutablePlan:
     nodes: Mapping[str, ExecutableNode]
 
 
+class UninstrumentedNode(Exception):
+    """Raised when a phase graph node was not wrapped by the assembler.
+
+    Carries ``plan_name`` and ``node_id`` so callers (CLI, diagnostics, CI
+    failure reporters) can produce targeted messages without re-walking the
+    plan to find the offending executor.
+    """
+
+    __slots__ = ("plan_name", "node_id")
+
+    def __init__(self, plan_name: str, node_id: str) -> None:
+        self.plan_name = plan_name
+        self.node_id = node_id
+        super().__init__(
+            f"phase graph node {node_id!r} in plan {plan_name!r} is not "
+            "wrapped by the assembler (missing "
+            f"{WRAP_INSTRUMENTED_ATTR!r} or wrap_provenance "
+            f"!= {ASSEMBLER_PROVENANCE!r})"
+        )
+
+
+def _resolve_runnable(executor: Any) -> Any:
+    """Return the underlying callable the Layer-3 check should inspect.
+
+    Production executors are ``InstrumentedPhaseExecutor`` instances, but
+    hand-crafted or pre-existing test plans may attach a bare callable or a
+    plain :class:`PhaseExecutor` object whose ``.execute`` is the actual
+    runnable. The check looks at the same callable ``wrap_executor`` would.
+    """
+
+    if executor is None:
+        return None
+    execute = getattr(executor, "execute", None)
+    if callable(execute):
+        return execute
+    if callable(executor):
+        return executor
+    return None
+
+
+def assert_all_instrumented(plan: ExecutablePlan) -> None:
+    """Hard-fail the plan if any node's runnable lacks the assembler wrap.
+
+    Walks every node in the plan and asserts that the node's underlying
+    runnable carries the Layer-3 invariants: ``__lca_instrumented__`` is
+    truthy and ``wrap_provenance`` equals the constant
+    :data:`ASSEMBLER_PROVENANCE` exported by :mod:`instrument_wrap`. The check
+    is intentionally narrow — it does not invoke the runnable, it only looks
+    at its marker attributes. A bare, hand-built plan triggers
+    :class:`UninstrumentedNode`; production callers get a fail-fast error
+    before the runtime ever calls the wrap site.
+
+    Returns ``None`` on success so callers can use the function in pytest
+    ``assert`` statements and in sequenced compile pipelines.
+    """
+
+    plan_name = plan.plan.profile_path
+    for node_id, node in plan.nodes.items():
+        runnable = _resolve_runnable(node.executor)
+        if runnable is None:
+            raise UninstrumentedNode(plan_name, node_id)
+        if not getattr(runnable, WRAP_INSTRUMENTED_ATTR, False):
+            raise UninstrumentedNode(plan_name, node_id)
+        if getattr(runnable, "wrap_provenance", None) != ASSEMBLER_PROVENANCE:
+            raise UninstrumentedNode(plan_name, node_id)
+    return None
+
+
 class GraphAssembler:
     """把 capability binding 装配成可执行 Protocol 实例。
 
@@ -93,6 +174,7 @@ class GraphAssembler:
                         "PS-002",
                         f"capability does not implement PhaseExecutor: {binding.executor_capability}",
                     )
+            executor = wrap_executor(executor)
             contributions: list[ExecutableContribution] = []
             for contribution in binding.contributions:
                 try:
@@ -122,7 +204,9 @@ class GraphAssembler:
                 contributions=tuple(contributions),
                 execution_policy=execution_policy,
             )
-        return ExecutablePlan(plan=plan, nodes=nodes)
+        executable = ExecutablePlan(plan=plan, nodes=nodes)
+        assert_all_instrumented(executable)
+        return executable
 
 
 __all__ = [
@@ -132,4 +216,7 @@ __all__ = [
     "GraphAssembler",
     "MappingRestrictedScope",
     "RestrictedScope",
+    "UninstrumentedNode",
+    "assert_all_instrumented",
+    "wrap_instrument",
 ]
