@@ -64,6 +64,7 @@ from lca.contracts.protocols.act.action import Action
 from lca.contracts.protocols.act.command_envelope import command_envelope_to_dict
 from lca.contracts.protocols.act.tool_batch_execution import ToolBatchExecutionPolicy
 from lca.infrastructure.observability import record
+from lca.plugins.observability.spine.reflectors import body_llm as _body_llm_reflector
 
 _ERR_DEADLINE_EXPIRED = "delegate 超时(deadline 已过期)"
 _ERR_TIMEOUT = "delegate 超时"
@@ -202,7 +203,28 @@ class UseToolOperation(Action):
         if wire_block is not None:
             return wire_block
 
-        return await self._batch_executor.execute(decision.tool_calls)
+        # PR-3.3: emit body.tool.execute.start/end at the action-handler layer
+        # so the spine sees one ``start``/``end`` pair per ``use_tool`` decision
+        # (regardless of batch size), bracketing the batch dispatch. The
+        # individual ``tool.execute(args)`` call inside SafeExecutor also
+        # emits its own per-call pair; this higher-level pair carries the
+        # tool-name list in the payload so consumers can join them by
+        # ``decision_id`` and parent_span_id.
+        tool_names = [tc.tool_name for tc in decision.tool_calls]
+        _body_llm_reflector.emit_body_tool_execute_start(
+            tool_name=",".join(tool_names) or "use_tool",
+            invocation_id=decision.decision_id or "",
+            attempt=1,
+        )
+        try:
+            return await self._batch_executor.execute(decision.tool_calls)
+        finally:
+            _body_llm_reflector.emit_body_tool_execute_end(
+                tool_name=",".join(tool_names) or "use_tool",
+                invocation_id=decision.decision_id or "",
+                attempt=1,
+                outcome="success",
+            )
 
 
 class DelegateOperation(Action):

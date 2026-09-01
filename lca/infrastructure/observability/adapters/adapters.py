@@ -31,6 +31,7 @@ from lca.infrastructure.observability.diagnostics.diagnostic_emitters import rec
 from lca.infrastructure.observability.facade.facade import record
 from lca.infrastructure.observability.stream.llm_stream_activity import LlmStreamActivityTracker
 from lca.infrastructure.observability.stream.response_text_stream import ResponseTextStreamExtractor
+from lca.plugins.observability.spine.reflectors import body_llm as _body_llm_reflector
 
 _PERF_COUNTER_SCALE = 1000
 """perf_counter 秒 → 毫秒换算。"""
@@ -81,10 +82,25 @@ class TelemetryLLMAdapter(LLMAdapter):
     async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
         model = _model_label(self._inner)
         started = time.perf_counter()
+        # PR-3.3: spine emits llm.call.start/end around the inner call.
+        # The journal ``record()`` pair (LlmCallStarted / LlmCallCompleted)
+        # remains for backward compatibility with the legacy projector
+        # pipeline; the spine pair is additive.
+        _body_llm_reflector.emit_llm_call_start(
+            model=model,
+            stream=False,
+            prompt_preview=prompt,
+        )
         try:
             response = await self._inner.complete(prompt, **kwargs)
         except Exception:
             self._record(model, prompt, "", False, started, 0, 0, stream=False)
+            _body_llm_reflector.emit_llm_call_end(
+                model=model,
+                stream=False,
+                outcome="failure",
+                latency_ms=int((time.perf_counter() - started) * _PERF_COUNTER_SCALE),
+            )
             raise
         prompt_tokens, completion_tokens = _usage_of(response)
         self._record(
@@ -96,6 +112,14 @@ class TelemetryLLMAdapter(LLMAdapter):
             prompt_tokens,
             completion_tokens,
             stream=False,
+        )
+        _body_llm_reflector.emit_llm_call_end(
+            model=model,
+            stream=False,
+            outcome="success",
+            latency_ms=int((time.perf_counter() - started) * _PERF_COUNTER_SCALE),
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
         )
         return response
 
@@ -113,6 +137,15 @@ class TelemetryLLMAdapter(LLMAdapter):
         answer_extractor = ResponseTextStreamExtractor()
 
         record(LlmCallStarted(step=step, model=model))
+        # PR-3.3: spine emits llm.call.start at the beginning of the stream.
+        _body_llm_reflector.emit_llm_call_start(
+            model=model,
+            stream=True,
+            prompt_preview=prompt,
+        )
+        # PR-3.3: llm.call.end fires once, on whichever terminal branch wins
+        # (success: post-loop; failure: inner except). Local flag tracks which.
+        spine_end_emitted = False
         activity = LlmStreamActivityTracker(step=step, model=model)
         activity.start()
 
@@ -171,6 +204,15 @@ class TelemetryLLMAdapter(LLMAdapter):
                             )
                         except ImportError:
                             pass
+                        # PR-3.3: emit llm.stream.token for reasoning deltas too
+                        # (channel_kind="reasoning") so traces see the full token
+                        # stream, not only output text.
+                        _body_llm_reflector.emit_llm_stream_token(
+                            model=model,
+                            text_delta=delta_text,
+                            seq=reasoning_seq,
+                            channel_kind="reasoning",
+                        )
                         reasoning_seq += 1
                 elif event.type == LLMStreamEventType.OUTPUT_TEXT_DELTA:
                     delta_text = event.text or ""
@@ -194,6 +236,13 @@ class TelemetryLLMAdapter(LLMAdapter):
                         )
                     except ImportError:
                         pass
+                    # PR-3.3: emit llm.stream.token for the output delta.
+                    _body_llm_reflector.emit_llm_stream_token(
+                        model=model,
+                        text_delta=delta_text,
+                        seq=delta_seq,
+                        channel_kind="output",
+                    )
                     delta_seq += 1
                     answer_delta = answer_extractor.feed(delta_text)
                     if answer_delta:
@@ -233,6 +282,13 @@ class TelemetryLLMAdapter(LLMAdapter):
                     stream=True,
                     reasoning_text=reasoning_text,
                 )
+            _body_llm_reflector.emit_llm_call_end(
+                model=model,
+                stream=True,
+                outcome="failure",
+                latency_ms=int((time.perf_counter() - started) * _PERF_COUNTER_SCALE),
+            )
+            spine_end_emitted = True
             raise
         finally:
             await activity.close()
@@ -252,6 +308,19 @@ class TelemetryLLMAdapter(LLMAdapter):
                 0,
                 stream=True,
                 reasoning_text=reasoning_text,
+            )
+        # PR-3.3: success path of llm.call.end on the stream terminal.
+        if not spine_end_emitted:
+            prompt_tokens, completion_tokens = (
+                _usage_of(final_response) if final_response is not None else (0, 0)
+            )
+            _body_llm_reflector.emit_llm_call_end(
+                model=model,
+                stream=True,
+                outcome="success",
+                latency_ms=int((time.perf_counter() - started) * _PERF_COUNTER_SCALE),
+                prompt_tokens=prompt_tokens or None,
+                completion_tokens=completion_tokens or None,
             )
 
     @staticmethod

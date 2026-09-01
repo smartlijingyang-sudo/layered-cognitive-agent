@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from typing import Any
+from typing import Any, Literal
 
 import structlog
 
@@ -68,6 +68,7 @@ from lca.cognition.body.tool_journal_emit import (  # noqa: E402
     emit_tool_invoked,
     emit_tool_started,
 )
+from lca.plugins.observability.spine.reflectors import body_llm as _body_llm_reflector  # noqa: E402
 
 
 def _emit_approval_requested(tool: Tool, invocation_id: str) -> None:
@@ -150,13 +151,27 @@ class SimpleSafeExecutor(SafeExecutor):
                 evidence_policy=evidence_policy,
             )
 
-        with tool_invocation_scope(invocation_id):
-            return await self._execute_with_retry(
-                tool,
-                args,
-                retry_policy=retry_policy,
-                cache_config=cache_config,
+        # PR-3.3: instrument the sandbox boundary. ``tool_invocation_scope``
+        # binds the invocation_id that adapters/sandbox tools read to
+        # correlate their output; we bracket it with body.sandbox.enter/exit
+        # so traces see the exact world-effect window.
+        _body_llm_reflector.emit_body_sandbox_enter(
+            invocation_id=invocation_id,
+            tool_name=tool.name,
+        )
+        try:
+            with tool_invocation_scope(invocation_id):
+                return await self._execute_with_retry(
+                    tool,
+                    args,
+                    retry_policy=retry_policy,
+                    cache_config=cache_config,
+                    invocation_id=invocation_id,
+                )
+        finally:
+            _body_llm_reflector.emit_body_sandbox_exit(
                 invocation_id=invocation_id,
+                tool_name=tool.name,
             )
 
     async def _execute_with_retry(
@@ -190,7 +205,7 @@ class SimpleSafeExecutor(SafeExecutor):
         delay = retry_policy.backoff_base_s
         for attempt in range(retry_policy.max_retries + 1):
             attempts_used = attempt + 1
-            obs = await self._execute_once(tool, args, attempt)
+            obs = await self._execute_once(tool, args, attempt, invocation_id)
             if obs.success:
                 if cache_config.enabled:
                     self._cache[cache_key] = obs
@@ -223,6 +238,15 @@ class SimpleSafeExecutor(SafeExecutor):
             last_obs = obs
             last_error = obs.error or ""
             if attempt < retry_policy.max_retries:
+                # PR-3.3: emit body.tool.retry on the spine before sleeping so
+                # observability traces see retry decisions at the same point
+                # the executor commits to another attempt.
+                _body_llm_reflector.emit_body_tool_retry(
+                    tool_name=tool.name,
+                    invocation_id=invocation_id,
+                    attempt=attempts_used,
+                    reason=last_error or str(failure_kind or "transient"),
+                )
                 await asyncio.sleep(delay)
                 delay *= retry_policy.backoff_multiplier
 
@@ -268,17 +292,28 @@ class SimpleSafeExecutor(SafeExecutor):
             evidence_policy=evidence_policy,
         )
 
-    async def _execute_once(self, tool: Tool, args: dict[str, Any], attempt: int) -> Observation:
+    async def _execute_once(
+        self, tool: Tool, args: dict[str, Any], attempt: int, invocation_id: str = ""
+    ) -> Observation:
+        # PR-3.3: instrument each attempt's execution boundary on the spine.
+        # body.tool.execute.start/end marks the actual ``tool.execute(args)``
+        # call so traces distinguish "we dispatched the call" from "the tool
+        # returned"; the invocation_id here is the one bound by the parent
+        # ``_execute_with_retry`` so start/end stay correlate-able.
+        _body_llm_reflector.emit_body_tool_execute_start(
+            tool_name=tool.name,
+            invocation_id=invocation_id,
+            attempt=attempt + 1,
+        )
+        execute_started = time.perf_counter()
+        outcome: Literal["success", "failure"] = "success"
         try:
             return await tool.execute(args)
         except ApprovalPendingError:
-            # Control-flow signal (HIL pause) — must propagate to the runtime
-            # loop, NOT be converted to an Observation.  Follows the LobeHub
-            # pattern: intervention is a pre-execution policy decision, not a
-            # mid-execution failure.  Retrying would be semantically wrong —
-            # the tool is waiting for external input, not broken.
+            outcome = "failure"
             raise
         except ToolExecutionError as err:
+            outcome = "failure"
             return Observation(
                 observation_id=new_id("obs"),
                 success=False,
@@ -287,6 +322,7 @@ class SimpleSafeExecutor(SafeExecutor):
                 extra={FAILURE_KIND: FAILURE_KIND_EXECUTION},
             )
         except Exception as err:
+            outcome = "failure"
             _log.warning(
                 "tool_execution_error",
                 tool=tool.name,
@@ -307,6 +343,14 @@ class SimpleSafeExecutor(SafeExecutor):
                 payload=None,
                 error=str(err),
                 extra={FAILURE_KIND: failure_kind},
+            )
+        finally:
+            _body_llm_reflector.emit_body_tool_execute_end(
+                tool_name=tool.name,
+                invocation_id=invocation_id,
+                attempt=attempt + 1,
+                outcome=outcome,
+                latency_ms=_elapsed_ms(execute_started),
             )
 
     @staticmethod
