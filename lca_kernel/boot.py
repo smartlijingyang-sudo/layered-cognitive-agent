@@ -281,6 +281,11 @@ async def _boot_context(
             )
             topo_order.append(spec.id)  # ↑ K3:记入拓扑序
         attach_profile_boot_products(ctx, products)  # ↑ K2:K2 编译产物挂到 ctx,transport / 诊断可读
+        # Step 2b: assemble the spine handler registry. Soft check only —
+        # PR-3 sub-PRs are still landing reflectors, so a coverage gap is
+        # expected and is logged as WARNING (not raised). The hard-fail
+        # surface lives in tests/observability/spine/test_registry_completeness.
+        _assemble_spine_registry(resolved)
         # Step 3: re-install observability with populated registries.
         install_observability(ctx)  # ↓ K5:第 2 次,plugin 已灌好 backend,BoundObservability 真正可写
         # Step 4: flush buffered events + emit final boot events.
@@ -403,6 +408,26 @@ async def _dispose_context(ctx: Context) -> None:
     """Best-effort dispose so the caller can re-raise the original boot error."""
     with contextlib.suppress(BaseException):
         await ctx.dispose()
+
+
+def _assemble_spine_registry(resolved: ResolvedProfile) -> None:
+    """Walk the resolved profile, assemble the spine handler registry,
+    and log coverage gaps as a soft warning.
+
+    Layer-1 / Layer-2 hard-fail enforcement lives in the pytest suite
+    (``tests/observability/spine/test_registry_completeness``), not at
+    runtime. The runtime kernel boot hook tolerates gaps so PR-3 sub-PRs
+    (3.1–3.4) can land independently and the boot path remains
+    unchanged when a future profile omits an EP that the close-set
+    has not yet enforced.
+    """
+    from lca.harness.profile.compile_spine_registry import (  # ↓ K3:locally imported to avoid boot cycle
+        compile_spine_registry,
+        log_coverage_gaps,
+    )
+
+    registry = compile_spine_registry(resolved)
+    log_coverage_gaps(registry)
 
 
 __all__ = [

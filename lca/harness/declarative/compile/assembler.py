@@ -25,7 +25,7 @@ from lca.harness.declarative.compile.instrument_wrap import (
     ASSEMBLER_PROVENANCE,
     WRAP_INSTRUMENTED_ATTR,
     wrap_executor,
-    wrap_instrument,  # noqa: F401  re-exported for tests and external wrap sites
+    wrap_instrument,
 )
 from lca.harness.declarative.controls.validation import require_valid
 
@@ -79,7 +79,7 @@ class UninstrumentedNode(Exception):
     plan to find the offending executor.
     """
 
-    __slots__ = ("plan_name", "node_id")
+    __slots__ = ("node_id", "plan_name")
 
     def __init__(self, plan_name: str, node_id: str) -> None:
         self.plan_name = plan_name

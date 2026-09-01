@@ -268,6 +268,8 @@ ignore = [
 "lca.infrastructure.cli/services/*.py" = ["S603", "S607", "S110", "SIM105"]  # subprocess for service management
 "deploy/lobehub/engine.py" = ["S603", "S607"]  # git describe on .lobehub-upstream (controlled path)
 "lca_kernel/*" = ["N999", "TC002", "RUF006"]  # top-level pkg; Stage re-imported at runtime; fire-and-forget create_task
+"lca/infrastructure/observability/spine/registry.py" = ["N818"]  # IncompleteRegistry / MissingWrapFn names mandated by Task 3.5 brief
+"lca/harness/declarative/compile/assembler.py" = ["N818"]  # UninstrumentedNode name mandated by Task 4.2 brief
 
 [tool.ruff.format]
 quote-style = "double"
