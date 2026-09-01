@@ -256,6 +256,23 @@ def _disabled_stub(plugin_id: str, module: str) -> PluginDefinition:
     )
 
 
+def _requirement_matches(requirement: str, provided_keys: set[str]) -> bool:
+    """Return True if ``requirement`` is satisfied by some key in ``provided_keys``.
+
+    The only supported wildcard is a single trailing ``*`` (e.g.
+    ``field_producer.*``), matching any key that shares the same prefix
+    before the dot. This covers the EventSpine composition where an L1
+    assembler needs every L0 ``field_producer.<name>`` producer without
+    forcing the profile to enumerate each one.
+    """
+    if requirement in provided_keys:
+        return True
+    if requirement.endswith(".*"):
+        prefix = requirement[:-2] + "."
+        return any(key.startswith(prefix) for key in provided_keys)
+    return False
+
+
 def _validate_capability_owners(plugins: list[ResolvedPlugin]) -> None:
     owners: dict[str, list[str]] = defaultdict(list)
     provided: set[str] = set()
@@ -269,7 +286,11 @@ def _validate_capability_owners(plugins: list[ResolvedPlugin]) -> None:
             raise ProfileResolveError(f"duplicate providers for capability {key!r}: {ids}")
 
     for plugin in plugins:
-        missing = [key for key in plugin.definition.required_capability_keys if key not in provided]
+        missing = [
+            key
+            for key in plugin.definition.required_capability_keys
+            if not _requirement_matches(key, provided)
+        ]
         if missing:
             raise ProfileResolveError(
                 f"Missing capability: {missing[0]}\n"
@@ -288,6 +309,10 @@ def _validate_layer_edges(plugins: list[ResolvedPlugin]) -> None:
     for consumer in plugins:
         consumer_rank = _LAYER_RANK.get(consumer.definition.spec.layer, 0)
         for key in consumer.definition.required_capability_keys:
+            if key.endswith(".*"):
+                # Wildcard requirements span many providers; per-provider
+                # layer ranks are not meaningful here.
+                continue
             provider = by_provide.get(key)
             if provider is None:
                 continue
@@ -311,6 +336,10 @@ def _topo_sort(
     edges: list[tuple[str, str]] = []
     for consumer in plugins:
         for key in consumer.definition.required_capability_keys:
+            if key.endswith(".*"):
+                # Wildcard requirements span many providers; the DAG sort
+                # cannot pin a single ordering edge for them.
+                continue
             owner = provide_owner.get(key)
             if owner is None or owner == consumer.id:
                 continue
