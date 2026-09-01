@@ -11,7 +11,6 @@ from lca.contracts.models.core.state import Budget
 
 if TYPE_CHECKING:
     from lca.contracts.models.core.decision import Observation
-    from lca.contracts.models.core.state import AgentState
 
 
 @dataclass
