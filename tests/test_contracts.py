@@ -10,8 +10,6 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.models.core.state import AgentState, Budget
-from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
-from lca.infrastructure.tools.calculator import build_tools as build_calculator_tools
 
 
 class TestBudget(unittest.TestCase):
@@ -32,40 +30,21 @@ class TestAgentState(unittest.TestCase):
         self.assertEqual(len(state.checkpoints), 1)
 
 
-class TestCalculatorTool(unittest.TestCase):
-    def test_simple_arithmetic(self):
-        tool = build_calculator_tools()[0]
-        result = asyncio.run(tool.execute({"expression": "2 + 3 * 4"}))
-        self.assertTrue(result.success)
-        self.assertEqual(result.payload, 14)
-
-    def test_invalid_expression(self):
-        tool = build_calculator_tools()[0]
-        result = asyncio.run(tool.execute({"expression": "import os"}))
-        self.assertFalse(result.success)
-
-
 class TestMockLLMAdapter(unittest.TestCase):
-    def test_arithmetic_detection(self):
-        llm = MockLLMAdapter()
-        result = asyncio.run(llm.complete("ROLE: test\nUSER_TASK: 123 乘以 456 等于多少？\n"))
-        # Native tool calling: tool calls are in LLMResponse.tool_calls
-        self.assertEqual(len(result.tool_calls), 1)
-        self.assertEqual(result.tool_calls[0].name, "calculate")
-        self.assertIn("123*456", result.tool_calls[0].arguments["expression"])
+    def test_tool_result_response(self) -> None:
+        from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
 
-    def test_tool_result_response(self):
         llm = MockLLMAdapter()
         result = asyncio.run(
             llm.complete(
-                "USER_TASK: 123 乘以 456\nCONTEXT:\n(无历史上下文)\n",
+                "USER_TASK: 任意问题\nCONTEXT:\n(无历史上下文)\n",
                 history=[
-                    {"role": "assistant", "tool_calls": [{"id": "c1", "name": "calculate"}]},
-                    {"role": "tool", "tool_call_id": "c1", "content": "56088"},
+                    {"role": "assistant", "tool_calls": [{"id": "c1", "name": "some_tool"}]},
+                    {"role": "tool", "tool_call_id": "c1", "content": "done"},
                 ],
             )
         )
-        self.assertIn("56088", result.text)
+        self.assertIn("done", result.text)
         self.assertEqual(result.tool_calls, [])
 
 
@@ -98,24 +77,6 @@ class TestLLMStreamEventContract(unittest.TestCase):
             response=LLMResponse(text="ok"),
         )
         self.assertIsNotNone(completed.response)
-
-
-class TestEndToEnd(unittest.TestCase):
-    def test_single_agent_qa(self):
-        from lca.application.api import Agent
-        from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
-
-        agent = Agent(
-            role="测试助手",
-            goal="回答问题",
-            backstory="测试用",
-            tools=build_calculator_tools(),
-            llm=MockLLMAdapter(),
-        )
-        result = asyncio.run(agent.run("123 乘以 456 等于多少？"))
-        self.assertEqual(result.status, "completed")
-        self.assertIsNotNone(result.output)
-        self.assertIn("56088", result.output)
 
 
 if __name__ == "__main__":

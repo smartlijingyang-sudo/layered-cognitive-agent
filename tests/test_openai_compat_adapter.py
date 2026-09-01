@@ -22,7 +22,7 @@ _HAS_OPENAI = importlib.util.find_spec("openai") is not None
 
 @dataclass
 class _FakeTool:
-    name: str = "calculator"
+    name: str = "some_tool"
     description: str = "calc"
     parameters: dict[str, Any] | None = None
     is_idempotent: bool = True
@@ -191,12 +191,12 @@ class TestOpenAICompatAdapter(unittest.IsolatedAsyncioTestCase):
         spec = to_openai_chat_tool_spec(_FakeTool())
         self.assertEqual(spec["type"], "function")
         self.assertIn("function", spec)
-        self.assertEqual(spec["function"]["name"], "calculator")
+        self.assertEqual(spec["function"]["name"], "some_tool")
 
     def test_responses_tool_spec_flat(self) -> None:
         spec = to_openai_responses_tool_spec(_FakeTool())
         self.assertEqual(spec["type"], "function")
-        self.assertEqual(spec["name"], "calculator")
+        self.assertEqual(spec["name"], "some_tool")
         self.assertNotIn("function", spec)
 
     async def test_chat_stream_completed_matches_complete(self) -> None:
@@ -244,7 +244,7 @@ class TestOpenAICompatAdapter(unittest.IsolatedAsyncioTestCase):
         client = self._patch_client()
         tc = mock.Mock()
         tc.id = "call_1"
-        tc.function.name = "calculator"
+        tc.function.name = "some_tool"
         tc.function.arguments = '{"expression": "1+1"}'
         complete_response = _MockChatResponse(
             choices=[
@@ -269,7 +269,7 @@ class TestOpenAICompatAdapter(unittest.IsolatedAsyncioTestCase):
                                             index=0,
                                             id="call_1",
                                             function=_MockFunction(
-                                                name="calculator",
+                                                name="some_tool",
                                                 arguments='{"expression":',
                                             ),
                                         )
@@ -324,7 +324,7 @@ class TestOpenAICompatAdapter(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(completed.response.tool_calls), 1)
         tool_call = completed.response.tool_calls[0]
         self.assertEqual(tool_call.call_id, "call_1")
-        self.assertEqual(tool_call.name, "calculator")
+        self.assertEqual(tool_call.name, "some_tool")
         self.assertEqual(tool_call.arguments, {"expression": "1+1"})
 
     async def test_chat_stream_reasoning_content_field(self) -> None:
@@ -541,7 +541,7 @@ class TestOpenAICompatAdapter(unittest.IsolatedAsyncioTestCase):
         self.assertIn("top_p", kwargs)
         self.assertEqual(kwargs["extra_body"]["enable_thinking"], True)
         self.assertEqual(kwargs["extra_body"]["top_k"], 20)
-        self.assertEqual(kwargs["tools"][0]["function"]["name"], "calculator")
+        self.assertEqual(kwargs["tools"][0]["function"]["name"], "some_tool")
 
     async def test_responses_usage_mapping(self) -> None:
         client = self._patch_client()

@@ -20,8 +20,7 @@ roles:
     role: 商务经理
     goal: 在毛利红线内设计续约让步与激励方案
     backstory: 擅长阶梯定价、多年期锁定与服务抵扣等合同设计；公司毛利红线 55%，单笔让步上限 25%
-    tools:
-      - calculator
+    tools: []
 
   - key: product_manager
     role: 产品经理

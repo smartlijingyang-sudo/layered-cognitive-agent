@@ -12,8 +12,7 @@ roles:
     role: 定价专员
     goal: 制定合理零售定价
     backstory: 擅长成本加成定价
-    tools:
-      - calculator
+    tools: []
 
   - key: copywriter
     role: 文案撰写

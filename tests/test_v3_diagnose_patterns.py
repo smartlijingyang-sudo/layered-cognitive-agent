@@ -64,7 +64,7 @@ class TestDiagnoseLoopStuck:
     def test_repeat_without_warn(self) -> None:
         store = RunStore()
         for i in range(10):
-            store.append(ToolInvoked(tool_name="calculator", invocation_id=f"inv-{i}", ok=True))
+            store.append(ToolInvoked(tool_name="some_tool", invocation_id=f"inv-{i}", ok=True))
         report = diagnose_loop_stuck(store, window=10)
         assert not report.ok
         assert "LoopBreaker may not be wired" in report.findings[0].summary
@@ -72,7 +72,7 @@ class TestDiagnoseLoopStuck:
     def test_repeat_with_warn(self) -> None:
         store = RunStore()
         for i in range(10):
-            store.append(ToolInvoked(tool_name="calculator", invocation_id=f"inv-{i}", ok=True))
+            store.append(ToolInvoked(tool_name="some_tool", invocation_id=f"inv-{i}", ok=True))
         store.append(
             GateDecided(gate="RepeatToolCallGate", verdict="warn", is_rewritten=False, step=9)
         )

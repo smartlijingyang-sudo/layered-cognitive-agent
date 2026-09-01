@@ -133,7 +133,7 @@ def _board_run(projector: OtelProjector) -> None:
         _BASE_TS + 5.0,
         biz_scope,
         ToolInvoked(
-            tool_name="calculator",
+            tool_name="some_tool",
             invocation_id="calc-1",
             ok=True,
             latency_ms=1,

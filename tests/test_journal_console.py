@@ -92,7 +92,7 @@ def _feed(projector: ConsoleJournalProjector) -> None:
     # 交错：Bob 的 LLM 先到，再到 Alice
     emit(_BASE_TS + 1.0, bob_scope, LlmCallCompleted(model="m-bob", latency_ms=700))
     emit(_BASE_TS + 1.2, alice_scope, LlmCallCompleted(model="m-alice", latency_ms=900))
-    emit(_BASE_TS + 1.3, bob_scope, ToolInvoked(tool_name="calculator", latency_ms=1))
+    emit(_BASE_TS + 1.3, bob_scope, ToolInvoked(tool_name="some_tool", latency_ms=1))
     emit(_BASE_TS + 1.4, alice_scope, AgentRunFinished(status="completed", steps=1))
     emit(
         _BASE_TS + 1.4,
@@ -180,7 +180,7 @@ def test_interleaved_events_land_in_correct_sections() -> None:
     bob_block = "\n".join(sections.get("Bob", []))
     assert "m-alice" in alice_block and "m-bob" not in alice_block
     assert "m-bob" in bob_block and "m-alice" not in bob_block
-    assert "calculator" in bob_block
+    assert "some_tool" in bob_block
 
 
 def test_delegation_narrative_lines() -> None:

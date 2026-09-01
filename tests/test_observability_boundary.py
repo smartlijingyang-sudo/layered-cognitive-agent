@@ -206,7 +206,7 @@ class TestExporterFaultIsolation(unittest.TestCase):
         provider.add_span_processor(SimpleSpanProcessor(good))
         tracer = OtelTracer(provider.get_tracer("lca"))
         bound = make_test_bound(tracer=tracer)
-        with bind_backends(bound), span(SpanName.TOOL_EXECUTE, **{"tool_name": "calculator"}):
+        with bind_backends(bound), span(SpanName.TOOL_EXECUTE, **{"tool_name": "some_tool"}):
             pass  # run 不被打断
         self.assertEqual(len(good.get_finished_spans()), 1)
 

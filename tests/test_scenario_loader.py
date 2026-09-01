@@ -19,7 +19,7 @@ class TestLoadScenario(unittest.TestCase):
         self.assertIsInstance(spec, ScenarioSpec)
         self.assertIn("market_analyst", spec.roles)
         self.assertEqual(spec.roles["market_analyst"].role, "市场分析师")
-        self.assertEqual(spec.roles["pricing_specialist"].tools, ["calculator"])
+        self.assertEqual(spec.roles["pricing_specialist"].tools, [])
         self.assertIn("hierarchical", spec.teams)
         self.assertEqual(spec.teams["hierarchical"].lead_agent, "project_lead")
         self.assertEqual(spec.teams["hierarchical"].lead_mandate, "board")

@@ -47,7 +47,6 @@ from lca.harness.observability import make_minimal_bound
 from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
 from lca.infrastructure.llm_adapter.openai_compat import OpenAICompatAdapter
 from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
-from lca.infrastructure.tools.calculator import build_tools as build_calculator_tools
 from lca.infrastructure.tools.weather import build_tools as build_weather_tools
 from lca.infrastructure.transport.agent_transport import InternalTransport
 from lca.infrastructure.transport.transport_registry import TransportRegistry
@@ -73,9 +72,6 @@ class TestL0ProtocolCompliance(unittest.TestCase):
 
     def test_openai_compat_is_llm_adapter(self):
         self.assertIsInstance(OpenAICompatAdapter.__new__(OpenAICompatAdapter), LLMAdapter)
-
-    def test_calculator_is_tool(self):
-        self.assertIsInstance(build_calculator_tools()[0], Tool)
 
     def test_weather_is_tool(self):
         self.assertIsInstance(build_weather_tools()[0], Tool)
@@ -319,7 +315,7 @@ class TestBrainFactoryRegistryIntegration(unittest.TestCase):
             role="测试",
             goal="测试",
             backstory="测试",
-            tools=build_calculator_tools(),
+            tools=build_weather_tools(),
             llm=MockLLMAdapter(),
             brain="default",
         )

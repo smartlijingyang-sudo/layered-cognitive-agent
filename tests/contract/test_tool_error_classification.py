@@ -7,15 +7,10 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
-
-from lca.cognition.body.safe_executor import SimpleSafeExecutor
 from lca.cognition.brain.critic import SimpleCritic
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.result import ToolExecutionError, ToolInputError
 from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
-from lca.infrastructure.tools.calculator import build_tools as build_calculator_tools
 
 # ---------------------------------------------------------------------------
 # 1. 错误分类协议本身
@@ -36,129 +31,7 @@ class TestErrorClassification:
 
 
 # ---------------------------------------------------------------------------
-# 2. Calculator validate 前置校验
-# ---------------------------------------------------------------------------
-
-
-class TestCalculatorValidate:
-    def setup_method(self) -> None:
-        self.tool = build_calculator_tools()[0]
-
-    def test_empty_expression_rejected(self) -> None:
-        assert self.tool.validate({"expression": ""}) is not None
-
-    def test_missing_expression_rejected(self) -> None:
-        assert self.tool.validate({}) is not None
-
-    def test_none_expression_rejected(self) -> None:
-        assert self.tool.validate({"expression": None}) is not None
-
-    def test_non_string_expression_rejected(self) -> None:
-        result = self.tool.validate({"expression": 42})
-        assert result is not None
-        assert "字符串" in result
-
-    def test_valid_expression_accepted(self) -> None:
-        assert self.tool.validate({"expression": "1 + 2"}) is None
-
-    def test_whitespace_only_rejected(self) -> None:
-        assert self.tool.validate({"expression": "   "}) is not None
-
-
-# ---------------------------------------------------------------------------
-# 3. SafeExecutor: validate 失败不进入重试循环
-# ---------------------------------------------------------------------------
-
-
-class TestSafeExecutorValidationNoRetry:
-    def setup_method(self) -> None:
-        self.executor = SimpleSafeExecutor(
-            ToolPermissionManifest(allowed_tools=["calculate"]),
-        )
-        self.tool = build_calculator_tools()[0]
-        self.retry_policy = RetryPolicy(max_retries=3, backoff_base_s=0.01)
-        self.cache_config = CacheConfig()
-
-    async def test_empty_expression_returns_immediately(self) -> None:
-        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
-            obs = await self.executor.execute(
-                self.tool, {"expression": ""}, self.retry_policy, self.cache_config
-            )
-            mock_sleep.assert_not_called()
-
-        assert obs.success is False
-        assert obs.extra.get("failure_kind") == "validation"
-
-    async def test_missing_expression_returns_immediately(self) -> None:
-        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
-            obs = await self.executor.execute(self.tool, {}, self.retry_policy, self.cache_config)
-            mock_sleep.assert_not_called()
-
-        assert obs.success is False
-        assert obs.extra.get("failure_kind") == "validation"
-
-
-# ---------------------------------------------------------------------------
-# 4. SafeExecutor: ToolInputError 不重试
-# ---------------------------------------------------------------------------
-
-
-class TestSafeExecutorInputErrorNoRetry:
-    def setup_method(self) -> None:
-        self.executor = SimpleSafeExecutor(
-            ToolPermissionManifest(allowed_tools=["calculate"]),
-        )
-        self.tool = build_calculator_tools()[0]
-        self.retry_policy = RetryPolicy(max_retries=3, backoff_base_s=0.01)
-        self.cache_config = CacheConfig()
-
-    async def test_syntax_error_does_not_retry(self) -> None:
-        """'2+' 通过 validate（非空字符串），但 ast.parse 抛 SyntaxError → failure_kind=validation。"""
-        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
-            obs = await self.executor.execute(
-                self.tool, {"expression": "2+"}, self.retry_policy, self.cache_config
-            )
-            mock_sleep.assert_not_called()
-
-        assert obs.success is False
-        assert obs.extra.get("failure_kind") == "validation"
-
-    async def test_unsupported_ast_node_does_not_retry(self) -> None:
-        """列表字面量通过 validate（非空字符串），但 _eval_node 遇到 List 节点 → failure_kind=validation。"""
-        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
-            obs = await self.executor.execute(
-                self.tool, {"expression": "['128.0 * 1.35']"}, self.retry_policy, self.cache_config
-            )
-            mock_sleep.assert_not_called()
-
-        assert obs.success is False
-        assert obs.extra.get("failure_kind") == "validation"
-
-
-# ---------------------------------------------------------------------------
-# 5. SafeExecutor: 正常执行仍然成功
-# ---------------------------------------------------------------------------
-
-
-class TestSafeExecutorNormalPath:
-    def setup_method(self) -> None:
-        self.executor = SimpleSafeExecutor(
-            ToolPermissionManifest(allowed_tools=["calculate"]),
-        )
-        self.tool = build_calculator_tools()[0]
-        self.retry_policy = RetryPolicy(max_retries=3, backoff_base_s=0.01)
-        self.cache_config = CacheConfig()
-
-    async def test_valid_expression_succeeds(self) -> None:
-        obs = await self.executor.execute(
-            self.tool, {"expression": "2 + 3"}, self.retry_policy, self.cache_config
-        )
-        assert obs.success is True
-        assert obs.payload == 5.0
-
-
-# ---------------------------------------------------------------------------
-# 6. Critic: failure_kind 传播到 Reflection
+# 2. Critic: failure_kind 传播到 Reflection
 # ---------------------------------------------------------------------------
 
 

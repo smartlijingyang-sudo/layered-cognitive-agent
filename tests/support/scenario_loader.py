@@ -23,11 +23,8 @@ from lca.contracts.models.team.team_coordination import (
     Pipeline,
 )
 from lca.contracts.protocols import LLMAdapter, ObservabilityBackend, Tool
-from lca.infrastructure.tools.calculator import build_tools as build_calculator_tools
 
-_TOOL_BUILDERS: dict[str, object] = {
-    "calculator": build_calculator_tools,
-}
+_TOOL_BUILDERS: dict[str, object] = {}
 
 _DEFAULT_FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures" / "team_scenarios"
 
