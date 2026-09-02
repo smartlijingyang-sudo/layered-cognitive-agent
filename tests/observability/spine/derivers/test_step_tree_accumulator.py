@@ -53,19 +53,25 @@ def test_flush_writes_journal_json(tmp_path: Path) -> None:
 
     # 一个完整 step
     deriver.on_event(_make_event(sequence=1, payload={"phase": "think", "step_id": "step_001"}))
-    deriver.on_event(_make_event(
-        execution_point="step.thinking.record",
-        sequence=2,
-        channel="fact",
-        payload={"trace": {"model": "x", "latency_ms": 1, "reasoning": "", "decision": "respond"}},
-    ))
-    deriver.on_event(_make_event(
-        execution_point="writable.step.end",
-        sequence=3,
-        channel="control",
-        payload={"step_id": "step_001", "outcome": "success"},
-        outcome="success",
-    ))
+    deriver.on_event(
+        _make_event(
+            execution_point="step.thinking.record",
+            sequence=2,
+            channel="fact",
+            payload={
+                "trace": {"model": "x", "latency_ms": 1, "reasoning": "", "decision": "respond"}
+            },
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            execution_point="writable.step.end",
+            sequence=3,
+            channel="control",
+            payload={"step_id": "step_001", "outcome": "success"},
+            outcome="success",
+        )
+    )
 
     deriver.flush()
 
@@ -85,13 +91,18 @@ def test_open_step_at_flush_close_forcibly(tmp_path: Path) -> None:
     SpineContext.set_run("r2")
     run_dir = tmp_path / "r2"
     deriver = StepTreeAccumulatorDeriver(
-        run_id="r2", run_dir=run_dir, agent_role="agt", strategy_key="solo",
-    )
-    deriver.on_event(_make_event(
         run_id="r2",
-        sequence=1,
-        payload={"phase": "act", "step_id": "step_001"},
-    ))
+        run_dir=run_dir,
+        agent_role="agt",
+        strategy_key="solo",
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r2",
+            sequence=1,
+            payload={"phase": "act", "step_id": "step_001"},
+        )
+    )
     deriver.flush()
 
     doc = deriver.document
@@ -105,7 +116,10 @@ def test_ignores_other_run_events(tmp_path: Path) -> None:
     SpineContext.set_run("r3")
     run_dir = tmp_path / "r3"
     deriver = StepTreeAccumulatorDeriver(
-        run_id="r3", run_dir=run_dir, agent_role="agt", strategy_key="solo",
+        run_id="r3",
+        run_dir=run_dir,
+        agent_role="agt",
+        strategy_key="solo",
     )
     deriver.on_event(_make_event(run_id="other-run", sequence=1))
     deriver.flush()
@@ -114,3 +128,115 @@ def test_ignores_other_run_events(tmp_path: Path) -> None:
     doc = deriver.document
     assert doc is not None
     assert len(doc.steps) == 0
+
+
+def test_objective_passed_via_constructor(tmp_path: Path) -> None:
+    """Regression: deriver 接受 objective kwarg,不再渲染 "(unobserved)"。
+
+    早先 StepTreeAccumulatorDeriver.__init__ 没有 objective 参数,_objective
+    永远 = "";_build_document 用 ``self._objective or "(unobserved)"`` 兜底,
+    导致 doctor / narrative 里 objective 始终是 "(unobserved)"。
+    """
+    SpineContext.set_run("r_obj")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_obj",
+        run_dir=tmp_path / "r_obj",
+        agent_role="agt",
+        strategy_key="solo",
+        objective="用户问你好",
+    )
+    # 至少一个 step 让 flush 走完整路径
+    deriver.on_event(
+        _make_event(
+            run_id="r_obj",
+            sequence=1,
+            payload={"phase": "think", "step_id": "step_001"},
+        )
+    )
+    deriver.flush(outcome="completed")
+
+    doc = deriver.document
+    assert doc is not None
+    assert doc.metadata.objective == "用户问你好", (
+        f"objective 应来自 constructor,但得到 {doc.metadata.objective!r}"
+    )
+
+
+def test_flush_outcome_overrides_in_progress_default(tmp_path: Path) -> None:
+    """Regression: flush(outcome=...) 不再被静默丢弃。
+
+    早先 StepTreeAccumulatorDeriver.flush(self) 不接受参数,materializer 传的
+    outcome 被丢弃;_build_document 用 ``completed if _steps else in_progress``,
+    0-step run 永远 in_progress → doctor H6 误判。
+    """
+    SpineContext.set_run("r_out")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_out",
+        run_dir=tmp_path / "r_out",
+        agent_role="agt",
+        strategy_key="solo",
+    )
+    # 不发任何 step —— 模拟 model-only respond
+    deriver.flush(outcome="completed")
+
+    doc = deriver.document
+    assert doc is not None
+    assert doc.metadata.outcome == "completed", (
+        f"flush(outcome=completed) 应覆盖 in_progress 启发式,但 outcome={doc.metadata.outcome!r}"
+    )
+
+
+def test_terminal_event_captures_completed_outcome(tmp_path: Path) -> None:
+    """Regression: spine 上 kernel.run.stop / lifecycle.finally 捕获 terminal outcome。
+
+    materializer.flush 没传 outcome 时,spine 上的 terminal event 仍能让
+    journal.metadata.outcome 正确(替代 in_progress)。
+    """
+    SpineContext.set_run("r_term")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_term",
+        run_dir=tmp_path / "r_term",
+        agent_role="agt",
+        strategy_key="solo",
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_term",
+            sequence=1,
+            execution_point="kernel.run.stop",
+            channel="control",
+            outcome="success",
+            payload={"run_id": "r_term"},
+        )
+    )
+    deriver.flush()  # 不传 outcome —— 靠 spine 捕获
+
+    doc = deriver.document
+    assert doc is not None
+    assert doc.metadata.outcome == "completed"
+
+
+def test_event_publisher_completed_event(tmp_path: Path) -> None:
+    """Regression: runtime.event_publisher.publish event_type=completed 也算终态。"""
+    SpineContext.set_run("r_pub")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_pub",
+        run_dir=tmp_path / "r_pub",
+        agent_role="agt",
+        strategy_key="solo",
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_pub",
+            sequence=1,
+            execution_point="runtime.event_publisher.publish",
+            channel="control",
+            outcome="success",
+            payload={"event_type": "completed", "trace_id": "t"},
+        )
+    )
+    deriver.flush()
+
+    doc = deriver.document
+    assert doc is not None
+    assert doc.metadata.outcome == "completed"

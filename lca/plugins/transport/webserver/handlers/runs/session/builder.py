@@ -153,6 +153,10 @@ class RunSessionBuilder:
                 agent_role=agent.name or agent.agent_id or "",
                 strategy_key=request.mode or "solo",
                 plan_ref="",
+                # objective 早先未传,deriver._objective 永远空字符串,
+                # journal.metadata.objective 渲染为 "(unobserved)"。
+                # 这里从已构造的 BuildJournalMetadata 取,保证两处一致。
+                objective=request.user_text or "",
             )
             event_spine.subscribe(step_tree_deriver.on_event)
             log.debug(

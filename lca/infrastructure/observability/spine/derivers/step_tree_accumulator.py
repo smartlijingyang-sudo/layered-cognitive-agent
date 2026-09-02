@@ -90,12 +90,18 @@ class StepTreeAccumulatorDeriver(Deriver):
         agent_role: str = "",
         strategy_key: str = "solo",
         plan_ref: str = "",
+        objective: str = "",
     ) -> None:
         self._run_id = run_id
         self._run_dir = Path(run_dir)
         self._agent_role = agent_role
         self._strategy_key = strategy_key
         self._plan_ref = plan_ref
+        # objective 在 build 时由 caller 传入(来自 request.user_text);
+        # 早先只初始化为空串、运行期从未被赋值,导致 journal.metadata.objective
+        # 始终是 "(unobserved)"。同时 spine 上 kernel.run.start.payload 也带
+        # objective 作为兜底来源,在 _apply 里二次捕获。
+        self._objective: str = objective
         self._step_seq = 0
         self._steps: list[JournalStep] = []
         self._phases: list[PhaseRecord] = []
@@ -105,7 +111,9 @@ class StepTreeAccumulatorDeriver(Deriver):
         self._seg_seq = 0
         self._first_ts: float | None = None
         self._last_ts: float | None = None
-        self._objective: str = ""
+        # terminal outcome 由 materializer.flush(outcome=...) 注入;
+        # 同时可从 spine 上 lifecycle.finally / kernel.run.stop 的 outcome 捕获
+        self._terminal_outcome: str | None = None
         self._attachments: tuple = ()
         self._last_document: JournalDocument | None = None
 
@@ -124,11 +132,20 @@ class StepTreeAccumulatorDeriver(Deriver):
                 event.execution_point, exc,
             )
 
-    def flush(self) -> None:
+    def flush(self, *, outcome: str | None = None) -> None:
         """收口：把累积状态写 journal.json。
 
         真实写盘是 cumulative 终态：open step 若仍在，强制 close（fail-safe）。
+
+        ``outcome`` 来自 materializer 传入的 RunSession 终态(completed/failed/
+        stopped/paused)。早先 flush(outcome=...) 被静默丢弃,_build_document
+        永远基于 _steps 是否非空来推断 in_progress/completed,导致 0-step
+        但 run 已完成的 journal.json 错误标记 in_progress → doctor H6 误判。
+        现优先使用传入的 outcome,没有时回退到 _terminal_outcome(spine
+        捕获),再没有才用 _steps 启发式。
         """
+        if outcome is not None:
+            self._terminal_outcome = outcome
         try:
             if self._open_step is not None:
                 self._close_step("cancelled")
@@ -154,6 +171,27 @@ class StepTreeAccumulatorDeriver(Deriver):
         self._last_ts = ts
         if self._first_ts is None:
             self._first_ts = ts
+
+        # Capture run-level terminal outcome from spine; 不依赖 flush() 传入。
+        # 优先级低于 materializer.flush(outcome=...) 但作为兜底:即便 caller 漏传,
+        # _build_document 也能拿到正确终态。
+        if ep in {"kernel.run.stop", "lifecycle.finally"}:
+            ev_outcome = (event.outcome or "").strip().lower()
+            if ev_outcome in {"success", "completed"}:
+                self._terminal_outcome = "completed"
+            elif ev_outcome in {"fail", "failed", "error"}:
+                self._terminal_outcome = "failed"
+            elif ev_outcome in {"stop", "stopped", "cancelled", "canceled"}:
+                self._terminal_outcome = "stopped"
+            elif ev_outcome in {"paused", "waiting_input"}:
+                self._terminal_outcome = "paused"
+        # runtime.event_publisher.publish event_type=completed 是更明确的信号
+        if ep == "runtime.event_publisher.publish":
+            event_type = event.payload.get("event_type")
+            if event_type == "completed":
+                self._terminal_outcome = "completed"
+            elif event_type == "failed":
+                self._terminal_outcome = "failed"
 
         if ep == "writable.step.start":
             self._begin_step(event, ts)
@@ -310,7 +348,12 @@ class StepTreeAccumulatorDeriver(Deriver):
             strategy_key=self._strategy_key,
             plan_ref=self._plan_ref,
             objective=self._objective or "(unobserved)",
-            outcome="completed" if self._steps else "in_progress",
+            # outcome 三路优先级:
+            # 1) materializer.flush(outcome=...) 注入(self._terminal_outcome)
+            # 2) spine 上的 terminal 事件(kernel.run.stop / lifecycle.finally /
+            #    runtime.event_publisher.publish event_type=completed)
+            # 3) 兜底:有 step → completed;否则 in_progress(旧启发式)
+            outcome=self._resolve_outcome(),
             started_at=self._first_ts or 0.0,
             closed_at=self._last_ts,
             total_steps=len(self._steps),
@@ -326,6 +369,22 @@ class StepTreeAccumulatorDeriver(Deriver):
             totals=totals,
             phases=tuple(self._phases),
         )
+
+    def _resolve_outcome(self) -> str:
+        """决定 JournalMetadata.outcome。
+
+        优先级:
+          1) self._terminal_outcome —— materializer.flush(outcome=...) 或 spine
+             捕获的 kernel.run.stop / lifecycle.finally / event_publisher.publish。
+          2) ``closed_at`` 已被 set + 有任何 phases/steps → completed
+             (model-only respond 没 step 也有 phases)。
+          3) 兜底:有 step → completed;否则 in_progress(旧启发式)。
+        """
+        if self._terminal_outcome:
+            return self._terminal_outcome
+        if self._last_ts is not None and (self._steps or self._phases):
+            return "completed"
+        return "completed" if self._steps else "in_progress"
 
     def _write_model_visible(self, frame: _StepFrame) -> None:
         """落 ``model_visible/step_NN/`` 五件套（ADR-0167 D3 / D4）。
