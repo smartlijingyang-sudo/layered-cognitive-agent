@@ -5,7 +5,7 @@
 + ``LoopCursorFactory``(PR-14,Profile 装配入口)
 + ``SpineWritePortAdapter`` / ``install_run_cursor`` / ``reset_run_cursor``(PR-1.5,EventSpine → WritePort 协议桥)
 + ``PersistenceCoordinator`` / ``NullPersistenceCoordinator`` / ``FilePersistenceCoordinator``(PR-25,持久化协同);
-不暴露 null_loop_cursor(ADR-0169 L13)。
+不暴露任何空实现 cursor 类(ADR-0169 L13,NullLoopCursor 不存在)。
 """
 
 from lca.infrastructure.observability.loop_cursor.bind import (

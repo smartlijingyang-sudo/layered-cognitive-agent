@@ -453,15 +453,6 @@ def get_span_context() -> SpanContextInfo:
 _log = structlog.get_logger("lca.observability")
 
 
-# ── ADR-0169 §D9 删除清单 ───────────────────────────────────
-# facade.step_open / step_close / step_record_* 共 7 个方法在 PR-26 阶段删除。
-# 原因:StepCoordinator 的 begin_step / record_* / end_step 在 §11 控制点迁移
-# 矩阵中标记删除,business 路径已迁 cursor.advance(phase) + cursor.record_*。
-# StepCoordinator 本身保留(writable_matrix 五面矩阵仍为 readonly 装配层,
-# 供 ProjectionHost / 兼容 fixture 使用);facade 仅删除 step_* 转口方法。
-# 无调用方:见 `grep facade.step_open in lca/ tests/` 输出 0(inventory 完整)。
-
-
 __all__ = [
     "BoundObservability",
     "EvidenceBinding",
