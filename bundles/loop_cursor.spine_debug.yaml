@@ -1,26 +1,44 @@
-# bundles/loop_cursor.spine_debug.yaml — source-level attacher for OII debugging.
+# bundles/loop_cursor.spine_debug.yaml — debug-only EventSpine plugin overlay.
 #
-# Per ADR-0165.1 §96 + i17-traceback §D3, ``spine.reflector.source`` is
-# **mandatory** in ``loop_cursor.spine_default``(已自带反射器)。本 bundle
-# 仅作为 ADR-0174 §D2 loop_cursor bundle 契约的"占位 + 配置合并入口":
-# oii-debug profile 在 ``patch:`` 段对 ``spine.reflector.source`` plugin 注入
-# ``max_locals_bytes`` + ``redact_patterns``,达到与旧 spine-oii-debug 同样的
-# 配置覆盖效果。
+# Carries plugins intentionally excluded from ``loop_cursor.spine_default``
+# to keep the production spine fast / minimal. The four plugins below are
+# only useful to humans reading traces (signature fingerprint for
+# ``journal_trace``, source-level transport metadata for ``journal_trace``
+# cross-bridge diagnostics, plus two wraps that were provided by a hook
+# installer rather than a real consumer). Each is debug-only because:
 #
-# 此 bundle **禁止** 重新声明 ``spine.reflector.source`` plugin entry — 否则
-# 与 spine_default 冲突(loader 拒绝跨 bundle 重复 plugin id)。
+# - ``spine.reflector.signature`` — emits ``signature_fingerprint`` /
+#   ``input_params`` / ``output_schema`` / ``docstring_captured``; consumed
+#   only by ``journal_trace.py`` CLI display and per-emit ``inspect.getsource``
+#   is hot-path cost. oii-debug may want it for diagnosing wrap behavior.
+# - ``spine.reflector.transport`` — marker capability that no consumer
+#   ``require()``s. The actual transport emit helpers live in
+#   ``lca/infrastructure/observability/spine/transport_emit.py`` and are
+#   wired independently of this plugin.
+# - ``spine.wrap.ctx_effect`` / ``spine.wrap.ctx_intercept`` — the
+#   ``@plugin`` manifests provide capabilities no caller requires. The
+#   runtime_hooks installers (``install_ctx_*_hook``) remain the real
+#   code path; the plugin entries are vestigial metadata.
 #
-# Used by profiles/oii-debug.yaml.
+# Profile wiring:
+# - ``profiles/oii-debug.yaml`` lists this bundle AFTER
+#   ``loop_cursor.spine_default`` so the four extras stack on top of the
+#   production spine. Source files for the moved plugins stay in
+#   ``lca/plugins/observability/spine/{reflectors,wraps}/``; the bundle
+#   just decides whether they are wired.
+# - ``profiles/web-standard.yaml`` / ``profiles/benchmark.yaml`` do NOT
+#   load this bundle — they want the fast 15-plugin spine.
 
 name: loop_cursor.spine_debug
 kind: loop_cursor_bundle
 description: |
-  Spine source-level attacher bundle (PR-9). Loaded only by oii-debug
-  profiles; web-standard / benchmark deliberately omit it.
+  Debug-only EventSpine plugin overlay. Loaded only by the ``oii-debug``
+  profile, on top of ``loop_cursor.spine_default``; web-standard /
+  benchmark deliberately omit it.
 
 # ADR-0174 §D2 loop_cursor bundle 契约。
-# 与 loop_cursor.spine_default 同 provides;差异在于 oii-debug profile 在
-# ``patch:`` 段对 ``spine.reflector.source`` 注入 redact 配置与 max_locals_bytes。
+# 与 loop_cursor.spine_default 同 provides;差异在于多装 4 个 debug-only
+# plugin entry。
 provides:
   - loop_cursor_factory
   - projection_host
@@ -32,7 +50,30 @@ provides:
 profile_aliases:
   - oii-debug
 
-# 此 bundle 在当前阶段不注册新 plugin entry(避免与 spine_default 冲突);
-# 配置覆盖由 profile 的 ``patch:`` 段承担。若后续引入新的 debug-only plugin,
-# 在这里添加,前提是与 loop_cursor.spine_default 不冲突。
-entries: []
+# Informational: which spine-side plugins this bundle wires.
+plugins:
+  - spine.reflector.signature
+  - spine.reflector.transport
+  - spine.wrap.ctx_effect
+  - spine.wrap.ctx_intercept
+
+entries:
+  - id: spine.reflector.signature
+    name: spine_reflector_signature
+    $module: lca.plugins.observability.spine.reflectors.signature
+    config: {}
+
+  - id: spine.reflector.transport
+    name: spine_reflector_transport
+    $module: lca.plugins.observability.spine.reflectors.transport
+    config: {}
+
+  - id: spine.wrap.ctx_effect
+    name: spine_wrap_ctx_effect
+    $module: lca.plugins.observability.spine.wraps.ctx_effect
+    config: {}
+
+  - id: spine.wrap.ctx_intercept
+    name: spine_wrap_ctx_intercept
+    $module: lca.plugins.observability.spine.wraps.ctx_intercept
+    config: {}

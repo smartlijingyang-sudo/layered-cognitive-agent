@@ -2,8 +2,12 @@
 #
 # Per ADR-0165 + ADR-0165.1, the EventSpine is composed from close-set
 # plugins (L2 spine.core + L1 emit_pipeline + L0 producers / classifiers /
-# derivers / sinks / wraps / transport reflector). Profile decides which
-# subset is enabled.
+# derivers / sinks / wraps). Profile decides which subset is enabled.
+#
+# Debug-only plugins (spine.reflector.signature, spine.reflector.transport,
+# spine.wrap.ctx_effect, spine.wrap.ctx_intercept) live in
+# ``bundles/loop_cursor.spine_debug.yaml`` and are only loaded by the
+# ``oii-debug`` profile.
 #
 # Source-level attacher (spine.reflector.source, ADR-0165.1 §96 + PR-9 /
 # ADR-2026-09-02-i17-traceback §D3) is **mandatory** here — I17 is a
@@ -20,8 +24,8 @@
 name: loop_cursor.spine_default
 kind: loop_cursor_bundle
 description: |
-  Spine 19-plugin composition (PR-7 + PR-8 §7.6.6 + PR-9 source
-  attacher). All modules are present and enabled. Profile
+  Spine 15-plugin composition (PR-7 + PR-8 §7.6.6 + PR-9 source
+  attacher). All production modules are present and enabled. Profile
   overrides via `patch:` per spine design §7.6.6.
 
 # ADR-0174 §D2 loop_cursor bundle 契约(每 profile 一个 loop_cursor.spine_*
@@ -43,11 +47,9 @@ profile_aliases:
 plugins:
   - spine.core
   - spine.emit_pipeline
-  - spine.reflector.signature
   - spine.reflector.source
   - spine.reflector.context
   - spine.reflector.runtime
-  - spine.reflector.transport
   - spine.classifier.exception.builtin
   - spine.classifier.exception.unclass
   - spine.spantree
@@ -63,8 +65,6 @@ plugins:
   - spine.deriver.live_tail
   - spine.sink.file
   - spine.sink.console
-  - spine.wrap.ctx_effect
-  - spine.wrap.ctx_intercept
   - spine.wrap.assembler
 
 entries:
@@ -80,12 +80,7 @@ entries:
     $module: lca.plugins.observability.spine.emit_pipeline
     config: {}
 
-  # ── L0 reflectors (4) ───────────────────────────────────────────
-  - id: spine.reflector.signature
-    name: spine_reflector_signature
-    $module: lca.plugins.observability.spine.reflectors.signature
-    config: {}
-
+  # ── L0 reflectors (3) ───────────────────────────────────────────
   - id: spine.reflector.source
     name: spine_reflector_source
     $module: lca.plugins.observability.spine.reflectors.source
@@ -99,11 +94,6 @@ entries:
   - id: spine.reflector.runtime
     name: spine_reflector_runtime
     $module: lca.plugins.observability.spine.reflectors.runtime
-    config: {}
-
-  - id: spine.reflector.transport
-    name: spine_reflector_transport
-    $module: lca.plugins.observability.spine.reflectors.transport
     config: {}
 
   # ── L0 classifiers (2) ──────────────────────────────────────────
@@ -166,17 +156,7 @@ entries:
     $module: lca.plugins.observability.spine.sinks.console
     config: {}
 
-  # ── L0 wraps (3) ────────────────────────────────────────────────
-  - id: spine.wrap.ctx_effect
-    name: spine_wrap_ctx_effect
-    $module: lca.plugins.observability.spine.wraps.ctx_effect
-    config: {}
-
-  - id: spine.wrap.ctx_intercept
-    name: spine_wrap_ctx_intercept
-    $module: lca.plugins.observability.spine.wraps.ctx_intercept
-    config: {}
-
+  # ── L0 wraps (1) ────────────────────────────────────────────────
   - id: spine.wrap.assembler
     name: spine_wrap_assembler
     $module: lca.plugins.observability.spine.wraps.assembler
