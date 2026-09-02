@@ -4,9 +4,31 @@
 # ADR-0076 W1：test / null profile 必须显式声明 fallback_policy，避免
 # 类构造函数默认值隐式触发运行时 fallback；本 profile 标记自身为 test
 # profile，对全部 closure 必需 capability 接受 test_default 策略。
+#
+# ADR-0174 PR-7.2/7.2: profile migrated to ``loop_cursor.spine_*`` bundle
+# naming(§D1 第二批);observability 五缝装配段 schema 与 web-standard 对齐,
+# 但 loop_cursor.spine_default 改为 loop_cursor.spine_minimal(测试 profile
+# 不需要 narrative/graph 投影与 model_visible capture,降低测试成本)。
+observability:
+  loop_cursor:
+    implementation: std                              # 默认实现(PR-14 LoopCursorFactory)
+    spine_minimal: loop_cursor.spine_minimal         # 复用 bundles/loop_cursor.spine_minimal.yaml 的 bundle
+  projection_host:
+    # minimal — 仅 step_tree + cost:narrative / graph 投影在 minimal spine 下被 deriver 排除
+    initial: [step_tree, cost]
+  persistence:
+    coalescer: default
+    sink: routing_file
+  model_visible:
+    enabled: false                                   # test profile 跳过 model_visible capture
+  close_barrier:
+    enabled: true
+  plan_ref: test-minimal
+
 bundles:
   - bundles/base.yaml
   - bundles/web-app.yaml
+  - bundles/loop_cursor.spine_minimal.yaml
 
 fallback_policy:
   effect_handler_registry: test_default

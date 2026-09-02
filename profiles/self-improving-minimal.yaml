@@ -7,6 +7,26 @@ name: self-improving-minimal
 description: |
   Minimal, non-default learning-plane profile for evidence-gated skill and
   profile candidates. Promotion remains external and explicitly approved.
+
+# ADR-0174 PR-7.2/7.2: profile migrated to ``loop_cursor.spine_*`` bundle
+# naming(§D1 第二批);observability 五缝装配段 schema 与 web-standard 对齐,
+# 使用 loop_cursor.spine_default(完整 spine),但 projection_host.initial
+# 收敛到 step_tree + cost(非默认,evidence-gated 意图下最小 deriver 表面)。
+observability:
+  loop_cursor:
+    implementation: std                              # 默认实现(PR-14 LoopCursorFactory)
+    spine_default: loop_cursor.spine_default         # 复用 bundles/loop_cursor.spine_default.yaml 的 bundle
+  projection_host:
+    initial: [step_tree, cost]
+  persistence:
+    coalescer: default
+    sink: routing_file
+  model_visible:
+    enabled: true
+  close_barrier:
+    enabled: true
+  plan_ref: self-improving-minimal
+
 bundles:
   # The resolver still performs a provides→requires topological sort. Listing
   # this scenario first guarantees its passive terminal-review contribution is
@@ -15,3 +35,4 @@ bundles:
   - base
   - web-app
   - declarative-phase-graph
+  - bundles/loop_cursor.spine_default.yaml
