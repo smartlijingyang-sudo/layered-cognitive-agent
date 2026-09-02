@@ -21,6 +21,15 @@ from lca.contracts.observability.evidence import (
 from lca.contracts.observability.evidence import (
     RetentionClass as RetentionClass,
 )
+from lca.contracts.observability.exception_capture import (
+    ExceptionRecord as ExceptionRecord,
+)
+from lca.contracts.observability.exception_capture import (
+    SourceLocation as SourceLocation,
+)
+from lca.contracts.observability.exception_capture import (
+    exc_to_record as exc_to_record,
+)
 from lca.contracts.observability.ledger import RunLedgerFactory as RunLedgerFactory
 from lca.contracts.observability.model_visible_capture import (
     ModelVisibleArtifact as ModelVisibleArtifact,
@@ -42,10 +51,13 @@ __all__ = [
     "EvidenceReceipt",
     "EvidenceRef",
     "EvidenceStore",
+    "ExceptionRecord",
     "ModelVisibleArtifact",
     "ModelVisibleCapture",
     "ReasonerPromptArtifact",
     "ReasonerPromptCapture",
     "RetentionClass",
     "RunLedgerFactory",
+    "SourceLocation",
+    "exc_to_record",
 ]

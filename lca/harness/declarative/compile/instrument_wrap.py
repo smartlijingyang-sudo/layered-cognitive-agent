@@ -197,43 +197,17 @@ def _fingerprint_value(value: Any) -> str:
 _TRACEBACK_CAPPED_BYTES = 4096
 
 
-def _exception_payload(exc: BaseException) -> dict[str, Any]:
-    """Structured failure fields (ADR-2026-09-02-i17-stream-align §B).
+def _exception_payload(exc: BaseException, *, boundary: str = "instrument_wrap") -> dict[str, Any]:
+    """Structured failure fields —— 走 :func:`exc_to_record` SSOT。
 
-    The wrap layer must propagate the original exception text into the
-    journal payload so a coding agent (and ``lca-ops explain`` /
-    ``doctor``) can recover the traceback from disk without re-raising
-    the exception. Field names mirror the public contract agreed on
-    2026-09-02:
-
-    - ``exc_type``           — ``type(exc).__qualname__``
-    - ``exception_message``  — ``str(exc)`` (may be empty)
-    - ``traceback_text``     — formatted chain, capped to 4 KiB
-    - ``cause_chain``        — tuple of qualnames for ``__cause__`` /
-      ``__context__`` (one level deep, deterministic order)
-
-    The historic ``exception_class`` / ``reason`` fields are also kept
-    so existing readers (e.g. ``spine.producer.failure`` projector,
-    ADR-0165.1 §96 ``_publish_i17_rejection``) continue to function
-    unchanged.
+    ADR-2026-09-02-i17-stream-align §B + ADR-0169: wrap 层的异常归一化
+    必须与 transport 路径一致,都经过 :class:`ExceptionRecord`。
+    历史 ``exc_type`` / ``reason`` legacy alias 由 :meth:`ExceptionRecord.asdict`
+    提供,这里不再手搓。
     """
-    exc_type = type(exc).__qualname__
-    exc_message = str(exc)
-    tb_text = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-    tb_capped = tb_text.encode("utf-8", errors="replace")[:_TRACEBACK_CAPPED_BYTES]
-    cause_chain: list[str] = []
-    for link in (exc.__cause__, exc.__context__):
-        if link is None or link is exc:
-            continue
-        cause_chain.append(type(link).__qualname__)
-    return {
-        "exc_type": exc_type,
-        "exception_class": exc_type,  # legacy alias — see docstring
-        "exception_message": exc_message,
-        "reason": exc_message,  # legacy alias — see docstring
-        "traceback_text": tb_capped.decode("utf-8", errors="ignore"),
-        "cause_chain": cause_chain,
-    }
+    from lca.contracts.observability import exc_to_record
+
+    return exc_to_record(exc, boundary=boundary).asdict()
 
 
 def _safe_append(

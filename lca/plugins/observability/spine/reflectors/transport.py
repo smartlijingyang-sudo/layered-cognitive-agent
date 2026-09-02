@@ -25,7 +25,6 @@ from lca.contracts.harness.composition.plugin_contract import (
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 from lca.infrastructure.observability.spine.transport_emit import (
-    emit_carrier_exception_caught,
     emit_carrier_exception_finally,
     emit_kernel_run_cancelled,
     emit_kernel_run_start,
@@ -72,7 +71,6 @@ async def setup(ctx: PluginContext, config: Any) -> None:
 
 
 __all__ = [
-    "emit_carrier_exception_caught",
     "emit_carrier_exception_finally",
     "emit_kernel_run_cancelled",
     "emit_kernel_run_start",

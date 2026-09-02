@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from lca.contracts.observability import exc_to_record
 from lca.harness.declarative.compile.instrument_wrap import set_active_spine_accessor
 from lca.infrastructure.observability.spine import transport_emit
 from lca.infrastructure.observability.spine.event_record import EventRecord
 from lca.infrastructure.observability.spine.event_spine import EventSpine
+from lca.infrastructure.observability.spine.exception_emit import (
+    emit_exception_caught as emit_exception_caught,
+)
 from lca.infrastructure.observability.spine.sinks.base import EventSink
 
 
@@ -38,12 +42,18 @@ def test_emit_transport_and_kernel_run_chain() -> None:
             path="/runs", method="POST", run_id="run_transport_test"
         )
         assert transport_emit.emit_kernel_run_start(run_id="run_transport_test", trace_id="trace_x")
-        assert transport_emit.emit_carrier_exception_caught(
-            boundary="lifecycle.execute",
-            exc_type="TypeError",
-            message="MemoryView.__init__() missing 1 required positional argument: 'buffer'",
-            run_id="run_transport_test",
-        )
+        try:
+            raise TypeError(
+                "MemoryView.__init__() missing 1 required positional argument: 'buffer'"
+            )
+        except TypeError as exc:
+            record = exc_to_record(
+                exc,
+                boundary="lifecycle.execute",
+                run_id="run_transport_test",
+                trace_id="trace_x",
+            )
+        assert emit_exception_caught(record)
         assert transport_emit.emit_kernel_run_stop(run_id="run_transport_test", outcome="failure")
         assert transport_emit.emit_transport_route_exit(
             path="/runs", method="POST", outcome="failure", run_id="run_transport_test"

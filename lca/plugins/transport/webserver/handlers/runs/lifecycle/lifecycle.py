@@ -9,6 +9,7 @@ from typing import Any
 import structlog
 
 from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.observability import exc_to_record
 from lca.contracts.protocols.runtime.infra import MachineResolver
 from lca.infrastructure.runtime_plane.resolve import PlaneBindingError
 from lca.infrastructure.runtime_plane.scope import plane_bindings_scope
@@ -72,8 +73,10 @@ class RunLifecycleCoordinator:
         success = False
         run_outcome: str = "failure"
         from lca.infrastructure.observability.spine.context import SpineContext
+        from lca.infrastructure.observability.spine.exception_emit import (
+            emit_exception_caught,
+        )
         from lca.infrastructure.observability.spine.transport_emit import (
-            emit_carrier_exception_caught,
             emit_carrier_exception_finally,
             emit_kernel_run_cancelled,
             emit_kernel_run_start,
@@ -117,12 +120,13 @@ class RunLifecycleCoordinator:
         except (PlaneBindingError, _UnknownExecutionTargetError) as exc:
             session.error = str(exc)
             self._record_failure(session, exc, hub)
-            emit_carrier_exception_caught(
-                boundary="lifecycle.execute",
-                exc_type=type(exc).__name__,
-                message=str(exc),
-                run_id=session.run_id,
-                trace_id=session.trace_id,
+            emit_exception_caught(
+                exc_to_record(
+                    exc,
+                    boundary="lifecycle.execute",
+                    run_id=session.run_id,
+                    trace_id=session.trace_id,
+                )
             )
             emit_carrier_exception_finally(
                 boundary="lifecycle.execute",
@@ -144,12 +148,13 @@ class RunLifecycleCoordinator:
             )
             session.error = self._format_exception(exc, session)
             self._record_failure(session, exc, hub)
-            emit_carrier_exception_caught(
-                boundary="lifecycle.execute",
-                exc_type=type(exc).__name__,
-                message=str(exc),
-                run_id=session.run_id,
-                trace_id=session.trace_id,
+            emit_exception_caught(
+                exc_to_record(
+                    exc,
+                    boundary="lifecycle.execute",
+                    run_id=session.run_id,
+                    trace_id=session.trace_id,
+                )
             )
             emit_carrier_exception_finally(
                 boundary="lifecycle.execute",

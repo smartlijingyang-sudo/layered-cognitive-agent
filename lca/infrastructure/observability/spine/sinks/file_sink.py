@@ -33,6 +33,14 @@ _ATOMIC_THRESHOLD = 4096  # Linux PIPE_BUF; do NOT change without kernel docs ch
 _DEFAULT_BATCH = 100
 _DEFAULT_INTERVAL_MS = 100
 
+# 异常事件必须 sidecar —— 不论 payload 大小;traceback 必须能从磁盘
+# 重建,这是观测层契约,不是"碰巧超 4 KiB 才 offload"。任何 EP 在此集合
+# 内都强制走 offload 路径,主 ledger 写 {execution_point, offloaded} 占位符。
+# 历史 sidecar 来自装饰器路径靠"反射增强字段碰巧超 4 KiB"自动触发;
+# 任何路径任何时机的异常都进 SSOT (:mod:`spine.exception_emit`),
+# 单一 emitter 写出后由 FileSink 强制 sidecar。
+_FORCE_OFFLOAD_EPS: frozenset[str] = frozenset({"exception.caught"})
+
 
 class FileSink:
     """Append-only JSONL sink 默认落盘 ``<run_dir>/<run_id>.spine.jsonl``。
@@ -85,7 +93,8 @@ class FileSink:
             raise RuntimeError("FileSink already closed")
         line = json.dumps(_serializable(record), default=str, sort_keys=False)
         encoded = line.encode("utf-8") + b"\n"
-        if len(encoded) <= _ATOMIC_THRESHOLD:
+        force_offload = record.execution_point in _FORCE_OFFLOAD_EPS
+        if len(encoded) <= _ATOMIC_THRESHOLD and not force_offload:
             os.write(self._fd, encoded)
         else:
             digest = hashlib.sha256(encoded).hexdigest()

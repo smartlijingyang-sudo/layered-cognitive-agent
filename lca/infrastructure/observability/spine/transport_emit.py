@@ -5,6 +5,10 @@ importing ``lca.plugins.observability`` (plugin-package independence).
 
 Uses the process-local spine accessor installed by ``spine.core``
 (``set_active_spine_accessor``). Helpers no-op when unwired.
+
+异常事件走 :mod:`lca.infrastructure.observability.spine.exception_emit`
+唯一 emitter(SSOT):先 :func:`lca.contracts.observability.exc_to_record`
+归一化,再 ``emit_exception_caught(record)``。
 """
 
 from __future__ import annotations
@@ -133,28 +137,6 @@ def emit_kernel_run_cancelled(*, run_id: str, trace_id: str = "") -> EventRecord
     )
 
 
-def emit_carrier_exception_caught(
-    *,
-    boundary: str,
-    exc_type: str,
-    message: str,
-    run_id: str = "",
-    trace_id: str = "",
-) -> EventRecord | None:
-    return _safe_append(
-        execution_point="exception.caught",
-        channel="error",
-        payload={
-            "boundary": boundary,
-            "exc_type": exc_type,
-            "message": message,
-            "run_id": run_id,
-            "trace_id": trace_id,
-        },
-        outcome="failure",
-    )
-
-
 def emit_carrier_exception_finally(
     *,
     boundary: str,
@@ -173,7 +155,6 @@ def emit_carrier_exception_finally(
 
 
 __all__ = [
-    "emit_carrier_exception_caught",
     "emit_carrier_exception_finally",
     "emit_kernel_run_cancelled",
     "emit_kernel_run_start",
