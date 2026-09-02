@@ -124,3 +124,81 @@ def test_run_session_consumes_profile_selected_journal_factory(tmp_path: Path) -
     # 真实路径由 event_spine.subscribe 注入, 见 test_runtime_journal_binding_integration)
     # 在这个 stub factory 场景下,deriver 不会被 subscribe, journal.json 不会写
     # (符合"真实 wire 由 spine 装配"的设计)。
+
+
+def test_session_step_tree_bundle_is_wired_for_terminalizer_flush(tmp_path: Path) -> None:
+    """Regression: ``RunSession.step_tree_bundle`` must be the bundle that owns
+    ``StepTreeAccumulatorDeriver.flush()``.
+
+    Without this, ``materialization._flush_step_tree`` early-returns on
+    ``bundle is None`` and ``journal.json`` never gets written.
+
+    ADR-0167 D11: terminalize flushes via ``session.step_tree_bundle.flush()``;
+    the bundle is constructed by the factory and ``RunSessionBuilder.build``
+    must propagate it into the session.
+    """
+    class _BundleSpyFactory:
+        def __init__(self) -> None:
+            self.process = ProcessJournal()
+            self.bundles_passed: list[object] = []
+
+        def create_run_components(self, *, spine_path: Path) -> RunJournalComponents:
+            # factory 真实给 _StepTreeBundle(dataclass frozen); spy 用
+            # 一个同形 dataclass 让 builder._dc_replace 能跑。
+            from dataclasses import dataclass as _dc
+
+            @_dc(frozen=True)
+            class _StubBundle:
+                deriver: object | None = None
+                narrative_writer: object | None = None
+
+            bundle = _StubBundle(narrative_writer=object())
+            self.bundles_passed.append(bundle)
+            return RunJournalComponents(
+                writer=LiveTail(),
+                tail=LiveTail(),
+                step_tree_writer=bundle,  # type: ignore[arg-type]
+            )
+
+        def create_process_journal(self) -> ProcessJournal:
+            return self.process
+
+    class _Ctx:
+        def __init__(self, factory: _BundleSpyFactory, wfr: WritableFaceRegistry) -> None:
+            class _StubSpine:
+                def subscribe(self, fn: object) -> object:
+                    del fn
+                    return lambda: None
+
+                def close(self) -> None: ...
+
+            self._services = {
+                "observability": BoundObservability(journal=MemoryJournal()),
+                "run_ledger_factory": factory,
+                "writable_face_registry": wfr,
+                "event_spine": _StubSpine(),
+            }
+
+        def inject(self, key: str, *, default: object = ...) -> object:
+            if key in self._services:
+                return self._services[key]
+            if default is not ...:
+                return default
+            raise KeyError(key)
+
+    registry = RunRegistry(locator=FilesystemRunLocator(root=tmp_path))
+    session = create_run_session(
+        registry,
+        question="q",
+        user_text="u",
+        ctx=_Ctx(_BundleSpyFactory(), WritableFaceRegistry()),
+    )
+
+    # session.step_tree_bundle 必须是 factory 给的那个 bundle —— 否则
+    # materialization._flush_step_tree 的 ``bundle = getattr(session, ...)``
+    # 拿 None 早退,deriver 永不 flush,journal.json 永不写。
+    assert session.step_tree_bundle is not None, (
+        "session.step_tree_bundle must be wired by RunSessionBuilder; "
+        "otherwise materialization._flush_step_tree early-returns and "
+        "StepTreeAccumulatorDeriver.flush() never produces journal.json"
+    )
