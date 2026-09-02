@@ -47,7 +47,7 @@ vendor/                       Cordis、Cosmokit、Schemastery
 | Body / SafeExecutor | `lca/cognition/body/` |
 | Journal / Projection | `lca/contracts/models/observability/`、`lca/infrastructure/observability/` |
 | Agent / Team | `lca/application/spawn.py`、`lca/agent/` |
-| 平台操作 | `./scripts/lca-ops`(含 `kernel {boot,serve}` 子命令;`stop / compose / dev / restart` 已删) |
+| 平台操作 | `./scripts/lca-ops`；按症状路由的命令矩阵见 §6，单 run 调试心智模型见 §6.1 |
 
 ## 3. 架构不变量
 
@@ -113,7 +113,29 @@ Fact → State → Decision / Plan → Verdict → Effect → Observation / Jour
 
 ## 6. 命令与验证
 
-`./scripts/lca-ops` 不带参数打印手册。常用命令：`status/heal/stop` 管理外部服务生命周期(`dev/restart` 已删;kernel 进程由 `kernel_serve` 自管,`heal` 会自愈);`logs [-v] [-d] [--replay]` 查看 Journal;`inspect-tree <profile>` 查看插件树;`dump-profile <profile>` 展开配置;`debug tree|run|scope` 查看 Context;`diagnose <alias>` 运行诊断;`provision` 部署 daemon。需要给脚本消费时使用 `--json`。
+`./scripts/lca-ops` 不带参数打印分层手册。**详细命令清单、debug SOP、工具对照表都在 [`docs/debug/run-debug-guide.md`](../debug/run-debug-guide.md)**（与 CLI 实测对齐，CLI 改动时改 docs/debug，不要改本节）。本节只留 coding agent 最常用的指针 + 验证矩阵。
+
+### 最常用命令指针
+
+| 场景 | 第一调用 | 失败退路 |
+|---|---|---|
+| 不知道 LCA 服务在不在跑 | `lca-ops status --json` | `lca-ops heal` |
+| 刚改完代码想重启 | `lca-ops kernel-restart` | `lca-ops kernel_serve` 打印启动命令 |
+| run 失败定位 | **`lca-ops debug-run <run_id>`** | `debug-env <run_id>` 只看摘要 |
+| 看完整流程 | `lca-ops trace <run_id> --focus llm\|tools\|delegation` | `journal logs -r <run_id>` |
+| 失败原因投影 | `lca-ops explain <run_id>` | `minimal-repro <run_id>` |
+| profile 拓扑 | `lca-ops inspect-tree <profile>` | `dump-profile <profile>` |
+| 能力归属 | `lca-ops why <capability>` / `why-plugin <id>` | `graph <profile>` |
+| 审计 hardcode / Reducer 单写 | `lca-ops audit-control-surface` / `audit-state-writers` / `audit-direct-commands` / `audit-hook-attach` | `audit` |
+| ADR 监督 / 历史迁移 | `lca-ops status-adr-supervision` | `lca-ops diagnose-package-organization` |
+| 预设症状诊断 | `lca-ops diagnose-{model-not-seen,loop-stuck,memory-poisoned,approval-rejected}` | `docs/debug/run-debug-guide.md` §5 |
+| DSH 风格 HTML 轨迹 | `lca-ops journal trajectory` | `journal narrative` |
+
+### 通用参数
+
+`--json` 结构化 JSON（给 agent）；`-q` / `--quiet` 少说话；`-c PATH` 配置，默认 `./lca-ops.yaml`；密码文件 `.lobehub-stack/sudo.pass`。需要给脚本消费时统一加 `--json`。
+
+> **命令细节、日志/SSOT 路径、fail-loud 开关、常见症状映射、对照表**全部在 [`docs/debug/run-debug-guide.md`](../debug/run-debug-guide.md)。改命令时**改那一处**，本节作为指针不动。
 
 默认循环：
 
