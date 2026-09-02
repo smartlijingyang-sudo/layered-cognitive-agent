@@ -22,11 +22,16 @@ from lca.contracts.models.observability.journal_step import (
     AttachmentRef,
     JournalStep,
     ReflectTrace,
+    SegmentRecord,
     SpanRecord,
     StepContext,
     ThinkingTrace,
     ToolCallRecord,
     ToolResult,
+)
+from lca.contracts.models.observability.journal_totals import (
+    PhaseRecord,
+    Totals,
 )
 
 
@@ -46,6 +51,8 @@ def _from_jsonable(obj: Any, cls: Any) -> Any:
         meta = _from_jsonable(obj["metadata"], JournalMetadata)
         steps_list = obj.get("steps", [])
         steps = tuple(_from_jsonable(s, JournalStep) for s in steps_list)
+        totals = _from_jsonable(obj["totals"], Totals) if obj.get("totals") else None
+        phases = tuple(_from_jsonable(p, PhaseRecord) for p in obj.get("phases", []))
         return cls(
             schema=obj["schema"],
             run_id=obj["run_id"],
@@ -54,6 +61,36 @@ def _from_jsonable(obj: Any, cls: Any) -> Any:
             steps=steps,
             metadata=meta,
             closed_at=obj.get("closed_at"),
+            totals=totals,
+            phases=phases,
+        )
+    if cls is Totals:
+        return cls(
+            steps=obj["steps"],
+            segments=obj["segments"],
+            phases=obj["phases"],
+        )
+    if cls is SegmentRecord:
+        return cls(
+            segment_id=obj["segment_id"],
+            kind=obj["kind"],
+            phase_ref=obj.get("phase_ref"),
+            started_at=obj.get("started_at", 0),
+            ended_at=obj.get("ended_at"),
+            outcome=obj.get("outcome"),
+            extra=obj.get("extra", {}),
+        )
+    if cls is PhaseRecord:
+        return cls(
+            phase_id=obj["phase_id"],
+            kind=obj["kind"],
+            step_id=obj.get("step_id"),
+            segment_id=obj.get("segment_id"),
+            entered_at=obj.get("entered_at", 0),
+            exited_at=obj.get("exited_at"),
+            summary=obj.get("summary"),
+            outcome=obj.get("outcome"),
+            extra=obj.get("extra", {}),
         )
     if cls is JournalMetadata:
         attachments = tuple(_from_jsonable(a, AttachmentRef) for a in obj.get("attachments", []))
@@ -103,6 +140,7 @@ def _from_jsonable(obj: Any, cls: Any) -> Any:
             spans=spans,
             outcome=obj.get("outcome"),
             error=obj.get("error"),
+            segments=tuple(_from_jsonable(s, SegmentRecord) for s in obj.get("segments", [])),
         )
     if cls is StepContext:
         attachments = tuple(_from_jsonable(a, AttachmentRef) for a in obj.get("attachments", ()))
@@ -186,15 +224,18 @@ class StepGroupedReader:
 
 
 def read_step_document(path: str | Path) -> JournalDocument:
-    """便捷函数 —— 直接读路径。"""
+    """便捷函数 —— 直接读路径。接受 lca.journal/3 与 lca.journal/3.1。"""
     p = Path(path)
     if not p.exists():
         raise FileNotFoundError(f"journal step file not found: {p}")
     text = p.read_text(encoding="utf-8")
     obj = json.loads(text)
     schema = obj.get("schema")
-    if schema != "lca.journal/3":
-        raise ValueError(f"read_step_document: expected schema='lca.journal/3', got {schema!r}")
+    if schema not in {"lca.journal/3", "lca.journal/3.1"}:
+        raise ValueError(
+            f"read_step_document: expected schema in "
+            f"{{'lca.journal/3', 'lca.journal/3.1'}}, got {schema!r}"
+        )
     return _from_jsonable(obj, JournalDocument)
 
 

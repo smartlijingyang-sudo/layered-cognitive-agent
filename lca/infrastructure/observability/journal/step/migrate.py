@@ -48,6 +48,10 @@ from lca.contracts.models.observability import (
     close_document,
     empty_document,
 )
+from lca.contracts.models.observability.journal_totals import (
+    PhaseRecord,
+    Totals,
+)
 from lca.infrastructure.observability.journal.engine.journal_io import (
     load_journal_records,
 )
@@ -56,6 +60,9 @@ from lca.infrastructure.observability.journal.step.narrative_writer import (
 )
 from lca.infrastructure.observability.journal.step.projector import (
     StepGroupedProjector,
+)
+from lca.infrastructure.observability.journal.step.reader import (
+    read_step_document,
 )
 
 # ── 事件→原语 helpers ──
@@ -602,6 +609,78 @@ def iter_run_ids(traces_root: Path) -> Iterator[str]:
             continue
         if (run_dir / "journal.jsonl").exists():
             yield run_dir.name
+
+
+# ── lca.journal/3 → lca.journal/3.1 升级（ADR-0167 D11）────────
+
+
+def upgrade_to_3_1(doc: JournalDocument) -> JournalDocument:
+    """把 lca.journal/3 step 树升级为 lca.journal/3.1（totals + phases）。
+
+    真相陈述：3.0 doc 是 phase-as-step 历史漂移期的产物，每个 step 已
+    等于一个 phase。**本 migrator 不折叠**——折叠会丢 phase 间的因果
+    链与 tool_call 归属。代价是 totals.phases == totals.steps
+    （反映真实历史）；doctor H-seg / H-phase 标 ``known_issue`` 即可。
+
+    幂等：``schema == "lca.journal/3.1"`` 直接返回。
+
+    输出：schemav3.1 + totals{steps, segments, phases} + phases[] 显式数组。
+    """
+    if doc.schema == "lca.journal/3.1":
+        return doc
+
+    phases: list[PhaseRecord] = []
+    for idx, s in enumerate(doc.steps, start=1):
+        phases.append(
+            PhaseRecord(
+                phase_id=f"phase_{idx:04d}",
+                kind=s.phase,
+                step_id=s.step_id,
+                segment_id=None,  # 3.0 doc 无 segment；新 doc 在 PR-1+2 引入
+                entered_at=int(s.entered_at),
+                exited_at=int(s.exited_at) if s.exited_at else None,
+                summary=s.reflect.summary if s.reflect else None,
+                outcome=s.outcome,
+            )
+        )
+
+    seg_count = sum(1 for p in phases if p.kind in ("think", "act"))
+    totals = Totals(
+        steps=len(doc.steps),
+        segments=seg_count,
+        phases=len(phases),
+    )
+
+    new_meta = asdict_replace(
+        doc.metadata,
+        total_steps=len(doc.steps),
+    )
+    return asdict_replace(
+        doc,
+        schema="lca.journal/3.1",
+        metadata=new_meta,
+        totals=totals,
+        phases=tuple(phases),
+    )
+
+
+def migrate_to_3_1(traces_root: Path, run_id: str) -> Path | None:
+    """读取 lca.journal/3 文档，写出 3.1 + 重新写 narrative。
+
+    返回写出的 ``journal.json`` 路径；已是 3.1 或文件不存在返回 ``None``。
+    原 ``journal.jsonl`` 不动；原 ``journal.json`` 直接覆盖（schema 升级）。
+    """
+    journal_path = traces_root / "runs" / run_id / "journal.json"
+    if not journal_path.exists():
+        return None
+    doc = read_step_document(journal_path)
+    if doc.schema == "lca.journal/3.1":
+        return None
+    upgraded = upgrade_to_3_1(doc)
+    StepGroupedProjector(journal_path).write(upgraded)
+    narrative_path = traces_root / "runs" / run_id / "journal.narrative.md"
+    StepNarrativeWriter(narrative_path).write(upgraded)
+    return journal_path
 
 
 __all__ = ["JournalMigrator", "iter_run_ids", "migrate_run"]

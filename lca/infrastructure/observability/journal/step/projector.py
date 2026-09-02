@@ -78,10 +78,10 @@ class StepGroupedProjector:
         返回: 写完的文件路径(便于调用方校验)。
         异常: schema 不对 / 序列化失败 → 直接抛, 不写半截。
         """
-        if document.schema != "lca.journal/3":
+        if document.schema not in {"lca.journal/3", "lca.journal/3.1"}:
             raise ValueError(
-                f"StepGroupedProjector.write: expected schema='lca.journal/3', "
-                f"got {document.schema!r}"
+                f"StepGroupedProjector.write: expected schema in "
+                f"{{'lca.journal/3', 'lca.journal/3.1'}}, got {document.schema!r}"
             )
         payload = _to_jsonable(document)
         text = json.dumps(payload, indent=self._indent, ensure_ascii=False)
