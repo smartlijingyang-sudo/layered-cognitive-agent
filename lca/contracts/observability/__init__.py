@@ -22,6 +22,12 @@ from lca.contracts.observability.evidence import (
     RetentionClass as RetentionClass,
 )
 from lca.contracts.observability.ledger import RunLedgerFactory as RunLedgerFactory
+from lca.contracts.observability.model_visible_capture import (
+    ModelVisibleArtifact as ModelVisibleArtifact,
+)
+from lca.contracts.observability.model_visible_capture import (
+    ModelVisibleCapture as ModelVisibleCapture,
+)
 
 __all__ = [
     "Classification",
@@ -30,6 +36,8 @@ __all__ = [
     "EvidenceReceipt",
     "EvidenceRef",
     "EvidenceStore",
+    "ModelVisibleArtifact",
+    "ModelVisibleCapture",
     "RetentionClass",
     "RunLedgerFactory",
 ]
