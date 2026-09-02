@@ -70,10 +70,16 @@ class SpineCore:
     """Holder for the L2-composed spine surface of one run.
 
     The class is the public seam that downstream plugins consume via
-    the ``event_spine`` capability — they call
-    ``spine_core.event_spine.append(...)`` and the wire goes through
-    the bound ``EmitPipeline`` + ``FileSink`` exactly as assembled by
-    :func:`setup`.
+    the ``event_spine`` capability. Two canonical surfaces:
+
+    * ``spine_core.event_spine.append(...)`` — preferred; routes
+      through the bound :class:`EmitPipeline` + :class:`FileSink`
+      exactly as assembled by :func:`setup`.
+    * ``spine_core.append(**kwargs)`` — SpineLike shim; delegates to
+      ``event_spine.append`` so callers holding the holder (instead of
+      the inner spine) still satisfy the ``SpineLike`` Protocol used by
+      ``writable.matrix.assembly``. New code SHOULD use the explicit
+      ``.event_spine`` surface.
 
     Attributes
     ----------
@@ -94,6 +100,15 @@ class SpineCore:
     event_spine: EventSpine
     file_sink: EventSink
     emit_pipeline: Any
+
+    def append(self, **kwargs: Any) -> Any:
+        """SpineLike shim — delegate to the inner :class:`EventSpine`.
+
+        Exists so :class:`lca.infrastructure.observability.writable_matrix.SpineEmitter`
+        can ``bind(spine_core)`` directly. The canonical surface for
+        new code is :attr:`event_spine`; this shim only forwards.
+        """
+        return self.event_spine.append(**kwargs)
 
     def close(self) -> None:
         """Close the sink; the spine itself is stateless across runs.
@@ -225,7 +240,11 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     file_sink = ctx.require("file_sink")
 
     sinks: list[EventSink] = [file_sink]
-    console_sink = getattr(ctx, "soft_get", lambda _k: None)("console_sink") if hasattr(ctx, "soft_get") else None
+    console_sink = (
+        getattr(ctx, "soft_get", lambda _k: None)("console_sink")
+        if hasattr(ctx, "soft_get")
+        else None
+    )
     if console_sink is not None and isinstance(console_sink, EventSink):
         sinks.append(console_sink)
 

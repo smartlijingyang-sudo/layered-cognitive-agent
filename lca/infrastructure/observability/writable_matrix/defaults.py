@@ -20,13 +20,23 @@ from contextlib import suppress
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, runtime_checkable
 
 from lca.infrastructure.observability.spine.event_record import EventRecord
 
 
+@runtime_checkable
 class SpineLike(Protocol):
-    """SpineEmitter 期望的最小表面（duck-typed 协议）。"""
+    """SpineEmitter 期望的最小表面（duck-typed 协议）。
+
+    任何带 ``.append(**kwargs)`` 的对象都满足本协议，包括
+    :class:`lca.infrastructure.observability.spine.event_spine.EventSpine`
+    本身和持有 EventSpine 的
+    :class:`lca.plugins.observability.spine.core.SpineCore`(后者通过
+    ``.append`` shim 委托)。装配时 :class:`SpineEmitter.bind` 会做
+    runtime 检查,失败的绑定在 boot 时 TypeError 而不是首次 emit 时
+    ``AttributeError``(修复前修复)。
+    """
 
     def append(self, **kwargs: Any) -> Any: ...
 
@@ -39,12 +49,19 @@ class SpineEmitter:
     """默认 EventEmitter = 调 EventSpine.append。
 
     必须先 :meth:`bind` 再调 :meth:`emit` —— 构造时不留 None，
-    避免「永远不触发的防御抛错」（ADR-0167 D13）。
+    避免「永远不触发的防御抛错」(ADR-0167 D13)。
     """
 
     _spine: SpineLike = field(init=False)
 
-    def bind(self, spine: SpineLike) -> None:
+    def bind(self, spine: Any) -> None:
+        if not isinstance(spine, SpineLike):
+            raise TypeError(
+                "SpineEmitter.bind() requires a SpineLike (object with "
+                f".append(**kwargs)); got {type(spine).__name__}. Did you "
+                "forget to unwrap SpineCore? Bind spine_core.event_spine "
+                "instead, or rely on SpineCore.append shim."
+            )
         self._spine = spine
 
     def emit(self, record: EventRecord) -> None:
