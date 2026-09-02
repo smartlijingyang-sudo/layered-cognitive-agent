@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from lca.cognition.body.tool_result_preview import tool_files
 from lca.contracts.models.core.decision import Observation, ToolCall  # noqa: F401
@@ -33,14 +33,13 @@ from lca.contracts.observability.evidence import (
     EvidenceRef,
     EvidenceStore,
 )
+from lca.contracts.observability.loop_cursor_payloads import (
+    ToolCallRecord,
+    ToolResultRecord,
+)
 from lca.contracts.protocols.runtime.infra import Tool
 from lca.infrastructure.observability import record, record_runtime
 from lca.infrastructure.tools.contract.project import project_tool_state
-
-if TYPE_CHECKING:
-    from lca.infrastructure.observability.writable_matrix.coordinator import (
-        StepCoordinator,
-    )
 
 _log = logging.getLogger(__name__)
 
@@ -136,22 +135,23 @@ def emit_tool_started(
             idempotency_key=idempotency_key,
         )
     )
-    # ADR-0167 D11: 写 step.tool_call 经 StepCoordinator（未注入时静默跳过）。
-    # ADR-0169 PR-26:保留 ``coord.emit`` —— ``phase.tool.call.start`` 是
-    # manifest-bound 任意 EP,删除条件绑 PR-21~24 业务迁 cursor 门禁。
-    from lca.infrastructure.observability.writable_matrix.coordinator import (
-        get_current_coordinator,
+    # ADR-0169 PR-1/S1: route through LoopCursor.record_tool_call — cursor
+    # is the SSOT for step/tool evidence (ADR-0169 D1); legacy
+    # ``phase.tool.call.start`` EP is dropped here, the canonical ToolStarted
+    # JournalEvent above remains (ADR-0063 SSOT).
+    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+        get_current_cursor,
     )
 
-    coord: StepCoordinator | None = get_current_coordinator()
-    if coord is not None:
-        coord.emit(
-            execution_point="phase.tool.call.start",
-            payload={
-                "tool_name": tool.name,
-                "invocation_id": invocation_id,
-                "arguments_summary": _summarize_args(args_dict),
-            },
+    cursor = get_current_cursor()
+    if cursor is not None:
+        cursor.record_tool_call(
+            ToolCallRecord(
+                tool_name=tool.name,
+                args_digest=_summarize_args(args_dict),
+                args_payload_path=None,
+                call_seq=hash(invocation_id) & 0x7FFFFFFF,
+            )
         )
     return arguments_ref
 
@@ -176,18 +176,22 @@ def emit_tool_denied(tool: Tool, reason: str) -> None:
         attributes={"tool_name": tool.name, "reason": reason},
     )
     record(ToolDenied(tool_name=tool.name, reason=reason))
-    # ADR-0167 D11: ToolDenied 走 StepCoordinator。ADR-0169 PR-26 保留
-    # ``coord.emit`` —— 任意 EP,删除条件绑 PR-21~24 grep 门禁。
-    from lca.infrastructure.observability.writable_matrix.coordinator import (
-        get_current_coordinator,
+    # ADR-0169 PR-1/S1: route through LoopCursor.record_tool_result with
+    # outcome="denied". Canonical ToolDenied JournalEvent above remains
+    # (ADR-0063 SSOT).
+    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+        get_current_cursor,
     )
 
-    coord: StepCoordinator | None = get_current_coordinator()
-    if coord is not None:
-        coord.emit(
-            execution_point="phase.tool.denied",
-            payload={"tool_name": tool.name, "reason": reason},
-            outcome="rejected",
+    cursor = get_current_cursor()
+    if cursor is not None:
+        cursor.record_tool_result(
+            ToolResultRecord(
+                tool_name=tool.name,
+                result_digest=reason,
+                result_path=None,
+                outcome="denied",
+            )
         )
 
 
@@ -271,33 +275,23 @@ def emit_tool_invoked(
             projected_state=projected_state_dict,
         )
     )
-    # ADR-0167 D11: 写 step.tool_result 经 StepCoordinator。
-    # ADR-0169 PR-26:保留 ``coord.emit`` —— ``phase.tool.call.end`` 是任意 EP,
-    # 删除条件绑 PR-21~24 grep 门禁。
-    from lca.infrastructure.observability.writable_matrix.coordinator import (
-        get_current_coordinator,
+    # ADR-0169 PR-1/S1: route through LoopCursor.record_tool_result — cursor
+    # is the SSOT for step/tool evidence (ADR-0169 D1); legacy
+    # ``phase.tool.call.end`` EP is dropped here, the canonical ToolInvoked
+    # JournalEvent above remains (ADR-0063 SSOT).
+    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+        get_current_cursor,
     )
 
-    coord: StepCoordinator | None = get_current_coordinator()
-    if coord is not None:
-        files = tool_files(obs)
-        files_created = tuple(str(f.get("name") or "") for f in files)
-        coord.emit(
-            execution_point="phase.tool.call.end",
-            payload={
-                "tool_name": tool.name,
-                "invocation_id": resolved_id,
-                "ok": obs.success,
-                "latency_ms": latency_ms,
-                "error": "" if obs.success else (obs.error or ""),
-                "files_created": files_created,
-                "delta_summary": _delta_summary_from_obs(obs, inline_output_text, output_ref),
-                "stdout_head": (inline_output_text or "")[:500],
-                "stdout_chars_total": len(inline_output_text or ""),
-                "stdout_truncated": output_ref is not None,
-                "stderr": str(obs.error or "") if not obs.success else "",
-            },
-            outcome="success" if obs.success else "failure",
+    cursor = get_current_cursor()
+    if cursor is not None:
+        cursor.record_tool_result(
+            ToolResultRecord(
+                tool_name=tool.name,
+                result_digest=_delta_summary_from_obs(obs, inline_output_text, output_ref),
+                result_path=None,
+                outcome="ok" if obs.success else "failure",
+            )
         )
 
 

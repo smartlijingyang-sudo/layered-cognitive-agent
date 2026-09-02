@@ -65,6 +65,25 @@ class _StubSpine:
         return seq
 
 
+@dataclass
+class _StubTool:
+    """Minimal Tool stub for emit_tool_started runtime test."""
+
+    name: str
+    description: str = ""
+    parameters: dict[str, object] = field(default_factory=dict)
+    is_idempotent: bool = True
+    default_timeout_s: float = 30.0
+
+    async def execute(self, args: dict[str, object]) -> object:  # pragma: no cover
+        del args
+        raise NotImplementedError
+
+    def validate(self, args: dict[str, object]) -> str | None:  # pragma: no cover
+        del args
+        return None
+
+
 def _make_cursor() -> tuple[StdLoopCursor, _StubSpine]:
     spine = _StubSpine()
     cursor = StdLoopCursor(
@@ -152,78 +171,178 @@ def test_perceive_hub_skips_cursor_advance_when_not_bound() -> None:
 # ── 2. tool_journal_emit calls cursor-aware EP routes ──────────
 
 
-def test_tool_journal_emit_emits_phase_tool_call_start_via_coord() -> None:
-    """``emit_tool_started`` 调 ``coord.emit('phase.tool.call.start', ...)``(compat)。
+def _strip_docstrings_and_comments(source: str) -> str:
+    """去掉 docstring 与行内注释,只保留可执行代码本体。"""
+    # 去除 """...""" 块
+    cleaned = re.sub(r'"""[\s\S]*?"""', "", source)
+    cleaned = re.sub(r"'''[\s\S]*?'''", "", cleaned)
+    # 去除 # 行内注释(简单处理:行首到 #)
+    lines = []
+    for line in cleaned.splitlines():
+        stripped = line.lstrip()
+        if stripped.startswith("#"):
+            continue
+        # 简易:删除 # 后内容(不含字符串内的 #)
+        if "#" in line:
+            # 极简启发:不处理字符串字面量,只删首个 # 之后
+            idx = line.find("#")
+            # 仅当 # 之前字符是空白或标点(粗糙判断不在字符串内)
+            if idx > 0 and line[idx - 1] in (" ", "\t"):
+                line = line[:idx]
+        lines.append(line)
+    return "\n".join(lines)
 
-    PR-26 阶段保留 ``coord.emit`` —— 任意 EP 不在 cursor 协议面;删除条件绑
-    PR-21~24 grep 门禁。本测试只验证 EP 名 + payload 结构不变。
+
+def test_tool_journal_emit_routes_start_through_cursor_record_tool_call() -> None:
+    """``emit_tool_started`` 调 ``cursor.record_tool_call(ToolCallRecord(...))``。
+
+    ADR-0169 PR-1/S1 业务迁 cursor:``phase.tool.call.start`` EP 不再经
+    ``coord.emit`` 落 spine,改走 cursor.record_tool_call → ``step.tool_call.record``。
+    canonical ToolStarted JournalEvent 仍然 record()(ADR-0063 SSOT)。
     """
-    # 静态校验:任意 EP 仍走 coord.emit(非 cursor.record_*)
     from lca.cognition.body import tool_journal_emit
 
     source_started = inspect.getsource(tool_journal_emit.emit_tool_started)
-    assert "phase.tool.call.start" in source_started, (
-        "emit_tool_started must still emit phase.tool.call.start EP"
+    body = _strip_docstrings_and_comments(source_started)
+    assert "cursor.record_tool_call" in body, (
+        "emit_tool_started must route through cursor.record_tool_call (ADR-0169 PR-1/S1)"
     )
-    assert "coord.emit" in source_started, (
-        "PR-26: phase.tool.call.start still goes through coord.emit (compat)"
+    assert "ToolCallRecord(" in body, "emit_tool_started must build a ToolCallRecord payload"
+    # coord.emit / phase.tool.call.start 不应再出现在代码路径(docstring/comment 忽略)
+    assert "coord.emit" not in body, "emit_tool_started no longer calls coord.emit (ADR-0169 §D9)"
+    assert "phase.tool.call.start" not in body, (
+        "emit_tool_started no longer emits phase.tool.call.start EP"
     )
 
 
-def test_tool_journal_emit_emits_phase_tool_call_end_via_coord() -> None:
-    """``emit_tool_invoked`` 调 ``coord.emit('phase.tool.call.end', ...)``。"""
+def test_tool_journal_emit_routes_end_through_cursor_record_tool_result() -> None:
+    """``emit_tool_invoked`` 调 ``cursor.record_tool_result(ToolResultRecord(...))``。"""
     from lca.cognition.body import tool_journal_emit
 
     source_invoked = inspect.getsource(tool_journal_emit.emit_tool_invoked)
-    assert "phase.tool.call.end" in source_invoked, (
-        "emit_tool_invoked must still emit phase.tool.call.end EP"
-    )
-    assert "coord.emit" in source_invoked
+    body = _strip_docstrings_and_comments(source_invoked)
+    assert "cursor.record_tool_result" in body
+    assert "ToolResultRecord(" in body
+    assert "coord.emit" not in body
+    assert "phase.tool.call.end" not in body
 
 
-def test_tool_journal_emit_emits_phase_tool_denied_via_coord() -> None:
-    """``emit_tool_denied`` 调 ``coord.emit('phase.tool.denied', ...)``。"""
+def test_tool_journal_emit_routes_denied_through_cursor_record_tool_result() -> None:
+    """``emit_tool_denied`` 调 ``cursor.record_tool_result(outcome="denied")``。"""
     from lca.cognition.body import tool_journal_emit
 
     source_denied = inspect.getsource(tool_journal_emit.emit_tool_denied)
-    assert "phase.tool.denied" in source_denied
-    assert "coord.emit" in source_denied
+    body = _strip_docstrings_and_comments(source_denied)
+    assert "cursor.record_tool_result" in body
+    assert '"denied"' in body
+    assert "coord.emit" not in body
+    assert "phase.tool.denied" not in body
+
+
+def test_tool_journal_emit_runtime_records_tool_call_ep_when_cursor_bound() -> None:
+    """运行时校验:cursor 已 bind 时,``emit_tool_started`` 触发 ``step.tool_call.record``。
+
+    注入 cursor → 调 emit_tool_started → spine 必新增 step.tool_call.record EP。
+    """
+    from lca.cognition.body import tool_journal_emit
+    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+        bind_current_cursor,
+        reset_current_cursor,
+    )
+
+    cursor, spine = _make_cursor()
+    # 提前 advance 到 ACT phase —— record_tool_call 需要 ACT window
+    cursor.advance("act")
+    pre_count = len(spine.records)
+
+    token = bind_current_cursor(cursor)
+    try:
+        tool = _StubTool(name="t1")
+        tool_journal_emit.emit_tool_started(
+            tool,
+            {"path": "stub/path"},
+            invocation_id="inv-1",
+        )
+    finally:
+        reset_current_cursor(token)
+
+    new_eps = [r["execution_point"] for r in spine.records[pre_count:]]
+    assert "step.tool_call.record" in new_eps, (
+        f"expected step.tool_call.record EP after emit_tool_started, got {new_eps}"
+    )
 
 
 # ── 3. safe_executor open/close act step ───────────────────────
 
 
-def test_safe_executor_open_act_step_emits_phase_act_fold_start() -> None:
-    """``_open_act_step`` 调 ``coord.emit('phase.act.fold.start', ...)``。
+def test_safe_executor_open_act_step_routes_through_cursor_record_tool_call() -> None:
+    """``_open_act_step`` 调 ``cursor.record_tool_call(ToolCallRecord(...))``。
 
-    PR-26 compat 期保留;类型注解 ``coord: StepCoordinator | None`` 强化。
+    PR-1/S1: ``phase.act.fold.start`` EP 不再经 ``coord.emit``,改走 cursor。
     """
     from lca.cognition.body import safe_executor
 
     source_open = inspect.getsource(safe_executor._open_act_step)
-    assert "phase.act.fold.start" in source_open
-    assert "coord.emit" in source_open
-    # 类型注解必须存在
-    assert re.search(r"coord:\s*StepCoordinator\s*\|\s*None", source_open), (
-        "type hint coord: StepCoordinator | None must be present"
+    body = _strip_docstrings_and_comments(source_open)
+    assert "cursor.record_tool_call" in body, (
+        "_open_act_step must route through cursor.record_tool_call (ADR-0169 PR-1/S1)"
     )
+    assert "ToolCallRecord(" in body
+    assert "coord.emit" not in body
+    assert "phase.act.fold.start" not in body
 
 
-def test_safe_executor_close_act_step_emits_phase_act_fold_end() -> None:
-    """``_close_act_step`` 调 ``coord.emit('phase.act.fold.end', ...)``。"""
+def test_safe_executor_close_act_step_routes_through_cursor_record_tool_result() -> None:
+    """``_close_act_step`` 调 ``cursor.record_tool_result(ToolResultRecord(...))``。"""
     from lca.cognition.body import safe_executor
 
     source_close = inspect.getsource(safe_executor._close_act_step)
-    assert "phase.act.fold.end" in source_close
-    assert "coord.emit" in source_close
-    assert re.search(r"coord:\s*StepCoordinator\s*\|\s*None", source_close)
+    body = _strip_docstrings_and_comments(source_close)
+    assert "cursor.record_tool_result" in body
+    assert "ToolResultRecord(" in body
+    assert "coord.emit" not in body
+    assert "phase.act.fold.end" not in body
 
 
-def test_safe_executor_helpers_silent_when_no_coordinator_bound() -> None:
-    """未注入 coord 时 ``_open_act_step`` / ``_close_act_step`` 静默 no-op(不抛)。"""
+def test_safe_executor_helpers_silent_when_no_cursor_bound() -> None:
+    """未注入 cursor 时 ``_open_act_step`` / ``_close_act_step`` 静默 no-op(不抛)。
+
+    PR-1/S1: 之前的兼容路径 ``coord.emit`` 已删除,helpers 现走 ``cursor.record_*``;
+    无 cursor 时直接返回,等价于原行为。
+    """
     # 默认 ContextVar 为 None → helpers 必须立即返回
     _open_act_step("test_tool")
     _close_act_step(outcome="ok")
+
+
+def test_safe_executor_runtime_records_tool_result_ep_when_cursor_bound() -> None:
+    """运行时校验:cursor 已 bind 时,``_close_act_step`` 触发 ``step.tool_result.record``。
+
+    ACT phase 上 cursor.record_tool_result 必落 step.tool_result.record EP。
+    """
+    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+        bind_current_cursor,
+        reset_current_cursor,
+    )
+
+    cursor, spine = _make_cursor()
+    cursor.advance("act")
+    pre_count = len(spine.records)
+
+    token = bind_current_cursor(cursor)
+    try:
+        _open_act_step("test_tool")
+        _close_act_step(outcome="ok")
+    finally:
+        reset_current_cursor(token)
+
+    new_eps = [r["execution_point"] for r in spine.records[pre_count:]]
+    assert "step.tool_call.record" in new_eps, (
+        f"expected step.tool_call.record from _open_act_step, got {new_eps}"
+    )
+    assert "step.tool_result.record" in new_eps, (
+        f"expected step.tool_result.record from _close_act_step, got {new_eps}"
+    )
 
 
 # ── 4. CoordinatorAdapter exposes current_cursor ContextVar ─────

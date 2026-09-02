@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 import structlog
 
@@ -26,6 +26,10 @@ from lca.contracts.models.core.result import ApprovalPendingError, ToolExecution
 from lca.contracts.models.observability.journal import ApprovalRequested
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.contracts.observability.evidence import EvidenceRef
+from lca.contracts.observability.loop_cursor_payloads import (
+    ToolCallRecord,
+    ToolResultRecord,
+)
 from lca.contracts.protocols import SafeExecutor, Tool
 from lca.infrastructure.observability import record
 from lca.infrastructure.tools.tool_invocation_scope import tool_invocation_scope
@@ -69,11 +73,6 @@ from lca.cognition.body.tool_journal_emit import (  # noqa: E402
     emit_tool_started,
 )
 from lca.plugins.observability.spine.reflectors import body_llm as _body_llm_reflector  # noqa: E402
-
-if TYPE_CHECKING:
-    from lca.infrastructure.observability.writable_matrix.coordinator import (
-        StepCoordinator,
-    )
 
 
 def _emit_approval_requested(tool: Tool, invocation_id: str) -> None:
@@ -382,39 +381,58 @@ class SimpleSafeExecutor(SafeExecutor):
 
 
 def _open_act_step(tool_name: str) -> None:
-    """Emit ``phase.act.fold.start`` via StepCoordinator (ADR-0167 D11, ADR-0169 PR-26 compat).
+    """Open ACT fold via LoopCursor.record_tool_call (ADR-0169 PR-1/S1).
 
-    PR-26 阶段保留 ``coord.emit`` —— cursor 不暴露任意 EP 入口(ADR-0169 D1);
-    ``phase.act.fold.start`` 是合法 EP(manifest 登记),删除条件绑 PR-21~24
-    ``grep coord.emit = 0`` 门禁。
+    Routes through ``cursor.record_tool_call(ToolCallRecord(...))`` instead
+    of ``coord.emit(phase.act.fold.start, ...)``. Cursor is the SSOT for
+    step/tool evidence (ADR-0169 D1); the legacy ``phase.*.fold.start/end``
+    EPs are dropped from these call sites. Unbound cursor → silent no-op
+    (no run context, no spine writes).
     """
-    from lca.infrastructure.observability.writable_matrix.coordinator import (
-        get_current_coordinator,
+    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+        get_current_cursor,
     )
 
-    coord: StepCoordinator | None = get_current_coordinator()
-    if coord is None:
+    cursor = get_current_cursor()
+    if cursor is None:
         return
-    coord.emit(
-        execution_point="phase.act.fold.start",
-        payload={"tool_name": tool_name, "objective": f"tool:{tool_name}"},
+    cursor.record_tool_call(
+        ToolCallRecord(
+            tool_name=tool_name,
+            args_digest=f"tool:{tool_name}",
+            args_payload_path=None,
+            call_seq=hash(tool_name) & 0x7FFFFFFF,
+        )
     )
 
 
 def _close_act_step(*, outcome: str, error: str | None = None) -> None:
-    """Emit ``phase.act.fold.end`` via StepCoordinator (ADR-0167 D11, ADR-0169 PR-26 compat).
+    """Close ACT fold via LoopCursor.record_tool_result (ADR-0169 PR-1/S1).
 
-    同 ``_open_act_step`` —— ``coord.emit`` 保留至 PR-21~24 业务迁 cursor 完成。
+    Routes through ``cursor.record_tool_result(ToolResultRecord(...))``;
+    ``outcome`` is mapped to cursor's ``Literal["ok","failure","timeout","denied"]``.
     """
-    from lca.infrastructure.observability.writable_matrix.coordinator import (
-        get_current_coordinator,
+    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+        get_current_cursor,
     )
 
-    coord: StepCoordinator | None = get_current_coordinator()
-    if coord is None:
+    cursor = get_current_cursor()
+    if cursor is None:
         return
-    coord.emit(
-        execution_point="phase.act.fold.end",
-        payload={"outcome": outcome, "error": error},
-        outcome=outcome if outcome != "ok" else None,
+    cursor_outcome: Literal["ok", "failure", "timeout", "denied"]
+    if outcome == "ok":
+        cursor_outcome = "ok"
+    elif outcome == "timeout":
+        cursor_outcome = "timeout"
+    elif outcome == "denied":
+        cursor_outcome = "denied"
+    else:
+        cursor_outcome = "failure"
+    cursor.record_tool_result(
+        ToolResultRecord(
+            tool_name="act.fold",
+            result_digest=error or outcome,
+            result_path=None,
+            outcome=cursor_outcome,
+        )
     )
