@@ -54,7 +54,6 @@ log:emit
 - `lca/infrastructure/cli/gateway.py`
 - `lca/infrastructure/cli/infra.py`
 - `lca/infrastructure/cli/journal.py`
-- `lca/infrastructure/cli/journal_log.py`
 - `lca/infrastructure/cli/lobehub.py`
 - `lca/infrastructure/cli/onlyboxes.py`
 - `lca/infrastructure/cli/package_organization.py`

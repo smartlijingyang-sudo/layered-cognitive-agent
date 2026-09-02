@@ -56,6 +56,74 @@ def _write_minimal_jsonl(path: Path) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+def _write_spine_v3_failure_jsonl(path: Path) -> None:
+    """A spine v3 (events.jsonl) failure carrying the structured traceback.
+
+    Mirrors the failure produced by ``wrap_instrument._sync_wrapper`` after
+    ADR-2026-09-02-i17-stream-align §B: the failure payload carries
+    ``exc_type`` / ``exception_message`` / ``traceback_text`` / ``cause_chain``.
+    """
+    rows = [
+        {
+            "execution_point": "kernel.run.start",
+            "channel": "control",
+            "sequence": 1,
+            "when": "2026-09-02T07:48:01.214108+00:00",
+            "run_id": "run_a",
+            "trace_id": "trace_a",
+            "payload": {"run_id": "run_a", "trace_id": "trace_a"},
+            "scope": {"trace_id": "trace_a", "run_id": "run_a"},
+        },
+        {
+            "execution_point": "phase_graph.node.end",
+            "channel": "error",
+            "sequence": 9,
+            "when": "2026-09-02T07:48:01.418338+00:00",
+            "run_id": "run_a",
+            "trace_id": "trace_a",
+            "outcome": "failure",
+            "payload": {
+                "exc_type": "AttributeError",
+                "exception_class": "AttributeError",
+                "exception_message": "'NoneType' object has no attribute 'x'",
+                "reason": "'NoneType' object has no attribute 'x'",
+                "traceback_text": (
+                    "Traceback (most recent call last):\n"
+                    "  File \"perceive/main.py\", line 12, in perceive\n"
+                    "    return node.x\n"
+                    "AttributeError: 'NoneType' object has no attribute 'x'\n"
+                ),
+                "cause_chain": [],
+            },
+            "scope": {"trace_id": "trace_a", "run_id": "run_a"},
+        },
+    ]
+    with path.open("w", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def test_failure_explainer_surfaces_spine_v3_traceback(tmp_path: Path) -> None:
+    """spine v3 envelope failure must be lifted into the failure report.
+
+    ADR-2026-09-02-i17-stream-align §C. Before this patch the
+    ``FailureExplainer`` returned ``event_count: 0`` because
+    ``_event_from_payload`` only recognised the legacy ``lca.journal/2``
+    envelope; the structured traceback was invisible.
+    """
+    jsonl = tmp_path / "events.jsonl"
+    _write_spine_v3_failure_jsonl(jsonl)
+    report = FailureExplainer(jsonl).explain_failure(run_id="run_a")
+    assert report["event_count"] == 2
+    failure_events = [
+        event for event in report["events"] if event.get("failure")
+    ]
+    assert failure_events, "expected the error event to carry the lifted failure block"
+    failure = failure_events[0]["failure"]
+    assert failure["exc_type"] == "AttributeError"
+    assert "AttributeError" in failure["traceback_text"]
+
+
 def test_seven_tools_exist(tmp_path: Path) -> None:
     _write_minimal_jsonl(tmp_path / "j.jsonl")
     jsonl_path = tmp_path / "j.jsonl"

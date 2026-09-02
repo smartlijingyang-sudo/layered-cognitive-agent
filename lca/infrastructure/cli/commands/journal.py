@@ -1,25 +1,32 @@
-"""Journal log following: the ``logs`` command + SSE streaming + JSONL replay."""
+"""Journal log following: tail the spine SSOT for the most recent run.
+
+ADR-2026-09-02-i17-stream-align §A — the legacy v2 stream envelope
+(``record_to_stamped`` / ``FactStreamProjector``) is retired (ADR-0164 Phase 7).
+The CLI now reads the spine SSOT directly: ``traces/runs/<run_id>/events.jsonl``.
+Live mode tails the most recent run's file; ``--replay`` re-reads a specific
+run from disk.
+"""
 
 from __future__ import annotations
 
 import json
+import time as _time
+from collections.abc import Iterator
 from pathlib import Path
 
-import httpx
 import typer
 
 from lca.infrastructure.cli.config import OpsConfig
 
-# Error codes returned by the kernel serve HTTP layer when it explicitly
+# Refusal codes returned by the kernel_serve HTTP layer when it explicitly
 # refuses a journal subscription. We surface these verbatim so operators
 # don't chase ghosts.
 _KERNEL_SERVE_REFUSAL_CODES = {
-    # Session Spine intentionally removed process-wide journal streaming;
-    # kernel_serve asks clients to follow per-run live streams or replay from disk.
     "legacy_process_journal_unavailable": (
         "Session Spine 已不再暴露全局 /journal/live；请改用下列任一路径查看 journal 事实：",
         [
-            "./scripts/lca-ops logs --replay    # 回放 traces/runs/*/events.jsonl",
+            "./scripts/lca-ops journal logs           # tail 最新 run 的 events.jsonl",
+            "./scripts/lca-ops journal logs --replay <run_id>  # 离线回放",
             "tail -f traces/runs/$(ls -t traces/runs | head -1)/events.jsonl",
         ],
     ),
@@ -50,26 +57,23 @@ def register(app: typer.Typer, group: typer.Typer | None = None) -> None:
     def logs(
         target: str = typer.Argument(
             "",
-            help="空=journal 事实流；lobehub | daemon = 进程日志",
+            help="空=tail 最新 run 的 spine SSOT；lobehub | daemon = 进程日志",
         ),
-        verbose: bool = typer.Option(
-            False, "--verbose", "-v", help="显示完整字段（prompt/response/args/result）"
-        ),
-        deltas: bool = typer.Option(
-            False, "--deltas", "-d", help="显示增量事件（text/reasoning/sandbox delta）"
-        ),
-        replay: bool = typer.Option(
-            False,
+        replay: str = typer.Option(
+            "",
             "--replay",
             "-r",
-            help="从 traces/lca_journal.jsonl / events.jsonl 回放（不连 SSE）",
+            help="离线回放指定 run_id(读 traces/runs/<id>/events.jsonl)",
+        ),
+        verbose: bool = typer.Option(
+            False, "--verbose", "-v", help="显示完整 payload（默认仅控制点 + channel + outcome）"
         ),
         config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
     ) -> None:
-        """事实流。默认是 journal（思考/工具/步/洞察），不是 kernel_serve.log。"""
+        """事实流。默认 follow 最新 run 的 spine SSOT(events.jsonl),不是 kernel_serve.log。"""
         ops_config = OpsConfig.load(config)
         if target in {"", "journal", "kernel_serve"}:
-            _follow_journal(ops_config, verbose=verbose, show_deltas=deltas, replay=replay)
+            _follow_spine_ssot(replay=replay, verbose=verbose)
             return
         import subprocess
 
@@ -87,206 +91,163 @@ def register(app: typer.Typer, group: typer.Typer | None = None) -> None:
         subprocess.run(["/usr/bin/tail", "-f", str(log_file)])  # noqa: S603
 
 
-def _follow_journal(
-    ops_config: OpsConfig,
-    *,
-    verbose: bool = False,
-    show_deltas: bool = False,
-    replay: bool = False,
-) -> None:
-    """Resilient journal SSE consumer with rich fact-stream rendering.
-
-    Three-layer architecture (model-visible = logged):
-    - Transport: SSE connection with auto-reconnect + Last-Event-ID
-    - Domain: SSE record → StampedEvent adapter
-    - Render: FactStreamProjector (every event as a structured fact)
-
-    ``--replay`` reads from the durable jsonl file instead of live SSE.
-    Death detection only triggers on actual connection stalls (no SSE
-    frames at all for 60s), not on absence of specific event types.
-    Heartbeats keep the connection alive silently.
-    """
-    if replay:
-        _replay_from_jsonl(verbose=verbose, show_deltas=show_deltas)
-        return
-    _stream_live(ops_config, verbose=verbose, show_deltas=show_deltas)
+# ────────────────────────── spine SSOT projection ──────────────────────────
 
 
-def _replay_from_jsonl(*, verbose: bool, show_deltas: bool) -> None:
-    """Read the durable jsonl journal file and project every event."""
-    from lca.infrastructure.observability.journal.engine.journal_io import (
-        JOURNAL_SCHEMA_VERSION,
-        load_journal_records,
-        record_to_stamped,
-    )
-    from lca.infrastructure.observability.journal.stream.fact_stream import (
-        FactStreamProjector,
-    )
+def _find_latest_run_dir() -> Path | None:
+    """Pick the most recently mutated run directory under ``traces/runs/``."""
+    runs_root = Path("traces/runs")
+    if not runs_root.exists():
+        return None
+    candidates = [p for p in runs_root.iterdir() if p.is_dir()]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda p: p.stat().st_mtime)
 
-    jsonl_path = Path("traces/lca_journal.jsonl")  # legacy stream; prefer events.jsonl
-    if not jsonl_path.exists():
-        print(f"No journal file at {jsonl_path}")
-        raise typer.Exit(1)
 
-    projector = FactStreamProjector(verbose=verbose, show_deltas=show_deltas)
-    total = 0
-    rendered = 0
-    skipped = 0
-    for record in load_journal_records(jsonl_path, strict=False):
-        total += 1
-        try:
-            if record.get("schema") != JOURNAL_SCHEMA_VERSION:
-                skipped += 1
+def _events_jsonl_for(run_dir: Path) -> Path | None:
+    """Return the events.jsonl under a run directory if present."""
+    candidate = run_dir / "events.jsonl"
+    return candidate if candidate.exists() else None
+
+
+def _iter_jsonl(path: Path) -> Iterator[dict[str, object]]:
+    """Yield non-empty JSON lines from a jsonl file (tolerant to mid-write)."""
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            stripped = line.strip()
+            if not stripped:
                 continue
-            stamped = record_to_stamped(record)
-            if stamped is not None:
-                projector.on_event(stamped)
-                rendered += 1
-        except Exception:
-            skipped += 1
-
-    projector.close()
-    print(f"\n── replay done: {rendered}/{total} events rendered, {skipped} skipped ──")
+            try:
+                obj = json.loads(stripped)
+            except json.JSONDecodeError:
+                # Mid-write partial line — skip and retry on next pass.
+                continue
+            if isinstance(obj, dict):
+                yield obj
 
 
-def _read_response_body(resp: httpx.Response) -> str:
-    """Best-effort decode of an httpx streaming response body for diagnostics.
+def _render_event(event: dict[str, object], *, verbose: bool) -> str:
+    """One-line human rendering of a spine event."""
+    when = str(event.get("when") or event.get("when_corrected") or "")
+    seq = event.get("sequence", 0)
+    ep = str(event.get("execution_point", "?"))
+    channel = str(event.get("channel", "?"))
+    outcome = event.get("outcome")
+    line = f"{when[:23]}  seq={seq:<3} ch={channel:<8} ep={ep}"
+    if outcome:
+        line += f"  outcome={outcome}"
+    if not verbose:
+        return line
 
-    Used only on the non-200 refusal path; swallows any decode/IO error.
-    """
-    try:
-        return resp.read().decode("utf-8", errors="replace")
-    except Exception:
-        return ""
-
-
-def _print_journal_refusal(status_code: int, body: str) -> None:
-    """Render a precise, actionable refusal message for non-200 journal responses.
-
-    Prefers the ``error.code`` taxonomy from the kernel_serve JSON body so the
-    operator sees a directive matched to the actual refusal reason rather
-    than a generic "rejected" line.
-    """
-    code, message = _extract_refusal(body)
-    print(f"kernel_serve 拒绝 journal 订阅（HTTP {status_code}）")
-    directive = _KERNEL_SERVE_REFUSAL_CODES.get(code or "")
-    if directive is not None:
-        head, hints = directive
-        print(f"  ↳ {head}")
-        for hint in hints:
-            print(f"    {hint}")
-        return
-    if message:
-        print(f"  ↳ {message}")
+    payload = event.get("payload")
+    if isinstance(payload, dict) and payload:
+        line += "\n    payload: " + json.dumps(payload, ensure_ascii=False, default=str)
+    if channel == "error":
+        tb = _extract_traceback(event)
+        if tb:
+            line += "\n    traceback:\n" + _indent(tb, "    ")
+    return line
 
 
-def _extract_refusal(body: str) -> tuple[str | None, str | None]:
-    """Return ``(error.code, error.message)`` from a kernel_serve JSON error body."""
-    if not body:
-        return None, None
-    try:
-        payload = json.loads(body)
-    except json.JSONDecodeError:
-        return None, None
+def _extract_traceback(event: dict[str, object]) -> str:
+    """Pull the most informative failure detail from an error-channel event."""
+    payload = event.get("payload")
     if not isinstance(payload, dict):
-        return None, None
-    err = payload.get("error")
-    if not isinstance(err, dict):
-        return None, None
-    code = err.get("code")
-    message = err.get("message")
-    return (
-        code if isinstance(code, str) else None,
-        message if isinstance(message, str) else None,
-    )
+        return ""
+    tb = payload.get("traceback_text")
+    if isinstance(tb, str) and tb.strip():
+        return tb.rstrip()
+    # Fall back to producer-side exception text when the wrap-layer didn't pass one.
+    exc_type = payload.get("exception_class") or payload.get("exc_type")
+    message = payload.get("exception_message") or payload.get("reason")
+    if exc_type or message:
+        return f"{exc_type or 'Exception'}: {message or ''}"
+    return ""
 
 
-def _stream_live(
-    ops_config: OpsConfig,
-    *,
-    verbose: bool,
-    show_deltas: bool,
-) -> None:
-    """Live SSE consumer with fact-stream rendering.
+def _indent(text: str, prefix: str) -> str:
+    return "\n".join(prefix + line for line in text.splitlines())
 
-    Death detection: only triggers when no SSE frames arrive for 60s
-    (connection stall). Heartbeats and all event types reset the timer.
-    """
-    import time as _time
 
-    from lca.infrastructure.cli.journal_log import (
-        extract_seq_from_record,
-        parse_sse_block,
-        sse_record_to_stamped,
-    )
-    from lca.infrastructure.observability.journal.stream.fact_stream import (
-        FactStreamProjector,
-    )
-
-    url = f"{ops_config.kernel_serve.base_url}/journal/live"
-    projector = FactStreamProjector(verbose=verbose, show_deltas=show_deltas)
-    last_seq = 0
-    last_frame_ts = _time.monotonic()
-    backoff = 1.0
-    stall_timeout = 60.0
-    max_backoff = 30.0
-
+def _tail_events_jsonl(path: Path, *, verbose: bool) -> None:
+    """Follow a jsonl file and render new lines as they are appended."""
+    print(f"[journal] tail {path}")
+    last_size = path.stat().st_size
     while True:
         try:
-            headers = {"Accept": "text/event-stream"}
-            if last_seq > 0:
-                headers["Last-Event-ID"] = str(last_seq)
-            with (
-                httpx.Client(timeout=httpx.Timeout(None, connect=5.0, read=120.0)) as client,
-                client.stream("GET", url, headers=headers) as resp,
-            ):
-                if resp.status_code == 404:
-                    print(
-                        "kernel_serve 还没有 /journal/live —— lca-ops 不再管理 LCA 进程 (ADR-0119 决定 4)。"
-                        " 请确认 `uv run python -m lca_kernel serve --profile profiles/web-standard.yaml` 在跑。"
-                    )
-                    projector.close()
-                    raise SystemExit(1)
-                if resp.status_code != 200:
-                    body = _read_response_body(resp)
-                    _print_journal_refusal(resp.status_code, body)
-                    projector.close()
-                    # SystemExit (not typer.Exit) so the outer ``except Exception``
-                    # below doesn't swallow the raise and re-enter the retry loop.
-                    raise SystemExit(1)
+            current_size = path.stat().st_size
+            if current_size < last_size:
+                # Truncation / rotation — restart from beginning.
+                last_size = 0
+            if current_size > last_size:
+                with path.open("r", encoding="utf-8") as handle:
+                    handle.seek(last_size)
+                    new_text = handle.read(current_size - last_size)
+                for line in new_text.splitlines():
+                    stripped = line.strip()
+                    if not stripped:
+                        continue
+                    try:
+                        obj = json.loads(stripped)
+                    except json.JSONDecodeError:
+                        continue
+                    if isinstance(obj, dict):
+                        print(_render_event(obj, verbose=verbose))
+                last_size = current_size
+        except FileNotFoundError:
+            # Run rotated out — try to recover.
+            new_dir = _find_latest_run_dir()
+            new_path = new_dir / "events.jsonl" if new_dir else None
+            if new_path is None or not new_path.exists():
+                _time.sleep(1.0)
+                continue
+            print(f"[journal] switch tail → {new_path}")
+            path = new_path
+            last_size = 0
+        _time.sleep(0.2)
 
-                backoff = 1.0
-                buf = ""
-                for chunk in resp.iter_text():
-                    buf += chunk
-                    last_frame_ts = _time.monotonic()
-                    while "\n\n" in buf:
-                        block, buf = buf.split("\n\n", 1)
-                        record = parse_sse_block(block)
-                        if record is None:
-                            continue
-                        seq = extract_seq_from_record(record)
-                        if seq > last_seq:
-                            last_seq = seq
-                        stamped = sse_record_to_stamped(record)
-                        if stamped is not None:
-                            projector.on_event(stamped)
 
-                    if _time.monotonic() - last_frame_ts > stall_timeout:
-                        print(f"\n⚠ journal 连接 60 秒无数据帧，主动重连（seq={last_seq}）...")
-                        break
+def _replay_events_jsonl(path: Path, *, verbose: bool) -> None:
+    """One-shot read of a jsonl file and render each line."""
+    if not path.exists():
+        print(f"No journal file at {path}")
+        raise typer.Exit(1)
+    total = 0
+    rendered = 0
+    for event in _iter_jsonl(path):
+        total += 1
+        print(_render_event(event, verbose=verbose))
+        rendered += 1
+    print(f"\n── replay done: {rendered}/{total} events ──")
 
-        except httpx.ConnectError:
-            print(f"\n⚠ kernel_serve 连接失败，{backoff:.0f}s 后重试...")
-        except httpx.RemoteProtocolError:
-            print(f"\n⚠ SSE 协议错误，{backoff:.0f}s 后重试...")
-        except (httpx.ReadError, httpx.ReadTimeout, httpx.StreamError) as exc:
-            print(f"\n⚠ 流中断（{type(exc).__name__}），{backoff:.0f}s 后从 seq={last_seq} 续播...")
-        except KeyboardInterrupt:
-            projector.close()
-            raise typer.Exit(0) from None
-        except Exception as exc:
-            print(f"\n⚠ 未知错误（{type(exc).__name__}: {exc}），{backoff:.0f}s 后重试...")
 
-        _time.sleep(backoff)
-        backoff = min(backoff * 2, max_backoff)
+def _follow_spine_ssot(*, replay: str, verbose: bool) -> None:
+    """Top-level entry for ``journal logs``.
+
+    With ``--replay <run_id>`` (or first positional) → one-shot replay of
+    that run's events.jsonl. Otherwise tail the latest run.
+    """
+    if replay:
+        run_dir = Path("traces/runs") / replay
+        path = _events_jsonl_for(run_dir)
+        if path is None:
+            print(f"No events.jsonl under {run_dir}")
+            raise typer.Exit(1)
+        _replay_events_jsonl(path, verbose=verbose)
+        return
+
+    latest = _find_latest_run_dir()
+    if latest is None:
+        print("No runs under traces/runs/. Start a run first.")
+        raise typer.Exit(1)
+    path = _events_jsonl_for(latest)
+    if path is None:
+        print(f"No events.jsonl under {latest}")
+        raise typer.Exit(1)
+    try:
+        _replay_events_jsonl(path, verbose=verbose)
+        # After replay we drop into tail mode so the operator can keep watching.
+        _tail_events_jsonl(path, verbose=verbose)
+    except KeyboardInterrupt:
+        raise typer.Exit(0) from None
