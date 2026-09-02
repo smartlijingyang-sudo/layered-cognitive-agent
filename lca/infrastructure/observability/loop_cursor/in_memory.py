@@ -20,7 +20,7 @@ from lca.infrastructure.observability.loop_cursor.state import _CursorState
 
 
 class InMemoryLoopCursor:
-    """纯内存 cursor;用于测试替身(ADR-0169 L13:NullLoopCursor 不存在)。"""
+    """纯内存 cursor;用于测试替身(ADR-0169 L13:null_loop_cursor 不存在)。"""
 
     def __init__(
         self,
