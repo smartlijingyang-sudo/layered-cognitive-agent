@@ -368,6 +368,7 @@ def diagnose_step_tree(
         run_id=run_id,
         trace_id=trace_id,
         status=status,
+        outcome=scan.outcome or "unknown",
         broken_hop=broken,
         summary=_summary(broken, hops, scan),
         mode=mode,

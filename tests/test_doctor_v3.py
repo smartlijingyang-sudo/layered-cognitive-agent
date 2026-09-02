@@ -331,3 +331,91 @@ def test_diagnose_rejects_unknown_suffix(tmp_path: Path) -> None:
     path.write_text("", encoding="utf-8")
     with pytest.raises(ValueError, match=r"got suffix '\.weird'"):
         diagnose(None, path, mode="backend")
+
+
+def test_doctor_report_outcome_exposed_as_top_level_field(tmp_path: Path) -> None:
+    """Regression: DoctorReport.outcome 不再是 null。
+
+    早先 as_dict() 没暴露 outcome,manifest.doctor_report.outcome 读不到;
+    现在 wire 字段一致。
+    """
+    from lca.plugins.transport.webserver.handlers.runs.doctor.models import (
+        DoctorReport,
+        HopVerdict,
+    )
+
+    report = DoctorReport(
+        schema="doctor.v3",
+        run_id="r_x",
+        trace_id="t_x",
+        status="completed",
+        outcome="completed",
+        broken_hop=None,
+        summary="ok",
+        mode="backend",
+        hops={"H1": HopVerdict(ok=True, detail="ok")},
+        journal_path="journal.json",
+        consistency={},
+        factory={"ok": True, "tools_missing_plugin_state": []},
+    )
+    wire = report.as_dict()
+    assert wire["outcome"] == "completed", f"outcome 应作为顶级字段暴露,但 wire 字典 = {wire!r}"
+    assert wire["status"] == "completed"
+
+
+def test_diagnose_step_tree_outcome_in_report(tmp_path: Path) -> None:
+    """Regression: diagnose_step_tree 写入 outcome 字段,不再让 manifest 读到 null。
+
+    写一个完整 journal.json 让 doctor 跑出来,然后验证 report.outcome 等于
+    journal.metadata.outcome。
+    """
+    # 写一份 journal.json(metadata.outcome=completed,有 step)
+    import json
+
+    from lca.plugins.transport.webserver.handlers.runs.doctor.step_check import (
+        diagnose_step_tree,
+    )
+
+    journal = {
+        "schema": "lca.journal/3.1",
+        "run_id": "r_y",
+        "trace_id": "t_y",
+        "started_at": 1000.0,
+        "closed_at": 1010.0,
+        "metadata": {
+            "agent_role": "a",
+            "strategy_key": "solo",
+            "plan_ref": "",
+            "objective": "test",
+            "attachments": [],
+            "outcome": "completed",
+            "started_at": 1000.0,
+            "closed_at": 1010.0,
+            "total_steps": 1,
+        },
+        "steps": [
+            {
+                "step_id": "step_001",
+                "step_index": 1,
+                "phase": "think",
+                "entered_at": 1000.0,
+                "exited_at": 1010.0,
+                "duration_ms": 10000,
+                "context_before": {"objective": "test"},
+                "thinking": None,
+                "tool_call": None,
+                "tool_result": None,
+                "reflect": None,
+                "segments": [],
+                "outcome": "success",
+            }
+        ],
+        "totals": {"steps": 1, "segments": 0, "phases": 0},
+        "phases": [],
+    }
+    journal_path = tmp_path / "journal.json"
+    journal_path.write_text(json.dumps(journal), encoding="utf-8")
+
+    report = diagnose_step_tree(journal_path, mode="backend")
+    assert report.outcome == "completed"
+    assert report.as_dict()["outcome"] == "completed"

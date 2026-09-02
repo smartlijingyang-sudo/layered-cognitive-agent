@@ -61,6 +61,7 @@ def diagnose_session_projection(
         run_id=run_id,
         trace_id=run_id,
         status=status,
+        outcome=status or "unknown",
         broken_hop=broken,
         summary=summary,
         mode="backend",

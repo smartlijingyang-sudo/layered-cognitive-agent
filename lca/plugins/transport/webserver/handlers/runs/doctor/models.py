@@ -50,6 +50,11 @@ class DoctorReport:
     run_id: str
     trace_id: str
     status: str
+    # outcome is the run-level terminal outcome (completed/failed/stopped/paused/
+    # in_progress), mirrored from ``JournalMetadata.outcome``. 以前仅埋在
+    # H6.extra.outcome 里,debug-run / manifest 消费方读到 null 是 bug;
+    # 现在作为顶级字段对外暴露, wire consumers 不用再 hop 到 H6。
+    outcome: str
     broken_hop: str | None
     summary: str
     mode: DoctorMode
@@ -65,6 +70,7 @@ class DoctorReport:
             "run_id": self.run_id,
             "trace_id": self.trace_id,
             "status": self.status,
+            "outcome": self.outcome,
             "broken_hop": self.broken_hop,
             "summary": self.summary,
             "mode": self.mode,
