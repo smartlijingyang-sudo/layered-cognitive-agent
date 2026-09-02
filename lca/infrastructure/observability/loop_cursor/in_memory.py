@@ -109,6 +109,12 @@ class InMemoryLoopCursor:
             raise CursorError("record_request_header must open THINK window")
 
     def fork(self, reason: Literal["child_agent", "delegation"]) -> LoopCursor:
+        """派生 child cursor —— Incarnation.child() 继承 run_id + plan_ref,seq += 1。
+
+        ADR-0171 I-FORK-1 / D1:child 不持独立 host / persistence / capture;
+        状态机自行重置(seq / step_index / iteration / attempt_in_step)。
+        """
+        self._ensure_open()
         # ADR-0171:child 继承 parent Incarnation + seq += 1
         child_incarnation = self._state.incarnation.child()
         return InMemoryLoopCursor(

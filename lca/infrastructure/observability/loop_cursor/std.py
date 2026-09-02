@@ -216,13 +216,38 @@ class StdLoopCursor:
         )
 
     def fork(self, reason: Literal["child_agent", "delegation"]) -> LoopCursor:
-        # ADR-0171:child 共享 parent host,Incarnation 继承 + incarnation_seq += 1
-        child_incarnation = self._state.incarnation.child()
+        """派生 child cursor —— 共享 parent spine handle,递增 incarnation_seq。
+
+        ADR-0171 I-FORK-1 / D1 / D6:
+            - child 持有 parent 的 spine(共享 SSOT,L10)
+            - child 不持独立 host / persistence / capture 实例
+            - Incarnation 继承 parent.run_id + parent.plan_ref
+            - incarnation_seq = parent.incarnation_seq + 1
+            - child 的 iteration / step_index / attempt_in_step / seq 重新计数
+            - 落 ``loop.fork`` EP,payload 携带 reason + child incarnation(ADR-0169 L14)
+        """
+        self._ensure_open()
+        s = self._state
+        # fork EP 携带 child incarnation(ADR-0171 D6,ADR-0169 L14)
+        s.seq += 1
+        self._spine.append(
+            execution_point="loop.fork",
+            payload={
+                "reason": reason,
+                "parent_incarnation": s.incarnation.incarnation_seq,
+                "child_incarnation": s.incarnation.incarnation_seq + 1,
+                "plan_ref": s.incarnation.plan_ref,
+            },
+            run_id=s.run_id,
+            seq=s.seq,
+            incarnation=s.incarnation.incarnation_seq,
+            phase=s.phase,
+        )
         return StdLoopCursor(
             spine=self._spine,
-            run_id=self._state.run_id,
-            trace_id=self._state.trace_id,
-            incarnation=child_incarnation,
+            run_id=s.run_id,
+            trace_id=s.trace_id,
+            incarnation=s.incarnation.child(),
         )
 
 

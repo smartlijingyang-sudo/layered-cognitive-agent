@@ -78,6 +78,9 @@ class LoopCursor(Protocol):
         - record_tool_result(...)   : 落 step.tool_result.record EP
         - record_request_header(...): 落 llm.request.header EP + 5 件套
         - fork(reason) -> LoopCursor  : subagent / delegation
+            (per ADR-0171:child cursor 共享 parent 的 spine handle,
+             Incarnation 继承 run_id + plan_ref,incarnation_seq += 1;
+             child 不持独立 host / persistence / capture 实例。)
 
     不暴露:
         begin_step / end_step / open_segment / close_segment
