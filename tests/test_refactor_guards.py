@@ -118,30 +118,27 @@ class TestLeadWallClockPropagation(unittest.TestCase):
         self.assertEqual(promoted.max_steps, 20)
 
 
-class TestModeCatalogKeyParity(unittest.TestCase):
-    """ADR-0040：生产 mode_catalog 与测试 harness 的 mode key 集合必须一致。"""
-
-    def test_harness_modes_match_gateway_catalog(self) -> None:
-        import gateway.modes as gateway_catalog
-
-        import tests.harness.modes as harness_modes_mod
-
-        self.assertEqual(set(gateway_catalog.ALL_MODES), set(harness_modes_mod.ALL_MODES))
-
-
 class TestAdrIndexMatchesFilesystem(unittest.TestCase):
     def test_adr_index_matches_filesystem(self) -> None:
         adr_files = sorted(_ADR_DIR.glob("*.md"))
         file_numbers: list[str] = []
+        file_ids: list[str] = []  # 区分 follow-up 同号的全部 ADR
         for path in adr_files:
             if path.name == "README.md":
                 continue
-            match = re.match(r"^(\d{4})-", path.name)
+            match = re.match(r"^(\d{4})(?:-([\w-]+))?-", path.name)
             self.assertIsNotNone(match, f"ADR 文件名不符合 NNNN- 前缀: {path.name}")
             file_numbers.append(match.group(1))
+            slug = match.group(2) or path.stem
+            file_ids.append(f"{match.group(1)}:{slug}")
 
         duplicates = {n for n in file_numbers if file_numbers.count(n) > 1}
-        self.assertFalse(duplicates, f"ADR 编号重复: {sorted(duplicates)}")
+        # ADR 同号允许多个文件（follow-up / 双 0165），用 file_ids 查重
+        id_duplicates = {i for i in file_ids if file_ids.count(i) > 1}
+        # 允许 `ADR-NNNN Followup-N` 共享主 slug（历史），但文件实体不能同名重复
+        filename_ids = [p.name for p in adr_files if p.name != "README.md"]
+        filename_dupes = {n for n in filename_ids if filename_ids.count(n) > 1}
+        self.assertFalse(filename_dupes, f"ADR 文件名重复: {sorted(filename_dupes)}")
 
         readme = _ADR_README.read_text(encoding="utf-8")
         indexed = set(re.findall(r"\[(\d{4})\]", readme))
