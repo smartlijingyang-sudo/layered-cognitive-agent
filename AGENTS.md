@@ -115,6 +115,41 @@ Fact → State → Decision / Plan → Verdict → Effect → Observation / Jour
 
 `./scripts/lca-ops` 不带参数打印分层手册。**详细命令清单、debug SOP、工具对照表都在 [`docs/debug/run-debug-guide.md`](../debug/run-debug-guide.md)**（与 CLI 实测对齐，CLI 改动时改 docs/debug，不要改本节）。本节只留 coding agent 最常用的指针 + 验证矩阵。
 
+### "最新一次 run 全面分析"流程（最常用触发）
+
+用户表达"**最新一次 run** / **刚才那个 run** / **最近一次** / **上一个 run** / **看看刚才发生了什么** / **分析一下这次**" → **直接按这个流程走，不要先去翻代码、问 run_id、或 ls traces/runs**。
+
+```sh
+# 1. 取最新 run_id（pointer 文件，不是 ls -t）
+LATEST=$(jq -r .run_id traces/latest.json)
+
+# 2. 一键 8 段诊断（首选；所有症状入口）
+lca-ops debug-run "$LATEST"
+
+# 3. 看完整 spine 事件流（理解过程；模型所见即日志）
+lca-ops journal logs -r "$LATEST" -v
+
+# 4. 失败原因投影（仅 run 失败时有意义）
+lca-ops explain "$LATEST"
+
+# 5. step 树 / 因果链 / narrative
+lca-ops journal steps "$LATEST"
+lca-ops journal narrative "$LATEST"
+```
+
+**口语映射**（agent 看到这些词就直接走流程，不要先分析语义）：
+
+| 用户说 | 走的流程 |
+|---|---|
+| "最新一次 run" / "刚才那个" / "上次" / "最近" | 上面 5 步全套 |
+| "分析一下这次" / "看看发生了什么" | 上面 1-3 步 |
+| "为啥这次失败" / "这次出错了" | 上面 1-2 + 4 |
+| "理解一下过程" / "走了一遍啥逻辑" | 上面 1 + 3 + 5 |
+| "DSH 风格轨迹" / "给我个 HTML" | 加 `lca-ops journal trajectory "$LATEST"` |
+| "模型都做了啥" / "调了啥工具" | `journal logs -r "$LATEST" --focus tools` |
+
+**取 run_id 的硬规则**：永远 `jq -r .run_id traces/latest.json`，**不要** ls、find、按 mtime 排序——pointer 文件是 SSOT。
+
 ### 最常用命令指针
 
 | 场景 | 第一调用 | 失败退路 |
