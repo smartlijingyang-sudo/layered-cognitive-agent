@@ -384,7 +384,7 @@ def _open_act_step(tool_name: str) -> None:
     """Open ACT fold via LoopCursor.record_tool_call (ADR-0169 PR-1/S1).
 
     Routes through ``cursor.record_tool_call(ToolCallRecord(...))`` instead
-    of ``coord.emit(phase.act.fold.start, ...)``. Cursor is the SSOT for
+    of the legacy facade ``phase.*.fold.start`` EP. Cursor is the SSOT for
     step/tool evidence (ADR-0169 D1); the legacy ``phase.*.fold.start/end``
     EPs are dropped from these call sites. Unbound cursor → silent no-op
     (no run context, no spine writes).

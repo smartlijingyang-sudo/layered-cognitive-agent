@@ -28,8 +28,7 @@ class Config(BaseModel):
 def build_simple_hook_registry(ctx: PluginContext) -> HookRegistry:
     """构建 CordisHookRegistry(ADR-0169 PR-26 清理后的版本)。
 
-    PR-26 之前:hook 注册 ``make_journal_emitting_hook`` 派生
-    ``_derive_step_completed`` / ``_derive_action_degraded`` 写入 journal。
+    PR-26 之前:hook 注册派生函数(ADR-0169 §D9 删除清单)写入 journal。
 
     PR-26 之后:两类派生函数已删除(ADR-0169 §D9),hook 不再做任何派生;业务
     路径走 ``cursor.advance(phase)`` + ``cursor.record_*(...)`` 直接写 spine。

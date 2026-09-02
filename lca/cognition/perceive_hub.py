@@ -74,7 +74,7 @@ class SequentialPerceiveHub(PerceiveHub):
 
     async def perceive(self, state: AgentState) -> ContextManifest:
         # ADR-0169 PR-26:业务路径只允许 ``cursor.advance(phase)`` 派生 phase EP;
-        # ``coord.emit_phase`` 已在 ADR-0169 §D9 删除清单中。Cursor 由 wiring 层
+        # 旧 facade phase-emit API 已在 ADR-0169 §D9 删除清单中。Cursor 由 wiring 层
         # 通过 ``CoordinatorAdapter.cursor`` 注入;未注入时静默跳过(无 run 上下文)。
         cursor: LoopCursor | None = _current_cursor()
 

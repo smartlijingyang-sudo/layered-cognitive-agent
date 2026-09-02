@@ -64,10 +64,10 @@ class SimpleBody(Body):
         """Execute a decision through its already-authorized action handler.
 
         Degradation emission (v3 §4.4 + §10) is no longer derived via the
-        legacy ``_derive_action_degraded`` hook (ADR-0169 §D9 deletion:
-        ``make_journal_emitting_hook`` + ``_derive_action_degraded`` are
-        removed; event emission re-routed through ``cursor.record_*(...)``
-        or ProjectionHost). Body still propagates the marker via
+        legacy degradation-emission hook (ADR-0169 §D9 deletion:
+        both derivation helpers are removed; event emission re-routed
+        through ``cursor.record_*(...)`` or ProjectionHost). Body still
+        propagates the marker via
         :meth:`_propagate_degradation` so downstream subscribers can
         observe ``observation.degraded_from``.
         """

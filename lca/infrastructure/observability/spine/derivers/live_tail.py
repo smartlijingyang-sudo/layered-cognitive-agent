@@ -10,6 +10,12 @@ SSE subscribers see the same ring-buffer semantics as before.
 The deriver does NOT remove or redirect any existing call site: both
 legacy ``LiveTail`` instances and ``LiveTailDeriver`` instances feed
 their own subscribers independently.
+
+COMPAT(delete-when: ADR-0170 §D3 LiveTail 单身份重构完成,
+       tracking: ADR-0170 §"删除条件" / issue 待开)
+# 当前保留 ``_to_stamped`` 是因为 ``LiveTail.on_event`` 仍只接受
+# ``StampedEvent``;LiveTail 改为接收 ``EventRecord`` + 单一身份后,
+# 本文件 + ``live_tail._to_stamped`` 整体迁出,deriver 直接转发。
 """
 
 from __future__ import annotations
