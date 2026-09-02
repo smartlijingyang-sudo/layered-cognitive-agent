@@ -331,3 +331,37 @@ def test_spine_core_holder_carries_all_three_components() -> None:
     # Frozen: attribute assignment raises.
     with pytest.raises((AttributeError, Exception)):
         holder.event_spine = spine  # type: ignore[misc]
+
+
+def test_setup_activates_process_local_spine_accessor() -> None:
+    """After setup, wrap_instrument / reflectors resolve the live EventSpine.
+
+    ADR-0165.1 production gap: spine.core used to publish ``event_spine``
+    without calling ``set_active_spine_accessor``, so every wrap and
+    reflector silently no-op'd. This pins the activation contract.
+    """
+    from lca.harness.declarative.compile.instrument_wrap import (
+        resolve_active_spine,
+        set_active_spine_accessor,
+    )
+    from lca.plugins.observability.spine.core import setup
+    from lca.plugins.observability.spine.reflectors import runtime as runtime_reflector
+
+    previous = set_active_spine_accessor(None)
+    runtime_reflector.set_active_spine(None)
+    try:
+        file_sink = _CaptureSink()
+        ctx = _StubPluginContext(
+            emit_pipeline=_CountingProducer(),
+            file_sink=file_sink,
+        )
+        import asyncio
+
+        asyncio.run(setup.setup(ctx, config={}))
+        spine_core = ctx.provided["event_spine"]
+
+        assert resolve_active_spine() is spine_core.event_spine
+        assert runtime_reflector.get_active_spine() is spine_core.event_spine
+    finally:
+        set_active_spine_accessor(previous)
+        runtime_reflector.set_active_spine(None)

@@ -1,9 +1,9 @@
 """Runtime factory that arms a ``StepLifecycleStore`` for one run.
 
-ADR-0164 Phase 7 端到端: 之前 ``lca/plugins/seams/observability/run_ledger.py``
-的 ``create_run_components`` 通过 ContextVar 拿 lifecycle store,但
-production 代码从未 ``set_lifecycle_store`` —— 导致 ``StepGroupedBackend``
-永远是 None, ``journal.json`` 从未被落盘。
+ADR-0164 Phase 7 端到端: ``create_run_components`` 需要已 bind_run 的
+lifecycle store。Builder 负责构造 store; ``RunExecutionEnvironment.prepare``
+必须 ``set_lifecycle_store`` + facade ``bind(RunContext)``, 否则
+step_emitter 静默跳过, terminal flush 写出 steps=[]。
 
 本模块把 "为某个 run 准备 lifecycle store" 显式化成 runtime 工厂,
 不依赖任何 transport 类型:

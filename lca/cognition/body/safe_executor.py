@@ -136,43 +136,57 @@ class SimpleSafeExecutor(SafeExecutor):
 
         invocation_id = invocation_id.strip() or new_id("inv")
         evidence_store, evidence_policy = _resolve_evidence_pair()
-        if tool.name == "askUserQuestion":
-            # HIL requests pause before any external effect starts. Keep the
-            # journal in the approval lifecycle; a ToolStarted event would
-            # require a ToolInvoked/ToolDenied terminal fact even though the
-            # question has not been executed yet.
-            _emit_approval_requested(tool, invocation_id)
-        else:
-            self._started_refs[invocation_id] = emit_tool_started(
-                tool,
-                args,
-                invocation_id,
-                evidence_store=evidence_store,
-                evidence_policy=evidence_policy,
-            )
-
-        # PR-3.3: instrument the sandbox boundary. ``tool_invocation_scope``
-        # binds the invocation_id that adapters/sandbox tools read to
-        # correlate their output; we bracket it with body.sandbox.enter/exit
-        # so traces see the exact world-effect window.
-        _body_llm_reflector.emit_body_sandbox_enter(
-            invocation_id=invocation_id,
-            tool_name=tool.name,
-        )
+        # ADR-0164: open act step at safe_executor boundary (auto dual-write).
+        _open_act_step(tool.name)
+        act_closed = False
         try:
-            with tool_invocation_scope(invocation_id):
-                return await self._execute_with_retry(
+            if tool.name == "askUserQuestion":
+                # HIL requests pause before any external effect starts. Keep the
+                # journal in the approval lifecycle; a ToolStarted event would
+                # require a ToolInvoked/ToolDenied terminal fact even though the
+                # question has not been executed yet.
+                _emit_approval_requested(tool, invocation_id)
+            else:
+                self._started_refs[invocation_id] = emit_tool_started(
                     tool,
                     args,
-                    retry_policy=retry_policy,
-                    cache_config=cache_config,
-                    invocation_id=invocation_id,
+                    invocation_id,
+                    evidence_store=evidence_store,
+                    evidence_policy=evidence_policy,
                 )
-        finally:
-            _body_llm_reflector.emit_body_sandbox_exit(
+
+            # PR-3.3: instrument the sandbox boundary. ``tool_invocation_scope``
+            # binds the invocation_id that adapters/sandbox tools read to
+            # correlate their output; we bracket it with body.sandbox.enter/exit
+            # so traces see the exact world-effect window.
+            _body_llm_reflector.emit_body_sandbox_enter(
                 invocation_id=invocation_id,
                 tool_name=tool.name,
             )
+            try:
+                with tool_invocation_scope(invocation_id):
+                    observation = await self._execute_with_retry(
+                        tool,
+                        args,
+                        retry_policy=retry_policy,
+                        cache_config=cache_config,
+                        invocation_id=invocation_id,
+                    )
+            finally:
+                _body_llm_reflector.emit_body_sandbox_exit(
+                    invocation_id=invocation_id,
+                    tool_name=tool.name,
+                )
+            _close_act_step(
+                outcome="ok" if observation.success else "fail",
+                error=observation.error,
+            )
+            act_closed = True
+            return observation
+        except Exception as exc:
+            if not act_closed:
+                _close_act_step(outcome="fail", error=str(exc))
+            raise
 
     async def _execute_with_retry(
         self,
@@ -360,3 +374,23 @@ class SimpleSafeExecutor(SafeExecutor):
             return None
         result: str | None = validator(args)
         return result
+
+
+def _open_act_step(tool_name: str) -> None:
+    """Open an act step at the safe_executor seam (ADR-0164 ownership)."""
+    try:
+        from lca.runtime.step_emitter import bridge_act_opened
+
+        bridge_act_opened(objective=f"tool:{tool_name}", tool_name=tool_name)
+    except ImportError:
+        pass
+
+
+def _close_act_step(*, outcome: str, error: str | None = None) -> None:
+    """Close the current act step after tool completion/failure."""
+    try:
+        from lca.runtime.step_emitter import bridge_act_closed
+
+        bridge_act_closed(outcome=outcome, error=error)
+    except ImportError:
+        pass

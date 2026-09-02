@@ -70,6 +70,18 @@ class RunLifecycleCoordinator:
         hub = session.hub if session.hub is not None else ensure_session_hub(session, ctx=ctx)
         workspace: Any = None
         success = False
+        run_outcome: str = "failure"
+        from lca.infrastructure.observability.spine.context import SpineContext
+        from lca.infrastructure.observability.spine.transport_emit import (
+            emit_carrier_exception_caught,
+            emit_carrier_exception_finally,
+            emit_kernel_run_cancelled,
+            emit_kernel_run_start,
+            emit_kernel_run_stop,
+        )
+
+        SpineContext.set_run(session.run_id)
+        emit_kernel_run_start(run_id=session.run_id, trace_id=session.trace_id)
         try:
             environment = RunExecutionEnvironment(
                 session,
@@ -98,14 +110,30 @@ class RunLifecycleCoordinator:
                         if session.approval_request
                         else None,
                     )
+                    run_outcome = "success"
                     return
                 success = outcome.success
+                run_outcome = "success" if success else "failure"
         except (PlaneBindingError, _UnknownExecutionTargetError) as exc:
             session.error = str(exc)
             self._record_failure(session, exc, hub)
+            emit_carrier_exception_caught(
+                boundary="lifecycle.execute",
+                exc_type=type(exc).__name__,
+                message=str(exc),
+                run_id=session.run_id,
+                trace_id=session.trace_id,
+            )
+            emit_carrier_exception_finally(
+                boundary="lifecycle.execute",
+                run_id=session.run_id,
+                trace_id=session.trace_id,
+            )
         except asyncio.CancelledError:
             session.cancel_requested = True
             session.status = RunStatus.CANCELED
+            emit_kernel_run_cancelled(run_id=session.run_id, trace_id=session.trace_id)
+            run_outcome = "cancelled"
             raise
         except Exception as exc:
             _log.exception(
@@ -116,7 +144,24 @@ class RunLifecycleCoordinator:
             )
             session.error = self._format_exception(exc, session)
             self._record_failure(session, exc, hub)
+            emit_carrier_exception_caught(
+                boundary="lifecycle.execute",
+                exc_type=type(exc).__name__,
+                message=str(exc),
+                run_id=session.run_id,
+                trace_id=session.trace_id,
+            )
+            emit_carrier_exception_finally(
+                boundary="lifecycle.execute",
+                run_id=session.run_id,
+                trace_id=session.trace_id,
+            )
         finally:
+            emit_kernel_run_stop(
+                run_id=session.run_id,
+                outcome=run_outcome,  # type: ignore[arg-type]
+                trace_id=session.trace_id,
+            )
             await self._finish_or_pause(session, workspace=workspace, success=success)
 
     async def resume(self, session: RunSession, *, answer: str) -> None:

@@ -9,7 +9,9 @@ from pathlib import Path
 from typing import Any
 
 from lca.infrastructure.observability.spine.event_record import EventRecord
-from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
+from lca.infrastructure.observability.spine.sinks.routing_file_sink import (
+    RunRoutingFileSink,
+)
 from lca.plugins.observability.spine.sinks.console import ConsoleSink
 from lca.plugins.observability.spine.sinks.console import setup as console_setup
 from lca.plugins.observability.spine.sinks.file import setup as file_setup
@@ -53,37 +55,56 @@ def _make_rec(**overrides: Any) -> EventRecord:
     return EventRecord(**base)
 
 
-def test_file_setup_provides_file_sink(tmp_path: Path) -> None:
-    """``spine.sink.file`` setup MUST provide a ``FileSink`` under ``file_sink``."""
+def test_file_setup_provides_routing_sink(tmp_path: Path) -> None:
+    """``spine.sink.file`` setup MUST provide a ``RunRoutingFileSink``."""
     ctx = _StubPluginContext()
-    events_path = tmp_path / "spine" / "events.jsonl"
+    boot = tmp_path / "spine" / "boot-events.jsonl"
+    runs = tmp_path / "traces" / "runs"
     asyncio.run(
         file_setup.setup(
             ctx,
-            {"path": str(events_path), "run_id": "test-run"},
+            {"boot_path": str(boot), "runs_root": str(runs)},
         )
     )
 
     assert "file_sink" in ctx.provided
     sink = ctx.provided["file_sink"]
-    assert isinstance(sink, FileSink)
-    assert sink.path == events_path
+    assert isinstance(sink, RunRoutingFileSink)
+    assert sink.boot_path == boot
+    assert sink.runs_root == runs
 
 
-def test_file_sink_plugin_writes_a_line(tmp_path: Path) -> None:
-    """Provided FileSink MUST append one JSONL line for a written record."""
+def test_file_sink_plugin_routes_run_events(tmp_path: Path) -> None:
+    """Run-scoped records MUST land under traces/runs/<run_id>/events.jsonl."""
     ctx = _StubPluginContext()
-    events_path = tmp_path / "events.jsonl"
-    asyncio.run(file_setup.setup(ctx, {"path": str(events_path), "run_id": "boot"}))
-    sink: FileSink = ctx.provided["file_sink"]
-    sink.write(_make_rec())
+    boot = tmp_path / "boot-events.jsonl"
+    runs = tmp_path / "runs"
+    asyncio.run(
+        file_setup.setup(
+            ctx,
+            {"boot_path": str(boot), "runs_root": str(runs)},
+        )
+    )
+    sink: RunRoutingFileSink = ctx.provided["file_sink"]
+    sink.write(_make_rec(run_id="run_r1"))
     sink.close()
 
-    lines = events_path.read_text(encoding="utf-8").splitlines()
+    path = runs / "run_r1" / "events.jsonl"
+    lines = path.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
     obj = json.loads(lines[0])
     assert obj["execution_point"] == "brain.think.start"
-    assert obj["run_id"] == "r1"
+    assert obj["run_id"] == "run_r1"
+
+
+def test_legacy_path_config_maps_to_boot_events(tmp_path: Path) -> None:
+    """Legacy ``path: .../events.jsonl`` MUST map to boot-events.jsonl."""
+    ctx = _StubPluginContext()
+    legacy = tmp_path / "spine" / "events.jsonl"
+    asyncio.run(file_setup.setup(ctx, {"path": str(legacy)}))
+    sink: RunRoutingFileSink = ctx.provided["file_sink"]
+    assert sink.boot_path.name == "boot-events.jsonl"
+    sink.close()
 
 
 def test_console_setup_provides_console_sink() -> None:

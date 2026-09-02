@@ -1,8 +1,9 @@
-# bundles/spine-default.yaml — 18-plugin spine composition (PR-7/PR-8 §7.6.6).
+# bundles/spine-default.yaml — spine composition (PR-7/PR-8 §7.6.6 + transport).
 #
-# Per ADR-0165 + ADR-0165.1, the EventSpine is composed from 18 close-set
-# plugins (L2 spine.core + L1 emit_pipeline + 15 L0 producers / classifiers /
-# derivers / sinks / wraps). Profile decides which subset is enabled.
+# Per ADR-0165 + ADR-0165.1, the EventSpine is composed from close-set
+# plugins (L2 spine.core + L1 emit_pipeline + L0 producers / classifiers /
+# derivers / sinks / wraps / transport reflector). Profile decides which
+# subset is enabled.
 #
 # The 19th spine plugin — `spine.reflector.source` (source-level
 # introspection, PR-9) — is intentionally omitted here. oii-debug.yaml
@@ -29,6 +30,7 @@ plugins:
   - spine.reflector.signature
   - spine.reflector.context
   - spine.reflector.runtime
+  - spine.reflector.transport
   - spine.classifier.exception.builtin
   - spine.classifier.exception.unclass
   - spine.spantree
@@ -70,6 +72,11 @@ entries:
   - id: spine.reflector.runtime
     name: spine_reflector_runtime
     $module: lca.plugins.observability.spine.reflectors.runtime
+    config: {}
+
+  - id: spine.reflector.transport
+    name: spine_reflector_transport
+    $module: lca.plugins.observability.spine.reflectors.transport
     config: {}
 
   # ── L0 classifiers (2) ──────────────────────────────────────────
@@ -120,7 +127,11 @@ entries:
     name: spine_sink_file
     $module: lca.plugins.observability.spine.sinks.file
     config:
-      path: .lca/spine/events.jsonl
+      # ADR-0165.1: boot → .lca/spine/boot-events.jsonl;
+      # real runs → traces/runs/<run_id>/events.jsonl
+      boot_path: .lca/spine/boot-events.jsonl
+      runs_root: traces/runs
+
 
   - id: spine.sink.console
     name: spine_sink_console

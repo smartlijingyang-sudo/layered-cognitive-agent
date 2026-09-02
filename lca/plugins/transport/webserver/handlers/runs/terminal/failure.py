@@ -41,6 +41,10 @@ def record_run_failure(facts: RunFailureFacts) -> None:
     Lifecycle and Journal emission are owned by ``lca.agent.cognitive_agent``.
     This function is a defensive log so the failure is visible when the
     primary emission path itself failed.
+
+    Also appends a durable line to ``traces/runs/<run_id>/kernel.log`` so
+    ``lca-ops debug-run`` can surface the message when Journal is empty
+    (ADR-0122 kernel.log intent / ADR-0165.1 carrier gap).
     """
     _log.warning(
         "run_failure_observed",
@@ -51,6 +55,28 @@ def record_run_failure(facts: RunFailureFacts) -> None:
         objective_preview=facts.objective[:200],
         error=facts.error,
     )
+    _append_kernel_log(facts)
+
+
+def _append_kernel_log(facts: RunFailureFacts) -> None:
+    """Best-effort per-run kernel.log write; never raises into lifecycle."""
+    try:
+        from pathlib import Path
+
+        run_dir = Path("traces") / "runs" / facts.run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+        line = (
+            f"run_failure_observed run_id={facts.run_id} "
+            f"trace_id={facts.trace_id} error={facts.error}\n"
+        )
+        with (run_dir / "kernel.log").open("a", encoding="utf-8") as handle:
+            handle.write(line)
+    except Exception:
+        _log.debug(
+            "kernel_log_append_failed",
+            run_id=facts.run_id,
+            exc_info=True,
+        )
 
 
 __all__ = ["RunFailureFacts", "record_run_failure"]

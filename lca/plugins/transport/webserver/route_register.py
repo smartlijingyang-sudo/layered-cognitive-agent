@@ -83,13 +83,10 @@ def register_routes(
     """
     registered: list[str] = []
     for spec in specs:
-        missing = tuple(
-            key for key in spec.requires if not _require_present(ctx, key)
-        )
+        missing = tuple(key for key in spec.requires if not _require_present(ctx, key))
         if missing:
             raise RuntimeError(
-                f"{plugin_id}: missing required capability {missing!r} "
-                f"for {spec.path}"
+                f"{plugin_id}: missing required capability {missing!r} for {spec.path}"
             )
         if any(key for key in spec.optional if not _inject_probe(ctx, key)):
             # Optional capability absent;the route simply is not registered.
@@ -103,7 +100,96 @@ def register_routes(
 
 
 def _starlette_route(spec: RouteSpec) -> Any:
-    """Materialise a Starlette ``Route`` from a :class:`RouteSpec`."""
+    """Materialise a Starlette ``Route`` from a :class:`RouteSpec`.
+
+    Handlers are bracketed with ``transport.route.enter`` /
+    ``transport.route.exit`` (ADR-0165.1). Emit helpers no-op when the
+    EventSpine is not activated, so partial profiles stay quiet.
+    """
     from starlette.routing import Route
 
-    return Route(spec.path, spec.handler, methods=list(spec.methods))
+    return Route(
+        spec.path,
+        _instrument_route_handler(spec.handler, path=spec.path),
+        methods=list(spec.methods),
+    )
+
+
+def _bind_run_from_request(request: Any) -> str | None:
+    """If the route carries ``run_id``, bind SpineContext before emitting."""
+    params = getattr(request, "path_params", None) or {}
+    run_id = params.get("run_id")
+    if not run_id:
+        return None
+    from lca.infrastructure.observability.spine.context import SpineContext
+
+    SpineContext.set_run(str(run_id))
+    return str(run_id)
+
+
+def _instrument_route_handler(handler: Any, *, path: str) -> Any:
+    """Wrap an HTTP handler with transport.route enter/exit spine events."""
+    import asyncio
+    import functools
+    import inspect
+
+    from lca.infrastructure.observability.spine.transport_emit import (
+        emit_transport_route_enter,
+        emit_transport_route_exit,
+    )
+
+    if inspect.iscoroutinefunction(handler):
+
+        @functools.wraps(handler)
+        async def _async_wrapper(request: Any, *args: Any, **kwargs: Any) -> Any:
+            method = str(getattr(request, "method", "") or "")
+            run_id = _bind_run_from_request(request)
+            emit_transport_route_enter(path=path, method=method, run_id=run_id)
+            try:
+                result = await handler(request, *args, **kwargs)
+            except BaseException:
+                emit_transport_route_exit(
+                    path=path, method=method, outcome="failure", run_id=run_id
+                )
+                raise
+            emit_transport_route_exit(
+                path=path, method=method, outcome="success", run_id=run_id
+            )
+            return result
+
+        return _async_wrapper
+
+    @functools.wraps(handler)
+    def _sync_wrapper(request: Any, *args: Any, **kwargs: Any) -> Any:
+        method = str(getattr(request, "method", "") or "")
+        run_id = _bind_run_from_request(request)
+        emit_transport_route_enter(path=path, method=method, run_id=run_id)
+        try:
+            result = handler(request, *args, **kwargs)
+        except BaseException:
+            emit_transport_route_exit(
+                path=path, method=method, outcome="failure", run_id=run_id
+            )
+            raise
+        if asyncio.iscoroutine(result):
+
+            async def _await_result() -> Any:
+                try:
+                    value = await result
+                except BaseException:
+                    emit_transport_route_exit(
+                        path=path, method=method, outcome="failure", run_id=run_id
+                    )
+                    raise
+                emit_transport_route_exit(
+                    path=path, method=method, outcome="success", run_id=run_id
+                )
+                return value
+
+            return _await_result()
+        emit_transport_route_exit(
+            path=path, method=method, outcome="success", run_id=run_id
+        )
+        return result
+
+    return _sync_wrapper

@@ -82,6 +82,7 @@ def test_emit_helpers_are_safe_when_no_spine_wired() -> None:
         body_llm.emit_body_sandbox_exit(invocation_id="i1", tool_name="t")
         body_llm.emit_llm_call_start(model="m", stream=False)
         body_llm.emit_llm_call_end(model="m", stream=False, outcome="success")
+        body_llm.emit_llm_stream_stall(model="m", idle_ms=1000, seq=0)
         body_llm.emit_llm_stream_token(model="m", text_delta="hi", seq=0)
     finally:
         set_spine(None)
@@ -104,6 +105,7 @@ def test_emit_helpers_forward_to_active_spine() -> None:
         body_llm.emit_body_sandbox_exit(invocation_id="i1", tool_name="t", outcome="success")
         body_llm.emit_llm_call_start(model="m", stream=False)
         body_llm.emit_llm_call_end(model="m", stream=False, outcome="success")
+        body_llm.emit_llm_stream_stall(model="m", idle_ms=1000, seq=0)
         body_llm.emit_llm_stream_token(model="m", text_delta="hi", seq=0)
     finally:
         body_llm.set_active_spine(None)
@@ -117,6 +119,7 @@ def test_emit_helpers_forward_to_active_spine() -> None:
         "body.sandbox.exit",
         "llm.call.start",
         "llm.call.end",
+        "llm.stream.stall",
         "llm.stream.token",
     ]
     assert sink.records[1].outcome == "success"
@@ -125,7 +128,8 @@ def test_emit_helpers_forward_to_active_spine() -> None:
     assert sink.records[0].payload["tool_name"] == "t"
     assert sink.records[3].payload["invocation_id"] == "i1"
     assert sink.records[5].payload["model"] == "m"
-    assert sink.records[7].payload["text_delta"] == "hi"
+    assert sink.records[7].payload["idle_ms"] == 1000
+    assert sink.records[8].payload["text_delta"] == "hi"
 
 
 # ── body.tool.execute.start/end via safe_executor ────────────────────
@@ -407,3 +411,208 @@ def test_telemetry_llm_adapter_emits_end_failure_on_inner_exception() -> None:
     assert "llm.call.start" in by_ep
     assert "llm.call.end" in by_ep
     assert by_ep["llm.call.end"][0].outcome == "failure"
+
+
+def test_telemetry_llm_stream_emits_call_end_when_consumer_breaks_on_completed() -> None:
+    """Real executor breaks on COMPLETED; spine must still emit llm.call.end.
+
+    ``_stream_turn`` does ``break`` after COMPLETED. That injects GeneratorExit
+    into the async generator and used to skip the post-loop success emit —
+    leaving production runs with llm.call.start and zero llm.call.end.
+    """
+    from collections.abc import AsyncIterator
+
+    from lca.contracts.atoms.enums import LLMStreamEventType
+    from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
+    from lca.contracts.protocols import LLMAdapter
+    from lca.infrastructure.observability.adapters.adapters import TelemetryLLMAdapter
+    from lca.plugins.observability.spine.reflectors import body_llm
+
+    class _InnerLLM(LLMAdapter):
+        name = "stub-break"
+
+        async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:  # type: ignore[override]
+            del prompt, kwargs
+            return LLMResponse(text="x", tool_calls=(), finish_reason="stop")
+
+        async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[LLMStreamEvent]:
+            del prompt, kwargs
+            yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text="hi")
+            yield LLMStreamEvent(
+                type=LLMStreamEventType.COMPLETED,
+                response=LLMResponse(text="hi", tool_calls=(), finish_reason="stop"),
+            )
+
+    spine, sink = _make_spine()
+    body_llm.set_active_spine(spine)
+    try:
+        adapter = TelemetryLLMAdapter(_InnerLLM())
+
+        async def _consume_like_executor() -> None:
+            async for ev in adapter.stream("hi"):
+                if ev.type == LLMStreamEventType.COMPLETED and ev.response is not None:
+                    break
+
+        _run(_consume_like_executor())
+    finally:
+        body_llm.set_active_spine(None)
+
+    by_ep = _eps_by_point(sink.records)
+    assert "llm.call.start" in by_ep
+    assert "llm.call.end" in by_ep
+    assert by_ep["llm.call.end"][0].outcome == "success"
+    assert len(by_ep["llm.call.end"]) == 1
+
+
+def test_telemetry_llm_stream_emits_call_end_cancelled_on_cancel() -> None:
+    """CancelledError mid-stream must emit llm.call.end outcome=cancelled."""
+    import asyncio
+    from collections.abc import AsyncIterator
+
+    from lca.contracts.atoms.enums import LLMStreamEventType
+    from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
+    from lca.contracts.protocols import LLMAdapter
+    from lca.infrastructure.observability.adapters.adapters import TelemetryLLMAdapter
+    from lca.plugins.observability.spine.reflectors import body_llm
+
+    class _HangLLM(LLMAdapter):
+        name = "stub-hang"
+
+        async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:  # type: ignore[override]
+            del prompt, kwargs
+            return LLMResponse(text="", tool_calls=(), finish_reason="stop")
+
+        async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[LLMStreamEvent]:
+            del prompt, kwargs
+            yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text="partial")
+            await asyncio.sleep(3600)
+
+    spine, sink = _make_spine()
+    body_llm.set_active_spine(spine)
+    try:
+        adapter = TelemetryLLMAdapter(_HangLLM())
+
+        async def _cancel_mid_stream() -> None:
+            async def _run_stream() -> None:
+                async for _ev in adapter.stream("hi"):
+                    pass
+
+            task = asyncio.create_task(_run_stream())
+            await asyncio.sleep(0.01)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
+        _run(_cancel_mid_stream())
+    finally:
+        body_llm.set_active_spine(None)
+
+    by_ep = _eps_by_point(sink.records)
+    assert "llm.call.start" in by_ep
+    assert "llm.call.end" in by_ep
+    assert by_ep["llm.call.end"][0].outcome == "cancelled"
+    assert len(by_ep["llm.call.end"]) == 1
+
+
+def test_telemetry_llm_stream_emits_stall_when_idle() -> None:
+    """Idle gaps mid-stream must surface as llm.stream.stall on the spine."""
+    import asyncio
+    from collections.abc import AsyncIterator
+
+    from lca.contracts.atoms.enums import LLMStreamEventType
+    from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
+    from lca.contracts.protocols import LLMAdapter
+    from lca.infrastructure.observability.adapters.adapters import TelemetryLLMAdapter
+    from lca.infrastructure.observability.stream import llm_stream_activity as activity_mod
+    from lca.plugins.observability.spine.reflectors import body_llm
+
+    class _SlowLLM(LLMAdapter):
+        name = "stub-slow"
+
+        async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:  # type: ignore[override]
+            del prompt, kwargs
+            return LLMResponse(text="done", tool_calls=(), finish_reason="stop")
+
+        async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[LLMStreamEvent]:
+            del prompt, kwargs
+            yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text="a")
+            await asyncio.sleep(0.05)
+            yield LLMStreamEvent(
+                type=LLMStreamEventType.COMPLETED,
+                response=LLMResponse(text="a", tool_calls=(), finish_reason="stop"),
+            )
+
+    spine, sink = _make_spine()
+    body_llm.set_active_spine(spine)
+    old_hb = activity_mod.LLM_ACTIVITY_HEARTBEAT_S
+    try:
+        activity_mod.LLM_ACTIVITY_HEARTBEAT_S = 0.02
+        adapter = TelemetryLLMAdapter(_SlowLLM())
+
+        async def _consume() -> None:
+            async for _ev in adapter.stream("hi"):
+                pass
+
+        _run(_consume())
+    finally:
+        activity_mod.LLM_ACTIVITY_HEARTBEAT_S = old_hb
+        body_llm.set_active_spine(None)
+
+    by_ep = _eps_by_point(sink.records)
+    assert "llm.stream.stall" in by_ep
+    stall = by_ep["llm.stream.stall"][0]
+    assert stall.payload.get("model")
+    assert float(stall.payload.get("idle_ms", 0)) >= 0
+
+
+def test_telemetry_llm_stream_times_out_on_inter_token_idle() -> None:
+    """After partial tokens, a long provider silence must abort with timeout.
+
+    Reproduces run_a3a442ff00aa: stream started, emitted intro text, then hung
+    until the user cancelled. Idle timeout should raise TimeoutError and emit
+    ``llm.call.end`` with outcome=timeout so the run fails closed without a
+    manual cancel.
+    """
+    import asyncio
+    from collections.abc import AsyncIterator
+
+    from lca.contracts.atoms.enums import LLMStreamEventType
+    from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
+    from lca.contracts.protocols import LLMAdapter
+    from lca.infrastructure.observability.adapters.adapters import TelemetryLLMAdapter
+    from lca.plugins.observability.spine.reflectors import body_llm
+
+    class _HangAfterPartialLLM(LLMAdapter):
+        name = "stub-hang-partial"
+
+        async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:  # type: ignore[override]
+            del prompt, kwargs
+            return LLMResponse(text="", tool_calls=(), finish_reason="stop")
+
+        async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[LLMStreamEvent]:
+            del prompt, kwargs
+            yield LLMStreamEvent(
+                type=LLMStreamEventType.OUTPUT_TEXT_DELTA,
+                text="好的！我来为你编写一个有趣的 Python 笑话程序",
+            )
+            await asyncio.sleep(3600)
+
+    spine, sink = _make_spine()
+    body_llm.set_active_spine(spine)
+    try:
+        adapter = TelemetryLLMAdapter(_HangAfterPartialLLM(), idle_timeout_s=0.05)
+
+        async def _consume() -> None:
+            async for _ev in adapter.stream("hi"):
+                pass
+
+        with pytest.raises(TimeoutError):
+            _run(_consume())
+    finally:
+        body_llm.set_active_spine(None)
+
+    by_ep = _eps_by_point(sink.records)
+    assert "llm.call.start" in by_ep
+    assert "llm.call.end" in by_ep
+    assert by_ep["llm.call.end"][0].outcome == "timeout"
+    assert len(by_ep["llm.call.end"]) == 1

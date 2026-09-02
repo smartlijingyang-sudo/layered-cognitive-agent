@@ -44,6 +44,7 @@ EXECUTION_POINTS: tuple[str, ...] = (
     "llm.call.start",
     "llm.call.end",
     "llm.stream.token",
+    "llm.stream.stall",
     # Runtime
     "runtime.reducer.apply",
     "runtime.checkpoint.create",

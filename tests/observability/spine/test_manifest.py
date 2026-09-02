@@ -22,6 +22,7 @@ def test_execution_points_covers_critical_layers():
         "body.tool.execute.end",
         "llm.call.start",
         "llm.call.end",
+        "llm.stream.stall",
         "runtime.reducer.apply",
         "phase_graph.node.start",
         "phase_graph.node.end",

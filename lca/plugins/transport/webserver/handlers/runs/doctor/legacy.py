@@ -42,7 +42,7 @@ def diagnose_legacy(session: Any | None, jsonl_path: Path) -> DoctorReport:
         ),
         "H4": HopVerdict(ok=None, detail="mode=legacy (H4 not applicable)"),
         "H5": HopVerdict(ok=None, detail="mode=legacy (H5 not applicable)"),
-        "H6": hop_h6(scan),
+        "H6": hop_h6(session, scan),
         "H7": hop_h7(scan),
     }
     missing_state = list(scan.missing_plugin_state)
@@ -147,15 +147,36 @@ def hop_h3(
     return HopVerdict(ok=True, detail="live tail tracking journal", extra=extra)
 
 
-def hop_h6(scan: JsonlScan) -> HopVerdict:
-    """Check whether a completed legacy run produced an observable result."""
+def hop_h6(session: Any | None, scan: JsonlScan) -> HopVerdict:
+    """Check whether a completed legacy run produced an observable result.
+
+    When the journal stream is empty but the carrier already recorded
+    ``session.error`` (pre-journal / identity failures), surface that
+    error so doctor and ``debug-run`` stay diagnosable without Journal.
+    """
+    session_error = ""
+    if session is not None:
+        session_error = str(getattr(session, "error", "") or "")
+    finished_error = scan.finished_error or ""
     extra: dict[str, Any] = {
         "output_text_len": len(scan.output_text),
-        "error": scan.finished_error or "",
+        "error": finished_error or session_error,
     }
     if not scan.exists or scan.rows == 0:
+        if session_error:
+            return HopVerdict(
+                ok=False,
+                detail=f"carrier failure (no journal): {session_error[:120]}",
+                extra=extra,
+            )
         return HopVerdict(ok=None, detail="no journal data", extra=extra)
     if not scan.has_finished:
+        if session_error:
+            return HopVerdict(
+                ok=False,
+                detail=f"carrier failure (no finish event): {session_error[:120]}",
+                extra=extra,
+            )
         return HopVerdict(ok=None, detail="no finish event yet", extra=extra)
     if scan.output_text_explicit and not scan.output_text.strip():
         detail = "AgentRunFinished.output_text 为空（零交付）"

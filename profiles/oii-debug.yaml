@@ -29,4 +29,5 @@ patch:
   # the production web-standard path.
   - id: spine.sink.file
     config:
-      path: .lca/spine/oii-debug-events.jsonl
+      boot_path: .lca/spine/oii-debug-boot-events.jsonl
+      runs_root: traces/runs

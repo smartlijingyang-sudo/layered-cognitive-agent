@@ -42,7 +42,8 @@ def record_terminal_materialization(session: RunSession) -> None:
     flush_errors.extend(_flush_step_tree(session))
 
     try:
-        report = diagnose(session, session.jsonl_path)
+        # Prefer step-tree journal.json (main store) over legacy jsonl.
+        report = diagnose(session, _doctor_journal_path(session, locator))
         if report.broken_hop or not report.factory["ok"]:
             _log.error(
                 "run_doctor_verdict",
@@ -65,6 +66,11 @@ def record_terminal_materialization(session: RunSession) -> None:
             extra={
                 "doctor_report": report.as_dict(),
                 "flush_errors": tuple(flush_errors),
+                # Carrier pre-journal failures live on session.error; persist
+                # them so offline debug-run can read the message after the
+                # live session is gone (ADR-0165.1 / ADR-0122 gap).
+                "session_error": str(session.error or ""),
+                "session_status": str(getattr(session.status, "value", session.status) or ""),
             },
         )
         manifest_path.write_text(
@@ -107,7 +113,10 @@ def _flush_step_tree(session: RunSession) -> list[dict[str, str]]:
         return []
     errors: list[dict[str, str]] = []
     try:
-        bundle.flush()
+        outcome = _journal_outcome_from_session(session)
+        flush = getattr(bundle, "flush", None)
+        if callable(flush):
+            flush(outcome=outcome)
     except Exception as exc:
         errors.append(
             {
@@ -123,6 +132,28 @@ def _flush_step_tree(session: RunSession) -> list[dict[str, str]]:
             exc_info=True,
         )
     return errors
+
+
+def _journal_outcome_from_session(session: RunSession) -> str:
+    """Map RunSession.status onto JournalMetadata.outcome vocabulary."""
+    status = str(getattr(session.status, "value", session.status) or "").lower()
+    if status == "completed":
+        return "completed"
+    if status == "failed":
+        return "failed"
+    if status in {"canceled", "cancelled"}:
+        return "stopped"
+    if status == "waiting_input":
+        return "paused"
+    return "stopped"
+
+
+def _doctor_journal_path(session: RunSession, locator: RunLocator) -> Path:
+    """Prefer ADR-0164 step-tree journal.json when present on disk."""
+    step_path = locator.journal_step_path(session.run_id)
+    if step_path.exists():
+        return step_path
+    return session.jsonl_path
 
 
 def session_locator(session: RunSession) -> RunLocator:

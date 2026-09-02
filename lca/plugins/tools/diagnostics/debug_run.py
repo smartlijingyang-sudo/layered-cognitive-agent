@@ -43,6 +43,9 @@ class DebugRunReport:
     journal_path: str
     journal_event_count: int
     journal_missing_seqs: tuple[int, ...]
+    spine_events_path: str
+    spine_event_count: int
+    spine_execution_points: tuple[str, ...]
     kernel_log_path: str
     kernel_log_tail: str
     phase_cursor: str | None
@@ -62,6 +65,9 @@ class DebugRunReport:
             "journal_path": self.journal_path,
             "journal_event_count": self.journal_event_count,
             "journal_missing_seqs": list(self.journal_missing_seqs),
+            "spine_events_path": self.spine_events_path,
+            "spine_event_count": self.spine_event_count,
+            "spine_execution_points": list(self.spine_execution_points),
             "kernel_log_path": self.kernel_log_path,
             "kernel_log_tail": self.kernel_log_tail,
             "phase_cursor": self.phase_cursor,
@@ -78,19 +84,10 @@ class DebugRunReport:
         lines: list[str] = []
         lines.append(f"[1/8] manifest            {self.manifest_path}")
         summary = (
-            self.manifest_summary.get("extra", {})
-            .get("doctor_report", {})
-            .get("status", "unknown")
+            self.manifest_summary.get("extra", {}).get("doctor_report", {}).get("status", "unknown")
         )
-        broken = (
-            self.manifest_summary.get("extra", {})
-            .get("doctor_report", {})
-            .get("broken_hop")
-        )
-        lines.append(
-            f"      status={summary}"
-            + (f" broken_hop={broken}" if broken else "")
-        )
+        broken = self.manifest_summary.get("extra", {}).get("doctor_report", {}).get("broken_hop")
+        lines.append(f"      status={summary}" + (f" broken_hop={broken}" if broken else ""))
         lines.append(
             f"[2/8] journal             {self.journal_path} "
             f"events={self.journal_event_count}"
@@ -100,6 +97,13 @@ class DebugRunReport:
                 else ""
             )
         )
+        lines.append(
+            f"      spine.events        {self.spine_events_path} events={self.spine_event_count}"
+        )
+        if self.spine_execution_points:
+            lines.append(
+                "      spine.points        " + " → ".join(self.spine_execution_points[-8:])
+            )
         lines.append(f"[3/8] kernel.log          {self.kernel_log_path}")
         for line in self.kernel_log_tail.splitlines()[-5:]:
             lines.append(f"      {line}")
@@ -134,12 +138,21 @@ class DebugRunToolAdapter:
         run_dir = self._locator.run_dir(run_id)
         manifest_path = self._locator.manifest_path(run_id)
         journal_path = self._locator.journal_path(run_id)
+        spine_events_path = run_dir / "events.jsonl"
         kernel_log_path = run_dir / "kernel.log"
 
         manifest_summary = _safe_json(manifest_path)
         journal = _safe_lines(journal_path)
+        spine_events = _safe_lines(spine_events_path)
         seqs = sorted({e.get("run_seq") for e in journal if isinstance(e.get("run_seq"), int)})
-        missing_seqs = tuple(s for s in range(1, (seqs[-1] if seqs else 0) + 1) if s not in set(seqs))
+        missing_seqs = tuple(
+            s for s in range(1, (seqs[-1] if seqs else 0) + 1) if s not in set(seqs)
+        )
+        spine_points = tuple(
+            str(e.get("execution_point"))
+            for e in spine_events
+            if isinstance(e.get("execution_point"), str)
+        )
 
         failure_node_id, error_message, error_type = _extract_failure(manifest_summary, journal)
         phase_cursor = _extract_phase_cursor(journal)
@@ -155,6 +168,9 @@ class DebugRunToolAdapter:
             journal_path=str(journal_path),
             journal_event_count=len(journal),
             journal_missing_seqs=missing_seqs,
+            spine_events_path=str(spine_events_path),
+            spine_event_count=len(spine_events),
+            spine_execution_points=spine_points,
             kernel_log_path=str(kernel_log_path),
             kernel_log_tail=tail,
             phase_cursor=phase_cursor,
@@ -202,9 +218,12 @@ def _safe_lines(path: Path) -> list[dict[str, Any]]:
 def _extract_failure(
     manifest: dict[str, Any], journal: list[dict[str, Any]]
 ) -> tuple[str | None, str | None, str | None]:
-    doctor = manifest.get("extra", {}).get("doctor_report", {})
-    h6 = doctor.get("hops", {}).get("H6", {})
-    error_message = h6.get("error")
+    extra = manifest.get("extra", {}) or {}
+    doctor = extra.get("doctor_report", {}) or {}
+    h6 = doctor.get("hops", {}).get("H6", {}) or {}
+    error_message = h6.get("error") or extra.get("session_error") or None
+    if isinstance(error_message, str) and not error_message.strip():
+        error_message = None
     error_type = None
     failure_node = None
     for event in reversed(journal):

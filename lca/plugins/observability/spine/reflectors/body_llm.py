@@ -282,6 +282,28 @@ def emit_llm_stream_token(
     )
 
 
+def emit_llm_stream_stall(
+    *,
+    model: str,
+    idle_ms: int,
+    seq: int = 0,
+) -> EventRecord | None:
+    """Emit when an in-flight LLM stream has produced no delta for a while.
+
+    Complements journal ``RunActivity`` heartbeats so offline spine
+    diagnosis can see provider stalls without the live journal tail.
+    """
+    return _safe_append(
+        execution_point="llm.stream.stall",
+        channel="diagnostic",
+        payload={
+            "model": model,
+            "idle_ms": idle_ms,
+            "seq": seq,
+        },
+    )
+
+
 __all__ = [
     "emit_body_sandbox_enter",
     "emit_body_sandbox_exit",
@@ -290,6 +312,7 @@ __all__ = [
     "emit_body_tool_retry",
     "emit_llm_call_end",
     "emit_llm_call_start",
+    "emit_llm_stream_stall",
     "emit_llm_stream_token",
     "get_active_spine",
     "set_active_spine",

@@ -67,6 +67,11 @@ class RegistryRunCommands:
                 ctx=request.ctx,
                 machine_resolver=self._machine_resolver,
             )
+        # Bind SpineContext as soon as run_id exists so subsequent
+        # kernel.run.* / exception.* land in traces/runs/<id>/events.jsonl.
+        from lca.infrastructure.observability.spine.context import SpineContext
+
+        SpineContext.set_run(session.run_id)
         return RunReceipt(run_id=session.run_id, trace_id=session.trace_id, accepted=True)
 
     async def cancel(self, run_id: str) -> RunCommandReceipt:

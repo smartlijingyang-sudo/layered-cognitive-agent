@@ -15,7 +15,9 @@ from pathlib import Path
 from lca.plugins.tools.diagnostics.debug_run import DebugRunToolAdapter
 
 
-def _write_run_dir(traces_root: Path, run_id: str, *, status: str = "failed", error: str = "boom") -> None:
+def _write_run_dir(
+    traces_root: Path, run_id: str, *, status: str = "failed", error: str = "boom"
+) -> None:
     run_dir = traces_root / "runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     manifest = {
@@ -38,16 +40,57 @@ def _write_run_dir(traces_root: Path, run_id: str, *, status: str = "failed", er
     (run_dir / "manifest.json").write_text(json.dumps(manifest))
     # Minimal journal: seq=1, 2, 3, 10, 11, 12 (3,4,5,6,7,8,9 dropped).
     envelopes = [
-        {"run_seq": 1, "descriptor": {"type": "AgentRunStarted"}, "data": {"attributes": {"payload": {}}}},
-        {"run_seq": 2, "descriptor": {"type": "ContextCompacted"}, "data": {"attributes": {"payload": {}}}},
-        {"run_seq": 3, "descriptor": {"type": "ContextManifested"}, "data": {"attributes": {"payload": {}}}},
-        {"run_seq": 10, "descriptor": {"type": "RuntimeObserved"}, "data": {"plugin": "stop", "operation": "phase.fact", "attributes": {"payload": {"node": "stop.main", "result_kind": "stop_decision", "failure": {"node_id": "think.main", "reason": "error", "final_output": "think.main step after 1 attempt(s).", "attempts": [{"attempt": 1, "category": "permanent", "error_type": "RuntimeError"}]}}}}},
+        {
+            "run_seq": 1,
+            "descriptor": {"type": "AgentRunStarted"},
+            "data": {"attributes": {"payload": {}}},
+        },
+        {
+            "run_seq": 2,
+            "descriptor": {"type": "ContextCompacted"},
+            "data": {"attributes": {"payload": {}}},
+        },
+        {
+            "run_seq": 3,
+            "descriptor": {"type": "ContextManifested"},
+            "data": {"attributes": {"payload": {}}},
+        },
+        {
+            "run_seq": 10,
+            "descriptor": {"type": "RuntimeObserved"},
+            "data": {
+                "plugin": "stop",
+                "operation": "phase.fact",
+                "attributes": {
+                    "payload": {
+                        "node": "stop.main",
+                        "result_kind": "stop_decision",
+                        "failure": {
+                            "node_id": "think.main",
+                            "reason": "error",
+                            "final_output": "think.main step after 1 attempt(s).",
+                            "attempts": [
+                                {
+                                    "attempt": 1,
+                                    "category": "permanent",
+                                    "error_type": "RuntimeError",
+                                }
+                            ],
+                        },
+                    }
+                },
+            },
+        },
         {"run_seq": 11, "descriptor": {"type": "RuntimeObserved"}, "data": {"attributes": {}}},
         {"run_seq": 12, "descriptor": {"type": "AgentRunFinished"}, "data": {"attributes": {}}},
     ]
-    (run_dir / "journal.jsonl").write_text(
-        "\n".join(json.dumps(e) for e in envelopes)
-    )
+    (run_dir / "journal.jsonl").write_text("\n".join(json.dumps(e) for e in envelopes))
+    spine_events = [
+        {"execution_point": "kernel.run.start", "run_id": run_id},
+        {"execution_point": "exception.caught", "run_id": run_id},
+        {"execution_point": "kernel.run.stop", "run_id": run_id},
+    ]
+    (run_dir / "events.jsonl").write_text("\n".join(json.dumps(e) for e in spine_events))
 
 
 def test_debug_run_extracts_8_section(tmp_path: Path) -> None:
@@ -64,6 +107,10 @@ def test_debug_run_extracts_8_section(tmp_path: Path) -> None:
     # [2] journal counts every event; missing seqs surface for review
     assert report.journal_event_count == 6
     assert report.journal_missing_seqs == (4, 5, 6, 7, 8, 9)
+    assert report.spine_event_count == 3
+    assert "events.jsonl" in report.spine_events_path
+    assert report.spine_execution_points[-1] == "kernel.run.stop"
+    assert "spine.events" in report.render_text()
 
     # [4] phase.cursor: last meaningful node before stop is recovered
     assert report.phase_cursor in {"stop.main", "stop.main (failed)"}
@@ -93,9 +140,7 @@ def test_debug_run_json_output_serialisable(tmp_path: Path) -> None:
     assert decoded["run_id"] == run_id
     assert decoded["journal_event_count"] == 6
     # ``manifest_summary`` carries the doctor_report.status verbatim.
-    assert (
-        decoded["manifest_summary"]["extra"]["doctor_report"]["status"] == "completed"
-    )
+    assert decoded["manifest_summary"]["extra"]["doctor_report"]["status"] == "completed"
 
 
 def test_debug_run_no_kernel_log_does_not_crash(tmp_path: Path) -> None:

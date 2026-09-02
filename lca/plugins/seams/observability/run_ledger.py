@@ -158,9 +158,13 @@ class _StepTreeBundle:
     backend: object | None  # StepGroupedBackend | None
     narrative_writer: object  # StepNarrativeWriter
 
-    def flush(self) -> None:
-        """写 step-tree journal.json + narrative.md。失败抛 → terminalizer 接管。"""
-        document = self._finalize_document()
+    def flush(self, *, outcome: str = "stopped") -> None:
+        """写 step-tree journal.json + narrative.md。失败抛 → terminalizer 接管。
+
+        ``outcome`` 必须反映真实终态(completed/failed/canceled/stopped),
+        不得写死 stopped —— 否则 doctor/narrative 与 session status 漂移。
+        """
+        document = self._finalize_document(outcome=outcome)
         if self.backend is not None and hasattr(self.backend, "flush"):
             self.backend.flush()
         if (
@@ -170,7 +174,7 @@ class _StepTreeBundle:
         ):
             self.narrative_writer.write(document)
 
-    def _finalize_document(self) -> object | None:
+    def _finalize_document(self, *, outcome: str = "stopped") -> object | None:
         """通过 store 的 idempotent finalizer 拿到 closed ``JournalDocument``。
 
         优于旧 ``_ensure_document_closed``: 不依赖 facade step_close_document
@@ -186,7 +190,19 @@ class _StepTreeBundle:
             # 老 store 没有 close_and_finalize —— 兜底读已闭合的 document
             document = getattr(lifecycle_store, "document", None)
             return document
-        return finalize(outcome="stopped")
+        return finalize(outcome=_normalize_journal_outcome(outcome))
+
+
+def _normalize_journal_outcome(outcome: str) -> str:
+    """Map session/carrier status strings onto JournalMetadata outcomes."""
+    value = (outcome or "stopped").strip().lower()
+    if value in {"completed", "failed", "paused", "stopped"}:
+        return value
+    if value in {"canceled", "cancelled"}:
+        return "stopped"
+    if value in {"error"}:
+        return "failed"
+    return "stopped"
 
 
 @plugin(

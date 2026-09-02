@@ -1,9 +1,12 @@
 """``spine.sink.file`` — L0 FileSink capability provider.
 
-Provides the ``file_sink`` capability backed by the infrastructure
-``FileSink`` (append-only JSONL under a run directory). Profile config
-supplies ``path`` (default ``.lca/spine/events.jsonl``) and optional
-``run_id`` (default ``boot``).
+Provides ``file_sink`` backed by :class:`RunRoutingFileSink`:
+
+- boot / no-run events → ``boot_path`` (default ``.lca/spine/boot-events.jsonl``)
+- real ``run_id`` events → ``<runs_root>/<run_id>/events.jsonl``
+
+ADR-0165.1 target layout: per-run ``events.jsonl`` lives next to journal /
+manifest / kernel.log under ``traces/runs/<run_id>/``.
 """
 
 from __future__ import annotations
@@ -25,18 +28,16 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
-from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
+from lca.infrastructure.observability.spine.sinks.routing_file_sink import (
+    RunRoutingFileSink,
+)
 
-_DEFAULT_PATH = ".lca/spine/events.jsonl"
-_DEFAULT_RUN_ID = "boot"
+_DEFAULT_BOOT_PATH = ".lca/spine/boot-events.jsonl"
+_DEFAULT_RUNS_ROOT = "traces/runs"
 
 
-def _register_sink_close(ctx: PluginContext, sink: FileSink) -> None:
-    """Register ``sink.close`` on the Cordis disposer chain when reachable.
-
-    ``AuditedPluginContext`` does not expose ``effect`` on its public
-    surface; try the facade first, then the wrapped inner context.
-    """
+def _register_sink_close(ctx: PluginContext, sink: RunRoutingFileSink) -> None:
+    """Register ``sink.close`` on the Cordis disposer chain when reachable."""
     effect = getattr(ctx, "effect", None)
     if callable(effect):
         effect(sink.close, label="spine.sink.file:close")
@@ -47,6 +48,19 @@ def _register_sink_close(ctx: PluginContext, sink: FileSink) -> None:
         inner_effect(sink.close, label="spine.sink.file:close")
 
 
+def _resolve_boot_path(cfg: Mapping[str, Any]) -> Path:
+    """Prefer ``boot_path``; map legacy ``path`` to boot file for compatibility."""
+    if "boot_path" in cfg:
+        return Path(str(cfg["boot_path"]))
+    if "path" in cfg:
+        legacy = Path(str(cfg["path"]))
+        # Old single-file layouts pointed at events.jsonl; rename to boot-events.
+        if legacy.name == "events.jsonl":
+            return legacy.with_name("boot-events.jsonl")
+        return legacy
+    return Path(_DEFAULT_BOOT_PATH)
+
+
 @plugin(
     id="spine.sink.file",
     provides=("file_sink",),
@@ -55,8 +69,8 @@ def _register_sink_close(ctx: PluginContext, sink: FileSink) -> None:
     kind=PluginKind.SEAM,
     effects=EffectClass.FILESYSTEM,
     description=(
-        "File sink — append-only events.jsonl truth store for the spine; "
-        "provides file_sink for spine.core and EmitPipeline consumers."
+        "File sink — routes boot events to boot-events.jsonl and per-run "
+        "events to traces/runs/<run_id>/events.jsonl."
     ),
     test_suite="tests.lca_plugins.observability.spine.test_sinks",
     contract=PluginContract(
@@ -79,16 +93,17 @@ def _register_sink_close(ctx: PluginContext, sink: FileSink) -> None:
     ),
 )
 async def setup(ctx: PluginContext, config: Any) -> None:
-    """Construct a ``FileSink`` from profile config and provide ``file_sink``."""
+    """Construct a routing file sink and provide ``file_sink``."""
     cfg: Mapping[str, Any] = config if isinstance(config, Mapping) else {}
-    path = Path(str(cfg.get("path", _DEFAULT_PATH)))
-    run_id = str(cfg.get("run_id", _DEFAULT_RUN_ID))
+    boot_path = _resolve_boot_path(cfg)
+    runs_root = Path(str(cfg.get("runs_root", _DEFAULT_RUNS_ROOT)))
+    file_name = str(cfg.get("file_name", "events.jsonl"))
 
-    run_dir = path.parent if str(path.parent) not in ("", ".") else Path(".")
-    file_name = path.name or "events.jsonl"
-    run_dir.mkdir(parents=True, exist_ok=True)
-
-    sink = FileSink(run_dir, run_id=run_id, file_name=file_name)
+    sink = RunRoutingFileSink(
+        boot_path=boot_path,
+        runs_root=runs_root,
+        file_name=file_name,
+    )
     ctx.provide("file_sink", sink)
     _register_sink_close(ctx, sink)
 

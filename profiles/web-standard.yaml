@@ -19,8 +19,9 @@ patch:
       default_model: qwen3.7-plus
       load_dotenv: true
 
-  # EventSpine file sink path — keeps journal output inside the per-run
-  # working dir alongside other LCA artefacts.
+  # EventSpine file sink — boot events process-local; run events under
+  # traces/runs/<run_id>/events.jsonl (ADR-0165.1 layout).
   - id: spine.sink.file
     config:
-      path: .lca/spine/events.jsonl
+      boot_path: .lca/spine/boot-events.jsonl
+      runs_root: traces/runs

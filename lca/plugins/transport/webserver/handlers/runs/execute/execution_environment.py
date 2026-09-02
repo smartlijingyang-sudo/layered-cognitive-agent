@@ -112,7 +112,33 @@ class RunExecutionEnvironment:
             attachment_ids=tuple(session.attachment_ids or ()),
             file_store=cast("FileStore | None", providers.file_store),
         )
+        # ADR-0164: bind StepLifecycleStore + facade RunContext so
+        # step_emitter / facade step_open write the same store that terminal
+        # flush reads. Without both, journal.json stays steps=[] forever
+        # (unbound RunContext → step_open raises → bridge_firewall swallows).
+        from lca.infrastructure.observability.facade import RunContext as FacadeRunContext
+        from lca.infrastructure.observability.facade import bind as bind_facade_run
+        from lca.runtime import step_lifecycle
+
+        lifecycle_token: object | None = None
+        store = getattr(session, "lifecycle_store", None)
+        if store is not None:
+            lifecycle_token = step_lifecycle.set_lifecycle_store(store)
+
+        agent = session.agent
+        agent_role = (
+            agent.name
+            if agent is not None and agent.name
+            else (agent.agent_id if agent is not None and agent.agent_id else "")
+        )
+        facade_ctx = FacadeRunContext(
+            run_id=cast("RunId", session.run_id),
+            trace_id=cast("TraceId", session.trace_id),
+            agent_role=agent_role,
+        )
+
         with (
+            bind_facade_run(facade_ctx),
             bind_run_ambit(ambit),
             run_id_scope(session.run_id),
             run_attachment_scope(session.attachment_ids),
@@ -128,9 +154,7 @@ class RunExecutionEnvironment:
                     run_scope(ambit.scope) if ambit.scope is not None else nullcontext(),
                     plane_bindings_scope(bindings),
                 ):
-                    await _bind_sandbox_runtime(
-                        session, providers.sandbox, providers.file_store
-                    )
+                    await _bind_sandbox_runtime(session, providers.sandbox, providers.file_store)
                     descriptor_registry = _resolve_descriptor_registry(self._ctx)
                     with bind_backends(self._hub), bind_descriptors(descriptor_registry):
                         await _stage_machine_attachments(
@@ -146,6 +170,8 @@ class RunExecutionEnvironment:
                         )
             finally:
                 structlog.contextvars.clear_contextvars()
+                if lifecycle_token is not None:
+                    step_lifecycle.reset_lifecycle_store(lifecycle_token)
 
 
 async def _bind_sandbox_runtime(session: RunSession, sandbox: Any, file_store: Any) -> None:

@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import time
 from collections.abc import AsyncIterator
 from typing import Any
@@ -29,7 +31,10 @@ from lca.infrastructure.observability.adapters.memory_adapter import (
 )
 from lca.infrastructure.observability.diagnostics.diagnostic_emitters import record_llm_completion
 from lca.infrastructure.observability.facade.facade import record
-from lca.infrastructure.observability.stream.llm_stream_activity import LlmStreamActivityTracker
+from lca.infrastructure.observability.stream.llm_stream_activity import (
+    LLM_STREAM_IDLE_TIMEOUT_S,
+    LlmStreamActivityTracker,
+)
 from lca.infrastructure.observability.stream.response_text_stream import ResponseTextStreamExtractor
 from lca.plugins.observability.spine.reflectors import body_llm as _body_llm_reflector
 
@@ -70,9 +75,17 @@ class TelemetryLLMAdapter(LLMAdapter):
 
     name = "telemetry-llm"
 
-    def __init__(self, inner: LLMAdapter) -> None:
+    def __init__(
+        self,
+        inner: LLMAdapter,
+        *,
+        idle_timeout_s: float | None = None,
+    ) -> None:
         self._inner = inner
         self.name = f"telemetry({getattr(inner, 'name', type(inner).__name__)})"
+        self._idle_timeout_s = (
+            LLM_STREAM_IDLE_TIMEOUT_S if idle_timeout_s is None else idle_timeout_s
+        )
 
     @property
     def inner(self) -> LLMAdapter:
@@ -82,6 +95,8 @@ class TelemetryLLMAdapter(LLMAdapter):
     async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
         model = _model_label(self._inner)
         started = time.perf_counter()
+        # ADR-0164: open think step at LLM boundary (auto dual-write seam).
+        _open_think_step(prompt)
         # PR-3.3: spine emits llm.call.start/end around the inner call.
         # The journal ``record()`` pair (LlmCallStarted / LlmCallCompleted)
         # remains for backward compatibility with the legacy projector
@@ -136,6 +151,8 @@ class TelemetryLLMAdapter(LLMAdapter):
         recorded = False
         answer_extractor = ResponseTextStreamExtractor()
 
+        # ADR-0164: open think step at LLM stream boundary.
+        _open_think_step(prompt)
         record(LlmCallStarted(step=step, model=model))
         # PR-3.3: spine emits llm.call.start at the beginning of the stream.
         _body_llm_reflector.emit_llm_call_start(
@@ -143,16 +160,48 @@ class TelemetryLLMAdapter(LLMAdapter):
             stream=True,
             prompt_preview=prompt,
         )
-        # PR-3.3: llm.call.end fires once, on whichever terminal branch wins
-        # (success: post-loop; failure: inner except). Local flag tracks which.
+        # llm.call.end must fire in ``finally``: consumers (``_stream_turn``)
+        # ``break`` on COMPLETED, which injects GeneratorExit and skips any
+        # code after the async-for. CancelledError is BaseException and also
+        # skipped the old ``except Exception`` end emit.
         spine_end_emitted = False
-        activity = LlmStreamActivityTracker(step=step, model=model)
+        saw_completed = False
+        end_outcome: str = "success"
+
+        def _on_idle(idle_s: float, idle_seq: int) -> None:
+            _body_llm_reflector.emit_llm_stream_stall(
+                model=model,
+                idle_ms=int(idle_s * _PERF_COUNTER_SCALE),
+                seq=idle_seq,
+            )
+
+        activity = LlmStreamActivityTracker(step=step, model=model, on_idle=_on_idle)
         activity.start()
 
+        inner_stream = self._inner.stream(prompt, **inner_kwargs)
         try:
-            async for event in self._inner.stream(prompt, **inner_kwargs):
+            while True:
+                try:
+                    event = await asyncio.wait_for(
+                        inner_stream.__anext__(),
+                        timeout=self._idle_timeout_s,
+                    )
+                except StopAsyncIteration:
+                    break
+                except TimeoutError:
+                    end_outcome = "timeout"
+                    with contextlib.suppress(Exception):
+                        await inner_stream.aclose()
+                    _log.warning(
+                        "llm_stream_idle_timeout",
+                        adapter=type(self._inner).__name__,
+                        model=model,
+                        idle_timeout_s=self._idle_timeout_s,
+                    )
+                    raise
                 activity.touch()
                 if event.type == LLMStreamEventType.COMPLETED:
+                    saw_completed = True
                     if reasoning_text or reasoning_started is not None:
                         duration_ms = 0
                         if reasoning_started is not None:
@@ -181,6 +230,21 @@ class TelemetryLLMAdapter(LLMAdapter):
                             reasoning_text=reasoning_text,
                         )
                         recorded = True
+                    # Emit success end BEFORE yielding COMPLETED. Consumers
+                    # (``_stream_turn``) break on COMPLETED, which aclose()s the
+                    # generator and can lose post-yield finally state on some
+                    # paths; bracketing here keeps llm.call.end durable.
+                    if not spine_end_emitted:
+                        pt, ct = _usage_of(final_response) if final_response is not None else (0, 0)
+                        _body_llm_reflector.emit_llm_call_end(
+                            model=model,
+                            stream=True,
+                            outcome="success",
+                            latency_ms=int((time.perf_counter() - started) * _PERF_COUNTER_SCALE),
+                            prompt_tokens=pt or None,
+                            completion_tokens=ct or None,
+                        )
+                        spine_end_emitted = True
                 elif event.type == LLMStreamEventType.REASONING_TEXT_DELTA:
                     delta_text = event.text or ""
                     if delta_text:
@@ -268,7 +332,8 @@ class TelemetryLLMAdapter(LLMAdapter):
                             pass
                         delta_seq += 1
                 yield event
-        except Exception:
+        except asyncio.CancelledError:
+            end_outcome = "cancelled"
             if not recorded:
                 preview = final_response.text if final_response is not None else accumulated_text
                 self._record(
@@ -282,46 +347,73 @@ class TelemetryLLMAdapter(LLMAdapter):
                     stream=True,
                     reasoning_text=reasoning_text,
                 )
-            _body_llm_reflector.emit_llm_call_end(
-                model=model,
-                stream=True,
-                outcome="failure",
-                latency_ms=int((time.perf_counter() - started) * _PERF_COUNTER_SCALE),
-            )
-            spine_end_emitted = True
+            raise
+        except TimeoutError:
+            end_outcome = "timeout"
+            if not recorded:
+                preview = final_response.text if final_response is not None else accumulated_text
+                self._record(
+                    model,
+                    prompt,
+                    preview,
+                    False,
+                    started,
+                    0,
+                    0,
+                    stream=True,
+                    reasoning_text=reasoning_text,
+                )
+            raise
+        except Exception:
+            end_outcome = "failure"
+            if not recorded:
+                preview = final_response.text if final_response is not None else accumulated_text
+                self._record(
+                    model,
+                    prompt,
+                    preview,
+                    False,
+                    started,
+                    0,
+                    0,
+                    stream=True,
+                    reasoning_text=reasoning_text,
+                )
             raise
         finally:
             await activity.close()
-
-        if not recorded:
-            _log.warning(
-                "inner_adapter_stream_missing_completed",
-                adapter=type(self._inner).__name__,
-            )
-            self._record(
-                model,
-                prompt,
-                accumulated_text,
-                True,
-                started,
-                0,
-                0,
-                stream=True,
-                reasoning_text=reasoning_text,
-            )
-        # PR-3.3: success path of llm.call.end on the stream terminal.
-        if not spine_end_emitted:
-            prompt_tokens, completion_tokens = (
-                _usage_of(final_response) if final_response is not None else (0, 0)
-            )
-            _body_llm_reflector.emit_llm_call_end(
-                model=model,
-                stream=True,
-                outcome="success",
-                latency_ms=int((time.perf_counter() - started) * _PERF_COUNTER_SCALE),
-                prompt_tokens=prompt_tokens or None,
-                completion_tokens=completion_tokens or None,
-            )
+            if not recorded and end_outcome == "success":
+                _log.warning(
+                    "inner_adapter_stream_missing_completed",
+                    adapter=type(self._inner).__name__,
+                )
+                self._record(
+                    model,
+                    prompt,
+                    accumulated_text,
+                    True,
+                    started,
+                    0,
+                    0,
+                    stream=True,
+                    reasoning_text=reasoning_text,
+                )
+            if not spine_end_emitted:
+                outcome = end_outcome
+                if outcome == "success" and not saw_completed:
+                    outcome = "cancelled"
+                prompt_tokens, completion_tokens = (
+                    _usage_of(final_response) if final_response is not None else (0, 0)
+                )
+                _body_llm_reflector.emit_llm_call_end(
+                    model=model,
+                    stream=True,
+                    outcome=outcome,  # type: ignore[arg-type]
+                    latency_ms=int((time.perf_counter() - started) * _PERF_COUNTER_SCALE),
+                    prompt_tokens=prompt_tokens or None,
+                    completion_tokens=completion_tokens or None,
+                )
+                spine_end_emitted = True
 
     @staticmethod
     def _record(
@@ -360,9 +452,12 @@ class TelemetryLLMAdapter(LLMAdapter):
                 reasoning_preview=reasoning_text[:1024],
             )
         )
-        # ADR-0164 Phase 3 双写:写 step.thinking
+        # ADR-0164 Phase 3 双写: thinking into open think step, then close.
         try:
-            from lca.runtime.step_emitter import bridge_llm_completed
+            from lca.runtime.step_emitter import (
+                bridge_llm_completed,
+                bridge_think_closed,
+            )
 
             bridge_llm_completed(
                 model=model,
@@ -373,5 +468,22 @@ class TelemetryLLMAdapter(LLMAdapter):
                 response_preview=(response_text or "")[:1024],
                 decision="respond" if ok else "error",
             )
+            bridge_think_closed(
+                outcome="ok" if ok else "fail",
+                summary=("respond" if ok else "error"),
+            )
         except ImportError:
             pass
+
+
+def _open_think_step(prompt: str) -> None:
+    """Open a think step at the LLM adapter seam (ADR-0164 ownership)."""
+    try:
+        from lca.runtime.step_emitter import bridge_think_opened
+
+        objective = (prompt or "").strip().replace("\n", " ")
+        if len(objective) > 200:
+            objective = objective[:200] + "…"
+        bridge_think_opened(objective=objective or "llm.complete")
+    except ImportError:
+        pass

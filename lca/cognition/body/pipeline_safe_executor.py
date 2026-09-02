@@ -324,39 +324,54 @@ class PipelineSafeExecutor(SafeExecutor):
             raise ToolExecutionError("command envelope failed safe-boundary validation")
 
         verdict_refs.append("executor.plan-boundary:valid")
-        result = await self._pipeline_for(tool, retry_policy, cache_config).execute(
-            tool.name, args, invocation_id=invocation_id
-        )
-        verdict_refs.append("executor.pipeline:completed")
-        envelope = replace(envelope, policy_verdict_refs=tuple(verdict_refs))
+        # ADR-0164: open/close act at pipeline executor boundary.
+        from lca.cognition.body.safe_executor import _close_act_step, _open_act_step
 
-        # 如果管线返回 deny，抛出异常
-        if (
-            not result.ok
-            and result.error
-            and ("未在 ToolPermissionManifest" in result.error or "validation" in result.error)
-        ):
-            raise ToolExecutionError(result.error)
+        _open_act_step(tool.name)
+        act_closed = False
+        try:
+            result = await self._pipeline_for(tool, retry_policy, cache_config).execute(
+                tool.name, args, invocation_id=invocation_id
+            )
+            verdict_refs.append("executor.pipeline:completed")
+            envelope = replace(envelope, policy_verdict_refs=tuple(verdict_refs))
 
-        # 返回 Observation
-        envelope_evidence = command_envelope_to_dict(envelope)
-        if result.ok and result.output:
-            observation = cast("Observation", result.output)
-            observation.extra["command_envelope"] = envelope_evidence
-            observation.extra["policy_verdict_refs"] = list(envelope.policy_verdict_refs)
+            # 如果管线返回 deny，抛出异常
+            if (
+                not result.ok
+                and result.error
+                and ("未在 ToolPermissionManifest" in result.error or "validation" in result.error)
+            ):
+                raise ToolExecutionError(result.error)
+
+            # 返回 Observation
+            envelope_evidence = command_envelope_to_dict(envelope)
+            if result.ok and result.output:
+                observation = cast("Observation", result.output)
+                observation.extra["command_envelope"] = envelope_evidence
+                observation.extra["policy_verdict_refs"] = list(envelope.policy_verdict_refs)
+                _close_act_step(outcome="ok")
+                act_closed = True
+                return observation
+
+            observation = Observation(
+                observation_id=new_id("obs"),
+                success=False,
+                payload=None,
+                error=result.error or "Unknown error",
+                extra={
+                    FAILURE_KIND: FAILURE_KIND_EXECUTION,
+                    "command_envelope": envelope_evidence,
+                    "policy_verdict_refs": list(envelope.policy_verdict_refs),
+                },
+            )
+            _close_act_step(outcome="fail", error=observation.error)
+            act_closed = True
             return observation
-
-        return Observation(
-            observation_id=new_id("obs"),
-            success=False,
-            payload=None,
-            error=result.error or "Unknown error",
-            extra={
-                FAILURE_KIND: FAILURE_KIND_EXECUTION,
-                "command_envelope": envelope_evidence,
-                "policy_verdict_refs": list(envelope.policy_verdict_refs),
-            },
-        )
+        except Exception as exc:
+            if not act_closed:
+                _close_act_step(outcome="fail", error=str(exc))
+            raise
 
     async def _execute_once(self, tool: Tool, args: dict[str, Any], attempt: int) -> Observation:
         """单次执行（不含重试）。"""
