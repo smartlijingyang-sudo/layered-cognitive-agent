@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Literal
 
+from lca.contracts.observability.incarnation import Incarnation
 from lca.contracts.observability.loop_cursor import (
     CloseReason,
     CursorError,
@@ -20,7 +21,13 @@ from lca.infrastructure.observability.loop_cursor.state import _CursorState
 class InMemoryLoopCursor:
     """纯内存 cursor;用于测试替身(ADR-0169 L13:NullLoopCursor 不存在)。"""
 
-    def __init__(self, *, run_id: str, trace_id: str, incarnation: int) -> None:
+    def __init__(
+        self,
+        *,
+        run_id: str,
+        trace_id: str,
+        incarnation: Incarnation,
+    ) -> None:
         self._state = _CursorState(
             run_id=run_id,
             trace_id=trace_id,
@@ -33,7 +40,7 @@ class InMemoryLoopCursor:
         return CursorSnapshot(
             run_id=s.run_id,
             trace_id=s.trace_id,
-            incarnation=s.incarnation,
+            incarnation=s.incarnation.incarnation_seq,
             step_id=s.step_id,
             step_index=s.step_index,
             iteration=s.iteration,
@@ -43,6 +50,11 @@ class InMemoryLoopCursor:
             stop_signal=s.stop_signal,
             seq=s.seq,
         )
+
+    @property
+    def incarnation(self) -> Incarnation:
+        """暴露当前 cursor 的显式身份(ADR-0169 D6)。"""
+        return self._state.incarnation
 
     def _ensure_open(self) -> None:
         if self._state.closed:
@@ -69,9 +81,10 @@ class InMemoryLoopCursor:
 
     def close(self, reason: CloseReason) -> None:
         self._ensure_open()
-        self._state.closed = True
-        self._state.stop_signal = reason
-        self._state.phase = None
+        s = self._state
+        s.closed = True
+        s.stop_signal = reason
+        s.phase = None
 
     # ── record_*:在正确 phase window 才能调(L5 / L6) ──────────
     def record_thinking(self, payload: object) -> None:
@@ -96,17 +109,19 @@ class InMemoryLoopCursor:
             raise CursorError("record_request_header must open THINK window")
 
     def fork(self, reason: Literal["child_agent", "delegation"]) -> LoopCursor:
-        # ADR-0171 接管共享 Host 语义;本 PR 只产出独立子 cursor
+        # ADR-0171:child 继承 parent Incarnation + seq += 1
+        child_incarnation = self._state.incarnation.child()
         return InMemoryLoopCursor(
             run_id=self._state.run_id,
             trace_id=self._state.trace_id,
-            incarnation=self._state.incarnation,
+            incarnation=child_incarnation,
         )
 
 
 def _static_protocol_check() -> None:
     """编译期检查 InMemoryLoopCursor 满足 LoopCursor Protocol(纯静态)。"""
-    _: LoopCursor = InMemoryLoopCursor(run_id="r", trace_id="t", incarnation=1)
+    inc = Incarnation(run_id="r", plan_ref="p", incarnation_seq=1)
+    _: LoopCursor = InMemoryLoopCursor(run_id="r", trace_id="t", incarnation=inc)
 
 
 __all__ = ["InMemoryLoopCursor"]

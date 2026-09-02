@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Literal
 
+from lca.contracts.observability.incarnation import Incarnation
 from lca.contracts.observability.loop_cursor import (
     CloseReason,
     CursorError,
@@ -33,6 +34,11 @@ class StdLoopCursor:
     - 进入 phase.X 后,record_X 必须在 X phase 窗口内调用
     - record_request_header 必在 THINK phase 调用,同时触发 step 自增
     - close() 之后所有 record_*/advance 抛 CursorError
+
+    incarnation 显式身份(ADR-0169 D6 / L14):
+    - cursor 持有 frozen Incarnation(run_id + plan_ref + incarnation_seq)
+    - snapshot.incarnation 派生自 Incarnation.incarnation_seq
+    - spine payload 携带 incarnation(plan_ref + seq),envelope 必携带(L14)
     """
 
     def __init__(
@@ -41,7 +47,7 @@ class StdLoopCursor:
         spine: WritePort,
         run_id: str,
         trace_id: str,
-        incarnation: int,
+        incarnation: Incarnation,
     ) -> None:
         self._spine = spine
         self._state = _CursorState(
@@ -56,7 +62,7 @@ class StdLoopCursor:
         return CursorSnapshot(
             run_id=s.run_id,
             trace_id=s.trace_id,
-            incarnation=s.incarnation,
+            incarnation=s.incarnation.incarnation_seq,
             step_id=s.step_id,
             step_index=s.step_index,
             iteration=s.iteration,
@@ -67,6 +73,11 @@ class StdLoopCursor:
             seq=s.seq,
         )
 
+    @property
+    def incarnation(self) -> Incarnation:
+        """暴露当前 cursor 的显式身份(ADR-0169 D6);供 fork / Capture 读取。"""
+        return self._state.incarnation
+
     # ── spine append helper ─────────────────────────────────────
     def _append(self, execution_point: str, payload: dict) -> int:
         s = self._state
@@ -76,7 +87,7 @@ class StdLoopCursor:
             payload=payload,
             run_id=s.run_id,
             seq=s.seq,
-            incarnation=s.incarnation,
+            incarnation=s.incarnation.incarnation_seq,
             phase=s.phase,
         )
 
@@ -123,7 +134,7 @@ class StdLoopCursor:
             payload={"reason": reason},
         )
 
-    # ── record_*(4)— cursor 派生 step_id / incarnation / call_seq ──────────
+    # ── record_*(4)— cursor 注入 incarnation(ADR-0169 L14) ──────────
     def record_thinking(self, payload: ThinkingRecord) -> None:
         self._ensure_open()
         if self._state.phase != "think":
@@ -135,7 +146,8 @@ class StdLoopCursor:
                 "content_path": payload.content_path,
                 "token_count": payload.token_count,
                 "thinking_kind": payload.thinking_kind,
-                "incarnation": self._state.incarnation,
+                "incarnation": self._state.incarnation.incarnation_seq,
+                "plan_ref": self._state.incarnation.plan_ref,
                 "step_index": self._state.step_index,
             },
         )
@@ -151,7 +163,8 @@ class StdLoopCursor:
                 "args_digest": payload.args_digest,
                 "args_payload_path": payload.args_payload_path,
                 "call_seq": payload.call_seq,
-                "incarnation": self._state.incarnation,
+                "incarnation": self._state.incarnation.incarnation_seq,
+                "plan_ref": self._state.incarnation.plan_ref,
                 "step_index": self._state.step_index,
             },
         )
@@ -167,7 +180,8 @@ class StdLoopCursor:
                 "result_digest": payload.result_digest,
                 "result_path": payload.result_path,
                 "outcome": payload.outcome,
-                "incarnation": self._state.incarnation,
+                "incarnation": self._state.incarnation.incarnation_seq,
+                "plan_ref": self._state.incarnation.plan_ref,
                 "step_index": self._state.step_index,
             },
         )
@@ -186,6 +200,7 @@ class StdLoopCursor:
             payload={
                 "step_id": header.step_id,
                 "incarnation": header.incarnation,
+                "plan_ref": self._state.incarnation.plan_ref,
                 "reason": header.reason,
                 "model": header.model,
                 "system_digest": header.system_digest,
@@ -201,12 +216,13 @@ class StdLoopCursor:
         )
 
     def fork(self, reason: Literal["child_agent", "delegation"]) -> LoopCursor:
-        # ADR-0171 接管共享 Host 语义;本 PR 产出独立子 cursor
+        # ADR-0171:child 共享 parent host,Incarnation 继承 + incarnation_seq += 1
+        child_incarnation = self._state.incarnation.child()
         return StdLoopCursor(
             spine=self._spine,
             run_id=self._state.run_id,
             trace_id=self._state.trace_id,
-            incarnation=self._state.incarnation,
+            incarnation=child_incarnation,
         )
 
 
@@ -217,11 +233,12 @@ def _static_protocol_check() -> None:
         def append(self, **kw: object) -> int:
             return 0
 
+    inc = Incarnation(run_id="r", plan_ref="p", incarnation_seq=1)
     _: LoopCursor = StdLoopCursor(
         spine=_StubSpine(),
         run_id="r",
         trace_id="t",
-        incarnation=1,
+        incarnation=inc,
     )
 
 

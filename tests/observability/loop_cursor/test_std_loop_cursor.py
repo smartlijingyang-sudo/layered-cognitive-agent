@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 
 import pytest
 
+from lca.contracts.observability.incarnation import Incarnation
 from lca.contracts.observability.loop_cursor import CursorError
 from lca.contracts.observability.loop_cursor_payloads import (
     RequestHeader,
@@ -58,7 +59,7 @@ def _make_cursor() -> tuple[StdLoopCursor, _StubSpine]:
         spine=spine,
         run_id="r1",
         trace_id="t1",
-        incarnation=2,
+        incarnation=Incarnation(run_id="r1", plan_ref="plan-A", incarnation_seq=2),
     )
     return cursor, spine
 
