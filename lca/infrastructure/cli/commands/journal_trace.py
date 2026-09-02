@@ -1,13 +1,15 @@
 """Journal trace — print one event per line, optionally with I17 source columns.
 
-Task 9.3: ``lca-ops journal trace <run_id> [--locals] [--source]`` reads
-the append-only ``events.jsonl`` written by the spine ``FileSink`` and
-prints a human-readable table. The default view shows ``seq / execution
-point / channel / outcome / when``. With ``--source`` two extra columns
-appear (``source_location`` file:line and the function name). With
-``--locals`` (which implies ``--source``) two more columns are added:
-the first ``call_frames`` entry beyond ``source_location`` and a compact
-``locals_snapshot.pre_call`` rendering.
+Task 9.3: ``./scripts/lca-ops journal trace [run_id] [--locals] [--source]``
+reads the append-only ``events.jsonl`` written by the spine ``FileSink``
+and prints a human-readable table. ``run_id`` is optional: when omitted
+the command picks the latest run via ``traces/latest.json`` (pointer
+preferred, mtime-sorted fallback). The default view shows ``seq /
+execution point / channel / outcome / when``. With ``--source`` two extra
+columns appear (``source_location`` file:line and the function name).
+With ``--locals`` (which implies ``--source``) two more columns are
+added: the first ``call_frames`` entry beyond ``source_location`` and a
+compact ``locals_snapshot.pre_call`` rendering.
 
 The CLI sits under ``journal`` to keep the LCA Spine concerns grouped;
 the older ``lca-ops trace`` command remains for legacy ``journal.jsonl``
@@ -44,6 +46,7 @@ from typing import Any
 
 import typer
 
+from lca.infrastructure.cli.commands._shared import find_latest_run_id
 from lca.infrastructure.observability.backends.run_locator_fs import (
     FilesystemRunLocator,
 )
@@ -1030,12 +1033,25 @@ def _resolve_events_path(traces_root: Path, run_id: str) -> Path:
     return events_path
 
 
+def _latest_run_id(traces_root: Path) -> str | None:
+    """Resolve the latest ``run_id`` under ``traces_root`` for argument-less trace.
+
+    Delegates to :func:`lca.infrastructure.cli.commands._shared.find_latest_run_id`
+    so the resolution rules (``traces/latest.json`` pointer first, then
+    mtime-sorted fallback) stay consistent across CLI commands.
+    """
+    return find_latest_run_id(traces_root)
+
+
 def register(app: typer.Typer) -> None:
     """Register the ``trace`` command under the ``journal`` group."""
 
     @app.command(name="trace")
     def trace_cmd(
-        run_id: str = typer.Argument(..., help="run_id (e.g. run_c38532761cfb)"),
+        run_id: str = typer.Argument(
+            "",
+            help="run_id (e.g. run_c38532761cfb);空 = 最新一个 run(traces/latest.json 优先)",
+        ),
         human: bool = typer.Option(
             True,
             "--human/--no-human",
@@ -1060,6 +1076,9 @@ def register(app: typer.Typer) -> None:
     ) -> None:
         """检查一个 run 的 spine ``events.jsonl``(只读,PR-9 I17 起生效)。
 
+        不带参数时自动选最新一个 run(``traces/latest.json`` 原子指针优先,
+        否则 mtime 最新)。其余语义同显式传参:
+
         默认开 ``--human``:tree 缩进 + payload 原文 + Δms 时间戳 +
         自动折叠 ``llm.stream.token`` / ``runtime.reducer.apply`` /
         配对的 ``transport.route.{enter,exit}``,但**不截断 payload 文本**。
@@ -1073,7 +1092,15 @@ def register(app: typer.Typer) -> None:
         if with_locals:
             with_source = True
 
-        events_path = _resolve_events_path(traces_root, run_id)
+        resolved_run_id = run_id or _latest_run_id(traces_root)
+        if not resolved_run_id:
+            print(
+                "no run_id provided and no runs found under "
+                f"{traces_root / 'runs'}; pass a run_id explicitly",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
+        events_path = _resolve_events_path(traces_root, resolved_run_id)
         all_events: list[dict[str, Any]] = []
         for event in _iter_events(events_path):
             if event.get("__decode_error__"):
@@ -1128,7 +1155,7 @@ def register(app: typer.Typer) -> None:
             ]
             report = {
                 "schema": "lca.journal_trace/1",
-                "run_id": run_id,
+                "run_id": resolved_run_id,
                 "events_path": str(events_path),
                 "total": total,
                 "rendered": len(rows),

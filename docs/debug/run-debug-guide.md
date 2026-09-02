@@ -9,12 +9,17 @@
 > `journal trace --human`, `journal narrative`, `journal trajectory` —
 > not from this document.
 >
+> **Path convention.** All commands in this SOP are written as
+> `./scripts/lca-ops ...`. From anywhere else invoke it as
+> `<repo>/scripts/lca-ops ...`. The bare `lca-ops` on `$PATH` is the same
+> script; both work.
+>
 > **SSOT rule.** Commands listed here are kept in sync with the CLI by
-> `scripts/check_run_debug_sync.py`. That script asks `lca-ops --help`
-> (the real registry) what commands exist and diffs against every
-> `lca-ops ...` path this SOP mentions. Run it in CI; if it fails, this
-> document is lying and you must fix it before proceeding. See
-> §Maintenance for details.
+> `scripts/check_run_debug_sync.py`. That script asks
+> `./scripts/lca-ops --help` (the real registry) what commands exist
+> and diffs against every `lca-ops ...` path this SOP mentions. Run it
+> in CI; if it fails, this document is lying and you must fix it before
+> proceeding. See §Maintenance for details.
 
 ---
 
@@ -55,14 +60,14 @@ Each step has five labels you should expect to find in your own output:
 **DO.**
 
 ```sh
-lca-ops status --json
+./scripts/lca-ops status --json
 ```
 
 **OUTPUT.** JSON with five services: `kernel_serve`, `infra`, `lobehub`, `daemon`, `onlyboxes`. Anything `unhealthy`/`missing`/`not running` → service problem, not run problem.
 
-**NEXT.** If any service is down: `lca-ops heal --json`, then re-check. Once `kernel_serve: healthy`, advance to Step 1.
+**NEXT.** If any service is down: `./scripts/lca-ops heal --json`, then re-check. Once `kernel_serve: healthy`, advance to Step 1.
 
-**FAIL.** `lca-ops` itself fails → check `which lca-ops`, run with `bash -x ./scripts/lca-ops status --json` to see where it dies.
+**FAIL.** `./scripts/lca-ops` itself fails → check `which lca-ops`, run with `bash -x ./scripts/lca-ops status --json` to see where it dies.
 
 ---
 
@@ -74,10 +79,10 @@ lca-ops status --json
 
 ```sh
 # Human-readable (default)
-lca-ops debug-run "$LATEST"
+./scripts/lca-ops debug-run "$LATEST"
 
 # You (agent)
-lca-ops debug-run "$LATEST" --json
+./scripts/lca-ops debug-run "$LATEST" --json
 ```
 
 **OUTPUT.** 8 sections. Important nuances:
@@ -106,17 +111,19 @@ lca-ops debug-run "$LATEST" --json
 ```sh
 # Default human view (tree indent + payload text + Δms + auto-collapse
 # token/reducer noise). Pass this to the user when they ask "走了一遍啥逻辑".
-lca-ops journal trace "$LATEST"
+# No run_id = latest run (traces/latest.json pointer, mtime fallback).
+./scripts/lca-ops journal trace
+./scripts/lca-ops journal trace "$LATEST"   # explicit, equivalent here
 
 # Compact table — control points + channel + outcome. Fast to scan.
-lca-ops journal logs -r "$LATEST"
+./scripts/lca-ops journal logs -r "$LATEST"
 
-# Expand payloads (and surface sidecar traceback when --v finds an
+# Expand payloads (and surface sidecar traceback when -v finds an
 # offloaded event)
-lca-ops journal logs -r "$LATEST" -v
+./scripts/lca-ops journal logs -r "$LATEST" -v
 
 # You (agent). Pipe to jq, don't try to parse the human tree.
-lca-ops journal trace "$LATEST" --json
+./scripts/lca-ops journal trace "$LATEST" --json
 ```
 
 **OUTPUT.**
@@ -168,8 +175,8 @@ SIDECAR=$(ls traces/runs/"$LATEST"/*.json 2>/dev/null \
 **DO.**
 
 ```sh
-lca-ops explain "$LATEST"           # human
-lca-ops explain "$LATEST" --json    # you (agent)
+./scripts/lca-ops explain "$LATEST"           # human
+./scripts/lca-ops explain "$LATEST" --json    # you (agent)
 ```
 
 **OUTPUT.** A `FailureExplanation` projection: leaf event, causal ancestors (parent_seq chain), `StopDecision.failure` record, suggested attribution.
@@ -198,10 +205,10 @@ lca-ops explain "$LATEST" --json    # you (agent)
 | New execution_point not in `EXECUTION_POINTS` whitelist | observability whitelist constant (e.g. `event_record.py`) |
 | Missing capability/dependency in plugin Manifest | `lca/plugins/<plugin>/manifest.py` |
 | Reducer wrote state outside `apply_*` | `lca/cognition/<area>/reducer.py` |
-| Tool bypassed Body (sandbox/transport direct import) | audit with `lca-ops audit-direct-commands` |
-| Hook re-introduced where forbidden | `lca-ops audit-hook-attach` |
+| Tool bypassed Body (sandbox/transport direct import) | audit with `./scripts/lca-ops audit-direct-commands` |
+| Hook re-introduced where forbidden | `./scripts/lca-ops audit-hook-attach` |
 | Side effect without reducer first | Body / SafeExecutor |
-| Profile topology missing a provides/requires | `lca-ops inspect-tree <profile>` then `lca-ops why-plugin <id>` |
+| Profile topology missing a provides/requires | `./scripts/lca-ops inspect-tree <profile>` then `./scripts/lca-ops why-plugin <id>` |
 
 If you find the failure root cause is *not* a single missing line (e.g. protocol mismatch, missing ADR) → escalate to Step 6 (diff against a passing run).
 
@@ -214,8 +221,8 @@ If you find the failure root cause is *not* a single missing line (e.g. protocol
 **WHY.** When the traceback is "obvious" but the *reason* isn't (the code path always ran before; why did it fail now?), the fastest disambiguation is a passing run from yesterday.
 
 ```sh
-lca-ops diff-runs <failing_id> <passing_id>
-lca-ops diff-context <failing_id> --step N
+./scripts/lca-ops diff-runs <failing_id> <passing_id>
+./scripts/lca-ops diff-context <failing_id> --step N
 ```
 
 For narrower comparisons, `optimize <run_id>` ranks candidates by latency/token/retries; `cost <run_id>` shows the LLM spend.
@@ -232,14 +239,14 @@ For narrower comparisons, `optimize <run_id>` ranks candidates by latency/token/
 
 ```sh
 # If you changed code:
-lca-ops kernel-restart --json
+./scripts/lca-ops kernel-restart --json
 
 # Then re-trigger the run via the same path the user used.
 # (Run via API / scenario file / curl — whatever the user's flow is.)
 
 # Then re-enter this SOP at Step 1 with the new run_id.
 LATEST2=$(jq -r .run_id traces/latest.json)
-lca-ops debug-run "$LATEST2" --json
+./scripts/lca-ops debug-run "$LATEST2" --json
 ```
 
 **OUTPUT.** `status=passed`, no exception class matching the prior bug.
@@ -268,14 +275,16 @@ lca-ops debug-run "$LATEST2" --json
 Then offer the user the human-readable view(s):
 
 ```sh
-# Tree with payloads + Δms (default --human)
-lca-ops journal trace "$LATEST"
+# Tree with payloads + Δms (default --human).
+# No run_id = latest run; pass $LATEST to be explicit.
+./scripts/lca-ops journal trace
+./scripts/lca-ops journal trace "$LATEST"
 
 # narrative.md story
-lca-ops journal narrative "$LATEST"
+./scripts/lca-ops journal narrative "$LATEST"
 
 # DSH-style HTML trajectory
-lca-ops journal trajectory "$LATEST"        # → traces/runs/<id>/journal.trajectory.html
+./scripts/lca-ops journal trajectory "$LATEST"        # → traces/runs/<id>/journal.trajectory.html
 ```
 
 Pick whichever the user actually asked for. Never hand the user raw `jq` output as a "human view".
@@ -296,7 +305,7 @@ When you (the agent) write the bug summary for the user:
 
 ## Don'ts (also enforced by sync check)
 
-- ❌ `lca-ops replay <run_id>` — that is not a top-level command. Use `lca-ops journal replay <run_id> --step N` (`--step` is required).
+- ❌ `lca-ops replay <run_id>` — that is not a top-level command. Use `./scripts/lca-ops journal replay <run_id> --step N` (`--step` is required).
 - ❌ `lca-ops diagnose phase-error` — alias removed.
 - ❌ `LCA_DEBUG=1` — env var does not exist (replaced by fail-loud).
 - ❌ `cat traces/lca_journal.jsonl` — dead path; the journal SSOT is `traces/runs/<id>/events.jsonl`.
@@ -322,8 +331,8 @@ When you (the agent) write the bug summary for the user:
 ## Maintenance (must be respected when editing CLI or this doc)
 
 - **This SOP must not lie.** Run `uv run python scripts/check_run_debug_sync.py` after any change to either the CLI or this document. CI should wire this script; if not, wire it.
-- **One-directional sync.** New CLI commands are *not* a failure — they appear in `lca-ops --help` and agents discover them. SOP references to commands that no longer exist *are* a failure.
-- **Sync mechanism.** The script invokes `./scripts/lca-ops --help` (and `<group> --help` for groups) to read the live command registry, parses the `Commands:` block, and diffs against every `\`lca-ops ...\`` backtick path this SOP contains. CI cost: ~30 s.
+- **One-directional sync.** New CLI commands are *not* a failure — they appear in `./scripts/lca-ops --help` and agents discover them. SOP references to commands that no longer exist *are* a failure.
+- **Sync mechanism.** The script invokes `./scripts/lca-ops --help` (and `<group> --help` for groups) to read the live command registry, parses the `Commands:` block, and diffs against every `` `lca-ops …` `` backtick path this SOP contains. The path prefix `./scripts/` is optional in the SOP — both `` `./scripts/lca-ops debug-run` `` and `` `lca-ops debug-run` `` are matched. CI cost: ~30 s.
 - **When you add a command** here, also update `AGENTS.md` §6 if it's a high-frequency command. Don't duplicate the matrix in both files.
 - **When you remove/rename a CLI command**, search this SOP for the old name; the sync check will tell you which lines to fix.
 - **Sidecar rules and I10 threshold** live in `lca/infrastructure/observability/spine/sinks/file_sink.py:_ATOMIC_THRESHOLD` — if that constant moves or the threshold changes, update Step 3 here.

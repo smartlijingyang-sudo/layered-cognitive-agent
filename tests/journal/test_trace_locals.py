@@ -501,3 +501,128 @@ def test_journal_trace_module_export() -> None:
     import lca.infrastructure.cli.commands.journal_trace as module
 
     assert "register" in module.__all__
+
+
+# ── argument-less mode (latest run) ──────────────────────────────────
+
+
+def test_no_run_id_picks_latest_via_pointer(traces_root: Path, monkeypatch) -> None:
+    """Omitting ``run_id`` reads ``traces/latest.json`` and renders that run.
+
+    The CliRunner changes cwd to a temp dir, so we monkeypatch the
+    default traces root and write the atomic pointer at that root.
+    """
+    pointer = traces_root / "latest.json"
+    pointer.write_text('{"run_id": "run_test", "kind": "run_pointer"}', encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "journal",
+            "trace",
+            "--traces-root",
+            str(traces_root),
+        ],
+    )
+    assert result.exit_code == 0, result.stderr
+    # The rendered tree/table should include the source column for the
+    # first event (proves it read run_test, not a missing run).
+    assert "brain/perceive.py" in result.stdout
+
+
+def test_no_run_id_picks_mtime_latest_when_pointer_missing(tmp_path: Path, monkeypatch) -> None:
+    """Without ``traces/latest.json`` we fall back to mtime order.
+
+    Two run directories under ``traces/runs/``; the second (newer) must
+    be picked automatically when no run_id is given.
+    """
+    root = tmp_path / "traces"
+    older = root / "runs" / "run_old"
+    newer = root / "runs" / "run_new"
+    older.mkdir(parents=True)
+    newer.mkdir(parents=True)
+
+    # Older run: one harmless event.
+    sink_old = FileSink(older, run_id="run_old", file_name="events.jsonl")
+    sink_old.write(
+        _make_record(
+            sequence=1,
+            execution_point="brain.perceive.start",
+            payload={"source_location": {"file": "old.py", "line": 1, "function": "f"}},
+            when_iso="2026-09-01T00:00:00+00:00",
+        )
+    )
+    sink_old.close()
+    # Touch the older directory earlier than the newer one.
+    import os
+
+    os.utime(older, (1_000_000, 1_000_000))
+
+    # Newer run: identifiable event we can grep for.
+    sink_new = FileSink(newer, run_id="run_new", file_name="events.jsonl")
+    sink_new.write(
+        _make_record(
+            sequence=1,
+            execution_point="brain.perceive.start",
+            payload={"source_location": {"file": "new.py", "line": 99, "function": "g"}},
+            when_iso="2026-09-01T00:00:00+00:00",
+        )
+    )
+    sink_new.close()
+    os.utime(newer, (2_000_000, 2_000_000))
+
+    result = runner.invoke(
+        app,
+        ["journal", "trace", "--traces-root", str(root)],
+    )
+    assert result.exit_code == 0, result.stderr
+    # Newer run wins; the older run's marker must be missing.
+    assert "new.py" in result.stdout
+    assert "old.py" not in result.stdout
+
+
+def test_no_run_id_with_no_runs_errors(tmp_path: Path) -> None:
+    """Empty ``traces/runs/`` and no pointer: friendly exit code 1."""
+    root = tmp_path / "traces"
+    root.mkdir()
+    result = runner.invoke(
+        app,
+        ["journal", "trace", "--traces-root", str(root)],
+    )
+    assert result.exit_code == 1
+    assert "no runs found" in result.stderr or "no runs" in result.stderr
+
+
+def test_no_run_id_with_pointer_but_missing_run_dir(tmp_path: Path) -> None:
+    """Pointer references a missing run directory → mtime fallback (empty → error).
+
+    If the pointer is stale (run directory removed), the resolver falls
+    back to mtime order. With no runs present the user gets the same
+    friendly error as the empty case.
+    """
+    root = tmp_path / "traces"
+    root.mkdir()
+    (root / "latest.json").write_text(
+        '{"run_id": "run_missing", "kind": "run_pointer"}', encoding="utf-8"
+    )
+    result = runner.invoke(
+        app,
+        ["journal", "trace", "--traces-root", str(root)],
+    )
+    assert result.exit_code == 1
+
+
+def test_explicit_run_id_still_works(traces_root: Path) -> None:
+    """Backwards compatibility: explicit ``run_id`` argument unchanged."""
+    result = runner.invoke(
+        app,
+        [
+            "journal",
+            "trace",
+            "run_test",
+            "--traces-root",
+            str(traces_root),
+        ],
+    )
+    assert result.exit_code == 0, result.stderr
+    assert "brain/perceive.py" in result.stdout

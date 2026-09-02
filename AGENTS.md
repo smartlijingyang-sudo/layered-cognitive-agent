@@ -139,14 +139,15 @@ Fact → State → Decision / Plan → Verdict → Effect → Observation / Jour
 LATEST=$(jq -r .run_id traces/latest.json)
 
 # 2. 一键 8 段诊断（首选；所有症状入口）
-lca-ops debug-run "$LATEST"
+./scripts/lca-ops debug-run "$LATEST"
 #    注：[3/8] kernel.log 多数 run 没有，[5/8] 不含完整 traceback。
 
 # 3. 看完整 spine 事件流（理解过程；模型所见即日志）
 #    表格视图（控制点 + channel + outcome）：
-lca-ops journal logs -r "$LATEST" -v
-#    树视图（人读；默认 --human：缩进 + payload 原文 + Δms + 自动折叠 reducer.apply/token 噪声）：
-lca-ops journal trace "$LATEST"
+./scripts/lca-ops journal logs -r "$LATEST" -v
+#    树视图（人读；不带 run_id 默认最新一个；--human：缩进 + payload 原文 + Δms + 自动折叠 reducer.apply/token 噪声）：
+./scripts/lca-ops journal trace            # 最新 run
+./scripts/lca-ops journal trace "$LATEST"  # 显式 run_id
 
 # 3.5 【必跑】读 run 目录的 <sha256>.json sidecar：traceback 通常在这里
 #      不是在 events.jsonl（大 event > 4 KB → I10 offload：FileSink._ATOMIC_THRESHOLD）。
@@ -161,11 +162,11 @@ SIDECAR=$(ls traces/runs/"$LATEST"/*.json 2>/dev/null \
 ' "$SIDECAR"
 
 # 4. 失败原因投影（仅 run 失败时有意义）
-lca-ops explain "$LATEST"
+./scripts/lca-ops explain "$LATEST"
 
 # 5. step 树 / 因果链 / narrative（早期失败的 run 可能 journal.json 不存在，正常）
-lca-ops journal steps "$LATEST" 2>/dev/null
-lca-ops journal narrative "$LATEST" 2>/dev/null
+./scripts/lca-ops journal steps "$LATEST" 2>/dev/null
+./scripts/lca-ops journal narrative "$LATEST" 2>/dev/null
 ```
 
 **口语映射**（agent 看到这些词就直接走流程，不要先分析语义）：
@@ -176,9 +177,9 @@ lca-ops journal narrative "$LATEST" 2>/dev/null
 | "分析一下这次" / "看看发生了什么" | 上面 1-3 + **3.5 sidecar** |
 | "为啥这次失败" / "这次出错了" | 上面 1-2 + **3.5 sidecar**(traceback 的第一站) + 4 |
 | "理解一下过程" / "走了一遍啥逻辑" | 上面 1 + 3 + 5 |
-| "DSH 风格轨迹" / "给我个 HTML" | 加 `lca-ops journal trajectory "$LATEST"` |
-| "模型都做了啥" / "调了啥工具" | `lca-ops trace "$LATEST" --focus llm\|tools\|delegation`（`--focus` 是 trace 的选项；`journal logs` 不支持） |
-| "给我个像 journal 那样的树视图" / "人读 trace" | `journal trace "$LATEST"`（**默认 --human**：树缩进 + Δms + payload 原文） |
+| "DSH 风格轨迹" / "给我个 HTML" | 加 `./scripts/lca-ops journal trajectory "$LATEST"` |
+| "模型都做了啥" / "调了啥工具" | `./scripts/lca-ops trace "$LATEST" --focus llm\|tools\|delegation`（`--focus` 是 trace 的选项；`journal logs` 不支持） |
+| "给我个像 journal 那样的树视图" / "人读 trace" | `./scripts/lca-ops journal trace`（**默认 --human**：树缩进 + Δms + payload 原文，默认最新 run） |
 
 **取 run_id 的硬规则**：永远 `jq -r .run_id traces/latest.json`，**不要** ls、find、按 mtime 排序——pointer 文件是 SSOT。
 
@@ -186,17 +187,17 @@ lca-ops journal narrative "$LATEST" 2>/dev/null
 
 | 场景 | 第一调用 | 失败退路 |
 |---|---|---|
-| 不知道 LCA 服务在不在跑 | `lca-ops status --json` | `lca-ops heal` |
-| 刚改完代码想重启 | `lca-ops kernel-restart` | `lca-ops kernel_serve` 打印启动命令 |
-| run 失败定位 | **`lca-ops debug-run <run_id>`** | `debug-env <run_id>` 只看摘要 |
-| 看完整流程 | `lca-ops trace <run_id> --focus llm\|tools\|delegation` | `journal trace <run_id>`（**默认 --human**，树视图） |
-| 失败原因投影 | `lca-ops explain <run_id>` | `minimal-repro <run_id>` |
-| profile 拓扑 | `lca-ops inspect-tree <profile>` | `dump-profile <profile>` |
-| 能力归属 | `lca-ops why <capability>` / `why-plugin <id>` | `graph <profile>` |
-| 审计 hardcode / Reducer 单写 | `lca-ops audit-control-surface` / `audit-state-writers` / `audit-direct-commands` / `audit-hook-attach` | `audit` |
-| ADR 监督 / 历史迁移 | `lca-ops status-adr-supervision` | `lca-ops diagnose-package-organization` |
-| 预设症状诊断 | `lca-ops diagnose-{model-not-seen,loop-stuck,memory-poisoned,approval-rejected}` | `docs/debug/run-debug-guide.md` §5 |
-| DSH 风格 HTML 轨迹 | `lca-ops journal trajectory` | `journal narrative` |
+| 不知道 LCA 服务在不在跑 | `./scripts/lca-ops status --json` | `./scripts/lca-ops heal` |
+| 刚改完代码想重启 | `./scripts/lca-ops kernel-restart` | `./scripts/lca-ops kernel_serve` 打印启动命令 |
+| run 失败定位 | **`./scripts/lca-ops debug-run <run_id>`** | `debug-env <run_id>` 只看摘要 |
+| 看完整流程 | `./scripts/lca-ops trace <run_id> --focus llm\|tools\|delegation` | `./scripts/lca-ops journal trace`（**默认 --human** + 默认最新 run） |
+| 失败原因投影 | `./scripts/lca-ops explain <run_id>` | `minimal-repro <run_id>` |
+| profile 拓扑 | `./scripts/lca-ops inspect-tree <profile>` | `dump-profile <profile>` |
+| 能力归属 | `./scripts/lca-ops why <capability>` / `why-plugin <id>` | `graph <profile>` |
+| 审计 hardcode / Reducer 单写 | `./scripts/lca-ops audit-control-surface` / `audit-state-writers` / `audit-direct-commands` / `audit-hook-attach` | `audit` |
+| ADR 监督 / 历史迁移 | `./scripts/lca-ops status-adr-supervision` | `./scripts/lca-ops diagnose-package-organization` |
+| 预设症状诊断 | `./scripts/lca-ops diagnose-{model-not-seen,loop-stuck,memory-poisoned,approval-rejected}` | `docs/debug/run-debug-guide.md` §5 |
+| DSH 风格 HTML 轨迹 | `./scripts/lca-ops journal trajectory` | `journal narrative` |
 
 ### 通用参数
 

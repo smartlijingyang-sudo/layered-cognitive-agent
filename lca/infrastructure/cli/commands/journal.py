@@ -16,6 +16,7 @@ from pathlib import Path
 
 import typer
 
+from lca.infrastructure.cli.commands._shared import find_latest_run_id
 from lca.infrastructure.cli.config import OpsConfig
 
 # Refusal codes returned by the kernel_serve HTTP layer when it explicitly
@@ -97,32 +98,14 @@ def register(app: typer.Typer, group: typer.Typer | None = None) -> None:
 def _find_latest_run_dir() -> Path | None:
     """Pick the most recently mutated run directory under ``traces/runs/``.
 
-    Preference order:
-
-    1. ``traces/latest.json`` (atomic pointer written by
-       :class:`FilesystemRunLocator.update_latest_pointer`). This is the
-       authoritative "what was the most recent completed run" signal and
-       avoids mtime races where an archived / restored run outranks the
-       live one.
-    2. mtime-sorted fallback when the pointer is missing or stale.
+    Thin wrapper around :func:`lca.infrastructure.cli.commands._shared.find_latest_run_id`
+    that returns the directory (not just the run_id) so callers that
+    already operate on paths don't have to re-glue ``traces/runs``.
     """
-    runs_root = Path("traces/runs")
-    if not runs_root.exists():
+    run_id = find_latest_run_id()
+    if run_id is None:
         return None
-    pointer = Path("traces/latest.json")
-    if pointer.is_file():
-        try:
-            payload = json.loads(pointer.read_text("utf-8"))
-        except (OSError, json.JSONDecodeError):
-            payload = None
-        if isinstance(payload, dict) and payload.get("kind") == "run_pointer":
-            run_dir = runs_root / str(payload.get("run_id", ""))
-            if run_dir.is_dir():
-                return run_dir
-    candidates = [p for p in runs_root.iterdir() if p.is_dir()]
-    if not candidates:
-        return None
-    return max(candidates, key=lambda p: p.stat().st_mtime)
+    return Path("traces/runs") / run_id
 
 
 def _events_jsonl_for(run_dir: Path) -> Path | None:

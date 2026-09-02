@@ -36,8 +36,10 @@ REPO = Path(__file__).resolve().parent.parent
 SOP = REPO / "docs" / "debug" / "run-debug-guide.md"
 LCA_OPS = REPO / "scripts" / "lca-ops"
 
-# SOP command-path capture: `lca-ops foo bar`
-SOP_CMD_RE = re.compile(r"`lca-ops((?:\s+[a-z][a-z0-9-]+)+)`")
+# SOP command-path capture: `lca-ops foo bar` or `./scripts/lca-ops foo bar`.
+# The leading `./scripts/` is optional so docs can use the canonical path
+# without losing sync coverage.
+SOP_CMD_RE = re.compile(r"`(?:\./scripts/)?lca-ops((?:\s+[a-z][a-z0-9-]+)+)`")
 
 # typer `Commands:` block: each line `  <name>   <desc>` (2-space indent).
 CMD_LINE_RE = re.compile(r"^\s{2}([a-z][a-z0-9-]+)\s{2,}\S")
