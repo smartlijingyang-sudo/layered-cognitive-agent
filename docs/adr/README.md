@@ -116,6 +116,12 @@
 | [0168](0168-loop-step-control-and-model-visible.md) | Loop Step Control 与 Model-Visible 真实化（被 0168-final 收敛;保留问题陈述） | Superseded |
 | [0168.1](0168.1-loop-cursor-state-machine.md) | LoopCursor — 单一 Loop 状态机收敛 step / segment / phase / iteration（被 0168-final 收敛;supersedes 0168 决策段） | Superseded |
 | [0168-final](0168-loop-cursor-final.md) | LoopCursor — 单状态机收敛 Spine / Step / Segment / Phase / Iteration / Journal / Projection（supersedes 0168 + 0168.1 决策段） | Proposed |
+| [0169](0169-loop-cursor-control.md) | LoopCursor 控制面收敛 — 五缝架构 + 与观测装配分离（supersedes 0168-final 全文） | Proposed |
+| [0170](0170-projection-host.md) | ProjectionHost — Loop 维度可插拔投影宿主（ADR-0169 §D8 投影缝） | Proposed |
+| [0171](0171-fork-shared-host.md) | fork 共享 Host 协议 — child cursor 不持独立 Host | Proposed |
+| [0172](0172-observability-exporters.md) | Observability Exporters 实现层（metrics / OTel / Langfuse） | Proposed |
+| [0173](0173-halt-resume-protocol.md) | halt-resume 协议 — LoopCursor 对外 rescue 路径 | Proposed |
+| [0174](0174-profile-cursor-bundles.md) | Profile 分批装配 — `loop_cursor.spine_*` bundle 落地 | Proposed |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
 

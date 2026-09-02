@@ -83,9 +83,7 @@ def test_business_layer_no_llm_call_completed() -> None:
                 if stripped.startswith('"') or stripped.startswith("'"):
                     continue
                 if emit_pattern.search(line):
-                    bad_lines.append(
-                        f"{py.relative_to(repo_root)}:{ln_no}: {line.strip()}"
-                    )
+                    bad_lines.append(f"{py.relative_to(repo_root)}:{ln_no}: {line.strip()}")
     assert not bad_lines, (
         "L11 violation: business 层禁止 emit LlmCallCompleted/Started:\n"
         + "\n".join(f"  {b}" for b in bad_lines)

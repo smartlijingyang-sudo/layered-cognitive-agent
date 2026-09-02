@@ -106,12 +106,16 @@ def test_l10_single_writer_no_concurrent_writers(tmp_path: Path) -> None:
     spine_b = EventSpine(sinks=[sink_b], run_id="run_a")
 
     spine_a.append(
-        execution_point="writable.step.start", channel="fact",
-        caller_payload={"seq": 1}, outcome="success",
+        execution_point="writable.step.start",
+        channel="fact",
+        caller_payload={"seq": 1},
+        outcome="success",
     )
     spine_b.append(
-        execution_point="writable.step.start", channel="fact",
-        caller_payload={"seq": 2}, outcome="success",
+        execution_point="writable.step.start",
+        channel="fact",
+        caller_payload={"seq": 2},
+        outcome="success",
     )
     spine_a.flush()
     spine_b.flush()
@@ -121,7 +125,5 @@ def test_l10_single_writer_no_concurrent_writers(tmp_path: Path) -> None:
     sink_b.close()
 
     # 同一路径累计 2 行(L10 不要求同实例;要求总写入行数 == 总 append)
-    lines = [
-        ln for ln in sink_a.path.read_text().splitlines() if ln.strip()
-    ]
+    lines = [ln for ln in sink_a.path.read_text().splitlines() if ln.strip()]
     assert len(lines) == 2
