@@ -49,6 +49,7 @@ EXECUTION_POINTS: tuple[str, ...] = (
     # PersistenceCoordinator 跨域订阅,在 ADR-0170 §D6 §L16 处制度化,
     # 此处仅为白名单登记(不引入新控制面)。
     "writable.iteration.halt",
+    "writable.iteration.closing",
     "writable.iteration.close",
     "loop.fork",
     # Writable matrix phase events (perceive / think / act / reflect / remember / stop)
@@ -61,6 +62,7 @@ EXECUTION_POINTS: tuple[str, ...] = (
     "phase.reflect.fold",
     "phase.act.fold.start",
     "phase.act.fold.end",
+    "phase.act.fold",  # loop cursor single phase EP(ADR-0169 D11)
     "phase.tool.call.start",
     "phase.tool.call.end",
     "phase.tool.denied",
