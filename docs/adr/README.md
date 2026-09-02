@@ -113,8 +113,10 @@
 | [0165](0165-event-spine-unified-log.md) | Event Spine 统一执行日志（stub；扩展见 0165-execution-point-enforcement） | Accepted |
 | [0166](0166-step-segment-phase-and-spine-hardening.md) | Step / Segment / Phase 三层计数与 Spine 硬化 | Accepted |
 | [0167](0167-spine-ssot-and-step-materialization.md) | Spine 唯一耐久真值、Step 物化视图与 Model-Visible 轨迹组织 | Accepted |
+| [0168](0168-loop-step-control-and-model-visible.md) | Loop Step Control 与 Model-Visible 真实化（被 0168.1 follow-up 收敛;保留问题陈述） | Proposed |
+| [0168.1](0168.1-loop-cursor-state-machine.md) | LoopCursor — 单一 Loop 状态机收敛 step / segment / phase / iteration（supersedes ADR-0168 决策段） | Proposed |
 
-> 同名 `0165` 系列有两份（stub + 执行点强制）：[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)（原 0165.1）。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
+> 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
 
 ## 维护规则
 - 不改旧文件；新决策用 `Supersedes: ADR-XXXX` 标记
