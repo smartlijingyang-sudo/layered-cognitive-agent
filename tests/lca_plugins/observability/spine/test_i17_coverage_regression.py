@@ -92,8 +92,44 @@ def test_existing_finished_events_still_work() -> None:
     # The union semantics: any one of the three token classes is
     # sufficient — pinned so a future contributor doesn't remove the
     # legacy tokens thinking they are dead code.
-    assert RUN_FINISHED_EVENTS >= {
+    assert {
         "AgentRunFinished",
         "TeamRunFinished",
         "kernel.run.stop",
-    }
+    } <= RUN_FINISHED_EVENTS
+
+
+def test_scan_jsonl_reads_spine_v3_sequence(tmp_path: Path) -> None:
+    """``scan_jsonl`` must honour ``sequence`` (spine v3 envelope).
+
+    Regression for the run ``run_5c0bb23d9e32`` (2026-09-02): the doctor
+    reported ``H2.last_seq=0`` while ``H3.last_seq=13`` because
+    ``scan_jsonl`` only accepted legacy ``seq`` / ``run_seq`` and missed
+    the canonical ``sequence`` field written by spine v3 sinks. This
+    pinned the envelope coverage at the doctor layer.
+    """
+    from lca.plugins.transport.webserver.handlers.runs.doctor.journal import (
+        scan_jsonl,
+    )
+
+    path = tmp_path / "events.jsonl"
+    rows = [
+        {"execution_point": "transport.route.exit", "channel": "control", "sequence": 2},
+        {"execution_point": "kernel.run.start", "channel": "control", "sequence": 3},
+        {"execution_point": "phase_graph.node.start", "channel": "control", "sequence": 7},
+        {"execution_point": "phase_graph.node.end", "channel": "control", "sequence": 13},
+        {"execution_point": "kernel.run.stop", "channel": "control", "sequence": 21},
+    ]
+    path.write_text(
+        "\n".join(json.dumps(r) for r in rows) + "\n",
+        encoding="utf-8",
+    )
+    scan = scan_jsonl(path)
+    assert scan.last_seq == 21
+    # Sanity: legacy ``seq`` still works.
+    legacy = tmp_path / "legacy.jsonl"
+    legacy.write_text(
+        json.dumps({"execution_point": "x", "channel": "c", "seq": 5}) + "\n",
+        encoding="utf-8",
+    )
+    assert scan_jsonl(legacy).last_seq == 5

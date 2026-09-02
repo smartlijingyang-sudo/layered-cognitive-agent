@@ -77,7 +77,11 @@ def scan_jsonl(path: Path) -> JsonlScan:
             or ""
         )
         counts[event_type] += 1
-        seq_raw = normalized.get("run_seq", record.get("seq")) or 0
+        # ADR-0167 / spine v3 envelope: ``events.jsonl`` carries the
+        # canonical ``sequence`` field. Older envelopes wrote ``seq``
+        # or ``run_seq``. Accept all three so H2 (scan_jsonl) and H3
+        # (live tail) agree on ``last_seq``.
+        seq_raw = record.get("sequence") or normalized.get("run_seq") or record.get("seq") or 0
         if isinstance(seq_raw, (int, float)) or (isinstance(seq_raw, str) and seq_raw.isdigit()):
             last_seq = max(last_seq, int(seq_raw))
         raw_event = normalized.get("data") or record.get("event")
