@@ -586,7 +586,7 @@ ContextVar 跨 async / thread / task 传递。`asyncio.copy_context()` 默认 in
 ### 5.4 trace 命令
 
 ```sh
-lca-ops journal trace run_c9fd294e5371 --include-orphan
+lca-ops journal trace run_c9fd294e5371 --human
 ```
 
 ```text
@@ -1723,7 +1723,7 @@ async def setup(ctx, config):
 ### 19.5 trace 命令扩展
 
 ```sh
-lca-ops journal trace run_c9fd294e5371 --include-orphan --locals
+lca-ops journal trace run_c9fd294e5371 --human --locals
 ```
 
 输出新增 4 列数据:

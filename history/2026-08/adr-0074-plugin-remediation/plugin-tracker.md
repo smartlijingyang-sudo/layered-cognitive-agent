@@ -1,6 +1,8 @@
 # ADR-0074 Plugin-Everything 实施追踪
 
 > **这是 ADR-0074「Plugin-Everything 裁剪版」的中央实施账本。开始动手前先读这一份——本文件自包含。**
+>
+> **历史命令脚注(2026-09-02):** 本文件提到的 `lca-ops explain control <slot>` 与 `lca-ops explain control <semantic-phase>` 实际等价 —— 第二个 positional 在 CLI 里接受的是 `SemanticPhase` 值(`perceive` / `think` / `act` / `reflect` / `gate` / `compose` / `stop`),不是 ControlSlot 名。`control` 子命令的 `slot` 参数是参数名而不是 ControlSlot 概念;请勿按 ControlSlot 名调用。
 
 ## 0. 读取顺序
 

@@ -4,6 +4,8 @@
 >
 > **Supersedes:** [history/2026-08/adr-0111-0114-boot-link-plan/plan.md](../adr-0111-0114-boot-link-plan/plan.md)(初版 8 PR / 30 commits / 4 周;被 3 个 subagent 评审一致 BLOCK 后重写)
 >
+> **历史命令脚注(2026-09-02):** 本计划在 §D / §验收 段落里写的 `lca-ops logs --scope boot [--tail N]` 与 `lca-ops kernel {boot,serve,stop,reload,compose}` 在实现时被替换为 `lca-ops journal logs -v` 与 `lca-ops kernel {boot,serve,compose}`(`stop` / `reload` 未实现,`reload` 概念由 kernel-restart 接管;见 [ADR-2026-09-02-i17-stream-align](../../../docs/adr/2026-09-02-i17-stream-align.md))。历史命令在本文件保留以体现当时的实现意图,但请勿再使用。
+>
 > **创建日期:** 2026-08-31
 > **预计总工作量:** 12 天,6 个 PR,16 commits
 >

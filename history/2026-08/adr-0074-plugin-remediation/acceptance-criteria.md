@@ -1,5 +1,7 @@
 # ADR-0066 / 0068 / 0069 + ADR-0074 验收规约
 
+> **历史命令脚注(2026-09-02):** 本文件中反复写到的 `lca-ops explain control <slot>` 实际等价于 `lca-ops explain control <semantic-phase>` —— 第二个 positional 在 CLI 里接受的是 `SemanticPhase` 值,不是 ControlSlot 名。ControlSlot 表里 `act.budget` / `perceive.fold` 等 dot-path 概念并未暴露到 CLI 表面。本文件保留原文以体现决策路径,但请勿按 ControlSlot 路径调用。
+>
 > **目的**：判定 ADR-0066 / 0068 / 0069 / 0074 提出的 Plugin-Everything 架构是否**真正**实施并达到预期效果；不是停留在概念、不是只在数据层加了 enum、不是只贴了一个 new dataclass 就宣布完成。
 >
 > **本文与 tracker 的关系**：[`adr-0074-plugin-everything-tracker.md`](adr-0074-plugin-everything-tracker.md) 记录"做了什么 PR、commit hash、依赖图"；本文记录"每条架构承诺需要看到什么证据才算达成"。两份文件**互为校验**——commit 在 tracker 里、证据在本文件里；二者必须同时绿。

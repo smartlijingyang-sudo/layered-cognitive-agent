@@ -2,7 +2,14 @@
 
 - Status: Accepted (2026-08-31)
 - Supersedes: 局部兼容收口 ADR-0119 / ADR-0121
-- Decision: 让任何 agent 失败能在 1 条命令 (`lca-ops debug run <run_id>`) 内自助定位;每种可观测/可调试能力都按 LCA Protocol → Seam → Provider → Adapter → Registry → Plugin 模型落地;清掉双执行路径的 legacy 垃圾;新增 RunDiagnostic / KernelLogProjection / phase-error diagnose alias 等缺失的诊断插件。
+- Decision: 让任何 agent 失败能在 1 条命令 (`lca-ops debug-run <run_id>`) 内自助定位;每种可观测/可调试能力都按 LCA Protocol → Seam → Provider → Adapter → Registry → Plugin 模型落地;清掉双执行路径的 legacy 垃圾;新增 RunDiagnostic / KernelLogProjection 等缺失的诊断插件。
+
+> **2026-09-02 实施脚注:** 本 ADR 描述的命令以最终落地为准:
+> - `lca-ops debug run <run_id>` → 顶层 `lca-ops debug-run <run_id>`(合并 dash);`debug env <run_id>` → `debug-env`。
+> - `phase-error` diagnose alias **未落地**;4 个真实 alias 是 `model-not-seen` / `loop-stuck` / `memory-poisoned` / `approval-rejected`(连字符)。详见 [run-debug-guide.md §5](../debug/run-debug-guide.md)。
+> - `lca-ops replay <run_id> --no-llm` → `lca-ops journal replay <run_id> --step K`(走 `ReplayCursor`,见 ADR-0167 D10)。
+>
+> ADR 原文保留以体现决策路径,但请勿按字面命令调用。
 
 ## Context
 

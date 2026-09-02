@@ -4571,11 +4571,11 @@ ORDER BY seq DESC
 #### 24.5.5 自动化诊断（CLI / Dashboard）
 
 ```bash
-# lca-ops diagnose
-lca-ops diagnose --trace trace-001 --problem "model_not_seen"
-lca-ops diagnose --trace trace-001 --problem "loop_stuck"
-lca-ops diagnose --trace trace-001 --problem "memory_poisoned"
-lca-ops diagnose --trace trace-001 --problem "approval_rejected"
+# lca-ops diagnose (连字符 problem key,positional 或 --trace-id)
+lca-ops diagnose model-not-seen --trace-id trace-001
+lca-ops diagnose loop-stuck --trace-id trace-001
+lca-ops diagnose memory-poisoned --trace-id trace-001
+lca-ops diagnose approval-rejected --trace-id trace-001
 
 # 输出：根因诊断树 + 修复建议
 ```

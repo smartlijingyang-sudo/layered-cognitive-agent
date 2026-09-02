@@ -301,8 +301,9 @@ ReplayCursor.at(run_id, K):
 
 ```sh
 lca-ops journal replay <run_id> --step K                 # 打印 StepContextAt
-lca-ops journal replay-diff <run_a> <run_b> --at K       # fork diff
 lca-ops journal verify-model-visible <run_id>            # 跑 I-MV1 全 run 校验
+# 注意: fork-diff (跨 run 同 step 对比) 由 `diff-runs <a> <b> --step N` 接管;
+# `journal replay-diff` 未实现,使用会得到 `No such command`。
 ```
 
 #### 10.6 与 DSH capability 对照
@@ -482,7 +483,7 @@ plugins:
 6. 仓库无 `step_emitter`；cognition 无 `open_step`。
 7. ADR 链无互相矛盾的「主真值」表述（以本 ADR 为准）。
 8. `spine.deriver.otel_trace` / `spine.deriver.waterfall` 作为可选 profile 装配存在；不装时不生效；装了也不影响 SSOT。
-9. `ReplayCursor` Protocol 与 `StepContextAt` 在 contracts 落地；CLI `journal replay / replay-diff / verify-model-visible` 可用，**不调 LLM 不跑 tool**。
+9. `ReplayCursor` Protocol 与 `StepContextAt` 在 contracts 落地；CLI `journal replay / verify-model-visible` 可用；fork-diff 走 `diff-runs <a> <b> --step N`，**不调 LLM 不跑 tool**。
 10. **五面矩阵 Protocol + 默认实现 + registry** 落地；任一面可被 profile 替换，**不动其他面、不影响 SSOT**（D11 I-PLUG1–6）。
 11. **Agent 端不直接 import `EventSpine` / `Serializer` / `Storage`**；架构测试锁死（D11 I-PLUG1）。
 12. **D13 设计尊严 10 条禁令**全部满足：B1 唯一装配 / B2 禁伪防御 / B3 显式栈 / B4 不假装语义 / B5 asdict / B6 符号一致 / B7 一 plugin 一目录 / B8 不起假名 / B9 无过渡期两边写 / B10 `Any` 最小化。
@@ -499,7 +500,7 @@ plugins:
 | **PR-5** | migrator / 死代码 / 文档清理 |
 | **PR-6** | TraceInspector 工具最小面（可选） |
 | **PR-7** | 多形态视图 deriver：`spine.deriver.otel_trace` + `spine.deriver.waterfall`；profile 开关（D9 / I-VIEW1-3） |
-| **PR-8** | 零 token 回放：`ReplayCursor` Protocol + `StepContextAt`；CLI `journal replay / replay-diff / verify-model-visible`（D10） |
+| **PR-8** | 零 token 回放：`ReplayCursor` Protocol + `StepContextAt`；CLI `journal replay / verify-model-visible`（D10） |
 | **PR-9** | 写路径五面插件化：`EventEmitter` / `StepDriver` / `Coalescer` / `Serializer` / `EventStorage` Protocol + 默认实现 + registry + profile 装配 + Agent 不直接 import 测试（D11 I-PLUG1–6） |
 | **PR-10** | 可替换实现示例：OTelEmitter / PassthroughCoalescer / ProtobufSerializer / SQLiteStore / S3Sink（示范，不强依赖） |
 

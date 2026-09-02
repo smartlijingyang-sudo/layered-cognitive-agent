@@ -24,7 +24,8 @@ coding_agent_optimization_finder.find_optimization_candidates(run_id=..., limit=
 ### Stage 3: 看决策 + 时间线 + 代码
 
 ```sh
-lca-ops trace <run_id> --format mermaid
+lca-ops graph-run <run_id>      # mermaid 插件交互图
+lca-ops trace <run_id> --focus llm|tools|delegation --depth 24
 ```
 
 或:

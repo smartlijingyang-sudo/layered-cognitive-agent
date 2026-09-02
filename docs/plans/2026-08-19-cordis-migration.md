@@ -1,5 +1,7 @@
 # Cordis Migration Implementation Plan
 
+> **历史命令脚注(2026-09-02):** 本计划中出现的 `lca-ops debug run <run_id>` 与 `lca-ops debug tree` 在实现时分别合并为顶层 `lca-ops debug-run <run_id>`(ADR-0122 8-section 报告)与 `lca-ops debug-tree`(Cordis Context 树)。Cordis migration 已完成,本计划保留作 ADR-01 / 历史存档;请勿按 `debug run` / `debug tree` 调用。
+>
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace LCA's in-house plugin kernel (`lca/infrastructure/plugin/` + `lca/harness/kernel/`) with vendored cordis from `~/taiyi-agent`. Migrate 21 LCA plugins to cordis `@plugin` form. Restructure to 38 plugins across 3 tiers (Definition / Provider / Behavior). Cut all hardcoded assembly from L4 composition root.

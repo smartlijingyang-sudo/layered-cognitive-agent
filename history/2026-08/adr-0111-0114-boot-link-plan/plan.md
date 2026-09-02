@@ -8,6 +8,8 @@
 > **预计总工作量:** 4 周,8 个 PR,30+ commits
 >
 > ⚠️ **本文初版(2026-08-31 上午)按 8 PR / 30+ commits / 4 周设计;3 个 subagent 评审一致 BLOCK(过度工程化 + YAGNI + Stage 词汇 4 处独立)。新架构方向见 [ADR-0115](../../../docs/adr/0115-kernel-transport-boundary.md)(Kernel/Transport 边界),执行计划见 [新 plan](../adr-0115-0117-kernel-bootstrap-plan/plan.md)。**
+>
+> **历史命令脚注(2026-09-02):** 本计划里反复出现的 `lca-ops trace boot --tail N --since <dur> --json` 子命令在实现时被替换为 `lca-ops journal trace <run_id> [--human/--no-human --source --locals --json --limit N]`(boot 已不再是独立 trace,而是每个 run 的初始 span)。文档保留以体现决策路径,但请勿按 `trace boot` 调用。
 
 ## 1. 总体目标
 

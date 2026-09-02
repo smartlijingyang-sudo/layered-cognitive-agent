@@ -17,13 +17,13 @@
 
 ```bash
 ./scripts/lca-ops          # 手册
-./scripts/lca-ops dev      # 第一次 / 全停之后
+./scripts/lca-ops provision     # 整机首次:装包 / venv / sandbox-user / CLI
 ./scripts/lca-ops status
-./scripts/lca-ops heal     # 有问题自己修
-./scripts/lca-ops logs     # journal 实况（思考 / 工具 / 步）
+./scripts/lca-ops heal         # 有问题自己修
+./scripts/lca-ops journal logs # journal 实况(思考 / 工具 / 步;`./scripts/lca-ops logs` 同义)
 ```
 
-`dev`：补丁 + gateway :8765 + LobeHub :3010 + daemon。日常用 `heal`，不要先 `restart`。
+日常用 `heal`，不要先 `restart`。首次装配走 `provision`（已删的 `dev` / `compose` 子命令见 ADR-0119 决定 4）。
 
 ## 状态与补丁：status 字段语义
 

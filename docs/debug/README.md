@@ -4,7 +4,7 @@ LCA 的"高级工程师自助定位"基础设施入口。所有 debug / observab
 
 ## 入口文档
 
-- **[run-debug-guide.md](./run-debug-guide.md)** — Agent 第一读物。`lca-ops debug run <run_id>` 的完整 SOP + 工具对照表 + 常见失败模式 → 命令映射。
+- **[run-debug-guide.md](./run-debug-guide.md)** — Agent 第一读物。`lca-ops debug-run <run_id>` 的完整 SOP + 工具对照表 + 常见失败模式 → 命令映射。
 
 ## 现有可观测/调试能力
 
@@ -12,17 +12,17 @@ LCA 的"高级工程师自助定位"基础设施入口。所有 debug / observab
 
 | 命令 | 用途 |
 |---|---|
-| `lca-ops debug run <run_id>` | 主入口,8-section 报告 |
-| `lca-ops debug env <run_id>` | dump RunAmbit |
+| `lca-ops debug-run <run_id>` | 主入口,8-section 报告 |
+| `lca-ops debug-env <run_id>` | dump RunAmbit |
 | `lca-ops trace <run_id>` | journal 轨迹 |
 | `lca-ops explain <run_id>` | 失败路径投影 |
-| `lca-ops diagnose <alias>` | 模式诊断(model-not-seen / loop-stuck / memory-poisoned / approval-rejected / phase-error) |
+| `lca-ops diagnose <problem>` | 模式诊断(连字符):`model-not-seen` / `loop-stuck` / `memory-poisoned` / `approval-rejected`(`phase-error` 不存在) |
 
 ### 离线分析
 
 | 命令 | 用途 |
 |---|---|
-| `lca-ops replay <run_id> --no-llm` | 重放失败,不消耗 token |
+| `lca-ops journal replay <run_id> --step K` | 重放失败,不消耗 token(原 `lca-ops replay --no-llm` 未实现) |
 | `lca-ops optimize <run_id>` | 优化候选(延迟/token/重试) |
 | `lca-ops graph-run <run_id>` | Mermaid 插件交互图 |
 | `lca-ops minimal-repro <run_id>` | 失败因果链 + evidence refs |

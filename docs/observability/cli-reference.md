@@ -6,42 +6,39 @@
 |---|---|
 | `status` | 全站状态(kernel_serve / infra / lobehub / daemon / onlyboxes) |
 | `heal` / `stop` | 生命周期(`restart` 已删;kernel 进程由 `kernel_serve` 自管,`heal` 会自愈) |
-| `logs` | **(已重命名)** → `journal logs`(默认 tail 最新 run 的 spine SSOT `events.jsonl`;`-r <run_id>` 离线回放;`-v` 展开 payload + error 通道 traceback) |
+| `journal logs` | **canonical** — tail 最新 run 的 spine SSOT `events.jsonl`;`-r <run_id>` 离线回放;`-v` 展开 payload + offloaded sidecar traceback |
+| `logs` | (alias for `journal logs`;保留避免外部脚本/ CI 拿到 `No such command`) |
 | `inspect-tree <profile.yaml>` | 解析后的插件树 + capability 图 |
 | `dump-profile <profile.yaml>` | 展开 bundle + patch 的 entries |
-| `diagnose <alias>` | 内置诊断:`model_not_seen` / `loop_stuck` / `memory_poisoned` / `approval_rejected` |
+| `diagnose <problem>` | 内置诊断(连字符):`model-not-seen` / `loop-stuck` / `memory-poisoned` / `approval-rejected` |
 
 ## observability 子集
 
 | 命令 | 用途 |
 |---|---|
-| `cost <run_id> [--by model\|phase\|tool]` | 按 pricing_ref 重算 cost |
-| `trace <run_id> [--format mermaid]` | trace 报告 |
+| `cost <run_id> [--json] [--jsonl PATH]` | 按 pricing_ref 重算 cost |
+| `trace <run_id> [--focus all\|llm\|tools\|delegation] [--depth N]` | trace 报告; mermaid 视图走 `graph-run <run_id>` |
 | `explain <run_id>` | 失败因果链 |
-| `graph <run_id>` | 插件交互图 |
-| `minimal-repro <run_id>` | 最小复现包 |
+| `graph-run <run_id>` | Mermaid 插件交互图(原 `trace --format mermaid` 已删) |
+| `minimal-repro <run_id> [--json] [--jsonl PATH]` | 最小复现包 |
 | `diff-runs <a> <b> --step N` | 两次 run 同 step 差异 |
 
 ## diagnose alias 输出格式
 
 ```json
 {
-  "alias": "loop_stuck",
-  "error_codes": ["loop_stuck", "loop_oscillating", "loop_max_steps"],
+  "problem": "loop-stuck",
+  "error_codes": ["loop-stuck", "loop-oscillating", "loop-max-steps"],
   "hint": "检查 step 数与 oscillation 模式;增大 max_steps 或调整 reasoner prompt。"
 }
 ```
 
-## logs --replay
+> **2026-09-02 修正(ADR-2026-09-02-i17-stream-align §A)**:
+> 顶层 `logs` 子命令曾被删除,改为 `lca-ops journal logs`(按 spine SSOT 直读,无 envelope v2 渲染层)。
+> 现已重新提供顶层 `logs` 作为 `journal logs` 的 alias —— 外部 CI / 仪表盘 / 老脚本可以无缝使用,
+> 标志、副作用、查找顺序均与 `journal logs` 一致。
 
-从 `materializations/<generator-id>/<generator-version>/` 重放历史
-materialization;不重新生成,而是验证现有视图与 ledger 一致。
-
-> **2026-09-02 修正(ADR-2026-09-02-i17-stream-align §A)**:顶层 `logs` 子命令已删,
-> 改为 `lca-ops journal logs` (按 spine SSOT 直读,无 envelope v2 渲染层)。
-> `materializations/` 重放由 `lca-ops journal trace <run_id>` 子命令接管(PR-9 I17)。
-
-## journal logs(取代顶层 `logs`)
+## journal logs(取代顶层 `logs`,但顶层 alias 仍在)
 
 ```sh
 # 默认: tail 最新 run 的 spine SSOT(traces/runs/<id>/events.jsonl)
@@ -52,12 +49,19 @@ lca-ops journal logs -r run_a4248231a677
 
 # 展开 payload + error 通道 traceback(exc_type/exception_message/traceback_text/cause_chain)
 lca-ops journal logs -v -r run_a4248231a677
+
+# 等价的顶层调用
+lca-ops logs -v -r run_a4248231a677
 ```
 
 按 `channel` 分桶打印:`control`(节点生命周期)/ `fact`(reducer 写入) /
 `error`(失败 + traceback)。`channel=error` 事件在 verbose 模式下额外展开
 `exc_type` / `exception_message` / `traceback_text` / `cause_chain`,由
 `wrap_instrument._exception_payload` 注入(ADR-2026-09-02-i17-stream-align §B)。
+
+> **offloaded sidecar**(>=4 KB 的 error 事件):`events.jsonl` 会写入一行
+`{"execution_point": ..., "offloaded": "<sha256>"}`, 真正的 payload 在 `<sha256>.json`。
+`-v` 模式会自动读 sidecar 并展示 traceback,无需 `cat` 单独文件。
 
 ## Run 路径查找顺序（`_resolve_journal_artifact`, ADR-0167.1 D6）
 
