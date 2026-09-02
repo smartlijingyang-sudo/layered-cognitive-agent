@@ -162,7 +162,8 @@ StepCoordinator      ← 唯一写入 API（ADR-0167）
 
 - Doctor H2/H3/H8：主断言改为 **step 树闭合**；新增 H-seg / H-phase：`totals` 与数组长度一致；segment/phase 时间不倒挂。
 - `lca-ops journal steps`：默认 step 表；`--segments`、`--phases`；JSON 带 `totals`。
-- `lca-ops explain|trace|cost|evidence`：**优先** `traces/runs/<id>/journal.json`，其次 raw `journal.jsonl` / `journal.raw.jsonl`。
+- `lca-ops explain|trace|cost|evidence`：**优先** `traces/runs/<id>/events.jsonl` (spine SSOT)，其次 `journal.json` / `journal.raw.jsonl`。
+> **事后修正（2026-09-02, ADR-2026-09-02-i17-stream-align §A/C）**:优先级顺序原写为 `journal.json → raw`。修正后,spine SSOT (`events.jsonl`) 优先,`journal.json` 次之,最后兜底 legacy `journal.raw.jsonl`。`resolve_journal_path` 在 `_shared.py` 实现这一回退顺序。
 - Narrative 标题：`steps=3 segments=5 phases=8`；因果链按 step；segment 缩进在 step 下。
 
 ### D6. Spine 硬化（与本 ADR 同批）

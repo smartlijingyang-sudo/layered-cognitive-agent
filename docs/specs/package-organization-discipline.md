@@ -372,9 +372,9 @@ lca/infrastructure/observability/journal/
 │   └── frames.py
 ├── stream/
 │   ├── __init__.py
-│   ├── fact_stream.py
+│   ├── fact_stream.py       # 2026-09-02 删除（ADR-2026-09-02-i17-stream-align §A）
 │   ├── live_tail.py
-│   └── narrative_sidecar.py
+│   └── narrative_sidecar.py # 2026-09-02 由 StepNarrativeWriter 接管
 └── backends/
     ├── __init__.py
     ├── filesystem.py

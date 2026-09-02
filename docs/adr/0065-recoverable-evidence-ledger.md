@@ -218,7 +218,8 @@ A2A、MCP、HTTP 或队列边界可以携带 W3C `traceparent` / `tracestate`。
 | **PR-6** | RunManifest + `materializations/<id>/<v>/` + `latest.json` 原子 rename + CostProjector with `pricing_ref` | contracts + layer0 + plugins + gateway | gateway/finalize + cli/cost | L6 / 决策第六节 |
 | **PR-7** | OTel GenAI 语义映射完成 + W3C trace context 不可信入站校验 + `causation.links` 映射 | contracts + layer0 + plugins + gateway | exporters + SSE 入站 | L8 / 决策第八节 |
 | **PR-8** | Coding Agent Tools bundle(7 工具,只读,无 `journal.write` 旁路)| contracts + layer0 + plugins + bundles | bundle / profile | L6 / L9 / 决策第六节 |
-| **PR-9** | Viewer + CLI 子命令(`lca-ops logs --replay` / `cost` / `diff-runs` / `graph` / `explain` / `minimal-repro` / `diagnose`) + ErrorCode 字典(10 大类 ~30 稳定码)| contracts + layer0 + gateway + cli | lca-ops + lobehub UI | 决策第六节 |
+| **PR-9** | Viewer + CLI 子命令(`lca-ops journal logs --replay` / `cost` / `diff-runs` / `graph` / `explain` / `minimal-repro` / `diagnose`) + ErrorCode 字典(10 大类 ~30 稳定码)| contracts + layer0 + gateway + cli | lca-ops + lobehub UI | 决策第六节 |
+> **事后修正（2026-09-02, ADR-2026-09-02-i17-stream-align §A）**:`lca-ops logs` 已重命名为 `lca-ops journal logs -r <run_id>`，按 spine SSOT `events.jsonl` 直读。 |
 | **PR-10** | 全量验证 + 8 篇 doc(`docs/observability/`)+ 7 个 check 脚本 + v1→v2 migration 测试 + lobehub patch 适配 + 收尾 | docs + scripts + tests + deploy | 全部 | 0065 验证约束表全部 7 条 |
 
 ### 故意丢弃(本 ADR 显式否决)

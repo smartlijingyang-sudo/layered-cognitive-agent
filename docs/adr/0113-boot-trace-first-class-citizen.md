@@ -15,7 +15,7 @@
 2. **structlog 在 module-load 时跑副作用**:`_configure_structlog()`(L109–117)
 3. **三条路径分叉**:boot stdout、structlog stderr、journal(目前 boot 不写 journal)
 4. **启动失败时**:`except BaseException: await _dispose_context(ctx); raise` —— 只在内存里 dispose,trace 数据丢失
-5. **`lca-ops logs --replay`** 对启动阶段空白,失败诊断只能靠 grep stdout
+5. **`lca-ops journal logs --replay`** 对启动阶段空白,失败诊断只能靠 grep stdout
 
 deepseek-harness 在 `host/audit-log` 包里实现了完整 trace 系统:
 
@@ -130,7 +130,7 @@ class JsonlFileSink:
 class JournalSink:
     """Forward boot TraceEvent to Journal as well.
 
-    让 lca-ops logs --replay 能 replay 启动阶段。
+    让 lca-ops journal logs --replay 能 replay 启动阶段。
     """
     def __init__(self, journal: Journal):
         self._journal = journal

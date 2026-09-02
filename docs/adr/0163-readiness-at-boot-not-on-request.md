@@ -152,7 +152,7 @@ PR 描述引用本 ADR；AGENTS.md 的"改动 → 最低要求"表 + routes 章�
 
 ## 兼容性
 
-- Wire 协议层：删除 `lca_llm_unavailable` / `lca_plugin_ctx_missing` / `legacy_process_journal_unavailable` 三类 error code。客户端应按"`503 + code∈{上述三}`"分支兜底的，需改为"`process exit + lca-ops logs`"。
+- Wire 协议层：删除 `lca_llm_unavailable` / `lca_plugin_ctx_missing` / `legacy_process_journal_unavailable` 三类 error code。客户端应按"`503 + code∈{上述三}`"分支兜底的，需改为"`process exit + lca-ops journal logs -r <run_id>`"。
 - HTTP API：`/runs` `/v1/*` `/journal/live` 的请求体契约 0 变化；响应只有 boot 期 4xx 保留 + 5xx 类型固定化。
 - Profile：`config.load_dotenv=false` + 无 `LLM_API_KEY` 现在是 boot 错，而非默默接受；release notes 标 **BREAKING**。
 

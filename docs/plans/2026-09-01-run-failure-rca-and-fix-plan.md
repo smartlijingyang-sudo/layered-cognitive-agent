@@ -224,6 +224,7 @@ chat 渲染器 折叠面板打开 → 把 arguments.code 整段渲染
     - 合并逻辑更新：`arguments_delta` 字符串追加；`arguments_preview` 取最后一段（不再累积）。
   - `lca/infrastructure/observability/journal/stream/fact_stream.py:473`
     - 渲染时不再累积 `arguments_preview.code` 到 narrative（避免淹没 narrative）。
+    > **事后修正（2026-09-02, ADR-2026-09-02-i17-stream-align §A）**:`fact_stream.py` 整文件已删除,narrative 渲染由 `lca/infrastructure/observability/journal/step/narrative_writer.py:_render_tool_streaming` 接管,等价行为。
 - 验证：
   - `tests/cognition/brain/llm_turn/test_executor.py`：构造 50 chunk stream，断言 `arguments_delta` 是字符级增量，journal 中 50 条 ToolCallStreaming 的 `arguments_delta` 拼接等价于完整 code，但每条 <=160 字符。
   - `tests/infrastructure/observability/journal/jsonl/test_projector.py`：tool_call_id 合并后 arguments_delta 拼接应等于原始累积全文。

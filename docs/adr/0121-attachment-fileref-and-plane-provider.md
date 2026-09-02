@@ -168,7 +168,7 @@ class AttachmentErrorCode(str, Enum):
 | `resolve_path_arg` 拦截 | `tests/lca/infrastructure/tools/seam/test_file_ref_args.py` 8 项 |
 | 死代码清理 | `uv run vulture lca/infrastructure/attachment lca/infrastructure/tools/seam lca/contracts/models/core/file_ref.py lca/contracts/protocols/runtime/attachment.py lca/contracts/protocols/runtime/attachment_errors.py lca/contracts/protocols/runtime/sandbox_backend.py lca/cognition/brain/sandbox_prompt.py --min-confidence 80` 0 输出 |
 | 全量 gate | `lint-imports` + `mypy lca` + `pytest` + importlinter `kernel-domain-isolation` & `transport-isolation` + `scripts/check_kernel_boundary.py` |
-| 端到端 | daemon 重启后 `lca-ops logs --replay`,用户上传附件 + 问"这是什么文件"必须看到 `<uploaded_files>` 注入 + `readFile` 命中 `/mnt/data/<name>` |
+| 端到端 | daemon 重启后 `lca-ops journal logs -r <run_id>`,用户上传附件 + 问"这是什么文件"必须看到 `<uploaded_files>` 注入 + `readFile` 命中 `/mnt/data/<name>` |
 
 ## 后续 PR(不在本 ADR 范围)
 

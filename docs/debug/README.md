@@ -35,10 +35,9 @@ LCA 的"高级工程师自助定位"基础设施入口。所有 debug / observab
 
 | 命令 | 用途 |
 |---|---|
-| `lca-ops logs` | journal 事实流(默认) |
-| `lca-ops logs -v` | + prompt/response/args/result |
-| `lca-ops logs -d` | + delta events |
-| `lca-ops logs --replay` | 从 `traces/lca_journal.jsonl` 回放 |
+| `lca-ops journal logs` | 默认 tail 最新 run 的 spine SSOT(`traces/runs/<id>/events.jsonl`) |
+| `lca-ops journal logs -r <run_id>` | 离线回放指定 run(优先 events.jsonl,否则兜底 journal.raw.jsonl) |
+| `lca-ops journal logs -v` | 展开 payload + error 通道 traceback |
 
 ## fail-loud 开关
 
@@ -52,8 +51,9 @@ LCA_DEBUG=1 lca_kernel serve --profile ...
 
 `traces/runs/<run_id>/`:
 
-- `journal.jsonl` — canonical journal (JsonlJournalProjector)
-- `journal.jsonl.narrative.md` — narrative sidecar
+- `events.jsonl` — spine SSOT(ADR-2026-09-02-i17-stream-align;canonical journal events)
+- `journal.json` — `lca.journal/3` step 投影(pretty-printed, codemap 用)
+- `journal.raw.jsonl` — legacy v2 envelope stream(CLI 已不直接读,仅迁移源)
 - `manifest.json` — terminal manifest
 - `profile_snapshot.json` — profile 快照
 - `kernel.log` — kernel 内部日志(ADR-0122)

@@ -1201,7 +1201,7 @@ P4 / P6 必跑：
 
 | 关注点 | 命令 |
 |---|---|
-| 启动链路 | `lca-ops status` / `lca-ops logs` |
+| 启动链路 | `lca-ops status` / `lca-ops journal logs -r <run_id>` |
 | 插件树 | `lca-ops inspect-tree`(--dump-config) |
 | Provider dispatch | `tests/test_llm_provider*.py` |
 | Session 事件 | `tests/test_session_service.py` + `tests/test_journal_*.py` |

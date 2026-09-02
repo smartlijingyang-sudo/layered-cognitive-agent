@@ -166,8 +166,9 @@ lca-ops minimal-repro <run_id> --jsonl traces/runs/<run_id>/journal.jsonl
 
 | 文件 | 写入 Plugin |
 |---|---|
-| `journal.jsonl` | `JsonlJournalProjector` |
-| `journal.jsonl.narrative.md` | `NarrativeSidecar` |
+| `events.jsonl` | `EventSpine` SSOT(ADR-2026-09-02-i17-stream-align) |
+| `journal.json` | `lca.journal/3` step 投影(step-tree) |
+| `journal.raw.jsonl` | legacy v2 envelope stream(迁移源,CLI 已不直接读) |
 | `manifest.json` | `ManifestMaterializer` |
 | `profile_snapshot.json` | profile snapshot plugin |
 | `kernel.log` | `KernelLogProjection` (ADR-0122) |
@@ -246,8 +247,9 @@ def test_my_phase_fails_cleanly():
 ### 监控 live runs
 
 ```sh
-lca-ops logs -v
-lca-ops logs -d        # + delta events
+lca-ops journal logs                # tail 最新 run 的 events.jsonl (按 channel 分桶)
+lca-ops journal logs -r <run_id>    # 离线回放某个 run
+lca-ops journal logs -v             # 展开 payload + error 通道 traceback
 ```
 
 ### 检查诊断 alias 是否覆盖
@@ -308,8 +310,9 @@ lca/
 
 traces/
   runs/<run_id>/
-    journal.jsonl                    # canonical per-run journal
-    journal.jsonl.narrative.md
+    events.jsonl                     # canonical per-run spine SSOT
+    journal.json                     # lca.journal/3 step-tree projection
+    journal.raw.jsonl                # legacy v2 stream(CLI 不直接读)
     manifest.json
     profile_snapshot.json
     # + kernel.log (ADR-0122 新增)
@@ -335,4 +338,4 @@ traces/
 - 任何新增 trace 写入 → 加 Projection Plugin + CLI wrapper + 测试 + 本文档 row
 - 任何新增诊断模式 → 加 `DiagnosePattern` enum + `diagnose_*` 函数 + 测试 + 本文档 row
 - 任何 per-run 文件 schema 变更 → 更新本文档的"per-run 资产"章节
-- 任何新增 `--jsonl` 路径 → 默认指向 `traces/runs/<run_id>/journal.jsonl`(per-run canonical)
+- 任何新增 `--jsonl` 路径 → 默认指向 `traces/runs/<run_id>/events.jsonl`(per-run SSOT);`resolve_journal_path` 自动降级到 `journal.json` / `journal.raw.jsonl`

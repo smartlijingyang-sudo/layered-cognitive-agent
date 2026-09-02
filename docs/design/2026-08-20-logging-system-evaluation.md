@@ -51,6 +51,11 @@
 
 ### 7. `ConsoleJournalProjector` 与 `FactStreamProjector` 70% 重复
 
+> **事后修正（2026-09-02,ADR-2026-09-02-i17-stream-align §A）**:
+> `FactStreamProjector` 已删除；本节描述的"70% 重复"是历史观察，不再适用。
+> CLI 渲染现统一通过 spine SSOT (`events.jsonl`) + `journal logs` 子命令走 `TraceInspector`。
+> `ConsoleJournalProjector` 仍在 narrative sidecar (`journal/narrative_sidecar.py`) 中使用。
+
 两个 projector 都从 journal 读、都做事件分类(table-driven handler)、都维护角色切换的 section header、都做容器事件/叙事事件的分派。差异只有:`FactStreamProjector` 多 `_total_prompt_tokens` 等累计 + 多 `_step_group` 缩进。约 700 行重复渲染代码,且 verbosity 控制点不一致(console 用 `Verbosity` enum,fact 用 `verbose=True/False` 开关)。
 
 ### 8. `_IsolatedSubscriber` / `_IsolatedExporter` / `_safe_detach` 三处独立实现"失败只 log"
@@ -208,7 +213,8 @@ verbose 时 `lambda _span: True` 全过,但 Langfuse 服务端还有自己的 sp
 
 ### 39. `lca_ops logs` 没有 user-facing 格式选择
 
-只有 `--verbose` / `--show-deltas` / `--replay` 三个开关,JSON / text / Mermaid 等输出格式由 FactStreamProjector 决定。
+只有 `--verbose` / `--replay <run_id>` 等开关,JSON / text 输出格式由 `journal logs` 内部 `_render_event` 决定。
+> **事后修正（2026-09-02）**:此节原引用 `FactStreamProjector`;该投影器已删除,改为 spine SSOT 通道分桶渲染。
 
 ### 40. `RunStore.events` 每次访问复制
 
@@ -473,7 +479,7 @@ def publish(self, stamped: StampedEvent) -> None:
 
 ### 84. `scripts/replay_journal.py` 与 `gateway/runs/cli.py:_replay_from_jsonl` 是两份独立 replay 脚本
 
-`scripts/replay_journal.py` 用 `ConsoleJournalProjector`;`cli.py:_replay_from_jsonl` 用 `FactStreamProjector`。同一命令行工具,不同 verbosity 模型,不同输出格式。
+`scripts/replay_journal.py` 用 `ConsoleJournalProjector`;`cli.py:_replay_from_jsonl` 历史上用 `FactStreamProjector`(2026-09-02 删除,见 §7 修正)。同一命令行工具的 verbosity 模型已被 spine SSOT + `TraceInspector` 统一收敛。
 
 ### 85. `_BoundProcessJournal` 是 inline class,只在 `process_journal.py` 用
 
@@ -536,7 +542,8 @@ from .otel_projector import OtelProjector
 from .reducer import RunState, RunStatus, fold_run_state
 ```
 
-`ConsoleJournalProjector` / `JsonlJournalProjector` / `FactStreamProjector` 都不在 `journal/__init__.py` 的 export 里。
+`ConsoleJournalProjector` / `JsonlJournalProjector` 都不在 `journal/__init__.py` 的 export 里。
+> **事后修正（2026-09-02）**:`FactStreamProjector` 不在 export 列表里因为它已被删除（ADR-2026-09-02-i17-stream-align §A）。
 
 ### 95. `tests/harness/collector.py:LiveCollector` 子类双构造
 

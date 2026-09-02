@@ -372,7 +372,7 @@ LCA 的 `@plugin` 装饰器标记的是一个**宿主单元**,它必须在 Profi
 |---|---|
 | `TraceSink / JsonlFileSink / JournalSink` 三个新概念 | **全部砍掉**(已有 `traces/lca_trace.jsonl` + `bundles/observability-default.yaml` 覆盖) |
 | `traces/boot/*.jsonl` 独立文件路径 | → 复用 `traces/lca_journal.jsonl` |
-| `lca-ops trace boot` 子命令 | → `lca-ops logs --scope boot --tail 50` 复用现有 CLI |
+| `lca-ops trace boot` 子命令 | → `lca-ops journal logs -r <run_id>` 复用现有 CLI（按 `traces/runs/<id>/events.jsonl` SSOT 直读）|
 | 5 个 typed JournalEvent | → 3 个 typed (`BootProfileResolved / BootPluginFiberSpawned / BootObservabilityAssembled`) + 2 个走 `RuntimeObserved` 复用 ADR-0063 |
 
 ### 新增 ADR-0117(Process 生命周期 + Fail-loud + Env 白名单)

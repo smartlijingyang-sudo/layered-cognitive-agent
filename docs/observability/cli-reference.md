@@ -6,7 +6,7 @@
 |---|---|
 | `status` | 全站状态(kernel_serve / infra / lobehub / daemon / onlyboxes) |
 | `heal` / `stop` | 生命周期(`restart` 已删;kernel 进程由 `kernel_serve` 自管,`heal` 会自愈) |
-| `logs` | journal 事实流(可加 `--replay` 从 materialization 重放) |
+| `logs` | **(已重命名)** → `journal logs`(默认 tail 最新 run 的 spine SSOT `events.jsonl`;`-r <run_id>` 离线回放;`-v` 展开 payload + error 通道 traceback) |
 | `inspect-tree <profile.yaml>` | 解析后的插件树 + capability 图 |
 | `dump-profile <profile.yaml>` | 展开 bundle + patch 的 entries |
 | `diagnose <alias>` | 内置诊断:`model_not_seen` / `loop_stuck` / `memory_poisoned` / `approval_rejected` |
@@ -36,6 +36,28 @@
 
 从 `materializations/<generator-id>/<generator-version>/` 重放历史
 materialization;不重新生成,而是验证现有视图与 ledger 一致。
+
+> **2026-09-02 修正(ADR-2026-09-02-i17-stream-align §A)**:顶层 `logs` 子命令已删,
+> 改为 `lca-ops journal logs` (按 spine SSOT 直读,无 envelope v2 渲染层)。
+> `materializations/` 重放由 `lca-ops journal trace <run_id>` 子命令接管(PR-9 I17)。
+
+## journal logs(取代顶层 `logs`)
+
+```sh
+# 默认: tail 最新 run 的 spine SSOT(traces/runs/<id>/events.jsonl)
+lca-ops journal logs
+
+# 离线回放指定 run
+lca-ops journal logs -r run_a4248231a677
+
+# 展开 payload + error 通道 traceback(exc_type/exception_message/traceback_text/cause_chain)
+lca-ops journal logs -v -r run_a4248231a677
+```
+
+按 `channel` 分桶打印:`control`(节点生命周期)/ `fact`(reducer 写入) /
+`error`(失败 + traceback)。`channel=error` 事件在 verbose 模式下额外展开
+`exc_type` / `exception_message` / `traceback_text` / `cause_chain`,由
+`wrap_instrument._exception_payload` 注入(ADR-2026-09-02-i17-stream-align §B)。
 
 ## Run 路径查找顺序（`_resolve_journal_artifact`, ADR-0167.1 D6）
 

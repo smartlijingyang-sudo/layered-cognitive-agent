@@ -14,7 +14,7 @@
 - `lca/harness/profile/boot.py` 内部用 structlog 写,但不进入 Journal
 - `gateway/app.py` 用 `print(text, flush=True)` 写 stdout
 - 启动失败时 `_dispose_context` 静默吞 dispose 异常,只 re-raise 原始错误
-- `lca-ops logs --replay` 对启动阶段空白
+- `lca-ops journal logs -r <run_id>` 对启动阶段空白
 - Coding Agent 无法从统一账本回答"插件 X 启动耗时多久、谁先谁后、是否失败、为何失败"
 
 deepseek-harness 的 `audit-log` 有完整事件词表 + Service 模式;LCA 缺少对应的 boot 词表。

@@ -113,9 +113,14 @@ const merged = rawArgs && typeof rawArgs === 'object'
   : baseState;
 ```
 
-### 五、`fact_stream._render_tool_streaming` 默认折叠 narrative
+### 五、`StepNarrativeWriter._render_tool_streaming` 默认折叠 narrative
 
-`lca/infrastructure/observability/journal/stream/fact_stream.py:473-481` 加 `show_streaming=False` 默认值,narrative 不再显示3800 行 tool.streaming(用户可选展开)。
+> **事后修正（2026-09-02）**:此处原引用 `journal/stream/fact_stream.py:473-481`,
+> 已随 `FactStreamProjector` 一起删除(ADR-2026-09-02-i17-stream-align §A)。
+> narrative 渲染由 `lca/infrastructure/observability/journal/step/narrative_writer.py`
+> 接管,等价开关名为 `show_streaming`(默认 False)。
+
+`step/narrative_writer.py:_render_tool_streaming` 加 `show_streaming=False` 默认值,narrative 不再显示3800 行 tool.streaming(用户可选展开)。
 
 ## 后果
 
@@ -170,7 +175,7 @@ uv run pytest tests/infrastructure/observability/journal/stream/test_narrative_f
 | `lca/infrastructure/observability/journal/jsonl/projector.py:80-95` | `_delta_key` 加 `("ToolCallStreaming", tool_call_id)` 合并键 |
 | `lca/infrastructure/observability/journal/jsonl/projector.py:106-124` | `_coalesce_deltas` 适配 ToolCallStreaming(`arguments_preview` 取最后一段) |
 | `lca/cognition/brain/llm_turn/executor.py:106-122` | emit `arguments_delta` 而非 `arguments_preview` 累积 |
-| `lca/infrastructure/observability/journal/stream/fact_stream.py:473-481` | `_render_tool_streaming` 加 `show_streaming` 默认 False |
+| `lca/infrastructure/observability/journal/step/narrative_writer.py:_render_tool_streaming` | 加 `show_streaming` 默认 False（ADR-2026-09-02-i17-stream-align 接管自原 `fact_stream.py`） |
 | `lobehub-ui/src/store/chat/agents/transports/lcaJournal.ts:108-110` | `merged` 改为 delta 追加 |
 
 ## 新增清单
@@ -189,4 +194,4 @@ uv run pytest tests/infrastructure/observability/journal/stream/test_narrative_f
 ## 风险
 
 - **风险 1**:`arguments_preview` 合并后"取最后一段"语义,若最后一次 chunk 的 preview 不完整,UI 仍可能看到不完整代码。**缓解**:测试覆盖 incomplete preview 路径;LobeHub `merged` 仅在 last_invoke 时拉取完整 `ToolStarted.arguments`,而非合并 preview。
-- **风险 2**:narrative `show_streaming=False` 默认隐藏,用户调试时需显式 `--show-streaming`。**缓解**:`lca-ops logs --show-streaming` 命令加开关。
+- **风险 2**:narrative `show_streaming=False` 默认隐藏,用户调试时需显式 `--show-streaming`。**缓解**:`lca-ops journal logs --show-streaming` 命令加开关。

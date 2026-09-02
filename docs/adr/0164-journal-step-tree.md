@@ -87,10 +87,17 @@ PR-6 (2026 Q2) 之前, journal 用 v1 envelope 流式追加 (`journal.jsonl`, 42
 ## 不做的事
 
 - **不删** v2 JournalEvent 类 (Phase 7 才删, 涉及 ~49 个 dataclass 清理)
-- **不删** JsonlJournalProjector / FactStreamProjector / LiveTail (SSE 还在用, 兜底回放)
+- **不删** LiveTail (SSE 还在用, 兜底回放)
 - **不删** 旧 `journal.jsonl` 文件 (用户生产数据, 谨慎)
 - **不改** StepTextDelta / ReasoningDelta 等流式事件 (SSE live 还需要)
 - **不写** 自动 migrate (用户主动跑 `lca-ops journal migrate`)
+
+> **事后修正（ADR-2026-09-02-i17-stream-align §A，2026-09-02）**:
+> `FactStreamProjector` 在 ADR-0164 接受时还没正式删除;但 v2 stream envelope
+> 路径在 spine 切换后已不再主用。2026-09-02 PR-A 把 CLI 的
+> `FactStreamProjector` 死引用连同 `cli/journal_log.py` 整文件一起清掉,
+> 新 `lca-ops journal logs` 直接读 spine SSOT (`events.jsonl`)。
+> `JsonlJournalProjector` / `LiveTail` 仍在使用,按上面清单保留。
 
 ## 后果
 

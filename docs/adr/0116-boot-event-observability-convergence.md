@@ -23,7 +23,7 @@
 |---|---|---|
 | ADR-0113 引入的 3 个新概念与现有 `bundles/observability-default.yaml` + `traces/lca_trace.jsonl` + `JournalEngine` **平行 schema**,违反 ADR-0063 I1 "一次发生一次追加" | 最小改动 + SSOT | BLOCK |
 | `JournalSink` 走 `kind: 'boot.trace'` 扁平字段,与 ADR-0114 typed JournalEvent 在同一 Journal 双写,consumer 必须知道两条路径 | 架构 | BLOCK |
-| `lca-ops trace boot` 与 `lca-ops logs --replay` 在功能上有 ≥ 80% 重叠(都是按时间窗 + filter 查启动事件),两个 CLI 子命令读两个不同文件,用户被迫猜该用哪个 | 最小改动 | FLAG |
+| `lca-ops trace boot` 与 `lca-ops journal logs --replay` 在功能上有 ≥ 80% 重叠(都是按时间窗 + filter 查启动事件),两个 CLI 子命令读两个不同文件,用户被迫猜该用哪个 | 最小改动 | FLAG |
 | Stage 词汇在 ADR-0113 (TraceEvent.stage: str) 与 ADR-0114 (BootLifecycleFailed.stage: Literal[...]) 与 ADR-0111 (Stage 枚举) 4 处独立定义,不一致 | 架构 + SSOT | BLOCK |
 
 本 ADR 在 [ADR-0115](./0115-kernel-transport-boundary.md) 决定 1 表中 K5(观测装配)与 K6(可观测 trace 数据)基础上,**收敛** boot 期可观测性。
@@ -41,7 +41,7 @@
 - `lca/plugins/observability/trace_journal.py` —— `lca-boot-trace-journal-sink` plugin
 - `bundles/observability.yaml`(新建)—— 已被 `bundles/observability-default.yaml` 覆盖
 - `traces/boot/*.jsonl` 独立目录
-- `lca-ops trace boot` 子命令(改用 `lca-ops logs --scope boot`)
+- `lca-ops trace boot` 子命令(改用 `lca-ops journal logs -r <run_id>`,按 events.jsonl SSOT 直读)
 
 **理由**:
 - 现有 `lca/infrastructure/observability/journal/` + `bundles/observability-default.yaml` 已经覆盖 boot 可观测性需求
@@ -143,21 +143,25 @@ class BootObservabilityAssembled:
 
 `trace_sink_count` 字段删除(已无独立 trace sink seam)。
 
-### 决定 7:`lca-ops logs --scope boot` 子命令(扩展现有 CLI)
+### 决定 7:`lca-ops journal logs --scope boot` 子命令(扩展现有 CLI)
 
-不新增 `lca-ops trace boot`,扩展现有 `lca-ops logs`:
+> **事后修正（2026-09-02, ADR-2026-09-02-i17-stream-align §A）**:
+> 旧的 `lca-ops logs --scope boot` 提议未实现。2026-09-02 PR-A 把 CLI 收敛到
+> `lca-ops journal logs [-r <run_id>]`（按 spine SSOT 直读 `events.jsonl`），
+> `--scope boot` flag 未保留。如果未来要按 boot 阶段过滤，应在
+> `journal logs` 加 `--filter execution_point=kernel.boot.*` 一类机制。
+
+不新增 `lca-ops trace boot`,扩展现有 `lca-ops journal logs`:
 
 ```sh
-$ lca-ops logs --scope boot            # 仅启动阶段事件
-$ lca-ops logs --scope boot --tail 50  # 最近 50 条
-$ lca-ops logs --scope boot --since 1h # 最近 1 小时
-$ lca-ops logs --scope boot --failures # 仅失败事件
-$ lca-ops logs --scope boot --json     # JSON 输出
+$ lca-ops journal logs                       # tail 最新 run 的 events.jsonl
+$ lca-ops journal logs -r <run_id>           # 离线回放指定 run
+$ lca-ops journal logs -v                    # 展开 payload + error traceback
 ```
 
-实现:`lca/infrastructure/cli/cli.py` 给 `logs` 子命令加 `--scope` flag,内部 filter journal 的 event.stage ∈ Stage enum。
+实现:`lca/infrastructure/cli/commands/journal.py` 重写 `_follow_spine_ssot`,按 channel 分桶打印；过滤通过 `--filter` 扩展（待定）。
 
-**复用而非新建**:`lca-ops logs` 已经能按时间窗 + filter 查 journal,加 `--scope boot` 是 1 行改动。
+**复用而非新建**:`journal logs` 已经直读 spine SSOT,boot 阶段事件 (`kernel.boot.*` execution_point) 同 SSOT 来源,无须单独路径。
 
 ### 决定 8:词表登记(沿用 ADR-0063 流程)
 
@@ -165,8 +169,8 @@ $ lca-ops logs --scope boot --json     # JSON 输出
 
 1. **`journal.py`** 加 3 个 frozen dataclass(`BootProfileResolved / BootPluginFiberSpawned / BootObservabilityAssembled`)+ `stage: Stage` 字段强引用 `lca-kernel/stages.py:Stage`
 2. **`event_descriptors_data.py`** 在 `build_default_registry()` 末尾追加 3 行 `_descriptor(...)`:
-   - `BootProfileResolved` → `kind="structural"`, `producer="lca-kernel.source_resolve"`, `consumer=["lca-ops logs --scope boot", "TraceInspector"]`
-   - `BootPluginFiberSpawned` → `kind="structural"`, `producer="lca-kernel.boot"`, `consumer=["lca-ops logs --scope boot"]`, `aggregation="pairs"`
+   - `BootProfileResolved` → `kind="structural"`, `producer="lca-kernel.source_resolve"`, `consumer=["lca-ops journal logs -r <run_id>", "TraceInspector"]`
+   - `BootPluginFiberSpawned` → `kind="structural"`, `producer="lca-kernel.boot"`, `consumer=["lca-ops journal logs -r <run_id>"]`, `aggregation="pairs"`
    - `BootObservabilityAssembled` → `kind="structural"`, `producer="lca-kernel.observability"`, `consumer=["lca-ops diagnose observability"]`
 3. **`JOURNAL_EVENT_CLASSES`** dict 加 3 个 entry
 4. **CI 守卫**:`tests/test_observability_boundary.py` 自动断言 frozen dataclass 与 descriptor 1:1
@@ -212,7 +216,7 @@ class BootTrace:
 | `BootLifecycleFailed.stage` Literal[5 个] | 引用 `Stage` IntEnum |
 | `BootLifecycleFailed.traceback_head`(前 5 帧) | 删除(走 RuntimeObserved 后由 `evidence_store` 接管) |
 | `BootTraceFlushed` typed dataclass | 改走 RuntimeObserved |
-| `lca-ops trace boot` 子命令 | 改 `lca-ops logs --scope boot` |
+| `lca-ops trace boot` 子命令 | 改 `lca-ops journal logs -r <run_id>` |
 | `topo_order` 完整列表(可能 >100 plugin) | 保留,但加 size 限制(`lca-kernel/stages.py` 顶部 docstring 标注) |
 
 ## 与既有 ADR 的衔接
@@ -230,7 +234,7 @@ class BootTrace:
 - `tests/test_journal_catalog_boot_events.py`(新建):3 个 event dataclass 形状 + descriptor 完整性 + stage 字段强类型断言
 - `tests/lca_kernel/test_stage_enum_is_ssot.py`(新建):Stage(IntEnum) 是 Stage 字段值的唯一来源,任何 typed event 的 stage 字段必须引用 `lca-kernel.stages.Stage`
 - `tests/lca_kernel/test_no_trace_sink_seam.py`(新建):`grep -rE 'class.*Sink(?!Service)' lca/` 在 `trace_sink.py` / `trace_sink_registry.py` 之外必须为空(只在 `journal.py` 里的 `JournalSink` 存在)
-- `tests/test_lca_ops_logs_scope_boot.py`(新建):`lca-ops logs --scope boot` 输出 filter 正确,跟 `lca-ops logs --scope all` 对比
+- `tests/test_lca_ops_logs_scope_boot.py`(新建):`lca-ops journal logs -r <run_id>` 输出 filter 正确,跟 `lca-ops journal logs`(默认 tail)对比
 - `tests/harness/profile/compilation/test_journal_emitted.py`(迁移):验证 boot 流程每个 stage emit 对应事件;走 `lca-kernel/` 而不是 `compilation/`
 - `tests/test_observability_boundary.py`(扩展):新增 boot events 后,descriptor 必须存在
 
@@ -238,7 +242,7 @@ class BootTrace:
 
 - **保留 ADR-0113 全部内容(深 sink seam + JsonlFileSink + JournalSink)**:违反 ADR-0063 I1,且 YAGNI;`bundles/observability-default.yaml` + `traces/lca_trace.jsonl` 已覆盖。
 - **保留 ADR-0114 全部 5 个 typed event**:与 RuntimeObserved 语义重叠,冗余;ADR-0063 RuntimeObserved 已是统一解释原语。
-- **保留 ADR-0113 `lca-ops trace boot` 子命令**:与 `lca-ops logs --replay` 80% 重叠,用户被迫二选一。
+- **保留 ADR-0113 `lca-ops trace boot` 子命令**:与 `lca-ops journal logs --replay` 80% 重叠,用户被迫二选一。
 - **Stage 词汇保留 str 字面量**:违反 ADR-0106 §4 "类型化优先于字符串";consumer 拼字符串易引入 typo。
 
 ## 后果
@@ -247,12 +251,12 @@ class BootTrace:
 - boot 可观测性走 ADR-0063 单一路径(Journal + RuntimeObserved),无平行 schema
 - 3 个 typed event + 2 个 RuntimeObserved 完整覆盖 boot 生命周期
 - Stage IntEnum 是 SSOT,4 处独立定义 → 1 处
-- `lca-ops logs --scope boot` 复用现有 CLI,新增 flag 仅 1 行
+- `lca-ops journal logs -r <run_id>` 复用现有 CLI,新增 flag 仅 1 行
 - 词条登记流程与 ADR-0063 完全一致,无需新增 schema 治理
 
 负面:
 - `bundles/observability.yaml`(如果之前按 ADR-0113 创建过)需要删除
-- ADR-0113 `lca-ops trace boot` 命令如果已被 CI 使用需要迁移到 `lca-ops logs --scope boot`
+- ADR-0113 `lca-ops trace boot` 命令如果已被 CI 使用需要迁移到 `lca-ops journal logs -r <run_id>`
 - `traces/boot/` 目录如果已建需要删除
 - 旧 tests(如果有引用 `TraceSinkRegistry` / `JsonlFileSink` / `JournalSink`)需要更新到新路径
 

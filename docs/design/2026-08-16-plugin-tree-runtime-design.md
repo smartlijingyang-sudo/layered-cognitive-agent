@@ -1552,7 +1552,7 @@ think 路径：`PromptReasoner` 持有 **create 时传入的** `LLMAdapter`（�
 - 每个插件一份 pydantic `Config`。未知字段拒绝。
 - 密钥继续走现有 settings / 环境（`LLM_API_KEY` 等），不进 YAML。
 - `dump-profile` 打印展开树；测试锁定默认 `lobehub-run` 的 id 列表（快照）。
-- boot 成功记一条 Journal 进程事件（新事件：`PluginTreeBooted{profile, plugin_ids}`），方便 `lca-ops logs` 确认「树活了」。
+- boot 成功记一条 Journal 进程事件（新事件：`PluginTreeBooted{profile, plugin_ids}`），方便 `lca-ops journal logs -r <run_id>` 确认「树活了」。
 - 每个插件 `apply` 可用 structlog，字段带 `plugin_id`。
 
 ---
