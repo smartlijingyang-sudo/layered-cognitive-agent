@@ -9,6 +9,7 @@ process-wide live journal to ``ProcessJournalBinding``.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import Enum
@@ -17,6 +18,7 @@ from typing import Any
 
 from lca.contracts.models.core.conversation import ConversationTurn
 from lca.contracts.models.core.plane import PlaneBindings
+from lca.contracts.observability.close_barrier import CloseReason
 from lca.contracts.observability.run_journal import (
     LiveRunProjection,
     ProcessJournalProjection,
@@ -25,6 +27,10 @@ from lca.contracts.observability.run_journal import (
 from lca.contracts.observability.run_locator import RunLocator
 from lca.contracts.protocols import JournalProjector
 from lca.infrastructure.observability import BoundObservability
+from lca.infrastructure.observability.loop_cursor import (
+    reset_model_visible_capture,
+    reset_run_cursor,
+)
 from lca.plugins.transport.webserver.handlers.runs.observability.identity import (
     AgentRef,
     default_agent_ref,
@@ -105,7 +111,47 @@ class RunSession:
     model_visible_capture: object | None = (
         None  # ADR-0169 PR-12.5: per-run ModelVisibleCapture 引用
     )
-    model_visible_capture_token: object | None = None  # ADR-0169 PR-12.5: ContextVar reset token
+    model_visible_capture_token: object | None = (
+        None  # ADR-0169 PR-12.7: ContextVar reset token (close 时释放)
+    )
+
+    _closed: bool = field(
+        default=False,
+        repr=False,
+        init=False,
+    )
+
+    def close(self, reason: CloseReason) -> bool:
+        """释放 run-local ContextVar token,run 终止时由 terminalizer 调一次。
+
+        PR-1.5 / PR-12.5 builder 里 ``install_run_cursor`` 与
+        ``install_model_visible_capture`` 配对操作。原本两者只 set token 不
+        reset,在多 run 时 ContextVar 内部字典无限增长(单进程 leak)。
+        是 PR-12.7 close hook 入口,被 :class:`RunTerminalizer.terminalize`
+        在 finalize 后调一次。
+
+        ADR-0169 D5/L10 + PR-12.7:reset 不可重复 — 调用后清字段,
+        第二次调用返回 ``False`` 告知 terminalizer 「已 close」,防双 close 重入。
+
+        Returns
+        -------
+        bool
+            ``True``  首次 close,token 已释放;
+            ``False`` 已 close 过,本调用幂等 no-op。
+        """
+        if self._closed:
+            return False
+        if self.loop_cursor_token is not None:
+            with contextlib.suppress(Exception):
+                reset_run_cursor(self.loop_cursor_token)
+            self.loop_cursor_token = None
+        if self.model_visible_capture_token is not None:
+            with contextlib.suppress(Exception):
+                reset_model_visible_capture(self.model_visible_capture_token)
+            self.model_visible_capture_token = None
+        self._closed = True
+        return True
+
     step_tree_bundle: object | None = (
         None  # ADR-0164 Phase 6: step-tree write bundle (legacy, 兼容)
     )

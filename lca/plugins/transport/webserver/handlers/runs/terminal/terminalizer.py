@@ -46,6 +46,11 @@ class RunTerminalizer:
 
     async def terminalize(self, session: RunSession, *, workspace: Any, success: bool) -> None:
         """Close a run exactly once while preserving Journal ownership of terminal facts."""
+        # ADR-0169 PR-12.7:close reason 由 terminal outcome 派生 — 'completed' 为
+        # 成功,'error' 为异常失败,与 cursor.close / LoopCursor 契约语义对齐。
+        from lca.contracts.observability.close_barrier import CloseReason
+
+        close_reason: CloseReason = "completed" if success else "error"
         try:
             if session.hub is not None:
                 _emit_artifact_closure_if_needed(workspace, session, session.hub)
@@ -63,6 +68,21 @@ class RunTerminalizer:
                 self._materializer(session)
                 if session.hub is not None:
                     await _dispose_export(session.hub)
+                # ADR-0169 PR-12.7:释放 loop_cursor / model_visible_capture
+                # ContextVar token(单进程 leak 修复点);close 内部幂等,
+                # 二重调用不再 reset(terminalizer 行为不受影响)。
+                try:
+                    released = session.close(close_reason)
+                    if not released:
+                        _log.debug(
+                            "run_session_already_closed",
+                            run_id=session.run_id,
+                        )
+                except Exception:
+                    _log.exception(
+                        "run_session_close_token_reset_failed",
+                        run_id=session.run_id,
+                    )
 
 
 __all__ = ["RunTerminalizer"]
