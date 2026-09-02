@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 
 from lca.harness.profile.boot import boot_profile
 from lca.infrastructure.observability.writable_matrix.registry import (

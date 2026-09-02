@@ -18,15 +18,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from functools import wraps
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import structlog
 from opentelemetry import trace as otel_trace
@@ -496,7 +494,7 @@ def _require_run_bound() -> RunContext:
     return ctx
 
 
-def _require_coordinator() -> "StepCoordinator":
+def _require_coordinator() -> StepCoordinator:
     """step API 要求已 bind StepCoordinator(transport 在 prepare 阶段绑)。
 
     失败时抛 RuntimeError 而不是返回 None —— ADR-0167 D13 B2 禁伪防御:

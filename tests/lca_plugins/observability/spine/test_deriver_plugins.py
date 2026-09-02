@@ -20,7 +20,6 @@ from lca.plugins.observability.spine.derivers import (
     narrative,
 )
 
-
 _BASE_KWARGS: dict[str, object] = {
     "execution_point": "brain.think.start",
     "channel": "fact",

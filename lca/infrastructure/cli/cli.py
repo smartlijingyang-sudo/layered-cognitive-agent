@@ -45,7 +45,8 @@ LCA 开发平台编排  ./scripts/lca-ops
 status
   看 kernel_serve / infra / lobehub / daemon / onlyboxes。异常会写出原因。
   onlyboxes 未钉 LCA terminal 镜像时会提示 configure-terminal-runtime。
-  kernel_serve 是 LCA 进程 (lca_kernel serve :8765),只观察不拉起 — heal 自愈。
+  kernel_serve 是 LCA 进程 (lca_kernel serve :8765)。
+  本地便捷: lca-ops kernel-restart。 supervisor 长管: kill + heal 自愈。
   ./scripts/lca-ops status
   ./scripts/lca-ops status --json          给 agent 用
 
@@ -96,17 +97,20 @@ onlyboxes  worker runtime(只读;无 start/stop 命令)
 工作流(全站)
 ────────────────────────────────
 status     看 kernel_serve + infra / lobehub / daemon / onlyboxes,JSON 加 --json
-heal       自己修不健康的服务(优先用这个;不是 restart)。含 kernel_serve 自愈。
+heal       自己修不健康的服务(只补缺失,不重启 healthy)。kernel-restart 用于本地改完代码后。
 stop       停外部平台服务(daemon / lobehub / infra),不含 LCA 进程
 provision  整机首次:装包 / venv / sandbox 用户 / 工作区 / CLI
 
-  注: dev / restart / compose 已删除(ADR-0119 决定 4:lca-ops 不再管 LCA 进程)。
+  注: dev / compose 已删除(ADR-0119 决定 4)。
+      本地便捷 LCA 重启走 ``kernel-restart`` 子命令(SIGTERM + spawn)。
 
 ────────────────────────────────
 LCA 进程 (kernel serve)  ADR-0119 决定 4
 ────────────────────────────────
-lca-ops 不管理 LCA 进程。LCA API :8765 由 lca_kernel serve 自管,
-SIGTERM/SIGINT 由 K6 ``lca_kernel.lifecycle`` 守护。
+lca-ops 不长管 LCA 进程(K6 ``lca_kernel.lifecycle`` 只负责
+SIGTERM/SIGINT LIFO dispose)。本地改完代码 / 换 profile / 强制刷新:
+
+  ./scripts/lca-ops kernel-restart   # 一行重启: SIGTERM → 等 K6 dispose → spawn 新进程
 
   # 启动(前台)
   uv run python -m lca_kernel serve \\

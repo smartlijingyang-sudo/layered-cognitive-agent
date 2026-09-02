@@ -15,6 +15,7 @@ ADR-0119 决定 4 把 LCA 进程入口切到 ``uv run python -m lca_kernel serve
 
 from __future__ import annotations
 
+import contextlib
 import subprocess
 import time
 from pathlib import Path
@@ -26,6 +27,10 @@ from lca.infrastructure.cli.service import (
     ServiceStatus,
     http_ready,
     pid_alive,
+)
+from lca.infrastructure.cli.services.process_utils import (
+    find_pid_by_argv,
+    port_listening,
 )
 
 
@@ -81,6 +86,25 @@ class KernelServeService:
             )
         return self.state()
 
+    def restart(self) -> ServiceState:
+        """SIGTERM 现有 PID(让 K6 dispose)→ 等端口空 → spawn 新进程。
+
+        ADR-0119 决定 4: lca-ops 不长管 kernel_serve;本 ``restart``
+        是给"改完代码 / 换 profile / 强制刷新"用的本地快捷方式。
+        操作员 SIGTERM 之后由 K6 dispose, 然后本方法负责 spawn 新进程。
+        """
+        existing_pid = find_pid_by_argv("lca_kernel", "serve")
+        if existing_pid is not None:
+            with contextlib.suppress(ProcessLookupError):
+                existing_pid.send_signal(15)  # SIGTERM → K6 dispose → exit
+            # 等端口彻底空闲(给 K6 留出 dispose 时间)
+            deadline = time.monotonic() + 10.0
+            while time.monotonic() < deadline:
+                if not port_listening(self._config.port):
+                    break
+                time.sleep(self._SPAWN_POLL_S)
+        return self.heal()
+
     # ── Internals ─────────────────────────────────────────────────────
 
     def _spawn(self) -> bool:
@@ -131,15 +155,6 @@ class KernelServeService:
             "请直接 `uv run python -m lca_kernel serve ...` "
             "或跑 `./scripts/lca-ops heal` 自愈。"
         )
-
-    def stop(self) -> ServiceState:  # pragma: no cover - intentional stub
-        raise NotImplementedError(
-            "lca-ops 不 stop kernel serve (SIGTERM 由 K6 守护)。"
-            "需要停时: kill <pid> 或 supervisor 介入。"
-        )
-
-    def restart(self) -> ServiceState:  # pragma: no cover - intentional stub
-        raise NotImplementedError("lca-ops 不 restart kernel serve。改完代码跑 heal,新进程会起来。")
 
 
 __all__ = ["KernelServeService"]

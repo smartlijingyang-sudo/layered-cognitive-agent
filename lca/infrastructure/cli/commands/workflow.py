@@ -73,3 +73,27 @@ def register(app: typer.Typer) -> None:
             ctx.console.verdict(False, "provision failed")
             raise typer.Exit(1)
         ctx.console.verdict(True, "host provisioned")
+
+    @app.command(name="kernel-restart")
+    def kernel_restart(
+        json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
+        quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
+        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
+    ) -> None:
+        """LCA 进程本地便捷重启: SIGTERM 现有 → 等 K6 dispose → spawn 新。
+
+        ADR-0119 决定 4: lca-ops 不长管 LCA 进程 (生产由 supervisor 守护)。
+        本命令给"改完代码 / 换 profile / 强制刷新"用的本地快捷方式。
+        旧进程被 SIGTERM,K6 ``run_kernel_lifespan`` LIFO dispose,然后
+        ``KernelServeService._spawn`` 拉起新 worker。
+
+        与 ``heal`` 区别: heal 不重启健康进程,只补缺失进程。
+        """
+        ctx = make_context(json_mode, quiet, config)
+        ks = ctx.registry.get("kernel_serve")
+        state = ks.restart()
+        ctx.console.service_state("kernel_serve", state)
+        if not state.is_running:
+            ctx.console.verdict(False, f"kernel_restart failed: {state.why or state.detail}")
+            raise typer.Exit(1)
+        ctx.console.verdict(True, "LCA kernel restarted")
