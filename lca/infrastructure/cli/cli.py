@@ -20,6 +20,7 @@ from lca.infrastructure.cli.commands import (
     diagnostics,
     journal,
     journal_migrate,
+    journal_replay,
     journal_steps,
     journal_trace,
     kernel,
@@ -202,6 +203,7 @@ journal.register(app, group=_journal_group)
 journal_steps.register(_journal_group)
 journal_migrate.register(_journal_group)
 journal_trace.register(_journal_group)
+journal_replay.register(_journal_group)
 kernel.register(app)
 
 
