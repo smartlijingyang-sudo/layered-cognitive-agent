@@ -19,6 +19,9 @@ from pathlib import Path
 from typing import Any
 
 from lca.infrastructure.observability.spine.event_record import EventRecord
+from lca.infrastructure.observability.spine.sinks.naming import (
+    spine_filename_for_run,
+)
 
 _ATOMIC_THRESHOLD = 4096  # Linux PIPE_BUF; do NOT change without kernel docs check
 _DEFAULT_BATCH = 100
@@ -26,7 +29,11 @@ _DEFAULT_INTERVAL_MS = 100
 
 
 class FileSink:
-    """Append-only JSONL sink under ``<run_dir>/events.jsonl``."""
+    """Append-only JSONL sink under ``<run_dir>/events.jsonl``。
+
+    ADR-0169 L10: ``spine_filename=True`` 时派生 ``<run_id>.spine.jsonl`` 作为
+    sink 文件名(默认 False 保留 events.jsonl 兼容既有 tests/生产路径)。
+    """
 
     def __init__(
         self,
@@ -36,9 +43,12 @@ class FileSink:
         file_name: str = "events.jsonl",
         fsync_batch: int = _DEFAULT_BATCH,
         fsync_interval_ms: int = _DEFAULT_INTERVAL_MS,
+        spine_filename: bool = False,
     ) -> None:
         self._run_dir = Path(run_dir)
         self._run_id = run_id
+        if spine_filename:
+            file_name = spine_filename_for_run(run_id)
         self._path = self._run_dir / file_name
         self._fsync_batch = fsync_batch
         self._fsync_interval_ms = fsync_interval_ms / 1000.0
