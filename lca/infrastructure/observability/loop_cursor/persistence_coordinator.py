@@ -21,11 +21,26 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from lca.infrastructure.observability.spine.event_record import EventRecord
 from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
+
+
+@dataclass(frozen=True)
+class PersistenceStats:
+    """持久化协同器运行时统计(ADR-0169 PR-25 S3 装配)。"""
+
+    total_appended: int
+    last_seq: int
+    bytes_written: int
+
+    @classmethod
+    def zero(cls) -> PersistenceStats:
+        return cls(total_appended=0, last_seq=0, bytes_written=0)
+
 
 log = logging.getLogger(__name__)
 
@@ -62,6 +77,10 @@ class PersistenceCoordinator(Protocol):
         """
         ...
 
+    def stats(self) -> PersistenceStats:
+        """运行时统计(总追加数 / 最后 seq / 写入字节)。"""
+        ...
+
 
 class NullPersistenceCoordinator:
     """No-op 持久化协同器(测试 / 无持久化场景)。
@@ -82,6 +101,10 @@ class NullPersistenceCoordinator:
     def restore(self, from_seq: int) -> Iterator[EventRecord]:
         """返回空迭代器。"""
         return iter(())
+
+    def stats(self) -> PersistenceStats:
+        """Null 永远返回零统计。"""
+        return PersistenceStats.zero()
 
 
 class FilePersistenceCoordinator:
@@ -154,9 +177,25 @@ class FilePersistenceCoordinator:
         _ = from_seq
         return iter(())
 
+    def stats(self) -> PersistenceStats:
+        """File sink stats:基于 path 字节数(估算)。
+
+        完整 stats 需要在 sink 中累计;本占位返回 path 文件大小近似。
+        """
+        try:
+            bytes_written = self._sink.path.stat().st_size
+        except OSError:
+            bytes_written = 0
+        return PersistenceStats(
+            total_appended=0,  # 占位 — sink 未暴露 append 计数
+            last_seq=0,
+            bytes_written=bytes_written,
+        )
+
 
 __all__ = [
     "FilePersistenceCoordinator",
     "NullPersistenceCoordinator",
     "PersistenceCoordinator",
+    "PersistenceStats",
 ]

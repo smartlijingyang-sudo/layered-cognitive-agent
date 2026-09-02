@@ -20,7 +20,11 @@ from lca.contracts.models.observability.journal_step import (
     ReflectTrace,
     SpanRecord,
     ThinkingTrace,
+)
+from lca.contracts.models.observability.journal_step import (
     ToolCallRecord as LegacyToolCallRecord,
+)
+from lca.contracts.models.observability.journal_step import (
     ToolResult as LegacyToolResult,
 )
 from lca.contracts.observability.incarnation import Incarnation
@@ -34,7 +38,6 @@ from lca.infrastructure.observability.writable_matrix.coordinator import StepCoo
 from lca.infrastructure.observability.writable_matrix.registry import (
     WritableFaceRegistry,
 )
-
 
 # ── Stubs ───────────────────────────────────────────────────
 

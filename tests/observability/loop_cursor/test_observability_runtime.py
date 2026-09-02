@@ -30,7 +30,6 @@ from lca.infrastructure.observability.loop_cursor.model_visible_capture import (
 from lca.infrastructure.observability.loop_cursor.projection_host import StdProjectionHost
 from lca_kernel.observability import ObservabilityRuntime
 
-
 # ── Stubs ───────────────────────────────────────────────────
 
 
@@ -207,6 +206,6 @@ def test_runtime_close_with_different_reasons(tmp_path: Path) -> None:
 def test_runtime_module_exports_observability_runtime() -> None:
     """``lca_kernel.ObservabilityRuntime` 公开(PR-25 公共 API)。"""
     # 确保 export 在 lca_kernel/__init__.py
-    from lca_kernel import ObservabilityRuntime as Public  # noqa: F401
+    from lca_kernel import ObservabilityRuntime as Public
 
     assert Public is ObservabilityRuntime

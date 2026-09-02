@@ -23,7 +23,13 @@ from pathlib import Path
 from typing import Any
 
 from lca.contracts.models.observability.journal import StampedEvent
+from lca.contracts.models.observability.journal_catalog import JOURNAL_EVENT_CLASSES
+from lca.contracts.observability.journal_format_errors import JournalFormatError
 from lca.contracts.observability.journal_store import JournalStoreBackend
+from lca.infrastructure.observability.journal.schema_version import (
+    SCHEMA_VERSION,
+    check_schema_version,
+)
 
 
 class FilesystemJournalStore(JournalStoreBackend):
@@ -65,16 +71,37 @@ class FilesystemJournalStore(JournalStoreBackend):
             except json.JSONDecodeError:
                 # 部分行损坏 —— 跳过(append-only 文件不应损坏)
                 continue
+            if not isinstance(payload, dict):
+                # 非对象行(纯标量) —— 跳过,与损坏行同类
+                continue
+            # L15: schema_version 必带;缺则按缺失处理(此处默认 v2 兼容)
+            raw_version = payload.get("schema_version", SCHEMA_VERSION)
+            try:
+                version_int = int(raw_version)
+            except (TypeError, ValueError):
+                # 无法解析为整数 —— 视为格式损坏,跳过(非 schema 拒绝)
+                continue
+            # 方向感知 schema 校验(VersionTooOld / VersionTooNew 必抛)
+            check_schema_version(version_int)
+            # L15: event_type 必须在已知词表,除非显式 ignorable
+            event_type = str(payload.get("event_type", "UnknownEvent"))
+            data = payload.get("data", {}) or {}
+            ignorable = bool(data.get("ignorable", False))
+            if event_type not in JOURNAL_EVENT_CLASSES and not ignorable:
+                from lca.contracts.observability.journal_format_errors import (
+                    UnknownEventType,
+                )
+
+                raise UnknownEventType(event_type)
             # 重建 StampedEvent 的最小骨架,seq/ts/event_type/data 已够消费
             from lca.contracts.models.observability.journal import (
                 JournalEvent,
                 RunScope,
             )
 
-            with contextlib.suppress(Exception):
+            try:
                 seq = int(payload.get("seq", len(self._events) + 1))
                 ts = float(payload.get("ts", 0.0))
-                event_type = str(payload.get("event_type", "UnknownEvent"))
                 scope = RunScope(
                     trace_id=str(payload.get("scope", {}).get("trace_id", "")),
                     run_id=str(payload.get("scope", {}).get("run_id", "")),
@@ -86,9 +113,14 @@ class FilesystemJournalStore(JournalStoreBackend):
                     scope=scope,
                     event=event,
                     event_type=event_type,
-                    data=payload.get("data", {}) or {},
+                    data=data,
                 )
                 self._events.append(stamped)
+            except JournalFormatError:
+                raise
+            except Exception:  # noqa: S112 — 单行字段异常按损坏行处理,继续下一行
+                # 其他字段级异常 —— 跳过单行,不影响其他行
+                continue
 
     # ── JournalStoreBackend 契约 ──────────────────────────────
 
@@ -143,6 +175,7 @@ class FilesystemJournalStore(JournalStoreBackend):
 
     def _serialize(self, stamped: StampedEvent) -> dict[str, Any]:
         return {
+            "schema_version": SCHEMA_VERSION,
             "seq": stamped.seq,
             "ts": stamped.ts,
             "event_type": stamped.event_type,
