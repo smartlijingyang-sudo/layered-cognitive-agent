@@ -6,9 +6,24 @@ LCA（Layered Cognitive Agent）是基于 vendored Cordis 的 Python 插件化�
 
 先读[认知原语宪法 v3](docs/design/2026-08-19-cognitive-primitive-constitution-v3.md)、[Harness Spine Spec](docs/specs/harness-spine-spec.md)、相关[ADR](docs/adr/)和[历史实施记录](history/)。文档中的目标态不等于当前生产事实；修改前必须核对当前入口、实现、测试和 Profile 配置，并标注迁移中或兼容路径。
 
-### 工程思维：追问前提
+### 工程思维：追问前提 + 第一性原理
 
-不要在错误机制上堆补丁。遇到长 `if/else`，先考虑 Registry、Strategy 或 Provider；遇到重复逻辑，检查抽象层；遇到 workaround、死监听或深调用链，检查是否应删除、正式接入或重新划分职责。新增规则若影响架构，应写 ADR 或专题文档，不要默默扩大旧机制。
+**默认原则**：
+
+- **从第一性原理思考**。拿到需求先问"问题的本质是什么、最干净的形态是什么"，再决定怎么做。先选定机制边界再选 API，而不是反过来照抄别人的实现。
+- **架构优雅优先**。代码是给未来的读者读的，不是给评审 pass 用的。模块边界、职责划分、依赖方向先于"能跑"。3 处重复就抽；长 `if/else` 先想 Strategy / Registry / Provider；workflow 扭曲就先重组 seam，再实现细节。
+- **职责单一、模块边界清晰**。一个 Protocol / 一个 dataclass / 一个 Plugin 只承担一类关注点。同一段代码同时做"记录 + 计算 + 副作用"就该拆。看到一个函数里同时 import 4 层就应该停手。
+- **不写临时/补丁式代码**。一次写对，不要写"先用 `try/except Exception: pass` 兜底回头再补"。TODO/FIXME 必须挂在 ADR 或 plan 里、给出删除条件，不允许留无期限占位符。兼容路径要写"何时删除"。
+- **写代码顺手清理垃圾**。动到的区域里如果看到死代码、dead import、注释掉的旧实现、命名错的字段、用错命名空间的别名、藏在角落的 workaround —— **顺手清掉**。但**不**顺手重构不在本任务范围的东西（= scope creep）；清理的范围 = 同一文件、同一 seam、同一次合理改动能覆盖的部分。改完跑 `vulture` / `ruff --fix` / 相关测试确认。
+- **正确性高于时效**。"少动一处"是常态，但"少动"不等于"将就"。把 `phase.think.fold` 这种一致性 bug 改对，往往就是 1 行 whitelist 加 1 行覆盖率测试。
+
+**具体抓手**：
+
+- 不要在错误机制上堆补丁。遇到长 `if/else`，先考虑 Registry、Strategy 或 Provider；遇到重复逻辑，检查抽象层；遇到 workaround、死监听或深调用链，检查是否应删除、正式接入或重新划分职责。
+- 新增规则若影响架构，应写 ADR 或专题文档，不要默默扩大旧机制。
+- 命名要"念得出来、查得到语义"：`emit_phase` 不是 `do_thing`；新枚举值要进 close-set 而不是塞 int/string 双轨。
+- 拒绝"魔数、裸 `except Exception`、硬编码路径、无说明的 type: ignore、为了 page 能渲染加的特殊分支"——这些是技术债，留下要写 ADR 解释为什么必须留。
+- 修改同时核对周边：契约改了 → 改 entry + 改 receivers + 改测试；Schema 改了 → 改 consumer + 改 migration。
 
 ## 2. 仓库地图
 
@@ -128,7 +143,10 @@ lca-ops debug-run "$LATEST"
 #    注：[3/8] kernel.log 多数 run 没有，[5/8] 不含完整 traceback。
 
 # 3. 看完整 spine 事件流（理解过程；模型所见即日志）
+#    表格视图（控制点 + channel + outcome）：
 lca-ops journal logs -r "$LATEST" -v
+#    树视图（人读；默认 --human：缩进 + payload 原文 + Δms + 自动折叠 reducer.apply/token 噪声）：
+lca-ops journal trace "$LATEST"
 
 # 3.5 【必跑】读 run 目录的 <sha256>.json sidecar：traceback 通常在这里
 #      不是在 events.jsonl（大 event > 4 KB → I10 offload：FileSink._ATOMIC_THRESHOLD）。
@@ -159,7 +177,8 @@ lca-ops journal narrative "$LATEST" 2>/dev/null
 | "为啥这次失败" / "这次出错了" | 上面 1-2 + **3.5 sidecar**(traceback 的第一站) + 4 |
 | "理解一下过程" / "走了一遍啥逻辑" | 上面 1 + 3 + 5 |
 | "DSH 风格轨迹" / "给我个 HTML" | 加 `lca-ops journal trajectory "$LATEST"` |
-| "模型都做了啥" / "调了啥工具" | `journal logs -r "$LATEST" --focus tools` |
+| "模型都做了啥" / "调了啥工具" | `lca-ops trace "$LATEST" --focus llm\|tools\|delegation`（`--focus` 是 trace 的选项；`journal logs` 不支持） |
+| "给我个像 journal 那样的树视图" / "人读 trace" | `journal trace "$LATEST"`（**默认 --human**：树缩进 + Δms + payload 原文） |
 
 **取 run_id 的硬规则**：永远 `jq -r .run_id traces/latest.json`，**不要** ls、find、按 mtime 排序——pointer 文件是 SSOT。
 
@@ -170,7 +189,7 @@ lca-ops journal narrative "$LATEST" 2>/dev/null
 | 不知道 LCA 服务在不在跑 | `lca-ops status --json` | `lca-ops heal` |
 | 刚改完代码想重启 | `lca-ops kernel-restart` | `lca-ops kernel_serve` 打印启动命令 |
 | run 失败定位 | **`lca-ops debug-run <run_id>`** | `debug-env <run_id>` 只看摘要 |
-| 看完整流程 | `lca-ops trace <run_id> --focus llm\|tools\|delegation` | `journal logs -r <run_id>` |
+| 看完整流程 | `lca-ops trace <run_id> --focus llm\|tools\|delegation` | `journal trace <run_id>`（**默认 --human**，树视图） |
 | 失败原因投影 | `lca-ops explain <run_id>` | `minimal-repro <run_id>` |
 | profile 拓扑 | `lca-ops inspect-tree <profile>` | `dump-profile <profile>` |
 | 能力归属 | `lca-ops why <capability>` / `why-plugin <id>` | `graph <profile>` |
