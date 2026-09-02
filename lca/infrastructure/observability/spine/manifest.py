@@ -48,6 +48,7 @@ EXECUTION_POINTS: tuple[str, ...] = (
     # Writable matrix phase events (perceive / think / act / reflect / remember / stop)
     "perceive.phase.fold",
     "phase.perceive.fold",
+    "phase.think.fold",
     "phase.remember.fold",
     "phase.stop.fold",
     "phase.reflect.fold",

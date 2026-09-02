@@ -31,6 +31,7 @@ _EP_GLYPH: dict[str, str] = {
     "phase.act.fold.start": "⚙",
     "phase.act.fold.end": "⚙",
     "phase.perceive.fold": "👁",
+    "phase.think.fold": "🧠",
     "phase.remember.fold": "💭",
     "phase.reflect.fold": "🪞",
     "phase.stop.fold": "🛑",

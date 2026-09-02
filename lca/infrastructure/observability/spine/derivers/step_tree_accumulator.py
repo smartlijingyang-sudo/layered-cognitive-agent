@@ -51,6 +51,7 @@ log = logging.getLogger(__name__)
 PHASE_FOLD_EPS: dict[str, StepPhase] = {
     "perceive.phase.fold": "perceive",
     "phase.perceive.fold": "perceive",
+    "phase.think.fold": "think",
     "phase.remember.fold": "remember",
     "phase.reflect.fold": "reflect",
     "phase.stop.fold": "stop",
