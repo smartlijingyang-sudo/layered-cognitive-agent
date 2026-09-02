@@ -115,6 +115,38 @@ def set_active_spine(spine: EventSpine | None) -> None:
     _active_spine = spine
 
 
+# ADR-2026-09-02-i17-traceback §D5: the runtime reflector needs to
+# thread the active run_id into its events. Tests already wire
+# ``set_active_spine``; we mirror that pattern with
+# ``set_active_run_id`` so the runtime reflector can stamp payload
+# ``run_id`` without changing every reducer call site. Hot path
+# stays a single ``globals()`` lookup in `_coerce_run_id`.
+
+_active_run_id: str = ""
+
+
+def set_active_run_id(run_id: str | None) -> None:
+    """Install the active run_id for runtime EP payloads.
+
+    Setting ``None`` clears (the helper stores ``""``). Profile boot
+    calls this once per run; tests can call it directly.
+    """
+    global _active_run_id
+    _active_run_id = str(run_id or "")
+
+
+def _coerce_run_id(explicit: str | None) -> str:
+    """Resolve ``run_id`` with explicit-first, active-fallback semantics.
+
+    The reducer's ``_instrument_apply`` decorator does not receive
+    the active run_id as an argument (state is the only handle it
+    has, and the state object is application-level). Using a
+    process-local accessor keeps the call site unchanged while still
+    landing the correct id on the journal.
+    """
+    return str(explicit or "") or _active_run_id
+
+
 def get_active_spine() -> EventSpine | None:
     """Return the active spine, or ``None`` if no run is in flight."""
     return _active_spine
@@ -171,7 +203,11 @@ def emit_runtime_reducer_apply_start(
     return _safe_append(
         execution_point="runtime.reducer.apply",
         channel="fact",
-        payload={"method": method, "phase": "start", "run_id": run_id or ""},
+        payload={
+            "method": method,
+            "phase": "start",
+            "run_id": _coerce_run_id(run_id),
+        },
     )
 
 
@@ -185,7 +221,11 @@ def emit_runtime_reducer_apply_end(
     return _safe_append(
         execution_point="runtime.reducer.apply",
         channel="fact",
-        payload={"method": method, "phase": "end", "run_id": run_id or ""},
+        payload={
+            "method": method,
+            "phase": "end",
+            "run_id": _coerce_run_id(run_id),
+        },
         outcome=outcome,
     )
 

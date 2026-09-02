@@ -46,6 +46,7 @@ import functools
 import hashlib
 import inspect
 import logging
+import traceback
 from collections.abc import Awaitable, Callable
 from typing import Any, TypeVar, overload
 
@@ -63,6 +64,24 @@ WRAP_INSTRUMENTED_ATTR = "__lca_instrumented__"
 ASSEMBLER_PROVENANCE = "assembler"
 DEFAULT_START_EXECUTION_POINT = "phase_graph.node.start"
 DEFAULT_END_EXECUTION_POINT = "phase_graph.node.end"
+
+
+def _is_i17_violation(exc: BaseException) -> bool:
+    """Duck-typed check for ``I17Violation`` without a static import.
+
+    ``lca.harness`` must not statically import ``lca.plugins``. The
+    I17 class lives in :mod:`lca.plugins.observability.spine.emit_pipeline`
+    and is identifiable by its fully-qualified name. This lets the
+    wrapper route I17 failures to a dedicated traceback-emitting path
+    (the silent-swallow bug from ADR-2026-09-02-i17-traceback §A) while
+    keeping the assembler import graph unchanged.
+    """
+    cls = type(exc)
+    return (
+        cls.__module__ == "lca.plugins.observability.spine.emit_pipeline"
+        and cls.__name__ == "I17Violation"
+    )
+
 
 _F = TypeVar("_F", bound=Callable[..., Any])
 
@@ -203,13 +222,36 @@ def _safe_append(
                 "wrap_instrument: drop invalid event ep=%s err=%s",
                 execution_point,
                 exc,
+                exc_info=True,
             )
         except Exception as exc:
-            log.warning(
-                "wrap_instrument: pipeline emit failed ep=%s err=%s",
-                execution_point,
-                exc,
-            )
+            if _is_i17_violation(exc):
+                # ADR-2026-09-02-i17-traceback §D1: I17 failures MUST
+                # surface their traceback (the original code swallowed
+                # them as a generic ``log.warning`` without
+                # ``exc_info=True``). The assembler wraps every phase,
+                # so losing the traceback here loses the entire
+                # evidence trail for any *.start rejection.
+                _publish_i17_rejection(
+                    spine=spine,
+                    span=span,
+                    attempted_ep=execution_point,
+                    exc=exc,
+                    channel=channel,
+                )
+                log.error(
+                    "wrap_instrument: I17 rejected ep=%s reason=%s",
+                    execution_point,
+                    exc,
+                    exc_info=True,
+                )
+            else:
+                log.warning(
+                    "wrap_instrument: pipeline emit failed ep=%s err=%s",
+                    execution_point,
+                    exc,
+                    exc_info=True,
+                )
         return
     if spine is None:
         return
@@ -227,16 +269,75 @@ def _safe_append(
             "wrap_instrument: drop invalid event ep=%s err=%s",
             execution_point,
             exc,
+            exc_info=True,
         )
     except Exception as exc:
         # FD-1 sink failures are supposed to propagate, but only to the
         # caller that triggered the emit. The wrap site is not a
         # business surface; contain it so a broken spine never aborts
         # the wrapped runnable mid-execution.
+        if _is_i17_violation(exc):
+            _publish_i17_rejection(
+                spine=spine,
+                span=span,
+                attempted_ep=execution_point,
+                exc=exc,
+                channel=channel,
+            )
+            log.error(
+                "wrap_instrument: I17 rejected ep=%s reason=%s",
+                execution_point,
+                exc,
+                exc_info=True,
+            )
+        else:
+            log.warning(
+                "wrap_instrument: spine emit failed ep=%s err=%s",
+                execution_point,
+                exc,
+                exc_info=True,
+            )
+
+
+def _publish_i17_rejection(
+    *,
+    spine: EventSpine,
+    span: SpanContext | None,
+    attempted_ep: str,
+    exc: BaseException,
+    channel: Channel,
+) -> None:
+    """Emit one ``spine.i17.rejected`` journal event with the original traceback.
+
+    Mirrors ``EmitPipeline``'s sidecar style so the rejection is
+    recoverable from the run directory (rather than only from
+    stderr). Falls back to a ``log.warning`` when the spine itself
+    rejects the publication — we never want reject-noticing to
+    mask the original I17.
+    """
+    tb_text = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    capped = tb_text.encode("utf-8", errors="replace")[:4096]
+    try:
+        spine.append(
+            execution_point="spine.i17.rejected",
+            channel="error",
+            caller_payload={
+                "attempted_execution_point": attempted_ep,
+                "exception_class": type(exc).__qualname__,
+                "reason": str(exc),
+                "traceback_text": capped.decode("utf-8", errors="ignore"),
+                "span_id": getattr(span, "span_id", None),
+                "outer_channel": str(channel),
+            },
+            outcome="failure",
+            span_ctx=span,
+        )
+    except Exception as publish_exc:
         log.warning(
-            "wrap_instrument: spine emit failed ep=%s err=%s",
-            execution_point,
-            exc,
+            "wrap_instrument: spine.i17.rejected publication failed "
+            "err=%s; I17 traceback still on stderr",
+            publish_exc,
+            exc_info=True,
         )
 
 

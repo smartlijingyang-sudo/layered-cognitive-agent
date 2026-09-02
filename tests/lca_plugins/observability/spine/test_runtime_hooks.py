@@ -373,3 +373,86 @@ def test_wrap_kinds_are_silent_without_a_wired_spine() -> None:
     assert host.run() == 7
     assert wrap_instrument(lambda: 3)() == 3
     ctx.dispose_all()
+
+
+# ── I17 traceback surfacing (ADR-2026-09-02-i17-traceback §D1) ────────
+
+
+class _FakeI17ViolationError(Exception):
+    """Test double mimicking the real ``I17Violation`` class.
+
+    Verified via duck-type rather than a static import to keep the
+    assembler import surface unchanged.
+    """
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        # Override the qualname so the duck-typed check in
+        # ``_is_i17_violation`` accepts this instance.
+        self.__class__.__module__ = "lca.plugins.observability.spine.emit_pipeline"
+        # The duck-typed check in ``_is_i17_violation`` accepts this
+        # instance by matching ``cls.__module__``/``cls.__name__`` after
+        # rebinding to the production qualname.
+        self.__class__.__name__ = "I17Violation"
+
+
+def test_i17_rejection_emits_traceback_to_stderr(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """ADR-2026-09-02 §D1: an I17 violation in wrap_instrument MUST
+    surface a traceback — the original ``log.warning(..., err=%s)``
+    dropped it on the floor and made incidents unrecoverable.
+
+    We wrap the spine accessor so that ``*.start`` emissions trip the
+    real ``I17Violation`` path through the public seam, and assert the
+    log line carries ``exc_info=True`` (so ``caplog.records[i].exc_info``
+    is populated, which is what makes the traceback appear).
+    """
+
+    class _RaisingSpine:
+        def append(self, *args: Any, **kwargs: Any) -> None:
+            raise _FakeI17ViolationError("I17: synthetic for test")
+
+    captured: list[dict[str, Any]] = []
+
+    def _capture(**payload: Any) -> Any:
+        captured.append(payload)
+        # Re-raise the I17 to drive the real wrapper path.
+        raise _FakeI17ViolationError(
+            "I17: execution_point='phase_graph.node.start' requires "
+            "'source_location' in payload (ADR-0165.1 §96); "
+            "SourceAttacher producer missing or disabled"
+        )
+
+    class _RaisingPipeline:
+        def emit(self, *args: Any, **kwargs: Any) -> None:
+            _capture(**kwargs)
+
+    def sample() -> int:
+        """Sentinel."""
+        return 0
+
+    set_active_spine_accessor(lambda: _RaisingSpine())
+    set_active_pipeline_accessor(lambda: _RaisingPipeline())
+    try:
+        with caplog.at_level("WARNING", logger="lca.harness.declarative.compile.instrument_wrap"):
+            wrapped = wrap_instrument(sample)
+            wrapped()
+    finally:
+        set_active_spine_accessor(None)
+        set_active_pipeline_accessor(None)
+
+    # The I17 path must use log.error so it stands out from generic
+    # sink failures, and must carry exc_info so the traceback is on
+    # the log record.
+    error_records = [
+        r for r in caplog.records if r.levelname == "ERROR" and "I17 rejected" in r.getMessage()
+    ]
+    assert error_records, (
+        "wrap_instrument silently swallowed the I17 violation; "
+        "no 'I17 rejected' ERROR record was emitted. This is the "
+        "exact regression ADR-2026-09-02 §D1 was written to prevent."
+    )
+    assert error_records[0].exc_info, (
+        "I17 rejection log line has exc_info=None — traceback was dropped on the floor."
+    )

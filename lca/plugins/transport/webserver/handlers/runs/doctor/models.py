@@ -15,7 +15,12 @@ from typing import Any, Literal
 TERMINAL_STATUSES = frozenset({"completed", "failed", "canceled"})
 OPEN_STATUSES = frozenset({"running", "waiting_input"})
 TOOL_TERMINAL_EVENTS = frozenset({"ToolInvoked", "ToolDenied"})
-RUN_FINISHED_EVENTS = frozenset({"AgentRunFinished", "TeamRunFinished"})
+# Events that mark a run as durably terminated. Spans both the legacy
+# event_type vocabulary (``AgentRunFinished`` / ``TeamRunFinished``)
+# and the journal execution_point vocabulary (``kernel.run.stop``).
+# Doctor's H2 closes when ANY one of these is present alongside a
+# terminal status — see ADR-2026-09-02-i17-traceback §D6.
+RUN_FINISHED_EVENTS = frozenset({"AgentRunFinished", "TeamRunFinished", "kernel.run.stop"})
 
 DoctorMode = Literal["backend", "ui"]
 """doctor 模式:backend = 没浏览器/UI 不可视,跳过 H4/H5;ui = 完整流程检查。"""

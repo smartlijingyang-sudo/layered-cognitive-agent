@@ -62,7 +62,20 @@ def scan_jsonl(path: Path) -> JsonlScan:
         rows += 1
         normalized = record_normalize(record)
         descriptor = normalized.get("descriptor", {}) or {}
-        event_type = str(descriptor.get("type") or record.get("event_type") or "")
+        # ADR-2026-09-02-i17-traceback §D6: doctor reads BOTH the
+        # legacy ``event_type`` (SSE-shaped records) AND the journal
+        # ``execution_point`` (the only field populated for
+        # ``events.jsonl``). Falling back to execution_point was
+        # missing in earlier revisions — every journal entry was
+        # recorded as ``event_type=""`` so RUN_FINISHED_EVENTS never
+        # matched. That is the H2 false-positive addressed by the
+        # ADR.
+        event_type = str(
+            descriptor.get("type")
+            or record.get("event_type")
+            or record.get("execution_point")
+            or ""
+        )
         counts[event_type] += 1
         seq_raw = normalized.get("run_seq", record.get("seq")) or 0
         if isinstance(seq_raw, (int, float)) or (isinstance(seq_raw, str) and seq_raw.isdigit()):
