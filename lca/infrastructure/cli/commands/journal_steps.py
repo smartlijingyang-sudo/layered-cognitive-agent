@@ -1,13 +1,12 @@
 """Journal step-tree viewer CLI(ADR-0164 草案 Phase 5)。
 
-三个新命令:
+命令:
     lcaops journal steps <run_id>           # step 表 + 一句话摘要
     lcaops journal steps <run_id> --step N  # 第 N 步详情(JSON / markdown)
     lcaops journal steps <run_id> --summary  # 因果链
     lcaops journal steps <run_id> --json    # 完整 JournalDocument JSON
 
     lcaops journal narrative <run_id>       # 输出 narrative.md
-    lcaops journal raw <run_id>             # 兜底读 journal.raw.jsonl
 
 设计:
     - 输入: <run_id> + traces 根目录(--traces-root 默认 "traces")
@@ -186,24 +185,6 @@ def register(app: typer.Typer) -> None:
         path = locator.journal_narrative_path(run_id)
         if not path.exists():
             print(f"narrative.md not found: {path}", file=sys.stderr)
-            raise SystemExit(1)
-        sys.stdout.write(path.read_text(encoding="utf-8"))
-
-    @app.command(name="raw")
-    def raw_cmd(
-        run_id: str = typer.Argument(..., help="run_id"),
-        traces_root: Path = typer.Option(  # noqa: B008
-            _DEFAULT_TRACES_ROOT, "--traces-root", help="traces 根目录"
-        ),
-    ) -> None:
-        """兜底读 journal.raw.jsonl(legacy 流式, 回放用)。
-
-        ADR-0164: 主路径走 step-tree (steps / narrative); raw 仅供迁移期调试。
-        """
-        locator = FilesystemRunLocator(traces_root)
-        path = locator.journal_path(run_id)
-        if not path.exists():
-            print(f"journal.raw.jsonl not found: {path}", file=sys.stderr)
             raise SystemExit(1)
         sys.stdout.write(path.read_text(encoding="utf-8"))
 

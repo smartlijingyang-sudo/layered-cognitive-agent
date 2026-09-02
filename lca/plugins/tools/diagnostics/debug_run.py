@@ -40,11 +40,9 @@ class DebugRunReport:
     run_id: str
     manifest_path: str
     manifest_summary: dict[str, Any]
-    journal_path: str
-    journal_event_count: int
-    journal_missing_seqs: tuple[int, ...]
     spine_events_path: str
     spine_event_count: int
+    spine_missing_seqs: tuple[int, ...]
     spine_execution_points: tuple[str, ...]
     kernel_log_path: str
     kernel_log_tail: str
@@ -62,11 +60,9 @@ class DebugRunReport:
             "run_id": self.run_id,
             "manifest_path": self.manifest_path,
             "manifest_summary": self.manifest_summary,
-            "journal_path": self.journal_path,
-            "journal_event_count": self.journal_event_count,
-            "journal_missing_seqs": list(self.journal_missing_seqs),
             "spine_events_path": self.spine_events_path,
             "spine_event_count": self.spine_event_count,
+            "spine_missing_seqs": list(self.spine_missing_seqs),
             "spine_execution_points": list(self.spine_execution_points),
             "kernel_log_path": self.kernel_log_path,
             "kernel_log_tail": self.kernel_log_tail,
@@ -89,13 +85,9 @@ class DebugRunReport:
         broken = self.manifest_summary.get("extra", {}).get("doctor_report", {}).get("broken_hop")
         lines.append(f"      status={summary}" + (f" broken_hop={broken}" if broken else ""))
         lines.append(
-            f"[2/8] journal             {self.journal_path} "
-            f"events={self.journal_event_count}"
-            + (
-                f" missing_seqs={list(self.journal_missing_seqs)}"
-                if self.journal_missing_seqs
-                else ""
-            )
+            f"[2/8] journal             {self.spine_events_path} "
+            f"events={self.spine_event_count}"
+            + (f" missing_seqs={list(self.spine_missing_seqs)}" if self.spine_missing_seqs else "")
         )
         lines.append(
             f"      spine.events        {self.spine_events_path} events={self.spine_event_count}"
@@ -137,14 +129,12 @@ class DebugRunToolAdapter:
     def debug_run(self, run_id: str) -> DebugRunReport:
         run_dir = self._locator.run_dir(run_id)
         manifest_path = self._locator.manifest_path(run_id)
-        journal_path = self._locator.journal_path(run_id)
-        spine_events_path = run_dir / "events.jsonl"
+        spine_events_path = self._locator.events_path(run_id)
         kernel_log_path = run_dir / "kernel.log"
 
         manifest_summary = _safe_json(manifest_path)
-        journal = _safe_lines(journal_path)
         spine_events = _safe_lines(spine_events_path)
-        seqs = sorted({e.get("run_seq") for e in journal if isinstance(e.get("run_seq"), int)})
+        seqs = sorted({e.get("run_seq") for e in spine_events if isinstance(e.get("run_seq"), int)})
         missing_seqs = tuple(
             s for s in range(1, (seqs[-1] if seqs else 0) + 1) if s not in set(seqs)
         )
@@ -154,8 +144,10 @@ class DebugRunToolAdapter:
             if isinstance(e.get("execution_point"), str)
         )
 
-        failure_node_id, error_message, error_type = _extract_failure(manifest_summary, journal)
-        phase_cursor = _extract_phase_cursor(journal)
+        failure_node_id, error_message, error_type = _extract_failure(
+            manifest_summary, spine_events
+        )
+        phase_cursor = _extract_phase_cursor(spine_events)
         attempts = _extract_attempts(manifest_summary)
         stack_frames, suggested = _extract_diagnostic(manifest_summary)
 
@@ -165,11 +157,9 @@ class DebugRunToolAdapter:
             run_id=run_id,
             manifest_path=str(manifest_path),
             manifest_summary=manifest_summary,
-            journal_path=str(journal_path),
-            journal_event_count=len(journal),
-            journal_missing_seqs=missing_seqs,
             spine_events_path=str(spine_events_path),
             spine_event_count=len(spine_events),
+            spine_missing_seqs=missing_seqs,
             spine_execution_points=spine_points,
             kernel_log_path=str(kernel_log_path),
             kernel_log_tail=tail,
@@ -216,45 +206,55 @@ def _safe_lines(path: Path) -> list[dict[str, Any]]:
 
 
 def _extract_failure(
-    manifest: dict[str, Any], journal: list[dict[str, Any]]
+    manifest: dict[str, Any], spine_events: list[dict[str, Any]]
 ) -> tuple[str | None, str | None, str | None]:
+    """失败节点 + 错误信息全部从 manifest extra 推导(spine-only)。
+
+    spine 流只有 execution_point 序列,没有 v2 envelope 的 ``descriptor.type``
+    字段,所以失败细节必须从 manifest 的 doctor_report / session_error / flush_errors 抽取。
+    """
     extra = manifest.get("extra", {}) or {}
     doctor = extra.get("doctor_report", {}) or {}
     h6 = doctor.get("hops", {}).get("H6", {}) or {}
     error_message = h6.get("error") or extra.get("session_error") or None
     if isinstance(error_message, str) and not error_message.strip():
         error_message = None
-    error_type = None
-    failure_node = None
-    for event in reversed(journal):
-        attrs = event.get("data", {}).get("attributes", {}) or {}
-        payload = attrs.get("payload", {}) or {}
-        if payload.get("node") in {"stop.main", "think.main"}:
-            failure = payload.get("failure", {}) or {}
-            if failure.get("node_id"):
-                failure_node = failure.get("node_id")
-            if failure.get("reason") == "error":
-                error_message = error_message or "phase_error: " + (
-                    failure.get("final_output") or "phase exhausted"
-                )
-            attempts = failure.get("attempts") or []
-            if attempts:
-                error_type = attempts[-1].get("error_type")
-            break
+    error_type: str | None = None
+    failure_node: str | None = None
+    flush_errors = extra.get("flush_errors", []) or []
+    if isinstance(flush_errors, list) and flush_errors:
+        last = flush_errors[-1] if isinstance(flush_errors[-1], dict) else {}
+        if last.get("node_id"):
+            failure_node = str(last["node_id"])
+        if last.get("exception_class"):
+            error_type = str(last["exception_class"])
+    # 兜底:spine 流里的 exception.caught EP(出现时附 payload.error_type)
+    for event in reversed(spine_events):
+        if event.get("execution_point") != "exception.caught":
+            continue
+        data = event.get("payload") or event.get("data") or {}
+        error_type = error_type or data.get("error_type")
+        node = data.get("node_id")
+        if node:
+            failure_node = failure_node or str(node)
+        break
     return failure_node, error_message, error_type
 
 
-def _extract_phase_cursor(journal: list[dict[str, Any]]) -> str | None:
-    for event in reversed(journal):
-        data = event.get("data", {}) or {}
-        if event.get("descriptor", {}).get("type") == "RuntimeObserved":
-            if data.get("plugin") == "stop":
-                return "stop.main (failed)"
-            if data.get("operation") == "phase.fact":
-                payload = (data.get("attributes") or {}).get("payload") or {}
-                node = payload.get("node")
-                if node:
-                    return node
+def _extract_phase_cursor(spine_events: list[dict[str, Any]]) -> str | None:
+    """从 spine execution_point 序列推 phase cursor(粗粒度:最后一个 phase.* EP)。"""
+    phase_eps = (
+        "phase.perceive.fold",
+        "phase.think.fold",
+        "phase.act.fold",
+        "phase.reflect.fold",
+        "phase.remember.fold",
+        "phase.stop.fold",
+    )
+    for event in reversed(spine_events):
+        ep = event.get("execution_point")
+        if isinstance(ep, str) and ep in phase_eps:
+            return ep
     return None
 
 

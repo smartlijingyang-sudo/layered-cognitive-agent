@@ -42,15 +42,15 @@ def _resolve_journal_artifact(
     jsonl: Path | None,
     trace_id: str | None,
 ) -> Path | None:
-    """Resolve a journal artifact path with run-aware fallback (ADR-0166 S1 / 0167 D3).
+    """Resolve a journal artifact path with run-aware fallback (ADR-0166 S1 / 0167 D3)。
 
-    Resolution order (ADR-0167 D11):
+    Resolution order:
     1. Explicit ``--journal`` argument (any caller-provided path wins).
-    2. ``traces/runs/<id>/journal.json`` (preferred — lca.journal/3 step story).
-    3. ``traces/runs/<id>/events.jsonl`` (SSOT — ADR-0165.1 spine stream)。
-    4. ``traces/runs/<id>/journal.raw.jsonl`` (legacy stream — replay source)。
-    5. ``traces/runs/<id>.journal`` (legacy per-trace_id layout)。
-    6. ``traces/lca_journal.jsonl`` (last-resort global legacy stream)。
+    2. ``traces/runs/<id>/journal.json`` (preferred — lca.journal/3 step story)。
+    3. ``traces/runs/<id>/events.jsonl`` (spine SSOT — ADR-0165.1 / 0167 D11)。
+
+    旧 ``journal.raw.jsonl`` / ``<id>.journal`` / 全局 ``lca_journal.jsonl``
+    流式布局已下线 —— 不再回退到任何 legacy artifact。
 
     Returns the resolved path or ``None`` when nothing was found.
     """
@@ -61,19 +61,9 @@ def _resolve_journal_artifact(
         primary = nested / "journal.json"
         if primary.exists():
             return primary
-        # ADR-0165.1: events.jsonl 是 spine SSOT;CLI trace/explain 也认
         ssot = nested / "events.jsonl"
         if ssot.exists():
             return ssot
-        legacy_stream = nested / "journal.raw.jsonl"
-        if legacy_stream.exists():
-            return legacy_stream
-        legacy_flat = Path("traces/runs") / f"{trace_id}.journal"
-        if legacy_flat.exists():
-            return legacy_flat
-    fallback = Path("traces/lca_journal.jsonl")
-    if fallback.exists():
-        return fallback
     return None
 
 
@@ -83,10 +73,7 @@ def resolve_journal_path(jsonl: Path | None, run_id: str | None) -> Path:
     if resolved is not None:
         return resolved
     typer.echo(
-        "No journal file found "
-        "(tried --journal, traces/runs/<id>/journal.json, "
-        "journal.raw.jsonl, traces/runs/<id>.journal, "
-        "traces/lca_journal.jsonl)"
+        "No journal file found (tried --journal, traces/runs/<id>/journal.json, events.jsonl)"
     )
     raise typer.Exit(1)
 

@@ -10,7 +10,9 @@ multi-host layout 都通过实现该契约提供。目录命名:
 ADR-0164 增 step-tree 路径:
   - ``journal_step_path`` → step-tree 主存储 (lca.journal/3)
   - ``journal_narrative_path`` → StepNarrativeWriter 写出的 markdown
-  - 旧的 ``journal_path`` 指向 ``journal.raw.jsonl``(回放兜底)
+  - ``events_path`` → spine SSOT(events.jsonl; ADR-0165.1 / ADR-0167 D11)
+  - 旧的 ``journal.jsonl`` / ``journal.raw.jsonl`` 已下线;``journal_path``
+    方法移除(boot 不再写回放流)。
 """
 
 from __future__ import annotations
@@ -25,9 +27,6 @@ class RunLocator(Protocol):
 
     def run_dir(self, run_id: str) -> Path:
         """返回 run 的物理目录;若目录不存在也返回路径(写时再创建)。"""
-
-    def journal_path(self, run_id: str) -> Path:
-        """返回该 run 的 journal.raw.jsonl 路径(legacy 流式,回放用)。"""
 
     def journal_step_path(self, run_id: str) -> Path:
         """返回该 run 的 journal.json 路径(ADR-0164 step-tree 主存储)。"""

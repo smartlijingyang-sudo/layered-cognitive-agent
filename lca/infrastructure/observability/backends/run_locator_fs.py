@@ -6,8 +6,8 @@
     ├── latest.json                                # 原子指针
     └── runs/
         └── <run_id>/                              # 不可猜测的目录名
+            ├── events.jsonl                        # spine SSOT (ADR-0165.1 / 0167 D11)
             ├── journal.json                        # step-tree 主存储 (ADR-0164)
-            ├── journal.raw.jsonl                  # 旧流式(可选,回放 / 调试)
             ├── journal.narrative.md                # StepNarrativeWriter 产出
             ├── manifest.json
             ├── evidence/
@@ -44,14 +44,6 @@ class FilesystemRunLocator(RunLocator):
 
     def run_dir(self, run_id: str) -> Path:
         return self._root / "runs" / run_id
-
-    def journal_path(self, run_id: str) -> Path:
-        """返回 legacy journal.jsonl 路径(回放 / 调试用)。
-
-        ADR-0164 Phase 5: 主存储是 journal.json(step-tree)。 ``journal.jsonl``
-        仍在 boot 装配里写, 这里兼容回放路径。
-        """
-        return self.run_dir(run_id) / "journal.jsonl"
 
     def journal_step_path(self, run_id: str) -> Path:
         """Step-tree 主存储路径(ADR-0164 Phase 2+)。"""

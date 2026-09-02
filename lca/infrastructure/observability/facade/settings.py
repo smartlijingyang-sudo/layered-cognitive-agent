@@ -12,7 +12,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from lca.infrastructure.observability.adapters.policy import Verbosity
 
 _DEFAULT_BACKENDS = "console"
-_DEFAULT_JSONL_PATH = "traces/lca_journal.jsonl"
 _DEFAULT_LANGFUSE_HOST = "http://localhost:3000"
 
 
@@ -36,7 +35,6 @@ class ObservabilitySettings(BaseSettings):
     backends: str = _DEFAULT_BACKENDS
     verbosity: Verbosity = Verbosity.STANDARD
     sampling_rate: float = Field(default=1.0, ge=0.0, le=1.0)
-    jsonl_path: str = _DEFAULT_JSONL_PATH
     diagnostics_enabled: bool = True
     redact_enabled: bool = True
     evidence_root: str = Field(

@@ -36,9 +36,8 @@ def register(app: typer.Typer) -> None:
             None,
             "--journal",
             help=(
-                "Path to a journal jsonl file (defaults to "
-                "traces/runs/<trace_id>/journal.json, journal.raw.jsonl, or "
-                "traces/lca_journal.jsonl)"
+                "Path to a journal artifact (defaults to "
+                "traces/runs/<trace_id>/journal.json or events.jsonl)"
             ),
         ),
     ) -> None:
