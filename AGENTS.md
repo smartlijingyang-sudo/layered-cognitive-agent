@@ -25,6 +25,35 @@ LCA（Layered Cognitive Agent）是基于 vendored Cordis 的 Python 插件化�
 - 拒绝"魔数、裸 `except Exception`、硬编码路径、无说明的 type: ignore、为了 page 能渲染加的特殊分支"——这些是技术债，留下要写 ADR 解释为什么必须留。
 - 修改同时核对周边：契约改了 → 改 entry + 改 receivers + 改测试；Schema 改了 → 改 consumer + 改 migration。
 
+**动手前 · 总闸 4 问（必答，不答不写）：**
+
+1. **问题是什么？** —— 一句话，不含实现词。
+2. **最干净的机制边界在哪？** —— 谁拥有真值、谁投影、谁副作用。
+3. **现有 seam / Protocol / ADR 能否表达？** —— 能则扩展，勿新开平行机制。
+4. **这次改动的删除条件是什么？** —— 兼容、TODO、双写路径必须写明。
+
+答不出 1–3 → 停手，读 ADR / 契约 / 调用方再写代码。答不出 4 却留下兼容分支 → 禁止「合并心态」（本地也不提交那种）。
+
+**契约改动必须闭环（漏一端 = 未完成，不是 follow-up）：**
+
+| 你改了 | 必须同 PR 改 |
+|---|---|
+| Protocol / 公共签名 | 全部实现 + 测试 + 必要时 mypy |
+| 枚举 / close-set / EP 名 | whitelist、catalog、emit 方、消费方、文档 |
+| Schema / Journal 字段 | consumer + migration/兼容说明 + 测试 |
+| 注册表 key / Plugin id | Profile/Bundle、`why-plugin`、相关装配测试 |
+
+**兼容路径模板（必须填满，无删除日 = 无期限补丁 = 红灯）：**
+
+```text
+# COMPAT(delete-when: <条件>, tracking: ADR-0xxx|issue)
+# 条件例: "writable.matrix 单写稳定 14 天" / "无调用方 rg 为零"
+```
+
+**离开前 · 卫生清单：** 无新增无期限 TODO；无双写同一 SSOT（除非 COMPAT 块写满删除条件）；无「记录+计算+副作用」未拆的新函数；死代码/死 import 已清（本 seam 内）；类型标注完整、无无理由 `type: ignore`；契约改了测双方、bugfix 有回归锁；`ruff check --fix`，需要时 `lint-imports` / mypy / vulture；`git diff --check`；提交信息说明「做了什么 / 为什么」。
+
+**与「能跑」冲突时的优先级（自上而下递减）：** 不变量与契约正确 → 依赖方向与单一职责 → 可观测真值（能重建现场）→ 可删的兼容 → 局部性能微优化 → 「少改几行」的幻觉。「先让 CI 绿再补设计」仅当失败是无关 flakes 且本 PR 不扩大错误机制；绿灯若靠吞异常 / 跳过断言 / 双写假装一致 → 视为红灯。
+
 ## 2. 仓库地图
 
 ```text
