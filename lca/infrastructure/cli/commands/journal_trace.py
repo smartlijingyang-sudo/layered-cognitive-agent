@@ -50,6 +50,7 @@ from lca.infrastructure.observability.backends.run_locator_fs import (
 )
 
 _DEFAULT_TRACES_ROOT = Path("traces")  # CLI default traces root
+_DEFAULT_MAX_DETAIL_PER_NODE = 8
 
 # Cap on the absolute-time cell so a long run does not push alignment out.
 _TIME_CELL_WIDTH = 9
@@ -601,24 +602,19 @@ def _detail_lines(ep: str, payload: dict[str, Any], *, max_lines: int) -> _Detai
 
 
 def _build_span_tree(events: list[dict[str, Any]]) -> dict[str | None, list[int]]:
-    """Index ``sequence`` by ``parent_span_id`` so we can render the tree.
+    """Index event positions by ``parent_span_id`` so we can render the tree.
 
-    Roots (``parent_span_id is None``) are returned under the ``None`` key.
+    Roots (``parent_span_id is None``) are returned under the ``None`` key;
+    every other event hangs under its parent's ``span_id``. Events whose
+    parent is missing from this run still appear — the caller walks the
+    full index and emits any orphans in their own ring so no event is
+    silently dropped.
     """
     children: dict[str | None, list[int]] = {}
     for i, e in enumerate(events):
         parent = e.get("parent_span_id")
         children.setdefault(parent, []).append(i)
     return children
-
-
-def _is_root_kind(ep: str) -> bool:
-    """Roots get the ``▸`` glyph; everything else ``↳``.
-
-    The transport / lifecycle outer ring is the operator's entry point;
-    everything inside is a child step in that ring.
-    """
-    return ep.startswith("transport.") or ep.startswith("kernel.run.") or ep == "lifecycle.finally"
 
 
 def _parse_when(event: dict[str, Any]) -> datetime | None:
@@ -688,10 +684,19 @@ def _render_human(
     output.append(f"▶ {run_id}  trace={trace_id}  ·持续 {_format_delta_ms(total_ms).lstrip('Δ+')}")
     output.append("")
 
-    def _walk(parent: str | None, depth: int, marker: str) -> None:
-        kids = children.get(parent, [])
-        if not kids:
-            return
+    def _walk(
+        kids: list[int],
+        *,
+        depth: int,
+        marker: str,
+        expected_parent: str | None,
+    ) -> set[int]:
+        """Render the kids indices, applying folding rules, in original order.
+
+        Returns the set of indices actually rendered (so the caller can
+        also surface anything that was *not* a child of ``expected_parent``
+        but showed up because of an out-of-order upstream mistake).
+        """
         rendered: set[int] = set()
         i = 0
         while i < len(kids):
@@ -705,7 +710,7 @@ def _render_human(
                 while (
                     j + 1 < len(kids)
                     and events[kids[j + 1]].get("execution_point") == "llm.stream.token"
-                    and events[kids[j + 1]].get("parent_span_id") == parent
+                    and events[kids[j + 1]].get("parent_span_id") == expected_parent
                 ):
                     j += 1
                 block = kids[i : j + 1]
@@ -718,7 +723,7 @@ def _render_human(
                 while (
                     j + 1 < len(kids)
                     and events[kids[j + 1]].get("execution_point") == "runtime.reducer.apply"
-                    and events[kids[j + 1]].get("parent_span_id") == parent
+                    and events[kids[j + 1]].get("parent_span_id") == expected_parent
                 ):
                     j += 1
                 block = kids[i : j + 1]
@@ -726,16 +731,19 @@ def _render_human(
                 output.append(_build_fold_line(events, block, ep_name, depth, anchor))
                 i = j + 1
                 continue
-            if ep_name == "transport.route.enter" and i + 1 < len(kids):
+            if (
+                ep_name == "transport.route.enter"
+                and i + 1 < len(kids)
+                and events[kids[i + 1]].get("execution_point") == "transport.route.exit"
+            ):
                 nxt_idx = kids[i + 1]
-                if events[nxt_idx].get("execution_point") == "transport.route.exit":
-                    rendered.add(idx)
-                    rendered.add(nxt_idx)
-                    output.append(
-                        _render_transport_pair(events, idx, nxt_idx, depth, anchor)
-                    )
-                    i += 2
-                    continue
+                rendered.add(idx)
+                rendered.add(nxt_idx)
+                output.append(
+                    _render_transport_pair(events, idx, nxt_idx, depth, anchor)
+                )
+                i += 2
+                continue
             rendered.add(idx)
             output.append(
                 _render_single(
@@ -747,21 +755,46 @@ def _render_human(
                 )
             )
             i += 1
+        return rendered
 
-    # Walk roots: ``parent_span_id is None``.
-    roots = children.get(None, [])
-    for idx in roots:
-        e = events[idx]
-        output.append(
-            _render_single(
-                e,
-                marker="▸",
-                depth=0,
-                anchor=anchor,
-                max_detail_per_node=max_detail_per_node,
-            )
+    def _emit_tree(parent: str | None, *, depth: int, marker: str) -> None:
+        kids = children.get(parent, [])
+        rendered = _walk(
+            kids,
+            depth=depth,
+            marker=marker,
+            expected_parent=parent,
         )
-        _walk(e.get("span_id"), 1, marker="↳")
+        for idx in kids:
+            if idx in rendered:
+                continue
+            ep_name = events[idx].get("execution_point", "")
+            if ep_name in ("llm.stream.token", "runtime.reducer.apply"):
+                continue  # already folded above
+            output.append(
+                _render_single(
+                    events[idx],
+                    marker=marker,
+                    depth=depth,
+                    anchor=anchor,
+                    max_detail_per_node=max_detail_per_node,
+                )
+            )
+            _emit_tree(events[idx].get("span_id"), depth=depth + 1, marker="↳")
+
+    _emit_tree(None, depth=0, marker="▸")
+
+    # Orphans: events whose ``parent_span_id`` references a span we never
+    # saw (parent process died before its child did). Surface them in their
+    # own ring so no event is silently dropped.
+    seen: set[int] = set()
+    for kids in children.values():
+        seen.update(kids)
+    orphans = [i for i in range(len(events)) if i not in seen]
+    if orphans:
+        output.append("")
+        output.append("── orphan events (parent span missing) ──")
+        _walk(orphans, depth=0, marker="?", expected_parent=None)
 
     # Footer summary — count EPs that matter to the operator.
     ep_counter: dict[str, int] = {}
@@ -901,6 +934,11 @@ def register(app: typer.Typer) -> None:
     @app.command(name="trace")
     def trace_cmd(
         run_id: str = typer.Argument(..., help="run_id (e.g. run_c38532761cfb)"),
+        human: bool = typer.Option(
+            True,
+            "--human/--no-human",
+            help="人读视图(默认开):tree 缩进 + payload 原文 + Δms",
+        ),
         with_locals: bool = typer.Option(
             False, "--locals", help="在表格里追加 next_frame + locals_snapshot 列"
         ),
@@ -912,42 +950,57 @@ def register(app: typer.Typer) -> None:
             _DEFAULT_TRACES_ROOT, "--traces-root", help="traces 根目录"
         ),
         limit: int = typer.Option(0, "--limit", "-n", help="只输出前 N 行(0 = 全部)"),
+        max_detail_per_node: int = typer.Option(
+            _DEFAULT_MAX_DETAIL_PER_NODE,
+            "--max-detail-per-node",
+            help="人读视图下每个节点最多展开的 payload 行数(超出显示 +N more)",
+        ),
     ) -> None:
         """检查一个 run 的 spine ``events.jsonl``(只读,PR-9 I17 起生效)。
 
-        默认列:``seq / execution_point / channel / outcome / when / source``。
+        默认开 ``--human``:tree 缩进 + payload 原文 + Δms 时间戳 +
+        自动折叠 ``llm.stream.token`` / ``runtime.reducer.apply`` /
+        配对的 ``transport.route.{enter,exit}``,但**不截断 payload 文本**。
 
-        --source / --locals 都开时,额外追加 ``next_frame`` 和
-        ``locals_snapshot.pre_call`` 列。``--locals`` 隐含开启
-        ``--source`` —— locals 列依赖 source_location 才能定位
-        Frame。
+        加 ``--no-human`` 回到原表格:``seq / execution_point /
+        channel / outcome / when / source``(对 CI / agent 友好)。
         """
         # ``--locals`` implies ``--source`` so the table is consistent:
-        # locals without source_location is ambiguous.
+        # locals without source_location is ambiguous. Only meaningful in
+        # the ``--no-human`` path; ignored in ``--human``.
         if with_locals:
             with_source = True
 
         events_path = _resolve_events_path(traces_root, run_id)
+        all_events: list[dict[str, Any]] = []
+        for event in _iter_events(events_path):
+            if event.get("__decode_error__"):
+                continue
+            all_events.append(event)
+
+        if limit > 0:
+            all_events = all_events[:limit]
+
+        if human and not json_output:
+            sys.stdout.write(
+                _render_human(
+                    all_events,
+                    max_detail_per_node=max_detail_per_node,
+                )
+            )
+            return
+
         rows: list[TraceRow] = []
         skipped = 0
         total = 0
-        for event in _iter_events(events_path):
+        for event in all_events:
             total += 1
-            if event.get("__decode_error__"):
-                skipped += 1
-                if limit > 0 and len(rows) >= limit:
-                    break
-                continue
             payload = event.get("payload")
             if not isinstance(payload, dict):
                 skipped += 1
-                if limit > 0 and len(rows) >= limit:
-                    break
                 continue
             seq = int(event.get("sequence", 0) or 0)
             rows.append(_event_to_row(seq, event))
-            if limit > 0 and len(rows) >= limit:
-                break
 
         if json_output:
             payload_rows = [
