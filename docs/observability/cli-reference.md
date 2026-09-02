@@ -17,7 +17,7 @@
 | 命令 | 用途 |
 |---|---|
 | `cost <run_id> [--json] [--jsonl PATH]` | 按 pricing_ref 重算 cost |
-| `trace <run_id> [--focus all\|llm\|tools\|delegation] [--depth N]` | trace 报告; mermaid 视图走 `graph-run <run_id>` |
+| `trace <run_id> [--focus all\|llm\|tools\|delegation] [--depth N]` | trace 报告; mermaid 视图走 `graph-run <run_id>`;**不会读 sidecar,offloaded > 4 KB 的事件仅显示 `offloaded` 占位符**——要看完整 traceback 走 `journal logs -v` 或 cat `<sha256>.json` |
 | `explain <run_id>` | 失败因果链 |
 | `graph-run <run_id>` | Mermaid 插件交互图(原 `trace --format mermaid` 已删) |
 | `minimal-repro <run_id> [--json] [--jsonl PATH]` | 最小复现包 |

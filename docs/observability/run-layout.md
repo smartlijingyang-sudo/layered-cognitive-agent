@@ -12,6 +12,7 @@ traces/
     ├── journal.narrative.md            # 人读轨迹（deriver）
     ├── manifest.json                   # RunManifest（封印 / 高水位 / 完整性）
     ├── profile_snapshot.json           # boot 组合快照
+    ├── <digest>.json                   # I10 spine offload sidecar：>4 KB 的 event 全文;**traceback 多数在此不在 events.jsonl**
     ├── model_visible/                  # 模型所见正文（按 step）
     │   └── step_001/
     │       ├── request-header.json
@@ -34,10 +35,11 @@ traces/
 
 | 你想知道 | 打开 |
 |---|---|
-| 发生了哪些执行点、耗时、错误链 | `events.jsonl` |
+| 发生了哪些执行点、耗时、错误链 | `events.jsonl`(**完整 traceback 不一定在里面;见 `<digest>.json`**) |
 | 第几步想了什么、调了哪些工具（故事） | `journal.json` / `journal.narrative.md` |
+| **完整 traceback / 完整 source_location / 完整 call_frames** | **首选** `<digest>.json`(I10 sidecar;多数情况 1 个文件 = 完整失败诊断);`journal logs -v` 会自动展开它 |
 | **当时模型完整看见了什么**（prompt / tools / skills） | `model_visible/step_NN/` |
-| 大段工具输出 / 附件正文 | `evidence/` |
+| 大段工具输出 / 附件正文 | `evidence/`(content-addressed namespace, **和上面 `<digest>.json` 是不同的**) |
 | Profile 装了谁 | `profile_snapshot.json` |
 
 原则（ADR-0167）：**Model-visible ≡ logged**；journal 持 digest + 相对路径，不把整段 prompt 塞进 `objective`。

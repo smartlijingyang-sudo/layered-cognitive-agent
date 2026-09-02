@@ -125,25 +125,38 @@ LATEST=$(jq -r .run_id traces/latest.json)
 
 # 2. 一键 8 段诊断（首选；所有症状入口）
 lca-ops debug-run "$LATEST"
+#    注：[3/8] kernel.log 多数 run 没有，[5/8] 不含完整 traceback。
 
 # 3. 看完整 spine 事件流（理解过程；模型所见即日志）
 lca-ops journal logs -r "$LATEST" -v
 
+# 3.5 【必跑】读 run 目录的 <sha256>.json sidecar：traceback 通常在这里
+#      不是在 events.jsonl（大 event > 4 KB → I10 offload：FileSink._ATOMIC_THRESHOLD）。
+#      debug-run [2/8] journal 只读主 ledger，看不到完整 traceback。
+SIDECAR=$(ls traces/runs/"$LATEST"/*.json 2>/dev/null \
+  | grep -vE 'events\.jsonl|manifest\.json|profile_snapshot\.json' | head -1)
+[ -n "$SIDECAR" ] && jq -r '
+  "exception_class: \(.payload.exception_class // "-")",
+  "exception_message: \(.payload.exception_message // "-")",
+  "source_location: \(.payload.source_location // "-")",
+  (.payload.traceback_text // "(no traceback_text)")
+' "$SIDECAR"
+
 # 4. 失败原因投影（仅 run 失败时有意义）
 lca-ops explain "$LATEST"
 
-# 5. step 树 / 因果链 / narrative
-lca-ops journal steps "$LATEST"
-lca-ops journal narrative "$LATEST"
+# 5. step 树 / 因果链 / narrative（早期失败的 run 可能 journal.json 不存在，正常）
+lca-ops journal steps "$LATEST" 2>/dev/null
+lca-ops journal narrative "$LATEST" 2>/dev/null
 ```
 
 **口语映射**（agent 看到这些词就直接走流程，不要先分析语义）：
 
 | 用户说 | 走的流程 |
 |---|---|
-| "最新一次 run" / "刚才那个" / "上次" / "最近" | 上面 5 步全套 |
-| "分析一下这次" / "看看发生了什么" | 上面 1-3 步 |
-| "为啥这次失败" / "这次出错了" | 上面 1-2 + 4 |
+| "最新一次 run" / "刚才那个" / "上次" / "最近" | 上面 5 步全套**含 3.5 sidecar** |
+| "分析一下这次" / "看看发生了什么" | 上面 1-3 + **3.5 sidecar** |
+| "为啥这次失败" / "这次出错了" | 上面 1-2 + **3.5 sidecar**(traceback 的第一站) + 4 |
 | "理解一下过程" / "走了一遍啥逻辑" | 上面 1 + 3 + 5 |
 | "DSH 风格轨迹" / "给我个 HTML" | 加 `lca-ops journal trajectory "$LATEST"` |
 | "模型都做了啥" / "调了啥工具" | `journal logs -r "$LATEST" --focus tools` |

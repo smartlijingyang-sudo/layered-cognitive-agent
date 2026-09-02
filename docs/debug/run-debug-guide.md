@@ -16,13 +16,18 @@ lca-ops debug-run <run_id>
 ```
 [1/8] manifest        status / broken_hop
 [2/8] journal         events + missing_seqs + spine.execution_point → …链
-[3/8] kernel.log      per-run kernel 日志 tail(找不到回退全局)
+[3/8] kernel.log      per-run kernel 日志 tail —— 仅当文件存在;多数 run 没有
 [4/8] phase.cursor    最后完成的 phase
 [5/8] error_ref       StopDecision.failure → 类型化 RunDiagnostic
 [6/8] stack frames    栈顶 8 帧
 [7/8] suggested_action 人读修复建议
 [8/8] replay command  lca-ops replay <run_id> --no-llm
 ```
+
+**关于每一节的实际产出**:
+
+- `[3/8] kernel.log` 节只在 `traces/runs/<run_id>/kernel.log` 存在时打印 tail;该文件由 `KernelLogProjection`(ADR-0122)在 kernel 显式 flush 时才会写入,**多数 run 目录下根本不存在**。如果没看到这一节,不要假定失败信息在别处丢失——直接跳到下面的"补充步骤 A:读 sidecar 拿 traceback"。
+- `[5/8] error_ref` 给的是高层的 `node=think.main error_kind=internal attempts=1[1:permanent:ValueError]`,**不含完整 traceback**;这只是分类标签。
 
 加 `--json` 给 agent 用。
 
@@ -72,13 +77,46 @@ lca-ops explain <run_id> --json
 
 输出失败路径投影 + 因果链。
 
-### 第 4 步: 看 kernel.log(per-run)
+### 第 4 步: 看 kernel.log(per-run,可选)
 
 ```sh
-cat traces/runs/<run_id>/kernel.log   # debug-run [3/8] 已给 tail
+test -f traces/runs/<run_id>/kernel.log && tail -n 200 traces/runs/<run_id>/kernel.log || echo "(no kernel.log — 该 run 没产出此文件,见下一步)"
 ```
 
-`kernel.log` 包含所有 kernel 内部事件(structlog 输出 / RuntimeObserved / stack trace / projection 失败警告)。**定位 RuntimeError / IO 错误最快的路径**。
+`kernel.log` 是 `KernelLogProjection`(ADR-0122)显式 flush 的输出文件:**不是每个 run 都有**;只有当 kernel 在 process 期间主动 sink 了 structlog / RuntimeObserved / stack trace 时才会出现。这一节只能用作**补充证据**,不能当作必出路径——`debug-run [3/8]` 省略它并不意味着失败信息丢失。
+
+### 补充步骤 A: **读 `<sha256>.json` sidecar 拿完整 traceback** ← 最常被忽略
+
+run 目录下除 `events.jsonl` / `manifest.json` / `profile_snapshot.json` 之外的、文件名是 **64 位十六进制(看起来像 sha256)**的 `.json` 文件,是 **I10 size offload sidecar**(见 `lca/infrastructure/observability/spine/sinks/file_sink.py:_ATOMIC_THRESHOLD = 4096`):当一条 event 序列化后超过 4 KB(PIPE_BUF,Linux 原子写阈值),FileSink 不进主 ledger,而是把完整 payload 写到 `<sha256>.json`,主 ledger 只留 placeholder:`{"execution_point": "...", "offloaded": "<sha256>"}`。
+
+**包含完整 traceback / 完整 call_frames / 完整 source_location 的 event(任意 channel,>4 KB)都会落到 sidecar**。`debug-run [2/8] journal` 和 `journal trace` / `journal logs` 都只读 `events.jsonl`,所以**这些 traceback 在主 ledger 里看不到**,必须直接读 sidecar。
+
+```sh
+# 列出 run 目录下所有 sidecar(events.jsonl / manifest.json / profile_snapshot.json / .swp 之外)
+ls traces/runs/<run_id> | grep -vE '^(events\.jsonl|manifest\.json|profile_snapshot\.json|\..*\.swp)$'
+
+# 通常只有一个(或零个):读它
+SIDECAR=$(ls traces/runs/<run_id>/<sha256>.json 2>/dev/null | head -1)
+[ -n "$SIDECAR" ] && jq -r '
+  "exception_class: \(.payload.exception_class // "-")",
+  "exception_message: \(.payload.exception_message // "-")",
+  "source_location: \(.payload.source_location // "-")",
+  "reason: \(.payload.reason // "-")",
+  "---traceback---",
+  (.payload.traceback_text // "(no traceback_text)")
+' "$SIDECAR"
+```
+
+快速版(单行 jq):
+
+```sh
+SIDECAR=$(ls traces/runs/<run_id>/*.json | grep -vE 'events\.jsonl|manifest\.json|profile_snapshot\.json' | head -1)
+jq -r '.payload.exception_class + ": " + (.payload.exception_message // "(no message)")' "$SIDECAR"
+```
+
+> ⚠️ 注意:**这些 sidecar 不是"被隔离的错误事件"**——FD-2 是 detector/sink 内部异常的 containment(见 `anomaly.py:91 / 216 / 327` 和 `emit_pipeline.py:204 / 242`),它**不**决定是否写文件。文件是否 offload 只看大小 4 KB。这条规则容易让人误以为"error-channel event 都被隔离出去了",记住:**事件仍然是 spine event,只是体积大就 sidecar。**
+
+### 第 5 步: 失败诊断(`lca-ops diagnose <alias>`)
 
 ### 第 5 步: 失败诊断(`lca-ops diagnose <alias>`)
 
@@ -175,15 +213,18 @@ lca-ops optimize <run_id> --limit 5            # 优化候选(延迟/token/重�
 
 ## per-run 资产(`traces/runs/<run_id>/`)
 
-| 文件 | 来源 |
-|---|---|
-| `events.jsonl` | **spine SSOT**(ADR-0167;append-only) |
-| `journal.json` | step 投影(`lca.journal/3.1`) |
-| `journal.raw.jsonl` | legacy v2 envelope stream(仅迁移源,CLI 不读) |
-| `manifest.json` | `ManifestMaterializer` |
-| `profile_snapshot.json` | profile snapshot |
-| `kernel.log` | `KernelLogProjection` (ADR-0122) |
-| `diagnostic.json` | `RunDiagnosticRecorder` (ADR-0122) |
+| 文件 | 来源 | 是否一定存在 |
+|---|---|---|
+| `events.jsonl` | **spine SSOT**(ADR-0167;append-only) | ✅ 每个 run |
+| `manifest.json` | `ManifestMaterializer` | ✅ 每个 run |
+| `profile_snapshot.json` | profile snapshot | ✅ 每个 run |
+| `journal.json` | step 投影(`lca.journal/3.1`) | ⚠️ 仅 run 进入 step 树后才写;**early-fail 的 run 没有**,`journal steps` 会报 `journal.json not found` |
+| `journal.narrative.md` | `StepNarrativeWriter` | ⚠️ 同上 |
+| `<sha256>.json` sidecar | **I10 size offload**(4 KB 以上的 event 自动 offload) | ⚠️ 仅当有 event > 4 KB,**包含完整 traceback / call_frames / source_location 的 event 必定在这里**,不是"错误隔离" |
+| `kernel.log` | `KernelLogProjection` (ADR-0122) | ❌ **多数 run 不存在**——只有 kernel 显式 flush 才会写;`debug-run [3/8]` 缺这一节不代表丢东西 |
+| `journal.raw.jsonl` | legacy v2 envelope stream(仅迁移源,CLI 不读) | ❌ 仅迁移期间的 run |
+| `diagnostic.json` | `RunDiagnosticRecorder` (ADR-0122) | ❌ 已不再写 |
+| `.<file>.swp` | 编辑器临时文件(vim 等) | ❌ 不参与诊断 |
 
 跨 run 全局:
 
@@ -197,15 +238,19 @@ lca-ops optimize <run_id> --limit 5            # 优化候选(延迟/token/重�
 
 ## 不要做的事
 
-- ❌ 不要 cat `traces/lca_journal.jsonl`(已 dead, 迁移后是占位符)
+- ❌ 不要 cat `traces/lca_journal.jsonl`(已 dead, 默认 `--jsonl` 仍指向它,见下)
 - ❌ 不要 cat `traces/runs/<id>/journal.jsonl`(旧 schema; 走 `journal.json` 或 `events.jsonl`)
 - ❌ 不要 `lca-ops replay <run_id>`(命令不存在; 用 `journal replay <run_id>`)
 - ❌ 不要 `lca-ops diagnose phase-error`(已删; 看上面 4 个 alias)
 - ❌ 不要 `LCA_DEBUG=1`(环境变量不存在,被 fail-loud 替代)
 - ❌ 不要 grep `.lca-ops/lobehub.log` 找 kernel 异常(那是 Next.js 进程日志)
 - ❌ 不要 grep `.lca-ops/kernel-serve.log` 找本次 run(stdout 可能被 pipe 截走,不可靠)
-- ❌ 不要 ps + /proc/fd/1 找 kernel stdout(直接 `cat traces/runs/<id>/kernel.log`)
+- ❌ 不要 `ps` + /proc/.../fd/1 找 kernel stdout
+- ❌ 不要假定 `traces/runs/<id>/kernel.log` 存在 —— 它**多数 run 不写**,遇到 [3/8] 不打印直接读 sidecar(见"补充步骤 A")
+- ❌ 不要 `cat traces/runs/<id>/events.jsonl` 然后以为 traceback 不在那里就完了 —— 大体积 event 在 sidecar,见"补充步骤 A"
 - ❌ 不要 patch 源码 + 重启才能定位(任何 bug 都该 1 条命令定位,否则就是 ADR-0122 没收口)
+
+> **关于 `lca-ops trace` / `explain` / `diff-runs` / `diff-context` / `minimal-repro` / `optimize` / `graph-run` / `cost` / `evidence` 的 `--jsonl <path>` 默认值**:全部默认指向 `traces/lca_journal.jsonl`(dead path)。实际上当前实现会回退去读 per-run 的 `events.jsonl`(`-_shared._resolve_journal_path` 的 fallback),所以 `lca-ops trace <run_id>` 不带 `--jsonl` 仍能工作,但**只能用每个 run 自己的 ledger**,跨 run 的文件名手填。改默认值这事属于 P-1 修复,跑命令时记得默认参数是不可信的。
 
 ---
 
@@ -213,8 +258,10 @@ lca-ops optimize <run_id> --limit 5            # 优化候选(延迟/token/重�
 
 | 症状 | 第一反应 |
 |---|---|
-| `status=failed` + 中文固定 error | `lca-ops debug-run <run_id>` |
-| spine 缺事件 (seq 不连续) | `debug-run` [2/8] 报 missing_seqs; 再 `cat traces/runs/<id>/kernel.log` |
+| `status=failed` + 中文固定 error | `lca-ops debug-run <run_id>`,然后**直接读 `<sha256>.json` sidecar** 拿完整 traceback(见"补充步骤 A") |
+| spine 缺事件 (seq 不连续) | `debug-run` [2/8] 报 missing_seqs;**多数情况下不是事件被隔离**,而是 ≥ 4 KB 的 event offload 到 sidecar,主 ledger 只留 placeholder `{"offloaded": "<sha256>"}` → `cat traces/runs/<id>/<sha256>.json` |
+| `debug-run [3/8] kernel.log` 没打印 | **预期行为**;该文件多数 run 不存在。直接读 `<sha256>.json` sidecar 找 traceback |
+| `debug-run [5/8] error_ref` 只给分类标签 | 同上,**不含完整 traceback**;读 sidecar |
 | model 没看到 expected manifest item | `lca-ops diagnose-model-not-seen --expected-kind <kind>` |
 | 工具循环卡死 / 超时 | `lca-ops diagnose-loop-stuck` |
 | 审批被拒 | `lca-ops diagnose-approval-rejected` |
