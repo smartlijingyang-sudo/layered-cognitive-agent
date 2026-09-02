@@ -31,6 +31,9 @@ class _CursorState:
     stop_signal: CloseReason | None = None
     seq: int = 0
     closed: bool = False
+    # ADR-0173 D1 halt != close:halt 保留 cursor 实例等待重建,
+    # 但 record_* / advance 锁住(spatial-temporal runtime 持有 resume 协议)。
+    halted: bool = False
 
 
 __all__ = ["_CursorState"]

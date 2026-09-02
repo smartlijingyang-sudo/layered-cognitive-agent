@@ -23,6 +23,7 @@ from lca.contracts.observability.loop_cursor_payloads import (
     ToolCallRecord,
     ToolResultRecord,
 )
+from lca.contracts.observability.resume import ResumeSpec
 from lca.infrastructure.observability.loop_cursor._spine_port import WritePort
 from lca.infrastructure.observability.loop_cursor.state import _CursorState
 
@@ -92,12 +93,19 @@ class StdLoopCursor:
         )
 
     def _ensure_open(self) -> None:
+        # close 优先(ADR-0169 D5):close 一律允许(halt→close 是合法转移,
+        # 操作员放弃 resume 时释放资源);halted 仅锁住 record_* / advance。
         if self._state.closed:
             raise CursorError("cursor closed")
+
+    def _ensure_not_halted(self) -> None:
+        if self._state.halted:
+            raise CursorError("cursor halted; awaiting resume")
 
     # ── 转移(3) ──────────────────────────────────────────────────
     def advance(self, phase: PhaseName) -> CursorSnapshot:
         self._ensure_open()
+        self._ensure_not_halted()
         s = self._state
         # stop → perceive 触发新 iteration
         if s.phase == "stop" and phase == "perceive":
@@ -116,11 +124,45 @@ class StdLoopCursor:
 
     def halt(self, reason: CloseReason) -> None:
         self._ensure_open()
+        # ADR-0173 D1 halt != close:halt 仅锁住 record_* / advance,
+        # 保留 cursor 实例等 spatial-temporal runtime 走 resume 协议重建。
+        self._state.halted = True
         self._state.stop_signal = reason
         self._append(
             execution_point="writable.iteration.halt",
             payload={"reason": reason},
         )
+
+    @staticmethod
+    def resume_cursor(
+        *,
+        spine: WritePort,
+        spec: ResumeSpec,
+        trace_id: str,
+    ) -> StdLoopCursor:
+        """由 spatial-temporal runtime 调用:派生新 cursor 实例(I-RESUME-1)。
+
+        新 cursor 复用 spine handle 与 spec 携带的 Incarnation;
+        旧 halted cursor **不复用**,由 caller 负责析构。
+        """
+        incarnation = Incarnation(
+            run_id=spec.run_id,
+            plan_ref=spec.plan_ref,
+            incarnation_seq=spec.incarnation_seq,
+        )
+        cursor = StdLoopCursor(
+            spine=spine,
+            run_id=spec.run_id,
+            trace_id=trace_id,
+            incarnation=incarnation,
+        )
+        # 注入 spec 携带的 snapshot 投影;新 cursor 默认 phase=None(OUTSIDE_LOOP),
+        # caller 经由 advance(spec.phase) 开窗。
+        cursor._state.phase = spec.phase
+        cursor._state.iteration = spec.iteration
+        cursor._state.step_index = spec.step_index
+        cursor._state.iteration_reason = spec.iteration_reason
+        return cursor
 
     def close(self, reason: CloseReason) -> None:
         self._ensure_open()
@@ -137,6 +179,7 @@ class StdLoopCursor:
     # ── record_*(4)— cursor 注入 incarnation(ADR-0169 L14) ──────────
     def record_thinking(self, payload: ThinkingRecord) -> None:
         self._ensure_open()
+        self._ensure_not_halted()
         if self._state.phase != "think":
             raise CursorError("record_thinking must be in THINK window")
         self._append(
@@ -154,6 +197,7 @@ class StdLoopCursor:
 
     def record_tool_call(self, payload: ToolCallRecord) -> None:
         self._ensure_open()
+        self._ensure_not_halted()
         if self._state.phase != "act":
             raise CursorError("record_tool_call must be in ACT window")
         self._append(
@@ -171,6 +215,7 @@ class StdLoopCursor:
 
     def record_tool_result(self, payload: ToolResultRecord) -> None:
         self._ensure_open()
+        self._ensure_not_halted()
         if self._state.phase != "act":
             raise CursorError("record_tool_result must be in ACT window")
         self._append(
@@ -188,6 +233,7 @@ class StdLoopCursor:
 
     def record_request_header(self, header: RequestHeader) -> None:
         self._ensure_open()
+        self._ensure_not_halted()
         # L6 + D2 step 语义:record_request_header 必在 THINK phase 调用
         if self._state.phase != "think":
             raise CursorError("record_request_header must open THINK window")
