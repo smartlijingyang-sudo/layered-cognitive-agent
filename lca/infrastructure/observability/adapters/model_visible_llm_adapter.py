@@ -54,6 +54,9 @@ from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
 from lca.infrastructure.observability.loop_cursor.model_visible_binding import (
     get_current_model_visible_capture,
 )
+from lca.infrastructure.observability.loop_cursor.reasoner_prompt_binding import (
+    get_current_reasoner_prompt,
+)
 
 _log = logging.getLogger(__name__)
 
@@ -123,16 +126,30 @@ def _derive_capture_inputs(
     prompt: str,
     kwargs: dict[str, Any],
 ) -> tuple[Any, list[Any], list[dict[str, Any]], dict[str, Any]]:
-    """从 ``prompt`` + ``kwargs`` 派生降级版 capture 输入。
+    """从 ``prompt`` + ``kwargs`` 派生降级版 capture 输入(ADR-0175 D4)。
 
-    5 件套里 system / tools / messages / manifest 全都能拿到最低限度;
-    ``system`` 不可派生(不知道 brain prompt),留空字符串 + manifest 标注。
+    5 件套里 system / tools / messages / manifest 全都能拿到最低限度。
+    ``system`` 优先读 ``get_current_reasoner_prompt()``(Reasoner 已 set,
+    注入 ``system_prompt_text`` 真值);若未绑定,退回占位字符串
+    ``{"objective":"(see provider prompt catalog)","derived":True}``。
+
     ``tools`` 从 kwargs.tools 派生(若调用方注入);否则空列表。
     ``messages`` 由 prompt 派生单条 user message(degraded — 真实 messages
     在 provider 内部组装;这条降级足够 I-MV1 model_visible 5 件套真实落盘)。
     ``manifest`` 派生最小上下文记录:{source, prompt_chars, has_tools, ...}。
     """
-    system = {"objective": "(see provider prompt catalog)", "derived": True}
+    reasoner_prompt = get_current_reasoner_prompt()
+    if reasoner_prompt is not None and reasoner_prompt.system_prompt_text:
+        system = {
+            "objective": "(from reasoner_prompt_capture)",
+            "body": reasoner_prompt.system_prompt_text,
+            "template_id": reasoner_prompt.template_id,
+            "selector_decision_path": reasoner_prompt.selector_decision_path,
+            "step_id": reasoner_prompt.step_id,
+            "derived": False,
+        }
+    else:
+        system = {"objective": "(see provider prompt catalog)", "derived": True}
     tools_raw = kwargs.get("tools")
     tools: list[Any] = list(tools_raw) if isinstance(tools_raw, (list, tuple)) else []
     messages: list[dict[str, Any]] = [{"role": "user", "content": prompt or ""}]
@@ -143,6 +160,9 @@ def _derive_capture_inputs(
         "has_temperature": "temperature" in kwargs,
         "kwargs_keys": sorted(kwargs.keys()),
     }
+    if reasoner_prompt is not None and reasoner_prompt.system_prompt_text:
+        manifest["reasoner_template_id"] = reasoner_prompt.template_id
+        manifest["reasoner_selector_decision_path"] = reasoner_prompt.selector_decision_path
     return system, tools, messages, manifest
 
 

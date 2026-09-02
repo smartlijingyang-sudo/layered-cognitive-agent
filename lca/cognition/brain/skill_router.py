@@ -41,6 +41,7 @@ class KeywordSkillRouter(SkillRouter):
                     emit_skill_router_route(
                         state_id=state.trace_id,
                         template=template_name,
+                        decision_path="keyword_match",
                         outcome="success",
                     )
                     return template_name
@@ -49,12 +50,14 @@ class KeywordSkillRouter(SkillRouter):
             emit_skill_router_route(
                 state_id=state.trace_id,
                 template=self._default,
+                decision_path="keyword_default",
                 outcome="failure",
             )
             raise
         emit_skill_router_route(
             state_id=state.trace_id,
             template=template,
+            decision_path="keyword_default",
             outcome="success",
         )
         return template
@@ -76,6 +79,7 @@ class StaticSkillRouter(SkillRouter):
         emit_skill_router_route(
             state_id=state.trace_id,
             template=template,
+            decision_path="static",
             outcome="success",
         )
         return template

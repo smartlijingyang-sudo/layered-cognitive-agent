@@ -37,6 +37,7 @@ forbidden by the brief.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from lca.infrastructure.observability.spine.event_record import (
@@ -218,12 +219,30 @@ def emit_reasoner_reason_end(*, state_id: str, outcome: Outcome = "success") -> 
 
 
 def emit_prompt_assembler_start(
-    *, state_id: str, template_id: str
+    *,
+    state_id: str,
+    template_id: str,
+    sections: Sequence[str] | None = None,
+    decision_path: str | None = None,
+    activated_skills: Sequence[str] | None = None,
+    tools_count: int | None = None,
+    available_skills_count: int | None = None,
 ) -> EventRecord | None:
+    payload: dict[str, Any] = {"state_id": state_id, "template_id": template_id}
+    if sections is not None:
+        payload["sections"] = list(sections)
+    if decision_path is not None:
+        payload["decision_path"] = decision_path
+    if activated_skills is not None:
+        payload["activated_skills"] = list(activated_skills)
+    if tools_count is not None:
+        payload["tools_count"] = tools_count
+    if available_skills_count is not None:
+        payload["available_skills_count"] = available_skills_count
     return _safe_append(
         execution_point="prompt_assembler.assemble.start",
         channel="fact",
-        payload={"state_id": state_id, "template_id": template_id},
+        payload=payload,
     )
 
 
@@ -232,12 +251,25 @@ def emit_prompt_assembler_end(
     state_id: str,
     template_id: str,
     section_count: int,
+    section_outputs: Sequence[Mapping[str, Any]] | None = None,
+    total_chars: int | None = None,
     outcome: Outcome = "success",
 ) -> EventRecord | None:
+    payload: dict[str, Any] = {
+        "state_id": state_id,
+        "template_id": template_id,
+        "section_count": section_count,
+    }
+    if section_outputs is not None:
+        payload["section_outputs"] = [
+            {k: v for k, v in dict(item).items() if v is not None} for item in section_outputs
+        ]
+    if total_chars is not None:
+        payload["total_chars"] = total_chars
     return _safe_append(
         execution_point="prompt_assembler.assemble.end",
         channel="fact",
-        payload={"state_id": state_id, "template_id": template_id, "section_count": section_count},
+        payload=payload,
         outcome=outcome,
     )
 
@@ -260,12 +292,19 @@ def emit_synthesizer_merge(
 
 
 def emit_skill_router_route(
-    *, state_id: str, template: str, outcome: Outcome = "success"
+    *,
+    state_id: str,
+    template: str,
+    decision_path: str | None = None,
+    outcome: Outcome = "success",
 ) -> EventRecord | None:
+    payload: dict[str, Any] = {"state_id": state_id, "template": template}
+    if decision_path is not None:
+        payload["decision_path"] = decision_path
     return _safe_append(
         execution_point="skill_router.route",
         channel="control",
-        payload={"state_id": state_id, "template": template},
+        payload=payload,
         outcome=outcome,
     )
 

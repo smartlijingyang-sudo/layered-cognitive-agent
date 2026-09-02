@@ -9,6 +9,7 @@ Solo / member / lead 共用同一个 Reasoner（ADR-0035）：状态携带
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 
 from lca.cognition.brain.llm_turn import execute_llm_turn
 from lca.cognition.brain.sections.types import (
@@ -31,6 +32,10 @@ from lca.contracts.atoms.telemetry import ATTR_PROMPT_TEMPLATE
 from lca.contracts.models.cognition.prompt_assembly import (
     PromptAssembler,
     PromptTemplateSelector,
+    PromptTrace,
+    SelectorDecisionPath,
+    normalize_assembler_result,
+    normalize_selector_result,
 )
 
 # ── Legacy helpers retained for tests that import them directly ────
@@ -183,7 +188,7 @@ class PromptReasoner:
         from lca.contracts.models.core.perceive_state import PerceiveState
 
         manifest = PerceiveState.from_agent_state(state).current_manifest
-        template_id = self._select_template(state)
+        template_id, decision_path = self._select_template(state)
         annotate(**{ATTR_PROMPT_TEMPLATE: template_id})
 
         from lca.plugins.observability.spine.reflectors.cognition import (
@@ -194,11 +199,30 @@ class PromptReasoner:
         )
 
         state_id = state.trace_id
-        section_count = 0
-        emit_prompt_assembler_start(state_id=state_id, template_id=template_id)
+        activated_skill_ids: tuple[str, ...] = ()
+        tools_count = len(self.tools)
+        available_skills_count = self._available_skills_count_hint()
+        # Sections preview from the template itself (available pre-render);
+        # end EP carries the authoritative section_outputs.
+        sections_preview: list[str] = self._template_section_names(template_id)
+        emit_prompt_assembler_start(
+            state_id=state_id,
+            template_id=template_id,
+            decision_path=decision_path,
+            sections=sections_preview or None,
+            activated_skills=list(activated_skill_ids) or None,
+            tools_count=tools_count,
+            available_skills_count=available_skills_count,
+        )
+        # Inject decision path into state so the assembler can stamp it
+        # into PromptTrace.selector_decision_path without a new parameter.
+        state._selector_decision_path = decision_path  # type: ignore[attr-defined]
+        reasoner_prompt_token = None
         try:
-            prompt, section_count = self._render_prompt(
-                state, manifest=manifest, template_id=template_id
+            prompt, trace, section_count = self._render_prompt(
+                state,
+                manifest=manifest,
+                template_id=template_id,
             )
         except BaseException:
             emit_prompt_assembler_end(
@@ -208,10 +232,33 @@ class PromptReasoner:
                 outcome="failure",
             )
             raise
+        if trace is not None:
+            sections_preview = [s.name for s in trace.sections]
+            activated_skill_ids = trace.activated_skill_ids
+            tools_count = trace.tools_count
+            available_skills_count = trace.available_skills_count
+            total_chars = trace.total_chars
+            section_outputs = [
+                {
+                    "name": s.name,
+                    "kind": s.kind,
+                    "optional": s.optional,
+                    "used_fallback": s.used_fallback,
+                    "skipped_empty": s.skipped_empty,
+                    "text_chars": s.text_chars,
+                }
+                for s in trace.sections
+            ]
+            reasoner_prompt_token = self._bind_reasoner_prompt(trace)
+        else:
+            total_chars = None
+            section_outputs = None
         emit_prompt_assembler_end(
             state_id=state_id,
             template_id=template_id,
             section_count=section_count,
+            section_outputs=section_outputs,
+            total_chars=total_chars,
             outcome="success",
         )
 
@@ -227,14 +274,19 @@ class PromptReasoner:
             )
         except BaseException:
             emit_reasoner_reason_end(state_id=state_id, outcome="failure")
+            if reasoner_prompt_token is not None:
+                self._reset_reasoner_prompt(reasoner_prompt_token)
             raise
         emit_reasoner_reason_end(state_id=state_id, outcome="success")
+        if reasoner_prompt_token is not None:
+            self._reset_reasoner_prompt(reasoner_prompt_token)
         return response
 
-    def _select_template(self, state: AgentState) -> str:
+    def _select_template(self, state: AgentState) -> tuple[str, SelectorDecisionPath]:
         if self.selector is not None:
-            return self.selector.select(state=state)
-        return self._legacy_select_template(state)
+            result = self.selector.select(state=state)
+            return normalize_selector_result(result)
+        return self._legacy_select_template(state), "legacy"
 
     def _render_prompt(
         self,
@@ -242,9 +294,9 @@ class PromptReasoner:
         *,
         manifest: object | None,
         template_id: str,
-    ) -> tuple[str, int]:
+    ) -> tuple[str, PromptTrace | None, int]:
         if self.assembler is not None:
-            prompt = self.assembler.render(
+            result = self.assembler.render(
                 template_id=template_id,
                 role_profile=self.role_profile,
                 state=state,
@@ -253,12 +305,9 @@ class PromptReasoner:
                 tools=self.tools,
                 activated_skills=tuple(state.activated_skills),
             )
-            section_count = (
-                len(self.assembler.template_provider.get_template(template_id).sections)
-                if hasattr(self.assembler, "template_provider")
-                else 0
-            )
-            return prompt, section_count
+            prompt, trace = normalize_assembler_result(result)
+            section_count = len(trace.sections) if trace is not None else 0
+            return prompt, trace, section_count
         # Legacy fallback: substring substitution using the registered
         # templates. Used by tests that still drive ``PromptReasoner``
         # with a plain ``templates={...}`` dict.
@@ -266,7 +315,96 @@ class PromptReasoner:
         variables = self._legacy_variables(state, manifest=manifest)
         template = self._legacy_templates.get(template_name, "")
         prompt = template.format(**variables) if template else ""
-        return prompt, 0
+        return prompt, None, 0
+
+    def _available_skills_count_hint(self) -> int:
+        catalog = getattr(self, "catalog", None)
+        if catalog is None:
+            return 0
+        installed = getattr(catalog, "installed_skills", None)
+        if installed is not None:
+            try:
+                return len(installed)
+            except TypeError:
+                return 0
+        return 0
+
+    def _template_section_names(self, template_id: str) -> list[str]:
+        """Return the names of sections a template references.
+
+        Falls back to an empty list when no assembler/template_provider is
+        wired (legacy/test paths). Used by ``emit_prompt_assembler_start``
+        so the start EP carries a useful section preview before render.
+        """
+        assembler = self.assembler
+        if assembler is None:
+            return []
+        provider = getattr(assembler, "template_provider", None)
+        if provider is None:
+            return []
+        template = provider.get_template(template_id)
+        if template is None:
+            return []
+        return [ref.name for ref in template.sections]
+
+    def _bind_reasoner_prompt(self, trace: PromptTrace) -> Any:
+        from lca.infrastructure.observability.loop_cursor.model_visible_binding import (
+            get_current_model_visible_capture,
+        )
+        from lca.infrastructure.observability.loop_cursor.reasoner_prompt_binding import (
+            CurrentReasonerPrompt,
+            bind_current_reasoner_prompt,
+        )
+        from lca.infrastructure.observability.loop_cursor.reasoner_prompt_capture import (
+            StdReasonerPromptCapture,
+        )
+
+        # ADR-0175 D3: capture writes system_prompt.json to <run_dir>/model_visible/.
+        # We reuse the same run_dir that StdModelVisibleCapture is already bound to
+        # (installed by RunSessionBuilder at session build time). When capture
+        # is absent (e.g. tests), skip the file write but still bind the
+        # ContextVar so downstream code can see the rendered prompt text.
+        capture = get_current_model_visible_capture()
+        run_dir = getattr(capture, "run_dir", None)
+        step_id = self._step_id_for_trace(trace)
+        if run_dir is not None:
+            try:
+                StdReasonerPromptCapture(run_dir=run_dir).capture(step_id=step_id, trace=trace)
+            except Exception as exc:  # ADR-0169 L10 + D5: 不挡业务
+                import logging as _logging
+
+                _logging.getLogger(__name__).warning("reasoner_prompt_capture_failed: %s", exc)
+        return bind_current_reasoner_prompt(
+            CurrentReasonerPrompt(
+                step_id=step_id,
+                template_id=trace.template_id,
+                selector_decision_path=trace.selector_decision_path,
+                system_prompt_text=trace.system_prompt_text,
+            )
+        )
+
+    @staticmethod
+    def _step_id_for_trace(trace: PromptTrace) -> str:
+        from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+            get_current_cursor,
+        )
+
+        cursor = get_current_cursor()
+        if cursor is None:
+            return f"step-unknown-{trace.template_id}"
+        try:
+            snap = cursor.snapshot
+            return f"step-{snap.step_index + 1:03d}"
+        except Exception:
+            return f"step-unknown-{trace.template_id}"
+
+    @staticmethod
+    def _reset_reasoner_prompt(token: Any) -> None:
+        from lca.infrastructure.observability.loop_cursor.reasoner_prompt_binding import (
+            reset_current_reasoner_prompt,
+        )
+
+        reset_current_reasoner_prompt(token)
 
     def _legacy_select_template(self, state: AgentState) -> str:
         if isinstance(getattr(state, "active_template", None), str) and state.active_template:

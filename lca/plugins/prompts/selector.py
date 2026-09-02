@@ -27,6 +27,9 @@ from lca.contracts.harness.composition.plugin_contract import (
 from lca.contracts.models.cognition.prompt_assembly import (
     PromptTemplateSelector as Protocol_,
 )
+from lca.contracts.models.cognition.prompt_assembly import (
+    SelectorDecisionPath,
+)
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
@@ -38,20 +41,26 @@ _REACT = "react_prompt"
 
 @dataclass(frozen=True, slots=True)
 class TeamAwarenessTemplateSelector(Protocol_):
-    """Profile-selected selector: consult_duty → hierarchical, else routing."""
+    """Profile-selected selector: consult_duty → hierarchical, else routing.
+
+    Returns ``(template_id, decision_path)`` per ADR-0175 D5. ``decision_path``
+    explains **why** this template was picked so that the
+    ``skill_router.route`` spine EP carries the rationale alongside the
+    resolved template id.
+    """
 
     default_template: str = _REACT
 
-    def select(self, *, state: AgentState) -> str:
+    def select(self, *, state: AgentState) -> tuple[str, SelectorDecisionPath]:
         active = getattr(state, "active_template", None)
         if isinstance(active, str) and active:
-            return active
+            return active, "active_template_override"
         awareness = state.team_awareness
         if awareness is None:
-            return self.default_template
+            return self.default_template, "profile_default"
         if awareness.consult_duty is not None:
-            return _HIERARCHICAL
-        return _ROUTING
+            return _HIERARCHICAL, "consult_duty"
+        return _ROUTING, "team_awareness_routing"
 
 
 class Config(BaseModel):

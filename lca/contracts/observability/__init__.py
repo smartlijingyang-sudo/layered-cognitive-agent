@@ -28,6 +28,12 @@ from lca.contracts.observability.model_visible_capture import (
 from lca.contracts.observability.model_visible_capture import (
     ModelVisibleCapture as ModelVisibleCapture,
 )
+from lca.contracts.observability.reasoner_prompt_capture import (
+    ReasonerPromptArtifact as ReasonerPromptArtifact,
+)
+from lca.contracts.observability.reasoner_prompt_capture import (
+    ReasonerPromptCapture as ReasonerPromptCapture,
+)
 
 __all__ = [
     "Classification",
@@ -38,6 +44,8 @@ __all__ = [
     "EvidenceStore",
     "ModelVisibleArtifact",
     "ModelVisibleCapture",
+    "ReasonerPromptArtifact",
+    "ReasonerPromptCapture",
     "RetentionClass",
     "RunLedgerFactory",
 ]

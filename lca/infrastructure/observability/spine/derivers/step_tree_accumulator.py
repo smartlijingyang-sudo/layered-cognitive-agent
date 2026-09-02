@@ -129,7 +129,8 @@ class StepTreeAccumulatorDeriver(Deriver):
         except Exception as exc:
             log.warning(
                 "step_tree_accumulator on_event failed ep=%s err=%s",
-                event.execution_point, exc,
+                event.execution_point,
+                exc,
             )
 
     def flush(self, *, outcome: str | None = None) -> None:
@@ -275,9 +276,7 @@ class StepTreeAccumulatorDeriver(Deriver):
             phase=f.phase,
             entered_at=f.entered_at,
             exited_at=f.exited_at,
-            duration_ms=max(0, int((f.exited_at - f.entered_at) * 1000))
-            if f.exited_at
-            else None,
+            duration_ms=max(0, int((f.exited_at - f.entered_at) * 1000)) if f.exited_at else None,
             context_before=f.context_before,
             thinking=f.thinking,
             tool_call=f.tool_call,
@@ -310,6 +309,7 @@ class StepTreeAccumulatorDeriver(Deriver):
             return
         # SegmentRecord is frozen — replace the last segment via dataclasses.replace.
         from dataclasses import replace as _dc_replace
+
         old = self._open_step.segments[-1]
         try:
             ended_at = int(self._last_ts or 0)
@@ -319,9 +319,7 @@ class StepTreeAccumulatorDeriver(Deriver):
         self._open_step.segments[-1] = new_seg
         self._open_segment_id = None
 
-    def _record_phase(
-        self, event: EventRecord, kind: StepPhase, ts: float
-    ) -> None:
+    def _record_phase(self, event: EventRecord, kind: StepPhase, ts: float) -> None:
         self._phase_seq += 1
         ph = PhaseRecord(
             phase_id=f"phase_{self._phase_seq:04d}",
@@ -330,8 +328,7 @@ class StepTreeAccumulatorDeriver(Deriver):
             segment_id=self._open_segment_id,
             entered_at=int(ts),
             exited_at=None,
-            summary=str(event.payload.get("summary", ""))[:200]
-            or None,
+            summary=str(event.payload.get("summary", ""))[:200] or None,
             outcome=event.outcome or None,
         )
         self._phases.append(ph)
@@ -398,52 +395,78 @@ class StepTreeAccumulatorDeriver(Deriver):
         - messages.json        —— 占位骨架 [{role, content, ...}] 供 replay 重建
         """
         import json as _json
+
         step_dir = self._run_dir / "model_visible" / frame.step_id
         step_dir.mkdir(parents=True, exist_ok=True)
 
         manifest = {
-            "kinds": [k for k in (
-                "skill_catalog" if frame.context_before
-                and any(getattr(a, "name", "") for a in getattr(frame.context_before, "attachments", ()))
-                else None, "objective", "memory"
-            ) if k],
+            "kinds": [
+                k
+                for k in (
+                    "skill_catalog"
+                    if frame.context_before
+                    and any(
+                        getattr(a, "name", "")
+                        for a in getattr(frame.context_before, "attachments", ())
+                    )
+                    else None,
+                    "objective",
+                    "memory",
+                )
+                if k
+            ],
             "objective": frame.context_before.objective if frame.context_before else "",
-            "item_count": len(getattr(frame.context_before, "attachments", ())) if frame.context_before else 0,
+            "item_count": len(getattr(frame.context_before, "attachments", ()))
+            if frame.context_before
+            else 0,
         }
         messages: list[dict[str, Any]] = []
         if frame.context_before is not None:
-            messages.append({
-                "role": "system",
-                "content": frame.context_before.objective,
-            })
+            messages.append(
+                {
+                    "role": "system",
+                    "content": frame.context_before.objective,
+                }
+            )
         if frame.thinking is not None:
-            messages.append({
-                "role": "assistant",
-                "content": frame.thinking.decision or "",
-            })
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": frame.thinking.decision or "",
+                }
+            )
         tool_schemas: list[dict[str, Any]] = []
         if frame.tool_call is not None:
             tool_schemas.append({"name": frame.tool_call.name})
-            messages.append({
-                "role": "assistant",
-                "tool_calls": [{
-                    "id": frame.tool_call.invocation_id,
-                    "function": {
-                        "name": frame.tool_call.name,
-                        "arguments": frame.tool_call.arguments,
-                    },
-                }],
-            })
+            messages.append(
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": frame.tool_call.invocation_id,
+                            "function": {
+                                "name": frame.tool_call.name,
+                                "arguments": frame.tool_call.arguments,
+                            },
+                        }
+                    ],
+                }
+            )
         if frame.tool_result is not None:
-            messages.append({
-                "role": "tool",
-                "content": frame.tool_result.delta_summary or "",
-            })
+            messages.append(
+                {
+                    "role": "tool",
+                    "content": frame.tool_result.delta_summary or "",
+                }
+            )
 
         def _sha(d: Any) -> str:
-            return "sha256:" + hashlib.sha256(
-                _json.dumps(d, sort_keys=True, ensure_ascii=False, default=str).encode()
-            ).hexdigest()
+            return (
+                "sha256:"
+                + hashlib.sha256(
+                    _json.dumps(d, sort_keys=True, ensure_ascii=False, default=str).encode()
+                ).hexdigest()
+            )
 
         header = {
             "run_id": self._run_id,
@@ -455,21 +478,38 @@ class StepTreeAccumulatorDeriver(Deriver):
             "manifest_digest": _sha(manifest),
         }
         (step_dir / "request-header.json").write_text(
-            _json.dumps(header, ensure_ascii=False, indent=2), encoding="utf-8",
-        )
-        (step_dir / "system-prompt.md").write_text(
-            f"# System Prompt — {frame.step_id}\n\n"
-            f"objective: {manifest['objective']}\n",
+            _json.dumps(header, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+        # COMPAT(delete-when: ≥95% traces/runs 在 ADR-0175 落地 14 天,
+        # tracking: ADR-0175 D6) —— 不再写 fake `system-prompt.md`,
+        # 改为若 ReasonerPromptCapture 已写真 `system_prompt.json`,
+        # 写一个只读指针文件 `system-prompt.legacy.md` 给老 viewer。
+        legacy_md = step_dir / "system-prompt.legacy.md"
+        if (step_dir / "system_prompt.json").exists():
+            legacy_md.write_text(
+                "# System Prompt — see system_prompt.json (ADR-0175 真值源)\n"
+                f"# objective: {manifest['objective']}\n",
+                encoding="utf-8",
+            )
+        else:
+            # 历史兼容:ReasonerPromptCapture 未启用,保留旧版摘要
+            legacy_md.write_text(
+                "# System Prompt — degraded (ReasonerPromptCapture not wired)\n\n"
+                f"objective: {manifest['objective']}\n",
+                encoding="utf-8",
+            )
         (step_dir / "tool-schemas.json").write_text(
-            _json.dumps(tool_schemas, ensure_ascii=False, indent=2), encoding="utf-8",
+            _json.dumps(tool_schemas, ensure_ascii=False, indent=2),
+            encoding="utf-8",
         )
         (step_dir / "context-manifest.json").write_text(
-            _json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8",
+            _json.dumps(manifest, ensure_ascii=False, indent=2),
+            encoding="utf-8",
         )
         (step_dir / "messages.json").write_text(
-            _json.dumps(messages, ensure_ascii=False, indent=2), encoding="utf-8",
+            _json.dumps(messages, ensure_ascii=False, indent=2),
+            encoding="utf-8",
         )
 
     __all__: list[str] = ["StepTreeAccumulatorDeriver", "PHASE_FOLD_EPS"]
