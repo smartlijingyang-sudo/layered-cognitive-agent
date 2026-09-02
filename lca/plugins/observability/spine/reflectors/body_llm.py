@@ -114,6 +114,11 @@ def emit_body_tool_execute_start(
     invocation_id: str,
     attempt: int = 1,
 ) -> EventRecord | None:
+    """Emit ``body.tool.execute.start`` —— 真实 invocation 层（safe_executor 内部）。
+
+    ADR-0166 S2：对外 spine 只表达 invocation；decision 层 wrapper 见
+    :func:`emit_body_tool_decision_start`。
+    """
     return _safe_append(
         execution_point="body.tool.execute.start",
         channel="control",
@@ -133,6 +138,7 @@ def emit_body_tool_execute_end(
     outcome: Outcome = "success",
     latency_ms: int | None = None,
 ) -> EventRecord | None:
+    """Emit ``body.tool.execute.end``（invocation 层，ADR-0166 S2）。"""
     payload: dict[str, Any] = {
         "tool_name": tool_name,
         "invocation_id": invocation_id,
@@ -144,6 +150,48 @@ def emit_body_tool_execute_end(
         execution_point="body.tool.execute.end",
         channel="control",
         payload=payload,
+        outcome=outcome,
+    )
+
+
+def emit_body_tool_decision_start(
+    *,
+    tool_name: str,
+    invocation_id: str,
+) -> EventRecord | None:
+    """decision wrapper 起点（ADR-0166 S2）。
+
+    action-handler 层 batch dispatch 边；LiveTail / reader 默认折叠
+    （payload 携带 ``wrapper=decision``）。
+    """
+    return _safe_append(
+        execution_point="body.tool.execute.start",
+        channel="control",
+        payload={
+            "tool_name": tool_name,
+            "invocation_id": invocation_id,
+            "attempt": 1,
+            "wrapper": "decision",
+        },
+    )
+
+
+def emit_body_tool_decision_end(
+    *,
+    tool_name: str,
+    invocation_id: str,
+    outcome: Outcome = "success",
+) -> EventRecord | None:
+    """decision wrapper 终点（ADR-0166 S2）。"""
+    return _safe_append(
+        execution_point="body.tool.execute.end",
+        channel="control",
+        payload={
+            "tool_name": tool_name,
+            "invocation_id": invocation_id,
+            "attempt": 1,
+            "wrapper": "decision",
+        },
         outcome=outcome,
     )
 
@@ -307,6 +355,8 @@ def emit_llm_stream_stall(
 __all__ = [
     "emit_body_sandbox_enter",
     "emit_body_sandbox_exit",
+    "emit_body_tool_decision_end",
+    "emit_body_tool_decision_start",
     "emit_body_tool_execute_end",
     "emit_body_tool_execute_start",
     "emit_body_tool_retry",

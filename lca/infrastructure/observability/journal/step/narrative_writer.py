@@ -186,14 +186,29 @@ def _render_reflect(reflect: ReflectTrace) -> list[str]:
 
 
 def _render_spans(spans: tuple[SpanRecord, ...]) -> list[str]:
-    """spans 折叠在 <details>, 默认隐藏, 需要时展开。"""
+    """spans 折叠在 <details>，默认隐藏，需要时展开（ADR-0166 D4b）。
+
+    合并 ``reasoning_delta`` 类的 per-token span 为单条 summary，避免
+    narrative 被几十~几百行 ``reasoning_delta`` 刷屏。其余按原样。
+    """
     if not spans:
         return []
+    token_kinds = {"reasoning_delta", "step_text_delta"}
+    collapsed = [s for s in spans if s.kind in token_kinds]
+    others = [s for s in spans if s.kind not in token_kinds]
+    bullets: list[str] = []
+    if collapsed:
+        sample = collapsed[0]
+        bullets.append(
+            f"- `{sample.kind}` × {len(collapsed)} 条 token 增量（已合并 / 详见 evidence）"
+        )
+    for s in others:
+        bullets.append(f"- `{s.kind}` @ {_format_ts(s.started_at)}: {_short(s.summary, 120)}")
     return [
         "<details>",
-        f"<summary>诊断 ({len(spans)} spans)</summary>",
+        f"<summary>诊断 ({len(spans)} spans，{len(collapsed)} 条 token 已 coalesce)</summary>",
         "",
-        *[f"- `{s.kind}` @ {_format_ts(s.started_at)}: {_short(s.summary, 120)}" for s in spans],
+        *bullets,
         "",
         "</details>",
     ]
@@ -322,11 +337,18 @@ class StepNarrativeWriter:
     def render(self, document: JournalDocument) -> str:
         """纯函数 —— 给 document 返回 markdown 文本(测试 / CLI 直接 print 用)。"""
         lines: list[str] = []
-        # 头
-        lines.append(f"# Run Narrative —— {document.metadata.objective}")
+        # 头 — totals 三数（ADR-0166 D1 / 0167 D11 narrative 形态）
+        totals = getattr(document, "totals", None)
+        total_str = (
+            f"steps={totals.steps} segments={totals.segments} phases={totals.phases}"
+            if totals is not None
+            else f"total_steps={document.total_steps()}"
+        )
+        lines.append(f"# Trajectory —— {_short(document.metadata.objective, 120)}")
         lines.append("")
         lines.append(
-            f"> run_id=`{document.run_id}` trace_id=`{document.trace_id}` "
+            f"> {total_str}  "
+            f"run_id=`{document.run_id}` trace_id=`{document.trace_id}` "
             f"started_at={_format_ts(document.started_at)} "
             f"closed_at={_format_ts(document.closed_at)}"
         )

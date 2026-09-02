@@ -19,8 +19,8 @@ _KERNEL_SERVE_REFUSAL_CODES = {
     "legacy_process_journal_unavailable": (
         "Session Spine 已不再暴露全局 /journal/live；请改用下列任一路径查看 journal 事实：",
         [
-            "./scripts/lca-ops logs --replay    # 回放 traces/runs/*/journal.jsonl",
-            "tail -f traces/runs/$(ls -t traces/runs | head -1)/journal.jsonl",
+            "./scripts/lca-ops logs --replay    # 回放 traces/runs/*/events.jsonl",
+            "tail -f traces/runs/$(ls -t traces/runs | head -1)/events.jsonl",
         ],
     ),
 }
@@ -59,7 +59,10 @@ def register(app: typer.Typer, group: typer.Typer | None = None) -> None:
             False, "--deltas", "-d", help="显示增量事件（text/reasoning/sandbox delta）"
         ),
         replay: bool = typer.Option(
-            False, "--replay", "-r", help="从 traces/lca_journal.jsonl 回放（不连 SSE）"
+            False,
+            "--replay",
+            "-r",
+            help="从 traces/lca_journal.jsonl / events.jsonl 回放（不连 SSE）",
         ),
         config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
     ) -> None:
@@ -120,7 +123,7 @@ def _replay_from_jsonl(*, verbose: bool, show_deltas: bool) -> None:
         FactStreamProjector,
     )
 
-    jsonl_path = Path("traces/lca_journal.jsonl")
+    jsonl_path = Path("traces/lca_journal.jsonl")  # legacy stream; prefer events.jsonl
     if not jsonl_path.exists():
         print(f"No journal file at {jsonl_path}")
         raise typer.Exit(1)

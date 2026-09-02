@@ -100,7 +100,7 @@ class JsonlScan:
 
 @dataclass(frozen=True, slots=True)
 class StepScan:
-    """Facts derived from one run's step-tree journal (lca.journal/3)。"""
+    """Facts derived from one run's step-tree journal (lca.journal/3 / 3.1)。"""
 
     exists: bool
     total_steps: int
@@ -116,6 +116,11 @@ class StepScan:
     has_output: bool
     outcome: str
     schema_version: str | None  # None → 文件不存在
+    # ADR-0166 D5: totals / segments / phases 一致性
+    totals_segments: int = -1  # -1 → 旧 3.0 schema 缺字段
+    totals_phases: int = -1
+    step_segment_counts: tuple[int, ...] = ()
+    phase_time_inversions: tuple[int, ...] = ()  # step_index 列表
 
 
 __all__ = [

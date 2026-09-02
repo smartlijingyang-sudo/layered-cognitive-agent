@@ -127,6 +127,20 @@ def _bind_run_from_request(request: Any) -> str | None:
     return str(run_id)
 
 
+_carrier_seq = 0
+
+
+def _next_carrier_seq() -> int:
+    """Return the next monotonic carrier sequence number (ADR-0166 S4).
+
+    Process-local, decoupled from run-local ``EventRecord.sequence``.
+    Transport EP 携带 ``carrier_seq`` 让 reader 区分两条 timeline。
+    """
+    global _carrier_seq
+    _carrier_seq += 1
+    return _carrier_seq
+
+
 def _instrument_route_handler(handler: Any, *, path: str) -> Any:
     """Wrap an HTTP handler with transport.route enter/exit spine events."""
     import asyncio
@@ -144,16 +158,30 @@ def _instrument_route_handler(handler: Any, *, path: str) -> Any:
         async def _async_wrapper(request: Any, *args: Any, **kwargs: Any) -> Any:
             method = str(getattr(request, "method", "") or "")
             run_id = _bind_run_from_request(request)
-            emit_transport_route_enter(path=path, method=method, run_id=run_id)
+            seq = _next_carrier_seq()
+            emit_transport_route_enter(
+                path=path,
+                method=method,
+                run_id=run_id,
+                carrier_seq=seq,
+            )
             try:
                 result = await handler(request, *args, **kwargs)
             except BaseException:
                 emit_transport_route_exit(
-                    path=path, method=method, outcome="failure", run_id=run_id
+                    path=path,
+                    method=method,
+                    outcome="failure",
+                    run_id=run_id,
+                    carrier_seq=seq,
                 )
                 raise
             emit_transport_route_exit(
-                path=path, method=method, outcome="success", run_id=run_id
+                path=path,
+                method=method,
+                outcome="success",
+                run_id=run_id,
+                carrier_seq=seq,
             )
             return result
 
@@ -163,12 +191,22 @@ def _instrument_route_handler(handler: Any, *, path: str) -> Any:
     def _sync_wrapper(request: Any, *args: Any, **kwargs: Any) -> Any:
         method = str(getattr(request, "method", "") or "")
         run_id = _bind_run_from_request(request)
-        emit_transport_route_enter(path=path, method=method, run_id=run_id)
+        seq = _next_carrier_seq()
+        emit_transport_route_enter(
+            path=path,
+            method=method,
+            run_id=run_id,
+            carrier_seq=seq,
+        )
         try:
             result = handler(request, *args, **kwargs)
         except BaseException:
             emit_transport_route_exit(
-                path=path, method=method, outcome="failure", run_id=run_id
+                path=path,
+                method=method,
+                outcome="failure",
+                run_id=run_id,
+                carrier_seq=seq,
             )
             raise
         if asyncio.iscoroutine(result):
@@ -178,17 +216,29 @@ def _instrument_route_handler(handler: Any, *, path: str) -> Any:
                     value = await result
                 except BaseException:
                     emit_transport_route_exit(
-                        path=path, method=method, outcome="failure", run_id=run_id
+                        path=path,
+                        method=method,
+                        outcome="failure",
+                        run_id=run_id,
+                        carrier_seq=seq,
                     )
                     raise
                 emit_transport_route_exit(
-                    path=path, method=method, outcome="success", run_id=run_id
+                    path=path,
+                    method=method,
+                    outcome="success",
+                    run_id=run_id,
+                    carrier_seq=seq,
                 )
                 return value
 
             return _await_result()
         emit_transport_route_exit(
-            path=path, method=method, outcome="success", run_id=run_id
+            path=path,
+            method=method,
+            outcome="success",
+            run_id=run_id,
+            carrier_seq=seq,
         )
         return result
 

@@ -78,6 +78,13 @@ def _scan_step_doc(path: Path) -> StepScan:
     has_output = bool(doc.cumulative_files()) or doc.metadata.objective != ""
     # H8: 因果链完整性检查
     failed_chain = _check_chain_integrity(doc)
+    # ADR-0166 D5: totals / segments / phases 一致性扫描
+    (
+        totals_segments,
+        totals_phases,
+        step_segment_counts,
+        phase_time_inversions,
+    ) = _scan_totals(doc)
     return StepScan(
         exists=True,
         total_steps=len(doc.steps),
@@ -93,6 +100,40 @@ def _scan_step_doc(path: Path) -> StepScan:
         has_output=has_output,
         outcome=doc.metadata.outcome,
         schema_version=doc.schema,
+        totals_segments=totals_segments,
+        totals_phases=totals_phases,
+        step_segment_counts=step_segment_counts,
+        phase_time_inversions=phase_time_inversions,
+    )
+
+
+def _scan_totals(doc: JournalDocument) -> tuple[int, int, tuple[int, ...], tuple[int, ...]]:
+    """ADR-0166 D5：collect totals 与时间序。
+
+    旧 lca.journal/3 文档缺 totals / segments / phases 字段时，totals 字段
+    返回 ``-1`` 让 H-seg / H-phase 显式标记「not evaluated（需迁移）」。
+    """
+    totals = getattr(doc, "totals", None)
+    if totals is None:
+        return -1, -1, (), ()
+    step_segment_counts: list[int] = []
+    last_ts: float | None = None
+    phase_inversions: list[int] = []
+    for s in doc.steps:
+        segs = getattr(s, "segments", None) or ()
+        step_segment_counts.append(len(segs))
+        for seg in segs:
+            seg_start = getattr(seg, "started_at", None)
+            if seg_start is not None and last_ts is not None and seg_start < last_ts:
+                phase_inversions.append(s.step_index)
+                break
+            if seg_start is not None:
+                last_ts = seg_start
+    return (
+        int(getattr(totals, "segments", -1)),
+        int(getattr(totals, "phases", -1)),
+        tuple(step_segment_counts),
+        tuple(phase_inversions),
     )
 
 
@@ -223,6 +264,62 @@ def _hop_h8(scan: StepScan) -> HopVerdict:
     return HopVerdict(ok=True, detail=f"全部 {scan.total_steps} 步因果链闭合", extra=extra)
 
 
+def _hop_h_seg(scan: StepScan) -> HopVerdict:
+    """Segment 与 totals 一致性 (ADR-0166 D5)。"""
+    extra: dict[str, Any] = {
+        "step_segment_counts": list(scan.step_segment_counts),
+        "totals_segments": scan.totals_segments,
+    }
+    if not scan.exists:
+        return HopVerdict(ok=None, detail="not evaluated", extra=extra)
+    if scan.totals_segments < 0:
+        return HopVerdict(
+            ok=None,
+            detail="journal.json 为 lca.journal/3（无 totals / segments 字段）",
+            extra=extra,
+        )
+    actual = sum(scan.step_segment_counts)
+    if actual != scan.totals_segments:
+        return HopVerdict(
+            ok=False,
+            detail=f"segments 计数不一致：sum(steps.segments)={actual} "
+            f"!= totals.segments={scan.totals_segments}",
+            extra=extra,
+        )
+    return HopVerdict(
+        ok=True,
+        detail=f"segments 一致 ({scan.totals_segments})",
+        extra=extra,
+    )
+
+
+def _hop_h_phase(scan: StepScan) -> HopVerdict:
+    """Phase 时间序 + totals 一致性 (ADR-0166 D5)。"""
+    extra: dict[str, Any] = {
+        "totals_phases": scan.totals_phases,
+        "phase_time_inversions": list(scan.phase_time_inversions),
+    }
+    if not scan.exists:
+        return HopVerdict(ok=None, detail="not evaluated", extra=extra)
+    if scan.totals_phases < 0:
+        return HopVerdict(
+            ok=None,
+            detail="journal.json 为 lca.journal/3（无 totals / phases 字段）",
+            extra=extra,
+        )
+    if scan.phase_time_inversions:
+        return HopVerdict(
+            ok=False,
+            detail=f"phase 时间倒挂于 step {next(iter(scan.phase_time_inversions))}",
+            extra=extra,
+        )
+    return HopVerdict(
+        ok=True,
+        detail=f"phases 顺序正确 ({scan.totals_phases})",
+        extra=extra,
+    )
+
+
 def diagnose_step_tree(
     journal_path: Path | str,
     *,
@@ -261,6 +358,8 @@ def diagnose_step_tree(
         "H6": _hop_h6(scan),
         "H7": _hop_h7(scan),
         "H8": _hop_h8(scan),
+        "H-seg": _hop_h_seg(scan),
+        "H-phase": _hop_h_phase(scan),
     }
     broken = next((name for name, hop in hops.items() if hop.ok is False), None)
     factory = {"ok": True, "tools_missing_plugin_state": []}
@@ -277,6 +376,8 @@ def diagnose_step_tree(
         consistency={
             "total_steps": scan.total_steps,
             "duration_ms": scan.duration_ms,
+            "totals_segments": scan.totals_segments,
+            "totals_phases": scan.totals_phases,
         },
         factory=factory,
     )

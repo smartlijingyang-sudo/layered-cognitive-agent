@@ -112,10 +112,10 @@ class RunExecutionEnvironment:
             attachment_ids=tuple(session.attachment_ids or ()),
             file_store=cast("FileStore | None", providers.file_store),
         )
-        # ADR-0164: bind StepLifecycleStore + facade RunContext so
-        # step_emitter / facade step_open write the same store that terminal
-        # flush reads. Without both, journal.json stays steps=[] forever
-        # (unbound RunContext → step_open raises → bridge_firewall swallows).
+        # ADR-0167 D2: bind StepLifecycleStore + facade RunContext。
+        # PR-3 已删 step_emitter / bridge_firewall —— 现在写路径唯一经
+        # StepCoordinator；lifecycle store 仍由本环境绑定，供
+        # terminal flush / journal.json 落盘使用。
         from lca.infrastructure.observability.facade import RunContext as FacadeRunContext
         from lca.infrastructure.observability.facade import bind as bind_facade_run
         from lca.runtime import step_lifecycle

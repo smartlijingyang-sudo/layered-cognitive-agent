@@ -316,11 +316,12 @@ def emit_exception_finally(
     *,
     boundary: str,
     trace_id: str | None = None,
+    outcome: Outcome = "failure",
 ) -> EventRecord | None:
-    """Emit the paired envelope after a caught exception is forwarded.
+    """Emit ``exception.finally`` —— 仅异常路径（ADR-0166 S5）。
 
-    Use this in a ``finally`` block to signal that the boundary's
-    terminal/projection logic completed, regardless of re-raise.
+    正常路径请用 :func:`emit_lifecycle_finally`；本 helper 仅在异常边界
+    收口时使用。默认 ``outcome="failure"``；cancelled 也走本 EP。
     """
     return _safe_append(
         execution_point="exception.finally",
@@ -329,6 +330,28 @@ def emit_exception_finally(
             "boundary": boundary,
             "trace_id": trace_id or "",
         },
+        outcome=outcome,
+    )
+
+
+def emit_lifecycle_finally(
+    *,
+    boundary: str,
+    trace_id: str | None = None,
+) -> EventRecord | None:
+    """Emit ``lifecycle.finally`` —— 正常路径收口（ADR-0166 S5）。
+
+    替代「成功路径也写 ``exception.finally``」的混淆语义；reader
+    通过 EP 名区分异常与正常生命周期收口。
+    """
+    return _safe_append(
+        execution_point="lifecycle.finally",
+        channel="control",
+        payload={
+            "boundary": boundary,
+            "trace_id": trace_id or "",
+        },
+        outcome="success",
     )
 
 
@@ -500,6 +523,7 @@ __all__ = [
     "RuntimeFieldProducer",
     "emit_exception_caught",
     "emit_exception_finally",
+    "emit_lifecycle_finally",
     "emit_runtime_checkpoint_create",
     "emit_runtime_event_publisher_publish",
     "emit_runtime_reducer_apply_end",

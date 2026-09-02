@@ -53,11 +53,20 @@ def emit_transport_route_enter(
     path: str,
     method: str,
     run_id: str | None = None,
+    carrier_seq: int | None = None,
 ) -> EventRecord | None:
+    """Carrier-plane route enter.
+
+    ADR-0166 S4：transport EP 携带 ``carrier_seq``（独立 carrier 单调计数）
+    与 run-local ``EventRecord.sequence`` 解耦；reader 不会混淆两条 timeline。
+    """
+    payload: dict[str, Any] = {"path": path, "method": method, "run_id": run_id or ""}
+    if carrier_seq is not None:
+        payload["carrier_seq"] = carrier_seq
     return _safe_append(
         execution_point="transport.route.enter",
         channel="control",
-        payload={"path": path, "method": method, "run_id": run_id or ""},
+        payload=payload,
     )
 
 
@@ -67,11 +76,16 @@ def emit_transport_route_exit(
     method: str,
     outcome: Outcome = "success",
     run_id: str | None = None,
+    carrier_seq: int | None = None,
 ) -> EventRecord | None:
+    """Carrier-plane route exit（ADR-0166 S4）。"""
+    payload: dict[str, Any] = {"path": path, "method": method, "run_id": run_id or ""}
+    if carrier_seq is not None:
+        payload["carrier_seq"] = carrier_seq
     return _safe_append(
         execution_point="transport.route.exit",
         channel="control",
-        payload={"path": path, "method": method, "run_id": run_id or ""},
+        payload=payload,
         outcome=outcome,
     )
 
