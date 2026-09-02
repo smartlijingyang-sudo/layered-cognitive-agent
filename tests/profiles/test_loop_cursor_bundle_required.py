@@ -3,15 +3,19 @@
 本测试保证 ``scripts/check_loop_cursor_bundle_required.py`` 在当前仓库
 状态下行为正确:
 
-- 迁移完成的 3 个 profile(web-standard / oii-debug / benchmark)必须通过 +
-  3 个 loop_cursor.spine_* bundle 必须 provides loop_cursor_factory
+- 所有 10 个 profile 必须都通过 + 3 个 loop_cursor.spine_* bundle 必须
+  provides loop_cursor_factory(ADR-0174 PR-7.4 完成态)
 - 旧名 ``spine-default.yaml`` / ``spine-benchmark-minimal.yaml`` /
   ``spine-oii-debug.yaml``(legacy)必须 = 0 命中
-- warning 与 strict 模式行为分离
+- warning 与 strict 模式行为分离(完成态:均无 WARN/FAIL 行 + exit 0)
 - 子命令 ``--strict`` / env ``LOOP_CURSOR_BUNDLE_REQUIRED_STRICT`` 控制
 
 本测试**静态调用 gate 脚本**(不重新实现校验逻辑);所以 gate 脚本修了
 错误规则会自然触发相应 test 失败。
+
+历史:测试最初为 PR-7.1/7.2 阶段编写,假定只有 3 个 profile 已迁移。
+PR-7.4 完成态下,所有 10 个 profile 都已迁移,strict 模式应 exit 0,
+warning-only 模式应无 WARN 行。钉死该完成态。
 """
 
 from __future__ import annotations
@@ -77,47 +81,67 @@ def test_default_mode_exit_zero_when_only_some_profiles_migrated() -> None:
     )
 
 
-def test_default_mode_emits_warnings_for_unmigrated_profiles() -> None:
-    """默认模式对未迁移的 profile 应打印 WARN 行(可读 visibility)。"""
+def test_default_mode_emits_no_warnings_when_all_profiles_migrated() -> None:
+    """默认模式在所有 profile 已迁移后应无 WARN 行(ADR-0174 PR-7.4 完成态)。
+
+    历史:分批迁移期间默认模式对未迁移 profile 打印 WARN 行。
+    PR-7.x 批次.4 第 4 批完成后所有 profile 都有 loop_cursor.spine_* bundle,
+    WARN 行应清零。本测试钉死该完成态。
+    """
     result = _run_gate(strict=False)
-    assert "WARN:" in result.stdout, (
-        "warning-only mode should still emit WARN lines for unmigrated profiles\n"
+    assert "WARN:" not in result.stdout, (
+        "warning-only mode should emit NO WARN lines after all profiles migrated "
+        "(ADR-0174 PR-7.4 完成态)\n"
         f"stdout:\n{result.stdout}"
     )
 
 
-def test_default_mode_passes_for_migrated_profiles() -> None:
-    """默认模式 PASS 标注必须包含 oii-debug / benchmark / web-standard。"""
+def test_default_mode_passes_for_all_profiles() -> None:
+    """默认模式 PASS 标注必须包含全部 10 个 profile(ADR-0174 PR-7.4 完成态)。"""
     result = _run_gate(strict=False)
-    for migrated in ("oii-debug", "benchmark", "web-standard"):
-        assert migrated in result.stdout, (
-            f"expected migrated profile mention: {migrated}\nstdout:\n{result.stdout}"
+    all_profiles = (
+        "benchmark", "coding-agent", "cordis-creator", "genai-traced",
+        "oii-debug", "self-improving-minimal", "test-minimal",
+        "web-standard", "web-standard-continuous", "web-standard-recovery",
+    )
+    for profile in all_profiles:
+        assert profile in result.stdout, (
+            f"expected migrated profile mention: {profile}\nstdout:\n{result.stdout}"
         )
 
 
 # ── strict 模式(PR-7.x 批次.4 第 4 批目标)───────────────────────────
 
 
-def test_strict_mode_exit_nonzero_when_some_profiles_unmigrated() -> None:
-    """strict 模式 + 未迁移 profile 必须 exit 1。"""
+def test_strict_mode_exit_zero_when_all_profiles_migrated() -> None:
+    """strict 模式 + 所有 profile 已迁移必须 exit 0(ADR-0174 PR-7.4 完成态)。
+
+    历史:分批迁移期间 strict 模式对未迁移 profile exit 1 + FAIL 行。
+    PR-7.x 批次.4 第 4 批完成后所有 profile 已迁移,strict 模式应 exit 0 + 无 FAIL 行。
+    本测试钉死该完成态。
+    """
     result = _run_gate(strict=True)
-    assert result.returncode != 0, (
-        f"strict mode should exit non-zero when unmigrated profiles exist\n"
+    assert result.returncode == 0, (
+        f"strict mode should exit zero after all profiles migrated "
+        f"(ADR-0174 PR-7.4 完成态); got {result.returncode}\n"
         f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
     )
 
 
-def test_strict_mode_emits_fail_lines_not_just_warnings() -> None:
-    """strict 模式必须用 FAIL: 前缀,不只是 WARN。"""
+def test_strict_mode_emits_no_fail_lines_when_all_profiles_migrated() -> None:
+    """strict 模式在完成态必须无 FAIL: 行(ADR-0174 PR-7.4 完成态)。"""
     result = _run_gate(strict=True)
-    assert "FAIL:" in result.stdout, f"strict mode should emit FAIL lines, got:\n{result.stdout}"
+    assert "FAIL:" not in result.stdout, (
+        f"strict mode should emit no FAIL lines when all profiles migrated; got:\n{result.stdout}"
+    )
 
 
-def test_env_var_strict_mode_works() -> None:
-    """``LOOP_CURSOR_BUNDLE_REQUIRED_STRICT=1`` 触发 strict 行为。"""
+def test_env_var_strict_mode_consistent_with_flag() -> None:
+    """``LOOP_CURSOR_BUNDLE_REQUIRED_STRICT=1`` 与 --strict 行为一致(完成态:均 exit 0)。"""
     result = _run_gate(env_strict=True)
-    assert result.returncode != 0, (
-        f"env-strict mode should exit non-zero\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+    assert result.returncode == 0, (
+        f"env-strict mode should also exit zero after all profiles migrated\n"
+        f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
     )
 
 
