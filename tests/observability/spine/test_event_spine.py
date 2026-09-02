@@ -10,7 +10,6 @@ import pytest
 
 from lca.infrastructure.observability.spine.context import (
     SpineContext,
-    SpanContext,
 )
 from lca.infrastructure.observability.spine.event_record import EventRecord
 from lca.infrastructure.observability.spine.event_spine import EventSpine

@@ -1,18 +1,21 @@
 """Bind observability projections for one Gateway run.
 
-This module owns the observability seam only: it extends the boot-provided
-binding with run-local projections and can lazily repair the compatibility
-path for sessions created by older callers. Session identity, registration,
-and lifecycle transitions remain outside this module.
+ADR-0167 D11 简化:
+    - ``ensure_session_hub`` 不再 lazy 构造 lifecycle_store。
+    - deriver (StepTreeAccumulator) 由 ``RunSessionBuilder.build`` 阶段
+      构造 + subscribe 到 spine; lifecycle_store 字段已被删除。
+    - 任何 ``ensure_session_hub`` 调用点都被保留,行为退化为"返回已 bind
+      的 hub,或抛错"。 因为 RunSessionBuilder 现在总是把 hub 设上,
+      真正的 fallback 不会发生 —— 但保留入口便于过渡期 regression。
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, cast
+from typing import Any
 
 from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
-from lca.contracts.observability.run_journal import LiveRunProjection, RunJournalFactory
+from lca.contracts.observability.run_journal import LiveRunProjection
 from lca.contracts.protocols import JournalProjector
 from lca.infrastructure.observability import BoundObservability
 from lca.infrastructure.observability.facade.settings import ObservabilitySettings
@@ -53,77 +56,23 @@ def assemble_run_hub(
 
 
 def ensure_session_hub(
-    session: RunSession,
-    *,
-    ctx: Any,
-    settings: ObservabilitySettings | None = None,
+    session: RunSession, *, ctx: Any
 ) -> BoundObservability:
-    """Lazily bind observability for a legacy session without creating it.
+    """Return the already-bound hub on the session.
 
-    ADR-0164 Phase 7: 显式为这个 session 构造 ``StepLifecycleStore`` 并
-    注入到 journal factory, 让 step-tree backend 非空, terminalizer flush
-    时 ``journal.json`` 才能真正被写出 (此前因 ContextVar 从未被 set,
-    backend 一直是 None, journal.json 从未落盘)。
+    ADR-0167 D11: RunSessionBuilder 在 ``build`` 阶段已经把 hub 装上, 任何
+    后续 ensure_session_hub 调用都假定 hub 已存在。如果 session 没 hub,
+    抛 RuntimeError (迁移期 guard; 不允许无 hub 静默 lazy 装)。
     """
-    if session.hub is not None:
-        return session.hub
-
-    journal_factory = cast("RunJournalFactory", require_capability(ctx, "run_ledger_factory"))
-    # 1) 先准备 lifecycle store (runtime 工厂, 不依赖 transport)
-    lifecycle_store = _ensure_lifecycle_store(session)
-    # 2) 注入到 factory → backend 拿到 store 后才能落盘
-    components = journal_factory.create_run_components(
-        jsonl_path=session.jsonl_path,
-        lifecycle_store=lifecycle_store,
-    )
-    session.lifecycle_store = lifecycle_store
-    session.tail = components.tail
-    # ADR-0164 Phase 6: 把 step-tree bundle 挂到 session(terminalizer 用)
-    session.step_tree_bundle = components.step_tree_writer
-    hub = assemble_run_hub(
-        jsonl_writer=components.writer,
-        tail=components.tail,
-        ctx=ctx,
-        settings=settings,
-    )
-    session.hub = hub
-    return hub
-
-
-def _ensure_lifecycle_store(session: RunSession) -> object:
-    """拿一个已 bind_run 的 ``StepLifecycleStore``(per-session 单例)。
-
-    优先复用 session 上已存在的 store;否则新造一个。 session 上的 store
-    只来自 ``ensure_session_hub`` 这一入口,保证每 session 一份。
-    """
-    existing = getattr(session, "lifecycle_store", None)
-    if existing is not None:
-        return existing
-    from lca.runtime.journal_setup import BuildJournalMetadata, build_step_lifecycle_store
-
-    agent = session.agent
-    agent_role = (
-        agent.name
-        if agent is not None and agent.name
-        else (agent.agent_id if agent is not None and agent.agent_id else "")
-    )
-    return build_step_lifecycle_store(
-        run_id=session.run_id,
-        trace_id=session.trace_id,
-        metadata=BuildJournalMetadata(
-            agent_role=agent_role,
-            strategy_key=session.mode or "solo",
-            objective=session.user_text or "",
-            started_at=session.started_at,
-        ),
-    )
+    if session.hub is None:
+        raise RuntimeError(
+            "ensure_session_hub: session.hub is None; "
+            "RunSessionBuilder.build must be called before lifecycle.start"
+        )
+    return session.hub
 
 
 __all__ = [
-    "_ensure_lifecycle_store",
     "assemble_run_hub",
     "ensure_session_hub",
 ]
-
-
-__all__ = ["assemble_run_hub", "ensure_session_hub"]

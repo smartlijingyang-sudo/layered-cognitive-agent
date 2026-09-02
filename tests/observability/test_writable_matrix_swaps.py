@@ -135,7 +135,6 @@ def test_swap_storage_does_not_change_event_content(tmp_path: Path) -> None:
 
 def test_swap_serializer_does_not_change_event_order(tmp_path: Path) -> None:
     """I-PLUG3-b: 换 serializer（Ndjson → 等价 custom）→ sequence 顺序一致。"""
-    from lca.infrastructure.observability.writable_matrix.defaults import NdjsonSerializer
 
     class _DictSerializer:
         def serialize(self, record: EventRecord) -> bytes:
@@ -223,7 +222,6 @@ def test_swap_driver_rejects_double_begin(tmp_path: Path) -> None:
 
 def test_swap_storage_preserves_hash_chain(tmp_path: Path) -> None:
     """换 storage 不影响 sequence / prev_event_hash（spine 自维护）。"""
-    from lca.infrastructure.observability.spine.context import SpineContext
 
     spine = _SpySpine()
     coord = _build_coord(spine, tmp_path)

@@ -1,9 +1,13 @@
-"""Run ledger and journal factory seam —— ADR-0065 L9.
+"""Run ledger and journal factory seam —— ADR-0065 L9 + ADR-0167 D11。
 
-The factory is the profile-selected entry point for both durable ledgers and
-run-scoped journal projections.  Gateway supplies only a path already resolved
-by ``RunLocator``; it no longer selects JSONL writers, live tails, or the
-process-wide projection implementation.
+ADR-0167 D11 简化: spine events.jsonl 是 SSOT, journal.json 由
+:class:`StepTreeAccumulatorDeriver` 累积 events 后落盘,
+journal.narrative.md 由 :class:`NarrativeDeriver` 从同一 events
+推导。
+
+职责: profile-selected factory 装配每个 run 的:
+  - LiveTail (SSE 投影)
+  - RunJournalComponents(step_tree_writer 现在是 ``_StepTreeBundle``)
 """
 
 from __future__ import annotations
@@ -43,13 +47,7 @@ class Config(BaseModel):
 
 
 class FilesystemRunLedgerFactory(RunLedgerFactory, RunJournalFactory):
-    """Create profile-selected durable ledgers and journal projections.
-
-    ``create`` is the low-level ledger path used by replay and diagnostic
-    callers.  ``create_run_components`` is the production run path: it keeps
-    the existing journal-v2 writer format while centralizing all projection
-    construction behind the same profile-selected factory.
-    """
+    """Profile-selected durable ledgers + per-run journal projections."""
 
     def __init__(self, root: Path, *, fsync_each_append: bool) -> None:
         self._root = root
@@ -74,32 +72,18 @@ class FilesystemRunLedgerFactory(RunLedgerFactory, RunJournalFactory):
         self,
         *,
         jsonl_path: Path,
-        lifecycle_store: object | None = None,
     ) -> RunJournalComponents:
-        """Create the durable writer and live tail for one resolved run path.
+        """Create the live tail for one resolved run path.
 
-        ADR-0164 Phase 7 端到端:
-            - 不再创建 JsonlJournalProjector(主路径不再写 jsonl stream)
-            - jsonl_path 仍被 rename 到 ``journal.raw.jsonl``(旧 run 数据保留)
-            - step-tree backend 写到 ``journal.json`` (lca.journal/3)
-            - narrative writer 写到 ``journal.narrative.md``(terminalize 时)
-            - RunJournalComponents.writer 改成 LiveTail( SSE 投影需要 JournalProjector)
-
-        参数:
-            jsonl_path: durable journal 路径(由 RunLocator 决定)
-            lifecycle_store: 已 bind_run 的 ``StepLifecycleStore``。 优先
-                            使用此注入; 为 None 时回退到 ContextVar
-                            (供单元测试 + offline 脚本使用, 生产路径
-                            必须显式注入 —— 这是 ADR-0164 Phase 7 接入点)
+        ADR-0167 D11: 删除 StepGroupedBackend 适配。journal.json 由
+        ``StepTreeAccumulatorDeriver``(已 subscribe 到 spine)落盘,
+        narrative.md 由 ``NarrativeDeriver`` 落盘。 factory 只提供
+        LiveTail(SSE 投影)+ step_tree_writer bundle 引用。
         """
-        from lca.infrastructure.observability.journal.step.backend import (
-            StepGroupedBackend,
-        )
         from lca.infrastructure.observability.journal.step.narrative_writer import (
             StepNarrativeWriter,
         )
         from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
-        from lca.runtime import step_lifecycle
 
         # 旧 jsonl 文件 rename 到 journal.raw.jsonl(回放兜底, 不删)
         raw_path = jsonl_path.with_name("journal.raw.jsonl")
@@ -107,25 +91,16 @@ class FilesystemRunLedgerFactory(RunLedgerFactory, RunJournalFactory):
             jsonl_path.rename(raw_path)
         raw_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # step-tree 主存储 —— 优先用注入的 store; 无则 ContextVar 兜底
-        step_tree_backend: StepGroupedBackend | None = None
-        store = (
-            lifecycle_store if lifecycle_store is not None else step_lifecycle.get_lifecycle_store()
-        )
-        if store is not None:
-            journal_step_path = raw_path.parent / "journal.json"
-            step_tree_backend = StepGroupedBackend(
-                output_path=journal_step_path,
-                lifecycle_store=store,
-            )
-
         narrative_writer = StepNarrativeWriter(raw_path.parent / "journal.narrative.md")
 
+        # step_tree_writer 是 _StepTreeBundle 的 placeholder —— deriver 与
+        # narrative_writer 由 transport 在 RunSessionBuilder.build 阶段
+        # 真正构造 + subscribe, 然后 session.step_tree_bundle 持有。
         return RunJournalComponents(
-            writer=LiveTail(),  # 仍需 JournalProjector 占位;SSE 投影消费
+            writer=LiveTail(),
             tail=LiveTail(),
             step_tree_writer=_StepTreeBundle(
-                backend=step_tree_backend,
+                deriver=None,
                 narrative_writer=narrative_writer,
             ),
         )
@@ -139,70 +114,28 @@ class FilesystemRunLedgerFactory(RunLedgerFactory, RunJournalFactory):
 
 @dataclass(frozen=True)
 class _StepTreeBundle:
-    """ADR-0164 step-tree 写入 bundle(boot 装好, terminalizer 时调用)。
+    """ADR-0167 D11 简化: bundle 只持 deriver + narrative_writer。
 
-    flush() 必须**同时**触发:
-      - ``backend.flush()`` —— 写 journal.json(step-tree 主存储)
-      - ``narrative_writer.write(document)`` —— 写 journal.narrative.md
+    flush() 调用顺序(都 idempotent):
+      1. ``deriver.flush()`` —— 写 journal.json(累积 events → JournalDocument)
+      2. ``deriver.document`` —— 拿到 closed JournalDocument
+      3. ``narrative_writer.write(document)`` —— 写 journal.narrative.md
 
-    flush() 通过 ``store.close_and_finalize()`` 拿到已 finalize 的
-    ``JournalDocument``: idempotent close, 后端拿到 document 就落盘。
-    这一路径替换了之前依赖 facade ``step_close_document`` 的 magic 调用
-    (违反 transport 不依赖具体 facade 的原则), 改成显式调 store 自身的
-    idempotent finalizer。
-
-    失败语义: flush 抛 → terminalizer 捕获, 写进 manifest.extra.flush_errors,
-    供 ``lca-ops debug-run <run_id>`` 立刻看见。
+    失败语义: deriver 内部 try/except 兜底, 不抛到 bundle 这一层;
+    bundle.flush() 仅在 narrative_writer.write() 异常时抛。
     """
 
-    backend: object | None  # StepGroupedBackend | None
+    deriver: object | None  # StepTreeAccumulatorDeriver
     narrative_writer: object  # StepNarrativeWriter
 
     def flush(self, *, outcome: str = "stopped") -> None:
-        """写 step-tree journal.json + narrative.md。失败抛 → terminalizer 接管。
-
-        ``outcome`` 必须反映真实终态(completed/failed/canceled/stopped),
-        不得写死 stopped —— 否则 doctor/narrative 与 session status 漂移。
-        """
-        document = self._finalize_document(outcome=outcome)
-        if self.backend is not None and hasattr(self.backend, "flush"):
-            self.backend.flush()
-        if (
-            document is not None
-            and self.narrative_writer is not None
-            and hasattr(self.narrative_writer, "write")
-        ):
+        """写 journal.json + narrative.md。"""
+        if self.deriver is None:
+            return
+        self.deriver.flush()
+        document = getattr(self.deriver, "document", None)
+        if document is not None and hasattr(self.narrative_writer, "write"):
             self.narrative_writer.write(document)
-
-    def _finalize_document(self, *, outcome: str = "stopped") -> object | None:
-        """通过 store 的 idempotent finalizer 拿到 closed ``JournalDocument``。
-
-        优于旧 ``_ensure_document_closed``: 不依赖 facade step_close_document
-        (单写者 store 已经持有 document; facade 只是 ContextVar 路径的薄壳)。
-        """
-        if self.backend is None:
-            return None
-        lifecycle_store = getattr(self.backend, "lifecycle_store", None)
-        if lifecycle_store is None:
-            return None
-        finalize = getattr(lifecycle_store, "close_and_finalize", None)
-        if finalize is None:
-            # 老 store 没有 close_and_finalize —— 兜底读已闭合的 document
-            document = getattr(lifecycle_store, "document", None)
-            return document
-        return finalize(outcome=_normalize_journal_outcome(outcome))
-
-
-def _normalize_journal_outcome(outcome: str) -> str:
-    """Map session/carrier status strings onto JournalMetadata outcomes."""
-    value = (outcome or "stopped").strip().lower()
-    if value in {"completed", "failed", "paused", "stopped"}:
-        return value
-    if value in {"canceled", "cancelled"}:
-        return "stopped"
-    if value in {"error"}:
-        return "failed"
-    return "stopped"
 
 
 @plugin(
@@ -240,14 +173,18 @@ def _normalize_journal_outcome(outcome: str) -> str:
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    """Mount the profile-selected run ledger and journal factory."""
-    ctx.provide(
-        RUN_LEDGER_FACTORY.key,
-        FilesystemRunLedgerFactory(
-            Path(config.root),
-            fsync_each_append=config.fsync_each_append,
-        ),
+    """Provide filesystem RunLedger + RunJournalFactory."""
+    root = Path(config.root)
+    root.mkdir(parents=True, exist_ok=True)
+    factory = FilesystemRunLedgerFactory(
+        root=root, fsync_each_append=config.fsync_each_append
     )
+    ctx.provide(RUN_LEDGER_FACTORY.key, factory)
 
 
-__all__ = ["Config", "FilesystemRunLedgerFactory", "setup"]
+__all__ = [
+    "Config",
+    "FilesystemRunLedgerFactory",
+    "_StepTreeBundle",
+    "setup",
+]

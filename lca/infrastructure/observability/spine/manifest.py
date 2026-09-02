@@ -78,4 +78,11 @@ EXECUTION_POINTS: tuple[str, ...] = (
     # Exception/finally
     "exception.caught",
     "exception.finally",
+    # Coordinator record_* EP(ADR-0167 D2: Agent 不直接 import EventSpine,
+    # 唯一写路径 = Coordinator.record_* → 这些 EP)
+    "step.thinking.record",
+    "step.tool_call.record",
+    "step.tool_result.record",
+    "step.reflect.record",
+    "step.span.record",
 )

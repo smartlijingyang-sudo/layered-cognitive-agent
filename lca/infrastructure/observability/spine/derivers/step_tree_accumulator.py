@@ -15,12 +15,8 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
-import os
-import tempfile
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -36,12 +32,14 @@ from lca.contracts.models.observability.journal_step import (
     ThinkingTrace,
     ToolCallRecord,
     ToolResult,
-    make_step_id,
 )
 from lca.contracts.models.observability.journal_totals import (
     PhaseRecord,
     SegmentRecord,
     Totals,
+)
+from lca.infrastructure.observability.journal.step.projector import (
+    JournalDocumentWriter,
 )
 from lca.infrastructure.observability.spine.derivers.base import Deriver
 from lca.infrastructure.observability.spine.event_record import EventRecord
@@ -108,6 +106,7 @@ class StepTreeAccumulatorDeriver(Deriver):
         self._last_ts: float | None = None
         self._objective: str = ""
         self._attachments: tuple = ()
+        self._last_document: JournalDocument | None = None
 
     # ── Deriver Protocol ─────────────────────────────────
 
@@ -118,7 +117,7 @@ class StepTreeAccumulatorDeriver(Deriver):
             return
         try:
             self._apply(event)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning(
                 "step_tree_accumulator on_event failed ep=%s err=%s",
                 event.execution_point, exc,
@@ -133,9 +132,18 @@ class StepTreeAccumulatorDeriver(Deriver):
             if self._open_step is not None:
                 self._close_step("cancelled")
             doc = self._build_document()
-            self._write_journal(doc)
-        except Exception as exc:  # noqa: BLE001
+            self._last_document = doc
+            JournalDocumentWriter(self._run_dir / "journal.json").write(doc)
+        except Exception as exc:
             log.warning("step_tree_accumulator.flush failed err=%s", exc)
+
+    @property
+    def document(self) -> JournalDocument | None:
+        """最后一次 ``flush()`` 的 JournalDocument(供 NarrativeDeriver 读)。
+
+        deriver 不会自发建 document;只在 flush 之后才能拿到。返回 None
+        表示还没 flush 过。"""
+        return self._last_document
 
     # ── 累积核心 ──────────────────────────────────────
 
@@ -318,21 +326,6 @@ class StepTreeAccumulatorDeriver(Deriver):
             phases=tuple(self._phases),
         )
 
-    def _write_journal(self, doc: JournalDocument) -> None:
-        out = self._run_dir / "journal.json"
-        out.parent.mkdir(parents=True, exist_ok=True)
-        # 原子写：tmp → rename
-        with tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf-8", dir=str(out.parent),
-            prefix="journal.", suffix=".tmp", delete=False,
-        ) as fh:
-            json.dump(
-                self._to_jsonable(doc),
-                fh, ensure_ascii=False, default=str, indent=2,
-            )
-            tmp = Path(fh.name)
-        tmp.replace(out)
-
     def _write_model_visible(self, frame: _StepFrame) -> None:
         """落 ``model_visible/step_NN/`` 五件套（ADR-0167 D3 / D4）。
 
@@ -344,9 +337,7 @@ class StepTreeAccumulatorDeriver(Deriver):
         - context-manifest.json—— { kinds, objective, item_count }
         - messages.json        —— 占位骨架 [{role, content, ...}] 供 replay 重建
         """
-        import hashlib
         import json as _json
-        import os
         step_dir = self._run_dir / "model_visible" / frame.step_id
         step_dir.mkdir(parents=True, exist_ok=True)
 
@@ -421,20 +412,4 @@ class StepTreeAccumulatorDeriver(Deriver):
             _json.dumps(messages, ensure_ascii=False, indent=2), encoding="utf-8",
         )
 
-    @staticmethod
-    def _to_jsonable(obj: Any) -> Any:
-        from dataclasses import asdict, is_dataclass
-        if is_dataclass(obj) and not isinstance(obj, type):
-            return {k: StepTreeAccumulatorDeriver._to_jsonable(v) for k, v in asdict(obj).items()}
-        if isinstance(obj, dict):
-            return {k: StepTreeAccumulatorDeriver._to_jsonable(v) for k, v in obj.items()}
-        if isinstance(obj, (list, tuple)):
-            return [StepTreeAccumulatorDeriver._to_jsonable(v) for v in obj]
-        if isinstance(obj, datetime):
-            return obj.isoformat()
-        if isinstance(obj, (str, int, float, bool, type(None))):
-            return obj
-        return repr(obj)
-
-
-__all__ = ["StepTreeAccumulatorDeriver", "PHASE_FOLD_EPS"]
+    __all__: list[str] = ["StepTreeAccumulatorDeriver", "PHASE_FOLD_EPS"]

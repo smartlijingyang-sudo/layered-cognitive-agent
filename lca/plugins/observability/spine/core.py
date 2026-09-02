@@ -108,21 +108,10 @@ class SpineCore:
 # ── plugin manifest ──────────────────────────────────────────────────
 
 
-_OPTIONAL_DERIVER_KEYS: tuple[str, ...] = (
-    "step_tree",
-    "narrative",
-    "graph",
-    "live_tail",
-)
-
-
-def _soft_get(ctx: PluginContext, key: str) -> Any | None:
-    """Return an optional capability when the context supports soft lookup."""
-    soft_get = getattr(ctx, "soft_get", None)
-    if callable(soft_get):
-        return soft_get(key)
-    return None
-
+# ADR-0167 D11 / I-MV3: deriver 都是 per-run 的(run_dir / agent_role / 写
+# journal.json / narrative.md); 不应在 spine.core boot 阶段硬 subscribe。
+# transport 在 RunSessionBuilder.build 阶段构造 + subscribe(通过
+# SpineCore.event_spine.subscribe)。
 
 # Reflector modules that keep a process-local ``_active_spine`` for emit_*.
 # Soft-import so a partial profile without those plugins still boots.
@@ -236,17 +225,11 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     file_sink = ctx.require("file_sink")
 
     sinks: list[EventSink] = [file_sink]
-    console_sink = _soft_get(ctx, "console_sink")
+    console_sink = getattr(ctx, "soft_get", lambda _k: None)("console_sink") if hasattr(ctx, "soft_get") else None
     if console_sink is not None and isinstance(console_sink, EventSink):
         sinks.append(console_sink)
 
     event_spine = EventSpine(sinks=sinks)
-
-    for deriver_key in _OPTIONAL_DERIVER_KEYS:
-        deriver = _soft_get(ctx, deriver_key)
-        on_event = getattr(deriver, "on_event", None) if deriver is not None else None
-        if callable(on_event):
-            event_spine.subscribe(on_event)
 
     spine_core = SpineCore(
         event_spine=event_spine,

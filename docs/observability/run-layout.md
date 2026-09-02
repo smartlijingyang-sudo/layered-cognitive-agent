@@ -42,6 +42,31 @@ traces/
 
 原则（ADR-0167）：**Model-visible ≡ logged**；journal 持 digest + 相对路径，不把整段 prompt 塞进 `objective`。
 
+## 谁写什么 (ADR-0167.1 D1–D3)
+
+| 文件 | 写者 | 触发 |
+|---|---|---|
+| `events.jsonl` | `RoutingFileSink` (registry 的 storage face) | 每个 spine EP |
+| `journal.json` | `StepTreeAccumulatorDeriver.flush()` | transport 在 terminalize 时调 (run 末尾) |
+| `journal.narrative.md` | `StepNarrativeWriter` 由 `_StepTreeBundle.flush()` 触发 | run 末尾 |
+| `manifest.json` | `record_terminal_materialization()` | terminalize |
+| `model_visible/` | `StepTreeAccumulatorDeriver._write_model_visible()` | 每次 step close |
+| `evidence/` | body / tool / facade 任意 evidence 写入者 | 同步 content addressing |
+
+**单一写入原则**：每个文件只有一个真实写入者（deriver 或 sink），不允许两个模块竞争同一文件。旧的 `StepGroupedBackend.flush` 已被删除（与 `StepTreeAccumulatorDeriver.flush` 重复写 `journal.json`）。
+
+**StepTreeAccumulatorDeriver 装配位置**：`RunSessionBuilder.build` 阶段（**不是** boot 阶段）。
+deriver 需要 `run_id / run_dir / agent_role / strategy_key / plan_ref`，这些字段是 per-run 的；
+boot 阶段（`spine.core.setup`）不再订阅任何 per-run deriver。
+
+```text
+RunSessionBuilder.build(run_id=X)
+    ├── StepCoordinator          ← Agent 唯一可见写入口 (ADR-0167 D2)
+    ├── StepTreeAccumulatorDeriver(run_id=X, run_dir=...)
+    │      └── event_spine.subscribe(deriver.on_event)
+    └── assemble_run_hub(...)
+```
+
 ## latest.json 原子更新
 
 写 `latest.json.tmp-{pid}-{counter}` → `os.replace()` 到 `latest.json`；
@@ -60,5 +85,6 @@ traces/
 ## 参考
 
 - [ADR-0167](../adr/0167-spine-ssot-and-step-materialization.md) D3/D4
+- [ADR-0167.1](../adr/0167.1-step-tree-deriver-wiring-and-run-layout-cleanup.md) D1–D7
 - [ADR-0166](../adr/0166-step-segment-phase-and-spine-hardening.md)
 - [ADR-0065](../adr/0065-recoverable-evidence-ledger.md)

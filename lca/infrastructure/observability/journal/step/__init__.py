@@ -1,24 +1,25 @@
-"""journal.step —— step-tree 落盘投影(ADR-0164 草案 Phase 2 + 4)。
+"""journal.step —— step-tree 落盘投影(ADR-0164 + ADR-0167 D11)。
 
 主存储: ``traces/runs/<run_id>/journal.json``(pretty-printed JSON)。
-顶层真相是 step 树, 不是 seq 流水。 与 ``journal.jsonl``(v2 流式)
-不共存 —— 主路径走这里。
+事件真相: ``traces/runs/<run_id>/events.jsonl``(SSOT, 单一 append-only)。
+两者的关系:
+    - SSOT 是 spine.events.jsonl
+    - journal.json 是由 :class:`StepTreeAccumulatorDeriver` 重放 events
+      累积出来的可重建视图(ADR-0167 I-MV3: Replay ≡ finalize)
+    - narrative.md 是 NarrativeDeriver 从同一 events 推导出的另一视图
 
 公开 API:
-    StepGroupedProjector:    接收 JournalDocument, 一次性写 journal.json
-    StepGroupedReader:       从 journal.json 还原为 JournalDocument
-    StepGroupedBackend:      JournalBackend 包装, 让 boot 装配挂到 BoundObservability
-    StepNarrativeWriter:     JournalDocument → narrative.md(替换 NarrativeSidecar)
+    JournalDocumentWriter:  JournalDocument → journal.json
+    StepGroupedReader:      journal.json → JournalDocument
+    read_step_document:     同上的函数形式
+    StepNarrativeWriter:    JournalDocument → narrative.md
 """
 
-from lca.infrastructure.observability.journal.step.backend import (
-    StepGroupedBackend,
-)
 from lca.infrastructure.observability.journal.step.narrative_writer import (
     StepNarrativeWriter,
 )
 from lca.infrastructure.observability.journal.step.projector import (
-    StepGroupedProjector,
+    JournalDocumentWriter,
 )
 from lca.infrastructure.observability.journal.step.reader import (
     StepGroupedReader,
@@ -26,8 +27,7 @@ from lca.infrastructure.observability.journal.step.reader import (
 )
 
 __all__ = [
-    "StepGroupedBackend",
-    "StepGroupedProjector",
+    "JournalDocumentWriter",
     "StepGroupedReader",
     "StepNarrativeWriter",
     "read_step_document",

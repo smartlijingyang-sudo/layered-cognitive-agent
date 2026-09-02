@@ -36,3 +36,36 @@
 
 从 `materializations/<generator-id>/<generator-version>/` 重放历史
 materialization;不重新生成,而是验证现有视图与 ledger 一致。
+
+## Run 路径查找顺序（`_resolve_journal_artifact`, ADR-0167.1 D6）
+
+CLI 在不显式 `--journal` / `--jsonl` 时按下列顺序查找 run artifact：
+
+```text
+1. --journal <path> (显式参数, 任意 caller-provided path)
+2. traces/runs/<id>/journal.json         # lca.journal/3.1 step-tree 主存储 (ADR-0164 + ADR-0167 D3)
+3. traces/runs/<id>/events.jsonl          # EventSpine SSOT (ADR-0165.1, ADR-0167 D1)
+4. traces/runs/<id>/journal.raw.jsonl     # legacy replay stream (回放兜底)
+5. traces/runs/<id>.journal               # legacy per-trace_id layout
+6. traces/lca_journal.jsonl                # 全局 legacy stream
+```
+
+`lca-ops trace <run_id>` / `lca-ops explain <run_id>` / `lca-ops minimal-repro <run_id>` /
+`lca-ops journal steps <run_id>` 全部走这条 lookup。`journal.json` 缺失但 `events.jsonl`
+存在时，CLI 会基于 `events.jsonl` re-derive step tree（Re- 协议见 ADR-0167 D10）。
+
+doctor 的 `_doctor_journal_path` 同样优先 `journal.json` → `events.jsonl` →
+否则 H2 broken。
+
+## 例子
+
+```sh
+# 标准 trace (自动找到 journal.json / events.jsonl)
+lca-ops trace run_abc123
+
+# 显式指 events.jsonl (off  /  partial profile 下)
+lca-ops trace run_abc123 --jsonl traces/runs/run_abc123/events.jsonl
+
+# debug-run: 看一次 8-section 诊断, spine.events + journal 双源都能识别
+lca-ops debug-run run_abc123
+```

@@ -12,8 +12,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.protocols.state.reducer import Reducer
 from lca.runtime.reducer import DefaultReducer
@@ -65,7 +63,9 @@ def test_artifact_closure_delta_handler_class_deleted() -> None:
     """ArtifactClosureDeltaHandler 类删除(走 transport 投影通道)。"""
 
     try:
-        from lca.plugins.providers.act.delta_handlers import ArtifactClosureDeltaHandler  # type: ignore[attr-defined]
+        from lca.plugins.providers.act.delta_handlers import (
+            ArtifactClosureDeltaHandler,  # type: ignore[attr-defined]
+        )
 
         exists = True
     except ImportError:

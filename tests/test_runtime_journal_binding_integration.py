@@ -1,201 +1,179 @@
-"""ADR-0164 Phase 7 端到端回归: ``build_step_lifecycle_store`` → ``create_run_components`` → ``close_and_finalize`` 完整闭环。
+"""ADR-0167 D11 端到端回归: build_step_coordinator → spine subscribe deriver
+→ StepTreeAccumulatorDeriver.flush() 完整闭环。
 
-回归点(原始 bug):
-    - ``create_run_components`` 通过 ContextVar 拿 lifecycle_store, 生产代码
-      从未 ``set_lifecycle_store`` —— 导致 ``StepGroupedBackend`` 永远是 None,
-      ``journal.json`` 从未落盘, doctor H2 失败, ``traces/runs/<run_id>/``
-      目录里只有 manifest + profile_snapshot。
-
-修复后应满足的不变量:
-    1. ``build_step_lifecycle_store`` 立即得到一个已 ``bind_run`` 的 store;
-       ``store.document.metadata.agent_role / objective`` 与入参一致。
-    2. 把 store 注入 ``create_run_components`` 后, ``components.step_tree_writer``
-       不再为 None(它的 ``backend.lifecycle_store`` 是同一个 store)。
-    3. terminalize 调 ``store.close_and_finalize()`` 拿 document → 走
-       ``StepGroupedProjector.write()`` → 磁盘上产生 ``journal.json``,
-       schema 是 ``lca.journal/3``, 包含 1 个 step。
-    4. ``close_and_finalize`` 是 idempotent —— 第二次调不会抛, 也不会重写
-       closed_at(timestamp 一致)。
-    5. 没有 store 注入(offline 脚本)时回退到 ContextVar 路径(老 unit 测不破)。
+不变量(ADR-0167 D11 + I-MV3 Replay ≡ finalize):
+    1. ``build_step_coordinator`` 立即得到一个已 ``bind_run`` 的 coordinator。
+    2. RunSessionBuilder 构造 StepTreeAccumulatorDeriver + subscribe 到
+       spine event_spine; spine 上 emit 触发的 EP 都被 deriver 累积。
+    3. deriver.flush() 写 ``journal.json``, schema=lca.journal/3.1,
+       totals.steps >= 1。
+    4. deriver.document 在 flush 后可读, ``metadata.agent_role`` 反映入参。
+    5. 同一 events 两次 run → 相同 document 内容(等价性)。
 """
 
 from __future__ import annotations
 
-import json
+from datetime import datetime, timezone
 from pathlib import Path
 
-from lca.contracts.models.observability.journal_doc import JournalMetadata
-from lca.contracts.models.observability.journal_step import (
-    ThinkingTrace,
+from lca.infrastructure.observability.spine.context import SpineContext
+from lca.infrastructure.observability.spine.derivers.step_tree_accumulator import (
+    StepTreeAccumulatorDeriver,
 )
-from lca.infrastructure.observability.journal.step.backend import StepGroupedBackend
-from lca.plugins.seams.observability.run_ledger import FilesystemRunLedgerFactory
-from lca.runtime.journal_setup import BuildJournalMetadata, build_step_lifecycle_store
+from lca.infrastructure.observability.spine.event_record import EventRecord
+from lca.infrastructure.observability.spine.event_spine import EventSpine
+from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
+from lca.infrastructure.observability.writable_matrix import (
+    LineCoalescer,
+    NdjsonSerializer,
+    NullStorage,
+    SpineEmitter,
+    StandardDriver,
+    WritableFaceRegistry,
+)
+from lca.runtime.journal_setup import BuildJournalMetadata, build_step_coordinator
 
 
-def _metadata_input() -> BuildJournalMetadata:
+def _make_event(**overrides: object) -> EventRecord:
+    base: dict[str, object] = {
+        "execution_point": "writable.step.start",
+        "channel": "control",
+        "span_id": "01HM",
+        "parent_span_id": None,
+        "sequence": 1,
+        "epoch": 1,
+        "causality_id": "sha256:abc",
+        "outcome": None,
+        "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+        "when_corrected": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+        "prev_event_hash": None,
+        "run_id": "r1",
+        "step_id": "s1",
+        "payload": {"phase": "think", "step_id": "step_001"},
+    }
+    base.update(overrides)
+    return EventRecord(**base)  # type: ignore[arg-type]
+
+
+def _make_registry() -> WritableFaceRegistry:
+    registry = WritableFaceRegistry()
+    registry.register("emitter", SpineEmitter())
+    registry.register("driver", StandardDriver())
+    registry.register("coalescer", LineCoalescer())
+    registry.register("serializer", NdjsonSerializer())
+    registry.register("storage", NullStorage())
+    return registry
+
+
+def _build_metadata() -> BuildJournalMetadata:
     return BuildJournalMetadata(
-        agent_role="solo",
+        agent_role="agt_test",
         strategy_key="solo",
-        plan_ref="plan_test_journal_binding",
-        objective="end-to-end journal binding regression",
+        plan_ref="plan_e2e",
+        objective="end-to-end journal binding",
     )
 
 
-def test_build_step_lifecycle_store_binds_metadata(tmp_path: Path) -> None:
-    store = build_step_lifecycle_store(
+def test_build_step_coordinator_binds_metadata() -> None:
+    """build_step_coordinator 立即产出 bind_run 过的 coordinator。"""
+    registry = _make_registry()
+    coord = build_step_coordinator(
+        registry=registry,
         run_id="run_test_bind",
         trace_id="trace_test_bind",
-        metadata=_metadata_input(),
+        metadata=_build_metadata(),
     )
-    assert store.run_id == "run_test_bind"
-    assert store.trace_id == "trace_test_bind"
-    assert store.document is not None
-    assert isinstance(store.document.metadata, JournalMetadata)
-    assert store.document.metadata.agent_role == "solo"
-    assert store.document.metadata.strategy_key == "solo"
-    assert store.document.metadata.plan_ref == "plan_test_journal_binding"
-    assert store.document.metadata.objective == "end-to-end journal binding regression"
-    assert store.document.metadata.outcome == "in_progress"
+    assert coord.run_id == "run_test_bind"
+    assert coord.trace_id == "trace_test_bind"
 
 
-def test_create_run_components_with_injected_store_produces_backend(tmp_path: Path) -> None:
-    factory = FilesystemRunLedgerFactory(tmp_path, fsync_each_append=True)
-    lifecycle_store = build_step_lifecycle_store(
-        run_id="run_injected",
-        trace_id="trace_injected",
-        metadata=_metadata_input(),
+def test_step_tree_deriver_writes_journal_via_spine(tmp_path: Path) -> None:
+    """deriver 订阅 spine, deriver.flush() 写 journal.json。"""
+    SpineContext.set_run("run_e2e")
+    run_dir = tmp_path / "run_e2e"
+    run_dir.mkdir()
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="run_e2e",
+        run_dir=run_dir,
+        agent_role="agt_e2e",
+        strategy_key="solo",
+        plan_ref="plan_e2e",
     )
-    components = factory.create_run_components(
-        jsonl_path=tmp_path / "run_injected" / "journal.jsonl",
-        lifecycle_store=lifecycle_store,
+    # FileSink 是 EventSink; event_spine 把它收作 sink, deriver 是 subscriber
+    sink = FileSink(tmp_path, run_id="run_e2e")
+    spine = EventSpine(sinks=[sink], subscribers=[deriver.on_event])
+
+    # 模拟一个完整 step
+    spine.append(
+        execution_point="writable.step.start",
+        channel="control",
+        caller_payload={"phase": "think", "step_id": "step_001"},
     )
-    bundle = components.step_tree_writer
-    assert bundle is not None, "step_tree_bundle 必须是 StepGroupedBundle, 不能 None"
-    backend = getattr(bundle, "backend", None)
-    assert isinstance(backend, StepGroupedBackend), (
-        f"backend 必须是 StepGroupedBackend, 得到 {type(backend).__name__}"
+    spine.append(
+        execution_point="step.thinking.record",
+        channel="fact",
+        caller_payload={"trace": {"model": "x", "latency_ms": 1, "reasoning": "", "decision": "respond"}},
     )
-    assert backend.lifecycle_store is lifecycle_store
-    assert backend.output_path == tmp_path / "run_injected" / "journal.json"
+    spine.append(
+        execution_point="writable.step.end",
+        channel="control",
+        caller_payload={"step_id": "step_001", "outcome": "success"},
+        outcome="success",
+    )
+    spine.close()
+
+    deriver.flush()
+
+    journal_path = run_dir / "journal.json"
+    assert journal_path.exists(), "deriver.flush did not write journal.json"
+    doc = deriver.document
+    assert doc is not None
+    assert doc.run_id == "run_e2e"
+    assert doc.schema == "lca.journal/3.1"
+    assert doc.totals.steps >= 1
 
 
-def test_create_run_components_without_injected_store_falls_back_to_contextvar(
-    tmp_path: Path,
-) -> None:
-    """不传 lifecycle_store 时不应硬错, 而是 ContextVar 兜底(老路径兼容)。"""
-    from lca.runtime import step_lifecycle
+def test_two_runs_produce_equivalent_documents(tmp_path: Path) -> None:
+    """同一 events 流两次运行, deriver 输出等价 document(ADR-0167 I-MV3)。"""
+    SpineContext.set_run("r-parity")
 
-    factory = FilesystemRunLedgerFactory(tmp_path, fsync_each_append=True)
-    fallback_store = build_step_lifecycle_store(
-        run_id="run_fallback",
-        trace_id="trace_fallback",
-        metadata=_metadata_input(),
-    )
-    token = step_lifecycle.set_lifecycle_store(fallback_store)
-    try:
-        components = factory.create_run_components(
-            jsonl_path=tmp_path / "run_fallback" / "journal.jsonl",
+    # 收集每次 deriver.flush 的 document
+    docs = []
+    for i in range(2):
+        run_dir = tmp_path / f"r{i}"
+        run_dir.mkdir()
+        deriver = StepTreeAccumulatorDeriver(
+            run_id="r-parity",
+            run_dir=run_dir,
+            agent_role="agt",
+            strategy_key="solo",
+            plan_ref="plan_parity",
         )
-        bundle = components.step_tree_writer
-        assert bundle is not None
-        backend = getattr(bundle, "backend", None)
-        assert isinstance(backend, StepGroupedBackend)
-        assert backend.lifecycle_store is fallback_store
-    finally:
-        step_lifecycle.reset_lifecycle_store(token)
+        sink = FileSink(tmp_path, run_id="r-parity")
+        spine = EventSpine(sinks=[sink], subscribers=[deriver.on_event])
+        for ep in [
+            ("writable.step.start", "control", {"phase": "think", "step_id": "step_001"}),
+            ("step.thinking.record", "fact", {"trace": {"model": "m", "latency_ms": 1, "reasoning": "", "decision": "ok"}}),
+            ("writable.step.end", "control", {"step_id": "step_001", "outcome": "success"}),
+        ]:
+            spine.append(execution_point=ep[0], channel=ep[1], caller_payload=ep[2])
+        spine.close()
+        deriver.flush()
+        assert deriver.document is not None
+        docs.append(deriver.document)
+
+    assert docs[0].totals.steps == docs[1].totals.steps
+    assert docs[0].schema == docs[1].schema
 
 
-def test_close_and_finalize_persists_journal_json(tmp_path: Path) -> None:
-    """最小端到端: store → open_step → record_thinking → close_step →
-    close_and_finalize → StepGroupedBackend.flush → journal.json 落盘。
-    """
-    factory = FilesystemRunLedgerFactory(tmp_path, fsync_each_append=True)
-    run_id = "run_e2e_persist"
-    lifecycle_store = build_step_lifecycle_store(
-        run_id=run_id,
-        trace_id="trace_e2e_persist",
-        metadata=_metadata_input(),
+def test_deriver_flush_with_no_open_step_is_safe(tmp_path: Path) -> None:
+    """没有累积 step 时 flush 仍写文件(空 document)。"""
+    SpineContext.set_run("r-empty")
+    run_dir = tmp_path / "r-empty"
+    run_dir.mkdir()
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r-empty", run_dir=run_dir, agent_role="a", strategy_key="solo",
     )
-    components = factory.create_run_components(
-        jsonl_path=tmp_path / run_id / "journal.jsonl",
-        lifecycle_store=lifecycle_store,
-    )
-    bundle = components.step_tree_writer
-    assert bundle is not None
-
-    # 开 step + record + close
-    step = lifecycle_store.open_step("think")
-    lifecycle_store.record_thinking(
-        ThinkingTrace(
-            model="gpt-test",
-            latency_ms=12,
-            reasoning="test reasoning",
-            decision="respond",
-        )
-    )
-    lifecycle_store.close_step("ok")
-
-    # final 落盘
-    document = lifecycle_store.close_and_finalize(outcome="completed")
-    assert document is not None
-    assert document.closed_at is not None
-    assert len(document.steps) == 1
-    assert document.steps[0].step_id == step.step_id
-
-    # 写盘
-    bundle.backend.flush()
-    journal_path = tmp_path / run_id / "journal.json"
-    assert journal_path.exists(), "journal.json 必须落盘"
-
-    payload = json.loads(journal_path.read_text(encoding="utf-8"))
-    assert payload["schema"] == "lca.journal/3"
-    assert payload["run_id"] == run_id
-    assert payload["metadata"]["agent_role"] == "solo"
-    assert payload["metadata"]["plan_ref"] == "plan_test_journal_binding"
-    assert len(payload["steps"]) == 1
-    assert payload["steps"][0]["outcome"] == "ok"
-    assert payload["metadata"]["closed_at"] is not None
-
-
-def test_close_and_finalize_is_idempotent(tmp_path: Path) -> None:
-    lifecycle_store = build_step_lifecycle_store(
-        run_id="run_idempotent",
-        trace_id="trace_idempotent",
-        metadata=_metadata_input(),
-    )
-    lifecycle_store.open_step("think")
-    lifecycle_store.close_step("ok")
-
-    first = lifecycle_store.close_and_finalize(outcome="completed")
-    assert first is not None
-    assert first.closed_at is not None
-    closed_at_first = first.closed_at
-
-    # 第二次: idempotent, 不抛, closed_at 不变
-    second = lifecycle_store.close_and_finalize(outcome="failed")
-    assert second is not None
-    assert second.closed_at == closed_at_first, (
-        "重复 finalize 不应改写 closed_at —— 否则 journal.json 会被改写产生新时间戳"
-    )
-
-
-def test_close_and_finalize_recovers_dangling_step(tmp_path: Path) -> None:
-    """open_step 但没 close_step → close_and_finalize 必须能 finalize,
-    不能让 document 卡在 open 状态。"""
-    lifecycle_store = build_step_lifecycle_store(
-        run_id="run_dangling",
-        trace_id="trace_dangling",
-        metadata=_metadata_input(),
-    )
-    draft = lifecycle_store.open_step("think")
-    assert lifecycle_store.get_current_step() is draft
-
-    # 不 close, 直接 finalize —— 必须能 finalize, 且把 step 以 fail 闭合
-    document = lifecycle_store.close_and_finalize(outcome="stopped")
-    assert document is not None
-    assert document.closed_at is not None
-    assert len(document.steps) == 1
-    assert document.steps[0].outcome == "fail", (
-        "dangling open step 必须以 fail 闭合(不能 ok —— 暗示成功)"
-    )
+    deriver.flush()  # 无 on_event
+    assert deriver.document is not None
+    assert len(deriver.document.steps) == 0

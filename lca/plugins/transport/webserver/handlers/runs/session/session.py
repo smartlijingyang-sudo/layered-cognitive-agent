@@ -96,10 +96,9 @@ class RunSession:
     execution_target: str = ""
     started_at: float = 0.0
     locator: RunLocator | None = None  # ADR-0065 PR-11: run 级 locator 引用
-    step_tree_bundle: object | None = None  # ADR-0164 Phase 6: step-tree write bundle(boot 装)
-    lifecycle_store: object | None = (
-        None  # ADR-0164 Phase 7: 已 bind_run 的 StepLifecycleStore;ensure_session_hub 装
-    )
+    thread_tree_writer: object | None = None  # ADR-0167 D11: per-run StepTreeAccumulatorDeriver
+    coordinator: object | None = None  # ADR-0167 D11: StepCoordinator (Agent 唯一写入口)
+    step_tree_bundle: object | None = None  # ADR-0164 Phase 6: step-tree write bundle (legacy, 兼容)
 
 
 class RunRegistry:

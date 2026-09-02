@@ -1,24 +1,15 @@
-"""Runtime factory that arms a ``StepLifecycleStore`` for one run.
+"""Runtime factory: 构造一个已 ``bind_run`` 的 StepCoordinator (ADR-0167 D11)。
 
-ADR-0164 Phase 7 端到端: ``create_run_components`` 需要已 bind_run 的
-lifecycle store。Builder 负责构造 store; ``RunExecutionEnvironment.prepare``
-必须 ``set_lifecycle_store`` + facade ``bind(RunContext)``, 否则
-terminal flush 写出 steps=[]。
+删除说明
+--------
+ADR-0167 D11 / PR-3 删除了 ``StepLifecycleStore`` 双写桥(原
+``lca.runtime.step_lifecycle``); spine events.jsonl 是 SSOT, 业务层
+唯一入口是 :class:`StepCoordinator` (Protocol + registry 解引用)。
+本模块负责在 run 创建期构造一个最小、最窄形态的 coordinator。
 
-PR-3 删除了历史桥接层；本模块只负责 store 构造，写路径全部走
-:mod:`lca.infrastructure.observability.writable_matrix` 的 StepCoordinator。
-
-- ``build_step_lifecycle_store`` —— 给定 run_id / trace_id / metadata,
-  直接造一个 ``StepLifecycleStore`` 并 ``bind_run``。 是最窄的形态。
-
-不在本模块做的事:
-    - 不负责 set ContextVar —— 调用方决定是否需要 ContextVar 路径
-      (legacy 单元测试 + facade API 仍依赖 ContextVar)。
-    - 不负责落盘 —— ``StepGroupedBackend.flush`` 是 sink,
-      ``StepLifecycleStore.close_and_finalize`` 是 source, 本模块只负责
-      source 端的构造。
-    - 不依赖 transport —— 调用方从 ``RunSession`` 推导 metadata 后传入
-      ``BuildJournalMetadata``(保持 ``runtime → transport`` 单向)。
+- ``build_step_coordinator`` —— 给定 WritableFaceRegistry + run_id +
+  trace_id + metadata, 构造一个已 ``bind_run`` 的 StepCoordinator。
+  不依赖 transport, 不写盘, 不绑 ContextVar (调用方决定)。
 """
 
 from __future__ import annotations
@@ -27,20 +18,25 @@ from dataclasses import dataclass, field
 
 from lca.contracts.models.observability.journal_doc import JournalMetadata
 from lca.contracts.models.observability.journal_step import AttachmentRef
-from lca.runtime.step_lifecycle import StepLifecycleStore
+from lca.infrastructure.observability.writable_matrix.coordinator import (
+    StepCoordinator,
+)
+from lca.infrastructure.observability.writable_matrix.registry import (
+    WritableFaceRegistry,
+)
 
 __all__ = [
     "BuildJournalMetadata",
-    "build_step_lifecycle_store",
+    "build_step_coordinator",
 ]
 
 
 @dataclass(frozen=True)
 class BuildJournalMetadata:
-    """``build_step_lifecycle_store`` 用的结构化 metadata 输入。
+    """``build_step_coordinator`` 用的结构化 metadata 输入。
 
     字段语义对齐 :class:`JournalMetadata`。 transport 层把
-    ``RunSession`` 拆成这个 dataclass,再交给 runtime,避免 ``runtime``
+    ``RunSession`` 拆成这个 dataclass, 再交给 runtime, 避免 ``runtime``
     反向 import transport。
     """
 
@@ -52,25 +48,29 @@ class BuildJournalMetadata:
     started_at: float = 0.0
 
 
-def build_step_lifecycle_store(
+def build_step_coordinator(
     *,
+    registry: WritableFaceRegistry,
     run_id: str,
     trace_id: str,
     metadata: BuildJournalMetadata,
-) -> StepLifecycleStore:
-    """造一个已 ``bind_run`` 的 store。 最窄形态,所有字段由调用方决定。
+) -> StepCoordinator:
+    """造一个已 ``bind_run`` 的 coordinator。最窄形态,所有字段由调用方决定。
 
-    返回的 store 已绑定 run,可以直接调 ``open_step`` / ``record_*`` /
-    ``close_step``。 落盘是 ``StepGroupedBackend`` 的事,本函数不碰。
+    返回的 coordinator 已绑定 run, 可以直接调 ``begin_step`` /
+    ``record_*`` / ``end_step``。 events.jsonl 落盘由
+    :class:`RoutingFileSink` (registry 中 storage face) 负责。
+    journal.json 落盘由 :class:`StepTreeAccumulatorDeriver`
+    (subscribed to spine) 负责。
     """
-    store = StepLifecycleStore()
-    store.bind_run(
+    coord = StepCoordinator(registry=registry, run_id=run_id)
+    coord.bind_run(
         run_id=run_id,
         trace_id=trace_id,
         metadata=_to_journal_metadata(metadata),
         started_at=metadata.started_at if metadata.started_at > 0 else None,
     )
-    return store
+    return coord
 
 
 def _to_journal_metadata(metadata: BuildJournalMetadata) -> JournalMetadata:

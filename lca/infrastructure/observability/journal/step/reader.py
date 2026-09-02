@@ -1,6 +1,6 @@
 """StepGroupedReader —— JournalDocument 反序列化(ADR-0164 草案)。
 
-配套 StepGroupedProjector, 用于读回 ``journal.json``。 给 CLI
+配套 JournalDocumentWriter, 用于读回 ``journal.json``。 给 CLI
 ``lca-ops journal steps`` / doctor / debug 工具用。
 
 不做的事:

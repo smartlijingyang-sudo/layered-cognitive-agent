@@ -18,13 +18,15 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from functools import wraps
-from typing import Any, Literal, TypeVar
+from typing import Any, TypeVar
 
 import structlog
 from opentelemetry import trace as otel_trace
@@ -41,7 +43,6 @@ from lca.contracts.models.observability.journal import (
     RuntimeObserved,
     StampedEvent,
 )
-from lca.contracts.models.observability.journal_doc import JournalDocument
 from lca.contracts.models.observability.journal_step import (
     ReflectTrace,
     SpanRecord,
@@ -466,21 +467,22 @@ def get_span_context() -> SpanContextInfo:
 _log = structlog.get_logger("lca.observability")
 
 
-# ── Step-tree API(ADR-0164 草案 Phase 2 facade 入口) ─────────────
+# ── Step-tree API(ADR-0167 D11: facade 转发给当前 StepCoordinator) ───
 #
-# 设计: facade 不持有 step 状态, 直接转发给 step_lifecycle 模块 facade。
-# 业务层调 ``facade.open_step(...)`` 等价于调 ``step_lifecycle.open_step(...)``,
-# 唯一区别是 facade 额外检查 _run_context 是否绑定(防御: 不绑 context 就
-# 没有当前 run 的身份, open_step 没意义)。
+# 设计: facade 不持有 step 状态, 转发给绑定的 StepCoordinator。 唯一区别是
+# facade 额外检查 _run_context 是否绑定(防御: 不绑 context 就没有当前 run
+# 身份, 写没意义)。 Phase 3 之后 facade 唯一的"step"入口就是 begin_step /
+# record_* / end_step, 全部走 StepCoordinator → writable_matrix 五面矩阵
+# → events.jsonl → StepTreeAccumulatorDeriver → journal.json (ADR-0167
+# I-MV3: Replay ≡ finalize)。
 #
-# 增 facade 这一层的理由: 保持业务层"只看到 4 个动词"的契约; 但 step 不是
-# "record / span / annotate / score" 中任何一个, 应当显式扩展 facade API。
-# Phase 4 之后 facade 的 record_runtime / record_operation 也收敛到 record_span,
-# 全部进 step-tree。
+# **延迟 import**: writable_matrix 在 infrastructure 包, facade 在同包内,
+# 但 facade 不在 infrastructure 内部 import 路径上, 仍用延迟 import 防循环。
+# 副作用: 调用方必须先 bind StepCoordinator (transport 在 prepare 阶段 bind),
+# 否则抛 RuntimeError; 不允许无 run 静默 no-op(违反 ADR-0167 D13 B2)。
 #
-# **延迟 import**: step_lifecycle 在 runtime 包内, runtime 包顶层 import
-# facade, 引入即循环。 故所有 step API 在函数体内延迟 import; 函数签名
-# 保持类型完整, 调用方从 type hints 看出契约。
+# 迁移说明: 原 StepLifecycleStore / step_lifecycle 路径已删除(ADR-0167 PR-3),
+# 本节 facade 即唯一 step 入口。
 
 
 def _require_run_bound() -> RunContext:
@@ -494,96 +496,84 @@ def _require_run_bound() -> RunContext:
     return ctx
 
 
+def _require_coordinator() -> "StepCoordinator":
+    """step API 要求已 bind StepCoordinator(transport 在 prepare 阶段绑)。
+
+    失败时抛 RuntimeError 而不是返回 None —— ADR-0167 D13 B2 禁伪防御:
+    无 coordinator 时 step API 不能静默 no-op。
+    """
+    from lca.infrastructure.observability.writable_matrix.coordinator import (
+        get_current_coordinator,
+    )
+
+    coord = get_current_coordinator()
+    if coord is None:
+        raise RuntimeError(
+            "step API requires bound StepCoordinator; "
+            "transport must bind coordinator in RunExecutionEnvironment.prepare"
+        )
+    return coord
+
+
 def step_open(
     phase: StepPhase,
     *,
     subagent_role: str | None = None,
     context: StepContext | None = None,
     parent_step_id: str | None = None,
-):
-    """开 step(5 原语: 上下文)。"""
+) -> str:
+    """开 step(走 StepCoordinator.begin_step)。"""
     _require_run_bound()
-    from lca.runtime import step_lifecycle as _step_lifecycle
-
-    return _step_lifecycle.open_step(
-        phase,
+    coord = _require_coordinator()
+    ctx_kw: dict[str, Any] = {}
+    if context is not None:
+        ctx_kw["context"] = context
+    return coord.begin_step(
+        str(phase),
         subagent_role=subagent_role,
-        context=context,
         parent_step_id=parent_step_id,
+        **ctx_kw,
     )
 
 
 def step_record_thinking(trace: ThinkingTrace) -> None:
-    """5 原语: 思考。"""
+    """思考 → StepCoordinator.record_thinking → spine EP ``step.thinking.record``。"""
     _require_run_bound()
-    from lca.runtime import step_lifecycle as _step_lifecycle
-
-    _step_lifecycle.record_thinking(trace)
+    _require_coordinator().record_thinking(trace)
 
 
 def step_record_tool_call(call: ToolCallRecord) -> None:
-    """5 原语: 工具调用。"""
+    """工具调用 → spine EP ``step.tool_call.record``。"""
     _require_run_bound()
-    from lca.runtime import step_lifecycle as _step_lifecycle
-
-    _step_lifecycle.record_tool_call(call)
+    _require_coordinator().record_tool_call(call)
 
 
 def step_record_tool_result(result: ToolResult) -> None:
-    """5 原语: 工具结果。"""
+    """工具结果 → spine EP ``step.tool_result.record``(outcome 跟 ok 字段)。"""
     _require_run_bound()
-    from lca.runtime import step_lifecycle as _step_lifecycle
-
-    _step_lifecycle.record_tool_result(result)
+    _require_coordinator().record_tool_result(result)
 
 
 def step_record_reflect(reflect: ReflectTrace) -> None:
-    """5 原语: 反思。"""
+    """反思 → spine EP ``step.reflect.record``。"""
     _require_run_bound()
-    from lca.runtime import step_lifecycle as _step_lifecycle
-
-    _step_lifecycle.record_reflect(reflect)
+    _require_coordinator().record_reflect(reflect)
 
 
 def step_record_span(span: SpanRecord) -> None:
-    """折叠诊断(RuntimeObserved / ToolRetryProgress / ContextCompacted)。"""
+    """折叠诊断 → spine EP ``step.span.record``(RuntimeObserved / ToolRetryProgress / ContextCompacted)。"""
     _require_run_bound()
-    from lca.runtime import step_lifecycle as _step_lifecycle
-
-    _step_lifecycle.record_span(span)
+    _require_coordinator().record_span(span)
 
 
 def step_close(
     outcome: StepLifecycleOutcome,
     *,
     error: str | None = None,
-):
-    """闭 step。"""
+) -> None:
+    """闭 step(走 StepCoordinator.end_step)。"""
     _require_run_bound()
-    from lca.runtime import step_lifecycle as _step_lifecycle
-
-    return _step_lifecycle.close_step(outcome, error=error)
-
-
-def step_close_document(
-    *,
-    outcome: Literal["completed", "failed", "paused", "stopped"],
-    closed_at: float | None = None,
-) -> JournalDocument | None:
-    """闭 run document。 必须所有 step 都已 close_step。"""
-    from lca.runtime import step_lifecycle as _step_lifecycle
-
-    store = _step_lifecycle.get_lifecycle_store()
-    if store is None:
-        return None
-    return store.close_document(outcome=outcome, closed_at=closed_at)
-
-
-def step_get_lifecycle_store():
-    """拿到当前 task 的 lifecycle store(给 boot 装配用)。"""
-    from lca.runtime import step_lifecycle as _step_lifecycle
-
-    return _step_lifecycle.get_lifecycle_store()
+    return _require_coordinator().end_step(str(outcome), error=error)
 
 
 __all__ = [
@@ -607,8 +597,6 @@ __all__ = [
     "set_session",
     "span",
     "step_close",
-    "step_close_document",
-    "step_get_lifecycle_store",
     "step_open",
     "step_record_reflect",
     "step_record_span",
@@ -617,3 +605,11 @@ __all__ = [
     "step_record_tool_result",
     "traced",
 ]
+
+
+if TYPE_CHECKING:
+    # 仅类型检查时引入;运行时通过 ``_require_coordinator()`` duck-type
+    # 访问 record_*,避免 facade ↔ writable_matrix 循环 import。
+    from lca.infrastructure.observability.writable_matrix.coordinator import (
+        StepCoordinator,
+    )

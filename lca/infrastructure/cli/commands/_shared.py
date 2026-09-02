@@ -44,13 +44,13 @@ def _resolve_journal_artifact(
 ) -> Path | None:
     """Resolve a journal artifact path with run-aware fallback (ADR-0166 S1 / 0167 D3).
 
-    Resolution order:
+    Resolution order (ADR-0167 D11):
     1. Explicit ``--journal`` argument (any caller-provided path wins).
     2. ``traces/runs/<id>/journal.json`` (preferred — lca.journal/3 step story).
-    3. ``traces/runs/<id>/journal.raw.jsonl`` (legacy stream — replay source).
-    4. ``traces/runs/<id>.journal`` (legacy per-trace_id layout, only for callers that
-       have no notion of nested directory).
-    5. ``traces/lca_journal.jsonl`` (last-resort global legacy stream).
+    3. ``traces/runs/<id>/events.jsonl`` (SSOT — ADR-0165.1 spine stream)。
+    4. ``traces/runs/<id>/journal.raw.jsonl`` (legacy stream — replay source)。
+    5. ``traces/runs/<id>.journal`` (legacy per-trace_id layout)。
+    6. ``traces/lca_journal.jsonl`` (last-resort global legacy stream)。
 
     Returns the resolved path or ``None`` when nothing was found.
     """
@@ -61,6 +61,10 @@ def _resolve_journal_artifact(
         primary = nested / "journal.json"
         if primary.exists():
             return primary
+        # ADR-0165.1: events.jsonl 是 spine SSOT;CLI trace/explain 也认
+        ssot = nested / "events.jsonl"
+        if ssot.exists():
+            return ssot
         legacy_stream = nested / "journal.raw.jsonl"
         if legacy_stream.exists():
             return legacy_stream

@@ -23,10 +23,10 @@ from lca.infrastructure.observability.journal.engine.journal_io import JOURNAL_S
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 from lca.plugins.transport.webserver.handlers.runs.doctor import diagnose
 from lca.plugins.transport.webserver.handlers.runs.observability.identity import parse_agent_ref
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession, RunStatus
 from lca.plugins.transport.webserver.handlers.runs.terminal.materialization import (
     record_terminal_materialization,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession, RunStatus
 
 
 def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:

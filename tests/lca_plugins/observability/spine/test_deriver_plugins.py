@@ -1,7 +1,9 @@
-"""Tests for spine deriver plugins (step_tree / narrative / graph / live_tail).
+"""Tests for spine deriver plugins (narrative / graph / live_tail).
 
-Covers Manifest id/provides for each module, GraphDeriver digraph flush,
-and FD-2 style ``on_event`` safety for the remaining derivers.
+ADR-0167 D11: spine.deriver.step_tree 已删除(plugin 是 boot-scope 但
+deriver 必须 per-run; 改由 transport 在 RunSessionBuilder 阶段构造
++ subscribe)。本测试覆盖仍在的 deriver plugin: manifest 声明 +
+on_event FD-2 安全性。
 """
 
 from __future__ import annotations
@@ -16,9 +18,8 @@ from lca.plugins.observability.spine.derivers import (
     graph,
     live_tail,
     narrative,
-    step_tree,
 )
-from lca.plugins.observability.spine.derivers.step_tree import StepTreeDeriverPlugin
+
 
 _BASE_KWARGS: dict[str, object] = {
     "execution_point": "brain.think.start",
@@ -45,13 +46,6 @@ def _make_event(**overrides: object) -> EventRecord:
 
 
 # ── Manifest declarations ────────────────────────────────────────────
-
-
-def test_step_tree_module_declares_plugin() -> None:
-    assert hasattr(step_tree, "setup")
-    definition = definition_from_plugin(step_tree.setup, module=__name__)
-    assert definition.id == "spine.deriver.step_tree"
-    assert "step_tree" in tuple(definition.provided_capability_keys)
 
 
 def test_narrative_module_declares_plugin() -> None:
@@ -102,13 +96,6 @@ def test_graph_deriver_terminal_event_auto_flushes(tmp_path: Path) -> None:
 
 
 # ── on_event does not raise ──────────────────────────────────────────
-
-
-def test_step_tree_on_event_does_not_raise() -> None:
-    deriver = StepTreeDeriverPlugin()
-    deriver.on_event(_make_event())
-    deriver.flush()
-    assert deriver.event_count == 1
 
 
 def test_narrative_on_event_does_not_raise(tmp_path: Path) -> None:

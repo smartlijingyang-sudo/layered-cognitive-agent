@@ -149,10 +149,20 @@ def _journal_outcome_from_session(session: RunSession) -> str:
 
 
 def _doctor_journal_path(session: RunSession, locator: RunLocator) -> Path:
-    """Prefer ADR-0164 step-tree journal.json when present on disk."""
+    """Doctor 扫描路径: 优先 journal.json (step-tree), 然后 events.jsonl (SSOT)。
+
+    ADR-0167 D11:
+    - journal.json 优先:它是可重建物化视图(lca.journal/3.1 step 树)
+    - events.jsonl 兜底: SSOT —— 即使 step_tree_deriver 没挂(未来不会发生,
+      仅供迁移期 / partial profile 用)
+    - 最后回落到 session.jsonl_path(legacy 兜底)
+    """
     step_path = locator.journal_step_path(session.run_id)
     if step_path.exists():
         return step_path
+    events_path = locator.events_path(session.run_id)
+    if events_path.exists():
+        return events_path
     return session.jsonl_path
 
 

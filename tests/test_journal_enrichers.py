@@ -6,10 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from lca.contracts.models.observability.journal import (
-    DecisionMade,
     RunScope,
     StampedEvent,
-    StepTextDelta,
 )
 from lca.infrastructure.observability.journal.enrichment.event_enrichers import (
     CausationEnricher,
@@ -219,7 +217,7 @@ def test_step_tree_does_not_emit_narrative_sidecar(tmp_path: Path) -> None:
         empty_document,
     )
     from lca.infrastructure.observability.journal.step.projector import (
-        StepGroupedProjector,
+        JournalDocumentWriter,
     )
 
     path = tmp_path / "j.json"
@@ -230,7 +228,7 @@ def test_step_tree_does_not_emit_narrative_sidecar(tmp_path: Path) -> None:
         objective="t",
     )
     doc = empty_document(run_id="r", trace_id="t", metadata=meta, started_at=0.0)
-    StepGroupedProjector(path).write(doc)
+    JournalDocumentWriter(path).write(doc)
 
     # step-tree 不应自动产出 narrative.md
     assert not (tmp_path / "j.narrative.md").exists()

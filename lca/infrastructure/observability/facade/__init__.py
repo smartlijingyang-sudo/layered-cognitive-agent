@@ -1,4 +1,9 @@
-"""observability.facade — facade subpackage."""
+"""observability.facade — facade subpackage.
+
+ADR-0167 D11 简化: 移除 ``step_close_document`` / ``step_get_lifecycle_store``。
+facade 的 step API 只负责转发到 StepCoordinator; document 收口由
+``StepTreeAccumulatorDeriver.flush`` 完成(transport 在 terminalize 触发)。
+"""
 
 from lca.infrastructure.observability.facade.facade import (
     BoundObservability,
@@ -18,8 +23,6 @@ from lca.infrastructure.observability.facade.facade import (
     set_session,
     span,
     step_close,
-    step_close_document,
-    step_get_lifecycle_store,
     step_open,
     step_record_reflect,
     step_record_span,
@@ -46,8 +49,6 @@ __all__ = [
     "set_session",
     "span",
     "step_close",
-    "step_close_document",
-    "step_get_lifecycle_store",
     "step_open",
     "step_record_reflect",
     "step_record_span",

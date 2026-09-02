@@ -5,9 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+from lca.plugins.tools.diagnostics.debug_run import _extract_failure
 from lca.plugins.transport.webserver.handlers.runs.doctor.legacy import hop_h6
 from lca.plugins.transport.webserver.handlers.runs.doctor.models import JsonlScan
-from lca.plugins.tools.diagnostics.debug_run import _extract_failure
 
 
 def test_hop_h6_surfaces_session_error_when_journal_empty() -> None:

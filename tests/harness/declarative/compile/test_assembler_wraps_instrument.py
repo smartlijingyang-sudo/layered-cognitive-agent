@@ -77,11 +77,11 @@ def _compile_single_node_plan() -> CompiledRunPlan:
     return CompiledRunPlan(
         profile_path="test://wrap-instrument-contract",
         capability=cast(
-            Any,
+            "Any",
             SimpleNamespace(profile_path="test://wrap-instrument-contract"),
         ),
         scope=cast(
-            Any,
+            "Any",
             SimpleNamespace(profile_path="test://wrap-instrument-contract"),
         ),
         phase_graph=phase_graph,

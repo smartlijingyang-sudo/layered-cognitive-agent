@@ -57,6 +57,14 @@ class FilesystemRunLocator(RunLocator):
         """Step-tree 主存储路径(ADR-0164 Phase 2+)。"""
         return self.run_dir(run_id) / "journal.json"
 
+    def events_path(self, run_id: str) -> Path:
+        """SSOT 事件流路径(ADR-0165.1 / ADR-0167 D11): events.jsonl。
+
+        与 ``journal_path`` (legacy raw jsonl) 不同 —— SSOT 是 spine
+        唯一 append-only 落点。
+        """
+        return self.run_dir(run_id) / "events.jsonl"
+
     def journal_narrative_path(self, run_id: str) -> Path:
         """Narrative markdown 路径(由 StepNarrativeWriter 写)。"""
         return self.run_dir(run_id) / "journal.narrative.md"

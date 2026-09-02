@@ -35,7 +35,6 @@ plugins:
   - spine.classifier.exception.unclass
   - spine.spantree
   - spine.deriver.anomaly
-  - spine.deriver.step_tree
   - spine.deriver.narrative
   - spine.deriver.graph
   - spine.deriver.live_tail
@@ -100,11 +99,6 @@ entries:
   - id: spine.deriver.anomaly
     name: spine_deriver_anomaly
     $module: lca.plugins.observability.spine.derivers.anomaly
-    config: {}
-
-  - id: spine.deriver.step_tree
-    name: spine_deriver_step_tree
-    $module: lca.plugins.observability.spine.derivers.step_tree
     config: {}
 
   - id: spine.deriver.narrative

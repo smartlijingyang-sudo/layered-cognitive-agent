@@ -25,7 +25,7 @@ from lca.contracts.models.observability import (
     empty_document,
 )
 from lca.infrastructure.observability.journal.step import (
-    StepGroupedProjector,
+    JournalDocumentWriter,
     StepGroupedReader,
     read_step_document,
 )
@@ -115,7 +115,7 @@ def _build_sample_doc() -> JournalDocument:
 def test_write_read_round_trip(tmp_path: Path) -> None:
     output = tmp_path / "journal.json"
     original = _build_sample_doc()
-    StepGroupedProjector(output).write(original)
+    JournalDocumentWriter(output).write(original)
     restored = read_step_document(output)
     assert restored.schema == original.schema
     assert restored.run_id == original.run_id
@@ -165,7 +165,7 @@ def test_round_trip_with_multiple_steps(tmp_path: Path) -> None:
         )
         doc = append_step(doc, s)
     doc = close_document(doc, outcome="completed", closed_at=10.0)
-    StepGroupedProjector(output).write(doc)
+    JournalDocumentWriter(output).write(doc)
 
     restored = read_step_document(output)
     assert len(restored.steps) == 5
@@ -191,7 +191,7 @@ def test_step_grouped_reader_class(tmp_path: Path) -> None:
     output = tmp_path / "journal.json"
     reader = StepGroupedReader(output)
     assert not reader.exists()
-    StepGroupedProjector(output).write(_build_sample_doc())
+    JournalDocumentWriter(output).write(_build_sample_doc())
     assert reader.exists()
     doc = reader.read()
     assert doc.schema == "lca.journal/3"
@@ -208,7 +208,7 @@ def test_read_chinese_unicode_preserved(tmp_path: Path) -> None:
     )
     doc = empty_document(run_id="r1", trace_id="t1", metadata=meta, started_at=0.0)
     doc = close_document(doc, outcome="completed", closed_at=1.0)
-    StepGroupedProjector(output).write(doc)
+    JournalDocumentWriter(output).write(doc)
     restored = read_step_document(output)
     assert restored.metadata.objective == "分析生成pdf版本"
 
@@ -224,7 +224,7 @@ def test_read_minimal_document(tmp_path: Path) -> None:
     )
     doc = empty_document(run_id="r", trace_id="t", metadata=meta, started_at=0.0)
     doc = close_document(doc, outcome="failed", closed_at=1.0)
-    StepGroupedProjector(output).write(doc)
+    JournalDocumentWriter(output).write(doc)
     restored = read_step_document(output)
     assert restored.steps == ()
     assert restored.metadata.outcome == "failed"

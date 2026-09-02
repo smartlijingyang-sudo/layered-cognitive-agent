@@ -17,10 +17,17 @@ Agent / Brain / Body / Perceive 只与 ``StepCoordinator`` 交互。
 from __future__ import annotations
 
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any
 
+from lca.contracts.models.observability.journal_step import (
+    ReflectTrace,
+    SpanRecord,
+    ThinkingTrace,
+    ToolCallRecord,
+    ToolResult,
+)
 from lca.infrastructure.observability.spine.event_record import (
     Channel,
     EventRecord,
@@ -56,13 +63,34 @@ def reset_current_coordinator(token: Any) -> None:
 
 @dataclass
 class StepCoordinator:
-    """唯一写入口。Agent 调 ``emit_*``，由 Coordinator 走五面矩阵。"""
+    """唯一写入口。Agent 调 ``emit_*``，由 Coordinator 走五面矩阵。
+
+    ADR-0167 D11: ``bind_run`` 设置 run 身份 + 元数据; 业务侧只在
+    bind 之后才能 begin_step / record_*。
+    """
 
     registry: WritableFaceRegistry
     run_id: str = "default-run"
+    trace_id: str = ""
+    metadata: Any = None  # JournalMetadata
+    started_at: float | None = None
     _current_step: str | None = None
     _current_segment: str | None = None
     _seq: int = 0
+
+    def bind_run(
+        self,
+        *,
+        run_id: str,
+        trace_id: str,
+        metadata: Any,
+        started_at: float | None = None,
+    ) -> None:
+        """绑定 run 身份。bind 不发 EP(state 已就位; 与旧 StepLifecycleStore 一致)。"""
+        self.run_id = run_id
+        self.trace_id = trace_id
+        self.metadata = metadata
+        self.started_at = started_at
 
     def _mint_record(
         self,
@@ -119,17 +147,26 @@ class StepCoordinator:
         )
         return self._current_step
 
-    def end_step(self, outcome: str = "success") -> None:
+    def end_step(
+        self,
+        outcome: str = "success",
+        *,
+        error: str | None = None,
+    ) -> None:
         if self._current_step is None:
             raise RuntimeError("end_step while no step open")
         driver = self.registry.require("driver")
         step_id = self._current_step
         driver.end_step(step_id, outcome)
+        payload: dict[str, Any] = {"step_id": step_id, "outcome": outcome}
+        if error is not None:
+            payload["error"] = error
+        final_outcome: str = "failure" if error is not None else outcome
         self._write(
             self._mint_record(
                 execution_point="writable.step.end",
-                payload={"step_id": step_id, "outcome": outcome},
-                outcome=outcome,
+                payload=payload,
+                outcome=final_outcome,
             )
         )
         self._current_step = None
@@ -229,6 +266,59 @@ class StepCoordinator:
                     "summary": summary,
                 },
                 outcome=outcome_lit,
+            )
+        )
+
+    # ── record_*(Agent 写原语) ─────────────────────────────────
+
+    def record_thinking(self, trace: ThinkingTrace) -> None:
+        if self._current_step is None:
+            raise RuntimeError("record_thinking: no open step")
+        self._write(
+            self._mint_record(
+                execution_point="step.thinking.record",
+                payload={"trace": asdict(trace)},
+            )
+        )
+
+    def record_tool_call(self, call: ToolCallRecord) -> None:
+        if self._current_step is None:
+            raise RuntimeError("record_tool_call: no open step")
+        self._write(
+            self._mint_record(
+                execution_point="step.tool_call.record",
+                payload={"call": asdict(call)},
+            )
+        )
+
+    def record_tool_result(self, result: ToolResult) -> None:
+        if self._current_step is None:
+            raise RuntimeError("record_tool_result: no open step")
+        self._write(
+            self._mint_record(
+                execution_point="step.tool_result.record",
+                payload={"result": asdict(result)},
+                outcome="success" if result.ok else "failure",
+            )
+        )
+
+    def record_reflect(self, reflect: ReflectTrace) -> None:
+        if self._current_step is None:
+            raise RuntimeError("record_reflect: no open step")
+        self._write(
+            self._mint_record(
+                execution_point="step.reflect.record",
+                payload={"reflect": asdict(reflect)},
+            )
+        )
+
+    def record_span(self, span: SpanRecord) -> None:
+        if self._current_step is None:
+            raise RuntimeError("record_span: no open step")
+        self._write(
+            self._mint_record(
+                execution_point="step.span.record",
+                payload={"span": asdict(span)},
             )
         )
 

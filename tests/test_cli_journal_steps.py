@@ -34,7 +34,7 @@ from lca.infrastructure.observability.journal.step.narrative_writer import (
     StepNarrativeWriter,
 )
 from lca.infrastructure.observability.journal.step.projector import (
-    StepGroupedProjector,
+    JournalDocumentWriter,
 )
 
 runner = CliRunner()
@@ -86,7 +86,7 @@ def traces_root(tmp_path: Path) -> Path:
     run_dir = root / "runs" / "r1"
     run_dir.mkdir(parents=True)
     doc = _build_doc()
-    StepGroupedProjector(run_dir / "journal.json").write(doc)
+    JournalDocumentWriter(run_dir / "journal.json").write(doc)
     StepNarrativeWriter(run_dir / "journal.narrative.md").write(doc)
     # 兜底 raw 也写一份(测试 raw 命令)
     (run_dir / "journal.jsonl").write_text('{"legacy": true}\n', encoding="utf-8")

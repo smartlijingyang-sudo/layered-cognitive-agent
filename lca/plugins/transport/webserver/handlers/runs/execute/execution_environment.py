@@ -112,18 +112,22 @@ class RunExecutionEnvironment:
             attachment_ids=tuple(session.attachment_ids or ()),
             file_store=cast("FileStore | None", providers.file_store),
         )
-        # ADR-0167 D2: bind StepLifecycleStore + facade RunContext。
-        # PR-3 已删 step_emitter / bridge_firewall —— 现在写路径唯一经
-        # StepCoordinator；lifecycle store 仍由本环境绑定，供
-        # terminal flush / journal.json 落盘使用。
+        # ADR-0167 D11: bind StepCoordinator + facade RunContext。
+        # StepCoordinator 是 Agent 唯一可见写入口 (D2); 通过 ContextVar 注入,
+        # adapter / facade 在 prepare 期间可直接拿当前 coordinator。
         from lca.infrastructure.observability.facade import RunContext as FacadeRunContext
         from lca.infrastructure.observability.facade import bind as bind_facade_run
-        from lca.runtime import step_lifecycle
+        from lca.infrastructure.observability.writable_matrix.coordinator import (
+            bind_current_coordinator,
+            reset_current_coordinator,
+        )
 
-        lifecycle_token: object | None = None
-        store = getattr(session, "lifecycle_store", None)
-        if store is not None:
-            lifecycle_token = step_lifecycle.set_lifecycle_store(store)
+        coordinator_token: object | None = None
+        coordinator = getattr(session, "coordinator", None)
+        if coordinator is None:
+            coordinator = getattr(session, "thread_tree_writer", None)
+        if coordinator is not None:
+            coordinator_token = bind_current_coordinator(coordinator)
 
         agent = session.agent
         agent_role = (
@@ -170,8 +174,8 @@ class RunExecutionEnvironment:
                         )
             finally:
                 structlog.contextvars.clear_contextvars()
-                if lifecycle_token is not None:
-                    step_lifecycle.reset_lifecycle_store(lifecycle_token)
+                if coordinator_token is not None:
+                    reset_current_coordinator(coordinator_token)
 
 
 async def _bind_sandbox_runtime(session: RunSession, sandbox: Any, file_store: Any) -> None:

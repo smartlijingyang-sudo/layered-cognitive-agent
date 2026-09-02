@@ -65,43 +65,35 @@ class ProcessJournalProjection(Protocol):
 class RunJournalComponents:
     """Run-scoped writer and live tail created as one coherent unit.
 
-    ADR-0164 Phase 6: 增 ``step_tree_writer`` 字段(可空), boot 把
-    StepGroupedBackend + StepNarrativeWriter 装进来, 让 terminalizer
-    在 close 时写 journal.json + narrative.md。 旧 writer 仍写 journal.raw.jsonl。
+    ADR-0167 D11 简化: 移除 ``lifecycle_store`` 注入。journal.json 由
+    ``StepTreeAccumulatorDeriver`` 落盘(transport 在 prepare 时
+    构造 + subscribe)。``step_tree_writer`` 现在是 ``_StepTreeBundle``
+    引用, 由 RunSessionBuilder 装配 deriver 后再填回。
     """
 
     writer: JournalProjector
     tail: LiveRunProjection
-    step_tree_writer: object | None = None  # StepGroupedBackend 实例(none 表示未启 step-tree)
+    step_tree_writer: object | None = None  # _StepTreeBundle 实例
 
 
 @runtime_checkable
 class RunJournalFactory(Protocol):
     """Profile-selected factory for runtime journal projections.
 
-    ``RunLocator`` remains the sole owner of physical path derivation.  The
-    factory receives the resolved durable path and selects the writer, live
-    tail and process-wide projection implementation without involving Gateway.
-
-    ``create_run_components`` 的 ``lifecycle_store`` 形参是可空注入:
-    transport 在 run 启动期用 ``lca.runtime.journal_setup.build_step_lifecycle_store``
-    构造好 store,显式注入到 factory。 factory 把它绑到 step-tree backend
-    (让 ``journal.json`` 真的被写)。 不传时回退到 ContextVar 路径
-    (供单元测试和 offline 脚本使用;生产路径必须传)。
+    ADR-0167 D11 简化: 移除 lifecycle_store 注入形参。 factory 只构造
+    LiveTail + 空 step_tree_writer; deriver 由 transport 在 run 准备期
+    装配到 bundle 上。
     """
 
     def create_run_components(
         self,
         *,
         jsonl_path: Path,
-        lifecycle_store: object | None = None,
     ) -> RunJournalComponents:
-        """Create the durable writer and live tail for one run.
+        """Create the live tail for one run.
 
         参数:
             jsonl_path:    durable journal 路径(由 RunLocator 决定)
-            lifecycle_store: 已 bind_run 的 StepLifecycleStore; 传 None
-                           时回退到 ContextVar (legacy 单元测试用)
         """
         ...
 

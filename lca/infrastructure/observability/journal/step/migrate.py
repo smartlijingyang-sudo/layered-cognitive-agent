@@ -59,7 +59,7 @@ from lca.infrastructure.observability.journal.step.narrative_writer import (
     StepNarrativeWriter,
 )
 from lca.infrastructure.observability.journal.step.projector import (
-    StepGroupedProjector,
+    JournalDocumentWriter,
 )
 from lca.infrastructure.observability.journal.step.reader import (
     read_step_document,
@@ -594,7 +594,7 @@ def migrate_run(traces_root: Path, run_id: str) -> tuple[Path, Path]:
 
     journal_path = traces_root / "runs" / run_id / "journal.json"
     narrative_path = traces_root / "runs" / run_id / "journal.narrative.md"
-    StepGroupedProjector(journal_path).write(doc)
+    JournalDocumentWriter(journal_path).write(doc)
     StepNarrativeWriter(narrative_path).write(doc)
     return journal_path, narrative_path
 
@@ -677,7 +677,7 @@ def migrate_to_3_1(traces_root: Path, run_id: str) -> Path | None:
     if doc.schema == "lca.journal/3.1":
         return None
     upgraded = upgrade_to_3_1(doc)
-    StepGroupedProjector(journal_path).write(upgraded)
+    JournalDocumentWriter(journal_path).write(upgraded)
     narrative_path = traces_root / "runs" / run_id / "journal.narrative.md"
     StepNarrativeWriter(narrative_path).write(upgraded)
     return journal_path

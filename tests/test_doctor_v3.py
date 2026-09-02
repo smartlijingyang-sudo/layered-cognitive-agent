@@ -22,7 +22,7 @@ from lca.contracts.models.observability import (
     close_document,
     empty_document,
 )
-from lca.infrastructure.observability.journal.step.projector import StepGroupedProjector
+from lca.infrastructure.observability.journal.step.projector import JournalDocumentWriter
 from lca.plugins.transport.webserver.handlers.runs.doctor.doctor import (
     diagnose,
     diagnose_step_tree,
@@ -84,7 +84,7 @@ def _build_doc(*, broken_chain: bool = False, fail_step: int | None = None) -> o
 
 def _write_doc(tmp_path: Path, doc, name: str = "journal.json") -> Path:
     p = tmp_path / name
-    StepGroupedProjector(p).write(doc)
+    JournalDocumentWriter(p).write(doc)
     return p
 
 

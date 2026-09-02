@@ -12,7 +12,6 @@
 
 from __future__ import annotations
 
-from lca.contracts.models.observability.event import EventDurability
 from lca.contracts.models.observability.journal import (
     JournalEvent,
     ToolAbandonedBeforeInvoke,

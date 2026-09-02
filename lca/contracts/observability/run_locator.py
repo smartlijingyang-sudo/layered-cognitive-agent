@@ -32,6 +32,9 @@ class RunLocator(Protocol):
     def journal_step_path(self, run_id: str) -> Path:
         """返回该 run 的 journal.json 路径(ADR-0164 step-tree 主存储)。"""
 
+    def events_path(self, run_id: str) -> Path:
+        """返回该 run 的 events.jsonl 路径(ADR-0165.1 / ADR-0167 D11 SSOT)。"""
+
     def journal_narrative_path(self, run_id: str) -> Path:
         """返回该 run 的 journal.narrative.md 路径(StepNarrativeWriter)。"""
 

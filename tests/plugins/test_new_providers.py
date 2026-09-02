@@ -194,7 +194,9 @@ class TestDeltaHandlers:
         应配套 transport projection 通道,不可走 reducer.apply_artifact_closure。
         """
         try:
-            from lca.plugins.providers.act.delta_handlers import ArtifactClosureDeltaHandler  # type: ignore[attr-defined]
+            from lca.plugins.providers.act.delta_handlers import (
+                ArtifactClosureDeltaHandler,  # type: ignore[attr-defined]
+            )
         except ImportError:
             return  # 已删除 ✓
         raise AssertionError(
