@@ -220,8 +220,7 @@ schema 版本:
 - ``lca.journal/3``  —— step 树主存储（旧）。Phase-as-step 漂移期。
 - ``lca.journal/3.1``—— 三层计数：step / segment / phase 显式数组 + totals。
 
-3.0 → 3.1 migration: 见 :mod:`lca.infrastructure.observability.journal.step.migrate`，
-phase-as-step 折叠为 DSH step，并构造 ``totals`` / ``phases`` / ``segments``。
-3.1 读 3.0 文档：totals / phases / segments 字段缺省，doctor H-seg / H-phase
-显式标 ``not evaluated`` 提示迁移。
+3.0 → 3.1 升级已下线（migrate 工具移除）：新 boot 仅产 3.1 文档；
+读 3.0 旧文件时 totals / phases / segments 字段缺省，doctor H-seg / H-phase
+显式标 ``not evaluated`` 提示 schema 漂移。
 """
