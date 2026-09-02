@@ -12,7 +12,7 @@
 - **segment** = `think` \| `act`（样本 5；含思考，不叫 action）
 - **phase** = 闭集相位显式数组，含 perceive（样本 8）
 
-流式 reasoning/text delta 运行时 coalesce，落盘合并进 `thinking`（可选 `stream_stats` span）。并硬化 spine：CLI `journal.json` 路径、工具双层事件、phase_graph start、run-local seq、finally 语义、FileSink 路径。
+**废除 `step_emitter` bridge**（存在性否定，非改职责）：`StepLifecycleStore` 唯一写者；agent loop 负责 open/close；Brain/Body 只 `record_*`。流式 delta 在 store 内 coalesce。并硬化 spine：CLI `journal.json` 路径、工具双层事件、phase_graph start、run-local seq、finally 语义、FileSink 路径。
 
 ## 非目标
 

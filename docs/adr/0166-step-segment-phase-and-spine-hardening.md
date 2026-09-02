@@ -9,7 +9,7 @@
 
 ## 一句话
 
-**step** 对齐 deepseek-harness（一次 LLM 请求 + 它触发的工具）；**segment** 计数 think|act（含思考）；**phase** 落盘闭集相位（含 perceive）。流式 `reasoning_delta` / `step_text_delta` 必须 coalesce 后落盘，禁止把每个 delta 当成独立 span 污染 narrative。同步硬化上次 spine 复盘暴露的观测缺陷。
+**step** 对齐 deepseek-harness（一次 LLM 请求 + 它触发的工具）；**segment** 计数 think|act（含思考）；**phase** 落盘闭集相位（含 perceive）。**废除 `step_emitter` bridge**：唯一写者是 `StepLifecycleStore`；**只有 agent loop / phase driver 可以 open/close step**；Brain/Body 只 `record_*`。流式 delta 在 store 内 coalesce 后落盘。同步硬化上次 spine 复盘暴露的观测缺陷。
 
 ## 背景
 
@@ -107,34 +107,53 @@ PhaseRecord
 
 `tool_call` 单数字段升级为 **`tool_calls` / `tool_results` 列表**（一步多工具）；单工具 run 长度为 1。旧单字段读路径保留一个版本。
 
-### D3. 流式 delta 合并（强制）
+### D3. 废除 bridge（第一性原理 / 大道至简）
 
-- **运行时**：`bridge_llm_reasoning_delta` / `bridge_llm_step_text_delta` 写入 **coalescer**（按 step + channel 追加 buffer），**禁止**每 delta `record_span`。
-- **落盘**：`close` think segment / step 时把 buffer flush 进 `thinking.reasoning`（及 answer/decision 文本字段）；可选一条汇总 span：
+**删除** `lca/runtime/step_emitter.py` 及其 `bridge_*` 调用点（PerceiveHub / TelemetryLLMAdapter / safe_executor 等）。
+
+现状问题（存在性否定，不只是改职责）：
+
+1. bridge 把「写事实」和「切步」混在同一旁路里；
+2. 步边界由遥测适配器/执行器各自 `open_step`，循环真正的主人（loop）反而不是写者；
+3. 双写（stream `record` + step_lifecycle）增加静默失败面（firewall skip）。
+
+目标态只有一条写路径：
 
 ```text
-SpanRecord(kind="stream_stats", summary={
-  reasoning_chars, reasoning_chunks,
-  text_channels: { decision: {chars, chunks}, answer: {...} }
-})
+Agent loop / phase driver
+  ├── open_step / close_step / open_segment / close_segment / append_phase
+  └── 把 StepWriter（或 store ContextVar）注入 Brain / Body / Perceive
+
+Brain / Body / Perceive
+  └── 只调 record_thinking / record_tool_* / record_reflect / append_delta
+      （禁止 open_step / close_step）
+
+StepLifecycleStore   ← 唯一写者（单写者不变式保留）
+  └── coalesce deltas；finalize 时写 journal.json
 ```
 
-- **SSE live**：仍可发细粒度 progress 事件（ADR-0157）；那是投影面，不是 journal 真值。
-- **narrative**：默认不展开 `reasoning_delta`；`stream_stats` 一行摘要；`--verbose-spans` 才展开非 delta spans。
+可选极薄 `StepWriter` Protocol（方法 = store 的 `record_*` / `append_delta`），**不是**第二套 bridge 模块；也可用现有 facade 的 `step_record_*`，但 **facade 不得提供 `step_open` 给 Brain/Body**——`open`/`close` 仅 loop 包可见（同模块或 `runtime/loop_step_control.py`）。
 
-### D4. Emitter 切步规则（取代 per-phase open_step）
+旧 stream `facade.record(JournalEvent)`：**不再经 bridge 双写**。若 SSE/raw 仍需要事件流，由 **store finalize / projector 从 step-tree 派生**，或单独的 progress 通道（ADR-0157）；不在业务 emit 点维护第二本账。
 
-| 钩子 | 新行为 |
+### D4. 切步规则（仅 loop）
+
+| 时刻（loop 拥有） | 行为 |
 |---|---|
-| `bridge_perceive_opened/closed` | **不** `open_step`；写 `phases[]` + 填充/暂存 `context_before` |
-| `bridge_think_opened` | 若无 open step → `open_step`；追加 `segment(kind=think)` + `phase(think)` |
-| LLM completed | `record_thinking`；flush delta coalescer |
-| `bridge_act_opened` | **同一** open step 上追加 `segment(kind=act)` + `phase(act)` + `tool_call`；禁止新 step |
-| tool invoked | `tool_result`；不关 step |
-| 无工具的最终 respond | think segment 结束后 `close_step` |
-| 有工具且模型还需下一轮 | `close_step` 发生在 **本步工具全部收口之后**、下一 `think_opened` 之前（与 DSH `step/end` 对齐） |
+| 即将发起模型请求 | `open_step`；`append_phase(think)`；`open_segment(think)` |
+| 模型流式输出 | Brain → `append_delta`（store 内 buffer） |
+| 模型请求结束 | `record_thinking`（flush buffer）；`close_segment(think)` |
+| 若有工具 | 对每个工具：`append_phase(act)`；`open_segment(act)`；Body → `record_tool_*`；`close_segment(act)` |
+| 本步工具全部收口（或无工具） | `close_step`（对齐 DSH `step/end`） |
+| perceive 相位 | **不**开 step；`append_phase(perceive)` + 写入下一 step 的 `context_before`（若 step 尚未 open，则写入 pending context，在下一次 `open_step` 时带入） |
 
-子 agent：保持 `subagent_role` 前缀 step_id；子 run 自己的 steps/segments/phases 计数，不与父混加。
+子 agent：子 loop 自有 store 或带 `subagent_role` 的同一 store 规则；计数不与父混加。
+
+### D4b. 流式 delta 合并（强制，在 store 内）
+
+- `append_delta(channel, text)` 只追加 buffer；**禁止**每 delta `record_span`。
+- `close_segment(think)` / `record_thinking` 时 flush → `thinking.reasoning`（及 decision/answer 字段）；可选一条 `stream_stats` span。
+- SSE live 仍可走 progress 投影；narrative 默认不展开 delta。
 
 ### D5. Doctor / CLI / Narrative
 
@@ -157,7 +176,9 @@ SpanRecord(kind="stream_stats", summary={
 ### D7. 不做的事
 
 - 不把 segment 命名为 action / total_actions（思考不是 action）。
-- 不删除 SSE 细粒度 delta（只禁止写入 journal spans）。
+- 不保留 `step_emitter`「改职责后继续活着」——**文件删除**，不是瘦身。
+- 不新造平行 bridge 包换皮（`StepWriter` Protocol 若需要，放 `contracts/`，实现即 store）。
+- 不删除 SSE 细粒度 progress（只禁止写入 journal spans）。
 - 不在本 ADR 改变认知闭集步骤集合（perceive→…→stop 仍是运行时相位）。
 - 不强制历史 7017 run 自动迁移；提供 `journal migrate --to 3.1`，旧 3.0 phase-as-step 可读。
 
@@ -172,9 +193,10 @@ SpanRecord(kind="stream_stats", summary={
 
 ### 负面 / 风险
 
-- `step_emitter` 与所有 `bridge_*` 调用点要改；测试需重写「一步一相」假设。
+- 删除 `step_emitter` 是破坏性清理：所有 `bridge_*` 调用点与「一步一相」测试要改；短期 diff 大于「只改 bridge 职责」。
 - UI 若硬编码 `steps.length === phase count` 会破 —— 需读 `totals`。
 - 双层工具事件改名可能影响外部 spine 消费者 —— 记入 changelog。
+- 过渡期若仍有代码走旧 `record(JournalEvent)` 且假定会进 step-tree，会漏步 —— 应用测试/`vulture`/契约测试挡住。
 
 ### 兼容
 
@@ -193,14 +215,19 @@ SpanRecord(kind="stream_stats", summary={
 
 | PR | 内容 |
 |---|---|
-| PR-1 | 合约：`JournalDocument` 3.1、`SegmentRecord`/`PhaseRecord`/`totals`、读兼容 |
-| PR-2 | coalescer + emitter 切步规则 + 单测（3/5/8） |
-| PR-3 | narrative / doctor / CLI 路径修复 |
+| PR-1 | 合约：`JournalDocument` 3.1、`SegmentRecord`/`PhaseRecord`/`totals`、store 内 coalescer API、读兼容 |
+| PR-2 | **删除 `step_emitter`**；loop 单点 open/close；Brain/Body 只 `record_*`；单测锁定 3/5/8 |
+| PR-3 | narrative / doctor / CLI `journal.json` 路径修复 |
 | PR-4 | spine S2–S6 |
 | PR-5 | migrator 3.0 → 3.1 启发式（phase-as-step 折叠为 DSH step） |
 
 ## 参考
 
-- deepseek-harness: `docs/architecture.zh.md` §轮次流程；`docs/agent-lifecycle.zh.md`
-- LCA: `docs/adr/0164-journal-step-tree.md`；`lca/runtime/step_emitter.py`；`lca/runtime/step_lifecycle.py`
+- deepseek-harness: `docs/architecture.zh.md` §轮次流程；`docs/agent-lifecycle.zh.md`（driver 写 `step/start|end`，非 adapter 旁路）
+- LCA: `docs/adr/0164-journal-step-tree.md`；`lca/runtime/step_lifecycle.py`（保留）；`lca/runtime/step_emitter.py`（**删除**）
 - 样本: `traces/runs/run_bb1b9570ef94/`
+
+## 修订记录
+
+- 2026-09-02：初版 Accepted（仍描述「收窄 bridge」）。
+- 2026-09-02：按第一性原理修订 —— **废除 bridge 存在性**；唯一写者 store；loop 切步（D3/D4/D4b）。
