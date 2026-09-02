@@ -15,6 +15,13 @@ from lca.infrastructure.observability.loop_cursor.bind import (
 )
 from lca.infrastructure.observability.loop_cursor.factory import LoopCursorFactory
 from lca.infrastructure.observability.loop_cursor.in_memory import InMemoryLoopCursor
+from lca.infrastructure.observability.loop_cursor.model_visible_binding import (
+    bind_current_capture,
+    get_current_model_visible_capture,
+    install_model_visible_capture,
+    reset_current_capture,
+    reset_model_visible_capture,
+)
 from lca.infrastructure.observability.loop_cursor.model_visible_capture import (
     StdModelVisibleCapture,
 )
@@ -34,6 +41,11 @@ __all__ = [
     "SpineWritePortAdapter",
     "StdLoopCursor",
     "StdModelVisibleCapture",
+    "bind_current_capture",
+    "get_current_model_visible_capture",
+    "install_model_visible_capture",
     "install_run_cursor",
+    "reset_current_capture",
+    "reset_model_visible_capture",
     "reset_run_cursor",
 ]

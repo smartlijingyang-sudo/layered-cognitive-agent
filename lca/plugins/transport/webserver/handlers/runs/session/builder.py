@@ -20,7 +20,10 @@ from lca.contracts.atoms.ids import new_id
 from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
 from lca.contracts.observability.incarnation import Incarnation
 from lca.contracts.observability.run_journal import RunJournalFactory
-from lca.infrastructure.observability.loop_cursor import StdLoopCursor
+from lca.infrastructure.observability.loop_cursor import (
+    StdLoopCursor,
+    install_model_visible_capture,
+)
 from lca.infrastructure.observability.loop_cursor.bind import (
     SpineWritePortAdapter,
     install_run_cursor,
@@ -128,6 +131,17 @@ class RunSessionBuilder:
         )
         cursor_token = install_run_cursor(cursor)
 
+        # ADR-0169 PR-12.5: install ModelVisibleCapture 到当前 run 的 ContextVar,
+        # 让 ModelVisibleLLMAdapter 在 LLM 调用前能拿到 capture 实例并落 5 件套。
+        # run_dir=None 时跳过(测试场景 / profile 关闭 capture)。
+        capture_token = None
+        if run_dir is not None:
+            from lca.infrastructure.observability.loop_cursor import (
+                StdModelVisibleCapture,
+            )
+
+            capture_token = install_model_visible_capture(StdModelVisibleCapture(run_dir=run_dir))
+
         step_tree_deriver: StepTreeAccumulatorDeriver | None = None
         if run_dir is not None:
             step_tree_deriver = StepTreeAccumulatorDeriver(
@@ -183,6 +197,10 @@ class RunSessionBuilder:
             coordinator=coordinator,
             loop_cursor=cursor,
             loop_cursor_token=cursor_token,
+            model_visible_capture=(
+                StdModelVisibleCapture(run_dir=run_dir) if run_dir is not None else None
+            ),
+            model_visible_capture_token=capture_token,
             question=request.question,
             user_text=request.user_text,
             mode=request.mode,

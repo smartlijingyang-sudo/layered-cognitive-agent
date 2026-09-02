@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from lca.contracts.observability.incarnation import Incarnation
 from lca.contracts.observability.loop_cursor import (
@@ -28,12 +28,16 @@ class InMemoryLoopCursor:
         run_id: str,
         trace_id: str,
         incarnation: Incarnation,
+        spine: Any = None,
     ) -> None:
         self._state = _CursorState(
             run_id=run_id,
             trace_id=trace_id,
             incarnation=incarnation,
         )
+        # 可选 spine:有则 ``record_request_header`` / ``advance`` 派生 EP;
+        # 无则纯内存状态机(早期测试用例)。
+        self._spine = spine
 
     @property
     def snapshot(self) -> CursorSnapshot:
@@ -134,12 +138,52 @@ class InMemoryLoopCursor:
         if self._state.phase != "act":
             raise CursorError("record_tool_result must be in ACT window")
 
-    def record_request_header(self, header: object) -> None:
+    def record_request_header(self, header: Any) -> None:
+        """派生 ``step_id`` + 自增 ``step_index`` + 落 EP(测试替身,ADR-0169 D4 / L6)。
+
+        契约:
+        - 必须 THINK 窗口(L6)
+        - step_id 由 header 传入(Protocol 钉定;cursor 不派生 step_id 字面)
+        - step_index += 1, attempt_in_step = 0
+        - spine 不为 None 时,落 ``llm.request.header`` EP (与 StdLoopCursor 同口径)
+        """
         self._ensure_open()
         self._ensure_not_halted()
         # L6 + D2 step 语义:record_request_header 必触发 think 开窗
         if self._state.phase != "think":
             raise CursorError("record_request_header must open THINK window")
+        step_id = getattr(header, "step_id", None)
+        if not isinstance(step_id, str) or not step_id:
+            raise CursorError("record_request_header requires header.step_id (str)")
+        s = self._state
+        s.step_index += 1
+        s.step_id = step_id
+        s.attempt_in_step = 0
+        if self._spine is not None:
+            s.seq += 1
+            self._spine.append(
+                execution_point="llm.request.header",
+                payload={
+                    "step_id": header.step_id,
+                    "incarnation": getattr(header, "incarnation", s.incarnation.incarnation_seq),
+                    "plan_ref": s.incarnation.plan_ref,
+                    "reason": getattr(header, "reason", "initial"),
+                    "model": getattr(header, "model", ""),
+                    "system_digest": getattr(header, "system_digest", ""),
+                    "system_path": getattr(header, "system_path", ""),
+                    "tools_digest": getattr(header, "tools_digest", ""),
+                    "tools_path": getattr(header, "tools_path", ""),
+                    "messages_digest": getattr(header, "messages_digest", ""),
+                    "messages_path": getattr(header, "messages_path", ""),
+                    "manifest_digest": getattr(header, "manifest_digest", ""),
+                    "manifest_path": getattr(header, "manifest_path", ""),
+                    "inherited_from_step": getattr(header, "inherited_from_step", None),
+                },
+                run_id=s.run_id,
+                seq=s.seq,
+                incarnation=s.incarnation.incarnation_seq,
+                phase=s.phase,
+            )
 
     def fork(self, reason: Literal["child_agent", "delegation"]) -> LoopCursor:
         """派生 child cursor —— Incarnation.child() 继承 run_id + plan_ref,seq += 1。

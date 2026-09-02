@@ -102,6 +102,10 @@ class RunSession:
     loop_cursor_token: object | None = (
         None  # ADR-0169 §D11 PR-1.5: ContextVar reset token (close 时释放)
     )
+    model_visible_capture: object | None = (
+        None  # ADR-0169 PR-12.5: per-run ModelVisibleCapture 引用
+    )
+    model_visible_capture_token: object | None = None  # ADR-0169 PR-12.5: ContextVar reset token
     step_tree_bundle: object | None = (
         None  # ADR-0164 Phase 6: step-tree write bundle (legacy, 兼容)
     )

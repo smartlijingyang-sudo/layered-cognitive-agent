@@ -15,15 +15,43 @@ from lca.contracts.protocols import (
     LLMAdapter,
 )
 from lca.contracts.protocols.journal.spec import AgentSpec
-from lca.infrastructure.observability.adapters import TelemetryLLMAdapter
+from lca.infrastructure.observability.adapters import (
+    ModelVisibleLLMAdapter,
+    TelemetryLLMAdapter,
+)
 from lca.plugins.composer.composition.skill_store import active_skill_store
 
 
 def instrument_llm(llm: LLMAdapter) -> LLMAdapter:
-    """Return the model adapter behind the standard telemetry decorator."""
+    """Wrap ``llm`` with model_visible + telemetry decorators (组合根 PR-12.5)。
 
-    inner = llm._inner if isinstance(llm, TelemetryLLMAdapter) else llm
-    return TelemetryLLMAdapter(inner)
+    装配顺序(外 → 内):
+        ModelVisibleLLMAdapter → TelemetryLLMAdapter → inner
+
+    这样:
+    - LLM 调用前先落 ``model_visible/step_<NN>/{...}.json`` + 1 条
+      ``llm.request.header`` EP(ADR-0169 D7 + I-MV1)
+    - 然后 TelemetryLLMAdapter 记 LlmCallCompleted / Otel projection / token
+      usage(ADR-0169 §C7 控制/观察分离)
+    - 任何 capture 缺失(profile 关闭 model_visible)cursor + capture contextvar
+      未绑 ⇒ 透明透传(不写盘、不落 EP,业务继续)
+    """
+
+    # 已有 TelemetryLLMAdapter 时,复用之;否则用 llm 自身
+    existing_telemetry = llm._inner if isinstance(llm, TelemetryLLMAdapter) else llm
+    instrumented = TelemetryLLMAdapter(existing_telemetry)
+    model_name = _resolve_model_name(instrumented)
+    return ModelVisibleLLMAdapter(instrumented, model=model_name)
+
+
+def _resolve_model_name(adapter: LLMAdapter) -> str:
+    """从装饰链取模型名(供 ModelVisible 记录 manifest.model)。"""
+    inner = getattr(adapter, "_inner", None) or adapter
+    for attr in ("_model", "model"):
+        name = getattr(inner, attr, None)
+        if isinstance(name, str) and name:
+            return name
+    return "unknown"
 
 
 def resolve_brain(spec: AgentSpec, llm: LLMAdapter, *, scope: object) -> Brain:
