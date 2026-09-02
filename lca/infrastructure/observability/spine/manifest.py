@@ -45,10 +45,17 @@ EXECUTION_POINTS: tuple[str, ...] = (
     "writable.step.end",
     "writable.segment.start",
     "writable.segment.end",
+    # Loop cursor control (ADR-0169):halt / closing / fork —— 投影宿主与
+    # PersistenceCoordinator 跨域订阅,在 ADR-0170 §D6 §L16 处制度化,
+    # 此处仅为白名单登记(不引入新控制面)。
+    "writable.iteration.halt",
+    "writable.iteration.close",
+    "loop.fork",
     # Writable matrix phase events (perceive / think / act / reflect / remember / stop)
     "perceive.phase.fold",
     "phase.perceive.fold",
     "phase.think.fold",
+    "phase.gate.fold",
     "phase.remember.fold",
     "phase.stop.fold",
     "phase.reflect.fold",
