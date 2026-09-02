@@ -79,7 +79,10 @@ class StandardCursor:
         # 3.1 多工具（待 PR-1 落地时切换到 step.tool_calls[]）
 
         digest_verified = self._verify_digest(
-            sidecar.header, messages, tool_schemas, manifest,
+            sidecar.header,
+            messages,
+            tool_schemas,
+            manifest,
         )
 
         return StepContextAt(
@@ -112,17 +115,9 @@ class StandardCursor:
         for act in ctx.actions:
             new_act = dict(act)
             data_obj = new_act.get("data")
-            tool_name = getattr(data_obj, "name", None) or getattr(
-                data_obj, "tool_name", None
-            )
-            if (
-                tool_name
-                and tool_name in tool_args_overrides
-                and hasattr(data_obj, "arguments")
-            ):
-                new_act["data"] = dc_replace(
-                    data_obj, arguments=tool_args_overrides[tool_name]
-                )
+            tool_name = getattr(data_obj, "name", None) or getattr(data_obj, "tool_name", None)
+            if tool_name and tool_name in tool_args_overrides and hasattr(data_obj, "arguments"):
+                new_act["data"] = dc_replace(data_obj, arguments=tool_args_overrides[tool_name])
             new_actions.append(new_act)
         return StepContextAt(
             step_index=ctx.step_index,
@@ -162,30 +157,34 @@ class StandardCursor:
         if step.context_before is not None:
             msgs.append({"role": "system", "content": step.context_before.objective})
         if step.thinking is not None:
-            msgs.append({
-                "role": "assistant",
-                "content": (
-                    step.thinking.raw_response_preview or step.thinking.decision
-                ),
-            })
+            msgs.append(
+                {
+                    "role": "assistant",
+                    "content": (step.thinking.raw_response_preview or step.thinking.decision),
+                }
+            )
         if step.tool_call is not None:
-            msgs.append({
-                "role": "assistant",
-                "tool_calls": [{
-                    "id": step.tool_call.invocation_id,
-                    "function": {
-                        "name": step.tool_call.name,
-                        "arguments": step.tool_call.arguments,
-                    },
-                }],
-            })
+            msgs.append(
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": step.tool_call.invocation_id,
+                            "function": {
+                                "name": step.tool_call.name,
+                                "arguments": step.tool_call.arguments,
+                            },
+                        }
+                    ],
+                }
+            )
         if step.tool_result is not None:
-            msgs.append({
-                "role": "tool",
-                "content": (
-                    step.tool_result.stdout_head or step.tool_result.delta_summary
-                ),
-            })
+            msgs.append(
+                {
+                    "role": "tool",
+                    "content": (step.tool_result.stdout_head or step.tool_result.delta_summary),
+                }
+            )
         return msgs
 
     @staticmethod

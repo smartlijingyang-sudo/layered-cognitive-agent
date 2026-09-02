@@ -4,11 +4,11 @@
     python scripts/lca-inspect-plan.py                 # 默认 profiles/web-standard.yaml
     python scripts/lca-inspect-plan.py profiles/coding-agent.yaml
 """
+
 from __future__ import annotations
 
 import sys
 
-from lca.harness.declarative.compile.assembler import GraphAssembler
 from lca.harness.declarative.execute.interpreter import compiled_run_plan_ref
 from lca.harness.profile.plan_compiler import CompileOptions, compile_plan
 from lca.harness.profile.resolve import resolve_profile
@@ -21,10 +21,14 @@ plan_ref = compiled_run_plan_ref(plan)
 
 print("=" * 78)
 print(f"plan_ref = {plan_ref}   (SHA-256[:16] of canonicalised plan)")
-print(f"profile_path: {plan.profile_path}   plan_version: {plan.plan_version}   revision: {plan.revision}")
+print(
+    f"profile_path: {plan.profile_path}   plan_version: {plan.plan_version}   revision: {plan.revision}"
+)
 
 issues = plan.validation_report.issues
-errors = [i for i in issues if str(i.severity) == "ValidationSeverity.ERROR" or i.severity == "error"]
+errors = [
+    i for i in issues if str(i.severity) == "ValidationSeverity.ERROR" or i.severity == "error"
+]
 print(f"validation: {len(errors)} error(s), {len(issues) - len(errors)} warning(s)")
 for i in issues:
     print(f"   [{i.code}] {i.severity} {i.location}: {i.message}")
@@ -39,9 +43,7 @@ for n in plan.phase_graph.nodes:
     pb = phase_bindings.get(n.id)
     exec_cap = pb.executor_capability if pb else "-"
     sem = n.semantic_phase.value if hasattr(n.semantic_phase, "value") else n.semantic_phase
-    print(
-        f"  {n.id:<14} {sem:<10} {n.binding:<26} {exec_cap:<24} {n.max_visits}"
-    )
+    print(f"  {n.id:<14} {sem:<10} {n.binding:<26} {exec_cap:<24} {n.max_visits}")
 
 # ---------- 2. 边视图 ----------------------------------------------------------
 print("\n## 2. Edges (source → target gated by when / loop_guard)")
@@ -103,20 +105,20 @@ for n in plan.phase_graph.nodes:
 # ---------- 7. 把图画成 ASCII (带节点上的控制槽) -------------------------------
 PHASE_COLOR = {
     "perceive": "P",
-    "think":    "T",
-    "act":      "A",
-    "reflect":  "R",
+    "think": "T",
+    "act": "A",
+    "reflect": "R",
     "remember": "M",
-    "stop":     "S",
-    "observe":  "O",
+    "stop": "S",
+    "observe": "O",
 }
 SEMANTIC_LETTER = {
     "perceive": "P",
-    "think":    "T",
-    "act":      "A",
-    "reflect":  "R",
+    "think": "T",
+    "act": "A",
+    "reflect": "R",
     "remember": "M",
-    "stop":     "S",
+    "stop": "S",
 }
 
 # 整理节点在每个 semantic_phase 上的控制贡献（来自 phase_bindings 的 contributions）
@@ -173,7 +175,7 @@ print("\n## 10. Provenance (what fed this plan)")
 print("-" * 78)
 prov = plan.provenance
 print(f"  profile_path     : {prov.profile_path}")
-print(f"  bundles          :")
+print("  bundles          :")
 for b in prov.bundles:
     print(f"    - {b}")
 print(f"  plugin_revisions : {len(prov.plugin_revisions)} entries (sorted, lexicographic)")

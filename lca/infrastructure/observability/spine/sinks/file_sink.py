@@ -20,7 +20,6 @@ from typing import Any
 
 from lca.infrastructure.observability.spine.event_record import EventRecord
 
-
 _ATOMIC_THRESHOLD = 4096  # Linux PIPE_BUF; do NOT change without kernel docs check
 _DEFAULT_BATCH = 100
 _DEFAULT_INTERVAL_MS = 100

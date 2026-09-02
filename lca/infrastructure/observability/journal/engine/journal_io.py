@@ -372,14 +372,8 @@ def _omit_empty(value: Any) -> Any:
     the moment any non-empty list was reached.
     """
     if isinstance(value, Mapping):
-        pruned_items = (
-            (str(k), _omit_empty(item)) for k, item in value.items()
-        )
-        return {
-            k: v
-            for k, v in pruned_items
-            if not _is_empty_default(v)
-        }
+        pruned_items = ((str(k), _omit_empty(item)) for k, item in value.items())
+        return {k: v for k, v in pruned_items if not _is_empty_default(v)}
     if isinstance(value, list):
         return [
             pruned

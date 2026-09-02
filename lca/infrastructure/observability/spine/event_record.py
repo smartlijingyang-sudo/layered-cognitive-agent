@@ -8,13 +8,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Literal, TYPE_CHECKING
+from typing import Any, Literal
 
 from lca.infrastructure.observability.spine.manifest import EXECUTION_POINTS
 
 Outcome = Literal[
-    "success", "failure", "timeout", "cancelled",
-    "rejected", "retrying", "partial", "exhausted", "void",
+    "success",
+    "failure",
+    "timeout",
+    "cancelled",
+    "rejected",
+    "retrying",
+    "partial",
+    "exhausted",
+    "void",
 ]
 Channel = Literal["fact", "control", "error", "diagnostic"]
 Phase = Literal["live", "orphan"]
@@ -49,9 +56,7 @@ class EventRecord:
                 f"not in EXECUTION_POINTS whitelist"
             )
         if self.phase == "orphan" and not self.reason:
-            raise ValueError(
-                "orphan events MUST carry reason (close enum; see ADR-0165.1 §19)"
-            )
+            raise ValueError("orphan events MUST carry reason (close enum; see ADR-0165.1 §19)")
         if self.sequence <= 0:
             raise ValueError(f"sequence must be > 0, got {self.sequence}")
         if self.epoch <= 0:

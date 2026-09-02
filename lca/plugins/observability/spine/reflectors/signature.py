@@ -92,9 +92,7 @@ class SignatureFieldProducer:
 
         source = inspect.getsource(fn)
         qualname = getattr(fn, "__qualname__", repr(fn))
-        fingerprint = _FINGERPRINT_ALGO(
-            f"{qualname}\n{source}".encode()
-        ).hexdigest()
+        fingerprint = _FINGERPRINT_ALGO(f"{qualname}\n{source}".encode()).hexdigest()
 
         return {
             "signature_fingerprint": fingerprint,
