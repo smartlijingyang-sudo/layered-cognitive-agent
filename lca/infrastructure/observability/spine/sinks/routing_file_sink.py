@@ -24,10 +24,12 @@ class RunRoutingFileSink:
         boot_path: Path,
         runs_root: Path,
         file_name: str = "events.jsonl",
+        spine_filename: bool = False,
     ) -> None:
         self._boot_path = Path(boot_path)
         self._runs_root = Path(runs_root)
         self._file_name = file_name
+        self._spine_filename = spine_filename
         self._boot_path.parent.mkdir(parents=True, exist_ok=True)
         self._runs_root.mkdir(parents=True, exist_ok=True)
         self._boot = FileSink(
@@ -80,7 +82,12 @@ class RunRoutingFileSink:
             if existing is not None:
                 return existing
             run_dir = self._runs_root / run_id
-            sink = FileSink(run_dir, run_id=run_id, file_name=self._file_name)
+            sink = FileSink(
+                run_dir,
+                run_id=run_id,
+                file_name=self._file_name,
+                spine_filename=self._spine_filename,
+            )
             self._runs[run_id] = sink
             return sink
 
