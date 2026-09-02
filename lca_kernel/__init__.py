@@ -59,6 +59,7 @@ from lca_kernel.lifecycle import (
     install_signal_handlers,
     run_kernel_lifespan,
 )
+from lca_kernel.observability import ObservabilityRuntime
 from lca_kernel.stages import Stage
 
 if TYPE_CHECKING:
@@ -84,6 +85,7 @@ __all__ = [
     "DefaultShutdownCoordinator",
     "FailLoudError",
     "KernelError",
+    "ObservabilityRuntime",
     "PatchConfig",
     "PatchEvent",
     "PatchWatcher",

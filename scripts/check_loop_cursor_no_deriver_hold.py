@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ADR-0169 评审 §S1 处方 + PR-1.9 grep 门禁 + ADR-0170 PR-3 增量校验。
+"""ADR-0169 评审 §S1 处方 + PR-1.9 grep 门禁 + ADR-0170 PR-3 增量校验 + PR-25 复核。
 
 StdLoopCursor 仅持 spine handle + _state;
 不得持有 deriver / projections / persistence / llm_hook / model_visible_recorder 字段。
@@ -10,6 +10,13 @@ PR-3 增量校验策略(精准):
   集合必须在 `_ALLOWED_STD_LOOP_CURSOR_FIELDS` 内
 - PR-3 引入的字段漂移检测:任何不在白名单的字段名都被拒绝
 - 白名单约定:`_spine` (PR-1) + `_state` (PR-1) + 派生字段 (allowed below)
+
+PR-25 复核:
+- ObservabilityRuntime 五缝装配 + CoordinatorAdapter 桥接均**不**修改
+  StdLoopCursor 字段集合 —— 字段仍 = {_spine, _state}。
+- 新增字段必须先有 ADR 改 ADR-0169 D8 / D11,然后才能加进白名单。
+- 当前 PR-25 不需要扩展白名单(无新字段);若后续 PR-26+ 引入新字段,
+  本脚本必须保持 PASS 才能合并。
 
 用法:
     uv run python scripts/check_loop_cursor_no_deriver_hold.py
