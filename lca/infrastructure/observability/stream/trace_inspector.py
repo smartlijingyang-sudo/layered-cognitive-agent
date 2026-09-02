@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from typing import Any, Literal
 
@@ -185,14 +185,27 @@ class TraceInspector:
     @staticmethod
     def _is_failure(stamped: StampedEvent) -> bool:
         event = stamped.event
-        return (
+        # v2 typed envelope paths (kept for replay compatibility).
+        if (
             (isinstance(event, RuntimeObserved) and str(event.outcome) == "error")
             or (isinstance(event, ToolInvoked) and not event.ok)
             or (
                 isinstance(event, (AgentRunFinished, TeamRunFinished))
                 and event.status in {"failed", "error", "cancelled"}
             )
-        )
+        ):
+            return True
+        # spine v3 SSOT path (ADR-0165.1). Channel "error" or
+        # outcome "failure" in the raw data dict both mark failure;
+        # ``data`` mirrors the spine payload (see ``_helpers._event_from_payload``).
+        if isinstance(stamped.data, Mapping):
+            channel = stamped.data.get("channel")
+            if channel == "error":
+                return True
+            outcome = stamped.data.get("outcome")
+            if outcome == "failure":
+                return True
+        return False
 
     @staticmethod
     def _summary(events: Sequence[StampedEvent], focus: TraceFocus) -> str:
@@ -204,7 +217,32 @@ class TraceInspector:
 
     @staticmethod
     def _render(stamped: StampedEvent) -> dict[str, Any]:
-        return {
+        # spine v3 SSOT path (ADR-2026-09-02-i17-stream-align §C).
+        # When the event carries an error payload, lift the structured
+        # traceback fields out of ``data`` so downstream consumers (CLI,
+        # doctor, Mermaid) can render the failure without re-reading the
+        # full data dict.
+        failure: dict[str, Any] | None = None
+        if isinstance(stamped.data, Mapping):
+            channel = stamped.data.get("channel")
+            outcome = stamped.data.get("outcome")
+            if channel == "error" or outcome == "failure":
+                failure = {}
+                for key in (
+                    "exc_type",
+                    "exception_class",
+                    "exception_message",
+                    "reason",
+                    "traceback_text",
+                    "cause_chain",
+                ):
+                    if key in stamped.data:
+                        failure[key] = stamped.data[key]
+                if "source_location" in stamped.data:
+                    failure["source_location"] = stamped.data["source_location"]
+                if "call_frames" in stamped.data:
+                    failure["call_frames"] = list(stamped.data["call_frames"])
+        rendered: dict[str, Any] = {
             "seq": stamped.seq,
             "time": stamped.ts,
             "type": stamped.event_type,
@@ -212,6 +250,9 @@ class TraceInspector:
             "parent_seq": stamped.parent_seq,
             "data": stamped.data,
         }
+        if failure is not None:
+            rendered["failure"] = failure
+        return rendered
 
 
 __all__ = ["TraceFocus", "TraceInspector", "TraceReport"]
