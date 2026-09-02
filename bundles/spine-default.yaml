@@ -35,6 +35,12 @@ plugins:
   - spine.classifier.exception.unclass
   - spine.spantree
   - spine.deriver.anomaly
+  # ADR-0167 D11.4: default writable matrix assembly
+  # (Emitter=SpineEmitter + Driver=StandardDriver + Coalescer=LineCoalescer
+  #  + Serializer=NdjsonSerializer + Storage=RoutingFileStorage).
+  # Provides writable_face_registry consumed by transport/journal_setup
+  # to construct StepCoordinator per run.
+  - writable.matrix.default
   - spine.deriver.narrative
   - spine.deriver.graph
   - spine.deriver.live_tail
@@ -126,6 +132,12 @@ entries:
       boot_path: .lca/spine/boot-events.jsonl
       runs_root: traces/runs
 
+
+  # ── L2 writable matrix assembly (ADR-0167 D11.4) ─────────────
+  - id: writable.matrix.default
+    name: writable_matrix_default
+    $module: lca.plugins.observability.writable_matrix.assembly
+    config: {}
 
   - id: spine.sink.console
     name: spine_sink_console

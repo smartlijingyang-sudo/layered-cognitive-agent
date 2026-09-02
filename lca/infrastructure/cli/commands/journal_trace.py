@@ -452,7 +452,15 @@ def _event_kind(ep: str, payload: dict[str, Any], outcome: str | None) -> str:
     return ep
 
 
-def _detail_lines(ep: str, payload: dict[str, Any], *, max_lines: int) -> list[str]:
+@dataclass(frozen=True, slots=True)
+class _DetailBlock:
+    """``_detail_lines`` return — lines plus a flag for the caller."""
+
+    lines: tuple[str, ...]
+    truncated: bool
+
+
+def _detail_lines(ep: str, payload: dict[str, Any], *, max_lines: int) -> _DetailBlock:
     """Per-EP payload text the operator actually needs to understand the link.
 
     Returns verbatim text (no translation / no summarisation) for the
@@ -464,19 +472,26 @@ def _detail_lines(ep: str, payload: dict[str, Any], *, max_lines: int) -> list[s
     Unknown EPs fall back to ``key=value`` for every non-empty
     payload key so no information is silently dropped when a new EP
     appears before the table is updated.
+
+    When the EP emits more lines than ``max_lines`` the leftover is
+    counted and ``truncated=True`` so the caller can print a
+    ``(+N more)`` hint without the caller having to re-render.
     """
     lines: list[str] = []
+    truncated = False
+
+    def _add(text: str) -> None:
+        nonlocal truncated
+        if len(lines) >= max_lines:
+            truncated = True
+            return
+        lines.append(text)
 
     def _trim(s: str, limit: int = _DETAIL_VALUE_LIMIT) -> str:
         s = str(s)
         if len(s) <= limit:
             return s
         return s[: limit - 1] + "…"
-
-    def _add(text: str) -> None:
-        if len(lines) >= max_lines:
-            return
-        lines.append(text)
 
     if ep == "phase_graph.node.start":
         params = payload.get("input_params")
@@ -490,14 +505,14 @@ def _detail_lines(ep: str, payload: dict[str, Any], *, max_lines: int) -> list[s
         pre = payload.get("preconditions")
         if isinstance(pre, list) and pre:
             _add(f"  └ preconditions = [{', '.join(_trim(p) for p in pre)}]")
-        return lines
+        return _DetailBlock(tuple(lines), truncated)
 
     if ep == "phase_graph.node.end":
         if (payload.get("error_type") or payload.get("exception_message")):
             _add(f"  ✗ error_type={payload.get('error_type', '?')}")
             msg = payload.get("exception_message")
             if msg:
-                _add(f"  ✗ exception_message:")
+                _add("  ✗ exception_message:")
                 for chunk in str(msg).splitlines() or [""]:
                     _add(f"    │ {_trim(chunk)}")
             tb = payload.get("traceback_snippet")
@@ -509,7 +524,7 @@ def _detail_lines(ep: str, payload: dict[str, Any], *, max_lines: int) -> list[s
             rvf = payload.get("return_value_fingerprint")
             if rvf:
                 _add(f"  └ return_value_fingerprint={_trim(rvf)}")
-        return lines
+        return _DetailBlock(tuple(lines), truncated)
 
     if ep == "phase.tool.call.end":
         ds = payload.get("delta_summary")
@@ -524,7 +539,7 @@ def _detail_lines(ep: str, payload: dict[str, Any], *, max_lines: int) -> list[s
         err = payload.get("error")
         if err:
             _add(f"    error: {_trim(err)}")
-        return lines
+        return _DetailBlock(tuple(lines), truncated)
 
     if ep == "phase.perceive.fold":
         sm = payload.get("summary")
@@ -533,13 +548,13 @@ def _detail_lines(ep: str, payload: dict[str, Any], *, max_lines: int) -> list[s
         obj = payload.get("objective")
         if obj:
             _add(f"    objective: {_trim(obj)}")
-        return lines
+        return _DetailBlock(tuple(lines), truncated)
 
     if ep == "phase.act.fold.end":
         err = payload.get("error")
         if err:
             _add(f"    error: {_trim(err)}")
-        return lines
+        return _DetailBlock(tuple(lines), truncated)
 
     if ep == "llm.call.start":
         pp = payload.get("prompt_preview")
@@ -550,15 +565,15 @@ def _detail_lines(ep: str, payload: dict[str, Any], *, max_lines: int) -> list[s
             _add("    prompt_preview:")
             for chunk in text.splitlines():
                 _add(f"    │ {_trim(chunk, 200)}")
-        return lines
+        return _DetailBlock(tuple(lines), truncated)
 
     if ep == "exception.caught":
         msg = payload.get("message")
         if msg:
-            _add(f"  ✗ message:")
+            _add("  ✗ message:")
             for chunk in str(msg).splitlines():
                 _add(f"    │ {_trim(chunk)}")
-        return lines
+        return _DetailBlock(tuple(lines), truncated)
 
     if ep == "phase.think.fold":
         obj = payload.get("objective")
@@ -570,7 +585,7 @@ def _detail_lines(ep: str, payload: dict[str, Any], *, max_lines: int) -> list[s
         sm = payload.get("summary")
         if sm:
             _add(f"    summary: {_trim(sm)}")
-        return lines
+        return _DetailBlock(tuple(lines), truncated)
 
     # Unknown EP / no specialised table — dump payload key=value verbatim
     # so no information is silently dropped.
@@ -582,7 +597,7 @@ def _detail_lines(ep: str, payload: dict[str, Any], *, max_lines: int) -> list[s
         except (TypeError, ValueError):
             text = repr(value)
         _add(f"  {key}={_trim(text)}")
-    return lines
+    return _DetailBlock(tuple(lines), truncated)
 
 
 def _build_span_tree(events: list[dict[str, Any]]) -> dict[str | None, list[int]]:
@@ -631,126 +646,6 @@ def _format_abs(when: datetime | None) -> str:
     if when.microsecond:
         text += f".{when.microsecond // 1000:03d}"
     return text.ljust(_TIME_CELL_WIDTH)
-
-
-def _fold_token_stream(events: list[dict[str, Any]], indices: list[int]) -> tuple[list[str], list[int]]:
-    """Collapse consecutive ``llm.stream.token`` into one summary line.
-
-    Returns ``(lines, remaining_indices)`` where ``remaining_indices`` are
-    the indices not folded into a token stream and must still be rendered.
-    """
-    lines: list[str] = []
-    remaining: list[int] = []
-    i = 0
-    while i < len(indices):
-        start = i
-        while (
-            i < len(indices)
-            and events[indices[i]].get("execution_point") == "llm.stream.token"
-            and events[indices[i - 1] if i > 0 else start].get("parent_span_id")
-            == events[indices[start]].get("parent_span_id")
-        ):
-            i += 1
-        block = indices[start:i]
-        if len(block) >= _TOKEN_FOLD_MIN:
-            text = "".join(
-                str(events[idx].get("payload", {}).get("text_delta", "")) for idx in block
-            )
-            head = events[block[0]]
-            lines.append(
-                f"    llm.stream.token ×{len(block)}  "
-                f"·{sum(len(str(events[idx].get('payload', {}).get('text_delta', ''))) for idx in block)} chars"
-                f"  \"{text}\""
-            )
-            remaining.extend(block)
-            continue
-        if block:
-            for idx in block:
-                remaining.append(idx)
-        else:
-            remaining.append(indices[start])
-            i += 1
-    return lines, remaining
-
-
-def _fold_reducer_stream(events: list[dict[str, Any]], indices: list[int]) -> tuple[list[str], list[int]]:
-    """Collapse consecutive ``runtime.reducer.apply`` into one summary line."""
-    lines: list[str] = []
-    remaining: list[int] = []
-    i = 0
-    while i < len(indices):
-        if events[indices[i]].get("execution_point") != "runtime.reducer.apply":
-            remaining.append(indices[i])
-            i += 1
-            continue
-        start = i
-        while (
-            i < len(indices)
-            and events[indices[i]].get("execution_point") == "runtime.reducer.apply"
-            and events[indices[i]].get("parent_span_id")
-            == events[indices[start]].get("parent_span_id")
-        ):
-            i += 1
-        block = indices[start:i]
-        if len(block) >= _REDUCER_FOLD_MIN:
-            methods = [
-                str(events[idx].get("payload", {}).get("method", "?")) for idx in block
-            ]
-            head = events[block[0]]
-            tail = events[block[-1]]
-            head_t = _parse_when(head)
-            tail_t = _parse_when(tail)
-            delta_ms = (
-                int((tail_t - head_t).total_seconds() * 1000)
-                if head_t and tail_t
-                else 0
-            )
-            lines.append(
-                f"    runtime.reducer.apply ×{len(block)}"
-                f"  ({', '.join(methods)})  Δ+{delta_ms}ms"
-            )
-            continue
-        for idx in block:
-            remaining.append(idx)
-    return lines, remaining
-
-
-def _fold_transport_pair(events: list[dict[str, Any]], indices: list[int]) -> list[str]:
-    """Pair ``transport.route.enter`` followed by ``.exit`` into one line.
-
-    We do not strip the unpaired ones — they fall back to single-row render.
-    """
-    lines: list[str] = []
-    used: set[int] = set()
-    for n, idx in enumerate(indices):
-        if idx in used:
-            continue
-        if events[idx].get("execution_point") != "transport.route.enter":
-            continue
-        if n + 1 < len(indices) and not (indices[n + 1] in used):
-            nxt = indices[n + 1]
-            if events[nxt].get("execution_point") == "transport.route.exit":
-                ep_in = events[idx]
-                ep_out = events[nxt]
-                used.add(idx)
-                used.add(nxt)
-                t_in = _parse_when(ep_in)
-                t_out = _parse_when(ep_out)
-                delta_ms = (
-                    int((t_out - t_in).total_seconds() * 1000)
-                    if t_in and t_out
-                    else 0
-                )
-                lines.append(
-                    f"  {ep_in.get('payload', {}).get('method', '?')} "
-                    f"{ep_in.get('payload', {}).get('path', '?')}"
-                    f" →{ep_out.get('payload', {}).get('status', '?')}"
-                    f"  {_format_delta_ms(delta_ms)}"
-                )
-    for idx in indices:
-        if idx not in used:
-            lines.append(idx)
-    return lines
 
 
 def _render_human(
@@ -897,29 +792,33 @@ def _render_single(
     when = _parse_when(event)
     delta_ms = int(((when - anchor).total_seconds() * 1000)) if when else 0
     payload = event.get("payload") or {}
+    if not isinstance(payload, dict):
+        payload = {}
     ep = event.get("execution_point", "?")
-    kind = _event_kind(ep, payload if isinstance(payload, dict) else {}, event.get("outcome"))
+    kind = _event_kind(ep, payload, event.get("outcome"))
     line = (
         f"{_format_abs(when)}"
         f"  {_format_delta_ms(delta_ms):<{_DELTA_WIDTH}}"
         f"  {marker} {kind}"
     )
-    out = [line]
-    out.extend(_detail_lines(ep, payload if isinstance(payload, dict) else {}, max_lines=max_detail_per_node))
-    if len(_detail_lines(ep, payload if isinstance(payload, dict) else {}, max_lines=10**6)) > max_detail_per_node:
-        out.append(f"  … (+{_count_extra(ep, payload)} more lines)")
+    block = _detail_lines(ep, payload, max_lines=max_detail_per_node)
+    out = [line, *block.lines]
+    if block.truncated:
+        # ``… (+N more lines)`` so the operator knows detail was elided
+        # and where to re-run with ``--max-detail-per-node`` raised.
+        out.append(f"  … (+{_estimate_extra(ep, payload)} more lines)")
     return "\n".join(out)
 
 
-def _count_extra(ep: str, payload: dict[str, Any]) -> int:
-    """Estimate how many extra lines the EP would produce at max_lines=∞."""
-    # Cheap approximation: count JSON lines we'd produce.
+def _estimate_extra(ep: str, payload: dict[str, Any]) -> int:
+    """Rough estimate of how many more lines the EP would emit without the cap."""
     if not payload:
         return 0
     try:
-        return len(json.dumps(payload, ensure_ascii=False).splitlines())
+        text = json.dumps(payload, ensure_ascii=False)
     except (TypeError, ValueError):
         return 1
+    return max(0, len(text.splitlines()) - 1)
 
 
 def _build_fold_line(
