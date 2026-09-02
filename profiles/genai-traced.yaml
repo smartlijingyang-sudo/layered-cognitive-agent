@@ -2,12 +2,51 @@
 #
 # 在 base + runtime-core + observability-default + coding-agent-tools 之上叠加 GenAI 遥测。
 # 用途：把 OTel 投影接入 Langfuse 时启用。
+#
+# ADR-0174 PR-7.4/S7.4: profile migrated to ``loop_cursor.spine_*`` bundle
+# naming(§D1 第四批,与 ADR-0172 Exporter 联跑);observability 五缝装配段
+# schema 与 web-standard 对齐,projection_host.initial 启用 ADR-0172 §D2
+# Exporter(opt-in:otel_trace / metrics / langfuse),exporter_config 段
+# 引用 ADR-0172 §D2 schema 注入凭证(经 Profile {from_env: ...} 注入,
+# 不直读 os.environ)。
 name: genai-traced
 description: |
   Profile with full observability + GenAI semantic mappers for Langfuse export.
+observability:
+  loop_cursor:
+    implementation: std                              # 默认实现(PR-14 LoopCursorFactory)
+    spine_default: loop_cursor.spine_default         # 复用 bundles/loop_cursor.spine_default.yaml 的 bundle
+  # ADR-0172 §D2 Exporter opt-in:otel_trace / metrics / langfuse 与 web-standard
+  # 的 step_tree / narrative / graph / cost 并列,ObservabilityRuntime.from_profile
+  # 据此构造 Exporter 实例并 register 到 host。
+  projection_host:
+    initial: [step_tree, narrative, graph, cost, otel_trace, metrics, langfuse]
+  persistence:
+    coalescer: default
+    sink: routing_file
+  model_visible:
+    enabled: true
+  close_barrier:
+    enabled: true
+  plan_ref: genai-traced
+
+# ADR-0172 §D2 exporter_config schema(无凭证不崩溃;Profile 解析期提示,
+# 运行时按需禁;凭证经 Profile {from_env: ...} 注入,严禁直读 os.environ)。
+exporter_config:
+  otel_trace:
+    endpoint: "${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4317}"
+    compression: gzip
+  metrics:
+    output_path: traces/runs/$RUN_ID/metrics.json
+  langfuse:
+    api_base: "${LANGFUSE_BASE_URL:-}"
+    secret_key: "${LANGFUSE_SECRET_KEY:-}"
+    public_key: "${LANGFUSE_PUBLIC_KEY:-}"
+
 bundles:
   - base
   - runtime-core
   - observability-default
   - coding-agent-tools
   - genai-telemetry
+  - loop_cursor.spine_default

@@ -2,11 +2,32 @@
 #
 # 仅含 base + runtime-core + observability-default + coding-agent-tools，
 # 默认 web-standard.yaml 不引入，保持默认 profile 不变。
+#
+# ADR-0174 PR-7.4/S7.4: profile migrated to ``loop_cursor.spine_*`` bundle
+# naming(§D1 第四批);observability 五缝装配段 schema 与 web-standard 对齐,
+# loop_cursor 复用 bundles/loop_cursor.spine_default.yaml。minimal deriver
+# surface(coding-agent debug profile)。
 name: coding-agent
 description: |
   Minimal profile for Coding Agent consumption: trace tools + debug CLI plugins only.
+observability:
+  loop_cursor:
+    implementation: std                              # 默认实现(PR-14 LoopCursorFactory)
+    spine_default: loop_cursor.spine_default         # 复用 bundles/loop_cursor.spine_default.yaml 的 bundle
+  projection_host:
+    initial: [step_tree, narrative, graph, cost]     # 默认 deriver 注册
+  persistence:
+    coalescer: default
+    sink: routing_file
+  model_visible:
+    enabled: true
+  close_barrier:
+    enabled: true
+  plan_ref: coding-agent
+
 bundles:
   - base
   - runtime-core
   - observability-default
   - coding-agent-tools
+  - loop_cursor.spine_default
