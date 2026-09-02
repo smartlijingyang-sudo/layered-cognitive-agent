@@ -13,20 +13,22 @@
   派生出来。
 - ``halt != close``(评审 §S10 + §潜在 #8):``close`` 释放资源,
   ``halt`` 保留 cursor 实例,等 spatial-temporal runtime 走 resume 重建。
+
+``IterationReason`` is the union declared in
+``contracts.observability.loop_cursor`` — single source of truth
+(ADR-0169 §D3 L1 close-set; introduced in two modules historically,
+consolidated here so callers can rely on a stable Literal). ``resume``
+re-exports the alias under its historic name for backwards
+compatibility with downstream imports.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
 
-from lca.contracts.observability.loop_cursor import PhaseName
+from lca.contracts.observability.loop_cursor import IterationReason, PhaseName
 
-IterationReason = Literal[
-    "checkpoint_resume",
-    "user_replay",
-    "subagent_resume",
-]
+__all__ = ["IterationReason", "ResumeSpec"]
 
 
 @dataclass(frozen=True)
@@ -45,6 +47,3 @@ class ResumeSpec:
     step_index: int
     phase: PhaseName
     iteration_reason: IterationReason = "checkpoint_resume"
-
-
-__all__ = ["IterationReason", "ResumeSpec"]

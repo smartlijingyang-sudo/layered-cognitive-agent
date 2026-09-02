@@ -45,39 +45,18 @@ from lca.infrastructure.observability.spine.event_record import (
     EventRecord,
     Outcome,
 )
-from lca.infrastructure.observability.spine.event_spine import EventSpine
+from lca.plugins.observability.spine._spine_safety import (
+    get_active_spine,
+    safe_append,
+    set_active_spine,
+)
 
 log = logging.getLogger(__name__)
 
 
-# ── process-local active spine accessor ─────────────────────────────
-#
-# The cognition layer never receives the spine through its Protocol
-# surface (Brain / Reasoner / Critic / Synthesizer / SkillRouter /
-# MemorySystem). Profile boot installs the run's EventSpine here so
-# every cognition call can locate it without changing any constructor
-# signature. Tests use the same setter to inject a capturing sink.
-
-_active_spine: EventSpine | None = None
-
-
-def set_active_spine(spine: EventSpine | None) -> None:
-    """Install or clear the process-local active spine.
-
-    Called by profile boot (``kernel_serve`` / ``boot_resolved_profile``)
-    at the start of a run. Tests call it directly to wire a capturing
-    spine. Passing ``None`` clears the binding.
-    """
-    global _active_spine
-    _active_spine = spine
-
-
-def get_active_spine() -> EventSpine | None:
-    """Return the active spine, or ``None`` if no run is in flight."""
-    return _active_spine
-
-
-# ── core emitter ──────────────────────────────────────────────────────
+# `set_active_spine` / `get_active_spine` are re-exported by name
+# (above) for callers that historically imported them from this
+# module. The single source of truth lives in ``_spine_safety``.
 
 
 def _safe_append(
@@ -87,30 +66,18 @@ def _safe_append(
     payload: dict[str, Any] | None = None,
     outcome: Outcome | None = None,
 ) -> EventRecord | None:
-    """Dispatch to the active spine, returning ``None`` when no spine wired.
+    """Thin module-local pass-through to the shared helper.
 
-    Swallows ``EventRecord`` validation errors (malformed payload) so a
-    broken helper never blocks the caller; logs at WARNING. All other
-    exceptions propagate as FD-1.
+    Kept under the historic name so the 18+ ``emit_*`` helpers in this
+    file continue to compile. The implementation lives in
+    ``plugins.observability.spine._spine_safety``.
     """
-    spine = _active_spine
-    if spine is None:
-        return None
-    try:
-        return spine.append(
-            execution_point=execution_point,
-            channel=channel,
-            caller_payload=payload,
-            outcome=outcome,
-        )
-    except ValueError as exc:
-        # EventRecord post-init validation failure (e.g. unknown EP).
-        log.warning(
-            "cognition_reflector: drop invalid event ep=%s err=%s",
-            execution_point,
-            exc,
-        )
-        return None
+    return safe_append(
+        execution_point=execution_point,
+        channel=channel,
+        payload=payload,
+        outcome=outcome,
+    )
 
 
 # ── brain.perceive (executed by PerceiveHub; emitted in the brain layer

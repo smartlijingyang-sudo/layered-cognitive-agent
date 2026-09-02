@@ -38,8 +38,21 @@ class PersistenceStats:
     bytes_written: int
 
     @classmethod
+    def unavailable(cls, *, bytes_written: int = 0) -> PersistenceStats:
+        """Marker factory — used by persistence backends that don't track counters.
+
+        ``total_appended`` and ``last_seq`` are explicitly set to a
+        sentinel (``-1``) to signal "sink did not record these"; this
+        is louder than silently returning zeros that look like real
+        measurements.  Callers that consume stats() should treat ``-1``
+        as a documented absence marker rather than a real count.
+        """
+        return cls(total_appended=-1, last_seq=-1, bytes_written=bytes_written)
+
+    @classmethod
     def zero(cls) -> PersistenceStats:
-        return cls(total_appended=0, last_seq=0, bytes_written=0)
+        """Deprecated — use :meth:`unavailable` for backends lacking counters."""
+        return cls(total_appended=-1, last_seq=-1, bytes_written=0)
 
 
 log = logging.getLogger(__name__)
@@ -75,6 +88,7 @@ class PersistenceCoordinator(Protocol):
         Iterator[EventRecord]
             按 seq 升序的事件迭代器;空迭代器表示无可回放事件。
         """
+        _ = from_seq  # noqa: F841 — part of the public Protocol surface
         ...
 
     def stats(self) -> PersistenceStats:
@@ -100,6 +114,7 @@ class NullPersistenceCoordinator:
 
     def restore(self, from_seq: int) -> Iterator[EventRecord]:
         """返回空迭代器。"""
+        _ = from_seq  # noqa: F841 — null-coordinator ignores the input
         return iter(())
 
     def stats(self) -> PersistenceStats:
@@ -159,43 +174,62 @@ class FilePersistenceCoordinator:
         self._sink.close()
 
     def restore(self, from_seq: int) -> Iterator[EventRecord]:
-        """Checkpoint replay —— 当前返回空迭代器。
+        """Checkpoint replay —— fails loud.
 
-        完整实现需要 EventRecord 反序列化(由 PR-15 提供);
-        本 PR 阶段仅占位,保证协议面可用。
+        Full implementation needs ``EventRecord`` deserialization
+        (delivered by PR-15 of ADR-0169). Until then we **raise**
+        :class:`PersistenceRestoreUnavailableError` rather than
+        silently yielding an empty iterator, so callers that genuinely
+        need checkpoint replay either pin to a backend that supports
+        it or fail fast at startup rather than discovering the gap at
+        recovery time.
 
         Parameters
         ----------
         from_seq:
             起始 sequence(含)。
 
-        Yields
+        Raises
         ------
-        EventRecord
-            空迭代器。
+        PersistenceRestoreUnavailableError
+            Always — checkpoint replay from a file sink is not
+            implemented. ADR-0169 PR-15 will replace this with a
+            real ``EventRecord`` reader.
         """
-        _ = from_seq
-        return iter(())
+        _ = from_seq  # noqa: F841 — referenced for documentation only
+        raise PersistenceRestoreUnavailableError(
+            "FilePersistenceCoordinator.restore is not implemented; "
+            "checkpoint replay is delivered by ADR-0169 PR-15."
+        )
 
     def stats(self) -> PersistenceStats:
-        """File sink stats:基于 path 字节数(估算)。
+        """File-sink stats.
 
-        完整 stats 需要在 sink 中累计;本占位返回 path 文件大小近似。
+        Returns the sink's path size as ``bytes_written`` (the only
+        count a file sink exposes cheaply); ``total_appended`` and
+        ``last_seq`` are explicit absence markers (-1) until the sink
+        emits them. Consumers should treat ``-1`` as "not measured".
         """
         try:
             bytes_written = self._sink.path.stat().st_size
         except OSError:
             bytes_written = 0
-        return PersistenceStats(
-            total_appended=0,  # 占位 — sink 未暴露 append 计数
-            last_seq=0,
-            bytes_written=bytes_written,
-        )
+        return PersistenceStats.unavailable(bytes_written=bytes_written)
+
+
+class PersistenceRestoreUnavailableError(NotImplementedError):
+    """Raised by :meth:`FilePersistenceCoordinator.restore`.
+
+    Loud signal that the file-sink backend does not implement
+    checkpoint replay (ADR-0169 PR-15). Use :class:`NullPersistenceCoordinator`
+    if you want a benign empty iterator.
+    """
 
 
 __all__ = [
     "FilePersistenceCoordinator",
     "NullPersistenceCoordinator",
     "PersistenceCoordinator",
+    "PersistenceRestoreUnavailableError",
     "PersistenceStats",
 ]

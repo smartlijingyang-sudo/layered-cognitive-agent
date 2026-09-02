@@ -19,93 +19,25 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Any
 
 from lca.contracts.observability.model_visible_capture import (
     ModelVisibleArtifact,
     ModelVisibleCapture,
 )
+from lca.infrastructure.observability.loop_cursor._capture_io import (
+    relative_posix as _relative_posix,
+)
+from lca.infrastructure.observability.loop_cursor._capture_io import (
+    to_jsonable as _to_jsonable,
+)
+from lca.infrastructure.observability.loop_cursor._capture_io import (
+    write_json as _write_json,
+)
 
 _log = logging.getLogger(__name__)
-
-_DIGEST_PREFIX = "sha256:"
-"""digest 字符串前缀,与 ADR-0169 D4 / ADR-0176 D2 兼容格式。"""
-
-
-def _to_jsonable(value: Any) -> Any:
-    """把任意对象转成可 JSON 序列化的结构。
-
-    优先级:
-    1. 已是 dict / list / str / int / float / bool / None ⇒ 原样;
-    2. 有 ``to_dict`` / ``model_dump`` / ``dict()`` 协议 ⇒ 调用之;
-    3. 有 ``__dict__`` ⇒ 取之;
-    4. 兜底 ``repr(value)``。
-
-    保证 ``json.dumps(...)`` 不抛 TypeError。
-    """
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
-    if isinstance(value, dict):
-        return {str(k): _to_jsonable(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_to_jsonable(item) for item in value]
-    # Pydantic v2 / dataclass 等有 to_dict/model_dump/dict 接口 —— 顺次尝试,失败退路
-    for proto_name in ("to_dict", "model_dump", "dict"):
-        proto = getattr(value, proto_name, None)
-        if callable(proto):
-            try:
-                return _to_jsonable(proto())
-            except Exception as exc:
-                _log.debug("model_visible %s() failed: %s", proto_name, exc)
-    if hasattr(value, "__dict__"):
-        try:
-            return _to_jsonable(vars(value))
-        except Exception as exc:
-            _log.debug("model_visible vars() failed: %s", exc)
-    return repr(value)
-
-
-def _sha256_digest(payload: Any) -> str:
-    """算 ``sha256:<hex>`` —— 与 step_tree_accumulator 兼容格式。"""
-    encoded = json.dumps(
-        payload,
-        sort_keys=True,
-        ensure_ascii=False,
-        default=str,
-    ).encode("utf-8")
-    return _DIGEST_PREFIX + hashlib.sha256(encoded).hexdigest()
-
-
-def _relative_posix(run_dir: Path, target: Path) -> str:
-    """算相对 ``run_dir`` 的 POSIX 风格 relpath。
-
-    失败(跨盘 / 越界)退化为 target.name —— 不抛,以保 cursor
-    record_request_header 永不因路径计算而抛异常。
-    """
-    try:
-        rel = target.relative_to(run_dir)
-    except ValueError:
-        return target.name
-    return PurePosixPath(rel.as_posix()).as_posix()
-
-
-def _write_json(path: Path, payload: Any) -> str:
-    """写 JSON 到 ``path``(mkdir parents);返回 sha256 digest。"""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    jsonable = _to_jsonable(payload)
-    serialized = json.dumps(
-        jsonable,
-        ensure_ascii=False,
-        indent=2,
-        default=str,
-        sort_keys=False,
-    )
-    path.write_text(serialized, encoding="utf-8")
-    return _sha256_digest(jsonable)
 
 
 class StdModelVisibleCapture(ModelVisibleCapture):

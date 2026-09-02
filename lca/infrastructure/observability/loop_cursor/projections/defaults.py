@@ -123,17 +123,24 @@ class _NarrativeProjection:
 @dataclass
 class _GraphState:
     edges: list[tuple[str, str]] = field(default_factory=list)
+    last_endpoint: str | None = None  # reducer purity per ADR-0170 D1
 
 
 class _GraphProjection:
+    """Edges-tuple reducer for the phase graph.
+
+    ADR-0170 D1 reducer purity: ``apply`` returns a new ``_GraphState``
+    and never mutates ``self``. The previous edge's terminal endpoint
+    lives in the state itself (``last_endpoint``) so two consecutive
+    calls with the same input produce identical output, satisfying
+    the close-set / reducer-purity invariant.
+    """
+
     key = "graph"
     version = 1
 
-    def __init__(self) -> None:
-        self._last: str | None = None
-
     def init(self) -> _GraphState:
-        return _GraphState()
+        return _GraphState(last_endpoint=None)
 
     def apply(
         self,
@@ -141,20 +148,20 @@ class _GraphProjection:
         snapshot: CursorSnapshot,
         record: EventRecord,
     ) -> _GraphState:
-        prev = self._last
-        self._last = record.execution_point
-        if prev is None:
-            return _GraphState(edges=list(state.edges))
+        prev = state.last_endpoint
         edges = list(state.edges)
-        edges.append((prev, record.execution_point))
-        return _GraphState(edges=edges)
+        if prev is not None:
+            edges.append((prev, record.execution_point))
+        return _GraphState(
+            edges=edges,
+            last_endpoint=record.execution_point,
+        )
 
     def view(self, state: _GraphState) -> dict[str, Any]:
         return {"key": self.key, "version": self.version, "edges": list(state.edges)}
 
     def restore(self, state: _GraphState) -> _GraphState:
-        self._last = None
-        return _GraphState()
+        return _GraphState(last_endpoint=None)
 
 
 # ── 4. cost ────────────────────────────────────────────────────────────

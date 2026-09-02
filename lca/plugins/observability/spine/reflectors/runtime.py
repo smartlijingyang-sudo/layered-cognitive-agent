@@ -90,29 +90,13 @@ from lca.infrastructure.observability.spine.event_record import (
     EventRecord,
     Outcome,
 )
-from lca.infrastructure.observability.spine.event_spine import EventSpine
+from lca.plugins.observability.spine._spine_safety import (
+    get_active_spine,
+    safe_append,
+    set_active_spine,
+)
 
 log = logging.getLogger(__name__)
-
-
-# ── process-local active spine accessor ─────────────────────────────
-#
-# Mirrors cognition.py so cognition, runtime, and other reflectors can
-# share the same wiring call. Profile boot installs the run's
-# EventSpine here so every runtime boundary can locate it without
-# changing any constructor signature.
-
-_active_spine: EventSpine | None = None
-
-
-def set_active_spine(spine: EventSpine | None) -> None:
-    """Install or clear the process-local active spine for runtime EPs.
-
-    Called by profile boot at the start of a run. Tests call it
-    directly to wire a capturing spine. Passing ``None`` clears.
-    """
-    global _active_spine
-    _active_spine = spine
 
 
 # ADR-2026-09-02-i17-traceback §D5: the runtime reflector needs to
@@ -136,20 +120,8 @@ def set_active_run_id(run_id: str | None) -> None:
 
 
 def _coerce_run_id(explicit: str | None) -> str:
-    """Resolve ``run_id`` with explicit-first, active-fallback semantics.
-
-    The reducer's ``_instrument_apply`` decorator does not receive
-    the active run_id as an argument (state is the only handle it
-    has, and the state object is application-level). Using a
-    process-local accessor keeps the call site unchanged while still
-    landing the correct id on the journal.
-    """
+    """Resolve ``run_id`` with explicit-first, active-fallback semantics."""
     return str(explicit or "") or _active_run_id
-
-
-def get_active_spine() -> EventSpine | None:
-    """Return the active spine, or ``None`` if no run is in flight."""
-    return _active_spine
 
 
 # ── core emitter ─────────────────────────────────────────────────────
@@ -162,29 +134,17 @@ def _safe_append(
     payload: dict[str, Any] | None = None,
     outcome: Outcome | None = None,
 ) -> EventRecord | None:
-    """Dispatch to the active spine, returning ``None`` when no spine wired.
+    """Thin pass-through to the shared ``safe_append`` helper.
 
-    Swallows ``EventRecord`` validation errors (malformed payload) so a
-    broken helper never blocks the caller; logs at WARNING. All other
-    exceptions propagate as FD-1.
+    Kept under the historic name for the ~15 ``emit_*`` helpers in
+    this file. The shared implementation lives in ``_spine_safety``.
     """
-    spine = _active_spine
-    if spine is None:
-        return None
-    try:
-        return spine.append(
-            execution_point=execution_point,
-            channel=channel,
-            caller_payload=payload,
-            outcome=outcome,
-        )
-    except ValueError as exc:
-        log.warning(
-            "runtime_reflector: drop invalid event ep=%s err=%s",
-            execution_point,
-            exc,
-        )
-        return None
+    return safe_append(
+        execution_point=execution_point,
+        channel=channel,
+        payload=payload,
+        outcome=outcome,
+    )
 
 
 # ── runtime.reducer.apply ───────────────────────────────────────────

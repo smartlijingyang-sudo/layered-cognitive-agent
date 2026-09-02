@@ -34,13 +34,18 @@ def test_null_persistence_restore_returns_empty_iterator() -> None:
     assert list(coord.restore(from_seq=42)) == []
 
 
-def test_null_persistence_stats_returns_zero_persistence_stats() -> None:
-    """``NullPersistenceCoordinator.stats()`` 返回全 0 PersistenceStats;满足 Protocol。"""
+def test_null_persistence_stats_marks_unavailable() -> None:
+    """``NullPersistenceCoordinator.stats()`` returns -1 sentinel counts.
+
+    The ``NullPersistenceCoordinator`` does not track counters; the
+    sentinel ``-1`` distinguishes "no measurement" from "0 events"
+    so consumers don't silently treat an empty stream as a real one.
+    """
     coord = NullPersistenceCoordinator()
     stats = coord.stats()
     assert isinstance(stats, PersistenceStats)
-    assert stats.total_appended == 0
-    assert stats.last_seq == 0
+    assert stats.total_appended == -1
+    assert stats.last_seq == -1
     assert stats.bytes_written == 0
     # 满足 PersistenceCoordinator Protocol(runtime_checkable)
     assert isinstance(coord, PersistenceCoordinator)

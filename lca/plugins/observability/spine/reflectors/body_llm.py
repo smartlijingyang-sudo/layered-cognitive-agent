@@ -42,35 +42,19 @@ from lca.infrastructure.observability.spine.event_record import (
     EventRecord,
     Outcome,
 )
-from lca.infrastructure.observability.spine.event_spine import EventSpine
+from lca.plugins.observability.spine._spine_safety import (
+    get_active_spine,
+    safe_append,
+    set_active_spine,
+)
 
 log = logging.getLogger(__name__)
 
-
-# ── process-local active spine accessor ─────────────────────────────
-#
-# The body and LLM layers never receive the spine through their Protocol
-# surface (Body / SafeExecutor / Tool / LLMAdapter). Profile boot
-# installs the run's EventSpine here so every body / LLM call can
-# locate it without changing any constructor signature. Tests call the
-# setter directly to inject a capturing sink.
-
-_active_spine: EventSpine | None = None
-
-
-def set_active_spine(spine: EventSpine | None) -> None:
-    """Install or clear the process-local active spine for body/LLM emits."""
-    global _active_spine
-    _active_spine = spine
-
-
-def get_active_spine() -> EventSpine | None:
-    """Return the active spine, or ``None`` if no run is in flight."""
-    return _active_spine
-
-
-# ── core emitter ──────────────────────────────────────────────────────
-
+# `_safe_append` and the active-spine accessors live in
+# `plugins.observability.spine._spine_safety` — the single
+# source of truth across all reflector modules. Profile boot
+# installs the run's EventSpine there so every body / LLM call
+# can locate it without changing any constructor signature.
 
 def _safe_append(
     *,
@@ -79,31 +63,17 @@ def _safe_append(
     payload: dict[str, Any] | None = None,
     outcome: Outcome | None = None,
 ) -> EventRecord | None:
-    """Dispatch to the active spine, returning ``None`` when no spine wired.
+    """Thin pass-through to the shared ``safe_append`` helper.
 
-    Swallows ``EventRecord`` validation errors (malformed payload) so a
-    broken helper never blocks the caller; logs at WARNING. All other
-    exceptions propagate as FD-1.
+    Kept under the historic name for the ``emit_*`` helpers in this
+    file. The shared implementation lives in ``_spine_safety``.
     """
-    spine = _active_spine
-    if spine is None:
-        return None
-    try:
-        return spine.append(
-            execution_point=execution_point,
-            channel=channel,
-            caller_payload=payload,
-            outcome=outcome,
-        )
-    except ValueError as exc:
-        # EventRecord post-init validation failure (e.g. unknown EP).
-        log.warning(
-            "body_llm_reflector: drop invalid event ep=%s err=%s",
-            execution_point,
-            exc,
-        )
-        return None
-
+    return safe_append(
+        execution_point=execution_point,
+        channel=channel,
+        payload=payload,
+        outcome=outcome,
+    )
 
 # ── body.tool.execute.start / body.tool.execute.end ─────────────────
 
