@@ -13,8 +13,10 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from collections.abc import Callable
+from contextlib import suppress
 from datetime import datetime, timezone
-from typing import Any, Callable, Optional
+from typing import Any
 
 from lca.infrastructure.observability.spine.context import SpineContext
 from lca.infrastructure.observability.spine.event_record import (
@@ -24,7 +26,6 @@ from lca.infrastructure.observability.spine.event_record import (
     Phase,
 )
 from lca.infrastructure.observability.spine.sinks.base import EventSink
-
 
 log = logging.getLogger(__name__)
 
@@ -36,8 +37,8 @@ class EventSpine:
         self,
         sinks: list[EventSink],
         *,
-        subscribers: Optional[list[Callable[[EventRecord], None]]] = None,
-        run_id: Optional[str] = None,
+        subscribers: list[Callable[[EventRecord], None]] | None = None,
+        run_id: str | None = None,
     ) -> None:
         if not sinks:
             raise ValueError("EventSpine requires at least one sink")
@@ -51,10 +52,8 @@ class EventSpine:
         self._subscribers.append(fn)
 
         def _dispose() -> None:
-            try:
+            with suppress(ValueError):
                 self._subscribers.remove(fn)
-            except ValueError:
-                pass
 
         return _dispose
 
@@ -63,12 +62,12 @@ class EventSpine:
         *,
         execution_point: str,
         channel: Channel,
-        caller_payload: Optional[dict[str, Any]] = None,
-        outcome: Optional[Outcome] = None,
-        span_ctx: Optional[Any] = None,
+        caller_payload: dict[str, Any] | None = None,
+        outcome: Outcome | None = None,
+        span_ctx: Any | None = None,
         phase: Phase = "live",
-        reason: Optional[str] = None,
-        when: Optional[datetime] = None,
+        reason: str | None = None,
+        when: datetime | None = None,
     ) -> EventRecord:
         """Stamp and dispatch an event to all sinks (FD-1) and subscribers (FD-2)."""
 
@@ -96,9 +95,10 @@ class EventSpine:
             default=str,
         )
         causality_id = "sha256:" + hashlib.sha256(causality_payload.encode()).hexdigest()
-        new_hash = "sha256:" + hashlib.sha256(
-            ((prev_hash or "") + causality_id).encode("utf-8")
-        ).hexdigest()
+        new_hash = (
+            "sha256:"
+            + hashlib.sha256(((prev_hash or "") + causality_id).encode("utf-8")).hexdigest()
+        )
 
         record = EventRecord(
             execution_point=execution_point,

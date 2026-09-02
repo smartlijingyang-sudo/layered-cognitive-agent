@@ -8,34 +8,36 @@ from __future__ import annotations
 
 from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Optional
 
 
-class PhaseMachineViolation(Exception):
+class PhaseMachineViolationError(Exception):
     """I13 — end ep without matching start ep."""
+
+
+# Back-compat alias: keep the original name to avoid breaking
+# external ``except PhaseMachineViolation`` callers (chore: ruff N818).
+PhaseMachineViolation = PhaseMachineViolationError
 
 
 @dataclass(frozen=True, slots=True)
 class SpanContext:
     execution_point: str
     span_id: str
-    parent_span_id: Optional[str]
+    parent_span_id: str | None
 
 
 class SpineContext:
     """Context-local Spine state. All classmethods; no instance."""
 
-    _run_id: ContextVar[Optional[str]] = ContextVar("lca_spine_run_id", default=None)
-    _step_id: ContextVar[Optional[str]] = ContextVar("lca_spine_step_id", default=None)
+    _run_id: ContextVar[str | None] = ContextVar("lca_spine_run_id", default=None)
+    _step_id: ContextVar[str | None] = ContextVar("lca_spine_step_id", default=None)
     _span_stack: ContextVar[tuple[SpanContext, ...]] = ContextVar(
         "lca_spine_span_stack", default=()
     )
     _seq: ContextVar[int] = ContextVar("lca_spine_seq", default=0)
     _epoch: ContextVar[int] = ContextVar("lca_spine_epoch", default=0)
     _span_counter: ContextVar[int] = ContextVar("lca_spine_span_counter", default=0)
-    _hash_chain: ContextVar[Optional[str]] = ContextVar(
-        "lca_spine_prev_hash", default=None
-    )
+    _hash_chain: ContextVar[str | None] = ContextVar("lca_spine_prev_hash", default=None)
 
     # ── run / step ─────────────────────────────────────────────────────
     @classmethod
@@ -43,7 +45,7 @@ class SpineContext:
         cls._run_id.set(run_id)
 
     @classmethod
-    def get_run(cls) -> Optional[str]:
+    def get_run(cls) -> str | None:
         return cls._run_id.get()
 
     @classmethod
@@ -51,7 +53,7 @@ class SpineContext:
         cls._step_id.set(step_id)
 
     @classmethod
-    def get_step(cls) -> Optional[str]:
+    def get_step(cls) -> str | None:
         return cls._step_id.get()
 
     # ── monotonic counters ─────────────────────────────────────────────
@@ -68,11 +70,11 @@ class SpineContext:
         return val
 
     @classmethod
-    def last_hash(cls) -> Optional[str]:
+    def last_hash(cls) -> str | None:
         return cls._hash_chain.get()
 
     @classmethod
-    def chain_hash(cls, new_hash: Optional[str]) -> None:
+    def chain_hash(cls, new_hash: str | None) -> None:
         cls._hash_chain.set(new_hash)
 
     # ── span stack ─────────────────────────────────────────────────────
@@ -86,27 +88,24 @@ class SpineContext:
             span_id=f"lca-span-{counter:08x}",
             parent_span_id=parent_id,
         )
-        cls._span_stack.set(cls._span_stack.get() + (span,))
+        cls._span_stack.set((*cls._span_stack.get(), span))
         return span
 
     @classmethod
     def pop_span(cls, execution_point: str) -> SpanContext:
         stack = cls._span_stack.get()
         if not stack:
-            raise PhaseMachineViolation(
-                f"pop_span({execution_point!r}) on empty stack"
-            )
+            raise PhaseMachineViolation(f"pop_span({execution_point!r}) on empty stack")
         top = stack[-1]
         if top.execution_point != execution_point:
             raise PhaseMachineViolation(
-                f"end {execution_point!r} without matching start "
-                f"{top.execution_point!r}"
+                f"end {execution_point!r} without matching start {top.execution_point!r}"
             )
         cls._span_stack.set(stack[:-1])
         return top
 
     @classmethod
-    def current_span(cls) -> Optional[SpanContext]:
+    def current_span(cls) -> SpanContext | None:
         stack = cls._span_stack.get()
         return stack[-1] if stack else None
 
