@@ -48,12 +48,12 @@ def _row(seq: int, event_type: str, event: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _make_session(*, run_id: str, jsonl_path: Path, status: RunStatus) -> RunSession:
-    locator = FilesystemRunLocator(root=jsonl_path.parent.parent.parent)
+def _make_session(*, run_id: str, spine_path: Path, status: RunStatus) -> RunSession:
+    locator = FilesystemRunLocator(root=spine_path.parent.parent.parent)
     return RunSession(
         run_id=run_id,
         trace_id="trace_x",
-        jsonl_path=jsonl_path,
+        spine_path=spine_path,
         tail=LiveTail(),
         question="q",
         user_text="q",
@@ -72,9 +72,9 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
     def test_manifest_written_with_run_id_and_terminal_event_seq(self) -> None:
         with self._fresh_root() as root:
             run_id = "run_terminal01"
-            jsonl_path = root / "runs" / run_id / "journal.jsonl"
+            spine_path = root / "runs" / run_id / "events.jsonl"
             _write_jsonl(
-                jsonl_path,
+                spine_path,
                 [
                     _row(
                         1,
@@ -89,7 +89,7 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
                 ],
             )
             session = _make_session(
-                run_id=run_id, jsonl_path=jsonl_path, status=RunStatus.COMPLETED
+                run_id=run_id, spine_path=spine_path, status=RunStatus.COMPLETED
             )
 
             record_terminal_materialization(session)
@@ -112,9 +112,9 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
     def test_latest_json_atomically_written(self) -> None:
         with self._fresh_root() as root:
             run_id = "run_terminal02"
-            jsonl_path = root / "runs" / run_id / "journal.jsonl"
+            spine_path = root / "runs" / run_id / "events.jsonl"
             _write_jsonl(
-                jsonl_path,
+                spine_path,
                 [
                     _row(
                         1,
@@ -129,7 +129,7 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
                 ],
             )
             session = _make_session(
-                run_id=run_id, jsonl_path=jsonl_path, status=RunStatus.COMPLETED
+                run_id=run_id, spine_path=spine_path, status=RunStatus.COMPLETED
             )
 
             record_terminal_materialization(session)
@@ -144,15 +144,15 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
             self.assertEqual(leftovers, [], "tmp files must not remain after rename")
 
     def test_session_without_locator_falls_back_to_path_inferred_locator(self) -> None:
-        """测试 / 直构造的 session 没 locator;从 jsonl_path 上溯推断 FilesystemRunLocator。"""
+        """测试 / 直构造的 session 没 locator;从 spine_path 上溯推断 FilesystemRunLocator。"""
         with self._fresh_root() as root:
             run_id = "run_terminal03"
-            jsonl_path = root / "runs" / run_id / "journal.jsonl"
-            _write_jsonl(jsonl_path, [_row(1, "AgentRunFinished", {"ok": True})])
+            spine_path = root / "runs" / run_id / "events.jsonl"
+            _write_jsonl(spine_path, [_row(1, "AgentRunFinished", {"ok": True})])
             session = RunSession(
                 run_id=run_id,
                 trace_id="t",
-                jsonl_path=jsonl_path,
+                spine_path=spine_path,
                 tail=LiveTail(),
                 question="q",
                 user_text="q",
@@ -169,16 +169,16 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
     def test_terminal_event_seq_picks_finished(self) -> None:
         with self._fresh_root() as root:
             run_id = "run_terminal04"
-            jsonl_path = root / "runs" / run_id / "journal.jsonl"
+            spine_path = root / "runs" / run_id / "events.jsonl"
             _write_jsonl(
-                jsonl_path,
+                spine_path,
                 [
                     _row(1, "AgentRunStarted", {}),
                     _row(7, "AgentRunFinished", {}),
                 ],
             )
             session = _make_session(
-                run_id=run_id, jsonl_path=jsonl_path, status=RunStatus.COMPLETED
+                run_id=run_id, spine_path=spine_path, status=RunStatus.COMPLETED
             )
             record_terminal_materialization(session)
             payload = json.loads(
@@ -192,12 +192,12 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
     def test_terminal_event_seq_fallback_accepts_run_finished(self) -> None:
         with self._fresh_root() as root:
             run_id = "run_terminal_fallback"
-            jsonl_path = root / "runs" / run_id / "journal.jsonl"
+            spine_path = root / "runs" / run_id / "events.jsonl"
             terminal = _row(3, "RunFinished", {"ok": True})
             terminal["event_id"] = "evt-run-finished"
-            _write_jsonl(jsonl_path, [_row(1, "AgentRunStarted", {}), terminal])
+            _write_jsonl(spine_path, [_row(1, "AgentRunStarted", {}), terminal])
             session = _make_session(
-                run_id=run_id, jsonl_path=jsonl_path, status=RunStatus.COMPLETED
+                run_id=run_id, spine_path=spine_path, status=RunStatus.COMPLETED
             )
 
             record_terminal_materialization(session)
@@ -212,9 +212,9 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
     def test_v2_envelope_fallback_preserves_watermark_and_terminal_event(self) -> None:
         with self._fresh_root() as root:
             run_id = "run_terminal_v2"
-            jsonl_path = root / "runs" / run_id / "journal.jsonl"
+            spine_path = root / "runs" / run_id / "events.jsonl"
             _write_jsonl(
-                jsonl_path,
+                spine_path,
                 [
                     {
                         "schema": JOURNAL_SCHEMA_VERSION,
@@ -241,7 +241,7 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
                 ],
             )
             session = _make_session(
-                run_id=run_id, jsonl_path=jsonl_path, status=RunStatus.COMPLETED
+                run_id=run_id, spine_path=spine_path, status=RunStatus.COMPLETED
             )
 
             record_terminal_materialization(session)
@@ -258,11 +258,11 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
         """任何 IO 错误必须 swallow + 记日志,不能污染 run 关闭。"""
         with self._fresh_root() as root:
             run_id = "run_terminal05"
-            jsonl_path = root / "runs" / run_id / "journal.jsonl"
+            spine_path = root / "runs" / run_id / "events.jsonl"
             session = RunSession(
                 run_id=run_id,
                 trace_id="t",
-                jsonl_path=jsonl_path,  # 不存在
+                spine_path=spine_path,  # 不存在
                 tail=LiveTail(),
                 question="q",
                 user_text="q",
@@ -282,21 +282,24 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
         """smoke:``diagnose`` 与新 jsonl 路径兼容(doctor_report 形状)。"""
         with self._fresh_root() as root:
             run_id = "run_terminal06"
-            jsonl_path = root / "runs" / run_id / "journal.jsonl"
+            spine_path = root / "runs" / run_id / "events.jsonl"
             _write_jsonl(
-                jsonl_path,
+                spine_path,
                 [
                     _row(1, "AgentRunStarted", {}),
                     _row(2, "AgentRunFinished", {}),
                 ],
             )
             session = _make_session(
-                run_id=run_id, jsonl_path=jsonl_path, status=RunStatus.COMPLETED
+                run_id=run_id, spine_path=spine_path, status=RunStatus.COMPLETED
             )
-            report = diagnose(session, jsonl_path)
+            report = diagnose(session, spine_path)
             self.assertEqual(report.schema, "doctor.v3")
             self.assertEqual(report.run_id, run_id)
-            self.assertGreaterEqual(report.hops["H2"].ok, True)  # type: ignore[arg-type]
+            # 仅 events.jsonl (spine SSOT) 存在时,doctor 给出最小 H1 fallback 诊断
+            self.assertEqual(report.broken_hop, "H1")
+            self.assertFalse(report.hops["H1"].ok)
+            self.assertIn("events.jsonl", report.hops["H1"].detail or "")
 
     @staticmethod
     def _fresh_root():

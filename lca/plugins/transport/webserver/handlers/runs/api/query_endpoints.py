@@ -31,7 +31,7 @@ _PROFILE_SNAPSHOT_NAME = "profile_snapshot.json"
 _DEFAULT_PROFILE_SNAPSHOT_ROOT = Path("traces") / "runs"
 
 
-def _journal_path_of(request: Request, run_id: str):
+def _spine_path_of(request: Request, run_id: str):
     """Resolve one run's Journal through the owner selected by composition."""
     return _run_port_of(request).journal_path(run_id)
 
@@ -215,7 +215,7 @@ async def get_run_evidence(request: Request) -> JSONResponse:
         evidence = RunEvidenceReader(evidence_binding.store).read_json(
             run_id=run_id,
             requested_ref=ref_str,
-            journal_path=_journal_path_of(request, run_id),
+            journal_path=_spine_path_of(request, run_id),
             requester=f"gateway:{run_id}",
         )
     except InvalidEvidenceDigestError:

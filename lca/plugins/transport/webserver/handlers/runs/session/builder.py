@@ -72,6 +72,7 @@ class RunSessionBuilder:
                 SpineEmitter,
                 StandardDriver,
             )
+
             registry.register("emitter", SpineEmitter())
             registry.register("driver", StandardDriver())
             registry.register("coalescer", LineCoalescer())
@@ -115,12 +116,13 @@ class RunSessionBuilder:
             event_spine.subscribe(step_tree_deriver.on_event)
             log.debug(
                 "run_session_builder: subscribed step_tree deriver run=%s dir=%s",
-                run_id, run_dir,
+                run_id,
+                run_dir,
             )
 
         # ── 3) 注入 factory → 拿 LiveTail + 空 step_tree_writer ──
         components = journal_factory.create_run_components(
-            jsonl_path=self._registry.jsonl_path_for(run_id),
+            spine_path=self._registry.spine_path_for(run_id),
         )
 
         # ── 4) 把 step_tree_deriver + narrative_writer 装到 bundle ──
@@ -149,7 +151,7 @@ class RunSessionBuilder:
         return RunSession(
             run_id=run_id,
             trace_id=trace_id,
-            jsonl_path=self._registry.jsonl_path_for(run_id),
+            spine_path=self._registry.spine_path_for(run_id),
             tail=components.tail,
             hub=hub,
             thread_tree_writer=step_tree_deriver,

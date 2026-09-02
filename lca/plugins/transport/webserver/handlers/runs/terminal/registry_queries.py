@@ -102,16 +102,16 @@ class RegistryRunQueries:
 
     async def doctor(self, run_id: str) -> DoctorReport | None:
         session = self._registry.get(run_id)
-        jsonl_path = (
-            session.jsonl_path if session is not None else self._registry.jsonl_path_for(run_id)
+        spine_path = (
+            session.spine_path if session is not None else self._registry.spine_path_for(run_id)
         )
-        if session is None and not jsonl_path.is_file():
+        if session is None and not spine_path.is_file():
             return None
-        return diagnose(session, jsonl_path)
+        return diagnose(session, spine_path)
 
     def journal_path(self, run_id: str) -> Path | None:
-        """Return only the current run's Journal path; never fall back across sessions."""
-        path = self._registry.jsonl_path_for(run_id)
+        """Return only the current run's spine path; never fall back across sessions."""
+        path = self._registry.spine_path_for(run_id)
         return path if path.is_file() else None
 
     def latest_bindings(self) -> object | None:

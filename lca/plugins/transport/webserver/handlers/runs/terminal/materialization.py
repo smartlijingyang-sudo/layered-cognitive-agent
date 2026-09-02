@@ -153,9 +153,7 @@ def _doctor_journal_path(session: RunSession, locator: RunLocator) -> Path:
 
     ADR-0167 D11:
     - journal.json 优先:它是可重建物化视图(lca.journal/3.1 step 树)
-    - events.jsonl 兜底: SSOT —— 即使 step_tree_deriver 没挂(未来不会发生,
-      仅供迁移期 / partial profile 用)
-    - 最后回落到 session.jsonl_path(legacy 兜底)
+    - events.jsonl 兜底: SSOT —— 仅供迁移期 / partial profile 兜底
     """
     step_path = locator.journal_step_path(session.run_id)
     if step_path.exists():
@@ -163,7 +161,7 @@ def _doctor_journal_path(session: RunSession, locator: RunLocator) -> Path:
     events_path = locator.events_path(session.run_id)
     if events_path.exists():
         return events_path
-    return session.jsonl_path
+    return session.spine_path
 
 
 def session_locator(session: RunSession) -> RunLocator:
@@ -172,11 +170,11 @@ def session_locator(session: RunSession) -> RunLocator:
         return session.locator
     from lca.infrastructure.observability.backends.run_locator_fs import FilesystemRunLocator
 
-    return FilesystemRunLocator(root=session.jsonl_path.parent.parent.parent)
+    return FilesystemRunLocator(root=session.spine_path.parent.parent.parent)
 
 
 def ledger_high_watermark_for(session: RunSession) -> int:
-    """Read the final Journal sequence from memory, then fall back to its JSONL file."""
+    """Read the final Journal sequence from memory, then fall back to the spine file."""
     store = journal_store(session.hub)
     if store is not None:
         try:
@@ -186,7 +184,7 @@ def ledger_high_watermark_for(session: RunSession) -> int:
             _log.debug(
                 "ledger_high_watermark_from_hub_failed", run_id=session.run_id, error=str(exc)
             )
-    return watermark_from_file(session.jsonl_path)
+    return watermark_from_file(session.spine_path)
 
 
 def terminal_event_seq_for(session: RunSession) -> int:
@@ -202,7 +200,7 @@ def terminal_event_seq_for(session: RunSession) -> int:
             event = getattr(stamped, "event", None)
             if event is not None and type(event).__name__ in _TERMINAL_EVENT_TYPES:
                 return int(getattr(stamped, "seq", 0) or 0)
-    return terminal_event_seq_from_file(session.jsonl_path)
+    return terminal_event_seq_from_file(session.spine_path)
 
 
 def watermark_from_file(path: Path) -> int:
@@ -258,7 +256,7 @@ def evidence_integrity_for(locator: RunLocator, run_id: str) -> tuple[ManifestEv
 
 def ledger_summary_for(session: RunSession) -> str:
     """Hash the terminal one megabyte of the Journal for integrity navigation."""
-    path = session.jsonl_path
+    path = session.spine_path
     if not path.exists():
         return ""
     try:

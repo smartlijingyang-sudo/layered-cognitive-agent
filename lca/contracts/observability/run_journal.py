@@ -88,12 +88,12 @@ class RunJournalFactory(Protocol):
     def create_run_components(
         self,
         *,
-        jsonl_path: Path,
+        spine_path: Path,
     ) -> RunJournalComponents:
         """Create the live tail for one run.
 
         参数:
-            jsonl_path:    durable journal 路径(由 RunLocator 决定)
+            spine_path:    落盘 spine 事件流路径(events.jsonl;由 RunLocator 决定)
         """
         ...
 

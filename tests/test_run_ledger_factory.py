@@ -59,9 +59,9 @@ def test_run_session_consumes_profile_selected_journal_factory(tmp_path: Path) -
         def create_run_components(
             self,
             *,
-            jsonl_path: Path,
+            spine_path: Path,
         ) -> RunJournalComponents:
-            self.paths.append(jsonl_path)
+            self.paths.append(spine_path)
             tail = LiveTail()
             self.tails.append(tail)
             return RunJournalComponents(
@@ -81,6 +81,7 @@ def test_run_session_consumes_profile_selected_journal_factory(tmp_path: Path) -
                 def subscribe(self, fn: object) -> object:
                     del fn
                     return lambda: None
+
                 def close(self) -> None: ...
 
             self._services = {
@@ -106,7 +107,7 @@ def test_run_session_consumes_profile_selected_journal_factory(tmp_path: Path) -
     second = create_run_session(registry, question="second", user_text="second", ctx=ctx)
 
     # factory 拿到两条路径 + 两个独立 tail
-    assert factory.paths == [first.jsonl_path, second.jsonl_path]
+    assert factory.paths == [first.spine_path, second.spine_path]
     assert first.tail is factory.tails[0]
     assert second.tail is factory.tails[1]
     assert factory.process_creations == 1

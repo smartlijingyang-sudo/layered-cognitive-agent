@@ -72,7 +72,7 @@ class RunSession:
 
     run_id: str
     trace_id: str
-    jsonl_path: Path
+    spine_path: Path
     tail: LiveRunProjection
     question: str
     user_text: str
@@ -98,7 +98,9 @@ class RunSession:
     locator: RunLocator | None = None  # ADR-0065 PR-11: run 级 locator 引用
     thread_tree_writer: object | None = None  # ADR-0167 D11: per-run StepTreeAccumulatorDeriver
     coordinator: object | None = None  # ADR-0167 D11: StepCoordinator (Agent 唯一写入口)
-    step_tree_bundle: object | None = None  # ADR-0164 Phase 6: step-tree write bundle (legacy, 兼容)
+    step_tree_bundle: object | None = (
+        None  # ADR-0164 Phase 6: step-tree write bundle (legacy, 兼容)
+    )
 
 
 class RunRegistry:
@@ -202,10 +204,10 @@ class RunRegistry:
 
         return self._process_journal.bind(factory)
 
-    def jsonl_path_for(self, run_id: str) -> Path:
-        """Resolve a run journal path through the durable locator."""
+    def spine_path_for(self, run_id: str) -> Path:
+        """Resolve the run's spine SSOT path (events.jsonl) via the durable locator."""
 
-        return self._locator.journal_path(run_id)
+        return self._locator.events_path(run_id)
 
     def manifest_path_for(self, run_id: str) -> Path:
         """Resolve a run manifest path through the durable locator."""
