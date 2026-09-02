@@ -1,0 +1,43 @@
+"""Cognition-plane model contracts."""
+
+from lca.contracts.models.cognition.prompt_assembly import (
+    BrainPromptCatalog,
+    MissingPromptSectionError,
+    MissingSectionKindError,
+    PromptAssembler,
+    PromptSectionRegistry,
+    PromptTemplate,
+    PromptTemplateConfig,
+    PromptTemplateProvider,
+    PromptTemplateSelector,
+    PromptTemplateVariant,
+    PureSection,
+    ReasonerTemplateCatalog,
+    SectionKind,
+    SectionManifest,
+    SectionOutput,
+    SectionReference,
+    StatefulSection,
+    templates_from_provider,
+)
+
+__all__ = [
+    "BrainPromptCatalog",
+    "MissingPromptSectionError",
+    "MissingSectionKindError",
+    "PromptAssembler",
+    "PromptSectionRegistry",
+    "PromptTemplate",
+    "PromptTemplateConfig",
+    "PromptTemplateProvider",
+    "PromptTemplateSelector",
+    "PromptTemplateVariant",
+    "PureSection",
+    "ReasonerTemplateCatalog",
+    "SectionKind",
+    "SectionManifest",
+    "SectionOutput",
+    "SectionReference",
+    "StatefulSection",
+    "templates_from_provider",
+]

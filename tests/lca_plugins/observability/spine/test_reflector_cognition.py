@@ -202,7 +202,12 @@ def test_reasoner_emits_reasoner_reason_events() -> None:
         raise
 
     points = [r.execution_point for r in sink.records]
-    assert points == ["reasoner.reason.start", "reasoner.reason.end"]
+    assert points == [
+        "prompt_assembler.assemble.start",
+        "prompt_assembler.assemble.end",
+        "reasoner.reason.start",
+        "reasoner.reason.end",
+    ]
 
 
 # ── critic emits critic.eval.start/end ──────────────────────────────

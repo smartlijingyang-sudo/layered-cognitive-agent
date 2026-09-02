@@ -162,11 +162,15 @@ class SkillRouter(Protocol):
 
 @runtime_checkable
 class ReasonerTemplateCatalog(Protocol):
-    """Profile-selected immutable template collection used by PromptReasoner."""
+    """Legacy Protocol preserved for back-compat imports.
 
-    def templates(self) -> Mapping[str, str]:
-        """Return all templates required by the configured reasoning strategy."""
-        ...
+    New code must depend on :class:`PromptTemplateProvider` from
+    :mod:`lca.contracts.models.cognition.prompt_assembly`. The reasoner
+    no longer renders templates by raw string substitution; it goes
+    through :class:`PromptAssembler`.
+    """
+
+    def templates(self) -> Mapping[str, str]: ...
 
 
 @runtime_checkable
@@ -184,6 +188,10 @@ class BrainPromptCatalog(Protocol):
 
     def render_brain_skills(self) -> str:
         """Render the compact skill catalog visible to the selected Brain factory."""
+        ...
+
+    def render_skill_discovery(self) -> str:
+        """Render the skill catalog with summaries and versions for discovery."""
         ...
 
 
@@ -218,8 +226,33 @@ class BrainFactory(Protocol):
         self,
         llm: LLMAdapter,
         role_profile: RoleProfile,
-        tools_desc: str,
+        catalog: BrainPromptCatalog,
         *,
         tools: list[Tool] | None = None,
-        available_skills: str = "",
     ) -> Brain: ...
+
+
+# Re-export the prompt-assembly protocols from the canonical home so
+# existing ``from lca.contracts.protocols.think.cognition import ...``
+# imports keep working during the transition.
+from lca.contracts.models.cognition.prompt_assembly import (  # noqa: E402
+    MissingPromptSectionError,
+    MissingSectionKindError,
+    PromptAssembler,
+    PromptSectionRegistry,
+    PromptTemplate,
+    PromptTemplateConfig,
+    PromptTemplateProvider,
+    PromptTemplateSelector,
+    PureSection,
+    SectionKind,
+    SectionManifest,
+    SectionOutput,
+    SectionReference,
+    StatefulSection,
+)
+
+
+# Re-export the prompt-assembly protocols from the canonical home so
+# existing ``from lca.contracts.protocols.think.cognition import ...``
+# imports keep working during the transition.

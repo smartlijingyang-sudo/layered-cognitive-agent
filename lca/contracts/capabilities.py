@@ -241,6 +241,18 @@ MEMORY_RETRIEVAL_POLICY = Capability[object]("memory.retrieval_policy", cardinal
 REASONER_TEMPLATE_CATALOG = Capability[object]("reasoner_template_catalog", cardinality="one")
 """Profile-selected template collection consumed by PromptReasoner factories."""
 
+PROMPT_ASSEMBLER = Capability[object]("prompt_assembler", cardinality="one")
+"""Profile-selected cognitive prompt assembler (cognition L1)."""
+
+PROMPT_TEMPLATE_SELECTOR = Capability[object]("prompt_template_selector", cardinality="one")
+"""Profile-selected selector that picks the active PromptTemplate per AgentState."""
+
+PROMPT_SECTION_REGISTRY = Capability[object]("prompt_section_registry", cardinality="one")
+"""Closed registry collecting typed prompt section providers (kind+name keying)."""
+
+PROMPT_TEMPLATE_PROVIDER = Capability[object]("prompt_template_provider", cardinality="one")
+"""Profile-selected provider of compiled PromptTemplate catalog (built-ins + overrides)."""
+
 TEAM_CASTING_PROMPT_RENDERER = Capability[object]("team_casting_prompt_renderer", cardinality="one")
 """Profile-selected renderer for LLM Team-casting prompts.
 

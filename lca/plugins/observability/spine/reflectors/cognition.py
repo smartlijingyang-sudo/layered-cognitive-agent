@@ -214,6 +214,34 @@ def emit_reasoner_reason_end(*, state_id: str, outcome: Outcome = "success") -> 
     )
 
 
+# ── prompt_assembler.assemble ───────────────────────────────────────
+
+
+def emit_prompt_assembler_start(
+    *, state_id: str, template_id: str
+) -> EventRecord | None:
+    return _safe_append(
+        execution_point="prompt_assembler.assemble.start",
+        channel="fact",
+        payload={"state_id": state_id, "template_id": template_id},
+    )
+
+
+def emit_prompt_assembler_end(
+    *,
+    state_id: str,
+    template_id: str,
+    section_count: int,
+    outcome: Outcome = "success",
+) -> EventRecord | None:
+    return _safe_append(
+        execution_point="prompt_assembler.assemble.end",
+        channel="fact",
+        payload={"state_id": state_id, "template_id": template_id, "section_count": section_count},
+        outcome=outcome,
+    )
+
+
 # ── synthesizer.merge ────────────────────────────────────────────────
 
 
@@ -286,6 +314,8 @@ __all__ = [
     "emit_critic_eval_start",
     "emit_memory_read",
     "emit_memory_write",
+    "emit_prompt_assembler_end",
+    "emit_prompt_assembler_start",
     "emit_reasoner_reason_end",
     "emit_reasoner_reason_start",
     "emit_skill_router_route",

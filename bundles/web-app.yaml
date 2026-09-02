@@ -142,16 +142,37 @@ entries:
     $module: lca.plugins.composer.composition.prompt_catalog
     config: {}
 
+  - id: lca-prompt-section-registry
+    name: lca_prompt_section_registry
+    $module: lca.plugins.prompts.registry
+    config: {}
+
+  - id: lca-prompt-template-provider-builtin
+    name: lca_prompt_template_provider_builtin
+    $module: lca.plugins.prompts.template_provider
+    config: {}
+
+  - id: lca-brain-prompt-sections
+    name: lca_brain_prompt_sections
+    $module: lca.plugins.prompts.sections
+    config: {}
+
+  - id: lca-prompt-assembler-section-manifest
+    name: lca_prompt_assembler_section_manifest
+    $module: lca.plugins.prompts.assembler
+    config:
+      strip_empty_fields: true
+
+  - id: lca-prompt-template-selector-team-awareness
+    name: lca_prompt_template_selector_team_awareness
+    $module: lca.plugins.prompts.selector
+    config:
+      default_template: react_prompt
+
   - id: lca-reasoner-prompt
     name: lca_reasoner_prompt
     $module: lca.plugins.reasoner.prompt
     config: {}
-
-  - id: lca-reasoner-template-catalog-builtin
-    name: lca_reasoner_template_catalog_builtin
-    $module: lca.plugins.seams.think.reasoner_template_catalog
-    config:
-      template_names: [react_prompt, hierarchical_prompt, routing_prompt]
 
   - id: lca-critic-simple
     name: lca_critic_simple

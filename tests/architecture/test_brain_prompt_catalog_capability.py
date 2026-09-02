@@ -38,6 +38,9 @@ class _Catalog:
     def render_brain_skills(self) -> str:
         return "custom-skill-catalog"
 
+    def render_skill_discovery(self) -> str:
+        return "custom-discovery"
+
 
 class _CatalogFactory:
     """Record composition inputs and return a profile-selected catalog."""
@@ -141,9 +144,12 @@ def test_resolve_brain_consumes_profile_selected_prompt_catalog_factory(
     assert catalog_factory.skill_store is skill_store
     assert catalog_factory.tools == ()
     assert len(registry.calls) == 1
-    _args, kwargs = registry.calls[0]
-    assert _args[2] == "<custom-tool-catalog />"
-    assert kwargs["available_skills"] == "custom-skill-catalog"
+    _args, _kwargs = registry.calls[0]
+    # The BrainFactory Protocol was tightened to inject the catalog directly
+    # instead of pre-rendering the tools XML as a third positional ``tools_desc``.
+    assert isinstance(_args[2], _Catalog)
+    assert _args[2].render_tools_xml() == "<custom-tool-catalog />"
+    assert _args[2].render_brain_skills() == "custom-skill-catalog"
 
 
 def test_brain_composer_has_no_direct_prompt_catalog_implementation() -> None:

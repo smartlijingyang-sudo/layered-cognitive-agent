@@ -29,9 +29,9 @@ def instrument_llm(llm: LLMAdapter) -> LLMAdapter:
 def resolve_brain(spec: AgentSpec, llm: LLMAdapter, *, scope: object) -> Brain:
     """Build the selected Brain with its model-visible prompt catalog.
 
-    The active skill provider is resolved only for this Think-cluster concern,
-    keeping skill discovery and prompt rendering out of unrelated graph
-    composers.
+    The active skill provider is resolved only for this Think-cluster
+    concern, keeping skill discovery and prompt rendering out of
+    unrelated graph composers.
     """
 
     if not isinstance(spec.brain, str):
@@ -61,9 +61,8 @@ def resolve_brain(spec: AgentSpec, llm: LLMAdapter, *, scope: object) -> Brain:
     brain = factory(
         consume("llm", llm, PromptReasoner),
         spec.profile,
-        prompt_catalog.render_tools_xml(),
+        prompt_catalog,
         tools=list(spec.tools),
-        available_skills=prompt_catalog.render_brain_skills(),
     )
     if not isinstance(brain, Brain):
         raise TypeError(

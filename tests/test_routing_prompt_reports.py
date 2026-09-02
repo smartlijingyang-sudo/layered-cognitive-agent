@@ -95,6 +95,7 @@ class TestRoutingPromptMemberReports(unittest.IsolatedAsyncioTestCase):
         reasoner = PromptReasoner(
             llm,  # type: ignore[arg-type]
             _profile("Lead"),
+            "(no tools available)",
             tools_desc="(no tools available)",
             templates={"routing_prompt": load_builtin_prompt("routing_prompt")},
         )

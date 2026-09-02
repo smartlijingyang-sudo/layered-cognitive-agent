@@ -30,6 +30,8 @@ EXECUTION_POINTS: tuple[str, ...] = (
     "critic.eval.end",
     "reasoner.reason.start",
     "reasoner.reason.end",
+    "prompt_assembler.assemble.start",
+    "prompt_assembler.assemble.end",
     "synthesizer.merge",
     "skill_router.route",
     "memory.read",

@@ -1,9 +1,10 @@
 """Shared composition of the standard cognitive Brain factory.
 
 Both ``default`` and ``modular`` registry aliases intentionally expose the
-same profile-selected cognitive primitive set.  Keeping that closure here
-makes the alias relationship explicit and prevents the two plugin declarations
-from silently drifting in their gate, reasoner, classifier, or pipeline wiring.
+same profile-selected cognitive primitive set. Keeping that closure here
+makes the alias relationship explicit and prevents the two plugin
+declarations from silently drifting in their gate, reasoner, classifier,
+or pipeline wiring.
 """
 
 from __future__ import annotations
@@ -14,7 +15,8 @@ from lca.contracts.capabilities import (
     BRAINS,
     COGNITIVE_REFLECTION_PIPELINE,
     COGNITIVE_THINK_PIPELINE,
-    REASONER_TEMPLATE_CATALOG,
+    PROMPT_ASSEMBLER,
+    PROMPT_TEMPLATE_SELECTOR,
 )
 from lca.contracts.protocols import BrainFactory
 
@@ -27,10 +29,11 @@ STANDARD_COGNITIVE_BRAIN_FACTORY_REQUIREMENTS: tuple[str, ...] = (
     "gates",
     "critic.simple",
     "reasoner.prompt",
-    REASONER_TEMPLATE_CATALOG.key,
     "decision_classifier",
     COGNITIVE_THINK_PIPELINE.key,
     COGNITIVE_REFLECTION_PIPELINE.key,
+    PROMPT_ASSEMBLER.key,
+    PROMPT_TEMPLATE_SELECTOR.key,
 )
 """The complete, profile-selected dependency closure of the standard Brain."""
 
@@ -40,7 +43,7 @@ def build_standard_cognitive_brain_factory(ctx: PluginContext) -> BrainFactory:
 
     The plugin declaration owns selection through ``requires``; this helper
     only consumes that declared closure and never supplies implementation
-    fallbacks.  Each registry alias receives a new factory with the same
+    fallbacks. Each registry alias receives a new factory with the same
     immutable profile configuration.
     """
 
@@ -52,7 +55,8 @@ def build_standard_cognitive_brain_factory(ctx: PluginContext) -> BrainFactory:
         classifier=ctx.require("decision_classifier"),
         critic_factory=ctx.require("critic.simple"),
         reasoner_cls=ctx.require("reasoner.prompt"),
-        reasoner_templates=ctx.require(REASONER_TEMPLATE_CATALOG.key).templates(),
+        assembler=ctx.require(PROMPT_ASSEMBLER.key),
+        selector=ctx.require(PROMPT_TEMPLATE_SELECTOR.key),
         think_pipeline=ctx.require(COGNITIVE_THINK_PIPELINE.key),
         reflection_pipeline=ctx.require(COGNITIVE_REFLECTION_PIPELINE.key),
     )

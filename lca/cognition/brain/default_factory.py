@@ -1,18 +1,21 @@
 """Build a modular Brain from collaborators selected by composition.
 
-``SimpleBrainFactory`` owns only the construction of one ``ModularBrain``. It
-must not choose a Critic, Reasoner, Think pipeline, or Reflect pipeline on
-behalf of the composition root: those choices are declared by the selected
-plugins and injected explicitly.
+``SimpleBrainFactory`` owns only the construction of one ``ModularBrain``.
+It must not choose a Critic, Reasoner, Think pipeline, or Reflect pipeline
+on behalf of the composition root: those choices are declared by the
+selected plugins and injected explicitly.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 
 from lca.cognition.brain.modular_brain import ModularBrain
 from lca.cognition.brain.reasoner import PromptReasoner
-from lca.contracts.mechanisms import consume
+from lca.contracts.models.cognition.prompt_assembly import (
+    PromptAssembler,
+    PromptTemplateSelector,
+)
 from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.protocols import (
     Brain,
@@ -33,14 +36,13 @@ class SimpleBrainFactory:
 
     The composition root selects the gate chain, decision classifier, critic,
     reasoner, and both cognitive subflow providers. Keeping these selections
-    outside Layer 1 makes a configured Brain reproducible from its plugin graph:
-    changing a primitive requires a changed declaration instead of relying on a
-    hidden Python fallback.
+    outside Layer 1 makes a configured Brain reproducible from its plugin
+    graph: changing a primitive requires a changed declaration instead of
+    relying on a hidden Python fallback.
 
-    This factory deliberately has no ``synthesizer_factory`` argument. A
-    synthesizer is not consumed while constructing ``ModularBrain``; exposing
-    it here would create a misleading seam whose configuration has no runtime
-    effect.
+    The assembler + selector are optional; when omitted the reasoner falls
+    back to its legacy template-string path so test code that still injects
+    ``templates={...}`` keeps compiling during the migration window.
     """
 
     def __init__(
@@ -50,15 +52,17 @@ class SimpleBrainFactory:
         classifier: DecisionClassifier,
         critic_factory: Callable[[], Critic],
         reasoner_cls: type[PromptReasoner],
-        reasoner_templates: Mapping[str, str],
         think_pipeline: CognitiveThinkPipeline,
         reflection_pipeline: CognitiveReflectionPipeline,
+        assembler: PromptAssembler | None = None,
+        selector: PromptTemplateSelector | None = None,
     ) -> None:
         self._agent_gate_factory = agent_gate_factory
         self._classifier = classifier
         self._critic_factory = critic_factory
         self._reasoner_cls = reasoner_cls
-        self._reasoner_templates = dict(reasoner_templates)
+        self._assembler = assembler
+        self._selector = selector
         if not isinstance(think_pipeline, CognitiveThinkPipeline):
             raise TypeError(
                 "think_pipeline must implement CognitiveThinkPipeline, got "
@@ -82,11 +86,12 @@ class SimpleBrainFactory:
         available_skills: str = "",
     ) -> Brain:
         reasoner = self._reasoner_cls(
-            consume("llm", llm, PromptReasoner),
+            llm,
             role_profile,
             tools_desc,
             tools=tools,
-            templates=self._reasoner_templates,
+            assembler=self._assembler,
+            selector=self._selector,
             available_skills=available_skills,
         )
         return ModularBrain(
