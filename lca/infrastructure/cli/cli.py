@@ -10,6 +10,8 @@ still works — tests and scripts import ``app`` directly.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import typer
 
 import lca.infrastructure.cli.steps  # noqa: F401
@@ -55,14 +57,14 @@ heal
   ./scripts/lca-ops heal
 
 ────────────────────────────────
-日志  logs
+日志  journal logs
 ────────────────────────────────
-  ./scripts/lca-ops logs              journal 事实流（模型所见即日志）
-  ./scripts/lca-ops logs -v           + prompt/response/args/result
-  ./scripts/lca-ops logs -d           + 增量事件（text/reasoning delta）
-  ./scripts/lca-ops logs --replay     从 traces/lca_journal.jsonl 回放
-  ./scripts/lca-ops logs lobehub      Next.js 进程日志
-  ./scripts/lca-ops logs daemon       sandbox 连接器
+  ./scripts/lca-ops journal logs              tail 最新 run 的 spine SSOT(events.jsonl)
+  ./scripts/lca-ops journal logs -v           + 完整 payload + offloaded sidecar traceback
+  ./scripts/lca-ops journal logs -r <run_id>  离线回放指定 run 的 events.jsonl
+  ./scripts/lca-ops journal logs lobehub      Next.js 进程日志
+  ./scripts/lca-ops journal logs daemon       sandbox 连接器日志
+  ./scripts/lca-ops logs                      (alias → journal logs)
 
   事实（decision / step / tool / llm）→ 观察（insight：冗余/循环/成本/关键路径）
   模型可见的一切都可从 journal 重建。
@@ -209,6 +211,36 @@ journal_migrate.register(_journal_group)
 journal_trace.register(_journal_group)
 journal_replay.register(_journal_group)
 kernel.register(app)
+
+
+# ── legacy alias: `lca-ops logs` → `journal logs` ──────────────────
+# Some scripts and CI configs learned the old top-level ``logs`` name.
+# Keep the alias so external consumers don't get `No such command` while
+# the canonical surface is ``journal logs`` (see GUIDE). The handler
+# delegates verbatim so the flag semantics stay in one place.
+
+
+@app.command(
+    name="logs",
+    help="(alias for `journal logs`) tail the spine SSOT of the latest run.",
+)
+def logs_alias(
+    target: str = typer.Argument(
+        "",
+        help="空=tail 最新 run；lobehub | daemon = 进程日志(同 journal logs)",
+    ),
+    replay: str = typer.Option("", "--replay", "-r", help="(同 -r) 离线回放指定 run_id"),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="(同 -v) 显示完整 payload + sidecar traceback"
+    ),
+    config: Path | None = typer.Option(  # noqa: B008 — typer Option sentinel
+        None, "--config", "-c", help="(同 -c) 配置文件"
+    ),
+) -> None:
+    """Forward all args to ``journal logs``. See ``journal logs --help``."""
+    from lca.infrastructure.cli.commands.journal import _follow_spine_ssot
+
+    _follow_spine_ssot(replay=replay, verbose=verbose)
 
 
 def main() -> None:

@@ -95,10 +95,30 @@ def register(app: typer.Typer, group: typer.Typer | None = None) -> None:
 
 
 def _find_latest_run_dir() -> Path | None:
-    """Pick the most recently mutated run directory under ``traces/runs/``."""
+    """Pick the most recently mutated run directory under ``traces/runs/``.
+
+    Preference order:
+
+    1. ``traces/latest.json`` (atomic pointer written by
+       :class:`FilesystemRunLocator.update_latest_pointer`). This is the
+       authoritative "what was the most recent completed run" signal and
+       avoids mtime races where an archived / restored run outranks the
+       live one.
+    2. mtime-sorted fallback when the pointer is missing or stale.
+    """
     runs_root = Path("traces/runs")
     if not runs_root.exists():
         return None
+    pointer = Path("traces/latest.json")
+    if pointer.is_file():
+        try:
+            payload = json.loads(pointer.read_text("utf-8"))
+        except (OSError, json.JSONDecodeError):
+            payload = None
+        if isinstance(payload, dict) and payload.get("kind") == "run_pointer":
+            run_dir = runs_root / str(payload.get("run_id", ""))
+            if run_dir.is_dir():
+                return run_dir
     candidates = [p for p in runs_root.iterdir() if p.is_dir()]
     if not candidates:
         return None
@@ -127,7 +147,7 @@ def _iter_jsonl(path: Path) -> Iterator[dict[str, object]]:
                 yield obj
 
 
-def _render_event(event: dict[str, object], *, verbose: bool) -> str:
+def _render_event(event: dict[str, object], *, verbose: bool, run_dir: Path | None = None) -> str:
     """One-line human rendering of a spine event."""
     when = str(event.get("when") or event.get("when_corrected") or "")
     seq = event.get("sequence", 0)
@@ -139,6 +159,25 @@ def _render_event(event: dict[str, object], *, verbose: bool) -> str:
         line += f"  outcome={outcome}"
     if not verbose:
         return line
+
+    # Spine v3: large events get offloaded to ``<sha256>.json`` and the
+    # in-place line is a 2-field placeholder. ``journal logs -v`` must
+    # follow the sidecar so the operator sees the actual traceback,
+    # not the bare ``{offloaded: <digest>}`` line (Bug D consumer side).
+    offloaded = event.get("offloaded")
+    if isinstance(offloaded, str) and offloaded and run_dir is not None:
+        sidecar = run_dir / f"{offloaded}.json"
+        if sidecar.is_file():
+            try:
+                full = json.loads(sidecar.read_text("utf-8"))
+            except (OSError, json.JSONDecodeError):
+                full = {}
+            if isinstance(full, dict):
+                tb = _extract_traceback(full) or json.dumps(full, ensure_ascii=False, default=str)
+                line += (
+                    "\n    [offloaded payload from " + offloaded + ".json]:\n" + _indent(tb, "    ")
+                )
+                return line
 
     payload = event.get("payload")
     if isinstance(payload, dict) and payload:
@@ -170,8 +209,10 @@ def _indent(text: str, prefix: str) -> str:
     return "\n".join(prefix + line for line in text.splitlines())
 
 
-def _tail_events_jsonl(path: Path, *, verbose: bool) -> None:
+def _tail_events_jsonl(path: Path, *, verbose: bool, run_dir: Path | None = None) -> None:
     """Follow a jsonl file and render new lines as they are appended."""
+    if run_dir is None:
+        run_dir = path.parent
     print(f"[journal] tail {path}")
     last_size = path.stat().st_size
     while True:
@@ -193,7 +234,7 @@ def _tail_events_jsonl(path: Path, *, verbose: bool) -> None:
                     except json.JSONDecodeError:
                         continue
                     if isinstance(obj, dict):
-                        print(_render_event(obj, verbose=verbose))
+                        print(_render_event(obj, verbose=verbose, run_dir=run_dir))
                 last_size = current_size
         except FileNotFoundError:
             # Run rotated out — try to recover.
@@ -204,12 +245,15 @@ def _tail_events_jsonl(path: Path, *, verbose: bool) -> None:
                 continue
             print(f"[journal] switch tail → {new_path}")
             path = new_path
+            run_dir = new_dir
             last_size = 0
         _time.sleep(0.2)
 
 
-def _replay_events_jsonl(path: Path, *, verbose: bool) -> None:
+def _replay_events_jsonl(path: Path, *, verbose: bool, run_dir: Path | None = None) -> None:
     """One-shot read of a jsonl file and render each line."""
+    if run_dir is None:
+        run_dir = path.parent
     if not path.exists():
         print(f"No journal file at {path}")
         raise typer.Exit(1)
@@ -217,7 +261,7 @@ def _replay_events_jsonl(path: Path, *, verbose: bool) -> None:
     rendered = 0
     for event in _iter_jsonl(path):
         total += 1
-        print(_render_event(event, verbose=verbose))
+        print(_render_event(event, verbose=verbose, run_dir=run_dir))
         rendered += 1
     print(f"\n── replay done: {rendered}/{total} events ──")
 
@@ -234,7 +278,7 @@ def _follow_spine_ssot(*, replay: str, verbose: bool) -> None:
         if path is None:
             print(f"No events.jsonl under {run_dir}")
             raise typer.Exit(1)
-        _replay_events_jsonl(path, verbose=verbose)
+        _replay_events_jsonl(path, verbose=verbose, run_dir=run_dir)
         return
 
     latest = _find_latest_run_dir()
@@ -246,8 +290,8 @@ def _follow_spine_ssot(*, replay: str, verbose: bool) -> None:
         print(f"No events.jsonl under {latest}")
         raise typer.Exit(1)
     try:
-        _replay_events_jsonl(path, verbose=verbose)
+        _replay_events_jsonl(path, verbose=verbose, run_dir=latest)
         # After replay we drop into tail mode so the operator can keep watching.
-        _tail_events_jsonl(path, verbose=verbose)
+        _tail_events_jsonl(path, verbose=verbose, run_dir=latest)
     except KeyboardInterrupt:
         raise typer.Exit(0) from None
