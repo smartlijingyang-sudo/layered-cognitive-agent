@@ -195,26 +195,6 @@ def test_narrative_missing_file_friendly_error(traces_root: Path) -> None:
 # ── raw 命令 ──
 
 
-def test_raw_outputs_legacy_jsonl(traces_root: Path) -> None:
-    result = runner.invoke(
-        app,
-        ["journal", "raw", "r1", "--traces-root", str(traces_root)],
-    )
-    assert result.exit_code == 0
-    assert '{"legacy": true}' in result.stdout
-
-
-def test_raw_missing_file_friendly_error(traces_root: Path) -> None:
-    """raw 默认不存在 → 友好错误, 不假退化为 steps。"""
-    # 删 raw 文件
-    (traces_root / "runs" / "r1" / "journal.jsonl").unlink()
-    result = runner.invoke(
-        app,
-        ["journal", "raw", "r1", "--traces-root", str(traces_root)],
-    )
-    assert result.exit_code == 1
-    assert "not found" in result.output
-
 
 # ── logs 命令仍存在 (向后兼容) ──
 

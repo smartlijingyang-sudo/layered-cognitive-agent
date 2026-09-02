@@ -10,7 +10,7 @@ def _session() -> RunSession:
     return RunSession(
         run_id="run-1",
         trace_id="trace-1",
-        jsonl_path=None,  # type: ignore[arg-type]
+        spine_path=None,  # type: ignore[arg-type]
         tail=None,  # type: ignore[arg-type]
         question="question",
         user_text="user text",
@@ -51,7 +51,7 @@ def test_apply_driver_formats_driver_failure_locally() -> None:
     assert paused is False
     assert session.status is RunStatus.PENDING
     assert "bad input" in session.error
-    assert "run-1" in session.error
+    # run_id/trace_id 在 envelope 上是 first-class,format_user_error 故意不重复 append
 
 
 def test_apply_resume_projects_input_required_and_completion() -> None:

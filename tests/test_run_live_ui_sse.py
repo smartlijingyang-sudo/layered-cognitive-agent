@@ -47,7 +47,7 @@ def _seed_journal(registry: RunRegistry, run_id: str = "run-live-ui") -> RunSess
     session = RunSession(
         run_id=run_id,
         trace_id=f"trace-{run_id}",
-        jsonl_path=Path("/var/data/lca-nonexistent.jsonl"),
+        spine_path=Path("/var/data/lca-nonexistent.jsonl"),
         tail=tail,
         question="hello",
         user_text="hello",
@@ -310,7 +310,7 @@ async def test_stream_run_live_emits_failed_done_when_tail_closes_without_finish
     session = RunSession(
         run_id="run-unfinished",
         trace_id="trace-unfinished",
-        jsonl_path=Path("/var/data/lca-nonexistent.jsonl"),
+        spine_path=Path("/var/data/lca-nonexistent.jsonl"),
         tail=tail,
         question="q",
         user_text="u",
@@ -335,7 +335,7 @@ async def test_stream_run_live_emits_nested_agent_run_finished() -> None:
     session = RunSession(
         run_id="run-team-live",
         trace_id="trace-team-live",
-        jsonl_path=Path("/var/data/lca-nonexistent.jsonl"),
+        spine_path=Path("/var/data/lca-nonexistent.jsonl"),
         tail=tail,
         question="q",
         user_text="u",

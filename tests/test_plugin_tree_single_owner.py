@@ -341,7 +341,7 @@ async def test_two_execute_runs_complete_with_scripted_text(no_llm_key: None) ->
         )
         await execute_run(registry, run_id=session.run_id, question=question, mode="solo", ctx=ctx)
         assert session.status == RunStatus.COMPLETED, session.error
-        journal = session.jsonl_path.read_text(encoding="utf-8")
+        journal = session.spine_path.read_text(encoding="utf-8")
         assert journal.strip(), "run journal is empty"
         assert "通用问题" in journal or "respond" in journal or "solo" in journal.lower()
         outputs.append(journal)
@@ -413,6 +413,6 @@ async def test_unknown_execution_target_writes_journal_and_session_error(
     assert "loop plugin" in (session2.error or "").lower()
     # Internal exception class name must not leak to end users.
     assert "_UnknownExecutionTargetError" not in (session2.error or "")
-    journal = session2.jsonl_path.read_text(encoding="utf-8")
-    assert "AgentRunFinished" in journal
+    journal = session2.spine_path.read_text(encoding="utf-8")
+    assert "kernel.run.stop" in journal
     assert "no-such-loop" in journal

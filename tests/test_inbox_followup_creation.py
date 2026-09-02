@@ -60,7 +60,7 @@ class TestInboxFollowupCreation:
         session = RunSession(
             run_id="run-test",
             trace_id="trace-test",
-            jsonl_path=tmp_path / "inbox.jsonl",
+            spine_path=tmp_path / "inbox.jsonl",
             tail=None,  # type: ignore[arg-type]
             hub=hub,
             question="hello world",
@@ -107,7 +107,7 @@ class TestInboxFollowupCreation:
         session = RunSession(
             run_id="run-test2",
             trace_id="trace-test2",
-            jsonl_path=tmp_path / "inbox2.jsonl",
+            spine_path=tmp_path / "inbox2.jsonl",
             tail=None,  # type: ignore[arg-type]
             hub=hub,
             question=question,

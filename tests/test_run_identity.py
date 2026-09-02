@@ -52,7 +52,7 @@ class TestAgentIsolation(unittest.TestCase):
         session = RunSession(
             run_id="run_main",
             trace_id="t",
-            jsonl_path=registry.jsonl_path_for("run_main"),
+            spine_path=registry.spine_path_for("run_main"),
             tail=LiveTail(),
             question="分析这个文件",
             user_text="分析这个文件",

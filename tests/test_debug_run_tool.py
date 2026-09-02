@@ -85,10 +85,19 @@ def _write_run_dir(
         {"run_seq": 12, "descriptor": {"type": "AgentRunFinished"}, "data": {"attributes": {}}},
     ]
     (run_dir / "journal.jsonl").write_text("\n".join(json.dumps(e) for e in envelopes))
+    # spine events 与 envelopes run_seq 对齐(debug_run 现在只读 events.jsonl)
     spine_events = [
-        {"execution_point": "kernel.run.start", "run_id": run_id},
-        {"execution_point": "exception.caught", "run_id": run_id},
-        {"execution_point": "kernel.run.stop", "run_id": run_id},
+        {"execution_point": "kernel.run.start", "run_id": run_id, "run_seq": 1},
+        {"execution_point": "brain.think.start", "run_id": run_id, "run_seq": 2},
+        {
+            "execution_point": "exception.caught",
+            "run_id": run_id,
+            "run_seq": 5,
+            "payload": {"node_id": "think.main", "error_type": "RuntimeError"},
+        },
+        {"execution_point": "runtime.reducer.apply", "run_id": run_id, "run_seq": 8},
+        {"execution_point": "phase.stop.fold", "run_id": run_id, "run_seq": 10},
+        {"execution_point": "kernel.run.stop", "run_id": run_id, "run_seq": 12},
     ]
     (run_dir / "events.jsonl").write_text("\n".join(json.dumps(e) for e in spine_events))
 
@@ -105,15 +114,14 @@ def test_debug_run_extracts_8_section(tmp_path: Path) -> None:
     assert "manifest.json" in report.manifest_path
 
     # [2] journal counts every event; missing seqs surface for review
-    assert report.journal_event_count == 6
-    assert report.journal_missing_seqs == (4, 5, 6, 7, 8, 9)
-    assert report.spine_event_count == 3
+    assert report.spine_event_count == 6
+    assert report.spine_missing_seqs == (3, 4, 6, 7, 9, 11)
     assert "events.jsonl" in report.spine_events_path
     assert report.spine_execution_points[-1] == "kernel.run.stop"
     assert "spine.events" in report.render_text()
 
-    # [4] phase.cursor: last meaningful node before stop is recovered
-    assert report.phase_cursor in {"stop.main", "stop.main (failed)"}
+    # [4] phase.cursor: last phase.* EP before stop is recovered
+    assert report.phase_cursor == "phase.stop.fold"
 
     # [5] error_ref: the failure blob contains typed detail
     assert report.error_message is not None
@@ -138,7 +146,7 @@ def test_debug_run_json_output_serialisable(tmp_path: Path) -> None:
     encoded = json.dumps(d)
     decoded = json.loads(encoded)
     assert decoded["run_id"] == run_id
-    assert decoded["journal_event_count"] == 6
+    assert decoded["spine_event_count"] == 6
     # ``manifest_summary`` carries the doctor_report.status verbatim.
     assert decoded["manifest_summary"]["extra"]["doctor_report"]["status"] == "completed"
 

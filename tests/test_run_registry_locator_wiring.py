@@ -24,6 +24,7 @@ class _FakeLocator(RunLocator):
 
     def __init__(self, root: Path) -> None:
         self._root = root
+        self.events_calls: list[str] = []
         self.journal_calls: list[str] = []
         self.manifest_calls: list[str] = []
         self.evidence_calls: list[str] = []
@@ -38,9 +39,9 @@ class _FakeLocator(RunLocator):
     def run_dir(self, run_id: str) -> Path:
         return self._root / "runs" / run_id
 
-    def journal_path(self, run_id: str) -> Path:
-        self.journal_calls.append(run_id)
-        return self._root / "runs" / run_id / "journal.jsonl"
+    def events_path(self, run_id: str) -> Path:
+        self.events_calls.append(run_id)
+        return self._root / "runs" / run_id / "events.jsonl"
 
     def manifest_path(self, run_id: str) -> Path:
         self.manifest_calls.append(run_id)
@@ -79,14 +80,14 @@ class RunRegistryLocatorWiring(unittest.TestCase):
             reg = RunRegistry(locator=fake)
             self.assertIs(reg.locator(), fake)
 
-    def test_jsonl_path_uses_locator_journal_path(self) -> None:
+    def test_spine_path_uses_locator_events_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             fake = _FakeLocator(root)
             reg = RunRegistry(locator=fake)
-            result = reg.jsonl_path_for("run_abc1234")
-            self.assertEqual(result, root / "runs" / "run_abc1234" / "journal.jsonl")
-            self.assertEqual(fake.journal_calls, ["run_abc1234"])
+            result = reg.spine_path_for("run_abc1234")
+            self.assertEqual(result, root / "runs" / "run_abc1234" / "events.jsonl")
+            self.assertEqual(fake.events_calls, ["run_abc1234"])
 
     def test_manifest_path_evidence_dir_materialization_dir_use_locator(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -117,7 +118,7 @@ class RunSessionHoldsLocator(unittest.TestCase):
             session = RunSession(
                 run_id="run_x",
                 trace_id="t",
-                jsonl_path=Path(tmp) / "runs" / "run_x" / "journal.jsonl",
+                spine_path=Path(tmp) / "runs" / "run_x" / "journal.jsonl",
                 tail=LiveTail(),
                 question="q",
                 user_text="q",
@@ -131,7 +132,7 @@ class RunSessionHoldsLocator(unittest.TestCase):
             session = RunSession(
                 run_id="run_x",
                 trace_id="t",
-                jsonl_path=Path(tmp) / "runs" / "run_x" / "journal.jsonl",
+                spine_path=Path(tmp) / "runs" / "run_x" / "journal.jsonl",
                 tail=LiveTail(),
                 question="q",
                 user_text="q",

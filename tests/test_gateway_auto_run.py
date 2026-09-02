@@ -38,7 +38,7 @@ def _journal_event_types(session: object) -> set[str]:
     if session.hub is not None and session.hub.journal is not None:
         store = cast("RunStore", getattr(session.hub.journal, "store", session.hub.journal))
         return {type(stamped.event).__name__ for stamped in store.events}
-    return {type(stamped.event).__name__ for stamped in read_journal(session.jsonl_path)}
+    return {type(stamped.event).__name__ for stamped in read_journal(session.spine_path)}
 
 
 class TestTeamRunPath(unittest.IsolatedAsyncioTestCase):

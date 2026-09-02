@@ -76,7 +76,7 @@ async def test_stream_run_live_emits_ui_wire_with_reasoning_tool_and_finish() ->
     session = RunSession(
         run_id="run-test-1",
         trace_id="trace-test-1",
-        jsonl_path=Path("/var/data/lca-nonexistent.jsonl"),
+        spine_path=Path("/var/data/lca-nonexistent.jsonl"),
         tail=tail,
         question="q",
         user_text="u",
@@ -154,7 +154,7 @@ async def test_stream_run_live_emits_failed_done_when_no_finish() -> None:
     session = RunSession(
         run_id="run-test-2",
         trace_id="trace-test-2",
-        jsonl_path=Path("/var/data/lca-nonexistent.jsonl"),
+        spine_path=Path("/var/data/lca-nonexistent.jsonl"),
         tail=tail,
         question="q",
         user_text="u",

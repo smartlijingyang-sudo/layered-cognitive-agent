@@ -152,7 +152,7 @@ class TestRunRegistryDedup(unittest.TestCase):
         session = RunSession(
             run_id="run_test",
             trace_id="trace_test",
-            jsonl_path=registry.jsonl_path_for("run_test"),
+            spine_path=registry.spine_path_for("run_test"),
             tail=LiveTail(),
             question="今天有什么新闻",
             user_text="今天有什么新闻",
@@ -168,7 +168,7 @@ class TestRunRegistryDedup(unittest.TestCase):
         session = RunSession(
             run_id="run_test",
             trace_id="trace_test",
-            jsonl_path=registry.jsonl_path_for("run_test"),
+            spine_path=registry.spine_path_for("run_test"),
             tail=LiveTail(),
             question="hello",
             user_text="hello",
@@ -188,7 +188,7 @@ class TestRunRegistryDedup(unittest.TestCase):
             session = RunSession(
                 run_id=f"run_{i}",
                 trace_id=f"t{i}",
-                jsonl_path=registry.jsonl_path_for(f"run_{i}"),
+                spine_path=registry.spine_path_for(f"run_{i}"),
                 tail=LiveTail(),
                 question="q",
                 user_text=f"q{i}",
@@ -207,7 +207,7 @@ class TestRunRegistryDedup(unittest.TestCase):
         session = RunSession(
             run_id="run_fresh",
             trace_id="t",
-            jsonl_path=registry.jsonl_path_for("run_fresh"),
+            spine_path=registry.spine_path_for("run_fresh"),
             tail=LiveTail(),
             question="q",
             user_text="q",
