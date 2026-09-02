@@ -1,26 +1,9 @@
 #!/usr/bin/env bash
-# LCA Platform Orchestrator — unified service management.
+# lca-ops — thin shell wrapper that delegates to the Python CLI.
 #
-# ADR-0119 决定 4:lca-ops 不再管 LCA 进程 — LCA 进程入口是
-#   ``uv run python -m lca_kernel serve --profile X --host H --port P``
-# SIGTERM 由 K6 ``lca_kernel.lifecycle`` 守护。本地便捷重启:
-#   ``lca-ops kernel-restart`` (SIGTERM 现有 PID → spawn 新进程)。
-# 详情看 docs/adr/0119-*。
-#
-# 本脚本只管外部平台服务:
-# - Infrastructure (postgres, redis, s3)        lca-ops infra start|stop|status
-# - LobeHub (Next.js frontend)                  lca-ops lobehub start|stop|restart|status|ensure
-# - Daemon (sandbox-user CLI connect)           lca-ops daemon  start|stop|restart|status|ensure
-# - Onlyboxes (worker runtime)                  只读,无 start/stop 命令
-# - LCA 进程 (kernel serve)                     uv run python -m lca_kernel serve ...
-#                                              或 lca-ops kernel-restart (本地便捷)
-#
-# Usage:
-#     lca-ops status           # Show status (kernel_serve / infra / lobehub / daemon / onlyboxes)
-#     lca-ops status --json    # JSON,给 agent 用
-#     lca-ops heal             # Auto-recover unhealthy services (含 kernel_serve 自愈)
-#     lca-ops kernel-restart   # 本地便捷重启 LCA kernel(不重启时用 heal)
-#     lca-ops logs             # journal 事实流
+# Banner & full command surface: see lca/infrastructure/cli/guide.py
+# (printed by `./scripts/lca-ops` with no subcommand, and as `--help`).
+# ADR-0119 decides what lca-ops manages vs. what `python -m lca_kernel serve` owns.
 #
 # Use --json for agent-friendly JSON output.
 
