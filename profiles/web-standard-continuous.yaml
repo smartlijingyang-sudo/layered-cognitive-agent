@@ -9,12 +9,42 @@ description: |
   Production-oriented Web profile for resumable agents. It selects SQLite
   AgentState persistence and durable trigger/work leasing while retaining the
   standard approval, budget, Journal and effect-receipt governance path.
+
+# ADR-0174 PR-7.3 / S7.3 第三批(与 ADR-0173 halt-resume 联跑):profile 迁到
+# ``loop_cursor.spine_*`` bundle naming(§D1);observability 五缝装配段与 web-standard
+# 同 schema。
+#
+# ADR-0173 §I-RESUME-6:web-standard 默认 close 政策,只有 recovery profile 才 halt
+# 可恢复。本 profile 保持 default close,无 halt_close_policy_override。
+#
+# ADR-0169 PR-25:observability 五缝装配段(Profile 读取 SSOT,见 ADR-0169 §D8)。
+# LoopCursor 由 LoopCursorFactory.from_profile 装配;ProjectionHost /
+# PersistenceCoordinator / ModelVisibleCapture / CloseBarrier 由
+# ObservabilityRuntime.from_profile 装配。Profile 提供 plan_ref 与
+# initial deriver 列表,实现细节(StdLoopCursor / StdProjectionHost 等)
+# 在 PR-25 阶段尚未拆成独立 plugin,本段先给 wiring 与读路径。
+observability:
+  loop_cursor:
+    implementation: std                              # 默认实现(PR-14 LoopCursorFactory)
+    spine_default: loop_cursor.spine_default         # 复用 bundles/loop_cursor.spine_default.yaml 的 bundle
+  projection_host:
+    initial: [step_tree, narrative, graph, cost]     # 默认 deriver 注册
+  persistence:
+    coalescer: default
+    sink: routing_file
+  model_visible:
+    enabled: true
+  close_barrier:
+    enabled: true
+  plan_ref: web-standard-continuous
+
 bundles:
   - bundles/base.yaml
   - bundles/web-app.yaml
   - bundles/scenario-cordis-creator.yaml
   - bundles/declarative-phase-graph.yaml
   - bundles/continuous-control-plane.yaml
+  - bundles/loop_cursor.spine_default.yaml           # ADR-0174 §D1 spine bundle SSOT
 
 patch:
   - id: lca-llm-resolver

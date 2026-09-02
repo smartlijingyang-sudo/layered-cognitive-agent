@@ -1,6 +1,6 @@
 # web-standard-recovery profile — extends web-standard with bounded recovery.
 # ADR-0075: Adds reflect→think recovery edge for failure handling.
-# 
+#
 # Recovery behavior:
 # - When a phase fails (observation.success == False), reflect phase sets admit_recovery
 # - Edge reflect.main → think.main is taken when admit_recovery is True
@@ -8,13 +8,67 @@
 #
 # This profile demonstrates bounded recovery: agent can retry once after failure,
 # then must stop or escalate to human.
+#
+# ADR-0174 PR-7.3 / S7.3 第三批(与 ADR-0173 halt-resume 联跑):profile 迁到
+# ``loop_cursor.spine_*`` bundle naming(§D1);observability 五缝装配段与 web-standard
+# 同 schema。
+#
+# ADR-0173 §D4 recovery-aware 装配:本 profile 是 halt 可恢复的 opt-in profile;
+# halt_close_policy_override + cursor_factory.resume_protocol 块当前不在
+# ``lca/harness/profile/resolve.py`` 已校验的 Profile 字段白名单中(I-RESUME-6
+# 钉死只有 recovery profile 才 halt 可恢复)。PR-5/S5 实施期会扩 Profile schema,
+# 删除条件 = Profile schema 接受 ``halt_close_policy_override`` 后,以下 TODO
+# 块替换为正式字段并由 resolve 校验。
+
+# TODO(ADR-0173 §D4, delete-when: Profile schema 接受以下字段):
+#   runtime:
+#     halt_close_policy_override:
+#       user_stop: "halt"                # 默认 halt;web-standard 用 "close"
+#       loop_guard: "halt"
+#       approval_pending: "halt"
+#     cursor_factory:
+#       resume_protocol:
+#         iteration_reason_default: "checkpoint_resume"
+#         enable_user_replay: true
+#         approval_resume:
+#           approval_token_validator: "lca.harness.approval.validate"
+#           retry_on_invalid: false
+#
+#   persist:
+#     spine_sink: { path: traces/runs/$RUN_ID/events.jsonl, best_effort_window_ms: 0 }
+#     restore_handler: "lca.infrastructure.persistence.checkpoint_restore"
+#
+#   host:
+#     initial: [step_tree, narrative, graph, cost, live_tail]
+
+# ADR-0169 PR-25:observability 五缝装配段(Profile 读取 SSOT,见 ADR-0169 §D8)。
+# LoopCursor 由 LoopCursorFactory.from_profile 装配;ProjectionHost /
+# PersistenceCoordinator / ModelVisibleCapture / CloseBarrier 由
+# ObservabilityRuntime.from_profile 装配。Profile 提供 plan_ref 与
+# initial deriver 列表,实现细节(StdLoopCursor / StdProjectionHost 等)
+# 在 PR-25 阶段尚未拆成独立 plugin,本段先给 wiring 与读路径。
+observability:
+  loop_cursor:
+    implementation: std                              # 默认实现(PR-14 LoopCursorFactory)
+    spine_default: loop_cursor.spine_default         # 复用 bundles/loop_cursor.spine_default.yaml 的 bundle
+  projection_host:
+    initial: [step_tree, narrative, graph, cost]     # 默认 deriver 注册
+  persistence:
+    coalescer: default
+    sink: routing_file
+  model_visible:
+    enabled: true
+  close_barrier:
+    enabled: true
+  plan_ref: web-standard-recovery
 
 bundles:
   - bundles/base.yaml
   - bundles/web-app.yaml
   - bundles/scenario-cordis-creator.yaml
   - bundles/declarative-phase-graph.yaml
-  - bundles/declarative-recovery.yaml  # Adds recovery phase graph edges
+  - bundles/declarative-recovery.yaml                # Adds recovery phase graph edges
+  - bundles/loop_cursor.spine_default.yaml           # ADR-0174 §D1 spine bundle SSOT
 
 patch:
   - id: lca-llm-resolver
