@@ -78,7 +78,7 @@ def resolve_journal_path(jsonl: Path | None, run_id: str | None) -> Path:
     resolved = _resolve_journal_artifact(jsonl=jsonl, trace_id=run_id)
     if resolved is not None:
         return resolved
-    print(
+    typer.echo(
         "No journal file found "
         "(tried --journal, traces/runs/<id>/journal.json, "
         "journal.raw.jsonl, traces/runs/<id>.journal, "

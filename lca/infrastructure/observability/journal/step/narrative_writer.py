@@ -204,9 +204,13 @@ def _render_spans(spans: tuple[SpanRecord, ...]) -> list[str]:
         )
     for s in others:
         bullets.append(f"- `{s.kind}` @ {_format_ts(s.started_at)}: {_short(s.summary, 120)}")
+    summary = f"诊断 ({len(spans)} spans"
+    if collapsed:
+        summary += f"，{len(collapsed)} 条 token 已 coalesce"
+    summary += ")"
     return [
         "<details>",
-        f"<summary>诊断 ({len(spans)} spans，{len(collapsed)} 条 token 已 coalesce)</summary>",
+        f"<summary>{summary}</summary>",
         "",
         *bullets,
         "",
@@ -344,7 +348,7 @@ class StepNarrativeWriter:
             if totals is not None
             else f"total_steps={document.total_steps()}"
         )
-        lines.append(f"# Trajectory —— {_short(document.metadata.objective, 120)}")
+        lines.append(f"# Run Narrative —— {_short(document.metadata.objective, 120)}")
         lines.append("")
         lines.append(
             f"> {total_str}  "

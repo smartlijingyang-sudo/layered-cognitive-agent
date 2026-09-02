@@ -60,7 +60,7 @@ def register(app: typer.Typer) -> None:
             "approval-rejected": DiagnosePattern.APPROVAL_REJECTED.value,
         }
         if pattern_key not in aliases:
-            print(f"Unknown pattern {problem!r}; expected one of {sorted(aliases)}")
+            typer.echo(f"Unknown pattern {problem!r}; expected one of {sorted(aliases)}")
             raise typer.Exit(1)
         canonical = aliases[pattern_key]
 
