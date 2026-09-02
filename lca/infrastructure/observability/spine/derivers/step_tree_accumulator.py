@@ -240,6 +240,8 @@ class StepTreeAccumulatorDeriver(Deriver):
             outcome=f.outcome,
         )
         self._steps.append(step)
+        # 落 model_visible/ 让 replay 可零 token 重建（D3 / D4 ADR-0167）
+        self._write_model_visible(f)
         self._open_step = None
 
     def _begin_segment(self, event: EventRecord, ts: float) -> None:
@@ -259,9 +261,15 @@ class StepTreeAccumulatorDeriver(Deriver):
     def _end_segment(self, outcome: str) -> None:
         if self._open_segment_id is None or self._open_step is None:
             return
-        seg = self._open_step.segments[-1]
-        seg.ended_at = int(self._last_ts or 0)
-        seg.outcome = outcome
+        # SegmentRecord is frozen — replace the last segment via dataclasses.replace.
+        from dataclasses import replace as _dc_replace
+        old = self._open_step.segments[-1]
+        try:
+            ended_at = int(self._last_ts or 0)
+        except (TypeError, ValueError):
+            ended_at = 0
+        new_seg = _dc_replace(old, ended_at=ended_at, outcome=outcome)
+        self._open_step.segments[-1] = new_seg
         self._open_segment_id = None
 
     def _record_phase(
@@ -324,6 +332,94 @@ class StepTreeAccumulatorDeriver(Deriver):
             )
             tmp = Path(fh.name)
         tmp.replace(out)
+
+    def _write_model_visible(self, frame: _StepFrame) -> None:
+        """落 ``model_visible/step_NN/`` 五件套（ADR-0167 D3 / D4）。
+
+        字段：
+        - request-header.json  —— { messages_digest, tools_digest, manifest_digest,
+                                  run_id, step_id, model, decided_at }
+        - system-prompt.md     —— objective + tool inventory 摘要
+        - tool-schemas.json    —— 当前可用的工具 schema 列表（空 = 未记录）
+        - context-manifest.json—— { kinds, objective, item_count }
+        - messages.json        —— 占位骨架 [{role, content, ...}] 供 replay 重建
+        """
+        import hashlib
+        import json as _json
+        import os
+        step_dir = self._run_dir / "model_visible" / frame.step_id
+        step_dir.mkdir(parents=True, exist_ok=True)
+
+        manifest = {
+            "kinds": [k for k in (
+                "skill_catalog" if frame.context_before
+                and any(getattr(a, "name", "") for a in getattr(frame.context_before, "attachments", ()))
+                else None, "objective", "memory"
+            ) if k],
+            "objective": frame.context_before.objective if frame.context_before else "",
+            "item_count": len(getattr(frame.context_before, "attachments", ())) if frame.context_before else 0,
+        }
+        messages: list[dict[str, Any]] = []
+        if frame.context_before is not None:
+            messages.append({
+                "role": "system",
+                "content": frame.context_before.objective,
+            })
+        if frame.thinking is not None:
+            messages.append({
+                "role": "assistant",
+                "content": frame.thinking.decision or "",
+            })
+        tool_schemas: list[dict[str, Any]] = []
+        if frame.tool_call is not None:
+            tool_schemas.append({"name": frame.tool_call.name})
+            messages.append({
+                "role": "assistant",
+                "tool_calls": [{
+                    "id": frame.tool_call.invocation_id,
+                    "function": {
+                        "name": frame.tool_call.name,
+                        "arguments": frame.tool_call.arguments,
+                    },
+                }],
+            })
+        if frame.tool_result is not None:
+            messages.append({
+                "role": "tool",
+                "content": frame.tool_result.delta_summary or "",
+            })
+
+        def _sha(d: Any) -> str:
+            return "sha256:" + hashlib.sha256(
+                _json.dumps(d, sort_keys=True, ensure_ascii=False, default=str).encode()
+            ).hexdigest()
+
+        header = {
+            "run_id": self._run_id,
+            "step_id": frame.step_id,
+            "model": frame.thinking.model if frame.thinking else "unknown",
+            "decided_at": frame.entered_at,
+            "messages_digest": _sha(messages),
+            "tools_digest": _sha(tool_schemas),
+            "manifest_digest": _sha(manifest),
+        }
+        (step_dir / "request-header.json").write_text(
+            _json.dumps(header, ensure_ascii=False, indent=2), encoding="utf-8",
+        )
+        (step_dir / "system-prompt.md").write_text(
+            f"# System Prompt — {frame.step_id}\n\n"
+            f"objective: {manifest['objective']}\n",
+            encoding="utf-8",
+        )
+        (step_dir / "tool-schemas.json").write_text(
+            _json.dumps(tool_schemas, ensure_ascii=False, indent=2), encoding="utf-8",
+        )
+        (step_dir / "context-manifest.json").write_text(
+            _json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8",
+        )
+        (step_dir / "messages.json").write_text(
+            _json.dumps(messages, ensure_ascii=False, indent=2), encoding="utf-8",
+        )
 
     @staticmethod
     def _to_jsonable(obj: Any) -> Any:

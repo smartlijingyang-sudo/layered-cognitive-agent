@@ -363,6 +363,17 @@ class StepNarrativeWriter:
         # 详述
         lines.append("## 🔍 Steps 详述")
         lines.append("")
+        # ADR-0167 D3 / D4: Model saw 链接区（指向 model_visible/step_NN/）
+        lines.append("### 🪞 Model saw (per step)")
+        lines.append("")
+        for step in document.steps:
+            lines.append(
+                f"- `{step.step_id}` → "
+                f"`traces/runs/{document.run_id}/model_visible/{step.step_id}/` "
+                f"(request-header.json / system-prompt.md / tool-schemas.json / "
+                f"context-manifest.json / messages.json)"
+            )
+        lines.append("")
         for step in document.steps:
             lines.extend(_render_step(step))
         # 落款
