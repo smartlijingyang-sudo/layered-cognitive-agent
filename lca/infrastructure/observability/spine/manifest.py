@@ -38,6 +38,24 @@ EXECUTION_POINTS: tuple[str, ...] = (
     "body.tool.execute.start",
     "body.tool.execute.end",
     "body.tool.retry",
+    # Writable matrix (ADR-0167 D11) —— coordinator-only step / segment 边
+    "writable.step.start",
+    "writable.step.end",
+    "writable.segment.start",
+    "writable.segment.end",
+    # Writable matrix phase events (perceive / think / act / reflect / remember / stop)
+    "perceive.phase.fold",
+    "phase.perceive.fold",
+    "phase.remember.fold",
+    "phase.stop.fold",
+    "phase.reflect.fold",
+    "phase.act.fold.start",
+    "phase.act.fold.end",
+    "phase.tool.call.start",
+    "phase.tool.call.end",
+    "phase.tool.denied",
+    # Lifecycle normalization (ADR-0166 S5) —— 正常路径用 lifecycle.finally
+    "lifecycle.finally",
     "body.sandbox.enter",
     "body.sandbox.exit",
     # LLM
