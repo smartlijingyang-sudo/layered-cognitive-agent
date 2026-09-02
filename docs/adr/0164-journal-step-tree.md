@@ -1,14 +1,15 @@
 # ADR-0164: Journal step-tree 取代 stream-envelope
 
-- 状态: Accepted
+- 状态: Accepted（存储形状仍有效；**写路径 / SSOT 以 [ADR-0167](0167-spine-ssot-and-step-materialization.md) 为准**）
 - 日期: 2026-09-01
 - 作者: coding-agent
 - 取代: ADR-0037 (record-as-data stream envelope), ADR-0074 PR-6 v2 envelope
 - 相关: ADR-0156/0157/0158(投影/进度/finalizer 清理), ADR-0065(run ledger)
+- 修订: ADR-0166（step/segment/phase 词汇）；ADR-0167（spine 耐久真值 + journal 物化视图；**废弃下文 bridge 双写**）
 
 ## 一句话
 
-journal 主存储从"事件流 + seq 流水"升级到"step 故事 + 因果链"。一个 step = 一个认知闭环(上下文 → 思考 → 工具 → 结果 → 反思)。
+journal 从"事件流 + seq 流水"升级到"step 故事 + 因果链"物化视图。一个 step = 一个认知闭环(上下文 → 思考 → 工具 → 结果 → 反思)——边界语义见 ADR-0166；**耐久 append-only 真值是 spine `events.jsonl`（ADR-0167）**。
 
 ## 背景
 
@@ -54,15 +55,10 @@ PR-6 (2026 Q2) 之前, journal 用 v1 envelope 流式追加 (`journal.jsonl`, 42
 4. 挂到 session.step_tree_bundle
 5. terminalizer 时 `_flush_step_tree()` 写 journal.json + narrative.md
 
-### runtime emit 路径 (双写过渡期)
+### runtime emit 路径 — **Deprecated by ADR-0167**
 
-Phase 3 改造: `lca/runtime/step_emitter.py` 桥接层, 把现有 emit (TelemetryLLMAdapter / tool_journal_emit / perceive_hub / event_emission) 折叠进 step_lifecycle:
-- `bridge_llm_completed` → step.thinking
-- `bridge_tool_started` / `bridge_tool_invoked` → step.tool_call / tool_result
-- `bridge_perceive_opened/closed` → step phase=perceive
-- `bridge_step_completed_emitted` → close_step
-
-调用方 API 完全不变 (emit_tool_started / record(event) 仍调用), 内部双写。 Phase 7 集中清理时删原 `record(event)` 调用, 只剩 step_lifecycle。
+> 原「`step_emitter` bridge 双写过渡」方案已否决。  
+> 目标态：`StepCoordinator` 唯一写入（spine EP + 内存累加器）；**删除** `lca/runtime/step_emitter.py`；Brain/Body 只 `StepWriter.record_*`；loop 负责 open/close。详见 ADR-0166 D3/D4 与 ADR-0167 D2。
 
 ### CLI
 

@@ -76,7 +76,11 @@
 | [0100](0100-chat-command-is-agent-run.md) | 聊天命令面是一次 Agent Run，不是一次模型补全 | Accepted |
 | [0101](0101-tool-facts-and-evidence-only.md) | Tool 事件回归事实 —— arguments/output 经 Evidence 平面，journal 不再携带渲染字段 | Proposed |
 
-| [0104](0104-runtime-package-organization-discipline.md) | 包组织纪律：8/10/15 规则 + 命名空间映射 | Proposed |
+| [0104](0104-semantic-layer-rename.md) | 语义层重命名 | Proposed |
+| [0101](0101-followup-tool-call-streaming-partial-preview.md) | 工具调用流式部分预览 follow-up | Proposed |
+| [0110](0110-followup-plugin-setup-generic.md) | Plugin Setup 通用化 follow-up | Proposed |
+| [0119](0119-followup-gateway-name-map.md) | Gateway 名字映射 follow-up | Proposed |
+| [0119](0119-followup-gateway-name-removal.md) | Gateway 名字移除 follow-up | Proposed |
 | [0105](0105-package-organization-discipline.md) | Python 包目录规模与命名规范（8/10/15 规则） | Proposed |
 | [0106](0106-naming-constitution.md) | 命名宪法（v3 九群归属 + 四维分解 + 角色后缀） | Proposed |
 | [0107](0107-unimplemented-scenario-modules.md) | scenario plugin modules never implemented (tracked gap) | Proposed |
@@ -95,8 +99,22 @@
 | [0102](0102-tool-render-contract.md) | Tool 渲染契约 — 集中 TS 生成（lcaToolRender） + 21 工具 registry | Accepted |
 | [0103](0103-locked-surface-and-port-policy.md) | back-ui-821-other-keep 锁定表面 + 移植策略（hard/soft-lock + lane A/B/C） | Accepted |
 | [0120](0120-retire-dsh-driver.md) | 退役 DSH (DeepSeek Harness) driver 集成路径 — `'dsh'` 执行目标闭集收敛 | Accepted |
+| [0121](0121-attachment-fileref-and-plane-provider.md) | Attachment FileRef 与平面 Provider | Accepted |
+| [0122](0122-plugin-native-debug-observability.md) | Plugin-native debug 与观测体系 | Accepted |
+| [0156](0156-eliminate-projection-and-progress-leakage.md) | 消除投影与进度泄漏 | Accepted |
+| [0157](0157-progress-stream-and-retire-toolcallstreaming.md) | Progress 流与退役 ToolCallStreaming | Accepted |
+| [0158](0158-projection-isolation-and-finalizer-cleanup.md) | 投影隔离与 finalizer 清理 | Accepted |
+| [0159](0159-phase-factsensor-and-tool-lifecycle-events.md) | Phase FactSensor 与工具生命周期事件 | Accepted |
+| [0160](0160-llm-call-stream-finalize-on-exit.md) | LLM 调用流式 finalize-on-exit | Accepted |
+| [0161](0161-step-advance-on-phase-retry.md) | Phase retry 时 step 推进 | Accepted |
+| [0162](0162-fact-vs-progress-judgment-criterion.md) | 事实 vs 进度判别准则 | Accepted |
+| [0163](0163-readiness-at-boot-not-on-request.md) | 就绪在 boot 而非请求时 | Accepted |
+| [0164](0164-journal-step-tree.md) | Journal step-tree 取代 stream-envelope | Accepted |
+| [0165](0165-event-spine-unified-log.md) | Event Spine 统一执行日志（stub；扩展见 0165-execution-point-enforcement） | Accepted |
+| [0166](0166-step-segment-phase-and-spine-hardening.md) | Step / Segment / Phase 三层计数与 Spine 硬化 | Accepted |
+| [0167](0167-spine-ssot-and-step-materialization.md) | Spine 唯一耐久真值、Step 物化视图与 Model-Visible 轨迹组织 | Accepted |
 
-> **ADR-0119** 已立项（Proposed），等待 review。后续 ADR 由未来缺口驱动。
+> 同名 `0165` 系列有两份（stub + 执行点强制）：[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)（原 0165.1）。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
 
 ## 维护规则
 - 不改旧文件；新决策用 `Supersedes: ADR-XXXX` 标记

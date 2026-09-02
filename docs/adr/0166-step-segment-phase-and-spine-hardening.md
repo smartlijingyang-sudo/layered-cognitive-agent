@@ -3,13 +3,14 @@
 - 状态: Accepted
 - 日期: 2026-09-02
 - 作者: coding-agent
-- 修订: ADR-0164（纠正 step 边界的实现漂移；保留 step-tree 主存储）
-- 相关: ADR-0164, ADR-0165.1, ADR-0159, ADR-0065；对照 deepseek-harness `docs/architecture.zh.md`（一步 = 一次模型请求 + 其工具）
+- 修订: ADR-0164（纠正 step 边界的实现漂移；保留 step-tree 形状）
+- **所有权 / SSOT / Model-visible 文件组织: 见 [ADR-0167](0167-spine-ssot-and-step-materialization.md)**（本 ADR 的「Store 唯一写者」改为「Accumulator 由 Coordinator 驱动；耐久真值是 spine」）
+- 相关: ADR-0164, ADR-0165-execution-point-enforcement, ADR-0159, ADR-0065, ADR-0167；对照 deepseek-harness `docs/architecture.zh.md`（一步 = 一次模型请求 + 其工具）
 - 触发样本: `run_bb1b9570ef94`（当前错误计为 8 phase-steps；正确应为 steps=3 / segments=5 / phases=8）
 
 ## 一句话
 
-**step** 对齐 deepseek-harness（一次 LLM 请求 + 它触发的工具）；**segment** 计数 think|act（含思考）；**phase** 落盘闭集相位（含 perceive）。**废除 `step_emitter` bridge**：唯一写者是 `StepLifecycleStore`；**只有 agent loop / phase driver 可以 open/close step**；Brain/Body 只 `record_*`。流式 delta 在 store 内 coalesce 后落盘。同步硬化上次 spine 复盘暴露的观测缺陷。
+**step** 对齐 deepseek-harness（一次 LLM 请求 + 它触发的工具）；**segment** 计数 think|act（含思考）；**phase** 落盘闭集相位（含 perceive）。**废除 `step_emitter` bridge**：`StepCoordinator` 驱动累加器 + spine；**只有 agent loop / phase driver 可以 open/close step**；Brain/Body 只 `record_*`。流式 delta 在累加器内 coalesce。同步硬化 spine 观测缺陷。轨迹清晰与 prompt/skill 落盘见 ADR-0167 D3/D4。
 
 ## 背景
 
@@ -128,13 +129,15 @@ Brain / Body / Perceive
   └── 只调 record_thinking / record_tool_* / record_reflect / append_delta
       （禁止 open_step / close_step）
 
-StepLifecycleStore   ← 唯一写者（单写者不变式保留）
-  └── coalesce deltas；finalize 时写 journal.json
+StepCoordinator      ← 唯一写入 API（ADR-0167）
+  ├── EventSpine.append     → events.jsonl（耐久 SSOT）
+  └── StepTreeAccumulator   → 内存物化；finalize → journal.json
+        └── coalesce deltas
 ```
 
-可选极薄 `StepWriter` Protocol（方法 = store 的 `record_*` / `append_delta`），**不是**第二套 bridge 模块；也可用现有 facade 的 `step_record_*`，但 **facade 不得提供 `step_open` 给 Brain/Body**——`open`/`close` 仅 loop 包可见（同模块或 `runtime/loop_step_control.py`）。
+可选极薄 `StepWriter` Protocol（方法 = accumulator 的 `record_*` / `append_delta` / `record_request_header`），**不是**第二套 bridge 模块；**facade 不得提供 `step_open` 给 Brain/Body**——`open`/`close` 仅 loop 包可见（`runtime/loop_step_control.py`）。
 
-旧 stream `facade.record(JournalEvent)`：**不再经 bridge 双写**。若 SSE/raw 仍需要事件流，由 **store finalize / projector 从 step-tree 派生**，或单独的 progress 通道（ADR-0157）；不在业务 emit 点维护第二本账。
+旧 stream `facade.record(JournalEvent)`：**不再经 bridge 双写**。若 SSE/raw 仍需要事件流，由 **deriver / progress 通道（ADR-0157）** 从 spine/step-tree 派生；不在业务 emit 点维护第二本账。Model-visible 正文进 `model_visible/step_N/`（ADR-0167 D3）。
 
 ### D4. 切步规则（仅 loop）
 

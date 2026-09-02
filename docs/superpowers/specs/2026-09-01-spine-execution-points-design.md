@@ -2,7 +2,7 @@
 
 > **Status**: Draft, pending user review
 > **Parent ADR**: [ADR-0165 — Event Spine 统一事件真相](../../adr/0165-event-spine-unified-log.md)
-> **Sub ADR planned**: [ADR-0165.1 — Execution Point 强制织入与编译期校验](../../adr/0165.1-execution-point-enforcement.md)
+> **Sub ADR planned**: [ADR-0165-execution-point-enforcement — Execution Point 强制织入与编译期校验](../../adr/0165-execution-point-enforcement.md)
 > **Incident refrence**: `docs/incidents/2026-09-01-run-c9fd294e5371-blank-spine.md`
 > **Date**: 2026-09-01
 > **Scope**: webserver → kernel → cognition → runtime → agent → body → llm → phase graph 全执行链路的框架强制埋点;从 EventSpine 单一入口、EXECUTION_POINTS 白名单、织入机制、build-time 5 层校验,到失效语义、SpanTree 派生视图,直至 Graphite stack 6 PR 实施。
@@ -31,7 +31,7 @@ ADR-0165 留下三个未充分解答的硬缺口:
 
 **D1.** **EXECUTION_POINTS 是 close set 白名单,所有执行点必须登记**。新增/删除执行点必须更新 `spine/manifest.py` + 五层校验全过 + 对应测试。Registry 是真值,不是代码扫描结果。
 
-**D2.** **主路径 = cordis `ctx.effect` + `ctx.intercept`**。cognition/runtime/agent 内部方法靠 intercept 包;plugin lifecycle 靠 effect 钩。**不允许业务方手写 `@instrument` 装饰器代替**。这是对 ADR-0165 § 三的偏离,需要在 ADR-0165.1 明确。
+**D2.** **主路径 = cordis `ctx.effect` + `ctx.intercept`**。cognition/runtime/agent 内部方法靠 intercept 包;plugin lifecycle 靠 effect 钩。**不允许业务方手写 `@instrument` 装饰器代替**。这是对 ADR-0165 § 三的偏离,需要在 ADR-0165-execution-point-enforcement 明确。
 
 **D3.** **assembler compile-time wrap** 是 phase graph 节点的织入机制。`ExecutableNode.runnable` 在 `compile_phase_graph` 时强制包成 instrumented 版本,**业务方写裸函数**。
 
@@ -1365,7 +1365,7 @@ spine:
 | ADR-0119 | cordis creator_promotion 手写 PluginMounted 改成 ctx.effect |
 | ADR-0115 | K7 BOOTSTRAP_NAMES 在 spine install 时注册 |
 
-### 10.2 偏离 ADR-0165 的部分(需 ADR-0165.1 记录)
+### 10.2 偏离 ADR-0165 的部分(需 ADR-0165-execution-point-enforcement 记录)
 
 - 主路径在 effect, decorator(B 路径)不再被推荐为通用工具;只作为 escape hatch 与回退。
 - 自动织入覆盖率优先级高于业务方显式标注。
@@ -1375,7 +1375,7 @@ spine:
 | 类型 | 路径 |
 |---|---|
 | 本 spec | `docs/superpowers/specs/2026-09-01-spine-execution-points-design.md` |
-| ADR-0165.1 | `docs/adr/0165.1-execution-point-enforcement.md` |
+| ADR-0165-execution-point-enforcement | `docs/adr/0165-execution-point-enforcement.md` |
 | 事件目录 | `docs/observability/EVENT-CATALOG.md` |
 | 运营手册 | `docs/operations/spine-observability.md`(`trace`/`span`/`orphan` 命令) |
 | 开发者入门 | `docs/development/spine-for-plugin-authors.md`(业务方零埋点指南) |

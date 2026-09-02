@@ -1,9 +1,10 @@
-# ADR-0165.1: Execution Point 强制织入、零字段声明、自发现、Source Trace
+# ADR-0165: Execution Point 强制织入、零字段声明、自发现、Source Trace
 
-- 状态: Accepted
+- 状态: Accepted（原 ADR-0165-execution-point-enforcement；编号并入 0165 系列；SSOT 表述见 [ADR-0167](0167-spine-ssot-and-step-materialization.md)）
 - 日期: 2026-09-01
 - 作者: coding-agent
-- 扩展: ADR-0165(Event Spine)
+- 扩展: [ADR-0165](0165-event-spine-unified-log.md)（Event Spine stub）
+- **耐久 SSOT / journal 物化 / Model-visible 布局: [ADR-0167](0167-spine-ssot-and-step-materialization.md)**
 - 相关: ADR-0164(step-tree),ADR-0096(Journal Protocol Layer 一切插件化),ADR-0112(webserver-4-routes-plugin),ADR-0119(webserver-as-plugin),ADR-0115(K1-K8)
 - spec: `docs/superpowers/specs/2026-09-01-spine-execution-points-design.md`
 

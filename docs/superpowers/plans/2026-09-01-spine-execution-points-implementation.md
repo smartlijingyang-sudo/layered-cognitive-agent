@@ -1,4 +1,4 @@
-# ADR 0165.1 Spine Execution Points Implementation Plan
+# ADR 0165-execution-point-enforcement Spine Execution Points Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -11,7 +11,7 @@
 **Spec:** `docs/superpowers/specs/2026-09-01-spine-execution-points-design.md` (1811 lines, 4-round iteration outcome)
 
 **Parent ADR:** `docs/adr/0165-event-spine-unified-log.md`
-**Mini-ADR:** `docs/adr/0165.1-execution-point-enforcement.md`
+**Mini-ADR:** `docs/adr/0165-execution-point-enforcement.md`
 
 ---
 
@@ -90,7 +90,7 @@ Expected: `ModuleNotFoundError: No module named 'lca.infrastructure.observabilit
 """Close-set of execution points that must emit a spine event.
 
 Adding/removing a point requires a Layer-1 build-time check pass and an
-EXECUTION_POINT_TEST matching it (I8 of ADR-0165.1). The set is intentional:
+EXECUTION_POINT_TEST matching it (I8 of ADR-0165-execution-point-enforcement). The set is intentional:
 do not edit casually.
 """
 
@@ -158,7 +158,7 @@ Expected: PASS
 
 ```bash
 git add lca/infrastructure/observability/spine/manifest.py tests/observability/spine/test_manifest.py
-git commit -m "feat(spine): EXECUTION_POINTS close-set manifest (ADR-0165.1)"
+git commit -m "feat(spine): EXECUTION_POINTS close-set manifest (ADR-0165-execution-point-enforcement)"
 ```
 
 ---
