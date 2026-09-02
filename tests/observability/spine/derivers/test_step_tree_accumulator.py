@@ -240,3 +240,211 @@ def test_event_publisher_completed_event(tmp_path: Path) -> None:
     doc = deriver.document
     assert doc is not None
     assert doc.metadata.outcome == "completed"
+
+
+# ── ADR-0176 D1 regressions ─────────────────────────────
+
+
+def test_phase_think_fold_creates_phase_record(tmp_path: Path) -> None:
+    """ADR-0176 D1 §1 (1):phase.think.fold 必须在 _apply 走 _record_phase 分支。
+
+    早先 PHASE_FOLD_EPS 表里有 phase.think.fold 但 _apply 没用它
+    (硬编码 if/elif 漏列),backend ReAct 路径累积空白。
+    """
+    SpineContext.set_run("r_tfold")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_tfold",
+        run_dir=tmp_path / "r_tfold",
+        agent_role="agt",
+        strategy_key="solo",
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_tfold",
+            execution_point="phase.think.fold",
+            payload={"phase": "think", "summary": "thinking"},
+        )
+    )
+    deriver.flush()
+
+    doc = deriver.document
+    assert doc is not None
+    assert doc.totals.phases >= 1
+    assert any(p.kind == "think" for p in doc.phases)
+
+
+def test_phase_act_fold_creates_phase_record(tmp_path: Path) -> None:
+    """ADR-0176 D1 §1 (1):phase.act.fold 现在也走 _record_phase。"""
+    SpineContext.set_run("r_afold")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_afold",
+        run_dir=tmp_path / "r_afold",
+        agent_role="agt",
+        strategy_key="solo",
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_afold",
+            execution_point="phase.act.fold",
+            payload={"phase": "act", "summary": "acting"},
+        )
+    )
+    deriver.flush()
+
+    doc = deriver.document
+    assert doc is not None
+    assert doc.totals.phases >= 1
+    assert any(p.kind == "act" for p in doc.phases)
+
+
+def test_brain_think_start_end_implicit_step_envelope(tmp_path: Path) -> None:
+    """ADR-0176 D1 §1 (2):backend ReAct 路径不发 writable.step.* 但发
+    brain.think.start/end → 隐式 begin_step/close_step。
+
+    显式 writable.step.start/end 优先(不变);brain.think.start 仅为
+    fallback 兜底。
+    """
+    SpineContext.set_run("r_env")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_env",
+        run_dir=tmp_path / "r_env",
+        agent_role="agt",
+        strategy_key="solo",
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_env",
+            execution_point="brain.think.start",
+            payload={"state_id": "abc"},
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_env",
+            execution_point="llm.call.end",
+            payload={
+                "model": "m",
+                "latency_ms": 10,
+                "decision": "respond",
+            },
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_env",
+            execution_point="brain.think.end",
+            outcome="success",
+            payload={"state_id": "abc"},
+        )
+    )
+    deriver.flush(outcome="completed")
+
+    doc = deriver.document
+    assert doc is not None
+    assert doc.totals.steps == 1, (
+        f"brain.think.start/end 应隐式开闭 step,得到 {doc.totals.steps}"
+    )
+    assert doc.steps[0].outcome == "success"
+
+
+def test_brain_think_does_not_nest_explicit_step(tmp_path: Path) -> None:
+    """ADR-0176 D1 §1 (2):显式 writable.step.* 优先级 > 隐式 brain.think.*。
+
+    writable.step.start 后再发 brain.think.start 不应嵌套开第二个 step。
+    """
+    SpineContext.set_run("r_expl")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_expl",
+        run_dir=tmp_path / "r_expl",
+        agent_role="agt",
+        strategy_key="solo",
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_expl",
+            execution_point="writable.step.start",
+            payload={"phase": "think", "step_id": "step_001"},
+        )
+    )
+    # brain.think.start 不应再开新 step
+    deriver.on_event(
+        _make_event(
+            run_id="r_expl",
+            execution_point="brain.think.start",
+            payload={"state_id": "x"},
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_expl",
+            execution_point="writable.step.end",
+            payload={"step_id": "step_001", "outcome": "success"},
+            outcome="success",
+        )
+    )
+    deriver.flush()
+
+    doc = deriver.document
+    assert doc is not None
+    assert doc.totals.steps == 1
+
+
+def test_empty_flush_writes_flush_error_to_manifest(tmp_path: Path) -> None:
+    """ADR-0176 D1 §1 (3):空累积 → manifest.extra.flush_errors 写入。
+
+    0-step + 0-phase + 已完成 run → 仍写 journal.json(空 doc),但 manifest
+    标 flush_errors,让 doctor H-xref 报 broken。
+    """
+    SpineContext.set_run("r_empty")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_empty",
+        run_dir=tmp_path / "r_empty",
+        agent_role="agt",
+        strategy_key="solo",
+    )
+    deriver.flush(outcome="completed")
+
+    manifest_path = tmp_path / "r_empty" / "manifest.json"
+    assert manifest_path.exists(), "空累积应写 manifest.json"
+
+    import json as _json
+
+    data = _json.loads(manifest_path.read_text(encoding="utf-8"))
+    errors = data.get("extra", {}).get("flush_errors", [])
+    assert errors, "空累积应在 manifest.extra.flush_errors 留记录"
+    assert any(e.get("operation") == "step_tree.flush.empty" for e in errors)
+
+
+def test_non_empty_flush_does_not_write_flush_error(tmp_path: Path) -> None:
+    """ADR-0176 D1 §1 (3):正常累积不写 flush_errors。"""
+    SpineContext.set_run("r_ne")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_ne",
+        run_dir=tmp_path / "r_ne",
+        agent_role="agt",
+        strategy_key="solo",
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_ne",
+            execution_point="brain.think.start",
+            payload={"state_id": "abc"},
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_ne",
+            execution_point="brain.think.end",
+            outcome="success",
+            payload={"state_id": "abc"},
+        )
+    )
+    deriver.flush(outcome="completed")
+
+    manifest_path = tmp_path / "r_ne" / "manifest.json"
+    if manifest_path.exists():
+        import json as _json
+
+        data = _json.loads(manifest_path.read_text(encoding="utf-8"))
+        errors = data.get("extra", {}).get("flush_errors", [])
+        assert not errors, f"正常累积不应写 flush_errors,但得到 {errors}"

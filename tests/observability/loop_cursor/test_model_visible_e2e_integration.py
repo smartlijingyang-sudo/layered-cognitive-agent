@@ -89,15 +89,17 @@ async def test_mock_llm_through_brain_writes_model_visible(
         result = await wrapped.complete("hello")
         assert result.text is not None
 
-        # 4 件套落盘
+        # 3 件套落盘(ADR-0176 D4:system.json 删除,system 并入 messages.json)
         step_dirs = sorted((run_dir / "model_visible").glob("step-*"))
         assert step_dirs, f"no step dirs in {run_dir}/model_visible"
         step_dir = step_dirs[0]
-        for stem in ("system", "tools", "messages", "manifest"):
+        assert not (step_dir / "system.json").exists()
+        for stem in ("tools", "messages", "manifest"):
             assert (step_dir / f"{stem}.json").is_file(), f"missing {stem}.json"
 
-        # messages.json 含 user 消息
-        messages = json.loads((step_dir / "messages.json").read_text())
+        # messages.json 含 user 消息(ADR-0176 D4:messages.json 是 dict 结构,含 messages_overview + messages)
+        raw = json.loads((step_dir / "messages.json").read_text())
+        messages = raw.get("messages", []) if isinstance(raw, dict) else raw
         assert any(
             m.get("role") == "user" and "hello" in (m.get("content") or "") for m in messages
         ), messages[:1]

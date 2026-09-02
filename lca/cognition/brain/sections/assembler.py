@@ -136,6 +136,7 @@ def render_template(
                     used_fallback=False,
                     skipped_empty=True,
                     text_chars=0,
+                    text="",
                 )
             )
             pieces.append("")
@@ -151,6 +152,7 @@ def render_template(
                         used_fallback=True,
                         skipped_empty=False,
                         text_chars=len(ref.fallback),
+                        text=ref.fallback,
                     )
                 )
                 pieces.append(ref.fallback)
@@ -175,6 +177,9 @@ def render_template(
                 used_fallback=output.used_fallback,
                 skipped_empty=skipped,
                 text_chars=len(output.text),
+                # ADR-0176 D3 §2:section 实际渲染正文一并落 trace,
+                # 而不是事后手动拼;replay 可零 token 重建。
+                text=output.text,
             )
         )
         if skipped:

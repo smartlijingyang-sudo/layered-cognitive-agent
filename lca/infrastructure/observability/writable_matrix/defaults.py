@@ -24,6 +24,9 @@ from typing import Any, Protocol, runtime_checkable
 
 from lca.infrastructure.observability.spine.event_record import EventRecord
 
+# 仅 FilesystemRecorder 用到 hashlib(json 已在上文 import);不再为它单独 import。
+# ADR-0176 D2:ModelVisibleRecorder 五面矩阵默认实现 import 集中管理。
+
 
 @runtime_checkable
 class SpineLike(Protocol):
@@ -237,3 +240,77 @@ class RoutingFileStorage:
     def close(self) -> None:
         with suppress(OSError):
             os.close(self._fd)
+
+
+# ── ModelVisibleRecorder ─────────────────────────────────────────
+# ADR-0167 D11.1 / ADR-0176 D2:五面矩阵的 model_visible_recorder 槽提供默认实现 + Null 兜底。
+# 注意:本协议与 lca.contracts.observability.model_visible_capture.ModelVisibleCapture
+# 是两条不同路径:后者在 LLM 边界捕获五件套 + digest 写入 model_visible/step_NN/,
+# 前者是 registry 解引用 + 接收 deriver 派出的 record_* 事件。两者职责不重叠:
+# - Capture(ADR-0169 D7):接收 system / tools / messages / manifest / inherited 五件套
+#   写盘 + 返回 ModelVisibleArtifact。
+# - Recorder(ADR-0167 D11.1):通用 record_header / record_prompt / record_tools /
+#   record_manifest / record_messages;deriver 写入或外部 hook 调用均可。
+# Profiles 默认装配 FilesystemRecorder(写入 <run_dir>/model_visible/step_NN/<file>);
+# 测试场景可选 NullRecorder 零副作用。
+# json 模块已在文件顶部 import(``import json``),FileSystemRecorder 直接用 json.dumps。
+
+
+class FilesystemRecorder:
+    """默认 ModelVisibleRecorder —— ``<run_dir>/model_visible/step_<NN>/<file>``。
+
+    满足 ``lca.contracts.observability.writable_matrix.ModelVisibleRecorder``
+    Protocol。``record_*`` 写对应 .json 文件;``run_dir`` 由构造期注入。
+    """
+
+    def __init__(self, *, run_dir: Path) -> None:
+        self._run_dir = Path(run_dir)
+
+    @property
+    def run_dir(self) -> Path:
+        return self._run_dir
+
+    def _write(self, step_id: str, file_name: str, payload: Any) -> None:
+        target = self._run_dir / "model_visible" / step_id / file_name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2, default=str),
+            encoding="utf-8",
+        )
+
+    def record_header(self, step_id: str, header: Any) -> None:
+        self._write(step_id, "request-header.json", header)
+
+    def record_prompt(self, step_id: str, text: str) -> None:
+        self._write(step_id, "system_prompt.json", {"step_id": step_id, "body": text})
+
+    def record_tools(self, step_id: str, schemas: tuple[Any, ...]) -> None:
+        self._write(step_id, "tools.json", list(schemas))
+
+    def record_manifest(self, step_id: str, manifest: Any) -> None:
+        self._write(step_id, "manifest.json", manifest)
+
+    def record_messages(self, step_id: str, messages: tuple[Any, ...]) -> None:
+        self._write(step_id, "messages.json", list(messages))
+
+
+class NullRecorder:
+    """测试 / 零副作用场景:吞掉所有 record_* 调用。
+
+    满足 ModelVisibleRecorder Protocol(全部 no-op)。
+    """
+
+    def record_header(self, step_id: str, header: Any) -> None:
+        del step_id, header
+
+    def record_prompt(self, step_id: str, text: str) -> None:
+        del step_id, text
+
+    def record_tools(self, step_id: str, schemas: tuple[Any, ...]) -> None:
+        del step_id, schemas
+
+    def record_manifest(self, step_id: str, manifest: Any) -> None:
+        del step_id, manifest
+
+    def record_messages(self, step_id: str, messages: tuple[Any, ...]) -> None:
+        del step_id, messages

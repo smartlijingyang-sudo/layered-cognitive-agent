@@ -117,10 +117,12 @@ class SectionManifest:
 
 @dataclass(frozen=True, slots=True)
 class SectionTrace:
-    """Per-section render trace produced by :class:`PromptAssembler` (ADR-0175 D2).
+    """Per-section render trace produced by :class:`PromptAssembler` (ADR-0175 D2)。
 
-    Lets the model-visible writer (and tests) reconstruct the structure
-    of the prompt without re-rendering or scraping the joined string.
+    让 model-visible writer(以及 tests)能重建 prompt 结构而不用再渲染 / 抓
+    完整字符串。ADR-0176 D3 升级:新增 ``text`` 字段(实际渲染正文),
+    ``text_chars`` 同步 = ``len(text)``;``content_digest`` 由 writer 派生
+    (sha256(text)),不落 trace dataclass。
     """
 
     name: str
@@ -129,6 +131,7 @@ class SectionTrace:
     used_fallback: bool
     skipped_empty: bool
     text_chars: int
+    text: str = ""  # ADR-0176 D3:section 实际渲染正文(replay 可零 token 重建)
 
 
 @dataclass(frozen=True, slots=True)
@@ -277,8 +280,8 @@ def templates_from_provider(provider: PromptTemplateProvider) -> Mapping[str, st
     from lca.cognition.brain.sections.assembler import render_template
 
     out: dict[str, str] = {}
-    for tid, _template in provider.list_templates():
-        prompt, _trace = render_template(
+    for _tid, _template in provider.list_templates():
+        _prompt, _trace = render_template(
             template=_template,
             registry=None,
             role_profile=None,  # type: ignore[arg-type]

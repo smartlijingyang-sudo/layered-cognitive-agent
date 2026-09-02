@@ -54,6 +54,29 @@ L10_FILENAME_SCAN_FILES = (
     "lca/plugins/observability/spine/sinks/file.py",
 )
 
+# ADR-0176 D8:deriver 写盘护栏。
+# spine deriver 路径(``lca/infrastructure/observability/spine/derivers/``)
+# 不得直接 ``Path.write_text`` / ``Path.write_bytes`` —— ADR-0167 D11 钉死
+# 单一职责:deriver 是「订阅 + 物化」,副作用(写盘)归 model_visible_recorder
+# 与 spine emitter / storage。本脚本扫描业务 cognition / deriver / spine
+# 路径,确保新增的"由 deriver 写盘"通道被 fail-fast 拦下。
+DERIVER_WRITE_PATH_PATTERN = re.compile(
+    r"""\.(write_text|write_bytes)\s*\("""
+)
+DERIVER_DIRECTORIES = (
+    ROOT / "lca/infrastructure/observability/spine/derivers",
+)
+# 例外:deriver 的合法"物化"产出 —— 每个文件都对应一个 deriver 的 view 视图。
+# - step_tree_accumulator.py → journal.json (StepTreeAccumulator 落 JournalDocument)
+# - waterfall.py → waterfall.md (人读 timeline 视图)
+# - graph.py → graph.mmd (Mermaid 图视图)
+# 这些都是 ADR-0167 D11 允许的 deriver 物化产物;新增 deriver 写盘前必须登记到本 allowlist。
+DERIVER_WRITE_ALLOWLIST = (
+    "step_tree_accumulator.py",
+    "waterfall.py",
+    "graph.py",
+)
+
 # PR-27:这些位置若把 ``"events.jsonl"`` 当作 ``file_name=`` / ``DEFAULT_FILENAME=`` /
 # ``filename=`` / ``cfg.get("file_name"`` 默认值,违反 L10。
 # 匹配模式 1:file_name / filename / DEFAULT_FILENAME 作为赋值或参数 → ``events.jsonl``
@@ -131,6 +154,33 @@ def _check_l10_l11() -> list[str]:
     return errors
 
 
+def _check_deriver_writes() -> list[str]:
+    """ADR-0176 D8:deriver 不直接调 Path.write_text / Path.write_bytes。
+
+    例外:StepTreeAccumulatorDeriver.flush() 写 journal.json 是物化主路径
+    (ADR-0167 D11 把 journal.json 视为 deriver 的物化产物),允许;其他 deriver
+    写盘路径都必须走 ModelVisibleRecorder / registry 解引用。
+    """
+    errors: list[str] = []
+    for d in DERIVER_DIRECTORIES:
+        if not d.exists():
+            continue
+        for py in d.rglob("*.py"):
+            if py.name in DERIVER_WRITE_ALLOWLIST:
+                continue
+            text = py.read_text(encoding="utf-8")
+            for ln_no, line in enumerate(text.splitlines(), start=1):
+                stripped = line.strip()
+                if stripped.startswith("#"):
+                    continue
+                if DERIVER_WRITE_PATH_PATTERN.search(line):
+                    errors.append(
+                        f"{py.relative_to(ROOT)}:{ln_no}: D8 violation: "
+                        f"deriver 禁止直接 .write_text/.write_bytes(走 ModelVisibleRecorder/registry)"
+                    )
+    return errors
+
+
 def _check() -> list[str]:
     errors: list[str] = []
     py_files: list[Path] = []
@@ -149,6 +199,7 @@ def _check() -> list[str]:
                 errors.append(f"{path.relative_to(ROOT)}: bans identifier {name!r}")
     errors.extend(_check_l10_l11())
     errors.extend(_check_l10_default_filename())
+    errors.extend(_check_deriver_writes())
     return errors
 
 
@@ -159,7 +210,7 @@ def main() -> int:
         for e in errs:
             print(f"  - {e}")
         return 1
-    print("Writable-matrix boundary guard OK (L4 + L10 + L10-default + L11)")
+    print("Writable-matrix boundary guard OK (L4 + L10 + L10-default + L11 + D8)")
     return 0
 
 

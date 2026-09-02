@@ -104,6 +104,15 @@ class StepScan:
     totals_phases: int = -1
     step_segment_counts: tuple[int, ...] = ()
     phase_time_inversions: tuple[int, ...] = ()  # step_index 列表
+    # ADR-0176 D5:H-xref 跨源扫描事实
+    spine_path: str = ""
+    spine_event_total: int = 0
+    spine_body_tool_start: int = 0
+    spine_llm_call_end: int = 0
+    spine_phase_fold_total: int = 0
+    spine_kernel_run_start: int = 0
+    events_jsonl_exists: bool = False
+    flush_errors: tuple[dict[str, Any], ...] = ()
 
 
 __all__ = [

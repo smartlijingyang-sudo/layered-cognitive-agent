@@ -124,3 +124,87 @@ def _make_current_prompt():
         selector_decision_path="profile_default",
         system_prompt_text="<ROLE>x</ROLE>\n<GOAL>y</GOAL>",
     )
+
+
+# ── ADR-0176 D3/D4 regressions ────────────────────────────
+
+
+def test_sections_payload_includes_content_digest(tmp_path: Path) -> None:
+    """ADR-0176 D3 §4:content_digest = sha256(text),仅当 text 非空时写。"""
+    from lca.contracts.models.cognition.prompt_assembly import (
+        PromptTrace,
+        SectionTrace,
+    )
+
+    run_dir = tmp_path / "run"
+    capture = StdReasonerPromptCapture(run_dir=run_dir)
+    trace = PromptTrace(
+        template_id="t1",
+        variant="react",
+        selector_decision_path="legacy",
+        sections=(
+            SectionTrace(
+                name="s1",
+                kind="pure",
+                optional=False,
+                used_fallback=False,
+                skipped_empty=False,
+                text_chars=5,
+                text="hello",
+            ),
+            SectionTrace(
+                name="s2",
+                kind="pure",
+                optional=False,
+                used_fallback=False,
+                skipped_empty=True,
+                text_chars=0,
+                text="",
+            ),
+        ),
+        total_chars=5,
+        activated_skill_ids=(),
+        tools_count=0,
+        available_skills_count=0,
+        system_prompt_text="hello",
+    )
+    capture.capture(step_id="step-001", trace=trace)
+
+    sections_path = run_dir / "model_visible" / "step-001" / "system_prompt_sections.json"
+    payload = json.loads(sections_path.read_text(encoding="utf-8"))
+    sections = payload["sections"]
+    # s1 有 text → content_digest
+    assert "content_digest" in sections[0]
+    assert sections[0]["content_digest"].startswith("sha256:")
+    # s2 text 空 → 没有 content_digest
+    assert "content_digest" not in sections[1]
+
+
+def test_messages_overview_system_field_in_capture(tmp_path: Path) -> None:
+    """ADR-0176 D4:StdModelVisibleCapture 把 system 数据并入 messages.json.messages_overview。"""
+    from lca.infrastructure.observability.loop_cursor.model_visible_capture import (
+        StdModelVisibleCapture,
+    )
+
+    capture = StdModelVisibleCapture(run_dir=tmp_path / "r")
+    artifact = capture.capture(
+        step_id="step-001",
+        incarnation=1,
+        system={"role": "system", "content": "be helpful"},
+        tools=[],
+        messages=[{"role": "user", "content": "hi"}],
+        manifest={"objective": "chat"},
+    )
+    # system.json 不再存在
+    assert not (tmp_path / "r" / "model_visible" / "step-001" / "system.json").exists()
+    # messages.json 含 messages_overview.system
+    messages_payload = json.loads(
+        (tmp_path / "r" / "model_visible" / "step-001" / "messages.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert "messages_overview" in messages_payload
+    assert messages_payload["messages_overview"]["system"]["content"] == "be helpful"
+    assert messages_payload["messages"][0]["role"] == "user"
+    # artifact.system_path 指向 messages.json
+    assert artifact.system_path == "model_visible/step-001/messages.json"

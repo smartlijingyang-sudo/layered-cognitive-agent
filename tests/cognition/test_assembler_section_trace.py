@@ -168,3 +168,43 @@ def _role_profile():
         backstory="b",
         tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
     )
+
+
+# ── ADR-0176 D3 regressions ─────────────────────────────
+
+
+def test_section_trace_text_field_carries_section_body() -> None:
+    """ADR-0176 D3 §2:SectionTrace.text 携带 section 实际渲染正文。
+
+    直接构造 SectionTrace + 验证 text 字段,frozen dataclass 可序列化。
+    """
+    from lca.contracts.models.cognition.prompt_assembly import SectionTrace
+
+    trace = SectionTrace(
+        name="static",
+        kind="pure",
+        optional=False,
+        used_fallback=False,
+        skipped_empty=False,
+        text_chars=25,
+        text="hello from static section",
+    )
+    assert trace.text == "hello from static section"
+    assert trace.text_chars == len(trace.text)
+
+def test_section_trace_text_equals_zero_when_registry_none() -> None:
+    """ADR-0176 D3 §2:registry=None 时(text="")占位。"""
+    from lca.cognition.brain.sections.assembler import render_template
+    from lca.contracts.models.cognition.prompt_assembly import (
+        PromptTemplate,
+        SectionReference,
+    )
+
+    template = PromptTemplate(
+        id="t1",
+        variant="react",
+        sections=(SectionReference(name="x", kind="pure"),),
+    )
+    _, trace = render_template(template=template, registry=None)
+    assert trace.sections[0].text == ""
+    assert trace.sections[0].text_chars == 0

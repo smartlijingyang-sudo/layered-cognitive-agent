@@ -33,7 +33,7 @@ from lca.contracts.observability.model_visible_capture import (
 _log = logging.getLogger(__name__)
 
 _DIGEST_PREFIX = "sha256:"
-"""digest 字符串前缀,与 step_tree_accumulator._write_model_visible 保持一致。"""
+"""digest 字符串前缀,与 ADR-0169 D4 / ADR-0176 D2 兼容格式。"""
 
 
 def _to_jsonable(value: Any) -> Any:
@@ -130,12 +130,13 @@ class StdModelVisibleCapture(ModelVisibleCapture):
             ...
         ))
 
-    写入位置(ADR-0169 D7)::
-        <run_dir>/model_visible/<step_id>/system.json
+    写入位置(ADR-0169 D7 + ADR-0176 D4):
         <run_dir>/model_visible/<step_id>/tools.json
-        <run_dir>/model_visible/<step_id>/messages.json
+        <run_dir>/model_visible/<step_id>/messages.json  # messages_overview.system + messages[]
         <run_dir>/model_visible/<step_id>/manifest.json
         <run_dir>/model_visible/<step_id>/inherited.json   # 当 inherited_from_step 非 None
+        # 注:system_prompt.json / system_prompt_sections.json 由 StdReasonerPromptCapture 写,
+        #   不再由本 Capture 写。system 数据合并到 messages.json 的 messages_overview.system 区段。
     """
 
     def __init__(self, *, run_dir: Path) -> None:
@@ -160,22 +161,27 @@ class StdModelVisibleCapture(ModelVisibleCapture):
         # 路径就位:<run_dir>/model_visible/<step_id>/
         step_dir = self._run_dir / "model_visible" / step_id
 
-        # 4 个必写文件(顺序无关,但保持 system → tools → messages → manifest)
-        system_path = step_dir / "system.json"
+        # ADR-0176 D4:删除 system.json(系统提示合并到 messages.json 的
+        # messages_overview.system 区段);tools / messages / manifest 三个文件保留。
         tools_path = step_dir / "tools.json"
         messages_path = step_dir / "messages.json"
         manifest_path = step_dir / "manifest.json"
 
-        # 系统提示,常含元信息:incarnation + step_id 在 manifest 里而非 system 里
-        system_with_meta = {
+        tools_digest = _write_json(tools_path, _to_jsonable(tools))
+
+        # messages.json 现在承载两件事:
+        # - messages_overview.system:送入 LLM 的 system 段(原 system.json 数据)
+        # - messages:实际发给模型的消息序列
+        messages_payload: dict[str, Any] = {
             "incarnation": incarnation,
             "step_id": step_id,
-            "body": _to_jsonable(system),
+            "messages_overview": {
+                "system": _to_jsonable(system),
+            },
+            "messages": _to_jsonable(messages),
         }
-        system_digest = _write_json(system_path, system_with_meta)
+        messages_digest = _write_json(messages_path, messages_payload)
 
-        tools_digest = _write_json(tools_path, _to_jsonable(tools))
-        messages_digest = _write_json(messages_path, _to_jsonable(messages))
         manifest_with_meta = {
             "incarnation": incarnation,
             "step_id": step_id,
@@ -196,9 +202,13 @@ class StdModelVisibleCapture(ModelVisibleCapture):
                 },
             )
 
+        # ADR-0176 D4:system_path 不再指向独立 system.json,而是 messages.json
+        # 的 messages_overview.system 区段;前端 viewer 据此找到完整 system 上下文。
+        # COMPAT(delete-when: 所有调用方已迁移到 system_path 指向 messages.json,
+        # tracking: ADR-0176 D4)
         return ModelVisibleArtifact(
             step_id=step_id,
-            system_path=_relative_posix(self._run_dir, system_path),
+            system_path=_relative_posix(self._run_dir, messages_path),
             tools_path=_relative_posix(self._run_dir, tools_path),
             messages_path=_relative_posix(self._run_dir, messages_path),
             manifest_path=_relative_posix(self._run_dir, manifest_path),
@@ -207,7 +217,9 @@ class StdModelVisibleCapture(ModelVisibleCapture):
                 if inherited_path is not None
                 else None
             ),
-            system_digest=system_digest,
+            # system_digest 复用 messages_digest;调用方需要时仍可读 system 段
+            # 的 content_digest。本字段保留 Protocol 兼容性。
+            system_digest=messages_digest,
             tools_digest=tools_digest,
             messages_digest=messages_digest,
             manifest_digest=manifest_digest,

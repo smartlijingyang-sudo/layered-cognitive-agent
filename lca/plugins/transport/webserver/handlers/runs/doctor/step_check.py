@@ -13,6 +13,9 @@ Hops:
   - H7: 工具成功率 +是否有失败 step
   - H8 (新): 步骤因果链完整性——每 step 的 prior_summary_chain
     末元素 == 上 step 的 reflect.summary;不一致 → ok=False
+  - H-xref (ADR-0176 D5): journal ⇄ spine 跨源一致性 hop
+    (body.tool.execute.start 数 > 0 但 journal.steps[*].tool_call 为 0,
+     llm.call.end 数 > 0 但 journal.totals.steps == 0,等)
 
 不做的事:
     - 不读 evidence(由 reader 按需 fetch)。
@@ -21,6 +24,7 @@ Hops:
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +39,98 @@ from lca.plugins.transport.webserver.handlers.runs.doctor.models import (
     HopVerdict,
     StepScan,
 )
+
+
+def _safe_logger() -> Any:
+    """Best-effort structlog getter;失败返回带 .debug() 接口的 stub。
+
+    H-xref 读取 events.jsonl / manifest.json 时不希望 structlog 异常向上
+    扩散;失败时退化为 print 输出。
+    """
+    try:
+        import structlog
+
+        return structlog.get_logger("lca.doctor.step_check")
+    except Exception:
+        class _Stub:
+            def debug(self, *args: object, **kwargs: object) -> None:
+                return None
+
+        return _Stub()
+
+
+def _scan_xref(run_dir: Path, scan: StepScan) -> StepScan:
+    """ADR-0176 D5:H-xref —— 跨源一致性扫描。
+
+    读取 ``<run_dir>/events.jsonl``(spine SSOT)与
+    ``<run_dir>/manifest.json``(manifest SSOT),把「spine 上有
+    某类 EP 但 journal 反映不到」挑出来落到 ``StepScan.xref_*``。
+    """
+    # spine events.jsonl 计数(逐行扫描,不解析 payload 细节)
+    spine_counts: dict[str, int] = {}
+    spine_path = run_dir / "events.jsonl"
+    if spine_path.exists():
+        try:
+            for ln in spine_path.read_text(encoding="utf-8").splitlines():
+                ln = ln.strip()
+                if not ln:
+                    continue
+                try:
+                    rec = json.loads(ln)
+                except Exception as exc:  # 行损坏跳过,doctor 容错
+                    _log = _safe_logger()
+                    _log.debug("h_xref.bad_line", error=str(exc))
+                    continue
+                ep = rec.get("execution_point")
+                if isinstance(ep, str):
+                    spine_counts[ep] = spine_counts.get(ep, 0) + 1
+        except Exception as exc:  # pragma: no cover — events.jsonl 读取失败兜底
+            _log = _safe_logger()
+            _log.debug("h_xref.events_jsonl_unreadable", error=str(exc))
+    spine_event_total = sum(spine_counts.values())
+    spine_body_tool_start = spine_counts.get("body.tool.execute.start", 0)
+    spine_llm_call_end = spine_counts.get("llm.call.end", 0)
+    spine_phase_fold_total = sum(
+        spine_counts.get(k, 0)
+        for k in (
+            "phase.perceive.fold",
+            "phase.think.fold",
+            "phase.act.fold",
+            "phase.remember.fold",
+            "phase.reflect.fold",
+            "phase.stop.fold",
+        )
+    )
+    spine_kernel_run_start = spine_counts.get("kernel.run.start", 0)
+
+    # manifest.extra.flush_errors(StepTreeAccumulator.flush 空写 fail-loud)
+    manifest_path = run_dir / "manifest.json"
+    flush_errors: tuple[dict[str, Any], ...] = ()
+    if manifest_path.exists():
+        try:
+            data = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                errs = data.get("extra", {}).get("flush_errors", [])
+                if isinstance(errs, list):
+                    flush_errors = tuple(e for e in errs if isinstance(e, dict))
+        except Exception as exc:  # pragma: no cover — manifest 损坏兜底
+            _log = _safe_logger()
+            _log.debug("h_xref.manifest_unreadable", error=str(exc))
+
+    # 用 dataclasses.replace 改 immutable 上的字段;slots 不会触发 FrozenInstanceError。
+    from dataclasses import replace as _dc_replace
+
+    return _dc_replace(
+        scan,
+        spine_path=str(spine_path),
+        spine_event_total=spine_event_total,
+        spine_body_tool_start=spine_body_tool_start,
+        spine_llm_call_end=spine_llm_call_end,
+        spine_phase_fold_total=spine_phase_fold_total,
+        spine_kernel_run_start=spine_kernel_run_start,
+        events_jsonl_exists=spine_path.exists(),
+        flush_errors=flush_errors,
+    )
 
 
 def _scan_step_doc(path: Path) -> StepScan:
@@ -336,6 +432,9 @@ def diagnose_step_tree(
     """
     path = Path(journal_path)
     scan = _scan_step_doc(path)
+    # ADR-0176 D5:H-xref 需要 events.jsonl/manifest.json —— 这两个文件与
+    # journal.json 在同一 run_dir。xpath 是 path.parent 而非 path 本身。
+    xref_scan = _scan_xref(path.parent, scan)
     run_id = path.parent.name  # traces/runs/<run_id>/journal.json
     trace_id = ""
     if scan.exists:
@@ -360,6 +459,7 @@ def diagnose_step_tree(
         "H8": _hop_h8(scan),
         "H-seg": _hop_h_seg(scan),
         "H-phase": _hop_h_phase(scan),
+        "H-xref": _hop_h_xref(xref_scan),
     }
     broken = next((name for name, hop in hops.items() if hop.ok is False), None)
     factory = {"ok": True, "tools_missing_plugin_state": []}
@@ -379,9 +479,64 @@ def diagnose_step_tree(
             "duration_ms": scan.duration_ms,
             "totals_segments": scan.totals_segments,
             "totals_phases": scan.totals_phases,
+            "spine_event_total": xref_scan.spine_event_total,
+            "flush_errors": list(xref_scan.flush_errors),
         },
         factory=factory,
     )
+
+
+def _hop_h_xref(scan: StepScan) -> HopVerdict:
+    """ADR-0176 D5.1:跨源一致性 hop(journal ⇄ spine)。
+
+    broken when:
+      - body.tool.execute.start > 0 且 journal.steps[*].tool_call 全为空
+      - llm.call.end > 0 且 journal.totals.steps == 0
+      - phase.*.fold > 0 且 journal.totals.phases == 0
+      - kernel.run.start > 0 且 events.jsonl 不存在(SSOT 缺失)
+      - manifest.extra.flush_errors 非空(StepTreeAccumulator.flush 已落 fail-loud)
+    """
+    extra: dict[str, Any] = {
+        "spine_event_total": scan.spine_event_total,
+        "spine_body_tool_start": scan.spine_body_tool_start,
+        "spine_llm_call_end": scan.spine_llm_call_end,
+        "spine_phase_fold_total": scan.spine_phase_fold_total,
+        "spine_kernel_run_start": scan.spine_kernel_run_start,
+        "events_jsonl_exists": scan.events_jsonl_exists,
+        "flush_errors": list(scan.flush_errors),
+        "journal_steps": scan.total_steps,
+    }
+    reasons: list[str] = []
+    if scan.spine_kernel_run_start > 0 and not scan.events_jsonl_exists:
+        reasons.append(
+            f"kernel.run.start={scan.spine_kernel_run_start} but events.jsonl missing"
+        )
+    if scan.flush_errors:
+        reasons.append(
+            f"manifest.flush_errors={len(scan.flush_errors)} "
+            f"(e.g. {scan.flush_errors[0].get('operation', '?')})"
+        )
+    if scan.spine_body_tool_start > 0 and scan.tool_total == 0:
+        reasons.append(
+            f"spine.body.tool.execute.start={scan.spine_body_tool_start} "
+            f"but journal.tool_total=0 (no tool recorded)"
+        )
+    if scan.spine_llm_call_end > 0 and scan.total_steps == 0:
+        reasons.append(
+            f"spine.llm.call.end={scan.spine_llm_call_end} "
+            f"but journal.totals.steps=0 (no step recorded)"
+        )
+    if (
+        scan.spine_phase_fold_total > 0
+        and scan.totals_phases == 0
+    ):
+        reasons.append(
+            f"spine.phase.*.fold={scan.spine_phase_fold_total} "
+            f"but journal.totals.phases=0 (no phase recorded)"
+        )
+    if reasons:
+        return HopVerdict(ok=False, detail="; ".join(reasons), extra=extra)
+    return HopVerdict(ok=True, detail="journal ⇄ spine 一致", extra=extra)
 
 
 def _summary(

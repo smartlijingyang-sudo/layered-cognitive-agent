@@ -152,7 +152,18 @@ class StdReasonerPromptCapture(ReasonerPromptCapture):
             "tools_count": trace.tools_count,
             "available_skills_count": trace.available_skills_count,
             "total_chars": trace.total_chars,
-            "sections": [_to_jsonable(s) for s in trace.sections],
+            "sections": [
+                {
+                    **_to_jsonable(s),
+                    # ADR-0176 D3 §4:content_digest = sha256(text),仅当 text 非空时写
+                    **(
+                        {"content_digest": _sha256_digest(s.text)}
+                        if s.text
+                        else {}
+                    ),
+                }
+                for s in trace.sections
+            ],
         }
         _write_json(sections_path, sections_payload)
 

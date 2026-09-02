@@ -74,8 +74,9 @@ def test_capture_writes_four_default_files(tmp_path: Path) -> None:
     )
 
     step_dir = run_dir / "model_visible" / "step-001"
-    # 4 件套存在
-    assert (step_dir / "system.json").is_file()
+    # ADR-0176 D4:system.json 删除,system 数据并入 messages.json 的
+    # messages_overview.system 区段;总文件数从 4 缩到 3 + inherited (可选)。
+    assert not (step_dir / "system.json").exists()
     assert (step_dir / "tools.json").is_file()
     assert (step_dir / "messages.json").is_file()
     assert (step_dir / "manifest.json").is_file()
@@ -84,7 +85,8 @@ def test_capture_writes_four_default_files(tmp_path: Path) -> None:
     # artifact.inherited_path 为 None
     assert artifact.inherited_path is None
     # 返回的 path 都是相对 run_dir 的 POSIX 风格
-    assert artifact.system_path == "model_visible/step-001/system.json"
+    # system_path 指向 messages.json (system 段并入 messages_overview)
+    assert artifact.system_path == "model_visible/step-001/messages.json"
     assert artifact.tools_path == "model_visible/step-001/tools.json"
     assert artifact.messages_path == "model_visible/step-001/messages.json"
     assert artifact.manifest_path == "model_visible/step-001/manifest.json"
@@ -166,7 +168,9 @@ def test_digests_match_file_contents(tmp_path: Path) -> None:
         )
         assert getattr(artifact, expected_digest_attr) == _sha256(encoded)
 
-    _check("system.json", "system_digest")
+    # ADR-0176 D4:system.json 删除,system 数据并入 messages.json 的
+    # messages_overview.system 区段;system_digest 复用 messages_digest。
+    _check("messages.json", "system_digest")
     _check("tools.json", "tools_digest")
     _check("messages.json", "messages_digest")
     _check("manifest.json", "manifest_digest")
@@ -197,7 +201,9 @@ def test_capture_creates_run_dir_and_step_dir(tmp_path: Path) -> None:
     )
     # 父子目录都被创建
     assert nested_run_dir.is_dir()
-    assert (nested_run_dir / "model_visible" / "step-1" / "system.json").is_file()
+    # ADR-0176 D4:system.json 删除;改写 tools.json。
+    assert not (nested_run_dir / "model_visible" / "step-1" / "system.json").exists()
+    assert (nested_run_dir / "model_visible" / "step-1" / "tools.json").is_file()
 
 
 def test_capture_serializes_arbitrary_objects(tmp_path: Path) -> None:
@@ -276,5 +282,7 @@ def test_files_under_model_visible_use_step_id_subdir(tmp_path: Path) -> None:
     )
     base = run_dir / "model_visible" / "custom-step-id"
     assert base.is_dir()
-    for stem in ("system", "tools", "messages", "manifest"):
+    # ADR-0176 D4:system.json 删除;改为检查 messages.json 包含 messages_overview.system
+    assert not (base / "system.json").exists()
+    for stem in ("tools", "messages", "manifest"):
         assert (base / f"{stem}.json").is_file(), f"missing {stem}.json"

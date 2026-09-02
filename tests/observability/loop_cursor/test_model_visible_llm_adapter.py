@@ -113,9 +113,9 @@ async def test_complete_writes_four_model_visible_files(
     assert response.text == "hello"
     assert inner.prompt_seen == "hello world"
 
-    # 2) 4 件套落盘
+    # 2) ADR-0176 D4:3 件套(system.json 删除,system 数据并入 messages.json)
     step_dir = tmp_path / "run" / "model_visible" / "step-001"
-    assert (step_dir / "system.json").is_file()
+    assert not (step_dir / "system.json").exists()
     assert (step_dir / "tools.json").is_file()
     assert (step_dir / "messages.json").is_file()
     assert (step_dir / "manifest.json").is_file()
@@ -154,9 +154,11 @@ async def test_complete_writes_four_model_visible_files(
         assert d.startswith("sha256:")
 
     # 5) messages.json 至少包含 user 消息(由 prompt 派生)
+    # ADR-0176 D4:messages.json 现在是 dict 结构,包含 messages_overview.system + messages。
     raw = json.loads((step_dir / "messages.json").read_text(encoding="utf-8"))
+    msgs = raw.get("messages", []) if isinstance(raw, dict) else raw
     assert any(
-        m.get("role") == "user" and "hello world" in (m.get("content") or "") for m in raw
+        m.get("role") == "user" and "hello world" in (m.get("content") or "") for m in msgs
     ), raw
 
 
@@ -188,9 +190,10 @@ async def test_stream_writes_one_set_of_files(tmp_path: Path) -> None:
             chunks.append(event.text or "")
 
     assert "".join(chunks) == "Hi"
-    # 同样 1 条 llm.request.header EP,4 件套落盘
+    # 同样 1 条 llm.request.header EP,3 件套落盘(ADR-0176 D4:system.json 删除)
     step_dir = tmp_path / "run" / "model_visible" / "step-001"
-    for stem in ("system", "tools", "messages", "manifest"):
+    assert not (step_dir / "system.json").exists()
+    for stem in ("tools", "messages", "manifest"):
         assert (step_dir / f"{stem}.json").is_file(), stem
 
     ep_names = [n for n, _ in spine_calls]

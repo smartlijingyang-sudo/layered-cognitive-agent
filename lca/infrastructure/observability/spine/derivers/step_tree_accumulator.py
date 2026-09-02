@@ -10,15 +10,16 @@
 - 工具 / LLM EP 仅做引用累积（不写 tool_call / tool_result 主轨；这两
   个原语由 StepGroupedBackend 在 close_and_finalize 收口）。
 - ``flush()`` 把累积状态转 JournalDocument + 写盘。
+- **deriver 是纯订阅 + 物化**:不写 model_visible(ADR-0176 D2)。model_visible
+  由 :class:`ModelVisibleRecorder` 在 LLM 边界一次性写;deriver 只读
+  ``step_id`` 做 phase 累计。
 """
 
 from __future__ import annotations
 
-import hashlib
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 from lca.contracts.models.observability.journal_doc import (
     JournalDocument,
@@ -47,11 +48,20 @@ from lca.infrastructure.observability.spine.event_record import EventRecord
 log = logging.getLogger(__name__)
 
 
-# 闭集 phase EP 表（ADR-0166 D4 闭集）
+# 闭集 phase EP 表（ADR-0166 D4 闭集 + ADR-0176 D1 扩）
+#
+# 增补 ADR-0176 D1 §1:
+#   - phase.think.fold 必须在 _apply 走 _record_phase 分支(原先表里有但无分支);
+#   - phase.act.fold / phase.act.fold.start / phase.act.fold.end 加入
+#     PHASE_FOLD_EPS 表(把 act 视作一等 phase fold,不再让 _apply 用硬编码
+#     if/elif 来专门覆盖 act.fold.start/end),与 D1 §1 "PHASE_FOLD_EPS 表
+#     里有 ≠ _apply 处理了 是已暴露缺陷" 关闭。
+# 任何新增 phase.*.fold EP 都应同时落表 + 写 _apply 分支;不增 vocabulary。
 PHASE_FOLD_EPS: dict[str, StepPhase] = {
     "perceive.phase.fold": "perceive",
     "phase.perceive.fold": "perceive",
     "phase.think.fold": "think",
+    "phase.act.fold": "act",
     "phase.remember.fold": "remember",
     "phase.reflect.fold": "reflect",
     "phase.stop.fold": "stop",
@@ -144,6 +154,11 @@ class StepTreeAccumulatorDeriver(Deriver):
         但 run 已完成的 journal.json 错误标记 in_progress → doctor H6 误判。
         现优先使用传入的 outcome,没有时回退到 _terminal_outcome(spine
         捕获),再没有才用 _steps 启发式。
+
+        ADR-0176 D1 §1 (3):空写 fail-loud —— 若 ``_open_step is None`` 且
+        ``_phases`` 也空,记 ``step_tree_deriver.flush.empty`` structlog.error
+        并把诊断写到 ``manifest.extra.flush_errors``;此时仍写 journal.json
+        (落一份空 doc),但后续 doctor 走 H-xref broken。
         """
         if outcome is not None:
             self._terminal_outcome = outcome
@@ -152,9 +167,69 @@ class StepTreeAccumulatorDeriver(Deriver):
                 self._close_step("cancelled")
             doc = self._build_document()
             self._last_document = doc
+            # ADR-0176 D1 §1 (3):空累积 → fail-loud。
+            empty = not self._steps and not self._phases
+            if empty:
+                try:
+                    import structlog
+
+                    _log = structlog.get_logger("lca.observability.step_tree")
+                    _log.error(
+                        "step_tree_deriver.flush.empty",
+                        run_id=self._run_id,
+                        terminal_outcome=self._terminal_outcome or "",
+                    )
+                except Exception as exc:  # pragma: no cover — structlog 不可用兜底
+                    log.warning("step_tree flush fail-loud structlog failed err=%s", exc)
+                # 把诊断写到 manifest.extra.flush_errors;不在此 assert。
+                self._record_flush_error(
+                    operation="step_tree.flush.empty",
+                    error_message="no step and no phase captured",
+                )
             JournalDocumentWriter(self._run_dir / "journal.json").write(doc)
         except Exception as exc:
             log.warning("step_tree_accumulator.flush failed err=%s", exc)
+
+    def _record_flush_error(self, *, operation: str, error_message: str) -> None:
+        """ADR-0176 D1 §1 (3):把 flush 期的诊断写进 manifest.extra.flush_errors。
+
+        写到 ``<run_dir>/manifest.json`` 的 ``extra.flush_errors`` 列表(append-only),
+        不影响 journal.json 本身。失败由 doctor H-xref hop 读取并报 broken。
+        """
+        import json
+
+        manifest_path = self._run_dir / "manifest.json"
+        payload: dict[str, object] = {}
+        if manifest_path.exists():
+            try:
+                payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except Exception:
+                payload = {}
+        if not isinstance(payload, dict):
+            payload = {}
+        extra = payload.get("extra")
+        if not isinstance(extra, dict):
+            extra = {}
+        errors = extra.get("flush_errors")
+        if not isinstance(errors, list):
+            errors = []
+        errors.append(
+            {
+                "operation": operation,
+                "error_message": error_message,
+                "ts": self._last_ts or 0.0,
+            }
+        )
+        extra["flush_errors"] = errors
+        payload["extra"] = extra
+        try:
+            manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            manifest_path.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2, default=str),
+                encoding="utf-8",
+            )
+        except Exception as exc:
+            log.warning("step_tree_accumulator.record_flush_error failed err=%s", exc)
 
     @property
     def document(self) -> JournalDocument | None:
@@ -202,14 +277,16 @@ class StepTreeAccumulatorDeriver(Deriver):
             self._begin_segment(event, ts)
         elif ep == "writable.segment.end":
             self._end_segment(outcome=event.outcome or "success")
-        elif ep == "phase.perceive.fold":
-            self._record_phase(event, "perceive", ts)
-        elif ep == "phase.reflect.fold":
-            self._record_phase(event, "reflect", ts)
-        elif ep == "phase.remember.fold":
-            self._record_phase(event, "remember", ts)
-        elif ep == "phase.stop.fold":
-            self._record_phase(event, "stop", ts)
+        elif ep in PHASE_FOLD_EPS:
+            # ADR-0176 D1 §1:phase fold 统一走 _record_phase;包括 phase.act.fold。
+            # 之前 phase.think.fold / phase.act.fold / phase.act.fold.end 表面登记
+            # 但 _apply 没有分支 → backend ReAct 路径累积空白,本 ADR 关掉该缺口。
+            self._record_phase(event, PHASE_FOLD_EPS[ep], ts)
+        elif ep == "phase.act.fold.start":
+            # 与 phase.act.fold 同样登记一次 fold(包络 act step 起头)。
+            # 这里不直接覆盖 _open_step.phase —— writable.step.start 已经显式
+            # 给出 phase,act.fold.start 仅作为冗余 hint 参与 _record_phase 累计。
+            self._record_phase(event, "act", ts)
         elif ep == "llm.call.end":
             if self._open_step is not None:
                 p = event.payload
@@ -236,13 +313,65 @@ class StepTreeAccumulatorDeriver(Deriver):
                     latency_ms=int(p.get("latency_ms") or 0),
                     delta_summary=str(p.get("delta_summary", "")),
                 )
-        elif ep == "phase.act.fold.start":
-            # 标记当前 step 主相位为 act（override phase）
+        # ADR-0176 D1 §1 (fallback step 包络,不改 vocabulary):
+        # backend ReAct 路径不发 writable.step.*,但发 brain.think.start/end
+        # 与 phase.tool.call.* / llm.call.*。在没有显式 step 边界时,
+        # 由 brain.think.start 隐式 begin_step("think"),brain.think.end 隐式 close;
+        # critic.eval.start/end 主营 reflect 累计,close 已有 open_step=act 时收尾。
+        # 显式 > 隐式:writable.step.start/end 永远优先(不变)。
+        elif ep == "brain.think.start":
+            if self._open_step is None:
+                self._begin_implicit_step(event, ts, phase="think")
+        elif ep == "brain.think.end":
             if self._open_step is not None:
-                self._open_step.phase = "act"
-        elif ep == "phase.act.fold.end":
-            if self._open_step is not None and not self._open_step.outcome:
-                self._open_step.outcome = event.outcome or "ok"
+                # _close_step 内部已幂等:无 open_step 时静默返回;
+                # 这里若 begin 来自 writable.step.start 而 end 来自 brain.think.end
+                # 不一致 → 仍以 writable.* 为准,_close 仅当 _open_step 存在时落,
+                # outcome 取 event.outcome(默认 "success")。
+                self._close_step(outcome=event.outcome or "success")
+        elif ep == "critic.eval.start":
+            # 主营 reflect 累计;若 _open_step 已在 act 上 → 让 _record_phase 落到 reflect
+            self._record_phase(event, "reflect", ts)
+        elif ep == "critic.eval.end":
+            self._record_phase(event, "reflect", ts)
+            if self._open_step is not None and self._open_step.phase == "act":
+                self._close_step(outcome=event.outcome or "success")
+        elif ep == "step.tool_call.record":
+            # ADR-0176 D1 §1 (3):fallback 下 open_step 绑 tool_call;
+            # 若已由 writable.tool_call.start 写过则覆盖更新。
+            if self._open_step is not None:
+                p = event.payload.get("call", {}) if isinstance(event.payload, dict) else {}
+                self._open_step.tool_call = ToolCallRecord(
+                    invocation_id=str(p.get("invocation_id", "")),
+                    name=str(p.get("name", "")),
+                    arguments=p.get("arguments") or {},
+                    arguments_summary=str(p.get("arguments_summary", "")),
+                )
+        elif ep == "step.tool_result.record":
+            if self._open_step is not None:
+                p = event.payload.get("result", {}) if isinstance(event.payload, dict) else {}
+                self._open_step.tool_result = ToolResult(
+                    ok=bool(p.get("ok", True)),
+                    latency_ms=int(p.get("latency_ms") or 0),
+                    delta_summary=str(p.get("delta_summary", "")),
+                )
+        elif ep == "body.tool.execute.start":
+            # backend ReAct 把 tool_call 落到该 EP;有 open_step 时一并 bind。
+            if self._open_step is not None:
+                p = event.payload
+                self._open_step.tool_call = ToolCallRecord(
+                    invocation_id=str(p.get("invocation_id", "")),
+                    name=str(p.get("tool_name", p.get("name", ""))),
+                    arguments=p.get("arguments") or {},
+                    arguments_summary=str(p.get("arguments_summary", "")),
+                )
+        elif ep == "body.tool.execute.end" and self._open_step is not None:
+            p = event.payload
+            self._open_step.tool_result = ToolResult(
+                ok=bool(p.get("ok", True)),
+                latency_ms=int(p.get("latency_ms") or 0),
+                delta_summary=str(p.get("delta_summary", "")),
+                )
 
     def _begin_step(self, event: EventRecord, ts: float) -> None:
         if self._open_step is not None:
@@ -252,6 +381,27 @@ class StepTreeAccumulatorDeriver(Deriver):
         phase = event.payload.get("phase", "think")
         if not isinstance(phase, str):
             phase = "think"
+        self._open_step = _StepFrame(
+            step_id=f"step_{self._step_seq:03d}",
+            step_index=self._step_seq,
+            phase=phase,  # type: ignore[arg-type]
+            entered_at=ts,
+            context_before=StepContext(objective=self._objective),
+        )
+
+    def _begin_implicit_step(self, event: EventRecord, ts: float, *, phase: str) -> None:
+        """ADR-0176 D1 §1 (2):fallback step 包络。
+
+        backend ReAct 路径不显式发 writable.step.start;当收到
+        ``brain.think.start`` 且无 _open_step 时,隐式 begin_step。
+        ``phase`` 默认 "think";critic.eval.start 走 _record_phase 累计 reflect,
+        不在此 begin step。
+        """
+        if self._open_step is not None:
+            # 已有显式 step(来自 writable.step.start 或上轮 brain.think.start)
+            # → 不嵌套;复用现有 _open_step(包络优先级:显式 > 隐式)。
+            return
+        self._step_seq += 1
         self._open_step = _StepFrame(
             step_id=f"step_{self._step_seq:03d}",
             step_index=self._step_seq,
@@ -286,8 +436,8 @@ class StepTreeAccumulatorDeriver(Deriver):
             outcome=f.outcome,
         )
         self._steps.append(step)
-        # 落 model_visible/ 让 replay 可零 token 重建（D3 / D4 ADR-0167）
-        self._write_model_visible(f)
+        # ADR-0176 D2:deriver 是纯订阅 + 物化,不再落 model_visible。
+        # model_visible 由 ModelVisibleRecorder 在 LLM 边界一次性写。
         self._open_step = None
 
     def _begin_segment(self, event: EventRecord, ts: float) -> None:
@@ -332,6 +482,20 @@ class StepTreeAccumulatorDeriver(Deriver):
             outcome=event.outcome or None,
         )
         self._phases.append(ph)
+        # ADR-0176 D1 §1 (2):phase.fold(think / act)累计到当前 _open_step.segments
+        # —— 替代旧实现「只在 writable.segment.* 累计」造成的 backend ReAct 路径
+        # segments 永远空的缺陷。segs 只用于人读叙事聚合,不参与 _resolve_outcome。
+        if self._open_step is not None and kind in {"think", "act"}:
+            self._seg_seq += 1
+            self._open_step.segments.append(
+                SegmentRecord(
+                    segment_id=f"seg_{self._seg_seq:04d}",
+                    kind=kind,
+                    started_at=int(ts),
+                    ended_at=None,
+                    outcome=event.outcome,
+                )
+            )
 
     def _build_document(self) -> JournalDocument:
         seg_count = sum(1 for p in self._phases if p.kind in ("think", "act"))
@@ -383,133 +547,4 @@ class StepTreeAccumulatorDeriver(Deriver):
             return "completed"
         return "completed" if self._steps else "in_progress"
 
-    def _write_model_visible(self, frame: _StepFrame) -> None:
-        """落 ``model_visible/step_NN/`` 五件套（ADR-0167 D3 / D4）。
-
-        字段：
-        - request-header.json  —— { messages_digest, tools_digest, manifest_digest,
-                                  run_id, step_id, model, decided_at }
-        - system-prompt.md     —— objective + tool inventory 摘要
-        - tool-schemas.json    —— 当前可用的工具 schema 列表（空 = 未记录）
-        - context-manifest.json—— { kinds, objective, item_count }
-        - messages.json        —— 占位骨架 [{role, content, ...}] 供 replay 重建
-        """
-        import json as _json
-
-        step_dir = self._run_dir / "model_visible" / frame.step_id
-        step_dir.mkdir(parents=True, exist_ok=True)
-
-        manifest = {
-            "kinds": [
-                k
-                for k in (
-                    "skill_catalog"
-                    if frame.context_before
-                    and any(
-                        getattr(a, "name", "")
-                        for a in getattr(frame.context_before, "attachments", ())
-                    )
-                    else None,
-                    "objective",
-                    "memory",
-                )
-                if k
-            ],
-            "objective": frame.context_before.objective if frame.context_before else "",
-            "item_count": len(getattr(frame.context_before, "attachments", ()))
-            if frame.context_before
-            else 0,
-        }
-        messages: list[dict[str, Any]] = []
-        if frame.context_before is not None:
-            messages.append(
-                {
-                    "role": "system",
-                    "content": frame.context_before.objective,
-                }
-            )
-        if frame.thinking is not None:
-            messages.append(
-                {
-                    "role": "assistant",
-                    "content": frame.thinking.decision or "",
-                }
-            )
-        tool_schemas: list[dict[str, Any]] = []
-        if frame.tool_call is not None:
-            tool_schemas.append({"name": frame.tool_call.name})
-            messages.append(
-                {
-                    "role": "assistant",
-                    "tool_calls": [
-                        {
-                            "id": frame.tool_call.invocation_id,
-                            "function": {
-                                "name": frame.tool_call.name,
-                                "arguments": frame.tool_call.arguments,
-                            },
-                        }
-                    ],
-                }
-            )
-        if frame.tool_result is not None:
-            messages.append(
-                {
-                    "role": "tool",
-                    "content": frame.tool_result.delta_summary or "",
-                }
-            )
-
-        def _sha(d: Any) -> str:
-            return (
-                "sha256:"
-                + hashlib.sha256(
-                    _json.dumps(d, sort_keys=True, ensure_ascii=False, default=str).encode()
-                ).hexdigest()
-            )
-
-        header = {
-            "run_id": self._run_id,
-            "step_id": frame.step_id,
-            "model": frame.thinking.model if frame.thinking else "unknown",
-            "decided_at": frame.entered_at,
-            "messages_digest": _sha(messages),
-            "tools_digest": _sha(tool_schemas),
-            "manifest_digest": _sha(manifest),
-        }
-        (step_dir / "request-header.json").write_text(
-            _json.dumps(header, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        # COMPAT(delete-when: ≥95% traces/runs 在 ADR-0175 落地 14 天,
-        # tracking: ADR-0175 D6) —— 不再写 fake `system-prompt.md`,
-        # 改为若 ReasonerPromptCapture 已写真 `system_prompt.json`,
-        # 写一个只读指针文件 `system-prompt.legacy.md` 给老 viewer。
-        legacy_md = step_dir / "system-prompt.legacy.md"
-        if (step_dir / "system_prompt.json").exists():
-            legacy_md.write_text(
-                "# System Prompt — see system_prompt.json (ADR-0175 真值源)\n"
-                f"# objective: {manifest['objective']}\n",
-                encoding="utf-8",
-            )
-        else:
-            # 历史兼容:ReasonerPromptCapture 未启用,保留旧版摘要
-            legacy_md.write_text(
-                "# System Prompt — degraded (ReasonerPromptCapture not wired)\n\n"
-                f"objective: {manifest['objective']}\n",
-                encoding="utf-8",
-            )
-        (step_dir / "tool-schemas.json").write_text(
-            _json.dumps(tool_schemas, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        (step_dir / "context-manifest.json").write_text(
-            _json.dumps(manifest, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        (step_dir / "messages.json").write_text(
-            _json.dumps(messages, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-
-    __all__: list[str] = ["StepTreeAccumulatorDeriver", "PHASE_FOLD_EPS"]
+    __all__: list[str] = ["StepTreeAccumulatorDeriver", "PHASE_FOLD_EPS"]  # noqa: RUF012
