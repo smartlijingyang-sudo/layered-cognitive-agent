@@ -87,6 +87,28 @@ def _to_provider(
     return _provider
 
 
+def _ensure_think_phase(cursor: LoopCursor) -> None:
+    """确保 cursor 进入 THINK 窗口;已 THINK / 已 stop / closed / halted 不动。
+
+    副作用:cursor.advance('think') 派生 1 条 ``phase.think.fold`` EP。
+    已 THINK 时本函数 no-op。
+    """
+    try:
+        snap = cursor.snapshot
+    except Exception:
+        return
+    if snap.phase == "think":
+        return
+    if snap.stop_signal is not None or snap.phase == "stop":
+        return
+    try:
+        cursor.advance("think")  # type: ignore[arg-type]
+    except Exception:
+        # advance 在 stop / closed / halted 时抛 CursorError;静默跳过。
+        # record_request_header 自身仍会再 catch(双保险)。
+        return
+
+
 def _step_id_for(step_index: int) -> str:
     """``"step-{step_index:03d}"`` —— ModelVisibleCapture + cursor 内部约定一致。
 
@@ -210,12 +232,29 @@ class ModelVisibleLLMAdapter:
         缺一不可:cursor 与 capture **都**必须存在才走完整 capture +
         record_request_header 链。任一缺失走透明分支(不写盘、不落 EP)。
         这是 ADR-0169 D5「profile 可关闭 model_visible capture」语义。
+
+        ADR-0169 §L6 钉死 ``record_request_header`` 必在 THINK 窗口;真实
+        生产路径上 cognitive driver 在 LLM 调用前往往还没 advance('think')
+        (PR-26 阶段,coord.emit_phase → cursor.advance('think') 双写还没接)。
+        这里 Adapter **自检** phase,如不是 think 且未 closed/halted/stopped,
+        主动 advance('think') 打开窗口;然后 record;如已是 think 不重复
+        advance(防 phase.think.fold EP 翻倍)。cursor 状态机 stop / closed
+        不允许此 advance — 那时直接跳过 record(走透明语义)。
         """
         cursor = self._cursor_provider()
         capture = self._capture_provider()
         if cursor is None or capture is None:
             return
+        # cursor 终结态(closed / halted / 已 stop 已 halt)→ 不走 capture。
+        # 此检查先于 _ensure_think_phase,避免在停机后写盘到孤儿目录。
         try:
+            cursor_snap = cursor.snapshot
+        except Exception:
+            return
+        if cursor_snap.phase is None and cursor_snap.stop_signal is not None:
+            return
+        try:
+            _ensure_think_phase(cursor)
             snap = cursor.snapshot
             step_id = _step_id_for(snap.step_index + 1)
             system, tools, messages, manifest = _derive_capture_inputs(prompt=prompt, kwargs=kwargs)

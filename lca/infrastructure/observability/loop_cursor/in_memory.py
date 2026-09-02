@@ -83,7 +83,17 @@ class InMemoryLoopCursor:
             s.attempt_in_step = 0
             s.step_index = 0
         s.phase = phase
-        # THINK / ACT 是 phase window "开窗"点 — 业务 record_* 在这两个 phase 才能调用
+        # 派生 phase.<name>.fold EP(ADR-0169 P2 / L3) — 与 StdLoopCursor 同口径。
+        if self._spine is not None:
+            s.seq += 1
+            self._spine.append(
+                execution_point=f"phase.{phase}.fold",
+                payload={"phase": phase},
+                run_id=s.run_id,
+                seq=s.seq,
+                incarnation=s.incarnation.incarnation_seq,
+                phase=s.phase,
+            )
         return self.snapshot
 
     def halt(self, reason: CloseReason) -> None:

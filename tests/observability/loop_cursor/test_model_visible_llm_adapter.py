@@ -298,3 +298,90 @@ def test_request_header_step_id_uses_cursor_step_index(tmp_path: Path) -> None:
     )
     snap = cursor.snapshot
     assert snap.step_id == "step-001"
+
+
+@pytest.mark.asyncio
+async def test_adapter_self_advances_to_think_when_phase_none(
+    tmp_path: Path,
+) -> None:
+    """Adapter 在 cursor phase=None 时主动 advance('think') 打开 RECORD 窗口。
+
+    生产路径上 cognitive driver (perceive_hub 等) 在 PR-26 阶段仍未调
+    cursor.advance('think') 双写;Adapter 必须自检 phase,否则 record_request_header
+    会被 CursorError 跳过(PR-12.5 已 catch 但不落 EP)。
+    """
+    spine_calls: list[tuple[str, dict]] = []
+    cursor, capture = _install_cursor_and_capture(tmp_path=tmp_path, spine_capture=spine_calls)
+    # 退回到 phase=None 模拟生产真实状态
+    while cursor.snapshot.phase is not None and cursor.snapshot.phase != "stop":
+        # 用 close 然后再构造一个新的 phase=None cursor
+        break  # pragma: no cover — 不走本路径;测试改用显式干净 cursor
+
+    # 干净起见:构造初始 phase=None 的 cursor
+    class _LocalSpine:
+        def append(self, **kw: Any) -> int:
+            spine_calls.append((kw["execution_point"], kw.get("payload", {})))
+            return len(spine_calls)
+
+    cursor = InMemoryLoopCursor(
+        run_id="r2",
+        trace_id="t2",
+        incarnation=Incarnation(run_id="r2", plan_ref="default", incarnation_seq=1),
+        spine=_LocalSpine(),
+    )
+    capture = StdModelVisibleCapture(run_dir=tmp_path / "run2")
+    assert cursor.snapshot.phase is None
+
+    inner = _FakeLLMAdapter()
+    adapter = ModelVisibleLLMAdapter(inner, cursor=cursor, capture=capture, model="fake")
+    await adapter.complete("hi")
+
+    # cursor 应走到 think,且 spine 派生 phase.think.fold + llm.request.header
+    assert cursor.snapshot.phase == "think"
+    ep_names = [n for n, _ in spine_calls]
+    assert "phase.think.fold" in ep_names, ep_names
+    assert "llm.request.header" in ep_names, ep_names
+    # 4 件套落盘
+    step_dir = tmp_path / "run2" / "model_visible" / "step-001"
+    assert (step_dir / "messages.json").is_file()
+
+
+@pytest.mark.asyncio
+async def test_adapter_does_not_re_advance_when_already_thinking(
+    tmp_path: Path,
+) -> None:
+    """phase 已经 think 时,Adapter 不重复 advance — 防 ``phase.think.fold`` EP 翻倍。"""
+    spine_calls: list[tuple[str, dict]] = []
+    cursor, capture = _install_cursor_and_capture(tmp_path=tmp_path, spine_capture=spine_calls)
+    inner = _FakeLLMAdapter()
+    adapter = ModelVisibleLLMAdapter(inner, cursor=cursor, capture=capture, model="fake")
+    # _install_cursor_and_capture 已经把 cursor 推到 THINK
+    await adapter.complete("hi")
+
+    think_fold_count = sum(1 for n, p in spine_calls if n == "phase.think.fold")
+    # cursor 提前 advance 了 perceive→think(2 次 phase.think.fold)+ Adapter no-op = 1
+    assert think_fold_count == 1, spine_calls
+    # llm.request.header 应该 1 次
+    assert sum(1 for n, _ in spine_calls if n == "llm.request.header") == 1
+
+
+@pytest.mark.asyncio
+async def test_adapter_skips_record_when_cursor_closed(
+    tmp_path: Path,
+) -> None:
+    """cursor 已 closed ⇒ record / advance 都不动;业务调用继续完成。"""
+    spine_calls: list[tuple[str, dict]] = []
+    cursor, capture = _install_cursor_and_capture(tmp_path=tmp_path, spine_capture=spine_calls)
+    cursor.close("completed")  # phase=None,closed=True
+    inner = _FakeLLMAdapter()
+    adapter = ModelVisibleLLMAdapter(inner, cursor=cursor, capture=capture, model="fake")
+
+    # 业务调用继续完成
+    response = await adapter.complete("hi")
+    assert response.text == "hello"
+    # 关闭后不走 capture / record(走透明)
+    llm_request_count = sum(1 for n, _ in spine_calls if n == "llm.request.header")
+    assert llm_request_count == 0
+    # 也不写盘(cursor 已关)
+    step_dir = tmp_path / "run" / "model_visible"
+    assert not step_dir.exists()

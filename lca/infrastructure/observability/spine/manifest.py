@@ -75,6 +75,7 @@ EXECUTION_POINTS: tuple[str, ...] = (
     "llm.call.end",
     "llm.stream.token",
     "llm.stream.stall",
+    "llm.request.header",  # ADR-0169 D7 + L6:必在 THINK 窗口开,model-visible SSOT
     # Runtime
     "runtime.reducer.apply",
     "runtime.checkpoint.create",
