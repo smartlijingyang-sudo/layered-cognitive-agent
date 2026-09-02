@@ -58,6 +58,10 @@ Limits
   reflection path would block every instrumented call. All
   ``OSError`` / ``AttributeError`` from ``inspect`` are swallowed and
   the affected field is replaced with a well-formed placeholder.
+  Failures are recorded via the ``_lca_failures`` sidecar field
+  (ADR-0165 §FieldProducer protocol extension); ``EmitPipeline``
+  consumes the sidecar, strips it from the merged payload, and emits
+  one ``spine.producer.failure`` journal event per failure.
 """
 
 from __future__ import annotations
@@ -86,6 +90,36 @@ from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugi
 # Maximum stack frames we ever return in ``call_frames`` — matches
 # the brief's "up to 10 frames" requirement.
 _MAX_FRAMES = 10
+
+# Byte cap on the traceback text we attach to a ``spine.producer.failure``
+# event payload so a single envelope cannot dominate the journal line.
+_FAIL_TRACEBACK_MAX_BYTES = 4096
+
+# Reserve category labels used by ``produce`` to classify failures by
+# which internal helper raised. Keeping them as module constants lets
+# ``EmitPipeline`` route them into the journal event uniformly.
+_SOURCE_KEY = "source_location"
+_FRAMES_KEY = "call_frames"
+_LOCALS_KEY = "locals_snapshot"
+
+
+def _shape_failure_record(key: str, exc: BaseException) -> dict[str, Any]:
+    """Shape one ``_lca_failures`` sidecar entry.
+
+    Format: ``{key, exception_class, traceback_text}``. Traceback
+    text is capped at 4 KB so the journal line stays bounded.
+    """
+    tb_text = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    encoded = tb_text.encode("utf-8", errors="replace")
+    if len(encoded) > _FAIL_TRACEBACK_MAX_BYTES:
+        encoded = encoded[:_FAIL_TRACEBACK_MAX_BYTES]
+        tb_text = encoded.decode("utf-8", errors="ignore") + "…"
+    return {
+        "key": key,
+        "exception_class": type(exc).__qualname__,
+        "traceback_text": tb_text,
+    }
+
 
 # Tail marker appended when a single value is truncated to honour
 # the ``max_locals_bytes`` cap. Three dots so the marker is itself a
@@ -236,29 +270,56 @@ class SourceAttacher:
         ``fn`` / ``args`` / ``kwargs`` / ``span`` are accepted but not
         consumed — the source_location is the call site of *this*
         ``produce``, not the call site of ``fn``.
+
+        Sidecar contract (ADR-0165 §FieldProducer protocol extension):
+
+        When any internal helper (``_source_location`` / ``_call_frames``
+        / ``_locals_snapshot``) raises the documented set of expected
+        exceptions, the affected field is replaced with a well-formed
+        placeholder **and** a sidecar entry is recorded under the
+        ``_lca_failures`` key. Each entry is shaped as
+        ``{key, exception_class, traceback_text}``. ``EmitPipeline``
+        strips that key from the merged payload before sealing
+        ``EventRecord`` and emits one ``spine.producer.failure``
+        journal event per entry, so the failure is observable from
+        the run directory without leaking implementation details
+        into the journal record itself.
         """
         del fn, args, kwargs, span, phase  # documented unused; see docstring.
 
+        failures: list[dict[str, Any]] = []
+
+        # Each helper runs in its own try/except so we can classify
+        # which subsystem failed. ``inspect`` raises ``OSError`` for
+        # builtins / shadowed frames and ``AttributeError`` for
+        # objects that drop ``__dict__`` between when we start and
+        # when we read — none of these may escape the merge path.
         try:
             location = self._source_location()
-            frames = self._call_frames()
-            snapshot = self._locals_snapshot(ctx)
-        except (OSError, AttributeError, KeyError, TypeError):
-            # ``inspect`` raises ``OSError`` for builtins / shadowed
-            # frames; ``AttributeError`` for objects that drop
-            # ``__dict__`` between when we start and when we read.
-            # None of these must escape the merge path.
-            return {
-                "source_location": SourceLocation("", 0, ""),
-                "call_frames": [],
-                "locals_snapshot": LocalsSnapshot(pre_call={}),
-            }
+        except (OSError, AttributeError, KeyError, TypeError) as exc:
+            location = SourceLocation("", 0, "")
+            failures.append(_shape_failure_record(_SOURCE_KEY, exc))
 
-        return {
+        try:
+            frames = self._call_frames()
+        except (OSError, AttributeError, KeyError, TypeError) as exc:
+            frames = []
+            failures.append(_shape_failure_record(_FRAMES_KEY, exc))
+
+        try:
+            snapshot = self._locals_snapshot(ctx)
+        except (OSError, AttributeError, KeyError, TypeError) as exc:
+            snapshot = LocalsSnapshot(pre_call={})
+            failures.append(_shape_failure_record(_LOCALS_KEY, exc))
+
+        envelope: dict[str, Any] = {
             "source_location": location,
             "call_frames": frames,
             "locals_snapshot": snapshot,
         }
+        if failures:
+            envelope["_lca_failures"] = failures
+        return envelope
 
     # ── internal helpers ─────────────────────────────────────────────
 

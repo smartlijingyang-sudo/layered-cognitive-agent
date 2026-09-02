@@ -2,8 +2,8 @@
 # Bundles: base (Tier-1 services + Tier-2 providers) + web-app (Tier-3 behaviors)
 # + scenario-cordis-creator（Creator §13.3 工具集注册到全局 tools 服务，
 # 但启用受 model=cordis-creator 请求触发 + RoleProfile.tool_permission_manifest 闸控）
-# + spine-default (PR-8 §7.6.6 — 18-plugin EventSpine composition, with
-# source-level introspection disabled; oii-debug profile re-enables it).
+# + spine-default (PR-8 §7.6.6 — 19-plugin EventSpine composition with
+# source-level introspection **mandatory**; ADR-2026-09-02 §D3).
 # LLM secrets are owned by lca-llm-resolver (loads project .env at setup).
 
 bundles:

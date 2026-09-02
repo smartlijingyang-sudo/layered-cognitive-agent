@@ -160,6 +160,11 @@ class EmitPipeline:
             producers, key=lambda producer: producer.priority
         )
         self._anomaly: _AnomalyLike = anomaly
+        # ADR-2026-09-02-i17-traceback §D4: a one-shot flag so the
+        # coverage-gap diagnostic fires at most once per pipeline
+        # instance. ``compile_profile`` constructs a fresh pipeline
+        # per run, so this naturally scopes to one run.
+        self._coverage_emitted = False
 
     @property
     def producers(self) -> tuple[FieldProducer, ...]:
@@ -211,6 +216,14 @@ class EmitPipeline:
         # lower-priority writer ran first and the higher-priority
         # writer's ``dict.update`` overwrites it — see module docstring
         # for the documented override direction.
+        #
+        # ``producer_failures`` rides alongside ``merged`` as a
+        # sidecar list of ``(producer, failure_entry)`` tuples. It is
+        # populated when a producer used the ``_lca_failures``
+        # protocol extension to surface sub-field failures without
+        # aborting the merge path (ADR-0165 §FieldProducer protocol
+        # extension; ADR-2026-09-02-i17-traceback §D2).
+        producer_failures: list[tuple[Any, dict[str, Any]]] = []
         for producer in self._producers:
             if not producer.enabled:
                 continue
@@ -234,8 +247,17 @@ class EmitPipeline:
                     exc_info=True,
                 )
                 continue
-            if fields:
-                merged.update(fields)
+            if not fields:
+                continue
+            # The sidecar key never lands in the merged payload —
+            # it is a protocol-internal channel that we strip here so
+            # the spine never sees implementation details.
+            sidecar = fields.pop("_lca_failures", None)
+            if isinstance(sidecar, list):
+                for entry in sidecar:
+                    if isinstance(entry, dict):
+                        producer_failures.append((producer, entry))
+            merged.update(fields)
 
         # Step 2: caller payload wins on conflict (D11).
         if caller_payload:
@@ -253,17 +275,54 @@ class EmitPipeline:
             )
 
         # Step 3a: I17 — every ``*.start`` event MUST carry a
-        # ``source_location`` field (ADR-0165.1 §96). Check happens
-        # after the producer + caller_payload merge so a
-        # ``source_location`` injected by either side satisfies the
-        # invariant; raising here keeps non-compliant emissions out of
-        # the spine entirely (fail-fast at the seam).
-        if execution_point.endswith(".start") and "source_location" not in merged:
+        # ``source_location`` field (ADR-0165.1 §96; ADR-2026-09-02
+        # §D4). The check is *producer-aware*, not naive: if the
+        # SourceAttacher is in the producer list, the check is
+        # strong (raise I17Violation on miss). If SourceAttacher is
+        # not in scope, the check degrades to weak: the event still
+        # seals without ``source_location`` (so the run continues)
+        # and a one-time ``phase_graph.instrument.coverage`` event
+        # is published at run end noting the coverage gap.
+        source_attacher_present = any(
+            getattr(p, "name", "") == "spine.reflector.source" for p in self._producers
+        )
+        if (
+            execution_point.endswith(".start")
+            and "source_location" not in merged
+            and source_attacher_present
+        ):
             raise I17Violation(
                 f"I17: execution_point={execution_point!r} requires "
                 f"'source_location' in payload (ADR-0165.1 §96); "
                 f"SourceAttacher producer missing or disabled"
             )
+        if (
+            execution_point.endswith(".start")
+            and "source_location" not in merged
+            and not source_attacher_present
+            and not self._coverage_emitted
+        ):
+            # Producer absent — surface the coverage gap once per
+            # pipeline instance so the run directory records it.
+            try:
+                spine.append(
+                    execution_point="phase_graph.instrument.coverage",
+                    channel="control",
+                    caller_payload={
+                        "source_attacher": "missing",
+                        "first_observed_ep": execution_point,
+                    },
+                    outcome=None,
+                    span_ctx=span_ctx,
+                    phase=phase,
+                )
+            except Exception as exc:
+                log.warning(
+                    "emit_pipeline: coverage event publication failed err=%s",
+                    exc,
+                    exc_info=True,
+                )
+            self._coverage_emitted = True
 
         record = spine.append(
             execution_point=execution_point,
@@ -274,6 +333,40 @@ class EmitPipeline:
             phase=phase,
             reason=reason,
         )
+
+        # Step 3b: producer sidecar (ADR-0165 §FieldProducer protocol
+        # extension). If a producer surfaced sub-field failures via
+        # the ``_lca_failures`` key, emit one ``spine.producer.failure``
+        # journal event per entry so the failure is observable from
+        # the run directory. We never propagate these back to the
+        # caller — emission of the original record is the truth, and
+        # the sidecar entries are best-effort diagnostics that ride
+        # the same anomaly-detection seam (FD-2 containment).
+        if producer_failures:
+            for producer_origin, entry in producer_failures:
+                try:
+                    spine.append(
+                        execution_point="spine.producer.failure",
+                        channel="error",
+                        caller_payload={
+                            "producer": getattr(producer_origin, "name", "unknown"),
+                            "key": entry.get("key"),
+                            "exception_class": entry.get("exception_class"),
+                            "traceback_text": entry.get("traceback_text"),
+                            "span_id": getattr(span_ctx, "span_id", None),
+                            "outer_execution_point": execution_point,
+                        },
+                        outcome="failure",
+                        span_ctx=span_ctx,
+                        phase=phase,
+                    )
+                except Exception as exc:
+                    log.warning(
+                        "emit_pipeline: spine.producer.failure "
+                        "publication failed err=%s; record still emitted",
+                        exc,
+                        exc_info=True,
+                    )
 
         # Step 4: anomaly detector runs on the sealed record. FD-2
         # containment means we never propagate a detector exception

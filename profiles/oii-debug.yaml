@@ -1,15 +1,11 @@
-# oii-debug profile — extends web-standard with deep introspection.
+# oii-debug profile — keeps production web-standard semantics but routes
+# the file sink to a debug-distinct path so OII traces don't overwrite
+# the production journal.
 #
-# Source-level attacher (spine.reflector.source) is enabled here for OII
-# debugging. The web-standard bundle does not declare this plugin at
-# all; this profile adds it via bundles/spine-oii-debug.yaml. Source-
-# level fields carry a 4 KB locals snapshot with secret redaction per
-# §7.6.6 — keep this profile off the production gateway.
-#
-# Same LLM patch and base / web-app / scenario / phase-graph bundles as
-# web-standard; the spine composition is augmented with the source
-# bundle and the file sink path is renamed to keep debug traces
-# separate.
+# As of ADR-2026-09-02-i17-traceback §D3, ``spine.reflector.source`` is
+# mandatory in ``spine-default``; this profile no longer needs the
+# separate ``spine-oii-debug`` bundle for attacher presence. It keeps
+# the bundle only to apply the custom debug boot-path.
 
 bundles:
   - bundles/base.yaml

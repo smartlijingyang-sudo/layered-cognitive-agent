@@ -69,5 +69,23 @@ class FieldProducer(Protocol):
 
         Returning an empty dict is the documented way for a producer
         to declare "no contribution for this phase".
+
+        Reserved optional key
+        ---------------------
+        ``"_lca_failures"`` is reserved for producers that want to
+        surface sub-field failures (e.g. ``SourceAttacher`` may fail
+        to walk ``inspect``). When present, it MUST be a
+        ``list[dict[str, Any]]`` with each entry shaped like::
+
+            {"key": "locals_snapshot",
+             "exception_class": "OSError",
+             "traceback_text": "..."}
+
+        ``EmitPipeline`` consumes the list and emits one
+        ``spine.producer.failure`` journal event per entry through
+        the same path as the main ``*.start`` event. Producers that
+        never raise may omit the key entirely. The key is stripped
+        from the merged payload before ``EventRecord`` sealing so
+        it never leaks into the journal record itself.
         """
         ...

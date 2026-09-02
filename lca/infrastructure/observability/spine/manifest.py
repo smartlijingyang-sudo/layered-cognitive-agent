@@ -85,4 +85,10 @@ EXECUTION_POINTS: tuple[str, ...] = (
     "step.tool_result.record",
     "step.reflect.record",
     "step.span.record",
+    # Spine self-observation (ADR-2026-09-02-i17-traceback):
+    # the spine itself publishes these via EmitPipeline so they ride
+    # the same seal/anomaly path as producer-supplied events.
+    "spine.i17.rejected",  # *.start rejected for missing source_location
+    "spine.producer.failure",  # a FieldProducer raised on a sub-field
+    "phase_graph.instrument.coverage",  # once-per-run I17 provider presence
 )

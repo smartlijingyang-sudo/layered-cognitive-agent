@@ -5,9 +5,12 @@
 # derivers / sinks / wraps / transport reflector). Profile decides which
 # subset is enabled.
 #
-# The 19th spine plugin — `spine.reflector.source` (source-level
-# introspection, PR-9) — is intentionally omitted here. oii-debug.yaml
-# loads it via a separate bundle entry + patch.
+# Source-level attacher (spine.reflector.source, ADR-0165.1 §96 + PR-9 /
+# ADR-2026-09-02-i17-traceback §D3) is **mandatory** here — I17 is a
+# spine-wide contract; enabling any profile that uses this bundle
+# implicitly opts in. The historical "skip on production / enable on
+# debug" toggle is removed: without source_location in every start
+# event, traces are unrecoverable.
 #
 # requires: observability-default (EventDescriptor registry) — not
 # declared as a hard ``requires:`` because that field is purely
@@ -16,18 +19,17 @@
 
 name: spine-default
 description: |
-  Spine 18-plugin composition (PR-7 + PR-8 §7.6.6). All modules are
-  present and enabled. Profile overrides via `patch:` per spine design
-  §7.6.6.
+  Spine 19-plugin composition (PR-7 + PR-8 §7.6.6 + PR-9 source
+  attacher). All modules are present and enabled. Profile
+  overrides via `patch:` per spine design §7.6.6.
 
 # Informational: which spine-side plugins this bundle wires.
-# Source-level attacher (spine.reflector.source) is omitted here per
-# brief §7.6.6: it ships only with the oii-debug profile. The web
-# standard profile uses this bundle as-is.
+# Source-level attacher is mandatory (ADR-2026-09-02 §D3).
 plugins:
   - spine.core
   - spine.emit_pipeline
   - spine.reflector.signature
+  - spine.reflector.source
   - spine.reflector.context
   - spine.reflector.runtime
   - spine.reflector.transport
@@ -67,6 +69,11 @@ entries:
   - id: spine.reflector.signature
     name: spine_reflector_signature
     $module: lca.plugins.observability.spine.reflectors.signature
+    config: {}
+
+  - id: spine.reflector.source
+    name: spine_reflector_source
+    $module: lca.plugins.observability.spine.reflectors.source
     config: {}
 
   - id: spine.reflector.context
