@@ -1,13 +1,12 @@
-"""FilesystemJournalStore —— ADR-0065 PR-4 / L2 / L7 持久化后端。
+"""FilesystemJournalStore —— Spine 持久化后端(append-only 事件流)。
 
-默认 layout::
-
-    <root>/journal.jsonl      # durable 事件流(append-only)
-    <root>/journal.lock       # fcntl/flock 跨进程互斥(可选)
+落盘文件承载 spine events(事实流),由 ``RunSessionBuilder`` / ``run_ledger``
+seam 通过 ``filename`` 显式指定为 ``events.jsonl``。 ``DEFAULT_FILENAME`` 仅
+作为未指定时的兜底;生产路径一定显式传入,这里与实际文件名解耦。
 
 特性:
 - 每次 ``append`` 走"写 staging + fsync + atomic rename"协议,崩溃时不破坏
-  既有文件(L2)。
+  既有文件。
 - ``flush()`` 把内存 buffer 强制刷到磁盘。
 - ``close()`` 重复调用安全。
 - 可选 ``fsync_each_append=True`` 保证 required 事件跨进程持久。
@@ -30,7 +29,7 @@ from lca.contracts.observability.journal_store import JournalStoreBackend
 class FilesystemJournalStore(JournalStoreBackend):
     """Append-only 文件账本(L2 durable)。"""
 
-    DEFAULT_FILENAME = "journal.jsonl"
+    DEFAULT_FILENAME = "events.jsonl"
 
     def __init__(
         self,

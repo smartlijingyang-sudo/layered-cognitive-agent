@@ -1,7 +1,7 @@
-"""journal 渲染共享工具（ADR-0063 清理 B）。
+"""Spine 事件渲染共享工具（ADR-0063 清理 B）。
 
-ConsoleJournalProjector / FactStreamProjector / JsonlJournalProjector 各有自己的
-渲染细节；它们不需要合并到一个巨型 class，但应共享最小工具集：
+ConsoleJournalProjector / FactStreamProjector 各有自己的渲染细节；它们不需
+要合并到一个巨型 class，但应共享最小工具集：
 - 文本截断（统一上限）
 - 容器 vs 叙事事件分类（按 EventDescriptor.plane）
 - section header 行为

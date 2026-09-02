@@ -8,7 +8,7 @@
 - 多个 enricher 按 ``priority`` 升序组合;priority 由调用方决定。
 - 每个 enricher 是独立的可替换单元 —— 新增 enricher 不修改 projector。
 
-调用路径:``JsonlJournalProjector.on_event`` → 拿 ``stamped`` →
+调用路径:``FilesystemJournalStore.append`` → 拿 ``stamped`` →
 ``stamped_to_record`` → 走 ``EnrichmentPipeline.run`` → ``dumps_journal_record``
 → 落盘 + 可选 sidecar(``NarrativeSidecar``)。
 """

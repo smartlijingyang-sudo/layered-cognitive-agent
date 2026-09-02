@@ -1,7 +1,8 @@
-"""journal backends —— ADR-0063 PR-8 / ADR-0065 PR-4 引入的存储抽象。
+"""Journal store backends —— ``JournalStoreBackend`` 协议的两个实现。
 
-- ``InMemoryJournalStore`` 默认(测试 + boot 期)
-- ``FilesystemJournalStore`` ADR-0065 PR-4 落地(L2 durable + atomic append)
+- ``InMemoryJournalStore``: 进程内唯一当前生产实现(boot 期 + 测试)。
+- ``FilesystemJournalStore``: append-only 落盘后端,被 ``run_ledger`` seam
+  用作 spine 事件的 durable backing store。
 """
 
 from lca.infrastructure.observability.journal.backends.filesystem import FilesystemJournalStore

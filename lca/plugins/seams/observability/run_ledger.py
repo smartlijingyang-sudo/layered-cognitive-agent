@@ -71,7 +71,7 @@ class FilesystemRunLedgerFactory(RunLedgerFactory, RunJournalFactory):
     def create_run_components(
         self,
         *,
-        jsonl_path: Path,
+        spine_path: Path,
     ) -> RunJournalComponents:
         """Create the live tail for one resolved run path.
 
@@ -85,13 +85,9 @@ class FilesystemRunLedgerFactory(RunLedgerFactory, RunJournalFactory):
         )
         from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 
-        # 旧 jsonl 文件 rename 到 journal.raw.jsonl(回放兜底, 不删)
-        raw_path = jsonl_path.with_name("journal.raw.jsonl")
-        if jsonl_path.exists() and not raw_path.exists():
-            jsonl_path.rename(raw_path)
-        raw_path.parent.mkdir(parents=True, exist_ok=True)
+        spine_path.parent.mkdir(parents=True, exist_ok=True)
 
-        narrative_writer = StepNarrativeWriter(raw_path.parent / "journal.narrative.md")
+        narrative_writer = StepNarrativeWriter(spine_path.parent / "journal.narrative.md")
 
         # step_tree_writer 是 _StepTreeBundle 的 placeholder —— deriver 与
         # narrative_writer 由 transport 在 RunSessionBuilder.build 阶段
@@ -176,9 +172,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     """Provide filesystem RunLedger + RunJournalFactory."""
     root = Path(config.root)
     root.mkdir(parents=True, exist_ok=True)
-    factory = FilesystemRunLedgerFactory(
-        root=root, fsync_each_append=config.fsync_each_append
-    )
+    factory = FilesystemRunLedgerFactory(root=root, fsync_each_append=config.fsync_each_append)
     ctx.provide(RUN_LEDGER_FACTORY.key, factory)
 
 
