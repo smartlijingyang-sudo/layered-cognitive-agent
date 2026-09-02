@@ -261,6 +261,16 @@ def test_ctx_intercept_wrap_kind_emits_failure_and_reraises(
     _assert_auto_source_fields(records[1])
     assert records[1].outcome == "failure"
     assert records[1].channel == "error"
+    # ADR-2026-09-02-i17-stream-align §B: the failure payload must
+    # carry the structured traceback fields so coding-agent tooling
+    # can render the failure without re-raising it.
+    failure_payload = records[1].payload
+    assert failure_payload["exc_type"] == "RuntimeError"
+    assert failure_payload["exception_class"] == "RuntimeError"
+    assert failure_payload["exception_message"] == "kaboom"
+    assert failure_payload["reason"] == "kaboom"
+    assert "RuntimeError: kaboom" in failure_payload["traceback_text"]
+    assert failure_payload["cause_chain"] == []
 
 
 def test_ctx_intercept_wrap_kind_is_idempotent(wired_spine: _CaptureSink) -> None:

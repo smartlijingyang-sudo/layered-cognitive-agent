@@ -146,6 +146,7 @@ def emit_through_pipeline(
     payload: dict[str, Any],
     outcome: OutcomeT | None = None,
     span: Any = None,
+    exc: BaseException | None = None,
 ) -> None:
     """Emit one spine event through ``emit_pipeline``, falling back to the spine.
 
@@ -154,9 +155,23 @@ def emit_through_pipeline(
     every enabled ``FieldProducer`` contributes its keys, and degrade to
     a direct ``EventSpine.append`` when the pipeline is not installed.
 
+    ``exc`` carries a captured ``BaseException`` so channel="error"
+    events always carry the structured traceback fields documented in
+    ``wrap_instrument._exception_payload`` (ADR-2026-09-02-i17-stream-align
+    §B). Both funnels share the same payload-merge convention: exc
+    fields are written first, caller payload wins on conflict.
+
     All emission failures are logged and swallowed — an observability
     fault must never break the instrumented call.
     """
+    if exc is not None:
+        # Reuse the wrap-side helper so the two emission paths emit
+        # identical field names and traceback caps.
+        from lca.harness.declarative.compile.instrument_wrap import (
+            _exception_payload,
+        )
+
+        payload = {**_exception_payload(exc), **payload}
     spine = resolve_active_spine()
     if spine is None:
         return
@@ -261,13 +276,14 @@ def wrap_ctx_intercept(
             )
             try:
                 result = await fn(*args, **kwargs)
-            except BaseException:
+            except BaseException as exc:
                 emit_through_pipeline(
                     execution_point=execution_point_end,
                     channel="error",
                     payload={},
                     outcome="failure",
                     span=span,
+                    exc=exc,
                 )
                 SpineContext.pop_span(execution_point_start)
                 raise
@@ -295,13 +311,14 @@ def wrap_ctx_intercept(
             )
             try:
                 result = fn(*args, **kwargs)
-            except BaseException:
+            except BaseException as exc:
                 emit_through_pipeline(
                     execution_point=execution_point_end,
                     channel="error",
                     payload={},
                     outcome="failure",
                     span=span,
+                    exc=exc,
                 )
                 SpineContext.pop_span(execution_point_start)
                 raise

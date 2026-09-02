@@ -9,7 +9,10 @@ validation:
 * Emit ``phase_graph.node.start`` before delegation
 * Emit ``phase_graph.node.end`` with ``outcome="success"`` on return
 * Emit ``phase_graph.node.end`` with ``outcome="failure"`` and
-  re-raise on exception
+  re-raise on exception; the failure payload carries the structured
+  ``exc_type`` / ``exception_message`` / ``traceback_text`` /
+  ``cause_chain`` fields (ADR-2026-09-02-i17-stream-align §B) so
+  coding-agent tooling can render the failure without re-raising it
 * Stamp the wrapper with ``__lca_instrumented__`` and
   ``wrap_provenance = "assembler"`` so downstream catalogs and the
   build-time check can prove the node was wrapped here
@@ -188,6 +191,51 @@ def _fingerprint_value(value: Any) -> str:
     return f"sha256:{digest[:16]}"
 
 
+# ``_TRACEBACK_CAPPED_BYTES`` mirrors ``_publish_i17_rejection`` (ADR-0165.1 §96).
+# 4 KiB is enough to keep the most recent frames of a typical agent call while
+# keeping the per-event jsonl cost bounded.
+_TRACEBACK_CAPPED_BYTES = 4096
+
+
+def _exception_payload(exc: BaseException) -> dict[str, Any]:
+    """Structured failure fields (ADR-2026-09-02-i17-stream-align §B).
+
+    The wrap layer must propagate the original exception text into the
+    journal payload so a coding agent (and ``lca-ops explain`` /
+    ``doctor``) can recover the traceback from disk without re-raising
+    the exception. Field names mirror the public contract agreed on
+    2026-09-02:
+
+    - ``exc_type``           — ``type(exc).__qualname__``
+    - ``exception_message``  — ``str(exc)`` (may be empty)
+    - ``traceback_text``     — formatted chain, capped to 4 KiB
+    - ``cause_chain``        — tuple of qualnames for ``__cause__`` /
+      ``__context__`` (one level deep, deterministic order)
+
+    The historic ``exception_class`` / ``reason`` fields are also kept
+    so existing readers (e.g. ``spine.producer.failure`` projector,
+    ADR-0165.1 §96 ``_publish_i17_rejection``) continue to function
+    unchanged.
+    """
+    exc_type = type(exc).__qualname__
+    exc_message = str(exc)
+    tb_text = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    tb_capped = tb_text.encode("utf-8", errors="replace")[:_TRACEBACK_CAPPED_BYTES]
+    cause_chain: list[str] = []
+    for link in (exc.__cause__, exc.__context__):
+        if link is None or link is exc:
+            continue
+        cause_chain.append(type(link).__qualname__)
+    return {
+        "exc_type": exc_type,
+        "exception_class": exc_type,  # legacy alias — see docstring
+        "exception_message": exc_message,
+        "reason": exc_message,  # legacy alias — see docstring
+        "traceback_text": tb_capped.decode("utf-8", errors="ignore"),
+        "cause_chain": cause_chain,
+    }
+
+
 def _safe_append(
     *,
     spine: EventSpine | None,
@@ -196,6 +244,7 @@ def _safe_append(
     payload: dict[str, Any],
     outcome: OutcomeT | None,
     span: SpanContext | None,
+    exc: BaseException | None = None,
 ) -> None:
     """Emit a spine event without letting a broken helper block the caller.
 
@@ -205,7 +254,18 @@ def _safe_append(
     ``EventRecord`` is sealed. When no pipeline is installed this
     function falls back to the direct ``EventSpine.append`` path so
     PR-4 assembler contracts still hold under unit tests.
+
+    ``exc`` carries a ``BaseException`` captured by the wrap layer at
+    the call site. When provided it is merged into the payload as the
+    structured failure fields documented in :func:`_exception_payload`,
+    so a channel="error" event always carries enough information to
+    render the traceback without re-raising.
     """
+    if exc is not None:
+        # Caller payload wins on conflict (the caller may override
+        # ``exception_message`` with a domain-specific phrasing), so we
+        # merge exc first and then apply caller payload on top.
+        payload = {**_exception_payload(exc), **payload}
     pipeline = _resolve_pipeline()
     if pipeline is not None and spine is not None:
         try:
@@ -361,7 +421,7 @@ def _sync_wrapper(
         )
         try:
             result = fn(*args, **kwargs)
-        except BaseException:
+        except BaseException as exc:
             _safe_append(
                 spine=spine,
                 execution_point=execution_point_end,
@@ -369,6 +429,7 @@ def _sync_wrapper(
                 payload={"return_value_fingerprint": None},
                 outcome="failure",
                 span=span,
+                exc=exc,
             )
             SpineContext.pop_span(execution_point_start)
             raise
@@ -414,7 +475,7 @@ def _async_wrapper(
         )
         try:
             result = await _invoke(fn, args, kwargs)
-        except BaseException:
+        except BaseException as exc:
             _safe_append(
                 spine=spine,
                 execution_point=execution_point_end,
@@ -422,6 +483,7 @@ def _async_wrapper(
                 payload={"return_value_fingerprint": None},
                 outcome="failure",
                 span=span,
+                exc=exc,
             )
             SpineContext.pop_span(execution_point_start)
             raise
