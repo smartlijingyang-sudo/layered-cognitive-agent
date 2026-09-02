@@ -98,6 +98,10 @@ class RunSession:
     locator: RunLocator | None = None  # ADR-0065 PR-11: run 级 locator 引用
     thread_tree_writer: object | None = None  # ADR-0167 D11: per-run StepTreeAccumulatorDeriver
     coordinator: object | None = None  # ADR-0167 D11: StepCoordinator (Agent 唯一写入口)
+    loop_cursor: object | None = None  # ADR-0169 §D11 PR-1.5: LoopCursor(写入 cursor 的入口)
+    loop_cursor_token: object | None = (
+        None  # ADR-0169 §D11 PR-1.5: ContextVar reset token (close 时释放)
+    )
     step_tree_bundle: object | None = (
         None  # ADR-0164 Phase 6: step-tree write bundle (legacy, 兼容)
     )

@@ -18,7 +18,13 @@ from typing import Any, cast
 
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
+from lca.contracts.observability.incarnation import Incarnation
 from lca.contracts.observability.run_journal import RunJournalFactory
+from lca.infrastructure.observability.loop_cursor import StdLoopCursor
+from lca.infrastructure.observability.loop_cursor.bind import (
+    SpineWritePortAdapter,
+    install_run_cursor,
+)
 from lca.infrastructure.observability.spine.derivers.step_tree_accumulator import (
     StepTreeAccumulatorDeriver,
 )
@@ -96,13 +102,31 @@ class RunSessionBuilder:
             ),
         )
 
-        # ── 2) 构造 per-run deriver (subscribe 到 spine event_spine) ──
+        # ── 2) 取 spine / locator / deriver(必须在 1.5 cursor 之前) ──
         locator = self._registry.locator()
         run_dir = locator.run_dir(run_id) if locator is not None else None
 
         spine_core = require_capability(self._ctx, "event_spine")
         # duck-type: SpineCore 有 .event_spine; tests / stub 提供裸 EventSpine
         event_spine = getattr(spine_core, "event_spine", None) or spine_core
+
+        # ── 1.5) PR-1.5: 构造 LoopCursor + 绑到 ContextVar ──────────────
+        # ADR-0169 §D11 PR-1 §S1 业务迁 cursor 第一步:让 web-standard run 真正
+        # 调 cursor.advance / record_*。Profile / Bundle 之后(PR-3 §S3)用
+        # LoopCursorFactory.from_profile,本 PR-1.5 直接构造 StdLoopCursor + 绑
+        # ContextVar;未来 PR 切到 factory 时仅替换此处。
+        spine_for_cursor = SpineWritePortAdapter(event_spine)
+        cursor = StdLoopCursor(
+            spine=spine_for_cursor,
+            run_id=run_id,
+            trace_id=trace_id,
+            incarnation=Incarnation(
+                run_id=run_id,
+                plan_ref=str(request.mode or "default"),
+                incarnation_seq=1,
+            ),
+        )
+        cursor_token = install_run_cursor(cursor)
 
         step_tree_deriver: StepTreeAccumulatorDeriver | None = None
         if run_dir is not None:
@@ -157,6 +181,8 @@ class RunSessionBuilder:
             thread_tree_writer=step_tree_deriver,
             step_tree_bundle=components.step_tree_writer,
             coordinator=coordinator,
+            loop_cursor=cursor,
+            loop_cursor_token=cursor_token,
             question=request.question,
             user_text=request.user_text,
             mode=request.mode,
