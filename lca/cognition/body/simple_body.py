@@ -5,15 +5,32 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+import structlog
+
 from lca.cognition.body.action_handlers import record_decision_made
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.semantic_keys import OBS_DEGRADED_FROM
 from lca.contracts.models.core.decision import Decision, Observation
 from lca.contracts.models.core.result import UnregisteredActionError
 from lca.contracts.models.core.state import AgentState
+from lca.contracts.observability.loop_cursor import CursorError, PhaseName
 from lca.contracts.protocols import Body, SafeExecutor, ToolRegistry, TransportRegistryProtocol
 from lca.contracts.protocols.act.action import ActionRegistryProtocol
 from lca.infrastructure.component_registry import RegistryKeyError
+
+_log = structlog.get_logger(__name__)
+
+# Body 是 phase=act 执行平面;advance(phase) 是把 cursor 推到对应窗口的 SSOT。
+# ADR-0169 §D1 + PR-26 task-25:phase 推进责任钉死在 SimpleBody,
+# SafeExecutor / 下游 record_* 只在合法 phase 内写证据 EP。
+_ACTION_TO_PHASE: dict[ActionType, PhaseName] = {
+    ActionType.USE_TOOL: "act",
+    ActionType.DELEGATE: "act",
+    ActionType.HANDOFF: "act",
+    ActionType.STOP: "stop",
+    ActionType.ASK_HUMAN: "stop",
+    # RESPOND: think phase 内 emit response;不进 act/stop。
+}
 
 
 class SimpleBody(Body):
@@ -27,6 +44,8 @@ class SimpleBody(Body):
 
     契约不变量（v3 §5.3 / §9.1 / PR6 / PR10 + ADR-0169 PR-26）：
     - ``act`` 只分发已经由计划授权并注册的 ``action_type``。
+    - ``act`` 入口按 ``decision.action_type`` 推进 cursor 到 act/stop;
+      Cursor 是 phase 推进 SSOT(ADR-0169 PR-26 task-25)。
     - ``CommandEnvelope`` 是声明式执行链唯一的效果授权入口；Body 不再补造
       旧的 ``ExecutionEnvelope``。
     - 协议边界派生事件：``ActionDegraded`` 由 ``ProjectionHost`` 或
@@ -70,8 +89,13 @@ class SimpleBody(Body):
         propagates the marker via
         :meth:`_propagate_degradation` so downstream subscribers can
         observe ``observation.degraded_from``.
+
+        phase 推进责任(ADR-0169 PR-26 task-25):本方法按 ``decision.action_type``
+        决定 cursor 推进到 act/stop;Cursor 校验失败(cursor 已 closed/halted 或
+        非法转移)降级 warning,不让单 decision 失败变 session RuntimeError。
         """
 
+        self._advance_cursor_for_action(decision.action_type)
         try:
             handler = self.action_registry.resolve(decision.action_type)
         except (KeyError, RegistryKeyError) as exc:
@@ -79,6 +103,33 @@ class SimpleBody(Body):
         record_decision_made(decision, state)
         observation = await handler.execute(decision, state)
         return self._propagate_degradation(decision, observation)
+
+    @staticmethod
+    def _advance_cursor_for_action(action_type: ActionType) -> None:
+        """Bound cursor 已就位 → 按 action_type 推进 phase;否则 no-op。
+
+        best-effort:取不到 cursor 或 advance 抛 CursorError → warning + 继续。
+        """
+        target = _ACTION_TO_PHASE.get(action_type)
+        if target is None:
+            return
+        from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+            get_current_cursor,
+        )
+
+        cursor = get_current_cursor()
+        if cursor is None:
+            return
+        try:
+            cursor.advance(target)
+        except CursorError as exc:
+            _log.warning(
+                "body_advance_cursor_failed",
+                action_type=action_type.value,
+                target_phase=target,
+                current_phase=cursor.snapshot.phase,
+                error=str(exc),
+            )
 
     async def finalize(self, observation: Observation, state: AgentState) -> None:
         """手平面 finalize（v3 §9.2：OfficeWorksSealer 迁移点）。

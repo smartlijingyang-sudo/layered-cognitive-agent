@@ -37,6 +37,7 @@ from lca.contracts.atoms.semantic_keys import (
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.result import ApprovalPendingError, ToolExecutionError
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
+from lca.contracts.observability.loop_cursor import CursorError
 from lca.contracts.protocols import SafeExecutor, Tool
 from lca.contracts.protocols.act.tool_pipeline import (
     ToolDefinition,
@@ -324,10 +325,18 @@ class PipelineSafeExecutor(SafeExecutor):
             raise ToolExecutionError("command envelope failed safe-boundary validation")
 
         verdict_refs.append("executor.plan-boundary:valid")
-        # ADR-0164: open/close act at pipeline executor boundary.
-        from lca.cognition.body.safe_executor import _close_act_step, _open_act_step
+        # ADR-0164 + ADR-0169 PR-26: 写证据 EP 到 bound cursor(由 SimpleBody.act
+        # 负责 advance 到 act phase);cursor 不在 act phase → CursorError 降级 warning,
+        # 不让单 tool 调用失败变 session RuntimeError。
+        from lca.cognition.body.safe_executor import (
+            _record_tool_call_evidence,
+            _record_tool_result_evidence,
+        )
 
-        _open_act_step(tool.name)
+        try:
+            _record_tool_call_evidence(tool.name, invocation_id)
+        except CursorError as exc:
+            _log.warning("pipeline_safe_executor_record_tool_call_evidence", error=str(exc))
         act_closed = False
         try:
             result = await self._pipeline_for(tool, retry_policy, cache_config).execute(
@@ -350,7 +359,16 @@ class PipelineSafeExecutor(SafeExecutor):
                 observation = cast("Observation", result.output)
                 observation.extra["command_envelope"] = envelope_evidence
                 observation.extra["policy_verdict_refs"] = list(envelope.policy_verdict_refs)
-                _close_act_step(outcome="ok")
+                try:
+                    _record_tool_result_evidence(
+                        tool_name=tool.name,
+                        invocation_id=invocation_id,
+                        outcome="ok",
+                    )
+                except CursorError as exc:
+                    _log.warning(
+                        "pipeline_safe_executor_record_tool_result_evidence", error=str(exc)
+                    )
                 act_closed = True
                 return observation
 
@@ -365,12 +383,31 @@ class PipelineSafeExecutor(SafeExecutor):
                     "policy_verdict_refs": list(envelope.policy_verdict_refs),
                 },
             )
-            _close_act_step(outcome="fail", error=observation.error)
+            try:
+                _record_tool_result_evidence(
+                    tool_name=tool.name,
+                    invocation_id=invocation_id,
+                    outcome="fail",
+                    error=observation.error,
+                )
+            except CursorError as exc:
+                _log.warning("pipeline_safe_executor_record_tool_result_evidence", error=str(exc))
             act_closed = True
             return observation
         except Exception as exc:
             if not act_closed:
-                _close_act_step(outcome="fail", error=str(exc))
+                try:
+                    _record_tool_result_evidence(
+                        tool_name=tool.name,
+                        invocation_id=invocation_id,
+                        outcome="fail",
+                        error=str(exc),
+                    )
+                except CursorError as cursor_exc:
+                    _log.warning(
+                        "pipeline_safe_executor_record_tool_result_evidence",
+                        error=str(cursor_exc),
+                    )
             raise
 
     async def _execute_once(self, tool: Tool, args: dict[str, Any], attempt: int) -> Observation:

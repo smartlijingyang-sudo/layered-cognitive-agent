@@ -16,9 +16,10 @@ evidence 平面,inline 由后续 EvidencePolicy.should_inline() 决策启用。
 from __future__ import annotations
 
 import json
-import logging
 from collections.abc import Mapping
 from typing import Any
+
+import structlog
 
 from lca.cognition.body.tool_result_preview import tool_files
 from lca.contracts.models.core.decision import Observation, ToolCall  # noqa: F401
@@ -33,6 +34,7 @@ from lca.contracts.observability.evidence import (
     EvidenceRef,
     EvidenceStore,
 )
+from lca.contracts.observability.loop_cursor import CursorError
 from lca.contracts.observability.loop_cursor_payloads import (
     ToolCallRecord,
     ToolResultRecord,
@@ -41,7 +43,7 @@ from lca.contracts.protocols.runtime.infra import Tool
 from lca.infrastructure.observability import record, record_runtime
 from lca.infrastructure.tools.contract.project import project_tool_state
 
-_log = logging.getLogger(__name__)
+_log = structlog.get_logger(__name__)
 
 
 def prepare_state_evidence(
@@ -145,14 +147,27 @@ def emit_tool_started(
 
     cursor = get_current_cursor()
     if cursor is not None:
-        cursor.record_tool_call(
-            ToolCallRecord(
-                tool_name=tool.name,
-                args_digest=_summarize_args(args_dict),
-                args_payload_path=None,
-                call_seq=hash(invocation_id) & 0x7FFFFFFF,
+        # ADR-0169 PR-26 task-25:phase 推进责任在 SimpleBody.act;本 seam
+        # 只负责落 tool_call 证据。Cursor 不在 act phase → CursorError 降级
+        # warning,不让单 tool 调用失败触发整 session RuntimeError
+        # (run_9e181f24c275 直接根因)。
+        try:
+            cursor.record_tool_call(
+                ToolCallRecord(
+                    tool_name=tool.name,
+                    args_digest=_summarize_args(args_dict),
+                    args_payload_path=None,
+                    call_seq=hash(invocation_id) & 0x7FFFFFFF,
+                )
             )
-        )
+        except CursorError as exc:
+            _log.warning(
+                "tool_journal_emit_record_tool_call_skipped",
+                tool_name=tool.name,
+                invocation_id=invocation_id,
+                current_phase=cursor.snapshot.phase,
+                error=str(exc),
+            )
     return arguments_ref
 
 
