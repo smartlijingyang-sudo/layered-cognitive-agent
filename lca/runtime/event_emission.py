@@ -67,15 +67,19 @@ def _derive_action_degraded(state: AgentState, kwargs: dict[str, Any]) -> Journa
 
 def _derive_step_completed(state: AgentState, kwargs: dict[str, Any]) -> JournalEvent | None:
     status = state.status
-    # ADR-0164 Phase 3 双写:StepCompleted 收口也关闭当前 step
-    try:
-        from lca.runtime.step_emitter import bridge_step_completed_emitted
+    # ADR-0167 D11 / PR-3: step_completed 经 StepCoordinator 推进 reflect/end 边
+    from lca.infrastructure.observability.writable_matrix.coordinator import (
+        get_current_coordinator,
+    )
 
-        bridge_step_completed_emitted(
-            status=getattr(status, "value", str(status)),
+    coord = get_current_coordinator()
+    if coord is not None:
+        coord.emit_phase(
+            phase="reflect",
+            objective=kwargs.get("action_type", "") or "reflect",
+            summary=f"step {state.step} {getattr(status, 'value', str(status))}",
+            outcome="ok" if str(status) in {"completed", "ok"} else "failure",
         )
-    except ImportError:
-        pass
     return StepCompleted(
         step=state.step,
         status=getattr(status, "value", str(status)),

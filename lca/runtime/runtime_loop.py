@@ -260,6 +260,7 @@ class CognitiveRuntime(Runtime):
         from lca.plugins.observability.spine.reflectors.runtime import (
             emit_exception_caught,
             emit_exception_finally,
+            emit_lifecycle_finally,
             emit_runtime_resume_end,
         )
 
@@ -308,7 +309,16 @@ class CognitiveRuntime(Runtime):
                     node_id=resume_envelope_meta["node_id"],
                     outcome=outcome_holder["value"],
                 )
-            emit_exception_finally(boundary=boundary, trace_id=trace_id)
+            # ADR-0166 S5: 异常路径走 exception.finally；正常路径走
+            # lifecycle.finally —— reader 不再被「成功也发 exception.*」混淆。
+            if outcome_holder["value"] == "success":
+                emit_lifecycle_finally(boundary=boundary, trace_id=trace_id)
+            else:
+                emit_exception_finally(
+                    boundary=boundary,
+                    trace_id=trace_id,
+                    outcome=outcome_holder["value"],
+                )
         await self._lifecycle.publish_terminal(state, result)
         return result
 

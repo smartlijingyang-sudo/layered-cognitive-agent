@@ -60,22 +60,14 @@ class SequentialPerceiveHub(PerceiveHub):
         self._sink: ManifestSink = sink if sink is not None else default_sink()
 
     async def perceive(self, state: AgentState) -> ContextManifest:
-        # ADR-0164 Phase 3: 开 perceive step + close 围绕 _fold + emit。
-        # 所有 bridge 调用都被 ``observability_firewall`` 接住:
-        # schema 漂移(AttributeError / TypeError) 不再打死主链路,
-        # 直接以 RuntimeObserved 写入 journal, 现场立刻可见。
-        from lca.runtime.observability_firewall import bridge_firewall
-        from lca.runtime.step_emitter import (
-            bridge_perceive_closed,
-            bridge_perceive_opened,
+        # ADR-0167 D11 / I-PLUG1: Agent 不直接写 EP。phase.fold 走 StepCoordinator
+        # （PR-3 删 bridge 之后唯一路径）。
+        from lca.infrastructure.observability.writable_matrix.coordinator import (
+            get_current_coordinator,
         )
 
-        # AgentState 的字段名契约是 ``task``(不是 ``objective``); 用 getattr
-        # 安全读取避免字段漂移。 ``objective`` 是 step-tree 的 StepContext 字段,
-        # 这里把 task 映射为 step objective 是语义正确的连接。
         step_objective = getattr(state, "task", "") or "perceive"
-        with bridge_firewall("bridge.perceive_opened", attributes={"step": state.step}):
-            bridge_perceive_opened(objective=str(step_objective))
+        coord = get_current_coordinator()
 
         items = await self._fold(state)
         manifest = build_manifest_from_items(items)
@@ -95,15 +87,14 @@ class SequentialPerceiveHub(PerceiveHub):
         )
         self._sink.emit(event, manifest)
 
-        # close perceive step(默认 ok, 失败由 _fold 内部异常上抛, bridge 不接管)
         kinds = ", ".join(item.kind for item in items)
-        with bridge_firewall(
-            "bridge.perceive_closed",
-            attributes={"step": state.step, "item_count": len(items)},
-        ):
-            bridge_perceive_closed(
+        summary = f"感知 {len(items)} 项 ({kinds})"
+        if coord is not None:
+            coord.emit_phase(
+                phase="perceive",
+                objective=str(step_objective),
+                summary=summary,
                 outcome="ok",
-                summary=f"感知 {len(items)} 项 ({kinds})",
             )
         return manifest
 

@@ -211,18 +211,16 @@ class UseToolOperation(Action):
         # tool-name list in the payload so consumers can join them by
         # ``decision_id`` and parent_span_id.
         tool_names = [tc.tool_name for tc in decision.tool_calls]
-        _body_llm_reflector.emit_body_tool_execute_start(
+        _body_llm_reflector.emit_body_tool_decision_start(
             tool_name=",".join(tool_names) or "use_tool",
             invocation_id=decision.decision_id or "",
-            attempt=1,
         )
         try:
             return await self._batch_executor.execute(decision.tool_calls)
         finally:
-            _body_llm_reflector.emit_body_tool_execute_end(
+            _body_llm_reflector.emit_body_tool_decision_end(
                 tool_name=",".join(tool_names) or "use_tool",
                 invocation_id=decision.decision_id or "",
-                attempt=1,
                 outcome="success",
             )
 

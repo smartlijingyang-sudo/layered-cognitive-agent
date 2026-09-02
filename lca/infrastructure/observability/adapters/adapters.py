@@ -258,19 +258,8 @@ class TelemetryLLMAdapter(LLMAdapter):
                                 seq=reasoning_seq,
                             )
                         )
-                        # ADR-0164 Phase 3 双写:reasoning 增量 → step span
-                        try:
-                            from lca.runtime.step_emitter import bridge_llm_reasoning_delta
-
-                            bridge_llm_reasoning_delta(
-                                text_delta=delta_text,
-                                started_at=time.time(),
-                            )
-                        except ImportError:
-                            pass
-                        # PR-3.3: emit llm.stream.token for reasoning deltas too
-                        # (channel_kind="reasoning") so traces see the full token
-                        # stream, not only output text.
+                        # ADR-0167 D4b / PR-3: 流式 delta 由 coalescer 合并后落
+                        # step.thinking.reasoning，不按 token 写 EP / span —— bridge 已删。
                         _body_llm_reflector.emit_llm_stream_token(
                             model=model,
                             text_delta=delta_text,
@@ -289,18 +278,7 @@ class TelemetryLLMAdapter(LLMAdapter):
                             channel=StreamChannel.DECISION.value,
                         )
                     )
-                    # ADR-0164 Phase 3 双写:step text 增量 → step span
-                    try:
-                        from lca.runtime.step_emitter import bridge_llm_step_text_delta
-
-                        bridge_llm_step_text_delta(
-                            text_delta=delta_text,
-                            channel=StreamChannel.DECISION.value,
-                            started_at=time.time(),
-                        )
-                    except ImportError:
-                        pass
-                    # PR-3.3: emit llm.stream.token for the output delta.
+                    # ADR-0167 D4b / PR-3: 流式 delta 不写 EP / span（已删 bridge_*）
                     _body_llm_reflector.emit_llm_stream_token(
                         model=model,
                         text_delta=delta_text,
@@ -318,18 +296,6 @@ class TelemetryLLMAdapter(LLMAdapter):
                                 channel=StreamChannel.ANSWER.value,
                             )
                         )
-                        try:
-                            from lca.runtime.step_emitter import (
-                                bridge_llm_step_text_delta,
-                            )
-
-                            bridge_llm_step_text_delta(
-                                text_delta=answer_delta,
-                                channel=StreamChannel.ANSWER.value,
-                                started_at=time.time(),
-                            )
-                        except ImportError:
-                            pass
                         delta_seq += 1
                 yield event
         except asyncio.CancelledError:
@@ -452,38 +418,36 @@ class TelemetryLLMAdapter(LLMAdapter):
                 reasoning_preview=reasoning_text[:1024],
             )
         )
-        # ADR-0164 Phase 3 双写: thinking into open think step, then close.
-        try:
-            from lca.runtime.step_emitter import (
-                bridge_llm_completed,
-                bridge_think_closed,
-            )
+        # ADR-0167 D11: think.end 经 Coordinator 推 phase 边
+        from lca.infrastructure.observability.writable_matrix.coordinator import (
+            get_current_coordinator,
+        )
 
-            bridge_llm_completed(
-                model=model,
-                latency_ms=latency_ms,
-                reasoning_preview=reasoning_text[:1024],
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-                response_preview=(response_text or "")[:1024],
-                decision="respond" if ok else "error",
-            )
-            bridge_think_closed(
-                outcome="ok" if ok else "fail",
+        coord = get_current_coordinator()
+        if coord is not None:
+            coord.emit_phase(
+                phase="think",
+                objective=model,
                 summary=("respond" if ok else "error"),
+                outcome="ok" if ok else "failure",
             )
-        except ImportError:
-            pass
 
 
 def _open_think_step(prompt: str) -> None:
-    """Open a think step at the LLM adapter seam (ADR-0164 ownership)."""
-    try:
-        from lca.runtime.step_emitter import bridge_think_opened
+    """Emit think 边 via StepCoordinator (ADR-0167 D11)。"""
+    from lca.infrastructure.observability.writable_matrix.coordinator import (
+        get_current_coordinator,
+    )
 
-        objective = (prompt or "").strip().replace("\n", " ")
-        if len(objective) > 200:
-            objective = objective[:200] + "…"
-        bridge_think_opened(objective=objective or "llm.complete")
-    except ImportError:
-        pass
+    coord = get_current_coordinator()
+    if coord is None:
+        return
+    objective = (prompt or "").strip().replace("\n", " ")
+    if len(objective) > 200:
+        objective = objective[:200] + "…"
+    coord.emit_phase(
+        phase="think",
+        objective=objective or "llm.complete",
+        summary="started",
+        outcome="ok",
+    )

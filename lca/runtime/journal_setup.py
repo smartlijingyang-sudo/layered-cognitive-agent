@@ -3,10 +3,10 @@
 ADR-0164 Phase 7 端到端: ``create_run_components`` 需要已 bind_run 的
 lifecycle store。Builder 负责构造 store; ``RunExecutionEnvironment.prepare``
 必须 ``set_lifecycle_store`` + facade ``bind(RunContext)``, 否则
-step_emitter 静默跳过, terminal flush 写出 steps=[]。
+terminal flush 写出 steps=[]。
 
-本模块把 "为某个 run 准备 lifecycle store" 显式化成 runtime 工厂,
-不依赖任何 transport 类型:
+PR-3 删除了历史桥接层；本模块只负责 store 构造，写路径全部走
+:mod:`lca.infrastructure.observability.writable_matrix` 的 StepCoordinator。
 
 - ``build_step_lifecycle_store`` —— 给定 run_id / trace_id / metadata,
   直接造一个 ``StepLifecycleStore`` 并 ``bind_run``。 是最窄的形态。

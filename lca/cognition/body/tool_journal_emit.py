@@ -131,19 +131,21 @@ def emit_tool_started(
             idempotency_key=idempotency_key,
         )
     )
-    # ADR-0164 Phase 3 双写:写 step.tool_call(无 step_lifecycle 时 silent 跳过)
-    try:
-        from lca.runtime.step_emitter import bridge_tool_started
+    # ADR-0167 D11: 写 step.tool_call 经 StepCoordinator（未注入时静默跳过）
+    from lca.infrastructure.observability.writable_matrix.coordinator import (
+        get_current_coordinator,
+    )
 
-        # args 可能很大(arguments_summary 限 200 字符), 由 reader 自己读完整 arguments
-        bridge_tool_started(
-            tool_name=tool.name,
-            invocation_id=invocation_id,
-            arguments=args_dict,
-            arguments_summary=_summarize_args(args_dict),
+    coord = get_current_coordinator()
+    if coord is not None:
+        coord.emit(
+            execution_point="phase.tool.call.start",
+            payload={
+                "tool_name": tool.name,
+                "invocation_id": invocation_id,
+                "arguments_summary": _summarize_args(args_dict),
+            },
         )
-    except ImportError:
-        pass
     return arguments_ref
 
 
@@ -167,13 +169,18 @@ def emit_tool_denied(tool: Tool, reason: str) -> None:
         attributes={"tool_name": tool.name, "reason": reason},
     )
     record(ToolDenied(tool_name=tool.name, reason=reason))
-    # ADR-0164 Phase 3 双写:ToolDenied 折叠为 step span
-    try:
-        from lca.runtime.step_emitter import bridge_tool_denied
+    # ADR-0167 D11: ToolDenied 走 StepCoordinator
+    from lca.infrastructure.observability.writable_matrix.coordinator import (
+        get_current_coordinator,
+    )
 
-        bridge_tool_denied(tool_name=tool.name, reason=reason)
-    except ImportError:
-        pass
+    coord = get_current_coordinator()
+    if coord is not None:
+        coord.emit(
+            execution_point="phase.tool.denied",
+            payload={"tool_name": tool.name, "reason": reason},
+            outcome="rejected",
+        )
 
 
 def emit_tool_invoked(
@@ -256,30 +263,32 @@ def emit_tool_invoked(
             projected_state=projected_state_dict,
         )
     )
-    # ADR-0164 Phase 3 双写:写 step.tool_result
-    try:
-        from lca.runtime.step_emitter import bridge_tool_invoked
+    # ADR-0167 D11: 写 step.tool_result 经 StepCoordinator
+    from lca.infrastructure.observability.writable_matrix.coordinator import (
+        get_current_coordinator,
+    )
 
+    coord = get_current_coordinator()
+    if coord is not None:
         files = tool_files(obs)
-        # ``files`` are file-part dicts (A2A metadata shape); ``ToolResult.files_created``
-        # is typed as ``tuple[str, ...]`` of display paths — keep that contract so
-        # downstream ``cumulative_files`` / ``Path(f).name`` don't blow up.
         files_created = tuple(str(f.get("name") or "") for f in files)
-        bridge_tool_invoked(
-            tool_name=tool.name,
-            invocation_id=resolved_id,
-            ok=obs.success,
-            latency_ms=latency_ms,
-            error="" if obs.success else (obs.error or None),
-            files_created=files_created,
-            delta_summary=_delta_summary_from_obs(obs, inline_output_text, output_ref),
-            stdout_head=(inline_output_text or "")[:500],
-            stdout_chars_total=len(inline_output_text or ""),
-            stdout_truncated=output_ref is not None,
-            stderr=str(obs.error or "") if not obs.success else "",
+        coord.emit(
+            execution_point="phase.tool.call.end",
+            payload={
+                "tool_name": tool.name,
+                "invocation_id": resolved_id,
+                "ok": obs.success,
+                "latency_ms": latency_ms,
+                "error": "" if obs.success else (obs.error or ""),
+                "files_created": files_created,
+                "delta_summary": _delta_summary_from_obs(obs, inline_output_text, output_ref),
+                "stdout_head": (inline_output_text or "")[:500],
+                "stdout_chars_total": len(inline_output_text or ""),
+                "stdout_truncated": output_ref is not None,
+                "stderr": str(obs.error or "") if not obs.success else "",
+            },
+            outcome="success" if obs.success else "failure",
         )
-    except ImportError:
-        pass
 
 
 def _delta_summary_from_obs(

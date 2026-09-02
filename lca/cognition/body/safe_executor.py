@@ -377,20 +377,31 @@ class SimpleSafeExecutor(SafeExecutor):
 
 
 def _open_act_step(tool_name: str) -> None:
-    """Open an act step at the safe_executor seam (ADR-0164 ownership)."""
-    try:
-        from lca.runtime.step_emitter import bridge_act_opened
+    """Emit ``phase.act.fold.start`` via StepCoordinator (ADR-0167 D11)."""
+    from lca.infrastructure.observability.writable_matrix.coordinator import (
+        get_current_coordinator,
+    )
 
-        bridge_act_opened(objective=f"tool:{tool_name}", tool_name=tool_name)
-    except ImportError:
-        pass
+    coord = get_current_coordinator()
+    if coord is None:
+        return
+    coord.emit(
+        execution_point="phase.act.fold.start",
+        payload={"tool_name": tool_name, "objective": f"tool:{tool_name}"},
+    )
 
 
 def _close_act_step(*, outcome: str, error: str | None = None) -> None:
-    """Close the current act step after tool completion/failure."""
-    try:
-        from lca.runtime.step_emitter import bridge_act_closed
+    """Emit ``phase.act.fold.end`` via StepCoordinator (ADR-0167 D11)."""
+    from lca.infrastructure.observability.writable_matrix.coordinator import (
+        get_current_coordinator,
+    )
 
-        bridge_act_closed(outcome=outcome, error=error)
-    except ImportError:
-        pass
+    coord = get_current_coordinator()
+    if coord is None:
+        return
+    coord.emit(
+        execution_point="phase.act.fold.end",
+        payload={"outcome": outcome, "error": error},
+        outcome=outcome if outcome != "ok" else None,
+    )
