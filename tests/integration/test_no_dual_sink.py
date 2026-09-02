@@ -34,9 +34,9 @@ def test_routing_sink_different_runs_get_different_sinks(tmp_path: Path) -> None
     a = sink._sink_for("run_1")
     b = sink._sink_for("run_2")
     assert a is not b
-    # 子目录布局:每个 run 单独目录
-    assert (tmp_path / "runs" / "run_1" / "events.jsonl").exists()
-    assert (tmp_path / "runs" / "run_2" / "events.jsonl").exists()
+    # 子目录布局:每个 run 单独目录;ADR-0169 PR-27 默认 = <run_id>.spine.jsonl
+    assert (tmp_path / "runs" / "run_1" / "run_1.spine.jsonl").exists()
+    assert (tmp_path / "runs" / "run_2" / "run_2.spine.jsonl").exists()
     sink.close()
 
 

@@ -75,7 +75,11 @@ def test_file_setup_provides_routing_sink(tmp_path: Path) -> None:
 
 
 def test_file_sink_plugin_routes_run_events(tmp_path: Path) -> None:
-    """Run-scoped records MUST land under traces/runs/<run_id>/events.jsonl."""
+    """Run-scoped records MUST land under traces/runs/<run_id>/<run_id>.spine.jsonl。
+
+    ADR-0169 PR-27:默认 file_name 模板 = ``$run_id.spine.jsonl``,
+    实例化为 ``<run_id>.spine.jsonl``。
+    """
     ctx = _StubPluginContext()
     boot = tmp_path / "boot-events.jsonl"
     runs = tmp_path / "runs"
@@ -89,7 +93,7 @@ def test_file_sink_plugin_routes_run_events(tmp_path: Path) -> None:
     sink.write(_make_rec(run_id="run_r1"))
     sink.close()
 
-    path = runs / "run_r1" / "events.jsonl"
+    path = runs / "run_r1" / "run_r1.spine.jsonl"
     lines = path.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
     obj = json.loads(lines[0])

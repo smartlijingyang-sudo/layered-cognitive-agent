@@ -1,6 +1,6 @@
-"""ADR-0169 PR-25:web-standard profile 装配回归测试。
+"""ADR-0169 PR-25 + ADR-0174 PR-7.1/7.2:web-standard profile 装配回归测试。
 
-web-standard 是 ADR-0169 §D11 / ADR-0174 的唯一主 profile;
+web-standard 是 ADR-0169 §D11 / ADR-0174 的主 profile;
 本测试保证:
 - 加载 ``profiles/web-standard.yaml`` 不抛
 - bundle 展开 + patch 合并 + 环境引用展开均成功
@@ -34,7 +34,7 @@ def test_web_standard_loads_without_error() -> None:
         "bundles/web-app.yaml",
         "bundles/scenario-cordis-creator.yaml",
         "bundles/declarative-phase-graph.yaml",
-        "bundles/spine-default.yaml",
+        "bundles/loop_cursor.spine_default.yaml",
     )
 
 
@@ -60,7 +60,7 @@ def test_web_standard_loop_cursor_implementation_is_std() -> None:
     raw = yaml.safe_load(PROFILE_PATH.read_text(encoding="utf-8"))
     lc = raw["observability"]["loop_cursor"]
     assert lc["implementation"] == "std"
-    assert lc["spine_default"] == "spine_default"
+    assert lc["spine_default"] == "loop_cursor.spine_default"
 
 
 def test_web_standard_projection_host_initial_keys() -> None:
@@ -85,15 +85,13 @@ def test_web_standard_bundles_unaffected_by_observability_section() -> None:
     """新增 observability 段不能影响 bundles 列表(Patch / Bundle 阶段已固化)。"""
     src = load_profile_source(PROFILE_PATH)
     # bundles 列表未变
-    assert "bundles/spine-default.yaml" in src.bundles
+    assert "bundles/loop_cursor.spine_default.yaml" in src.bundles
     # entries 数量 > 100(web-standard 是大 profile,通常 ~190)
     assert len(src.entries) >= 100
 
 
 def test_web_standard_patch_section_still_valid() -> None:
     """Patch 段仍包含 ``lca-llm-resolver`` + ``spine.sink.file``(未受 observability 段影响)。"""
-    src = load_profile_source(PROFILE_PATH)
-    patch_ids = {entry.get("id") for entry in src.entries}
     # Note:patch 段在 source 层展开后才进入 entries;source.entries 不含 patch
     # (patch 是 profiles yaml 顶层独立段)。这里验证 yaml 顶层 patch 段在
     yaml_raw = __import__("yaml").safe_load(PROFILE_PATH.read_text(encoding="utf-8"))

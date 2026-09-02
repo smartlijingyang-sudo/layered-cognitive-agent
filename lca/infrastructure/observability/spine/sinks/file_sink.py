@@ -7,6 +7,10 @@ on Linux guarantees atomic append). Events > 4 KB are offloaded to
 Fsync runs on a counter (every N events) and timer (every T ms). Both
 default to ``100`` — small enough for crash consistency, large enough
 that fsync is not on the hot path.
+
+ADR-0169 PR-27:默认文件名 = ``$run_id.spine.jsonl`` 模板,实例化时通过
+:func:`resolve_filename` 替换为 ``<run_id>.spine.jsonl``(L10 / D9)。
+旧字面 ``events.jsonl`` 仍可显式传入,获得向后兼容的旧布局。
 """
 
 from __future__ import annotations
@@ -20,6 +24,8 @@ from typing import Any
 
 from lca.infrastructure.observability.spine.event_record import EventRecord
 from lca.infrastructure.observability.spine.sinks.naming import (
+    DEFAULT_SPINE_TEMPLATE,
+    resolve_filename,
     spine_filename_for_run,
 )
 
@@ -29,10 +35,14 @@ _DEFAULT_INTERVAL_MS = 100
 
 
 class FileSink:
-    """Append-only JSONL sink under ``<run_dir>/events.jsonl``。
+    """Append-only JSONL sink 默认落盘 ``<run_dir>/<run_id>.spine.jsonl``。
 
-    ADR-0169 L10: ``spine_filename=True`` 时派生 ``<run_id>.spine.jsonl`` 作为
-    sink 文件名(默认 False 保留 events.jsonl 兼容既有 tests/生产路径)。
+    ADR-0169 L10:
+    - 默认 ``file_name`` 模板 = ``$run_id.spine.jsonl`` → 实例化为
+      ``<run_id>.spine.jsonl``(PR-27)。
+    - ``spine_filename=True`` 时同样解析为 ``<run_id>.spine.jsonl``;
+      默认值已等价于 ``spine_filename=True``,保留该参数仅为兼容既有调用方。
+    - 显式 ``file_name="events.jsonl"`` 仍生效,获得旧布局(向后兼容)。
     """
 
     def __init__(
@@ -40,15 +50,18 @@ class FileSink:
         run_dir: Path,
         *,
         run_id: str,
-        file_name: str = "events.jsonl",
+        file_name: str = DEFAULT_SPINE_TEMPLATE,
         fsync_batch: int = _DEFAULT_BATCH,
         fsync_interval_ms: int = _DEFAULT_INTERVAL_MS,
         spine_filename: bool = False,
     ) -> None:
         self._run_dir = Path(run_dir)
         self._run_id = run_id
-        if spine_filename:
+        # 解析 $run_id 占位符 → 实际 per-run 文件名
+        if spine_filename or file_name == DEFAULT_SPINE_TEMPLATE:
             file_name = spine_filename_for_run(run_id)
+        else:
+            file_name = resolve_filename(file_name, run_id)
         self._path = self._run_dir / file_name
         self._fsync_batch = fsync_batch
         self._fsync_interval_ms = fsync_interval_ms / 1000.0

@@ -1,8 +1,16 @@
 """FilesystemJournalStore —— Spine 持久化后端(append-only 事件流)。
 
 落盘文件承载 spine events(事实流),由 ``RunSessionBuilder`` / ``run_ledger``
-seam 通过 ``filename`` 显式指定为 ``events.jsonl``。 ``DEFAULT_FILENAME`` 仅
-作为未指定时的兜底;生产路径一定显式传入,这里与实际文件名解耦。
+seam 通过 ``filename`` 显式指定。``DEFAULT_FILENAME`` 是未指定时的兜底模板。
+
+ADR-0169 PR-27(L10 / D9):默认 ``DEFAULT_FILENAME`` 改为 ``$run_id.spine.jsonl``
+模板,通过 ``run_id`` 推导 / 占位符替换得到 ``<run_id>.spine.jsonl``。
+``run_id`` 默认 = ``root`` 目录 basename(单 run 实例目录约定)。
+
+向后兼容:
+- 显式传入 ``filename="events.jsonl"`` 时仍生效,获得旧布局。
+- :meth:`_load_existing` 同时尝试 ``events.jsonl`` 兜底,让旧的 ledger 文件仍
+  可被新代码读到(reader 透明)。
 
 特性:
 - 每次 ``append`` 走"写 staging + fsync + atomic rename"协议,崩溃时不破坏
@@ -35,31 +43,50 @@ from lca.infrastructure.observability.journal.schema_version import (
 class FilesystemJournalStore(JournalStoreBackend):
     """Append-only 文件账本(L2 durable)。"""
 
-    DEFAULT_FILENAME = "events.jsonl"
+    DEFAULT_FILENAME = "$run_id.spine.jsonl"
 
     def __init__(
         self,
         root: Path | str,
         *,
-        filename: str = DEFAULT_FILENAME,
+        run_id: str = "default-run",
+        filename: str | None = None,
         fsync_each_append: bool = True,
     ) -> None:
+        from lca.infrastructure.observability.spine.sinks.naming import (
+            LEGACY_DEFAULT_NAME,
+            resolve_filename,
+        )
+
         self._root = Path(root)
         self._root.mkdir(parents=True, exist_ok=True)
-        self._path = self._root / filename
+        # 模板解析:$run_id.spine.jsonl → <run_id>.spine.jsonl
+        template = filename if filename is not None else FilesystemJournalStore.DEFAULT_FILENAME
+        resolved = resolve_filename(template, run_id)
+        # 写入路径总是新 spine 命名(后续 append 落此)
+        self._path = self._root / resolved
         self._fsync_each_append = fsync_each_append
         self._events: list[StampedEvent] = []
-        # 若文件已存在,载入历史(只读 bootstrap;后续 append 继续追加)
+        # bootstrap:优先 spine;若 spine 不存在但 events.jsonl 存在,
+        # 从 events.jsonl 加载历史(不切换写入路径 — 后续 append 仍落 spine)
         if self._path.exists():
             self._load_existing()
+        else:
+            legacy_path = self._root / LEGACY_DEFAULT_NAME
+            if legacy_path.exists():
+                # 临时 bootstrap legacy 数据(不动 self._path)
+                self._load_existing_at(legacy_path)
 
     @property
     def path(self) -> Path:
         return self._path
 
     def _load_existing(self) -> None:
+        self._load_existing_at(self._path)
+
+    def _load_existing_at(self, path: Path) -> None:
         try:
-            text = self._path.read_text(encoding="utf-8")
+            text = path.read_text(encoding="utf-8")
         except OSError:
             return
         for _line_no, line in enumerate(text.splitlines(), start=1):

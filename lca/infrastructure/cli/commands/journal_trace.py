@@ -1015,22 +1015,27 @@ def _render_transport_pair(
 
 
 def _resolve_events_path(traces_root: Path, run_id: str) -> Path:
-    """Resolve ``<run_dir>/events.jsonl`` or surface a friendly error."""
+    """Resolve spine events file under ``<run_dir>`` or surface a friendly error(PR-27)。
+
+    ADR-0169 PR-27 L10:默认 ``<run_id>.spine.jsonl``;若不存在回退到
+    ``events.jsonl``(向后兼容)。两者都不存在时给出友好错误。
+    """
     locator = FilesystemRunLocator(traces_root)
     run_dir = locator.run_dir(run_id)
     if not run_dir.exists():
         print(f"run directory not found: {run_dir}", file=sys.stderr)
         print("  hint: 检查 --traces-root 是否正确,run_id 是否存在", file=sys.stderr)
         raise SystemExit(1)
-    events_path = run_dir / "events.jsonl"
-    if not events_path.exists():
-        print(
-            f"events.jsonl not found: {events_path}\n"
-            f"  hint: spine FileSink 尚未写入 events,或 run {run_id} 不在 PR-9 之后",
-            file=sys.stderr,
-        )
-        raise SystemExit(1)
-    return events_path
+    spine_path = locator.events_path(run_id)
+    if spine_path.exists():
+        return spine_path
+    # locator.events_path 已包含 legacy 兜底,若仍不存在则提示
+    print(
+        f"spine events file not found: {spine_path}\n"
+        f"  hint: spine FileSink 尚未写入 events,或 run {run_id} 不在 PR-9 之后",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
 
 
 def _latest_run_id(traces_root: Path) -> str | None:

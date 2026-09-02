@@ -364,7 +364,8 @@ def test_missing_events_jsonl_friendly_error(tmp_path: Path) -> None:
         ["journal", "trace", "noevents", "--traces-root", str(root)],
     )
     assert result.exit_code == 1
-    assert "events.jsonl not found" in result.stderr
+    # ADR-0169 PR-27:缺 spine 文件时友好错误提示使用 spine 路径
+    assert "spine events file not found" in result.stderr
 
 
 # ── edge cases ─────────────────────────────────────────────────────

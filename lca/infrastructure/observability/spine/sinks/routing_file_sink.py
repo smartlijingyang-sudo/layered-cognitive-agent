@@ -1,7 +1,11 @@
-"""Run-routing FileSink — boot vs per-run events.jsonl (ADR-0165.1 layout).
+"""Run-routing FileSink — boot vs per-run spine.jsonl (ADR-0165.1 layout + PR-27)。
 
-Boot / no-run events → ``boot_path`` (default ``.lca/spine/boot-events.jsonl``).
-Events with a real ``run_id`` → ``<runs_root>/<run_id>/events.jsonl``.
+Boot / no-run events → ``boot_path`` (default ``.lca/spine/boot-events.jsonl``)。
+Events with a real ``run_id`` → ``<runs_root>/<run_id>/<resolved_file_name>``。
+
+ADR-0169 PR-27:``file_name`` 默认 ``$run_id.spine.jsonl`` 模板,在
+:meth:`_sink_for` 实例化时按当前 ``run_id`` 解析为
+``<run_id>.spine.jsonl``。旧字面 ``events.jsonl`` 仍可显式传入(向后兼容)。
 """
 
 from __future__ import annotations
@@ -11,19 +15,23 @@ from pathlib import Path
 
 from lca.infrastructure.observability.spine.event_record import EventRecord
 from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
+from lca.infrastructure.observability.spine.sinks.naming import (
+    DEFAULT_SPINE_TEMPLATE,
+    resolve_filename,
+)
 
 _BOOT_RUN_IDS = frozenset({"", "boot", "default-run"})
 
 
 class RunRoutingFileSink:
-    """Demux EventRecords to boot file or per-run ``events.jsonl``."""
+    """Demux EventRecords to boot file or per-run spine 文件。"""
 
     def __init__(
         self,
         *,
         boot_path: Path,
         runs_root: Path,
-        file_name: str = "events.jsonl",
+        file_name: str = DEFAULT_SPINE_TEMPLATE,
         spine_filename: bool = False,
     ) -> None:
         self._boot_path = Path(boot_path)
@@ -50,10 +58,11 @@ class RunRoutingFileSink:
         return self._runs_root
 
     def path_for(self, run_id: str) -> Path:
-        """Return the events.jsonl path for a run (may not exist yet)."""
+        """Return the per-run 文件路径(可能尚未落盘)。"""
         if self._is_boot_run_id(run_id):
             return self._boot.path
-        return self._runs_root / run_id / self._file_name
+        resolved = self._resolve_file_name(run_id)
+        return self._runs_root / run_id / resolved
 
     def write(self, record: EventRecord) -> None:
         if self._closed:
@@ -75,6 +84,20 @@ class RunRoutingFileSink:
         self._boot.close()
         for sink in sinks:
             sink.close()
+
+    def _resolve_file_name(self, run_id: str) -> str:
+        """把 ``file_name`` 模板按 ``run_id`` 解析为实际文件名。
+
+        ``$run_id`` 占位符或 ``spine_filename=True`` 时统一解析为
+        ``<run_id>.spine.jsonl``;其他字面量原样返回。
+        """
+        if self._spine_filename or self._file_name == DEFAULT_SPINE_TEMPLATE:
+            from lca.infrastructure.observability.spine.sinks.naming import (
+                spine_filename_for_run,
+            )
+
+            return spine_filename_for_run(run_id)
+        return resolve_filename(self._file_name, run_id)
 
     def _sink_for(self, run_id: str) -> FileSink:
         with self._lock:

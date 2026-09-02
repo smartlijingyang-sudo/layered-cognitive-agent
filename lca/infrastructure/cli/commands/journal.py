@@ -109,9 +109,23 @@ def _find_latest_run_dir() -> Path | None:
 
 
 def _events_jsonl_for(run_dir: Path) -> Path | None:
-    """Return the events.jsonl under a run directory if present."""
-    candidate = run_dir / "events.jsonl"
-    return candidate if candidate.exists() else None
+    """Return spine events file under a run directory if present (PR-27)。
+
+    ADR-0169 PR-27 L10:默认 ``<run_id>.spine.jsonl``;为向后兼容,旧
+    ``events.jsonl`` 也被接受,优先返回 spine 命名。
+    """
+    from lca.infrastructure.observability.spine.sinks.naming import (
+        LEGACY_FILE_NAME,
+        spine_filename_for_run,
+    )
+
+    spine = run_dir / spine_filename_for_run(run_dir.name)
+    if spine.exists():
+        return spine
+    legacy = run_dir / LEGACY_FILE_NAME
+    if legacy.exists():
+        return legacy
+    return None
 
 
 def _iter_jsonl(path: Path) -> Iterator[dict[str, object]]:

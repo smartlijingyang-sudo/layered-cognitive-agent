@@ -61,7 +61,16 @@ def _resolve_journal_artifact(
         primary = nested / "journal.json"
         if primary.exists():
             return primary
-        ssot = nested / "events.jsonl"
+        # ADR-0169 PR-27 L10:默认 <run_id>.spine.jsonl;events.jsonl 向后兼容
+        from lca.infrastructure.observability.spine.sinks.naming import (
+            LEGACY_FILE_NAME,
+            spine_filename_for_run,
+        )
+
+        spine = nested / spine_filename_for_run(trace_id)
+        if spine.exists():
+            return spine
+        ssot = nested / LEGACY_FILE_NAME
         if ssot.exists():
             return ssot
     return None

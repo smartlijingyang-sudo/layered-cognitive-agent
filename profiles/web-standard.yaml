@@ -2,8 +2,8 @@
 # Bundles: base (Tier-1 services + Tier-2 providers) + web-app (Tier-3 behaviors)
 # + scenario-cordis-creator（Creator §13.3 工具集注册到全局 tools 服务，
 # 但启用受 model=cordis-creator 请求触发 + RoleProfile.tool_permission_manifest 闸控）
-# + spine-default (PR-8 §7.6.6 — 19-plugin EventSpine composition with
-# source-level introspection **mandatory**; ADR-2026-09-02 §D3).
+# + loop_cursor.spine_default (PR-8 §7.6.6 — 19-plugin EventSpine composition with
+# source-level introspection **mandatory**; ADR-2026-09-02 §D3; ADR-0174 profile 装配).
 # LLM secrets are owned by lca-llm-resolver (loads project .env at setup).
 
 # ADR-0169 PR-25:observability 五缝装配段(Profile 读取 SSOT,见 ADR-0169 §D8)。
@@ -14,10 +14,10 @@
 # 在 PR-25 阶段尚未拆成独立 plugin,本段先给 wiring 与读路径。
 observability:
   loop_cursor:
-    implementation: std            # 默认实现(PR-14 LoopCursorFactory)
-    spine_default: spine_default  # 复用 bundles/spine-default.yaml 的 bundle
+    implementation: std                              # 默认实现(PR-14 LoopCursorFactory)
+    spine_default: loop_cursor.spine_default         # 复用 bundles/loop_cursor.spine_default.yaml 的 bundle
   projection_host:
-    initial: [step_tree, narrative, graph, cost]  # 默认 deriver 注册
+    initial: [step_tree, narrative, graph, cost]     # 默认 deriver 注册
   persistence:
     coalescer: default
     sink: routing_file
@@ -32,7 +32,7 @@ bundles:
   - bundles/web-app.yaml
   - bundles/scenario-cordis-creator.yaml
   - bundles/declarative-phase-graph.yaml
-  - bundles/spine-default.yaml
+  - bundles/loop_cursor.spine_default.yaml
 
 patch:
   - id: lca-llm-resolver

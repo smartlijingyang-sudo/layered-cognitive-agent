@@ -197,25 +197,32 @@ class NullStorage:
 
 
 class RoutingFileStorage:
-    """默认 Storage = per-run 追加 events.jsonl(O_APPEND 原子写入)。
+    """默认 Storage = per-run 追加 ``<run_id>.spine.jsonl``(O_APPEND 原子写入)。
 
-    ADR-0169 L10: ``spine_filename=True`` 时派生 ``<run_id>.spine.jsonl``;
-    默认 False 保留 events.jsonl 兼容既有 tests/生产路径(PR-2 / S2)。
+    ADR-0169 PR-27(L10 / D9):
+    - 默认 ``file_name`` 模板 = ``$run_id.spine.jsonl`` → 实例化为
+      ``<run_id>.spine.jsonl``。
+    - ``spine_filename=True`` 时等价于新默认。
+    - 显式 ``file_name="events.jsonl"`` 仍生效,获得旧布局(向后兼容)。
     """
 
     def __init__(
         self,
         run_dir: Path,
         *,
-        file_name: str = "events.jsonl",
+        file_name: str = "$run_id.spine.jsonl",
         spine_filename: bool = False,
     ) -> None:
         from lca.infrastructure.observability.spine.sinks.naming import (
+            DEFAULT_SPINE_TEMPLATE,
+            resolve_filename,
             spine_filename_for_run,
         )
 
-        if spine_filename:
+        if spine_filename or file_name == DEFAULT_SPINE_TEMPLATE:
             file_name = spine_filename_for_run(Path(run_dir).name)
+        else:
+            file_name = resolve_filename(file_name, Path(run_dir).name)
         self._path = Path(run_dir) / file_name
         Path(run_dir).mkdir(parents=True, exist_ok=True)
         self._fd = os.open(

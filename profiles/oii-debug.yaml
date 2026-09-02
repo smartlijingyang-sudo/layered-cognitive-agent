@@ -3,17 +3,40 @@
 # the production journal.
 #
 # As of ADR-2026-09-02-i17-traceback §D3, ``spine.reflector.source`` is
-# mandatory in ``spine-default``; this profile no longer needs the
-# separate ``spine-oii-debug`` bundle for attacher presence. It keeps
-# the bundle only to apply the custom debug boot-path.
+# mandatory in ``loop_cursor.spine_default``; this profile no longer
+# needs the separate ``loop_cursor.spine_debug`` bundle for attacher
+# presence. The bundle is included only as an ADR-0174 §D2 marker for
+# the loop_cursor.* SSOT — actual redact/max_locals_bytes overrides
+# travel via ``patch:`` below (seam: ``ProfileSource.entries`` rejects
+# duplicate plugin ids across bundles; migration to loop_cursor.* is
+# therefore also the cleanest moment to drop the long-standing
+# `spine-oii-debug.yaml` re-declaration).
+#
+# ADR-0174 PR-7.1/7.2: profile migrated to ``loop_cursor.spine_*`` bundle
+# naming(§D1 第一批);observability 五缝装配段与 web-standard 同 schema。
+
+observability:
+  loop_cursor:
+    implementation: std                              # 默认实现(PR-14 LoopCursorFactory)
+    spine_debug: loop_cursor.spine_debug              # 复用 bundles/loop_cursor.spine_debug.yaml 的 bundle
+  projection_host:
+    initial: [step_tree, narrative, graph, cost]     # 默认 deriver 注册
+  persistence:
+    coalescer: default
+    sink: routing_file
+  model_visible:
+    enabled: true
+  close_barrier:
+    enabled: true
+  plan_ref: oii-debug
 
 bundles:
   - bundles/base.yaml
   - bundles/web-app.yaml
   - bundles/scenario-cordis-creator.yaml
   - bundles/declarative-phase-graph.yaml
-  - bundles/spine-default.yaml
-  - bundles/spine-oii-debug.yaml
+  - bundles/loop_cursor.spine_default.yaml
+  - bundles/loop_cursor.spine_debug.yaml
 
 patch:
   - id: lca-llm-resolver
@@ -27,3 +50,17 @@ patch:
     config:
       boot_path: .lca/spine/oii-debug-boot-events.jsonl
       runs_root: traces/runs
+
+  # OII-only source-level attacher overrides(migrated from the legacy
+  # bundles/spine-oii-debug.yaml entry; loop_cursor.spine_debug no longer
+  # redeclares spine.reflector.source to avoid cross-bundle plugin id
+  # collision with loop_cursor.spine_default).
+  - id: spine.reflector.source
+    config:
+      max_locals_bytes: 4096
+      redact_patterns:
+        - "sk-[A-Za-z0-9]{16,}"
+        - "AKIA[0-9A-Z]{16}"
+        - "xox[baprs]-[A-Za-z0-9-]{10,}"
+        - "ghp_[A-Za-z0-9]{36}"
+        - "gho_[A-Za-z0-9]{36}"

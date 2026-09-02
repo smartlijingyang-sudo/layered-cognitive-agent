@@ -203,8 +203,9 @@ def test_setup_event_spine_routes_through_file_sink(tmp_path: Path) -> None:
     assert isinstance(record, EventRecord)
     spine_core.close()
 
-    assert (tmp_path / "events.jsonl").exists()
-    line = (tmp_path / "events.jsonl").read_text().strip().splitlines()[0]
+    # ADR-0169 PR-27:默认 = <run_id>.spine.jsonl
+    assert (tmp_path / "core-wiring.spine.jsonl").exists()
+    line = (tmp_path / "core-wiring.spine.jsonl").read_text().strip().splitlines()[0]
     assert "brain.perceive.start" in line
     assert file_sink._closed is True
 

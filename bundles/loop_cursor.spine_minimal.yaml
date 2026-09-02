@@ -1,0 +1,63 @@
+# bundles/loop_cursor.spine_minimal.yaml — minimal spine for benchmarking (PR-8 §7.6.6).
+#
+# Only the producer / sink minimum needed to exercise EventSpine itself.
+# No classifiers, no source-level introspection, no projection derivers
+# (the cost study excludes derived projections). Anomaly + one field
+# producer are required because emit_pipeline hard-requires them.
+#
+# Used by profiles/benchmark.yaml; not loaded by web-standard.
+
+name: loop_cursor.spine_minimal
+kind: loop_cursor_bundle
+description: |
+  Minimal spine composition for benchmark cost studies. Wires L2
+  composer + L1 emit_pipeline + L0 anomaly + L0 spantree producer +
+  L0 file sink so EventSpine can boot; everything else is intentionally
+  absent.
+
+# ADR-0174 §D2 loop_cursor bundle 契约(benchmark cost-study 专用,projection
+# 列表裁剪到 step_tree + cost;model_visible 默认关闭)。
+provides:
+  - loop_cursor_factory
+  - projection_host
+  - persistence
+  - close_barrier
+  # model_visible intentionally absent in minimal mode(关闭以减少 cost 干扰)
+
+profile_aliases:
+  - benchmark
+
+# Informational: which spine-side plugins this bundle wires.
+plugins:
+  - spine.core
+  - spine.emit_pipeline
+  - spine.deriver.anomaly
+  - spine.spantree
+  - spine.sink.file
+
+entries:
+  - id: spine.core
+    name: spine_core
+    $module: lca.plugins.observability.spine.core
+    config: {}
+
+  - id: spine.emit_pipeline
+    name: spine_emit_pipeline
+    $module: lca.plugins.observability.spine.emit_pipeline
+    config: {}
+
+  - id: spine.deriver.anomaly
+    name: spine_deriver_anomaly
+    $module: lca.plugins.observability.spine.derivers.anomaly
+    config: {}
+
+  - id: spine.spantree
+    name: spine_spantree
+    $module: lca.plugins.observability.spine.spantree
+    config: {}
+
+  - id: spine.sink.file
+    name: spine_sink_file
+    $module: lca.plugins.observability.spine.sinks.file
+    config:
+      path: .lca/spine/benchmark-events.jsonl

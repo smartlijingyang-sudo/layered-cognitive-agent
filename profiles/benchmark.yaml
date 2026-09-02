@@ -9,13 +9,33 @@
 #
 # No anomaly detector (I15/I16 omitted), no classifiers (unclassified
 # exceptions propagate as hard fails by design), no source attacher.
+#
+# ADR-0174 PR-7.1/7.2: profile migrated to ``loop_cursor.spine_*`` bundle
+# naming(§D1 第一批);observability 五缝装配段 schema 与 web-standard 对齐,
+# 但 loop_cursor.spine_default 改为 loop_cursor.spine_minimal(成本研究专用)。
+
+observability:
+  loop_cursor:
+    implementation: std                              # 默认实现(PR-14 LoopCursorFactory)
+    spine_minimal: loop_cursor.spine_minimal         # 复用 bundles/loop_cursor.spine_minimal.yaml 的 bundle
+  projection_host:
+    # 仅 step_tree + cost:narrative / graph 投影在 minimal spine 下被 deriver 排除
+    initial: [step_tree, cost]
+  persistence:
+    coalescer: default
+    sink: routing_file
+  model_visible:
+    enabled: false                                   # minimal profile 跳过 model_visible capture
+  close_barrier:
+    enabled: true
+  plan_ref: benchmark
 
 bundles:
   - bundles/base.yaml
   - bundles/web-app.yaml
   - bundles/scenario-cordis-creator.yaml
   - bundles/declarative-phase-graph.yaml
-  - bundles/spine-benchmark-minimal.yaml
+  - bundles/loop_cursor.spine_minimal.yaml
 
 patch:
   - id: lca-llm-resolver

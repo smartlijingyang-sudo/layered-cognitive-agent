@@ -1,12 +1,12 @@
-"""FilesystemRunLocator —— ADR-0065 §七 / PR-5 默认实现。
+"""FilesystemRunLocator —— ADR-0065 §七 / PR-5 默认实现 + ADR-0169 PR-27 升级。
 
-布局::
+布局(ADR-0169 PR-27 L10 / D9)::
 
     <root>/
     ├── latest.json                                # 原子指针
     └── runs/
         └── <run_id>/                              # 不可猜测的目录名
-            ├── events.jsonl                        # spine SSOT (ADR-0165.1 / 0167 D11)
+            ├── <run_id>.spine.jsonl                # spine SSOT (ADR-0165.1 / 0167 D11 / PR-27)
             ├── journal.json                        # step-tree 主存储 (ADR-0164)
             ├── journal.narrative.md                # StepNarrativeWriter 产出
             ├── manifest.json
@@ -26,10 +26,14 @@ from pathlib import Path
 from typing import Any
 
 from lca.contracts.observability.run_locator import RunLocator
+from lca.infrastructure.observability.spine.sinks.naming import (
+    LEGACY_FILE_NAME,
+    spine_filename_for_run,
+)
 
 
 class FilesystemRunLocator(RunLocator):
-    """fs 后端 RunLocator(0065 §七)。"""
+    """fs 后端 RunLocator(0065 §七 / ADR-0169 PR-27)。"""
 
     def __init__(self, root: Path | str) -> None:
         self._root = Path(root)
@@ -50,12 +54,20 @@ class FilesystemRunLocator(RunLocator):
         return self.run_dir(run_id) / "journal.json"
 
     def events_path(self, run_id: str) -> Path:
-        """SSOT 事件流路径(ADR-0165.1 / ADR-0167 D11): events.jsonl。
+        """SSOT 事件流路径(ADR-0165.1 / ADR-0167 D11 / ADR-0169 PR-27 L10)。
 
-        与 ``journal_path`` (legacy raw jsonl) 不同 —— SSOT 是 spine
-        唯一 append-only 落点。
+        默认 ``<run_id>.spine.jsonl``(L10 单写);若该文件不存在但
+        ``events.jsonl`` 存在(legacy layout,迁移前 run),返回 ``events.jsonl``
+        让 reader 仍可读到旧数据。
         """
-        return self.run_dir(run_id) / "events.jsonl"
+        run_dir = self.run_dir(run_id)
+        spine_path = run_dir / spine_filename_for_run(run_id)
+        if spine_path.exists():
+            return spine_path
+        legacy_path = run_dir / LEGACY_FILE_NAME
+        if legacy_path.exists():
+            return legacy_path
+        return spine_path
 
     def journal_narrative_path(self, run_id: str) -> Path:
         """Narrative markdown 路径(由 StepNarrativeWriter 写)。"""

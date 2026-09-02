@@ -1,0 +1,38 @@
+# bundles/loop_cursor.spine_debug.yaml — source-level attacher for OII debugging.
+#
+# Per ADR-0165.1 §96 + i17-traceback §D3, ``spine.reflector.source`` is
+# **mandatory** in ``loop_cursor.spine_default``(已自带反射器)。本 bundle
+# 仅作为 ADR-0174 §D2 loop_cursor bundle 契约的"占位 + 配置合并入口":
+# oii-debug profile 在 ``patch:`` 段对 ``spine.reflector.source`` plugin 注入
+# ``max_locals_bytes`` + ``redact_patterns``,达到与旧 spine-oii-debug 同样的
+# 配置覆盖效果。
+#
+# 此 bundle **禁止** 重新声明 ``spine.reflector.source`` plugin entry — 否则
+# 与 spine_default 冲突(loader 拒绝跨 bundle 重复 plugin id)。
+#
+# Used by profiles/oii-debug.yaml.
+
+name: loop_cursor.spine_debug
+kind: loop_cursor_bundle
+description: |
+  Spine source-level attacher bundle (PR-9). Loaded only by oii-debug
+  profiles; web-standard / benchmark deliberately omit it.
+
+# ADR-0174 §D2 loop_cursor bundle 契约。
+# 与 loop_cursor.spine_default 同 provides;差异在于 oii-debug profile 在
+# ``patch:`` 段对 ``spine.reflector.source`` 注入 redact 配置与 max_locals_bytes。
+provides:
+  - loop_cursor_factory
+  - projection_host
+  - persistence
+  - model_visible
+  - close_barrier
+  - source_attacher_overrides
+
+profile_aliases:
+  - oii-debug
+
+# 此 bundle 在当前阶段不注册新 plugin entry(避免与 spine_default 冲突);
+# 配置覆盖由 profile 的 ``patch:`` 段承担。若后续引入新的 debug-only plugin,
+# 在这里添加,前提是与 loop_cursor.spine_default 不冲突。
+entries: []

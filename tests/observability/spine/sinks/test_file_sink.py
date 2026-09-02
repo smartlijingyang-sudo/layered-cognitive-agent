@@ -36,7 +36,8 @@ def test_file_sink_appends_and_reads_back(tmp_path: Path):
     rec = _make_rec()
     fs.write(rec)
     fs.close()
-    lines = (tmp_path / "events.jsonl").read_text().splitlines()
+    # ADR-0169 PR-27:默认 = <run_id>.spine.jsonl
+    lines = (tmp_path / "r1.spine.jsonl").read_text().splitlines()
     assert len(lines) == 1
     obj = json.loads(lines[0])
     assert obj["execution_point"] == "brain.think.start"
@@ -48,10 +49,10 @@ def test_file_sink_oversize_uses_sidecar(tmp_path: Path):
     rec = _make_rec(payload={"big": big})
     fs.write(rec)
     fs.close()
-    # main events.jsonl references offload; a <hash>.json sidecar exists
-    sidecars = [p for p in tmp_path.glob("*.json") if p.name != "events.jsonl"]
+    # main <run_id>.spine.jsonl references offload; a <hash>.json sidecar exists
+    sidecars = [p for p in tmp_path.glob("*.json") if p.name != "r1.spine.jsonl"]
     assert len(sidecars) == 1
-    main_lines = (tmp_path / "events.jsonl").read_text().splitlines()
+    main_lines = (tmp_path / "r1.spine.jsonl").read_text().splitlines()
     main = json.loads(main_lines[0])
     assert "offloaded" in main
     assert main["offloaded"]
@@ -76,7 +77,7 @@ def test_file_sink_multiple_writes_preserve_order(tmp_path: Path):
     for seq in (1, 2, 3, 4, 5):
         fs.write(_make_rec(sequence=seq))
     fs.close()
-    lines = (tmp_path / "events.jsonl").read_text().splitlines()
+    lines = (tmp_path / "r1.spine.jsonl").read_text().splitlines()
     assert len(lines) == 5
     seqs = [json.loads(line)["sequence"] for line in lines]
     assert seqs == [1, 2, 3, 4, 5]

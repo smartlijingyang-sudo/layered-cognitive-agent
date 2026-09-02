@@ -3,10 +3,14 @@
 Provides ``file_sink`` backed by :class:`RunRoutingFileSink`:
 
 - boot / no-run events → ``boot_path`` (default ``.lca/spine/boot-events.jsonl``)
-- real ``run_id`` events → ``<runs_root>/<run_id>/events.jsonl``
+- real ``run_id`` events → ``<runs_root>/<run_id>/<resolved_file_name>``
 
-ADR-0165.1 target layout: per-run ``events.jsonl`` lives next to journal /
-manifest / kernel.log under ``traces/runs/<run_id>/``.
+ADR-0165.1 target layout: per-run 文件 lives next to journal /
+manifest / kernel.log under ``traces/runs/<run_id>/``。
+
+ADR-0169 PR-27:默认 ``file_name`` 模板 = ``$run_id.spine.jsonl``,
+实例化时按 run_id 解析为 ``<run_id>.spine.jsonl``。显式
+``file_name: "events.jsonl"`` 仍生效(向后兼容,旧 profile / 配置不破)。
 """
 
 from __future__ import annotations
@@ -28,6 +32,9 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.infrastructure.observability.spine.sinks.naming import (
+    DEFAULT_SPINE_TEMPLATE,
+)
 from lca.infrastructure.observability.spine.sinks.routing_file_sink import (
     RunRoutingFileSink,
 )
@@ -70,7 +77,7 @@ def _resolve_boot_path(cfg: Mapping[str, Any]) -> Path:
     effects=EffectClass.FILESYSTEM,
     description=(
         "File sink — routes boot events to boot-events.jsonl and per-run "
-        "events to traces/runs/<run_id>/events.jsonl."
+        "events to traces/runs/<run_id>/<run_id>.spine.jsonl (L10 / PR-27)."
     ),
     test_suite="tests.lca_plugins.observability.spine.test_sinks",
     contract=PluginContract(
@@ -97,7 +104,9 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     cfg: Mapping[str, Any] = config if isinstance(config, Mapping) else {}
     boot_path = _resolve_boot_path(cfg)
     runs_root = Path(str(cfg.get("runs_root", _DEFAULT_RUNS_ROOT)))
-    file_name = str(cfg.get("file_name", "events.jsonl"))
+    # ADR-0169 PR-27:默认 file_name 模板 = $run_id.spine.jsonl。
+    # 旧 profile / 配置若显式传 file_name="events.jsonl" 仍生效(向后兼容)。
+    file_name = str(cfg.get("file_name", DEFAULT_SPINE_TEMPLATE))
 
     sink = RunRoutingFileSink(
         boot_path=boot_path,

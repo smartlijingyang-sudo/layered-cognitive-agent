@@ -55,8 +55,8 @@ def test_deriver_failing_one_does_not_block_business(
     assert any("spine.deriver_failed" in record.getMessage() for record in caplog.records), (
         caplog.text
     )
-    # event still landed on the sink
-    assert (tmp_path / "events.jsonl").exists()
+    # event still landed on the sink(ADR-0169 PR-27 默认 = <run_id>.spine.jsonl)
+    assert (tmp_path / "r1.spine.jsonl").exists()
 
 
 def test_deriver_protocol_satisfied_by_structural_class() -> None:

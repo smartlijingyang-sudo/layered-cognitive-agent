@@ -21,8 +21,8 @@ def _make_sink(tmp_path: Path, run_id: str) -> FileSink:
 
 def test_l10_sink_line_count_equals_spine_append(tmp_path: Path) -> None:
     """L10:spine.append N 次 → sink.path 行数 = N(1:1)。"""
-    sink = _make_sink(tmp_path, "run_l10")
-    spine = EventSpine(sinks=[sink], run_id="run_l10")
+    sink = _make_sink(tmp_path, "run_l10_seq_test")
+    spine = EventSpine(sinks=[sink], run_id="run_l10_seq_test")
 
     n_appends = 5
     for i in range(1, n_appends + 1):
@@ -43,10 +43,10 @@ def test_l10_sink_line_count_equals_spine_append(tmp_path: Path) -> None:
         f"L10 violation: spine.append {n_appends} 次,但 sink.path 写入 {len(lines)} 行"
     )
 
-    # 每行是合法 JSON,且 sequence 字段存在
-    for i, line in enumerate(lines, start=1):
-        obj = json.loads(line)
-        assert obj["sequence"] == i
+    # 每行是合法 JSON;sequence 字段存在(单测内单调递增,绝对值取决于 ContextVar)
+    sequences = [json.loads(ln)["sequence"] for ln in lines]
+    assert sequences == sorted(sequences), "sequence 不单调"
+    assert len(set(sequences)) == n_appends, "sequence 不唯一"
 
 
 def test_l10_spine_filename_produces_spine_suffixed_file(tmp_path: Path) -> None:
@@ -73,12 +73,13 @@ def test_l10_spine_filename_produces_spine_suffixed_file(tmp_path: Path) -> None
 
 
 def test_l10_legacy_events_jsonl_still_supported(tmp_path: Path) -> None:
-    """向后兼容:`spine_filename=False` 默认行为仍写 ``events.jsonl``。
+    """向后兼容:显式 ``file_name="events.jsonl"`` 仍生效(旧 layout 兼容)。
 
-    本测试保证 PR-2 不破坏既有生产路径(显式传 file_name 或依赖默认值)。
+    ADR-0169 PR-27:默认已切到 ``<run_id>.spine.jsonl``;显式旧字面
+    ``events.jsonl`` 仍落旧 layout,保证既有 reader / 测试夹具不破。
     """
-    sink = FileSink(tmp_path, run_id="legacy_run")
-    assert sink.path.name == "events.jsonl"  # 默认值不变
+    sink = FileSink(tmp_path, run_id="legacy_run", file_name="events.jsonl")
+    assert sink.path.name == "events.jsonl"  # 显式传入旧字面仍生效
 
     spine = EventSpine(sinks=[sink], run_id="legacy_run")
     spine.append(

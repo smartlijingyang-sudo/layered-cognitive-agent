@@ -45,7 +45,9 @@ def test_boot_ids_go_to_boot_file(tmp_path: Path) -> None:
 
     lines = boot.read_text().splitlines()
     assert len(lines) == 3
+    # ADR-0169 PR-27:默认 = <run_id>.spine.jsonl,旧 events.jsonl 不再出现
     assert not any(runs.glob("*/events.jsonl"))
+    assert not any(runs.glob("*/spine.jsonl"))
 
 
 def test_real_run_id_goes_to_traces_runs(tmp_path: Path) -> None:
@@ -58,7 +60,8 @@ def test_real_run_id_goes_to_traces_runs(tmp_path: Path) -> None:
     finally:
         sink.close()
 
-    path = runs / "run_abc" / "events.jsonl"
+    # ADR-0169 PR-27:默认 = <run_id>.spine.jsonl
+    path = runs / "run_abc" / "run_abc.spine.jsonl"
     assert path.exists()
     objs = [json.loads(line) for line in path.read_text().splitlines()]
     assert [o["execution_point"] for o in objs] == [
