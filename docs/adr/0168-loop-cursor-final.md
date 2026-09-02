@@ -2,8 +2,12 @@
 
 ## 状态
 
-**Proposed — 2026-09-02**
+**Superseded by ADR-0169 — 2026-09-02**
 
+> **替代关系**: 本 ADR 决策段(§D6 把 deriver / ProjectionRegistry /
+> PersistenceCoordinator / LLMCallHook / ModelVisibleRecorder 五件套塞入
+> ``StdLoopCursor`` 的 God Cursor 设计)被 ADR-0169 §D8 五缝拆分方案取代。
+> 本 ADR §背景段(问题陈述与现状盘点)保留供历史参考。
 > **Supersedes**: ADR-0168 决策段、ADR-0168.1 决策段。
 > **保留**: ADR-0168 作"问题陈述与现状盘点";ADR-0168.1 §转移图 / §Payload / §不变量 L1-L8 全部继承并升级。
 > **引用 (cross-ref, 不 supersede)**: ADR-0063 / 0093 / 0094 / 0095 / 0162 / 0164 / 0165(.1) / 0166 / 0167(.1)。

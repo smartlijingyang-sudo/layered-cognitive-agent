@@ -2,8 +2,13 @@
 
 ## 状态
 
-**Proposed — 2026-09-02**
+**Accepted — 2026-09-02**
 
+> **实施状态(2026-09-02)**: ``StdProjectionHost`` 已实现并经
+> ``tests/observability/loop_cursor/test_projection_host.py`` 覆盖;Runtime
+> 装配时由 ``ObservabilityRuntime.from_profile`` 实例化(0170 D2 协议面 + D5 默认清单);
+> web run 暂未把 deriver 切到 ``host.register(...)`` —— 仍是 0167
+> ``event_spine.subscribe`` 路径,该迁移是 0170 的独立 follow-up。
 > **Owner 不变量**: L9(ADR-0169 D3)。
 > **关联**: ADR-0063 SSOT、ADR-0065 可恢复证据账本、ADR-0088 Profile-selected Runtime、ADR-0157 progress 流退役、ADR-0167 I-MV1 Model-visible ≡ Logged、ADR-0169 五缝架构的"投影缝"。
 > **独立条件**:本 ADR 可独立实现 + 测试,前提是 ADR-0169 的`LoopCursor` Protocol 只持 spine handle,不持任何 Projection 字段。

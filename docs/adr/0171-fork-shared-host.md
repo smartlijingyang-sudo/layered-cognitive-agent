@@ -2,8 +2,14 @@
 
 ## 状态
 
-**Proposed — 2026-09-02**
+**Accepted — 2026-09-02**
 
+> **实施状态(2026-09-02)**: ``StdLoopCursor.fork`` 仅共享 spine handle,
+> child 不持独立 host / persistence / capture 实例(0171 D1 / D6);
+> ``Incarnation.child()`` 在 fork 时递增 ``incarnation_seq`` 并继承
+> ``run_id + plan_ref``(``tests/observability/loop_cursor/test_fork_shared.py``
+> 覆盖)。fault-isolated subagent 走 ``IsolatedSubagentRuntime`` 协议
+> 仍待 PR-25 后续补。
 > **Owner 不变量**: I-CURSOR-6(ADR-0169 新引入)。
 > **关联**: ADR-0065 Recovery(冷读 subagent)+ ADR-0093 Continuous Control Plane + ADR-0094 StopPolicy 局部性 + ADR-0165(.1) Execution Point Enforcement + ADR-0169 五缝架构的"fork 横切"。
 

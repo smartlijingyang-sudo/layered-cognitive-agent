@@ -2,8 +2,15 @@
 
 ## 状态
 
-**Proposed — 2026-09-02**
+**Accepted — 2026-09-02**
 
+> **实施状态(2026-09-02)**: ``scripts/check_loop_cursor_bundle_required.py``
+> 全量通过 —— 10 个 profile(benchmark / coding-agent / cordis-creator /
+> genai-traced / oii-debug / self-improving-minimal / test-minimal /
+> web-standard / web-standard-continuous / web-standard-recovery)均含
+> ``loop_cursor.spine_*`` bundle;3 个 bundle(``spine_default`` /
+> ``spine_minimal`` / ``spine_debug``)声明 ``kind: loop_cursor_bundle``。
+> 评审"分批迁移"约束已被 lint 强制。
 > **关联**: ADR-0088 Profile-selected Runtime Factory、ADR-0169 §D11 阶段化实施、ADR-0168-final §D16(被评审 §潜在 #9 + §5.4 判定"9 profile 同迁是范围绑决策")。
 > **本 ADR 范围**: web-standard 之外的 8 profile **分批迁移** 的实施契约;不重提 ADR-0169 的五缝与控制面决策。
 

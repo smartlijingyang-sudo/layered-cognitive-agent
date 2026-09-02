@@ -2,8 +2,15 @@
 
 ## 状态
 
-**Proposed — 2026-09-02**
+**Accepted — 2026-09-02**
 
+> **实施状态(2026-09-02)**: 五缝文件全部落地(`StdLoopCursor` /
+> `StdProjectionHost` / `PersistenceCoordinator` / `ModelVisibleCapture` /
+> `StdCloseBarrier`);``LoopCursorFactory.from_profile`` 公开;webserver
+> :class:`RunSessionBuilder` 已切到 :class:`ObservabilityRuntime.from_profile`
+> + :meth:`make_cursor`(回归锁:``tests/observability/loop_cursor/test_builder_runtime_wiring.py``)。
+> step_tree_deriver 仍走 ``event_spine.subscribe``(0167 既有契约;0170 deriver
+> migration 不在本 PR 范围)。
 > **Supersedes**: ADR-0168 决策段、ADR-0168.1 决策段、ADR-0168-loop-cursor-final 全文。
 > **保留**: ADR-0168 §背景段(问题陈述与现状盘点);ADR-0168.1 §转移图 / §Payload / §不变量 L1-L8 全部继承并按本 ADR 重新挂点。
 > **评审回应**: 评审 `docs/reviews/2026-09-02-adr-0168-final-review.md` 山姆「Conditional Go」三条总判全部纳入；剩余 17 项潜在问题 / 10 条 ADR 评审检查单详见 §10「评审点逐条消化」附录。

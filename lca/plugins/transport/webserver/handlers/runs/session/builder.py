@@ -18,15 +18,16 @@ from typing import Any, cast
 
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
-from lca.contracts.observability.incarnation import Incarnation
 from lca.contracts.observability.run_journal import RunJournalFactory
 from lca.infrastructure.observability.loop_cursor import (
-    StdLoopCursor,
     install_model_visible_capture,
 )
 from lca.infrastructure.observability.loop_cursor.bind import (
     SpineWritePortAdapter,
     install_run_cursor,
+)
+from lca.infrastructure.observability.loop_cursor.persistence_coordinator import (
+    NullPersistenceCoordinator,
 )
 from lca.infrastructure.observability.spine.derivers.step_tree_accumulator import (
     StepTreeAccumulatorDeriver,
@@ -39,6 +40,7 @@ from lca.plugins.transport.webserver.handlers.runs.observability.identity import
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunSession
 from lca.plugins.transport.webserver.handlers.runs.session.setup_types import RunSessionRequest
 from lca.runtime.journal_setup import BuildJournalMetadata, build_step_coordinator
+from lca_kernel.observability import ObservabilityRuntime
 
 log = logging.getLogger(__name__)
 
@@ -113,34 +115,35 @@ class RunSessionBuilder:
         # duck-type: SpineCore 有 .event_spine; tests / stub 提供裸 EventSpine
         event_spine = getattr(spine_core, "event_spine", None) or spine_core
 
-        # ── 1.5) PR-1.5: 构造 LoopCursor + 绑到 ContextVar ──────────────
-        # ADR-0169 §D11 PR-1 §S1 业务迁 cursor 第一步:让 web-standard run 真正
-        # 调 cursor.advance / record_*。Profile / Bundle 之后(PR-3 §S3)用
-        # LoopCursorFactory.from_profile,本 PR-1.5 直接构造 StdLoopCursor + 绑
-        # ContextVar;未来 PR 切到 factory 时仅替换此处。
+        # ── 1.5) 装配 ObservabilityRuntime(ADR-0169 §D8 五缝) ────────────
+        # 业务路径走 :meth:`ObservabilityRuntime.make_cursor` 派生 cursor
+        # (不再手工 ``StdLoopCursor(...)``);capture 由 Runtime 持有;persistence
+        # 缺省 fallback 到 NullPersistenceCoordinator(barrier 注入面不空)。
+        # 后续 PR(0170 deriver migration)再把 step_tree_deriver 从
+        # ``event_spine.subscribe`` 切到 ``host.register(LoopProjectionDefinition)``。
         spine_for_cursor = SpineWritePortAdapter(event_spine)
-        cursor = StdLoopCursor(
-            spine=spine_for_cursor,
+        profile_proxy = _ProfileProxy(
+            plan_ref=str(request.mode or "default"),
+            runs_root=str(run_dir.parent) if run_dir is not None else "traces/runs",
+        )
+        runtime = ObservabilityRuntime.from_profile(
+            profile=profile_proxy,
+            ctx=self._ctx,
+            persistence=NullPersistenceCoordinator(),  # 生产路径应注 File;此处 fallback
+            run_dir=run_dir,
+        )
+        cursor = runtime.make_cursor(
             run_id=run_id,
             trace_id=trace_id,
-            incarnation=Incarnation(
-                run_id=run_id,
-                plan_ref=str(request.mode or "default"),
-                incarnation_seq=1,
-            ),
+            spine=spine_for_cursor,
         )
         cursor_token = install_run_cursor(cursor)
 
-        # ADR-0169 PR-12.5: install ModelVisibleCapture 到当前 run 的 ContextVar,
+        # ADR-0169 PR-12.5: install Runtime 提供的 capture 到当前 run 的 ContextVar,
         # 让 ModelVisibleLLMAdapter 在 LLM 调用前能拿到 capture 实例并落 5 件套。
-        # run_dir=None 时跳过(测试场景 / profile 关闭 capture)。
-        capture_token = None
-        if run_dir is not None:
-            from lca.infrastructure.observability.loop_cursor import (
-                StdModelVisibleCapture,
-            )
-
-            capture_token = install_model_visible_capture(StdModelVisibleCapture(run_dir=run_dir))
+        # run_dir=None 时 Runtime 仍构造 capture(用 profile.runs_root);ContextVar
+        # 安装保持,测试场景下 capture.run_dir 落在 traces/runs/unknown 也不影响。
+        capture_token = install_model_visible_capture(runtime.capture)
 
         step_tree_deriver: StepTreeAccumulatorDeriver | None = None
         if run_dir is not None:
@@ -197,9 +200,7 @@ class RunSessionBuilder:
             coordinator=coordinator,
             loop_cursor=cursor,
             loop_cursor_token=cursor_token,
-            model_visible_capture=(
-                StdModelVisibleCapture(run_dir=run_dir) if run_dir is not None else None
-            ),
+            model_visible_capture=runtime.capture,
             model_visible_capture_token=capture_token,
             question=request.question,
             user_text=request.user_text,
@@ -219,6 +220,28 @@ class RunSessionBuilder:
 def _clean_attachment_ids(values: Sequence[str]) -> tuple[str, ...]:
     """Normalize attachment carriers at the edge of session construction."""
     return tuple(str(item).strip() for item in values if str(item).strip())
+
+
+class _ProfileProxy:
+    """``ObservabilityRuntime.from_profile`` 接受的 duck-typed profile。
+
+    ADR-0169 §D8 Runtime 是 profile duck-typed —— 只读 ``plan_ref`` /
+    ``runs_root``。web run 不持有完整 Profile 对象,只从
+    :class:`RunSessionRequest` 派生必要字段。
+
+    Attributes
+    ----------
+    plan_ref:
+        profile 标识(用于 Incarnation.plan_ref);从 ``request.mode`` 派生。
+    runs_root:
+        run 输出根目录;Runtime 用来构造 StdModelVisibleCapture.run_dir 缺省值。
+    """
+
+    __slots__ = ("plan_ref", "runs_root")
+
+    def __init__(self, *, plan_ref: str, runs_root: str) -> None:
+        self.plan_ref = plan_ref
+        self.runs_root = runs_root
 
 
 __all__ = ["RunSessionBuilder"]

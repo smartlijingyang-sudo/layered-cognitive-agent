@@ -48,7 +48,9 @@ Profile 装配步骤(plan §Task 25):
     6. 把五件套 + factory 一起冻进 :class:`ObservabilityRuntime`。
 
 PersistenceCoordinator 不在 PR-25 装配范围 —— PR-15 已独立构造;
-本 Runtime 接受外部注入的 persistence(host 或 factory 持有即可)。
+本 Runtime 接受外部注入的 persistence;为调用方便,``persistence=None``
+fallback 到 :class:`NullPersistenceCoordinator`(ADR-0169 D8 barrier 注入面
+不能为空;生产路径仍由调用方注入 FilePersistenceCoordinator)。
 """
 
 from __future__ import annotations
@@ -70,6 +72,9 @@ from lca.infrastructure.observability.loop_cursor.close_barrier_impl import StdC
 from lca.infrastructure.observability.loop_cursor.factory import LoopCursorFactory
 from lca.infrastructure.observability.loop_cursor.model_visible_capture import (
     StdModelVisibleCapture,
+)
+from lca.infrastructure.observability.loop_cursor.persistence_coordinator import (
+    NullPersistenceCoordinator,
 )
 from lca.infrastructure.observability.loop_cursor.projection_host import StdProjectionHost
 
@@ -153,8 +158,10 @@ class ObservabilityRuntime:
         ctx:
             cordis Context(留作未来 K5 接入点;PR-25 仅占位)。
         persistence:
-            :class:`PersistenceCoordinator` 实例;**必传**(barrier 注入需要)。
-            PR-25 阶段 runtime 不自己构造 persistence —— 那是 PR-15 的职责。
+            :class:`PersistenceCoordinator` 实例;``None`` 时 fallback 到
+            :class:`NullPersistenceCoordinator`(barrier 注入面永不空)。
+            PR-25 阶段 runtime 不自己构造 file persistence —— 生产路径
+            由调用方注入 :class:`FilePersistenceCoordinator`(PR-15 边界)。
         run_dir:
             run 输出目录;用于 ModelVisibleCapture。缺省 ``traces/runs/<run_id>``。
 
@@ -178,10 +185,16 @@ class ObservabilityRuntime:
         )
         capture: ModelVisibleCapture = StdModelVisibleCapture(run_dir=resolved_run_dir)
 
-        # 4) close barrier —— 由 runtime 持有;cursor 关闭时委托给它
+        # 4) persistence —— 由调用方注入;None 时 fallback Null(ADR-0169 D8,
+        #    barrier 注入面不能为空;调用方便利契约,PR-15 File sink 仍走外部注入)。
+        resolved_persistence: Any = (
+            persistence if persistence is not None else NullPersistenceCoordinator()
+        )
+
+        # 5) close barrier —— 由 runtime 持有;cursor 关闭时委托给它
         #    barrier 需要 persistence / host / emitter;emitter = cursor 自身
         barrier: CloseBarrier = StdCloseBarrier(
-            persistence=persistence,  # type: ignore[arg-type]
+            persistence=resolved_persistence,  # type: ignore[arg-type]
             host=projection_host,
             close_emitter=_NullCloseEmitter(),  # cursor 自身是 emitter,barrier 仅协调顺序
         )
@@ -189,7 +202,7 @@ class ObservabilityRuntime:
         return cls(
             cursor_factory=cursor_factory,
             projection_host=projection_host,
-            persistence=persistence,
+            persistence=resolved_persistence,
             capture=capture,
             barrier=barrier,
             plan_ref=plan_ref,

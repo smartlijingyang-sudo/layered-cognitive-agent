@@ -2,8 +2,14 @@
 
 ## 状态
 
-**Proposed — 2026-09-02**
+**Accepted — 2026-09-02**
 
+> **实施状态(2026-09-02)**: ``StdLoopCursor.halt(reason)`` 仅锁 record_* /
+> advance,保留 cursor 实例(0173 D1);``StdLoopCursor.resume_cursor`` 由
+> spatial-temporal runtime 调用,派生新 cursor + 复用 spine handle
+> (I-RESUME-1);``tests/observability/loop_cursor/test_halt_resume.py``
+> 覆盖 halt/resume 状态机。Checkpoint replay 在 PersistenceCoordinator 仍占位
+> (PR-15 边界) —— 0173 §D2 完整接 ``restore(from_seq)`` 待后续 PR。
 > **不挂在 LoopCursor 内部异常路径**(评审山姆 §S10 + §潜在 #8):halt-resume 是独立协议,由 ADR-0171 ObservableRuntime + ADR-0093 Continuous Control Plane 协作。
 > **回收自 ADR-0168-final §"不在本 ADR 范围"** 列第 7 项"halt 的 resume 协议"。
 > **关联**: ADR-0065 L3 receipt sequence, ADR-0067 时空运行时, ADR-0093 Continuous Control Plane, ADR-0094 StopPolicy 局部性, ADR-0095 LoopGuard, ADR-0169 §D1 halt(reason), ADR-0171 Incarnation。

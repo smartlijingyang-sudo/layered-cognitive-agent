@@ -2,8 +2,12 @@
 
 ## 状态
 
-**Proposed — 2026-09-02**
+**Accepted — 2026-09-02**
 
+> **实施状态(2026-09-02)**: Exporter 实现以 ``LoopProjectionDefinition`` 接口
+> 注册到 ``StdProjectionHost``;Langfuse / OTel / metrics 投影测试在
+> ``tests/observability/loop_cursor/test_{langfuse,otel,metrics}_projection.py``
+> 已存在并通过(loop 维度 Exporter 契约面验证)。与 cursor / barrier 严格解耦。
 > **被 ADR-0170 引用**: Exporters 在 loop 维度以 `LoopProjectionDefinition` 实现,注册到 `ProjectionHost`,不挂在 cursor(继承 ADR-0169 五缝原则)。
 > **隔离**: 本 ADR 只覆盖"出口实现层",与 ADR-0169 五缝架构(控制 / 投影宿主 / 持久化 / 模型可见 / 关闭屏障)严格正交。
 
