@@ -182,11 +182,11 @@ TELEMETRY_CATALOG: dict[str, VocabDef] = {
         desc="工具调用被安全策略拒绝",
     ),
     EventName.ACTION_DEGRADED.value: _event(
-        "lca.runtime.event_emission",
-        desc="动作降级（journal 直写）",
+        "lca.cognition.body.simple_body",
+        desc="动作降级（marker propagation via _propagate_degradation）",
     ),
     EventName.STEP_COMPLETED.value: _event(
-        "lca.runtime.event_emission",
+        "lca.cognition.body.simple_body",
         required=(ATTR_STEP,),
         desc="步骤完成（journal 直写）",
     ),

@@ -420,25 +420,13 @@ def test_coordinator_adapter_exposes_cursor_property() -> None:
 
 
 def test_runtime_event_emission_does_not_export_removed_symbols() -> None:
-    """``lca.runtime.event_emission`` 在 PR-26 后不再导出 ``JournalEmitFn``、
-    ``make_journal_emitting_hook``、``_derive_action_degraded``、
-    ``_derive_step_completed``(ADR-0169 §D9 删除清单)。
-
-    通过 importlib 加载模块并断言上述名字不在 ``__dict__`` 中。
+    """Removed(ADR-0169 §D9): the event_emission module has been
+    fully deleted per ADR-0169 §D9 (file absence is the gate). This
+    test no longer has a module to load — kept as a marker so the
+    surrounding test numbering stays stable. The grep gate replaces
+    this runtime assertion.
     """
-    import importlib
-
-    mod = importlib.import_module("lca.runtime.event_emission")
-    exports = set(dir(mod))
-    for name in (
-        "JournalEmitFn",
-        "make_journal_emitting_hook",
-        "_derive_action_degraded",
-        "_derive_step_completed",
-    ):
-        assert name not in exports, (
-            f"lca.runtime.event_emission still exports {name!r} (ADR-0169 §D9)"
-        )
+    return None
 
 
 def test_runtime_package_does_not_re_export_removed_symbols() -> None:

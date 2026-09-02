@@ -44,7 +44,7 @@ log:emit
 
 - `lca/runtime/checkpoint_resolution.py`
 - `lca/runtime/declarative_runtime.py`
-- `lca/runtime/event_emission.py` *(ADR-0169 PR-26 清理后空壳)*
+- *(module removed per ADR-0169 §D9)*
 - `lca/runtime/idempotency_fixtures.py`
 - `lca/runtime/phase_capabilities.py`
 - `lca/runtime/phases.py`

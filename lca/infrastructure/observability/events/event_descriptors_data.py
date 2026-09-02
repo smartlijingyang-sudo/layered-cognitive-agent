@@ -302,7 +302,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             StepCompleted,
             domain=VocabDomain.EVENT,
-            emitter="lca.runtime.event_emission",
+            emitter="lca.cognition.body.simple_body",
             required=("step",),
             description="步完成",
             durability="best_effort",
@@ -312,7 +312,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             ActionDegraded,
             domain=VocabDomain.EVENT,
-            emitter="lca.runtime.event_emission",
+            emitter="lca.cognition.body.simple_body",
             description="动作降级",
             durability="required",
             audience="operator",

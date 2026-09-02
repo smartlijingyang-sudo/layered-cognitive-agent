@@ -2,7 +2,7 @@
 only purpose was to point readers at the real emitter.
 
 The historical ``_maybe_record_action_degraded`` was a no-op stub that
-delegated to ``lca.runtime.event_emission._derive_action_degraded`` via
+delegated to the deleted ``_derive_action_degraded`` via
 the ``POST_ACT`` hook. The stub's docstring (and the call from ``act``) added
 zero behavior; they were documentation masquerading as code.
 
