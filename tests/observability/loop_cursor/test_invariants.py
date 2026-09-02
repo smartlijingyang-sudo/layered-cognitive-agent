@@ -467,8 +467,9 @@ def test_l3_phase_fold_order_is_recorded_in_order() -> None:
 def test_l4_business_layer_does_not_emit_cordis_event_literals() -> None:
     """L4:业务代码不直字面 emit ``ctx.emit('agent.*' / 'phase.*' ...)``。
 
-    静态门禁由 ``scripts/check_cordis_event_derivation.py`` 执行(ADR-0169 L12);
-    本测试确保该脚本在当前仓库状态下返回 0(无违规)。
+    静态门禁由 ``scripts/check_cordis_event_derivation.py`` 执行
+    (ADR-0169 L12 + I-CURSOR-4);PR-30 把该门禁从 WARNING 升级为 ERROR
+    fail-fast,本测试确保在当前仓库状态下返回 0(无违规)。
     """
     script = REPO_ROOT / "scripts" / "check_cordis_event_derivation.py"
     assert script.exists(), f"missing static guard script: {script}"

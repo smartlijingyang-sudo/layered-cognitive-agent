@@ -56,7 +56,6 @@ log:emit
 - `lca/cognition/default_factory.py`
 - `lca/cognition/delegation_cache.py`
 - `lca/cognition/delegation_target.py`
-- `lca/cognition/event_bus.py`
 - `lca/cognition/executor.py`
 - `lca/cognition/gate_service.py`
 - `lca/cognition/group_assembly.py`

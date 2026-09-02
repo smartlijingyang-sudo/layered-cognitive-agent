@@ -22,7 +22,6 @@ from lca.cognition.body.tool_registry import SimpleToolRegistry
 from lca.cognition.brain.critic import SimpleCritic
 from lca.cognition.brain.modular_brain import ModularBrain
 from lca.cognition.brain.reasoner import PromptReasoner
-from lca.cognition.event_bus import CordisEventBus
 from lca.cognition.hook_registry import CordisHookRegistry
 from lca.cognition.memory.simple_memory import SimpleMemorySystem
 from lca.contracts.protocols import (
@@ -31,7 +30,6 @@ from lca.contracts.protocols import (
     Body,
     Brain,
     Critic,
-    EventBus,
     HookRegistry,
     LLMAdapter,
     MemorySystem,
@@ -164,9 +162,6 @@ class TestL1ProtocolCompliance(unittest.TestCase):
 
     def test_simple_memory_system(self):
         self.assertIsInstance(SimpleMemorySystem(), MemorySystem)
-
-    def test_cordis_event_bus(self):
-        self.assertIsInstance(CordisEventBus(object()), EventBus)
 
     def test_cordis_hook_registry(self):
         self.assertIsInstance(CordisHookRegistry(Context()), HookRegistry)

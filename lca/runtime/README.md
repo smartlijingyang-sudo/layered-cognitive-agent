@@ -39,14 +39,12 @@ log:emit
 
 - `AgentPhase`
 - `CognitiveRuntime`
-- `JournalEmitFn`
-- `make_journal_emitting_hook`
 
 **模块清单**:
 
 - `lca/runtime/checkpoint_resolution.py`
 - `lca/runtime/declarative_runtime.py`
-- `lca/runtime/event_emission.py`
+- `lca/runtime/event_emission.py` *(ADR-0169 PR-26 清理后空壳)*
 - `lca/runtime/idempotency_fixtures.py`
 - `lca/runtime/phase_capabilities.py`
 - `lca/runtime/phases.py`

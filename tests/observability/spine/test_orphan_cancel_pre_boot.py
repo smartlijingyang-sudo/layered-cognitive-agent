@@ -99,8 +99,8 @@ def test_cancel_pre_boot_emits_orphan_events(tmp_path: Path) -> None:
     spine.flush()
     spine.close()
 
-    # events.jsonl 携带 orphan trail
-    events_path = tmp_path / "events.jsonl"
+    # ADR-0169 PR-27:默认 = <run_id>.spine.jsonl
+    events_path = tmp_path / "r-cancel-pre-boot.spine.jsonl"
     assert events_path.exists()
     lines = events_path.read_text().splitlines()
     records = [json.loads(line) for line in lines]
@@ -148,7 +148,8 @@ def test_orphan_trail_round_trips_via_file_sink(tmp_path: Path) -> None:
 
     spine.close()
 
-    records = [json.loads(line) for line in (tmp_path / "events.jsonl").read_text().splitlines()]
+    # ADR-0169 PR-27:默认 = <run_id>.spine.jsonl
+    records = [json.loads(line) for line in (tmp_path / "r-roundtrip.spine.jsonl").read_text().splitlines()]
     assert len(records) == 3
     for rec, reason in zip(records, reasons, strict=True):
         assert rec["phase"] == "orphan"

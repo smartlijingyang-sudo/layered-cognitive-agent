@@ -33,11 +33,24 @@ from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.perception import ContextItem, ContextManifest
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.diagnostic import DiagnosticCategory, DiagnosticStatus
+from lca.contracts.observability.loop_cursor import LoopCursor
 from lca.contracts.protocols import MemorySystem, PerceiveHub, Sensor
 from lca.contracts.protocols.think.cognition import SensorDisabledError
 from lca.infrastructure.observability import record_runtime
 
 _log = structlog.get_logger("lca.perceive_hub")
+
+
+def _current_cursor() -> LoopCursor | None:
+    """取当前 run 绑定的 LoopCursor(ADR-0169 PR-26 业务迁 cursor)。
+
+    由 ``CoordinatorAdapter.cursor`` ContextVar 暴露;未注入返回 ``None``。
+    """
+    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+        current_cursor,
+    )
+
+    return current_cursor()
 
 
 class SequentialPerceiveHub(PerceiveHub):
@@ -60,14 +73,10 @@ class SequentialPerceiveHub(PerceiveHub):
         self._sink: ManifestSink = sink if sink is not None else default_sink()
 
     async def perceive(self, state: AgentState) -> ContextManifest:
-        # ADR-0167 D11 / I-PLUG1: Agent 不直接写 EP。phase.fold 走 StepCoordinator
-        # （PR-3 删 bridge 之后唯一路径）。
-        from lca.infrastructure.observability.writable_matrix.coordinator import (
-            get_current_coordinator,
-        )
-
-        step_objective = getattr(state, "task", "") or "perceive"
-        coord = get_current_coordinator()
+        # ADR-0169 PR-26:业务路径只允许 ``cursor.advance(phase)`` 派生 phase EP;
+        # ``coord.emit_phase`` 已在 ADR-0169 §D9 删除清单中。Cursor 由 wiring 层
+        # 通过 ``CoordinatorAdapter.cursor`` 注入;未注入时静默跳过(无 run 上下文)。
+        cursor: LoopCursor | None = _current_cursor()
 
         items = await self._fold(state)
         manifest = build_manifest_from_items(items)
@@ -87,15 +96,9 @@ class SequentialPerceiveHub(PerceiveHub):
         )
         self._sink.emit(event, manifest)
 
-        kinds = ", ".join(item.kind for item in items)
-        summary = f"感知 {len(items)} 项 ({kinds})"
-        if coord is not None:
-            coord.emit_phase(
-                phase="perceive",
-                objective=str(step_objective),
-                summary=summary,
-                outcome="ok",
-            )
+        if cursor is not None:
+            # 派生 phase.perceive.fold EP(ADR-0169 P2 / L3)。
+            cursor.advance("perceive")
         return manifest
 
     async def _fold(self, state: AgentState) -> list[ContextItem]:

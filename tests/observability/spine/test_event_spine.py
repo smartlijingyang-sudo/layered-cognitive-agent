@@ -28,7 +28,8 @@ def test_event_spine_writes_event(tmp_path: Path):
         span_ctx=span,
     )
     spine.close()
-    lines = (tmp_path / "events.jsonl").read_text().splitlines()
+    # ADR-0169 PR-27:默认 = <run_id>.spine.jsonl
+    lines = (tmp_path / "r1.spine.jsonl").read_text().splitlines()
     assert len(lines) == 1
     obj = json.loads(lines[0])
     assert obj["execution_point"] == "brain.think.start"
@@ -79,8 +80,8 @@ def test_event_spine_fd2_deriver_failure_contained(tmp_path: Path):
     # good deriver saw the event
     assert len(captured) == 1
     assert captured[0].sequence == rec.sequence
-    # event still landed on disk
-    assert (tmp_path / "events.jsonl").exists()
+    # event still landed on disk(ADR-0169 PR-27 默认 = <run_id>.spine.jsonl)
+    assert (tmp_path / "r1.spine.jsonl").exists()
 
 
 def test_event_spine_multiple_events_monotonic_seq(tmp_path: Path):

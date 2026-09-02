@@ -253,9 +253,11 @@ class PromptReasoner:
                 tools=self.tools,
                 activated_skills=tuple(state.activated_skills),
             )
-            section_count = len(
-                self.assembler.template_provider.get_template(template_id).sections
-            ) if hasattr(self.assembler, "template_provider") else 0
+            section_count = (
+                len(self.assembler.template_provider.get_template(template_id).sections)
+                if hasattr(self.assembler, "template_provider")
+                else 0
+            )
             return prompt, section_count
         # Legacy fallback: substring substitution using the registered
         # templates. Used by tests that still drive ``PromptReasoner``
@@ -320,7 +322,9 @@ class PromptReasoner:
             variables["assigned_roles_text"] = render_assigned_roles(awareness.assigned_roles)
             variables["member_reports_text"] = render_member_reports(awareness.results)
             if awareness.consult_duty is not None:
-                variables["member_status_text"] = awareness.consult_duty.member_status.as_prompt_text()
+                variables["member_status_text"] = (
+                    awareness.consult_duty.member_status.as_prompt_text()
+                )
                 from lca.contracts.models.team.consultation import build_evidence_pack_text
 
                 variables["evidence_pack_text"] = build_evidence_pack_text(

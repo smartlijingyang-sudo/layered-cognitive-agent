@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import structlog
 
@@ -69,6 +69,11 @@ from lca.cognition.body.tool_journal_emit import (  # noqa: E402
     emit_tool_started,
 )
 from lca.plugins.observability.spine.reflectors import body_llm as _body_llm_reflector  # noqa: E402
+
+if TYPE_CHECKING:
+    from lca.infrastructure.observability.writable_matrix.coordinator import (
+        StepCoordinator,
+    )
 
 
 def _emit_approval_requested(tool: Tool, invocation_id: str) -> None:
@@ -377,12 +382,17 @@ class SimpleSafeExecutor(SafeExecutor):
 
 
 def _open_act_step(tool_name: str) -> None:
-    """Emit ``phase.act.fold.start`` via StepCoordinator (ADR-0167 D11)."""
+    """Emit ``phase.act.fold.start`` via StepCoordinator (ADR-0167 D11, ADR-0169 PR-26 compat).
+
+    PR-26 阶段保留 ``coord.emit`` —— cursor 不暴露任意 EP 入口(ADR-0169 D1);
+    ``phase.act.fold.start`` 是合法 EP(manifest 登记),删除条件绑 PR-21~24
+    ``grep coord.emit = 0`` 门禁。
+    """
     from lca.infrastructure.observability.writable_matrix.coordinator import (
         get_current_coordinator,
     )
 
-    coord = get_current_coordinator()
+    coord: StepCoordinator | None = get_current_coordinator()
     if coord is None:
         return
     coord.emit(
@@ -392,12 +402,15 @@ def _open_act_step(tool_name: str) -> None:
 
 
 def _close_act_step(*, outcome: str, error: str | None = None) -> None:
-    """Emit ``phase.act.fold.end`` via StepCoordinator (ADR-0167 D11)."""
+    """Emit ``phase.act.fold.end`` via StepCoordinator (ADR-0167 D11, ADR-0169 PR-26 compat).
+
+    同 ``_open_act_step`` —— ``coord.emit`` 保留至 PR-21~24 业务迁 cursor 完成。
+    """
     from lca.infrastructure.observability.writable_matrix.coordinator import (
         get_current_coordinator,
     )
 
-    coord = get_current_coordinator()
+    coord: StepCoordinator | None = get_current_coordinator()
     if coord is None:
         return
     coord.emit(

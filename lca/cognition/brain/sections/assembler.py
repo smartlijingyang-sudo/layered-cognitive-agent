@@ -116,11 +116,7 @@ def render_template(
             tools=tuple(tools),
             activated_skills=activated_skills,
         )
-        if (
-            output.text == ""
-            and not output.used_fallback
-            and strip_empty_fields
-        ):
+        if output.text == "" and not output.used_fallback and strip_empty_fields:
             continue
         pieces.append(output.text)
     text = join_lines(pieces)
@@ -142,17 +138,13 @@ def _dispatch(
 ) -> SectionOutput:
     if ref.kind == "pure":
         if not isinstance(section, PureSection):
-            raise TypeError(
-                f"section {ref.name!r} does not implement PureSection"
-            )
+            raise TypeError(f"section {ref.name!r} does not implement PureSection")
         if role_profile is None:
             return SectionOutput(text="")
         return section.render(role_profile=role_profile, tools=tools)
     if ref.kind == "stateful":
         if not isinstance(section, StatefulSection):
-            raise TypeError(
-                f"section {ref.name!r} does not implement StatefulSection"
-            )
+            raise TypeError(f"section {ref.name!r} does not implement StatefulSection")
         if role_profile is None or state is None:
             return SectionOutput(text="")
         return section.render(

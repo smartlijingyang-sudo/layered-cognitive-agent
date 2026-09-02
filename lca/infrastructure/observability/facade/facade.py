@@ -24,7 +24,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from functools import wraps
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import Any, TypeVar
 
 import structlog
 from opentelemetry import trace as otel_trace
@@ -40,18 +40,6 @@ from lca.contracts.models.observability.journal import (
     JournalEvent,
     RuntimeObserved,
     StampedEvent,
-)
-from lca.contracts.models.observability.journal_step import (
-    ReflectTrace,
-    SpanRecord,
-    StepContext,
-    StepPhase,
-    ThinkingTrace,
-    ToolCallRecord,
-    ToolResult,
-)
-from lca.contracts.models.observability.journal_step import (
-    StepOutcome as StepLifecycleOutcome,
 )
 from lca.contracts.observability.evidence import (
     EvidencePolicy,
@@ -465,113 +453,13 @@ def get_span_context() -> SpanContextInfo:
 _log = structlog.get_logger("lca.observability")
 
 
-# ── Step-tree API(ADR-0167 D11: facade 转发给当前 StepCoordinator) ───
-#
-# 设计: facade 不持有 step 状态, 转发给绑定的 StepCoordinator。 唯一区别是
-# facade 额外检查 _run_context 是否绑定(防御: 不绑 context 就没有当前 run
-# 身份, 写没意义)。 Phase 3 之后 facade 唯一的"step"入口就是 begin_step /
-# record_* / end_step, 全部走 StepCoordinator → writable_matrix 五面矩阵
-# → events.jsonl → StepTreeAccumulatorDeriver → journal.json (ADR-0167
-# I-MV3: Replay ≡ finalize)。
-#
-# **延迟 import**: writable_matrix 在 infrastructure 包, facade 在同包内,
-# 但 facade 不在 infrastructure 内部 import 路径上, 仍用延迟 import 防循环。
-# 副作用: 调用方必须先 bind StepCoordinator (transport 在 prepare 阶段 bind),
-# 否则抛 RuntimeError; 不允许无 run 静默 no-op(违反 ADR-0167 D13 B2)。
-#
-# 迁移说明: 原 StepLifecycleStore / step_lifecycle 路径已删除(ADR-0167 PR-3),
-# 本节 facade 即唯一 step 入口。
-
-
-def _require_run_bound() -> RunContext:
-    """step API 要求 context 已 bind(否则不知道当前 run)。"""
-    ctx = _run_context.get()
-    if ctx is None:
-        raise RuntimeError(
-            "step API requires bound run context; "
-            "call facade.bind(RunContext(run_id=..., trace_id=...)) first"
-        )
-    return ctx
-
-
-def _require_coordinator() -> StepCoordinator:
-    """step API 要求已 bind StepCoordinator(transport 在 prepare 阶段绑)。
-
-    失败时抛 RuntimeError 而不是返回 None —— ADR-0167 D13 B2 禁伪防御:
-    无 coordinator 时 step API 不能静默 no-op。
-    """
-    from lca.infrastructure.observability.writable_matrix.coordinator import (
-        get_current_coordinator,
-    )
-
-    coord = get_current_coordinator()
-    if coord is None:
-        raise RuntimeError(
-            "step API requires bound StepCoordinator; "
-            "transport must bind coordinator in RunExecutionEnvironment.prepare"
-        )
-    return coord
-
-
-def step_open(
-    phase: StepPhase,
-    *,
-    subagent_role: str | None = None,
-    context: StepContext | None = None,
-    parent_step_id: str | None = None,
-) -> str:
-    """开 step(走 StepCoordinator.begin_step)。"""
-    _require_run_bound()
-    coord = _require_coordinator()
-    ctx_kw: dict[str, Any] = {}
-    if context is not None:
-        ctx_kw["context"] = context
-    return coord.begin_step(
-        str(phase),
-        subagent_role=subagent_role,
-        parent_step_id=parent_step_id,
-        **ctx_kw,
-    )
-
-
-def step_record_thinking(trace: ThinkingTrace) -> None:
-    """思考 → StepCoordinator.record_thinking → spine EP ``step.thinking.record``。"""
-    _require_run_bound()
-    _require_coordinator().record_thinking(trace)
-
-
-def step_record_tool_call(call: ToolCallRecord) -> None:
-    """工具调用 → spine EP ``step.tool_call.record``。"""
-    _require_run_bound()
-    _require_coordinator().record_tool_call(call)
-
-
-def step_record_tool_result(result: ToolResult) -> None:
-    """工具结果 → spine EP ``step.tool_result.record``(outcome 跟 ok 字段)。"""
-    _require_run_bound()
-    _require_coordinator().record_tool_result(result)
-
-
-def step_record_reflect(reflect: ReflectTrace) -> None:
-    """反思 → spine EP ``step.reflect.record``。"""
-    _require_run_bound()
-    _require_coordinator().record_reflect(reflect)
-
-
-def step_record_span(span: SpanRecord) -> None:
-    """折叠诊断 → spine EP ``step.span.record``(RuntimeObserved / ToolRetryProgress / ContextCompacted)。"""
-    _require_run_bound()
-    _require_coordinator().record_span(span)
-
-
-def step_close(
-    outcome: StepLifecycleOutcome,
-    *,
-    error: str | None = None,
-) -> None:
-    """闭 step(走 StepCoordinator.end_step)。"""
-    _require_run_bound()
-    return _require_coordinator().end_step(str(outcome), error=error)
+# ── ADR-0169 §D9 删除清单 ───────────────────────────────────
+# facade.step_open / step_close / step_record_* 共 7 个方法在 PR-26 阶段删除。
+# 原因:StepCoordinator 的 begin_step / record_* / end_step 在 §11 控制点迁移
+# 矩阵中标记删除,business 路径已迁 cursor.advance(phase) + cursor.record_*。
+# StepCoordinator 本身保留(writable_matrix 五面矩阵仍为 readonly 装配层,
+# 供 ProjectionHost / 兼容 fixture 使用);facade 仅删除 step_* 转口方法。
+# 无调用方:见 `grep facade.step_open in lca/ tests/` 输出 0(inventory 完整)。
 
 
 __all__ = [
@@ -594,20 +482,5 @@ __all__ = [
     "set_actor",
     "set_session",
     "span",
-    "step_close",
-    "step_open",
-    "step_record_reflect",
-    "step_record_span",
-    "step_record_thinking",
-    "step_record_tool_call",
-    "step_record_tool_result",
     "traced",
 ]
-
-
-if TYPE_CHECKING:
-    # 仅类型检查时引入;运行时通过 ``_require_coordinator()`` duck-type
-    # 访问 record_*,避免 facade ↔ writable_matrix 循环 import。
-    from lca.infrastructure.observability.writable_matrix.coordinator import (
-        StepCoordinator,
-    )

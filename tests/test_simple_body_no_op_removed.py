@@ -10,8 +10,14 @@ After R87:
 - The stub is removed.
 - The active seam (``_propagate_degradation``) now carries the documentation
   pointing at the real emitter.
-- ``act`` still surfaces the degradation marker on the observation so the
-  hook can derive ``ActionDegraded`` without the body knowing about it.
+- ``act`` still surfaces the degradation marker on the observation so
+  subscribers (ProjectionHost / cursor-side projections) can derive
+  ``ActionDegraded`` without the body knowing about it.
+
+ADR-0169 PR-26:the legacy hook + derivation functions
+(``make_journal_emitting_hook`` / ``_derive_action_degraded``) are removed
+per ADR §D9; this test continues to assert marker propagation contract
+without depending on the deleted hook emitter.
 """
 
 from __future__ import annotations

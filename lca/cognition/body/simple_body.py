@@ -25,12 +25,13 @@ class SimpleBody(Body):
     or turn dependencies into executable authority.  Tests use the same
     explicit construction rule through ``tests.support.action_authority``.
 
-    契约不变量（v3 §5.3 / §9.1 / PR6 / PR10）：
+    契约不变量（v3 §5.3 / §9.1 / PR6 / PR10 + ADR-0169 PR-26）：
     - ``act`` 只分发已经由计划授权并注册的 ``action_type``。
     - ``CommandEnvelope`` 是声明式执行链唯一的效果授权入口；Body 不再补造
       旧的 ``ExecutionEnvelope``。
-    - 协议边界派生事件：``ActionDegraded`` 在 ``act`` 末尾直接 ``record()``，
-      不再走 hook 派生（v3 §4.4）。
+    - 协议边界派生事件：``ActionDegraded`` 由 ``ProjectionHost`` 或
+      ``cursor.record_*(...)`` 派生(ADR-0169 §D8 / D1);Body 不再走
+      ``_derive_action_degraded`` hook(ADR-0169 §D9 删除)。
     - ``finalize`` 是 Body finalize 钩子，OfficeWorksSealer 等手平面副作用
       从这里调用；不在 ``act`` 内部。
     """
@@ -62,12 +63,13 @@ class SimpleBody(Body):
     async def act(self, decision: Decision, state: AgentState) -> Observation:
         """Execute a decision through its already-authorized action handler.
 
-        Degradation emission (v3 §4.4 + §10) lives in
-        :func:`lca.runtime.event_emission._derive_action_degraded`,
-        which subscribes to ``HookEvent.POST_ACT`` and reads
-        ``observation.degraded_from`` that we surface here via
-        :meth:`_propagate_degradation`. Body never emits ``ActionDegraded``
-        directly.
+        Degradation emission (v3 §4.4 + §10) is no longer derived via the
+        legacy ``_derive_action_degraded`` hook (ADR-0169 §D9 deletion:
+        ``make_journal_emitting_hook`` + ``_derive_action_degraded`` are
+        removed; event emission re-routed through ``cursor.record_*(...)``
+        or ProjectionHost). Body still propagates the marker via
+        :meth:`_propagate_degradation` so downstream subscribers can
+        observe ``observation.degraded_from``.
         """
 
         try:
@@ -102,10 +104,10 @@ class SimpleBody(Body):
     def _propagate_degradation(decision: Decision, observation: Observation) -> Observation:
         """Surface the degradation marker on ``Observation`` for downstream emission.
 
-        The actual ``ActionDegraded`` journal event is emitted by
-        :func:`lca.runtime.event_emission._derive_action_degraded`
-        via the ``POST_ACT`` hook (v3 §4.4 + §10). Body is responsible only
-        for carrying the marker on the observation; it does not emit.
+        ADR-0169 PR-26:``ActionDegraded`` 不再由 ``_derive_action_degraded``
+        派生(hook 已删除);下游消费者走 cursor.record_*(...) 或 ProjectionHost
+        读取 ``observation.degraded_from`` / ``observation.extra[OBS_DEGRADED_FROM]``。
+        Body 只负责在 observation 上携带 marker,不再 emit。
         """
         if decision.degraded_from is None:
             return observation

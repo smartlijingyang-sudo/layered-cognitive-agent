@@ -5,7 +5,6 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.enums import HookEvent
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.capabilities import HOOKS
@@ -27,19 +26,18 @@ class Config(BaseModel):
 
 
 def build_simple_hook_registry(ctx: PluginContext) -> HookRegistry:
+    """构建 CordisHookRegistry(ADR-0169 PR-26 清理后的版本)。
+
+    PR-26 之前:hook 注册 ``make_journal_emitting_hook`` 派生
+    ``_derive_step_completed`` / ``_derive_action_degraded`` 写入 journal。
+
+    PR-26 之后:两类派生函数已删除(ADR-0169 §D9),hook 不再做任何派生;业务
+    路径走 ``cursor.advance(phase)`` + ``cursor.record_*(...)`` 直接写 spine。
+    本函数保留只为兼容现有 plugin manifest 装配,返回空注册实例。
+    """
     from lca.cognition.hook_registry import CordisHookRegistry
 
-    hooks = CordisHookRegistry(ctx)
-    try:
-        from lca.infrastructure.observability import record as _journal_record
-        from lca.runtime.event_emission import make_journal_emitting_hook
-
-        journal_hook = make_journal_emitting_hook(_journal_record)
-        for event_name in HookEvent:
-            hooks.register(event_name, journal_hook)
-    except ImportError:
-        pass
-    return hooks
+    return CordisHookRegistry(ctx)
 
 
 @plugin(

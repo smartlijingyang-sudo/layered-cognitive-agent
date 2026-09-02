@@ -149,10 +149,12 @@ def test_eventbus_and_hookregistry_single_backend() -> None:
     """The only event/hook dispatch backend is cordis events.
 
     EventBus and HookRegistry dispatch must always route through Cordis
-    rather than a parallel local listener table.
+    rather than a parallel local listener table. The cordis business wrapper
+    (``lca/cognition/event_bus.py``) is removed by PR-30 (ADR-0169 §D9 +
+    评审 §S4); only ``hook_registry.py`` remains as the surface that
+    routes through cordis events.
     """
     layers = [
-        _ROOT / "lca" / "cognition" / "event_bus.py",
         _ROOT / "lca" / "cognition" / "hook_registry.py",
     ]
     forbidden_patterns = [
@@ -163,6 +165,8 @@ def test_eventbus_and_hookregistry_single_backend() -> None:
     ]
     offenders: list[str] = []
     for layer in layers:
+        if not layer.exists():
+            continue
         text = layer.read_text(encoding="utf-8")
         for pat in forbidden_patterns:
             for match in pat.finditer(text):

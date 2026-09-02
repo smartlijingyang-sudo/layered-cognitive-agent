@@ -37,6 +37,7 @@ COMPAT 块(AGENTS.md §1 + G15 模板)
 
 from __future__ import annotations
 
+from contextvars import ContextVar
 from typing import Any
 
 from lca.contracts.models.observability.journal_step import (
@@ -57,6 +58,32 @@ from lca.contracts.observability.loop_cursor_payloads import (
     ToolResultRecord,
 )
 from lca.infrastructure.observability.writable_matrix.coordinator import StepCoordinator
+
+# COMPAT(delete-when: PR-21~24 grep 全部为 0, tracking: ADR-0169-task-25)
+# 当前 cursor 由 CoordinatorAdapter 持有;PR-21~24 业务迁 cursor 期间,
+# 业务路径(perceive_hub / safe_executor / tool_journal_emit)取 cursor 走本
+# ContextVar —— 由 wiring 层在 RunExecutionEnvironment.prepare 阶段 set。
+# 删除条件:业务代码全迁完 cursor 后,直接传 cursor 参数替换 ContextVar 访问。
+_current_cursor: ContextVar[LoopCursor | None] = ContextVar("lca_loop_cursor_current", default=None)
+
+
+def get_current_cursor() -> LoopCursor | None:
+    """取当前 run 绑定的 LoopCursor(PR-26 业务迁 cursor 入口)。"""
+    return _current_cursor.get()
+
+
+def bind_current_cursor(cursor: LoopCursor) -> Any:
+    """绑定 cursor;返回 reset token,由调用方在 finally 释放。"""
+    return _current_cursor.set(cursor)
+
+
+def reset_current_cursor(token: Any) -> None:
+    _current_cursor.reset(token)
+
+
+# 兼容旧名:PR-26 业务代码用 current_cursor() 访问;保留别名便于增量迁移。
+def current_cursor() -> LoopCursor | None:
+    return _current_cursor.get()
 
 
 # COMPAT(delete-when: PR-21~24 grep 全部为 0, tracking: ADR-0169-task-25)
@@ -278,4 +305,10 @@ class CoordinatorAdapter:
         return getattr(self._coord, name)
 
 
-__all__ = ["CoordinatorAdapter"]
+__all__ = [
+    "CoordinatorAdapter",
+    "bind_current_cursor",
+    "current_cursor",
+    "get_current_cursor",
+    "reset_current_cursor",
+]

@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from lca.cognition.body.tool_result_preview import tool_files
 from lca.contracts.models.core.decision import Observation, ToolCall  # noqa: F401
@@ -36,6 +36,11 @@ from lca.contracts.observability.evidence import (
 from lca.contracts.protocols.runtime.infra import Tool
 from lca.infrastructure.observability import record, record_runtime
 from lca.infrastructure.tools.contract.project import project_tool_state
+
+if TYPE_CHECKING:
+    from lca.infrastructure.observability.writable_matrix.coordinator import (
+        StepCoordinator,
+    )
 
 _log = logging.getLogger(__name__)
 
@@ -131,12 +136,14 @@ def emit_tool_started(
             idempotency_key=idempotency_key,
         )
     )
-    # ADR-0167 D11: 写 step.tool_call 经 StepCoordinator（未注入时静默跳过）
+    # ADR-0167 D11: 写 step.tool_call 经 StepCoordinator（未注入时静默跳过）。
+    # ADR-0169 PR-26:保留 ``coord.emit`` —— ``phase.tool.call.start`` 是
+    # manifest-bound 任意 EP,删除条件绑 PR-21~24 业务迁 cursor 门禁。
     from lca.infrastructure.observability.writable_matrix.coordinator import (
         get_current_coordinator,
     )
 
-    coord = get_current_coordinator()
+    coord: StepCoordinator | None = get_current_coordinator()
     if coord is not None:
         coord.emit(
             execution_point="phase.tool.call.start",
@@ -169,12 +176,13 @@ def emit_tool_denied(tool: Tool, reason: str) -> None:
         attributes={"tool_name": tool.name, "reason": reason},
     )
     record(ToolDenied(tool_name=tool.name, reason=reason))
-    # ADR-0167 D11: ToolDenied 走 StepCoordinator
+    # ADR-0167 D11: ToolDenied 走 StepCoordinator。ADR-0169 PR-26 保留
+    # ``coord.emit`` —— 任意 EP,删除条件绑 PR-21~24 grep 门禁。
     from lca.infrastructure.observability.writable_matrix.coordinator import (
         get_current_coordinator,
     )
 
-    coord = get_current_coordinator()
+    coord: StepCoordinator | None = get_current_coordinator()
     if coord is not None:
         coord.emit(
             execution_point="phase.tool.denied",
@@ -263,12 +271,14 @@ def emit_tool_invoked(
             projected_state=projected_state_dict,
         )
     )
-    # ADR-0167 D11: 写 step.tool_result 经 StepCoordinator
+    # ADR-0167 D11: 写 step.tool_result 经 StepCoordinator。
+    # ADR-0169 PR-26:保留 ``coord.emit`` —— ``phase.tool.call.end`` 是任意 EP,
+    # 删除条件绑 PR-21~24 grep 门禁。
     from lca.infrastructure.observability.writable_matrix.coordinator import (
         get_current_coordinator,
     )
 
-    coord = get_current_coordinator()
+    coord: StepCoordinator | None = get_current_coordinator()
     if coord is not None:
         files = tool_files(obs)
         files_created = tuple(str(f.get("name") or "") for f in files)
