@@ -1,34 +1,10 @@
-"""Journal Step-Tree —— 顶层真相从事件流升级为 step 树（ADR-0164 草案）。
-
-背景：
-    原 ``lca.contracts.models.observability.journal`` 把"事实"建模为
-    seq 流水 —— 49 种事件类型平铺, step 边界靠 ``scope.step`` 隐式
-    累积, 读者必须自己数 seq 才能拼出"这次跑分几步"。这跟人类认知
-    "step = 一个因果闭环" 的天然模型错位。
-
-新模型（ADR-0164 草案）：
-    - **顶层真相是 step 树**, 不是 seq 流水。 一个 step 是一个
-      因果闭环, 由 5 原语穷尽: 上下文 / 思考 / 工具调用 / 工具结果 / 反思。
-    - **seq 降级为 step 的实现细节**, 由 runtime 内部使用, 不出现在
-      顶层 envelope。
-    - **诊断事件 (RuntimeObserved / ToolRetryProgress / ContextCompacted)**
-      折叠为 step.spans, 不再是顶层事件。
-    - **LLM/工具事实** 折叠为 step.thinking / step.tool_call /
-      step.tool_result, 不再是顶层事件。
-
-闭集从 49 减到 12 —— 仅保留容器 / 协作 / 控制 / 附件 / 插件 / boot
-等"事件级别"事实 (沿用 ``journal.py`` 中相应 frozen dataclass)。
-
-本模块不删除 ``journal.py``, 但新增 ``journal_step.py`` 作为新主存储的
-数据契约。 旧 ``journal.py`` 中的 ``StampedEvent`` 仅供回放 / 迁移使用,
-不再作为 live writer 的产物。
-"""
-
 from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
+
+from lca.contracts.models.observability.journal_totals import SegmentRecord, StepPhase
 
 # ── 5 原语子记录 ────────────────────────────────────────
 
@@ -156,7 +132,6 @@ class SpanRecord:
 
 
 StepOutcome = Literal["ok", "fail", "skip"]
-StepPhase = Literal["perceive", "think", "act", "reflect", "remember", "stop"]
 
 
 @dataclass(frozen=True)
@@ -194,6 +169,7 @@ class JournalStep:
     spans: tuple[SpanRecord, ...] = ()
     outcome: StepOutcome | None = None
     error: str | None = None
+    segments: tuple[SegmentRecord, ...] = ()  # 3.1; ADR-0166 D2
 
 
 # ── helpers ──────────────────────────────────────────────
@@ -259,3 +235,28 @@ __all__ = [
     "make_step_id",
     "summarize_step",
 ]
+"""Journal Step-Tree —— 顶层真相从事件流升级为 step 树（ADR-0164 草案）。
+
+背景：
+    原 ``lca.contracts.models.observability.journal`` 把"事实"建模为
+    seq 流水 —— 49 种事件类型平铺, step 边界靠 ``scope.step`` 隐式
+    累积, 读者必须自己数 seq 才能拼出"这次跑分几步"。这跟人类认知
+    "step = 一个因果闭环" 的天然模型错位。
+
+新模型（ADR-0164 草案）：
+    - **顶层真相是 step 树**, 不是 seq 流水。 一个 step 是一个
+      因果闭环, 由 5 原语穷尽: 上下文 / 思考 / 工具调用 / 工具结果 / 反思。
+    - **seq 降级为 step 的实现细节**, 由 runtime 内部使用, 不出现在
+      顶层 envelope。
+    - **诊断事件 (RuntimeObserved / ToolRetryProgress / ContextCompacted)**
+      折叠为 step.spans, 不再是顶层事件。
+    - **LLM/工具事实** 折叠为 step.thinking / step.tool_call /
+      step.tool_result, 不再是顶层事件。
+
+闭集从 49 减到 12 —— 仅保留容器 / 协作 / 控制 / 附件 / 插件 / boot
+等"事件级别"事实 (沿用 ``journal.py`` 中相应 frozen dataclass)。
+
+本模块不删除 ``journal.py``, 但新增 ``journal_step.py`` 作为新主存储的
+数据契约。 旧 ``journal.py`` 中的 ``StampedEvent`` 仅供回放 / 迁移使用,
+不再作为 live writer 的产物。
+"""

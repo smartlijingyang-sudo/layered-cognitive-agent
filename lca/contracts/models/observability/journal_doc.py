@@ -1,16 +1,3 @@
-"""JournalDocument —— run 顶层 envelope (ADR-0164 草案)。
-
-对比 v2 envelope(``lca.journal/2`` schema):
-    - 顶层从 ``{schema, run_seq, descriptor, data, ...}`` 改为
-      ``{schema, run_id, trace_id, started_at, steps: [...], metadata}``
-    - 不再有 ``run_seq`` —— seq 是 step 内部实现, 不暴露顶层
-    - 不再有 ``_doc`` / ``_redaction`` boilerplate —— metadata 收口
-    - 顶层 ``steps`` 是有序 tuple, 不再追加流
-
-``JournalDocument`` 是 ``traces/runs/<run_id>/journal.json`` 的根结构,
-projector 在 run 终止时一次性写出(不再流式追加)。
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -21,8 +8,12 @@ from lca.contracts.models.observability.journal_step import (
     AttachmentRef,
     JournalStep,
 )
+from lca.contracts.models.observability.journal_totals import (
+    PhaseRecord,
+    Totals,
+)
 
-JournalSchemaVersion = Literal["lca.journal/3"]
+JournalSchemaVersion = Literal["lca.journal/3", "lca.journal/3.1"]
 
 
 @dataclass(frozen=True)
@@ -54,6 +45,10 @@ class JournalDocument:
     主存储格式: ``traces/runs/<run_id>/journal.json``(pretty-printed JSON)。
     不再使用 NDJSON 流式追加 —— 顶层真相是 step 树, 由 projector 在 run
     终止时一次性写出。
+
+    3.1 增量字段（缺省即 3.0 文档）：
+    - ``totals``  —— 三层计数单一真理
+    - ``phases``  —— 显式相位数组（perceive 也在其中）
     """
 
     schema: JournalSchemaVersion
@@ -63,10 +58,29 @@ class JournalDocument:
     steps: tuple[JournalStep, ...]
     metadata: JournalMetadata
     closed_at: float | None = None
+    totals: Totals | None = None  # 3.1; None → 3.0 schema
+    phases: tuple[PhaseRecord, ...] = ()  # 3.1; 空 → 3.0 schema
 
     def total_steps(self) -> int:
-        """返回 step 总数(跟 metadata.total_steps 一致, 但不依赖 metadata 落盘)。"""
+        """返回 step 总数（跟 metadata.total_steps 一致，但不依赖 metadata 落盘）。
+
+        优先读 3.1 ``totals.steps``，回退到 ``len(self.steps)``。
+        """
+        if self.totals is not None:
+            return self.totals.steps
         return len(self.steps)
+
+    def total_segments(self) -> int:
+        """返回 segment 总数（3.1 totals.segments，3.0 返回 -1）。"""
+        if self.totals is None:
+            return -1
+        return self.totals.segments
+
+    def total_phases(self) -> int:
+        """返回 phase 总数（3.1 totals.phases，3.0 返回 -1）。"""
+        if self.totals is None:
+            return -1
+        return self.totals.phases
 
     def step_by_index(self, step_index: int) -> JournalStep | None:
         """O(1) 查找 step_index 对应的 step(假设 step_index 顺序, 实际 O(n))。
@@ -199,3 +213,15 @@ __all__ = [
     "close_document",
     "empty_document",
 ]
+"""JournalDocument —— run 顶层 envelope (ADR-0164 + 0166/0167 step 树)。
+
+schema 版本:
+
+- ``lca.journal/3``  —— step 树主存储（旧）。Phase-as-step 漂移期。
+- ``lca.journal/3.1``—— 三层计数：step / segment / phase 显式数组 + totals。
+
+3.0 → 3.1 migration: 见 :mod:`lca.infrastructure.observability.journal.step.migrate`，
+phase-as-step 折叠为 DSH step，并构造 ``totals`` / ``phases`` / ``segments``。
+3.1 读 3.0 文档：totals / phases / segments 字段缺省，doctor H-seg / H-phase
+显式标 ``not evaluated`` 提示迁移。
+"""
