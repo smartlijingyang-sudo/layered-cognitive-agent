@@ -1,38 +1,14 @@
-"""Doctor H6 surfaces session.error when journal stream is empty."""
+"""Doctor surfaces session.error via debug-run extraction when journal missing.
+
+Legacy journal.jsonl H6 fallback 已下线;step-tree 路径无 journal 时由
+debug-run 通过 manifest.session_error 抽取故障信息。
+"""
 
 from __future__ import annotations
 
 from pathlib import Path
-from types import SimpleNamespace
 
 from lca.plugins.tools.diagnostics.debug_run import _extract_failure
-from lca.plugins.transport.webserver.handlers.runs.doctor.legacy import hop_h6
-from lca.plugins.transport.webserver.handlers.runs.doctor.models import JsonlScan
-
-
-def test_hop_h6_surfaces_session_error_when_journal_empty() -> None:
-    session = SimpleNamespace(error="MemoryView.__init__() missing 1 required positional argument: 'buffer'")
-    scan = JsonlScan(
-        exists=False,
-        rows=0,
-        last_seq=0,
-        counts={},
-        has_finished=False,
-        finished_error="",
-        journal_status="",
-        output_text="",
-        output_text_explicit=False,
-        has_attachment=False,
-        unpaired_tools=(),
-        tool_total=0,
-        tool_success=0,
-        max_consecutive_fail=0,
-        missing_plugin_state=(),
-    )
-    verdict = hop_h6(session, scan)
-    assert verdict.ok is False
-    assert "carrier failure" in (verdict.detail or "")
-    assert "MemoryView" in (verdict.extra or {}).get("error", "")
 
 
 def test_debug_run_extract_failure_reads_session_error() -> None:

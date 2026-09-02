@@ -310,11 +310,24 @@ def test_diagnose_routes_step_tree(tmp_path: Path) -> None:
     assert report.mode == "backend"
 
 
-def test_diagnose_routes_legacy_jsonl(tmp_path: Path) -> None:
-    """legacy .jsonl 走 diagnose_legacy(v2 子集,但 schema=v3)。"""
-    path = tmp_path / "journal.jsonl"
+def test_diagnose_accepts_spine_events_jsonl_as_fallback(tmp_path: Path) -> None:
+    """``events.jsonl`` (spine SSOT) 后缀作为 step-tree 缺失兜底。
+
+    不再回退到 legacy v2 hops;直接给出最小 H1 诊断。
+    """
+    path = tmp_path / "events.jsonl"
     path.write_text("", encoding="utf-8")
     report = diagnose(None, path, mode="backend")
-    # schema 升级到 v3, 但 hops 是 legacy 集合(无 H8)
     assert report.schema == "doctor.v3"
-    assert "H8" not in report.hops  # legacy 路径不产生 H8
+    assert report.broken_hop == "H1"
+    assert "events.jsonl" in (report.hops["H1"].detail or "")
+
+
+def test_diagnose_rejects_unknown_suffix(tmp_path: Path) -> None:
+    """doctor 仅接受 ``.json`` (step-tree) 或 ``.jsonl`` (spine)。"""
+    import pytest
+
+    path = tmp_path / "something.weird"
+    path.write_text("", encoding="utf-8")
+    with pytest.raises(ValueError, match=r"got suffix '\.weird'"):
+        diagnose(None, path, mode="backend")

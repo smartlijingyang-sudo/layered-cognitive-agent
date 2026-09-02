@@ -2,26 +2,31 @@
 
 Public entry points re-exported so callers can use
 ``from lca.plugins.transport.webserver.handlers.runs.doctor import diagnose``.
+
+Legacy ``journal.jsonl`` 流式布局已下线;doctor 只支持 ``journal.json``
+(step-tree materialization) 与 Session Spine 路径。
 """
 
 from lca.plugins.transport.webserver.handlers.runs.doctor.doctor import (
-    DoctorReport,
-    HopVerdict,
     diagnose,
     diagnose_session,
 )
 from lca.plugins.transport.webserver.handlers.runs.doctor.models import (
-    RUN_FINISHED_EVENTS,
-    TOOL_TERMINAL_EVENTS,
-    JsonlScan,
+    OPEN_STATUSES,
+    TERMINAL_STATUSES,
+    DoctorMode,
+    DoctorReport,
+    HopVerdict,
+    StepScan,
 )
 
 __all__ = [
-    "RUN_FINISHED_EVENTS",
-    "TOOL_TERMINAL_EVENTS",
+    "OPEN_STATUSES",
+    "TERMINAL_STATUSES",
+    "DoctorMode",
     "DoctorReport",
     "HopVerdict",
-    "JsonlScan",
+    "StepScan",
     "diagnose",
     "diagnose_session",
 ]

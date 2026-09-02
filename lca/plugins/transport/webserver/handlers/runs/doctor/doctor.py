@@ -1,9 +1,12 @@
 """Stable Gateway doctor.v3 facade(ADR-0164 草案 Phase 4)。
 
 路由策略:
-    - ``journal.json`` (.json / .jsonl → .json) → ``diagnose_step_tree``
-    - ``journal.jsonl`` (.jsonl 旧格式) → ``diagnose_legacy``(保留回退)
+    - ``journal.json`` (step-tree) → ``diagnose_step_tree``
     - Session Spine 路径 → ``diagnose_session_projection``(沿用)
+
+新 boot 只产 ``events.jsonl`` (spine SSOT) + ``journal.json`` (step-tree
+materialization)。 ``journal.jsonl`` / ``journal.raw.jsonl`` 旧流式路径已
+彻底移除;doctor 不再保留 legacy fallback,非 step-tree 路径直接报错。
 
 升级要点:
     - schema 从 "doctor.v2" → "doctor.v3"。
@@ -18,7 +21,6 @@ from pathlib import Path
 from typing import Any
 
 from lca.contracts.harness.state.projection import ProjectionSnapshot
-from lca.plugins.transport.webserver.handlers.runs.doctor.legacy import diagnose_legacy
 from lca.plugins.transport.webserver.handlers.runs.doctor.models import (
     DoctorMode,
     DoctorReport,
@@ -34,20 +36,71 @@ from lca.plugins.transport.webserver.handlers.runs.doctor.step_check import (
 
 def diagnose(
     session: Any | None,
-    jsonl_path: Path,
+    journal_path: Path,
     *,
     mode: DoctorMode = "backend",
 ) -> DoctorReport:
     """诊断 run → doctor.v3。
 
     路由规则:
-      - ``jsonl_path`` 指向 ``.json``(step-tree) → ``diagnose_step_tree``。
-      - 指向 ``.jsonl``(legacy) → ``diagnose_legacy``(返回 v2 风格报告,
-        schema 标记为 "doctor.v3" 但 hops 是 v2 子集)。
+      - ``.json`` → ``diagnose_step_tree``(完整 step-tree 检查)。
+      - ``.jsonl`` → spine SSOT(events.jsonl)兜底:journal.json 缺失,
+        doctor 报告一个 H1=False 的最小诊断,不再回退到 legacy v2 hops。
+
+    旧 ``journal.jsonl`` 流式布局已下线:该后缀只允许指向当前 boot 产出的
+    events.jsonl(spine SSOT),不接受历史 journal.jsonl 流。
     """
-    if jsonl_path.suffix == ".json":
-        return diagnose_step_tree(jsonl_path, mode=mode)
-    return diagnose_legacy(session, jsonl_path)
+    del session  # step-tree 路径不需要 live session;保留签名以避免调用方改动
+    if journal_path.suffix == ".json":
+        return diagnose_step_tree(journal_path, mode=mode)
+    if journal_path.suffix == ".jsonl":
+        return _diagnose_spine_only(journal_path, mode=mode)
+    raise ValueError(
+        f"doctor.diagnose expects journal.json (step-tree) or events.jsonl (spine SSOT), "
+        f"got suffix {journal_path.suffix!r}: {journal_path}"
+    )
+
+
+def _diagnose_spine_only(
+    spine_path: Path,
+    *,
+    mode: DoctorMode,
+) -> DoctorReport:
+    """Step-tree materialization 缺失时的最小诊断。
+
+    仅提供:
+      - H1: journal.json 是否缺失 + spine events.jsonl 状态
+      - 其他 hop: ok=None "not evaluated" (无 step-tree,无法诊断)
+
+    不复用 legacy v2 hops; 不解析 spine 内容(留给后续 spine-only 工具)。
+    """
+    run_id = spine_path.parent.name
+    detail = (
+        f"step-tree journal.json missing; spine events.jsonl present at {spine_path}"
+        if spine_path.exists()
+        else f"journal materialization missing: spine events.jsonl not found at {spine_path}"
+    )
+    return DoctorReport(
+        schema="doctor.v3",
+        run_id=run_id,
+        trace_id="",
+        status="unknown",
+        broken_hop="H1",
+        summary=detail,
+        mode=mode,
+        hops={
+            "H1": HopVerdict(ok=False, detail=detail),
+            "H2": HopVerdict(ok=None, detail="not evaluated (no step-tree)"),
+            "H3": HopVerdict(ok=None, detail="not evaluated"),
+            "H4": HopVerdict(ok=None, detail="not evaluated"),
+            "H5": HopVerdict(ok=None, detail="not evaluated"),
+            "H6": HopVerdict(ok=None, detail="not evaluated"),
+            "H7": HopVerdict(ok=None, detail="not evaluated"),
+        },
+        journal_path=str(spine_path),
+        consistency={},
+        factory={"ok": True, "tools_missing_plugin_state": []},
+    )
 
 
 def diagnose_session(

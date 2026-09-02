@@ -84,17 +84,18 @@ def test_ingest_facade_keeps_policy_cache_transport_and_mirroring_separate() -> 
     assert "async def ingest_file_refs" not in source
 
 
-def test_doctor_facade_separates_legacy_and_session_spine_read_models() -> None:
-    """Legacy journal hops and Session Spine projections must retain separate owners."""
-    source = _source("gateway/runs/doctor/doctor.py")
+def test_doctor_facade_routes_step_tree_and_session_spine() -> None:
+    """Doctor facade delegates step-tree 和 Session Spine paths;legacy jsonl 已下线。"""
+    source = _source("lca/plugins/transport/webserver/handlers/runs/doctor/doctor.py")
 
-    assert "lca.plugins.transport.webserver.handlers.runs.doctor.legacy" in source
     assert "lca.plugins.transport.webserver.handlers.runs.doctor.session_check" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.doctor.step_check" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.doctor.legacy" not in source
     assert "def _scan_jsonl" not in source
     assert "def _hop_h2" not in source
 
-    legacy_source = _source("gateway/runs/doctor/legacy.py")
-    assert "lca.plugins.transport.webserver.handlers.runs.doctor.journal" in legacy_source
+    legacy_path = ROOT / "lca/plugins/transport/webserver/handlers/runs/doctor/legacy.py"
+    assert not legacy_path.exists()
 
 
 def test_temporal_memory_store_delegates_schema_and_record_codec() -> None:

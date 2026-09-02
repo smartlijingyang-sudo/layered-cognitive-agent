@@ -14,13 +14,6 @@ from typing import Any, Literal
 
 TERMINAL_STATUSES = frozenset({"completed", "failed", "canceled"})
 OPEN_STATUSES = frozenset({"running", "waiting_input"})
-TOOL_TERMINAL_EVENTS = frozenset({"ToolInvoked", "ToolDenied"})
-# Events that mark a run as durably terminated. Spans both the legacy
-# event_type vocabulary (``AgentRunFinished`` / ``TeamRunFinished``)
-# and the journal execution_point vocabulary (``kernel.run.stop``).
-# Doctor's H2 closes when ANY one of these is present alongside a
-# terminal status — see ADR-2026-09-02-i17-traceback §D6.
-RUN_FINISHED_EVENTS = frozenset({"AgentRunFinished", "TeamRunFinished", "kernel.run.stop"})
 
 DoctorMode = Literal["backend", "ui"]
 """doctor 模式:backend = 没浏览器/UI 不可视,跳过 H4/H5;ui = 完整流程检查。"""
@@ -50,7 +43,7 @@ class DoctorReport:
     字段变更:
       - ``schema`` 永远 "doctor.v3"。
       - ``mode`` 显式标记("backend" / "ui"), reader 据此理解 H4/H5。
-      - ``journal_path`` 取代 ``jsonl_path``(可能是 .json step-tree 或 .jsonl legacy)。
+      - ``journal_path`` 指向 step-tree ``journal.json``(legacy jsonl 已下线)。
     """
 
     schema: str
@@ -83,27 +76,6 @@ class DoctorReport:
 
 
 @dataclass(frozen=True, slots=True)
-class JsonlScan:
-    """Facts derived from one legacy run's JSONL journal without live state."""
-
-    last_seq: int
-    counts: dict[str, int]
-    missing_plugin_state: tuple[str, ...]
-    unpaired_tools: tuple[str, ...]
-    has_finished: bool
-    journal_status: str
-    exists: bool
-    rows: int
-    output_text: str
-    output_text_explicit: bool
-    finished_error: str
-    tool_total: int
-    tool_success: int
-    max_consecutive_fail: int
-    has_attachment: bool
-
-
-@dataclass(frozen=True, slots=True)
 class StepScan:
     """Facts derived from one run's step-tree journal (lca.journal/3 / 3.1)。"""
 
@@ -130,12 +102,9 @@ class StepScan:
 
 __all__ = [
     "OPEN_STATUSES",
-    "RUN_FINISHED_EVENTS",
     "TERMINAL_STATUSES",
-    "TOOL_TERMINAL_EVENTS",
     "DoctorMode",
     "DoctorReport",
     "HopVerdict",
-    "JsonlScan",
     "StepScan",
 ]
