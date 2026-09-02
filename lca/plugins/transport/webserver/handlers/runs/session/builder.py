@@ -155,6 +155,7 @@ class RunSessionBuilder:
             tail=components.tail,
             hub=hub,
             thread_tree_writer=step_tree_deriver,
+            step_tree_bundle=components.step_tree_writer,
             coordinator=coordinator,
             question=request.question,
             user_text=request.user_text,
