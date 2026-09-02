@@ -160,11 +160,6 @@ class EmitPipeline:
             producers, key=lambda producer: producer.priority
         )
         self._anomaly: _AnomalyLike = anomaly
-        # ADR-2026-09-02-i17-traceback §D4: a one-shot flag so the
-        # coverage-gap diagnostic fires at most once per pipeline
-        # instance. ``compile_profile`` constructs a fresh pipeline
-        # per run, so this naturally scopes to one run.
-        self._coverage_emitted = False
 
     @property
     def producers(self) -> tuple[FieldProducer, ...]:
@@ -276,53 +271,21 @@ class EmitPipeline:
 
         # Step 3a: I17 — every ``*.start`` event MUST carry a
         # ``source_location`` field (ADR-0165.1 §96; ADR-2026-09-02
-        # §D4). The check is *producer-aware*, not naive: if the
-        # SourceAttacher is in the producer list, the check is
-        # strong (raise I17Violation on miss). If SourceAttacher is
-        # not in scope, the check degrades to weak: the event still
-        # seals without ``source_location`` (so the run continues)
-        # and a one-time ``phase_graph.instrument.coverage`` event
-        # is published at run end noting the coverage gap.
-        source_attacher_present = any(
-            getattr(p, "name", "") == "spine.reflector.source" for p in self._producers
-        )
-        if (
-            execution_point.endswith(".start")
-            and "source_location" not in merged
-            and source_attacher_present
-        ):
+        # §D4, ADR-i17-tb). Per ADR-i17-tb the I17 check is a
+        # spine-wide strong contract: a ``*.start`` event missing
+        # ``source_location`` MUST raise I17Violation unconditionally,
+        # regardless of whether the SourceAttacher producer is wired
+        # into the pipeline. The previous weak-degradation branch
+        # (publishing ``phase_graph.instrument.coverage``) was a
+        # temporary backstop while Task 9.1 was in flight; the
+        # SourceAttacher is now mandatory in ``loop_cursor.spine_default``
+        # (web-standard forces it on), so the backstop is removed.
+        if execution_point.endswith(".start") and "source_location" not in merged:
             raise I17Violation(
                 f"I17: execution_point={execution_point!r} requires "
-                f"'source_location' in payload (ADR-0165.1 §96); "
-                f"SourceAttacher producer missing or disabled"
+                f"'source_location' in payload (ADR-0165.1 §96; "
+                f"ADR-i17-tb spine-wide strong contract)"
             )
-        if (
-            execution_point.endswith(".start")
-            and "source_location" not in merged
-            and not source_attacher_present
-            and not self._coverage_emitted
-        ):
-            # Producer absent — surface the coverage gap once per
-            # pipeline instance so the run directory records it.
-            try:
-                spine.append(
-                    execution_point="phase_graph.instrument.coverage",
-                    channel="control",
-                    caller_payload={
-                        "source_attacher": "missing",
-                        "first_observed_ep": execution_point,
-                    },
-                    outcome=None,
-                    span_ctx=span_ctx,
-                    phase=phase,
-                )
-            except Exception as exc:
-                log.warning(
-                    "emit_pipeline: coverage event publication failed err=%s",
-                    exc,
-                    exc_info=True,
-                )
-            self._coverage_emitted = True
 
         record = spine.append(
             execution_point=execution_point,
