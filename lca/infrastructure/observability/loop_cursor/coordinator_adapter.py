@@ -57,6 +57,9 @@ from lca.contracts.observability.loop_cursor_payloads import (
     ToolCallRecord,
     ToolResultRecord,
 )
+from lca.infrastructure.observability.loop_cursor._capture_io import (
+    sha256_digest,
+)
 from lca.infrastructure.observability.writable_matrix.coordinator import StepCoordinator
 
 # COMPAT(delete-when: PR-21~24 grep 全部为 0, tracking: ADR-0169-task-25)
@@ -182,7 +185,7 @@ class CoordinatorAdapter:
         decision / tool_call / prompt_tokens / completion_tokens /
         raw_response_preview;cursor ``ThinkingRecord`` 字段 = content_digest /
         content_path / token_count / thinking_kind。映射:
-            content_digest ← reasoning 字符串(由 spine-side digest 计算)
+            content_digest ← sha256:<hex> via _capture_io helper
             content_path   ← None
             token_count    ← prompt_tokens + completion_tokens
             thinking_kind  ← "reasoning"
@@ -190,9 +193,17 @@ class CoordinatorAdapter:
         prompt_tokens = getattr(trace, "prompt_tokens", 0) or 0
         completion_tokens = getattr(trace, "completion_tokens", 0) or 0
         token_count = prompt_tokens + completion_tokens or None
+        # Bug fix (round 2): cursor's ``content_digest`` is contracted
+        # as ``sha256:<hex>`` (per ``loop_cursor_payloads.RequestHeader``
+        # + the shared _capture_io digest helper). The legacy adapter
+        # used to forward the raw ``reasoning`` text verbatim, which
+        # broke every downstream ``ReplayCursor`` that verifies the
+        # digest against the on-disk ``model_visible`` files. Now we
+        # compute the digest properly via the shared helper.
+        reasoning_text = getattr(trace, "reasoning", "") or ""
         self._cursor.record_thinking(
             ThinkingRecord(
-                content_digest=getattr(trace, "reasoning", ""),
+                content_digest=sha256_digest({"reasoning": reasoning_text}),
                 content_path=None,
                 token_count=token_count,
                 thinking_kind="reasoning",
@@ -207,18 +218,19 @@ class CoordinatorAdapter:
         arguments_summary;cursor ``ToolCallRecord`` 字段 = tool_name / args_digest /
         args_payload_path / call_seq。映射:
             tool_name       ← name
-            args_digest     ← arguments_summary 或 invocation_id(降级)
+            args_digest     ← sha256:<hex> via _capture_io helper
             args_payload_path ← None(arguments 内容由 payload adapter 处理)
-            call_seq        ← invocation_id 后缀 hash(去重来源)
+            call_seq        ← cursor's monotonic seq (was invocation_id hash, process-randomised)
         """
         tool_name = getattr(call, "name", "")
-        args_digest = getattr(call, "arguments_summary", "") or getattr(call, "invocation_id", "")
+        invocation_id = getattr(call, "invocation_id", "") or ""
+        args_summary = getattr(call, "arguments_summary", "") or ""
         self._cursor.record_tool_call(
             ToolCallRecord(
                 tool_name=tool_name,
-                args_digest=args_digest,
+                args_digest=sha256_digest({"args": args_summary, "invocation_id": invocation_id}),
                 args_payload_path=None,
-                call_seq=hash(getattr(call, "invocation_id", "")) & 0x7FFFFFFF,
+                call_seq=self._cursor.snapshot.seq,
             )
         )
         self._coord.record_tool_call(call)
@@ -231,11 +243,17 @@ class CoordinatorAdapter:
         """
         ok = bool(getattr(result, "ok", True))
         outcome: str = "ok" if ok else "failure"
-        tool_name = getattr(result, "tool_name", "") or getattr(result, "delta_summary", "")
+        # Bug fix (round 2): the legacy fallback used ``delta_summary``
+        # as tool_name when ``tool_name`` was empty, polluting the
+        # tool_name field with prose. Drop the fallback — an empty
+        # tool_name signals "anonymous tool result" which downstream
+        # handlers can deal with.
+        tool_name = getattr(result, "tool_name", "") or ""
+        delta_summary = getattr(result, "delta_summary", "") or ""
         self._cursor.record_tool_result(
             ToolResultRecord(
                 tool_name=tool_name,
-                result_digest=getattr(result, "delta_summary", ""),
+                result_digest=sha256_digest({"delta_summary": delta_summary}),
                 result_path=None,
                 outcome=outcome,  # type: ignore[arg-type]
             )

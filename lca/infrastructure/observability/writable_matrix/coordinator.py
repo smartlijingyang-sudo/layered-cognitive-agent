@@ -19,7 +19,7 @@ from __future__ import annotations
 from contextvars import ContextVar
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, get_args
 
 from lca.contracts.models.observability.journal_step import (
     ReflectTrace,
@@ -241,22 +241,7 @@ class StepCoordinator:
         写入 ``phase.<name>.fold`` 一个事实 EP；stop 与失败回退由
         Driver 在 ``end_step`` 处表达。
         """
-        outcome_lit = (
-            outcome
-            if outcome
-            in {
-                "success",
-                "failure",
-                "timeout",
-                "cancelled",
-                "rejected",
-                "retrying",
-                "partial",
-                "exhausted",
-                "void",
-            }
-            else None
-        )
+        outcome_lit = outcome if outcome in get_args(Outcome) else None
         self._write(
             self._mint_record(
                 execution_point=f"phase.{phase}.fold",

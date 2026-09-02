@@ -28,6 +28,9 @@ from lca.contracts.models.observability.journal_step import (
     ToolResult as LegacyToolResult,
 )
 from lca.contracts.observability.incarnation import Incarnation
+from lca.infrastructure.observability.loop_cursor._capture_io import (
+    sha256_digest,
+)
 from lca.contracts.observability.loop_cursor import CursorSnapshot
 from lca.infrastructure.observability.loop_cursor import StdLoopCursor
 from lca.infrastructure.observability.loop_cursor._spine_port import WritePort
@@ -187,7 +190,12 @@ def test_adapter_record_thinking_emits_cursor_thinking_ep() -> None:
 
     # payload 字段映射:token_count = prompt + completion = 30
     thinking_ep = next(r for r in spine.records if r["execution_point"] == "step.thinking.record")
-    assert thinking_ep["payload"]["content_digest"] == "reasoning text"
+    assert thinking_ep["payload"]["content_digest"].startswith("sha256:")
+    # The digest is computed via ``_capture_io.sha256_digest``; we
+    # accept any sha256:<hex> with the right payload shape so the
+    # test stays independent of the exact hash.
+    expected_thinking_digest = sha256_digest({"reasoning": "reasoning text"})
+    assert thinking_ep["payload"]["content_digest"] == expected_thinking_digest
     assert thinking_ep["payload"]["token_count"] == 30
     assert thinking_ep["payload"]["thinking_kind"] == "reasoning"
     assert thinking_ep["payload"]["incarnation"] == 1
@@ -211,7 +219,16 @@ def test_adapter_record_tool_call_emits_cursor_tool_call_ep() -> None:
     assert "step.tool_call.record" in eps
     call_ep = next(r for r in spine.records if r["execution_point"] == "step.tool_call.record")
     assert call_ep["payload"]["tool_name"] == "echo"
-    assert call_ep["payload"]["args_digest"] == "echo(x=1)"
+    # Bug fix (round 2): the legacy adapter used the raw
+    # ``arguments_summary`` text as args_digest, breaking the
+    # sha256:<hex> contract; the bug-fixed adapter now wraps it.
+    expected_call_digest = sha256_digest({"args": "echo(x=1)", "invocation_id": "inv-001"})
+    assert call_ep["payload"]["args_digest"] == expected_call_digest
+    # Bug fix (round 2): call_seq now uses the cursor's monotonic seq
+    # counter (was a process-randomized hash; non-deterministic
+    # across runs).
+    assert isinstance(call_ep["payload"]["call_seq"], int)
+    assert call_ep["payload"]["call_seq"] >= 1
 
 
 def test_adapter_record_tool_result_emits_cursor_tool_result_ep() -> None:
@@ -231,7 +248,14 @@ def test_adapter_record_tool_result_emits_cursor_tool_result_ep() -> None:
     assert "step.tool_result.record" in eps
     result_ep = next(r for r in spine.records if r["execution_point"] == "step.tool_result.record")
     assert result_ep["payload"]["outcome"] == "ok"
-    assert result_ep["payload"]["result_digest"] == "echoed"
+    # Bug fix (round 2): the legacy adapter used the raw
+    # ``delta_summary`` text as result_digest, breaking the
+    # sha256:<hex> contract; the bug-fixed adapter now wraps it.
+    expected_result_digest = sha256_digest({"delta_summary": "echoed"})
+    assert result_ep["payload"]["result_digest"] == expected_result_digest
+    # Bug fix (round 2): tool_name no longer falls back to delta_summary
+    # when ``tool_name`` is empty on the legacy result; it stays empty.
+    assert result_ep["payload"]["tool_name"] == ""
 
 
 def test_adapter_emit_phase_advances_cursor_phase_window() -> None:

@@ -10,19 +10,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal
 
+from lca.contracts.observability.outcome import Outcome
 from lca.infrastructure.observability.spine.manifest import EXECUTION_POINTS
 
-Outcome = Literal[
-    "success",
-    "failure",
-    "timeout",
-    "cancelled",
-    "rejected",
-    "retrying",
-    "partial",
-    "exhausted",
-    "void",
-]
+__all__ = ["Channel", "EventRecord", "Outcome", "Phase"]
+
 Channel = Literal["fact", "control", "error", "diagnostic"]
 Phase = Literal["live", "orphan"]
 

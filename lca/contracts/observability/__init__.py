@@ -31,6 +31,7 @@ from lca.contracts.observability.exception_capture import (
     exc_to_record as exc_to_record,
 )
 from lca.contracts.observability.ledger import RunLedgerFactory as RunLedgerFactory
+from lca.contracts.observability.outcome import Outcome as Outcome
 from lca.contracts.observability.model_visible_capture import (
     ModelVisibleArtifact as ModelVisibleArtifact,
 )
@@ -54,6 +55,7 @@ __all__ = [
     "ExceptionRecord",
     "ModelVisibleArtifact",
     "ModelVisibleCapture",
+    "Outcome",
     "ReasonerPromptArtifact",
     "ReasonerPromptCapture",
     "RetentionClass",
