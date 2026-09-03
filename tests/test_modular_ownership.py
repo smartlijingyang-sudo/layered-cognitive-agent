@@ -9,14 +9,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lca.cognition.team.modes.cordis_creator_mode import _CordisCreatorModeAdapter
+from lca.plugins.collaboration.modes.cordis_creator import _CordisCreatorModeAdapter
 from lca.cognition.team.modes.default_modes import (
     _CordisCreatorModeAdapter as CompatibilityCreatorAdapter,
 )
 from lca.cognition.team.modes.default_modes import _SoloModeAdapter as CompatibilitySoloAdapter
 from lca.cognition.team.modes.default_modes import _TeamModeAdapter as CompatibilityTeamAdapter
-from lca.cognition.team.modes.solo_mode import _SoloModeAdapter
-from lca.cognition.team.modes.team_mode import _TeamModeAdapter
+from lca.plugins.collaboration.modes.solo import _SoloModeAdapter
+from lca.plugins.collaboration.modes.team import _TeamModeAdapter
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -48,12 +48,12 @@ def test_execution_environment_only_coordinates_scope_order() -> None:
 
 
 def test_default_mode_facade_keeps_backward_imports_without_owning_behavior() -> None:
-    """Each mode owns its builder and adapter; the old module only re-exports them."""
-    source = _source("gateway/plugins/default_modes.py")
+    """Each mode owns its builder and adapter; the facade only re-exports them."""
+    source = _source("lca/cognition/team/modes/default_modes.py")
 
-    assert "from lca.cognition.team.modes.solo_mode import" in source
-    assert "from lca.cognition.team.modes.team_mode import" in source
-    assert "from lca.cognition.team.modes.cordis_creator_mode import" in source
+    assert "from lca.plugins.collaboration.modes.solo import" in source
+    assert "from lca.plugins.collaboration.modes.team import" in source
+    assert "from lca.plugins.collaboration.modes.cordis_creator import" in source
     assert "class _" not in source
     assert "def build_" not in source
     assert CompatibilitySoloAdapter is _SoloModeAdapter

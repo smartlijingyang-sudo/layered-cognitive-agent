@@ -115,6 +115,7 @@ def _descriptor(
 _EMITTER_ALIASES: dict[str, str] = {
     "lca.harness.command.gateway": "lca.harness.command.dispatcher",
     "gateway.plugins.default_modes": "lca.cognition.team.modes.default_modes",
+    "lca.cognition.team.modes.team_mode": "lca.plugins.collaboration.modes.team",
 }
 
 
@@ -221,7 +222,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             CastingStarted,
             domain=VocabDomain.TEAM,
-            emitter="lca.cognition.team.modes.team_mode",
+            emitter="lca.plugins.collaboration.modes.team",
             required=("objective_preview",),
             description="自动组队选角开始",
             durability="best_effort",
@@ -231,7 +232,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             CastingCompleted,
             domain=VocabDomain.TEAM,
-            emitter="lca.cognition.team.modes.team_mode",
+            emitter="lca.plugins.collaboration.modes.team",
             required=("governance_kind",),
             description="自动组队选角完成",
             durability="required",
@@ -241,7 +242,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             CastingFailed,
             domain=VocabDomain.TEAM,
-            emitter="lca.cognition.team.modes.team_mode",
+            emitter="lca.plugins.collaboration.modes.team",
             required=("error",),
             description="自动组队选角失败",
             durability="required",

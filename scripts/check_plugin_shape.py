@@ -3,7 +3,7 @@
 Phase A of the unified-plugin-shape plan. 与 ADR-0110 contract 面正交,只校验
 目录级与文件级形态规范,不动 ``@plugin(...)`` 装饰器签名。
 
-扫描三个维度:
+扫描四个维度:
 1. **effects 未声明** —— ``@plugin(...)`` 调用缺 ``effects=`` 关键字。
    AST 扫:与 ``codegen_plugin_metadata.py`` 的元数据提取共享,确保基线一致。
 2. **双形态残留** —— ``lca/plugins/events/{sinks,publishers,subscribers}/*/manifest.py``
@@ -11,6 +11,9 @@ Phase A of the unified-plugin-shape plan. 与 ADR-0110 contract 面正交,只校
    ``codegen`` 只扫含 ``@plugin`` 的文件;events 双形态 plugin 没 ``@plugin`` 自然漏,
    本脚本独立扫该目录。
 3. **同 id 镜像** —— 多个文件声明相同 ``@plugin(id=...)``,违反单一入口原则。
+4. **位置逃逸**(PR-9)—— ``@plugin`` 装饰器只允许在 ``lca/plugins/`` 与
+   ``lca_kernel/events/manifest.py``(kernel 元插件,合法位置)。其他位置出现
+   ``@plugin`` 装饰器即视为位置逃逸。
 
 输出:人类可读 + ``--json`` 模式。返回 exit code:有违例 → 1,否则 0。
 豁免通过 ``--root`` 之外的白名单(本脚本不读 ``legacy_blacklist.txt``;豁免仅做
@@ -45,7 +48,7 @@ DUAL_FORM_KIND_DIRS = ("sinks", "publishers", "subscribers")
 class ShapeViolation:
     """单一形态违例记录。"""
 
-    kind: str  # "missing_effects" | "dual_form_residue" | "duplicate_id"
+    kind: str  # "missing_effects" | "dual_form_residue" | "duplicate_id" | "location_escape"
     plugin_id: str  # 缺 id 时为 "<unknown>"
     file: str
     line: int
@@ -232,23 +235,77 @@ def _scan_duplicate_ids(root: Path) -> list[ShapeViolation]:
     return out
 
 
+# 位置逃逸扫描白名单:唯一允许 ``@plugin`` 在 ``lca/plugins/`` 之外的合法位置。
+# 当前白名单:
+# - ``lca_kernel/events/manifest.py`` —— kernel 元插件(PR-9 行明示保留)。
+LOCATION_ALLOWED_EXCEPTIONS: tuple[str, ...] = ("lca_kernel/events/manifest.py",)
+
+
+def _is_under_plugins(path: Path) -> bool:
+    """``path`` 是否在 ``lca/plugins/`` 之下(白名单主目录)。"""
+    try:
+        rel = path.relative_to(ROOT / "lca" / "plugins")
+    except ValueError:
+        return False
+    return not rel.parts or rel.parts[0] != ".."
+
+
+def _scan_location_escape(root: Path) -> list[ShapeViolation]:
+    """扫描 ``@plugin`` 装饰器出现在 ``lca/plugins/`` 与白名单之外的位置。
+
+    扫描范围:整个仓库的 .py 文件,但仅 ``@plugin`` 装饰器所在文件需被定位。
+    唯一例外:``lca_kernel/events/manifest.py``(kernel 元插件,PR-9 行显式豁免)。
+    """
+    out: list[ShapeViolation] = []
+    for path in sorted(root.parent.rglob("*.py")):
+        if "__pycache__" in path.parts:
+            continue
+        if path.name == "__init__.py":
+            continue
+        if _is_under_plugins(path):
+            continue
+        rel = path.relative_to(root.parent)
+        rel_str = str(rel)
+        if rel_str in LOCATION_ALLOWED_EXCEPTIONS:
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError:
+            continue
+        for decorator in _find_plugin_decorators(tree):
+            plugin_id = _kw_literal_str(decorator, "id") or "<unknown>"
+            line = getattr(decorator, "lineno", 0)
+            out.append(
+                ShapeViolation(
+                    kind="location_escape",
+                    plugin_id=plugin_id,
+                    file=rel_str,
+                    line=line,
+                    detail="@plugin 装饰器只能位于 lca/plugins/ 或 lca_kernel/events/manifest.py",
+                )
+            )
+    return out
+
+
 # ── 主入口 ───────────────────────────────────────────────────────────────
 
 
 def scan(root: Path) -> ShapeReport:
-    """执行三维扫描,返回汇总。"""
+    """执行四维扫描,返回汇总。"""
     total, missing_effects = _scan_missing_effects(root)
     dual_form = _scan_dual_form_residue(root)
     duplicates = _scan_duplicate_ids(root)
+    location_escape = _scan_location_escape(root)
     by_kind: dict[str, int] = {
         "missing_effects": len(missing_effects),
         "dual_form_residue": len(dual_form),
         "duplicate_id": len(duplicates),
+        "location_escape": len(location_escape),
     }
     return ShapeReport(
         root=str(root),
         total_plugins=total,
-        violations=missing_effects + dual_form + duplicates,
+        violations=missing_effects + dual_form + duplicates + location_escape,
         by_kind=by_kind,
     )
 
@@ -265,7 +322,8 @@ def emit_human(report: ShapeReport) -> None:
         f"{len(report.violations)} violations "
         f"(missing_effects={report.by_kind['missing_effects']}, "
         f"dual_form_residue={report.by_kind['dual_form_residue']}, "
-        f"duplicate_id={report.by_kind['duplicate_id']})",
+        f"duplicate_id={report.by_kind['duplicate_id']}, "
+        f"location_escape={report.by_kind['location_escape']})",
         file=sys.stderr,
     )
     grouped: dict[str, list[ShapeViolation]] = defaultdict(list)
@@ -275,8 +333,9 @@ def emit_human(report: ShapeReport) -> None:
         "missing_effects": "缺少 effects=",
         "dual_form_residue": "双形态残留",
         "duplicate_id": "同 id 镜像",
+        "location_escape": "位置逃逸",
     }
-    for kind in ("missing_effects", "dual_form_residue", "duplicate_id"):
+    for kind in ("missing_effects", "dual_form_residue", "duplicate_id", "location_escape"):
         items = grouped.get(kind, [])
         if not items:
             continue
@@ -290,7 +349,8 @@ def emit_human(report: ShapeReport) -> None:
         "\n跟踪: docs/notes/implemented/seam/2026-09-03-plugin-shape-baseline.md; "
         "delete-when: missing_effects → Phase C 全部补齐; "
         "dual_form_residue → Phase B 全部清除; "
-        "duplicate_id → Phase C 镜像合并完毕。",
+        "duplicate_id → Phase C 镜像合并完毕; "
+        "location_escape → PR-9 全部归位。",
         file=sys.stderr,
     )
 

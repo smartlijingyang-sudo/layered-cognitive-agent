@@ -16,7 +16,7 @@ from lca.contracts.protocols.journal.spec import AgentSpec, LeadSpec
 from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
 from lca.plugins.composer.collaboration.team_transport import build_team_transport
 from lca.plugins.providers.gate.decision_classifier import DefaultDecisionClassifier
-from lca.runtime.reducer import DefaultReducer
+from lca.plugins.runtime.reducer import DefaultReducer
 from tests.support.agent_specs import make_spec
 
 

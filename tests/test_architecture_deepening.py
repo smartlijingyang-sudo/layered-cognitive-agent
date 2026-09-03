@@ -41,7 +41,7 @@ from lca.plugins.composer.runtime.runtime_factory import (
 from lca.plugins.phase_graph.stop_policy import DefaultStopPolicy
 from lca.plugins.providers.gate.decision_classifier import DefaultDecisionClassifier
 from lca.plugins.providers.journal.artifact_closure import DefaultArtifactClosure
-from lca.runtime.reducer import DefaultReducer
+from lca.plugins.runtime.reducer import DefaultReducer
 from tests.phase_executors import standard_phase_executors
 
 

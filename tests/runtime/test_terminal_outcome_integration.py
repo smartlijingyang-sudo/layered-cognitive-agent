@@ -19,7 +19,7 @@ from lca.contracts.models.core.terminal_outcome import (
 )
 from lca.contracts.protocols.declarative.declarative_common import DeclarativeValidationError
 from lca.plugins.phase_graph.stop_policy import DefaultStopPolicy
-from lca.runtime.reducer import DefaultReducer
+from lca.plugins.runtime.reducer import DefaultReducer
 
 
 class _FixedArtifactClosure:

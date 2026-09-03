@@ -12,7 +12,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     PhaseRunCursor,
 )
 from lca.harness.declarative.execute.outcome_projection import InterpretationResult
-from lca.runtime.reducer import DefaultReducer
+from lca.plugins.runtime.reducer import DefaultReducer
 from lca.runtime.result_finalizer import RuntimeResultFinalizer
 
 

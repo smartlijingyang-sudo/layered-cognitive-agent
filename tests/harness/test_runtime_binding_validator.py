@@ -149,7 +149,7 @@ patch:
 
 def test_default_reducer_plugin_declares_reducer_capability() -> None:
     """lca-default-reducer 必须声明 ``provides=["reducer"]``（ADR-0076 §三）。"""
-    from lca.runtime.reducer import setup
+    from lca.plugins.runtime.reducer import setup
 
     defn = setup._lca_definition
     assert "reducer" in defn.provided_capability_keys, (
