@@ -153,6 +153,12 @@ Audit 测量网  ADR-0074 PR-0（只读）
                                               = 验证 tracker.md 一致性 + 输出当前历史迁移基线
                                               (实现了 tracker 即实现 5 ADR)
 
+  Agent Notes (docs/notes/) 门禁 + 诊断（只读，老 ADR 一律不动；详见 docs/notes/README.md）
+  ./scripts/lca-ops notes-check       docs/notes/ 三态 + class 闭集 + filename + Alternatives considered 门禁
+  ./scripts/lca-ops notes-audit       ADR 健康体检（只读），写到 docs/notes/audit-YYYY-MM-DD.md
+  ./scripts/lca-ops notes-slop        docs/ 内 stale-time / change-log 散文扫描
+  ./scripts/lca-ops notes-list        枚举 docs/notes/ 现有 note（--json 给 agent）
+
 ────────────────────────────────
 通用参数
 ────────────────────────────────
