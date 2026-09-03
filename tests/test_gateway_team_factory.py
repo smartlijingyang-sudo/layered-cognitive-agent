@@ -18,7 +18,7 @@ from lca.cognition.team.modes_catalog import ALL_MODES
 from lca.contracts.capabilities import TEAM_CASTER, TEAM_ROLE_LIBRARY
 from lca.contracts.mechanisms.capability import MissingCapabilityError
 from lca.contracts.models.core.llm import LLMResponse
-from lca.plugins.seams.collaboration.team_casting_prompt_renderer import (
+from lca.plugins.collaboration.team_casting_prompt_renderer_seam import (
     BuiltinCastingPromptRenderer,
 )
 from tests.harness.collector import InMemoryObservability

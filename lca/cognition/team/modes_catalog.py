@@ -8,7 +8,7 @@ solo 不进 MODE_DEFINITIONS，由 run_executor 直接构造。
 本模块定义面向真实用户的产品文案。
 
 Mode 分派（ADR-0076 §六）：``resolve_lca_mode()`` 不再做字符串
-``if/elif``；它读取由 :mod:`lca.plugins.seams.state.run_mode_registry`
+``if/elif``；它读取由 :mod:`lca.plugins.state.run_mode_registry_seam`
 提供的 ``RunModeRegistry``，每个 mode（solo / team / cordis-creator / 未来
 research / code / creator 变体）由 ``ModeAdapter`` plugin 注册。无 ctx 时
 退化为稳定的 ``_FALLBACK_KEY_MAP``，保持与现有 OpenAI shim / 测试契约
@@ -24,7 +24,7 @@ from lca.contracts.capabilities import RUN_MODE_REGISTRY
 from lca.contracts.mechanisms.capability import require_capability
 
 if TYPE_CHECKING:
-    from lca.plugins.seams.state.run_mode_registry import RunModeRegistry
+    from lca.plugins.state.run_mode_registry_seam import RunModeRegistry
 
 
 @dataclass(frozen=True)

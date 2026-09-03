@@ -224,19 +224,19 @@ def test_missing_binding_error_exposes_diagnostic_fields() -> None:
         capability="effect_handler_registry",
         expected_source="bundle or profile patch",
         fallback_policy=FallbackPolicy.PRODUCTION,
-        provider_hint="lca.plugins.seams.act.effect_handler",
+        provider_hint="lca.plugins.act.effect_handler_seam",
         candidates=("bundle: bundles/base.yaml",),
-        additional=(("reducer", FallbackPolicy.PRODUCTION, "lca.plugins.runtime.reducer"),),
+        additional=(("reducer", FallbackPolicy.PRODUCTION, "lca.runtime.reducer"),),
     )
     msg = str(error)
     assert "effect_handler_registry" in msg
-    assert "lca.plugins.seams.act.effect_handler" in msg
+    assert "lca.plugins.act.effect_handler_seam" in msg
     assert "reducer" in msg
     assert "bundle: bundles/base.yaml" in msg
     assert error.capability == "effect_handler_registry"
     assert error.fallback_policy is FallbackPolicy.PRODUCTION
-    assert error.provider_hint == "lca.plugins.seams.act.effect_handler"
-    assert error.additional == (("reducer", FallbackPolicy.PRODUCTION, "lca.plugins.runtime.reducer"),)
+    assert error.provider_hint == "lca.plugins.act.effect_handler_seam"
+    assert error.additional == (("reducer", FallbackPolicy.PRODUCTION, "lca.runtime.reducer"),)
 
 
 def test_fallback_policy_test_default_relaxes_validator(tmp_path: Path) -> None:

@@ -28,7 +28,7 @@ from lca.contracts.protocols.collaboration.casting import (
     SelectedRole,
 )
 from lca.contracts.protocols.journal.spec import LeadSpec
-from lca.plugins.seams.collaboration.team_casting_prompt_renderer import (
+from lca.plugins.collaboration.team_casting_prompt_renderer_seam import (
     BuiltinCastingPromptRenderer,
 )
 from tests.harness.collector import InMemoryObservability

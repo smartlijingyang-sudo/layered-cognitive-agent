@@ -4,7 +4,7 @@
 entries:
   - id: lca-continuous-control-plane-factory
     name: lca_continuous_control_plane_factory
-    $module: lca.plugins.providers.collaboration.continuous_control_plane
+    $module: lca.plugins.collaboration.continuous_control_plane_provider
     config:
       database_path: .lca/continuous-work.db
       lease_seconds: 60

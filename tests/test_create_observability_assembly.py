@@ -2,9 +2,9 @@
 
 NOTE: 旧 ``create_observability(backends, settings, extra_projectors=...)``
 工厂已被 plugin 装配面替代：
-- console/jsonl/memory 后端 → ``lca.plugins.providers.memory.journal_memory`` 等
+- console/jsonl/memory 后端 → ``lca.plugins.memory.journal_memory_provider`` 等
   seam 工厂，由 ``assemble_observability`` 从 ``PluginContext`` 注册表解析；
-- Langfuse 桥接 → ``lca.plugins.providers.observability.fact_reader_langfuse`` 工厂；
+- Langfuse 桥接 → ``lca.plugins.observability.fact_reader_langfuse_provider`` 工厂；
 - 投影器注入 → ``extra_projectors`` 已无对应入口；后端工厂接受
   ``projections=`` 关键字，调用方应在注册 seam 时传入。
 

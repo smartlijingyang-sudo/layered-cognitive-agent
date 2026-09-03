@@ -30,7 +30,7 @@ from lca.contracts.models.core.budget import Budget
 from lca.contracts.models.core.decision import Decision, Observation, Turn
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.team.role_team import ToolPermissionManifest
-from lca.plugins.providers.gate.gate_chain_composer import DefaultGateChainComposer
+from lca.plugins.gate.gate_chain_composer_provider import DefaultGateChainComposer
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SEALER_PATH = (

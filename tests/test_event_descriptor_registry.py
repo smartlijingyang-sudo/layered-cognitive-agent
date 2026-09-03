@@ -122,7 +122,7 @@ def test_registry_iterator_returns_all_descriptors() -> None:
 
 def test_seam_provides_registry() -> None:
     """seam_event_descriptor 模块导入即可，且 setup 是 cordis Plugin 对象。"""
-    from lca.plugins.seams.observability import event_descriptor as mod
+    from lca.plugins.observability import event_descriptor_seam as mod
 
     assert hasattr(mod, "setup")
     # setup 在 @plugin 装饰后是 Plugin 对象，不是原函数

@@ -19,7 +19,7 @@ from lca.infrastructure.observability.journal.engine.journal_io import (
     read_journal,
     stamped_to_record,
 )
-from lca.plugins.providers.observability.cli_debug_trace import _DebugTraceCommand
+from lca.plugins.observability.cli_debug_trace_provider import _DebugTraceCommand
 
 
 def _scope() -> RunScope:
@@ -82,7 +82,7 @@ def test_trace_command_missing_file_returns_1(tmp_path) -> None:
 
 
 def test_seam_provides_debug_registry() -> None:
-    from lca.plugins.seams.observability import cli_debug as mod
+    from lca.plugins.observability import cli_debug_seam as mod
 
     assert hasattr(mod, "setup")
     meta = getattr(mod.setup, "meta", {})
@@ -90,8 +90,7 @@ def test_seam_provides_debug_registry() -> None:
 
 
 def test_trace_command_registered() -> None:
-    from lca.plugins import providers  # noqa: F401
-    from lca.plugins.providers.observability import cli_debug_trace as mod
+    from lca.plugins.observability import cli_debug_trace_provider as mod
 
     assert hasattr(mod, "setup")
     meta = getattr(mod.setup, "meta", {})

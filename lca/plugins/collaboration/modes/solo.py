@@ -15,7 +15,7 @@ from lca.contracts.protocols.runtime.infra import Tool
 from lca.contracts.protocols.session.run_mode import ModeAdapter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.observability import BoundObservability
-from lca.plugins.seams.state.run_mode_registry import RunModeRegistry
+from lca.plugins.state.run_mode_registry_seam import RunModeRegistry
 from lca.plugins.transport.webserver.handlers.runs.lifecycle.runnable_assembly import (
     RunnableBuildRequest,
 )

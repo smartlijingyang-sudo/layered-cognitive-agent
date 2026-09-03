@@ -24,8 +24,8 @@ from lca.contracts.protocols import (
     Reducer,
     SkillRouter,
 )
-from lca.plugins.providers.gate.decision_classifier import DefaultDecisionClassifier
-from lca.plugins.runtime.reducer import DefaultReducer
+from lca.plugins.gate.decision_classifier_provider import DefaultDecisionClassifier
+from lca.runtime.reducer import DefaultReducer
 
 # ── Test doubles ─────────────────────────────────────────────────────
 

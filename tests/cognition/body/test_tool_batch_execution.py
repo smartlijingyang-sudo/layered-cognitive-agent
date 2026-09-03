@@ -23,7 +23,7 @@ from lca.contracts.protocols.act.tool_batch_execution import (
     ToolBatchExecutionMode,
     ToolBatchExecutionSegment,
 )
-from lca.plugins.providers.act.tool_batch_execution_policy import build_tool_batch_execution_policy
+from lca.plugins.act.tool_batch_execution_policy_provider import build_tool_batch_execution_policy
 
 
 class _Tool:

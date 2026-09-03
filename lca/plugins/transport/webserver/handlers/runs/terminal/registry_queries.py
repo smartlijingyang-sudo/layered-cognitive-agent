@@ -33,9 +33,11 @@ class RegistryRunQueries:
 
         ADR-0099: single SSE connection, OpenAI ChatCompletion streaming format.
         """
-        from lca.plugins.providers.openai_stream_encoder import (
-            OpenAIChatChunkBuilder,
+        from lca.plugins.transport.openai_stream_encoder__encoder_provider import (
             OpenAIStreamEncoder,
+        )
+        from lca.plugins.transport.openai_stream_encoder__chunk_provider import (
+            OpenAIChatChunkBuilder,
         )
 
         session = self._registry.get(run_id)

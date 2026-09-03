@@ -100,7 +100,7 @@ def test_run_store_accepts_explicit_backend() -> None:
 
 def test_seam_provides_journal_store() -> None:
     """seam plugin 模块可导入。"""
-    from lca.plugins.seams.journal import journal_store_factories as mod
+    from lca.plugins.journal import journal_store_factories_seam as mod
 
     assert hasattr(mod, "setup")
     meta = getattr(mod.setup, "meta", {})
@@ -109,8 +109,7 @@ def test_seam_provides_journal_store() -> None:
 
 def test_provider_registers_memory_factory() -> None:
     """provider plugin 模块可导入并暴露 memory factory。"""
-    from lca.plugins import providers  # noqa: F401
-    from lca.plugins.providers.journal import fact_store_memory as mod
+    from lca.plugins.journal import fact_store_memory_provider as mod
 
     assert hasattr(mod, "setup")
     meta = getattr(mod.setup, "meta", {})

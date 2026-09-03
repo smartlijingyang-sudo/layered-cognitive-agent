@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from lca.plugins.providers.openai_stream_encoder._chunk import OpenAIChatChunkBuilder
+from lca.plugins.transport.openai_stream_encoder__chunk_provider import OpenAIChatChunkBuilder
 
 
 @pytest.fixture

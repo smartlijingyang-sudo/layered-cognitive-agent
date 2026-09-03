@@ -4,7 +4,7 @@ from __future__ import annotations
 
 
 def test_seam_provides_registry() -> None:
-    from lca.plugins.seams.observability import fact_scorer as mod
+    from lca.plugins.observability import fact_scorer_seam as mod
 
     assert hasattr(mod, "setup")
     meta = getattr(mod.setup, "meta", {})
@@ -12,8 +12,7 @@ def test_seam_provides_registry() -> None:
 
 
 def test_langfuse_scorer_registered() -> None:
-    from lca.plugins import providers  # noqa: F401
-    from lca.plugins.providers.observability import fact_scorer_langfuse as mod
+    from lca.plugins.observability import fact_scorer_langfuse_provider as mod
 
     assert hasattr(mod, "setup")
     meta = getattr(mod.setup, "meta", {})

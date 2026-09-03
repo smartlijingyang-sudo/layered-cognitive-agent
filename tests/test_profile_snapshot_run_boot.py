@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from lca.plugins.providers.profile_snapshot.run_boot import RunBootSnapshot
+from lca.plugins.observability.profile_snapshot_run_boot_provider import RunBootSnapshot
 
 
 def test_run_boot_writes_snapshot(tmp_path: Path):

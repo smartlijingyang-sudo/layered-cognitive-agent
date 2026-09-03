@@ -41,7 +41,7 @@ from lca.contracts.models.observability.journal_catalog import (
 from lca.infrastructure.observability.journal.engine.serialization import (
     stamped_to_journal_record,
 )
-from lca.plugins.providers.journal_schema.v2 import EnvelopeV2Schema
+from lca.plugins.journal.journal_schema_v2_provider import EnvelopeV2Schema
 
 _DEFAULT_SCHEMA = EnvelopeV2Schema()
 

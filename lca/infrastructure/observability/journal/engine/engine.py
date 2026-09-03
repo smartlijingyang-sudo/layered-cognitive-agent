@@ -52,7 +52,7 @@ from lca.infrastructure.observability.facade.projection_registry import (
 )
 from lca.infrastructure.observability.facade.run_context import get_current_run_scope
 from lca.infrastructure.observability.journal.backends.memory import InMemoryJournalStore
-from lca.plugins.providers.event_identity.stable_ulid import StableUlidIdentity
+from lca.plugins.observability.event_identity_stable_ulid_provider import StableUlidIdentity
 
 
 class UnregisteredJournalEventError(LedgerUnregisteredError):

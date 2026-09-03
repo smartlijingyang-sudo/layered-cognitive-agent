@@ -40,7 +40,7 @@ def test_booted_composer_factory_receives_the_selected_invariant_checker() -> No
 def test_production_provider_has_no_implicit_invariant_default() -> None:
     """Direct constructor fallback remains a fixture convenience, not a provider decision."""
 
-    source = (REPO / "lca/plugins/providers/think/composition_provider.py").read_text(
+    source = (REPO / "lca/plugins/think/composition_provider_provider.py").read_text(
         encoding="utf-8"
     )
     assert "build_composer_factory(target)" not in source

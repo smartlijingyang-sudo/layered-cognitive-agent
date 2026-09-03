@@ -84,7 +84,7 @@ def test_registry_returns_none_for_unknown() -> None:
 
 
 def test_seam_provides_registry() -> None:
-    from lca.plugins.seams.observability import genai as mod
+    from lca.plugins.observability import genai_seam as mod
 
     assert hasattr(mod, "setup")
     meta = getattr(mod.setup, "meta", {})
@@ -92,16 +92,16 @@ def test_seam_provides_registry() -> None:
 
 
 def test_llm_mapper_registered() -> None:
-    from lca.plugins import providers  # noqa: F401
-    from lca.plugins.providers.observability import genai_llm as mod
+    
+    from lca.plugins.observability import genai_llm_provider as mod
 
     meta = getattr(mod.setup, "meta", {})
     assert meta.get("id") == "lca-genai-llm-mapper"
 
 
 def test_tool_mapper_registered() -> None:
-    from lca.plugins import providers  # noqa: F401
-    from lca.plugins.providers.observability import genai_tool as mod
+    
+    from lca.plugins.observability import genai_tool_provider as mod
 
     meta = getattr(mod.setup, "meta", {})
     assert meta.get("id") == "lca-genai-tool-mapper"

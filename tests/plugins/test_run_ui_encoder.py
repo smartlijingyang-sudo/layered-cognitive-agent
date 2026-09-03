@@ -23,7 +23,7 @@ from lca.contracts.models.observability.journal import (
     ToolInvoked,
     ToolStarted,
 )
-from lca.plugins.providers.run_ui_encoder import RunUiEncoder
+from lca.plugins.transport.run_ui_encoder__encoder_provider import RunUiEncoder
 
 
 def _events(*items: Any) -> AsyncIterator[Any]:

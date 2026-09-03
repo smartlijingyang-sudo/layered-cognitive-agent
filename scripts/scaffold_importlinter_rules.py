@@ -47,7 +47,7 @@ PACKAGE_FORBIDDEN_RULES: list[tuple[str, list[str]]] = [
 ]
 
 # lca.plugins sub-packages 互不依赖
-# NOTE: Phase 1 暂不启用此规则。原因：lca.plugins.providers 是多个 plugin 的
+# NOTE: Phase 1 暂不启用此规则。原因：lca.plugins 下多个 plugin 通过
 # 间接依赖中枢（通过 lca.infrastructure.observability.journal.journal_io），导致
 # 几乎所有 lca.plugins 子包都间接依赖 providers，独立性规则会全失败。
 # 计划在 Phase 2/3 治理 providers 依赖后重新启用。

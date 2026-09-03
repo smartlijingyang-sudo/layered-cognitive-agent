@@ -47,47 +47,47 @@ class RuntimeClosureRequirement:
 _RUNTIME_CLOSURE_CATALOG: tuple[RuntimeClosureRequirement, ...] = (
     RuntimeClosureRequirement(
         "idempotency_store",
-        "lca.plugins.seams.journal.idempotency_store",
+        "lca.plugins.journal.idempotency_store_seam",
     ),
     RuntimeClosureRequirement(
         "effect_handler_registry",
-        "lca.plugins.seams.act.effect_handler",
+        "lca.plugins.act.effect_handler_seam",
     ),
     RuntimeClosureRequirement(
         "effect_dispatcher_factory",
-        "lca.plugins.providers.journal.declarative_runtime_seams",
+        "lca.plugins.journal.declarative_runtime_seams_provider",
     ),
     RuntimeClosureRequirement(
         "checkpoint_state_resolver_factory",
-        "lca.plugins.providers.journal.declarative_runtime_seams",
+        "lca.plugins.journal.declarative_runtime_seams_provider",
     ),
     RuntimeClosureRequirement(
         "result_finalizer_factory",
-        "lca.plugins.providers.journal.declarative_runtime_seams",
+        "lca.plugins.journal.declarative_runtime_seams_provider",
     ),
     RuntimeClosureRequirement(
         "delta_handler_registry",
-        "lca.plugins.seams.act.delta_handler",
+        "lca.plugins.act.delta_handler_seam",
     ),
     RuntimeClosureRequirement(
         "delta_reducer_factory",
-        "lca.plugins.providers.journal.declarative_runtime_seams",
+        "lca.plugins.journal.declarative_runtime_seams_provider",
     ),
     RuntimeClosureRequirement(
         "declarative_interpreter_factory",
-        "lca.plugins.providers.journal.declarative_runtime_seams",
+        "lca.plugins.journal.declarative_runtime_seams_provider",
     ),
     RuntimeClosureRequirement(
         "runtime_journal_factory",
-        "lca.plugins.providers.journal.declarative_runtime_seams",
+        "lca.plugins.journal.declarative_runtime_seams_provider",
     ),
     RuntimeClosureRequirement(
         "loop_guard_evaluator",
-        "lca.plugins.providers.think.loop_guard",
+        "lca.plugins.think.loop_guard_provider",
     ),
     RuntimeClosureRequirement(
         "evidence_store",
-        "lca.plugins.seams.observability.evidence_store",
+        "lca.plugins.observability.evidence_store_seam",
     ),
     RuntimeClosureRequirement(
         "stop_policy",
@@ -99,15 +99,15 @@ _RUNTIME_CLOSURE_CATALOG: tuple[RuntimeClosureRequirement, ...] = (
     ),
     RuntimeClosureRequirement(
         "artifact_closure",
-        "lca.plugins.providers.journal.artifact_closure",
+        "lca.plugins.journal.artifact_closure_provider",
     ),
     RuntimeClosureRequirement(
         "phase_observer",
-        "lca.plugins.providers.perceive.phase_observer",
+        "lca.plugins.perceive.phase_observer_provider",
     ),
     RuntimeClosureRequirement(
         "resume_input_adapters",
-        "lca.plugins.seams.gate.factory_seams",
+        "lca.plugins.gate.factory_seams_seam",
     ),
 )
 _RUNTIME_CLOSURE_BY_CAPABILITY: Mapping[str, RuntimeClosureRequirement] = MappingProxyType(

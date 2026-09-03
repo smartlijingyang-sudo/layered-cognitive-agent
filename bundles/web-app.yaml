@@ -92,7 +92,7 @@ entries:
   # barrier while allowing adjacent idempotent/read-only calls to overlap.
   - id: lca-tool-batch-execution-policy
     name: lca_tool_batch_execution_policy
-    $module: lca.plugins.providers.act.tool_batch_execution_policy
+    $module: lca.plugins.act.tool_batch_execution_policy_provider
     config:
       mode: segmented_safe
 
@@ -101,12 +101,12 @@ entries:
   # Tier-2 provider supplies DefaultActionHandlerRegistry with 4 built-in handlers.
   - id: lca-action-handler-registry-seam
     name: lca_seam_action_handler_registry
-    $module: lca.plugins.seams.act.action_handler
+    $module: lca.plugins.act.action_handler_seam
     config: {}
 
   - id: lca-action-handler-provider
     name: lca_action_handler_provider
-    $module: lca.plugins.providers.act.action_handlers
+    $module: lca.plugins.act.action_handlers_provider
     config: {}
 
   # ── Act / world plane ──
@@ -188,7 +188,7 @@ entries:
   # ── Journal store (named factory; spawn instantiates per-run) ──
   - id: lca-journal-store
     name: lca_journal_store
-    $module: lca.plugins.seams.journal.journal_store
+    $module: lca.plugins.journal.journal_store_seam
     config: {}
 
   # ── Run-loop driver registry (Tier-3) ─────────────
@@ -263,22 +263,22 @@ entries:
   # Tier-2 contributors register one component each for independent substitution.
   - id: lca-component-registry-seam
     name: lca_component_registry_seam
-    $module: lca.plugins.seams.state.component_registry
+    $module: lca.plugins.state.component_registry_seam
     config: {}
 
   - id: lca-component-state-store-contributor
     name: lca_component_state_store_contributor
-    $module: lca.plugins.providers.state.component_state_store
+    $module: lca.plugins.state.component_state_store_provider
     config: {}
 
   - id: lca-component-memory-contributor
     name: lca_component_memory_contributor
-    $module: lca.plugins.providers.memory.component_memory
+    $module: lca.plugins.memory.component_memory_provider
     config: {}
 
   - id: lca-component-budget-policy-contributor
     name: lca_component_budget_policy_contributor
-    $module: lca.plugins.providers.state.component_budget_policy
+    $module: lca.plugins.state.component_budget_policy_provider
     config: {}
 
   # ── Team strategy factories (ADR-0062 §7 / PR-4) ──

@@ -219,7 +219,7 @@ async def _build_team(
     if caster is not None:
         resolved_caster = caster
     else:
-        from lca.plugins.seams.collaboration.team_casting_prompt_renderer import (
+        from lca.plugins.collaboration.team_casting_prompt_renderer_seam import (
             BuiltinCastingPromptRenderer,
         )
 

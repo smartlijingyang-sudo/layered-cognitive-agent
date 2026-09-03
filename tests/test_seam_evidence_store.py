@@ -15,8 +15,8 @@ from lca.infrastructure.observability.evidence.store import FilesystemEvidenceSt
 
 def _invoke_seam_setup() -> dict[str, object]:
     """``@plugin`` 装饰后 ``setup`` 是 Plugin 对象;真实函数挂在 ``.setup`` 上。"""
-    from lca.plugins.seams.observability.evidence_store import Config
-    from lca.plugins.seams.observability.evidence_store import setup as seam_setup
+    from lca.plugins.observability.evidence_store_seam import Config
+    from lca.plugins.observability.evidence_store_seam import setup as seam_setup
 
     provided: dict[str, object] = {}
 
@@ -56,7 +56,7 @@ def test_seam_idempotent_when_called_twice() -> None:
 
 def test_seam_meta_manifest_is_correct() -> None:
     """Seam 的 cordis Plugin 元数据必须与 @plugin 装饰器一致(ADR-0061 / 0062)。"""
-    from lca.plugins.seams.observability.evidence_store import setup as seam_setup
+    from lca.plugins.observability.evidence_store_seam import setup as seam_setup
 
     meta = getattr(seam_setup, "meta", {})
     assert meta.get("id") == "lca-evidence-store-seam"

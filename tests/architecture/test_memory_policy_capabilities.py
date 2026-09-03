@@ -61,6 +61,6 @@ def test_booted_memory_service_uses_profile_selected_policy_instances() -> None:
 def test_memory_provider_does_not_register_the_concrete_class_directly() -> None:
     """Factory closure, rather than constructor defaults, owns production policy injection."""
 
-    source = (REPO / "lca/plugins/providers/memory/memory.py").read_text(encoding="utf-8")
+    source = (REPO / "lca/plugins/memory/memory_provider.py").read_text(encoding="utf-8")
     assert 'register("simple", SimpleMemorySystem)' not in source
     assert "build_simple_memory" in source
