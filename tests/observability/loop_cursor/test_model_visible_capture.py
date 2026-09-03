@@ -207,7 +207,11 @@ def test_capture_creates_run_dir_and_step_dir(tmp_path: Path) -> None:
 
 
 def test_capture_serializes_arbitrary_objects(tmp_path: Path) -> None:
-    """非原生 JSON 对象(Pydantic-like)也能序列化,content 不丢失关键字段。"""
+    """非原生 JSON 对象(Pydantic-like)也能序列化,content 不丢失关键字段。
+
+    SSOT 收口后:capture 入参已收紧为 ``list[ToolSchema]``,但通过
+    ``ToolSchema.from_any()`` 边界 transform,允许 SDK-style 异源对象。
+    """
     run_dir = tmp_path / "runs" / "r4"
     capture = StdModelVisibleCapture(run_dir=run_dir)
 
@@ -216,8 +220,15 @@ def test_capture_serializes_arbitrary_objects(tmp_path: Path) -> None:
             self.name = name
             self.args_schema = args_schema
 
-        def to_dict(self) -> dict:
-            return {"name": self.name, "args_schema": self.args_schema}
+        def to_openai_dict(self) -> dict:
+            return {
+                "type": "function",
+                "function": {
+                    "name": self.name,
+                    "description": "",
+                    "parameters": self.args_schema,
+                },
+            }
 
     tool = _StubTool("calc", {"type": "object"})
     artifact = capture.capture(
@@ -232,7 +243,16 @@ def test_capture_serializes_arbitrary_objects(tmp_path: Path) -> None:
     tools_raw = json.loads(
         (run_dir / "model_visible" / "step-009" / "tools.json").read_text(encoding="utf-8")
     )
-    assert tools_raw == [{"name": "calc", "args_schema": {"type": "object"}}]
+    assert tools_raw == [
+        {
+            "type": "function",
+            "function": {
+                "name": "calc",
+                "description": "",
+                "parameters": {"type": "object"},
+            },
+        }
+    ]
     assert artifact.tools_digest.startswith("sha256:")
 
 

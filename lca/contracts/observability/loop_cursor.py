@@ -92,7 +92,16 @@ class LoopCursor(Protocol):
     def snapshot(self) -> CursorSnapshot: ...
 
     # ── 转移(3) ──────────────────────────────────────────────────
-    def advance(self, phase: PhaseName) -> CursorSnapshot: ...
+    def advance(
+        self,
+        phase: PhaseName,
+        *,
+        objective_kind: Literal[
+            "user_text", "agent_role", "system_role", "model_name"
+        ] = "system_role",
+        objective: str = "",
+        summary: str = "",
+    ) -> CursorSnapshot: ...
     def halt(self, reason: CloseReason) -> None: ...
     def close(self, reason: CloseReason) -> None: ...
 

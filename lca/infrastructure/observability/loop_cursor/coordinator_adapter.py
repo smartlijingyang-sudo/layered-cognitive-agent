@@ -162,24 +162,23 @@ class CoordinatorAdapter:
         summary: str,
         outcome: str = "ok",
     ) -> None:
-        """``coord.emit_phase`` 翻译 → ``cursor.advance(phase)``。
+        r"""兼容壳 —— SSOT 收口后由调用方直接走 cursor.advance。
 
-        ``coord.emit_phase`` 写 ``phase.<name>.fold`` EP;cursor.advance(phase)
-        也派生 ``phase.<name>.fold`` EP(ADR-0169 P2 / L3)。
-        双写保 compat + 新增 SSOT 同步。
+        COMPAT(delete-when: ``rg "CoordinatorAdapter.emit_phase\|coord.emit_phase" lca/`` = 0,
+        tracking: ADR-0169-task-25)。业务路径必须改用 cursor.advance 并显式
+        标 objective_kind;不再由 Adapter 暗中翻译,杜绝 keyword 错位 bug
+        (历史:``objective=model`` 误传导致同 EP 出两条 payload)。
         """
-        self._cursor.advance(phase)  # type: ignore[arg-type]
-        self._coord.emit_phase(
-            phase=phase,
-            objective=objective,
-            summary=summary,
-            outcome=outcome,
+        del outcome  # outcome 已统一在 cursor.advance 不传,由 caller 决定
+        raise NotImplementedError(
+            "CoordinatorAdapter.emit_phase 已废弃;调用方请改用 cursor.advance(phase, "
+            "objective_kind=..., objective=..., summary=...)"
         )
 
     # ── record_*: 同时调 cursor + coord(双写) ──────────────────
 
     def record_thinking(self, trace: ThinkingTrace) -> None:
-        """``record_thinking`` 翻译 → ``cursor.record_thinking(ThinkingRecord(...))``。
+        """``record_thinking`` —— cursor 唯一 writer(SSOT 收口)。
 
         journal_step ``ThinkingTrace`` 字段 = model / latency_ms / reasoning /
         decision / tool_call / prompt_tokens / completion_tokens /
@@ -193,13 +192,6 @@ class CoordinatorAdapter:
         prompt_tokens = getattr(trace, "prompt_tokens", 0) or 0
         completion_tokens = getattr(trace, "completion_tokens", 0) or 0
         token_count = prompt_tokens + completion_tokens or None
-        # Bug fix (round 2): cursor's ``content_digest`` is contracted
-        # as ``sha256:<hex>`` (per ``loop_cursor_payloads.RequestHeader``
-        # + the shared _capture_io digest helper). The legacy adapter
-        # used to forward the raw ``reasoning`` text verbatim, which
-        # broke every downstream ``ReplayCursor`` that verifies the
-        # digest against the on-disk ``model_visible`` files. Now we
-        # compute the digest properly via the shared helper.
         reasoning_text = getattr(trace, "reasoning", "") or ""
         self._cursor.record_thinking(
             ThinkingRecord(
@@ -209,10 +201,9 @@ class CoordinatorAdapter:
                 thinking_kind="reasoning",
             )
         )
-        self._coord.record_thinking(trace)
 
     def record_tool_call(self, call: LegacyToolCallRecord) -> None:
-        """``record_tool_call`` 翻译 → ``cursor.record_tool_call(ToolCallRecord(...))``。
+        """``record_tool_call`` —— cursor 唯一 writer。
 
         journal_step ``ToolCallRecord`` 字段 = invocation_id / name / arguments /
         arguments_summary;cursor ``ToolCallRecord`` 字段 = tool_name / args_digest /
@@ -220,7 +211,7 @@ class CoordinatorAdapter:
             tool_name       ← name
             args_digest     ← sha256:<hex> via _capture_io helper
             args_payload_path ← None(arguments 内容由 payload adapter 处理)
-            call_seq        ← cursor's monotonic seq (was invocation_id hash, process-randomised)
+            call_seq        ← cursor's monotonic seq
         """
         tool_name = getattr(call, "name", "")
         invocation_id = getattr(call, "invocation_id", "") or ""
@@ -237,21 +228,15 @@ class CoordinatorAdapter:
             arguments_summary=args_summary,
             invocation_id=invocation_id,
         )
-        self._coord.record_tool_call(call)
 
     def record_tool_result(self, result: LegacyToolResult) -> None:
-        """``record_tool_result`` 翻译 → ``cursor.record_tool_result(ToolResultRecord(...))``。
+        """``record_tool_result`` —— cursor 唯一 writer。
 
         journal_step ``ToolResult`` 没有 ``tool_name`` 字段(由 caller 上下文
-        提供);cursor ``ToolResultRecord`` 必填 tool_name,降级用 ``delta_summary`` 或空串。
+        提供);cursor ``ToolResultRecord`` 必填 tool_name,降级用空串。
         """
         ok = bool(getattr(result, "ok", True))
         outcome: str = "ok" if ok else "failure"
-        # Bug fix (round 2): the legacy fallback used ``delta_summary``
-        # as tool_name when ``tool_name`` was empty, polluting the
-        # tool_name field with prose. Drop the fallback — an empty
-        # tool_name signals "anonymous tool result" which downstream
-        # handlers can deal with.
         tool_name = getattr(result, "tool_name", "") or ""
         delta_summary = getattr(result, "delta_summary", "") or ""
         latency_ms = int(getattr(result, "latency_ms", 0) or 0)
@@ -278,7 +263,6 @@ class CoordinatorAdapter:
             error=error,
             delta_summary=delta_summary,
         )
-        self._coord.record_tool_result(result)
 
     def record_reflect(self, reflect: ReflectTrace) -> None:
         """``record_reflect`` —— cursor 无 record_reflect,仅 coord 写。"""

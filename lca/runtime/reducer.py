@@ -223,9 +223,15 @@ class DefaultReducer(Reducer):
         (b) state.history[-1].decision.response_text(decision 的载体文本);
         (c) handoff completion 走 "handoff completed" 占位(仅在 output_text
         为空时 materialization)。
+
+        SSOT 收口(SSOT-Teardown):本方法**不**再内部调 ``apply_stop``;
+        teardown 顺序由 caller 决定——caller 应先 ``apply_stop(state, stop)``
+        再 ``apply_terminal_outcome(state, stop, ...)``。这避免历史 bug
+        (spine 同 run 出现 apply_stop × 2,第二次嵌套在 apply_terminal_outcome
+        内部,造成 reducer 状态被 apply 两次)。
         """
-        # Apply stop to state first (legacy compatibility)
-        state = self.apply_stop(state, stop)
+        # 注释保留:不再调 self.apply_stop(state, stop)。
+        # 调用方必须在调本方法前显式 apply_stop 一次。
 
         # ADR-0158 决策 四:final_output 来源整合(不再读 state.final_output)。
         # 优先级:StopDecision.final_output > last_turn.decision.response_text

@@ -258,19 +258,33 @@ def test_adapter_record_tool_result_emits_cursor_tool_result_ep() -> None:
     assert result_ep["payload"]["tool_name"] == ""
 
 
-def test_adapter_emit_phase_advances_cursor_phase_window() -> None:
-    """``adapter.emit_phase(phase='perceive', ...)`` → cursor.advance('perceive') 派生 phase.perceive.fold EP。"""
-    adapter, spine, _ = _build_adapter()
+def test_adapter_emit_phase_is_deprecated() -> None:
+    """SSOT 收口后 emit_phase raise,业务路径必须直接调 cursor.advance(phase, ...) 派生 phase.<x>.fold EP。
 
-    adapter.emit_phase(
-        phase="perceive",
+    删除条件(SSOT-Compat):``rg "CoordinatorAdapter.emit_phase|coord.emit_phase" lca/`` = 0 时,
+    CoordinatorAdapter.emit_phase 整体删除(包括本测试)。
+    """
+    adapter, _, _ = _build_adapter()
+
+    raised = False
+    try:
+        adapter.emit_phase(
+            phase="perceive",
+            objective="collect context",
+            summary="perceived 3 items",
+            outcome="ok",
+        )
+    except NotImplementedError:
+        raised = True
+    assert raised, "adapter.emit_phase must raise NotImplementedError"
+
+    # cursor.advance 仍然派生 phase.<x>.fold EP,SSOT 唯一 writer。
+    adapter.cursor.advance(
+        "perceive",
+        objective_kind="system_role",
         objective="collect context",
         summary="perceived 3 items",
-        outcome="ok",
     )
-
-    eps = [r["execution_point"] for r in spine.records]
-    assert "phase.perceive.fold" in eps
     assert adapter.cursor.snapshot.phase == "perceive"
 
 
@@ -288,46 +302,55 @@ def test_adapter_close_triggers_cursor_close_ep() -> None:
     assert closing_ep["payload"]["reason"] == "completed"
 
 
-def test_adapter_record_reflect_delegates_to_coord_only() -> None:
-    """``adapter.record_reflect(reflect)`` —— cursor 不暴露 record_reflect;仅 coord 写。"""
-    adapter, spine, _ = _build_adapter()
+def test_adapter_record_reflect_is_deprecated() -> None:
+    """SSOT 收口后 ``record_reflect`` raise(SSOT-Compat)—— reflect EP 由 cursor 派生。
+
+    删除条件:``rg "CoordinatorAdapter.record_reflect" lca/`` = 0 时本测试与对应方法整体删除。
+    """
+    adapter, _, _ = _build_adapter()
     adapter.begin_step("think")
 
     reflect = ReflectTrace(summary="ok", verdict="ok")
-    adapter.record_reflect(reflect)
+    raised = False
+    try:
+        adapter.record_reflect(reflect)
+    except NotImplementedError:
+        raised = True
+    assert raised, "adapter.record_reflect must raise NotImplementedError"
 
-    # cursor 不知道 record_reflect;spine 不应有 step.reflect.record EP
-    eps = [r["execution_point"] for r in spine.records]
-    assert "step.reflect.record" not in eps
 
+def test_adapter_record_span_is_deprecated() -> None:
+    """SSOT 收口后 ``record_span`` raise(SSOT-Compat)—— span EP 由 cursor 派生。
 
-def test_adapter_record_span_delegates_to_coord_only() -> None:
-    """``adapter.record_span(span)`` —— cursor 不暴露 record_span;仅 coord 写。"""
-    adapter, spine, _ = _build_adapter()
+    删除条件:``rg "CoordinatorAdapter.record_span" lca/`` = 0 时本测试与对应方法整体删除。
+    """
+    adapter, _, _ = _build_adapter()
     adapter.begin_step("think")
 
     span = SpanRecord(kind="runtime_observed", started_at=0.0)
-    adapter.record_span(span)
+    raised = False
+    try:
+        adapter.record_span(span)
+    except NotImplementedError:
+        raised = True
+    assert raised, "adapter.record_span must raise NotImplementedError"
 
-    eps = [r["execution_point"] for r in spine.records]
-    assert "step.span.record" not in eps
 
+def test_adapter_emit_is_deprecated() -> None:
+    """SSOT 收口后 ``emit`` raise(SSOT-Compat)—— 任意 EP 不再由 Adapter 翻译。
 
-def test_adapter_emit_passes_through_to_coord() -> None:
-    """``adapter.emit(...)`` —— cursor 不暴露任意 EP 入口;只走 coord。
-
-    StepCoordinator.emit 走五面矩阵(emitter / coalescer / storage),不是
-    spine;所以 ``spine.records`` 不会增加(capture 端需走 coord 自身)。
+    删除条件:``rg "CoordinatorAdapter.emit(" lca/`` = 0 时本测试与对应方法整体删除。
     """
-    adapter, spine, _ = _build_adapter()
-    adapter.emit(
-        execution_point="writable.step.start",
-        payload={"phase": "think"},
-    )
-
-    # spine 不接收任意 EP —— adapter.emit 不调 spine
-    eps = [r["execution_point"] for r in spine.records]
-    assert "writable.step.start" not in eps
+    adapter, _, _ = _build_adapter()
+    raised = False
+    try:
+        adapter.emit(
+            execution_point="writable.step.start",
+            payload={"phase": "think"},
+        )
+    except NotImplementedError:
+        raised = True
+    assert raised, "adapter.emit must raise NotImplementedError"
 
 
 def test_adapter_exposes_cursor_and_coord() -> None:

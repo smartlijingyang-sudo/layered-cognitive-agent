@@ -20,6 +20,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from lca.contracts.observability.loop_cursor_payloads import ToolSchema
+
 
 @dataclass(frozen=True)
 class ModelVisibleArtifact:
@@ -68,7 +70,7 @@ class ModelVisibleCapture(Protocol):
         step_id: str,
         incarnation: int,
         system: Any,
-        tools: list[Any],
+        tools: list[ToolSchema],
         messages: list[Any],
         manifest: Any,
         inherited_from_step: str | None = None,

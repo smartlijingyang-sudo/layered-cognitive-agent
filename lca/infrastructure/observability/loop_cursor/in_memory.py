@@ -70,25 +70,42 @@ class InMemoryLoopCursor:
         if self._state.halted:
             raise CursorError("cursor halted; awaiting resume")
 
-    def advance(self, phase: PhaseName) -> CursorSnapshot:
+    def advance(
+        self,
+        phase: PhaseName,
+        *,
+        objective_kind: Literal[
+            "user_text", "agent_role", "system_role", "model_name"
+        ] = "system_role",
+        objective: str = "",
+        summary: str = "",
+    ) -> CursorSnapshot:
         self._ensure_open()
         self._ensure_not_halted()
         s = self._state
         # 进入 stop 之后必须 close 才能 advance
         if s.phase == "stop" and phase != "perceive":
             raise CursorError(f"cannot advance from stop to {phase!r}")
-        # 业务：从 stop → perceive 触发新一轮 iteration
+        # 业务:从 stop → perceive 触发新一轮 iteration
         if s.phase == "stop" and phase == "perceive":
             s.iteration += 1
             s.attempt_in_step = 0
             s.step_index = 0
         s.phase = phase
-        # 派生 phase.<name>.fold EP(ADR-0169 P2 / L3) — 与 StdLoopCursor 同口径。
+        # 派生 phase.<name>.fold EP(ADR-0169 P2 / L3)—— 与 StdLoopCursor 同口径。
         if self._spine is not None:
             s.seq += 1
             self._spine.append(
                 execution_point=f"phase.{phase}.fold",
-                payload={"phase": phase},
+                payload={
+                    "phase": phase,
+                    "objective_kind": objective_kind,
+                    "objective": objective,
+                    "summary": summary,
+                    "incarnation": s.incarnation.incarnation_seq,
+                    "plan_ref": s.incarnation.plan_ref,
+                    "step_index": s.step_index,
+                },
                 run_id=s.run_id,
                 seq=s.seq,
                 incarnation=s.incarnation.incarnation_seq,

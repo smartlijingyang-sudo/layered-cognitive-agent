@@ -167,12 +167,15 @@ def test_apply_terminal_outcome_rejects_waiting_input_without_durable_cursor() -
         status=TaskStatus.INPUT_REQUIRED,
     )
 
+    # SSOT 收口(SSOT-Teardown):apply_terminal_outcome 不再内部调 apply_stop;
+    # teardown 顺序由 caller 决定——caller 必须先 apply_stop 再 apply_terminal_outcome。
+    state = DefaultReducer().apply_stop(_state(), stop)
     with pytest.raises(
         DeclarativeValidationError,
         match="requires a durable resume cursor",
     ):
         DefaultReducer().apply_terminal_outcome(
-            _state(), stop, plan_ref="plan-hil", journal_seq_end=4
+            state, stop, plan_ref="plan-hil", journal_seq_end=4
         )
 
 

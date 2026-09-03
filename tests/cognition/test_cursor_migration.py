@@ -197,21 +197,22 @@ def _strip_docstrings_and_comments(source: str) -> str:
 
 
 def test_tool_journal_emit_routes_start_through_cursor_record_tool_call() -> None:
-    """``emit_tool_started`` 调 ``cursor.record_tool_call(ToolCallRecord(...))``。
+    """``emit_tool_started`` 经 cursor.record_tool_call / CursorRecord 落 evidence EP。
 
-    ADR-0169 PR-1/S1 业务迁 cursor:``phase.tool.call.start`` EP 不再经
-    ``coord.emit`` 落 spine,改走 cursor.record_tool_call → ``step.tool_call.record``。
-    canonical ToolStarted JournalEvent 仍然 record()(ADR-0063 SSOT)。
+    ADR-0169 PR-1/S1 + SSOT 收口:cursor 是 spine writer 唯一入口。ToolCallRecord
+    构造在 CursorRecord 内部;helper 只透传字段。
     """
     from lca.cognition.body import tool_journal_emit
 
     source_started = inspect.getsource(tool_journal_emit.emit_tool_started)
     body = _strip_docstrings_and_comments(source_started)
-    assert "cursor.record_tool_call" in body, (
-        "emit_tool_started must route through cursor.record_tool_call (ADR-0169 PR-1/S1)"
+    assert (
+        "cursor.record_tool_call" in body
+        or "CursorRecord.try_record_tool_call" in body
+    ), (
+        "emit_tool_started must route through cursor.record_tool_call "
+        "(directly or via CursorRecord wrapper; ADR-0169 SSOT)"
     )
-    assert "ToolCallRecord(" in body, "emit_tool_started must build a ToolCallRecord payload"
-    # coord.emit / phase.tool.call.start 不应再出现在代码路径(docstring/comment 忽略)
     assert "coord.emit" not in body, "emit_tool_started no longer calls coord.emit (ADR-0169 §D9)"
     assert "phase.tool.call.start" not in body, (
         "emit_tool_started no longer emits phase.tool.call.start EP"
@@ -219,24 +220,35 @@ def test_tool_journal_emit_routes_start_through_cursor_record_tool_call() -> Non
 
 
 def test_tool_journal_emit_routes_end_through_cursor_record_tool_result() -> None:
-    """``emit_tool_invoked`` 调 ``cursor.record_tool_result(ToolResultRecord(...))``。"""
+    """``emit_tool_invoked`` 经 cursor.record_tool_result 落 evidence EP。"""
     from lca.cognition.body import tool_journal_emit
 
     source_invoked = inspect.getsource(tool_journal_emit.emit_tool_invoked)
     body = _strip_docstrings_and_comments(source_invoked)
-    assert "cursor.record_tool_result" in body
-    assert "ToolResultRecord(" in body
+    assert (
+        "cursor.record_tool_result" in body
+        or "CursorRecord.try_record_tool_result" in body
+    ), (
+        "emit_tool_invoked must route through cursor.record_tool_result "
+        "(directly or via CursorRecord wrapper; ADR-0169 SSOT)"
+    )
     assert "coord.emit" not in body
     assert "phase.tool.call.end" not in body
 
 
 def test_tool_journal_emit_routes_denied_through_cursor_record_tool_result() -> None:
-    """``emit_tool_denied`` 调 ``cursor.record_tool_result(outcome="denied")``。"""
+    """``emit_tool_denied`` 经 cursor.record_tool_result(outcome="denied") 落 evidence EP。"""
     from lca.cognition.body import tool_journal_emit
 
     source_denied = inspect.getsource(tool_journal_emit.emit_tool_denied)
     body = _strip_docstrings_and_comments(source_denied)
-    assert "cursor.record_tool_result" in body
+    assert (
+        "cursor.record_tool_result" in body
+        or "CursorRecord.try_record_tool_result" in body
+    ), (
+        "emit_tool_denied must route through cursor.record_tool_result "
+        "(directly or via CursorRecord wrapper; ADR-0169 SSOT)"
+    )
     assert '"denied"' in body
     assert "coord.emit" not in body
     assert "phase.tool.denied" not in body
@@ -279,31 +291,39 @@ def test_tool_journal_emit_runtime_records_tool_call_ep_when_cursor_bound() -> N
 
 
 def test_safe_executor_record_tool_call_evidence_routes_through_cursor() -> None:
-    """``_record_tool_call_evidence`` 调 ``cursor.record_tool_call(ToolCallRecord(...))``。
+    """``_record_tool_call_evidence`` 经 cursor.record_tool_call 落 evidence EP。
 
-    PR-1/S1: ``phase.act.fold.start`` EP 不再经 ``coord.emit``,改走 cursor。
-    PR-26 task-25:phase 推进由 SimpleBody 负责,helpers 只落证据 EP。
+    PR-1/S1 + SSOT 收口:允许 CursorRecord.try_record_tool_call 包装层。ToolCallRecord
+    构造在 CursorRecord 内部;helper 只透传 tool_name / invocation_id / args_digest。
     """
     from lca.cognition.body import safe_executor
 
     source_open = inspect.getsource(safe_executor._record_tool_call_evidence)
     body = _strip_docstrings_and_comments(source_open)
-    assert "cursor.record_tool_call" in body, (
-        "_record_tool_call_evidence must route through cursor.record_tool_call (ADR-0169 PR-1/S1)"
+    assert (
+        "cursor.record_tool_call" in body
+        or "CursorRecord.try_record_tool_call" in body
+    ), (
+        "_record_tool_call_evidence must route through cursor.record_tool_call "
+        "(ADR-0169 PR-1/S1)"
     )
-    assert "ToolCallRecord(" in body
     assert "coord.emit" not in body
     assert "phase.act.fold.start" not in body
 
 
 def test_safe_executor_record_tool_result_evidence_routes_through_cursor() -> None:
-    """``_record_tool_result_evidence`` 调 ``cursor.record_tool_result(ToolResultRecord(...))``。"""
+    """``_record_tool_result_evidence`` 经 cursor.record_tool_result 落 evidence EP。
+
+    ToolResultRecord 构造在 CursorRecord 内部;helper 只透传 tool_name / result_digest / outcome。
+    """
     from lca.cognition.body import safe_executor
 
     source_close = inspect.getsource(safe_executor._record_tool_result_evidence)
     body = _strip_docstrings_and_comments(source_close)
-    assert "cursor.record_tool_result" in body
-    assert "ToolResultRecord(" in body
+    assert (
+        "cursor.record_tool_result" in body
+        or "CursorRecord.try_record_tool_result" in body
+    )
     assert "coord.emit" not in body
     assert "phase.act.fold.end" not in body
 
@@ -350,10 +370,11 @@ def test_safe_executor_evidence_runtime_records_tool_result_ep_when_cursor_bound
 
 
 def test_safe_executor_record_tool_call_evidence_swallows_cursor_phase_error() -> None:
-    """``_record_tool_call_evidence`` 在 cursor 不在 ACT phase 时抛 CursorError。
+    """``_record_tool_call_evidence`` 经 CursorRecord.try_record_tool_call 包装层吞 CursorError。
 
-    调用方(SimpleBody.act / SafeExecutor.execute)负责捕获并降级,本函数
-    仅验证 record_tool_call 的契约:phase != "act" → CursorError,不静默吞。
+    SSOT 收口:phase != "act" 时 cursor.record_tool_call 抛 CursorError(契约不变);
+    CursorRecord.try_record_tool_call 包装层吞掉并 warning,不向上抛——避免单 tool
+    调用失败触发整 session RuntimeError(regression for run_9e181f24c275)。
     """
     cursor, _ = _make_cursor()
     cursor.advance("think")
@@ -364,8 +385,8 @@ def test_safe_executor_record_tool_call_evidence_swallows_cursor_phase_error() -
 
     token = bind_current_cursor(cursor)
     try:
-        with pytest.raises(CursorError):
-            _record_tool_call_evidence("test_tool", "inv-1")
+        # 不应抛 CursorError:try_record_tool_call 包装层吞掉(PR-26 task-25 政策)。
+        _record_tool_call_evidence("test_tool", "inv-1")
     finally:
         reset_current_cursor(token)
 

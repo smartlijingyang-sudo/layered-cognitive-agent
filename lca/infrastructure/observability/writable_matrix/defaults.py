@@ -22,6 +22,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
+from lca.contracts.observability.loop_cursor_payloads import ToolSchema
 from lca.infrastructure.observability.spine.event_record import EventRecord
 
 # 仅 FilesystemRecorder 用到 hashlib(json 已在上文 import);不再为它单独 import。
@@ -284,8 +285,16 @@ class FilesystemRecorder:
     def record_prompt(self, step_id: str, text: str) -> None:
         self._write(step_id, "system_prompt.json", {"step_id": step_id, "body": text})
 
-    def record_tools(self, step_id: str, schemas: tuple[Any, ...]) -> None:
-        self._write(step_id, "tools.json", list(schemas))
+    def record_tools(self, step_id: str, schemas: tuple[ToolSchema, ...]) -> None:
+        """强类型入参 —— 边界做 OpenAI-style transform(SSOT 收口)。
+
+        历史 bug:tuple[Any, ...] 路径在 LLM adapter 把 Tool 对象直接传进来,
+        json.dumps(default=str) 退化为空 dict / 暴露 _store 句柄 —— 22 个工具
+        落盘后 17 个是空 dict。修复:Protocol 钉死 tuple[ToolSchema, ...],
+        在边界把异源对象归一到 ToolSchema,然后只导出 to_openai_dict()。
+        """
+        payload = [s.to_openai_dict() for s in schemas]
+        self._write(step_id, "tools.json", payload)
 
     def record_manifest(self, step_id: str, manifest: Any) -> None:
         self._write(step_id, "manifest.json", manifest)
@@ -306,7 +315,7 @@ class NullRecorder:
     def record_prompt(self, step_id: str, text: str) -> None:
         del step_id, text
 
-    def record_tools(self, step_id: str, schemas: tuple[Any, ...]) -> None:
+    def record_tools(self, step_id: str, schemas: tuple[ToolSchema, ...]) -> None:
         del step_id, schemas
 
     def record_manifest(self, step_id: str, manifest: Any) -> None:

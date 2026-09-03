@@ -23,6 +23,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from lca.contracts.observability.loop_cursor_payloads import ToolSchema
 from lca.contracts.observability.model_visible_capture import (
     ModelVisibleArtifact,
     ModelVisibleCapture,
@@ -85,7 +86,7 @@ class StdModelVisibleCapture(ModelVisibleCapture):
         step_id: str,
         incarnation: int,
         system: Any,
-        tools: list[Any],
+        tools: list[ToolSchema],
         messages: list[Any],
         manifest: Any,
         inherited_from_step: str | None = None,
@@ -99,7 +100,18 @@ class StdModelVisibleCapture(ModelVisibleCapture):
         messages_path = step_dir / "messages.json"
         manifest_path = step_dir / "manifest.json"
 
-        tools_digest = _write_json(tools_path, _to_jsonable(tools))
+        # 边界 transform:异源 tool 对象归一到 ToolSchema(to_openai_dict())。
+        # capture 不允许接 ``list[Any]`` —— Protocol 钉死 list[ToolSchema],
+        # 但调用方仍可能传带 to_openai_dict() 方法的 SDK 对象;统一走 ToolSchema.from_any。
+        from lca.contracts.observability.loop_cursor_payloads import ToolSchema
+
+        normalised = [
+            t if isinstance(t, ToolSchema) else ToolSchema.from_any(t) for t in tools
+        ]
+        tools_digest = _write_json(
+            tools_path,
+            _to_jsonable([t.to_openai_dict() for t in normalised]),
+        )
 
         # messages.json 现在承载两件事:
         # - messages_overview.system:送入 LLM 的 system 段(原 system.json 数据)

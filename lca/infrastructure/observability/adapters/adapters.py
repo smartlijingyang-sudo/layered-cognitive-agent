@@ -418,36 +418,43 @@ class TelemetryLLMAdapter(LLMAdapter):
                 reasoning_preview=reasoning_text[:1024],
             )
         )
-        # ADR-0167 D11: think.end 经 Coordinator 推 phase 边
-        from lca.infrastructure.observability.writable_matrix.coordinator import (
-            get_current_coordinator,
+        # SSOT:phase.think.fold 由 cursor 唯一派生(ADR-0169 P2)。
+        # 历史 bug:此路径曾用 coord.emit_phase 把 ``model=`` 误传成 ``objective=``,
+        # 导致 spine 同 EP 出现 objective=模型名 与 objective=用户文本两条。
+        # 修复:直接走 cursor.advance,objective_kind 显式 ``model_name``。
+        from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+            get_current_cursor,
         )
 
-        coord = get_current_coordinator()
-        if coord is not None:
-            coord.emit_phase(
-                phase="think",
+        cursor = get_current_cursor()
+        if cursor is not None:
+            cursor.advance(
+                "think",
+                objective_kind="model_name",
                 objective=model,
                 summary=("respond" if ok else "error"),
-                outcome="ok" if ok else "failure",
             )
 
 
 def _open_think_step(prompt: str) -> None:
-    """Emit think 边 via StepCoordinator (ADR-0167 D11)。"""
-    from lca.infrastructure.observability.writable_matrix.coordinator import (
-        get_current_coordinator,
+    """Emit think 边 via cursor —— cursor 是唯一 writer(SSOT 收口)。
+
+    ADR-0169 P2:phase.<x>.fold 由 cursor.advance 派生,禁止 coord 双写。
+    objective 必须是用户原文,显式标 ``user_text``。
+    """
+    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+        get_current_cursor,
     )
 
-    coord = get_current_coordinator()
-    if coord is None:
+    cursor = get_current_cursor()
+    if cursor is None:
         return
     objective = (prompt or "").strip().replace("\n", " ")
     if len(objective) > 200:
         objective = objective[:200] + "…"
-    coord.emit_phase(
-        phase="think",
+    cursor.advance(
+        "think",
+        objective_kind="user_text",
         objective=objective or "llm.complete",
         summary="started",
-        outcome="ok",
     )

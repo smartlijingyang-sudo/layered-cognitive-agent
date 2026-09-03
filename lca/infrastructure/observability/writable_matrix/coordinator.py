@@ -17,9 +17,9 @@ Agent / Brain / Body / Perceive 只与 ``StepCoordinator`` 交互。
 from __future__ import annotations
 
 from contextvars import ContextVar
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, get_args
+from typing import Any
 
 from lca.contracts.models.observability.journal_step import (
     ReflectTrace,
@@ -124,6 +124,10 @@ class StepCoordinator:
         )
 
     def _write(self, record: EventRecord) -> None:
+        # SSOT 收口:StepCoordinator 不再是 spine writer。cursor 是唯一写入者
+        # (ADR-0169 P2 / D1);此方法保留仅供内部 state 派生(driver.begin_step
+        # 仍要走 StepDriver registry 派生 step_id,见 begin_step 注释)。
+        # 业务路径(record_* / emit_* / emit_phase)必须改走 cursor。
         emitter = self.registry.require("emitter")
         coalescer = self.registry.require("coalescer")
         serializer = self.registry.require("serializer")
@@ -132,19 +136,28 @@ class StepCoordinator:
         coalescer.feed(record.execution_point, record.payload)
         storage.write(serializer.serialize(record))
 
+    def _block_ep_write(self, ep: str) -> None:
+        r"""业务路径 EP 写入 SSOT 守护 —— cursor 才是唯一 writer。
+
+        COMPAT(delete-when: ``rg "step\.thinking\.record\|step\.tool_call\.record\|step\.tool_result\.record\|step\.reflect\.record\|step\.span\.record\|phase\..*\.fold\|writable\.step\|writable\.segment" lca/infrastructure/observability/writable_matrix/coordinator.py`` 仅剩 begin_step/end_step/begin_segment/end_segment 的内部 _write,
+        tracking: ADR-0169-task-25)。
+        """
+        raise NotImplementedError(
+            f"StepCoordinator.{ep} 已废弃:spine EP 写入唯一走 cursor.advance / cursor.record_*(SSOT)。"
+        )
+
     # ── 切步 / 切段 ────────────────────────────────────────────────
 
     def begin_step(self, phase: str, **ctx: Any) -> str:
+        """SSOT 收口后,begin_step 仅保留 driver 派生 step_id 的内部状态。
+
+        不再写 ``writable.step.start`` EP —— step 派生由 cursor.record_request_header
+        完成(ADR-0169 D4,L6)。业务路径必须走 cursor。
+        """
         if self._current_step is not None:
             raise RuntimeError(f"begin_step while step {self._current_step!r} still open")
         driver = self.registry.require("driver")
         self._current_step = driver.begin_step(phase, **ctx)
-        self._write(
-            self._mint_record(
-                execution_point="writable.step.start",
-                payload={"phase": phase, "step_id": self._current_step, **ctx},
-            )
-        )
         return self._current_step
 
     def end_step(
@@ -153,54 +166,35 @@ class StepCoordinator:
         *,
         error: str | None = None,
     ) -> None:
+        """仅做 driver.end_step 状态收尾,不再写 ``writable.step.end`` EP。
+
+        EP 派生由 cursor.advance('stop') 完成(ADR-0169 P2)。
+        """
         if self._current_step is None:
             raise RuntimeError("end_step while no step open")
         driver = self.registry.require("driver")
         step_id = self._current_step
         driver.end_step(step_id, outcome)
-        payload: dict[str, Any] = {"step_id": step_id, "outcome": outcome}
-        if error is not None:
-            payload["error"] = error
-        final_outcome: str = "failure" if error is not None else outcome
-        self._write(
-            self._mint_record(
-                execution_point="writable.step.end",
-                payload=payload,
-                outcome=final_outcome,
-            )
-        )
         self._current_step = None
 
     def begin_segment(self, kind: str) -> str:
+        """仅做 driver.begin_segment 状态派生,不再写 ``writable.segment.start`` EP。
+
+        EP 由 cursor 派生(ADR-0169)。
+        """
         if self._current_step is None:
             raise RuntimeError("begin_segment while no step open")
         driver = self.registry.require("driver")
         self._current_segment = driver.begin_segment(self._current_step, kind)
-        self._write(
-            self._mint_record(
-                execution_point="writable.segment.start",
-                payload={
-                    "step_id": self._current_step,
-                    "segment_id": self._current_segment,
-                    "kind": kind,
-                },
-            )
-        )
         return self._current_segment
 
     def end_segment(self, outcome: str = "success") -> None:
+        """仅做 driver.end_segment 状态收尾,不再写 EP。"""
         if self._current_segment is None:
             raise RuntimeError("end_segment while no segment open")
         driver = self.registry.require("driver")
         seg_id = self._current_segment
         driver.end_segment(seg_id, outcome)
-        self._write(
-            self._mint_record(
-                execution_point="writable.segment.end",
-                payload={"segment_id": seg_id, "outcome": outcome},
-                outcome=outcome,
-            )
-        )
         self._current_segment = None
 
     # ── 通用 emit ─────────────────────────────────────────────────
@@ -214,16 +208,13 @@ class StepCoordinator:
         outcome: Outcome | None = None,
         reason: str | None = None,
     ) -> None:
-        """任意 EP 入口；delegate 给五面矩阵。"""
-        self._write(
-            self._mint_record(
-                execution_point=execution_point,
-                channel=channel,
-                payload=payload,
-                outcome=outcome,
-                reason=reason,
-            )
-        )
+        """SSOT 守护:任意 EP 入口已废弃 —— 由 cursor 派生。
+
+        COMPAT(见 _block_ep_write 注释)。保留空实现仅供 fixture 旧 wiring
+        不破;业务代码必须改用 cursor.advance / cursor.record_*。
+        """
+        del execution_point, channel, payload, outcome, reason
+        self._block_ep_write("emit")
 
     # ── phase 边（perceive / remember / stop 不开 step）──────────
 
@@ -235,77 +226,40 @@ class StepCoordinator:
         summary: str,
         outcome: str = "ok",
     ) -> None:
-        """不开 step 的相位：单次事实事件（ADR-0167 D2 / D11）。
+        """SSOT 守护:phase.<x>.fold 必须由 cursor.advance 派生。
 
-        ADR-0166 D4：perceive / reflect / remember / stop 不创建 step，
-        写入 ``phase.<name>.fold`` 一个事实 EP；stop 与失败回退由
-        Driver 在 ``end_step`` 处表达。
+        COMPAT(见 _block_ep_write 注释)。本方法保留以保旧 wiring 不破,但
+        一旦调用即 raise,迫使调用方迁移到 cursor。
         """
-        outcome_lit = outcome if outcome in get_args(Outcome) else None
-        self._write(
-            self._mint_record(
-                execution_point=f"phase.{phase}.fold",
-                payload={
-                    "phase": phase,
-                    "objective": objective,
-                    "summary": summary,
-                },
-                outcome=outcome_lit,
-            )
-        )
+        del phase, objective, summary, outcome
+        self._block_ep_write("emit_phase")
 
     # ── record_*(Agent 写原语) ─────────────────────────────────
 
     def record_thinking(self, trace: ThinkingTrace) -> None:
-        if self._current_step is None:
-            raise RuntimeError("record_thinking: no open step")
-        self._write(
-            self._mint_record(
-                execution_point="step.thinking.record",
-                payload={"trace": asdict(trace)},
-            )
-        )
+        """SSOT 守护:step.thinking.record 由 cursor.record_thinking 派生。"""
+        del trace
+        self._block_ep_write("record_thinking")
 
     def record_tool_call(self, call: ToolCallRecord) -> None:
-        if self._current_step is None:
-            raise RuntimeError("record_tool_call: no open step")
-        self._write(
-            self._mint_record(
-                execution_point="step.tool_call.record",
-                payload={"call": asdict(call)},
-            )
-        )
+        """SSOT 守护:step.tool_call.record 由 cursor.record_tool_call 派生。"""
+        del call
+        self._block_ep_write("record_tool_call")
 
     def record_tool_result(self, result: ToolResult) -> None:
-        if self._current_step is None:
-            raise RuntimeError("record_tool_result: no open step")
-        self._write(
-            self._mint_record(
-                execution_point="step.tool_result.record",
-                payload={"result": asdict(result)},
-                outcome="success" if result.ok else "failure",
-            )
-        )
+        """SSOT 守护:step.tool_result.record 由 cursor.record_tool_result 派生。"""
+        del result
+        self._block_ep_write("record_tool_result")
 
     def record_reflect(self, reflect: ReflectTrace) -> None:
-        if self._current_step is None:
-            raise RuntimeError("record_reflect: no open step")
-        self._write(
-            self._mint_record(
-                execution_point="step.reflect.record",
-                payload={"reflect": asdict(reflect)},
-            )
-        )
+        """SSOT 守护:step.reflect.record 由 cursor 派生。"""
+        del reflect
+        self._block_ep_write("record_reflect")
 
     def record_span(self, span: SpanRecord) -> None:
-        if self._current_step is None:
-            raise RuntimeError("record_span: no open step")
-        self._write(
-            self._mint_record(
-                execution_point="step.span.record",
-                payload={"span": asdict(span)},
-            )
-        )
+        """SSOT 守护:step.span.record 由 cursor 派生。"""
+        del span
+        self._block_ep_write("record_span")
 
     # ── context manager 便利 ─────────────────────────────────────
 

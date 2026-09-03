@@ -18,6 +18,7 @@ from lca.contracts.observability.loop_cursor import (
     PhaseName,
 )
 from lca.contracts.observability.loop_cursor_payloads import (
+    PhaseFoldPayload,
     RequestHeader,
     ThinkingRecord,
     ToolCallRecord,
@@ -116,7 +117,23 @@ class StdLoopCursor:
             raise CursorError("cursor halted; awaiting resume")
 
     # ── 转移(3) ──────────────────────────────────────────────────
-    def advance(self, phase: PhaseName) -> CursorSnapshot:
+    def advance(
+        self,
+        phase: PhaseName,
+        *,
+        objective_kind: Literal["user_text", "agent_role", "system_role", "model_name"] = "system_role",
+        objective: str = "",
+        summary: str = "",
+    ) -> CursorSnapshot:
+        """Phase 窗口转移,并唯一派生 ``phase.<name>.fold`` EP。
+
+        强类型 payload(ADR-0169 P2 + SSOT 收口):
+        - ``objective_kind`` 与 ``objective`` 必须配对 —— 不再接受裸 str,
+          杜绝历史 bug(spine 同时出现 objective=模型名 与 objective=用户文本
+          两条同 EP,因为 LLM adapter 把 ``objective=model`` 误传给 emit_phase)。
+        - 不传 objective 时 objective_kind 默认为 ``system_role``,允许
+          perceive / remember / stop 等不带 objective 的相位折叠。
+        """
         self._ensure_open()
         self._ensure_not_halted()
         s = self._state
@@ -128,10 +145,24 @@ class StdLoopCursor:
         elif s.phase == "stop" and phase != "perceive":
             raise CursorError(f"cannot advance from stop to {phase!r}")
         s.phase = phase
-        # 派生 phase.<name>.fold EP(ADR-0169 P2 / L3)
+        # 派生 phase.<name>.fold EP(ADR-0169 P2 / L3)—— cursor 是唯一写入者
+        fold_payload = PhaseFoldPayload(
+            phase=phase,
+            objective_kind=objective_kind,
+            objective=objective,
+            summary=summary,
+        )
         self._append(
             execution_point=f"phase.{phase}.fold",
-            payload={"phase": phase},
+            payload={
+                "phase": fold_payload.phase,
+                "objective_kind": fold_payload.objective_kind,
+                "objective": fold_payload.objective,
+                "summary": fold_payload.summary,
+                "incarnation": s.incarnation.incarnation_seq,
+                "plan_ref": s.incarnation.plan_ref,
+                "step_index": s.step_index,
+            },
         )
         return self.snapshot
 

@@ -221,18 +221,25 @@ def test_swap_driver_rejects_double_begin(tmp_path: Path) -> None:
 
 
 def test_swap_storage_preserves_hash_chain(tmp_path: Path) -> None:
-    """换 storage 不影响 sequence / prev_event_hash（spine 自维护）。"""
+    """换 storage 不影响 sequence / prev_event_hash(spine 自维护)。
 
+    SSOT 收口(SSOT-Cursor):spine EP 由 cursor 派生,不再经 coord.emit。
+    本测试改走 spine 直发,保持"hash chain 由 spine context 维护"的本意。
+    """
     spine = _SpySpine()
     coord = _build_coord(spine, tmp_path)
-    # Coordinator 走 spine.append；spine 内部 hash chain 自维护
+    # Coordinator 走 spine.append;spine 内部 hash chain 自维护
     coord.begin_step("think")
     coord.begin_segment("think")
-    coord.emit(execution_point="writable.segment.end", payload={"k": 1})
-    # 确认 _SpySpine 接收了 3 个调用；hash chain 由 spine context 维护
+    # 业务路径不再调 coord.emit;直接走 spine append(SSOT 收口后)
+    spine.append(
+        execution_point="writable.segment.end",
+        payload={"k": 1},
+    )
+    # 确认 _SpySpine 接收了 3 个调用;hash chain 由 spine context 维护
     # 我们用 spy calls 数量与 sequence 顺序来证明 SSOT 不变
     seqs = []
     for c in spine.calls:
         p = c.get("caller_payload") or c.get("payload") or {}
         seqs.append(p.get("sequence") if isinstance(p, dict) and "sequence" in p else 0)
-    assert seqs == [1, 2, 3] or len(seqs) >= 1  # SSOT 顺序不变（内容因 EP 而异）
+    assert seqs == [1, 2, 3] or len(seqs) >= 1  # SSOT 顺序不变(内容因 EP 而异)

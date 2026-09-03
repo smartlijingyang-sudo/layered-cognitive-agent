@@ -70,6 +70,10 @@ class RuntimeResultFinalizer(ResultFinalizer):
         if outcome.kind == "paused":
             final_state = self._reducer.apply_paused(final_state, outcome.cursor)
 
+        # SSOT 收口(SSOT-Teardown):先 apply_stop,再 apply_terminal_outcome,
+        # 二者严格单向顺序——避免历史 bug(spine 同 run 出现 apply_stop × 2,
+        # 第二次嵌套在 apply_terminal_outcome 内部)。
+        final_state = self._reducer.apply_stop(final_state, outcome.stop)
         terminal_outcome = self._reducer.apply_terminal_outcome(
             final_state,
             outcome.stop,

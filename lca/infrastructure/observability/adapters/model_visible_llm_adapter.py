@@ -153,7 +153,11 @@ def _derive_capture_inputs(
     else:
         system = {"objective": "(see provider prompt catalog)", "derived": True}
     tools_raw = kwargs.get("tools")
-    tools: list[Any] = list(tools_raw) if isinstance(tools_raw, (list, tuple)) else []
+    raw_list = list(tools_raw) if isinstance(tools_raw, (list, tuple)) else []
+    # SSOT 收口:异源 tool 对象归一到 ToolSchema,防止 tools.json 落盘成空 dict。
+    from lca.contracts.observability.loop_cursor_payloads import ToolSchema
+
+    tools: list[ToolSchema] = [ToolSchema.from_any(t) for t in raw_list]
     messages: list[dict[str, Any]] = [{"role": "user", "content": prompt or ""}]
     manifest: dict[str, Any] = {
         "source": "model_visible_llm_adapter",
