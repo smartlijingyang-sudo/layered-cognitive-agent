@@ -133,6 +133,29 @@ _SPINE_EP_TO_CATEGORY: dict[str, str] = {
     "skill_router.route": "spine.cognition.skill_router.route",
     "memory.read": "spine.cognition.memory.read",
     "memory.write": "spine.cognition.memory.write",
+    # Body（PR-3）
+    "body.tool.execute.start": "spine.body.tool.execute.start",
+    "body.tool.execute.end": "spine.body.tool.execute.end",
+    "body.tool.retry": "spine.body.tool.retry",
+    "body.sandbox.enter": "spine.body.sandbox.enter",
+    "body.sandbox.exit": "spine.body.sandbox.exit",
+    # Lifecycle（PR-3）
+    "lifecycle.finally": "spine.lifecycle.finally",
+    # LLM（PR-3）
+    "llm.call.start": "spine.llm.call.start",
+    "llm.call.end": "spine.llm.call.end",
+    "llm.stream.token": "spine.llm.stream.token",
+    "llm.stream.stall": "spine.llm.stream.stall",
+    "llm.request.header": "spine.llm.request.header",
+    # Exception（PR-3）
+    "exception.caught": "spine.exception.caught",
+    "exception.finally": "spine.exception.finally",
+    # Runtime observed（PR-3 与 exception 一起迁；旧 runtime.py 整文件删前迁齐）
+    "runtime.reducer.apply": "spine.runtime.reducer.apply",
+    "runtime.checkpoint.create": "spine.runtime.checkpoint.create",
+    "runtime.resume.start": "spine.runtime.resume.start",
+    "runtime.resume.end": "spine.runtime.resume.end",
+    "runtime.event_publisher.publish": "spine.runtime.event_publisher.publish",
 }
 
 

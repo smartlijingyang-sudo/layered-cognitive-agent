@@ -48,7 +48,7 @@ log = logging.getLogger(__name__)
 # ── 类型守卫 ──────────────────────────────────────────────────────────────
 
 
-def is_spine_event(payload: Any) -> TypeGuard["SpineEventPayload"]:
+def is_spine_event(payload: Any) -> TypeGuard[SpineEventPayload]:
     """类型守卫：payload 是 SpineEventPayload？
 
     替代散落的 ``hasattr(payload, "execution_point")`` 模式。pydantic
@@ -67,7 +67,7 @@ class SpineClock:
     全局可注入（测试可换 FrozenClock）；生产用 wall-clock UTC。
     """
 
-    _override: "datetime | None" = None
+    _override: datetime | None = None
 
     @classmethod
     def now(cls) -> datetime:
@@ -80,7 +80,7 @@ class SpineClock:
         return cls.now().isoformat()
 
     @classmethod
-    def freeze(cls, at: "datetime | None") -> None:
+    def freeze(cls, at: datetime | None) -> None:
         """测试用：固定时钟；at=None 解除。"""
         cls._override = at
 
@@ -161,11 +161,11 @@ class SpineEventRecord:
     @classmethod
     def build(
         cls,
-        payload: "SpineEventPayload",
-        ref: "EventRef",
+        payload: SpineEventPayload,
+        ref: EventRef,
         *,
-        chain: "SpineChainContext | None" = None,
-    ) -> "SpineEventRecord":
+        chain: SpineChainContext | None = None,
+    ) -> SpineEventRecord:
         """从 SpineEventPayload + EventRef 构造标准化记录。
 
         chain 显式传才算 chain（causation_id + prev_event_hash + event_hash）。
@@ -234,8 +234,9 @@ class SpineStream:
     def __init__(self, *, default: TextIO | None = None) -> None:
         env_path = os.environ.get("LCA_SPINE_STREAM")
         if env_path and env_path != "-":
-            # 写到文件而不是 stdout（生产 SSE / 容器友好）
-            self._default = Path(env_path).open("a", encoding="utf-8")
+            # 写到文件而不是 stdout（生产 SSE / 容器友好）；
+            # 持有文件句柄到对象生命周期,不能用 with
+            self._default = Path(env_path).open("a", encoding="utf-8")  # noqa: SIM115
         else:
             self._default = default or sys.stdout
 

@@ -271,6 +271,17 @@ def test_setup_requires_file_sink_capability() -> None:
         asyncio.run(setup.setup(ctx, config={}))
 
 
+@pytest.mark.xfail(
+    reason=(
+        "ADR-0181 PR-3：旧 EventSpine 反射器 (runtime / body_llm) 已退役；"
+        "spine.core 还试图对它们 soft-import + set_active_spine，"
+        "而新 spine_reflector_body_llm / spine_reflector_runtime "
+        "不再提供 set_active_spine。本测试覆盖 EventSpine 路径，等价 "
+        "EventMechanism 路径由 spine.core boot 重新覆盖（PR-7 cleanup）。"
+        "删-when：PR-9 旧 spine 全退役（rg EventSpine lca/plugins/observability/spine/ = 0）。"
+    ),
+    strict=True,
+)
 def test_setup_soft_subscribes_optional_derivers_and_console_sink() -> None:
     """Optional derivers / console_sink are wired when present; missing is fine."""
     from lca.plugins.observability.spine.core import setup
@@ -334,6 +345,18 @@ def test_spine_core_holder_carries_all_three_components() -> None:
         holder.event_spine = spine  # type: ignore[misc]
 
 
+@pytest.mark.xfail(
+    reason=(
+        "ADR-0181 PR-3：旧 EventSpine 反射器 (runtime / body_llm) 已退役；"
+        "旧 test_setup_activates_process_local_spine_accessor 强依赖 "
+        "runtime_reflector.set_active_spine/get_active_spine，"
+        "新 spine_reflector_runtime 不再提供。本测试覆盖 EventSpine 路径，"
+        "等价 EventMechanism 路径由 EventMechanism.set_default + spine core "
+        "boot 重新覆盖。删-when：PR-9 旧 spine 全退役（rg "
+        "lca.plugins.observability.spine.reflectors lca/ = 0）。"
+    ),
+    strict=True,
+)
 def test_setup_activates_process_local_spine_accessor() -> None:
     """After setup, wrap_instrument / reflectors resolve the live EventSpine.
 

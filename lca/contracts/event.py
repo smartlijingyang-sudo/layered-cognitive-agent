@@ -56,6 +56,26 @@ class Category(str, Enum):
     SPINE_COGNITION_SKILL_ROUTER_ROUTE = "spine.cognition.skill_router.route"
     SPINE_COGNITION_MEMORY_READ = "spine.cognition.memory.read"
     SPINE_COGNITION_MEMORY_WRITE = "spine.cognition.memory.write"
+    # observability/spine — PR-3 body / llm / lifecycle / exception 全迁 12 EP
+    SPINE_BODY_TOOL_EXECUTE_START = "spine.body.tool.execute.start"
+    SPINE_BODY_TOOL_EXECUTE_END = "spine.body.tool.execute.end"
+    SPINE_BODY_TOOL_RETRY = "spine.body.tool.retry"
+    SPINE_BODY_SANDBOX_ENTER = "spine.body.sandbox.enter"
+    SPINE_BODY_SANDBOX_EXIT = "spine.body.sandbox.exit"
+    SPINE_LIFECYCLE_FINALLY = "spine.lifecycle.finally"
+    SPINE_LLM_CALL_START = "spine.llm.call.start"
+    SPINE_LLM_CALL_END = "spine.llm.call.end"
+    SPINE_LLM_STREAM_TOKEN = "spine.llm.stream.token"  # noqa: S105  # enum 名,非密码
+    SPINE_LLM_STREAM_STALL = "spine.llm.stream.stall"
+    SPINE_LLM_REQUEST_HEADER = "spine.llm.request.header"
+    SPINE_EXCEPTION_CAUGHT = "spine.exception.caught"
+    SPINE_EXCEPTION_FINALLY = "spine.exception.finally"
+    # observability/spine — PR-3 runtime.observed 5 EP（runtime.py 整文件删前迁齐）
+    SPINE_RUNTIME_REDUCER_APPLY = "spine.runtime.reducer.apply"
+    SPINE_RUNTIME_CHECKPOINT_CREATE = "spine.runtime.checkpoint.create"
+    SPINE_RUNTIME_RESUME_START = "spine.runtime.resume.start"
+    SPINE_RUNTIME_RESUME_END = "spine.runtime.resume.end"
+    SPINE_RUNTIME_EVENT_PUBLISHER_PUBLISH = "spine.runtime.event_publisher.publish"
 
 
 class Plane(str, Enum):
@@ -86,6 +106,25 @@ CATEGORY_DEFAULT_PLANE: dict[Category, Plane] = {
     Category.SPINE_COGNITION_SKILL_ROUTER_ROUTE: Plane.OBSERVABILITY,
     Category.SPINE_COGNITION_MEMORY_READ: Plane.OBSERVABILITY,
     Category.SPINE_COGNITION_MEMORY_WRITE: Plane.OBSERVABILITY,
+    # PR-3 body / llm / lifecycle / exception 全迁
+    Category.SPINE_BODY_TOOL_EXECUTE_START: Plane.OBSERVABILITY,
+    Category.SPINE_BODY_TOOL_EXECUTE_END: Plane.OBSERVABILITY,
+    Category.SPINE_BODY_TOOL_RETRY: Plane.OBSERVABILITY,
+    Category.SPINE_BODY_SANDBOX_ENTER: Plane.OBSERVABILITY,
+    Category.SPINE_BODY_SANDBOX_EXIT: Plane.OBSERVABILITY,
+    Category.SPINE_LIFECYCLE_FINALLY: Plane.OBSERVABILITY,
+    Category.SPINE_LLM_CALL_START: Plane.OBSERVABILITY,
+    Category.SPINE_LLM_CALL_END: Plane.OBSERVABILITY,
+    Category.SPINE_LLM_STREAM_TOKEN: Plane.OBSERVABILITY,
+    Category.SPINE_LLM_STREAM_STALL: Plane.OBSERVABILITY,
+    Category.SPINE_LLM_REQUEST_HEADER: Plane.OBSERVABILITY,
+    Category.SPINE_EXCEPTION_CAUGHT: Plane.OBSERVABILITY,
+    Category.SPINE_EXCEPTION_FINALLY: Plane.OBSERVABILITY,
+    Category.SPINE_RUNTIME_REDUCER_APPLY: Plane.OBSERVABILITY,
+    Category.SPINE_RUNTIME_CHECKPOINT_CREATE: Plane.OBSERVABILITY,
+    Category.SPINE_RUNTIME_RESUME_START: Plane.OBSERVABILITY,
+    Category.SPINE_RUNTIME_RESUME_END: Plane.OBSERVABILITY,
+    Category.SPINE_RUNTIME_EVENT_PUBLISHER_PUBLISH: Plane.OBSERVABILITY,
 }
 
 

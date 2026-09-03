@@ -91,11 +91,6 @@ entries:
     $module: lca.plugins.observability.spine.reflectors.context
     config: {}
 
-  - id: spine.reflector.runtime
-    name: spine_reflector_runtime
-    $module: lca.plugins.observability.spine.reflectors.runtime
-    config: {}
-
   # ── L0 classifiers (2) ──────────────────────────────────────────
   - id: spine.classifier.exception.builtin
     name: spine_classifier_exception_builtin

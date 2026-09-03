@@ -36,7 +36,23 @@ from lca.infrastructure.observability.stream.llm_stream_activity import (
     LlmStreamActivityTracker,
 )
 from lca.infrastructure.observability.stream.response_text_stream import ResponseTextStreamExtractor
-from lca.plugins.observability.spine.reflectors import body_llm as _body_llm_reflector
+# NOTE: spine_reflector_body_llm 走函数内 lazy import，避免 adapters →
+# lca.infrastructure.observability → lca_kernel.boot 链路触发 circular import。
+
+
+def _body_llm_reflector() -> Any:
+    """Lazy-import spine_reflector_body_llm to break circular import.
+
+    adapters.adapters 被 lca.infrastructure.observability.__init__ 优先
+    导入；如顶层 import spine_reflector_body_llm 会触发
+    lca_kernel.events.payloads → lca_kernel.boot → lca.harness.observability
+    → lca.infrastructure.observability 回灌，模块未初始化导致
+    ``ImportError: cannot import name 'X' from partially initialized module``。
+    """
+    from lca.plugins.events.publishers.spine_reflector_body_llm import plugin
+
+    return plugin
+
 
 _PERF_COUNTER_SCALE = 1000
 """perf_counter 秒 → 毫秒换算。"""
@@ -101,7 +117,7 @@ class TelemetryLLMAdapter(LLMAdapter):
         # The journal ``record()`` pair (LlmCallStarted / LlmCallCompleted)
         # remains for backward compatibility with the legacy projector
         # pipeline; the spine pair is additive.
-        _body_llm_reflector.emit_llm_call_start(
+        _body_llm_reflector().emit_llm_call_start(
             model=model,
             stream=False,
             prompt_preview=prompt,
@@ -110,7 +126,7 @@ class TelemetryLLMAdapter(LLMAdapter):
             response = await self._inner.complete(prompt, **kwargs)
         except Exception:
             self._record(model, prompt, "", False, started, 0, 0, stream=False)
-            _body_llm_reflector.emit_llm_call_end(
+            _body_llm_reflector().emit_llm_call_end(
                 model=model,
                 stream=False,
                 outcome="failure",
@@ -128,7 +144,7 @@ class TelemetryLLMAdapter(LLMAdapter):
             completion_tokens,
             stream=False,
         )
-        _body_llm_reflector.emit_llm_call_end(
+        _body_llm_reflector().emit_llm_call_end(
             model=model,
             stream=False,
             outcome="success",
@@ -155,7 +171,7 @@ class TelemetryLLMAdapter(LLMAdapter):
         _open_think_step(prompt)
         record(LlmCallStarted(step=step, model=model))
         # PR-3.3: spine emits llm.call.start at the beginning of the stream.
-        _body_llm_reflector.emit_llm_call_start(
+        _body_llm_reflector().emit_llm_call_start(
             model=model,
             stream=True,
             prompt_preview=prompt,
@@ -169,7 +185,7 @@ class TelemetryLLMAdapter(LLMAdapter):
         end_outcome: str = "success"
 
         def _on_idle(idle_s: float, idle_seq: int) -> None:
-            _body_llm_reflector.emit_llm_stream_stall(
+            _body_llm_reflector().emit_llm_stream_stall(
                 model=model,
                 idle_ms=int(idle_s * _PERF_COUNTER_SCALE),
                 seq=idle_seq,
@@ -236,7 +252,7 @@ class TelemetryLLMAdapter(LLMAdapter):
                     # paths; bracketing here keeps llm.call.end durable.
                     if not spine_end_emitted:
                         pt, ct = _usage_of(final_response) if final_response is not None else (0, 0)
-                        _body_llm_reflector.emit_llm_call_end(
+                        _body_llm_reflector().emit_llm_call_end(
                             model=model,
                             stream=True,
                             outcome="success",
@@ -260,7 +276,7 @@ class TelemetryLLMAdapter(LLMAdapter):
                         )
                         # ADR-0167 D4b / PR-3: 流式 delta 由 coalescer 合并后落
                         # step.thinking.reasoning，不按 token 写 EP / span —— bridge 已删。
-                        _body_llm_reflector.emit_llm_stream_token(
+                        _body_llm_reflector().emit_llm_stream_token(
                             model=model,
                             text_delta=delta_text,
                             seq=reasoning_seq,
@@ -279,7 +295,7 @@ class TelemetryLLMAdapter(LLMAdapter):
                         )
                     )
                     # ADR-0167 D4b / PR-3: 流式 delta 不写 EP / span（已删 bridge_*）
-                    _body_llm_reflector.emit_llm_stream_token(
+                    _body_llm_reflector().emit_llm_stream_token(
                         model=model,
                         text_delta=delta_text,
                         seq=delta_seq,
@@ -371,7 +387,7 @@ class TelemetryLLMAdapter(LLMAdapter):
                 prompt_tokens, completion_tokens = (
                     _usage_of(final_response) if final_response is not None else (0, 0)
                 )
-                _body_llm_reflector.emit_llm_call_end(
+                _body_llm_reflector().emit_llm_call_end(
                     model=model,
                     stream=True,
                     outcome=outcome,  # type: ignore[arg-type]

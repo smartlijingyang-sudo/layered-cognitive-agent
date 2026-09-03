@@ -45,7 +45,7 @@ class DeclarativeCheckpoint:
         # PR-3.4: emit the canonical runtime.checkpoint.create event after the
         # checkpoint materialises. The helper is a silent no-op when no spine
         # is wired (default in unit tests), so legacy callers are unchanged.
-        from lca.plugins.observability.spine.reflectors.runtime import (
+        from lca.plugins.events.publishers.spine_reflector_runtime import (
             emit_runtime_checkpoint_create,
         )
 

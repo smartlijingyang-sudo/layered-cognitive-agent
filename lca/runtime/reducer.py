@@ -74,7 +74,7 @@ def _instrument_apply(
 
         @functools.wraps(fn)
         def wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
-            from lca.plugins.observability.spine.reflectors.runtime import (
+            from lca.plugins.events.publishers.spine_reflector_runtime import (
                 emit_runtime_reducer_apply_end,
                 emit_runtime_reducer_apply_start,
             )
@@ -99,7 +99,7 @@ def _instrument_apply(
     def decorator(fn: Callable[_P, _R]) -> Callable[_P, _R]:
         @functools.wraps(fn)
         def wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
-            from lca.plugins.observability.spine.reflectors.runtime import (
+            from lca.plugins.events.publishers.spine_reflector_runtime import (
                 emit_runtime_reducer_apply_end,
                 emit_runtime_reducer_apply_start,
             )

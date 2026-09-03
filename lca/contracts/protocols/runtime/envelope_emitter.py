@@ -6,10 +6,12 @@ tree (``lca.plugins.observability.spine.reflectors.runtime``,
 dependency direction (``runtime → plugin.observability``) and forced
 every emit helper to be lazily imported inside each call site.
 
-This Protocol flips the dependency: the plugin tree provides the
-implementation; the runtime consumes it through a bound capability on
-``DeclarativeRuntimeBindings``.  Call sites use ``self._bindings.envelope.emit_*``
-instead of inline imports.
+PR-3 把 envelope emitter helper 迁到
+``lca.plugins.events.publishers.spine_reflector_runtime`` /
+``spine_reflector_agent_spawn``（PR-4）；旧 plugin 树上的 reflector 文件
+随 PR-9 一起退役。本 Protocol 描述的 capability 形态不变：plugin tree
+提供实现，runtime 通过 ``DeclarativeRuntimeBindings`` 消费。
+Call sites 用 ``self._bindings.envelope.emit_*`` 取代 inline imports。
 
 Implementations are provided by the spine plugin tree via
 ``lca/infrastructure/observability/envelope_emitter.py``.

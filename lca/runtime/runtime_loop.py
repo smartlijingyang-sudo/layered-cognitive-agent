@@ -215,7 +215,7 @@ class CognitiveRuntime(Runtime):
         # materialised so the event payload reflects the plan_ref / node_id
         # the driver is about to interpret. The end event is emitted from
         # inside _run_driver's exception/finally envelope.
-        from lca.plugins.observability.spine.reflectors.runtime import (
+        from lca.plugins.events.publishers.spine_reflector_runtime import (
             emit_runtime_resume_start,
         )
 
@@ -257,7 +257,7 @@ class CognitiveRuntime(Runtime):
                 ),
                 "node_id": phase_cursor,
             }
-        from lca.plugins.observability.spine.reflectors.runtime import (
+        from lca.plugins.events.publishers.spine_reflector_runtime import (
             emit_exception_caught,
             emit_exception_finally,
             emit_lifecycle_finally,

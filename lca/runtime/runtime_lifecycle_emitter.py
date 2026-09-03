@@ -80,7 +80,7 @@ class RuntimeLifecycleEmitter:
         # no-op when no spine is wired (default in unit tests), so the
         # existing DI seam to the legacy RuntimeLifecyclePublisher is
         # preserved untouched.
-        from lca.plugins.observability.spine.reflectors.runtime import (
+        from lca.plugins.events.publishers.spine_reflector_runtime import (
             emit_runtime_event_publisher_publish,
         )
 

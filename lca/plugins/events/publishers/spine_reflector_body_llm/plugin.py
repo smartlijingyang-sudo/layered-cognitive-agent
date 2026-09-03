@@ -1,81 +1,64 @@
-"""Body + LLM spine reflector — PR-3.3.
+"""spine_reflector_body_llm plugin（ADR-0181 PR-3）。
 
-Emits canonical ``EXECUTION_POINTS`` events from the body layer (tool
-execution and sandbox enter/exit) and the LLM layer (call start/end
-and stream token). The module is the single emission site for these
-eight execution points; the cognition/body/llm modules call the tiny
-``emit_*`` helpers here before/after their public-method work and never
-touch ``EventSpine.append`` directly.
+PR-3：body + llm 全部 9 emit（tool.execute.start/end + retry + sandbox.enter/exit
++ decision.start/end + llm.call.start/end + llm.stream.token + llm.stream.stall）
+下沉到 EventMechanism.send；signature 严格对齐旧
+lca/plugins/observability/spine/reflectors/body_llm.py 调用方零改动（仅
+import 路径换到 lca.plugins.events.publishers.spine_reflector_body_llm）。
 
-Pattern
--------
-Mirrors :mod:`lca.plugins.observability.spine.reflectors.cognition`:
-helpers read the process-local active spine installed by
-``set_active_spine`` and call ``spine.append(...)``. When no spine is
-wired (default in unit tests), the helpers are silent no-ops — body
-and LLM semantics and existing test surface are unchanged.
-
-FD-1 / FD-2 containment
------------------------
-- ``emit_*`` wraps ``spine.append`` in ``try/except``. ``spine.append``
-  follows FD-1 fail-fast on sink errors and FD-2 containment on
-  deriver errors; the helper itself never adds another failure surface
-  above it.
-- ``EventRecord`` validation errors (e.g. malformed payload) raised
-  by ``spine.append`` are contained here so body / LLM business logic
-  is never blocked by a broken helper.
-
-The module imports only the public spine surface (``EventSpine``,
-``SpineContext``, ``EXECUTION_POINTS``) and the ``Outcome`` type. It
-does NOT import the legacy journal facade or any
-``journal.{engine,backends,stream,step}`` module — those are forbidden
-by the brief.
+业务方一行调：
+    EventMechanism.send(
+        SpineEventPayload(execution_point="...", channel="...", payload={...}),
+        plugin=ReflectorClass,
+    )
 """
-
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from lca.infrastructure.observability.spine.event_record import (
-    Channel,
-    EventRecord,
-    Outcome,
-)
-from lca.plugins.observability.spine._spine_safety import (
-    get_active_spine,
-    safe_append,
-    set_active_spine,
-)
+from lca_kernel.events.payloads import Category, SpineEventPayload
+from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
+
+if TYPE_CHECKING:
+    from lca_kernel.events.mechanism import EventRef
 
 log = logging.getLogger(__name__)
 
-# `_safe_append` and the active-spine accessors live in
-# `plugins.observability.spine._spine_safety` — the single
-# source of truth across all reflector modules. Profile boot
-# installs the run's EventSpine there so every body / LLM call
-# can locate it without changing any constructor signature.
 
-def _safe_append(
+class ReflectorClass:
+    """publisher plugin 类（空标记类）。机制按 class 全路径鉴权。"""
+
+
+def _send(
     *,
     execution_point: str,
-    channel: Channel,
-    payload: dict[str, Any] | None = None,
-    outcome: Outcome | None = None,
-) -> EventRecord | None:
-    """Thin pass-through to the shared ``safe_append`` helper.
+    channel: str,
+    payload: dict[str, Any],
+) -> EventRef:
+    """内部 helper：构造 SpineEventPayload + EventMechanism.send。
 
-    Kept under the historic name for the ``emit_*`` helpers in this
-    file. The shared implementation lives in ``_spine_safety``.
+    category 由 execution_point 通过 _SPINE_EP_TO_CATEGORY 派生。
+    outcome（旧 reflector EventRecord.outcome）写进 payload，保留旧 API。
+
+    注：EventMechanism import 走函数内 lazy，避免 lca_kernel.events 顶层
+    被 lca.infrastructure.observability 启动时倒灌触发 circular import
+    （lca_kernel.boot → lca.harness.observability → adapters →
+    spine_reflector_body_llm）。
     """
-    return safe_append(
+    from lca_kernel.events.mechanism import EventMechanism
+
+    cat_str = _SPINE_EP_TO_CATEGORY[execution_point]
+    sp = SpineEventPayload(
+        category=Category(cat_str),
         execution_point=execution_point,
         channel=channel,
         payload=payload,
-        outcome=outcome,
     )
+    return EventMechanism.default().send(sp, plugin=ReflectorClass)
 
-# ── body.tool.execute.start / body.tool.execute.end ─────────────────
+
+# ── body.tool.execute.start / end（invocation 层，ADR-0166 S2）───────────
 
 
 def emit_body_tool_execute_start(
@@ -83,13 +66,13 @@ def emit_body_tool_execute_start(
     tool_name: str,
     invocation_id: str,
     attempt: int = 1,
-) -> EventRecord | None:
+) -> Any:
     """Emit ``body.tool.execute.start`` —— 真实 invocation 层（safe_executor 内部）。
 
     ADR-0166 S2：对外 spine 只表达 invocation；decision 层 wrapper 见
     :func:`emit_body_tool_decision_start`。
     """
-    return _safe_append(
+    return _send(
         execution_point="body.tool.execute.start",
         channel="control",
         payload={
@@ -105,36 +88,39 @@ def emit_body_tool_execute_end(
     tool_name: str,
     invocation_id: str,
     attempt: int = 1,
-    outcome: Outcome = "success",
+    outcome: str = "success",
     latency_ms: int | None = None,
-) -> EventRecord | None:
+) -> Any:
     """Emit ``body.tool.execute.end``（invocation 层，ADR-0166 S2）。"""
     payload: dict[str, Any] = {
         "tool_name": tool_name,
         "invocation_id": invocation_id,
         "attempt": attempt,
+        "outcome": outcome,
     }
     if latency_ms is not None:
         payload["latency_ms"] = latency_ms
-    return _safe_append(
+    return _send(
         execution_point="body.tool.execute.end",
         channel="control",
         payload=payload,
-        outcome=outcome,
     )
+
+
+# ── decision wrapper（ADR-0166 S2）─────────────────────────────────────
 
 
 def emit_body_tool_decision_start(
     *,
     tool_name: str,
     invocation_id: str,
-) -> EventRecord | None:
+) -> Any:
     """decision wrapper 起点（ADR-0166 S2）。
 
     action-handler 层 batch dispatch 边；LiveTail / reader 默认折叠
     （payload 携带 ``wrapper=decision``）。
     """
-    return _safe_append(
+    return _send(
         execution_point="body.tool.execute.start",
         channel="control",
         payload={
@@ -150,10 +136,10 @@ def emit_body_tool_decision_end(
     *,
     tool_name: str,
     invocation_id: str,
-    outcome: Outcome = "success",
-) -> EventRecord | None:
+    outcome: str = "success",
+) -> Any:
     """decision wrapper 终点（ADR-0166 S2）。"""
-    return _safe_append(
+    return _send(
         execution_point="body.tool.execute.end",
         channel="control",
         payload={
@@ -161,12 +147,12 @@ def emit_body_tool_decision_end(
             "invocation_id": invocation_id,
             "attempt": 1,
             "wrapper": "decision",
+            "outcome": outcome,
         },
-        outcome=outcome,
     )
 
 
-# ── body.tool.retry ──────────────────────────────────────────────────
+# ── body.tool.retry ───────────────────────────────────────────────────
 
 
 def emit_body_tool_retry(
@@ -175,8 +161,8 @@ def emit_body_tool_retry(
     invocation_id: str,
     attempt: int,
     reason: str,
-) -> EventRecord | None:
-    return _safe_append(
+) -> Any:
+    return _send(
         execution_point="body.tool.retry",
         channel="control",
         payload={
@@ -184,20 +170,20 @@ def emit_body_tool_retry(
             "invocation_id": invocation_id,
             "attempt": attempt,
             "reason": reason,
+            "outcome": "retrying",
         },
-        outcome="retrying",
     )
 
 
-# ── body.sandbox.enter / body.sandbox.exit ───────────────────────────
+# ── body.sandbox.enter / body.sandbox.exit ─────────────────────────────
 
 
 def emit_body_sandbox_enter(
     *,
     invocation_id: str,
     tool_name: str,
-) -> EventRecord | None:
-    return _safe_append(
+) -> Any:
+    return _send(
         execution_point="body.sandbox.enter",
         channel="control",
         payload={
@@ -211,20 +197,20 @@ def emit_body_sandbox_exit(
     *,
     invocation_id: str,
     tool_name: str,
-    outcome: Outcome = "success",
-) -> EventRecord | None:
-    return _safe_append(
+    outcome: str = "success",
+) -> Any:
+    return _send(
         execution_point="body.sandbox.exit",
         channel="control",
         payload={
             "invocation_id": invocation_id,
             "tool_name": tool_name,
+            "outcome": outcome,
         },
-        outcome=outcome,
     )
 
 
-# ── llm.call.start / llm.call.end ────────────────────────────────────
+# ── llm.call.start / llm.call.end ──────────────────────────────────────
 
 
 def emit_llm_call_start(
@@ -232,8 +218,8 @@ def emit_llm_call_start(
     model: str,
     stream: bool,
     prompt_preview: str = "",
-) -> EventRecord | None:
-    return _safe_append(
+) -> Any:
+    return _send(
         execution_point="llm.call.start",
         channel="fact",
         payload={
@@ -248,14 +234,15 @@ def emit_llm_call_end(
     *,
     model: str,
     stream: bool,
-    outcome: Outcome = "success",
+    outcome: str = "success",
     latency_ms: int | None = None,
     prompt_tokens: int | None = None,
     completion_tokens: int | None = None,
-) -> EventRecord | None:
+) -> Any:
     payload: dict[str, Any] = {
         "model": model,
         "stream": stream,
+        "outcome": outcome,
     }
     if latency_ms is not None:
         payload["latency_ms"] = latency_ms
@@ -263,15 +250,14 @@ def emit_llm_call_end(
         payload["prompt_tokens"] = prompt_tokens
     if completion_tokens is not None:
         payload["completion_tokens"] = completion_tokens
-    return _safe_append(
+    return _send(
         execution_point="llm.call.end",
         channel="fact",
         payload=payload,
-        outcome=outcome,
     )
 
 
-# ── llm.stream.token ────────────────────────────────────────────────
+# ── llm.stream.token / llm.stream.stall ───────────────────────────────
 
 
 def emit_llm_stream_token(
@@ -280,7 +266,7 @@ def emit_llm_stream_token(
     text_delta: str,
     seq: int,
     channel_kind: str = "output",
-) -> EventRecord | None:
+) -> Any:
     """Emit one streamed token.
 
     ``channel_kind`` distinguishes ``output`` (final answer) from
@@ -288,7 +274,7 @@ def emit_llm_stream_token(
     interpret the value, just carries it through so downstream
     consumers can filter.
     """
-    return _safe_append(
+    return _send(
         execution_point="llm.stream.token",
         channel="fact",
         payload={
@@ -305,13 +291,13 @@ def emit_llm_stream_stall(
     model: str,
     idle_ms: int,
     seq: int = 0,
-) -> EventRecord | None:
+) -> Any:
     """Emit when an in-flight LLM stream has produced no delta for a while.
 
     Complements journal ``RunActivity`` heartbeats so offline spine
     diagnosis can see provider stalls without the live journal tail.
     """
-    return _safe_append(
+    return _send(
         execution_point="llm.stream.stall",
         channel="diagnostic",
         payload={
@@ -323,6 +309,7 @@ def emit_llm_stream_stall(
 
 
 __all__ = [
+    "ReflectorClass",
     "emit_body_sandbox_enter",
     "emit_body_sandbox_exit",
     "emit_body_tool_decision_end",
@@ -334,6 +321,4 @@ __all__ = [
     "emit_llm_call_start",
     "emit_llm_stream_stall",
     "emit_llm_stream_token",
-    "get_active_spine",
-    "set_active_spine",
 ]

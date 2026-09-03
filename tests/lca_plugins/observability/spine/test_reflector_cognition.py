@@ -5,6 +5,11 @@ Asserts that cognition layer entry points emit the canonical
 emit helpers are safe no-ops when no spine is wired.
 """
 
+# ADR-0181 PR-2：cognition 反射器已迁到
+# lca.plugins.events.publishers.spine_reflector_cognition，EventMechanism
+# 路径下等价覆盖在 tests/plugins/events/publishers/test_spine_reflector_cognition.py。
+# 删-when：PR-9 旧 spine 全退役后，本文件删除（rg
+# lca.plugins.observability.spine.reflectors lca/ = 0 触发）。
 from __future__ import annotations
 
 import asyncio
@@ -14,6 +19,17 @@ import pytest
 from lca.infrastructure.observability.spine.context import SpineContext
 from lca.infrastructure.observability.spine.event_record import EventRecord
 from lca.infrastructure.observability.spine.event_spine import EventSpine
+
+
+pytestmark = pytest.mark.xfail(
+    reason=(
+        "ADR-0181 PR-2：旧 EventSpine 反射器路径已退役。cognition emit_* "
+        "等价 EventMechanism 路径覆盖在 tests/plugins/events/publishers/test_spine_reflector_cognition.py；"
+        "本测试在 PR-9 旧 spine 全退役时删（rg "
+        "lca.plugins.observability.spine.reflectors lca/ = 0 触发）。"
+    ),
+    strict=True,
+)
 
 # ── helpers ──────────────────────────────────────────────────────────
 
