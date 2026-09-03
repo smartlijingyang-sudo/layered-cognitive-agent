@@ -39,6 +39,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, TextIO, TypeGuard
 
 if TYPE_CHECKING:
+    from lca.contracts.event import EventPayload
     from lca_kernel.events.mechanism import EventRef
     from lca_kernel.events.payloads_spine import SpineEventPayload
 
@@ -123,7 +124,10 @@ class SpineChain:
     @staticmethod
     def next_hash(prev_hash: str | None, causality_id: str) -> str:
         """算 chain next event_hash（sha256:hex）。"""
-        return "sha256:" + hashlib.sha256(((prev_hash or "") + causality_id).encode("utf-8")).hexdigest()
+        return (
+            "sha256:"
+            + hashlib.sha256(((prev_hash or "") + causality_id).encode("utf-8")).hexdigest()
+        )
 
 
 # ── 记录序列化 ────────────────────────────────────────────────────────────
@@ -220,6 +224,26 @@ class SpineEventRecord:
             "event_hash": self.event_hash,
         }
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> SpineEventRecord:
+        """从 dict 反序列化（to_dict 的逆操作）。
+
+        ADR-0183 PR-5：SpineReader 的唯一构造入口；字段名 / 字段顺序与
+        ``to_dict()`` 严格对齐。缺字段 / 类型不匹配由调用方（reader）吞错，
+        本方法直接 raise 触发 caller 跳过。
+        """
+        return cls(
+            event_id=str(data["event_id"]),
+            category=str(data["category"]),
+            execution_point=str(data["execution_point"]),
+            channel=str(data["channel"]),
+            payload=dict(data.get("payload") or {}),
+            ts=str(data["ts"]),
+            causation_id=data.get("causation_id"),
+            prev_event_hash=data.get("prev_event_hash"),
+            event_hash=data.get("event_hash"),
+        )
+
 
 # ── 日志输出 ──────────────────────────────────────────────────────────────
 
@@ -264,6 +288,69 @@ __all__ = [
     "SpineClock",
     "SpineEventRecord",
     "SpineStream",
+    "build_record",
     "default_chain_path",
     "is_spine_event",
 ]
+
+
+# ── 统一 record 构造入口（ADR-0183 PR-5）─────────────────────────────────
+
+
+def build_record(
+    payload: EventPayload,
+    ref: EventRef,
+    *,
+    chain: SpineChainContext | None = None,
+) -> SpineEventRecord:
+    """统一 record 构造入口 —— ADR-0183 §3.5 + PR-5。
+
+    旧 ``_build_event_record(sp, ref)`` 反推 14 字段 ``EventRecord`` 的逻辑
+    被吸收；``SpineEventRecord``（9 字段）是新的字节布局 SSOT，plugin 不可改
+    ``to_dict()``。
+
+    payload 形态兼容：
+    - ``SpineEventPayload``：直接读 ``execution_point`` / ``channel`` /
+      ``prev_event_hash`` 字段
+    - 其它 ``EventPayload``（非 spine）：``getattr(payload, "execution_point",
+      "unknown")`` 容错走位；channel 默认 ``"fact"``；prev_event_hash 默认 None
+    """
+    execution_point = getattr(payload, "execution_point", "unknown")
+    channel = getattr(payload, "channel", "fact")
+    inner_payload: dict[str, Any] = getattr(payload, "payload", {}) or {}
+    prev_event_hash_attr: str | None = getattr(payload, "prev_event_hash", None)
+
+    record = SpineEventRecord(
+        event_id=ref.event_id,
+        category=ref.category,
+        execution_point=execution_point,
+        channel=channel,
+        payload=inner_payload,
+        ts=SpineClock.now_iso(),
+        causation_id=None,
+        prev_event_hash=prev_event_hash_attr,
+        event_hash=None,
+    )
+
+    if chain is None:
+        return record
+
+    base = {
+        "execution_point": record.execution_point,
+        "channel": record.channel,
+        "payload": record.payload,
+        "event_id": record.event_id,
+    }
+    causation_id = SpineChain.causality_id(base)
+    event_hash = SpineChain.next_hash(chain.prev_hash, causation_id)
+    return SpineEventRecord(
+        event_id=record.event_id,
+        category=record.category,
+        execution_point=record.execution_point,
+        channel=record.channel,
+        payload=record.payload,
+        ts=record.ts,
+        causation_id=causation_id,
+        prev_event_hash=chain.prev_hash,
+        event_hash=event_hash,
+    )
