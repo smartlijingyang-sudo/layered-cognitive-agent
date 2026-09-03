@@ -5,8 +5,13 @@
 # - plane: Plane enum 全路径
 # - payload_class: EventPayload 子类全路径
 # - publishers: plugin class 全路径（module.qualname）→ 解析为 type
-# - subscribers: plugin class 全路径 → 解析为 type
-# - default_subscribers: 同上
+# - consumer_rules: subscriber 鉴权按前缀规则声明；某 category 的授权 =
+#   命中的所有规则的 subscribers 并集
+consumer_rules:
+  - prefix: "team."
+    subscribers:
+      - lca.plugins.events.sinks.journal.sink.JournalSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 events:
   - category: team.delegation.cache_hit
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -17,9 +22,3 @@ events:
       step: int
     publishers:
       - lca.plugins.events.publishers.delegation_cache.plugin.DelegationCachePlugin
-    subscribers:
-      - lca.plugins.events.sinks.journal.sink.JournalSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.journal.sink.JournalSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber

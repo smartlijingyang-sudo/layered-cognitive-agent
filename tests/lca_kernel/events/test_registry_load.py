@@ -9,7 +9,7 @@ import pytest
 from lca.contracts.event import Category, EventPayload, Plane
 from lca_kernel.events.errors import UnknownCategoryError
 from lca_kernel.events.mechanism import _DEFAULT_CONFIG_DIR
-from lca_kernel.events.registry import EventRegistry
+from lca_kernel.events.registry import EventRegistry, EventSpec
 
 
 def test_default_registry_loads() -> None:
@@ -28,8 +28,25 @@ def test_publishers_subscribers_resolved_to_types() -> None:
     # publishers / subscribers 是 typed Python type 对象（不是字符串）
     assert all(isinstance(p, type) for p in registry.publishers[cat])
     assert all(isinstance(s, type) for s in registry.subscribers[cat])
-    # default_subscribers ⊆ subscribers
-    assert registry.default_subscribers[cat] <= registry.subscribers[cat]
+
+
+def test_registry_contract_fields_are_closed_set() -> None:
+    """ADR-0183 PR-6：registry 契约字段闭集（死配置字段已删除，断言不回归）。"""
+    assert set(EventRegistry.__dataclass_fields__) == {
+        "specs",
+        "publishers",
+        "subscribers",
+        "consumer_rules",
+        "payload_by_category",
+    }
+    assert set(EventSpec.__dataclass_fields__) == {
+        "category",
+        "plane",
+        "payload_class",
+        "fields",
+        "publishers",
+        "subscribers",
+    }
 
 
 def test_unresolvable_payload_class_raises(tmp_path: Path) -> None:

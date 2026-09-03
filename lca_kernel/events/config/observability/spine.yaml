@@ -1,9 +1,19 @@
-# spine 事件 SSOT（ADR-0181 D3）
+# spine 事件 SSOT（ADR-0181 D3 / ADR-0183 PR-6）
 #
-# 试点 PR（已合并）：1 行 = spine.cognition.brain.perceive.start
-# PR-2（本）：cognition 余 15 EP（试点 + 15 = 16 cognition）
+# consumer_rules：subscriber 鉴权按前缀规则声明。某 category 的授权 =
+# 命中的所有规则的 subscribers 并集；更细前缀的规则为子树追加订阅者。
 # 删-when（PR-9）：lca/infrastructure/observability/spine/manifest.py
 # 全量迁完后 rg "EXECUTION_POINTS" lca/ = 0
+consumer_rules:
+  - prefix: "spine."
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+  # perceive 子树：SpineStepTreeAccumulator 额外构建 step tree
+  - prefix: "spine.cognition.brain.perceive."
+    subscribers:
+      - lca.plugins.events.subscribers.spine_step_tree_accumulator.subscriber.SpineStepTreeAccumulator
+
 events:
   # ── Cognition（试点 + PR-2 一次性全迁，删-when：cognition reflector 旧
   # lca/plugins/observability/spine/reflectors/cognition.py 删 + rg
@@ -15,13 +25,6 @@ events:
       state_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.spine_step_tree_accumulator.subscriber.SpineStepTreeAccumulator
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.cognition.brain.perceive.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -31,13 +34,6 @@ events:
       outcome: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.spine_step_tree_accumulator.subscriber.SpineStepTreeAccumulator
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.cognition.brain.think.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -46,12 +42,6 @@ events:
       state_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.cognition.brain.think.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -61,12 +51,6 @@ events:
       outcome: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.cognition.brain.gate.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -75,12 +59,6 @@ events:
       state_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.cognition.brain.gate.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -90,12 +68,6 @@ events:
       outcome: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.cognition.critic.eval.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -104,12 +76,6 @@ events:
       state_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.cognition.critic.eval.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -119,12 +85,6 @@ events:
       outcome: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.cognition.reasoner.reason.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -133,12 +93,6 @@ events:
       state_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.cognition.reasoner.reason.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -148,12 +102,6 @@ events:
       outcome: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.cognition.prompt_assembler.assemble.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -163,12 +111,6 @@ events:
       template_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.cognition.prompt_assembler.assemble.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -179,12 +121,6 @@ events:
       section_count: int
     publishers:
       - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.cognition.synthesizer.merge
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -193,12 +129,6 @@ events:
       state_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.cognition.skill_router.route
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -208,12 +138,6 @@ events:
       decision_path: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.cognition.memory.read
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -223,12 +147,6 @@ events:
       outcome: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.cognition.memory.write
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -238,12 +156,6 @@ events:
       outcome: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   # ── Body（PR-3）─────────────────────────────────────────────
   - category: spine.body.tool.execute.start
@@ -255,12 +167,6 @@ events:
       attempt: int
     publishers:
       - lca.plugins.events.publishers.spine_reflector_body_llm.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.body.tool.execute.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -272,12 +178,6 @@ events:
       outcome: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_body_llm.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.body.tool.retry
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -289,12 +189,6 @@ events:
       reason: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_body_llm.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.body.sandbox.enter
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -304,12 +198,6 @@ events:
       tool_name: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_body_llm.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.body.sandbox.exit
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -320,12 +208,6 @@ events:
       outcome: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_body_llm.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   # ── Lifecycle normalization（PR-3，ADR-0166 S5）───────────────
   - category: spine.lifecycle.finally
@@ -336,12 +218,6 @@ events:
       trace_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_runtime.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   # ── LLM（PR-3）──────────────────────────────────────────────
   - category: spine.llm.call.start
@@ -353,12 +229,6 @@ events:
       prompt_preview: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_body_llm.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.llm.call.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -369,12 +239,6 @@ events:
       outcome: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_body_llm.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.llm.stream.token
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -386,12 +250,6 @@ events:
       channel_kind: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_body_llm.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.llm.stream.stall
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -402,12 +260,6 @@ events:
       seq: int
     publishers:
       - lca.plugins.events.publishers.spine_reflector_body_llm.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.llm.request.header
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -417,12 +269,6 @@ events:
       prompt_preview: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_body_llm.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   # ── Exception（PR-3）─────────────────────────────────────────
   - category: spine.exception.caught
@@ -435,12 +281,6 @@ events:
       trace_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_runtime.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.exception.finally
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -451,12 +291,6 @@ events:
       outcome: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_runtime.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   # ── Runtime observed（PR-3 与 exception 一起迁，PR-6 新加 runtime.observed 类别）──
   - category: spine.runtime.reducer.apply
@@ -468,12 +302,6 @@ events:
       outcome: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_runtime.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.runtime.checkpoint.create
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -485,12 +313,6 @@ events:
       outcome: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_runtime.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.runtime.resume.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -501,12 +323,6 @@ events:
       node_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_runtime.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.runtime.resume.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -518,12 +334,6 @@ events:
       outcome: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_runtime.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.runtime.event_publisher.publish
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -534,12 +344,6 @@ events:
       outcome: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_runtime.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   # ── Transport（PR-4）─────────────────────────────────────────────
   - category: spine.transport.route.enter
@@ -551,12 +355,6 @@ events:
       run_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_transport.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.transport.route.exit
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -568,12 +366,6 @@ events:
       outcome: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_transport.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.transport.sse.publish
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -583,12 +375,6 @@ events:
       run_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_transport.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   # ── Kernel lifecycle（PR-4）─────────────────────────────────────
   - category: spine.kernel.boot.start
@@ -598,12 +384,6 @@ events:
       profile: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_kernel_loop.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.kernel.boot.completed
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -613,12 +393,6 @@ events:
       outcome: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_kernel_loop.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.kernel.run.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -628,12 +402,6 @@ events:
       trace_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_transport.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.kernel.run.stop
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -644,12 +412,6 @@ events:
       outcome: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_transport.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.kernel.run.cancelled
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -659,12 +421,6 @@ events:
       trace_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_transport.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   # ── Agent loop + agent + loop fork（PR-4）─────────────────────────
   - category: spine.agent_loop.iteration.start
@@ -676,12 +432,6 @@ events:
       iteration_kind: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_agent_spawn.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.agent_loop.iteration.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -693,12 +443,6 @@ events:
       outcome: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_agent_spawn.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.loop.fork
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -708,12 +452,6 @@ events:
       parent_step: int
     publishers:
       - lca.plugins.events.publishers.spine_reflector_kernel_loop.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.agent.spawn
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -724,12 +462,6 @@ events:
       agent_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_agent_spawn.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.agent.iteration
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -741,12 +473,6 @@ events:
       iteration: int
     publishers:
       - lca.plugins.events.publishers.spine_reflector_agent_spawn.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.agent.final
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -758,12 +484,6 @@ events:
       outcome: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_agent_spawn.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   # ── Writable matrix（PR-5）───────────────────────────────────────
   - category: spine.writable.step.start
@@ -775,12 +495,6 @@ events:
     publishers:
       - lca.plugins.events.publishers.spine_reflector_writable.plugin.ReflectorClass
       - lca.plugins.events.publishers.spine_writable_matrix.plugin.WritableMatrixPlugin
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.writable.step.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -792,12 +506,6 @@ events:
     publishers:
       - lca.plugins.events.publishers.spine_reflector_writable.plugin.ReflectorClass
       - lca.plugins.events.publishers.spine_writable_matrix.plugin.WritableMatrixPlugin
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.writable.segment.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -809,12 +517,6 @@ events:
     publishers:
       - lca.plugins.events.publishers.spine_reflector_writable.plugin.ReflectorClass
       - lca.plugins.events.publishers.spine_writable_matrix.plugin.WritableMatrixPlugin
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.writable.segment.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -827,12 +529,6 @@ events:
     publishers:
       - lca.plugins.events.publishers.spine_reflector_writable.plugin.ReflectorClass
       - lca.plugins.events.publishers.spine_writable_matrix.plugin.WritableMatrixPlugin
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.writable.iteration.halt
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -843,12 +539,6 @@ events:
     publishers:
       - lca.plugins.events.publishers.spine_reflector_writable.plugin.ReflectorClass
       - lca.plugins.events.publishers.spine_writable_matrix.plugin.WritableMatrixPlugin
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.writable.iteration.closing
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -858,12 +548,6 @@ events:
     publishers:
       - lca.plugins.events.publishers.spine_reflector_writable.plugin.ReflectorClass
       - lca.plugins.events.publishers.spine_writable_matrix.plugin.WritableMatrixPlugin
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.writable.iteration.close
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -873,12 +557,6 @@ events:
     publishers:
       - lca.plugins.events.publishers.spine_reflector_writable.plugin.ReflectorClass
       - lca.plugins.events.publishers.spine_writable_matrix.plugin.WritableMatrixPlugin
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   # ── Phase（PR-5）────────────────────────────────────────────────
   - category: spine.perceive.phase.fold
@@ -890,12 +568,6 @@ events:
     publishers:
       - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
       - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.phase.perceive.fold
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -906,12 +578,6 @@ events:
     publishers:
       - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
       - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.phase.think.fold
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -923,12 +589,6 @@ events:
     publishers:
       - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
       - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.phase.gate.fold
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -940,12 +600,6 @@ events:
     publishers:
       - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
       - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.phase.remember.fold
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -956,12 +610,6 @@ events:
     publishers:
       - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
       - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.phase.stop.fold
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -973,12 +621,6 @@ events:
     publishers:
       - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
       - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.phase.reflect.fold
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -990,12 +632,6 @@ events:
     publishers:
       - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
       - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.phase.act.fold.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -1007,12 +643,6 @@ events:
     publishers:
       - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
       - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.phase.act.fold.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -1025,12 +655,6 @@ events:
     publishers:
       - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
       - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.phase.act.fold
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -1043,12 +667,6 @@ events:
     publishers:
       - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
       - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.phase.tool.call.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -1061,12 +679,6 @@ events:
     publishers:
       - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
       - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.phase.tool.call.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -1080,12 +692,6 @@ events:
     publishers:
       - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
       - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.phase.tool.denied
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -1098,12 +704,6 @@ events:
     publishers:
       - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
       - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   # ── Phase graph（PR-5）──────────────────────────────────────────
   - category: spine.phase_graph.node.start
@@ -1114,12 +714,6 @@ events:
       run_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_phase_graph.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.phase_graph.node.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -1130,12 +724,6 @@ events:
       outcome: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_phase_graph.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.phase_graph.edge.transit
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -1146,12 +734,6 @@ events:
       run_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_phase_graph.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.phase_graph.instrument.coverage
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -1162,12 +744,6 @@ events:
       run_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_phase_graph.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   # ── Team（PR-6 新加）─────────────────────────────────────────
   - category: spine.team.casting.started
@@ -1179,12 +755,6 @@ events:
       run_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_team.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.team.casting.completed
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1195,12 +765,6 @@ events:
       run_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_team.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.team.casting.failed
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1211,12 +775,6 @@ events:
       run_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_team.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.team.delegation.issued
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1228,12 +786,6 @@ events:
       run_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_team.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.team.delegation.completed
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1246,12 +798,6 @@ events:
       run_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_team.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.team.delegation.cache_hit
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1262,12 +808,6 @@ events:
       step: int
     publishers:
       - lca.plugins.events.publishers.spine_reflector_team.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.team.message.published
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1279,12 +819,6 @@ events:
       run_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_team.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   # ── Perception（PR-6）────────────────────────────────────────
   - category: spine.perception.observe
@@ -1295,12 +829,6 @@ events:
       source: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_perception.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.perception.attention.focus
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -1310,12 +838,6 @@ events:
       target: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_perception.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.perception.attention.blur
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -1325,12 +847,6 @@ events:
       target: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_perception.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.perception.signal.detected
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -1341,12 +857,6 @@ events:
       score: float
     publishers:
       - lca.plugins.events.publishers.spine_reflector_perception.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.perception.fused
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -1357,12 +867,6 @@ events:
       sources: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_perception.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.perception.artifact.built
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -1373,12 +877,6 @@ events:
       size_bytes: int
     publishers:
       - lca.plugins.events.publishers.spine_reflector_perception.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   # ── Control（PR-6）──────────────────────────────────────────
   - category: spine.control.dispatch
@@ -1390,12 +888,6 @@ events:
       intent: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_control.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.control.invoke
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1405,12 +897,6 @@ events:
       target: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_control.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.control.signal
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1420,12 +906,6 @@ events:
       name: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_control.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.control.approve.request
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1436,12 +916,6 @@ events:
       intent: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_control.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.control.approve.response
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1453,12 +927,6 @@ events:
       actor: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_control.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.control.deny
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1469,12 +937,6 @@ events:
       reason: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_control.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.control.revoke
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1484,12 +946,6 @@ events:
       target: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_control.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.control.pause
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1499,12 +955,6 @@ events:
       reason: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_control.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.control.resume
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1513,12 +963,6 @@ events:
       run_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_control.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.control.stop
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1528,12 +972,6 @@ events:
       outcome: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_control.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.control.accept
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1543,12 +981,6 @@ events:
       request_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_control.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   # ── Boot（PR-6）─────────────────────────────────────────────
   - category: spine.boot.profile.resolved
@@ -1559,12 +991,6 @@ events:
       plugins: int
     publishers:
       - lca.plugins.events.publishers.spine_reflector_boot.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.boot.plugin.fiber.spawned
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1574,12 +1000,6 @@ events:
       layer: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_boot.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   - category: spine.boot.observability.assembled
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1589,12 +1009,6 @@ events:
       derivers: int
     publishers:
       - lca.plugins.events.publishers.spine_reflector_boot.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 
   # ── Runtime observed（PR-6）──────────────────────────────────
   - category: spine.runtime.observed
@@ -1606,9 +1020,3 @@ events:
       run_id: str
     publishers:
       - lca.plugins.events.publishers.spine_reflector_runtime.plugin.ReflectorClass
-    subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-    default_subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
