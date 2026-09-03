@@ -69,6 +69,31 @@ class InMemoryJournalCommitter(JournalCommitter):
         return f"{node_ref}:observation:{len(self.observations)}"
 
 
+def _extract_run_identity(
+    state: object,
+    artifacts: Mapping[str, object] | None,
+) -> tuple[str, str]:
+    """从 ``state`` / ``artifacts`` 派生 ``(run_id, trace_id)``。
+
+    测试环境常用 dict 替代 AgentState;此处宽松接受任何能
+    ``getattr`` 出 ``extra`` / ``trace_id`` 的对象。AgentState 的
+    顶层字段只有 ``trace_id``;``run_id`` 通过 ``state.extra["run_id"]``
+    或 ``artifacts["run_id"]`` 兜底取。
+    """
+    run_id = ""
+    trace_id = ""
+    if state is not None:
+        trace_id = str(getattr(state, "trace_id", "") or "")
+        extra = getattr(state, "extra", None)
+        if isinstance(extra, dict):
+            run_id = str(extra.get("run_id", "") or "")
+    if not run_id and isinstance(artifacts, Mapping):
+        run_id = str(artifacts.get("run_id", "") or "")
+        if not trace_id:
+            trace_id = str(artifacts.get("trace_id", "") or "")
+    return run_id, trace_id
+
+
 class GenericPlanInterpreter:
     """Traverse an ``ExecutablePlan`` without reading executor internals.
 
@@ -95,7 +120,14 @@ class GenericPlanInterpreter:
             reducer=reducer,
             phase_observer=phase_observer or NullPhaseObserver(),
         )
-        self._outcomes = RunOutcomeProjector(self._journal)
+        # run_id / trace_id 由 _drive 从 AgentState 派生并通过
+        # _attach_run_context 在第一次 catch 前注入,确保失败路径上
+        # exception 归一化能落 spine。默认空串 → non-run context(boot
+        # 测试场景)。
+        self._outcomes = RunOutcomeProjector(
+            self._journal,
+            boundary="declarative.interpreter._drive",
+        )
         self._loop_guard_evaluator = loop_guard_evaluator or DeclarativeLoopGuardEvaluator()
         self._lifecycle_publisher = lifecycle_publisher
 
@@ -176,6 +208,19 @@ class GenericPlanInterpreter:
         require_valid(plan.validation_report)
         graph = plan.phase_graph
         node_by_id = {node.id: node for node in graph.nodes}
+        # SSOT 收口(2026-09-03):把 run_id / trace_id 推到 projector,
+        # 让 interpreter 失败路径上的异常能归一化到 exception.caught。
+        # AgentState 没显式 run_id 顶层字段,从 state.extra / artifacts
+        # 兜底取;取不到就退化为 trace_id(空串等价于 non-run context,
+        # exception 仍落 spine 但 run_id 字段空)。
+        derived_run_id, derived_trace_id = _extract_run_identity(state, artifacts)
+        if derived_run_id or derived_trace_id:
+            self._outcomes = RunOutcomeProjector(
+                self._journal,
+                run_id=derived_run_id,
+                trace_id=derived_trace_id,
+                boundary="declarative.interpreter._drive",
+            )
         traversal = (
             PhaseTraversal.resume(cursor=resume_cursor, input=input)
             if resume_cursor is not None

@@ -24,6 +24,10 @@ DEFAULT_SPINE_TEMPLATE = "$run_id.spine.jsonl"
 # 旧默认名(向后兼容;若显式传入 events.jsonl,继续生效)
 LEGACY_DEFAULT_NAME = "events.jsonl"
 
+# Per-run exceptions / kernel log 文件后缀(命名空间独立于 spine ledger)。
+EXCEPTIONS_FILE_SUFFIX = ".exceptions.jsonl"
+KERNEL_LOG_FILENAME = "kernel.log"
+
 # 占位符集合(目前只有 $run_id;未来可扩 $trace_id 等)
 _PLACEHOLDER_RUN_ID = "$run_id"
 
@@ -35,6 +39,27 @@ def spine_filename_for_run(run_id: str) -> str:
     'run_abc.spine.jsonl'
     """
     return f"{run_id}{SPINE_FILE_SUFFIX}"
+
+
+def exceptions_filename_for_run(run_id: str) -> str:
+    """派生 per-run exceptions 索引文件名。
+
+    >>> exceptions_filename_for_run("run_abc")
+    'run_abc.exceptions.jsonl'
+    """
+    return f"{run_id}{EXCEPTIONS_FILE_SUFFIX}"
+
+
+def kernel_log_filename(run_id: str) -> str:
+    """Per-run kernel 日志文件名(无 run_id 前缀)。
+
+    与 spine / exceptions 不同,kernel log 是进程级单文件,与 run_id
+    一一对应,但命名保留简短的 ``kernel.log``,不嵌 run_id。
+
+    >>> kernel_log_filename("run_abc")
+    'kernel.log'
+    """
+    return KERNEL_LOG_FILENAME
 
 
 def resolve_filename(template: str, run_id: str) -> str:
@@ -59,9 +84,13 @@ def resolve_filename(template: str, run_id: str) -> str:
 
 __all__ = [
     "DEFAULT_SPINE_TEMPLATE",
+    "EXCEPTIONS_FILE_SUFFIX",
+    "KERNEL_LOG_FILENAME",
     "LEGACY_DEFAULT_NAME",
     "LEGACY_FILE_NAME",
     "SPINE_FILE_SUFFIX",
+    "exceptions_filename_for_run",
+    "kernel_log_filename",
     "resolve_filename",
     "spine_filename_for_run",
 ]

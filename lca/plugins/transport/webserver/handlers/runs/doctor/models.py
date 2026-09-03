@@ -111,7 +111,7 @@ class StepScan:
     spine_llm_call_end: int = 0
     spine_phase_fold_total: int = 0
     spine_kernel_run_start: int = 0
-    events_jsonl_exists: bool = False
+    spine_file_exists: bool = False
     flush_errors: tuple[dict[str, Any], ...] = ()
 
 

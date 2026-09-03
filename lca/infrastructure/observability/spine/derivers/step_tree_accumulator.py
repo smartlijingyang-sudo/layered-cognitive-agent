@@ -102,6 +102,11 @@ class _StepFrame:
     segments: list[SegmentRecord] = field(default_factory=list)
     outcome: str | None = None
     exited_at: float | None = None
+    # 2026-09-03 观测面 SSOT 收口:close 不再立即清空 _open_step,
+    # 而是标记 ``closed_pending=True``;``_open_step`` 直到下一个 step
+    # 开始 / critic.eval.end 才真正置 None —— 这样 ``step.tool_call.record``
+    # 在 ``brain.think.end`` 之后到达时还能 attach 到这一步的 tool_call。
+    closed_pending: bool = False
     # LLM stream accumulator state —— step_tree 通过订阅 llm.stream.* 累积。
     # 仅在 open_step 期间持有;llm.call.end 时格式化写回 thinking.reasoning。
     stream_reasoning_chunks: list[str] = field(default_factory=list)
@@ -153,13 +158,24 @@ class StepTreeAccumulatorDeriver(Deriver):
         self._terminal_outcome: str | None = None
         self._attachments: tuple = ()
         self._last_document: JournalDocument | None = None
+        # SSOT 收口:closed step frame 暂存,让 ``_resolve_step_target`` 在
+        # ``brain.think.end`` 之后 cursor act 窗口发 record 时仍能找到
+        # 对应 step 并 attach tool_call/tool_result。
+        self._closed_frames: list[_StepFrame] = []
+        self._steps_by_index: dict[int, _StepFrame] = {}
 
     # ── Deriver Protocol ─────────────────────────────────
 
     def on_event(self, event: EventRecord) -> None:
         if event.run_id != self._run_id:
             return
-        if event.phase != "live":
+        # 观测面 SSOT 收口(2026-09-03):接受 phase=act 的 spine event。
+        # 之前 ``event.phase != "live"`` 直接 return,cursor 在 act 窗口
+        # 发出的 ``step.tool_call.record`` / ``step.tool_result.record`` /
+        # ``body.tool.execute.*`` 全部被 silently 丢弃(journal 里的
+        # tool_call 永远 EMPTY,run_3e48052e6c36 那个 BUG 的根本源头)。
+        # 现在 accept live + act phase;只过滤 synthetic / archived。
+        if event.phase not in ("live", "act"):
             return
         try:
             self._apply(event)
@@ -192,10 +208,14 @@ class StepTreeAccumulatorDeriver(Deriver):
         try:
             if self._open_step is not None:
                 self._close_step("cancelled")
+                # flush() 强制关:不再保留 _open_step 引用。
+                self._open_step = None
             doc = self._build_document()
             self._last_document = doc
             # ADR-0176 D1 §1 (3):空累积 → fail-loud。
-            empty = not self._steps and not self._phases
+            # SSOT 收口后 _steps 不再 append,_closed_frames 才是 closed step
+            # 容器;empty 判断走 ``_closed_frames``(2026-09-03)。
+            empty = not self._closed_frames and not self._phases
             if empty:
                 try:
                     import structlog
@@ -418,55 +438,84 @@ class StepTreeAccumulatorDeriver(Deriver):
             if self._open_step is not None and self._open_step.phase == "act":
                 self._close_step(outcome=event.outcome or "success")
         elif ep == "step.tool_call.record":
-            # tool_call 走两条 EP payload shape:
-            #   - writable_matrix.coordinator: nested ``payload.call``
-            #   - StdLoopCursor (post-fix): flat ``payload.arguments``
-            # 取并集即可 — 前者都是真值,后者只在 cursor 路径下会发。
-            if self._open_step is not None:
-                p = event.payload if isinstance(event.payload, dict) else {}
-                nested = p.get("call") if isinstance(p.get("call"), dict) else {}
-                # 优先 nested, 其次 flat。
-                invocation_id = str(nested.get("invocation_id", "") or p.get("invocation_id", ""))
-                name = str(nested.get("name", "") or p.get("name", "") or p.get("tool_name", ""))
+            # 观测面 SSOT 收口(2026-09-03):canonical payload 是 flat 形态,
+            # 由 ``CursorRecord`` 透传给 ``cursor.record_tool_call``(后者
+            # 已支持 kwargs 透传),再被 std.py 拍平进 event_payload。字段:
+            # tool_name / invocation_id / arguments / arguments_summary /
+            # args_digest / call_seq / incarnation / plan_ref / step_index。
+            # writable_matrix.coordinator 这条历史路径仍可能发 nested
+            # ``payload.call``,这里按字段合并:每个字段独立 flat→nested
+            # 兜底(flat 是 canonical 命名空间)。
+            #
+            # 关键 SSOT:**即使 _open_step 已被 close**(brain.think.end 之后
+            # cursor 还在 act 窗口发 record),``payload.step_index`` 仍然
+            # 指向对应 closed step,deriver 把 tool_call attach 到那一步。
+            p = event.payload if isinstance(event.payload, dict) else {}
+            target = self._resolve_step_target(event, p)
+            if target is not None:
+                nested = p.get("call") if isinstance(p.get("call"), dict) else None
+                # 每个字段独立取值:flat 非空优先,否则 nested 兜底。
+                _name_flat = p.get("tool_name") or p.get("name") or ""
+                _name_nested = nested.get("name") if nested else ""
+                name = str(_name_flat or _name_nested or "")
+                _inv_flat = p.get("invocation_id") or ""
+                _inv_nested = nested.get("invocation_id") if nested else ""
+                invocation_id = str(_inv_flat or _inv_nested or "")
+                _arg_flat = p.get("arguments")
+                _arg_nested = nested.get("arguments") if nested else None
                 arguments = (
-                    nested.get("arguments")
-                    if isinstance(nested.get("arguments"), dict)
-                    else (p.get("arguments") or {})
+                    _arg_flat if isinstance(_arg_flat, dict)
+                    else _arg_nested if isinstance(_arg_nested, dict)
+                    else {}
                 )
-                arguments_summary = str(
-                    nested.get("arguments_summary", "") or p.get("arguments_summary", "")
-                )
-                self._open_step.tool_call = ToolCallRecord(
+                _summary_flat = p.get("arguments_summary") or ""
+                _summary_nested = nested.get("arguments_summary") if nested else ""
+                arguments_summary = str(_summary_flat or _summary_nested or "")
+                target.tool_call = ToolCallRecord(
                     invocation_id=invocation_id,
                     name=name,
                     arguments=dict(arguments),
                     arguments_summary=arguments_summary,
                 )
         elif ep == "step.tool_result.record":
-            if self._open_step is not None:
-                p = event.payload if isinstance(event.payload, dict) else {}
-                nested = p.get("result") if isinstance(p.get("result"), dict) else {}
-                # ToolResult 全字段: ok/latency/stdout_head/stderr/files_created/delta_summary
-                stdout_head = str(nested.get("stdout_head", "") or p.get("stdout_head", ""))
-                stdout_chars_total = int(
-                    nested.get("stdout_chars_total", 0) or p.get("stdout_chars_total", 0) or 0
-                )
-                stdout_truncated = bool(
-                    nested.get("stdout_truncated", False) or p.get("stdout_truncated", False)
-                )
-                stderr = str(nested.get("stderr", "") or p.get("stderr", ""))
-                files_raw = nested.get("files_created") or p.get("files_created") or ()
+            # canonical flat payload 字段:
+            # tool_name / result_digest / result_path / outcome / invocation_id /
+            # ok / latency_ms / stdout_head / stdout_chars_total /
+            # stdout_truncated / stderr / files_created / error /
+            # delta_summary / incarnation / plan_ref / step_index。
+            # writable_matrix.coordinator 历史路径仍可能发 nested
+            # ``payload.result``;每字段独立 flat→nested 兜底。
+            p = event.payload if isinstance(event.payload, dict) else {}
+            target = self._resolve_step_target(event, p)
+            if target is not None:
+                nested = p.get("result") if isinstance(p.get("result"), dict) else None
+
+                def _pick(key: str, default: object = None) -> object:
+                    """字段独立 flat→nested 兜底。"""
+                    flat_v = p.get(key)
+                    if flat_v is not None:
+                        return flat_v
+                    if nested is not None and key in nested:
+                        return nested.get(key)
+                    return default
+
+                stdout_head = str(_pick("stdout_head", "") or "")
+                stdout_chars_total = int(_pick("stdout_chars_total", 0) or 0)
+                stdout_truncated = bool(_pick("stdout_truncated", False))
+                stderr = str(_pick("stderr", "") or "")
+                files_raw = _pick("files_created", ()) or ()
                 files_tuple = (
-                    tuple(str(f) for f in files_raw) if isinstance(files_raw, (list, tuple)) else ()
+                    tuple(str(f) for f in files_raw)
+                    if isinstance(files_raw, (list, tuple)) else ()
                 )
-                ok = bool(nested.get("ok", True) if "ok" in nested else p.get("ok", True))
-                latency_ms = int(nested.get("latency_ms", 0) or p.get("latency_ms", 0) or 0)
-                error = nested.get("error", None) if "error" in nested else p.get("error", None)
-                delta_summary = str(nested.get("delta_summary", "") or p.get("delta_summary", ""))
-                self._open_step.tool_result = ToolResult(
+                ok = bool(_pick("ok", True))
+                latency_ms = int(_pick("latency_ms", 0) or 0)
+                error = _pick("error", None)
+                delta_summary = str(_pick("delta_summary", "") or "")
+                target.tool_result = ToolResult(
                     ok=ok,
                     latency_ms=latency_ms,
-                    stdout_head=stdout_head[:2000],  # cap, full 在 model_visible
+                    stdout_head=stdout_head[:2000],
                     stdout_chars_total=stdout_chars_total,
                     stdout_truncated=stdout_truncated,
                     stderr=stderr[:2000],
@@ -477,32 +526,60 @@ class StepTreeAccumulatorDeriver(Deriver):
         elif ep == "body.tool.execute.start":
             # backend ReAct 把 tool_call 落到该 EP — payload 是 cursor 的
             # flat 形式 (tool_name / arguments / arguments_summary / invocation_id)。
-            if self._open_step is not None:
-                p = event.payload if isinstance(event.payload, dict) else {}
-                self._open_step.tool_call = ToolCallRecord(
+            p = event.payload if isinstance(event.payload, dict) else {}
+            target = self._resolve_step_target(event, p)
+            if target is not None:
+                target.tool_call = ToolCallRecord(
                     invocation_id=str(p.get("invocation_id", "")),
                     name=str(p.get("tool_name", p.get("name", ""))),
                     arguments=p.get("arguments") or {},
                     arguments_summary=str(p.get("arguments_summary", "")),
                 )
-        elif ep == "body.tool.execute.end" and self._open_step is not None:
+        elif ep == "body.tool.execute.end":
             p = event.payload if isinstance(event.payload, dict) else {}
-            self._open_step.tool_result = ToolResult(
-                ok=bool(p.get("ok", True)),
-                latency_ms=int(p.get("latency_ms") or 0),
-                stdout_head=str(p.get("stdout_head", ""))[:2000],
-                stdout_chars_total=int(p.get("stdout_chars_total", 0) or 0),
-                stdout_truncated=bool(p.get("stdout_truncated", False)),
-                stderr=str(p.get("stderr", ""))[:2000],
-                files_created=tuple(p.get("files_created", ()) or ()),
-                error=p.get("error", None),
-                delta_summary=str(p.get("delta_summary", "")),
-            )
+            target = self._resolve_step_target(event, p)
+            if target is not None:
+                target.tool_result = ToolResult(
+                    ok=bool(p.get("ok", True)),
+                    latency_ms=int(p.get("latency_ms") or 0),
+                    stdout_head=str(p.get("stdout_head", ""))[:2000],
+                    stdout_chars_total=int(p.get("stdout_chars_total", 0) or 0),
+                    stdout_truncated=bool(p.get("stdout_truncated", False)),
+                    stderr=str(p.get("stderr", ""))[:2000],
+                    files_created=tuple(p.get("files_created", ()) or ()),
+                    error=p.get("error", None),
+                    delta_summary=str(p.get("delta_summary", "")),
+                )
+
+    def _resolve_step_target(
+        self,
+        event: EventRecord,
+        payload: dict[str, object],
+    ) -> _StepFrame | None:
+        """SSOT 收口:返回这条 tool event 应该 attach 的 step 帧。
+
+        优先级:
+        1. ``self._open_step`` —— 当前 open 的 step。
+        2. ``payload.step_index`` —— cursor 发 event 时已带上对应 step 索引,
+           即使 _open_step 已 close(``brain.think.end`` 之后 cursor 还在
+           ``act`` 窗口发 record),用 ``step_index`` 找 ``self._closed_frames``
+           里已 close 的 frame 并返回。
+        3. 没匹配上 → drop(此时一般是事件发生在首个 step 开启前)。
+        """
+        if self._open_step is not None:
+            return self._open_step
+        event_step_index = payload.get("step_index")
+        if isinstance(event_step_index, int):
+            for frame in self._closed_frames:
+                if frame.step_index == event_step_index:
+                    return frame
+        return None
 
     def _begin_step(self, event: EventRecord, ts: float) -> None:
         if self._open_step is not None:
             # 嵌套 begin_step 视为上一 step 收口失败 → 强制 close
             self._close_step("fail")
+            # _close_step 已 set _open_step=None,_begin_step 接管
         self._step_seq += 1
         phase = event.payload.get("phase", "think")
         if not isinstance(phase, str):
@@ -527,6 +604,11 @@ class StepTreeAccumulatorDeriver(Deriver):
             # 已有显式 step(来自 writable.step.start 或上轮 brain.think.start)
             # → 不嵌套;复用现有 _open_step(包络优先级:显式 > 隐式)。
             return
+        # 把上一步 closed_pending 的 _open_step 引用清掉(若有)
+        if self._open_step is not None and getattr(
+            self._open_step, "closed_pending", False
+        ):
+            self._open_step = None
         self._step_seq += 1
         self._open_step = _StepFrame(
             step_id=f"step_{self._step_seq:03d}",
@@ -545,26 +627,40 @@ class StepTreeAccumulatorDeriver(Deriver):
         # reflect 默认摘要
         if f.reflect is None and f.tool_result is not None:
             f.reflect = ReflectTrace(summary=f.tool_result.delta_summary[:200])
-        # construct JournalStep
-        step = JournalStep(
-            step_id=f.step_id,
-            step_index=f.step_index,
-            phase=f.phase,
-            entered_at=f.entered_at,
-            exited_at=f.exited_at,
-            duration_ms=max(0, int((f.exited_at - f.entered_at) * 1000)) if f.exited_at else None,
-            context_before=f.context_before,
-            thinking=f.thinking,
-            tool_call=f.tool_call,
-            tool_result=f.tool_result,
-            reflect=f.reflect,
-            segments=tuple(f.segments),
-            outcome=f.outcome,
-        )
-        self._steps.append(step)
         # ADR-0176 D2:deriver 是纯订阅 + 物化,不再落 model_visible。
         # model_visible 由 ModelVisibleRecorder 在 LLM 边界一次性写。
+        #
+        # 观测面 SSOT 收口(2026-09-03):``brain.think.end`` 之后 cursor
+        # 可能还在 ``act`` 窗口里产生 ``step.tool_call.record`` /
+        # ``step.tool_result.record`` / ``body.tool.execute.*``,这些
+        # 事件**仍属于**这一步。原实现立即 ``_open_step=None`` + 立即
+        # 构造 JournalStep 会让这些 tool 事件被静默丢弃(journal 里的
+        # tool_call 永远 EMPTY)。现在改:close 时只把 frame 推到
+        # ``self._closed_frames`` 与 ``self._steps_by_index``,真正的
+        # JournalStep 构造在 ``_build_document`` / ``flush()`` 时统一进行。
+        f.closed_pending = True
         self._open_step = None
+        self._closed_frames.append(f)
+        self._steps_by_index[f.step_index] = f
+
+    def _build_step(self, frame: _StepFrame) -> JournalStep:
+        """从 _StepFrame 构造 JournalStep(deferred at flush time)。"""
+        return JournalStep(
+            step_id=frame.step_id,
+            step_index=frame.step_index,
+            phase=frame.phase,
+            entered_at=frame.entered_at,
+            exited_at=frame.exited_at,
+            duration_ms=max(0, int((frame.exited_at - frame.entered_at) * 1000))
+            if frame.exited_at else None,
+            context_before=frame.context_before,
+            thinking=frame.thinking,
+            tool_call=frame.tool_call,
+            tool_result=frame.tool_result,
+            reflect=frame.reflect,
+            segments=tuple(frame.segments),
+            outcome=frame.outcome,
+        )
 
     def _begin_segment(self, event: EventRecord, ts: float) -> None:
         if self._open_step is None:
@@ -625,8 +721,17 @@ class StepTreeAccumulatorDeriver(Deriver):
 
     def _build_document(self) -> JournalDocument:
         seg_count = sum(1 for p in self._phases if p.kind in ("think", "act"))
+        # SSOT 收口(2026-09-03):构造 JournalStep 时从 ``self._steps_by_index``
+        # 重新读最新 frame(包括 close 之后 attach 的 tool_call / tool_result)。
+        # 之前 ``_close_step`` 直接把 JournalStep 写入 ``self._steps``,后续
+        # mutate frame 的 tool_call 不会反映到 JournalStep。
+        steps_list = [
+            self._build_step(frame) for frame in sorted(
+                self._closed_frames, key=lambda f: f.step_index,
+            )
+        ]
         totals = Totals(
-            steps=len(self._steps),
+            steps=len(steps_list),
             segments=seg_count,
             phases=len(self._phases),
         )
@@ -643,14 +748,14 @@ class StepTreeAccumulatorDeriver(Deriver):
             outcome=self._resolve_outcome(),
             started_at=self._first_ts or 0.0,
             closed_at=self._last_ts,
-            total_steps=len(self._steps),
+            total_steps=len(steps_list),
         )
         return JournalDocument(
             schema="lca.journal/3.1",
             run_id=self._run_id,
             trace_id=self._run_id,
             started_at=self._first_ts or 0.0,
-            steps=tuple(self._steps),
+            steps=tuple(steps_list),
             metadata=meta,
             closed_at=self._last_ts,
             totals=totals,

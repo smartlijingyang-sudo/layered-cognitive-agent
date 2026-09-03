@@ -74,10 +74,10 @@ class _RejectingCursor:
     def advance(self, phase: PhaseName) -> None:
         raise CursorError("rejected")
 
-    def record_tool_call(self, payload: ToolCallRecord) -> None:
+    def record_tool_call(self, payload: ToolCallRecord, **kwargs: Any) -> None:
         raise CursorError("rejected")
 
-    def record_tool_result(self, payload: ToolResultRecord) -> None:
+    def record_tool_result(self, payload: ToolResultRecord, **kwargs: Any) -> None:
         raise CursorError("rejected")
 
 

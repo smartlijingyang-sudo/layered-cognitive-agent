@@ -142,10 +142,15 @@ def emit_tool_started(
     # CursorRecord.try_record_tool_call swallows CursorError when cursor is
     # not in ACT phase — this is the run_9e181f24c275 regression lock
     # (record_tool_call in non-ACT phase must not escalate to RuntimeError).
+    #
+    # 2026-09-03 观测面 SSOT 收口:把 inline_args + summary 透传给 cursor,
+    # 让 deriver 在没做 sidecar round-trip 时也能拿到 tool 调用内容。
     CursorRecord.try_record_tool_call(
         tool_name=tool.name,
         invocation_id=invocation_id,
         args_digest=_summarize_args(args_dict),
+        arguments=inline_args,
+        arguments_summary=_summarize_args(args_dict),
     )
     return arguments_ref
 
@@ -268,10 +273,22 @@ def emit_tool_invoked(
     # JournalEvent above remains (ADR-0063 SSOT).
     #
     # R2: best-effort write goes through :class:`CursorRecord` SSOT helper.
+    # 2026-09-03 观测面 SSOT 收口:把 stdout / files / latency / error /
+    # delta_summary 全部透传给 cursor,deriver 在没做 sidecar round-trip
+    # 时也能拿到完整 result 字段。
+    delta = _delta_summary_from_obs(obs, inline_output_text, output_ref)
     CursorRecord.try_record_tool_result(
         tool_name=tool.name,
-        result_digest=_delta_summary_from_obs(obs, inline_output_text, output_ref),
+        result_digest=delta,
         outcome="ok" if obs.success else "failure",
+        invocation_id=resolved_id,
+        ok=obs.success,
+        latency_ms=latency_ms,
+        stdout_head=(inline_output_text or "")[:2000],
+        stderr="" if obs.success else (obs.error or ""),
+        files_created=tuple(str(f.get("name") or "") for f in tool_files(obs)),
+        error=obs.error or None,
+        delta_summary=delta,
     )
 
 

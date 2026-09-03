@@ -32,6 +32,10 @@ from lca.contracts.models.observability.journal_doc import JournalDocument
 from lca.contracts.models.observability.journal_step import (
     summarize_step,
 )
+from lca.contracts.observability.ssot import (
+    ObservationSSOTError,
+    find_spine_file,
+)
 from lca.infrastructure.observability.journal.step.reader import read_step_document
 from lca.plugins.transport.webserver.handlers.runs.doctor.models import (
     DoctorMode,
@@ -59,17 +63,27 @@ def _safe_logger() -> Any:
         return _Stub()
 
 
-def _scan_xref(run_dir: Path, scan: StepScan) -> StepScan:
+def _scan_xref(run_dir: Path, run_id: str, scan: StepScan) -> StepScan:
     """ADR-0176 D5:H-xref —— 跨源一致性扫描。
 
-    读取 ``<run_dir>/events.jsonl``(spine SSOT)与
-    ``<run_dir>/manifest.json``(manifest SSOT),把「spine 上有
-    某类 EP 但 journal 反映不到」挑出来落到 ``StepScan.xref_*``。
+    通过 ``find_spine_file`` 解析 per-run spine ledger(spine SSOT),
+    读取 ``<run_dir>/manifest.json``,把「spine 上有某类 EP 但 journal
+    反映不到」挑出来落到 ``StepScan.xref_*``。
+
+    SSOT 解析失败(spine ledger 不存在)= H-xref **fail-loud**,不再
+    silently 报全零后 ``ok=True``。这正是历史 ``events.jsonl`` 硬编码
+    bug 的修复点(2026-09-03 H-xref PR-1 / ssot.py PR)。
     """
-    # spine events.jsonl 计数(逐行扫描,不解析 payload 细节)
+    # spine ledger 路径解析:走 SSOT(PR-27 spine 命名 + events.jsonl legacy 兜底)
     spine_counts: dict[str, int] = {}
-    spine_path = run_dir / "events.jsonl"
-    if spine_path.exists():
+    spine_path: Path | None = None
+    try:
+        spine_path = find_spine_file(run_dir, run_id)
+    except ObservationSSOTError as exc:
+        _log = _safe_logger()
+        _log.debug("h_xref.spine_missing", run_id=run_id, error=str(exc))
+        spine_path = None
+    if spine_path is not None:
         try:
             for ln in spine_path.read_text(encoding="utf-8").splitlines():
                 ln = ln.strip()
@@ -84,9 +98,9 @@ def _scan_xref(run_dir: Path, scan: StepScan) -> StepScan:
                 ep = rec.get("execution_point")
                 if isinstance(ep, str):
                     spine_counts[ep] = spine_counts.get(ep, 0) + 1
-        except Exception as exc:  # pragma: no cover — events.jsonl 读取失败兜底
+        except Exception as exc:  # pragma: no cover — spine ledger 读取失败兜底
             _log = _safe_logger()
-            _log.debug("h_xref.events_jsonl_unreadable", error=str(exc))
+            _log.debug("h_xref.spine_unreadable", error=str(exc))
     spine_event_total = sum(spine_counts.values())
     spine_body_tool_start = spine_counts.get("body.tool.execute.start", 0)
     spine_llm_call_end = spine_counts.get("llm.call.end", 0)
@@ -122,13 +136,13 @@ def _scan_xref(run_dir: Path, scan: StepScan) -> StepScan:
 
     return _dc_replace(
         scan,
-        spine_path=str(spine_path),
+        spine_path=str(spine_path) if spine_path is not None else "",
         spine_event_total=spine_event_total,
         spine_body_tool_start=spine_body_tool_start,
         spine_llm_call_end=spine_llm_call_end,
         spine_phase_fold_total=spine_phase_fold_total,
         spine_kernel_run_start=spine_kernel_run_start,
-        events_jsonl_exists=spine_path.exists(),
+        spine_file_exists=spine_path is not None,
         flush_errors=flush_errors,
     )
 
@@ -432,21 +446,28 @@ def diagnose_step_tree(
     """
     path = Path(journal_path)
     scan = _scan_step_doc(path)
-    # ADR-0176 D5:H-xref 需要 events.jsonl/manifest.json —— 这两个文件与
-    # journal.json 在同一 run_dir。xpath 是 path.parent 而非 path 本身。
-    xref_scan = _scan_xref(path.parent, scan)
     run_id = path.parent.name  # traces/runs/<run_id>/journal.json
-    trace_id = ""
     if scan.exists:
         try:
             doc = read_step_document(path)
             run_id = doc.run_id or run_id
-            trace_id = doc.trace_id
         except Exception as exc:
             import structlog
 
             _log = structlog.get_logger("lca.doctor.step_check")
             _log.debug("scan_failed", path=str(path), error=str(exc))
+    # ADR-0176 D5:H-xref 需要 spine ledger(SSOT 解析)+ manifest.json。
+    # SSOT 解析需要 run_id:spine_filename_for_run(run_id)派生主路径,
+    # legacy events.jsonl 作为兜底(PR-27 迁移窗口期)。
+    xref_scan = _scan_xref(path.parent, run_id, scan)
+    trace_id = ""
+    if scan.exists:
+        try:
+            doc = read_step_document(path)
+            trace_id = doc.trace_id
+        except Exception as exc:
+            _log = structlog.get_logger("lca.doctor.step_check")
+            _log.debug("scan_failed_2", path=str(path), error=str(exc))
     status = scan.outcome or "unknown"
     hops: dict[str, HopVerdict] = {
         "H1": _hop_h1(scan),
@@ -502,14 +523,15 @@ def _hop_h_xref(scan: StepScan) -> HopVerdict:
         "spine_llm_call_end": scan.spine_llm_call_end,
         "spine_phase_fold_total": scan.spine_phase_fold_total,
         "spine_kernel_run_start": scan.spine_kernel_run_start,
-        "events_jsonl_exists": scan.events_jsonl_exists,
+        "spine_file_exists": scan.spine_file_exists,
+        "spine_path": scan.spine_path,
         "flush_errors": list(scan.flush_errors),
         "journal_steps": scan.total_steps,
     }
     reasons: list[str] = []
-    if scan.spine_kernel_run_start > 0 and not scan.events_jsonl_exists:
+    if scan.spine_kernel_run_start > 0 and not scan.spine_file_exists:
         reasons.append(
-            f"kernel.run.start={scan.spine_kernel_run_start} but events.jsonl missing"
+            f"kernel.run.start={scan.spine_kernel_run_start} but spine ledger missing"
         )
     if scan.flush_errors:
         reasons.append(

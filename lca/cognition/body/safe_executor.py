@@ -43,6 +43,70 @@ def _elapsed_ms(started: float) -> int:
     return int((time.perf_counter() - started) * _PERF_COUNTER_SCALE)
 
 
+def _summarize_args_for_cursor(args: dict[str, Any]) -> str:
+    """人话摘要(< 200 字符)→ step.tool_call.arguments_summary。
+
+    与 :mod:`lca.cognition.body.tool_journal_emit` 的 ``_summarize_args``
+    同语义,这里独立一份以保持 safe_executor 自包含。
+    """
+    if not args:
+        return ""
+    keys = list(args.keys())[:5]
+    head = ", ".join(f"{k}={repr(args[k])[:32]}" for k in keys)
+    if len(head) > 200:
+        return head[:200] + "…"
+    return head
+
+
+def _extract_stdout_head(observation: Any, *, limit: int = 2000) -> str:
+    """从 Observation.payload 抽 stdout-like 文本;空 observation 返回空串。"""
+    payload = getattr(observation, "payload", None)
+    if not isinstance(payload, dict):
+        return ""
+    for key in ("output", "stdout", "content"):
+        value = payload.get(key)
+        if isinstance(value, str):
+            return value[:limit]
+    return ""
+
+
+def _extract_stderr(observation: Any, *, limit: int = 2000) -> str:
+    """从 Observation.payload 抽 stderr;空 observation 返回空串。"""
+    payload = getattr(observation, "payload", None)
+    if not isinstance(payload, dict):
+        return ""
+    value = payload.get("stderr")
+    if isinstance(value, str):
+        return value[:limit]
+    return ""
+
+
+def _extract_files_created(observation: Any) -> tuple[str, ...]:
+    """从 Observation 抽 files_created 元组;失败兜底空 tuple。"""
+    extra = getattr(observation, "extra", None)
+    if not isinstance(extra, dict):
+        return ()
+    files = extra.get("files_created")
+    if isinstance(files, (list, tuple)):
+        return tuple(str(f) for f in files)
+    return ()
+
+
+def _delta_summary_from_obs(observation: Any, *, limit: int = 200) -> str:
+    """从 Observation 生成 step.tool_result.delta_summary(< 200 字符人话)。"""
+    if not getattr(observation, "success", True):
+        err = getattr(observation, "error", None) or "unknown"
+        return f"❌ {type(err).__class__.__name__ if hasattr(type(err), '__class__') else 'err'}: {err}"[:limit]
+    files = _extract_files_created(observation)
+    if files:
+        names = ", ".join(files[:3])
+        return f"✅ 写出 {len(files)} 个文件: {names}"[:limit]
+    stdout = _extract_stdout_head(observation, limit=80)
+    if stdout:
+        return f"✅ stdout[:80] = {stdout.replace(chr(10), '⏎')}"[:limit]
+    return "✅ ok"
+
+
 from lca.cognition.body.tool_journal_emit import (  # noqa: E402
     emit_tool_denied,
     emit_tool_invoked,
@@ -119,10 +183,16 @@ class SimpleSafeExecutor(SafeExecutor):
         # ADR-0164 + ADR-0169 PR-26: phase 推进由 SimpleBody.act 负责,本 seam
         # 仅负责记录 tool_call/tool_result 证据。CursorRecord.try_* 吞掉
         # CursorError + 无 cursor 情况(单条记录缺失 ≠ 整 session RuntimeError)。
+        # 2026-09-03 观测面 SSOT 收口:把 ``arguments`` 与 ``arguments_summary``
+        # 也透传给 cursor;后者由 ``_summarize_args`` 生成,deriver
+        # 不必再 sidecar round-trip。
+        arguments_for_record = dict(args) if isinstance(args, dict) else {}
         CursorRecord.try_record_tool_call(
             tool_name=tool.name,
             invocation_id=invocation_id,
             args_digest=f"tool:{tool.name}",
+            arguments=arguments_for_record,
+            arguments_summary=_summarize_args_for_cursor(arguments_for_record),
         )
         act_closed = False
         try:
@@ -167,6 +237,13 @@ class SimpleSafeExecutor(SafeExecutor):
                 tool_name=tool.name,
                 result_digest=observation.error or ("ok" if observation.success else "fail"),
                 outcome="ok" if observation.success else "failure",
+                invocation_id=invocation_id,
+                ok=observation.success,
+                error=observation.error or None,
+                stdout_head=_extract_stdout_head(observation),
+                stderr=_extract_stderr(observation),
+                files_created=_extract_files_created(observation),
+                delta_summary=_delta_summary_from_obs(observation),
             )
             act_closed = True
             return observation
@@ -176,6 +253,10 @@ class SimpleSafeExecutor(SafeExecutor):
                     tool_name=tool.name,
                     result_digest=str(exc),
                     outcome="failure",
+                    invocation_id=invocation_id,
+                    ok=False,
+                    error=str(exc),
+                    delta_summary=str(exc)[:120],
                 )
             raise
 
