@@ -1,14 +1,14 @@
-"""spine_file_sink plugin 实现（ADR-0181 PR-8）。
+"""spine_file_sink plugin 实现（ADR-0181 PR-8 shim；record 入口 ADR-0183 PR-5）。
 
 # COMPAT(delete-when: PR-9, tracking: ADR-0181)
-# shim：保留旧 FileSink 逻辑（<run_dir>/<run_id>.spine.jsonl + exceptions 索引）
-# 但改用 EventMechanism callback 入口（``__call__(payload, ref)``）替代
-# 旧 ``write(EventRecord)``。EventRecord 字段从 SpineEventPayload + EventRef
-# 推导，保持链上字节兼容。
+# shim：<run_dir>/default-run.spine.jsonl 落盘入口。record 构造 =
+# build_record() 单一入口（ADR-0183 §3.5）；落盘 = SpineSink（I-FW-SSOT-1
+# 唯一 writer）；字节布局 = SpineEventRecord.to_dict() 9 键（sort_keys）。
 
 PR-9 旧 spine 全退役时一并删除本 shim（rg FileSink lca/infrastructure/
 = 0 触发）。
 """
+
 from __future__ import annotations
 
 import logging
@@ -16,65 +16,34 @@ from pathlib import Path
 from typing import Any
 
 from lca_kernel.events.mechanism import EventRef
-from lca_kernel.events.payloads import SpineEventPayload
-from lca_kernel.events.spine_runtime import is_spine_event
-
-# Reuse the OLD FileSink implementation; only the entry point changes.
-from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
+from lca_kernel.events.sinks.spine_sink import SpineSink
+from lca_kernel.events.spine_runtime import build_record, is_spine_event
 
 log = logging.getLogger(__name__)
 
 
 class SpineFileSink:
-    """EventMechanism-aware wrapper around the old FileSink.
+    """EventMechanism callback 入口；落盘委托 SpineSink SSOT 路径。
 
-    Subscribes to all spine EP categories and forwards as ``EventRecord``
-    to the underlying ``FileSink.write`` method. The byte format on
-    disk is unchanged (same field schema).
+    manifest 订阅全部 spine EP category；每条事件经 ``build_record()`` 构造
+    ``SpineEventRecord`` 后交 ``SpineSink.append``。字节布局 =
+    ``SpineEventRecord.to_dict()`` 9 键（ADR-0183 §3.5 SSOT，plugin 不可改）。
+
+    失败语义：callback 异常上抛；订阅路径由机制 FD-2 contained 显式记日志，
+    无静默枚举 fallback。
     """
 
     def __init__(self, run_dir: Path | None = None) -> None:
-        # FileSink.__init__ requires run_dir + run_id; default to cwd + sentinel
+        # run_id 哨兵：shim 不感知 run 生命周期；PR-9 并入
+        # lca_kernel/events/sinks/spine_file_sink.py 后由 set_run_id 注入。
         target = run_dir or Path.cwd()
-        self._inner = FileSink(run_dir=target, run_id="default-run")
+        self._inner = SpineSink(path_template=str(target / "{run_id}.spine.jsonl"))
+        self._inner.set_run_id("default-run")
 
     def __call__(self, payload: Any, ref: EventRef) -> None:
         if not is_spine_event(payload):
-            raise TypeError(
-                f"SpineFileSink 只接 SpineEventPayload；got {type(payload).__name__}"
-            )
-        sp: SpineEventPayload = payload  # narrow for type checker
-        record = self._build_event_record(sp, ref)
-        self._inner.write(record)
-
-    def _build_event_record(
-        self, sp: SpineEventPayload, ref: EventRef
-    ) -> Any:
-        """推导旧 EventRecord（保持磁盘兼容）。"""
-        from lca.infrastructure.observability.spine.event_record import (
-            Channel,
-            EventRecord,
-            Outcome,
-        )
-
-        channel_str = sp.channel
-        try:
-            channel = Channel(channel_str)
-        except ValueError:
-            channel = Channel.FACT  # fallback
-        outcome_str = sp.payload.get("outcome", "success")
-        try:
-            outcome = Outcome(outcome_str)
-        except ValueError:
-            outcome = Outcome.SUCCESS
-        return EventRecord(
-            event_id=ref.event_id,
-            execution_point=sp.execution_point,
-            channel=channel,
-            outcome=outcome,
-            caller_payload=dict(sp.payload),
-            timestamp=ref.ts,
-        )
+            raise TypeError(f"SpineFileSink 只接 SpineEventPayload；got {type(payload).__name__}")
+        self._inner.append(build_record(payload, ref))
 
     def flush(self) -> None:
         self._inner.flush()

@@ -5,6 +5,7 @@
 
 PR-2 删-when：见 lca_kernel/events/spine_runtime.py 顶部说明。
 """
+
 from __future__ import annotations
 
 import json
@@ -15,7 +16,7 @@ from typing import Any
 from lca_kernel.events.mechanism import EventRef
 from lca_kernel.events.spine_runtime import (
     SpineChainContext,
-    SpineEventRecord,
+    build_record,
     default_chain_path,
     is_spine_event,
 )
@@ -37,10 +38,10 @@ class SpineChainSink:
     def __call__(self, payload: Any, ref: EventRef) -> None:
         """sink callback（FD-1：抛错上抛 sender）。"""
         if not is_spine_event(payload):
-            raise TypeError(
-                f"SpineChainSink 只接 SpineEventPayload；got {type(payload).__name__}"
-            )
-        record = SpineEventRecord.build(payload, ref, chain=self._chain)
+            raise TypeError(f"SpineChainSink 只接 SpineEventPayload；got {type(payload).__name__}")
+        # build_record = record 构造单一入口（ADR-0183 §3.5 PR-5）；
+        # chain 显式传入时 prev_event_hash 取 chain.prev_hash，落盘字节不变。
+        record = build_record(payload, ref, chain=self._chain)
         with self.output_path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(record.to_dict(), ensure_ascii=False) + "\n")
         if record.event_hash is not None:
