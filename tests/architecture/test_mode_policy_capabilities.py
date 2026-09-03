@@ -15,7 +15,7 @@ from types import SimpleNamespace
 import pytest
 
 from lca.application.casting import build_from_casting_plan
-from lca.cognition.team.modes.cordis_creator_mode import build_cordis_creator_agent
+from lca.plugins.collaboration.modes.cordis_creator import build_cordis_creator_agent
 from lca.contracts.capabilities import CORDIS_CONTROL_TOOL_FACTORY, CORDIS_CREATOR_ROLE
 from lca.contracts.mechanisms.capability import MissingCapabilityError
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
@@ -70,7 +70,7 @@ def test_creator_adapter_uses_profile_role_and_control_tool_factory(monkeypatch)
             self.observability = observability
             self.scope = scope
 
-    monkeypatch.setattr("gateway.plugins.cordis_creator_mode.Agent", _Agent)
+    monkeypatch.setattr("lca.plugins.collaboration.modes.cordis_creator.Agent", _Agent)
     factory = _ControlFactory()
     scope = _Scope(factory)
     agent = build_cordis_creator_agent(
@@ -105,7 +105,7 @@ def test_creator_adapter_fails_closed_without_a_role_capability() -> None:
 def test_creator_adapter_has_no_local_persona_tools_or_grant_literals() -> None:
     """Static gate against reintroducing Creator policy into the Gateway adapter."""
 
-    source = (REPO / "gateway" / "plugins" / "cordis_creator_mode.py").read_text(encoding="utf-8")
+    source = (REPO / "lca" / "plugins" / "collaboration" / "modes" / "cordis_creator.py").read_text(encoding="utf-8")
     assert "build_cordis_creator_role_profile" not in source
     assert "creator_names =" not in source
     assert "caller_grant=(" not in source

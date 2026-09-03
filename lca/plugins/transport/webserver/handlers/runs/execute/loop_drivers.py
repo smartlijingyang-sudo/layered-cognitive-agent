@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 from lca.agent.role_library import FileRoleLibrary
 from lca.application.api import Agent, Team
 from lca.application.casting import LLMTeamCaster
-from lca.cognition.team.modes.team_mode import build_runnable_team
+from lca.plugins.collaboration.modes.team import build_runnable_team
 from lca.cognition.team.modes_catalog import SOLO_MODE_KEY, SOLO_ROLE
 from lca.contracts.mechanisms.capability import provider_current, require_capability
 from lca.contracts.models.core.lifecycle import TaskStatus
@@ -209,9 +209,9 @@ async def _build_team(
 ) -> Team:
     """Team LLM casting — select roles + governance, then build Team.
 
-    Delegates to ``team_mode.build_runnable_team`` so ``CastingStarted`` /
+    Delegates to ``team.build_runnable_team`` so ``CastingStarted`` /
     ``CastingCompleted`` / ``CastingFailed`` are emitted from a single
-    emitter (``lca.cognition.team.modes.team_mode``), keeping the catalog
+    emitter (``lca.plugins.collaboration.modes.team``), keeping the catalog
     single-emitter constraint intact.
     """
     del bindings  # 已由 build_runnable_team 透传
@@ -241,7 +241,8 @@ async def _build_team(
 # import ``build_solo_agent`` from
 # ``lca.plugins.transport.webserver.handlers.runs.execute.loop_drivers``
 # after the assemble.py removal. ``build_runnable_team`` is imported above
-# and used directly; callers should now import it from ``team_mode``.
+# and used directly; callers should now import it from
+# ``lca.plugins.collaboration.modes.team``.
 build_solo_agent = _build_solo_agent
 
 

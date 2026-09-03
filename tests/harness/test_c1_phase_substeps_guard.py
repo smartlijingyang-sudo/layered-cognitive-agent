@@ -38,7 +38,7 @@ LCA_ROOT = Path("lca")
 BRAIN_DIR = LCA_ROOT / "cognition" / "brain"
 RUNTIME_FILE = LCA_ROOT / "runtime" / "runtime_loop.py"
 REDUCER_PROTOCOL = LCA_ROOT / "contracts" / "protocols" / "state" / "reducer.py"
-REDUCER_DEFAULT = LCA_ROOT / "runtime" / "reducer.py"
+REDUCER_DEFAULT = LCA_ROOT / "plugins" / "runtime" / "reducer.py"
 
 
 class TestCV4NoGateChainField:

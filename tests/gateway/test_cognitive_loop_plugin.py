@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.cognition.team.modes.cognitive_loop import _cognitive_driver_factory
+from lca.plugins.collaboration.modes.cognitive import _cognitive_driver_factory
 from lca.contracts.capabilities import RUN_MODE_REGISTRY
 from lca.contracts.mechanisms.capability import MissingCapabilityError
 

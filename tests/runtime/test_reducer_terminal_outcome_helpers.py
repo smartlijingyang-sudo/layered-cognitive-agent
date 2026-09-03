@@ -29,7 +29,7 @@ from lca.contracts.models.core.terminal_outcome import (
     TextRef,
 )
 from lca.contracts.protocols.declarative.declarative_common import DeclarativeValidationError
-from lca.runtime.reducer import DefaultReducer
+from lca.plugins.runtime.reducer import DefaultReducer
 
 
 def _state(status: TaskStatus = TaskStatus.WORKING) -> AgentState:

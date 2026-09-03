@@ -38,7 +38,7 @@ def test_state_module_does_not_declare_final_output() -> None:
 def test_runtime_reducer_does_not_read_state_final_output() -> None:
     """reducer.py 代码段不含 state.final_output 引用。"""
 
-    from lca.runtime import reducer as reducer_module
+    from lca.plugins.runtime import reducer as reducer_module
 
     src = reducer_module.__file__ or ""
     with open(src, encoding="utf-8") as fh:

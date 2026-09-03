@@ -464,12 +464,12 @@ entries:
 
   - id: lca-mode-solo-default
     name: lca_mode_solo_default
-    $module: lca.cognition.team.modes.solo_mode
+    $module: lca.plugins.collaboration.modes.solo
     config: {}
 
   - id: lca-mode-team-default
     name: lca_mode_team_default
-    $module: lca.cognition.team.modes.team_mode
+    $module: lca.plugins.collaboration.modes.team
     config: {}
 
   # ── ADR-0065 / W1: Evidence store seam ──
@@ -494,5 +494,5 @@ entries:
   # requires this plugin to be in the bundle so production boot is fail-closed.
   - id: lca-default-reducer
     name: lca_default_reducer
-    $module: lca.runtime.reducer
+    $module: lca.plugins.runtime.reducer
     config: {}

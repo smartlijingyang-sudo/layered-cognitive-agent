@@ -72,9 +72,9 @@ def test_builtin_mode_plugins_are_entry_local() -> None:
     different Creator adapter without editing a shared defaults registrar.
     """
 
-    from lca.cognition.team.modes.cordis_creator_mode import setup as creator_setup
-    from lca.cognition.team.modes.solo_mode import setup as solo_setup
-    from lca.cognition.team.modes.team_mode import setup as team_setup
+    from lca.plugins.collaboration.modes.cordis_creator import setup as creator_setup
+    from lca.plugins.collaboration.modes.solo import setup as solo_setup
+    from lca.plugins.collaboration.modes.team import setup as team_setup
 
     solo = definition_from_plugin(solo_setup)
     team = definition_from_plugin(team_setup)

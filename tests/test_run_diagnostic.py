@@ -89,7 +89,7 @@ def test_reducer_apply_stop_propagates_diagnostic_message() -> None:
     """``state.last_error`` must be filled from the RunDiagnostic, not fall back."""
     from lca.contracts.models.core.state import AgentState, Budget
     from lca.plugins.phase_graph.failure_stop import _summarize_attempts
-    from lca.runtime.reducer import DefaultReducer
+    from lca.plugins.runtime.reducer import DefaultReducer
 
     # ADR-clean-truths 决策 一:用真构造路径(phase_failure_stop_result 用的
     # 摘要生成器)造 message,而不是直接写字面量。这样 reducer 透传测试与
@@ -131,7 +131,7 @@ def test_terminal_outcome_error_ref_carries_diagnostic() -> None:
     from lca.contracts.models.core.state import AgentState, Budget
     from lca.contracts.models.core.terminal_outcome import ErrorRef
     from lca.plugins.phase_graph.failure_stop import _summarize_attempts
-    from lca.runtime.reducer import DefaultReducer
+    from lca.plugins.runtime.reducer import DefaultReducer
 
     failure = PhaseExecutionFailure(
         node_id="think.main",

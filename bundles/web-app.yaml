@@ -207,7 +207,7 @@ entries:
   # are loaded; nothing in gateway hard-codes drivers.
   - id: lca-loop-cognitive
     name: lca_loop_cognitive
-    $module: lca.cognition.team.modes.cognitive_loop
+    $module: lca.plugins.collaboration.modes.cognitive
     config:
       target: cognitive
   # Cognitive is the default loop driver; the bundle decides whether to load
@@ -218,7 +218,7 @@ entries:
   # profiles, which must not accidentally promise a Session Spine they cannot run.
   - id: lca-session-live-builder-provider
     name: lca_providers_session_live_builder
-    $module: lca.application.session_live_builder_provider
+    $module: lca.plugins.runtime.session_live_builder
     config: {}
 
   # ── Plan-driven composers (one entry per capability plane) ─────────

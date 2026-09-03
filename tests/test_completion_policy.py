@@ -32,7 +32,7 @@ from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
 from lca.contracts.protocols import SupportsShortcut
 from lca.contracts.protocols.journal.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
 from lca.plugins.providers.gate.decision_classifier import DefaultDecisionClassifier
-from lca.runtime.reducer import DefaultReducer
+from lca.plugins.runtime.reducer import DefaultReducer
 
 # ── helpers ──
 
