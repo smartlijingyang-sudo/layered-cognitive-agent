@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 
 from lca.contracts.event import Category, EventPayload, Plane
-from lca_kernel.events.errors import UnknownCategoryError
 from lca_kernel.events import _DEFAULT_CONFIG_DIR
+from lca_kernel.events.errors import UnknownCategoryError
 from lca_kernel.events.registry import EventRegistry, EventSpec
 
 
@@ -38,12 +38,16 @@ def test_registry_contract_fields_are_closed_set() -> None:
         "subscribers",
         "consumer_rules",
         "payload_by_category",
+        "_plugins",
+        "_raw_consumer_rules",
     }
     assert set(EventSpec.__dataclass_fields__) == {
         "category",
         "plane",
         "payload_class",
         "fields",
+        "publishers_tokens",
+        "subscribers_tokens",
         "publishers",
         "subscribers",
     }
@@ -64,6 +68,10 @@ events:
 
 
 def test_unresolvable_publisher_class_raises(tmp_path: Path) -> None:
+    """class-path 形态 token import 失败 → :class:`UnknownCategoryError`。
+
+    PR-5：catalog 缺位时仍按 class-path 解析,id-form token 留待 refresh。
+    """
     bad_yaml = tmp_path / "bad.yaml"
     bad_yaml.write_text(
         """

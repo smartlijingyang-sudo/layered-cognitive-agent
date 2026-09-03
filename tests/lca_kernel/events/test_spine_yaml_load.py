@@ -26,11 +26,17 @@ def test_spine_yaml_loads_spine_events_after_pr6() -> None:
 
 
 def test_spine_publisher_resolved() -> None:
-    """spine.yaml publishers 字段 → ReflectorClass type 对象。"""
-    config_dir = Path(__file__).resolve().parents[3] / "lca_kernel" / "events" / "config"
-    registry = EventRegistry.load(config_dir)
+    """spine.yaml publishers 字段 → ReflectorClass type 对象。
+
+    PR-5：yaml 改 id 形态后，``EventRegistry.load`` 缺 catalog → publishers
+    解析为空。本测试改用 :func:`build_test_bus` 注入 catalog，与生产路径
+    同形态。
+    """
+    from lca_kernel.events.test_catalog import build_test_bus
+
+    bus = build_test_bus()
     cat = Category("spine.cognition.brain.perceive.start")
-    pubs = registry.publishers[cat]
+    pubs = bus.registry.publishers[cat]
     from lca.plugins.events.publishers.spine_reflector_cognition.plugin import (
         ReflectorClass,
     )
@@ -39,11 +45,15 @@ def test_spine_publisher_resolved() -> None:
 
 
 def test_spine_subscribers_resolved() -> None:
-    """spine.yaml consumer_rules 前缀规则 → 物化的订阅授权 type 集合。"""
-    config_dir = Path(__file__).resolve().parents[3] / "lca_kernel" / "events" / "config"
-    registry = EventRegistry.load(config_dir)
+    """spine.yaml consumer_rules 前缀规则 → 物化的订阅授权 type 集合。
+
+    PR-5：catalog 注入后才解析；用 :func:`build_test_bus`。
+    """
+    from lca_kernel.events.test_catalog import build_test_bus
+
+    bus = build_test_bus()
     cat = Category("spine.cognition.brain.perceive.start")
-    subs = registry.subscribers[cat]
+    subs = bus.registry.subscribers[cat]
     from lca.plugins.events.sinks.spine_chain_sink.sink import SpineChainSink
     from lca.plugins.events.subscribers.console_projector.subscriber import (
         ConsoleProjectorSubscriber,
@@ -58,9 +68,14 @@ def test_spine_subscribers_resolved() -> None:
 
 
 def test_spine_consumer_rules_cover_all_categories() -> None:
-    """顶层 consumer_rules：最少前缀规则覆盖全部 100 category。"""
-    config_dir = Path(__file__).resolve().parents[3] / "lca_kernel" / "events" / "config"
-    registry = EventRegistry.load(config_dir)
+    """顶层 consumer_rules：最少前缀规则覆盖全部 100 category。
+
+    PR-5：catalog 注入后才解析；用 :func:`build_test_bus`。
+    """
+    from lca_kernel.events.test_catalog import build_test_bus
+
+    bus = build_test_bus()
+    registry = bus.registry
     assert {r.prefix for r in registry.consumer_rules} == {
         "spine.",
         "spine.cognition.brain.perceive.",

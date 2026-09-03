@@ -15,16 +15,15 @@ from lca.plugins.events.subscribers.spine_step_tree_accumulator.subscriber impor
 )
 from lca_kernel.events.bus import EventBus
 from lca_kernel.events.errors import UnauthorizedSubscribeError
-from lca_kernel.events import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.payloads import SpineEventPayload
-from lca_kernel.events.registry import EventRegistry
 
 
 @pytest.fixture
 def bus() -> EventBus:
     SpineStepTreeAccumulator.reset()
     config_dir = Path(__file__).resolve().parents[4] / "lca_kernel" / "events" / "config"
-    b = EventBus(EventRegistry.load(config_dir))
+    from lca_kernel.events.test_catalog import build_test_bus
+    b = build_test_bus(config_dir)
     b.subscribe(
         plugin=SpineStepTreeAccumulator,
         category=Category("spine.cognition.brain.perceive.start"),

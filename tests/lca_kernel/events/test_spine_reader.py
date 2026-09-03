@@ -118,12 +118,12 @@ def test_read_dicts_missing_file_yields_nothing(tmp_path: Path) -> None:
 
 
 __all__ = [
-    "test_locate_returns_canonical_spine_path",
-    "test_locate_raises_when_spine_missing",
     "test_locate_does_not_consult_legacy_layout",
-    "test_read_dicts_yields_raw_dict_per_line",
-    "test_read_dicts_skips_corrupted_lines",
-    "test_read_dicts_skips_blank_lines",
-    "test_read_dicts_skips_non_dict_lines",
+    "test_locate_raises_when_spine_missing",
+    "test_locate_returns_canonical_spine_path",
     "test_read_dicts_missing_file_yields_nothing",
+    "test_read_dicts_skips_blank_lines",
+    "test_read_dicts_skips_corrupted_lines",
+    "test_read_dicts_skips_non_dict_lines",
+    "test_read_dicts_yields_raw_dict_per_line",
 ]

@@ -1,17 +1,20 @@
 # 业务 / 团队维度 —— ADR-0180 D2 鉴权矩阵 SSOT。
 #
 # 字段值规范（typed Python 实体全路径，避免出错）：
-# - category: enum 值字符串（contracts.event.Category）
+# - category: enum 值字符串（ID 形态由 registry catalog 解析，class-path 兼容保留）
 # - plane: Plane enum 全路径
 # - payload_class: EventPayload 子类全路径
-# - publishers: plugin class 全路径（module.qualname）→ 解析为 type
+# - publishers: plugin id 或 class 全路径（id 形态优先按 catalog 解析，
+#   class-path 形态作为 PR-5 兼容期 fallback；详见
+#   2026-09-04-plugin-universe-single-entry PR-5）
 # - consumer_rules: subscriber 鉴权按前缀规则声明；某 category 的授权 =
-#   命中的所有规则的 subscribers 并集
+#   命中的所有规则的 subscribers 并集（同样支持 id / class-path 双形态）
+
 consumer_rules:
   - prefix: "team."
     subscribers:
-      - lca.plugins.events.sinks.journal.sink.JournalSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+      - lca.events.sink.journal
+      - lca.events.subscriber.console_projector
 events:
   - category: team.delegation.cache_hit
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -21,4 +24,4 @@ events:
       subtask: str
       step: int
     publishers:
-      - lca.plugins.events.publishers.delegation_cache.plugin.DelegationCachePlugin
+      - delegation_cache

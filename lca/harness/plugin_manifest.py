@@ -106,6 +106,13 @@ class PluginDefinition(Generic[C]):
     logic_address: LogicAddress | None = None
     contract: PluginContract | None = None
     ownership: OwnershipDeclaration | None = None
+    marker_class: type | None = None
+    """PR-5：插件作为事件 yaml 鉴权矩阵的 marker 类（详见 plugin_declaration）。
+
+    当插件在 yaml 中以 id 形式被引用时，``EventRegistry`` 按
+    ``id → marker_class`` 解析。仅声明了 ``@plugin(marker_class=...)``
+    的插件才会进入 EventRegistry 的 catalog；其余插件无 marker。
+    """
 
     @property
     def id(self) -> str:

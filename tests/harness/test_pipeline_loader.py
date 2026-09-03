@@ -81,7 +81,8 @@ def _write_yaml(path: Path, data: object) -> Path:
 
 def _make_bus() -> EventBus:
     """独立 EventBus(默认鉴权矩阵),避免单例串扰。"""
-    return EventBus(EventRegistry.load(_DEFAULT_CONFIG_DIR))
+    from lca_kernel.events.test_catalog import build_test_bus
+    return build_test_bus()
 
 
 def _authorized_producer() -> type:

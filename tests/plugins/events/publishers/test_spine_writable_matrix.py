@@ -9,13 +9,13 @@ from pathlib import Path
 import pytest
 
 from lca_kernel.events.bus import EventBus
-from lca_kernel.events.registry import EventRegistry
 
 
 @pytest.fixture
 def bus() -> EventBus:
     config_dir = Path(__file__).resolve().parents[4] / "lca_kernel" / "events" / "config"
-    return EventBus(EventRegistry.load(config_dir))
+    from lca_kernel.events.test_catalog import build_test_bus
+    return build_test_bus(config_dir)
 
 
 def test_writable_matrix_send(bus: EventBus) -> None:

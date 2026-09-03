@@ -7,6 +7,7 @@ sinks / consumer_rules 三段声明一次性装载到 EventBus。装载后不可
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -82,10 +83,16 @@ def matches_rule(category: Category, rule: ConsumerRule) -> bool:
 # ── yaml 解析 ────────────────────────────────────────────────────────────
 
 
-def parse_pipeline_yaml(path: Path) -> Pipeline:
+def parse_pipeline_yaml(
+    path: Path, *, catalog: Mapping[str, type] | None = None
+) -> Pipeline:
     """解析 ADR-0183 §3.3 给的 yaml 结构。
 
     若文件不存在,返回空 Pipeline(stage 全空) —— 允许 Pipeline 装载为可选步骤。
+
+    PR-5：``catalog`` 是可选的 ``id → marker class`` 映射；hooks /
+    sinks 段接受 ``plugin: <id>`` 字段，按 catalog 解析为 class。
+    缺省 = 仅 class-path 形态可用（向后兼容）。
     """
     if not path.exists():
         return Pipeline(name=path.stem or "empty")
@@ -98,9 +105,9 @@ def parse_pipeline_yaml(path: Path) -> Pipeline:
         return Pipeline(name=path.stem or "empty")
     name = str(pipeline.get("name", path.stem or "empty"))
     version = int(pipeline.get("version", 1))
-    hooks = _parse_hooks(pipeline.get("hooks") or [])
-    sinks = _parse_sinks(pipeline.get("sinks") or [])
-    rules = _parse_rules(pipeline.get("consumer_rules") or [])
+    hooks = _parse_hooks(pipeline.get("hooks") or [], catalog=catalog)
+    sinks = _parse_sinks(pipeline.get("sinks") or [], catalog=catalog)
+    rules = _parse_rules(pipeline.get("consumer_rules") or [], catalog=catalog)
     return Pipeline(
         name=name,
         version=version,
@@ -110,15 +117,23 @@ def parse_pipeline_yaml(path: Path) -> Pipeline:
     )
 
 
-def _parse_hooks(entries: list[Any]) -> tuple[HookSpec, ...]:
+def _parse_hooks(
+    entries: list[Any], *, catalog: Mapping[str, type] | None = None
+) -> tuple[HookSpec, ...]:
     out: list[HookSpec] = []
     for entry in entries:
         if not isinstance(entry, dict):
             continue
+        hook_path = str(entry.get("hook", ""))
+        plugin_id = entry.get("plugin")
+        if plugin_id is not None:
+            hook_cls = _resolve_via_catalog(str(plugin_id), catalog=catalog, ctx="hook")
+        else:
+            hook_cls = _resolve_type(hook_path, ctx="hook")
         out.append(
             HookSpec(
                 id=str(entry.get("id", "")),
-                hook=_resolve_type(str(entry.get("hook", "")), ctx="hook"),
+                hook=hook_cls,
                 stage=Stage(str(entry.get("stage", Stage.PRE_DISPATCH.value))),
                 config=dict(entry.get("config") or {}),
             )
@@ -126,15 +141,23 @@ def _parse_hooks(entries: list[Any]) -> tuple[HookSpec, ...]:
     return tuple(out)
 
 
-def _parse_sinks(entries: list[Any]) -> tuple[SinkSpec, ...]:
+def _parse_sinks(
+    entries: list[Any], *, catalog: Mapping[str, type] | None = None
+) -> tuple[SinkSpec, ...]:
     out: list[SinkSpec] = []
     for entry in entries:
         if not isinstance(entry, dict):
             continue
+        backend_path = str(entry.get("backend", ""))
+        plugin_id = entry.get("plugin")
+        if plugin_id is not None:
+            backend_cls = _resolve_via_catalog(str(plugin_id), catalog=catalog, ctx="sink")
+        else:
+            backend_cls = _resolve_type(backend_path, ctx="sink")
         out.append(
             SinkSpec(
                 id=str(entry.get("id", "")),
-                backend=_resolve_type(str(entry.get("backend", "")), ctx="sink"),
+                backend=backend_cls,
                 failure=FailureSemantics(
                     str(entry.get("failure", FailureSemantics.CONTAINED.value))
                 ),
@@ -147,20 +170,26 @@ def _parse_sinks(entries: list[Any]) -> tuple[SinkSpec, ...]:
     return tuple(out)
 
 
-def _parse_rules(entries: list[Any]) -> tuple[ConsumerRule, ...]:
+def _parse_rules(
+    entries: list[Any], *, catalog: Mapping[str, type] | None = None
+) -> tuple[ConsumerRule, ...]:
     out: list[ConsumerRule] = []
     for entry in entries:
         if not isinstance(entry, dict):
             continue
-        plugins = tuple(
-            _resolve_type(str(p), ctx="rule.plugin")
-            for p in entry.get("plugins", entry.get("consumers", ())) or ()
-            if p
-        )
+        plugins: list[type] = []
+        for raw in entry.get("plugins", entry.get("consumers", ())) or ():
+            if not raw:
+                continue
+            raw_str = str(raw)
+            # PR-5：consumer_rules 不走 registry（由 EventRegistry 解析 yaml
+            # 时一并物化），仅保留 class-path 形态；id-form 在 yaml
+            # ``subscribers:`` 字段直接表达，与此处解析器正交。
+            plugins.append(_resolve_type(raw_str, ctx="rule.plugin"))
         out.append(
             ConsumerRule(
                 prefix=str(entry.get("prefix", "")),
-                plugins=plugins,
+                plugins=tuple(plugins),
                 failure=FailureSemantics(
                     str(entry.get("failure", FailureSemantics.CONTAINED.value))
                 ),
@@ -174,6 +203,9 @@ def _resolve_type(full_path: str, *, ctx: str) -> type:
 
     解析失败 → 抛 ImportError / AttributeError,parse_pipeline_yaml 透传;
     框架级(lca_kernel.*)的 hook / sink 由 Pipeline 装载时再走实例化。
+
+    COMPAT(delete-when: rg "lca.plugins.[A-Za-z0-9_]+.[A-Z][A-Za-z]+$" lca_kernel/events/config
+    profiles/event-pipeline = 0;tracking: 2026-09-04-plugin-universe-single-entry PR-5)
     """
     from importlib import import_module
 
@@ -187,6 +219,24 @@ def _resolve_type(full_path: str, *, ctx: str) -> type:
     if cls is None or not isinstance(cls, type):
         raise ValueError(f"{ctx}: 不可解析 {full_path!r}")
     return cls
+
+
+def _resolve_via_catalog(
+    plugin_id: str, *, catalog: Mapping[str, type] | None, ctx: str
+) -> type:
+    """PR-5：通过 catalog 解析 id 到 class。
+
+    catalog miss → 抛 ``KeyError``（pipeline_loader 转为
+    ``FileNotFoundError``-like 错误）；class-path 形态不在本函数处理范围
+    （用 ``_resolve_type``）。
+    """
+    if catalog is None:
+        raise ValueError(
+            f"{ctx}: plugin={plugin_id!r} 需要 catalog；当前调用方未传 catalog"
+        )
+    if plugin_id not in catalog:
+        raise KeyError(plugin_id)
+    return catalog[plugin_id]
 
 
 __all__ = [

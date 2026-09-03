@@ -121,12 +121,19 @@ def plugin(
     contract: PluginContract | None = None,
     spec: PluginSpec | None = None,
     ownership: OwnershipDeclaration | None = None,
+    marker_class: type | None = None,
 ) -> CordisPlugin | Callable[[PluginSetupFn[Any]], CordisPlugin]:
     """Declare a plugin Manifest and adapt it to the Cordis carrier.
 
     Required: ``id``, ``layer`` (``L0``–``L4``), ``kind``. Optional declaration
     inputs are normalized before Profile Resolve consumes the immutable
     ``PluginDefinition`` cached on the carrier.
+
+    ``marker_class``（PR-5）：当插件作为事件 publisher / subscriber / sink
+    在 yaml 鉴权矩阵中以 id 形式被引用时，记录"代表本插件的 marker 类"。
+    ``EventRegistry`` 装载时按 id → marker class 解析（详见
+    ``lca_kernel.events.registry.EventRegistry.register_marker``）；
+    缺省 = 无 marker（不参与事件 yaml id 鉴权）。
     """
 
     def _wrap(fn: PluginSetupFn[Any]) -> CordisPlugin:
@@ -141,6 +148,7 @@ def plugin(
         functional_group_value = _resolve_functional_group(functional_group)
         relation_tuple = _normalize_relations(relations)
         contributes_tuple = _normalize_contributes(contributes)
+        marker = _normalize_marker_class(marker_class, plugin_id=id)
 
         merged_meta: dict[str, object] = dict(meta) if meta else {}
         merged_meta.update(
@@ -154,6 +162,7 @@ def plugin(
                 "effects": sorted(effect.value for effect in effect_set),
                 "test_suite": suite,
                 "description": desc,
+                "marker_class": f"{marker.__module__}.{marker.__qualname__}" if marker is not None else None,
             }
         )
         if functional_group_value is not None:
@@ -210,6 +219,7 @@ def plugin(
                 logic_address=legacy_logic_address,
                 contract=canonical_contract,
                 ownership=ownership,
+                marker_class=marker,
             ),
         )
         return cordis_plugin
@@ -277,6 +287,11 @@ def definition_from_plugin(
     module_name = module or getattr(raw_setup, "__module__", "__main__")
     if not isinstance(module_name, str):
         module_name = "__main__"
+    marker_raw = meta.get("marker_class")
+    marker = _normalize_marker_class(
+        _import_marker(marker_raw) if isinstance(marker_raw, str) else None,
+        plugin_id=plugin_id,
+    )
     return PluginDefinition[Any](
         Config=config_cls,
         setup=setup_fn,
@@ -295,6 +310,7 @@ def definition_from_plugin(
         ),
         description=str(meta.get("description") or ""),
         functional_group=functional_group,
+        marker_class=marker,
     )
 
 
@@ -319,6 +335,39 @@ def _config_from_annotations(fn: Callable[..., object]) -> type[BaseModel] | Non
     except (NameError, TypeError, ValueError):
         return None
     return None
+
+
+def _normalize_marker_class(value: type | None, *, plugin_id: str) -> type | None:
+    """Validate ``@plugin(marker_class=...)`` 形参。
+
+    marker_class 必须是 type；非 type（string 等）→ TypeError。
+    返回 class 对象（直接复用，不做额外包装）。
+    """
+    if value is None:
+        return None
+    if not isinstance(value, type):
+        raise TypeError(
+            f"@plugin marker_class ({plugin_id!r}) must be type, got {type(value).__name__}"
+        )
+    return value
+
+
+def _import_marker(path: str) -> type:
+    """从 ``module.qualname`` 字符串导入 marker class。
+
+    仅在 ``@plugin(marker_class=...)`` 被省略、改走 meta["marker_class"]
+    序列化字符串路径时调用；用于 ``definition_from_plugin`` 回放。
+    """
+    from importlib import import_module
+
+    module_path, _, class_name = path.rpartition(".")
+    if not module_path:
+        raise ValueError(f"invalid marker_class path: {path!r}")
+    module = import_module(module_path)
+    cls = getattr(module, class_name, None)
+    if cls is None or not isinstance(cls, type):
+        raise ValueError(f"marker_class {path!r} not importable as type")
+    return cls
 
 
 def _normalize_keys(values: Sequence[Capability[object] | str] | None) -> tuple[str, ...]:

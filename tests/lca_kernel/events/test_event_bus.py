@@ -21,6 +21,10 @@ import pytest
 
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.event import Category, EventPayload
+from lca_kernel.events import (
+    _DEFAULT_CONFIG_DIR,
+    EventRef,
+)
 from lca_kernel.events.bus import (
     ConsumerHandle,
     EventBus,
@@ -37,10 +41,6 @@ from lca_kernel.events.hooks import (
     PublishContext,
     SkipDispatch,
 )
-from lca_kernel.events import (
-    _DEFAULT_CONFIG_DIR,
-    EventRef,
-)
 from lca_kernel.events.pipeline import (
     ConsumerRule,
     HookSpec,
@@ -56,8 +56,8 @@ from lca_kernel.events.registry import EventRegistry
 
 def _make_bus() -> EventBus[EventPayload]:
     """独立 EventBus 实例(从默认 yaml 加载 registry),避免单例串扰。"""
-    registry = EventRegistry.load(_DEFAULT_CONFIG_DIR)
-    return EventBus(registry)
+    from lca_kernel.events.test_catalog import build_test_bus
+    return build_test_bus()
 
 
 @pytest.fixture

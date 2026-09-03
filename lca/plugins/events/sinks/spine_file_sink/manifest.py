@@ -29,7 +29,7 @@ class _Config(BaseModel):
 @plugin(
     id="lca.events.sink.spine_file",
     provides=["event.sink.spine_file"],
-    requires=["event.bus"],
+    requires=[],
     layer="L0",
     kind=PluginKind.PROVIDER,
     effects="none",
@@ -55,7 +55,7 @@ class _Config(BaseModel):
         state_mutation="forbidden",
     ),
 )
-async def setup_spine_file_sink(ctx: PluginContext, config: _Config) -> None:
+async def setup(ctx: PluginContext, config: _Config) -> None:
     """SpineFileSink boot：构造 sink + 订阅 EventBus 所有 spine 类别。"""
     from lca_kernel.events.bus import EventBus
     from lca_kernel.events.hooks import FailureSemantics
@@ -76,4 +76,4 @@ async def setup_spine_file_sink(ctx: PluginContext, config: _Config) -> None:
     ctx.provide("event.sink.spine_file", sink)
 
 
-__all__ = ["SINK_PLUGIN_CLASS", "setup_spine_file_sink"]
+__all__ = ["SINK_PLUGIN_CLASS", "setup"]
