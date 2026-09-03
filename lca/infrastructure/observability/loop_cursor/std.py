@@ -208,41 +208,100 @@ class StdLoopCursor:
             },
         )
 
-    def record_tool_call(self, payload: ToolCallRecord) -> None:
+    def record_tool_call(
+        self,
+        payload: ToolCallRecord,
+        *,
+        arguments: dict[str, object] | None = None,
+        arguments_summary: str = "",
+        invocation_id: str = "",
+    ) -> None:
+        """Emit ``step.tool_call.record`` with rich arguments payload.
+
+        The dataclass :class:`ToolCallRecord` carries only ``args_digest``
+        + ``args_payload_path``. To make step-tree (and downstream
+        readers) recoverable we accept ``arguments`` / ``arguments_summary``
+        / ``invocation_id`` as keyword-only additions; when provided they
+        are forwarded into the spine event payload so derivers do not
+        have to fetch model_visible separately just to see what the
+        tool was called with.
+        """
         self._ensure_open()
         self._ensure_not_halted()
         if self._state.phase != "act":
             raise CursorError("record_tool_call must be in ACT window")
-        self._append(
-            execution_point="step.tool_call.record",
-            payload={
-                "tool_name": payload.tool_name,
-                "args_digest": payload.args_digest,
-                "args_payload_path": payload.args_payload_path,
-                "call_seq": payload.call_seq,
-                "incarnation": self._state.incarnation.incarnation_seq,
-                "plan_ref": self._state.incarnation.plan_ref,
-                "step_index": self._state.step_index,
-            },
-        )
+        event_payload: dict[str, object] = {
+            "tool_name": payload.tool_name,
+            "args_digest": payload.args_digest,
+            "args_payload_path": payload.args_payload_path,
+            "call_seq": payload.call_seq,
+            "incarnation": self._state.incarnation.incarnation_seq,
+            "plan_ref": self._state.incarnation.plan_ref,
+            "step_index": self._state.step_index,
+        }
+        if arguments is not None:
+            event_payload["arguments"] = arguments
+        if arguments_summary:
+            event_payload["arguments_summary"] = arguments_summary
+        if invocation_id:
+            event_payload["invocation_id"] = invocation_id
+        self._append(execution_point="step.tool_call.record", payload=event_payload)
 
-    def record_tool_result(self, payload: ToolResultRecord) -> None:
+    def record_tool_result(
+        self,
+        payload: ToolResultRecord,
+        *,
+        invocation_id: str = "",
+        ok: bool = True,
+        latency_ms: int = 0,
+        stdout_head: str = "",
+        stdout_chars_total: int = 0,
+        stdout_truncated: bool = False,
+        stderr: str = "",
+        files_created: tuple[str, ...] = (),
+        error: str | None = None,
+        delta_summary: str = "",
+    ) -> None:
+        """Emit ``step.tool_result.record`` with rich result fields.
+
+        Same forward-compat pattern as :meth:`record_tool_call` —
+        callers may attach the full result surface so step-tree readers
+        do not have to round-trip through sidecars.
+        """
         self._ensure_open()
         self._ensure_not_halted()
         if self._state.phase != "act":
             raise CursorError("record_tool_result must be in ACT window")
-        self._append(
-            execution_point="step.tool_result.record",
-            payload={
-                "tool_name": payload.tool_name,
-                "result_digest": payload.result_digest,
-                "result_path": payload.result_path,
-                "outcome": payload.outcome,
-                "incarnation": self._state.incarnation.incarnation_seq,
-                "plan_ref": self._state.incarnation.plan_ref,
-                "step_index": self._state.step_index,
-            },
-        )
+        event_payload: dict[str, object] = {
+            "tool_name": payload.tool_name,
+            "result_digest": payload.result_digest,
+            "result_path": payload.result_path,
+            "outcome": payload.outcome,
+            "incarnation": self._state.incarnation.incarnation_seq,
+            "plan_ref": self._state.incarnation.plan_ref,
+            "step_index": self._state.step_index,
+        }
+        if invocation_id:
+            event_payload["invocation_id"] = invocation_id
+        if not ok:
+            event_payload["ok"] = False
+        if latency_ms:
+            event_payload["latency_ms"] = latency_ms
+        if stdout_head:
+            event_payload["stdout_head"] = stdout_head
+        if stdout_chars_total:
+            event_payload["stdout_chars_total"] = stdout_chars_total
+        if stdout_truncated:
+            event_payload["stdout_truncated"] = True
+        if stderr:
+            event_payload["stderr"] = stderr
+        if files_created:
+            event_payload["files_created"] = list(files_created)
+        if error is not None:
+            event_payload["error"] = error
+        if delta_summary:
+            event_payload["delta_summary"] = delta_summary
+        self._append(execution_point="step.tool_result.record", payload=event_payload)
 
     def record_request_header(self, header: RequestHeader) -> None:
         self._ensure_open()

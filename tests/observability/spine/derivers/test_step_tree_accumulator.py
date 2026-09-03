@@ -341,9 +341,7 @@ def test_brain_think_start_end_implicit_step_envelope(tmp_path: Path) -> None:
 
     doc = deriver.document
     assert doc is not None
-    assert doc.totals.steps == 1, (
-        f"brain.think.start/end 应隐式开闭 step,得到 {doc.totals.steps}"
-    )
+    assert doc.totals.steps == 1, f"brain.think.start/end 应隐式开闭 step,得到 {doc.totals.steps}"
     assert doc.steps[0].outcome == "success"
 
 
@@ -448,3 +446,361 @@ def test_non_empty_flush_does_not_write_flush_error(tmp_path: Path) -> None:
         data = _json.loads(manifest_path.read_text(encoding="utf-8"))
         errors = data.get("extra", {}).get("flush_errors", [])
         assert not errors, f"正常累积不应写 flush_errors,但得到 {errors}"
+
+
+# ── reasoning / llm stream accumulation ─────────────────────────────
+
+
+def test_llm_stream_tokens_accumulate_into_step_thinking(tmp_path: Path) -> None:
+    """reasoning + final 流在 llm.call.end 收口时拼成 thinking.reasoning/raw_response_preview。
+
+    Regression:之前 deriver 不订阅 llm.stream.*,thinking.reasoning 永远是空。
+    """
+    import json as _json
+
+    SpineContext.set_run("r_stream")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_stream",
+        run_dir=tmp_path / "r_stream",
+        agent_role="agt",
+        strategy_key="solo",
+        objective="ask",
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_stream",
+            execution_point="writable.step.start",
+            sequence=1,
+            payload={"phase": "think", "objective": "ask"},
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_stream",
+            execution_point="llm.call.start",
+            channel="control",
+            sequence=2,
+            payload={"model": "qwen3.7-plus", "stream": True, "prompt_preview": "<...>"},
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_stream",
+            execution_point="llm.stream.token",
+            channel="fact",
+            sequence=3,
+            payload={
+                "model": "qwen3.7-plus",
+                "seq": 1,
+                "channel_kind": "reasoning",
+                "text_delta": "Let me think.",
+            },
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_stream",
+            execution_point="llm.stream.token",
+            channel="fact",
+            sequence=4,
+            payload={
+                "model": "qwen3.7-plus",
+                "seq": 2,
+                "channel_kind": "reasoning",
+                "text_delta": " Answer?",
+            },
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_stream",
+            execution_point="llm.stream.token",
+            channel="fact",
+            sequence=5,
+            payload={
+                "model": "qwen3.7-plus",
+                "seq": 3,
+                "channel_kind": "final",
+                "text_delta": "Hello",
+            },
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_stream",
+            execution_point="llm.call.end",
+            channel="fact",
+            sequence=6,
+            outcome="success",
+            payload={
+                "model": "qwen3.7-plus",
+                "stream": True,
+                "latency_ms": 1234,
+                "prompt_tokens": 10,
+                "completion_tokens": 5,
+                "decision": "respond",
+            },
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_stream",
+            execution_point="brain.think.end",
+            channel="fact",
+            sequence=7,
+            outcome="success",
+            payload={"state_id": "abc"},
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_stream",
+            execution_point="writable.step.end",
+            channel="control",
+            sequence=8,
+            outcome="success",
+        )
+    )
+    deriver.flush(outcome="completed")
+    journal = _json.loads((tmp_path / "r_stream" / "journal.json").read_text())
+    thinking = journal["steps"][0]["thinking"]
+    assert thinking is not None
+    assert thinking["reasoning"] == "Let me think. Answer?"
+    assert thinking["raw_response_preview"] == "Hello"
+    assert thinking["model"] == "qwen3.7-plus"
+    assert thinking["latency_ms"] == 1234
+    assert thinking["prompt_tokens"] == 10
+    assert thinking["completion_tokens"] == 5
+
+
+def test_long_reasoning_text_is_truncated_with_marker(tmp_path: Path) -> None:
+    """超出 head+tail budget 的 reasoning 段被 head + middle-marker + tail 截短。
+
+    journal.json 不应无限膨胀;完整 text 继续存于 model_visible/messages.json。
+    """
+    import json as _json
+
+    SpineContext.set_run("r_trunc")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_trunc",
+        run_dir=tmp_path / "r_trunc",
+        agent_role="agt",
+        strategy_key="solo",
+        objective="long",
+    )
+    big_chunk = "x" * 5000  # 一个流 > 4096 + head budget
+    deriver.on_event(
+        _make_event(
+            run_id="r_trunc",
+            execution_point="writable.step.start",
+            sequence=1,
+            payload={"phase": "think", "objective": "long"},
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_trunc",
+            execution_point="llm.call.start",
+            channel="control",
+            sequence=2,
+            payload={"model": "qwen", "stream": True, "prompt_preview": "<...>"},
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_trunc",
+            execution_point="llm.stream.token",
+            channel="fact",
+            sequence=3,
+            payload={
+                "model": "qwen",
+                "seq": 1,
+                "channel_kind": "reasoning",
+                "text_delta": big_chunk,
+            },
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_trunc",
+            execution_point="llm.call.end",
+            channel="fact",
+            sequence=4,
+            outcome="success",
+            payload={
+                "model": "qwen",
+                "stream": True,
+                "latency_ms": 1,
+                "prompt_tokens": 1,
+                "completion_tokens": 1,
+                "decision": "respond",
+            },
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_trunc",
+            execution_point="writable.step.end",
+            channel="control",
+            sequence=5,
+            outcome="success",
+        )
+    )
+    deriver.flush(outcome="completed")
+    journal = _json.loads((tmp_path / "r_trunc" / "journal.json").read_text())
+    kept = journal["steps"][0]["thinking"]["reasoning"]
+    assert len(kept) < 5000, "长度应被截短"
+    assert "truncated" in kept, "中间应明示被截断字符数"
+
+
+def test_step_tool_call_record_writes_arguments_when_payload_has_them(tmp_path: Path) -> None:
+    """step.tool_call.record 携带 arguments 时,tool_call.arguments 应被写入 step。
+
+    Regression:之前 arguments=[] 因为 EP payload 不带 arguments;本测试
+    走 spine 订阅并验证 arguments 落到 step.tool_call.arguments。
+    """
+    import json as _json
+
+    SpineContext.set_run("r_tc")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_tc",
+        run_dir=tmp_path / "r_tc",
+        agent_role="agt",
+        strategy_key="solo",
+        objective="tc",
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_tc",
+            execution_point="writable.step.start",
+            sequence=1,
+            payload={"phase": "act", "objective": "tc"},
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_tc",
+            execution_point="step.tool_call.record",
+            channel="control",
+            sequence=2,
+            payload={
+                "call": {
+                    "invocation_id": "dec_abc",
+                    "name": "executeCode",
+                    "arguments": {"code": "print('hi')", "language": "python"},
+                    "arguments_summary": "executeCode(python)",
+                },
+                "tool_name": "executeCode",
+                "args_digest": "sha256:abcd",
+                "step_index": 1,
+            },
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_tc",
+            execution_point="writable.step.end",
+            channel="control",
+            sequence=3,
+            outcome="success",
+        )
+    )
+    deriver.flush(outcome="completed")
+    journal = _json.loads((tmp_path / "r_tc" / "journal.json").read_text())
+    tc = journal["steps"][0]["tool_call"]
+    assert tc is not None
+    assert tc["name"] == "executeCode"
+    assert tc["arguments"] == {"code": "print('hi')", "language": "python"}
+    assert tc["arguments_summary"] == "executeCode(python)"
+
+
+def test_step_tool_call_record_with_flat_payload_writes_arguments(tmp_path: Path) -> None:
+    """``step.tool_call.record`` 在 StdLoopCursor 路径 (flat payload) 下同样写 arguments。
+
+    StdLoopCursor.record_tool_call 现在把 arguments/arguments_summary
+    /invocation_id 平铺在 EP payload 上,deriver 必须能从 flat 形取到。
+    """
+    import json as _json
+
+    SpineContext.set_run("r_tc_flat")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_tc_flat",
+        run_dir=tmp_path / "r_tc_flat",
+        agent_role="agt",
+        strategy_key="solo",
+        objective="flat",
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_tc_flat",
+            execution_point="writable.step.start",
+            sequence=1,
+            payload={"phase": "act", "objective": "flat"},
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_tc_flat",
+            execution_point="step.tool_call.record",
+            channel="control",
+            sequence=2,
+            payload={
+                "tool_name": "executeCode",
+                "args_digest": "sha256:abc",
+                "args_payload_path": None,
+                "call_seq": 1,
+                "incarnation": 1,
+                "plan_ref": "p1",
+                "step_index": 1,
+                "arguments": {"code": "print('ok')", "language": "python"},
+                "arguments_summary": "executeCode(python)",
+                "invocation_id": "dec_xyz",
+            },
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_tc_flat",
+            execution_point="step.tool_result.record",
+            channel="control",
+            sequence=3,
+            payload={
+                "tool_name": "executeCode",
+                "result_digest": "sha256:def",
+                "result_path": None,
+                "outcome": "ok",
+                "incarnation": 1,
+                "plan_ref": "p1",
+                "step_index": 1,
+                "ok": True,
+                "latency_ms": 1234,
+                "stdout_head": "ok\n",
+                "stdout_chars_total": 3,
+                "stdout_truncated": False,
+                "files_created": ["out.md"],
+                "delta_summary": "executed successfully",
+            },
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_tc_flat",
+            execution_point="writable.step.end",
+            channel="control",
+            sequence=4,
+            outcome="success",
+        )
+    )
+    deriver.flush(outcome="completed")
+    journal = _json.loads((tmp_path / "r_tc_flat" / "journal.json").read_text())
+    tc = journal["steps"][0]["tool_call"]
+    tr = journal["steps"][0]["tool_result"]
+    assert tc["name"] == "executeCode"
+    assert tc["arguments"] == {"code": "print('ok')", "language": "python"}
+    assert tc["arguments_summary"] == "executeCode(python)"
+    assert tc["invocation_id"] == "dec_xyz"
+    assert tr["ok"] is True
+    assert tr["latency_ms"] == 1234
+    assert tr["stdout_head"] == "ok\n"
+    assert tr["files_created"] == ["out.md"]
+    assert tr["delta_summary"] == "executed successfully"

@@ -225,13 +225,17 @@ class CoordinatorAdapter:
         tool_name = getattr(call, "name", "")
         invocation_id = getattr(call, "invocation_id", "") or ""
         args_summary = getattr(call, "arguments_summary", "") or ""
+        arguments = getattr(call, "arguments", None) or {}
         self._cursor.record_tool_call(
             ToolCallRecord(
                 tool_name=tool_name,
                 args_digest=sha256_digest({"args": args_summary, "invocation_id": invocation_id}),
                 args_payload_path=None,
                 call_seq=self._cursor.snapshot.seq,
-            )
+            ),
+            arguments=arguments,
+            arguments_summary=args_summary,
+            invocation_id=invocation_id,
         )
         self._coord.record_tool_call(call)
 
@@ -250,13 +254,29 @@ class CoordinatorAdapter:
         # handlers can deal with.
         tool_name = getattr(result, "tool_name", "") or ""
         delta_summary = getattr(result, "delta_summary", "") or ""
+        latency_ms = int(getattr(result, "latency_ms", 0) or 0)
+        stdout_head = getattr(result, "stdout_head", "") or ""
+        stdout_chars_total = int(getattr(result, "stdout_chars_total", 0) or 0)
+        stdout_truncated = bool(getattr(result, "stdout_truncated", False))
+        stderr = getattr(result, "stderr", "") or ""
+        files_created = getattr(result, "files_created", ()) or ()
+        error = getattr(result, "error", None)
         self._cursor.record_tool_result(
             ToolResultRecord(
                 tool_name=tool_name,
                 result_digest=sha256_digest({"delta_summary": delta_summary}),
                 result_path=None,
                 outcome=outcome,  # type: ignore[arg-type]
-            )
+            ),
+            ok=ok,
+            latency_ms=latency_ms,
+            stdout_head=stdout_head,
+            stdout_chars_total=stdout_chars_total,
+            stdout_truncated=stdout_truncated,
+            stderr=stderr,
+            files_created=tuple(files_created),
+            error=error,
+            delta_summary=delta_summary,
         )
         self._coord.record_tool_result(result)
 

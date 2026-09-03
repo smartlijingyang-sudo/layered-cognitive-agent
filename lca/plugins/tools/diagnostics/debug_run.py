@@ -103,6 +103,13 @@ class DebugRunReport:
         )
         broken = self.manifest_summary.get("extra", {}).get("doctor_report", {}).get("broken_hop")
         lines.append(f"      status={summary}" + (f" broken_hop={broken}" if broken else ""))
+        lines.append(f"[1b/8] doctor.viewport     {self.manifest_path}")
+        viewport_lines = _render_doctor_viewport(self.manifest_summary)
+        if viewport_lines:
+            for vl in viewport_lines:
+                lines.append(f"      {vl}")
+        else:
+            lines.append("      (no doctor_report present — likely legacy run)")
         lines.append(
             f"[2/8] journal             {self.spine_events_path} "
             f"events={self.spine_event_count}"
@@ -120,13 +127,14 @@ class DebugRunReport:
             lines.append(f"      {line}")
         lines.append(f"[4/8] phase.cursor        {self.phase_cursor}")
         lines.append(f"[5/8] error_ref           {self.error_message or '(none)'}")
+        lines.append(f"      error_type:        {self.error_type or '(none)'}")
         lines.append("[6/8] stack frames")
         for frame in self.stack_frames[:8]:
             lines.append(
                 f"      {frame.get('filename', '?')}:{frame.get('lineno', '?')} "
                 f"in {frame.get('name', '?')}"
             )
-        lines.append("[7/8] suggested_action    " + (self.suggested_action or "(none)"))
+        lines.append(f"[7/8] suggested_action    {self.suggested_action or '(none)'}")
         # [8/8] 复现命令:journal replay (model-visible) + plan_ref grep (图复现)。
         # ADR-0068 §决策二:plan_ref 是 run 的 16-hex 稳定 ID,可一锤定音反查。
         lines.append(
@@ -336,3 +344,32 @@ def _tail_lines(path: Path, max_lines: int = 50) -> str:
     except Exception:
         return ""
     return "\n".join(text.splitlines()[-max_lines:])
+
+
+def _render_doctor_viewport(manifest_summary: dict[str, Any]) -> list[str]:
+    """Project the ``extra.doctor_report`` block as a 1-line-per-key view.
+
+    The viewport reads from the manifest JSON (no RunManifest schema
+    change). Format: ``key: <value>`` per line, sorted for stable diffs.
+    """
+    doctor = manifest_summary.get("extra", {}).get("doctor_report", {}) or {}
+    if not doctor:
+        return []
+    keys_of_interest = (
+        "status",
+        "broken_hop",
+        "mode",
+        "outcome",
+        "factory",
+        "consistency",
+        "summary",
+        "trace_id",
+        "journal_path",
+        "schema",
+    )
+    rendered: list[str] = []
+    for key in keys_of_interest:
+        if key in doctor:
+            value = doctor[key]
+            rendered.append(f"{key}: {value}")
+    return rendered

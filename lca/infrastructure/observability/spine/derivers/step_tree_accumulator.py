@@ -48,6 +48,25 @@ from lca.infrastructure.observability.spine.event_record import EventRecord
 log = logging.getLogger(__name__)
 
 
+def _truncate_kept(text: str, *, head: int, tail: int) -> str:
+    """Truncate ``text`` to at most ``head + tail + 12`` characters.
+
+    The middle is collapsed to ``"\\n… [truncated N chars] …\\n"``. Caller
+    decides the budget; absolute limit is the journal.json size ceiling.
+    The full text continues to live in ``model_visible/<step_id>/...``
+    so no information is lost — this is a viewport projection only.
+    """
+    if not text:
+        return ""
+    total = len(text)
+    if total <= head + tail + 64:
+        return text
+    head_part = text[:head]
+    tail_part = text[-tail:] if tail else ""
+    middle_dropped = total - head - tail
+    return f"{head_part}\n… [{middle_dropped} chars truncated] …\n{tail_part}"
+
+
 # 闭集 phase EP 表（ADR-0166 D4 闭集 + ADR-0176 D1 扩）
 #
 # 增补 ADR-0176 D1 §1:
@@ -83,6 +102,14 @@ class _StepFrame:
     segments: list[SegmentRecord] = field(default_factory=list)
     outcome: str | None = None
     exited_at: float | None = None
+    # LLM stream accumulator state —— step_tree 通过订阅 llm.stream.* 累积。
+    # 仅在 open_step 期间持有;llm.call.end 时格式化写回 thinking.reasoning。
+    stream_reasoning_chunks: list[str] = field(default_factory=list)
+    stream_final_chunks: list[str] = field(default_factory=list)
+    stream_reasoning_chars_total: int = 0
+    stream_final_chars_total: int = 0
+    llm_started: bool = False
+    llm_model: str = ""
 
 
 class StepTreeAccumulatorDeriver(Deriver):
@@ -287,15 +314,69 @@ class StepTreeAccumulatorDeriver(Deriver):
             # 这里不直接覆盖 _open_step.phase —— writable.step.start 已经显式
             # 给出 phase,act.fold.start 仅作为冗余 hint 参与 _record_phase 累计。
             self._record_phase(event, "act", ts)
+        elif ep == "llm.call.start":
+            # 标记新一轮 LLM 流的开启:记录 model + 重置累积缓冲.
+            # 仅在仍有 open_step 时才接累积 —— 没有 open_step 的 stream
+            # 不会落到任何 step (可能 orphan), 走到这里自然忽略。
+            if self._open_step is not None:
+                self._open_step.llm_started = True
+                self._open_step.llm_model = str(event.payload.get("model", ""))
+                self._open_step.stream_reasoning_chunks.clear()
+                self._open_step.stream_final_chunks.clear()
+                self._open_step.stream_reasoning_chars_total = 0
+                self._open_step.stream_final_chars_total = 0
+        elif ep == "llm.stream.token":
+            # 增量累积 reasoning / final: text_delta 由 spine 已带
+            # channel_kind 标注 — reasoning 通道写 reasoning, default 走
+            # final。整段过长(> 16 KiB reasoning / > 32 KiB final)时
+            # 仍继续记字符总数, 但截字串到 budgeting, 避免 journal.json
+            # size 爆炸; 全量继续落 model_visible/messages.json (SSOT)。
+            if self._open_step is not None and self._open_step.llm_started:
+                p = event.payload
+                delta = str(p.get("text_delta", "") or "")
+                if not delta:
+                    return
+                kind = p.get("channel_kind") or "final"
+                if kind == "reasoning":
+                    self._open_step.stream_reasoning_chars_total += len(delta)
+                    self._open_step.stream_reasoning_chunks.append(delta)
+                else:
+                    self._open_step.stream_final_chars_total += len(delta)
+                    self._open_step.stream_final_chunks.append(delta)
         elif ep == "llm.call.end":
+            # 收口:把累积缓冲拼成 ThinkingTrace 写到 step.thinking。
+            # reasoning/final 各自 cap 到 4 KiB 字符; 超出时 first + ... + last
+            # 拼接(可读性 > 完整性, 全文留在 model_visible)。
             if self._open_step is not None:
                 p = event.payload
+                model = str(p.get("model", "unknown"))
+                decision = str(p.get("decision") or "respond")
+                latency_ms = int(p.get("latency_ms") or 0)
+                prompt_tokens = p.get("prompt_tokens")
+                completion_tokens = p.get("completion_tokens")
+                reasoning_text = "".join(self._open_step.stream_reasoning_chunks)
+                final_text = "".join(self._open_step.stream_final_chunks)
+                reasoning_kept = _truncate_kept(reasoning_text, head=2048, tail=1024)
+                final_kept = _truncate_kept(final_text, head=4096, tail=1024)
+                # preview 不出现在 schema 里, 我们放入 raw_response_preview 字段
+                # (已存在)，让 jso 顶层 view 一眼能看到"模型回了什么" 摘
                 self._open_step.thinking = ThinkingTrace(
-                    model=p.get("model", "unknown"),
-                    latency_ms=int(p.get("latency_ms") or 0),
-                    reasoning="",
-                    decision=p.get("decision") or "respond",
+                    model=model,
+                    latency_ms=latency_ms,
+                    reasoning=reasoning_kept,
+                    decision=decision,
+                    prompt_tokens=int(prompt_tokens)
+                    if isinstance(prompt_tokens, (int, float))
+                    else None,
+                    completion_tokens=int(completion_tokens)
+                    if isinstance(completion_tokens, (int, float))
+                    else None,
+                    raw_response_preview=final_kept[:600] if final_kept else "",
                 )
+                # 重置累积状态,让下一轮 LLM 重新开始
+                self._open_step.llm_started = False
+                self._open_step.stream_reasoning_chunks.clear()
+                self._open_step.stream_final_chunks.clear()
         elif ep == "phase.tool.call.start":
             if self._open_step is not None:
                 p = event.payload
@@ -337,28 +418,67 @@ class StepTreeAccumulatorDeriver(Deriver):
             if self._open_step is not None and self._open_step.phase == "act":
                 self._close_step(outcome=event.outcome or "success")
         elif ep == "step.tool_call.record":
-            # ADR-0176 D1 §1 (3):fallback 下 open_step 绑 tool_call;
-            # 若已由 writable.tool_call.start 写过则覆盖更新。
+            # tool_call 走两条 EP payload shape:
+            #   - writable_matrix.coordinator: nested ``payload.call``
+            #   - StdLoopCursor (post-fix): flat ``payload.arguments``
+            # 取并集即可 — 前者都是真值,后者只在 cursor 路径下会发。
             if self._open_step is not None:
-                p = event.payload.get("call", {}) if isinstance(event.payload, dict) else {}
+                p = event.payload if isinstance(event.payload, dict) else {}
+                nested = p.get("call") if isinstance(p.get("call"), dict) else {}
+                # 优先 nested, 其次 flat。
+                invocation_id = str(nested.get("invocation_id", "") or p.get("invocation_id", ""))
+                name = str(nested.get("name", "") or p.get("name", "") or p.get("tool_name", ""))
+                arguments = (
+                    nested.get("arguments")
+                    if isinstance(nested.get("arguments"), dict)
+                    else (p.get("arguments") or {})
+                )
+                arguments_summary = str(
+                    nested.get("arguments_summary", "") or p.get("arguments_summary", "")
+                )
                 self._open_step.tool_call = ToolCallRecord(
-                    invocation_id=str(p.get("invocation_id", "")),
-                    name=str(p.get("name", "")),
-                    arguments=p.get("arguments") or {},
-                    arguments_summary=str(p.get("arguments_summary", "")),
+                    invocation_id=invocation_id,
+                    name=name,
+                    arguments=dict(arguments),
+                    arguments_summary=arguments_summary,
                 )
         elif ep == "step.tool_result.record":
             if self._open_step is not None:
-                p = event.payload.get("result", {}) if isinstance(event.payload, dict) else {}
+                p = event.payload if isinstance(event.payload, dict) else {}
+                nested = p.get("result") if isinstance(p.get("result"), dict) else {}
+                # ToolResult 全字段: ok/latency/stdout_head/stderr/files_created/delta_summary
+                stdout_head = str(nested.get("stdout_head", "") or p.get("stdout_head", ""))
+                stdout_chars_total = int(
+                    nested.get("stdout_chars_total", 0) or p.get("stdout_chars_total", 0) or 0
+                )
+                stdout_truncated = bool(
+                    nested.get("stdout_truncated", False) or p.get("stdout_truncated", False)
+                )
+                stderr = str(nested.get("stderr", "") or p.get("stderr", ""))
+                files_raw = nested.get("files_created") or p.get("files_created") or ()
+                files_tuple = (
+                    tuple(str(f) for f in files_raw) if isinstance(files_raw, (list, tuple)) else ()
+                )
+                ok = bool(nested.get("ok", True) if "ok" in nested else p.get("ok", True))
+                latency_ms = int(nested.get("latency_ms", 0) or p.get("latency_ms", 0) or 0)
+                error = nested.get("error", None) if "error" in nested else p.get("error", None)
+                delta_summary = str(nested.get("delta_summary", "") or p.get("delta_summary", ""))
                 self._open_step.tool_result = ToolResult(
-                    ok=bool(p.get("ok", True)),
-                    latency_ms=int(p.get("latency_ms") or 0),
-                    delta_summary=str(p.get("delta_summary", "")),
+                    ok=ok,
+                    latency_ms=latency_ms,
+                    stdout_head=stdout_head[:2000],  # cap, full 在 model_visible
+                    stdout_chars_total=stdout_chars_total,
+                    stdout_truncated=stdout_truncated,
+                    stderr=stderr[:2000],
+                    files_created=files_tuple,
+                    error=error,
+                    delta_summary=delta_summary,
                 )
         elif ep == "body.tool.execute.start":
-            # backend ReAct 把 tool_call 落到该 EP;有 open_step 时一并 bind。
+            # backend ReAct 把 tool_call 落到该 EP — payload 是 cursor 的
+            # flat 形式 (tool_name / arguments / arguments_summary / invocation_id)。
             if self._open_step is not None:
-                p = event.payload
+                p = event.payload if isinstance(event.payload, dict) else {}
                 self._open_step.tool_call = ToolCallRecord(
                     invocation_id=str(p.get("invocation_id", "")),
                     name=str(p.get("tool_name", p.get("name", ""))),
@@ -366,12 +486,18 @@ class StepTreeAccumulatorDeriver(Deriver):
                     arguments_summary=str(p.get("arguments_summary", "")),
                 )
         elif ep == "body.tool.execute.end" and self._open_step is not None:
-            p = event.payload
+            p = event.payload if isinstance(event.payload, dict) else {}
             self._open_step.tool_result = ToolResult(
                 ok=bool(p.get("ok", True)),
                 latency_ms=int(p.get("latency_ms") or 0),
+                stdout_head=str(p.get("stdout_head", ""))[:2000],
+                stdout_chars_total=int(p.get("stdout_chars_total", 0) or 0),
+                stdout_truncated=bool(p.get("stdout_truncated", False)),
+                stderr=str(p.get("stderr", ""))[:2000],
+                files_created=tuple(p.get("files_created", ()) or ()),
+                error=p.get("error", None),
                 delta_summary=str(p.get("delta_summary", "")),
-                )
+            )
 
     def _begin_step(self, event: EventRecord, ts: float) -> None:
         if self._open_step is not None:
