@@ -3,7 +3,7 @@
 每个事件类型对应一个 ``EventDoc``:中文一句话摘要、为何存在、它在认知
 闭环 / 五层架构中的位置、关联 ADR。``FilesystemJournalStore`` 落盘前
 会调用 ``doc_for(event_type)`` 把 ``_doc`` 段注入 disk JSON,新手打开
-events.jsonl 就能读懂每个 block 的来龙去脉。
+spine ledger 就能读懂每个 block 的来龙去脉。
 
 权威性:本模块是"教新手读 spine"的副本,事实语义仍由 journal.py
 frozen dataclass + event_descriptors_data.EventDescriptor 拥有。一旦两边

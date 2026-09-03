@@ -18,7 +18,7 @@
     ./scripts/lca-ops journal exceptions --raw                 # 完整 payload
     ./scripts/lca-ops journal exceptions --grep AttributeError # 按 class 过滤
 
-设计上不重读 ``events.jsonl`` 主 ledger —— 主 ledger 异常行是
+设计上不重读 spine 主 ledger —— 主 ledger 异常行是
 ``{execution_point, offloaded}`` 占位符(>4 KiB offload 到 sidecar),
 查 traceback 必须走 exceptions.jsonl 或 sidecar,前者是专用索引。
 """

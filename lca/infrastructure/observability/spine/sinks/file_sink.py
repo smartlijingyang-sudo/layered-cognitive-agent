@@ -131,7 +131,6 @@ class FileSink:
 
     Backward compatibility:
 
-    - ``file_name="events.jsonl"`` still resolves to the legacy layout.
     - ``spine_filename=True`` is the default; passing it is a no-op.
     - Disable the exception index for legacy test fixtures that don't want
       the extra file.

@@ -1,7 +1,7 @@
 """Journal trace — print one event per line, optionally with I17 source columns.
 
 Task 9.3: ``./scripts/lca-ops journal trace [run_id] [--locals] [--source]``
-reads the append-only ``events.jsonl`` written by the spine ``FileSink``
+reads the append-only ``<run_id>.spine.jsonl`` written by the spine ``FileSink``
 and prints a human-readable table. ``run_id`` is optional: when omitted
 the command picks the latest run via ``traces/latest.json`` (pointer
 preferred, mtime-sorted fallback). The default view shows ``seq /
@@ -27,7 +27,7 @@ Not in scope
 ------------
 - The CLI does NOT fall back to ``journal.jsonl``. Spine events and the
   legacy ``journal.jsonl`` are two separate streams; mixing them would
-  hide I17 violations. If ``events.jsonl`` is missing the CLI emits a
+  hide I17 violations. If the spine ledger is missing the CLI emits a
   short error and ``typer.Exit(1)``.
 - The CLI does NOT resolve offloaded sidecars (>4 KB rows live in
   ``<event_hash>.json``). Out-of-scope here; future PR can wire a
@@ -102,7 +102,7 @@ class TraceRow:
 
 
 def _iter_events(events_path: Path) -> Iterator[dict[str, Any]]:
-    """Yield one decoded record per line of ``events.jsonl``.
+    """Yield one decoded record per line of spine ledger.
 
     Blank lines are silently skipped (no count). JSON decode failures
     yield a sentinel ``{"__decode_error__": True}`` so the caller can
@@ -197,7 +197,7 @@ def _render_locals(payload: dict[str, Any]) -> str:
 
 
 def _event_to_row(seq: int, event: dict[str, Any]) -> TraceRow:
-    """Project one ``events.jsonl`` line into a :class:`TraceRow`."""
+    """Project one spine ledger line into a :class:`TraceRow`."""
     payload = event.get("payload")
     if not isinstance(payload, dict):
         payload = {}
@@ -286,7 +286,7 @@ def _row_iter_to_table(rows: Iterable[TraceRow], *, with_locals: bool) -> str:
 
 # ── human view (Phase 1) ───────────────────────────────────────────────
 #
-# The view layer below translates the spine ``events.jsonl`` SSOT into a
+# The view layer below translates the spine ledger SSOT into a
 # tree-shaped timeline that surfaces every node's own payload text. The
 # SSOT schema (``EventRecord``) is intentionally untouched — see
 # ADR-0167 + ADR-0165 I12 for the close-set contract. This module is
@@ -713,7 +713,7 @@ def _render_human(
     *,
     max_detail_per_node: int = 8,
 ) -> str:
-    """Render the spine ``events.jsonl`` as a tree-shaped human timeline.
+    """Render the spine ledger as a tree-shaped human timeline.
 
     Walks ``parent_span_id`` recursively (top-level transport / kernel /
     lifecycle, then per-span children). Per EP, renders a headline via
@@ -1015,10 +1015,10 @@ def _render_transport_pair(
 
 
 def _resolve_events_path(traces_root: Path, run_id: str) -> Path:
-    """Resolve spine events file under ``<run_dir>`` or surface a friendly error(PR-27)。
+    """Resolve spine ledger under ``<run_dir>`` or surface a friendly error (PR-27 / PR-4)。
 
-    ADR-0169 PR-27 L10:默认 ``<run_id>.spine.jsonl``;若不存在回退到
-    ``events.jsonl``(向后兼容)。两者都不存在时给出友好错误。
+    ADR-0169 PR-27 L10 + PR-4:唯一 ``<run_id>.spine.jsonl``;不存在时给
+    出友好错误,不再回退到旧文件名。
     """
     locator = FilesystemRunLocator(traces_root)
     run_dir = locator.run_dir(run_id)
@@ -1029,10 +1029,9 @@ def _resolve_events_path(traces_root: Path, run_id: str) -> Path:
     spine_path = locator.events_path(run_id)
     if spine_path.exists():
         return spine_path
-    # locator.events_path 已包含 legacy 兜底,若仍不存在则提示
     print(
-        f"spine events file not found: {spine_path}\n"
-        f"  hint: spine FileSink 尚未写入 events,或 run {run_id} 不在 PR-9 之后",
+        f"spine ledger not found: {spine_path}\n"
+        f"  hint: spine FileSink 尚未写入,或 run {run_id} 不存在",
         file=sys.stderr,
     )
     raise SystemExit(1)
@@ -1079,7 +1078,7 @@ def register(app: typer.Typer) -> None:
             help="人读视图下每个节点最多展开的 payload 行数(超出显示 +N more)",
         ),
     ) -> None:
-        """检查一个 run 的 spine ``events.jsonl``(只读,PR-9 I17 起生效)。
+        """检查一个 run 的 spine ledger(只读,PR-9 I17 起生效)。
 
         不带参数时自动选最新一个 run(``traces/latest.json`` 原子指针优先,
         否则 mtime 最新)。其余语义同显式传参:
@@ -1178,7 +1177,7 @@ def register(app: typer.Typer) -> None:
         sys.stdout.write("\n")
         sys.stdout.write(
             f"\n── trace done: {len(rows)}/{total} events rendered, "
-            f"{skipped} skipped (events.jsonl={events_path}) ──\n"
+            f"{skipped} skipped (spine_ledger={events_path}) ──\n"
         )
 
 

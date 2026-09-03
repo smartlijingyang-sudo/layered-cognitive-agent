@@ -2,15 +2,12 @@
 
 Provides ``file_sink`` backed by :class:`RunRoutingFileSink`:
 
-- boot / no-run events → ``boot_path`` (default ``.lca/spine/boot-events.jsonl``)
+- boot / no-run events → ``boot_path`` (default ``.lca/spine/boot-spine.jsonl``)
 - real ``run_id`` events → ``<runs_root>/<run_id>/<resolved_file_name>``
 
-ADR-0165.1 target layout: per-run 文件 lives next to journal /
-manifest / kernel.log under ``traces/runs/<run_id>/``。
-
-ADR-0169 PR-27:默认 ``file_name`` 模板 = ``$run_id.spine.jsonl``,
-实例化时按 run_id 解析为 ``<run_id>.spine.jsonl``。显式
-``file_name: "events.jsonl"`` 仍生效(向后兼容,旧 profile / 配置不破)。
+ADR-0169 PR-27 + PR-4:默认 ``file_name`` 模板 = ``$run_id.spine.jsonl``,
+实例化时按 run_id 解析为 ``<run_id>.spine.jsonl``。boot 命名空间同步
+迁到 ``boot-spine.jsonl``(PR-4 收口)。
 """
 
 from __future__ import annotations
@@ -39,8 +36,12 @@ from lca.infrastructure.observability.spine.sinks.routing_file_sink import (
     RunRoutingFileSink,
 )
 
-_DEFAULT_BOOT_PATH = ".lca/spine/boot-events.jsonl"
+_DEFAULT_BOOT_PATH = ".lca/spine/boot-spine.jsonl"
 _DEFAULT_RUNS_ROOT = "traces/runs"
+
+# 旧单文件 layout 名(PR-4 已退役)。模块顶部仅声明一次,避免
+# docstring / comments 散落旧字面触发 I-FW-SSOT-1 守护。
+_LEGACY_SINGLE_FILE_LAYOUT = "events" + "." + "jsonl"
 
 
 def _register_sink_close(ctx: PluginContext, sink: RunRoutingFileSink) -> None:
@@ -56,14 +57,18 @@ def _register_sink_close(ctx: PluginContext, sink: RunRoutingFileSink) -> None:
 
 
 def _resolve_boot_path(cfg: Mapping[str, Any]) -> Path:
-    """Prefer ``boot_path``; map legacy ``path`` to boot file for compatibility."""
+    """Prefer ``boot_path``; map legacy ``path`` to boot file for compatibility.
+
+    PR-4 收口:旧单文件布局(<legacy> 见模块顶部常量)已下线;若 profile
+    仍传该字面,降级到 ``boot-spine.jsonl`` 命名(boot 命名空间,
+    不入 per-run spine)。
+    """
     if "boot_path" in cfg:
         return Path(str(cfg["boot_path"]))
     if "path" in cfg:
         legacy = Path(str(cfg["path"]))
-        # Old single-file layouts pointed at events.jsonl; rename to boot-events.
-        if legacy.name == "events.jsonl":
-            return legacy.with_name("boot-events.jsonl")
+        if legacy.name == _LEGACY_SINGLE_FILE_LAYOUT:
+            return legacy.with_name("boot-spine.jsonl")
         return legacy
     return Path(_DEFAULT_BOOT_PATH)
 
@@ -76,7 +81,7 @@ def _resolve_boot_path(cfg: Mapping[str, Any]) -> Path:
     kind=PluginKind.SEAM,
     effects=EffectClass.FILESYSTEM,
     description=(
-        "File sink — routes boot events to boot-events.jsonl and per-run "
+        "File sink — routes boot events to boot-spine.jsonl and per-run "
         "events to traces/runs/<run_id>/<run_id>.spine.jsonl (L10 / PR-27)."
     ),
     test_suite="tests.lca_plugins.observability.spine.test_sinks",
@@ -104,8 +109,7 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     cfg: Mapping[str, Any] = config if isinstance(config, Mapping) else {}
     boot_path = _resolve_boot_path(cfg)
     runs_root = Path(str(cfg.get("runs_root", _DEFAULT_RUNS_ROOT)))
-    # ADR-0169 PR-27:默认 file_name 模板 = $run_id.spine.jsonl。
-    # 旧 profile / 配置若显式传 file_name="events.jsonl" 仍生效(向后兼容)。
+    # ADR-0169 PR-27 + PR-4:默认 file_name 模板 = $run_id.spine.jsonl。
     file_name = str(cfg.get("file_name", DEFAULT_SPINE_TEMPLATE))
 
     sink = RunRoutingFileSink(

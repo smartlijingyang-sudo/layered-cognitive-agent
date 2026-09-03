@@ -3,7 +3,7 @@
 读取事件的统一辅助;**不写账本**(check_no_journal_write_in_coding_agent AST 扫描兜底)。
 
 ADR-2026-09-02-i17-stream-align §C: spine is the SSOT
-(``traces/runs/<id>/events.jsonl``); legacy ``journal.jsonl`` /
+(``traces/runs/<id>/<run_id>.spine.jsonl``); legacy ``journal.jsonl`` /
 ``lca.journal/2`` envelopes still parse but only as a replay fallback.
 """
 
@@ -54,7 +54,7 @@ def _event_from_payload(payload: dict[str, object]) -> StampedEvent | None:
 
     - **spine v3** (preferred): top-level ``execution_point`` /
       ``channel`` / ``when`` / ``payload`` / ``causality_id`` — what
-      ``traces/runs/<id>/events.jsonl`` writes today.
+      ``traces/runs/<id>/<run_id>.spine.jsonl`` writes today.
     - **legacy v2**: nested ``scope`` / ``descriptor.type`` /
       ``run_seq`` / ``data`` — what the old ``lca.journal/2`` envelope
       used. Kept for replay compatibility only.

@@ -48,7 +48,7 @@ from lca.plugins.transport.webserver.handlers.runs.doctor.models import (
 def _safe_logger() -> Any:
     """Best-effort structlog getter;失败返回带 .debug() 接口的 stub。
 
-    H-xref 读取 events.jsonl / manifest.json 时不希望 structlog 异常向上
+    H-xref 读取 spine ledger / manifest.json 时不希望 structlog 异常向上
     扩散;失败时退化为 print 输出。
     """
     try:
@@ -72,10 +72,10 @@ def _scan_xref(run_dir: Path, run_id: str, scan: StepScan) -> StepScan:
     反映不到」挑出来落到 ``StepScan.xref_*``。
 
     SSOT 解析失败(spine ledger 不存在)= H-xref **fail-loud**,不再
-    silently 报全零后 ``ok=True``。这正是历史 ``events.jsonl`` 硬编码
-    bug 的修复点(2026-09-03 H-xref PR-1 / ssot.py PR)。
+    silently 报全零后 ``ok=True``。这正是历史 spine ledger 硬编码
+    bug 的修复点(2026-09-03 H-xref PR-1 / ssot.py PR / PR-4 收口)。
     """
-    # spine ledger 路径解析:走 SSOT(PR-27 spine 命名 + events.jsonl legacy 兜底)
+    # spine ledger 路径解析:走 SSOT(PR-27 spine 命名)
     spine_counts: dict[str, int] = {}
     spine_path: Path | None = None
     try:
@@ -518,8 +518,8 @@ def diagnose_step_tree(
             _log = structlog.get_logger("lca.doctor.step_check")
             _log.debug("scan_failed", path=str(path), error=str(exc))
     # ADR-0176 D5:H-xref 需要 spine ledger(SSOT 解析)+ manifest.json。
-    # SSOT 解析需要 run_id:spine_filename_for_run(run_id)派生主路径,
-    # legacy events.jsonl 作为兜底(PR-27 迁移窗口期)。
+    # SSOT 解析需要 run_id:spine_filename_for_run(run_id)派生主路径
+    # (PR-4 收口,不再有 legacy 兜底)。
     xref_scan = _scan_xref(path.parent, run_id, scan)
     trace_id = ""
     if scan.exists:
@@ -580,7 +580,7 @@ def _hop_h_xref(scan: StepScan) -> HopVerdict:
       - body.tool.execute.start > 0 且 journal.steps[*].tool_call 全为空
       - llm.call.end > 0 且 journal.totals.steps == 0
       - phase.*.fold > 0 且 journal.totals.phases == 0
-      - kernel.run.start > 0 且 events.jsonl 不存在(SSOT 缺失)
+      - kernel.run.start > 0 且 spine ledger 不存在(SSOT 缺失)
       - manifest.extra.flush_errors 非空(StepTreeAccumulator.flush 已落 fail-loud)
     """
     extra: dict[str, Any] = {

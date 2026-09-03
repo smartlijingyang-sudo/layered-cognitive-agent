@@ -155,18 +155,18 @@ def _journal_outcome_from_session(session: RunSession) -> str:
 
 
 def _doctor_journal_path(session: RunSession, locator: RunLocator) -> Path:
-    """Doctor 扫描路径: 优先 journal.json (step-tree), 然后 events.jsonl (SSOT)。
+    """Doctor 扫描路径: 优先 journal.json (step-tree), 然后 spine ledger (SSOT)。
 
     ADR-0167 D11:
     - journal.json 优先:它是可重建物化视图(lca.journal/3.1 step 树)
-    - events.jsonl 兜底: SSOT —— 仅供迁移期 / partial profile 兜底
+    - spine ledger 兜底: SSOT —— 仅供迁移期 / partial profile 兜底
     """
     step_path = locator.journal_step_path(session.run_id)
     if step_path.exists():
         return step_path
-    events_path = locator.events_path(session.run_id)
-    if events_path.exists():
-        return events_path
+    spine_path = locator.events_path(session.run_id)
+    if spine_path.exists():
+        return spine_path
     return session.spine_path
 
 

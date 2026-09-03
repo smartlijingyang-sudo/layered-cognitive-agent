@@ -384,7 +384,7 @@ def _omit_empty(value: Any) -> Any:
 
 
 def _for_disk_reading(record: Mapping[str, Any]) -> dict[str, Any]:
-    """Reorder envelope keys and omit empty defaults so events.jsonl is scannable.
+    """Reorder envelope keys and omit empty defaults so the spine ledger is scannable.
 
     ``data`` / ``scope`` / ``causation`` 内的空默认值（None / "" / [] / {}）
     省略；envelope 字段按 ``_DISK_KEY_ORDER`` 排序，未列入的字段按原顺序

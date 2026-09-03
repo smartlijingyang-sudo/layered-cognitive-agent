@@ -60,4 +60,4 @@ entries:
     name: spine_sink_file
     $module: lca.plugins.observability.spine.sinks.file
     config:
-      path: .lca/spine/benchmark-events.jsonl
+      path: .lca/spine/benchmark-spine.jsonl

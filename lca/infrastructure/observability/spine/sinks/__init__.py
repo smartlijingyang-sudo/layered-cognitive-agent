@@ -2,7 +2,6 @@
 
 from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
 from lca.infrastructure.observability.spine.sinks.naming import (
-    LEGACY_FILE_NAME,
     SPINE_FILE_SUFFIX,
     spine_filename_for_run,
 )
@@ -11,7 +10,6 @@ from lca.infrastructure.observability.spine.sinks.routing_file_sink import (
 )
 
 __all__ = [
-    "LEGACY_FILE_NAME",
     "SPINE_FILE_SUFFIX",
     "FileSink",
     "RunRoutingFileSink",

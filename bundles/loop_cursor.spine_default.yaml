@@ -130,9 +130,9 @@ entries:
     name: spine_sink_file
     $module: lca.plugins.observability.spine.sinks.file
     config:
-      # ADR-0165.1: boot → .lca/spine/boot-events.jsonl;
-      # real runs → traces/runs/<run_id>/events.jsonl
-      boot_path: .lca/spine/boot-events.jsonl
+      # ADR-0165.1 / PR-27 L10 / PR-4: boot → .lca/spine/boot-spine.jsonl;
+      # real runs → traces/runs/<run_id>/<run_id>.spine.jsonl
+      boot_path: .lca/spine/boot-spine.jsonl
       runs_root: traces/runs
 
 
