@@ -114,8 +114,11 @@ class TerminalResultProjection:
                 }
             if declarative_outcome is not None:
                 self._add_approval_details(extra, declarative_outcome)
-            if declarative_outcome is not None and declarative_outcome.cursor is not None:
-                extra["phase_cursor"] = declarative_outcome.cursor
+                # R7: ``_add_approval_details`` no longer writes ``phase_cursor``;
+                # the WAITING_INPUT branch below is the sole writer so a
+                # regression here is observable in tests/runtime/test_result_projection_phase_cursor.py.
+                if declarative_outcome.cursor is not None:
+                    extra["phase_cursor"] = declarative_outcome.cursor
                 if saved_ref is not None:
                     extra["state_snapshot"] = StateSnapshot(
                         snapshot_id=new_id("snap"),
@@ -150,7 +153,10 @@ class TerminalResultProjection:
             else {"type": "approval_pending"}
         )
         extra["approval_request"] = approval
-        extra["phase_cursor"] = outcome.cursor
+        # R7: ``phase_cursor`` is written by ``_terminal_extra`` for the
+        # WAITING_INPUT branch; emitting it here would silently overwrite the
+        # canonical value. The duplicated write was the proximate cause of a
+        # confusion bug in the WAITING_INPUT projection.
 
 
 def _status_for_terminal_kind(kind: TerminalOutcomeKind) -> TaskStatus:

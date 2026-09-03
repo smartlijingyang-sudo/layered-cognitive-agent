@@ -14,6 +14,7 @@ from typing import Any, Literal
 
 import structlog
 
+from lca.cognition.body.cursor_record import CursorRecord
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.atoms.semantic_keys import (
     FAILURE_KIND,
@@ -26,11 +27,6 @@ from lca.contracts.models.core.result import ApprovalPendingError, ToolExecution
 from lca.contracts.models.observability.journal import ApprovalRequested
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.contracts.observability.evidence import EvidenceRef
-from lca.contracts.observability.loop_cursor import CursorError
-from lca.contracts.observability.loop_cursor_payloads import (
-    ToolCallRecord,
-    ToolResultRecord,
-)
 from lca.contracts.protocols import SafeExecutor, Tool
 from lca.infrastructure.observability import record
 from lca.infrastructure.tools.tool_invocation_scope import tool_invocation_scope
@@ -38,30 +34,9 @@ from lca.infrastructure.tools.tool_invocation_scope import tool_invocation_scope
 _log = structlog.get_logger("lca.safe_executor")
 
 _PERF_COUNTER_SCALE = 1000
-# Deterministic exceptions — retrying with the same args will never succeed.
-_DETERMINISTIC_EXCEPTIONS: tuple[type[BaseException], ...] = (
-    ValueError,
-    TypeError,
-    KeyError,
-    AttributeError,
-    SyntaxError,
-    IndexError,
-    NameError,
-    NotImplementedError,
-    OverflowError,
-    ZeroDivisionError,
-    # OS-level failures against a fixed (path, args) tuple never resolve by
-    # retrying — re-running write_bytes() into the same directory produces the
-    # same PermissionError.  Without this, /mnt/data-style inputs cause the
-    # agent to burn through retry_policy.max_retries=3 + 1 = 4 attempts
-    # before surfacing the obvious cause.  Bare OSError is intentionally left
-    # out so transient subclasses (BlockingIOError / InterruptedError / etc.)
-    # stay retryable.
-    PermissionError,
-    IsADirectoryError,
-    FileExistsError,
-    FileNotFoundError,
-)
+# R1: deterministic exceptions live in ``_retry_classification`` so the two
+# SafeExecutor implementations cannot drift on what is non-retryable.
+from lca.cognition.body._retry_classification import _DETERMINISTIC_EXCEPTIONS  # noqa: E402
 
 
 def _elapsed_ms(started: float) -> int:
@@ -142,12 +117,13 @@ class SimpleSafeExecutor(SafeExecutor):
         invocation_id = invocation_id.strip() or new_id("inv")
         evidence_store, evidence_policy = _resolve_evidence_pair()
         # ADR-0164 + ADR-0169 PR-26: phase 推进由 SimpleBody.act 负责,本 seam
-        # 仅负责记录 tool_call/tool_result 证据。Cursor SSOT 校验失败降级
-        # warning(单条记录缺失 ≠ 整 session RuntimeError)。
-        try:
-            _record_tool_call_evidence(tool.name, invocation_id)
-        except CursorError as exc:
-            _log.warning("safe_executor_record_tool_call_evidence", error=str(exc))
+        # 仅负责记录 tool_call/tool_result 证据。CursorRecord.try_* 吞掉
+        # CursorError + 无 cursor 情况(单条记录缺失 ≠ 整 session RuntimeError)。
+        CursorRecord.try_record_tool_call(
+            tool_name=tool.name,
+            invocation_id=invocation_id,
+            args_digest=f"tool:{tool.name}",
+        )
         act_closed = False
         try:
             if tool.name == "askUserQuestion":
@@ -187,28 +163,20 @@ class SimpleSafeExecutor(SafeExecutor):
                     invocation_id=invocation_id,
                     tool_name=tool.name,
                 )
-            try:
-                _record_tool_result_evidence(
-                    tool_name=tool.name,
-                    invocation_id=invocation_id,
-                    outcome="ok" if observation.success else "fail",
-                    error=observation.error,
-                )
-            except CursorError as exc:
-                _log.warning("safe_executor_record_tool_result_evidence", error=str(exc))
+            CursorRecord.try_record_tool_result(
+                tool_name=tool.name,
+                result_digest=observation.error or ("ok" if observation.success else "fail"),
+                outcome="ok" if observation.success else "failure",
+            )
             act_closed = True
             return observation
         except Exception as exc:
             if not act_closed:
-                try:
-                    _record_tool_result_evidence(
-                        tool_name=tool.name,
-                        invocation_id=invocation_id,
-                        outcome="fail",
-                        error=str(exc),
-                    )
-                except CursorError as cursor_exc:
-                    _log.warning("safe_executor_record_tool_result_evidence", error=str(cursor_exc))
+                CursorRecord.try_record_tool_result(
+                    tool_name=tool.name,
+                    result_digest=str(exc),
+                    outcome="failure",
+                )
             raise
 
     async def _execute_with_retry(
@@ -406,21 +374,13 @@ def _record_tool_call_evidence(tool_name: str, invocation_id: str) -> None:
     Phase 推进责任在 ``SimpleBody.act``(PR-26 task-25);本 seam 只负责落证据 EP,
     cursor 不在 act phase → CursorError 由 caller 降级,不让单 tool 调用失败
     触发整 session RuntimeError。Unbound cursor → silent no-op(无 run context)。
-    """
-    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
-        get_current_cursor,
-    )
 
-    cursor = get_current_cursor()
-    if cursor is None:
-        return
-    cursor.record_tool_call(
-        ToolCallRecord(
-            tool_name=tool_name,
-            args_digest=f"tool:{tool_name}",
-            args_payload_path=None,
-            call_seq=hash(invocation_id) & 0x7FFFFFFF,
-        )
+    R2: thin wrapper over :class:`CursorRecord` SSOT helper.
+    """
+    CursorRecord.try_record_tool_call(
+        tool_name=tool_name,
+        invocation_id=invocation_id,
+        args_digest=f"tool:{tool_name}",
     )
 
 
@@ -434,16 +394,11 @@ def _record_tool_result_evidence(
     """Write one ``step.tool_result.record`` EP via the bound LoopCursor.
 
     ADR-0169 PR-1/S1: routes through ``cursor.record_tool_result(ToolResultRecord)``.
-    ``outcome`` mapped to cursor's ``Literal["ok","failure","timeout","denied"]``.
+    ``outcome`` mapped to cursor's ``Literal["ok","failure","timeout","denied"]``。
     Phase 不在 act → CursorError 由 caller 降级。
-    """
-    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
-        get_current_cursor,
-    )
 
-    cursor = get_current_cursor()
-    if cursor is None:
-        return
+    R2: thin wrapper over :class:`CursorRecord` SSOT helper.
+    """
     cursor_outcome: Literal["ok", "failure", "timeout", "denied"]
     if outcome == "ok":
         cursor_outcome = "ok"
@@ -453,11 +408,8 @@ def _record_tool_result_evidence(
         cursor_outcome = "denied"
     else:
         cursor_outcome = "failure"
-    cursor.record_tool_result(
-        ToolResultRecord(
-            tool_name=tool_name,
-            result_digest=error or outcome,
-            result_path=None,
-            outcome=cursor_outcome,
-        )
+    CursorRecord.try_record_tool_result(
+        tool_name=tool_name,
+        result_digest=error or outcome,
+        outcome=cursor_outcome,
     )

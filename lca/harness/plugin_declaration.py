@@ -1,8 +1,8 @@
 """插件声明的 Cordis 载体适配器。
 
 ``@plugin`` 是开放装饰器参数进入不可变 ``PluginDefinition`` 的唯一接缝。输入字段
-规范化委派给 ``plugin_declaration_normalization``，类型化 ``PluginSpec`` 构造委派给
-``plugin_spec_projection``；本模块仅负责载体创建与已装饰插件的 Manifest 提取。
+规范化、类型化 ``PluginSpec`` 构造委派给 ``plugin_spec_projection``；本模块同时
+承载 Cordis 载体创建、已装饰插件的 Manifest 提取以及输入字段规范化规则。
 
 **ADR-0110 PR-A：** ``@plugin(...)`` 当前接收三入口
 ``functional_group=`` / ``logic_address=`` / ``contract=`` 表达同一概念；
@@ -22,7 +22,7 @@ from cordis.plugin import plugin as _cordis_plugin
 from pydantic import BaseModel
 
 from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.capabilities import Capability
+from lca.contracts.capabilities import Capability, cap_key
 from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     compose_plugin_contract,
@@ -30,16 +30,6 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.harness.plugin_declaration_normalization import (
-    config_from_annotations,
-    normalize_contributes,
-    normalize_effects,
-    normalize_implements,
-    normalize_keys,
-    normalize_relations,
-    resolve_functional_group,
-    resolve_layer_kind,
-)
 from lca.harness.plugin_manifest import (
     _LAYER_VALUES,
     EffectClass,
@@ -52,7 +42,10 @@ from lca.harness.plugin_manifest import (
 from lca.harness.plugin_spec_projection import native_spec_from_declaration
 
 if TYPE_CHECKING:
-    from lca.contracts.protocols.declarative.declarative_phase_graph import PluginSpec
+    from lca.contracts.protocols.declarative.declarative_phase_graph import (
+        PhaseContribution,
+        PluginSpec,
+    )
 
 
 def _resolve_plugin_contract(
@@ -137,17 +130,17 @@ def plugin(
     """
 
     def _wrap(fn: PluginSetupFn[Any]) -> CordisPlugin:
-        resolved_layer, resolved_kind = resolve_layer_kind(layer=layer, kind=kind)
-        config_cls = Config or config_from_annotations(fn)
-        provide_keys = normalize_keys(provides)
-        require_keys = normalize_keys(requires)
-        implementation_names = normalize_implements(implements)
-        effect_set = normalize_effects(effects)
+        resolved_layer, resolved_kind = _resolve_layer_kind(layer=layer, kind=kind)
+        config_cls = Config or _config_from_annotations(fn)
+        provide_keys = _normalize_keys(provides)
+        require_keys = _normalize_keys(requires)
+        implementation_names = _normalize_implements(implements)
+        effect_set = _normalize_effects(effects)
         suite = test_suite or ""
         desc = description or ""
-        functional_group_value = resolve_functional_group(functional_group)
-        relation_tuple = normalize_relations(relations)
-        contributes_tuple = normalize_contributes(contributes)
+        functional_group_value = _resolve_functional_group(functional_group)
+        relation_tuple = _normalize_relations(relations)
+        contributes_tuple = _normalize_contributes(contributes)
 
         merged_meta: dict[str, object] = dict(meta) if meta else {}
         merged_meta.update(
@@ -276,9 +269,9 @@ def definition_from_plugin(
     provides = _meta_strings("provides")
     requires = _meta_strings("requires", getattr(plugin_obj, "inject", None))
     implements = _meta_strings("implements")
-    functional_group = resolve_functional_group(functional_group_raw)
+    functional_group = _resolve_functional_group(functional_group_raw)
     kind = PluginKind(kind_raw)
-    effects = normalize_effects(effects_raw)
+    effects = _normalize_effects(effects_raw)
     test_suite = str(meta.get("test_suite") or "")
     setup_fn = cast("PluginSetupFn[Any]", raw_setup)
     module_name = module or getattr(raw_setup, "__module__", "__main__")
@@ -303,3 +296,194 @@ def definition_from_plugin(
         description=str(meta.get("description") or ""),
         functional_group=functional_group,
     )
+
+
+# ---------------------------------------------------------------------------
+# Input-field normalization helpers (folded in from plugin_declaration_normalization).
+# Private because they are internal plumbing for ``@plugin`` /
+# ``definition_from_plugin``; public callers go through
+# ``lca.harness.plugin_api``. Renamed with underscore prefix to mark them as
+# module-private.
+# ---------------------------------------------------------------------------
+
+
+def _config_from_annotations(fn: Callable[..., object]) -> type[BaseModel] | None:
+    """Pick Pydantic Config from ``config: Config`` annotation when Config= omitted."""
+    try:
+        import typing
+
+        resolved = typing.get_type_hints(fn)
+        annotated = resolved.get("config")
+        if isinstance(annotated, type) and issubclass(annotated, BaseModel):
+            return annotated
+    except (NameError, TypeError, ValueError):
+        return None
+    return None
+
+
+def _normalize_keys(values: Sequence[Capability[object] | str] | None) -> tuple[str, ...]:
+    """Normalize typed and textual capability keys at the declaration seam."""
+    if not values:
+        return ()
+    return tuple(cap_key(value) for value in values)
+
+
+def _resolve_functional_group(value: FunctionalGroup | str | None) -> FunctionalGroup | None:
+    """Resolve FunctionalGroup from str / enum / None; returns enum or None."""
+    if value is None:
+        return None
+    from lca.contracts.atoms.functional_group import parse_functional_group
+
+    if isinstance(value, FunctionalGroup):
+        return value
+    if isinstance(value, str):
+        try:
+            return parse_functional_group(value)
+        except ValueError as exc:
+            raise ValueError(f"@plugin functional_group: {exc}") from exc
+    raise TypeError(
+        f"@plugin functional_group must be str or FunctionalGroup, got {type(value).__name__}"
+    )
+
+
+def _normalize_declaration_entries(
+    value: Sequence[Mapping[str, object]] | None,
+    *,
+    field: str,
+) -> tuple[Mapping[str, object], ...]:
+    """Reject malformed open declaration entries before plan compilation."""
+    if value is None:
+        return ()
+    if not isinstance(value, (list, tuple)):
+        raise TypeError(f"@plugin {field} must be list/tuple, got {type(value).__name__}")
+
+    normalized: list[Mapping[str, object]] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, Mapping):
+            raise TypeError(f"@plugin {field}[{index}] must be mapping, got {type(item).__name__}")
+        if any(not isinstance(key, str) for key in item):
+            raise TypeError(f"@plugin {field}[{index}] keys must be str")
+        normalized.append(dict(item))
+    return tuple(normalized)
+
+
+def _normalize_relations(
+    value: Sequence[RawRelationEntry] | None,
+) -> tuple[RawRelationEntry, ...]:
+    """Normalize open relation declarations without assigning plan semantics."""
+    return _normalize_declaration_entries(value, field="relations")
+
+
+def _normalize_contributes(value: Sequence[object] | None) -> tuple[PhaseContribution, ...]:
+    """Normalize ``contributes`` into typed phase entries."""
+    if value is None:
+        return ()
+    if not isinstance(value, (list, tuple)):
+        raise TypeError(f"@plugin contributes must be list/tuple, got {type(value).__name__}")
+    from lca.contracts.protocols.declarative.declarative_phase_graph import (
+        ContributionRole,
+        PhaseContribution,
+        SemanticPhase,
+    )
+
+    normalized: list[PhaseContribution] = []
+    for index, item in enumerate(value):
+        if isinstance(item, PhaseContribution):
+            normalized.append(item)
+            continue
+        if isinstance(item, Mapping):
+            phase_value = item.get("phase")
+            role_value = item.get("role")
+            if not isinstance(phase_value, SemanticPhase):
+                raise TypeError(
+                    "@plugin contributes["
+                    f"{index}].phase must be SemanticPhase, got {type(phase_value).__name__}"
+                )
+            if not isinstance(role_value, ContributionRole):
+                raise TypeError(
+                    "@plugin contributes["
+                    f"{index}].role must be ContributionRole, got {type(role_value).__name__}"
+                )
+            executor = item.get("executor")
+            output = item.get("output")
+            order = item.get("order", index)
+            aggregation = item.get("aggregation")
+            if not isinstance(executor, str) or not executor:
+                raise TypeError(f"@plugin contributes[{index}].executor must be non-empty str")
+            if not isinstance(output, str) or not output:
+                raise TypeError(f"@plugin contributes[{index}].output must be non-empty str")
+            if not isinstance(order, int) or isinstance(order, bool):
+                raise TypeError(f"@plugin contributes[{index}].order must be int")
+            if aggregation is not None and not isinstance(aggregation, str):
+                raise TypeError(f"@plugin contributes[{index}].aggregation must be str or None")
+            normalized.append(
+                PhaseContribution(
+                    phase=phase_value,
+                    role=role_value,
+                    executor=executor,
+                    output=output,
+                    order=order,
+                    aggregation=aggregation,
+                )
+            )
+            continue
+        raise TypeError(
+            "@plugin contributes["
+            f"{index}] must be PhaseContribution or mapping, got {type(item).__name__}"
+        )
+    return tuple(normalized)
+
+
+def _normalize_implements(values: object) -> tuple[str, ...]:
+    """Normalize class, Protocol alias, or string implementation declarations."""
+    if not values:
+        return ()
+    if isinstance(values, (str, type)):
+        items: Sequence[object] = (values,)
+    elif isinstance(values, Sequence):
+        items = values
+    else:
+        items = (values,)
+
+    out: list[str] = []
+    for value in items:
+        if isinstance(value, str):
+            out.append(value)
+        elif isinstance(value, type):
+            out.append(value.__name__)
+        else:
+            out.append(str(value))
+    return tuple(out)
+
+
+def _normalize_effects(
+    effects: EffectClass | str | Sequence[EffectClass | str] | None,
+) -> frozenset[EffectClass]:
+    """Normalize effect declarations while rejecting no valid effect values."""
+    if effects is None:
+        return frozenset({EffectClass.NONE})
+    if isinstance(effects, (EffectClass, str)):
+        items: Sequence[EffectClass | str] = (effects,)
+    else:
+        items = effects
+    out: set[EffectClass] = set()
+    for item in items:
+        out.add(EffectClass(item) if not isinstance(item, EffectClass) else item)
+    if EffectClass.NONE in out and len(out) > 1:
+        out.discard(EffectClass.NONE)
+    return frozenset(out)
+
+
+def _resolve_layer_kind(
+    *,
+    layer: str | None,
+    kind: PluginKind | str | None,
+) -> tuple[str, PluginKind]:
+    """Validate and normalize the canonical layer and kind declarations."""
+    if layer is None:
+        raise ValueError("@plugin requires layer= (one of L0–L4)")
+    if layer not in _LAYER_VALUES:
+        raise ValueError(f"unknown layer={layer!r}; expected L0–L4 (no legacy taxonomy)")
+    if kind is None:
+        raise ValueError("kind= is required when layer is L0–L4")
+    return layer, PluginKind(kind) if not isinstance(kind, PluginKind) else kind

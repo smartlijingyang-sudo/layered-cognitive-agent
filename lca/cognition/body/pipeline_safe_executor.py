@@ -28,6 +28,7 @@ from typing import Any, cast
 
 import structlog
 
+from lca.cognition.body.cursor_record import CursorRecord
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.atoms.semantic_keys import (
     FAILURE_KIND,
@@ -37,7 +38,6 @@ from lca.contracts.atoms.semantic_keys import (
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.result import ApprovalPendingError, ToolExecutionError
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
-from lca.contracts.observability.loop_cursor import CursorError
 from lca.contracts.protocols import SafeExecutor, Tool
 from lca.contracts.protocols.act.tool_pipeline import (
     ToolDefinition,
@@ -53,30 +53,9 @@ _log = structlog.get_logger("lca.safe_executor")
 
 _PERF_COUNTER_SCALE = 1000
 
-# Deterministic exceptions — retrying with the same args will never succeed.
-_DETERMINISTIC_EXCEPTIONS: tuple[type[BaseException], ...] = (
-    ValueError,
-    TypeError,
-    KeyError,
-    AttributeError,
-    SyntaxError,
-    IndexError,
-    NameError,
-    NotImplementedError,
-    OverflowError,
-    ZeroDivisionError,
-    # OS-level failures against a fixed (path, args) tuple never resolve by
-    # retrying — re-running write_bytes() into the same directory produces the
-    # same PermissionError.  Without this, /mnt/data-style inputs cause the
-    # agent to burn through retry_policy.max_retries=3 + 1 = 4 attempts
-    # before surfacing the obvious cause.  Bare OSError is intentionally left
-    # out so transient subclasses (BlockingIOError / InterruptedError / etc.)
-    # stay retryable.
-    PermissionError,
-    IsADirectoryError,
-    FileExistsError,
-    FileNotFoundError,
-)
+# R1: deterministic exceptions live in ``_retry_classification`` so the two
+# SafeExecutor implementations cannot drift on what is non-retryable.
+from lca.cognition.body._retry_classification import _DETERMINISTIC_EXCEPTIONS  # noqa: E402
 
 
 def _elapsed_ms(started: float) -> int:
@@ -326,17 +305,13 @@ class PipelineSafeExecutor(SafeExecutor):
 
         verdict_refs.append("executor.plan-boundary:valid")
         # ADR-0164 + ADR-0169 PR-26: 写证据 EP 到 bound cursor(由 SimpleBody.act
-        # 负责 advance 到 act phase);cursor 不在 act phase → CursorError 降级 warning,
-        # 不让单 tool 调用失败变 session RuntimeError。
-        from lca.cognition.body.safe_executor import (
-            _record_tool_call_evidence,
-            _record_tool_result_evidence,
+        # 负责 advance 到 act phase);cursor 不在 act phase → CursorRecord.try_*
+        # 降级 warning,不让单 tool 调用失败变 session RuntimeError。
+        CursorRecord.try_record_tool_call(
+            tool_name=tool.name,
+            invocation_id=invocation_id,
+            args_digest=f"tool:{tool.name}",
         )
-
-        try:
-            _record_tool_call_evidence(tool.name, invocation_id)
-        except CursorError as exc:
-            _log.warning("pipeline_safe_executor_record_tool_call_evidence", error=str(exc))
         act_closed = False
         try:
             result = await self._pipeline_for(tool, retry_policy, cache_config).execute(
@@ -359,16 +334,11 @@ class PipelineSafeExecutor(SafeExecutor):
                 observation = cast("Observation", result.output)
                 observation.extra["command_envelope"] = envelope_evidence
                 observation.extra["policy_verdict_refs"] = list(envelope.policy_verdict_refs)
-                try:
-                    _record_tool_result_evidence(
-                        tool_name=tool.name,
-                        invocation_id=invocation_id,
-                        outcome="ok",
-                    )
-                except CursorError as exc:
-                    _log.warning(
-                        "pipeline_safe_executor_record_tool_result_evidence", error=str(exc)
-                    )
+                CursorRecord.try_record_tool_result(
+                    tool_name=tool.name,
+                    result_digest="ok",
+                    outcome="ok",
+                )
                 act_closed = True
                 return observation
 
@@ -383,31 +353,20 @@ class PipelineSafeExecutor(SafeExecutor):
                     "policy_verdict_refs": list(envelope.policy_verdict_refs),
                 },
             )
-            try:
-                _record_tool_result_evidence(
-                    tool_name=tool.name,
-                    invocation_id=invocation_id,
-                    outcome="fail",
-                    error=observation.error,
-                )
-            except CursorError as exc:
-                _log.warning("pipeline_safe_executor_record_tool_result_evidence", error=str(exc))
+            CursorRecord.try_record_tool_result(
+                tool_name=tool.name,
+                result_digest=observation.error,
+                outcome="failure",
+            )
             act_closed = True
             return observation
         except Exception as exc:
             if not act_closed:
-                try:
-                    _record_tool_result_evidence(
-                        tool_name=tool.name,
-                        invocation_id=invocation_id,
-                        outcome="fail",
-                        error=str(exc),
-                    )
-                except CursorError as cursor_exc:
-                    _log.warning(
-                        "pipeline_safe_executor_record_tool_result_evidence",
-                        error=str(cursor_exc),
-                    )
+                CursorRecord.try_record_tool_result(
+                    tool_name=tool.name,
+                    result_digest=str(exc),
+                    outcome="failure",
+                )
             raise
 
     async def _execute_once(self, tool: Tool, args: dict[str, Any], attempt: int) -> Observation:

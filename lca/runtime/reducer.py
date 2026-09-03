@@ -6,6 +6,7 @@ mutation 集中在此模块；``CognitiveRuntime._loop`` 不再直接写 state�
 
 from __future__ import annotations
 
+import functools
 from collections.abc import Callable
 from typing import TYPE_CHECKING, ParamSpec, TypeVar, overload
 
@@ -18,6 +19,7 @@ from lca.contracts.models.core.perception import ContextManifest
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.core.stop import StopDecision
 from lca.contracts.models.core.terminal_outcome import (
+    ErrorRef,
     ResumeCursor,
     TerminalOutcome,
     TerminalOutcomeKind,
@@ -70,6 +72,7 @@ def _instrument_apply(
         method_name: str = method_name_or_fn.__name__
         fn: Callable[_P, _R] = method_name_or_fn
 
+        @functools.wraps(fn)
         def wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
             from lca.plugins.observability.spine.reflectors.runtime import (
                 emit_runtime_reducer_apply_end,
@@ -89,14 +92,12 @@ def _instrument_apply(
                     outcome=outcome,
                 )
 
-        wrapped.__name__ = fn.__name__
-        wrapped.__qualname__ = getattr(fn, "__qualname__", fn.__name__)
-        wrapped.__doc__ = fn.__doc__
         return wrapped
 
     method_name = method_name_or_fn
 
     def decorator(fn: Callable[_P, _R]) -> Callable[_P, _R]:
+        @functools.wraps(fn)
         def wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
             from lca.plugins.observability.spine.reflectors.runtime import (
                 emit_runtime_reducer_apply_end,
@@ -116,9 +117,6 @@ def _instrument_apply(
                     outcome=outcome,
                 )
 
-        wrapped.__name__ = fn.__name__
-        wrapped.__qualname__ = getattr(fn, "__qualname__", fn.__name__)
-        wrapped.__doc__ = fn.__doc__
         return wrapped
 
     return decorator
@@ -202,6 +200,7 @@ class DefaultReducer(Reducer):
             state.last_error = stop.failure.message
         return state
 
+    @_instrument_apply
     def apply_terminal_outcome(
         self,
         state: AgentState,
@@ -213,11 +212,11 @@ class DefaultReducer(Reducer):
     ) -> TerminalOutcome:
         """Fold StopDecision into the sole TerminalOutcome (ADR-0077 §决策一).
 
-        This is the single point where terminal truth is constructed. The Reducer
-        first applies the stop to state (preserving legacy behavior), then builds
-        the TerminalOutcome from the resulting state. The caller (DeclarativeRuntimeDriver)
-        must use the returned TerminalOutcome as the sole source of terminal truth
-        instead of calling Result.from_state(state).
+        Slim orchestrator — delegates state→kind classification to
+        :meth:`_classify_kind` and ErrorRef construction to
+        :meth:`_build_error_ref`. The zero-output Chinese fallback lives in
+        :meth:`_zero_output_fallback_message` so both call sites read the
+        same string.
 
         ADR-0158 决策 四 + 决策 十:AgentState.final_output 字段已删除;
         final_output 来源改为:(a) StopDecision.final_output 显式传入;
@@ -232,60 +231,7 @@ class DefaultReducer(Reducer):
         # 优先级:StopDecision.final_output > last_turn.decision.response_text
         response_text = self._extract_response_text(state, stop)
 
-        # Determine outcome kind from state.status. A terminal stop carrying
-        # output is authoritative even when older StopDecision producers omit
-        # the optional status field; otherwise the output would be discarded by
-        # the zero-output guard.
-        if state.status == TaskStatus.WORKING and stop.should_stop and bool(response_text):
-            state.status = TaskStatus.COMPLETED
-
-        if state.status == TaskStatus.WORKING:
-            # WORKING at terminal means budget exhausted without output = FAILED
-            kind = TerminalOutcomeKind.FAILED
-            state.status = TaskStatus.FAILED
-            if not state.last_error:
-                state.last_error = (
-                    "Agent 运行结束但未产生任何输出。"
-                    "可能原因: 工具循环失败、代码执行错误、模型未正确响应。"
-                )
-        elif state.status == TaskStatus.COMPLETED:
-            # A handoff is a valid completion even when its carrier has no
-            # response text. Materialize a stable terminal marker so the
-            # ADR-0077 TerminalOutcome still has the required output ref.
-            output_text = response_text or ""
-            if not output_text.strip() and self._is_handoff_completion(state):
-                output_text = "handoff completed"
-            if not output_text.strip():
-                kind = TerminalOutcomeKind.FAILED
-                state.status = TaskStatus.FAILED
-                if not state.last_error:
-                    state.last_error = (
-                        "Agent 运行结束但未产生任何输出。"
-                        "可能原因: 工具循环失败、代码执行错误、模型未正确响应。"
-                    )
-            else:
-                kind = TerminalOutcomeKind.COMPLETED
-                # ADR-0158 决策 四:final_output_ref 来源是 output_text 本地变量
-                # (含 handoff 占位 materialization),不读 state.final_output 字段
-                response_text = output_text
-        elif state.status == TaskStatus.FAILED:
-            kind = TerminalOutcomeKind.FAILED
-            if not state.last_error:
-                # phase.result fact under the run journal already carries
-                # the typed ``PhaseExecutionFailure`` payload; users dig
-                # into the journal for the cause. The reducer just gives
-                # a single-sentence summary so the run envelope's
-                # ``error`` field is informative rather than opaque.
-                state.last_error = (
-                    "Agent 阶段执行失败。可能原因: phase 异常、模型未响应或工具循环失败。"
-                )
-        elif state.status == TaskStatus.INPUT_REQUIRED:
-            kind = TerminalOutcomeKind.WAITING_INPUT
-        elif state.status == TaskStatus.CANCELED:
-            kind = TerminalOutcomeKind.CANCELED
-        else:
-            # DEGRADED or unknown status
-            kind = TerminalOutcomeKind.DEGRADED
+        kind, response_text = self._classify_kind(state, stop, response_text)
 
         # Build final_output_ref if we have output(ADR-0158 决策 四:
         # 输出文本从 response_text local 变量来,不再读 state.final_output 字段)
@@ -293,35 +239,7 @@ class DefaultReducer(Reducer):
         if kind == TerminalOutcomeKind.COMPLETED and response_text:
             final_output_ref = TextRef(text=response_text, seq=journal_seq_end, cursor="")
 
-        # Build error_ref. The ADR-0077 invariant for FAILED requires
-        # ``error_ref`` to be set; upstream ``StopDecision`` does not carry
-        # a structured error field, so a FAILED terminal can land here with
-        # ``state.last_error`` empty (e.g. when stop_reason=ERROR fires
-        # without an explicit failure message). Fall back to the stop
-        # reason value so the invariant always holds and downstream
-        # consumers see a coherent reason.
-        from lca.contracts.models.core.terminal_outcome import ErrorRef
-
-        stop_reason_value = getattr(stop.reason, "value", str(stop.reason))
-
-        error_ref = None
-        if state.last_error:
-            error_ref = ErrorRef(
-                kind="error",
-                message=state.last_error,
-                source_ref="",
-                diagnostic=getattr(stop, "failure", None),
-            )
-        elif kind is TerminalOutcomeKind.FAILED:
-            error_ref = ErrorRef(
-                kind="error",
-                message=stop_reason_value or "stop_reason=error",
-                source_ref="",
-                diagnostic=getattr(stop, "failure", None),
-            )
-        elif kind in (TerminalOutcomeKind.CANCELED, TerminalOutcomeKind.DEGRADED):
-            default_msg = "canceled" if kind == TerminalOutcomeKind.CANCELED else "degraded"
-            error_ref = ErrorRef(kind=default_msg, message=default_msg, source_ref="")
+        error_ref = self._build_error_ref(state, kind, stop)
 
         # A pause cursor belongs to the declared interpreter outcome. Do not
         # fabricate a legacy cursor: resume must be backed by durable facts.
@@ -331,10 +249,10 @@ class DefaultReducer(Reducer):
                 "waiting-input terminal outcome requires a durable resume cursor",
             )
 
-        stop_reason = stop_reason_value
+        stop_reason_value = getattr(stop.reason, "value", str(stop.reason))
         return TerminalOutcome(
             kind=kind,
-            stop_reason=stop_reason
+            stop_reason=stop_reason_value
             or ("completed" if kind == TerminalOutcomeKind.COMPLETED else "unknown"),
             final_output_ref=final_output_ref,
             artifact_refs=(),
@@ -343,6 +261,118 @@ class DefaultReducer(Reducer):
             plan_ref=plan_ref,
             journal_seq_end=journal_seq_end,
         )
+
+    @staticmethod
+    def _zero_output_fallback_message() -> str:
+        """SSOT for the Chinese 'no output produced' message.
+
+        Both the WORKING-at-terminal branch and the COMPLETED-zero-output
+        branch of :meth:`_classify_kind` use this string so the user-facing
+        envelope is consistent across ladder entries.
+        """
+        return (
+            "Agent 运行结束但未产生任何输出。可能原因: 工具循环失败、代码执行错误、模型未正确响应。"
+        )
+
+    def _classify_kind(
+        self,
+        state: AgentState,
+        stop: StopDecision,
+        response_text: str | None,
+    ) -> tuple[TerminalOutcomeKind, str | None]:
+        """Map ``state.status`` to a :class:`TerminalOutcomeKind` (the kind ladder).
+
+        Mutates ``state.status`` per the existing rules (e.g. WORKING + output →
+        COMPLETED; zero-output COMPLETED → FAILED). The second tuple element
+        is the materialized response text — non-empty when a stable carrier
+        is present, ``"handoff completed"`` when a HANDOFF decision was the
+        terminal action, ``None`` otherwise.
+        """
+        # A terminal stop carrying output is authoritative even when older
+        # StopDecision producers omit the optional status field; otherwise
+        # the output would be discarded by the zero-output guard.
+        if state.status == TaskStatus.WORKING and stop.should_stop and bool(response_text):
+            state.status = TaskStatus.COMPLETED
+
+        if state.status == TaskStatus.WORKING:
+            # WORKING at terminal means budget exhausted without output = FAILED
+            state.status = TaskStatus.FAILED
+            if not state.last_error:
+                state.last_error = self._zero_output_fallback_message()
+            return TerminalOutcomeKind.FAILED, response_text
+
+        if state.status == TaskStatus.COMPLETED:
+            # A handoff is a valid completion even when its carrier has no
+            # response text. Materialize a stable terminal marker so the
+            # ADR-0077 TerminalOutcome still has the required output ref.
+            output_text = response_text or ""
+            if not output_text.strip() and self._is_handoff_completion(state):
+                output_text = "handoff completed"
+            if not output_text.strip():
+                state.status = TaskStatus.FAILED
+                if not state.last_error:
+                    state.last_error = self._zero_output_fallback_message()
+                return TerminalOutcomeKind.FAILED, response_text
+            # ADR-0158 决策 四:final_output_ref 来源是 output_text 本地变量
+            # (含 handoff 占位 materialization),不读 state.final_output 字段
+            return TerminalOutcomeKind.COMPLETED, output_text
+
+        if state.status == TaskStatus.FAILED:
+            if not state.last_error:
+                # phase.result fact under the run journal already carries
+                # the typed ``PhaseExecutionFailure`` payload; users dig
+                # into the journal for the cause. The reducer just gives
+                # a single-sentence summary so the run envelope's
+                # ``error`` field is informative rather than opaque.
+                state.last_error = (
+                    "Agent 阶段执行失败。可能原因: phase 异常、模型未响应或工具循环失败。"
+                )
+            return TerminalOutcomeKind.FAILED, response_text
+
+        if state.status == TaskStatus.INPUT_REQUIRED:
+            return TerminalOutcomeKind.WAITING_INPUT, response_text
+
+        if state.status == TaskStatus.CANCELED:
+            return TerminalOutcomeKind.CANCELED, response_text
+
+        # DEGRADED or unknown status
+        return TerminalOutcomeKind.DEGRADED, response_text
+
+    @staticmethod
+    def _build_error_ref(
+        state: AgentState,
+        kind: TerminalOutcomeKind,
+        stop: StopDecision,
+    ) -> ErrorRef | None:
+        """Build the :class:`ErrorRef` for a terminal outcome (ADR-0077 invariant).
+
+        The ADR-0077 invariant for FAILED requires ``error_ref`` to be set;
+        upstream ``StopDecision`` does not carry a structured error field,
+        so a FAILED terminal can land here with ``state.last_error`` empty
+        (e.g. when stop_reason=ERROR fires without an explicit failure
+        message). Fall back to the stop reason value so the invariant
+        always holds and downstream consumers see a coherent reason.
+        """
+        if state.last_error:
+            return ErrorRef(
+                kind="error",
+                message=state.last_error,
+                source_ref="",
+                diagnostic=getattr(stop, "failure", None),
+            )
+        if kind is TerminalOutcomeKind.FAILED:
+            stop_reason_value = getattr(stop.reason, "value", str(stop.reason))
+            return ErrorRef(
+                kind="error",
+                message=stop_reason_value or "stop_reason=error",
+                source_ref="",
+                diagnostic=getattr(stop, "failure", None),
+            )
+        if kind is TerminalOutcomeKind.CANCELED:
+            return ErrorRef(kind="canceled", message="canceled", source_ref="")
+        if kind is TerminalOutcomeKind.DEGRADED:
+            return ErrorRef(kind="degraded", message="degraded", source_ref="")
+        return None
 
     def _is_handoff_completion(self, state: AgentState) -> bool:
         """HANDOFF is a valid terminal action even when response_text is empty."""

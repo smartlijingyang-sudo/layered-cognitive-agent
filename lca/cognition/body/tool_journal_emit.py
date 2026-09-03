@@ -21,6 +21,7 @@ from typing import Any
 
 import structlog
 
+from lca.cognition.body.cursor_record import CursorRecord
 from lca.cognition.body.tool_result_preview import tool_files
 from lca.contracts.models.core.decision import Observation, ToolCall  # noqa: F401
 from lca.contracts.models.observability.diagnostic import DiagnosticCategory
@@ -33,11 +34,6 @@ from lca.contracts.observability.evidence import (
     EvidencePolicy,
     EvidenceRef,
     EvidenceStore,
-)
-from lca.contracts.observability.loop_cursor import CursorError
-from lca.contracts.observability.loop_cursor_payloads import (
-    ToolCallRecord,
-    ToolResultRecord,
 )
 from lca.contracts.protocols.runtime.infra import Tool
 from lca.infrastructure.observability import record, record_runtime
@@ -141,33 +137,16 @@ def emit_tool_started(
     # is the SSOT for step/tool evidence (ADR-0169 D1); legacy
     # ``phase.tool.call.start`` EP is dropped here, the canonical ToolStarted
     # JournalEvent above remains (ADR-0063 SSOT).
-    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
-        get_current_cursor,
+    #
+    # R2: best-effort write goes through :class:`CursorRecord` SSOT helper.
+    # CursorRecord.try_record_tool_call swallows CursorError when cursor is
+    # not in ACT phase — this is the run_9e181f24c275 regression lock
+    # (record_tool_call in non-ACT phase must not escalate to RuntimeError).
+    CursorRecord.try_record_tool_call(
+        tool_name=tool.name,
+        invocation_id=invocation_id,
+        args_digest=_summarize_args(args_dict),
     )
-
-    cursor = get_current_cursor()
-    if cursor is not None:
-        # ADR-0169 PR-26 task-25:phase 推进责任在 SimpleBody.act;本 seam
-        # 只负责落 tool_call 证据。Cursor 不在 act phase → CursorError 降级
-        # warning,不让单 tool 调用失败触发整 session RuntimeError
-        # (run_9e181f24c275 直接根因)。
-        try:
-            cursor.record_tool_call(
-                ToolCallRecord(
-                    tool_name=tool.name,
-                    args_digest=_summarize_args(args_dict),
-                    args_payload_path=None,
-                    call_seq=hash(invocation_id) & 0x7FFFFFFF,
-                )
-            )
-        except CursorError as exc:
-            _log.warning(
-                "tool_journal_emit_record_tool_call_skipped",
-                tool_name=tool.name,
-                invocation_id=invocation_id,
-                current_phase=cursor.snapshot.phase,
-                error=str(exc),
-            )
     return arguments_ref
 
 
@@ -194,20 +173,13 @@ def emit_tool_denied(tool: Tool, reason: str) -> None:
     # ADR-0169 PR-1/S1: route through LoopCursor.record_tool_result with
     # outcome="denied". Canonical ToolDenied JournalEvent above remains
     # (ADR-0063 SSOT).
-    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
-        get_current_cursor,
+    #
+    # R2: best-effort write goes through :class:`CursorRecord` SSOT helper.
+    CursorRecord.try_record_tool_result(
+        tool_name=tool.name,
+        result_digest=reason,
+        outcome="denied",
     )
-
-    cursor = get_current_cursor()
-    if cursor is not None:
-        cursor.record_tool_result(
-            ToolResultRecord(
-                tool_name=tool.name,
-                result_digest=reason,
-                result_path=None,
-                outcome="denied",
-            )
-        )
 
 
 def emit_tool_invoked(
@@ -294,20 +266,13 @@ def emit_tool_invoked(
     # is the SSOT for step/tool evidence (ADR-0169 D1); legacy
     # ``phase.tool.call.end`` EP is dropped here, the canonical ToolInvoked
     # JournalEvent above remains (ADR-0063 SSOT).
-    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
-        get_current_cursor,
+    #
+    # R2: best-effort write goes through :class:`CursorRecord` SSOT helper.
+    CursorRecord.try_record_tool_result(
+        tool_name=tool.name,
+        result_digest=_delta_summary_from_obs(obs, inline_output_text, output_ref),
+        outcome="ok" if obs.success else "failure",
     )
-
-    cursor = get_current_cursor()
-    if cursor is not None:
-        cursor.record_tool_result(
-            ToolResultRecord(
-                tool_name=tool.name,
-                result_digest=_delta_summary_from_obs(obs, inline_output_text, output_ref),
-                result_path=None,
-                outcome="ok" if obs.success else "failure",
-            )
-        )
 
 
 def _delta_summary_from_obs(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from lca.cognition._spine_envelope import with_spine_envelope
 from lca.contracts.atoms.enums import ReflectionVerdict
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.atoms.semantic_keys import (
@@ -26,22 +27,10 @@ _FAILURE_KIND_HINT: dict[str, str] = {
 class SimpleCritic(Critic):
     """基于执行结果生成反思。"""
 
+    @with_spine_envelope("critic_eval", state_id_arg="state")
     async def critique(self, state: AgentState, observation: Observation) -> Reflection:
-        # PR-3.2: spine envelope for the critic.eval execution point.
-        from lca.plugins.observability.spine.reflectors.cognition import (
-            emit_critic_eval_end,
-            emit_critic_eval_start,
-        )
-
-        state_id = state.trace_id
-        emit_critic_eval_start(state_id=state_id)
-        try:
-            reflection = self._evaluate(state, observation)
-        except BaseException:
-            emit_critic_eval_end(state_id=state_id, outcome="failure")
-            raise
-        emit_critic_eval_end(state_id=state_id, outcome="success")
-        return reflection
+        # R3: spine envelope (start/end) lives in the decorator.
+        return self._evaluate(state, observation)
 
     def _evaluate(self, state: AgentState, observation: Observation) -> Reflection:
         if observation.success:

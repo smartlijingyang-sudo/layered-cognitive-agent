@@ -5,20 +5,21 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-import structlog
-
 from lca.cognition.body.action_handlers import record_decision_made
+from lca.cognition.body.cursor_record import CursorRecord
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.semantic_keys import OBS_DEGRADED_FROM
 from lca.contracts.models.core.decision import Decision, Observation
 from lca.contracts.models.core.result import UnregisteredActionError
 from lca.contracts.models.core.state import AgentState
-from lca.contracts.observability.loop_cursor import CursorError, PhaseName
+from lca.contracts.observability.loop_cursor import PhaseName
 from lca.contracts.protocols import Body, SafeExecutor, ToolRegistry, TransportRegistryProtocol
 from lca.contracts.protocols.act.action import ActionRegistryProtocol
 from lca.infrastructure.component_registry import RegistryKeyError
 
-_log = structlog.get_logger(__name__)
+# Body 是 phase=act 执行平面;advance(phase) 是把 cursor 推到对应窗口的 SSOT。
+# ADR-0169 §D1 + PR-26 task-25:phase 推进责任钉死在 SimpleBody,
+# SafeExecutor / 下游 record_* 只在合法 phase 内写证据 EP。
 
 # Body 是 phase=act 执行平面;advance(phase) 是把 cursor 推到对应窗口的 SSOT。
 # ADR-0169 §D1 + PR-26 task-25:phase 推进责任钉死在 SimpleBody,
@@ -106,30 +107,14 @@ class SimpleBody(Body):
 
     @staticmethod
     def _advance_cursor_for_action(action_type: ActionType) -> None:
-        """Bound cursor 已就位 → 按 action_type 推进 phase;否则 no-op。
+        """Bound cursor 已就位 → 按 action_type 推进 phase;否则 no-op (R2).
 
         best-effort:取不到 cursor 或 advance 抛 CursorError → warning + 继续。
         """
         target = _ACTION_TO_PHASE.get(action_type)
         if target is None:
             return
-        from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
-            get_current_cursor,
-        )
-
-        cursor = get_current_cursor()
-        if cursor is None:
-            return
-        try:
-            cursor.advance(target)
-        except CursorError as exc:
-            _log.warning(
-                "body_advance_cursor_failed",
-                action_type=action_type.value,
-                target_phase=target,
-                current_phase=cursor.snapshot.phase,
-                error=str(exc),
-            )
+        CursorRecord.try_advance(target, action_type=action_type.value)
 
     async def finalize(self, observation: Observation, state: AgentState) -> None:
         """手平面 finalize（v3 §9.2：OfficeWorksSealer 迁移点）。
