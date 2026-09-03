@@ -8,32 +8,24 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from enum import Enum
 
-from lca.contracts.atoms.enums import SpanStatus
-from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     StampedEvent,
     TeamRunFinished,
 )
+from lca.contracts.observability.status import RunLifecycleStatus
 
-
-class RunStatus(str, Enum):
-    """Run 的派生状态。"""
-
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELED = "canceled"
-    WAITING_INPUT = "waiting_input"
+# COMPAT(delete-when: rg "\bRunStatus\." 生产引用归零、全部改走 RunLifecycleStatus,
+# tracking: ADR-0183 PR-11)
+RunStatus = RunLifecycleStatus
 
 
 @dataclass(frozen=True)
 class RunState:
     """Run 的派生状态——纯函数 fold(events) 的结果。"""
 
-    status: RunStatus
+    status: RunLifecycleStatus
     finished_at: float | None = None
     error: str | None = None
 
@@ -62,30 +54,17 @@ def fold_run_state(events: Sequence[StampedEvent]) -> RunState:
             last_root_agent_finish_ts = stamped.ts
 
     if last_team_finish is not None:
-        status = _map_finish_status(last_team_finish.status)
         return RunState(
-            status=status,
+            status=RunLifecycleStatus.from_finish_status(last_team_finish.status),
             finished_at=last_team_finish_ts,
             error=last_team_finish.error or None,
         )
 
     if last_root_agent_finish is not None:
-        status = _map_finish_status(last_root_agent_finish.status)
         return RunState(
-            status=status,
+            status=RunLifecycleStatus.from_finish_status(last_root_agent_finish.status),
             finished_at=last_root_agent_finish_ts,
             error=last_root_agent_finish.error or None,
         )
 
-    return RunState(status=RunStatus.RUNNING)
-
-
-def _map_finish_status(raw: str) -> RunStatus:
-    """映射事件 status 字符串到 RunStatus 枚举。"""
-    if raw == SpanStatus.ERROR or raw == TaskStatus.FAILED:
-        return RunStatus.FAILED
-    if raw == "canceled":
-        return RunStatus.CANCELED
-    if raw == TaskStatus.COMPLETED:
-        return RunStatus.COMPLETED
-    return RunStatus.COMPLETED
+    return RunState(status=RunLifecycleStatus.RUNNING)

@@ -50,6 +50,9 @@ from lca.contracts.observability.reasoner_prompt_capture import (
 from lca.contracts.observability.reasoner_prompt_capture import (
     ReasonerPromptCapture as ReasonerPromptCapture,
 )
+from lca.contracts.observability.status import (
+    RunLifecycleStatus as RunLifecycleStatus,
+)
 
 __all__ = [
     "Classification",
@@ -67,6 +70,7 @@ __all__ = [
     "ReasonerPromptCapture",
     "RetentionClass",
     "RunLedgerFactory",
+    "RunLifecycleStatus",
     "SourceLocation",
     "classify_exception",
     "exc_to_record",

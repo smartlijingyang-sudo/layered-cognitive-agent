@@ -12,7 +12,6 @@ import asyncio
 import contextlib
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +24,7 @@ from lca.contracts.observability.run_journal import (
     RunJournalFactory,
 )
 from lca.contracts.observability.run_locator import RunLocator
+from lca.contracts.observability.status import RunLifecycleStatus
 from lca.contracts.protocols import JournalProjector
 from lca.infrastructure.observability import BoundObservability
 from lca.infrastructure.observability.loop_cursor import (
@@ -49,27 +49,9 @@ from lca.plugins.transport.webserver.handlers.runs.session.projection import sum
 
 _RUNS_ROOT = Path("traces")  # ADR-0065 §七: locator root, runs/ 是其子目录
 
-
-class RunStatus(str, Enum):
-    PENDING = "pending"
-    RUNNING = "running"
-    WAITING_INPUT = "waiting_input"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELED = "canceled"
-
-    def to_lobehub_session_status(self) -> str:
-        return _LOBEHUB_STATUS_MAP[self]
-
-
-_LOBEHUB_STATUS_MAP: dict[RunStatus, str] = {
-    RunStatus.PENDING: "running",
-    RunStatus.RUNNING: "running",
-    RunStatus.WAITING_INPUT: "waiting_input",
-    RunStatus.COMPLETED: "completed",
-    RunStatus.FAILED: "error",
-    RunStatus.CANCELED: "interrupted",
-}
+# COMPAT(delete-when: rg "\bRunStatus\." 生产引用归零、全部改走 RunLifecycleStatus,
+# tracking: ADR-0183 PR-11)
+RunStatus = RunLifecycleStatus
 
 
 @dataclass

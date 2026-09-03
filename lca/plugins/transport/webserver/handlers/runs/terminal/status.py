@@ -6,9 +6,12 @@ import asyncio
 import time
 from typing import Any
 
+from lca.contracts.observability.status import RunLifecycleStatus
 from lca.infrastructure.observability import BoundObservability, fold_run_state
-from lca.infrastructure.observability.journal.engine.reducer import RunStatus as JournalRunStatus
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession, RunStatus
+
+# COMPAT(delete-when: rg "JournalRunStatus" 生产引用归零, tracking: ADR-0183 PR-11)
+JournalRunStatus = RunLifecycleStatus
 
 
 def journal_store(hub: BoundObservability | None) -> Any:
@@ -40,27 +43,13 @@ def derive_terminal_status(session: RunSession, success: bool) -> None:
         if store is None:
             fallback_terminal_status(session, success)
         else:
-            session.status = journal_to_session_status(fold_run_state(store.events).status)
+            session.status = fold_run_state(store.events).status
             if session.status is RunStatus.RUNNING:
                 fallback_terminal_status(session, success)
     else:
         fallback_terminal_status(session, success)
     if session.status in {RunStatus.CANCELED, RunStatus.FAILED, RunStatus.COMPLETED}:
         session.closed_at = time.time()
-
-
-def journal_to_session_status(journal_status: JournalRunStatus | None) -> RunStatus:
-    """Map the Journal reducer status into the Gateway carrier status."""
-    mapping: dict[JournalRunStatus, RunStatus] = {
-        JournalRunStatus.COMPLETED: RunStatus.COMPLETED,
-        JournalRunStatus.FAILED: RunStatus.FAILED,
-        JournalRunStatus.CANCELED: RunStatus.CANCELED,
-        JournalRunStatus.RUNNING: RunStatus.RUNNING,
-        JournalRunStatus.WAITING_INPUT: RunStatus.WAITING_INPUT,
-    }
-    if journal_status is None:
-        return RunStatus.RUNNING
-    return mapping.get(journal_status, RunStatus.RUNNING)
 
 
 def fallback_terminal_status(session: RunSession, success: bool) -> None:
@@ -74,10 +63,10 @@ def fallback_terminal_status(session: RunSession, success: bool) -> None:
 
 
 __all__ = [
+    "JournalRunStatus",
     "current_task_cancelled",
     "derive_terminal_status",
     "fallback_terminal_status",
     "journal_store",
-    "journal_to_session_status",
     "task_cancelled",
 ]
