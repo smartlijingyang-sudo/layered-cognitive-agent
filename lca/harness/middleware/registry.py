@@ -11,6 +11,7 @@ import structlog
 
 from lca.contracts.harness.act.middleware import MiddlewareRegistration
 from lca.contracts.harness.composition.plugin import ExtensionPoint
+from lca.contracts.mechanisms.capability import CapabilityKey
 
 _log = structlog.get_logger("lca.harness.middleware")
 
@@ -93,13 +94,13 @@ class InMemoryMiddlewareRegistry:
         bucket.append((registration, middleware))
         bucket.sort(key=lambda item: item[0].priority)
 
-    def has_point(self, seam_key: str) -> bool:
+    def has_point(self, seam_key: CapabilityKey | str) -> bool:
         return seam_key in self._points
 
-    def list_registrations(self, seam_key: str) -> list[MiddlewareRegistration]:
+    def list_registrations(self, seam_key: CapabilityKey | str) -> list[MiddlewareRegistration]:
         return [reg for reg, _ in self._mw.get(seam_key, ())]
 
-    async def run(self, seam_key: str, phase: str, state: Any, context: Any) -> Any:
+    async def run(self, seam_key: CapabilityKey | str, phase: str, state: Any, context: Any) -> Any:
         point = self._points.get(seam_key)
         mode = point.dispatch_mode if point is not None else "waterfall"
         chain = list(self._mw.get(seam_key, ()))

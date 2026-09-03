@@ -18,6 +18,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Protocol
 
+from lca.contracts.mechanisms.capability import CapabilityKey
+
 # ── PluginContext Protocol (kept; cordis surface only) ───────────────
 
 
@@ -79,7 +81,7 @@ class ProviderMode(Enum):
 class ExtensionPoint:
     """DEPRECATED: ExtensionPoint is gone. cordis events replace."""
 
-    seam_key: str
+    seam_key: CapabilityKey | str
     dispatch_mode: str = "waterfall"
     description: str = ""
 
@@ -103,7 +105,7 @@ class PluginManifest:
     provides: tuple[str, ...] = field(default_factory=tuple)
     requires: tuple[str, ...] = field(default_factory=tuple)
     inject: tuple[str, ...] = field(default_factory=tuple)
-    seam_key: str = ""
+    seam_key: str | CapabilityKey = ""
     dispatch_mode: str = "waterfall"
     middleware: tuple[str, ...] = field(default_factory=tuple)
     optional_requires: tuple[str, ...] = field(default_factory=tuple)

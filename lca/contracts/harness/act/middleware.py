@@ -6,6 +6,8 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from lca.contracts.mechanisms.capability import CapabilityKey
+
 
 @dataclass(frozen=True)
 class MiddlewareRegistration:
@@ -22,7 +24,7 @@ class MiddlewareRegistration:
     is registered separately via `InMemoryMiddlewareRegistry.register()`.
     """
 
-    seam_key: str
+    seam_key: CapabilityKey
     priority: int = 100
     plugin_id: str = ""
     callback: Callable[..., Awaitable[Any]] | None = None

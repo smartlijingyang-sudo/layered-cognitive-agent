@@ -117,7 +117,7 @@ _TO_JSONABLE_DEF: list[tuple[str, re.Pattern[str]]] = [
 
 # 反模式 6:seam_key: str 字面(CapabilityKey 应取代)
 _SEAM_KEY_STR: list[tuple[str, re.Pattern[str]]] = [
-    ("seam_key: str", re.compile(r"seam_key:\s*str\b")),
+    ("seam_key: str (pure, not Union)", re.compile(r"seam_key:\s*str(?:\s|$|\)|,)")"),
 ]
 
 
