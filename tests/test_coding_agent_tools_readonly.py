@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 from pathlib import Path
 
@@ -187,31 +186,10 @@ def test_run_diff_two_runs(tmp_path: Path) -> None:
     assert diff.run_id_b == "run_y"
 
 
-def test_bundle_plugin_meta_manifest() -> None:
-    from lca.plugins.bundles.coding_agent_tools import setup as bundle_setup
-
-    meta = getattr(bundle_setup, "meta", {})
-    assert meta.get("id") == "lca-coding-agent-tools-bundle"
-    provides = meta.get("provides", [])
-    assert "coding_agent_trace_inspector" in provides
-    assert "coding_agent_failure_explainer" in provides
-    assert "coding_agent_optimization_finder" in provides
-    assert "coding_agent_plugin_graph_renderer" in provides
-    assert "coding_agent_minimal_reproduction" in provides
-    assert "coding_agent_diff_context" in provides
-    assert "coding_agent_run_diff" in provides
-
-
-def test_bundle_setup_invokes() -> None:
-    from lca.plugins.bundles.coding_agent_tools import Config
-    from lca.plugins.bundles.coding_agent_tools import setup as bundle_setup
-
-    provided: dict[str, object] = {}
-
-    class FakeCtx:
-        def provide(self, key: str, value: object) -> None:
-            provided[key] = value
-
-    asyncio.run(getattr(bundle_setup, "setup", bundle_setup)(FakeCtx(), Config()))
-    assert "coding_agent_trace_inspector" in provided
-    assert "coding_agent_run_diff" in provided
+# NOTE: tests ``test_bundle_plugin_meta_manifest`` and ``test_bundle_setup_invokes``
+# were removed in 2026-09-04 PR-3 of note 2026-09-04-plugin-universe-single-entry.md.
+# ``lca/plugins/bundles/coding_agent_tools.py`` is deleted (no shipped bundle
+# activated it; tools are now self-declared via individual ``@plugin`` entries
+# in ``bundles/coding-agent-tools.yaml``). The contract-level "bundle meta"
+# coverage moved to ``scripts/check_no_journal_write_in_coding_agent`` as the
+# sole runtime invariant enforcement.

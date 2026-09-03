@@ -14,7 +14,7 @@ AST 扫描兜底。
 7. ``RunDiffTool`` — diff(run_id_a, run_id_b, step)
 
 实现位置:``lca.plugins.tools.diagnostics/``(7 个 .py)。
-Bundle:``lca/plugins/bundles/coding_agent_tools.py`` + ``bundles/coding-agent-tools.yaml``。
+Bundle:``bundles/coding-agent-tools.yaml``(plugin 入口由各诊断工具的 ``@plugin`` 自行声明)。
 """
 
 from __future__ import annotations
