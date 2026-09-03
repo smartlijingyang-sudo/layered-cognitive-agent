@@ -26,9 +26,9 @@ from pathlib import Path
 from typing import Any
 
 from lca.contracts.observability.run_locator import RunLocator
-from lca.infrastructure.observability.spine.sinks.naming import (
-    LEGACY_FILE_NAME,
-    spine_filename_for_run,
+from lca.contracts.observability.ssot import (
+    exceptions_filename_for_run,
+    find_spine_file,
 )
 
 
@@ -54,20 +54,13 @@ class FilesystemRunLocator(RunLocator):
         return self.run_dir(run_id) / "journal.json"
 
     def events_path(self, run_id: str) -> Path:
-        """SSOT 事件流路径(ADR-0165.1 / ADR-0167 D11 / ADR-0169 PR-27 L10)。
+        """SSOT 事件流路径(委托 :func:`find_spine_file`,ADR-0165.1 / 0167 D11 / 0169 L10)。
 
         默认 ``<run_id>.spine.jsonl``(L10 单写);若该文件不存在但
         ``events.jsonl`` 存在(legacy layout,迁移前 run),返回 ``events.jsonl``
         让 reader 仍可读到旧数据。
         """
-        run_dir = self.run_dir(run_id)
-        spine_path = run_dir / spine_filename_for_run(run_id)
-        if spine_path.exists():
-            return spine_path
-        legacy_path = run_dir / LEGACY_FILE_NAME
-        if legacy_path.exists():
-            return legacy_path
-        return spine_path
+        return find_spine_file(self.run_dir(run_id), run_id)
 
     def journal_narrative_path(self, run_id: str) -> Path:
         """Narrative markdown 路径(由 StepNarrativeWriter 写)。"""
@@ -75,6 +68,21 @@ class FilesystemRunLocator(RunLocator):
 
     def evidence_dir(self, run_id: str) -> Path:
         return self.run_dir(run_id) / "evidence"
+
+    def kernel_log_path(self, run_id: str) -> Path:
+        """``<run_dir>/kernel.log`` 路径(kernel 内部日志,ADR-0122)。"""
+        return self.run_dir(run_id) / "kernel.log"
+
+    def exceptions_path(self, run_id: str) -> Path:
+        """``<run_dir>/<run_id>.exceptions.jsonl`` 路径(exceptions index)。
+
+        文件名由 :func:`exceptions_filename_for_run` 派生。
+        """
+        return self.run_dir(run_id) / exceptions_filename_for_run(run_id)
+
+    def profile_snapshot_path(self, run_id: str) -> Path:
+        """``<run_dir>/profile_snapshot.json`` 路径(Profile 快照)。"""
+        return self.run_dir(run_id) / "profile_snapshot.json"
 
     def materialization_dir(
         self, run_id: str, *, generator_id: str, generator_version: str
