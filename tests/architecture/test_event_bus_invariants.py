@@ -19,10 +19,13 @@
 - I-FW-SSOT-1 sink 唯一: lca_kernel/events/sinks/ 唯一 .write( = spine_sink
 
 待后续 PR 收口(本测试在 docstring 内注明债务范围,不在断言里硬性 fail):
-- PR-8 reducer: 16 处 coord.emit_phase 兼容路径删除
-- PR-9 cursor: loop_cursor 直写 spine 收口
-- PR-10 runtime_loop: emit_exception_caught 4 键裸 dict → EnvelopeEmitter
-- PR-12 trace_id + 自观察: 业务不订阅 event.bus.dispatch.* 由 Pipeline 装载保证
+- PR-8 reducer: 16 处 coord.emit_phase 兼容路径删除(已合;剩 8 处全在历史叙事注释)
+- PR-9 cursor: loop_cursor 直写 spine 收口(已合;cursor 走 self._spine WritePort facade,
+  strict 断言守护禁止 cursor 绕 WritePort 直调 event_spine.append()
+- PR-10 runtime_loop: emit_exception_caught 4 键裸 dict → EnvelopeEmitter(已合)
+- PR-12 trace_id + 自观察: 业务不订阅 event.bus.dispatch.* 由 Pipeline 装载保证(已合)
+- PR-3 payload FieldType 字符串化: EventSpec.fields 仍是 dict[str, str];运行期无影响,
+  留作下一个 ADR
 """
 
 from __future__ import annotations
@@ -133,23 +136,22 @@ class TestIFwBus1:
             matches[:5]
         )
 
-    def test_i_fw_bus_1_loop_cursor_debt_xfail(self) -> None:
-        """债务标记:PR-9 待 lca/infrastructure/observability/loop_cursor/
-        直写收口后,本 xfail 改回 strict 断言。
+    def test_i_fw_bus_1_loop_cursor_no_bypass_write_port(self) -> None:
+        """I-FW-BUS-1 (PR-9):cursor 通过 ``self._spine`` (WritePort facade) 写 spine。
 
-        当前 4 处:`loop_cursor/std.py:2、loop_cursor/bind.py:1、
-        loop_cursor/in_memory.py:2`。等待 PR-9 (cursor 收口)。
+        cursor 业务方调 ``self._spine.append(`` 是 WritePort Protocol 调用
+        (PR-9 commit 477c8a35 设计本身)。禁止 cursor 绕过 WritePort 直接
+        调 ``event_spine.append(``——后者是绕 facade,违反 I-FW-BUS-1。
         """
         loop_cursor = _REPO_ROOT / "lca" / "infrastructure" / "observability" / "loop_cursor"
         if not loop_cursor.exists():
             pytest.skip("loop_cursor path not found")
-        matches = _rg(r"_spine\.append\(|event_spine\.append\(", loop_cursor)
-        # 仅记录债务范围,不 fail
-        if matches:
-            pytest.xfail(
-                f"PR-9 收口债:loop_cursor/ 仍 {len(matches)} 处直写 spine.append;"
-                f"等 PR-9 收口后改 strict 断言"
-            )
+        # 仅扫描绕过 WritePort 的直调;cursor 调 self._spine.append 是 facade 调用
+        bypass = _rg(r"event_spine\.append\(", loop_cursor)
+        assert not bypass, (
+            "I-FW-BUS-1 违规:cursor 绕过 WritePort 直调 event_spine.append(\n"
+            + "\n".join(bypass[:5])
+        )
 
     def test_i_fw_bus_1_no_direct_sink_call_in_runtime(self) -> None:
         """PR-1+2+4:生产路径不直调 sink(spine_chain_sink./spine_file_sink.write)。"""

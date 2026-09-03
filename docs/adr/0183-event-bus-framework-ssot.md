@@ -2,7 +2,22 @@
 
 ## 状态
 
-Proposed（2026-09-03 起草；2026-09-03 PR-A/B/C/D 已合入 worktree）。本 ADR 的 12 PR 全部落地（§5.2 列出 commit hash），但 Status 升 Accepted 由主控合并全部 4 PR 后统一执行；附录 note 状态见 §10。
+Accepted（2026-09-03 落地完成）。
+
+**主分支 `back-ui-821-other-keep` 已合并**：
+
+| Merge commit | 内含 PR | 合并日期 |
+|---|---|---|
+| `d439ece8` | PR-A（`events.jsonl` 字面量 SSOT sweep）+ PR-D（文档/附录 note 收口）| 2026-09-03 |
+| `0a816748` | PR-B（EventMechanism 全收口 + `mechanism.py` 整文件删除）| 2026-09-03 |
+| `79b20b73` | PR-C（legacy reader 全迁 `SpineReader` + xfail 改 strict）| 2026-09-03 |
+
+12 PR 全部落地：PR-1~12 的 commit hash 与 delete-when 验收见 §5.2 + §B.2。架构不变量 `tests/architecture/test_event_bus_invariants.py` **8 passed, 0 xfailed**（2026-09-03 验证）。
+
+**遗留债务（非阻塞,已记入后续 ADR）**：
+
+- PR-3 `FieldType` 字符串化：`EventSpec.fields` 仍是 `dict[str, str]`,yaml 字段类型未做运行时校验。101 个 category 已全部绑定 typed `payload_class`（`EventRegistry.payload_by_category` SSOT）。运行期正确性不受影响,留作下一个 ADR 单独做字段类型化增量。
+- `loop_cursor/_spine_port.py:WritePort` 是 cursor 写 spine 的 facade（PR-9 设计）,与 EventBus.publish 并行存在,符合 I-FW-BUS-1 的"业务不绕 facade 直调 EventSpine"严格断言。
 
 ## 0. 决策摘要
 
@@ -1002,6 +1017,20 @@ uv run lca-ops event-bus-status
 
 附录 C:Pipeline YAML 完整示例 + 4 hook 默认实现 → `docs/notes/implemented/contract/2026-09-03-event-bus-pipeline-spec.md`
 
-## 11. 状态升 Accepted 待办
+## 11. 实施完毕记录（2026-09-03）
 
-PR-A(附录 A note → implemented)、PR-B(附录 B note → implemented)、PR-C(附录 C note → implemented)、PR-D(本文档收口)合入 worktree 后,主控合并全部 4 PR 后再把 Status 升 Accepted;现行 Status 保留 Proposed。本节为升档交接信号。
+**已落地证据**：
+
+- 3 个附录 note 已从 `proposed/` 转 `implemented/`：附录 A（101 category mapping）/ 附录 B（PR 兼容性矩阵）/ 附录 C（Pipeline YAML 规范）
+- 架构不变量测试 `tests/architecture/test_event_bus_invariants.py` **8 passed, 0 xfailed**：
+  - I-FW-BUS-1（producer 唯一入口）：3 测试（含 cursor 走 WritePort facade 的 strict 守护）
+  - I-FW-BUS-2（consumer 唯一入口）：1 测试（框架外 `.subscribe(` / `.register_sink(` 全收口）
+  - I-FW-BUS-4（业务不订阅 dispatch 事件）：1 测试
+  - I-FW-SSOT-1（`<run_id>.spine.jsonl` 唯一 SSOT）：3 测试（含 legacy reader 收口的 strict 守护）
+- `scripts/event_bus_status.py` 输出：`ssot1-events-jsonl-legacy ok 0/0` + `pr5-new-build-record ok 6` + `eventbus-skeleton-modules ok True` + `pipeline-mount-points ok 16`
+- `scripts/verify_consumer_rules_equivalence.py`：101 specs 全等(PR-6 收口验证)
+- `rg "events\.jsonl" lca/ lca_kernel/ profiles/ bundles/` = **0**
+- `rg "EventMechanism" lca/ lca_kernel/ tests/` = **20**(全部 `EventMechanismError` 类名 + 历史 docstring,无 module import / 类实例化)
+- `EventBus.default().publish()` 调用方 = **17 个文件**(15 publisher plugin + reducer 装饰器 + 1 个 runtime 相关)
+- `lca_kernel/events/mechanism.py` 已删除(commit `cfe4ad37`)
+- `default_subscribers` 全仓 = 0；`coord.emit_phase` 实调用 = 0（剩 8 处全在历史叙事注释）；`class RunStatus\b` = 0；`class JournalRunStatus\b` = 0；`_map_finish_status` 实调用 = 0；`journal_to_session_status` 实调用 = 0；publisher `trace_id=""` = 0
