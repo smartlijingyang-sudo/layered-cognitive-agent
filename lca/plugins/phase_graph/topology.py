@@ -22,7 +22,7 @@ from lca.contracts.protocols.collaboration.graph_node_executor import (
     GraphNodeExecutor,
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -56,7 +56,7 @@ class TopologyGraphNodeExecutor(GraphNodeExecutor):
     implements=[GraphNodeExecutor],
     layer="L3",
     kind=PluginKind.PRIMITIVE,
-    effects=EffectClass.NONE,
+    effects="none",
     description="Register default no-op primitives for graph entry, exit, and router nodes.",
     test_suite="tests/test_graph_node_executors.py",
     contract=PluginContract(

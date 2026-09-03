@@ -25,7 +25,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     SemanticPhase,
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.phase_graph.capabilities import StandardPhaseCapabilities
 from lca.plugins.phase_graph.common import (
     StandardPhaseConfig,
@@ -96,7 +96,7 @@ class StandardRememberExecutor:
     provides=("phase.remember.standard",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
-    effects=EffectClass.NONE,
+    effects="memory",
     test_suite="tests/declarative/test_phase_graph.py",
     spec=SPEC,
     contract=PluginContract(

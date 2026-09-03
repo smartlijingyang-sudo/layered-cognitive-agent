@@ -25,7 +25,7 @@ from lca.contracts.protocols.collaboration.graph_node_executor import (
     GraphNodeExecutor,
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 _AGGREGATOR_TRACE_PREFIX = "graph-agg"
 
@@ -75,7 +75,7 @@ class AggregatorGraphNodeExecutor(GraphNodeExecutor):
     implements=[GraphNodeExecutor],
     layer="L3",
     kind=PluginKind.PRIMITIVE,
-    effects=EffectClass.NONE,
+    effects="none",
     description="Register the default predecessor-result aggregation primitive for graph nodes.",
     test_suite="tests/test_graph_node_executors.py",
     contract=PluginContract(

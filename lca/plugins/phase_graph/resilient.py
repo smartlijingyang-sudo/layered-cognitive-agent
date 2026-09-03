@@ -31,7 +31,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
 from lca.contracts.protocols.declarative.declarative_plugin import (
     OwnershipDeclaration,  # noqa: F811
 )
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class PhaseAttemptPolicyConfig(BaseModel):
@@ -107,7 +107,7 @@ SPEC = PluginSpec(
     provides=("phase.execution_policy.resilient",),
     layer="L2",
     kind=PluginKind.PROVIDER,
-    effects=EffectClass.NONE,
+    effects="none",
     test_suite="tests/declarative/test_phase_execution_policy.py",
     spec=SPEC,
     contract=PluginContract(

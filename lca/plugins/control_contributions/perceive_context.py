@@ -26,7 +26,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class PerceiveContextExecutor:
@@ -64,7 +64,7 @@ class Config(BaseModel):
     provides=["control.perceive.context"],
     layer="L2",
     kind=PluginKind.PROVIDER,
-    effects=EffectClass.NONE,
+    effects="none",
     test_suite="tests/declarative/test_control_contributions.py",
     contributes=[
         PhaseContribution(
