@@ -65,6 +65,10 @@ SPINE_EXECUTION_POINTS: tuple[str, ...] = (
     "writable.iteration.closing",
     "writable.iteration.close",
     "loop.fork",
+    # Agent (PR-4)
+    "agent.spawn",
+    "agent.iteration",
+    "agent.final",
     # Writable matrix phase events
     "perceive.phase.fold",
     "phase.perceive.fold",
@@ -156,6 +160,24 @@ _SPINE_EP_TO_CATEGORY: dict[str, str] = {
     "runtime.resume.start": "spine.runtime.resume.start",
     "runtime.resume.end": "spine.runtime.resume.end",
     "runtime.event_publisher.publish": "spine.runtime.event_publisher.publish",
+    # Transport / kernel / agent_loop / agent / loop（PR-4）
+    "transport.route.enter": "spine.transport.route.enter",
+    "transport.route.exit": "spine.transport.route.exit",
+    "transport.sse.publish": "spine.transport.sse.publish",
+    "kernel.boot.start": "spine.kernel.boot.start",
+    "kernel.boot.completed": "spine.kernel.boot.completed",
+    "kernel.run.start": "spine.kernel.run.start",
+    "kernel.run.stop": "spine.kernel.run.stop",
+    "kernel.run.cancelled": "spine.kernel.run.cancelled",
+    "agent_loop.iteration.start": "spine.agent_loop.iteration.start",
+    "agent_loop.iteration.end": "spine.agent_loop.iteration.end",
+    "loop.fork": "spine.loop.fork",
+    "agent.spawn": "spine.agent.spawn",
+    "agent.iteration": "spine.agent.iteration",
+    "agent.final": "spine.agent.final",
+    "agent.spawn": "spine.agent.spawn",
+    "agent.iteration": "spine.agent.iteration",
+    "agent.final": "spine.agent.final",
 }
 
 

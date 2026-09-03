@@ -37,7 +37,9 @@ class SpineEnvelopeEmitter:
 
     @staticmethod
     def _agent_spawn() -> Any:
-        from lca.plugins.observability.spine.reflectors import agent_spawn as _a
+        from lca.plugins.events.publishers.spine_reflector_agent_spawn import (
+            plugin as _a,
+        )
 
         return _a
 

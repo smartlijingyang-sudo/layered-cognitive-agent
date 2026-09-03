@@ -147,7 +147,7 @@ def _instrument_route_handler(handler: Any, *, path: str) -> Any:
     import functools
     import inspect
 
-    from lca.infrastructure.observability.spine.transport_emit import (
+    from lca.plugins.events.publishers.spine_reflector_transport import (
         emit_transport_route_enter,
         emit_transport_route_exit,
     )

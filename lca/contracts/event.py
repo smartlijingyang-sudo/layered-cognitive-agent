@@ -76,6 +76,21 @@ class Category(str, Enum):
     SPINE_RUNTIME_RESUME_START = "spine.runtime.resume.start"
     SPINE_RUNTIME_RESUME_END = "spine.runtime.resume.end"
     SPINE_RUNTIME_EVENT_PUBLISHER_PUBLISH = "spine.runtime.event_publisher.publish"
+    # observability/spine — PR-4 transport / kernel / agent_loop / agent / loop 14 EP
+    SPINE_TRANSPORT_ROUTE_ENTER = "spine.transport.route.enter"
+    SPINE_TRANSPORT_ROUTE_EXIT = "spine.transport.route.exit"
+    SPINE_TRANSPORT_SSE_PUBLISH = "spine.transport.sse.publish"
+    SPINE_KERNEL_BOOT_START = "spine.kernel.boot.start"
+    SPINE_KERNEL_BOOT_COMPLETED = "spine.kernel.boot.completed"
+    SPINE_KERNEL_RUN_START = "spine.kernel.run.start"
+    SPINE_KERNEL_RUN_STOP = "spine.kernel.run.stop"
+    SPINE_KERNEL_RUN_CANCELLED = "spine.kernel.run.cancelled"
+    SPINE_AGENT_LOOP_ITERATION_START = "spine.agent_loop.iteration.start"
+    SPINE_AGENT_LOOP_ITERATION_END = "spine.agent_loop.iteration.end"
+    SPINE_LOOP_FORK = "spine.loop.fork"
+    SPINE_AGENT_SPAWN = "spine.agent.spawn"
+    SPINE_AGENT_ITERATION = "spine.agent.iteration"
+    SPINE_AGENT_FINAL = "spine.agent.final"
 
 
 class Plane(str, Enum):
@@ -125,6 +140,20 @@ CATEGORY_DEFAULT_PLANE: dict[Category, Plane] = {
     Category.SPINE_RUNTIME_RESUME_START: Plane.OBSERVABILITY,
     Category.SPINE_RUNTIME_RESUME_END: Plane.OBSERVABILITY,
     Category.SPINE_RUNTIME_EVENT_PUBLISHER_PUBLISH: Plane.OBSERVABILITY,
+    Category.SPINE_TRANSPORT_ROUTE_ENTER: Plane.OBSERVABILITY,
+    Category.SPINE_TRANSPORT_ROUTE_EXIT: Plane.OBSERVABILITY,
+    Category.SPINE_TRANSPORT_SSE_PUBLISH: Plane.OBSERVABILITY,
+    Category.SPINE_KERNEL_BOOT_START: Plane.OBSERVABILITY,
+    Category.SPINE_KERNEL_BOOT_COMPLETED: Plane.OBSERVABILITY,
+    Category.SPINE_KERNEL_RUN_START: Plane.OBSERVABILITY,
+    Category.SPINE_KERNEL_RUN_STOP: Plane.OBSERVABILITY,
+    Category.SPINE_KERNEL_RUN_CANCELLED: Plane.OBSERVABILITY,
+    Category.SPINE_AGENT_LOOP_ITERATION_START: Plane.OBSERVABILITY,
+    Category.SPINE_AGENT_LOOP_ITERATION_END: Plane.OBSERVABILITY,
+    Category.SPINE_LOOP_FORK: Plane.OBSERVABILITY,
+    Category.SPINE_AGENT_SPAWN: Plane.OBSERVABILITY,
+    Category.SPINE_AGENT_ITERATION: Plane.OBSERVABILITY,
+    Category.SPINE_AGENT_FINAL: Plane.OBSERVABILITY,
 }
 
 

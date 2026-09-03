@@ -1,16 +1,25 @@
 """Unit tests for carrier transport / kernel.run spine emit helpers."""
 
+# ADR-0181 PR-4：旧 EventSpine transport_emit 已退役，transport / kernel.run
+# 全部 6 emit 迁到 lca.plugins.events.publishers.spine_reflector_transport。
+# EventMechanism 路径下等价覆盖在
+# tests/plugins/events/publishers/test_spine_reflector_transport.py。
+# 删-when：PR-9 旧 spine 全退役（rg
+# lca.infrastructure.observability.spine.transport_emit lca/ = 0 触发）。
 from __future__ import annotations
 
-from lca.contracts.observability import exc_to_record
-from lca.harness.declarative.compile.instrument_wrap import set_active_spine_accessor
-from lca.infrastructure.observability.spine import transport_emit
-from lca.infrastructure.observability.spine.event_record import EventRecord
-from lca.infrastructure.observability.spine.event_spine import EventSpine
-from lca.infrastructure.observability.spine.exception_emit import (
-    emit_exception_caught as emit_exception_caught,
+import pytest
+
+
+pytestmark = pytest.mark.xfail(
+    reason=(
+        "ADR-0181 PR-4：旧 EventSpine transport_emit 路径已退役。emit_transport_route_* 等价 "
+        "EventMechanism 路径覆盖在 tests/plugins/events/publishers/test_spine_reflector_transport.py；"
+        "本测试在 PR-9 旧 spine 全退役时删（rg "
+        "lca.infrastructure.observability.spine.transport_emit lca/ = 0 触发）。"
+    ),
+    strict=True,
 )
-from lca.infrastructure.observability.spine.sinks.base import EventSink
 
 
 class _CaptureSink:
