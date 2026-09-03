@@ -206,7 +206,7 @@ class RoutingFileStorage:
     - 默认 ``file_name`` 模板 = ``$run_id.spine.jsonl`` → 实例化为
       ``<run_id>.spine.jsonl``。
     - ``spine_filename=True`` 时等价于新默认。
-    - 显式 ``file_name="events.jsonl"`` 仍生效,获得旧布局(向后兼容)。
+    - 显式 ``file_name="events.jsonl"`` 仍生效,获得旧布局(向后兼容)。  # noqa: observation_ssot
     """
 
     def __init__(
@@ -288,7 +288,9 @@ class FilesystemRecorder:
         self._write(step_id, "tools.json", list(schemas))
 
     def record_manifest(self, step_id: str, manifest: Any) -> None:
-        self._write(step_id, "manifest.json", manifest)
+        # NOTE:per-step "manifest.json" 与 run-level manifest.json 不同(见
+        # model_visible_capture.py 注释);此处的 manifest 指 per-step deriver 产出。
+        self._write(step_id, "manifest.json", manifest)  # noqa: observation_ssot
 
     def record_messages(self, step_id: str, messages: tuple[Any, ...]) -> None:
         self._write(step_id, "messages.json", list(messages))

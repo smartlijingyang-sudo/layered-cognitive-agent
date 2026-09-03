@@ -54,7 +54,11 @@ class StandardCursor:
         )
 
         run_dir = self._root / "runs" / run_id
-        journal_path = run_dir / "journal.json"
+        from lca.infrastructure.observability.backends.run_locator_fs import (
+            FilesystemRunLocator,
+        )
+
+        journal_path = FilesystemRunLocator(run_dir.parent).journal_step_path(run_dir.name)
         if not journal_path.exists():
             raise FileNotFoundError(f"journal.json not found: {journal_path}")
         doc = read_step_document(journal_path)

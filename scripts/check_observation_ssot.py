@@ -31,6 +31,7 @@ _FILE_ALLOWLIST: frozenset[str] = frozenset(
         "lca/contracts/observability/run_locator.py",
         "lca/contracts/observability/model_visible_capture.py",
         "lca/infrastructure/observability/spine/sinks/file_sink.py",
+        "lca/infrastructure/observability/loop_cursor/model_visible_capture.py",
         "scripts/check_observation_ssot.py",
     }
 )
@@ -117,7 +118,10 @@ _TO_JSONABLE_DEF: list[tuple[str, re.Pattern[str]]] = [
 
 # 反模式 6:seam_key: str 字面(CapabilityKey 应取代)
 _SEAM_KEY_STR: list[tuple[str, re.Pattern[str]]] = [
-    ("seam_key: str (pure, not Union)", re.compile(r"seam_key:\s*str(?:\s|$|\)|,)")"),
+    (
+        "seam_key: str (pure, not Union)",
+        re.compile(r"seam_key:\s*str(?:\s|$|\)|,|;)"),
+    ),
 ]
 
 
@@ -132,7 +136,12 @@ def _line_in_docstring(line: str) -> bool:
     stripped = line.strip()
     if not stripped:
         return True
-    return bool(stripped.startswith("#"))
+    if stripped.startswith("#"):
+        return True
+    # 行级白名单:注释 `# noqa: observation_ssot` 豁免(给 legacy fallback 用)
+    if "# noqa: observation_ssot" in line:
+        return True
+    return False
 
 
 def _check_file(

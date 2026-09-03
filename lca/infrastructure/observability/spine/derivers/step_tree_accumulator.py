@@ -39,6 +39,9 @@ from lca.contracts.models.observability.journal_totals import (
     SegmentRecord,
     Totals,
 )
+from lca.infrastructure.observability.backends.run_locator_fs import (
+    FilesystemRunLocator,
+)
 from lca.infrastructure.observability.journal.step.projector import (
     JournalDocumentWriter,
 )
@@ -213,7 +216,7 @@ class StepTreeAccumulatorDeriver(Deriver):
                     operation="step_tree.flush.empty",
                     error_message="no step and no phase captured",
                 )
-            JournalDocumentWriter(self._run_dir / "journal.json").write(doc)
+            JournalDocumentWriter(FilesystemRunLocator(self._run_dir).journal_step_path(self._run_dir.name)).write(doc)
         except Exception as exc:
             log.warning("step_tree_accumulator.flush failed err=%s", exc)
 
@@ -225,7 +228,7 @@ class StepTreeAccumulatorDeriver(Deriver):
         """
         import json
 
-        manifest_path = self._run_dir / "manifest.json"
+        manifest_path = FilesystemRunLocator(self._run_dir).manifest_path(self._run_dir.name)
         payload: dict[str, object] = {}
         if manifest_path.exists():
             try:

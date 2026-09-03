@@ -34,7 +34,12 @@ _DEFAULT_TRACES_ROOT = Path("traces")
 
 
 def _read_doc(run_id: str, traces_root: Path):
-    journal_path = traces_root / "runs" / run_id / "journal.json"
+    from lca.infrastructure.observability.backends.run_locator_fs import (
+        FilesystemRunLocator,
+    )
+
+    locator = FilesystemRunLocator(traces_root)
+    journal_path = locator.journal_step_path(run_id)
     if not journal_path.exists():
         raise FileNotFoundError(f"journal.json not found: {journal_path}")
     return read_step_document(journal_path), journal_path

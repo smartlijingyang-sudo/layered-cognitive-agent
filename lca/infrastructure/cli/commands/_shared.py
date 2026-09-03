@@ -57,22 +57,20 @@ def _resolve_journal_artifact(
     if jsonl is not None:
         return jsonl if jsonl.exists() else None
     if trace_id:
-        nested = Path("traces/runs") / trace_id
-        primary = nested / "journal.json"
-        if primary.exists():
-            return primary
-        # ADR-0169 PR-27 L10:默认 <run_id>.spine.jsonl;events.jsonl 向后兼容
-        from lca.infrastructure.observability.spine.sinks.naming import (
-            LEGACY_FILE_NAME,
-            spine_filename_for_run,
+        from lca.contracts.observability.ssot import find_spine_file
+        from lca.infrastructure.observability.backends.run_locator_fs import (
+            FilesystemRunLocator,
         )
 
-        spine = nested / spine_filename_for_run(trace_id)
+        nested = Path("traces/runs") / trace_id
+        locator = FilesystemRunLocator(nested)
+        primary = locator.journal_step_path(trace_id)
+        if primary.exists():
+            return primary
+        # SSOT 解析走 find_spine_file(spine 优先 + events.jsonl 兜底)
+        spine = find_spine_file(nested, trace_id)
         if spine.exists():
             return spine
-        ssot = nested / LEGACY_FILE_NAME
-        if ssot.exists():
-            return ssot
     return None
 
 

@@ -10,7 +10,8 @@ manifest / kernel.log under ``traces/runs/<run_id>/``。
 
 ADR-0169 PR-27:默认 ``file_name`` 模板 = ``$run_id.spine.jsonl``,
 实例化时按 run_id 解析为 ``<run_id>.spine.jsonl``。显式
-``file_name: "events.jsonl"`` 仍生效(向后兼容,旧 profile / 配置不破)。
+``file_name: "events.jsonl"`` 仍生效(向后兼容,旧 profile / 配置不破)。  # noqa: observation_ssot
+# noqa: observation_ssot
 """
 
 from __future__ import annotations
@@ -62,7 +63,7 @@ def _resolve_boot_path(cfg: Mapping[str, Any]) -> Path:
     if "path" in cfg:
         legacy = Path(str(cfg["path"]))
         # Old single-file layouts pointed at events.jsonl; rename to boot-events.
-        if legacy.name == "events.jsonl":
+        if legacy.name == "events.jsonl":  # noqa: observation_ssot
             return legacy.with_name("boot-events.jsonl")
         return legacy
     return Path(_DEFAULT_BOOT_PATH)

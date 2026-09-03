@@ -235,22 +235,6 @@ class BrainFactory(Protocol):
 # Re-export the prompt-assembly protocols from the canonical home so
 # existing ``from lca.contracts.protocols.think.cognition import ...``
 # imports keep working during the transition.
-from lca.contracts.models.cognition.prompt_assembly import (  # noqa: E402
-    MissingPromptSectionError,
-    MissingSectionKindError,
-    PromptAssembler,
-    PromptSectionRegistry,
-    PromptTemplate,
-    PromptTemplateConfig,
-    PromptTemplateProvider,
-    PromptTemplateSelector,
-    PureSection,
-    SectionKind,
-    SectionManifest,
-    SectionOutput,
-    SectionReference,
-    StatefulSection,
-)
 
 
 # Re-export the prompt-assembly protocols from the canonical home so

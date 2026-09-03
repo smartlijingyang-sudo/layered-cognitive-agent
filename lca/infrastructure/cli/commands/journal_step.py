@@ -37,7 +37,12 @@ def _resolve_run_dir(run_id: str, traces_root: Path) -> Path | None:
 
 
 def _load_journal(run_dir: Path) -> dict[str, Any] | None:
-    journal_path = run_dir / "journal.json"
+    from lca.infrastructure.observability.backends.run_locator_fs import (
+        FilesystemRunLocator,
+    )
+
+    locator = FilesystemRunLocator(run_dir.parent)
+    journal_path = locator.journal_step_path(run_dir.name)
     if not journal_path.exists():
         return None
     try:

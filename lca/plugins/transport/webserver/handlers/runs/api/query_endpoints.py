@@ -27,7 +27,6 @@ from lca.plugins.transport.webserver.handlers.runs.observability.evidence import
 )
 from lca.plugins.transport.webserver.handlers.runs.terminal.port import RunPort
 
-_PROFILE_SNAPSHOT_NAME = "profile_snapshot.json"
 _DEFAULT_PROFILE_SNAPSHOT_ROOT = Path("traces") / "runs"
 
 
@@ -49,11 +48,11 @@ def _run_locator_of(request: Request) -> RunLocator | None:
 
 
 def _profile_snapshot_path(request: Request, run_id: str) -> Path:
-    """Resolve ``traces/runs/<id>/profile_snapshot.json`` via RunLocator when bound."""
+    """Resolve ``<run_dir>/profile_snapshot.json`` via RunLocator when bound."""
     locator = _run_locator_of(request)
     if locator is not None:
-        return locator.run_dir(run_id) / _PROFILE_SNAPSHOT_NAME
-    return _DEFAULT_PROFILE_SNAPSHOT_ROOT / run_id / _PROFILE_SNAPSHOT_NAME
+        return locator.profile_snapshot_path(run_id)
+    return _DEFAULT_PROFILE_SNAPSHOT_ROOT / run_id / "profile_snapshot.json"  # noqa: observation_ssot
 
 
 def _plane_payload(ref: object | None) -> dict[str, str] | None:

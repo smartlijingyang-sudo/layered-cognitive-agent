@@ -105,7 +105,7 @@ class PluginManifest:
     provides: tuple[str, ...] = field(default_factory=tuple)
     requires: tuple[str, ...] = field(default_factory=tuple)
     inject: tuple[str, ...] = field(default_factory=tuple)
-    seam_key: str | CapabilityKey = ""
+    seam_key: CapabilityKey | str = ""
     dispatch_mode: str = "waterfall"
     middleware: tuple[str, ...] = field(default_factory=tuple)
     optional_requires: tuple[str, ...] = field(default_factory=tuple)

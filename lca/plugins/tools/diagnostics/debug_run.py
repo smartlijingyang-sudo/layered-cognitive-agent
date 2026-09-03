@@ -167,7 +167,7 @@ class DebugRunToolAdapter:
         run_dir = self._locator.run_dir(run_id)
         manifest_path = self._locator.manifest_path(run_id)
         spine_events_path = self._locator.events_path(run_id)
-        kernel_log_path = run_dir / "kernel.log"
+        kernel_log_path = self._locator.kernel_log_path(run_id)
 
         manifest_summary = _safe_json(manifest_path)
         spine_events = _safe_lines(spine_events_path)

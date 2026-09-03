@@ -87,7 +87,16 @@ class FilesystemRunLedgerFactory(RunLedgerFactory, RunJournalFactory):
 
         spine_path.parent.mkdir(parents=True, exist_ok=True)
 
-        narrative_writer = StepNarrativeWriter(spine_path.parent / "journal.narrative.md")
+        # run_id 从 spine 文件名派生(run_id.spine.jsonl);journal_narrative 走
+        # locator 单一入口
+        from lca.infrastructure.observability.backends.run_locator_fs import (
+            FilesystemRunLocator,
+        )
+
+        run_id = spine_path.stem.removesuffix(".spine")
+        narrative_writer = StepNarrativeWriter(
+            FilesystemRunLocator(spine_path.parent).journal_narrative_path(run_id),
+        )
 
         # step_tree_writer 是 _StepTreeBundle 的 placeholder —— deriver 与
         # narrative_writer 由 transport 在 RunSessionBuilder.build 阶段

@@ -20,7 +20,7 @@ from lca.contracts.protocols.memory.operational_skills import (
 from lca.infrastructure.skills.frontmatter import skill_title, split_frontmatter
 from lca.infrastructure.skills.settings import SkillSettings, get_skill_settings
 
-_MANIFEST = "manifest.json"
+_MANIFEST = "manifest.json"  # noqa: observation_ssot  # skill-package manifest, 与 run manifest 不同的命名空间
 _SKILL_MD = "SKILL.md"
 _RESOURCES = "resources"
 _SKILL_ID_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")

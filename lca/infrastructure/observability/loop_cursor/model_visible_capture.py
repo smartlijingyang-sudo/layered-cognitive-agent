@@ -95,6 +95,9 @@ class StdModelVisibleCapture(ModelVisibleCapture):
 
         # ADR-0176 D4:删除 system.json(系统提示合并到 messages.json 的
         # messages_overview.system 区段);tools / messages / manifest 三个文件保留。
+        # NOTE:per-step "manifest.json" 与 run-level RunLocator.manifest_path
+        # 不冲突 —— 文件位于不同目录(model_visible/<step_id>/ vs <run_dir>/),
+        # 但字面同名有混淆风险;后续 PR 改 per-step artifact 名时统一。
         tools_path = step_dir / "tools.json"
         messages_path = step_dir / "messages.json"
         manifest_path = step_dir / "manifest.json"

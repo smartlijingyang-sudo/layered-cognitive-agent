@@ -236,8 +236,8 @@ def _tail_events_jsonl(path: Path, *, verbose: bool, run_dir: Path | None = None
         except FileNotFoundError:
             # Run rotated out — try to recover.
             new_dir = _find_latest_run_dir()
-            new_path = new_dir / "events.jsonl" if new_dir else None
-            if new_path is None or not new_path.exists():
+            new_path = _events_jsonl_for(new_dir) if new_dir else None
+            if new_path is None:
                 _time.sleep(1.0)
                 continue
             print(f"[journal] switch tail → {new_path}")

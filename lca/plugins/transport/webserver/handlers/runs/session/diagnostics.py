@@ -29,8 +29,7 @@ from lca.plugins.transport.webserver.handlers.runs.session.session import RunSes
 _log = structlog.get_logger(__name__)
 
 # Duplicated with lca.plugins.transport.webserver.handlers.runs.api.routes.query_endpoints; keep both in lockstep (MVA-3).
-_PROFILE_SNAPSHOT_NAME = "profile_snapshot.json"
-_DEFAULT_PROFILE_SNAPSHOT_ROOT = Path("traces") / "runs"
+_PROFILE_SNAPSHOT_NAME = "profile_snapshot.json"  # noqa: observation_ssot  # diagnostic log payload only; path resolution delegates to RunLocator
 
 
 def plugin_inventory_from_boot_products(ctx: Any) -> list[str]:
@@ -65,8 +64,8 @@ def _snapshot_outdir_for(run_id: str, ctx: Any) -> Path:
     except MissingCapabilityError:
         locator = None
     if isinstance(locator, RunLocator):
-        return locator.run_dir(run_id)
-    return _DEFAULT_PROFILE_SNAPSHOT_ROOT / run_id
+        return locator.profile_snapshot_path(run_id)
+    return _DEFAULT_PROFILE_SNAPSHOT_ROOT / run_id / _PROFILE_SNAPSHOT_NAME
 
 
 class RunBootSnapshotRecorder:

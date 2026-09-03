@@ -32,6 +32,8 @@ from typing import Any
 
 import typer
 
+from lca.contracts.observability.ssot import exceptions_filename_for_run
+
 _DEFAULT_TRACES_ROOT = Path("traces")
 
 
@@ -44,7 +46,7 @@ def _find_exceptions_path(run_id: str, traces_root: Path) -> Path:
         from lca.infrastructure.cli.commands._shared import find_latest_run_id
 
         run_id = find_latest_run_id(traces_root)
-    return traces_root / "runs" / run_id / f"{run_id}.exceptions.jsonl"
+    return traces_root / "runs" / run_id / exceptions_filename_for_run(run_id)
 
 
 def _iter_records(path: Path) -> list[dict[str, Any]]:

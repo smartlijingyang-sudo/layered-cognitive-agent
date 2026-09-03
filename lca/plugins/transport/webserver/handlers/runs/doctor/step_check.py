@@ -66,9 +66,10 @@ def _scan_xref(run_dir: Path, scan: StepScan) -> StepScan:
     ``<run_dir>/manifest.json``(manifest SSOT),把「spine 上有
     某类 EP 但 journal 反映不到」挑出来落到 ``StepScan.xref_*``。
     """
-    # spine events.jsonl 计数(逐行扫描,不解析 payload 细节)
+    # spine 文件名解析(spine 优先 + events.jsonl 兜底;SSOT 走 find_spine_file)
     spine_counts: dict[str, int] = {}
-    spine_path = run_dir / "events.jsonl"
+    from lca.contracts.observability.ssot import find_spine_file
+    spine_path = find_spine_file(run_dir, run_dir.name)
     if spine_path.exists():
         try:
             for ln in spine_path.read_text(encoding="utf-8").splitlines():
@@ -104,7 +105,10 @@ def _scan_xref(run_dir: Path, scan: StepScan) -> StepScan:
     spine_kernel_run_start = spine_counts.get("kernel.run.start", 0)
 
     # manifest.extra.flush_errors(StepTreeAccumulator.flush 空写 fail-loud)
-    manifest_path = run_dir / "manifest.json"
+    from lca.infrastructure.observability.backends.run_locator_fs import (
+        FilesystemRunLocator,
+    )
+    manifest_path = FilesystemRunLocator(run_dir).manifest_path(run_dir.name)
     flush_errors: tuple[dict[str, Any], ...] = ()
     if manifest_path.exists():
         try:

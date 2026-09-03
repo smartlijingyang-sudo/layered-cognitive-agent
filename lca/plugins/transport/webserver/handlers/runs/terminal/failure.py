@@ -63,13 +63,20 @@ def _append_kernel_log(facts: RunFailureFacts) -> None:
     try:
         from pathlib import Path
 
+        from lca.infrastructure.observability.backends.run_locator_fs import (
+            FilesystemRunLocator,
+        )
+
         run_dir = Path("traces") / "runs" / facts.run_id
         run_dir.mkdir(parents=True, exist_ok=True)
         line = (
             f"run_failure_observed run_id={facts.run_id} "
             f"trace_id={facts.trace_id} error={facts.error}\n"
         )
-        with (run_dir / "kernel.log").open("a", encoding="utf-8") as handle:
+        with FilesystemRunLocator(run_dir).kernel_log_path(facts.run_id).open(
+            "a",
+            encoding="utf-8",
+        ) as handle:
             handle.write(line)
     except Exception:
         _log.debug(

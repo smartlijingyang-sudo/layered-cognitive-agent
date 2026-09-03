@@ -35,7 +35,11 @@ class RunBootSnapshot:
         capabilities: dict[str, bool],
         control_plan: dict[str, object],
     ) -> Path:
-        path = outdir / "profile_snapshot.json"
+        from lca.infrastructure.observability.backends.run_locator_fs import (
+            FilesystemRunLocator,
+        )
+
+        path = FilesystemRunLocator(outdir).profile_snapshot_path(run_id)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
             json.dumps(
