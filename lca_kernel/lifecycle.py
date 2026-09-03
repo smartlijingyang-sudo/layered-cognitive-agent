@@ -37,6 +37,7 @@ Public surface
 from __future__ import annotations
 
 import asyncio
+import logging
 import signal
 import sys
 import threading
@@ -45,7 +46,15 @@ from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
-from lca_kernel.errors import FailLoudError, KernelError
+# SSOT 异常归一化(ADR-2026-09-03 traceback-ssot-hook):三钩子兜底走这里
+# 而非直接构造 dict payload。任何逃出 try/except 的异常必须在 traceback
+# 丢失之前归一化成 ExceptionRecord,再 emit_exception_caught → spine。
+# 公开名直接 import(供测试 monkeypatch + lint-imports whitelist)。
+from lca.contracts.observability.exception_capture import exc_to_record
+from lca.infrastructure.observability.spine.exception_emit import emit_exception_caught
+from lca_kernel.errors import KernelError
+
+log = logging.getLogger(__name__)
 
 FAIL_LOUD_RELEASE_TIMEOUT_MS: int = 2000
 
@@ -142,27 +151,95 @@ class DefaultShutdownCoordinator:
 
 
 def install_fail_loud(coordinator: ShutdownCoordinator) -> None:
-    """装 sys.excepthook + asyncio loop handler + threading.excepthook。"""
+    """装 sys.excepthook + asyncio loop handler + threading.excepthook。
+
+    ADR-2026-09-03 traceback-ssot-hook:三道异常通道的共享回调 **必须**
+    先归一化异常到 SSOT(ExceptionRecord → emit_exception_caught),**然后**
+    才触发 coordinator.interrupt(1) shutdown。原实现只触发 shutdown,
+    异常信息丢失 → manifest.session_error 只有一行字符串,无 sidecar
+    traceback。
+
+    设计要点:
+    1. **必须先 emit 再 shutdown**:emit 是同步 spine append,block 几十微秒;
+       shutdown 走 async dispose,需要 event loop。这里先 emit 把异常写盘,
+       再触发 interrupt,确保 traceback 进 spine(否则 shutdown 路径若异常
+       递归,异常本体仍能进 spine)。
+    2. **递归防护**:emit_exception_caught 自身可能抛(spine 未装 / OOM);
+       fallback structlog,不让钩子 panic 触发再次 excepthook。
+    3. **shutting_down 短路**:关闭期间再触发的异常 no-op,防重复 emit
+       + 防止 coordinator.interrupt 在 shutdown 路径里再次触发自己。
+    4. **FailLoudError 不再 raise**:旧实现 ``raise FailLoudError(...)`` 是
+       给 supervisor 看的 exit code 标记,但该 raise 会被 sys.excepthook
+       自己再次捕获 → 无限递归。删除 raise,改用 emit exception.caught
+       event(outcome="failure") 作为 fail-loud 痕迹(下游 reader 已消费
+       exception.caught 事件,FailLoudError 仅剩类型别名用于 type narrowing)。
+    """
     if not isinstance(coordinator, DefaultShutdownCoordinator):
         raise TypeError(
             "install_fail_loud expects DefaultShutdownCoordinator",
         )
+
+    # 进程级递归标志:同一线程内 emit 内部抛异常时,fallback 路径不要
+    # 再次进入 emit。Python 没有线程级的"已捕获"状态,用模块级标志
+    # + threading.Lock(主路径同步,线程路径并发)双重防护。
+    _capture_lock = threading.Lock()
+    _capturing = False
+
+    def _capture(exc: BaseException, *, boundary: str) -> None:
+        """归一化 + emit,失败 fallback structlog。绝不抛。"""
+        nonlocal _capturing
+        with _capture_lock:
+            if _capturing:
+                return
+            _capturing = True
+        try:
+            try:
+                record = exc_to_record(
+                    exc,
+                    boundary=boundary,
+                    run_id="",
+                    trace_id="",
+                )
+            except Exception:
+                log.exception(
+                    "lifecycle.fail_loud: exc_to_record failed boundary=%s",
+                    boundary,
+                )
+                return
+            try:
+                emit_exception_caught(record)
+            except Exception:
+                log.exception(
+                    "lifecycle.fail_loud: emit_exception_caught failed boundary=%s",
+                    boundary,
+                )
+        finally:
+            _capturing = False
 
     def _on_unhandled(
         exc_type: Any, exc_value: Any, _exc_tb: Any
     ) -> None:  # ↑ K6:三道异常通道的共享回调
         if coordinator.is_shutting_down:
             return  # ↑ K6:已在关闭中,不再重复触发
-        coordinator.interrupt(1)  # ↓ K6:fire-and-forget 触发 shutdown(异步跑)
-        raise FailLoudError(
-            f"unhandled {exc_type.__name__}: {exc_value}"
-        )  # ↑ K6:留下 fail-loud 痕迹
+        # 第 1 步:归一化异常 → SSOT → emit(治本关键)
+        # 仅处理真实异常实例,过滤掉 exc_value 是 None 的"空槽"场景
+        # (asyncio handler 在 task.cancel() 时会传 None)。
+        if isinstance(exc_value, BaseException):
+            _capture(exc_value, boundary=f"lifecycle.fail_loud.{exc_type.__name__}")
+        # 第 2 步:触发 shutdown(原行为保留)
+        coordinator.interrupt(1)  # ↓ K6:fire-and-forget 触发 shutdown
 
     sys.excepthook = _on_unhandled  # ↓ K6:同步路径异常 → _on_unhandled
+    # asyncio handler 装到 _currently_running loop 或 set_event_loop 的 loop。
+    # get_running_loop 只在 loop 已在跑时返回,set_event_loop 是裸 install
+    # 时的唯一抓手(K3 启动顺序中 loop 已 set_event_loop 但尚未 run_forever)。
     try:
         loop = asyncio.get_running_loop()  # ↑ K6:拿当前事件循环(可能尚未启动)
     except RuntimeError:
-        loop = None
+        try:
+            loop = asyncio.get_event_loop_policy().get_event_loop()
+        except RuntimeError:
+            loop = None
     if loop is not None:
         loop.set_exception_handler(  # ↓ K6:asyncio 任务未捕获异常 → _on_unhandled
             lambda _l, ctx: _on_unhandled(

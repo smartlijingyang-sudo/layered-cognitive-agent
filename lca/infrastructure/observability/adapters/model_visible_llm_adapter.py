@@ -99,6 +99,8 @@ def _ensure_think_phase(cursor: LoopCursor) -> None:
     try:
         snap = cursor.snapshot
     except Exception:
+        # INTENTIONAL: cursor 未就绪或已 closed → 不阻止下游 record_request_header
+        # 自身会再 catch 此场景(双保险);此处仅做"cursor 缺失就跳过 advance"。
         return
     if snap.phase == "think":
         return
@@ -107,8 +109,8 @@ def _ensure_think_phase(cursor: LoopCursor) -> None:
     try:
         cursor.advance("think")  # type: ignore[arg-type]
     except Exception:
-        # advance 在 stop / closed / halted 时抛 CursorError;静默跳过。
-        # record_request_header 自身仍会再 catch(双保险)。
+        # INTENTIONAL: advance 在 stop / closed / halted 时抛 CursorError;
+        # 静默跳过,record_request_header 自身仍会再 catch(双保险)。
         return
 
 
@@ -270,6 +272,8 @@ class ModelVisibleLLMAdapter:
         try:
             cursor_snap = cursor.snapshot
         except Exception:
+            # INTENTIONAL: cursor 已 dispose → 跳过 capture,本函数是 best-effort
+            # 增强,不阻断主路径;_ensure_think_phase 自身有更深兜底。
             return
         if cursor_snap.phase is None and cursor_snap.stop_signal is not None:
             return

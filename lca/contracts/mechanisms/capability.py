@@ -85,12 +85,15 @@ def provider_current(svc: object) -> object | None:
         try:
             return cast("object", providers.current())
         except Exception:
+            # INTENTIONAL: providers.current() 内部可能在未注册 active 时抛
+            # NotActiveError 等 → 视为"无 active",返回 None 而不是崩 caller。
             return None
     current_attr = getattr(svc, "current", None)
     if callable(current_attr):
         try:
             return cast("object", current_attr())
         except Exception:
+            # INTENTIONAL: 同上,无 current 时返回 None。
             return None
     return svc
 

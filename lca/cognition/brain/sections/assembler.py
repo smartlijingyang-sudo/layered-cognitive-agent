@@ -92,6 +92,8 @@ class SectionManifestPromptAssembler(Protocol_):
         try:
             return self.catalog_provider()
         except Exception:
+            # INTENTIONAL: catalog_provider 内部可能因 env / registry 未就绪抛
+            # → 视为"无 catalog",回 None 让 caller 走内置默认 sections。
             return None
 
 
@@ -219,6 +221,8 @@ def _catalog_skill_count(catalog: object | None) -> int:
         try:
             return len(installed)
         except TypeError:
+            # INTENTIONAL: installed 是非 size-able 类型(generator / 单值)
+            # → 视为 0;catalog 数量统计允许非序列来源。
             pass
     return 0
 

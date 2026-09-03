@@ -8,9 +8,12 @@ swallowed so a console sink cannot break the spine hot path.
 from __future__ import annotations
 
 import json
+import logging
 import sys
 from dataclasses import asdict
 from typing import Any, TextIO
+
+log = logging.getLogger(__name__)
 
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
@@ -40,7 +43,10 @@ class ConsoleSink:
             self._stream.write(line + "\n")
             self._stream.flush()
         except Exception:
-            return
+            # INTENTIONAL: sink 写入失败必须 swallow(否则会从 spine 冒泡到
+            # K6 fail-loud)。Broken pipe / encoding 错误是预期环境噪声,
+            # 留 structlog 兜底,console 输出不应阻塞主路径。
+            log.exception("spine.console.write failed record_id=%s", id(record))
 
     def close(self) -> None:
         return

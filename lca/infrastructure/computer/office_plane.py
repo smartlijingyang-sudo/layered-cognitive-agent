@@ -115,5 +115,7 @@ def _coerce_prop(raw: str) -> Any:
         if raw.isdigit() or (raw.startswith("-") and raw[1:].isdigit()):
             return int(raw)
     except ValueError:
+        # INTENTIONAL: 解析失败 → 回 raw 字符串;strict 类型检测在更上层
+        # (此处 parse_bool_int 是 lenient 模式,接受任意 env 变量)。
         pass
     return raw

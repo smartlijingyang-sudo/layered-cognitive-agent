@@ -276,6 +276,8 @@ async def connect_device(websocket: WebSocket) -> None:
             elif kind == "agent_run_ack":
                 hub.complete(str(msg.get("operationId") or ""), msg)
     except WebSocketDisconnect:
+        # INTENTIONAL: 客户端断开 → 走 finally 清理 hub/registry;
+        # WebSocket 关闭是预期结束,不是错误。
         pass
     finally:
         live = registry.channel(device_id)

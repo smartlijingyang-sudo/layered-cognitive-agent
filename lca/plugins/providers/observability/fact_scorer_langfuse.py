@@ -78,9 +78,11 @@ async def setup(ctx: PluginContext, config: Config) -> None:
                 )
                 client.score_current_span(name=name, value=value, data=attributes or None)
             except ImportError:
-                pass  # Langfuse SDK 未安装；不影响框架
+                pass  # INTENTIONAL: Langfuse SDK 未安装；不影响框架
             except Exception:
-                return  # 失败不传播；评估是辅助通道
+                # INTENTIONAL: 评估通道是 best-effort 辅助,失败不传播;
+                # 不阻断主评分路径(LCA 内置 fact_scorer 仍跑)。
+                return
 
         return _score_current
 

@@ -162,6 +162,7 @@ def kill_tree(pid: int, sig: int = 15) -> None:
             if child_pid.strip():
                 kill_tree(int(child_pid.strip()), sig)
     except Exception:  # noqa: S110
+        # INTENTIONAL: kill_tree 在 subprocess 不在时抛;视为 cleanup 已完成。
         pass
 
     with contextlib.suppress(ProcessLookupError):
@@ -215,6 +216,8 @@ def pid_on_port(port: int) -> int | None:
             if line.strip():
                 return int(line.strip())
     except (OSError, ValueError, subprocess.TimeoutExpired):
+        # INTENTIONAL: port 查询命令失败 / 端口空闲 / 输出不可解析 → 回 None,
+        # caller 视为"无 holder",走下一种释放策略。
         pass
 
     try:
@@ -232,6 +235,8 @@ def pid_on_port(port: int) -> int | None:
             if match:
                 return int(match.group(1))
     except (OSError, ValueError, subprocess.TimeoutExpired):
+        # INTENTIONAL: port owner 不存在 / lsof 缺失 / 解析失败 → 回 None,
+        # caller 走其他路径,port release 是 best-effort。
         pass
     return None
 
@@ -251,4 +256,6 @@ def http_ready(url: str, timeout: float = 2.0) -> bool:
         )
         return r.returncode == 0
     except Exception:
+        # INTENTIONAL: HTTP 检查失败 → 回 False;这是 readiness probe,
+        # caller 会重试或报错,不阻断启动流程。
         return False

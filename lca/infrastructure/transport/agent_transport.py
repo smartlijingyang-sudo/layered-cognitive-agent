@@ -183,6 +183,7 @@ class InternalTransport(AgentTransport):
                     result.error = _ERR_TIMEOUT
                 return result
         except (TimeoutError, asyncio.CancelledError, asyncio.InvalidStateError):
+            # INTENTIONAL: 任务被外部 cancel → 静默 cleanup;不影响 polling caller。
             pass
         except Exception as exc:
             return _fail_observation(str(exc))

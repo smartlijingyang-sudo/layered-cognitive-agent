@@ -141,6 +141,8 @@ class DefaultAttachmentResolver:
         try:
             return normalize_for_injection(data.decode("utf-8", errors="replace"))
         except Exception:
+            # INTENTIONAL: 二进制 / 非 utf-8 附件解码失败 → 回 None,让上层
+            # 走原始字节旁路;附件是辅助通道,不阻断主 prompt 流程。
             return None
 
 
@@ -347,6 +349,8 @@ class DefaultAttachmentPromptRenderer:
         try:
             return normalize_for_injection(data.decode("utf-8", errors="replace"))
         except Exception:
+            # INTENTIONAL: 二进制附件 / 编码错误视作"不可注入",回 None 让上层
+            # 走原始字节旁路;附件是辅助通道,不阻断主 prompt 流程。
             return None
 
 
