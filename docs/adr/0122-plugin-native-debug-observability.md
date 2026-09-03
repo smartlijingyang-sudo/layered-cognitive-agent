@@ -8,6 +8,7 @@
 > - `lca-ops debug run <run_id>` → 顶层 `lca-ops debug-run <run_id>`(合并 dash);`debug env <run_id>` → `debug-env`。
 > - `phase-error` diagnose alias **未落地**;4 个真实 alias 是 `model-not-seen` / `loop-stuck` / `memory-poisoned` / `approval-rejected`(连字符)。详见 [run-debug-guide.md §5](../debug/run-debug-guide.md)。
 > - `lca-ops replay <run_id> --no-llm` → `lca-ops journal replay <run_id> --step K`(走 `ReplayCursor`,见 ADR-0167 D10)。
+> - **§5 `KernelLogProjection` / §12 `LCA_DEBUG=1` 均未落地**:`lca/plugins/observability/projections/kernel_log.py` 与 `lca/infrastructure/observability/debug_mode.py` 不存在,代码中没有任何读取 `LCA_DEBUG` 的位置。`traces/runs/<run_id>/kernel.log` 的唯一写者是 `record_run_failure()`(`lca/plugins/transport/webserver/handlers/runs/terminal/failure.py`),仅在 run 收尾路径本身失败时追加一行失败事实;多数 run 没有此文件。验收标准 #1("kernel.log 一定有完整 traceback")作废。fail-loud 能力实际由 `lca_kernel` K6 lifecycle 钩子提供(ADR-0115),常开、无环境变量开关。
 >
 > ADR 原文保留以体现决策路径,但请勿按字面命令调用。
 

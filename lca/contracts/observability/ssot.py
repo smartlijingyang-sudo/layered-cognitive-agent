@@ -52,14 +52,11 @@ def find_spine_file(run_dir: Path, run_id: str) -> Path:
     - 调用方不应再做 ``.exists()`` 二次校验;SSOT 抛错即失败。
     """
     if not run_dir.exists():
-        raise ObservationSSOTError(
-            f"run_dir does not exist: {run_dir} (run_id={run_id})"
-        )
+        raise ObservationSSOTError(f"run_dir does not exist: {run_dir} (run_id={run_id})")
     spine_path = run_dir / spine_filename_for_run(run_id)
     if not spine_path.exists():
         raise ObservationSSOTError(
-            f"spine ledger not found in {run_dir} "
-            f"(looked for {spine_path.name})"
+            f"spine ledger not found in {run_dir} (looked for {spine_path.name})"
         )
     return spine_path
 
@@ -73,21 +70,20 @@ def find_exceptions_file(run_dir: Path, run_id: str) -> Path:
     "读盘失败")。
     """
     if not run_dir.exists():
-        raise ObservationSSOTError(
-            f"run_dir does not exist: {run_dir} (run_id={run_id})"
-        )
+        raise ObservationSSOTError(f"run_dir does not exist: {run_dir} (run_id={run_id})")
     return run_dir / exceptions_filename_for_run(run_id)
 
 
 def find_kernel_log(run_dir: Path, run_id: str) -> Path:
     """Return the canonical kernel log path for ``run_id``.
 
-    期望 ``<run_dir>/kernel.log``。缺失抛 :class:`ObservationSSOTError`。
+    返回 ``<run_dir>/kernel.log``;``run_dir`` 不存在抛
+    :class:`ObservationSSOTError`。与 spine / exceptions 不同,文件本身
+    缺失是常态(唯一写者是失败兜底 ``record_run_failure``,多数 run 无
+    此文件),本函数**不**对文件缺失抛错,调用方需自行 ``.exists()``。
     """
     if not run_dir.exists():
-        raise ObservationSSOTError(
-            f"run_dir does not exist: {run_dir} (run_id={run_id})"
-        )
+        raise ObservationSSOTError(f"run_dir does not exist: {run_dir} (run_id={run_id})")
     return run_dir / kernel_log_filename(run_id)
 
 

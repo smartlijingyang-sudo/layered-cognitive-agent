@@ -49,13 +49,12 @@ LCA 的"高级工程师自助定位"基础设施入口。所有 debug / observab
 | `lca-ops journal logs -r <run_id>` | 离线回放指定 run(优先 events.jsonl,否则兜底 journal.raw.jsonl) |
 | `lca-ops journal logs -v` | 展开 payload + error 通道 traceback |
 
-## fail-loud 开关
+## fail-loud
 
-```sh
-LCA_DEBUG=1 lca_kernel serve --profile ...
-```
-
-开启后,所有 projection / phase / 异常 + traceback → stderr + `traces/runs/<id>/kernel.log`。
+fail-loud 是 `lca_kernel` lifecycle 的 K6 内置钩子(`lca_kernel/lifecycle.py`,ADR-0115):
+未捕获异常、SIGTERM/SIGINT、环境加载违例直接以非零退出或 stderr 暴露,不被静默吞掉。
+**常开,没有开关**;`LCA_DEBUG` 环境变量不存在(ADR-0122 §12 的设计未落地)。
+异常与 traceback 的持久化走 spine 事件 + I10 sidecar(`<sha256>.json`),不写 `kernel.log`。
 
 ## per-run 资产
 
@@ -66,7 +65,7 @@ LCA_DEBUG=1 lca_kernel serve --profile ...
 - `journal.raw.jsonl` — legacy v2 envelope stream(CLI 已不直接读,仅迁移源)
 - `manifest.json` — terminal manifest
 - `profile_snapshot.json` — profile 快照
-- `kernel.log` — kernel 内部日志(ADR-0122)
+- `kernel.log` — 失败兜底单行记录,唯一写者是 `record_run_failure()`(`lca/plugins/transport/webserver/handlers/runs/terminal/failure.py`):仅当 run 的收尾路径本身失败时追加一行 `run_failure_observed ...`。**多数 run 没有此文件,缺失不代表失败丢失**(ADR-0122 §5 的 `KernelLogProjection` 未落地)。进程级内核日志在 `/tmp/lca-kernel.log`(`lca-ops heal` 的 spawn 输出),两者不要混淆。
 - `diagnostic.json` — typed RunDiagnostic(ADR-0122)
 
 ## 相关 ADR

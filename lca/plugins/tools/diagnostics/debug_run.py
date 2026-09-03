@@ -4,7 +4,8 @@ The previous debug workflow required:
 
 1. ``cat traces/runs/<run_id>/manifest.json``
 2. ``cat traces/runs/<run_id>/journal.jsonl``
-3. ``tail kernel.log`` (often missing — stdout went to a pipe)
+3. ``tail kernel.log`` (often missing — written only by the run-failure
+   fallback in ``record_run_failure``, not a general kernel log)
 4. ``ps`` + ``/proc/<pid>/fd/1`` to locate kernel stdout
 5. grep through several logs
 
@@ -12,7 +13,7 @@ This adapter collapses all of the above into one invocation that prints:
 
     [1] manifest            path / summary
     [2] journal             event counts / missing-seq report
-    [3] kernel.log          tail of per-run kernel log (fallback to global)
+    [3] kernel.log          tail of per-run kernel.log (empty when absent)
     [4] phase.cursor        last completed phase + failure node
     [5] error_ref           StopDecision.failure → typed RunDiagnostic
     [6] stack frames        top frames from the diagnostic

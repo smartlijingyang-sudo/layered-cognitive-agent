@@ -127,8 +127,9 @@ def test_debug_run_extracts_8_section(tmp_path: Path) -> None:
     assert report.error_message is not None
     assert report.failure_node_id == "think.main"
 
-    # [8] replay command is the canonical no-LLM invocation
-    assert report.replay_command == f"lca-ops replay {run_id} --no-llm"
+    # [8] replay commands use the canonical journal replay invocation
+    # (model-visible dump; --no-llm is the default, not a flag — ADR-0167 D10)
+    assert report.replay_commands[0] == f"lca-ops journal replay {run_id} --step 1 --diff-only"
 
     text = report.render_text()
     for marker in ("[1/8]", "[2/8]", "[3/8]", "[4/8]", "[5/8]", "[6/8]", "[7/8]", "[8/8]"):
