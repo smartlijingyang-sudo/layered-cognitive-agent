@@ -53,7 +53,7 @@ class _SenderConfig(BaseModel):
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(
-            group=FunctionalGroup.G7_EXECUTION,
+            group=FunctionalGroup.G7_OBSERVABILITY,
             control_slots=(ControlSlot.OBSERVE_WILDCARD,),
         ),
         lifecycle=LifecycleContract(allowed_scopes=(Scope.PROFILE,)),
@@ -73,17 +73,17 @@ async def setup_sender(ctx: PluginContext, config: _SenderConfig) -> None:
     from lca.plugins.events.router import EventRouterImpl
     from lca.plugins.events.sender import EventSenderImpl
 
-    # PluginContext 提供 soft_get(key) | None；试点要求 profile 同时装载
-    # lca.events.consumer_registry 与 lca.events.sender，未配齐时退化为空 registry。
-    registry_obj = ctx.soft_get("events.consumer_registry")
-    registry = registry_obj if isinstance(registry_obj, ConsumerRegistry) else ConsumerRegistry()
+    registry = (
+        ctx.resolve("events.consumer_registry")
+        if hasattr(ctx, "resolve")
+        else ctx.get("events.consumer_registry")
+    )  # type: ignore[attr-defined]
+    if not isinstance(registry, ConsumerRegistry):
+        # 试点：ctx API 不一致时退化为裸构造（profile 未配齐时的安全 fallback）。
+        registry = ConsumerRegistry()
     router = EventRouterImpl(registry)
     sender = EventSenderImpl(router, dual_write_legacy=config.dual_write_legacy)
     ctx.provide("events.sender", sender)
-    # 注入进程级 sender，使业务方 publish(payload) 无需走 Cordis Context。
-    from lca.plugins.events.sender import set_active_sender
-
-    set_active_sender(sender)
 
 
 # ── lca.events.consumer.console_projector ─────────────────────────────────
@@ -108,7 +108,7 @@ class _ProjectorConfig(BaseModel):
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(
-            group=FunctionalGroup.G7_EXECUTION,
+            group=FunctionalGroup.G7_OBSERVABILITY,
             control_slots=(ControlSlot.OBSERVE_WILDCARD,),
         ),
         lifecycle=LifecycleContract(allowed_scopes=(Scope.PROFILE,)),
@@ -126,5 +126,18 @@ async def setup_console_projector(ctx: PluginContext, config: _ProjectorConfig) 
 
     consumer = ConsoleProjectorConsumer()
     ctx.provide("events.consumer.console_projector", consumer)
-    # 试点：消费者注册到 consumer_registry 由 profile 装配段显式调用；manifest 不在
-    # boot 阶段探测 ctx API（避免 mypy attr-defined 与 ctx API 漂移）。
+
+    # 试点：如果 consumer_registry 已注册（sender 在更早阶段已 boot），把本消费者加入。
+    registry_obj: object | None = None
+    for attr_name in ("get", "resolve"):
+        getter = getattr(ctx, attr_name, None)
+        if not callable(getter):
+            continue
+        registry_obj = getter("events.consumer_registry")
+        if registry_obj is not None:
+            break
+    if registry_obj is not None:
+        from lca.plugins.events.consumer_registry import ConsumerRegistry
+
+        if isinstance(registry_obj, ConsumerRegistry):
+            registry_obj.register(consumer)

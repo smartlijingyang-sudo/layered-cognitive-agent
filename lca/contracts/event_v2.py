@@ -22,7 +22,6 @@ sender 内部负责：构造 Event、推导 plane、生成 EventRef、路由、�
 from __future__ import annotations
 
 from enum import Enum
-from typing import Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict
 
@@ -88,9 +87,6 @@ class EventPayload(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    category: EventCategory
-    """子类必须覆盖：声明本 payload 归属的 category 闭集值。"""
-
 
 class DelegationCacheHit(EventPayload):
     """试点 payload：委派幂等短路命中（对应旧 DelegationCacheHit）。"""
@@ -136,18 +132,16 @@ class Event(BaseModel):
 # ── Protocols：发送者与消费者 ────────────────────────────────────────────
 
 
-@runtime_checkable
-class EventConsumerProtocol(Protocol):
-    """消费者协议。
+class EventSenderProtocol:
+    """保留作为类型占位；具体方法定义在 sender.py（避免循环 import）。
 
-    实现见 ``lca.plugins.events.consumers``。消费者按 ``categories`` 集合订阅，
-    ``on_event`` 是副作用入口；消费者**不**发送事件（E8）。
+    业务方**不**直接持有 EventSender 实例 —— ``publish(payload)`` 模块函数
+    内部委托给进程级 sender，业务方对此透明。
     """
 
-    @property
-    def categories(self) -> frozenset[EventCategory]: ...
 
-    def on_event(self, event: Event, ref: EventRef) -> None: ...
+class EventConsumerProtocol:
+    """消费者协议占位；具体见 ``lca.plugins.events.consumers``。"""
 
 
 # ── 业务方一行发送入口 ──────────────────────────────────────────────────
@@ -189,6 +183,7 @@ __all__ = [
     "EventPayload",
     "EventPlane",
     "EventRef",
+    "EventSenderProtocol",
     "default_plane",
     "publish",
 ]
