@@ -10,3 +10,11 @@
 # Currently empty: all 194 plugins declare logic_address.
 # Add entries only when a plugin genuinely cannot have logic_address
 # (e.g. test fixtures, factory-only modules with no runtime instance).
+
+# COMPAT(2026-09-04 PR-3 of note 2026-09-04-plugin-universe-single-entry.md)
+# Unreferenced by shipped bundles; kept as test-only fixture for the
+# lca.cognition.brain.null_critic / null_synthesizer protocol impls.
+# Delete-when: bundles reference these plugins OR lca/cognition/brain/null_* are
+# themselves deleted.
+lca-critic-null  # test-only fixture; not deployed in standard profile
+lca-synthesizer-null  # test-only fixture; not deployed in standard profile
