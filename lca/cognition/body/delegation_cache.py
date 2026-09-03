@@ -2,11 +2,6 @@
 
 纯函数集：``DelegateOperation`` 只负责调度编排；回报记录匹配、缓存 span 发射与
 Observation 归属标签集中在此，可独立测试。
-
-ADR-0179 试点：本模块是首批迁到 v2 协议的 A 类业务方；命中时构造 ``Event``
-并调 ``EventSender.publish``，由 sender 内部双写到旧 journal backend（COMPAT，
-删除条件见 ADR-0179 PR-25）。``set_active_sender`` 由 ``lca.plugins.events``
-的 boot 阶段调用一次；不绑定 Cordis Context API 以保持试点独立验证。
 """
 
 from __future__ import annotations
@@ -20,18 +15,19 @@ from lca.contracts.atoms.semantic_keys import (
     OBS_RESULT_KIND,
     OBS_TASK_ID,
 )
-from lca.contracts.event_v2 import DelegationCacheHit, publish
 from lca.contracts.models.core.decision import DelegationSpec, Observation
 from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.observability.journal import DelegationCacheHit
 from lca.contracts.models.team.delegation import find_result
+from lca.infrastructure.observability import record
 
 
 def cached_delegation_observation(spec: DelegationSpec, state: AgentState) -> Observation | None:
     """幂等短路：回报记录中已有成功返回的 ``(target_role, subtask)`` 直接复用。
 
     回报记录只在自由 routing（无 consult_duty）下累积——义务路径由状态板
-    管辖，不走此路径。命中时发 ``TEAM_DELEGATION / DelegationCacheHit`` v2 Event，
-    不产生 transport 往返。语义刻意保守：仅拦字面重复，改写措辞的新问题不受影响。
+    管辖，不走此路径。命中时 record ``DelegationCacheHit``，不产生
+    transport 往返。语义刻意保守：仅拦字面重复，改写措辞的新问题不受影响。
     """
     awareness = state.team_awareness
     if awareness is None or not spec.target_role:
@@ -39,10 +35,11 @@ def cached_delegation_observation(spec: DelegationSpec, state: AgentState) -> Ob
     hit = find_result(awareness.results, target_role=spec.target_role, subtask=spec.subtask)
     if hit is None:
         return None
-    # 业务方一行发送入口（ADR-0179 P2）：构造 pydantic payload 即可，不感知 Event。
-    publish(
+    record(
         DelegationCacheHit(
-            callee_role=hit.target_role, subtask_preview=spec.subtask, step=state.step
+            callee_role=hit.target_role,
+            subtask_preview=spec.subtask,
+            step=state.step,
         )
     )
     observation = Observation(

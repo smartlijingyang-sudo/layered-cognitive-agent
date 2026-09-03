@@ -124,13 +124,8 @@
 | [0174](0174-profile-cursor-bundles.md) | Profile 分批装配 — `loop_cursor.spine_*` bundle 落地 | Proposed |
 | [0175](0175-prompt-trace-into-model-visible.md) | Prompt trace 落 model_visible / spine EP payload 扩字段 | Accepted |
 | [0176](0176-step-tree-deriver-closure-and-model-visible-dedup.md) | StepTreeAccumulator 闭环 + Model-Visible 去重重构 + Prompt Section 真值化 | Accepted |
-| [0177](0177-envelope-emitter-binding.md) | EnvelopeEmitter binding — 收敛 runtime/agent 对 spine reflector 的反向 import | Proposed |
-| [0178](0178-observation-control-state-convergence.md) | 观测面 / 控制面 / 状态机三方收口 — 四级收敛与单 SSOT 体系 | Proposed |
-| [0179](0179-event-layer-v2.md) | 事件层 v2 — 单一发送者 + 闭集 category + typed 协议 | Proposed |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
->
-> 同名 `0168` 系列:[0168-loop-step-control-and-model-visible.md](0168-loop-step-control-and-model-visible.md) / [0168.1-loop-cursor-state-machine.md](0168.1-loop-cursor-state-machine.md) / [0168-loop-cursor-final.md](0168-loop-cursor-final.md);SSOT 以 [0169](0169-loop-cursor-control.md) 为准。
 
 ## 维护规则
 - 不改旧文件；新决策用 `Supersedes: ADR-XXXX` 标记
