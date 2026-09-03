@@ -97,6 +97,8 @@ class SpineEventPayload(EventPayload):
 - `execution_point` 字段替代原 `EventRecord.execution_point` 字符串；`SpineEventPayload.__post_init__` 校验 `execution_point ∈ SPINE_EXECUTION_POINTS`（76 个闭集，单独常量；不是 enum，跨层不能用 enum）。
 - `EventMechanism.send(SpineEventPayload(...), plugin=...)` 不动；机制只认 `payload.category` 做鉴权，**不**感知 spine 内部字段。
 - hash chain 由 `spine_chain_sink` 落盘前算（`prev_event_hash` 在 sink 内做 sha256），不进 `EventMechanism` 主路径。
+- **PR-2 增强：category 自动派生**。`payloads_spine.py` 内 `_SPINE_EP_TO_CATEGORY: dict[str, str]`（16 EP → category 映射，目前 cognition 全量），`SpineEventPayload.model_validator(before)` 从 `execution_point` 自动派生 `category`。**业务方只传 `execution_point`，不传 `category`**——category 不再由业务方构造，避免"业务方任意伪造 category 走鉴权矩阵"的协议层风险；机制仍按 `payload.category` 鉴权，但 `category` 是壳类派生、不可被业务方改写。EP 增则映射表 + yaml 同 PR 加；EP 删则映射表保留到 PR-9 旧 spine 全退役。
+- **PR-2 增强：`SpineChainContext` 无状态 chain**。`spine_runtime.SpineChainContext` 把 chain 上下文（prev_hash / sequence / epoch）从 sink 的类级可变状态（`_last_hash`）提到一个 sink 自维护的上下文对象里——`SpineChain` 本身是纯函数（`prev_hash` 显式传入），不持状态；sink 持有一个 `SpineChainContext` 实例，每次 `append` 时传入 `SpineChain.next(prev, payload)` 得新 hash。**协议层不变**：FD-1 sink 失败语义仍由 `EventMechanism` 通用失败语义（D4 + 机制 D6）保证；chain 完整性测试要求 chain 字段在 sink 失败时一致（见风险 2 缓解）。
 
 ### D3. 鉴权矩阵 = spine.yaml 76 行 closure，PluginSpec 互校验
 
@@ -145,6 +147,38 @@ events:
 - 旧 `set_active_spine` / `get_active_spine` / `safe_append`（`lca/plugins/observability/spine/_spine_safety.py`）退役；`SpineContext` 仅保留给 `spine_chain_sink` 内部用。
 - **不**提供 `LegacySpineBridgeSink` 逃生口（D1 一致性优先于过渡期便利）。
 
+### D6. `_SPINE_EP_TO_CATEGORY` 自动派生：壳类对外只露 `execution_point`
+
+> 见 D2 中"PR-2 增强"段。要点：业务方构造 `SpineEventPayload(execution_point=..., ...)` 即可，`category` 由壳类 model_validator 从 `_SPINE_EP_TO_CATEGORY` 自动派生，业务方**不能**显式传 `category`、**不能**靠伪造 category 绕过鉴权。机制仍按 `payload.category` 鉴权——SSOT 唯一来源是 `_SPINE_EP_TO_CATEGORY` + `spine.yaml` closure。
+
+### D7. `spine_runtime helpers` 提取层：机制与 sink/subscriber 之间的公共辅助层（PR-2 复审新增）
+
+PR-2 复审发现试点 + PR-2 余 15 EP 共 2 个 sink（`spine_chain_sink`）+ 1 个 subscriber（`spine_step_tree_accumulator`）出现 3 类重复：① 散落的 `hasattr(payload, "x")` 类型守卫；② `spine_chain_sink` 自维护 `_last_hash` 类级可变状态 + `datetime.now(timezone.utc)` 时钟；③ 各自实现结构化记录 + 序列化。把这些重复抽到 `lca_kernel/events/spine_runtime.py`：
+
+| helper | 职责 | 不属于它的 |
+|---|---|---|
+| `is_spine_event(payload) -> TypeGuard[SpineEventPayload]` | 统一类型守卫，替代散落 `hasattr` 检查 | 不做鉴权（机制 D6 负责） |
+| `SpineClock.now_iso()` / `now_epoch()` | 统一时钟，可 freeze（测试用） | 不做 chain |
+| `SpineChain.next(prev_hash, payload) -> str` | **无状态** chain 计算（纯函数），`prev_hash` 显式传入 | 不持类级可变状态 |
+| `SpineChainContext` | chain 上下文壳（sink 自维护 prev 实例） | 不做落盘路径（sink 自己管） |
+| `SpineEventRecord.build(payload, hash=...)` + `.to_dict()` | 标准化不可变记录 + 序列化 | 不做 fanout |
+| `SpineStream` | 统一流输出，可注入 stream（测试 override） | 不做订阅路由 |
+| `default_chain_path(root)` | 落盘路径 helper | 不读 Profile（路径由 Profile 注入） |
+
+**关键边界 — `spine_runtime` 不是机制也不是 plugin**：
+
+- **不是机制**：`EventMechanism`（`mechanism.py`）只负责 send / subscribe / 鉴权 / 失败语义（FD-1/FD-2）；`spine_runtime` 不参与 send/subscribe 路径，不持任何"机制层状态"（无 registry、无 router、无 sender）。
+- **不是 plugin**：`spine_runtime` 不在 `lca/plugins/events/` 下，不被 Profile `provides/requires` 装配，**不可被 plugin 替换**；与机制同一层（`lca_kernel/events/`），属 kernel 元层，固定。
+- **不是壳类**：`payloads_spine.py` 承载 `execution_point` + `payload` + chain 字段；`spine_runtime` 只承载"所有 sink/subscriber 都要做的事"（类型守卫 / 时钟 / chain / 序列化 / 流）。
+
+**职责边界守护**：
+
+- `spine_runtime` **不允许** `import` 任何 sink / subscriber / publisher / plugin——helper 永远是被调用方，不调用业务方。**lint-imports 守护 `lca_kernel/events/spine_runtime.py` → `lca/plugins/events/` 反向依赖为硬错误**（imports 方向只能是 `lca/plugins/events/ → lca_kernel/events/spine_runtime.py`，反向 → fail）。
+- `spine_runtime` **不允许** `import` `EventMechanism`（机制本体）——helper 不依赖机制运行时；只依赖 `SpineEventPayload` 壳类（壳类是数据，不含机制）。
+- `spine_runtime` 当前消费者：`spine_chain_sink`（82 行 → 30 行；chain / 时钟 / 路径 / 序列化全走 helpers）、`spine_step_tree_accumulator`（`is_spine_event()` 替换 `hasattr` 守卫）。
+
+**删-when**：`spine_runtime` 与 `EventMechanism` 同生命周期；`spine` 完全退役（PR-9 + PR-10 完成后）才考虑是否合并入 mechanism 或保留——届时 ADR-0181 状态变更时再决策，本 ADR 不锁。
+
 ## 试点范围（P1，与 ADR-0180 P2 试点同一边界）
 
 | 项 | 范围 |
@@ -156,27 +190,39 @@ events:
 | sink 迁 1 | `lca/plugins/events/sinks/spine_chain_sink/`：1 个新 sink，承担 hash chain 落盘（替代旧 `file_sink` 的 chain 部分） |
 | subscriber 迁 1 | `lca/plugins/events/subscribers/spine_step_tree_accumulator/`：1 个 deriver 迁到 `EventMechanism.subscribe(...)` |
 | 测试 | 4 套：`test_spine_payload_validate` / `test_spine_yaml_load` / `test_spine_publisher_auth` / `test_spine_chain_sink_e2e` |
-| **不在范围** | 其余 75 EP、其他 7 reflector、其他 3+ sink、其他 7 deriver、cursor / reducer / projection_host 耦合点（按 §迁移 PR 切分后续推进） |
 
-## 迁移 PR 切分（试点通过后启动）
+### 试点范围（P2 — PR-2 cognition 全迁后实际状态）
 
-每 PR 一个 yaml 扩行 + 一个 reflector 迁 + 配套测试；删-when 见每 PR 头：
+PR-2（commit `2b3643e1`）合并后实际状态：试点 1 + PR-2 余 15 = **cognition 16 EP 全迁**，旧 `lca/plugins/observability/spine/reflectors/cognition.py` 已删除。
 
-| PR | 范围 | 删-when |
-|---|---|---|
-| 试点 PR（本 ADR） | 机制 D6 + SpineEventPayload + 1 yaml 行 + 1 publisher + 1 sink + 1 subscriber | — |
-| 2 | `spine.yaml` 补 cognition 余 13 EP + cognition reflector 余 13 emit | `rg "emit_brain_" lca/plugins/observability/spine/ = 0` |
-| 3 | `spine.yaml` 补 body_llm EP + body_llm reflector | 旧 body_llm reflector 删 |
-| 4 | `spine.yaml` 补 runtime EP + runtime reflector + ADR-0169 cursor 改造为 subscriber | `coord.emit_phase` 删（与 ADR-0180 PR-15 同步） |
-| 5 | `spine.yaml` 补 agent_spawn EP + agent_spawn reflector | 旧 agent_spawn reflector 删 |
-| 6 | `spine.yaml` 补 transport/context/signature/source reflector EP | 旧 transport/context/signature/source reflector 删 |
-| 7 | spine sinks 全迁（file_sink / routing_file_sink / tracing_file_sink / otel_trace） | `rg "from lca.infrastructure.observability.spine.sinks" lca/ = 0` |
-| 8 | spine derivers 全迁（step_tree_accumulator / graph / waterfall / narrative / live_tail） | `rg "from lca.infrastructure.observability.spine.derivers" lca/ = 0` |
-| 9 | 旧 `event_spine.py` / `event_record.py` / `manifest.py` 删除 | `rg "EventSpine\b" lca/ = 0` |
-| 10 | 旧 `_spine_safety.py` 删除（`safe_append` / `set_active_spine` / `get_active_spine` 退役） | `rg "safe_append\|set_active_spine" lca/ = 0` |
-| 11 | writable_matrix 改造：`writable_matrix.append` 调 `EventMechanism.send(..., plugin=WritableMatrixPlugin)` | 旧 path `rg = 0` |
-| 12 | ProjectionHost（ADR-0170）改走 `EventMechanism.subscribe` | 旧 `host.drive` 路径废 |
-| 13 | reducer 改造为 subscriber | reducer 不再写 state；改 subscribe `gate.*` |
+| 项 | PR-2 后范围 |
+|---|---|
+| `spine.yaml` EP 行数 | **16 行**（试点 1 + PR-2 余 15） |
+| `spine_reflector_cognition` emit 数 | **16 个**：`brain.{perceive,think,gate}.{start,end}`（6）+ `critic.eval.{start,end}`（2）+ `reasoner.reason.{start,end}`（2）+ `prompt_assembler.assemble.{start,end}`（2）+ `synthesizer.merge`（1）+ `skill_router.route`（1）+ `memory.{read,write}`（2）|
+| `payloads_spine.py` 闭集 | 16 EP；`_SPINE_EP_TO_CATEGORY` 映射；`model_validator(before)` 从 `execution_point` 自动派生 `category`（业务方只传 EP，不传 category） |
+| `contracts/event.py` `Category` enum | 加 15 个 `SPINE_COGNITION_*`；`CATEGORY_DEFAULT_PLANE` 加 15 个 OBSERVABILITY 映射 |
+| 调用方零改动 | `reasoner` / `synthesizer` / `skill_router` / `null_critic` / `modular_brain` / `simple_memory` 6 个 cognition 调用方：emit signature 严格对齐旧 reflector，零改动 |
+| 旧 cognition reflector | `lca/plugins/observability/spine/reflectors/cognition.py` 删除 |
+| `_spine_envelope` 装饰器 | import 路径改 `lca.plugins.events.publishers.spine_reflector_cognition` |
+| `spine_runtime helpers` 提取层 | `lca_kernel/events/spine_runtime.py`（见 D7）|
+| 试点盖章判定 | 4 条全过；PR-2 余 15 EP 由 `spine.yaml` 16 行 + 16 enum + 16 emit + `_SPINE_EP_TO_CATEGORY` 完整覆盖 |
+
+## 迁移 PR 切分（PR-2 已合并，余 9 PR 推进中）
+
+PR-2（commit `2b3643e1`）合并 §迁移 PR 切分 PR-2 + PR-7 余 cognition = cognition 16 EP 全迁 + `spine_runtime helpers` 提取层。下方表为 PR-2 后重排的 10 PR 视图（试点 PR = 已落 1 个 EP + 机制 D6 + 壳类 + 1 publisher/sink/subscriber）：
+
+| PR | 状态 | 范围 | 删-when |
+|---|---|---|---|
+| 试点 PR | ✅ 合并 | 机制 D6 + SpineEventPayload + 1 yaml 行 + 1 publisher + 1 sink + 1 subscriber | — |
+| 2 | ✅ 合并（`2b3643e1`）| cognition 16 EP 全迁（旧 PR-2 余 13 EP + 旧 PR-7 余 cognition 部分合并而来）+ spine_runtime helpers 提取层（D7）| `rg "emit_brain_\|emit_critic_\|emit_reasoner_\|emit_prompt_assembler\|emit_synthesizer\|emit_skill_router\|emit_memory_" lca/plugins/observability/spine/ = 0` ✅ |
+| 3 | 待启 | `spine.yaml` 补 body_llm EP + body_llm reflector | 旧 body_llm reflector 删 |
+| 4 | 待启 | `spine.yaml` 补 runtime EP + runtime reflector + ADR-0169 cursor 改造为 subscriber | `coord.emit_phase` 删（与 ADR-0180 PR-15 同步） |
+| 5 | 待启 | `spine.yaml` 补 agent_spawn EP + agent_spawn reflector | 旧 agent_spawn reflector 删 |
+| 6 | 待启 | `spine.yaml` 补 transport/context/signature/source reflector EP | 旧 transport/context/signature/source reflector 删 |
+| 7 | 待启 | spine sinks 余下部分全迁（routing_file_sink / tracing_file_sink / otel_trace；`spine_chain_sink` 已在 PR-2 走 `spine_runtime` helpers 重构） | `rg "from lca.infrastructure.observability.spine.sinks" lca/ = 0` |
+| 8 | 待启 | spine derivers 余下全迁（graph / waterfall / narrative / live_tail；`spine_step_tree_accumulator` 已在 PR-2 用 `is_spine_event()` 重构） | `rg "from lca.infrastructure.observability.spine.derivers" lca/ = 0` |
+| 9 | 待启 | 旧 `event_spine.py` / `event_record.py` / `manifest.py` / `compile_spine_registry` 删除 | `rg "EventSpine\b" lca/ = 0` 且 `rg "compile_spine_registry" lca/ = 0` |
+| 10 | 待启 | 旧 `_spine_safety.py` 删除（`safe_append` / `set_active_spine` / `get_active_spine` 退役）+ writable_matrix 改走 `EventMechanism.send(..., plugin=WritableMatrixPlugin)` + ProjectionHost（ADR-0170）改走 `EventMechanism.subscribe` + reducer 改造为 subscriber（不再写 state；改 subscribe `gate.*`）| `rg "safe_append\|set_active_spine\|writable_matrix.append" lca/ = 0` |
 
 ## 取代与吸收
 
@@ -219,4 +265,5 @@ D6. 失败语义
 - **风险 1**：spine 影响面比 events 大（76 EP 跨 5 层 + cursor / reducer / projection_host 三个耦合点）。**缓解**：试点只 1 EP + 1 publisher + 1 sink + 1 subscriber；后续 PR 逐 EP 推。
 - **风险 2**：hash chain 从机制剥离到 sink，落盘失败时 chain 字段可能不一致。**缓解**：`spine_chain_sink` 与 `file_sink` 同事务写入；试点 PR 必加 chain 完整性测试。
 - **风险 3**：FD-1/FD-2 升级为 EventMechanism 通用语义，可能影响 events 试点（ADR-0180 业务方）行为。**缓解**：机制 D6 必加 0180 试点业务方回归测试（`tests/plugins/events/publishers/test_delegation_cache.py` 必须仍全过）。
-- **回滚**：试点 PR 不删旧 `EventSpine` / reflector / sink / deriver 任何文件，回滚 = 撤回试点 PR 即可。
+- **风险 4**：`spine_runtime helpers` 提取层职责边界被侵蚀（PR-2 复审发现重复 → 抽取；若 helpers 越界 import sink/subscriber/plugin 或机制，会把 helpers 变成平行机制）。**缓解**：helpers 不允许 import 任何 sink/subscriber/plugin；`spine_runtime` → `lca/plugins/events/` 反向依赖由 `lint-imports` 硬守护（imports 方向只能是 `lca/plugins/events/ → lca_kernel/events/spine_runtime.py`，反向 → fail）；`spine_runtime` 不 import `EventMechanism`；与机制同生命周期（PR-9 + PR-10 完成后才评估是否合并）。
+- **回滚**：试点 PR + PR-2 不删旧 `EventSpine` / reflector 余 7 文件 / sink 余 3+ 文件 / deriver 余 7 文件，回滚 = `git revert 2b3643e1 71d76d27` 即可恢复 spine 旧机制。
