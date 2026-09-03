@@ -24,6 +24,22 @@ from lca_kernel.events.bus import EventBus
 from lca_kernel.events.payloads import Category, SpineEventPayload
 from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
 
+from pydantic import BaseModel
+
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+
 log = logging.getLogger(__name__)
 
 
@@ -313,4 +329,57 @@ __all__ = [
     "emit_runtime_resume_end",
     "emit_runtime_resume_start",
     "set_active_run_id",
+    "setup",
 ]
+
+
+
+
+class _Config(BaseModel):
+    model_config = {"extra": "forbid"}
+
+
+@plugin(
+    id="events.spine.reflector.runtime",
+    provides=["event.bus.reflector.runtime"],
+    requires=["event.bus"],
+    layer="L2",
+    kind=PluginKind.PRIMITIVE,
+    effects="none",
+    description=(
+        "runtime publisher（ADR-0181）：event.bus.reflector.runtime 由本 plugin 发出。"
+    ),
+    test_suite="tests/plugins/events/publishers/test_events_spine_reflector_runtime.py",
+    functional_group=FunctionalGroup.G6_DECISION,
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G6_DECISION,
+            control_slots=(ControlSlot.OBSERVE_WILDCARD,),
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.PROFILE,)),
+        authority=AuthorityContract(grants=("event.bus.publish",)),
+        observability=EvidenceContract(
+            descriptors=("event.bus.reflector.runtime.published",),
+        ),
+    ),
+    ownership=OwnershipDeclaration(
+        reads=("event.bus",),
+        emits=(
+            "spine.lifecycle.finally",
+            "spine.exception.caught",
+            "spine.exception.finally",
+            "spine.runtime.reducer.apply",
+            "spine.runtime.checkpoint.create",
+            "spine.runtime.resume.start",
+            "spine.runtime.resume.end",
+            "spine.runtime.event_publisher.publish",
+            "spine.runtime.observed",
+        ),
+        state_mutation="forbidden",
+    ),
+)
+async def setup(ctx: PluginContext, config: _Config) -> None:
+    """events.spine.reflector.runtime boot：注册 publisher marker 给 ctx。"""
+    ctx.provide("event.bus.reflector.runtime", ReflectorClass)
+

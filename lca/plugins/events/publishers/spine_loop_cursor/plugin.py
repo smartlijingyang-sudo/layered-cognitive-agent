@@ -11,6 +11,21 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from pydantic import BaseModel
+
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca_kernel.events.payloads import Category, SpineEventPayload
 from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
 
@@ -18,6 +33,10 @@ if TYPE_CHECKING:
     from lca_kernel.events.bus import EventRef
 
 log = logging.getLogger(__name__)
+
+
+class _Config(BaseModel):
+    model_config = {"extra": "forbid"}
 
 
 class LoopCursorPlugin:
@@ -48,4 +67,52 @@ class LoopCursorPlugin:
         return EventBus.default().publish(sp, producer=LoopCursorPlugin)
 
 
-__all__ = ["LoopCursorPlugin"]
+@plugin(
+    id="events.spine.loop_cursor",
+    provides=["event.bus.loop_cursor"],
+    requires=["event.bus"],
+    layer="L2",
+    kind=PluginKind.PRIMITIVE,
+    effects="none",
+    description=(
+        "spine_loop_cursor publisher（ADR-0181 PR-10）：EventBus 入口骨架；"
+        "cursor phase.fold / step.record_* / writable.iteration.* EP 由本 plugin 发出。"
+    ),
+    test_suite="tests/plugins/events/publishers/test_spine_loop_cursor.py",
+    functional_group=FunctionalGroup.G0_CON_KERNEL,
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G0_CON_KERNEL,
+            control_slots=(ControlSlot.OBSERVE_WILDCARD,),
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.PROFILE,)),
+        authority=AuthorityContract(grants=("event.bus.publish",)),
+        observability=EvidenceContract(descriptors=("event.bus.loop_cursor.published",)),
+    ),
+    ownership=OwnershipDeclaration(
+        reads=("event.bus",),
+        emits=(
+            "spine.perceive.phase.fold",
+            "spine.phase.perceive.fold",
+            "spine.phase.think.fold",
+            "spine.phase.gate.fold",
+            "spine.phase.remember.fold",
+            "spine.phase.stop.fold",
+            "spine.phase.reflect.fold",
+            "spine.phase.act.fold.start",
+            "spine.phase.act.fold.end",
+            "spine.phase.act.fold",
+            "spine.phase.tool.call.start",
+            "spine.phase.tool.call.end",
+            "spine.phase.tool.denied",
+        ),
+        state_mutation="forbidden",
+    ),
+)
+async def setup(ctx: PluginContext, config: _Config) -> None:
+    """spine_loop_cursor boot：注册 publisher marker 给 ctx。"""
+    ctx.provide("event.bus.loop_cursor", LoopCursorPlugin)
+
+
+__all__ = ["LoopCursorPlugin", "setup"]

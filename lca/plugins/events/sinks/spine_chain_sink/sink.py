@@ -13,6 +13,21 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from pydantic import BaseModel
+
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca_kernel.events import EventRef
 from lca_kernel.events.spine_runtime import (
     SpineChainContext,
@@ -22,6 +37,10 @@ from lca_kernel.events.spine_runtime import (
 )
 
 log = logging.getLogger(__name__)
+
+
+class _Config(BaseModel):
+    model_config = {"extra": "forbid"}
 
 
 class SpineChainSink:
@@ -48,4 +67,50 @@ class SpineChainSink:
             self._chain = SpineChainContext(prev_hash=record.event_hash)
 
 
-__all__ = ["SpineChainSink"]
+@plugin(
+    id="events.spine.chain_sink",
+    provides=["event.bus.chain_sink"],
+    requires=["event.bus"],
+    layer="L2",
+    kind=PluginKind.PRIMITIVE,
+    effects="none",
+    description=(
+        "SpineChainSink（ADR-0181 PR-2）：spine chain 落盘 sink；"
+        "EventBus callback 入口（fail-fast）。"
+    ),
+    test_suite="tests/plugins/events/sinks/test_spine_chain_sink.py",
+    functional_group=FunctionalGroup.G0_CON_KERNEL,
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G0_CON_KERNEL,
+            control_slots=(ControlSlot.OBSERVE_WILDCARD,),
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.PROFILE,)),
+        authority=AuthorityContract(grants=("event.bus.subscribe",)),
+        observability=EvidenceContract(descriptors=("event.bus.chain_sink.written",)),
+    ),
+    ownership=OwnershipDeclaration(
+        reads=("event.bus",),
+        emits=("event.bus.chain_sink.written",),
+        state_mutation="forbidden",
+    ),
+)
+async def setup(ctx: PluginContext, config: _Config) -> None:
+    """spine_chain_sink boot：构造 sink + 订阅 yaml spine.* 类别。
+
+    # COMPAT(delete-when: PR-6 鉴权三方一致, tracking: ADR-0183)
+    # yaml consumer_rules 当前仍按类路径订阅；plugin 上线后逐步迁至
+    # registry-based 订阅，PR-6 收口。setup 内部仅注册 marker + 提供 capability。
+    """
+    from lca_kernel.events.bus import EventBus
+
+    bus_obj = ctx.soft_get("event.bus")
+    if not isinstance(bus_obj, EventBus):
+        msg = "event.bus.chain_sink boot 失败：event.bus 未装载"
+        raise RuntimeError(msg)
+    sink = SpineChainSink()
+    ctx.provide("event.bus.chain_sink", sink)
+
+
+__all__ = ["SpineChainSink", "setup"]

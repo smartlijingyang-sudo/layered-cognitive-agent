@@ -18,6 +18,22 @@ from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
 if TYPE_CHECKING:
     from lca_kernel.events.bus import EventRef
 
+from pydantic import BaseModel
+
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+
 log = logging.getLogger(__name__)
 
 
@@ -253,4 +269,61 @@ __all__ = [
     "emit_phase_tool_call_end",
     "emit_phase_tool_call_start",
     "emit_phase_tool_denied",
+    "setup",
 ]
+
+
+
+
+class _Config(BaseModel):
+    model_config = {"extra": "forbid"}
+
+
+@plugin(
+    id="events.spine.reflector.phase",
+    provides=["event.bus.reflector.phase"],
+    requires=["event.bus"],
+    layer="L2",
+    kind=PluginKind.PRIMITIVE,
+    effects="none",
+    description=(
+        "phase publisher（ADR-0181）：event.bus.reflector.phase 由本 plugin 发出。"
+    ),
+    test_suite="tests/plugins/events/publishers/test_events_spine_reflector_phase.py",
+    functional_group=FunctionalGroup.G6_DECISION,
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G6_DECISION,
+            control_slots=(ControlSlot.OBSERVE_WILDCARD,),
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.PROFILE,)),
+        authority=AuthorityContract(grants=("event.bus.publish",)),
+        observability=EvidenceContract(
+            descriptors=("event.bus.reflector.phase.published",),
+        ),
+    ),
+    ownership=OwnershipDeclaration(
+        reads=("event.bus",),
+        emits=(
+            "spine.perceive.phase.fold",
+            "spine.phase.perceive.fold",
+            "spine.phase.think.fold",
+            "spine.phase.gate.fold",
+            "spine.phase.remember.fold",
+            "spine.phase.stop.fold",
+            "spine.phase.reflect.fold",
+            "spine.phase.act.fold.start",
+            "spine.phase.act.fold.end",
+            "spine.phase.act.fold",
+            "spine.phase.tool.call.start",
+            "spine.phase.tool.call.end",
+            "spine.phase.tool.denied",
+        ),
+        state_mutation="forbidden",
+    ),
+)
+async def setup(ctx: PluginContext, config: _Config) -> None:
+    """events.spine.reflector.phase boot：注册 publisher marker 给 ctx。"""
+    ctx.provide("event.bus.reflector.phase", ReflectorClass)
+
