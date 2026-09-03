@@ -1,5 +1,10 @@
 """Process-local active spine accessor + safe-append helper (ADR-0169 + ADR-0165.1).
 
+# COMPAT(delete-when: PR-9, tracking: ADR-0181)
+# 旧 EventSpine fallback 路径；PR-3~PR-6 已迁 spine_reflector_*，本模块
+# 只剩老 exception_emit.py + spine.core._activate_process_local_spine 兜底
+# 用。PR-9 全退役时一并删除（rg _spine_safety lca/ = 0 触发）。
+
 Private module. Five reflector modules
 (``cognition``, ``runtime``, ``body_llm``, ``agent_spawn``, ``transport_emit``)
 each previously maintained their own ``_active_spine`` module-level global,

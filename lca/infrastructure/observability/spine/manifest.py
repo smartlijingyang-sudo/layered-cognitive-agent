@@ -3,6 +3,14 @@
 Adding/removing a point requires a Layer-1 build-time check pass and an
 EXECUTION_POINT_TEST matching it (I8 of ADR-0165.1). The set is intentional:
 do not edit casually.
+
+# COMPAT(delete-when: PR-9, tracking: ADR-0181)
+# 旧 EXECUTION_POINTS 仍被旧 spine (lca.infrastructure.observability.spine)
+# 的 _spine_safety.safe_append 与 spine.core._REFLECTOR_SET_ACTIVE_MODULES
+# 兜底使用。PR-3~PR-6 已迁 spine.yaml + payloads_spine.py + 各
+# spine_reflector_*，旧 spine 仅剩顶层 stubs（event_spine / event_record /
+# orphan / registry / *_emit / compile_spine_registry）以及本 manifest。
+# PR-9 全退役时一并删除（rg EXECUTION_POINTS lca/ = 0 触发）。
 """
 
 EXECUTION_POINTS: tuple[str, ...] = (
