@@ -1,19 +1,12 @@
 {
-  "root": "/home/lichao/layered-cognitive-agent/lca/plugins",
-  "total_plugins": 230,
+  "root": "/home/lichao/.grok/worktrees/lichao-layered-cognitive-agent/subagent-01a067c1-14a5-7d13-9ae5-5c741e6f115d/lca/plugins",
+  "total_plugins": 228,
   "by_kind": {
-    "missing_effects": 49,
+    "missing_effects": 47,
     "dual_form_residue": 17,
-    "duplicate_id": 4
+    "duplicate_id": 0
   },
   "violations": [
-    {
-      "kind": "missing_effects",
-      "id": "control.act.execute",
-      "file": "lca/plugins/control_contributions/act/act_execute.py",
-      "line": 82,
-      "detail": "@plugin(...) \u7f3a effects= \u5173\u952e\u5b57"
-    },
     {
       "kind": "missing_effects",
       "id": "control.act.authorize",
@@ -33,13 +26,6 @@
       "id": "control.act.constrain",
       "file": "lca/plugins/control_contributions/act_constrain.py",
       "line": 88,
-      "detail": "@plugin(...) \u7f3a effects= \u5173\u952e\u5b57"
-    },
-    {
-      "kind": "missing_effects",
-      "id": "control.act.execute",
-      "file": "lca/plugins/control_contributions/act_execute.py",
-      "line": 82,
       "detail": "@plugin(...) \u7f3a effects= \u5173\u952e\u5b57"
     },
     {
@@ -179,7 +165,7 @@
       "kind": "missing_effects",
       "id": "spine.sink.file",
       "file": "lca/plugins/observability/spine/sinks/file.py",
-      "line": 73,
+      "line": 77,
       "detail": "@plugin(...) \u7f3a effects= \u5173\u952e\u5b57"
     },
     {
@@ -468,34 +454,6 @@
       "file": "lca/plugins/events/subscribers/spine_step_tree_accumulator/manifest.py",
       "line": 12,
       "detail": "\u53cc\u5f62\u6001\u6b8b\u7559: event_plugin_spec = EventPluginSpec(...); plugin_spec: dict = {...}"
-    },
-    {
-      "kind": "duplicate_id",
-      "id": "control.act.execute",
-      "file": "lca/plugins/control_contributions/act/act_execute.py",
-      "line": 82,
-      "detail": "id='control.act.execute' \u5728 2 \u4e2a\u6587\u4ef6\u51fa\u73b0"
-    },
-    {
-      "kind": "duplicate_id",
-      "id": "control.act.execute",
-      "file": "lca/plugins/control_contributions/act_execute.py",
-      "line": 82,
-      "detail": "id='control.act.execute' \u5728 2 \u4e2a\u6587\u4ef6\u51fa\u73b0"
-    },
-    {
-      "kind": "duplicate_id",
-      "id": "lca-run-loop-driver-registry",
-      "file": "lca/plugins/loop_drivers/registry.py",
-      "line": 103,
-      "detail": "id='lca-run-loop-driver-registry' \u5728 2 \u4e2a\u6587\u4ef6\u51fa\u73b0"
-    },
-    {
-      "kind": "duplicate_id",
-      "id": "lca-run-loop-driver-registry",
-      "file": "lca/plugins/run_loop_driver_registry.py",
-      "line": 96,
-      "detail": "id='lca-run-loop-driver-registry' \u5728 2 \u4e2a\u6587\u4ef6\u51fa\u73b0"
     }
   ]
 }

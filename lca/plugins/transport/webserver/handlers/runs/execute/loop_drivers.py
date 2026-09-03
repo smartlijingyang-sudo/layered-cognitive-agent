@@ -27,10 +27,10 @@ from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols.collaboration.casting import RoleLibrary, TeamCaster
 from lca.contracts.protocols.runtime.infra import Tool
 from lca.infrastructure.observability import BoundObservability, record
-from lca.plugins.run_loop_driver_registry import (
+from lca.plugins.loop_drivers.registry import (
     RunLoopDriverRegistry as RunLoopDriverRegistry,
 )
-from lca.plugins.run_loop_driver_registry import (
+from lca.plugins.loop_drivers.registry import (
     _UnknownExecutionTargetError as _UnknownExecutionTargetError,
 )
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession

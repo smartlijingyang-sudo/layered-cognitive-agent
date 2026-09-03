@@ -127,7 +127,6 @@ _PLANE_RULES: list[tuple[str, dict[str, object]]] = [
             "layers": {"L0", "L1", "L2", "L3", "L4"},
             "module_patterns": [
                 r"^lca/plugins/(strategies|roles|loop_drivers|composer|team_lead|modes|phase_graph)/",
-                r"^lca/plugins/run_loop_driver_registry\.py",
                 r"^lca/agent/",
                 r"^lca/application/",
                 r"^gateway/",
