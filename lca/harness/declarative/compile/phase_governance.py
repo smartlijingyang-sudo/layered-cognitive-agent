@@ -9,6 +9,7 @@ from lca.contracts.models.core.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.core.stop import StopDecision, StopReason
+from lca.contracts.observability.ssot import ExecutionOutcome
 from lca.contracts.protocols.act.command_envelope import RunFact
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ContributionRole,
@@ -287,7 +288,7 @@ def _verdict_resolution(
     result: PhaseResult,
 ) -> tuple[
     str,
-    Literal["completed", "paused", "failed"] | None,
+    ExecutionOutcome | None,
     StopDecision | None,
     dict[str, object] | None,
 ]:

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from lca.contracts.harness.tasks.session import SessionEvent
+from lca.contracts.observability.ssot import is_terminal_run_status
 
 # ADR-0098 D4: terminal Statuses 命中后 ActivityProjection.view 增加 terminal=True 标记
 # 仅字典多一字段,旧 client 只读 status/turn/error 不受影响
@@ -68,7 +69,7 @@ class TaskProjection:
                 }
             )
         elif event.type in {"turn.started.v1", "task.started.v1"}:
-            if state.get("status") not in {"completed", "succeeded", "failed", "canceled"}:
+            if not is_terminal_run_status(state.get("status", "")):
                 state["status"] = "working"
         elif event.type in {"turn.ended.v1", "task.completed.v1"}:
             state["status"] = event.data.get("status", "completed")

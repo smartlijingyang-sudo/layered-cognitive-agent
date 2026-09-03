@@ -10,6 +10,12 @@ from typing import Literal, Protocol, runtime_checkable
 from lca.contracts.models.core.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.core.stop import StopDecision
+from lca.contracts.observability.ssot import TERMINAL_EXECUTION_OUTCOMES as _ALL_TERM_OUTCOMES
+from lca.contracts.observability.ssot import ExecutionOutcome
+
+TERMINAL_EXECUTION_OUTCOMES_EXCL_INPROGRESS = frozenset(
+    o for o in _ALL_TERM_OUTCOMES if o != ExecutionOutcome.IN_PROGRESS
+)
 from lca.contracts.protocols.act.command_envelope import CommandEnvelope, RunDelta, RunFact
 from lca.contracts.protocols.declarative.declarative_common import DeclarativeValidationError
 from lca.contracts.protocols.declarative.declarative_graph import EffectPolicyPlan
@@ -68,14 +74,14 @@ class PhaseRunCursor:
 class DeclarativeRunOutcome:
     """完成、暂停、失败或效果不确定时的统一运行结果。"""
 
-    kind: Literal["completed", "paused", "failed", "effect_uncertain"]
+    kind: ExecutionOutcome
     cursor: PhaseRunCursor
     stop: StopDecision
     error_fact: RunFact | None = None
     approval_request: dict[str, object] | None = None
 
     def __post_init__(self) -> None:
-        if self.kind not in {"completed", "paused", "failed", "effect_uncertain"}:
+        if self.kind not in TERMINAL_EXECUTION_OUTCOMES_EXCL_INPROGRESS:
             raise DeclarativeValidationError(
                 "PG-009",
                 "outcome kind must be one of: completed, paused, failed, effect_uncertain; "

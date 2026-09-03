@@ -33,6 +33,8 @@ import urllib.request
 
 import typer
 
+from lca.contracts.observability.ssot import is_terminal_run_status
+
 
 def register(app: typer.Typer) -> None:
     """Register the ``runs`` subcommand on the CLI app."""
@@ -154,7 +156,7 @@ def _create(
         if status and status != last_status:
             typer.echo(f"[doctor] status={status}")
             last_status = status
-        if status in {"success", "failed", "cancelled", "paused"}:
+        if is_terminal_run_status(status):
             typer.echo(f"[lca-ops runs create] terminal status={status}")
             if json_mode:
                 typer.echo(json.dumps(doctor, indent=2, ensure_ascii=False))

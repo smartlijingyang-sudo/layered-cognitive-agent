@@ -12,6 +12,7 @@ from lca.contracts.models.observability.journal_totals import (
     PhaseRecord,
     Totals,
 )
+from lca.contracts.observability.ssot import ExecutionOutcome
 
 JournalSchemaVersion = Literal["lca.journal/3", "lca.journal/3.1"]
 
@@ -31,7 +32,7 @@ class JournalMetadata:
     plan_ref: str
     objective: str
     attachments: tuple[AttachmentRef, ...] = ()
-    outcome: Literal["completed", "failed", "paused", "stopped", "in_progress"] = "in_progress"
+    outcome: ExecutionOutcome = ExecutionOutcome.IN_PROGRESS
     started_at: float = 0.0
     closed_at: float | None = None
     total_steps: int = 0
@@ -178,7 +179,7 @@ def append_step(
 def close_document(
     doc: JournalDocument,
     *,
-    outcome: Literal["completed", "failed", "paused", "stopped"],
+    outcome: ExecutionOutcome,
     closed_at: float,
 ) -> JournalDocument:
     """标记 run 终止。"""
