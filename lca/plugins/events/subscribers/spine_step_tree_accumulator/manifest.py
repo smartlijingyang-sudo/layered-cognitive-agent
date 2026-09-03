@@ -1,16 +1,20 @@
 """subscriber manifest（ADR-0180 @plugin 形式）。"""
 from __future__ import annotations
 
-from typing import Any
-
 from lca.contracts.event import Category
+from lca_kernel.events.payloads import EventPluginSpec
 
 _PLUGIN_ID = "spine_step_tree_accumulator"
 _SUBSCRIBES: tuple[Category, ...] = (
     Category("spine.cognition.brain.perceive.start"),
 )
 
-plugin_spec: dict[str, Any] = {
+event_plugin_spec = EventPluginSpec(
+    plugin_id="lca.plugins.events.subscribers.spine_step_tree_accumulator.subscriber.SpineStepTreeAccumulator",
+    event_subscribes=frozenset(_SUBSCRIBES),
+)
+
+plugin_spec: dict[str, object] = {
     "id": _PLUGIN_ID,
     "provides": ("events.subscriber",),
     "requires": ("lca.events.mechanism",),
@@ -21,4 +25,4 @@ plugin_spec: dict[str, Any] = {
     "test_suite": "tests.plugins.events.subscribers.test_spine_step_tree_accumulator",
 }
 
-__all__ = ["plugin_spec"]
+__all__ = ["event_plugin_spec", "plugin_spec"]

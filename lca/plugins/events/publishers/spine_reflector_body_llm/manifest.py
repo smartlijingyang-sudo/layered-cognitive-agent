@@ -1,9 +1,8 @@
 """publisher manifest（ADR-0180 @plugin 形式）。"""
 from __future__ import annotations
 
-from typing import Any
-
 from lca.contracts.event import Category
+from lca_kernel.events.payloads import EventPluginSpec
 
 # publisher plugin id 字符串：spine_reflector_body_llm（与 yaml publishers 同名）
 _PLUGIN_ID = "spine_reflector_body_llm"
@@ -19,7 +18,12 @@ _PUBLISHES: tuple[Category, ...] = (
     Category("spine.llm.stream.stall"),
 )
 
-plugin_spec: dict[str, Any] = {
+event_plugin_spec = EventPluginSpec(
+    plugin_id="lca.plugins.events.publishers.spine_reflector_body_llm.plugin.ReflectorClass",
+    event_publishes=frozenset(_PUBLISHES),
+)
+
+plugin_spec: dict[str, object] = {
     "id": _PLUGIN_ID,
     "provides": ("events.publish",),
     "requires": ("lca.events.mechanism",),
@@ -30,4 +34,4 @@ plugin_spec: dict[str, Any] = {
     "test_suite": "tests.plugins.events.publishers.test_spine_reflector_body_llm",
 }
 
-__all__ = ["plugin_spec"]
+__all__ = ["event_plugin_spec", "plugin_spec"]

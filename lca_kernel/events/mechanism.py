@@ -29,17 +29,19 @@ from __future__ import annotations
 import logging
 import time
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from lca.contracts.atoms.ids import new_id
 from lca_kernel.events.errors import (
+    AuthMatrixMismatchError,
     MissingPluginIdentityError,
     UnauthorizedPublishError,
     UnauthorizedSubscribeError,
 )
+from lca_kernel.events.payloads import EventPluginSpec
 from lca_kernel.events.registry import EventRegistry
 
 if TYPE_CHECKING:
@@ -158,6 +160,54 @@ class EventMechanism:
         if not self._registry.can_subscribe(plugin, category):
             raise UnauthorizedSubscribeError(plugin.__qualname__, category.value)
         self._sinks[category].append((plugin, callback))
+
+    # ── boot-time 鉴权矩阵互校验（ADR-0180 D3）─────────────────────────────
+
+    def validate_auth_matrix(
+        self,
+        plugin_specs: Iterable[EventPluginSpec],
+    ) -> None:
+        """业务方 plugin 鉴权声明 vs yaml SSOT 互校验。
+
+        对每个 :class:`EventPluginSpec`：
+        - ``plugin_id`` 是 plugin class 全路径（与 yaml publishers/subscribers
+          解析后的 class 全路径对齐；不接短 plugin_id 字符串）。
+        - ``event_publishes`` 内每个 category 必须在 yaml publishers 白名单中
+          存在（即本 plugin class 已被 yaml 授权 publish 该 category）。
+        - ``event_subscribes`` 内每个 category 必须在 yaml subscribers 白名单
+          中存在。
+
+        任何不匹配 → :class:`AuthMatrixMismatchError`，机制 boot 失败。
+
+        调用点：profile boot 完成后、plugins 装载前；本方法由 profile loader
+        触发（`lca_kernel/events/manifest.py` 当前未挂 profile 钩子；后续 PR
+        接 profile integration 时启用）。
+        """
+        for spec in plugin_specs:
+            missing_publish = sorted(
+                c.value
+                for c in spec.event_publishes
+                if spec.plugin_id
+                not in {
+                    f"{cls.__module__}.{cls.__qualname__}"
+                    for cls in self._registry.publishers.get(c, frozenset())
+                }
+            )
+            missing_subscribe = sorted(
+                c.value
+                for c in spec.event_subscribes
+                if spec.plugin_id
+                not in {
+                    f"{cls.__module__}.{cls.__qualname__}"
+                    for cls in self._registry.subscribers.get(c, frozenset())
+                }
+            )
+            if missing_publish or missing_subscribe:
+                raise AuthMatrixMismatchError(
+                    spec.plugin_id,
+                    missing_publish=set(missing_publish),
+                    missing_subscribe=set(missing_subscribe),
+                )
 
     # ── 内部（ADR-0181 D6 FD-1 / FD-2）────────────────────────────────────
 

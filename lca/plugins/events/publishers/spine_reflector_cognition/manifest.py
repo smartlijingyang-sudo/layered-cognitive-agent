@@ -1,9 +1,8 @@
 """publisher manifest（ADR-0180 @plugin 形式）。"""
 from __future__ import annotations
 
-from typing import Any
-
 from lca.contracts.event import Category
+from lca_kernel.events.payloads import EventPluginSpec
 
 # publisher plugin id 字符串：spine_reflector_cognition（与 yaml publishers 同名）
 # 鉴权：PluginSpec.event_publishes ⊆ yaml publishers 白名单。
@@ -12,8 +11,15 @@ _PUBLISHES: tuple[Category, ...] = (
     Category("spine.cognition.brain.perceive.start"),
 )
 
-# PluginSpec 形式（动态，yaml 互校验时由 EventMechanism 拉取）。
-plugin_spec: dict[str, Any] = {
+# Typed 鉴权声明（ADR-0180 D3，EventMechanism.validate_auth_matrix 接收）。
+# plugin_id 必须是 plugin class 全路径，与 yaml publishers 解析后 class 一致。
+event_plugin_spec = EventPluginSpec(
+    plugin_id="lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass",
+    event_publishes=frozenset(_PUBLISHES),
+)
+
+# 旧 `plugin_spec: dict[str, Any]` 形态保留为参考；机制不读，doc/test 用。
+plugin_spec: dict[str, object] = {
     "id": _PLUGIN_ID,
     "provides": ("events.publish",),
     "requires": ("lca.events.mechanism",),
@@ -24,4 +30,4 @@ plugin_spec: dict[str, Any] = {
     "test_suite": "tests.plugins.events.publishers.test_spine_reflector_cognition",
 }
 
-__all__ = ["plugin_spec"]
+__all__ = ["event_plugin_spec", "plugin_spec"]
