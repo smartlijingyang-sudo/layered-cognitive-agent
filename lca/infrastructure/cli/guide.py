@@ -139,6 +139,14 @@ Run 复盘  coding-agent tools(ADR-0065 §六 / PR-9,只读)
   diagnose <alias> 已内置 4 个 alias:model-not-seen / loop-stuck /
   memory-poisoned / approval-rejected(看 DIAGNOSE_HINTS 拿修复建议)。
 
+────────────────────────────────
+事件投递诊断  ADR-0184(进程内计数器)
+────────────────────────────────
+  ./scripts/lca-ops events-delivery            按 category 的 published/persisted/delivered/dropped
+  ./scripts/lca-ops events-delivery --json     给 agent
+  ./scripts/lca-ops events-delivery --category spine.cognition.brain.think.start
+  计数器是 EventBus 进程内内存;独立 CLI 进程显示自己的快照。
+
 ────────────────────────────
 Audit 测量网  ADR-0074 PR-0（只读）
 ────────────────────────────

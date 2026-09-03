@@ -136,7 +136,7 @@ Each step has five labels you should expect to find in your own output:
 
 **NEXT.** Look at the failure. Find the first event with `outcome=failure` (or the `broken_hop` from Step 1). Note its `seq` number and `execution_point`. Advance to Step 3 to find the exception itself — Step 2 alone won't give you a traceback because exceptions over 4 KB are offloaded.
 
-**FAIL.** `journal.jsonl events=0` but `events.jsonl events=N>0` → the run was early-fail, the step-tree never materialized. That's expected for early failures. Don't run `journal steps` (it'll say `journal.json not found`); go straight to sidecar.
+**FAIL.** `journal.jsonl events=0` but `events.jsonl events=N>0` → the run was early-fail, the step-tree never materialized. That's expected for early failures. Don't run `journal steps` (it'll say `journal.json not found`); go straight to sidecar. If the ledger itself is empty or a whole EP family is missing (e.g. no `brain.think.*` rows), check the bus delivery counters with `./scripts/lca-ops events-delivery --json` — per-category `published / persisted / delivered / dropped`, where `dropped > 0` means sent-but-neither-persisted-nor-dispatched (ADR-0184 D2; counters are EventBus in-process memory of the invoking process).
 
 ---
 

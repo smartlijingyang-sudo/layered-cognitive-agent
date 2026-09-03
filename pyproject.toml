@@ -131,6 +131,9 @@ ignore_imports = [
     # CLI 是 kernel 的合法调用方(``lca-ops kernel {boot,serve,stop,compose}``);
     # 走公共面 import (compile_profile / run_kernel / stop_kernel)。
     "lca.infrastructure.cli.commands.kernel -> lca_kernel",
+    # events-delivery 诊断命令只读 EventBus 公共面
+    # (default() + delivery_snapshot(), ADR-0184 D2),不触 kernel 内部。
+    "lca.infrastructure.cli.commands.events_delivery -> lca_kernel",
 ]
 
 # ── 契约 7: transport plugin 不得 import kernel 内部 + cognition/agent/runtime ──

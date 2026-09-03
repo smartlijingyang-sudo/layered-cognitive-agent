@@ -31,6 +31,7 @@ from lca.infrastructure.cli.commands import (
     creator_plan,
     declarative,
     diagnostics,
+    events_delivery,
     journal,
     journal_exceptions,
     journal_replay,
@@ -73,6 +74,7 @@ runs.register(app)
 tools.register(app)
 profile_inspect.register(app)
 diagnostics.register(app)
+events_delivery.register(app)
 package_organization.register(app)
 audit.register(app)
 creator_plan.register(app)
