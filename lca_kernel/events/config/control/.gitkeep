@@ -1,0 +1,4 @@
+# control 维度 —— PR 10 / PR 11 / PR 12
+# - approval.yaml      审批
+# - pause.yaml         暂停/恢复
+# - policy.yaml        策略 / 插件生命周期

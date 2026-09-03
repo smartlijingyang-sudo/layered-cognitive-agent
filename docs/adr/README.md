@@ -124,6 +124,7 @@
 | [0174](0174-profile-cursor-bundles.md) | Profile 分批装配 — `loop_cursor.spine_*` bundle 落地 | Proposed |
 | [0175](0175-prompt-trace-into-model-visible.md) | Prompt trace 落 model_visible / spine EP payload 扩字段 | Accepted |
 | [0176](0176-step-tree-deriver-closure-and-model-visible-dedup.md) | StepTreeAccumulator 闭环 + Model-Visible 去重重构 + Prompt Section 真值化 | Accepted |
+| [0180](0180-event-mechanism-as-kernel-plugin.md) | 事件机制 — kernel 元层插件 + 鉴权矩阵 SSOT | Accepted |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
 

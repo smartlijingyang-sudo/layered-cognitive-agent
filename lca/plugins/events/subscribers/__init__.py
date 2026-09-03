@@ -1,0 +1,1 @@
+"""Subscribers 统一目录（ADR-0180）。"""

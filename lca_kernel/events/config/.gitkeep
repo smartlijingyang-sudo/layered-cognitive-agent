@@ -1,0 +1,9 @@
+# 业务维度总览
+# - team.yaml          团队（casting / delegation / message）—— PR 2
+# - tool.yaml          工具调用 —— PR 3
+# - llm.yaml           LLM 调用 —— PR 4
+# - gate.yaml          决策门 —— PR 5
+# - memory.yaml        记忆 —— PR 6
+# - perception.yaml    感知 —— PR 7
+#
+# 试点 PR 只覆盖 team.delegation.cache_hit；其余维度后续 PR 推进。

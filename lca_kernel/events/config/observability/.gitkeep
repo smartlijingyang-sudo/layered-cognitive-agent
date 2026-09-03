@@ -1,0 +1,4 @@
+# observability 维度 —— PR 8 / PR 9
+# - log.yaml           日志（runtime.observed / exception.*）
+# - trace.yaml         链路（sandbox.output_delta / stream.*）
+# - metric.yaml        指标（试点未启用）
