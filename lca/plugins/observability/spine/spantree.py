@@ -48,7 +48,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.observability.spine.producer import Phase
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.observability.spine.context import SpineContext
 
 
@@ -121,7 +121,7 @@ def _span_identity(span: Any) -> tuple[str | None, str | None]:
     requires=(),
     layer="L0",
     kind=PluginKind.SEAM,
-    effects=EffectClass.NONE,
+    effects="none",
     description=(
         "SpanTree FieldProducer — injects D11 span_id / parent_span_id / "
         "sequence / epoch / prev_event_hash into every spine "

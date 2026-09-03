@@ -6,6 +6,7 @@ PR-6：control 维度 11 EP（新加，old manifest 没有）。
 stop / signal / accept。这些是控制指令的事实记录，区别于 reflection /
 exception / lifecycle 等观察类事件。
 """
+
 from __future__ import annotations
 
 import logging

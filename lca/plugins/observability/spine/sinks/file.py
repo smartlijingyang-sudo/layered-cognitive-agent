@@ -28,10 +28,9 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.observability.spine.sinks.naming import (
     DEFAULT_SPINE_TEMPLATE,
-    LEGACY_FILE_NAME,
 )
 from lca.infrastructure.observability.spine.sinks.routing_file_sink import (
     RunRoutingFileSink,
@@ -80,7 +79,7 @@ def _resolve_boot_path(cfg: Mapping[str, Any]) -> Path:
     requires=(),
     layer="L0",
     kind=PluginKind.SEAM,
-    effects=EffectClass.FILESYSTEM,
+    effects="filesystem",
     description=(
         "File sink — routes boot events to boot-spine.jsonl and per-run "
         "events to traces/runs/<run_id>/<run_id>.spine.jsonl (L10 / PR-27)."

@@ -1,4 +1,5 @@
 """publisher manifest（ADR-0180 @plugin 形式）。"""
+
 from __future__ import annotations
 
 from pydantic import BaseModel

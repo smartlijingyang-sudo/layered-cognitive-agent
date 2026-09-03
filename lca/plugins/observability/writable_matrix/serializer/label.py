@@ -31,6 +31,7 @@ class LabelSerializer:
     provides=("serializer",),
     layer="L0",
     kind=PluginKind.SEAM,
+    effects="none",
     description="Label-only serializer; metadata only, no payload.",
 )
 def setup(ctx: PluginContext, config: Any) -> None:

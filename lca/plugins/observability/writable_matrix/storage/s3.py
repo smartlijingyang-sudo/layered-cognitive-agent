@@ -38,6 +38,7 @@ def _not_implemented() -> None:
     provides=("storage",),
     layer="L0",
     kind=PluginKind.SEAM,
+    effects="filesystem",
     description="S3 EventStorage (PR-10 TODO; not implemented in this milestone).",
 )
 def setup(ctx: PluginContext, config: Any) -> None:

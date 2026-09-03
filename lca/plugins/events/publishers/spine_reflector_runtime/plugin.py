@@ -14,6 +14,7 @@ signature 严格对齐旧 lca/plugins/observability/spine/reflectors/runtime.py
         producer=ReflectorClass,
     )
 """
+
 from __future__ import annotations
 
 import logging
@@ -206,6 +207,7 @@ def emit_runtime_event_publisher_publish(
 # 解释流 marker：记录"某处发生了不改变领域状态的观察事件"。reader 凭
 # ``runtime.observed`` 聚合事实流 + 解释流，避免理解任何 runtime.* EP
 # 时遗漏"看到但没改"的边角。
+
 
 def emit_runtime_observed(
     *,

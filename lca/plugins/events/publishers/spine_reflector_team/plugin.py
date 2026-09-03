@@ -6,6 +6,7 @@ PR-6：team 维度 7 EP 下沉到 EventBus.publish（新加，old manifest 没�
 一行 publish）。本 publisher 是 spine 侧 typed 入口，业务方在 EventBus
 路径下统一调用。
 """
+
 from __future__ import annotations
 
 import logging
@@ -196,4 +197,3 @@ __all__ = [
     "emit_team_delegation_issued",
     "emit_team_message_published",
 ]
-

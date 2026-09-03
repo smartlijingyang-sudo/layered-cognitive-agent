@@ -27,7 +27,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.observability.spine.event_record import EventRecord
 
 
@@ -58,7 +58,7 @@ class ConsoleSink:
     requires=(),
     layer="L0",
     kind=PluginKind.SEAM,
-    effects=EffectClass.NONE,
+    effects="none",
     description=(
         "Console sink — stdout JSON lines of EventRecord for development; "
         "provides console_sink. write() never raises."

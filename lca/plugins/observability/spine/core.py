@@ -50,7 +50,6 @@ from lca.contracts.protocols.declarative.declarative_plugin import (
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import (
-    EffectClass,
     PluginContext,
     PluginKind,
     plugin,
@@ -186,7 +185,7 @@ def _activate_process_local_spine(ctx: PluginContext, event_spine: EventSpine) -
     requires=("emit_pipeline", "file_sink"),
     layer="L2",
     kind=PluginKind.SEAM,
-    effects=EffectClass.NONE,
+    effects="none",
     description=(
         "L2 spine composer — assembles EventSpine from the bound "
         "EmitPipeline (field merge) and FileSink (append-only truth), "

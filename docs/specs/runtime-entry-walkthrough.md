@@ -145,7 +145,7 @@ async def execute(self, *, run_id, question, ...):
     ...
 ```
 
-关键点：**driver 是 profile 注入的，不是 carrier 写死的**。`RunLoopDriverRegistry`（`lca/plugins/run_loop_driver_registry/`）是一个 registry seam：
+关键点：**driver 是 profile 注入的，不是 carrier 写死的**。`RunLoopDriverRegistry`（`lca/plugins/loop_drivers/registry.py`）是一个 registry seam：
 
 | 内置 driver | 用途 | 在 |
 |---|---|---|

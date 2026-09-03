@@ -22,7 +22,7 @@ from lca.contracts.protocols.collaboration.graph_node_executor import (
     GraphNodeExecutorRegistryProtocol,
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -79,7 +79,7 @@ class GraphNodeExecutorRegistry(GraphNodeExecutorRegistryProtocol):
     implements=[GraphNodeExecutorRegistryProtocol],
     layer="L3",
     kind=PluginKind.SEAM,
-    effects=EffectClass.NONE,
+    effects="none",
     description="Provide the closed registry for collaboration graph-node primitives.",
     test_suite="tests/test_graph_node_executors.py",
     contract=PluginContract(

@@ -31,6 +31,7 @@ class PassthroughCoalescer:
     provides=("coalescer",),
     layer="L0",
     kind=PluginKind.SEAM,
+    effects="none",
     description="Coalescer replacement: no buffering / windowing.",
 )
 def setup(ctx: PluginContext, config: Any) -> None:
