@@ -804,3 +804,271 @@ def test_step_tool_call_record_with_flat_payload_writes_arguments(tmp_path: Path
     assert tr["stdout_head"] == "ok\n"
     assert tr["files_created"] == ["out.md"]
     assert tr["delta_summary"] == "executed successfully"
+
+
+# ── phase whitelist regression (run_2d0bdd30f2fb) ─────────────────────
+
+
+def test_phase_fold_event_with_non_live_phase_is_accepted(tmp_path: Path) -> None:
+    """Regression: on_event 必须接受 EventRecord.phase == 'think' 的 phase.think.fold。
+
+    真实 spine 写入 EventRecord.phase 等于分类名(perceive/think/remember/...),
+    不是字面 'live'。旧 on_event 白名单只放 live+act,phase.fold EP 永远被丢,
+    backend ReAct 路径累积空白 → flush.empty → doctor H-xref fail。
+
+    显式设 phase='think' 还原真实形态,断言 on_event 接收并创建 phase record。
+    """
+    SpineContext.set_run("r_ph_think")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_ph_think",
+        run_dir=tmp_path / "r_ph_think",
+        agent_role="agt",
+        strategy_key="solo",
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_ph_think",
+            execution_point="phase.think.fold",
+            phase="think",
+            payload={"phase": "think", "summary": "thinking", "step_index": 0},
+        )
+    )
+    deriver.flush()
+
+    doc = deriver.document
+    assert doc is not None
+    assert doc.totals.phases >= 1, "phase.think.fold (phase='think') 应被接收并累积 phase"
+    assert any(p.kind == "think" for p in doc.phases)
+
+
+def test_phase_fold_accepted_for_each_category(tmp_path: Path) -> None:
+    """Regression: perceive / remember / reflect / stop phase fold 都被 on_event 接收。
+
+    PHASE_FOLD_EPS 表里登记的全部 6 个 phase,每个都该被接收。
+    """
+    cases = [
+        ("phase.perceive.fold", "perceive", "感知"),
+        ("phase.think.fold", "think", "思考"),
+        ("phase.remember.fold", "remember", "记忆"),
+        ("phase.reflect.fold", "reflect", "反思"),
+        ("phase.stop.fold", "stop", "收口"),
+    ]
+    for ep, phase_name, summary in cases:
+        SpineContext.set_run(f"r_ph_{phase_name}")
+        run_dir = tmp_path / f"r_ph_{phase_name}"
+        deriver = StepTreeAccumulatorDeriver(
+            run_id=f"r_ph_{phase_name}",
+            run_dir=run_dir,
+            agent_role="agt",
+            strategy_key="solo",
+        )
+        deriver.on_event(
+            _make_event(
+                run_id=f"r_ph_{phase_name}",
+                execution_point=ep,
+                phase=phase_name,
+                payload={"phase": phase_name, "summary": summary, "step_index": 0},
+            )
+        )
+        deriver.flush()
+
+        doc = deriver.document
+        assert doc is not None
+        assert doc.totals.phases >= 1, (
+            f"{ep} (phase={phase_name!r}) 应被接收并累积 phase,得到 totals.phases={doc.totals.phases}"
+        )
+        assert any(p.kind == phase_name for p in doc.phases), (
+            f"{ep} 应创建 kind={phase_name!r} 的 phase record,得到 {[p.kind for p in doc.phases]}"
+        )
+
+
+def test_live_phase_still_accepted_regression_lock(tmp_path: Path) -> None:
+    """Regression lock: EventRecord.phase='live' 仍被 on_event 接收。
+
+    修复白名单不得破环原 live 路径(phase_graph.node.* / 工具事件)。
+    """
+    SpineContext.set_run("r_live_lock")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_live_lock",
+        run_dir=tmp_path / "r_live_lock",
+        agent_role="agt",
+        strategy_key="solo",
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_live_lock",
+            execution_point="writable.step.start",
+            phase="live",
+            payload={"phase": "think", "step_id": "step_001"},
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_live_lock",
+            execution_point="writable.step.end",
+            phase="live",
+            outcome="success",
+            payload={"step_id": "step_001", "outcome": "success"},
+        )
+    )
+    deriver.flush()
+
+    doc = deriver.document
+    assert doc is not None
+    assert doc.totals.steps >= 1, "live phase 路径回归锁:必须仍能累积 step"
+
+
+def test_act_phase_still_accepted_regression_lock(tmp_path: Path) -> None:
+    """Regression lock: EventRecord.phase='act' 仍被 on_event 接收。
+
+    ADR-0176 D1 §1 收口后 cursor 在 act 窗口发的 tool_call.record / tool_result.record
+    都走 phase=act,本测试锁此路径不被新白名单破环。
+    """
+    SpineContext.set_run("r_act_lock")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_act_lock",
+        run_dir=tmp_path / "r_act_lock",
+        agent_role="agt",
+        strategy_key="solo",
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_act_lock",
+            execution_point="writable.step.start",
+            phase="act",
+            payload={"phase": "act", "step_id": "step_001"},
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_act_lock",
+            execution_point="phase.act.fold",
+            phase="act",
+            payload={"phase": "act", "summary": "acting", "step_index": 1},
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_act_lock",
+            execution_point="writable.step.end",
+            phase="act",
+            outcome="success",
+            payload={"step_id": "step_001", "outcome": "success"},
+        )
+    )
+    deriver.flush()
+
+    doc = deriver.document
+    assert doc is not None
+    assert doc.totals.steps >= 1
+    assert doc.totals.phases >= 1, "phase=act 的 phase.act.fold 仍应累积"
+
+
+def test_orphan_phase_still_dropped_regression_lock(tmp_path: Path) -> None:
+    """Regression lock: EventRecord.phase='orphan' 仍被 on_event 丢弃。
+
+    orphan 事件是 PR-6 引入的"非业务方"事件(plan_rejected 等),即便 phase fold EP
+    也不可能携带 orphan 标记;on_event 接受 orphan 会污染累积器。本测试锁 drop。
+    """
+    SpineContext.set_run("r_orphan_lock")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_orphan_lock",
+        run_dir=tmp_path / "r_orphan_lock",
+        agent_role="agt",
+        strategy_key="solo",
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_orphan_lock",
+            execution_point="phase.think.fold",
+            phase="orphan",
+            reason="no_owner",
+            payload={"phase": "think", "summary": "should be dropped"},
+        )
+    )
+    deriver.flush()
+
+    doc = deriver.document
+    assert doc is not None
+    assert doc.totals.phases == 0, "phase=orphan 的 phase.think.fold 必须被丢"
+
+
+def test_backend_react_path_flush_not_empty(tmp_path: Path) -> None:
+    """End-to-end: backend ReAct 路径(无 writable.step.*)的 phase fold 序列。
+
+    模拟真实 run:6 个 phase_graph.node.* + phase.perceive.fold + 两次 phase.think.fold。
+    期望 totals.phases >= 2,flush.empty 不触发,manifest.flush_errors 为空。
+    """
+    SpineContext.set_run("r_react")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_react",
+        run_dir=tmp_path / "r_react",
+        agent_role="agt",
+        strategy_key="solo",
+        objective="用户问今天星期几",
+    )
+    # phase_graph.node 包裹(phase='live')
+    for i, node_id in enumerate(["perceive", "think", "act", "remember", "reflect", "stop"]):
+        seq = 10 + i * 2
+        deriver.on_event(
+            _make_event(
+                run_id="r_react",
+                execution_point="phase_graph.node.start",
+                phase="live",
+                sequence=seq,
+                payload={"node_id": node_id},
+            )
+        )
+        deriver.on_event(
+            _make_event(
+                run_id="r_react",
+                execution_point="phase_graph.node.end",
+                phase="live",
+                sequence=seq + 1,
+                payload={"node_id": node_id, "outcome": "success"},
+                outcome="success",
+            )
+        )
+    # 真实 fold 事件(phase=分类名)
+    deriver.on_event(
+        _make_event(
+            run_id="r_react",
+            execution_point="phase.perceive.fold",
+            phase="perceive",
+            payload={"phase": "perceive", "summary": "saw input", "step_index": 0},
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_react",
+            execution_point="phase.think.fold",
+            phase="think",
+            payload={"phase": "think", "summary": "thinking", "step_index": 0},
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_react",
+            execution_point="phase.think.fold",
+            phase="think",
+            payload={"phase": "think", "summary": "respond", "step_index": 0},
+        )
+    )
+    deriver.flush(outcome="completed")
+
+    doc = deriver.document
+    assert doc is not None
+    assert doc.totals.phases >= 2, (
+        f"backend ReAct 路径 totals.phases 应 >= 2,得到 {doc.totals.phases}"
+    )
+    assert any(p.kind == "perceive" for p in doc.phases)
+    assert any(p.kind == "think" for p in doc.phases)
+
+    # manifest.flush_errors 应为空
+    manifest_path = tmp_path / "r_react" / "manifest.json"
+    if manifest_path.exists():
+        import json as _json
+
+        data = _json.loads(manifest_path.read_text(encoding="utf-8"))
+        errors = data.get("extra", {}).get("flush_errors", [])
+        assert not errors, f"backend ReAct 路径不应触发 flush_errors,得到 {errors}"

@@ -91,6 +91,14 @@ PHASE_FOLD_EPS: dict[str, StepPhase] = {
     # writable.* 不视作 phase fold —— 它们定义 step / segment 边
 }
 
+# on_event phase 白名单 —— 由 PHASE_FOLD_EPS.values() 推导,不再硬编码 magic str。
+# 真实 spine EventRecord.phase == 分类名(perceive/think/remember/reflect/stop),
+# 不是字面 'live';本表把 fold 涉及的 phase 全部纳入,防止 on_event 在查
+# PHASE_FOLD_EPS 之前就因 phase 不在白名单而 silent-drop(回归:run_2d0bdd30f2fb)。
+# 仍保留 'live' / 'act' 两个非 fold phase:前者覆盖 phase_graph.node.* 与工具事件,
+# 后者是 ADR-0176 D1 §1 收口后 cursor 在 act 窗口发的 tool_call/result record 必经路径。
+_ACCEPTED_PHASES: frozenset[str] = frozenset(PHASE_FOLD_EPS.values()) | {"live", "act"}
+
 
 @dataclass
 class _StepFrame:
@@ -178,8 +186,15 @@ class StepTreeAccumulatorDeriver(Deriver):
         # 发出的 ``step.tool_call.record`` / ``step.tool_result.record`` /
         # ``body.tool.execute.*`` 全部被 silently 丢弃(journal 里的
         # tool_call 永远 EMPTY,run_3e48052e6c36 那个 BUG 的根本源头)。
-        # 现在 accept live + act phase;只过滤 synthetic / archived。
-        if event.phase not in ("live", "act"):
+        # 现在 accept live + act phase + fold-phase(perceive/think/
+        # remember/reflect/stop)—— 真实 spine EventRecord.phase 是分类名
+        # 而非 'live',只放 live+act 会让 backend ReAct 路径 phase.fold
+        # 永远 silent-drop(journal totals.phases=0 → flush.empty →
+        # doctor H-xref fail,回归:run_2d0bdd30f2fb)。
+        # orphan / synthetic 仍过滤:不在 PHASE_FOLD_EPS.values() ∪ {live,act}
+        # 内的 phase 一律 drop。``_ACCEPTED_PHASES`` 由 PHASE_FOLD_EPS 推导,
+        # 任何新增 phase fold EP → 增表 → 自动放行。
+        if event.phase not in _ACCEPTED_PHASES:
             return
         try:
             self._apply(event)
@@ -468,8 +483,10 @@ class StepTreeAccumulatorDeriver(Deriver):
                 _arg_flat = p.get("arguments")
                 _arg_nested = nested.get("arguments") if nested else None
                 arguments = (
-                    _arg_flat if isinstance(_arg_flat, dict)
-                    else _arg_nested if isinstance(_arg_nested, dict)
+                    _arg_flat
+                    if isinstance(_arg_flat, dict)
+                    else _arg_nested
+                    if isinstance(_arg_nested, dict)
                     else {}
                 )
                 _summary_flat = p.get("arguments_summary") or ""
@@ -509,8 +526,7 @@ class StepTreeAccumulatorDeriver(Deriver):
                 stderr = str(_pick("stderr", "") or "")
                 files_raw = _pick("files_created", ()) or ()
                 files_tuple = (
-                    tuple(str(f) for f in files_raw)
-                    if isinstance(files_raw, (list, tuple)) else ()
+                    tuple(str(f) for f in files_raw) if isinstance(files_raw, (list, tuple)) else ()
                 )
                 ok = bool(_pick("ok", True))
                 latency_ms = int(_pick("latency_ms", 0) or 0)
@@ -609,9 +625,7 @@ class StepTreeAccumulatorDeriver(Deriver):
             # → 不嵌套;复用现有 _open_step(包络优先级:显式 > 隐式)。
             return
         # 把上一步 closed_pending 的 _open_step 引用清掉(若有)
-        if self._open_step is not None and getattr(
-            self._open_step, "closed_pending", False
-        ):
+        if self._open_step is not None and getattr(self._open_step, "closed_pending", False):
             self._open_step = None
         self._step_seq += 1
         self._open_step = _StepFrame(
@@ -656,7 +670,8 @@ class StepTreeAccumulatorDeriver(Deriver):
             entered_at=frame.entered_at,
             exited_at=frame.exited_at,
             duration_ms=max(0, int((frame.exited_at - frame.entered_at) * 1000))
-            if frame.exited_at else None,
+            if frame.exited_at
+            else None,
             context_before=frame.context_before,
             thinking=frame.thinking,
             tool_call=frame.tool_call,
@@ -749,8 +764,10 @@ class StepTreeAccumulatorDeriver(Deriver):
         # 之前 ``_close_step`` 直接把 JournalStep 写入 ``self._steps``,后续
         # mutate frame 的 tool_call 不会反映到 JournalStep。
         steps_list = [
-            self._build_step(frame) for frame in sorted(
-                self._closed_frames, key=lambda f: f.step_index,
+            self._build_step(frame)
+            for frame in sorted(
+                self._closed_frames,
+                key=lambda f: f.step_index,
             )
         ]
         totals = Totals(
