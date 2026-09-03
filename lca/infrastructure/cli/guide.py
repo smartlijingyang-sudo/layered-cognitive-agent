@@ -148,6 +148,7 @@ Audit 测量网  ADR-0074 PR-0（只读）
   ./scripts/lca-ops audit-state-writers     state.* 写入点(Reducer 单写校验基线)
   ./scripts/lca-ops audit-direct-commands   Body 直接 import sandbox/transport 的路径
   ./scripts/lca-ops audit-hook-attach       hooks.trigger / middleware_bag / _emit 残留
+  ./scripts/lca-ops audit-plugin-shape      lca/plugins/* 单 Manifest 范式(effects 缺失 + 双形态残留 + 同 id 镜像)
 
   ./scripts/lca-ops status-adr-supervision   一命令看 ADR-0066/0067/0068/0069/0074 监督状态
                                               = 验证 tracker.md 一致性 + 输出当前历史迁移基线

@@ -88,6 +88,38 @@ def register(app: typer.Typer) -> None:
         sys.stdout.write(report)
         raise typer.Exit(0 if not findings else 1)
 
+    @app.command(name="audit-plugin-shape")
+    def audit_plugin_shape_cmd(
+        json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
+    ) -> None:
+        """Scan ``lca/plugins/`` for single-Manifest convention violations.
+
+        三维扫描:effects 缺失 + events/* 双形态残留 + 同 id 镜像。
+        与 ``check_plugin_metadata`` 的 ADR-0110 contract 面正交。
+        delete-when:missing_effects → Phase C 补齐;
+        dual_form_residue → Phase B 清残留;duplicate_id → Phase C 镜像合并。
+        """
+        repo_root = resolve_repo_root()
+        if json_mode:
+            check_proc = subprocess.run(
+                [sys.executable, "scripts/check_plugin_shape.py", "--json"],
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+            )
+            sys.stdout.write(check_proc.stdout)
+            if check_proc.stderr.strip():
+                sys.stderr.write(check_proc.stderr)
+        else:
+            check_proc = subprocess.run(
+                [sys.executable, "scripts/check_plugin_shape.py"],
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+            )
+            sys.stdout.write(check_proc.stderr or check_proc.stdout)
+        raise typer.Exit(check_proc.returncode)
+
     @app.command(name="status-adr-supervision")
     def status_adr_supervision_cmd(
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),

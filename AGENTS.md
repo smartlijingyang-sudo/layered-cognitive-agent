@@ -132,6 +132,29 @@ Brain、Reasoner、Critic、Synthesizer、SkillRouter、DecisionGate 属于认�
 - **Common commits** 用 `<type>(<scope>): <subject>`(Conventional Commits),正文说"做了什么 / 为什么"。
 - **邻接原则**:改一处,顺带清本 seam 死代码/死 import;**不**顺手重构范围外的东西(。
 
+### Plugin 范式(`lca/plugins/` 下)
+
+每个 plugin **一个 .py 文件**,目录名 = `kind`,入口唯一 = `@plugin(...)` 装饰器。
+
+```text
+@plugin(
+    id="lca.plugins.<dir>.<name>",     # 短 id 与目录层级对齐
+    provides=("..."),                  # capability key
+    requires=("..."),                  # 依赖的 capability
+    layer="L0".."L4",                  # 显式层级
+    kind=PluginKind.PROVIDER | SEAM | PRIMITIVE | BRIDGE,
+    effects=(EffectClass.FILESYSTEM,), # 副作用类必声明;空 = NONE
+    test_suite="tests/plugins/<dir>/<test>.py",
+    description="一句话:做什么 + 不做什么",
+)
+async def setup_<name>(ctx: PluginContext, config: Config) -> None: ...
+```
+
+- **禁止**:`lca/plugins/<dir>/<subdir>/manifest.py + plugin.py` 双文件;`__init__.py` 写 `@plugin`;同 id 在多个文件
+- **bundle 形态**:`bundles/<bundle>.yaml:plugins:` 列短 id,**不引路径**
+- **校验**:`./scripts/lca-ops audit-plugin-shape`(effects 缺失 / 双形态残留 / 同 id 镜像);基线见 `docs/notes/baselines/plugin-shape.json`
+- **新 plugin 必须满足以上三条**,存量违例在 `docs/notes/implemented/seam/2026-09-03-plugin-shape-baseline.md` delete-when 跟踪
+
 ## 6. 命令与验证
 
 `./scripts/lca-ops` 不带参数打印分层手册;`./scripts/lca-ops <cmd> --help` 看子命令。
