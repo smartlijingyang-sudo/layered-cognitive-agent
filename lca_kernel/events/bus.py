@@ -286,6 +286,9 @@ class EventBus(Generic[P]):
         results: list[ConsumerResult] = []
         try:
             persisted = self._dispatch_sinks(effective, ref)
+            # 回执逐段填齐:S3 落定后订正 persisted,订阅者在 S4 派发时
+            # 已能读到落盘事实;subscriber_count 在 fanout 收敛后填。
+            ref = replace(ref, persisted=persisted)
             self._fanout(effective, ref, results)
         finally:
             if persisted:
@@ -294,7 +297,7 @@ class EventBus(Generic[P]):
                 counts["delivered"] += 1
             if not persisted or (not results and self._has_declared_subscribers(category)):
                 counts["dropped"] += 1
-        ref = replace(ref, persisted=persisted, subscriber_count=len(results))
+        ref = replace(ref, subscriber_count=len(results))
 
         self._run_post_dispatch(effective, ref, results)
 
