@@ -245,7 +245,7 @@ class RunRegistry:
         return self._process_journal.bind(factory)
 
     def spine_path_for(self, run_id: str) -> Path:
-        """Resolve the run's spine SSOT path (events.jsonl) via the durable locator."""
+        """Resolve the run's spine SSOT path (<run_id>.spine.jsonl) via the durable locator."""
 
         return self._locator.events_path(run_id)
 

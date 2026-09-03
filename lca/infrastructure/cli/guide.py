@@ -34,9 +34,9 @@ heal
 ────────────────────────────────
 日志  journal logs
 ────────────────────────────────
-  ./scripts/lca-ops journal logs              tail 最新 run 的 spine SSOT(events.jsonl)
+  ./scripts/lca-ops journal logs              tail 最新 run 的 spine SSOT(<run_id>.spine.jsonl)
   ./scripts/lca-ops journal logs -v           + 完整 payload + offloaded sidecar traceback
-  ./scripts/lca-ops journal logs -r <run_id>  离线回放指定 run 的 events.jsonl
+  ./scripts/lca-ops journal logs -r <run_id>  离线回放指定 run 的 <run_id>.spine.jsonl
   ./scripts/lca-ops journal logs lobehub      Next.js 进程日志
   ./scripts/lca-ops journal logs daemon       sandbox 连接器日志
   ./scripts/lca-ops logs                      (alias → journal logs)

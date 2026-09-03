@@ -169,7 +169,7 @@ def _read_events_jsonl(run_id: str, traces_root: Path) -> list[EventRecord]:
     """Read spine events file into ``EventRecord`` instances for derivers(PR-27)。
 
     优先 ``<run_id>.spine.jsonl``(ADR-0169 PR-27 L10 默认);若不存在,回退
-    ``events.jsonl``(旧 layout 向后兼容)。Returns empty list if neither exists。
+    :data:`LEGACY_FILE_NAME`(旧 layout 向后兼容)。Returns empty list if neither exists。
     Per-line parse errors are skipped(best-effort; trajectory page degrades gracefully)。
     """
     from lca.infrastructure.observability.spine.sinks.naming import (

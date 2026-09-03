@@ -3,7 +3,7 @@
 PR-6 spine-orphan-events (ADR-0165.1 §19, design §4.3): an event
 emitted when no active step is open cannot belong to the step tree
 and must not flow through ``StepTreeDeriver``. It still reaches the
-append-only ``events.jsonl`` via the sink so diagnosis remains
+append-only spine ledger via the sink so diagnosis remains
 possible, but the ``phase="orphan"`` + ``reason`` tags tell consumers
 (e.g. ``lca-ops journal trace --include-orphan``) why it stands alone.
 

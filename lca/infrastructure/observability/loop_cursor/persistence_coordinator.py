@@ -128,7 +128,7 @@ class FilePersistenceCoordinator:
     ``flush()``  → 调 sink 的 ``fsync``(通过 ``FileSink.close`` 不行 ——
     close 后不可再用;改为直接 flush sink 内部 fd)
     ``close()``  → 关 sink
-    ``restore()`` → 从 events.jsonl 逐行读回 ``EventRecord``(仅支持 seq >= from_seq)
+    ``restore()`` → 从 spine ledger 逐行读回 ``EventRecord``(仅支持 seq >= from_seq)
 
     当前 ``restore()`` 返回空迭代器 —— FileSink 是 append-only JSONL,
     反向解析需要 ``EventRecord`` 反序列化器(由 PR-15 提供)。

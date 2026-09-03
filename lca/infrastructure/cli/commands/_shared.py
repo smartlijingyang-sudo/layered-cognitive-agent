@@ -47,7 +47,7 @@ def _resolve_journal_artifact(
     Resolution order:
     1. Explicit ``--journal`` argument (any caller-provided path wins).
     2. ``traces/runs/<id>/journal.json`` (preferred — lca.journal/3 step story)。
-    3. ``traces/runs/<id>/events.jsonl`` (spine SSOT — ADR-0165.1 / 0167 D11)。
+    3. ``traces/runs/<id>/<run_id>.spine.jsonl`` (spine SSOT — ADR-0165.1 / 0167 D11)。
 
     旧 ``journal.raw.jsonl`` / ``<id>.journal`` / 全局 ``lca_journal.jsonl``
     流式布局已下线 —— 不再回退到任何 legacy artifact。
@@ -61,7 +61,7 @@ def _resolve_journal_artifact(
         primary = nested / "journal.json"
         if primary.exists():
             return primary
-        # ADR-0169 PR-27 L10:默认 <run_id>.spine.jsonl;events.jsonl 向后兼容
+        # ADR-0169 PR-27 L10:默认 <run_id>.spine.jsonl;LEGACY_FILE_NAME 向后兼容
         from lca.infrastructure.observability.spine.sinks.naming import (
             LEGACY_FILE_NAME,
             spine_filename_for_run,
@@ -82,7 +82,7 @@ def resolve_journal_path(jsonl: Path | None, run_id: str | None) -> Path:
     if resolved is not None:
         return resolved
     typer.echo(
-        "No journal file found (tried --journal, traces/runs/<id>/journal.json, events.jsonl)"
+        "No journal file found (tried --journal, traces/runs/<id>/journal.json, <run_id>.spine.jsonl)"
     )
     raise typer.Exit(1)
 

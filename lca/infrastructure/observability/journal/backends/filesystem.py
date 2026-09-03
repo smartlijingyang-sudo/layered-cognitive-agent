@@ -8,8 +8,8 @@ ADR-0169 PR-27(L10 / D9):默认 ``DEFAULT_FILENAME`` 改为 ``$run_id.spine.json
 ``run_id`` 默认 = ``root`` 目录 basename(单 run 实例目录约定)。
 
 向后兼容:
-- 显式传入 ``filename="events.jsonl"`` 时仍生效,获得旧布局。
-- :meth:`_load_existing` 同时尝试 ``events.jsonl`` 兜底,让旧的 ledger 文件仍
+- 显式传入 ``filename=LEGACY_FILE_NAME`` 时仍生效,获得旧布局。
+- :meth:`_load_existing` 同时尝试 :data:`LEGACY_FILE_NAME` 兜底,让旧的 ledger 文件仍
   可被新代码读到(reader 透明)。
 
 特性:
@@ -67,8 +67,8 @@ class FilesystemJournalStore(JournalStoreBackend):
         self._path = self._root / resolved
         self._fsync_each_append = fsync_each_append
         self._events: list[StampedEvent] = []
-        # bootstrap:优先 spine;若 spine 不存在但 events.jsonl 存在,
-        # 从 events.jsonl 加载历史(不切换写入路径 — 后续 append 仍落 spine)
+        # bootstrap:优先 spine;若 spine 不存在但 legacy ledger 存在,
+        # 从 legacy ledger 加载历史(不切换写入路径 — 后续 append 仍落 spine)
         if self._path.exists():
             self._load_existing()
         else:

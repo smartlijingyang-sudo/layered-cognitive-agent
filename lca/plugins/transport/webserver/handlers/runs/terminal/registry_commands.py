@@ -68,7 +68,7 @@ class RegistryRunCommands:
                 machine_resolver=self._machine_resolver,
             )
         # Bind SpineContext as soon as run_id exists so subsequent
-        # kernel.run.* / exception.* land in traces/runs/<id>/events.jsonl.
+        # kernel.run.* / exception.* land in traces/runs/<id>/<run_id>.spine.jsonl.
         from lca.infrastructure.observability.spine.context import SpineContext
 
         SpineContext.set_run(session.run_id)

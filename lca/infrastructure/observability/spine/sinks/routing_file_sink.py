@@ -9,7 +9,7 @@ Events with a real ``run_id`` → ``<runs_root>/<run_id>/<resolved_file_name>``�
 
 ADR-0169 PR-27:``file_name`` 默认 ``$run_id.spine.jsonl`` 模板,在
 :meth:`_sink_for` 实例化时按当前 ``run_id`` 解析为
-``<run_id>.spine.jsonl``。旧字面 ``events.jsonl`` 仍可显式传入(向后兼容)。
+``<run_id>.spine.jsonl``。旧字面 :data:`LEGACY_FILE_NAME` 仍可显式传入(向后兼容)。
 """
 
 from __future__ import annotations

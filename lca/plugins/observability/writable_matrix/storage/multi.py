@@ -1,7 +1,7 @@
 """``writable.storage.multi`` —— Fan-out Storage 替换实现。
 
 把同一份 bytes payload 写到多个子 storage。可在归档 profile 同时落：
-- 默认 RoutingFileStorage（per-run events.jsonl）
+- 默认 RoutingFileStorage（per-run ``<run_id>.spine.jsonl``）
 - S3 / SQLite / Kafka 子 storage（由 patch / config 注入）
 """
 

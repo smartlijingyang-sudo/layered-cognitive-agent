@@ -2,7 +2,7 @@
 
 ADR-2026-09-02-i17-stream-align §A — the legacy v2 stream envelope
 (``record_to_stamped`` / ``FactStreamProjector``) is retired (ADR-0164 Phase 7).
-The CLI now reads the spine SSOT directly: ``traces/runs/<run_id>/events.jsonl``.
+The CLI now reads the spine SSOT directly: ``traces/runs/<run_id>/<run_id>.spine.jsonl``.
 Live mode tails the most recent run's file; ``--replay`` re-reads a specific
 run from disk.
 """
@@ -26,9 +26,9 @@ _KERNEL_SERVE_REFUSAL_CODES = {
     "legacy_process_journal_unavailable": (
         "Session Spine 已不再暴露全局 /journal/live；请改用下列任一路径查看 journal 事实：",
         [
-            "./scripts/lca-ops journal logs           # tail 最新 run 的 events.jsonl",
+            "./scripts/lca-ops journal logs           # tail 最新 run 的 <run_id>.spine.jsonl",
             "./scripts/lca-ops journal logs --replay <run_id>  # 离线回放",
-            "tail -f traces/runs/$(ls -t traces/runs | head -1)/events.jsonl",
+            "tail -f traces/runs/$(ls -t traces/runs | head -1)/<run_id>.spine.jsonl",
         ],
     ),
 }
@@ -64,14 +64,14 @@ def register(app: typer.Typer, group: typer.Typer | None = None) -> None:
             "",
             "--replay",
             "-r",
-            help="离线回放指定 run_id(读 traces/runs/<id>/events.jsonl)",
+            help="离线回放指定 run_id(读 traces/runs/<id>/<run_id>.spine.jsonl)",
         ),
         verbose: bool = typer.Option(
             False, "--verbose", "-v", help="显示完整 payload（默认仅控制点 + channel + outcome）"
         ),
         config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
     ) -> None:
-        """事实流。默认 follow 最新 run 的 spine SSOT(events.jsonl),不是 kernel_serve.log。"""
+        """事实流。默认 follow 最新 run 的 spine SSOT(<run_id>.spine.jsonl),不是 kernel_serve.log。"""
         ops_config = OpsConfig.load(config)
         if target in {"", "journal", "kernel_serve"}:
             _follow_spine_ssot(replay=replay, verbose=verbose)
@@ -112,7 +112,7 @@ def _events_jsonl_for(run_dir: Path) -> Path | None:
     """Return spine events file under a run directory if present (PR-27)。
 
     ADR-0169 PR-27 L10:默认 ``<run_id>.spine.jsonl``;为向后兼容,旧
-    ``events.jsonl`` 也被接受,优先返回 spine 命名。
+    :data:`LEGACY_FILE_NAME` 也被接受,优先返回 spine 命名。
     """
     from lca.infrastructure.observability.spine.sinks.naming import (
         LEGACY_FILE_NAME,
@@ -236,7 +236,7 @@ def _tail_events_jsonl(path: Path, *, verbose: bool, run_dir: Path | None = None
         except FileNotFoundError:
             # Run rotated out — try to recover.
             new_dir = _find_latest_run_dir()
-            new_path = new_dir / "events.jsonl" if new_dir else None
+            new_path = _events_jsonl_for(new_dir) if new_dir else None
             if new_path is None or not new_path.exists():
                 _time.sleep(1.0)
                 continue
@@ -267,13 +267,13 @@ def _follow_spine_ssot(*, replay: str, verbose: bool) -> None:
     """Top-level entry for ``journal logs``.
 
     With ``--replay <run_id>`` (or first positional) → one-shot replay of
-    that run's events.jsonl. Otherwise tail the latest run.
+    that run's spine ledger. Otherwise tail the latest run.
     """
     if replay:
         run_dir = Path("traces/runs") / replay
         path = _events_jsonl_for(run_dir)
         if path is None:
-            print(f"No events.jsonl under {run_dir}")
+            print(f"No spine ledger under {run_dir}")
             raise typer.Exit(1)
         _replay_events_jsonl(path, verbose=verbose, run_dir=run_dir)
         return
@@ -284,7 +284,7 @@ def _follow_spine_ssot(*, replay: str, verbose: bool) -> None:
         raise typer.Exit(1)
     path = _events_jsonl_for(latest)
     if path is None:
-        print(f"No events.jsonl under {latest}")
+        print(f"No spine ledger under {latest}")
         raise typer.Exit(1)
     try:
         _replay_events_jsonl(path, verbose=verbose, run_dir=latest)

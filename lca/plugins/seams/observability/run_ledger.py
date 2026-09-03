@@ -1,6 +1,6 @@
 """Run ledger and journal factory seam —— ADR-0065 L9 + ADR-0167 D11。
 
-ADR-0167 D11 简化: spine events.jsonl 是 SSOT, journal.json 由
+ADR-0167 D11 简化: spine ``<run_id>.spine.jsonl`` 是 SSOT, journal.json 由
 :class:`StepTreeAccumulatorDeriver` 累积 events 后落盘,
 journal.narrative.md 由 :class:`NarrativeDeriver` 从同一 events
 推导。

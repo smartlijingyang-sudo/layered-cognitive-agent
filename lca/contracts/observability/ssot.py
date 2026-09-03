@@ -2,18 +2,20 @@
 
 本模块是文件名 / 路径派生的单一权威。任何 reader / writer 必须通过
 下列函数得到 per-run artifact 的物理路径,**禁止** 再有
-``run_dir / "events.jsonl"`` 之类的字符串拼接。
+``run_dir / LEGACY_FILE_NAME`` 之类的字符串拼接(LEGACY_FILE_NAME 在
+:mod:`lca.infrastructure.observability.spine.sinks.naming` 中定义)。
 
 历史回归根因:
-- ``events.jsonl`` 字符串被多处 reader / writer 硬编码;
+- :data:`LEGACY_FILE_NAME` 字面量被多处 reader / writer 硬编码;
 - 一旦 FileSink 的默认文件名在 PR-27 改成 ``$run_id.spine.jsonl``,
   所有未同步的 reader 立刻读到全零、H-xref 永远 ok、bug 沉默通过;
 - exception 落盘文件名 ``<run_id>.exceptions.jsonl`` 同理被多处字符串拼。
 
 收口:
-- :func:`find_spine_file` 取代所有 ``events.jsonl`` 字面 reader,默认
-  ``<run_dir>/<run_id>.spine.jsonl``,旧 ``<run_dir>/events.jsonl`` 作为
-  兜底;两者都缺则抛 :class:`FileNotFoundError`。
+- :func:`find_spine_file` 取代所有 :data:`LEGACY_FILE_NAME` 字面 reader,
+  默认 ``<run_dir>/<run_id>.spine.jsonl``,旧
+  ``<run_dir>/LEGACY_FILE_NAME`` 作为兜底;两者都缺则抛
+  :class:`FileNotFoundError`。
 - :func:`find_exceptions_file` 取代所有 ``<run_id>.exceptions.jsonl``
   字面 reader;同样走 spine 命名 + 不存在抛错。
 - :func:`find_kernel_log` 取代 ``kernel.log`` 字面 reader。
@@ -46,7 +48,7 @@ def find_spine_file(run_dir: Path, run_id: str) -> Path:
     """Return the canonical spine ledger path for ``run_id`` in ``run_dir``.
 
     优先 ``<run_dir>/<run_id>.spine.jsonl``(PR-27 默认),其次
-    ``<run_dir>/events.jsonl``(legacy 兜底)。两者都缺抛
+    ``<run_dir>/LEGACY_FILE_NAME``(legacy 兜底)。两者都缺抛
     :class:`ObservationSSOTError`。
 
     Contract:

@@ -10,7 +10,7 @@ manifest / kernel.log under ``traces/runs/<run_id>/``。
 
 ADR-0169 PR-27:默认 ``file_name`` 模板 = ``$run_id.spine.jsonl``,
 实例化时按 run_id 解析为 ``<run_id>.spine.jsonl``。显式
-``file_name: "events.jsonl"`` 仍生效(向后兼容,旧 profile / 配置不破)。
+``file_name: LEGACY_FILE_NAME`` 仍生效(向后兼容,旧 profile / 配置不破)。
 """
 
 from __future__ import annotations
@@ -34,6 +34,7 @@ from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDecl
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 from lca.infrastructure.observability.spine.sinks.naming import (
     DEFAULT_SPINE_TEMPLATE,
+    LEGACY_FILE_NAME,
 )
 from lca.infrastructure.observability.spine.sinks.routing_file_sink import (
     RunRoutingFileSink,
@@ -61,8 +62,9 @@ def _resolve_boot_path(cfg: Mapping[str, Any]) -> Path:
         return Path(str(cfg["boot_path"]))
     if "path" in cfg:
         legacy = Path(str(cfg["path"]))
-        # Old single-file layouts pointed at events.jsonl; rename to boot-events.
-        if legacy.name == "events.jsonl":
+        # Old single-file layouts pointed at the pre-PR-27 legacy per-run ledger;
+        # rename to boot-events.LEGACY_FILE_NAME is the SSOT for the legacy name.
+        if legacy.name == LEGACY_FILE_NAME:
             return legacy.with_name("boot-events.jsonl")
         return legacy
     return Path(_DEFAULT_BOOT_PATH)
@@ -105,7 +107,7 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     boot_path = _resolve_boot_path(cfg)
     runs_root = Path(str(cfg.get("runs_root", _DEFAULT_RUNS_ROOT)))
     # ADR-0169 PR-27:默认 file_name 模板 = $run_id.spine.jsonl。
-    # 旧 profile / 配置若显式传 file_name="events.jsonl" 仍生效(向后兼容)。
+    # 旧 profile / 配置若显式传 file_name=LEGACY_FILE_NAME 仍生效(向后兼容)。
     file_name = str(cfg.get("file_name", DEFAULT_SPINE_TEMPLATE))
 
     sink = RunRoutingFileSink(

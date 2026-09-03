@@ -10,7 +10,7 @@ multi-host layout 都通过实现该契约提供。目录命名:
 ADR-0164 增 step-tree 路径:
   - ``journal_step_path`` → step-tree 主存储 (lca.journal/3)
   - ``journal_narrative_path`` → StepNarrativeWriter 写出的 markdown
-  - ``events_path`` → spine SSOT(events.jsonl; ADR-0165.1 / ADR-0167 D11)
+  - ``events_path`` → spine SSOT(<run_id>.spine.jsonl; ADR-0165.1 / ADR-0167 D11)
   - 旧的 ``journal.jsonl`` / ``journal.raw.jsonl`` 已下线;``journal_path``
     方法移除(boot 不再写回放流)。
 """
@@ -32,7 +32,7 @@ class RunLocator(Protocol):
         """返回该 run 的 journal.json 路径(ADR-0164 step-tree 主存储)。"""
 
     def events_path(self, run_id: str) -> Path:
-        """返回该 run 的 events.jsonl 路径(ADR-0165.1 / ADR-0167 D11 SSOT)。"""
+        """返回该 run 的 spine ledger 路径(<run_id>.spine.jsonl,ADR-0165.1 / ADR-0167 D11 SSOT)。"""
 
     def journal_narrative_path(self, run_id: str) -> Path:
         """返回该 run 的 journal.narrative.md 路径(StepNarrativeWriter)。"""

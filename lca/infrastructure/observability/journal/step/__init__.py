@@ -1,9 +1,9 @@
 """journal.step —— step-tree 落盘投影(ADR-0164 + ADR-0167 D11)。
 
 主存储: ``traces/runs/<run_id>/journal.json``(pretty-printed JSON)。
-事件真相: ``traces/runs/<run_id>/events.jsonl``(SSOT, 单一 append-only)。
+事件真相: ``traces/runs/<run_id>/<run_id>.spine.jsonl``(SSOT, 单一 append-only)。
 两者的关系:
-    - SSOT 是 spine.events.jsonl
+    - SSOT 是 spine ledger
     - journal.json 是由 :class:`StepTreeAccumulatorDeriver` 重放 events
       累积出来的可重建视图(ADR-0167 I-MV3: Replay ≡ finalize)
     - narrative.md 是 NarrativeDeriver 从同一 events 推导出的另一视图

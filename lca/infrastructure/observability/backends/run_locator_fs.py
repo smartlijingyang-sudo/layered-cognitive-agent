@@ -57,8 +57,8 @@ class FilesystemRunLocator(RunLocator):
         """SSOT 事件流路径(ADR-0165.1 / ADR-0167 D11 / ADR-0169 PR-27 L10)。
 
         默认 ``<run_id>.spine.jsonl``(L10 单写);若该文件不存在但
-        ``events.jsonl`` 存在(legacy layout,迁移前 run),返回 ``events.jsonl``
-        让 reader 仍可读到旧数据。
+        :data:`LEGACY_FILE_NAME` 存在(legacy layout,迁移前 run),返回
+        :data:`LEGACY_FILE_NAME` 让 reader 仍可读到旧数据。
         """
         run_dir = self.run_dir(run_id)
         spine_path = run_dir / spine_filename_for_run(run_id)

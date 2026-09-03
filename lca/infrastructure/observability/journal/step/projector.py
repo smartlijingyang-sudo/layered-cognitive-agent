@@ -1,6 +1,6 @@
 """JournalDocumentWriter:JournalDocument → ``journal.json`` 落盘。
 
-ADR-0167 D11: spine.events.jsonl 是唯一 SSOT;``journal.json`` 是可重
+ADR-0167 D11: spine ledger 是唯一 SSOT;``journal.json`` 是可重
 建物化视图,由 :class:`StepTreeAccumulatorDeriver` 累积事件后落盘。本
 模块只负责写盘逻辑 + 序列化 dataclass,deriver 不再自己写文件。
 
