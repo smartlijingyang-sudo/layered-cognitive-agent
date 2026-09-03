@@ -9,8 +9,8 @@ from lca.infrastructure.observability.events.w3c_validator import DefaultW3CVali
 
 
 def _invoke_seam_setup() -> dict[str, object]:
-    from lca.plugins.seams.observability.w3c_validator import Config
-    from lca.plugins.seams.observability.w3c_validator import setup as seam_setup
+    from lca.plugins.observability.w3c_validator_seam import Config
+    from lca.plugins.observability.w3c_validator_seam import setup as seam_setup
 
     provided: dict[str, object] = {}
 
@@ -35,7 +35,7 @@ def test_seam_validator_satisfies_protocol() -> None:
 
 
 def test_seam_meta_manifest_is_correct() -> None:
-    from lca.plugins.seams.observability.w3c_validator import setup as seam_setup
+    from lca.plugins.observability.w3c_validator_seam import setup as seam_setup
 
     meta = getattr(seam_setup, "meta", {})
     assert meta.get("id") == "lca-w3c-validator-seam"

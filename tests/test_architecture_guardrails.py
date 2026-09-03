@@ -176,14 +176,21 @@ def test_architecture_33_plugin_composer() -> None:
     _require_path("lca", "plugins", "composer")
 
 
-def test_architecture_34_plugin_providers() -> None:
-    """守护 providers 作为能力实现目录。"""
-    _require_path("lca", "plugins", "providers")
+def test_architecture_34_plugin_seam_provider_collapsed() -> None:
+    """PR-10 之后,seams/providers 两个 kind 维度的子目录已并入 lca/plugins/<domain>/。
+    本测试是反向断言:它们不应该再存在,以防后续 PR 把这两个目录加回来。"""
+    assert not (ROOT / "lca" / "plugins" / "seams").exists(), (
+        "lca/plugins/seams/ must stay collapsed post-PR-10"
+    )
+    assert not (ROOT / "lca" / "plugins" / "providers").exists(), (
+        "lca/plugins/providers/ must stay collapsed post-PR-10"
+    )
 
 
 def test_architecture_35_plugin_seams() -> None:
-    """守护 seams 作为替换接口目录。"""
-    _require_path("lca", "plugins", "seams")
+    """PR-10 反向断言: lca/plugins/seams/ 不应再存在。
+    合并到 test_architecture_34 之后保留空壳以维持 test 编号稳定。"""
+    assert not (ROOT / "lca" / "plugins" / "seams").exists()
 
 
 def test_architecture_36_plugin_strategies() -> None:

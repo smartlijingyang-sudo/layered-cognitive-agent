@@ -12,7 +12,7 @@ from lca.contracts.models.core.decision import Decision, Observation, ToolCall, 
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent, NativeToolCall
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.infrastructure.search.constants import WEB_SEARCH_TOOL
-from lca.plugins.providers.gate.decision_classifier import DefaultDecisionClassifier
+from lca.plugins.gate.decision_classifier_provider import DefaultDecisionClassifier
 
 
 def _state_after_web_search() -> AgentState:

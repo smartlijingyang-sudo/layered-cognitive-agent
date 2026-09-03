@@ -3,14 +3,14 @@
 import pytest
 
 from lca.cognition.body.tool_batch_execution import SafeToolBatchExecutionPolicy
-from lca.plugins.providers.act.action_handlers import (
+from lca.plugins.act.action_handlers_provider import (
     DefaultActionHandlerRegistry,
     DelegateActionHandler,
     HandoffActionHandler,
     RespondActionHandler,
     UseToolActionHandler,
 )
-from lca.plugins.providers.act.delta_handlers import (
+from lca.plugins.act.delta_handlers_provider import (
     ActivationDeltaHandler,
     DefaultDeltaHandlerRegistry,
     ErrorDeltaHandler,
@@ -23,15 +23,15 @@ from lca.plugins.providers.act.delta_handlers import (
     StopDeltaHandler,
     TurnDeltaHandler,
 )
-from lca.plugins.providers.act.effect_handlers import (
+from lca.plugins.act.effect_handlers_provider import (
     BodyActEffectHandler,
     InMemoryEffectHandlerRegistry,
     MemoryUpdateEffectHandler,
     register_default_effect_handlers,
 )
-from lca.plugins.providers.gate.decision_classifier import DefaultDecisionClassifier
-from lca.plugins.providers.gate.gate_chain_composer import DefaultGateChainComposer
-from lca.plugins.providers.journal.artifact_closure import DefaultArtifactClosure
+from lca.plugins.gate.decision_classifier_provider import DefaultDecisionClassifier
+from lca.plugins.gate.gate_chain_composer_provider import DefaultGateChainComposer
+from lca.plugins.journal.artifact_closure_provider import DefaultArtifactClosure
 
 
 class TestDefaultDecisionClassifier:
@@ -194,7 +194,7 @@ class TestDeltaHandlers:
         应配套 transport projection 通道,不可走 reducer.apply_artifact_closure。
         """
         try:
-            from lca.plugins.providers.act.delta_handlers import (
+            from lca.plugins.act.delta_handlers_provider import (
                 ArtifactClosureDeltaHandler,  # type: ignore[attr-defined]
             )
         except ImportError:

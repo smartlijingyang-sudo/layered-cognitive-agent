@@ -14,7 +14,7 @@ import pytest
 
 from lca.contracts.protocols.act.command_envelope import CommandEnvelope
 from lca.harness.declarative.execute.dispatch import RegistryEffectDispatcher
-from lca.plugins.providers.act.effect_handlers import (
+from lca.plugins.act.effect_handlers_provider import (
     InMemoryEffectHandlerRegistry,
     register_default_effect_handlers,
 )

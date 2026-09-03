@@ -3,7 +3,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from lca.plugins.providers.profile_snapshot.run_boot import RunBootSnapshot
+from lca.plugins.observability.profile_snapshot_run_boot_provider import RunBootSnapshot
 
 
 def test_snapshot_recorder_writes_file(monkeypatch) -> None:

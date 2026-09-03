@@ -13,8 +13,8 @@ import asyncio
 
 def _invoke_seam_setup() -> dict[str, object]:
     """``@plugin`` 装饰后 ``setup`` 是 Plugin 对象；真实函数挂在 ``.setup`` 上。"""
-    from lca.plugins.seams.observability.journal_schema import Config
-    from lca.plugins.seams.observability.journal_schema import (
+    from lca.plugins.observability.journal_schema_seam import Config
+    from lca.plugins.observability.journal_schema_seam import (
         setup as seam_setup,
     )
 
@@ -44,7 +44,7 @@ def test_journal_schema_registry_name() -> None:
 
 def test_journal_schema_seam_meta_manifest_is_correct() -> None:
     """Seam 的 cordis Plugin 元数据必须与 @plugin 装饰器一致 (ADR-0061 / 0062)。"""
-    from lca.plugins.seams.observability.journal_schema import (
+    from lca.plugins.observability.journal_schema_seam import (
         setup as seam_setup,
     )
 

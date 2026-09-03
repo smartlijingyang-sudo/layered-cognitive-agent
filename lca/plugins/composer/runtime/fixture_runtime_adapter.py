@@ -33,7 +33,7 @@ from lca.plugins.composer.runtime import fixture_runtime_defaults
 from lca.plugins.composer.runtime.fixture_runtime_input import RuntimeDeps
 from lca.plugins.composer.runtime.runtime_deps import ProductionRuntimeDeps
 from lca.plugins.phase_graph.stop_policy import DefaultStopPolicy
-from lca.plugins.providers.journal.declarative_runtime_seams import (
+from lca.plugins.journal.declarative_runtime_seams_provider import (
     DefaultCheckpointStateResolverFactory,
     DefaultDeclarativeInterpreterFactory,
     DefaultResultFinalizerFactory,

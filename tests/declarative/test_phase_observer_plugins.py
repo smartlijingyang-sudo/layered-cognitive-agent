@@ -21,7 +21,7 @@ from lca.harness.declarative.lifecycle.phase_observation import (
     phase_state_snapshot,
 )
 from lca.plugins.composer.runtime.runtime_assembly import _require_runtime
-from lca.plugins.providers.perceive import phase_observer, phase_observer_tracing
+from lca.plugins.perceive import phase_observer_provider, phase_observer_tracing_provider
 
 
 @dataclass
@@ -182,10 +182,10 @@ def test_observer_cannot_suppress_executor_error() -> None:
 async def test_plugins_contribute_then_freeze_the_default_tracing_observer() -> None:
     registry = InMemoryPhaseObserverRegistry()
     tracing_context = _PluginContext({PHASE_OBSERVER_REGISTRY.key: registry})
-    await phase_observer_tracing.setup.setup(tracing_context, phase_observer_tracing.Config())
+    await phase_observer_tracing_provider.setup.setup(tracing_context, phase_observer_tracing_provider.Config())
 
     provider_context = _PluginContext({PHASE_OBSERVER_REGISTRY.key: registry})
-    await phase_observer.setup.setup(provider_context, phase_observer.Config())
+    await phase_observer_provider.setup.setup(provider_context, phase_observer_provider.Config())
     composite = provider_context.services[PHASE_OBSERVER.key]
 
     assert isinstance(composite, CompositePhaseObserver)

@@ -15,7 +15,7 @@ from lca.contracts.models.team.team_coordination import LeadMandate, gate_name_f
 from lca.contracts.protocols.journal.spec import AgentSpec, LeadSpec
 from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
 from lca.plugins.composer.collaboration.team_transport import build_team_transport
-from lca.plugins.providers.gate.decision_classifier import DefaultDecisionClassifier
+from lca.plugins.gate.decision_classifier_provider import DefaultDecisionClassifier
 from lca.runtime.reducer import DefaultReducer
 from tests.support.agent_specs import make_spec
 

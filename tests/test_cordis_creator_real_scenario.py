@@ -53,7 +53,7 @@ from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent, NativeToo
 from lca.contracts.protocols import LLMAdapter
 from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
 from lca.infrastructure.observability.facade import BoundObservability, bind_backends
-from lca.plugins.providers.think.composition_composer import (
+from lca.plugins.think.composition_composer_provider import (
     CordisComposer,
     build_default_invariant_checker,
 )

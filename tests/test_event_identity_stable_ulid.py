@@ -1,7 +1,7 @@
 import inspect
 import re
 
-from lca.plugins.providers.event_identity.stable_ulid import StableUlidIdentity
+from lca.plugins.observability.event_identity_stable_ulid_provider import StableUlidIdentity
 
 
 def test_derive_returns_ulid_format():

@@ -23,7 +23,7 @@ import structlog
 from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
 from lca.contracts.observability.run_locator import RunLocator
 from lca.harness.profile.boot_products import resolved_profile_from_scope
-from lca.plugins.providers.profile_snapshot.run_boot import RunBootSnapshot
+from lca.plugins.observability.profile_snapshot_run_boot_provider import RunBootSnapshot
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
 
 _log = structlog.get_logger(__name__)

@@ -37,7 +37,7 @@ from lca.infrastructure.observability.journal.engine.journal_io import (
     read_journal,
     stamped_to_record,
 )
-from lca.plugins.providers.think.composition_composer import (
+from lca.plugins.think.composition_composer_provider import (
     CordisComposer,
     build_default_invariant_checker,
 )

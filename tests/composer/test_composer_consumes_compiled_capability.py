@@ -36,11 +36,11 @@ from lca.contracts.capabilities import (
 )
 from lca.contracts.harness.composition.composer import AgentCompositionRequest
 from lca.contracts.protocols.journal.spec import AgentSpec
-from lca.plugins.seams.collaboration.team_communication import (
+from lca.plugins.collaboration.team_communication_seam import (
     DefaultTeamCommunicationAssembler,
 )
-from lca.plugins.seams.collaboration.team_seam import TeamSeam, TeamSeamFactory
-from lca.plugins.seams.collaboration.team_shared_memory import DefaultTeamSharedMemoryResolver
+from lca.plugins.collaboration.team_seam_seam import TeamSeam, TeamSeamFactory
+from lca.plugins.collaboration.team_shared_memory_seam import DefaultTeamSharedMemoryResolver
 
 REPO = Path(__file__).resolve().parents[2]
 COMPOSER_DIRECTORY = REPO / "lca" / "plugins" / "composer"
@@ -389,7 +389,7 @@ def test_team_seam_factory_requires_profile_selected_backends() -> None:
 def test_team_seam_plugin_consumes_shared_memory_resolver_from_scope() -> None:
     """The profile-selected resolver must be a required Team seam dependency."""
 
-    module = REPO / "lca" / "plugins" / "seams" / "collaboration" / "team_seam.py"
+    module = REPO / "lca" / "plugins" / "collaboration" / "team_seam_seam.py"
     source = module.read_text(encoding="utf-8")
     assert "TEAM_SHARED_MEMORY_RESOLVER" in source
     assert (

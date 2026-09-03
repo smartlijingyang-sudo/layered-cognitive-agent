@@ -126,7 +126,7 @@ async def test_attached_span_still_captures_children() -> None:
 #
 # NOTE: 旧 ``create_observability("langfuse", ...)`` 装配面已被
 # ``assemble_observability`` + plugin 注册表替代；Langfuse exporter 现在由
-# ``lca.plugins.providers.observability.fact_reader_langfuse`` 工厂按 settings 装配。
+# ``lca.plugins.observability.fact_reader_langfuse_provider`` 工厂按 settings 装配。
 # 因此原"直接构造 hub + 读 ``hub.bridges``"的测试与新架构不兼容 —— 跳过并
 # 说明原因。bridge 行为（``should_export_span`` 回调）现在由对应 Langfuse
 # exporter 工厂内部装配；如需覆盖，应改为 mock 工厂调用并验证注册表条目。
@@ -151,7 +151,7 @@ class _FakeLangfuse:
     reason="Removed in plugin-ification: ``create_observability`` is gone; Langfuse "
     "exporter is now assembled via ``assemble_observability`` and the Langfuse "
     "plugin factory. Rewrite the bridge assertions to inspect the factory's "
-    "``should_export_span`` output directly (see lca.plugins.providers.observability.fact_reader_langfuse)."
+    "``should_export_span`` output directly (see lca.plugins.observability.fact_reader_langfuse_provider)."
 )
 def test_bridge_applies_noise_filter_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     pytest.importorskip("langfuse")

@@ -24,17 +24,17 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
 )
 from lca.contracts.protocols.state.delta_handler import DeltaHandler, DeltaHandlerRegistry
 from lca.harness.declarative.execute.dispatch import RegistryEffectDispatcher
-from lca.plugins.providers.act.action_handlers import (
+from lca.plugins.act.action_handlers_provider import (
     DefaultActionHandlerRegistry,
     InMemoryActionHandlerRegistry,
     register_default_action_handlers,
 )
-from lca.plugins.providers.act.delta_handlers import (
+from lca.plugins.act.delta_handlers_provider import (
     DefaultDeltaHandlerRegistry,
     InMemoryDeltaHandlerRegistry,
     register_default_delta_handlers,
 )
-from lca.plugins.providers.act.effect_handlers import (
+from lca.plugins.act.effect_handlers_provider import (
     InMemoryEffectHandlerRegistry,
 )
 from lca.runtime.declarative_runtime import RuntimePhaseCapabilities

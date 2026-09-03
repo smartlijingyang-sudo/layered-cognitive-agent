@@ -21,7 +21,7 @@ from lca.infrastructure.workspace.artifact_ledger import (
     rewrite_artifact_markdown,
 )
 from lca.infrastructure.workspace.scope import effective_agent_wall_clock, run_workspace_scope
-from lca.plugins.providers.journal.artifact_closure import DefaultArtifactClosure
+from lca.plugins.journal.artifact_closure_provider import DefaultArtifactClosure
 
 
 class TestSafeBoundary:

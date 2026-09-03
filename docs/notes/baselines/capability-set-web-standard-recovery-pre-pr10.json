@@ -1,0 +1,2410 @@
+{
+  "edges": [
+    [
+      "lca-llm-service",
+      "lca-llm-resolver"
+    ],
+    [
+      "lca-memory-service",
+      "lca-memory-provider"
+    ],
+    [
+      "lca-memory-write-policy-simple",
+      "lca-memory-provider"
+    ],
+    [
+      "lca-memory-compaction-policy-simple",
+      "lca-memory-provider"
+    ],
+    [
+      "lca-retrieval-layered",
+      "lca-memory-provider"
+    ],
+    [
+      "lca-state-store-service",
+      "lca-state-store-provider"
+    ],
+    [
+      "lca-search-service",
+      "lca-search-provider"
+    ],
+    [
+      "lca-tools-service",
+      "lca-tools-provider"
+    ],
+    [
+      "lca-transport-service",
+      "lca-transport-provider"
+    ],
+    [
+      "lca-skills-service",
+      "lca-skills-provider"
+    ],
+    [
+      "lca-file-store-service",
+      "lca-file-store-provider"
+    ],
+    [
+      "lca-sandbox-service",
+      "lca-sandbox-provider"
+    ],
+    [
+      "lca-event-descriptor-registry",
+      "lca-event-descriptor-bootstrap"
+    ],
+    [
+      "lca-journal-store-factory-registry",
+      "lca-fact-store-memory-factory"
+    ],
+    [
+      "lca-journal-seam",
+      "lca-journal-memory-factory"
+    ],
+    [
+      "lca-tracer-seam",
+      "lca-tracer-otel-factory"
+    ],
+    [
+      "lca-attribute-policy-seam",
+      "lca-attribute-policy-default-factory"
+    ],
+    [
+      "lca-fact-reader-seam",
+      "lca-fact-reader-console-factory"
+    ],
+    [
+      "lca-fact-reader-seam",
+      "lca-fact-reader-otel-factory"
+    ],
+    [
+      "lca-fact-reader-seam",
+      "lca-fact-reader-langfuse-factory"
+    ],
+    [
+      "lca-fact-scorer-seam",
+      "lca-langfuse-eval-scorer"
+    ],
+    [
+      "lca-trace-tool-seam",
+      "lca-trace-tool-provider"
+    ],
+    [
+      "lca-cli-debug-command-seam",
+      "lca-cli-debug-trace"
+    ],
+    [
+      "lca-genai-semantic-mapper-seam",
+      "lca-genai-llm-mapper"
+    ],
+    [
+      "lca-genai-semantic-mapper-seam",
+      "lca-genai-tool-mapper"
+    ],
+    [
+      "lca-effect-handler-registry-seam",
+      "lca-effect-handler-provider"
+    ],
+    [
+      "lca-delta-handler-registry-seam",
+      "lca-delta-handler-provider"
+    ],
+    [
+      "lca-declarative-loop-guard",
+      "lca-declarative-runtime-seams-provider"
+    ],
+    [
+      "lca-phase-observer-registry-seam",
+      "lca-phase-observer-tracing-provider"
+    ],
+    [
+      "lca-phase-observer-registry-seam",
+      "lca-phase-observer-provider"
+    ],
+    [
+      "lca-runtime-lifecycle-subscriber-registry-seam",
+      "lca-runtime-lifecycle-logging-provider"
+    ],
+    [
+      "lca-runtime-lifecycle-subscriber-registry-seam",
+      "lca-runtime-lifecycle-publisher"
+    ],
+    [
+      "lca-team-casting-prompt-renderer-builtin",
+      "lca-team-caster-default"
+    ],
+    [
+      "lca-team-communication-default",
+      "lca-team-seam-seam"
+    ],
+    [
+      "lca-team-shared-memory-default",
+      "lca-team-seam-seam"
+    ],
+    [
+      "lca-run-mode-registry-seam",
+      "lca-mode-solo-default"
+    ],
+    [
+      "lca-run-mode-registry-seam",
+      "lca-mode-team-default"
+    ],
+    [
+      "lca-team-role-library-default",
+      "lca-mode-team-default"
+    ],
+    [
+      "lca-team-caster-default",
+      "lca-mode-team-default"
+    ],
+    [
+      "perceive",
+      "perceive.hub.sequential"
+    ],
+    [
+      "perceive",
+      "sensor.clock"
+    ],
+    [
+      "perceive",
+      "sensor.workspace-artifacts"
+    ],
+    [
+      "perceive",
+      "sensor.inbox-facts"
+    ],
+    [
+      "perceive",
+      "sensor.team-inbox"
+    ],
+    [
+      "perceive",
+      "sensor.workspace-instructions"
+    ],
+    [
+      "perceive",
+      "sensor.skill-catalog"
+    ],
+    [
+      "gates",
+      "gates.chain.sequential"
+    ],
+    [
+      "gates",
+      "gate.repeat-tool-call"
+    ],
+    [
+      "gates",
+      "gate.tool-loop-breaker"
+    ],
+    [
+      "gates",
+      "gate.progress-loop-detector"
+    ],
+    [
+      "gates",
+      "gate.terminal-respond"
+    ],
+    [
+      "gates",
+      "gate.artifact-respond-injector"
+    ],
+    [
+      "gates",
+      "gate.must-consult-all"
+    ],
+    [
+      "lca-action-handler-registry-seam",
+      "lca-action-handler-provider"
+    ],
+    [
+      "lca-tool-batch-execution-policy",
+      "lca-action-handler-provider"
+    ],
+    [
+      "lca-factory-seams-default",
+      "body.simple"
+    ],
+    [
+      "lca-artifact-closure-provider",
+      "state.stop-policy.default"
+    ],
+    [
+      "lca-factory-seams-default",
+      "hook_registry.simple"
+    ],
+    [
+      "lca-factory-seams-default",
+      "resume_input.human_answer"
+    ],
+    [
+      "lca-prompt-section-registry",
+      "lca-brain-prompt-sections"
+    ],
+    [
+      "lca-prompt-section-registry",
+      "lca-prompt-assembler-section-manifest"
+    ],
+    [
+      "lca-prompt-template-provider-builtin",
+      "lca-prompt-assembler-section-manifest"
+    ],
+    [
+      "lca-factory-seams-default",
+      "lca-brain-simple"
+    ],
+    [
+      "gates",
+      "lca-brain-simple"
+    ],
+    [
+      "lca-critic-simple",
+      "lca-brain-simple"
+    ],
+    [
+      "lca-reasoner-prompt",
+      "lca-brain-simple"
+    ],
+    [
+      "lca-decision-classifier-seam",
+      "lca-brain-simple"
+    ],
+    [
+      "lca-cognitive-think-pipeline-standard",
+      "lca-brain-simple"
+    ],
+    [
+      "lca-cognitive-reflection-pipeline-standard",
+      "lca-brain-simple"
+    ],
+    [
+      "lca-prompt-assembler-section-manifest",
+      "lca-brain-simple"
+    ],
+    [
+      "lca-prompt-template-selector-team-awareness",
+      "lca-brain-simple"
+    ],
+    [
+      "lca-run-loop-driver-registry",
+      "lca-loop-cognitive"
+    ],
+    [
+      "lca-run-mode-registry-seam",
+      "lca-loop-cognitive"
+    ],
+    [
+      "lca-session-turn-controller-factory",
+      "lca-loop-cognitive"
+    ],
+    [
+      "lca-session-followup-policy",
+      "lca-loop-cognitive"
+    ],
+    [
+      "lca-loop-cognitive",
+      "lca-session-live-builder-provider"
+    ],
+    [
+      "lca-component-registry-seam",
+      "lca-component-state-store-contributor"
+    ],
+    [
+      "lca-component-registry-seam",
+      "lca-component-memory-contributor"
+    ],
+    [
+      "lca-component-registry-seam",
+      "lca-component-budget-policy-contributor"
+    ],
+    [
+      "lca-factory-seams-default",
+      "strategy.lead"
+    ],
+    [
+      "lca-factory-seams-default",
+      "strategy.pipeline"
+    ],
+    [
+      "lca-factory-seams-default",
+      "strategy.fan_out"
+    ],
+    [
+      "lca-factory-seams-default",
+      "strategy.peer_relay"
+    ],
+    [
+      "lca-factory-seams-default",
+      "strategy.peer_swarm"
+    ],
+    [
+      "lca-factory-seams-default",
+      "strategy.debate"
+    ],
+    [
+      "lca.graph-node-executor-registry",
+      "graph-node.agent.default"
+    ],
+    [
+      "lca.graph-node-executor-registry",
+      "graph-node.aggregator.default"
+    ],
+    [
+      "lca.graph-node-executor-registry",
+      "graph-node.topology.default"
+    ],
+    [
+      "lca-factory-seams-default",
+      "strategy.graph"
+    ],
+    [
+      "lca.graph-node-executor-registry",
+      "strategy.graph"
+    ],
+    [
+      "lca-webserver-router",
+      "lca-gateway-routes-health-options"
+    ],
+    [
+      "lca-webserver-router",
+      "lca-gateway-routes-runs-sessions"
+    ],
+    [
+      "lca-webserver-router",
+      "lca-gateway-routes-openai-compat-files"
+    ],
+    [
+      "lca-llm-resolver",
+      "lca-gateway-routes-openai-compat-files"
+    ],
+    [
+      "lca-webserver-router",
+      "lca-gateway-routes-device"
+    ],
+    [
+      "lca-file-store-service",
+      "lca-webserver-bootstrap"
+    ],
+    [
+      "lca-webserver-router",
+      "lca-web-server"
+    ],
+    [
+      "lca-webserver-bootstrap",
+      "lca-web-server"
+    ],
+    [
+      "lca-composition-invariant-default",
+      "lca-composer-provider"
+    ],
+    [
+      "lca-run-mode-registry-seam",
+      "lca-mode-cordis-creator-default"
+    ],
+    [
+      "lca-role-cordis-creator",
+      "lca-mode-cordis-creator-default"
+    ],
+    [
+      "lca-tool-cordis-control",
+      "lca-mode-cordis-creator-default"
+    ],
+    [
+      "lca-tools-service",
+      "lca-tool-bash"
+    ],
+    [
+      "lca-tools-service",
+      "lca-tool-file-write"
+    ],
+    [
+      "spine.emit_pipeline",
+      "spine.core"
+    ],
+    [
+      "spine.sink.file",
+      "spine.core"
+    ],
+    [
+      "spine.deriver.anomaly",
+      "spine.emit_pipeline"
+    ],
+    [
+      "spine.core",
+      "writable.matrix.default"
+    ]
+  ],
+  "manifest_hash": "c4ff0f08657e6faa",
+  "nodes": [
+    {
+      "disabled": false,
+      "id": "lca-llm-service",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "llm"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-decision-classifier-seam",
+      "kind": "seam",
+      "layer": "L1",
+      "provides": [
+        "decision_classifier"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-factory-seams-default",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "bodies",
+        "brains",
+        "hooks",
+        "resume_input_adapters",
+        "team_strategies"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-cognitive-think-pipeline-standard",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "cognitive.think_pipeline"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-cognitive-reflection-pipeline-standard",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "cognitive.reflection_pipeline"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-tools-service",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "tools"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-transport-service",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "transport"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-skills-service",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "skills"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-file-store-service",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "file_store"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-observability-service",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "observability"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-sandbox-service",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "sandbox"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-memory-service",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "memory"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-search-service",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "search"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-state-store-service",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "state_store"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-llm-resolver",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "llm_resolver"
+      ],
+      "requires": [
+        "llm"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-memory-write-policy-simple",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "memory.write_policy"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-memory-compaction-policy-simple",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "memory.compaction_policy"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-retrieval-layered",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "retrieval.layered",
+        "memory.retrieval_policy"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-memory-provider",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "memory",
+        "memory.write_policy",
+        "memory.compaction_policy",
+        "memory.retrieval_policy"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-state-store-provider",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "state_store"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-session-persistence-jsonl-provider",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "session_persistence_factory"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-session-projection-memory-provider",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "session_projection_registry_factory"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-session-turn-controller-factory",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [
+        "session_turn_controller_factory"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-session-followup-policy",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [
+        "session_followup_policy"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-session-command-ledger",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [
+        "session_command_ledger"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-search-provider",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "search"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-tools-provider",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "tools"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-transport-provider",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "transport"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-skills-provider",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "skills"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-file-store-provider",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "file_store"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-sandbox-provider",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "sandbox"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-event-descriptor-registry",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "event_descriptor_registry"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-event-descriptor-bootstrap",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "event_descriptor_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-journal-store-factory-registry",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "journal_store_factories"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-fact-store-memory-factory",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "journal_store_factories"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-journal-seam",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "journal_backends"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-tracer-seam",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "tracer_backends"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-attribute-policy-seam",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "attribute_policy_backends"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-fact-reader-seam",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "fact_readers"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-fact-scorer-seam",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "fact_scorers"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-journal-memory-factory",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "journal_backends"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-tracer-otel-factory",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "tracer_backends"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-attribute-policy-default-factory",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "attribute_policy_backends"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-fact-reader-console-factory",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "fact_readers"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-fact-reader-otel-factory",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "fact_readers"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-fact-reader-langfuse-factory",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "fact_readers"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-langfuse-eval-scorer",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "fact_scorers"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-trace-tool-seam",
+      "kind": "seam",
+      "layer": "L3",
+      "provides": [
+        "trace_inspector_tools"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-trace-tool-provider",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [],
+      "requires": [
+        "trace_inspector_tools"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-cli-debug-command-seam",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "cli_debug_command"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-cli-debug-trace",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "cli_debug_command"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-genai-semantic-mapper-seam",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "genai_semantic_mapper"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-genai-llm-mapper",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "genai_semantic_mapper"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-genai-tool-mapper",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "genai_semantic_mapper"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-idempotency-store-seam",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "idempotency_store"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-effect-handler-registry-seam",
+      "kind": "seam",
+      "layer": "L2",
+      "provides": [
+        "effect_handler_registry"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-effect-handler-provider",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [],
+      "requires": [
+        "effect_handler_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-delta-handler-registry-seam",
+      "kind": "seam",
+      "layer": "L2",
+      "provides": [
+        "delta_handler_registry"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-delta-handler-provider",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [],
+      "requires": [
+        "delta_handler_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-declarative-loop-guard",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "loop_guard_evaluator"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-declarative-runtime-seams-provider",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "checkpoint_state_resolver_factory",
+        "declarative_interpreter_factory",
+        "delta_reducer_factory",
+        "effect_dispatcher_factory",
+        "result_finalizer_factory",
+        "runtime_journal_factory"
+      ],
+      "requires": [
+        "loop_guard_evaluator"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-cognitive-runtime-factory",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "runtime_factory"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-artifact-closure-provider",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "artifact_closure"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-phase-observer-registry-seam",
+      "kind": "seam",
+      "layer": "L2",
+      "provides": [
+        "phase_observer_registry"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-phase-observer-tracing-provider",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [],
+      "requires": [
+        "phase_observer_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-phase-observer-provider",
+      "kind": "composite",
+      "layer": "L2",
+      "provides": [
+        "phase_observer"
+      ],
+      "requires": [
+        "phase_observer_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-runtime-lifecycle-subscriber-registry-seam",
+      "kind": "seam",
+      "layer": "L2",
+      "provides": [
+        "runtime_lifecycle_subscriber_registry"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-runtime-lifecycle-logging-provider",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [],
+      "requires": [
+        "runtime_lifecycle_subscriber_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-runtime-lifecycle-publisher",
+      "kind": "composite",
+      "layer": "L2",
+      "provides": [
+        "runtime_lifecycle_publisher"
+      ],
+      "requires": [
+        "runtime_lifecycle_subscriber_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-team-shared-memory-default",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [
+        "team_shared_memory_resolver"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-team-communication-default",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [
+        "team_communication"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-team-role-library-default",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [
+        "team_role_library"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-team-casting-prompt-renderer-builtin",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [
+        "team_casting_prompt_renderer"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-team-caster-default",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [
+        "team_caster"
+      ],
+      "requires": [
+        "team_casting_prompt_renderer"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-team-seam-seam",
+      "kind": "seam",
+      "layer": "L3",
+      "provides": [
+        "team_seam"
+      ],
+      "requires": [
+        "team_communication",
+        "team_shared_memory_resolver"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-run-mode-registry-seam",
+      "kind": "seam",
+      "layer": "L1",
+      "provides": [
+        "run_mode_registry"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-mode-solo-default",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [],
+      "requires": [
+        "run_mode_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-mode-team-default",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [],
+      "requires": [
+        "run_mode_registry",
+        "team_role_library",
+        "team_caster"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-evidence-store-seam",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "evidence_store",
+        "evidence_policy"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-run-ledger-factory-seam",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "run_ledger_factory"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-default-reducer",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "reducer"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "perceive",
+      "kind": "seam",
+      "layer": "L1",
+      "provides": [
+        "perceive"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "perceive.hub.sequential",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "perceive"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "sensor.clock",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "perceive"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "sensor.workspace-artifacts",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "perceive"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "sensor.inbox-facts",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "perceive"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "sensor.team-inbox",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "perceive"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "sensor.workspace-instructions",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "perceive"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "sensor.skill-catalog",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "perceive"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "gates",
+      "kind": "seam",
+      "layer": "L1",
+      "provides": [
+        "gates"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "gates.chain.sequential",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "gates"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "gate.repeat-tool-call",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "gates"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "gate.tool-loop-breaker",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "gates"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "gate.progress-loop-detector",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "gates"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "gate.terminal-respond",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "gates"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "gate.artifact-respond-injector",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "gates"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "gate.must-consult-all",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "gates"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-tool-batch-execution-policy",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "tool_batch_execution_policy"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-action-handler-registry-seam",
+      "kind": "seam",
+      "layer": "L1",
+      "provides": [
+        "action_handler_registry"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-action-handler-provider",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "action_handler_registry",
+        "tool_batch_execution_policy"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "body.simple",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "bodies"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "safe_executor.simple",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "safe_executor.simple"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "state.stop-policy.default",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "stop_policy"
+      ],
+      "requires": [
+        "artifact_closure"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "hook_registry.simple",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "hooks"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "resume_input.human_answer",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [],
+      "requires": [
+        "resume_input_adapters"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-brain-prompt-catalog-default",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "brain_prompt_catalog_factory"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-prompt-section-registry",
+      "kind": "seam",
+      "layer": "L1",
+      "provides": [
+        "prompt_section_registry"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-prompt-template-provider-builtin",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "prompt_template_provider"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-brain-prompt-sections",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "prompt_section_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-prompt-assembler-section-manifest",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "prompt_assembler"
+      ],
+      "requires": [
+        "prompt_section_registry",
+        "prompt_template_provider"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-prompt-template-selector-team-awareness",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "prompt_template_selector"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-reasoner-prompt",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "reasoner.prompt"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-critic-simple",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "critic.simple"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-brain-simple",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "brains",
+        "gates",
+        "critic.simple",
+        "reasoner.prompt",
+        "decision_classifier",
+        "cognitive.think_pipeline",
+        "cognitive.reflection_pipeline",
+        "prompt_assembler",
+        "prompt_template_selector"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-journal-store",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "journal_store"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-run-loop-driver-registry",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "run_loop_driver_registry"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-loop-cognitive",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [
+        "agent_loop",
+        "run_loop_driver_registry[cognitive]"
+      ],
+      "requires": [
+        "run_loop_driver_registry",
+        "run_mode_registry",
+        "session_turn_controller_factory",
+        "session_followup_policy"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-session-live-builder-provider",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [
+        "session_live_builder"
+      ],
+      "requires": [
+        "agent_loop"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-plan-brain-composer",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [
+        "composer.brain"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-plan-body-composer",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [
+        "composer.body"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-plan-perceive-composer",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [
+        "composer.perceive"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-plan-team-composer",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [
+        "composer.team"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "tools.compose_service",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "tools.compose_service"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "transport.compose_service",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "transport.compose_service"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-component-registry-seam",
+      "kind": "seam",
+      "layer": "L4",
+      "provides": [
+        "component_registry"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-component-state-store-contributor",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [],
+      "requires": [
+        "component_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-component-memory-contributor",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [],
+      "requires": [
+        "component_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-component-budget-policy-contributor",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [
+        "lead_budget_policy_resolver"
+      ],
+      "requires": [
+        "component_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "strategy.lead",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [],
+      "requires": [
+        "team_strategies"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "strategy.pipeline",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [],
+      "requires": [
+        "team_strategies"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "strategy.fan_out",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [],
+      "requires": [
+        "team_strategies"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "strategy.peer_relay",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [],
+      "requires": [
+        "team_strategies"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "strategy.peer_swarm",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [],
+      "requires": [
+        "team_strategies"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "strategy.debate",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [],
+      "requires": [
+        "team_strategies"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca.graph-node-executor-registry",
+      "kind": "seam",
+      "layer": "L3",
+      "provides": [
+        "graph_node_executors"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "graph-node.agent.default",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [],
+      "requires": [
+        "graph_node_executors"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "graph-node.aggregator.default",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [],
+      "requires": [
+        "graph_node_executors"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "graph-node.topology.default",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [],
+      "requires": [
+        "graph_node_executors"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "strategy.graph",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [],
+      "requires": [
+        "team_strategies",
+        "graph_node_executors"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-webserver-router",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "route_registry"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-gateway-routes-health-options",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "route_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-gateway-routes-runs-sessions",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "route_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-gateway-routes-openai-compat-files",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "route_registry",
+        "llm_resolver"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-gateway-routes-device",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "route_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-webserver-bootstrap",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "webserver_bootstrap_factory",
+        "webserver_bootstrap_config",
+        "install_bootstrap_state"
+      ],
+      "requires": [
+        "file_store"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-web-server",
+      "kind": "seam",
+      "layer": "L1",
+      "provides": [
+        "web_server"
+      ],
+      "requires": [
+        "route_registry",
+        "install_bootstrap_state",
+        "webserver_bootstrap_config"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-composition-invariant-default",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "composition.invariant_checker"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-composer-provider",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "composition.compose_factory"
+      ],
+      "requires": [
+        "composition.invariant_checker"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-role-cordis-creator",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [
+        "role.cordis_creator"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-tool-cordis-control",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "cordis_control_tool_factory"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-mode-cordis-creator-default",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [],
+      "requires": [
+        "run_mode_registry",
+        "role.cordis_creator",
+        "cordis_control_tool_factory"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-tool-bash",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "tools.bash"
+      ],
+      "requires": [
+        "tools"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-tool-file-write",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "tools.file_write"
+      ],
+      "requires": [
+        "tools"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "phase.perceive.standard",
+      "kind": "phase-executor",
+      "layer": "L2",
+      "provides": [
+        "phase.perceive.standard"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.think.standard",
+      "kind": "phase-executor",
+      "layer": "L2",
+      "provides": [
+        "phase.think.standard"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.act.standard",
+      "kind": "phase-executor",
+      "layer": "L2",
+      "provides": [
+        "phase.act.standard"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.reflect.standard",
+      "kind": "phase-executor",
+      "layer": "L2",
+      "provides": [
+        "phase.reflect.standard"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.remember.standard",
+      "kind": "phase-executor",
+      "layer": "L2",
+      "provides": [
+        "phase.remember.standard"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.stop.standard",
+      "kind": "phase-executor",
+      "layer": "L2",
+      "provides": [
+        "phase.stop.standard"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.topology.standard",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "phase.topology.standard"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.execution_policy.resilient",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "phase.execution_policy.resilient"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.edge.standard",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "phase.edge.standard"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "control.perceive.context",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "control.perceive.context"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "control.think.guard",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "control.think.guard"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "control.act.authorize",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "control.act.authorize"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "control.act.budget",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "control.act.budget"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "control.act.constrain",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "control.act.constrain"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "control.act.execute",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "control.act.execute"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "control.act.safe-boundary",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "control.act.safe-boundary"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "control.remember.admit",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "control.remember.admit"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "control.stop.decide",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "control.stop.decide"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "control.stop.focus",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "control.stop.focus"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "control.observe.checkpoint",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "control.observe.checkpoint"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "control.observe.wildcard",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "control.observe.wildcard"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.edge.reflect_to_think.recovery",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "phase.edge.recovery"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "spine.reflector.source",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "field_producer.source"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "spine.classifier.exception.builtin",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "field_producer.exception.builtin"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "spine.classifier.exception.unclass",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "field_producer.exception.unclass"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "spine.spantree",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "field_producer.spantree"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "spine.deriver.anomaly",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "deriver.anomaly"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "spine.emit_pipeline",
+      "kind": "seam",
+      "layer": "L1",
+      "provides": [
+        "emit_pipeline"
+      ],
+      "requires": [
+        "field_producer.*",
+        "deriver.anomaly"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "spine.deriver.narrative",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "narrative"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "spine.deriver.graph",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "graph"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "spine.deriver.live_tail",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "live_tail"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "spine.sink.file",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "file_sink"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "spine.core",
+      "kind": "seam",
+      "layer": "L2",
+      "provides": [
+        "event_spine",
+        "spine_context"
+      ],
+      "requires": [
+        "emit_pipeline",
+        "file_sink"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "writable.matrix.default",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "writable_face_registry"
+      ],
+      "requires": [
+        "event_spine"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "spine.sink.console",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "console_sink"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "spine.wrap.assembler",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "assembler_wrap"
+      ],
+      "requires": []
+    }
+  ],
+  "profile": "profiles/web-standard-recovery.yaml"
+}

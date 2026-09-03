@@ -22,7 +22,7 @@ from lca.contracts.protocols.journal.spec import (
 from lca.harness.profile.boot import boot_profile
 from lca.infrastructure.component_registry import ComponentRegistry, RegistryKeyError
 from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
-from lca.plugins.providers.state.component_budget_policy import (
+from lca.plugins.state.component_budget_policy_provider import (
     ComponentRegistryLeadBudgetPolicyResolver,
 )
 

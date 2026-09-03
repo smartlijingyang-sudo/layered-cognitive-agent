@@ -20,7 +20,7 @@ from lca.contracts.protocols.runtime.runtime_lifecycle import (
     RuntimeLifecycleEventType,
     RuntimeLifecycleSubscriberContribution,
 )
-from lca.plugins.providers.state import runtime_lifecycle, runtime_lifecycle_logging
+from lca.plugins.state import runtime_lifecycle_provider, runtime_lifecycle_logging_provider
 from lca.runtime.runtime_event_publisher import (
     CompositeRuntimeLifecyclePublisher,
     InMemoryRuntimeLifecycleSubscriberRegistry,
@@ -130,13 +130,13 @@ async def test_subscriber_failure_is_fail_open_by_default_but_strict_mode_fails_
 async def test_plugins_contribute_then_freeze_default_lifecycle_logging() -> None:
     registry = InMemoryRuntimeLifecycleSubscriberRegistry()
     logging_context = _PluginContext({RUNTIME_LIFECYCLE_SUBSCRIBER_REGISTRY.key: registry})
-    await runtime_lifecycle_logging.setup.setup(
+    await runtime_lifecycle_logging_provider.setup.setup(
         logging_context,
-        runtime_lifecycle_logging.Config(),
+        runtime_lifecycle_logging_provider.Config(),
     )
 
     provider_context = _PluginContext({RUNTIME_LIFECYCLE_SUBSCRIBER_REGISTRY.key: registry})
-    await runtime_lifecycle.setup.setup(provider_context, runtime_lifecycle.Config())
+    await runtime_lifecycle_provider.setup.setup(provider_context, runtime_lifecycle_provider.Config())
     publisher = provider_context.services[RUNTIME_LIFECYCLE_PUBLISHER.key]
 
     assert isinstance(publisher, CompositeRuntimeLifecyclePublisher)

@@ -180,18 +180,18 @@ def test_missing_binding_error_message_is_helpful() -> None:
         "test_capability",
         "bundle or profile patch",
         fallback_policy=FallbackPolicy.PRODUCTION,
-        provider_hint="lca.plugins.seams.test_capability",
+        provider_hint="lca.plugins.<area>.test_capability_seam",
         candidates=("bundle: bundles/base.yaml", "plugin: lca-test-capability-seam"),
     )
     msg = str(error)
     assert "test_capability" in msg
     assert "bundle or profile patch" in msg
-    assert "lca.plugins.seams.test_capability" in msg
+    assert "lca.plugins.<area>.test_capability_seam" in msg
     assert "bundle: bundles/base.yaml" in msg
     assert error.capability == "test_capability"
     assert error.expected_source == "bundle or profile patch"
     assert error.fallback_policy is FallbackPolicy.PRODUCTION
-    assert error.provider_hint == "lca.plugins.seams.test_capability"
+    assert error.provider_hint == "lca.plugins.<area>.test_capability_seam"
 
 
 def test_fallback_policy_test_default_passes(tmp_path: Path) -> None:

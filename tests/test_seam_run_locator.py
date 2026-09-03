@@ -9,8 +9,8 @@ from lca.infrastructure.observability.backends.run_locator_fs import FilesystemR
 
 
 def _invoke_seam_setup() -> dict[str, object]:
-    from lca.plugins.seams.observability.run_locator import Config
-    from lca.plugins.seams.observability.run_locator import setup as seam_setup
+    from lca.plugins.observability.run_locator_seam import Config
+    from lca.plugins.observability.run_locator_seam import setup as seam_setup
 
     provided: dict[str, object] = {}
 
@@ -36,7 +36,7 @@ def test_seam_locator_satisfies_protocol() -> None:
 
 
 def test_seam_meta_manifest_is_correct() -> None:
-    from lca.plugins.seams.observability.run_locator import setup as seam_setup
+    from lca.plugins.observability.run_locator_seam import setup as seam_setup
 
     meta = getattr(seam_setup, "meta", {})
     assert meta.get("id") == "lca-run-locator-seam"
