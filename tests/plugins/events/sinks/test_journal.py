@@ -10,16 +10,23 @@ from lca.plugins.events.sinks.journal.sink import EventRecord, JournalSink
 from lca.plugins.events.subscribers.console_projector.subscriber import (
     ConsoleProjectorSubscriber,
 )
+from lca_kernel.events import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.bus import EventBus, EventRef
 from lca_kernel.events.hooks import FailureSemantics
-from lca_kernel.events import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.registry import EventRegistry
 
 
 def test_journal_sink_records_events() -> None:
     sink = JournalSink()
     payload = TeamDelegationCacheHit(callee_role="x", subtask="y", step=0)
-    ref = EventRef(event_id="evt_1", category="team.delegation.cache_hit", trace_id="", ts=0.0)
+    ref = EventRef(
+        event_id="evt_1",
+        category="team.delegation.cache_hit",
+        trace_id="",
+        ts=0.0,
+        persisted=False,
+        subscriber_count=0,
+    )
     sink.on_event(payload, ref)
     assert len(sink.records) == 1
     record = sink.records[0]
@@ -44,7 +51,14 @@ def test_console_projector_subscriber_renders_to_stdout() -> None:
 
     subscriber = ConsoleProjectorSubscriber(stream=stream)
     payload = TeamDelegationCacheHit(callee_role="analyst", subtask="汇总", step=3)
-    ref = EventRef(event_id="evt_1", category="team.delegation.cache_hit", trace_id="", ts=0.0)
+    ref = EventRef(
+        event_id="evt_1",
+        category="team.delegation.cache_hit",
+        trace_id="",
+        ts=0.0,
+        persisted=False,
+        subscriber_count=0,
+    )
     subscriber.on_event(payload, ref)
     output = stream.getvalue()
     assert "analyst" in output

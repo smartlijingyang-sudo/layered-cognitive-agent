@@ -34,6 +34,8 @@ def _ref() -> EventRef:
         category="spine.cognition.brain.perceive.start",
         trace_id="",
         ts=1725350000.0,
+        persisted=False,
+        subscriber_count=0,
     )
 
 

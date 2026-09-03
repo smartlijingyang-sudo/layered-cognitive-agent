@@ -6,6 +6,7 @@
 - E3：plugin manifest 声明的 event_publishes/event_subscribes 与 yaml 不一致 → AuthMatrixMismatchError
 - E4：yaml 中 category 与 contracts Category 闭集不一致 → UnknownCategoryError
 - E5：plugin 调 publish/subscribe 时未传 plugin_id → MissingPluginIdentityError
+- E6：持久 category 零挂载 sink 且投递策略为 strict（ADR-0184 I2）→ EventNoSinkError
 
 PR-7：EventMechanism 已删除，但 ``EventMechanismError`` 类名保留作为
 公开错误基类（业务方已 import 该名）；新错误请直接继承该类。
@@ -71,9 +72,23 @@ class MissingPluginIdentityError(EventMechanismError):
         super().__init__(f"{op} 必须传 plugin_id；机制按 plugin_id 鉴权")
 
 
+class EventNoSinkError(EventMechanismError):
+    """持久 category 零挂载 sink，且投递策略为 strict（ADR-0184 I2 发送必落）。
+
+    由 ``EventBus._dispatch_sinks`` 上抛：对注册表标记持久（``plane:
+    OBSERVABILITY``）的 category，零落盘不是合法终态。发送方收到错误后
+    自行决定重试或修复装配；事件不进入 ``_fanout``。
+    """
+
+    def __init__(self, category: str) -> None:
+        super().__init__(f"持久 category={category!r} 零挂载 sink；I2 发送必落，拒绝静默丢弃")
+        self.category = category
+
+
 __all__ = [
     "AuthMatrixMismatchError",
     "EventMechanismError",
+    "EventNoSinkError",
     "MissingPluginIdentityError",
     "UnauthorizedPublishError",
     "UnauthorizedSubscribeError",

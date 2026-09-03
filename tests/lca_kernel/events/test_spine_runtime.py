@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import io
-import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
+from lca_kernel.events import EventRef
 from lca_kernel.events.payloads import Category, SpineEventPayload
 from lca_kernel.events.spine_runtime import (
     SpineChain,
@@ -21,8 +19,6 @@ from lca_kernel.events.spine_runtime import (
     default_chain_path,
     is_spine_event,
 )
-from lca_kernel.events import EventRef
-
 
 # ── is_spine_event ───────────────────────────────────────────────────────
 
@@ -94,7 +90,14 @@ def test_record_build_without_chain() -> None:
     PR-2 契约：字段一律输出（值可 None），下游消费者 dict.get() / d["k"] 行为一致。
     """
     p = _build_payload()
-    ref = EventRef(event_id="e1", category=p.category.value, trace_id="t1", ts=0.0)
+    ref = EventRef(
+        event_id="e1",
+        category=p.category.value,
+        trace_id="t1",
+        ts=0.0,
+        persisted=False,
+        subscriber_count=0,
+    )
     rec = SpineEventRecord.build(p, ref)
     d = rec.to_dict()
     assert d["event_id"] == "e1"
@@ -110,7 +113,14 @@ def test_record_build_without_chain() -> None:
 def test_record_build_with_chain_from_start() -> None:
     """chain 起点（prev_hash=None）必须算 event_hash（不是 None）。"""
     p = _build_payload()
-    ref = EventRef(event_id="e1", category=p.category.value, trace_id="t1", ts=0.0)
+    ref = EventRef(
+        event_id="e1",
+        category=p.category.value,
+        trace_id="t1",
+        ts=0.0,
+        persisted=False,
+        subscriber_count=0,
+    )
     rec = SpineEventRecord.build(p, ref, chain=SpineChainContext(prev_hash=None))
     d = rec.to_dict()
     assert d["prev_event_hash"] is None
@@ -122,7 +132,14 @@ def test_record_build_with_chain_from_start() -> None:
 def test_record_build_with_chain_from_prev() -> None:
     """chain 中段（prev_hash=sha256:abc）必须继承 prev + 算新 hash。"""
     p = _build_payload()
-    ref = EventRef(event_id="e1", category=p.category.value, trace_id="t1", ts=0.0)
+    ref = EventRef(
+        event_id="e1",
+        category=p.category.value,
+        trace_id="t1",
+        ts=0.0,
+        persisted=False,
+        subscriber_count=0,
+    )
     rec = SpineEventRecord.build(p, ref, chain=SpineChainContext(prev_hash="sha256:abc"))
     d = rec.to_dict()
     assert d["prev_event_hash"] == "sha256:abc"

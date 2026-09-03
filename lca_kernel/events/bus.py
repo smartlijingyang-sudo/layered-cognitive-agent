@@ -18,6 +18,10 @@ LCA 事件总线唯一入口（SSOT）。原 EventMechanism（ADR-0180）在 PR-
   → new_id("trc");ambient 值由 webserver 请求入口 set/reset
 - 自观察事件(§3.10)走 _emit_self_observation 内部路径:不进鉴权矩阵、
   不重入 hook chain,结构上杜绝递归
+- 投递回执与计数器(ADR-0184 D1/D2/D4):publish 返回的 EventRef 携带
+  persisted / subscriber_count;按 category 的 published / persisted /
+  delivered / dropped 四值计数器经 delivery_snapshot() 只读投影;
+  零落盘策略经 configure_delivery_policy(strict=...) 切换
 """
 
 from __future__ import annotations
@@ -27,13 +31,16 @@ import logging
 import time
 from collections import defaultdict
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Generic, TypeVar
 
+import structlog
+
 from lca.contracts.atoms.ids import new_id
-from lca.contracts.event import Category, EventPayload
+from lca.contracts.event import Category, EventPayload, Plane
 from lca_kernel.events.errors import (
     EventMechanismError,
+    EventNoSinkError,
     MissingPluginIdentityError,
     UnauthorizedPublishError,
     UnauthorizedSubscribeError,
@@ -57,6 +64,7 @@ if TYPE_CHECKING:
     from lca_kernel.events.sinks import SinkBackend
 
 _log = logging.getLogger(__name__)
+_delivery_log = structlog.get_logger(__name__)
 
 P = TypeVar("P", bound=EventPayload)
 
@@ -66,12 +74,39 @@ P = TypeVar("P", bound=EventPayload)
 
 @dataclass(frozen=True, slots=True)
 class EventRef:
-    """机制返回给发送方的轻量引用。"""
+    """机制返回给发送方的轻量引用 + 投递回执(ADR-0184 D1)。
+
+    回执字段契约:
+    - ``persisted``: S3 是否有 ≥1 个已装载 sink 实际写入成功;
+    - ``subscriber_count``: S4 实际派发的订阅者数量(含 contained 失败)。
+
+    失败语义:字段只反映事实,不抛错;零落盘的抛错由 I2 负责
+    (:class:`EventNoSinkError`)。时序:``publish`` 返回前填充完毕,
+    派生路径(自观察)同样返回填齐的回执。所有权:机制层唯一写方,
+    发送方只读。外部后果:发送方可在调用点立即判断事件停在哪个阶段。
+    """
 
     event_id: str
     category: str
     trace_id: str
     ts: float
+    persisted: bool
+    subscriber_count: int
+
+
+# ── 投递策略(ADR-0184 D4)──────────────────────────────────────────────
+
+
+@dataclass(frozen=True, slots=True)
+class DeliveryPolicy:
+    """零落盘投递策略(ADR-0184 I2)。
+
+    ``strict=True``:持久 category 零挂载 sink → publish 抛
+    :class:`EventNoSinkError`(fail-loud),事件不进入 ``_fanout``;
+    ``strict=False``:降级为 ``dropped`` 计数 + error 日志,事件继续派发。
+    """
+
+    strict: bool
 
 
 # ── ambient trace_id(ADR-0183 §3.9)─────────────────────────────────────
@@ -164,6 +199,17 @@ class EventBus(Generic[P]):
         # sink 的装载走 mount_sink(由 pipeline_loader.apply_pipeline 调用),
         # publish 期经 _dispatch_sinks 派发(FD-1,先于 consumer FD-2)。
         self._sinks: dict[str, tuple[SinkBackend, FailureSemantics]] = {}
+        # 进程内投递计数器(ADR-0184 D2):按 category 累计四值,内存结构,
+        # 不落盘、不按事件保留;上限 = Category 闭集大小 × 4。
+        self._delivery_counts: defaultdict[str, dict[str, int]] = defaultdict(
+            self._new_delivery_counts
+        )
+        # COMPAT(delete-when: ADR-0184 PR-C 合并且 live-run 验证通过,
+        # tracking: ADR-0184 PR-C)
+        # 迁移窗口默认 strict=False:存量事件仍走老链,总线零落盘是过渡态
+        # 事实,此时抛错会打断全部 publish;PR-C 装配切换后翻转为 True,
+        # 降级路径随之删除。
+        self._delivery_policy = DeliveryPolicy(strict=False)
 
     # ── 进程级单例 ────────────────────────────────────────────────────────
 
@@ -194,7 +240,14 @@ class EventBus(Generic[P]):
         producer: type,
         trace_id: str | None = None,
     ) -> EventRef:
-        """唯一发送入口。流程见 ADR-0183 §3.1 publish 流程 1–9。"""
+        """唯一发送入口。流程见 ADR-0183 §3.1 publish 流程 1–9。
+
+        投递事实(ADR-0184):鉴权与 schema 校验通过后计入 ``published``,
+        S3/S4 结果计入 ``persisted`` / ``delivered`` / ``dropped`` 计数器,
+        返回的 :class:`EventRef` 回执填齐 ``persisted`` / ``subscriber_count``。
+        阶段抛错(FD-1 fail-fast / I2 EventNoSinkError / FAIL_FAST 订阅)时
+        计数器只记抛错前已完成的事实,错误原样上抛。
+        """
         if producer is None or not isinstance(producer, type):
             raise MissingPluginIdentityError("publish")
         category = payload.category
@@ -212,6 +265,8 @@ class EventBus(Generic[P]):
             category=category.value,
             trace_id=self._resolve_trace_id(trace_id, effective),
             ts=ctx.ts,
+            persisted=False,
+            subscriber_count=0,
         )
 
         # ADR-0183 §3.9 PR-12:把 trace_id 写入 SpineContext contextvars,让老
@@ -225,8 +280,22 @@ class EventBus(Generic[P]):
         except ImportError:
             pass  # SpineContext 不可用时退回 None
 
-        self._dispatch_sinks(effective, ref)
-        results = self._fanout(effective, ref)
+        counts = self._delivery_counts[category.value]
+        counts["published"] += 1
+        persisted = False
+        results: list[ConsumerResult] = []
+        try:
+            persisted = self._dispatch_sinks(effective, ref)
+            self._fanout(effective, ref, results)
+        finally:
+            if persisted:
+                counts["persisted"] += 1
+            if results:
+                counts["delivered"] += 1
+            if not persisted or (not results and self._has_declared_subscribers(category)):
+                counts["dropped"] += 1
+        ref = replace(ref, persisted=persisted, subscriber_count=len(results))
+
         self._run_post_dispatch(effective, ref, results)
 
         if any(r.exc is not None for r in results):
@@ -317,7 +386,47 @@ class EventBus(Generic[P]):
                 if callable(on_fail):
                     self._failure_hooks.append(on_fail)
 
+    # ── 投递回执 / 计数器(ADR-0184 D2/D4)────────────────────────────────
+
+    def delivery_snapshot(self) -> dict[str, dict[str, int]]:
+        """按 category 的投递计数器快照(ADR-0184 D2)。
+
+        返回 ``{category: {"published":…, "persisted":…, "delivered":…,
+        "dropped":…}}`` 的拷贝:只含发生过 publish 的 category;调用方可
+        自由读取聚合,写回不影响计数器。所有权:返回值归调用方。
+        ``dropped`` 定义 = 事件未落盘,或零派发且注册表为该 category
+        声明了订阅者。
+        """
+        return {category: dict(counts) for category, counts in self._delivery_counts.items()}
+
+    def configure_delivery_policy(self, *, strict: bool) -> None:
+        """设置零落盘投递策略(ADR-0184 D4),立即对后续 publish 生效。
+
+        ``strict=True``:持久 category 零挂载 sink 抛 :class:`EventNoSinkError`;
+        ``strict=False``:降级为 ``dropped`` 计数 + error 日志(迁移窗口)。
+        """
+        self._delivery_policy = DeliveryPolicy(strict=strict)
+
+    @property
+    def delivery_policy(self) -> DeliveryPolicy:
+        """当前投递策略(只读)。"""
+        return self._delivery_policy
+
     # ── 内部 ──────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _new_delivery_counts() -> dict[str, int]:
+        return {"published": 0, "persisted": 0, "delivered": 0, "dropped": 0}
+
+    def _has_declared_subscribers(self, category: Category) -> bool:
+        """注册表(含 consumer_rules 物化)是否为该 category 声明订阅者。"""
+        return bool(self._registry.subscribers.get(category))
+
+    def _is_persistent_category(self, category: Category) -> bool:
+        """注册表 plane = OBSERVABILITY 即持久类;查无注册信息按持久处理
+        (fail-safe:宁可抛错也不静默丢事实链事件)。"""
+        spec = self._spec_by_category.get(category)
+        return spec is None or spec.plane is Plane.OBSERVABILITY
 
     def _run_pre_dispatch(
         self,
@@ -352,22 +461,39 @@ class EventBus(Generic[P]):
                 f"{expected_cls.__qualname__}, 实际 {type(payload).__qualname__}"
             )
 
-    def _dispatch_sinks(self, payload: EventPayload, ref: EventRef) -> None:
+    def _dispatch_sinks(self, payload: EventPayload, ref: EventRef) -> bool:
         """把事实派发到已装载的落盘后端(FD-1,先于 consumer FD-2)。
 
         每个后端收到 ``build_record(payload, ref)`` 的 9 键 ``SpineEventRecord``;
         后端 ``append`` 抛错时按 :meth:`mount_sink` 声明的 ``failure`` 处理。
-        未装载任何后端时为 no-op(生产 boot 仅装 hook,不走本路径)。
+        返回 S3 持久回执:≥1 个后端写入成功为 True。
+
+        零挂载策略(ADR-0184 I2):持久类 category 零 sink 时,
+        ``strict=True`` 抛 :class:`EventNoSinkError`(事件不进 ``_fanout``);
+        ``strict=False`` 记 error 日志后返回 False(事件继续派发),
+        ``dropped`` 计数由 :meth:`publish` 统一记。非持久 category
+        零 sink 只返回 False,不打 error 日志。
         """
         if not self._sinks:
-            return
+            if self._is_persistent_category(payload.category):
+                if self._delivery_policy.strict:
+                    raise EventNoSinkError(payload.category.value)
+                _delivery_log.error(
+                    "persistent category dispatched with zero sinks; dropped",
+                    category=payload.category.value,
+                    event_id=ref.event_id,
+                    trace_id=ref.trace_id,
+                )
+            return False
         # 延迟导入避免环:spine_runtime 依赖 mechanism,不与 bus 互引。
         from lca_kernel.events.spine_runtime import build_record
 
         record = build_record(payload, ref)
+        persisted = False
         for sink_id, (backend, failure) in self._sinks.items():
             try:
                 backend.append(record)
+                persisted = True
             except Exception:
                 if failure is FailureSemantics.FAIL_FAST:
                     raise
@@ -375,22 +501,28 @@ class EventBus(Generic[P]):
                     "sink backend append failed (contained)",
                     extra={"sink_id": sink_id, "event_id": ref.event_id},
                 )
+        return persisted
 
     def _fanout(
         self,
         payload: EventPayload,
         ref: EventRef,
-    ) -> list[ConsumerResult]:
-        """fanout:FAIL_FAST 路径首个 sink 抛错上抛,CONTAINED 路径统一吞错。"""
-        results: list[ConsumerResult] = []
+        out: list[ConsumerResult],
+    ) -> None:
+        """fanout:FAIL_FAST 路径首个 sink 抛错上抛,CONTAINED 路径统一吞错。
+
+        每次派发尝试(无论成功或 contained 失败)向 ``out`` 追加一条
+        ``ConsumerResult``;FAIL_FAST 抛错时 ``out`` 保留抛错前的部分事实,
+        供 :meth:`publish` 的计数器与回执使用。
+        """
         for plugin_cls, callback, failure in self._subscribers.get(payload.category, ()):
             try:
                 callback(payload, ref)
-                results.append(
+                out.append(
                     ConsumerResult(plugin=plugin_cls, category=payload.category, failure=failure)
                 )
             except Exception as exc:
-                results.append(
+                out.append(
                     ConsumerResult(
                         plugin=plugin_cls,
                         category=payload.category,
@@ -405,7 +537,6 @@ class EventBus(Generic[P]):
                     "consumer callback failed",
                     extra={"event_id": ref.event_id, "category": payload.category.value},
                 )
-        return results
 
     def _run_post_dispatch(
         self,
@@ -441,14 +572,22 @@ class EventBus(Generic[P]):
         结构性防递归守卫:本路径不跑 pre/post_dispatch hook、不进
         _fanout 业务订阅表、不再调 publish —— 自观察事件不可能再次
         触发 MechanismDispatchObserver。callback 失败 contained 吞错。
+
+        回执事实:自观察事件不经 sink 落盘(persisted=False),
+        subscriber_count = 实际派发的自观察 callback 数;不进投递计数器
+        (其 category 不在 Category 闭集内)。
         """
         ref = EventRef(
             event_id=new_id("evt"),
             category=payload.category,
             trace_id=trace_id,
             ts=time.time(),
+            persisted=False,
+            subscriber_count=0,
         )
+        dispatched = 0
         for _plugin_cls, callback in self._self_observers.get(payload.category, ()):
+            dispatched += 1
             try:
                 callback(payload, ref)
             except Exception:
@@ -456,7 +595,7 @@ class EventBus(Generic[P]):
                     "self-observation callback failed",
                     extra={"event_id": ref.event_id, "category": payload.category},
                 )
-        return ref
+        return replace(ref, subscriber_count=dispatched)
 
     def _run_failure_hooks(
         self,
@@ -501,6 +640,7 @@ class EventBus(Generic[P]):
 
 __all__ = [
     "ConsumerHandle",
+    "DeliveryPolicy",
     "EventBus",
     "EventRef",
     "FailureSemantics",
