@@ -10,18 +10,15 @@ from collections.abc import Iterator
 import pytest
 
 from lca_kernel.events.bus import EventBus
-from lca_kernel.events.mechanism import EventMechanism
 
 
 @pytest.fixture
 def event_singletons_reset() -> Iterator[None]:
-    """EventBus / EventMechanism 进程级单例测试前后对称重置。
+    """EventBus 进程级单例测试前后对称重置。
 
-    ``EventBus.default()`` 与 ``EventMechanism.default()`` 是进程级单例;
+    ``EventBus.default()`` 是进程级单例;
     集成测试之间不可共享鉴权矩阵、订阅表或已装载的 pipeline 状态。
     """
     EventBus.reset_singleton()
-    EventMechanism.reset_singleton()
     yield
     EventBus.reset_singleton()
-    EventMechanism.reset_singleton()

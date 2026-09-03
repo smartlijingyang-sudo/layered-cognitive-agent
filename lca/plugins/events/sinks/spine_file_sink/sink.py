@@ -1,4 +1,4 @@
-"""spine_file_sink plugin 实现（ADR-0181 PR-8 shim；record 入口 ADR-0183 PR-5）。
+"""spine_file_sink plugin 实现（ADR-0181 PR-8 shim / ADR-0183 PR-7；record 入口 ADR-0183 PR-5）。
 
 # COMPAT(delete-when: PR-9, tracking: ADR-0181)
 # shim：<run_dir>/default-run.spine.jsonl 落盘入口。record 构造 =
@@ -15,7 +15,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from lca_kernel.events.mechanism import EventRef
+from lca_kernel.events.bus import EventRef
 from lca_kernel.events.sinks.spine_sink import SpineSink
 from lca_kernel.events.spine_runtime import build_record, is_spine_event
 
@@ -23,13 +23,13 @@ log = logging.getLogger(__name__)
 
 
 class SpineFileSink:
-    """EventMechanism callback 入口；落盘委托 SpineSink SSOT 路径。
+    """EventBus callback 入口；落盘委托 SpineSink SSOT 路径。
 
     manifest 订阅全部 spine EP category；每条事件经 ``build_record()`` 构造
     ``SpineEventRecord`` 后交 ``SpineSink.append``。字节布局 =
     ``SpineEventRecord.to_dict()`` 9 键（ADR-0183 §3.5 SSOT，plugin 不可改）。
 
-    失败语义：callback 异常上抛；订阅路径由机制 FD-2 contained 显式记日志，
+    失败语义：sink path 失败上抛；订阅路径由机制 FD-1 fail-fast 显式记日志，
     无静默枚举 fallback。
     """
 

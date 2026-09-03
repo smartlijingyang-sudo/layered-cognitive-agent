@@ -1,60 +1,58 @@
-"""spine_step_tree_accumulator subscriber 端到端（ADR-0181 试点盖章条件 3: 防偷听）。"""
+"""spine_step_tree_accumulator subscriber 端到端（ADR-0181 试点盖章条件 3 / ADR-0183 PR-7）。"""
 from __future__ import annotations
+
+from pathlib import Path
 
 import pytest
 
+from lca.contracts.event import Category
 from lca.plugins.events.publishers.spine_reflector_cognition.plugin import (
     ReflectorClass,
 )
 from lca.plugins.events.subscribers.spine_step_tree_accumulator.subscriber import (
     SpineStepTreeAccumulator,
 )
+from lca_kernel.events.bus import EventBus
 from lca_kernel.events.errors import UnauthorizedSubscribeError
-from lca_kernel.events.mechanism import EventMechanism
+from lca_kernel.events.mechanism import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.payloads import SpineEventPayload
 from lca_kernel.events.registry import EventRegistry
 
 
 @pytest.fixture
-def mechanism() -> EventMechanism:
-    from pathlib import Path
-
+def bus() -> EventBus:
     SpineStepTreeAccumulator.reset()
     config_dir = Path(__file__).resolve().parents[4] / "lca_kernel" / "events" / "config"
-    m = EventMechanism(EventRegistry.load(config_dir))
-    m.subscribe(
+    b = EventBus(EventRegistry.load(config_dir))
+    b.subscribe(
         plugin=SpineStepTreeAccumulator,
-        category=__import__("lca.contracts.event", fromlist=["Category"]).Category(
-            "spine.cognition.brain.perceive.start"
-        ),
-        callback=SpineStepTreeAccumulator(),
+        category=Category("spine.cognition.brain.perceive.start"),
+        on_event=SpineStepTreeAccumulator(),
     )
-    return m
+    return b
 
 
-def test_authorized_subscriber_receives(mechanism: EventMechanism) -> None:
-    mechanism.send(
+def test_authorized_subscriber_receives(bus: EventBus) -> None:
+    bus.publish(
         SpineEventPayload(
             execution_point="brain.perceive.start",
             channel="fact",
             payload={"state_id": "s1"},
         ),
-        plugin=ReflectorClass,
+        producer=ReflectorClass,
     )
     assert len(SpineStepTreeAccumulator._state) == 1
     assert SpineStepTreeAccumulator._state[0]["state_id"] == "s1"
 
 
-def test_unauthorized_subscriber_rejected(mechanism: EventMechanism) -> None:
+def test_unauthorized_subscriber_rejected(bus: EventBus) -> None:
     """盖章 3: 偷听 — 未在 yaml subscribers 白名单的 plugin 调 subscribe → raise。"""
     class NotInWhitelist:
         pass
 
     with pytest.raises(UnauthorizedSubscribeError):
-        mechanism.subscribe(
+        bus.subscribe(
             plugin=NotInWhitelist,
-            category=__import__("lca.contracts.event", fromlist=["Category"]).Category(
-                "spine.cognition.brain.perceive.start"
-            ),
-            callback=lambda p, r: None,
+            category=Category("spine.cognition.brain.perceive.start"),
+            on_event=lambda p, r: None,
         )

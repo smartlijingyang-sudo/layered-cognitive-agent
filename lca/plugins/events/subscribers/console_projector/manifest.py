@@ -1,4 +1,4 @@
-"""Console projector subscriber plugin Manifest（ADR-0180）。
+"""Console projector subscriber plugin Manifest（ADR-0180 / ADR-0183 PR-7）。
 
 统一目录：``lca/plugins/events/subscribers/<name>/manifest.py``。
 """
@@ -23,9 +23,8 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.events.subscribers.console_projector.subscriber import (
     ConsoleProjectorSubscriber,
 )
-from lca_kernel.events import EventMechanism
 
-# subscriber 的 plugin class（必须在 yaml subscribers 全路径登记）。
+# subscriber 的 plugin class（必须在 yaml subscribers全路径登记）。
 SUBSCRIBER_PLUGIN_CLASS = ConsoleProjectorSubscriber
 
 
@@ -36,7 +35,7 @@ class _Config(BaseModel):
 @plugin(
     id="lca.events.subscriber.console_projector",
     provides=["event.subscriber.console_projector"],
-    requires=["event.mechanism"],
+    requires=["event.bus"],
     layer="L0",
     kind=PluginKind.PROVIDER,
     effects="none",
@@ -56,23 +55,25 @@ class _Config(BaseModel):
         ),
     ),
     ownership=OwnershipDeclaration(
-        reads=("event.mechanism",),
+        reads=("event.bus",),
         emits=("event.subscriber.console_projector.rendered",),
         state_mutation="forbidden",
     ),
 )
 async def setup_console_projector(ctx: PluginContext, config: _Config) -> None:
-    """Console projector subscriber boot：构造 subscriber + 订阅 yaml 中所有 category。"""
-    mechanism_obj = ctx.soft_get("event.mechanism")
-    if not isinstance(mechanism_obj, EventMechanism):
-        msg = "event.subscriber.console_projector boot 失败：event.mechanism 未装载"
+    """Console projector subscriber boot：构造 subscriber + 订阅 EventBus 所有 category。"""
+    from lca_kernel.events.bus import EventBus
+
+    bus_obj = ctx.soft_get("event.bus")
+    if not isinstance(bus_obj, EventBus):
+        msg = "event.subscriber.console_projector boot 失败：event.bus 未装载"
         raise RuntimeError(msg)
     subscriber = ConsoleProjectorSubscriber()
-    for spec in mechanism_obj.registry.specs:
-        mechanism_obj.subscribe(
+    for spec in bus_obj.registry.specs:
+        bus_obj.subscribe(
             plugin=SUBSCRIBER_PLUGIN_CLASS,
             category=spec.category,
-            callback=subscriber.on_event,
+            on_event=subscriber.on_event,
         )
     ctx.provide("event.subscriber.console_projector", subscriber)
 
