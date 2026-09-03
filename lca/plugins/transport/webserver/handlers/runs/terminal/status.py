@@ -6,9 +6,10 @@ import asyncio
 import time
 from typing import Any
 
+from lca.contracts.observability.ssot import RunLifecycleStatus as RunStatus
 from lca.infrastructure.observability import BoundObservability, fold_run_state
 from lca.infrastructure.observability.journal.engine.reducer import RunStatus as JournalRunStatus
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession, RunStatus
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
 
 
 def journal_store(hub: BoundObservability | None) -> Any:

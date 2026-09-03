@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 
+from lca.contracts.observability.ssot import RunLifecycleStatus as RunStatus
 from lca.contracts.protocols.runtime.infra import MachineResolver
 from lca.plugins.transport.webserver.handlers.runs.execute.execute import (
     create_run_session,
@@ -18,7 +19,7 @@ from lca.plugins.transport.webserver.handlers.runs.execute.execute import (
 from lca.plugins.transport.webserver.handlers.runs.execute.scheduling import (
     schedule_run,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunStatus
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry
 from lca.plugins.transport.webserver.handlers.runs.terminal.port import (
     RunCommandReceipt,
     RunReceipt,

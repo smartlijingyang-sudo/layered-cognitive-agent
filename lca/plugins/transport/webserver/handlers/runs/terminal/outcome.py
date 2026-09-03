@@ -11,11 +11,12 @@ from __future__ import annotations
 from typing import Any
 
 from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.observability.ssot import RunLifecycleStatus as RunStatus
 from lca.plugins.transport.webserver.handlers.runs.execute.loop_drivers import DriverOutcome
 from lca.plugins.transport.webserver.handlers.runs.observability.error_presentation import (
     format_user_error,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession, RunStatus
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
 
 
 class RunOutcomeApplier:
