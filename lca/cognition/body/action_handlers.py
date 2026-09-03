@@ -64,7 +64,9 @@ from lca.contracts.protocols.act.action import Action
 from lca.contracts.protocols.act.command_envelope import command_envelope_to_dict
 from lca.contracts.protocols.act.tool_batch_execution import ToolBatchExecutionPolicy
 from lca.infrastructure.observability import record
-from lca.plugins.observability.spine.reflectors import body_llm as _body_llm_reflector
+from lca.plugins.events.publishers.spine_reflector_body_llm import (
+    plugin as _body_llm_reflector,
+)
 
 _ERR_DEADLINE_EXPIRED = "delegate 超时(deadline 已过期)"
 _ERR_TIMEOUT = "delegate 超时"

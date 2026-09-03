@@ -10,13 +10,32 @@ active spine installed by ``set_active_spine`` and call
 ``spine.append(...)``.
 """
 
+# ADR-0181 PR-3：旧 spine 反射器（lca.plugins.observability.spine.reflectors.runtime）
+# 已迁到 lca.plugins.events.publishers.spine_reflector_runtime。EventMechanism
+# 路径下等价覆盖在
+# tests/plugins/events/publishers/test_spine_reflector_runtime.py。
+# 删-when：PR-9 旧 spine 全部退役后，本文件删除（rg
+# EventSpine lca/plugins/observability/spine/ = 0 触发）。
 from __future__ import annotations
 
 from typing import Any, ClassVar
 
+import pytest
+
 from lca.infrastructure.observability.spine.context import SpineContext
 from lca.infrastructure.observability.spine.event_record import EventRecord
 from lca.infrastructure.observability.spine.event_spine import EventSpine
+
+
+pytestmark = pytest.mark.xfail(
+    reason=(
+        "ADR-0181 PR-3：旧 EventSpine 反射器路径已退役。runtime emit_* 等价 "
+        "EventMechanism 路径覆盖在 tests/plugins/events/publishers/test_spine_reflector_runtime.py；"
+        "本测试在 PR-9 旧 spine 全退役时删（rg "
+        "lca.plugins.observability.spine.reflectors.runtime lca/ = 0 触发）。"
+    ),
+    strict=True,
+)
 
 # ── helpers ──────────────────────────────────────────────────────────
 

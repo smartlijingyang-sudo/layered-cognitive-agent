@@ -8,12 +8,15 @@ from lca_kernel.events.payloads import SpineEventPayload
 from lca_kernel.events.registry import EventRegistry
 
 
-def test_spine_yaml_loads_sixteen_cognition_events() -> None:
-    """spine.yaml PR-2 必须有 16 个 cognition 事件（试点 1 + PR-2 余 15）。"""
+def test_spine_yaml_loads_spine_events_after_pr3() -> None:
+    """spine.yaml PR-3 后：试点 1 + PR-2 15 cognition + PR-3 13 body/llm/lifecycle/exception + PR-3 5 runtime.observed = 34。
+
+    删-when：spine.yaml 退化为单一 cognition 测试时（本测试断言的事件数）。
+    """
     config_dir = Path(__file__).resolve().parents[3] / "lca_kernel" / "events" / "config"
     registry = EventRegistry.load(config_dir)
     spine_specs = [s for s in registry.specs if s.category.value.startswith("spine.")]
-    assert len(spine_specs) == 16, f"spine.yaml PR-2 应 16 个 cognition 事件；found {len(spine_specs)}"
+    assert len(spine_specs) == 34, f"spine.yaml PR-3 应 34 个事件（cognition 16 + body 5 + lifecycle 1 + llm 5 + exception 2 + runtime 5）；found {len(spine_specs)}"
     spec = spine_specs[0]
     assert spec.category == Category("spine.cognition.brain.perceive.start")
     assert spec.payload_class is SpineEventPayload

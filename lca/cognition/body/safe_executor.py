@@ -112,7 +112,9 @@ from lca.cognition.body.tool_journal_emit import (  # noqa: E402
     emit_tool_invoked,
     emit_tool_started,
 )
-from lca.plugins.observability.spine.reflectors import body_llm as _body_llm_reflector  # noqa: E402
+from lca.plugins.events.publishers.spine_reflector_body_llm import (
+    plugin as _body_llm_reflector,  # noqa: E402
+)
 
 
 def _emit_approval_requested(tool: Tool, invocation_id: str) -> None:

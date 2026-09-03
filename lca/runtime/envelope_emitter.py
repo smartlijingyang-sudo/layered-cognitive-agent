@@ -29,7 +29,9 @@ class SpineEnvelopeEmitter:
 
     @staticmethod
     def _runtime() -> Any:
-        from lca.plugins.observability.spine.reflectors import runtime as _r
+        from lca.plugins.events.publishers.spine_reflector_runtime import (
+            plugin as _r,
+        )
 
         return _r
 
