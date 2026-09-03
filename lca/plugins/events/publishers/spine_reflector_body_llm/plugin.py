@@ -18,6 +18,21 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from pydantic import BaseModel
+
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca_kernel.events.payloads import Category, SpineEventPayload
 from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
 
@@ -25,6 +40,10 @@ if TYPE_CHECKING:
     from lca_kernel.events.bus import EventRef
 
 log = logging.getLogger(__name__)
+
+
+class _Config(BaseModel):
+    model_config = {"extra": "forbid"}
 
 
 class ReflectorClass:
@@ -322,4 +341,53 @@ __all__ = [
     "emit_llm_call_start",
     "emit_llm_stream_stall",
     "emit_llm_stream_token",
+    "setup",
 ]
+
+
+@plugin(
+    id="events.spine.reflector.body_llm",
+    provides=["event.bus.reflector.body_llm"],
+    requires=["event.bus"],
+    layer="L2",
+    kind=PluginKind.PRIMITIVE,
+    effects="none",
+    description=(
+        "spine_reflector_body_llm publisher（ADR-0181 PR-3）：body + llm 10 emit 由本 plugin 发出；"
+        "覆盖 body.tool.execute.start/end + retry + sandbox.enter/exit + llm.call.start/end + "
+        "llm.stream.token + llm.stream.stall + llm.request.header。"
+    ),
+    test_suite="tests/plugins/events/publishers/test_spine_reflector_body_llm.py",
+    functional_group=FunctionalGroup.G7_EXECUTION,
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G7_EXECUTION,
+            control_slots=(ControlSlot.OBSERVE_WILDCARD,),
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.PROFILE,)),
+        authority=AuthorityContract(grants=("event.bus.publish",)),
+        observability=EvidenceContract(
+            descriptors=("event.bus.reflector.body_llm.published",),
+        ),
+    ),
+    ownership=OwnershipDeclaration(
+        reads=("event.bus",),
+        emits=(
+            "spine.body.tool.execute.start",
+            "spine.body.tool.execute.end",
+            "spine.body.tool.retry",
+            "spine.body.sandbox.enter",
+            "spine.body.sandbox.exit",
+            "spine.llm.call.start",
+            "spine.llm.call.end",
+            "spine.llm.stream.token",
+            "spine.llm.stream.stall",
+            "spine.llm.request.header",
+        ),
+        state_mutation="forbidden",
+    ),
+)
+async def setup(ctx: PluginContext, config: _Config) -> None:
+    """spine_reflector_body_llm boot：注册 publisher marker 给 ctx。"""
+    ctx.provide("event.bus.reflector.body_llm", ReflectorClass)

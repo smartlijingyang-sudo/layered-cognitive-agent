@@ -16,6 +16,22 @@ from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
 if TYPE_CHECKING:
     from lca_kernel.events.bus import EventRef
 
+from pydantic import BaseModel
+
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+
 log = logging.getLogger(__name__)
 
 
@@ -154,4 +170,53 @@ __all__ = [
     "emit_agent_loop_iteration_end",
     "emit_agent_loop_iteration_start",
     "emit_agent_spawn",
+    "setup",
 ]
+
+
+
+
+class _Config(BaseModel):
+    model_config = {"extra": "forbid"}
+
+
+@plugin(
+    id="events.spine.reflector.agent_spawn",
+    provides=["event.bus.reflector.agent_spawn"],
+    requires=["event.bus"],
+    layer="L2",
+    kind=PluginKind.PRIMITIVE,
+    effects="none",
+    description=(
+        "agent_spawn publisher（ADR-0181）：event.bus.reflector.agent_spawn 由本 plugin 发出。"
+    ),
+    test_suite="tests/plugins/events/publishers/test_events_spine_reflector_agent_spawn.py",
+    functional_group=FunctionalGroup.G8_COLLAB,
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G8_COLLAB,
+            control_slots=(ControlSlot.OBSERVE_WILDCARD,),
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.PROFILE,)),
+        authority=AuthorityContract(grants=("event.bus.publish",)),
+        observability=EvidenceContract(
+            descriptors=("event.bus.reflector.agent_spawn.published",),
+        ),
+    ),
+    ownership=OwnershipDeclaration(
+        reads=("event.bus",),
+        emits=(
+            "spine.agent_loop.iteration.start",
+            "spine.agent_loop.iteration.end",
+            "spine.agent.spawn",
+            "spine.agent.iteration",
+            "spine.agent.final",
+        ),
+        state_mutation="forbidden",
+    ),
+)
+async def setup(ctx: PluginContext, config: _Config) -> None:
+    """events.spine.reflector.agent_spawn boot：注册 publisher marker 给 ctx。"""
+    ctx.provide("event.bus.reflector.agent_spawn", ReflectorClass)
+

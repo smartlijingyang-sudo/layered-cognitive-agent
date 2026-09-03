@@ -20,11 +20,30 @@ import logging
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from pydantic import BaseModel
+
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca_kernel.events.bus import EventBus
 from lca_kernel.events.payloads import Category, SpineEventPayload
 from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
 
 log = logging.getLogger(__name__)
+
+
+class _Config(BaseModel):
+    model_config = {"extra": "forbid"}
 
 
 class ReflectorClass:
@@ -263,4 +282,58 @@ __all__ = [
     "emit_reasoner_reason_start",
     "emit_skill_router_route",
     "emit_synthesizer_merge",
+    "setup",
 ]
+
+
+@plugin(
+    id="events.spine.reflector.cognition",
+    provides=["event.bus.reflector.cognition"],
+    requires=["event.bus"],
+    layer="L2",
+    kind=PluginKind.PRIMITIVE,
+    effects="none",
+    description=(
+        "spine_reflector_cognition publisher（ADR-0181 PR-2）：cognition 16 emit 由本 plugin 发出；"
+        "覆盖 brain / critic / reasoner / prompt_assembler / synthesizer / skill_router / memory。"
+    ),
+    test_suite="tests/plugins/events/publishers/test_spine_reflector_cognition.py",
+    functional_group=FunctionalGroup.G5_COGNITION,
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G5_COGNITION,
+            control_slots=(ControlSlot.OBSERVE_WILDCARD,),
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.PROFILE,)),
+        authority=AuthorityContract(grants=("event.bus.publish",)),
+        observability=EvidenceContract(
+            descriptors=("event.bus.reflector.cognition.published",),
+        ),
+    ),
+    ownership=OwnershipDeclaration(
+        reads=("event.bus",),
+        emits=(
+            "spine.cognition.brain.perceive.start",
+            "spine.cognition.brain.perceive.end",
+            "spine.cognition.brain.think.start",
+            "spine.cognition.brain.think.end",
+            "spine.cognition.brain.gate.start",
+            "spine.cognition.brain.gate.end",
+            "spine.cognition.critic.eval.start",
+            "spine.cognition.critic.eval.end",
+            "spine.cognition.reasoner.reason.start",
+            "spine.cognition.reasoner.reason.end",
+            "spine.cognition.prompt_assembler.assemble.start",
+            "spine.cognition.prompt_assembler.assemble.end",
+            "spine.cognition.synthesizer.merge",
+            "spine.cognition.skill_router.route",
+            "spine.cognition.memory.read",
+            "spine.cognition.memory.write",
+        ),
+        state_mutation="forbidden",
+    ),
+)
+async def setup(ctx: PluginContext, config: _Config) -> None:
+    """spine_reflector_cognition boot：注册 publisher marker 给 ctx。"""
+    ctx.provide("event.bus.reflector.cognition", ReflectorClass)

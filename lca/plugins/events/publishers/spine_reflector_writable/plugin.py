@@ -20,6 +20,22 @@ from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
 if TYPE_CHECKING:
     from lca_kernel.events.bus import EventRef
 
+from pydantic import BaseModel
+
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+
 log = logging.getLogger(__name__)
 
 
@@ -135,4 +151,55 @@ __all__ = [
     "emit_writable_segment_start",
     "emit_writable_step_end",
     "emit_writable_step_start",
+    "setup",
 ]
+
+
+
+
+class _Config(BaseModel):
+    model_config = {"extra": "forbid"}
+
+
+@plugin(
+    id="events.spine.reflector.writable",
+    provides=["event.bus.reflector.writable"],
+    requires=["event.bus"],
+    layer="L2",
+    kind=PluginKind.PRIMITIVE,
+    effects="none",
+    description=(
+        "writable publisher（ADR-0181）：event.bus.reflector.writable 由本 plugin 发出。"
+    ),
+    test_suite="tests/plugins/events/publishers/test_events_spine_reflector_writable.py",
+    functional_group=FunctionalGroup.G7_EXECUTION,
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G7_EXECUTION,
+            control_slots=(ControlSlot.OBSERVE_WILDCARD,),
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.PROFILE,)),
+        authority=AuthorityContract(grants=("event.bus.publish",)),
+        observability=EvidenceContract(
+            descriptors=("event.bus.reflector.writable.published",),
+        ),
+    ),
+    ownership=OwnershipDeclaration(
+        reads=("event.bus",),
+        emits=(
+            "spine.writable.step.start",
+            "spine.writable.step.end",
+            "spine.writable.segment.start",
+            "spine.writable.segment.end",
+            "spine.writable.iteration.halt",
+            "spine.writable.iteration.closing",
+            "spine.writable.iteration.close",
+        ),
+        state_mutation="forbidden",
+    ),
+)
+async def setup(ctx: PluginContext, config: _Config) -> None:
+    """events.spine.reflector.writable boot：注册 publisher marker 给 ctx。"""
+    ctx.provide("event.bus.reflector.writable", ReflectorClass)
+

@@ -16,6 +16,22 @@ from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
 if TYPE_CHECKING:
     from lca_kernel.events.bus import EventRef
 
+from pydantic import BaseModel
+
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+
 log = logging.getLogger(__name__)
 
 
@@ -84,4 +100,51 @@ __all__ = [
     "emit_kernel_boot_completed",
     "emit_kernel_boot_start",
     "emit_loop_fork",
+    "setup",
 ]
+
+
+
+
+class _Config(BaseModel):
+    model_config = {"extra": "forbid"}
+
+
+@plugin(
+    id="events.spine.reflector.kernel_loop",
+    provides=["event.bus.reflector.kernel_loop"],
+    requires=["event.bus"],
+    layer="L2",
+    kind=PluginKind.PRIMITIVE,
+    effects="none",
+    description=(
+        "kernel_loop publisher（ADR-0181）：event.bus.reflector.kernel_loop 由本 plugin 发出。"
+    ),
+    test_suite="tests/plugins/events/publishers/test_events_spine_reflector_kernel_loop.py",
+    functional_group=FunctionalGroup.G0_CON_KERNEL,
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G0_CON_KERNEL,
+            control_slots=(ControlSlot.OBSERVE_WILDCARD,),
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.PROFILE,)),
+        authority=AuthorityContract(grants=("event.bus.publish",)),
+        observability=EvidenceContract(
+            descriptors=("event.bus.reflector.kernel_loop.published",),
+        ),
+    ),
+    ownership=OwnershipDeclaration(
+        reads=("event.bus",),
+        emits=(
+            "spine.kernel.boot.start",
+            "spine.kernel.boot.completed",
+            "spine.loop.fork",
+        ),
+        state_mutation="forbidden",
+    ),
+)
+async def setup(ctx: PluginContext, config: _Config) -> None:
+    """events.spine.reflector.kernel_loop boot：注册 publisher marker 给 ctx。"""
+    ctx.provide("event.bus.reflector.kernel_loop", ReflectorClass)
+

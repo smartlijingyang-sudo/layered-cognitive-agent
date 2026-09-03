@@ -1,0 +1,131 @@
+# bundles/event-bus-components.yaml — Event-bus component plugins (plugin-universe PR-4).
+#
+# 列出 21 个事件总线组件 plugin id + $module，给 profile/web-standard.yaml 装配：
+#   17 新增 @plugin（plugin-universe PR-4 落地）:
+#     publishers/spine_loop_cursor, spine_writable_matrix,
+#     spine_reflector_{cognition,body_llm,runtime,transport,
+#       kernel_loop,agent_spawn,phase,phase_graph,writable,
+#       team,perception,control,boot}
+#     sinks/spine_chain_sink
+#     subscribers/spine_step_tree_accumulator
+#   4 已有 @plugin（PR-4 提权为 bundle 可见）:
+#     publishers/delegation_cache, sinks/journal, sinks/spine_file_sink,
+#     subscribers/console_projector
+#
+# 行为约束（PR-4 不改）：
+#   - yaml 鉴权 SSOT（lca_kernel/events/config/**/*.yaml）仍是事实真值。
+#   - 本 bundle 仅把 plugin id 与 $module 绑定给 profile resolver
+#     （lca-ops inspect-tree 可见 + future PR-5 yaml→id 迁移入口）。
+#   - profile/event-pipeline/web-standard.yaml 不装配本 bundle（Pipeline loader
+#     走 classpath 白名单 + hooks/sinks 段，与本 bundle 是平行通道）。
+
+entries:
+  # ── Publishers: cursor + writable matrix ──
+  - id: events.spine.loop_cursor
+    name: events_spine_loop_cursor
+    $module: lca.plugins.events.publishers.spine_loop_cursor.plugin
+    config: {}
+
+  - id: events.spine.writable_matrix
+    name: events_spine_writable_matrix
+    $module: lca.plugins.events.publishers.spine_writable_matrix.plugin
+    config: {}
+
+  # ── Publishers: 13 spine reflectors ──
+  - id: events.spine.reflector.cognition
+    name: events_spine_reflector_cognition
+    $module: lca.plugins.events.publishers.spine_reflector_cognition.plugin
+    config: {}
+
+  - id: events.spine.reflector.body_llm
+    name: events_spine_reflector_body_llm
+    $module: lca.plugins.events.publishers.spine_reflector_body_llm.plugin
+    config: {}
+
+  - id: events.spine.reflector.runtime
+    name: events_spine_reflector_runtime
+    $module: lca.plugins.events.publishers.spine_reflector_runtime.plugin
+    config: {}
+
+  - id: events.spine.reflector.transport
+    name: events_spine_reflector_transport
+    $module: lca.plugins.events.publishers.spine_reflector_transport.plugin
+    config: {}
+
+  - id: events.spine.reflector.kernel_loop
+    name: events_spine_reflector_kernel_loop
+    $module: lca.plugins.events.publishers.spine_reflector_kernel_loop.plugin
+    config: {}
+
+  - id: events.spine.reflector.agent_spawn
+    name: events_spine_reflector_agent_spawn
+    $module: lca.plugins.events.publishers.spine_reflector_agent_spawn.plugin
+    config: {}
+
+  - id: events.spine.reflector.phase
+    name: events_spine_reflector_phase
+    $module: lca.plugins.events.publishers.spine_reflector_phase.plugin
+    config: {}
+
+  - id: events.spine.reflector.phase_graph
+    name: events_spine_reflector_phase_graph
+    $module: lca.plugins.events.publishers.spine_reflector_phase_graph.plugin
+    config: {}
+
+  - id: events.spine.reflector.writable
+    name: events_spine_reflector_writable
+    $module: lca.plugins.events.publishers.spine_reflector_writable.plugin
+    config: {}
+
+  - id: events.spine.reflector.team
+    name: events_spine_reflector_team
+    $module: lca.plugins.events.publishers.spine_reflector_team.plugin
+    config: {}
+
+  - id: events.spine.reflector.perception
+    name: events_spine_reflector_perception
+    $module: lca.plugins.events.publishers.spine_reflector_perception.plugin
+    config: {}
+
+  - id: events.spine.reflector.control
+    name: events_spine_reflector_control
+    $module: lca.plugins.events.publishers.spine_reflector_control.plugin
+    config: {}
+
+  - id: events.spine.reflector.boot
+    name: events_spine_reflector_boot
+    $module: lca.plugins.events.publishers.spine_reflector_boot.plugin
+    config: {}
+
+  # ── Sinks: chain sink ──
+  - id: events.spine.chain_sink
+    name: events_spine_chain_sink
+    $module: lca.plugins.events.sinks.spine_chain_sink.sink
+    config: {}
+
+  # ── Subscribers: step tree accumulator ──
+  - id: events.spine.step_tree_accumulator
+    name: events_spine_step_tree_accumulator
+    $module: lca.plugins.events.subscribers.spine_step_tree_accumulator.subscriber
+    config: {}
+
+  # ── 已有 @plugin（PR-4 提权；$module 取包路径，__init__.py re-export setup）──
+  - id: delegation_cache
+    name: delegation_cache
+    $module: lca.plugins.events.publishers.delegation_cache
+    config: {}
+
+  - id: lca.events.sink.journal
+    name: lca_events_sink_journal
+    $module: lca.plugins.events.sinks.journal
+    config: {}
+
+  - id: lca.events.sink.spine_file
+    name: lca_events_sink_spine_file
+    $module: lca.plugins.events.sinks.spine_file_sink
+    config: {}
+
+  - id: lca.events.subscriber.console_projector
+    name: lca_events_subscriber_console_projector
+    $module: lca.plugins.events.subscribers.console_projector
+    config: {}

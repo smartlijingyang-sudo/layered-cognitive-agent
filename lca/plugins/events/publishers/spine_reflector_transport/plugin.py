@@ -20,6 +20,22 @@ from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
 if TYPE_CHECKING:
     from lca_kernel.events.bus import EventRef
 
+from pydantic import BaseModel
+
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
+from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+
 log = logging.getLogger(__name__)
 
 
@@ -154,4 +170,54 @@ __all__ = [
     "emit_transport_route_enter",
     "emit_transport_route_exit",
     "emit_transport_sse_publish",
+    "setup",
 ]
+
+
+
+
+class _Config(BaseModel):
+    model_config = {"extra": "forbid"}
+
+
+@plugin(
+    id="events.spine.reflector.transport",
+    provides=["event.bus.reflector.transport"],
+    requires=["event.bus"],
+    layer="L2",
+    kind=PluginKind.PRIMITIVE,
+    effects="none",
+    description=(
+        "transport publisher（ADR-0181）：event.bus.reflector.transport 由本 plugin 发出。"
+    ),
+    test_suite="tests/plugins/events/publishers/test_events_spine_reflector_transport.py",
+    functional_group=FunctionalGroup.G9_INTERACTION,
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G9_INTERACTION,
+            control_slots=(ControlSlot.OBSERVE_WILDCARD,),
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.PROFILE,)),
+        authority=AuthorityContract(grants=("event.bus.publish",)),
+        observability=EvidenceContract(
+            descriptors=("event.bus.reflector.transport.published",),
+        ),
+    ),
+    ownership=OwnershipDeclaration(
+        reads=("event.bus",),
+        emits=(
+            "spine.transport.route.enter",
+            "spine.transport.route.exit",
+            "spine.transport.sse.publish",
+            "spine.kernel.run.start",
+            "spine.kernel.run.stop",
+            "spine.kernel.run.cancelled",
+        ),
+        state_mutation="forbidden",
+    ),
+)
+async def setup(ctx: PluginContext, config: _Config) -> None:
+    """events.spine.reflector.transport boot：注册 publisher marker 给 ctx。"""
+    ctx.provide("event.bus.reflector.transport", ReflectorClass)
+

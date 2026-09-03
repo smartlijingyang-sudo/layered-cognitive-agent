@@ -33,6 +33,7 @@ bundles:
   - bundles/scenario-cordis-creator.yaml
   - bundles/declarative-phase-graph.yaml
   - bundles/loop_cursor.spine_default.yaml
+  - bundles/event-bus-components.yaml
 
 patch:
   - id: lca-llm-resolver
