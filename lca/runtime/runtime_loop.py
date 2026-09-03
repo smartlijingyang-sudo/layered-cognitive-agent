@@ -23,9 +23,11 @@ from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import Result
 from lca.contracts.models.core.state import StateSnapshot
 from lca.contracts.models.team.run_context import RunContext
+from lca.contracts.observability import exc_to_record
 from lca.contracts.protocols.runtime.runtime import Runtime
 from lca.contracts.protocols.runtime.runtime_lifecycle import RuntimeLifecycleEventType
 from lca.infrastructure.observability import get_current_run_scope, get_span_context
+from lca.infrastructure.observability.spine.exception_emit import emit_exception_caught
 from lca.runtime.checkpoint_resolution import DeclarativeCheckpoint
 from lca.runtime.runtime_bindings import DeclarativeRuntimeBindings
 from lca.runtime.runtime_lifecycle_emitter import (
@@ -258,7 +260,6 @@ class CognitiveRuntime(Runtime):
                 "node_id": phase_cursor,
             }
         from lca.plugins.events.publishers.spine_reflector_runtime import (
-            emit_exception_caught,
             emit_exception_finally,
             emit_lifecycle_finally,
             emit_runtime_resume_end,
@@ -266,24 +267,33 @@ class CognitiveRuntime(Runtime):
 
         trace_id = str(getattr(state, "trace_id", ""))
         boundary = "resume" if resume_envelope else "terminal_driver"
+        run_scope = get_current_run_scope()
+        run_id = str(run_scope.run_id if run_scope is not None else "")
+
+        def _emit_caught(exc: BaseException) -> None:
+            # ADR-0169 SSOT: normalize the real exception instance before the
+            # single emitter; 4-key dict payloads drop traceback evidence.
+            record = exc_to_record(
+                exc,
+                boundary=boundary,
+                run_id=run_id,
+                trace_id=trace_id,
+            )
+            emit_exception_caught(record)
+
         # Mutable holder so the except branches can update the outcome
         # that the finally block reads when emitting resume.end / finally.
         outcome_holder: dict[str, Outcome] = {"value": "success"}
         try:
             result = await runner()
-        except asyncio.CancelledError:
+        except asyncio.CancelledError as exc:
             await self._lifecycle.publish(
                 RuntimeLifecycleEventType.CANCELED,
                 state,
                 status=TaskStatus.CANCELED,
                 **lifecycle_context,
             )
-            emit_exception_caught(
-                boundary=boundary,
-                exc_type="asyncio.CancelledError",
-                message="driver cancelled",
-                trace_id=trace_id,
-            )
+            _emit_caught(exc)
             outcome_holder["value"] = "cancelled"
             raise
         except Exception as exc:
@@ -293,12 +303,7 @@ class CognitiveRuntime(Runtime):
                 status=TaskStatus.FAILED,
                 **lifecycle_context,
             )
-            emit_exception_caught(
-                boundary=boundary,
-                exc_type=type(exc).__qualname__,
-                message=str(exc),
-                trace_id=trace_id,
-            )
+            _emit_caught(exc)
             outcome_holder["value"] = "failure"
             raise
         finally:

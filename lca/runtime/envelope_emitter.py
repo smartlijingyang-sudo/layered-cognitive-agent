@@ -1,10 +1,16 @@
 """SpineEnvelopeEmitter — default EnvelopeEmitter impl backed by spine reflectors (ADR-0177).
 
 The spine plugin tree owns the actual emit helpers
-(``lca.plugins.observability.spine.reflectors.{runtime,agent_spawn}``).
+(``lca.plugins.events.publishers.spine_reflector_{runtime,agent_spawn}``).
 This module wraps them in the :class:`EnvelopeEmitter` Protocol so that
 ``runtime`` and ``agent`` layers can use a bound capability instead of
 inline-importing the plugin tree.
+
+``emit_exception_caught`` is the exception: it forwards the normalized
+:class:`ExceptionRecord` to the single emitter
+``lca.infrastructure.observability.spine.exception_emit`` (ADR-0169
+SSOT) instead of the reflector tree, so the record's
+``traceback_text`` / ``call_frames`` / ``err_kind`` fields survive.
 
 When no spine is wired, the wrapped reflectors silently no-op (the
 plugin tree documents that behaviour); this class preserves it.
@@ -19,7 +25,10 @@ from __future__ import annotations
 
 import contextlib
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
+
+if TYPE_CHECKING:
+    from lca.contracts.observability import ExceptionRecord
 
 _F = TypeVar("_F", bound=Callable[..., Any])
 
@@ -89,16 +98,12 @@ class SpineEnvelopeEmitter:
             trace_id=trace_id,
         )
 
-    def emit_exception_caught(
-        self, *, boundary: str, exc_type: str, message: str, trace_id: str
-    ) -> None:
-        self._safe_emit(
-            self._runtime().emit_exception_caught,
-            boundary=boundary,
-            exc_type=exc_type,
-            message=message,
-            trace_id=trace_id,
+    def emit_exception_caught(self, record: ExceptionRecord) -> None:
+        from lca.infrastructure.observability.spine.exception_emit import (
+            emit_exception_caught as _emit_record,
         )
+
+        self._safe_emit(_emit_record, record=record)
 
     def emit_exception_finally(self, *, boundary: str, trace_id: str, outcome: str) -> None:
         self._safe_emit(

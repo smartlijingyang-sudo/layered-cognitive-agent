@@ -13,13 +13,15 @@ PR-3 把 envelope emitter helper 迁到
 提供实现，runtime 通过 ``DeclarativeRuntimeBindings`` 消费。
 Call sites 用 ``self._bindings.envelope.emit_*`` 取代 inline imports。
 
-Implementations are provided by the spine plugin tree via
-``lca/infrastructure/observability/envelope_emitter.py``.
+Default implementation: ``lca/runtime/envelope_emitter.py::SpineEnvelopeEmitter``.
 """
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from lca.contracts.observability import ExceptionRecord
 
 
 class EnvelopeEmitter(Protocol):
@@ -28,6 +30,14 @@ class EnvelopeEmitter(Protocol):
     All methods MUST be no-ops when no spine is wired — the existing
     reflector helpers silently swallow spine-write failures, and this
     Protocol preserves that behaviour so call sites can fire-and-forget.
+
+    ``emit_exception_caught`` is the only method that carries structured
+    content: it receives an :class:`ExceptionRecord` that the caller MUST
+    produce via ``lca.contracts.observability.exc_to_record`` (ADR-0169
+    SSOT). Implementations forward the record to the single emitter
+    ``lca.infrastructure.observability.spine.exception_emit``; 4-key
+    keyword payloads are forbidden because they drop ``traceback_text`` /
+    ``call_frames`` / ``err_kind``.
     """
 
     def emit_reducer_apply_start(self, *, method: str) -> None: ...
@@ -41,9 +51,7 @@ class EnvelopeEmitter(Protocol):
     ) -> None: ...
 
     def emit_lifecycle_finally(self, *, boundary: str, trace_id: str) -> None: ...
-    def emit_exception_caught(
-        self, *, boundary: str, exc_type: str, message: str, trace_id: str
-    ) -> None: ...
+    def emit_exception_caught(self, record: ExceptionRecord) -> None: ...
     def emit_exception_finally(self, *, boundary: str, trace_id: str, outcome: str) -> None: ...
 
     def emit_agent_loop_iteration_start(self, *, trace_id: str, role: str, kind: str) -> None: ...
