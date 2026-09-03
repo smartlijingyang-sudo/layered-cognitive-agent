@@ -116,6 +116,39 @@ SPINE_EXECUTION_POINTS: tuple[str, ...] = (
     "spine.i17.rejected",
     "spine.producer.failure",
     "phase_graph.instrument.coverage",
+    # Team (PR-6)
+    "team.casting.started",
+    "team.casting.completed",
+    "team.casting.failed",
+    "team.delegation.issued",
+    "team.delegation.completed",
+    "team.delegation.cache_hit",
+    "team.message.published",
+    # Perception (PR-6)
+    "perception.observe",
+    "attention.focus",
+    "attention.blur",
+    "perception.signal.detected",
+    "perception.fused",
+    "perception.artifact.built",
+    # Control (PR-6)
+    "control.dispatch",
+    "control.invoke",
+    "control.signal",
+    "control.approve.request",
+    "control.approve.response",
+    "control.deny",
+    "control.revoke",
+    "control.pause",
+    "control.resume",
+    "control.stop",
+    "control.accept",
+    # Boot (PR-6)
+    "boot.profile.resolved",
+    "boot.plugin.fiber.spawned",
+    "boot.observability.assembled",
+    # Runtime observed (PR-6)
+    "runtime.observed",
 )
 
 
@@ -202,6 +235,39 @@ _SPINE_EP_TO_CATEGORY: dict[str, str] = {
     "phase_graph.node.end": "spine.phase_graph.node.end",
     "phase_graph.edge.transit": "spine.phase_graph.edge.transit",
     "phase_graph.instrument.coverage": "spine.phase_graph.instrument.coverage",
+    # Team (PR-6)
+    "team.casting.started": "spine.team.casting.started",
+    "team.casting.completed": "spine.team.casting.completed",
+    "team.casting.failed": "spine.team.casting.failed",
+    "team.delegation.issued": "spine.team.delegation.issued",
+    "team.delegation.completed": "spine.team.delegation.completed",
+    "team.delegation.cache_hit": "spine.team.delegation.cache_hit",
+    "team.message.published": "spine.team.message.published",
+    # Perception (PR-6)
+    "perception.observe": "spine.perception.observe",
+    "attention.focus": "spine.perception.attention.focus",
+    "attention.blur": "spine.perception.attention.blur",
+    "perception.signal.detected": "spine.perception.signal.detected",
+    "perception.fused": "spine.perception.fused",
+    "perception.artifact.built": "spine.perception.artifact.built",
+    # Control (PR-6)
+    "control.dispatch": "spine.control.dispatch",
+    "control.invoke": "spine.control.invoke",
+    "control.signal": "spine.control.signal",
+    "control.approve.request": "spine.control.approve.request",
+    "control.approve.response": "spine.control.approve.response",
+    "control.deny": "spine.control.deny",
+    "control.revoke": "spine.control.revoke",
+    "control.pause": "spine.control.pause",
+    "control.resume": "spine.control.resume",
+    "control.stop": "spine.control.stop",
+    "control.accept": "spine.control.accept",
+    # Boot (PR-6)
+    "boot.profile.resolved": "spine.boot.profile.resolved",
+    "boot.plugin.fiber.spawned": "spine.boot.plugin.fiber.spawned",
+    "boot.observability.assembled": "spine.boot.observability.assembled",
+    # Runtime observed (PR-6)
+    "runtime.observed": "spine.runtime.observed",
 }
 
 

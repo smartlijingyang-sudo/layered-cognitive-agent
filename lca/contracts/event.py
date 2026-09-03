@@ -116,6 +116,35 @@ class Category(str, Enum):
     SPINE_PHASE_GRAPH_NODE_END = "spine.phase_graph.node.end"
     SPINE_PHASE_GRAPH_EDGE_TRANSIT = "spine.phase_graph.edge.transit"
     SPINE_PHASE_GRAPH_INSTRUMENT_COVERAGE = "spine.phase_graph.instrument.coverage"
+    # observability/spine — PR-6 team / perception / control / boot / runtime.observed 新加 28 EP
+    SPINE_TEAM_CASTING_STARTED = "spine.team.casting.started"
+    SPINE_TEAM_CASTING_COMPLETED = "spine.team.casting.completed"
+    SPINE_TEAM_CASTING_FAILED = "spine.team.casting.failed"
+    SPINE_TEAM_DELEGATION_ISSUED = "spine.team.delegation.issued"
+    SPINE_TEAM_DELEGATION_COMPLETED = "spine.team.delegation.completed"
+    SPINE_TEAM_DELEGATION_CACHE_HIT = "spine.team.delegation.cache_hit"
+    SPINE_TEAM_MESSAGE_PUBLISHED = "spine.team.message.published"
+    SPINE_PERCEPTION_OBSERVE = "spine.perception.observe"
+    SPINE_PERCEPTION_ATTENTION_FOCUS = "spine.perception.attention.focus"
+    SPINE_PERCEPTION_ATTENTION_BLUR = "spine.perception.attention.blur"
+    SPINE_PERCEPTION_SIGNAL_DETECTED = "spine.perception.signal.detected"
+    SPINE_PERCEPTION_FUSED = "spine.perception.fused"
+    SPINE_PERCEPTION_ARTIFACT_BUILT = "spine.perception.artifact.built"
+    SPINE_CONTROL_DISPATCH = "spine.control.dispatch"
+    SPINE_CONTROL_INVOKE = "spine.control.invoke"
+    SPINE_CONTROL_SIGNAL = "spine.control.signal"
+    SPINE_CONTROL_APPROVE_REQUEST = "spine.control.approve.request"
+    SPINE_CONTROL_APPROVE_RESPONSE = "spine.control.approve.response"
+    SPINE_CONTROL_DENY = "spine.control.deny"
+    SPINE_CONTROL_REVOKE = "spine.control.revoke"
+    SPINE_CONTROL_PAUSE = "spine.control.pause"
+    SPINE_CONTROL_RESUME = "spine.control.resume"
+    SPINE_CONTROL_STOP = "spine.control.stop"
+    SPINE_CONTROL_ACCEPT = "spine.control.accept"
+    SPINE_BOOT_PROFILE_RESOLVED = "spine.boot.profile.resolved"
+    SPINE_BOOT_PLUGIN_FIBER_SPAWNED = "spine.boot.plugin.fiber.spawned"
+    SPINE_BOOT_OBSERVABILITY_ASSEMBLED = "spine.boot.observability.assembled"
+    SPINE_RUNTIME_OBSERVED = "spine.runtime.observed"
 
 
 class Plane(str, Enum):
@@ -203,6 +232,34 @@ CATEGORY_DEFAULT_PLANE: dict[Category, Plane] = {
     Category.SPINE_PHASE_GRAPH_NODE_END: Plane.OBSERVABILITY,
     Category.SPINE_PHASE_GRAPH_EDGE_TRANSIT: Plane.OBSERVABILITY,
     Category.SPINE_PHASE_GRAPH_INSTRUMENT_COVERAGE: Plane.OBSERVABILITY,
+    Category.SPINE_TEAM_CASTING_STARTED: Plane.STRUCTURAL,
+    Category.SPINE_TEAM_CASTING_COMPLETED: Plane.STRUCTURAL,
+    Category.SPINE_TEAM_CASTING_FAILED: Plane.STRUCTURAL,
+    Category.SPINE_TEAM_DELEGATION_ISSUED: Plane.STRUCTURAL,
+    Category.SPINE_TEAM_DELEGATION_COMPLETED: Plane.STRUCTURAL,
+    Category.SPINE_TEAM_DELEGATION_CACHE_HIT: Plane.STRUCTURAL,
+    Category.SPINE_TEAM_MESSAGE_PUBLISHED: Plane.STRUCTURAL,
+    Category.SPINE_PERCEPTION_OBSERVE: Plane.OBSERVABILITY,
+    Category.SPINE_PERCEPTION_ATTENTION_FOCUS: Plane.OBSERVABILITY,
+    Category.SPINE_PERCEPTION_ATTENTION_BLUR: Plane.OBSERVABILITY,
+    Category.SPINE_PERCEPTION_SIGNAL_DETECTED: Plane.OBSERVABILITY,
+    Category.SPINE_PERCEPTION_FUSED: Plane.OBSERVABILITY,
+    Category.SPINE_PERCEPTION_ARTIFACT_BUILT: Plane.OBSERVABILITY,
+    Category.SPINE_CONTROL_DISPATCH: Plane.STRUCTURAL,
+    Category.SPINE_CONTROL_INVOKE: Plane.STRUCTURAL,
+    Category.SPINE_CONTROL_SIGNAL: Plane.STRUCTURAL,
+    Category.SPINE_CONTROL_APPROVE_REQUEST: Plane.STRUCTURAL,
+    Category.SPINE_CONTROL_APPROVE_RESPONSE: Plane.STRUCTURAL,
+    Category.SPINE_CONTROL_DENY: Plane.STRUCTURAL,
+    Category.SPINE_CONTROL_REVOKE: Plane.STRUCTURAL,
+    Category.SPINE_CONTROL_PAUSE: Plane.STRUCTURAL,
+    Category.SPINE_CONTROL_RESUME: Plane.STRUCTURAL,
+    Category.SPINE_CONTROL_STOP: Plane.STRUCTURAL,
+    Category.SPINE_CONTROL_ACCEPT: Plane.STRUCTURAL,
+    Category.SPINE_BOOT_PROFILE_RESOLVED: Plane.STRUCTURAL,
+    Category.SPINE_BOOT_PLUGIN_FIBER_SPAWNED: Plane.STRUCTURAL,
+    Category.SPINE_BOOT_OBSERVABILITY_ASSEMBLED: Plane.STRUCTURAL,
+    Category.SPINE_RUNTIME_OBSERVED: Plane.OBSERVABILITY,
 }
 
 

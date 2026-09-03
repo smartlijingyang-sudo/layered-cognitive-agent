@@ -201,6 +201,36 @@ def emit_runtime_event_publisher_publish(
     )
 
 
+# ── runtime.observed（PR-6 新加 category）──────────────────────────────
+#
+# 解释流 marker：记录"某处发生了不改变领域状态的观察事件"。reader 凭
+# ``runtime.observed`` 聚合事实流 + 解释流，避免理解任何 runtime.* EP
+# 时遗漏"看到但没改"的边角。
+
+def emit_runtime_observed(
+    *,
+    observed_at: str,
+    detail: str,
+    run_id: str | None = None,
+) -> Any:
+    """Emit ``runtime.observed`` marker (PR-6 new category).
+
+    ``observed_at`` 是 runtime 内的 subsystem name（"checkpoint_persist" /
+    "loop_cursor_advance" 等），``detail`` 自由文本。runtime.* 详细 EP
+    仍走 spine_reflector_runtime 既有 emit_*，本 helper 仅在 runtime
+    想表达"我已经记下了某个状态观察，无需进一步结构化"时使用。
+    """
+    return _send(
+        execution_point="runtime.observed",
+        channel="diagnostic",
+        payload={
+            "observed_at": observed_at,
+            "detail": detail,
+            "run_id": run_id or "",
+        },
+    )
+
+
 # ── exception.caught / exception.finally ──────────────────────────────
 #
 # ``exception.caught`` 是 runner 抛出后转发时 emit；``exception.finally``
@@ -275,6 +305,7 @@ __all__ = [
     "emit_lifecycle_finally",
     "emit_runtime_checkpoint_create",
     "emit_runtime_event_publisher_publish",
+    "emit_runtime_observed",
     "emit_runtime_reducer_apply_end",
     "emit_runtime_reducer_apply_start",
     "emit_runtime_resume_end",
