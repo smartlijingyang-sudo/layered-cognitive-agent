@@ -56,6 +56,7 @@ def _safe_logger() -> Any:
 
         return structlog.get_logger("lca.doctor.step_check")
     except Exception:
+
         class _Stub:
             def debug(self, *args: object, **kwargs: object) -> None:
                 return None
@@ -134,6 +135,62 @@ def _scan_xref(run_dir: Path, run_id: str, scan: StepScan) -> StepScan:
     # 用 dataclasses.replace 改 immutable 上的字段;slots 不会触发 FrozenInstanceError。
     from dataclasses import replace as _dc_replace
 
+    # SSOT 看门狗(H-ssot + H-mv-journal):同一 EP 必须只有一种 payload schema;
+    # model_visible/tools.json 非空 schema 数必须等于 journal 暴露的工具种类数。
+    phase_fold_payload_kinds: dict[str, set[str]] = {}
+    phase_fold_objective_anomalies: list[dict[str, Any]] = []
+    tool_schema_count: int = -1
+    tool_schema_empty_count: int = 0
+    if spine_path is not None:
+        try:
+            for ln in spine_path.read_text(encoding="utf-8").splitlines():
+                ln = ln.strip()
+                if not ln:
+                    continue
+                try:
+                    rec = json.loads(ln)
+                except Exception:
+                    continue
+                ep = rec.get("execution_point")
+                payload = rec.get("payload")
+                if not isinstance(ep, str) or not isinstance(payload, dict):
+                    continue
+                if ep.startswith("phase.") and ep.endswith(".fold"):
+                    keys = tuple(sorted(payload.keys()))
+                    phase_fold_payload_kinds.setdefault(ep, set()).add(str(keys))
+                    obj = payload.get("objective")
+                    if ep == "phase.think.fold":
+                        kind = payload.get("objective_kind")
+                        # 强类型约束:objective_kind 必须是 Literal(SSOT 收口后);
+                        # objective 不再允许是裸字符串,必须是 user_text / agent_role /
+                        # system_role / model_name 之一。
+                        if kind not in ("user_text", "agent_role", "system_role", "model_name"):
+                            phase_fold_objective_anomalies.append(
+                                {
+                                    "seq": rec.get("sequence"),
+                                    "objective_kind": kind,
+                                    "objective": obj,
+                                }
+                            )
+        except Exception:
+            pass
+        # model_visible/tools.json 非空 schema 数(任一 step 取一次即可,取首个存在)
+        mv_dir = run_dir / "model_visible"
+        if mv_dir.is_dir():
+            for step_dir in sorted(mv_dir.iterdir()):
+                tools_path = step_dir / "tools.json"
+                if tools_path.exists():
+                    try:
+                        data = json.loads(tools_path.read_text(encoding="utf-8"))
+                        if isinstance(data, list):
+                            tool_schema_count = sum(1 for x in data if isinstance(x, dict) and x)
+                            tool_schema_empty_count = sum(
+                                1 for x in data if isinstance(x, dict) and not x
+                            )
+                            break
+                    except Exception:
+                        pass
+
     return _dc_replace(
         scan,
         spine_path=str(spine_path) if spine_path is not None else "",
@@ -144,6 +201,10 @@ def _scan_xref(run_dir: Path, run_id: str, scan: StepScan) -> StepScan:
         spine_kernel_run_start=spine_kernel_run_start,
         spine_file_exists=spine_path is not None,
         flush_errors=flush_errors,
+        phase_fold_payload_kinds=phase_fold_payload_kinds,
+        phase_fold_objective_anomalies=tuple(phase_fold_objective_anomalies),
+        tool_schema_count=tool_schema_count,
+        tool_schema_empty_count=tool_schema_empty_count,
     )
 
 
@@ -481,6 +542,8 @@ def diagnose_step_tree(
         "H-seg": _hop_h_seg(scan),
         "H-phase": _hop_h_phase(scan),
         "H-xref": _hop_h_xref(xref_scan),
+        "H-ssot": _hop_h_ssot(xref_scan),
+        "H-mv-journal": _hop_h_mv_journal(xref_scan),
     }
     broken = next((name for name, hop in hops.items() if hop.ok is False), None)
     factory = {"ok": True, "tools_missing_plugin_state": []}
@@ -502,6 +565,9 @@ def diagnose_step_tree(
             "totals_phases": scan.totals_phases,
             "spine_event_total": xref_scan.spine_event_total,
             "flush_errors": list(xref_scan.flush_errors),
+            "tool_schema_count": xref_scan.tool_schema_count,
+            "tool_schema_empty_count": xref_scan.tool_schema_empty_count,
+            "phase_fold_objective_anomalies": list(xref_scan.phase_fold_objective_anomalies),
         },
         factory=factory,
     )
@@ -530,9 +596,7 @@ def _hop_h_xref(scan: StepScan) -> HopVerdict:
     }
     reasons: list[str] = []
     if scan.spine_kernel_run_start > 0 and not scan.spine_file_exists:
-        reasons.append(
-            f"kernel.run.start={scan.spine_kernel_run_start} but spine ledger missing"
-        )
+        reasons.append(f"kernel.run.start={scan.spine_kernel_run_start} but spine ledger missing")
     if scan.flush_errors:
         reasons.append(
             f"manifest.flush_errors={len(scan.flush_errors)} "
@@ -548,10 +612,7 @@ def _hop_h_xref(scan: StepScan) -> HopVerdict:
             f"spine.llm.call.end={scan.spine_llm_call_end} "
             f"but journal.totals.steps=0 (no step recorded)"
         )
-    if (
-        scan.spine_phase_fold_total > 0
-        and scan.totals_phases == 0
-    ):
+    if scan.spine_phase_fold_total > 0 and scan.totals_phases == 0:
         reasons.append(
             f"spine.phase.*.fold={scan.spine_phase_fold_total} "
             f"but journal.totals.phases=0 (no phase recorded)"
@@ -571,6 +632,74 @@ def _summary(
     if not scan.exists:
         return "no journal.json"
     return f"ok ({scan.total_steps} steps, {scan.tool_total} tools)"
+
+
+def _hop_h_ssot(scan: StepScan) -> HopVerdict:
+    """SSOT 看门狗(SSOT-Doctor):同一 EP 必须只有一种 payload schema。
+
+    broken when:
+      - 同一 ``phase.<x>.fold`` EP 在 spine 上出现 ≥2 种 payload key 集合
+        (历史 bug:cursor.advance 与 coord.emit_phase 双写,一个写
+        ``{phase}`` 一个写 ``{phase,objective,summary}``,导致 schema 漂移)
+      - ``phase.think.fold`` 的 objective_kind 不在合法 Literal 内
+        (说明 LLM adapter / coord.emit_phase 把 ``model=`` 误传成
+        ``objective=``,落盘到 objective 字段)
+    """
+    extra: dict[str, Any] = {
+        "phase_fold_payload_kinds": {
+            k: sorted(v) for k, v in scan.phase_fold_payload_kinds.items()
+        },
+        "phase_fold_objective_anomalies": list(scan.phase_fold_objective_anomalies),
+    }
+    if not scan.spine_file_exists:
+        return HopVerdict(ok=None, detail="spine ledger missing", extra=extra)
+    reasons: list[str] = []
+    for ep, kinds in scan.phase_fold_payload_kinds.items():
+        if len(kinds) > 1:
+            reasons.append(f"{ep} has {len(kinds)} payload schemas: {sorted(kinds)}")
+    if scan.phase_fold_objective_anomalies:
+        reasons.append(
+            f"phase.think.fold objective_kind 异常 {len(scan.phase_fold_objective_anomalies)} 次"
+        )
+    if reasons:
+        return HopVerdict(ok=False, detail="; ".join(reasons), extra=extra)
+    return HopVerdict(ok=True, detail="phase.<x>.fold payload schema 唯一", extra=extra)
+
+
+def _hop_h_mv_journal(scan: StepScan) -> HopVerdict:
+    """model_visible vs journal 一致性(SSOT-Doctor)。
+
+    broken when:
+      - tools.json 落盘后非空 schema 数 = 0(说明 record_tools 接 Any,
+        json.dumps(default=str) 退化为空 dict 的历史 bug 重现)
+      - tools.json 含 ``{}`` 空 dict(同上,边界 transform 没接上)
+    """
+    extra: dict[str, Any] = {
+        "tool_schema_count": scan.tool_schema_count,
+        "tool_schema_empty_count": scan.tool_schema_empty_count,
+    }
+    if scan.tool_schema_count < 0:
+        return HopVerdict(ok=None, detail="model_visible/tools.json 不存在", extra=extra)
+    if scan.tool_schema_count == 0:
+        return HopVerdict(
+            ok=False,
+            detail="tools.json 全是非空 schema=0(可能 record_tools 没接 ToolSchema)",
+            extra=extra,
+        )
+    if scan.tool_schema_empty_count > 0:
+        return HopVerdict(
+            ok=False,
+            detail=(
+                f"tools.json 含 {scan.tool_schema_empty_count} 个空 dict schema "
+                "(record_tools 边界 transform 未生效)"
+            ),
+            extra=extra,
+        )
+    return HopVerdict(
+        ok=True,
+        detail=f"tools.json 非空 schema={scan.tool_schema_count}",
+        extra=extra,
+    )
 
 
 __all__ = ["diagnose_step_tree"]

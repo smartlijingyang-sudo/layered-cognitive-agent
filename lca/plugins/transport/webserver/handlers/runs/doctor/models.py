@@ -113,6 +113,11 @@ class StepScan:
     spine_kernel_run_start: int = 0
     spine_file_exists: bool = False
     flush_errors: tuple[dict[str, Any], ...] = ()
+    # SSOT 看门狗(SSOT-Doctor):H-ssot / H-mv-journal
+    phase_fold_payload_kinds: dict[str, set[str]] = field(default_factory=dict)
+    phase_fold_objective_anomalies: tuple[dict[str, Any], ...] = ()
+    tool_schema_count: int = -1  # -1 → model_visible/tools.json 不存在
+    tool_schema_empty_count: int = 0
 
 
 __all__ = [
