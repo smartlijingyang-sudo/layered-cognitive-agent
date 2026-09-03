@@ -19,7 +19,8 @@ from lca_kernel.events.registry import EventRegistry
 def mechanism(tmp_path) -> EventMechanism:
     from pathlib import Path
 
-    SpineChainSink.reset()
+    # PR-2 复审：chain_sink 改无状态（prev_hash 走实例属性），fixture 重建
+    # sink 实例即可重置 chain；旧 SpineChainSink.reset() classmethod 已删。
     config_dir = Path(__file__).resolve().parents[4] / "lca_kernel" / "events" / "config"
     m = EventMechanism(EventRegistry.load(config_dir))
     sink = SpineChainSink(output_path=tmp_path / "chain.jsonl")

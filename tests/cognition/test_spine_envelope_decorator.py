@@ -25,7 +25,7 @@ def test_decorator_emits_start_then_end_on_success() -> None:
     class _State:
         trace_id = "trace-1"
 
-    from lca.plugins.observability.spine.reflectors import cognition as cog_mod
+    from lca.plugins.events.publishers import spine_reflector_cognition as cog_mod
 
     original_start = getattr(cog_mod, "emit_test_point_start", None)
     original_end = getattr(cog_mod, "emit_test_point_end", None)
@@ -68,7 +68,7 @@ def test_decorator_emits_failure_on_exception() -> None:
     class _State:
         trace_id = "trace-2"
 
-    from lca.plugins.observability.spine.reflectors import cognition as cog_mod
+    from lca.plugins.events.publishers import spine_reflector_cognition as cog_mod
 
     original_start = getattr(cog_mod, "emit_boom_start", None)
     original_end = getattr(cog_mod, "emit_boom_end", None)
@@ -105,7 +105,7 @@ def test_decorator_noop_when_spine_emitters_missing() -> None:
     class _State:
         trace_id = "trace-3"
 
-    from lca.plugins.observability.spine.reflectors import cognition as cog_mod
+    from lca.plugins.events.publishers import spine_reflector_cognition as cog_mod
 
     sentinel_start = getattr(cog_mod, "emit_does_not_exist_start", None)
     sentinel_end = getattr(cog_mod, "emit_does_not_exist_end", None)

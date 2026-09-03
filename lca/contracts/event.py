@@ -35,8 +35,27 @@ class Category(str, Enum):
     TEAM_DELEGATION_COMPLETED = "team.delegation.completed"
     TEAM_DELEGATION_CACHE_HIT = "team.delegation.cache_hit"
     TEAM_MESSAGE_PUBLISHED = "team.message.published"
-    # observability/spine — ADR-0181 试点 1 个；PR-2 全量补
+    # observability/spine — ADR-0181 试点 1 个 + PR-2 cognition 余 15
     SPINE_COGNITION_BRAIN_PERCEIVE_START = "spine.cognition.brain.perceive.start"
+    SPINE_COGNITION_BRAIN_PERCEIVE_END = "spine.cognition.brain.perceive.end"
+    SPINE_COGNITION_BRAIN_THINK_START = "spine.cognition.brain.think.start"
+    SPINE_COGNITION_BRAIN_THINK_END = "spine.cognition.brain.think.end"
+    SPINE_COGNITION_BRAIN_GATE_START = "spine.cognition.brain.gate.start"
+    SPINE_COGNITION_BRAIN_GATE_END = "spine.cognition.brain.gate.end"
+    SPINE_COGNITION_CRITIC_EVAL_START = "spine.cognition.critic.eval.start"
+    SPINE_COGNITION_CRITIC_EVAL_END = "spine.cognition.critic.eval.end"
+    SPINE_COGNITION_REASONER_REASON_START = "spine.cognition.reasoner.reason.start"
+    SPINE_COGNITION_REASONER_REASON_END = "spine.cognition.reasoner.reason.end"
+    SPINE_COGNITION_PROMPT_ASSEMBLER_ASSEMBLE_START = (
+        "spine.cognition.prompt_assembler.assemble.start"
+    )
+    SPINE_COGNITION_PROMPT_ASSEMBLER_ASSEMBLE_END = (
+        "spine.cognition.prompt_assembler.assemble.end"
+    )
+    SPINE_COGNITION_SYNTHESIZER_MERGE = "spine.cognition.synthesizer.merge"
+    SPINE_COGNITION_SKILL_ROUTER_ROUTE = "spine.cognition.skill_router.route"
+    SPINE_COGNITION_MEMORY_READ = "spine.cognition.memory.read"
+    SPINE_COGNITION_MEMORY_WRITE = "spine.cognition.memory.write"
 
 
 class Plane(str, Enum):
@@ -52,6 +71,21 @@ class Plane(str, Enum):
 CATEGORY_DEFAULT_PLANE: dict[Category, Plane] = {
     Category.TEAM_DELEGATION_CACHE_HIT: Plane.STRUCTURAL,
     Category.SPINE_COGNITION_BRAIN_PERCEIVE_START: Plane.OBSERVABILITY,
+    Category.SPINE_COGNITION_BRAIN_PERCEIVE_END: Plane.OBSERVABILITY,
+    Category.SPINE_COGNITION_BRAIN_THINK_START: Plane.OBSERVABILITY,
+    Category.SPINE_COGNITION_BRAIN_THINK_END: Plane.OBSERVABILITY,
+    Category.SPINE_COGNITION_BRAIN_GATE_START: Plane.OBSERVABILITY,
+    Category.SPINE_COGNITION_BRAIN_GATE_END: Plane.OBSERVABILITY,
+    Category.SPINE_COGNITION_CRITIC_EVAL_START: Plane.OBSERVABILITY,
+    Category.SPINE_COGNITION_CRITIC_EVAL_END: Plane.OBSERVABILITY,
+    Category.SPINE_COGNITION_REASONER_REASON_START: Plane.OBSERVABILITY,
+    Category.SPINE_COGNITION_REASONER_REASON_END: Plane.OBSERVABILITY,
+    Category.SPINE_COGNITION_PROMPT_ASSEMBLER_ASSEMBLE_START: Plane.OBSERVABILITY,
+    Category.SPINE_COGNITION_PROMPT_ASSEMBLER_ASSEMBLE_END: Plane.OBSERVABILITY,
+    Category.SPINE_COGNITION_SYNTHESIZER_MERGE: Plane.OBSERVABILITY,
+    Category.SPINE_COGNITION_SKILL_ROUTER_ROUTE: Plane.OBSERVABILITY,
+    Category.SPINE_COGNITION_MEMORY_READ: Plane.OBSERVABILITY,
+    Category.SPINE_COGNITION_MEMORY_WRITE: Plane.OBSERVABILITY,
 }
 
 

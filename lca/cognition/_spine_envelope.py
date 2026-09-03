@@ -57,7 +57,9 @@ def with_spine_envelope(
     ) -> Callable[_P, Awaitable[_R]]:
         @functools.wraps(fn)
         async def wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
-            from lca.plugins.observability.spine.reflectors import cognition as _cog
+            # ADR-0181 PR-2: 旧 cognition reflector 退役，import 路径改
+            # lca.plugins.events.publishers.spine_reflector_cognition。
+            from lca.plugins.events.publishers import spine_reflector_cognition as _cog
 
             start_fn = getattr(_cog, f"emit_{point}_start", None)
             end_fn = getattr(_cog, f"emit_{point}_end", None)

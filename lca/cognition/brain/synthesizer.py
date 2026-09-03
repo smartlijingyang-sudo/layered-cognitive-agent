@@ -20,7 +20,7 @@ class ConcatSynthesizer(Synthesizer):
 
     async def synthesize(self, objective: str, candidates: list[Result]) -> Result:
         # PR-3.2: spine envelope for the synthesizer.merge execution point.
-        from lca.plugins.observability.spine.reflectors.cognition import (
+        from lca.plugins.events.publishers.spine_reflector_cognition import (
             emit_synthesizer_merge,
         )
 

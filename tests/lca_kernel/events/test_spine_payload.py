@@ -28,8 +28,13 @@ def test_pilot_ep_passes_validation() -> None:
 
 
 def test_unknown_ep_raises() -> None:
-    """未知 EP → ValueError（fail-fast，I12 同构）。"""
-    with pytest.raises(ValueError, match="UnknownSpineExecutionPoint"):
+    """未知 EP → ValueError（fail-fast，I12 同构）。
+
+    注意：mode="before" validator 在 category 派生时已先 raise "未登记 category 映射"；
+    在白名单内的 EP 才进入 mode="after" 的 "UnknownSpineExecutionPoint" 校验。
+    未知 EP 必不在白名单 → 必不在 _SPINE_EP_TO_CATEGORY → 模式"before" 先 raise。
+    """
+    with pytest.raises(ValueError, match="未登记 category 映射"):
         SpineEventPayload(execution_point="not.in.whitelist")
 
 

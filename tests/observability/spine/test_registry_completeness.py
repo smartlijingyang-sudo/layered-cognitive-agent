@@ -133,6 +133,15 @@ def test_get_returns_wrap_fn_for_point() -> None:
 # ── Integration — compile_spine_registry + full EXECUTION_POINTS ─────
 
 
+@pytest.mark.xfail(
+    reason=(
+        "ADR-0181 PR-2: 旧 spine registry compile 走 "
+        "lca/infrastructure/observability/spine/reflectors/ AST 扫描；"
+        "cognition reflector 已迁到 lca/plugins/events/publishers/spine_reflector_cognition/。"
+        "本测试在 PR-9 旧 spine 全部退役时一并删除（rg compile_spine_registry lca/ = 0 触发）。"
+    ),
+    strict=True,
+)
 def test_compile_spine_registry_returns_handlers_for_real_reflectors() -> None:
     """``compile_spine_registry`` walks the spine plugins package and
     registers every ``emit_*`` helper whose AST carries a canonical

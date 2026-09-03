@@ -19,7 +19,7 @@ class NullCritic(Critic):
 
     async def critique(self, state: AgentState, observation: Observation) -> Reflection:
         # PR-3.2: spine envelope (consistent instrumentation across critics).
-        from lca.plugins.observability.spine.reflectors.cognition import (
+        from lca.plugins.events.publishers.spine_reflector_cognition import (
             emit_critic_eval_end,
             emit_critic_eval_start,
         )

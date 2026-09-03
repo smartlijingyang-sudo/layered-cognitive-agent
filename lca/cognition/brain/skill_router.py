@@ -30,7 +30,7 @@ class KeywordSkillRouter(SkillRouter):
 
     async def route(self, state: AgentState) -> str:
         # PR-3.2: spine envelope for the skill_router.route execution point.
-        from lca.plugins.observability.spine.reflectors.cognition import (
+        from lca.plugins.events.publishers.spine_reflector_cognition import (
             emit_skill_router_route,
         )
 
@@ -71,7 +71,7 @@ class StaticSkillRouter(SkillRouter):
 
     async def route(self, state: AgentState) -> str:
         # PR-3.2: spine envelope for the skill_router.route execution point.
-        from lca.plugins.observability.spine.reflectors.cognition import (
+        from lca.plugins.events.publishers.spine_reflector_cognition import (
             emit_skill_router_route,
         )
 

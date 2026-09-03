@@ -87,7 +87,7 @@ class ModularBrain(Brain):
         """Delegate one Think phase to the selected cognitive primitive."""
 
         # PR-3.2: spine envelope for the brain.think execution point.
-        from lca.plugins.observability.spine.reflectors.cognition import (
+        from lca.plugins.events.publishers.spine_reflector_cognition import (
             emit_brain_think_end,
             emit_brain_think_start,
         )

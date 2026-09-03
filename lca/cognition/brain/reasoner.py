@@ -191,7 +191,7 @@ class PromptReasoner:
         template_id, decision_path = self._select_template(state)
         annotate(**{ATTR_PROMPT_TEMPLATE: template_id})
 
-        from lca.plugins.observability.spine.reflectors.cognition import (
+        from lca.plugins.events.publishers.spine_reflector_cognition import (
             emit_prompt_assembler_end,
             emit_prompt_assembler_start,
             emit_reasoner_reason_end,

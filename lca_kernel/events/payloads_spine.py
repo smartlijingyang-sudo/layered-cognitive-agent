@@ -1,10 +1,13 @@
 """Spine 壳类 payload（ADR-0181 D2）。
 
 承载 spine EP 字符串 + caller payload dict + chain 字段，套进
-:class:`EventMechanism` 发送。SPINE_EXECUTION_POINTS 是 76 EP 字符串闭集
-（原 ADR-0165 / ADR-0165.1 EXECUTION_POINTS 迁移）；不是 enum，EP 跨 5 层
-（transport / kernel / agent_loop / cognition / body / llm / runtime），
-跨层 enum 违反架构不变量。
+:class:`EventMechanism` 发送。SPINE_EXECUTION_POINTS 是 spine EP 字符串闭集,
+完整迁移自 ``lca/infrastructure/observability/spine/manifest.py`` 的
+``EXECUTION_POINTS`` 75 EP（试点 PR 已迁 1 个，余 74 个按 ADR-0181 §迁移
+PR 切分逐个扩到 ``lca_kernel/events/config/observability/spine.yaml``）。
+
+不是 enum，EP 跨 5 层（transport / kernel / agent_loop / cognition /
+body / llm / runtime / writable / phase / step），跨层 enum 违反架构不变量。
 """
 
 from __future__ import annotations
@@ -15,9 +18,8 @@ from pydantic import ConfigDict, Field, model_validator
 
 from lca.contracts.event import Category, EventPayload, Plane
 
-# 76 EP 字符串闭集（原 lca/infrastructure/observability/spine/manifest.py
-# EXECUTION_POINTS；试点 PR 暂不全量迁移，PR-2 全量迁移并标旧 manifest.py
-# 删-when）。
+# spine EP 字符串闭集（原 lca/infrastructure/observability/spine/manifest.py
+# EXECUTION_POINTS 75 EP 完整迁移；试点 PR 已迁 1 个 = brain.perceive.start）。
 SPINE_EXECUTION_POINTS: tuple[str, ...] = (
     # Transport (ADR-0112)
     "transport.route.enter",
@@ -43,89 +45,112 @@ SPINE_EXECUTION_POINTS: tuple[str, ...] = (
     "critic.eval.end",
     "reasoner.reason.start",
     "reasoner.reason.end",
-    "prompt_assembler.start",
-    "prompt_assembler.end",
+    "prompt_assembler.assemble.start",
+    "prompt_assembler.assemble.end",
     "synthesizer.merge",
     "skill_router.route",
-    # Body / LLM
-    "tool.invoked",
-    "tool.completed",
-    "tool.denied",
-    "tool.retry_progress",
-    "tool.lifecycle_ended",
-    "tool.abandoned_before_invoke",
-    "llm.call_started",
-    "llm.call_completed",
-    "llm.stream_token",
-    "llm.stream_stall",
-    "llm.tool_call_resolved",
-    "sandbox.output_delta",
-    # Runtime / orchestration
-    "phase.start",
-    "phase.end",
-    "phase.fold",
-    "phase.act.fold",
-    "runtime.observed",
-    "exception.caught",
-    "exception.finally",
-    "exception.lifecycle_finally",
-    "agent.spawn",
-    "agent.iteration",
-    "agent.final",
-    # Team
-    "team.casting.started",
-    "team.casting.completed",
-    "team.casting.failed",
-    "team.delegation.issued",
-    "team.delegation.completed",
-    "team.delegation.cache_hit",
-    "team.message.published",
-    # Memory
     "memory.read",
     "memory.write",
-    "memory.committed",
-    "memory.compacted",
-    # Perception
-    "perception.context_manifested",
-    "perception.merged",
-    "perception.step_text_delta",
-    "perception.reasoning_delta",
-    "perception.reasoning_completed",
-    "perception.run_activity",
-    # Control
-    "control.approval.requested",
-    "control.approval.resolved",
-    "control.run_paused",
-    "control.run_resumed",
-    "control.inbox_followup",
-    "plugin.authored",
-    "plugin.mounted",
-    "plugin.mount_rejected",
-    "plugin.unmounted",
-    "plugin.inspected",
-    "preset.published",
-    # Boot
-    "boot.profile_resolved",
-    "boot.plugin_fiber_spawned",
-    "boot.observability_assembled",
+    # Body
+    "body.tool.execute.start",
+    "body.tool.execute.end",
+    "body.tool.retry",
+    # Writable matrix (ADR-0167 D11)
+    "writable.step.start",
+    "writable.step.end",
+    "writable.segment.start",
+    "writable.segment.end",
+    # Loop cursor control (ADR-0169)
+    "writable.iteration.halt",
+    "writable.iteration.closing",
+    "writable.iteration.close",
+    "loop.fork",
+    # Writable matrix phase events
+    "perceive.phase.fold",
+    "phase.perceive.fold",
+    "phase.think.fold",
+    "phase.gate.fold",
+    "phase.remember.fold",
+    "phase.stop.fold",
+    "phase.reflect.fold",
+    "phase.act.fold.start",
+    "phase.act.fold.end",
+    "phase.act.fold",
+    "phase.tool.call.start",
+    "phase.tool.call.end",
+    "phase.tool.denied",
+    # Lifecycle normalization (ADR-0166 S5)
+    "lifecycle.finally",
+    "body.sandbox.enter",
+    "body.sandbox.exit",
+    # LLM
+    "llm.call.start",
+    "llm.call.end",
+    "llm.stream.token",
+    "llm.stream.stall",
+    "llm.request.header",
+    # Runtime
+    "runtime.reducer.apply",
+    "runtime.checkpoint.create",
+    "runtime.resume.start",
+    "runtime.resume.end",
+    "runtime.event_publisher.publish",
+    # Phase graph
+    "phase_graph.node.start",
+    "phase_graph.node.end",
+    "phase_graph.edge.transit",
+    # Exception/finally
+    "exception.caught",
+    "exception.finally",
+    # Coordinator record_* EP(ADR-0167 D2)
+    "step.thinking.record",
+    "step.tool_call.record",
+    "step.tool_result.record",
+    "step.reflect.record",
+    "step.span.record",
+    # Spine self-observation (ADR-2026-09-02-i17-traceback)
+    "spine.i17.rejected",
+    "spine.producer.failure",
+    "phase_graph.instrument.coverage",
 )
+
+
+_SPINE_EP_TO_CATEGORY: dict[str, str] = {
+    # Cognition（PR-2 全量；试点已含 brain.perceive.start）
+    "brain.perceive.start": "spine.cognition.brain.perceive.start",
+    "brain.perceive.end": "spine.cognition.brain.perceive.end",
+    "brain.think.start": "spine.cognition.brain.think.start",
+    "brain.think.end": "spine.cognition.brain.think.end",
+    "brain.gate.start": "spine.cognition.brain.gate.start",
+    "brain.gate.end": "spine.cognition.brain.gate.end",
+    "critic.eval.start": "spine.cognition.critic.eval.start",
+    "critic.eval.end": "spine.cognition.critic.eval.end",
+    "reasoner.reason.start": "spine.cognition.reasoner.reason.start",
+    "reasoner.reason.end": "spine.cognition.reasoner.reason.end",
+    "prompt_assembler.assemble.start": "spine.cognition.prompt_assembler.assemble.start",
+    "prompt_assembler.assemble.end": "spine.cognition.prompt_assembler.assemble.end",
+    "synthesizer.merge": "spine.cognition.synthesizer.merge",
+    "skill_router.route": "spine.cognition.skill_router.route",
+    "memory.read": "spine.cognition.memory.read",
+    "memory.write": "spine.cognition.memory.write",
+}
 
 
 class SpineEventPayload(EventPayload):
     """spine 壳类 payload（ADR-0181 D2）。
 
     承载：
-    - ``category``（pydantic 父类必填）：试点 = SPINE_COGNITION_BRAIN_PERCEIVE_START
-    - ``execution_point``：SPINE_EXECUTION_POINTS 闭集中的字符串
+    - ``execution_point``：SPINE_EXECUTION_POINTS 闭集中的字符串（决定 category）
     - ``channel``：原 EventRecord.channel（fact/control/error/diagnostic）
     - ``payload``：原 caller_payload（dict）
     - chain 字段（span_id / parent_span_id / sequence / epoch / prev_event_hash）：
       由 SpineContext 注入；spine_chain_sink 落盘前算 hash chain
+    - ``category``（pydantic 父类必填）：由 execution_point 派生（业务方不传）
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    category: Category = Category.SPINE_COGNITION_BRAIN_PERCEIVE_START
+    category: Category
     execution_point: str
     channel: str = "fact"
     payload: dict[str, Any] = Field(default_factory=dict)
@@ -135,12 +160,36 @@ class SpineEventPayload(EventPayload):
     epoch: int = 0
     prev_event_hash: str | None = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def _derive_category_from_ep(cls, data: Any) -> Any:
+        """业务方只传 execution_point；category 由 _SPINE_EP_TO_CATEGORY 派生注入。"""
+        if isinstance(data, dict) and "category" not in data and "execution_point" in data:
+            ep = data["execution_point"]
+            cat_str = _SPINE_EP_TO_CATEGORY.get(ep)
+            if cat_str is None:
+                raise ValueError(
+                    f"spine EP {ep!r} 未登记 category 映射（ADR-0181 后续 PR 补）"
+                )
+            data = {**data, "category": Category(cat_str)}
+        return data
+
     @model_validator(mode="after")
     def _validate_spine_fields(self) -> SpineEventPayload:
         if self.execution_point not in SPINE_EXECUTION_POINTS:
             raise ValueError(
                 f"UnknownSpineExecutionPoint({self.execution_point!r}): "
                 f"not in SPINE_EXECUTION_POINTS whitelist"
+            )
+        expected_category = _SPINE_EP_TO_CATEGORY.get(self.execution_point)
+        if expected_category is None:
+            raise ValueError(
+                f"spine EP {self.execution_point!r} 未登记 category 映射（ADR-0181 后续 PR 补）"
+            )
+        if self.category.value != expected_category:
+            raise ValueError(
+                f"spine EP {self.execution_point!r} 必须用 category={expected_category!r}；"
+                f"got {self.category.value!r}"
             )
         if self.channel not in ("fact", "control", "error", "diagnostic"):
             raise ValueError(

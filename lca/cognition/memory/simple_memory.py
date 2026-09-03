@@ -84,7 +84,7 @@ class SimpleMemorySystem(MemorySystem):
     async def perceive(self, state: AgentState) -> AgentState:
         """Return a context-enriched state value without mutating the input instance."""
         # PR-3.2: spine envelope for the memory.read execution point.
-        from lca.plugins.observability.spine.reflectors.cognition import (
+        from lca.plugins.events.publishers.spine_reflector_cognition import (
             emit_memory_read,
         )
 
@@ -155,7 +155,7 @@ class SimpleMemorySystem(MemorySystem):
         # PR-3.2: spine envelope for the memory.write execution point
         # (one event per accepted write — the close-set intent of
         # memory.write is per-record, not per-batch).
-        from lca.plugins.observability.spine.reflectors.cognition import (
+        from lca.plugins.events.publishers.spine_reflector_cognition import (
             emit_memory_write,
         )
 
