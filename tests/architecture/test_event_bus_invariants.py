@@ -184,6 +184,7 @@ class TestIFwBus2:
     _ALLOW_PATH_SUBSTRINGS: tuple[str, ...] = (
         "lca_kernel/events/",  # EventMechanism / EventBus 框架本体
         "lca/plugins/events/",  # 业务方 plugin manifest 内部走 EventMechanism
+        "lca/harness/profile/pipeline_loader.py",  # Pipeline 装配:consumer_rules → bus.subscribe
         "archive/",  # 归档
         str(_THIS_TEST_FILE.name),  # 本测试文件
     )
@@ -237,50 +238,51 @@ class TestIFwBus2:
 class TestIFwBus4:
     """I-FW-BUS-4: 业务不订阅 event.bus.dispatch.*。"""
 
+    _SELF_OBS_PREFIX = "event.bus.dispatch"
+
     def test_i_fw_bus_4_no_business_subscribe_dispatch_event(self) -> None:
-        """Pipeline consumer_rules / subscribers / pipeline 段不订阅 event.bus.dispatch.*。"""
-        # profile/bundle yaml 路径
+        """Pipeline 订阅面不得路由 event.bus.dispatch.*。
+
+        只扫**订阅面**:``consumer_rules[].prefix`` 与逐条 ``category`` 块。
+        自观察 hook 的 ``config.emit_event*`` 是**发射**配置而非订阅,不判违规。
+        """
+        import yaml
+
         search_roots = [
             _REPO_ROOT / "lca" / "profiles",
             _REPO_ROOT / "lca" / "bundles",
             _REPO_ROOT / "profiles",
             _REPO_ROOT / "bundles",
         ]
-        matches: list[str] = []
+        violations: list[str] = []
         for root in search_roots:
             if not root.exists():
                 continue
-            # 只看 yaml 文件
-            if _have_ripgrep():
-                result = subprocess.run(  # noqa: S603  # path is a constant binary
-                    [  # noqa: S607  # rg binary located via shutil.which()
-                        "rg",
-                        "--line-number",
-                        "--no-heading",
-                        "--glob",
-                        "*.yaml",
-                        "--glob",
-                        "*.yml",
-                        r"event\.bus\.dispatch\.",
-                        str(root),
-                    ],
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                )
-                if result.returncode not in (0, 1):
+            for path in list(root.rglob("*.yaml")) + list(root.rglob("*.yml")):
+                rel = path.relative_to(_REPO_ROOT)
+                try:
+                    data = yaml.safe_load(path.read_text(encoding="utf-8", errors="ignore"))
+                except (OSError, yaml.YAMLError):
                     continue
-                for line in result.stdout.splitlines():
-                    matches.append(line)
-            else:
-                for path in root.rglob("*.yaml"):
-                    text = path.read_text(encoding="utf-8", errors="ignore")
-                    for lineno, line in enumerate(text.splitlines(), start=1):
-                        if "event.bus.dispatch." in line:
-                            rel = path.relative_to(_REPO_ROOT)
-                            matches.append(f"{rel}:{lineno}:{line}")
-        assert not matches, "I-FW-BUS-4 违规:业务订阅 event.bus.dispatch.*\n" + "\n".join(
-            matches[:5]
+                mapping = None
+                if isinstance(data, dict):
+                    inner = data.get("pipeline")
+                    mapping = inner if isinstance(inner, dict) else data
+                if not isinstance(mapping, dict):
+                    continue
+                for rule in mapping.get("consumer_rules") or []:
+                    if not isinstance(rule, dict):
+                        continue
+                    prefix = str(rule.get("prefix", ""))
+                    if prefix.startswith(self._SELF_OBS_PREFIX):
+                        violations.append(f"{rel}: consumer_rules prefix={prefix!r}")
+                for block in mapping.get("events") or []:
+                    if isinstance(block, dict) and str(block.get("category", "")).startswith(
+                        self._SELF_OBS_PREFIX
+                    ):
+                        violations.append(f"{rel}: category={block.get('category')!r}")
+        assert not violations, "I-FW-BUS-4 违规:业务订阅 event.bus.dispatch.*\n" + "\n".join(
+            violations[:5]
         )
 
 

@@ -114,6 +114,8 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     """
     from starlette.applications import Starlette
 
+    from lca.plugins.transport.webserver.lifespan_adapter import install_trace_middleware
+
     # 1. 解析 config(支持 dict 或 LcaWebServerConfig)
     if isinstance(config, LcaWebServerConfig):
         cfg = config
@@ -140,6 +142,11 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     # 3b. lca-webserver-router 提供的 registry 实例,装 routes
     registry = ctx.require("route_registry")
     registry.install(app)
+
+    # 3d. 装 trace_id 上下文隔离中间件(ADR-0183 §3.9 / PR-12)。
+    # 必须在 routes 之后:lifespan_adapter.install_trace_middleware 是
+    # ``app.add_middleware(...)`` 的最早入口 = ASGI 最外层,跨所有请求隔离。
+    install_trace_middleware(app)
 
     # 3c. 装 Starlette lifespan 协议(让 TestClient(app).lifespan_context(app) 工作)
     # 长期可维护:lifespan 实现放在 lca_kernel.lifespan,plugin/cli/test 三方都用它

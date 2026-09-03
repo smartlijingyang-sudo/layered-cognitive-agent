@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Callable
-from typing import TYPE_CHECKING, ParamSpec, TypeVar, overload
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, overload
 
 from pydantic import BaseModel
 
@@ -30,7 +30,7 @@ from lca.contracts.protocols.state.reducer import Reducer
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 if TYPE_CHECKING:
-    from lca.infrastructure.observability.spine.event_record import Outcome
+    from lca.contracts.observability.outcome import Outcome
 
 
 class Config(BaseModel):
@@ -39,6 +39,70 @@ class Config(BaseModel):
 
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
+
+
+def _publish_apply_marker(
+    *,
+    method: str,
+    phase: str,
+    outcome: Outcome | None = None,
+) -> None:
+    """Publish one ``runtime.reducer.apply`` marker through the EventBus.
+
+    Contract (ADR-0183 PR-8): reducer fold 是 AgentState C4 单写边界,每次
+    fold 经 ``EventBus.publish`` 发一条 ``runtime.reducer.apply`` marker,
+    category 为 ``spine.runtime.reducer.apply``(与 execution_point 一一绑定,
+    :class:`SpineEventPayload` 校验两者一致)。
+
+    producer 用 ``spine_reflector_runtime.plugin.ReflectorClass``:yaml SSOT
+    (``lca_kernel/events/config/observability/spine.yaml``) 对该 category 只
+    授权这一个 publish 身份;换独立身份需同步改 yaml 白名单。
+
+    payload 字段 method/phase/outcome/run_id 与 ``journal_trace`` reader 的
+    字段集对齐。``run_id`` 恒为空串——进程内无 active-run 注入点,
+    trace 关联由 EventBus 的 trace_id 通道承担。
+
+    Failure:鉴权或 payload 校验失败抛 ``UnauthorizedPublishError`` /
+    ``PayloadSchemaError``,不静默吞错。
+    """
+    from lca.contracts.event import Category
+    from lca.plugins.events.publishers.spine_reflector_runtime.plugin import (
+        ReflectorClass,
+    )
+    from lca_kernel.events.bus import EventBus
+    from lca_kernel.events.payloads import SpineEventPayload
+
+    inner: dict[str, Any] = {"method": method, "phase": phase}
+    if outcome is not None:
+        inner["outcome"] = outcome
+    inner["run_id"] = ""
+    EventBus.default().publish(
+        SpineEventPayload(
+            category=Category("spine.runtime.reducer.apply"),
+            execution_point="runtime.reducer.apply",
+            channel="fact",
+            payload=inner,
+        ),
+        producer=ReflectorClass,
+    )
+
+
+def _wrap_apply(fn: Callable[_P, _R], method_name: str) -> Callable[_P, _R]:
+    """Single wrap implementation shared by both decorator call patterns."""
+
+    @functools.wraps(fn)
+    def wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+        _publish_apply_marker(method=method_name, phase="start")
+        outcome: Outcome = "success"
+        try:
+            return fn(*args, **kwargs)
+        except BaseException:
+            outcome = "failure"
+            raise
+        finally:
+            _publish_apply_marker(method=method_name, phase="end", outcome=outcome)
+
+    return wrapped
 
 
 @overload
@@ -54,70 +118,24 @@ def _instrument_apply(
 def _instrument_apply(
     method_name_or_fn: str | Callable[_P, _R],
 ) -> Callable[_P, _R] | Callable[[Callable[_P, _R]], Callable[_P, _R]]:
-    """Wrap an ``apply_*`` body with spine ``runtime.reducer.apply`` start/end.
+    """Wrap an ``apply_*`` body with ``runtime.reducer.apply`` start/end markers.
 
-    The wrapper is the additive middleware that the PR-3.4 brief asks
-    for: every reducer fold now emits one ``runtime.reducer.apply`` start
-    event and one end event (with ``outcome="success"`` or ``"failure"``).
-    The helpers are silent no-ops when no spine is wired; existing
-    Reducer contracts and test surface are unchanged.
+    Every reducer fold emits one start marker and one end marker
+    (``outcome="success"`` or ``"failure"``) via :func:`_publish_apply_marker`;
+    the Reducer contract and the wrapped function's signature are unchanged.
 
     Two call patterns supported:
 
     - ``@_instrument_apply`` — uses ``fn.__name__`` as the method tag.
     - ``@_instrument_apply("custom_name")`` — explicit method tag.
     """
-
     if callable(method_name_or_fn):
-        method_name: str = method_name_or_fn.__name__
-        fn: Callable[_P, _R] = method_name_or_fn
-
-        @functools.wraps(fn)
-        def wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
-            from lca.plugins.events.publishers.spine_reflector_runtime import (
-                emit_runtime_reducer_apply_end,
-                emit_runtime_reducer_apply_start,
-            )
-
-            emit_runtime_reducer_apply_start(method=method_name)
-            outcome: Outcome = "success"
-            try:
-                return fn(*args, **kwargs)
-            except BaseException:
-                outcome = "failure"
-                raise
-            finally:
-                emit_runtime_reducer_apply_end(
-                    method=method_name,
-                    outcome=outcome,
-                )
-
-        return wrapped
+        return _wrap_apply(method_name_or_fn, method_name_or_fn.__name__)
 
     method_name = method_name_or_fn
 
     def decorator(fn: Callable[_P, _R]) -> Callable[_P, _R]:
-        @functools.wraps(fn)
-        def wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
-            from lca.plugins.events.publishers.spine_reflector_runtime import (
-                emit_runtime_reducer_apply_end,
-                emit_runtime_reducer_apply_start,
-            )
-
-            emit_runtime_reducer_apply_start(method=method_name)
-            outcome: Outcome = "success"
-            try:
-                return fn(*args, **kwargs)
-            except BaseException:
-                outcome = "failure"
-                raise
-            finally:
-                emit_runtime_reducer_apply_end(
-                    method=method_name,
-                    outcome=outcome,
-                )
-
-        return wrapped
+        return _wrap_apply(fn, method_name)
 
     return decorator
 
@@ -130,8 +148,8 @@ class DefaultReducer(Reducer):
       但本类把 mutation 集中在同一文件，未来 AgentState 转 frozen 后只
       改这一处）。
     - 每个方法是纯函数（除 await 内 yield）；无 side effect。
-    - 公共 ``apply_*`` 方法通过 ``_instrument_apply`` 包装,每次调用发射
-      ``runtime.reducer.apply`` 事件(start/end);spine 未连接时静默 no-op。
+    - 公共 ``apply_*`` 方法通过 ``_instrument_apply`` 包装,每次调用经
+      EventBus 发 ``runtime.reducer.apply`` start/end marker。
     """
 
     @_instrument_apply

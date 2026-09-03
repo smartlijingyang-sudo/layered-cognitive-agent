@@ -6,7 +6,7 @@
 - post_dispatch hook 派生新事件
 - failure hook 吞错 vs 上抛
 - failure= 参数语义:FAIL_FAST 上抛,CONTAINED 吞错
-- trace_id 优先顺序:payload → contextvars(留 stub) → new_id("trc")
+- trace_id 优先顺序:显式参数 → payload.trace_id → ambient contextvars → new_id("trc")
 - 鉴权失败 raise UnauthorizedPublishError
 - ConsumerHandle.unregister 留 stub
 - 重置 EventBus.default() 单例(测试隔离)

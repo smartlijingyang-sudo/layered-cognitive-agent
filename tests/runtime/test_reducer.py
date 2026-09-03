@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import pytest
 
+from lca.contracts.event import Category, EventPayload
 from lca.contracts.models.core.activation import ActivatedSkill
 from lca.contracts.models.core.budget import create_budget
 from lca.contracts.models.core.decision import Decision, Observation, Reflection, Turn
@@ -15,6 +16,10 @@ from lca.contracts.models.core.perception import ContextItem, ContextManifest
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.core.stop import StopDecision
 from lca.runtime.reducer import DefaultReducer
+from lca_kernel.events.bus import EventBus
+from lca_kernel.events.mechanism import _DEFAULT_CONFIG_DIR, EventMechanism
+from lca_kernel.events.payloads_spine import SpineEventPayload
+from lca_kernel.events.registry import EventRegistry
 
 
 def _state() -> AgentState:
@@ -174,9 +179,7 @@ def test_apply_terminal_outcome_rejects_waiting_input_without_durable_cursor() -
         DeclarativeValidationError,
         match="requires a durable resume cursor",
     ):
-        DefaultReducer().apply_terminal_outcome(
-            state, stop, plan_ref="plan-hil", journal_seq_end=4
-        )
+        DefaultReducer().apply_terminal_outcome(state, stop, plan_ref="plan-hil", journal_seq_end=4)
 
 
 # ── ADR-0077 invariant: TerminalOutcome(FAILED) must always carry error_ref ──
@@ -247,3 +250,105 @@ class TestFailedTerminalCarriesErrorRef:
         assert outcome.kind.value == "failed"
         assert outcome.error_ref is not None
         assert outcome.error_ref.message == "explicit failure: cloud-sandbox unavailable"
+
+
+# ── _instrument_apply → EventBus(ADR-0183 PR-8) ──────────────────────────
+
+
+def _make_collecting_bus() -> tuple[EventBus[EventPayload], list[EventPayload]]:
+    """EventBus with the real yaml registry and a collecting subscriber.
+
+    The collector subscribes under the ``SpineChainSink`` identity: the yaml
+    subscribers whitelist of ``spine.runtime.reducer.apply`` authorizes that
+    class, so the test callback passes subscribe authorization.
+    """
+    from lca.plugins.events.sinks.spine_chain_sink.sink import SpineChainSink
+
+    bus: EventBus[EventPayload] = EventBus(EventRegistry.load(_DEFAULT_CONFIG_DIR))
+    seen: list[EventPayload] = []
+    bus.subscribe(
+        plugin=SpineChainSink,
+        category=Category("spine.runtime.reducer.apply"),
+        on_event=lambda payload, ref: seen.append(payload),
+    )
+    return bus, seen
+
+
+class TestInstrumentApply:
+    """``_instrument_apply`` publishes ``runtime.reducer.apply`` via EventBus."""
+
+    def test_instrument_apply_success_emits_paired_markers(self) -> None:
+        """One fold emits start + end markers with the spine payload shape."""
+        bus, seen = _make_collecting_bus()
+        EventBus.set_default(bus)
+        try:
+            DefaultReducer().apply_step_advanced(_state(), 2)
+        finally:
+            EventBus.set_default(None)
+
+        markers = [p for p in seen if isinstance(p, SpineEventPayload)]
+        assert [m.payload for m in markers] == [
+            {"method": "apply_step_advanced", "phase": "start", "run_id": ""},
+            {
+                "method": "apply_step_advanced",
+                "phase": "end",
+                "outcome": "success",
+                "run_id": "",
+            },
+        ]
+        assert all(m.category.value == "spine.runtime.reducer.apply" for m in markers)
+        assert all(m.channel == "fact" for m in markers)
+
+    def test_instrument_apply_failure_outcome_and_exception_propagate(self) -> None:
+        """A raising fold emits ``outcome="failure"`` and re-raises the error."""
+        from lca.contracts.protocols.declarative.declarative_phase_graph import (
+            DeclarativeValidationError,
+        )
+
+        bus, seen = _make_collecting_bus()
+        EventBus.set_default(bus)
+        try:
+            stop = StopDecision(
+                should_stop=True,
+                reason="approval_required",  # type: ignore[arg-type]
+                status=TaskStatus.INPUT_REQUIRED,
+            )
+            state = DefaultReducer().apply_stop(_state(), stop)
+            with pytest.raises(DeclarativeValidationError):
+                DefaultReducer().apply_terminal_outcome(
+                    state, stop, plan_ref="plan-x", journal_seq_end=1
+                )
+        finally:
+            EventBus.set_default(None)
+
+        markers = [
+            p.payload
+            for p in seen
+            if isinstance(p, SpineEventPayload) and p.payload["method"] == "apply_terminal_outcome"
+        ]
+        assert [m["phase"] for m in markers] == ["start", "end"]
+        assert markers[1]["outcome"] == "failure"
+
+    def test_instrument_apply_does_not_use_event_mechanism(self) -> None:
+        """Dispatch happens on the EventBus only; an EventMechanism subscriber
+        for the same category receives nothing."""
+        from lca.plugins.events.sinks.spine_chain_sink.sink import SpineChainSink
+
+        mechanism = EventMechanism(EventRegistry.load(_DEFAULT_CONFIG_DIR))
+        mechanism_seen: list[EventPayload] = []
+        mechanism.subscribe(
+            plugin=SpineChainSink,
+            category=Category("spine.runtime.reducer.apply"),
+            callback=lambda payload, ref: mechanism_seen.append(payload),
+        )
+        bus, seen = _make_collecting_bus()
+        EventBus.set_default(bus)
+        EventMechanism.set_default(mechanism)
+        try:
+            DefaultReducer().apply_paused(_state(), "snap-ref")
+        finally:
+            EventBus.set_default(None)
+            EventMechanism.set_default(None)
+
+        assert len(seen) == 2
+        assert mechanism_seen == []

@@ -25,6 +25,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+import structlog
 from cordis import Context
 
 from lca.harness.plugin_api import AuditedPluginContext, PluginDefinition
@@ -43,6 +44,8 @@ from lca.harness.profile.resolve import (
 )
 from lca.harness.profile.source import load_profile_entries
 from lca.infrastructure.file_store import FileStore
+
+_log = structlog.get_logger(__name__)
 
 warnings.warn(
     "lca.harness.profile.boot is deprecated, use lca_kernel.boot (ADR-0115)",
@@ -118,6 +121,30 @@ def _install_observability(ctx: Context) -> None:
     assemble_observability(ctx, ObservabilitySettings())
 
 
+def _register_event_pipeline(resolved: ResolvedProfile) -> None:
+    """Profile 声明事件编排时装载到进程级 EventBus（ADR-0183 §3.3）。
+
+    机制装载（observability 组装）之后执行。未声明且约定文件不存在时
+    直接跳过——Pipeline 是可选装配。同名同版 Pipeline 每进程只装载一次；
+    sink 的 run_id 绑定由运行时在 run 开始时完成，此处只装配。
+    """
+    from lca.harness.profile.pipeline_loader import (
+        load_pipeline_for_profile,
+        register_pipeline_once,
+    )
+    from lca_kernel.events.bus import EventBus
+
+    pipeline = load_pipeline_for_profile(resolved)
+    if pipeline is None:
+        return
+    if register_pipeline_once(EventBus.default(), pipeline):
+        _log.info(
+            "event pipeline registered",
+            pipeline=pipeline.name,
+            version=pipeline.version,
+        )
+
+
 async def boot_profile(
     profile_path: Path | str,
     *,
@@ -155,6 +182,7 @@ async def _boot_context(
                 _bind_bootstrap_file_store(ctx, bootstrap_file_store)
         attach_profile_boot_products(ctx, products)
         _install_observability(ctx)
+        _register_event_pipeline(resolved)
     except BaseException:
         await _dispose_context(ctx)
         raise

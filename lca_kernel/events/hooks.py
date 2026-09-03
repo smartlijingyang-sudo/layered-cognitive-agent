@@ -9,12 +9,14 @@ plugin 通过实现 hook Protocol 注入自定义逻辑；Pipeline 装载时绑�
 
 from __future__ import annotations
 
+import time
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Protocol
 
 from lca.contracts.event import Category, EventPayload
+from lca_kernel.events.payloads import MechanismDispatchEventPayload
 
 if TYPE_CHECKING:
     from lca_kernel.events.bus import EventBus
@@ -22,6 +24,18 @@ if TYPE_CHECKING:
     from lca_kernel.events.spine_runtime import EventRef
 
 # ── 公开枚举 / 哨兵 ──────────────────────────────────────────────────────
+
+
+class FailureSemantics(str, Enum):
+    """consumer 失败语义(sink vs subscriber)。
+
+    FAIL_FAST = sink 路径(失败上抛 publisher);CONTAINED = subscriber
+    路径(失败吞错)。定义在 hooks 层因为 ConsumerResult 需要携带它供
+    post_dispatch 观察;bus 模块 re-export 保持公开面不变。
+    """
+
+    FAIL_FAST = "fail_fast"
+    CONTAINED = "contained"
 
 
 class FailureAction(str, Enum):
@@ -66,7 +80,10 @@ class SpecResolverHook(Protocol):
 class PostDispatchHook(Protocol):
     """dispatch 完成后(所有 consumer 跑完),plugin 可派生事件 / 跨 EP 关联。
 
-    返回 0..N 新事件 → 走 bus.publish 再次进入总线。空 Iterable = 无派生。
+    返回 0..N 新事件;空 Iterable = 无派生。路由由 bus 决定:
+    - :class:`MechanismDispatchEventPayload` → bus 内部自观察路径
+      (不重入 hook chain,防递归;I-FW-BUS-4)
+    - 其他 EventPayload → bus.publish 再次进入总线
     """
 
     def after_dispatch(
@@ -99,7 +116,8 @@ class PublishContext:
     producer: type
     ts: float
     trace_id: str | None = None
-    """trace_id 由 hook 注入,本 PR 留 stub —— PR-12 启用 contextvars。"""
+    """publish 显式传入的 trace_id;ambient contextvars 回退由
+    EventBus._resolve_trace_id 统一解析,hook 不重复实现。"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,21 +128,25 @@ class ConsumerResult:
     category: Category
     exc: BaseException | None = None
     """不为空即失败。"""
+    failure: FailureSemantics = FailureSemantics.CONTAINED
+    """该 consumer 的失败语义;自观察据此区分 sinks(FAIL_FAST)/consumers(CONTAINED)。"""
 
     @property
     def failed(self) -> bool:
         return self.exc is not None
 
 
-# ── 默认实现（PR-2 落地,PR-12 启用）─────────────────────────────────────
+# ── 默认实现 ────────────────────────────────────────────────────────────
 
 
 class TraceContextHook:
-    """PreDispatchHook：从 ctx 取 trace_id 注入 payload(本 PR 留 stub)。
+    """PreDispatchHook：trace_id seam,保持 payload 透传。
 
-    落地步骤:
-    - 本 PR：method 直接返回 payload(stub)，保证 Pipeline 装载不抛。
-    - PR-12：替换为 contextvars 取值 + 写 payload.trace_id。
+    trace_id 解析由 :meth:`EventBus._resolve_trace_id` 单点承担
+    (显式参数 → payload.trace_id → ambient contextvars → new_id);
+    EventPayload 是 frozen + extra=forbid 的 pydantic 模型,hook 无法
+    泛化写入 trace_id 字段,因此本 hook 不重复实现解析,仅作为
+    Pipeline 装载的 pre_dispatch seam 存在(未来按类型注入扩展点)。
     """
 
     def before_publish(
@@ -165,11 +187,18 @@ class DefaultFailureHook:
 
 
 class MechanismDispatchObserver:
-    """PostDispatchHook：自指派观察(本 PR 留 stub,等 PR-12)。
+    """PostDispatchHook：机制自指派观察(ADR-0183 §3.10)。
 
-    PR-12 落地:
-    - yield MechanismDispatchEventPayload(category=event.bus.dispatch.consumers.end, ...)
-    - 默认 consumer_rules 不订阅 event.bus.dispatch.*(I-FW-BUS-4 守护)。
+    dispatch 完成后,按失败语义把 results 拆成两个阶段并派生自观察事件:
+    - ``event.bus.dispatch.sinks.end`` ← FAIL_FAST(sink)结果
+    - ``event.bus.dispatch.consumers.end`` ← CONTAINED(subscriber)结果
+
+    仅当该阶段有实际执行的 consumer 时才派生(不空发)。派生的
+    :class:`MechanismDispatchEventPayload` 由 bus 走内部自观察路径
+    (不重入 post_dispatch,防递归;I-FW-BUS-4 禁止业务订阅)。
+
+    ``duration_s`` 取整次 dispatch 的墙钟耗时(``time.time() - ref.ts``);
+    bus 不做逐 consumer 计时,两阶段事件共用同一总耗时。
     """
 
     def after_dispatch(
@@ -178,7 +207,22 @@ class MechanismDispatchObserver:
         ref: EventRef,
         results: list[ConsumerResult],
     ) -> Iterable[EventPayload]:
-        return ()
+        duration_s = max(0.0, time.time() - ref.ts)
+        for stage, semantics in (
+            ("sinks", FailureSemantics.FAIL_FAST),
+            ("consumers", FailureSemantics.CONTAINED),
+        ):
+            stage_results = [r for r in results if r.failure is semantics]
+            if not stage_results:
+                continue
+            yield MechanismDispatchEventPayload(
+                category=f"event.bus.dispatch.{stage}.end",
+                consumer_count=len(stage_results),
+                duration_s=duration_s,
+                contained_failures=tuple(
+                    type(r.exc).__qualname__ for r in stage_results if r.failed
+                ),
+            )
 
 
 __all__ = [
@@ -186,6 +230,7 @@ __all__ = [
     "DefaultFailureHook",
     "FailureAction",
     "FailureHook",
+    "FailureSemantics",
     "MechanismDispatchObserver",
     "PayloadSchemaHook",
     "PostDispatchHook",

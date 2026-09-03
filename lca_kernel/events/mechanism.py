@@ -118,7 +118,7 @@ class EventMechanism:
         ref = EventRef(
             event_id=new_id("evt"),
             category=category.value,
-            trace_id="",
+            trace_id=self._resolve_trace_id(payload),
             ts=time.time(),
         )
         # ADR-0181 D6: FD-1 sink fail-fast（先），FD-2 subscriber contained（后）。
@@ -210,6 +210,17 @@ class EventMechanism:
                 )
 
     # ── 内部（ADR-0181 D6 FD-1 / FD-2）────────────────────────────────────
+
+    @staticmethod
+    def _resolve_trace_id(payload: EventPayload) -> str:
+        """trace_id 解析:payload.trace_id → ambient contextvars → new_id。
+
+        与 EventBus._resolve_trace_id 同一解析链(ADR-0183 §3.9)。
+        bus 模块级 import mechanism,故此处函数内延迟 import 防循环。
+        """
+        from lca_kernel.events.bus import _current_trace_id
+
+        return getattr(payload, "trace_id", None) or _current_trace_id.get() or new_id("trc")
 
     def _dispatch_sinks(self, payload: EventPayload, ref: EventRef) -> None:
         """FD-1: 首个 sink 抛错 → 上抛 sender（fail-fast）。"""

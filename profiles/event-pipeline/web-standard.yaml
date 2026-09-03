@@ -1,0 +1,69 @@
+# web-standard 事件编排 —— ADR-0183 §3.3 Pipeline 声明。
+#
+# 装配路径：profile boot 时 lca/harness/profile/pipeline_loader.py 按约定
+# （<profile 目录>/event-pipeline/<profile stem>.yaml）发现本文件，构造
+# Pipeline 后调 EventBus.default().register_pipeline(pipeline)。
+#
+# 约束（附录 C §C.1）：
+# - hooks 类必须可无参构造（register_pipeline 走 spec.hook() 实例化）；
+# - sinks 段有且仅有 1 个 fail_fast 的事实链 sink（spine-fact-chain）；
+# - consumer_rules 不允许覆盖 event.bus.dispatch.*（I-FW-BUS-4）。
+
+pipeline:
+  name: web-standard-event-pipeline
+  version: 1
+
+  # ====== A. hooks（自定义逻辑，按 stage 装载） ======
+  hooks:
+    - id: trace-context-injection
+      hook: lca_kernel.events.hooks.TraceContextHook
+      stage: pre_dispatch
+      config:
+        trace_id_source: contextvars   # PR-12 启用；当前 stub 原样透传
+
+    - id: payload-schema-validation
+      hook: lca_kernel.events.hooks.PayloadSchemaHook
+      stage: pre_dispatch
+      config:
+        fail_fast_on_missing_field: true
+
+    - id: mechanism-self-observation
+      hook: lca_kernel.events.hooks.MechanismDispatchObserver
+      stage: post_dispatch
+      config:
+        emit_event_sinks: event.bus.dispatch.sinks.end
+        emit_event_consumers: event.bus.dispatch.consumers.end
+
+    - id: consumers-failure-default
+      hook: lca_kernel.events.hooks.DefaultFailureHook
+      stage: on_failure
+      config:
+        swallow: true
+
+  # ====== B. sinks（落盘后端） ======
+  # run_id 由运行时在 run 开始时经 set_run_id 绑定；boot 期只装配实例。
+  sinks:
+    - id: spine-fact-chain
+      backend: lca_kernel.events.sinks.spine_sink.SpineSink
+      failure: fail_fast
+      config:
+        path_template: "{run_id}.spine.jsonl"
+        fsync_strategy: batch
+        fsync_batch_size: 100
+        fsync_interval_ms: 50
+        checksum_on_open: true
+
+  # ====== C. consumer_rules（前缀路由） ======
+  # 兜底：所有 spine.* 事实走 SpineChainSink（fail_fast 落盘）。
+  # 更细前缀规则（spine.llm. / spine.exception. 等）由后续 PR 按需追加。
+  consumer_rules:
+    - prefix: "spine."
+      plugins:
+        - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      failure: fail_fast
+
+  # ====== D. options（可选元数据，inspect-pipeline 展示） ======
+  options:
+    trace_id_source: contextvars
+    self_observation: false            # PR-12 启用 MechanismDispatchObserver 实装
+    schema_validation: strict
