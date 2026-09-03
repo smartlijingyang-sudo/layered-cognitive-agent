@@ -2,6 +2,7 @@
 
 PR-6：boot 维度 3 EP（新加，old manifest 没有）。
 """
+
 from __future__ import annotations
 
 import logging

@@ -2,6 +2,7 @@
 
 PR-6：perception 维度 6 EP（新加，old manifest 没有）。
 """
+
 from __future__ import annotations
 
 import logging
@@ -116,10 +117,10 @@ def emit_perception_artifact_built(
 
 __all__ = [
     "ReflectorClass",
+    "emit_attention_blur",
+    "emit_attention_focus",
     "emit_perception_artifact_built",
     "emit_perception_fused",
     "emit_perception_observe",
     "emit_perception_signal_detected",
-    "emit_attention_blur",
-    "emit_attention_focus",
 ]

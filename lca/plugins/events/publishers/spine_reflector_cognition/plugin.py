@@ -13,6 +13,7 @@ lca/cognition/brain/reasoner.py 等调用方零改动。旧 _safe_append
         producer=ReflectorClass,
     )
 """
+
 from __future__ import annotations
 
 import logging
@@ -186,9 +187,7 @@ def emit_prompt_assembler_end(
     )
 
 
-def emit_synthesizer_merge(
-    *, state_id: str, candidate_count: int, outcome: str = "success"
-) -> Any:
+def emit_synthesizer_merge(*, state_id: str, candidate_count: int, outcome: str = "success") -> Any:
     return _send(
         execution_point="synthesizer.merge",
         channel="fact",

@@ -5,6 +5,7 @@ PR-5：phase_graph 全部 4 emit 下沉到 EventBus.publish：
 - phase_graph.edge.transit
 - phase_graph.instrument.coverage
 """
+
 from __future__ import annotations
 
 import logging

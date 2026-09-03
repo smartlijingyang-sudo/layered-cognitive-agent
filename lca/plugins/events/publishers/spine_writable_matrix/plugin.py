@@ -6,6 +6,7 @@
 # 在 spine-writable-matrix worktree 中分批做（cursor 内部 5+ 处 append
 # 需逐个适配；本 PR 不动 cursor 内部代码）。
 """
+
 from __future__ import annotations
 
 import logging

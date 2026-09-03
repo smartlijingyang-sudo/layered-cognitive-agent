@@ -6,6 +6,7 @@ PR-5：phase 全部 13 emit 下沉到 EventBus.publish：
 - phase.act.fold.start / .end / phase.act.fold
 - phase.tool.call.start / .end / phase.tool.denied
 """
+
 from __future__ import annotations
 
 import logging

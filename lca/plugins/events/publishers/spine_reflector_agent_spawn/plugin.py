@@ -4,6 +4,7 @@ PR-4：agent_loop + agent 全部 5 emit 下沉到 EventBus.publish：
 - agent_loop.iteration.start / .end
 - agent.spawn / agent.iteration / agent.final
 """
+
 from __future__ import annotations
 
 import logging

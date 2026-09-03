@@ -40,8 +40,7 @@ class _Config(BaseModel):
     kind=PluginKind.PROVIDER,
     effects="none",
     description=(
-        "Journal sink（ADR-0180 / ADR-0183 PR-7）：缓存 EventRecord，"
-        "订阅 EventBus 所有 category。"
+        "Journal sink（ADR-0180 / ADR-0183 PR-7）：缓存 EventRecord，订阅 EventBus 所有 category。"
     ),
     test_suite="tests/plugins/events/sinks/test_journal.py",
     functional_group=FunctionalGroup.G0_CON_KERNEL,

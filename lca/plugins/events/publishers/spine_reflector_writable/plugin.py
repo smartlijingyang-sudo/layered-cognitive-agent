@@ -8,6 +8,7 @@ PR-5：writable matrix 全部 7 emit 下沉到 EventBus.publish：
 实际写入由 cursor._append + WritePort 接管；本 publisher 提供
 EventBus 路径的 typed 入口。
 """
+
 from __future__ import annotations
 
 import logging

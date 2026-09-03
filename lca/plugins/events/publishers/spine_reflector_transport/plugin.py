@@ -8,6 +8,7 @@ PR-4：transport / kernel.run 全部 6 emit 下沉到 EventBus.publish：
 signature 严格对齐旧 lca/infrastructure/observability/spine/transport_emit.py
 调用方零改动。
 """
+
 from __future__ import annotations
 
 import logging
