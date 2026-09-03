@@ -22,22 +22,28 @@ from lca.contracts.observability.evidence import (
     RetentionClass as RetentionClass,
 )
 from lca.contracts.observability.exception_capture import (
+    ErrKind as ErrKind,
+)
+from lca.contracts.observability.exception_capture import (
     ExceptionRecord as ExceptionRecord,
 )
 from lca.contracts.observability.exception_capture import (
     SourceLocation as SourceLocation,
 )
 from lca.contracts.observability.exception_capture import (
+    classify_exception as classify_exception,
+)
+from lca.contracts.observability.exception_capture import (
     exc_to_record as exc_to_record,
 )
 from lca.contracts.observability.ledger import RunLedgerFactory as RunLedgerFactory
-from lca.contracts.observability.outcome import Outcome as Outcome
 from lca.contracts.observability.model_visible_capture import (
     ModelVisibleArtifact as ModelVisibleArtifact,
 )
 from lca.contracts.observability.model_visible_capture import (
     ModelVisibleCapture as ModelVisibleCapture,
 )
+from lca.contracts.observability.outcome import Outcome as Outcome
 from lca.contracts.observability.reasoner_prompt_capture import (
     ReasonerPromptArtifact as ReasonerPromptArtifact,
 )
@@ -47,6 +53,7 @@ from lca.contracts.observability.reasoner_prompt_capture import (
 
 __all__ = [
     "Classification",
+    "ErrKind",
     "EvidenceIntegrityError",
     "EvidencePolicy",
     "EvidenceReceipt",
@@ -61,5 +68,6 @@ __all__ = [
     "RetentionClass",
     "RunLedgerFactory",
     "SourceLocation",
+    "classify_exception",
     "exc_to_record",
 ]

@@ -49,7 +49,6 @@ import functools
 import hashlib
 import inspect
 import logging
-import traceback
 from collections.abc import Awaitable, Callable
 from typing import Any, TypeVar, overload
 
@@ -349,17 +348,19 @@ def _publish_i17_rejection(
     rejects the publication — we never want reject-noticing to
     mask the original I17.
     """
-    tb_text = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-    capped = tb_text.encode("utf-8", errors="replace")[:4096]
+    from lca.contracts.observability import exc_to_record
+
+    rec = exc_to_record(exc, boundary="spine.i17.rejection")
     try:
         spine.append(
             execution_point="spine.i17.rejected",
             channel="error",
             caller_payload={
                 "attempted_execution_point": attempted_ep,
-                "exception_class": type(exc).__qualname__,
-                "reason": str(exc),
-                "traceback_text": capped.decode("utf-8", errors="ignore"),
+                "exception_class": rec.exception_class,
+                "reason": rec.exception_message,
+                "err_kind": rec.err_kind.value,
+                "traceback_text": rec.traceback_text,
                 "span_id": getattr(span, "span_id", None),
                 "outer_channel": str(channel),
             },

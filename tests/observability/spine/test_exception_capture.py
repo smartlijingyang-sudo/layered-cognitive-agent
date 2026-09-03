@@ -3,9 +3,11 @@
 覆盖：
 - ``exc_to_record`` 字段齐全(boundary / exception_class /
   exception_message / traceback_text / source_location / call_frames /
-  cause_chain / run_id / trace_id)
+  cause_chain / run_id / trace_id / err_kind)
 - ``cause_chain`` 去重 + 跳过 self
 - ``ExceptionRecord.asdict()`` 含 legacy alias (exc_type / reason)
+  + 新 ``err_kind``
+- traceback by-frame cap: 64 帧截断,栈顶优先,栈底优先丢
 - ``emit_exception_caught`` 是唯一 SSOT emitter —— 与 FileSink
   端到端:任何异常事件必然落 ``<sha256>.json`` sidecar,
   主 ledger 用 ``{execution_point, offloaded: <digest>}`` 占位符。
@@ -16,10 +18,15 @@
 from __future__ import annotations
 
 import json
+import ssl
 from datetime import datetime, timezone
 from pathlib import Path
 
-from lca.contracts.observability import ExceptionRecord, exc_to_record
+from lca.contracts.observability import (
+    ErrKind,
+    ExceptionRecord,
+    exc_to_record,
+)
 from lca.infrastructure.observability.spine.event_record import EventRecord
 from lca.infrastructure.observability.spine.event_spine import EventSpine
 from lca.infrastructure.observability.spine.exception_emit import (
@@ -127,6 +134,7 @@ def test_asdict_contains_all_canonical_fields() -> None:
         cause_chain=(),
         run_id="r1",
         trace_id="t1",
+        err_kind=ErrKind.INTERNAL,
     )
     d = rec.asdict()
     for key in (
@@ -137,6 +145,7 @@ def test_asdict_contains_all_canonical_fields() -> None:
         "source_location",
         "call_frames",
         "cause_chain",
+        "err_kind",
         "run_id",
         "trace_id",
         # legacy alias
@@ -146,6 +155,7 @@ def test_asdict_contains_all_canonical_fields() -> None:
         assert key in d, f"missing {key}"
     assert d["exc_type"] == "ValueError"
     assert d["reason"] == "m"
+    assert d["err_kind"] == "internal"
 
 
 def test_extra_overrides_legacy_alias_but_not_canonical() -> None:
@@ -219,10 +229,13 @@ def test_emit_exception_caught_writes_sidecar_for_any_exception(tmp_path: Path) 
     assert main.get("execution_point") == "exception.caught"
     assert main.get("offloaded"), "main ledger must reference offloaded digest"
 
-    # sidecar 必有
+    # sidecar 必有(占位符 schema 包含 ``sidecar`` —— 可读文件名)
     digest = main["offloaded"]
-    sidecar = run_dir / f"{digest}.json"
+    sidecar_name = main["sidecar"]
+    sidecar = run_dir / sidecar_name
     assert sidecar.exists(), "sidecar must exist for any exception event"
+    assert sidecar_name.startswith(digest[:8])
+    assert sidecar_name.endswith("-ValueError.json")
 
     # sidecar payload 字段齐全
     sidecar_payload = json.loads(sidecar.read_text())
@@ -300,9 +313,168 @@ def test_instrument_wrap_exception_payload_uses_ssot() -> None:
         "source_location",
         "call_frames",
         "cause_chain",
+        "err_kind",
         "exc_type",
         "reason",
     ):
         assert key in d, f"wrap path missing {key}"
     assert d["exception_class"] == "KeyError"
     assert "wrap path" in d["traceback_text"]
+    assert d["err_kind"] == "internal"
+
+
+# ── err_kind 分类 ───────────────────────────────────────────────────────────────
+
+
+def test_exc_to_record_classifies_ssl_want_read_as_ssl() -> None:
+    """``ssl.SSLWantReadError`` 由 classify_exception 标为 SSL。
+
+    模拟 LLM 流式 SSL 帧被掐的场景(SSLWantReadError 是 SSL 三件套里
+    最常见的非致命读帧信号 —— 在 python 3.12+ 升级 path 中可能移到
+    ``_ssl`` 子模块或被重命名,所以另走 name 启发式兜底)。
+    """
+    ssl_exc: ssl.SSLWantReadError = ssl.SSLWantReadError()
+    rec = exc_to_record(ssl_exc, boundary="x")
+    assert rec.err_kind is ErrKind.SSL
+    assert rec.asdict()["err_kind"] == "ssl"
+
+
+def test_exc_to_record_classifies_cancellation() -> None:
+    import asyncio as _asyncio
+
+    try:
+        raise _asyncio.CancelledError()
+    except BaseException as exc:
+        rec = exc_to_record(exc, boundary="x")
+    assert rec.err_kind is ErrKind.CANCELLED
+
+
+def test_classify_exception_business_builtin_maps_to_internal() -> None:
+    """业务 ValueError / KeyError 等 OTel 表外 builtin 异常 → INTERNAL。
+
+    这部分异常在本仓出现意味着 LCA 代码的意外,不是外部网络/取消/SANDBOX,
+    应走 triage 路径(读 traceback 而非 retry)。
+    """
+    from lca.contracts.observability.exception_capture import classify_exception
+
+    assert classify_exception(ValueError("x")) is ErrKind.INTERNAL
+    assert classify_exception(KeyError("k")) is ErrKind.INTERNAL
+    assert classify_exception(LookupError("l")) is ErrKind.INTERNAL
+
+
+def test_classify_exception_unknown_when_no_signal() -> None:
+    """非 builtin / 非已知名 = UNKNOWN 兜底。"""
+
+    from lca.contracts.observability.exception_capture import classify_exception
+
+    class _Unknown(BaseException):
+        pass
+
+    assert classify_exception(_Unknown("x")) is ErrKind.UNKNOWN
+
+
+# ── by-frame cap ────────────────────────────────────────────────────────────────
+
+
+def test_exc_to_record_caps_traceback_text_by_frame_budget() -> None:
+    """框架数 > frame_budget → traceback_text 只输出最近 N 帧。"""
+
+    def _deep(depth: int) -> None:
+        if depth == 0:
+            raise ValueError("deep")
+        _deep(depth - 1)
+
+    try:
+        _deep(120)
+    except ValueError as exc:
+        full_rec = exc_to_record(exc, boundary="x", frame_budget=128)
+        capped_rec = exc_to_record(exc, boundary="x", frame_budget=8)
+
+    # 完整栈应远大于 8 帧
+    assert len(full_rec.call_frames) > 8
+    # call_frames 永远保留全栈 —— 只是 traceback_text 被截
+    assert len(capped_rec.call_frames) == len(full_rec.call_frames)
+    # 截过的 traceback_text 明显比完整短
+    assert len(capped_rec.traceback_text) < len(full_rec.traceback_text)
+    # 截过的文本仍含栈顶(抛出处 _deep)和 ValueError 行
+    assert "_deep" in capped_rec.traceback_text
+    assert "ValueError: deep" in capped_rec.traceback_text
+
+
+def test_exc_to_record_frame_budget_does_not_drop_raising_site() -> None:
+    """栈底优先丢 —— 抛出处(最末帧)必须在 traceback_text 中。"""
+
+    def _raise() -> None:
+        raise ValueError("raising site")
+
+    def _middle() -> None:
+        _raise()
+
+    try:
+        _middle()
+    except ValueError as exc:
+        rec = exc_to_record(exc, boundary="x", frame_budget=4)
+    # 当前测试文件的栈顶帧 + _raise 栈底 都应在;被截掉的应是栈中间其他模块
+    assert "ValueError: raising site" in rec.traceback_text
+    # source_location 总是最末帧 —— 即 _raise 的现场
+    assert rec.source_location is not None
+    assert rec.source_location.function == "_raise"
+
+
+# ── lifecycle 路径 emit 端到端 ──────────────────────────────────────────────────
+
+
+def test_lifecycle_path_emit_includes_err_kind(tmp_path: Path) -> None:
+    """lifecycle 走 emit_exception_caught → spine JSONL 含 err_kind。
+
+    注意:SSLWantReadError 不带 __traceback__,traceback_text 较小,
+    payload 序列化后 **未必** 越过 FileSink 4 KiB 阈值 → 可能无 sidecar。
+    err_kind 仍以 JSON 行(主 ledger 或 offload)记录。本测试用 call_stack
+    触发一个 frame 充足的 ValueError,这样 file_sink 必然 offload 到 sidecar。
+    """
+    from lca.harness.declarative.compile.instrument_wrap import (
+        set_active_spine_accessor,
+    )
+
+    run_id = "r_lifecycle"
+    run_dir = tmp_path / "runs" / run_id
+    run_dir.mkdir(parents=True)
+    file_sink = FileSink(run_dir, run_id=run_id)
+    spine = EventSpine(sinks=[file_sink], run_id=run_id)
+    previous = set_active_spine_accessor(lambda: spine)
+
+    try:
+        # 多帧 ValueError —— 保证 traceback_text 长度令 payload > 4 KiB
+        def _a() -> None:
+            def _b() -> None:
+                raise ssl.SSLWantReadError()
+
+            _b()
+
+        try:
+            _a()
+        except BaseException as exc:
+            rec = exc_to_record(exc, boundary="lifecycle.execute")
+            emit_exception_caught(rec)
+    finally:
+        set_active_spine_accessor(previous)
+
+    spine.close()
+    file_sink.close()
+
+    # 主 ledger 必有,且 on-load payload 含 err_kind = "ssl"
+    payload = None
+    # exceptions.jsonl 里含完整 payload,主 ledger 是 placeholder
+    exc_path = run_dir / f"{run_id}.exceptions.jsonl"
+    exc_lines = exc_path.read_text().splitlines()
+    for line in exc_lines:
+        parsed = json.loads(line)
+        if parsed.get("execution_point") == "exception.caught":
+            payload = parsed["payload"]
+            break
+    assert payload is not None, "exception.caught event not found in exceptions.jsonl"
+    assert payload["err_kind"] == "ssl"
+    assert payload["exception_class"] == "SSLWantReadError"
+    # call_frames 至少含 _a / _b 帧
+    frame_funcs = [f["function"] for f in payload["call_frames"]]
+    assert "_b" in frame_funcs
