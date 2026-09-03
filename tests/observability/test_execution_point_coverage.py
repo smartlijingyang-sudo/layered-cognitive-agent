@@ -30,16 +30,16 @@ from lca.contracts.protocols import LLMAdapter
 from lca.plugins.events.publishers.spine_reflector_cognition import (  # noqa: F401  # ADR-0181 PR-2: 旧 reflector 退役
     ReflectorClass,
 )
-from lca_kernel.events.mechanism import EventMechanism
+from lca_kernel.events.bus import EventBus
 
 
-class _CapturingMechanism:
-    """Stub matching ``EventMechanism.send(...)`` keyword surface (ADR-0181 PR-2)."""
+class _CapturingBus:
+    """Stub matching ``EventBus.publish(...)`` keyword surface (ADR-0183 §3.1)."""
 
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
 
-    def send(self, payload, *, plugin):  # noqa: ARG002
+    def publish(self, payload, *, producer, trace_id=None):  # noqa: ARG002
         self.calls.append(
             {
                 "execution_point": payload.execution_point,
@@ -147,8 +147,8 @@ async def test_prompt_assembler_eps_emitted_with_payload():
         ToolPermissionManifest,
     )
 
-    # ADR-0181 PR-2: 旧 _CapturingSpine 退役，新机制走 _CapturingMechanism
-    spine = _CapturingMechanism(); EventMechanism.set_default(spine)
+    # ADR-0183 PR-7: _CapturingMechanism 退役，新 EventBus 走 _CapturingBus
+    spine = _CapturingBus(); EventBus.set_default(spine)
     try:
         template = PromptTemplate(
             id="react_prompt",
@@ -172,7 +172,7 @@ async def test_prompt_assembler_eps_emitted_with_payload():
         )
         await reasoner.generate_thoughts(_build_state())
     finally:
-        EventMechanism.set_default(None)
+        EventBus.set_default(None)
 
     starts = [c for c in spine.calls if c["execution_point"] == "prompt_assembler.assemble.start"]
     ends = [c for c in spine.calls if c["execution_point"] == "prompt_assembler.assemble.end"]
@@ -198,8 +198,8 @@ def test_skill_router_route_emits_decision_path():
 
     from lca.cognition.brain.skill_router import KeywordSkillRouter
 
-    # ADR-0181 PR-2: 旧 _CapturingSpine 退役，新机制走 _CapturingMechanism
-    spine = _CapturingMechanism(); EventMechanism.set_default(spine)
+    # ADR-0183 PR-7: _CapturingMechanism 退役，新 EventBus 走 _CapturingBus
+    spine = _CapturingBus(); EventBus.set_default(spine)
     try:
         router = KeywordSkillRouter(
             rules={"research_prompt": ["hello"]},
@@ -207,7 +207,7 @@ def test_skill_router_route_emits_decision_path():
         )
         result = asyncio.run(router.route(_build_state()))
     finally:
-        EventMechanism.set_default(None)
+        EventBus.set_default(None)
 
     assert result == "research_prompt"
     skill_eps = [c for c in spine.calls if c["execution_point"] == "skill_router.route"]

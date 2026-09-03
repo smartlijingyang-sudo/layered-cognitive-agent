@@ -1,12 +1,12 @@
-"""spine_reflector_writable plugin（ADR-0181 PR-5）。
+"""spine_reflector_writable plugin（ADR-0181 PR-5 / ADR-0183 PR-7）。
 
-PR-5：writable matrix 全部 7 emit 下沉到 EventMechanism.send：
+PR-5：writable matrix 全部 7 emit 下沉到 EventBus.publish：
 - writable.step.start / .end
 - writable.segment.start / .end
 - writable.iteration.halt / .closing / .close
 
-PR-5 同步签名即可；实际写入由 cursor._append + WritePort 接管，
-本 publisher 提供 EventMechanism 路径的 typed 入口（PR-10 接管）。
+实际写入由 cursor._append + WritePort 接管；本 publisher 提供
+EventBus 路径的 typed 入口。
 """
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from lca_kernel.events.payloads import Category, SpineEventPayload
 from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
 
 if TYPE_CHECKING:
-    from lca_kernel.events.mechanism import EventRef
+    from lca_kernel.events.bus import EventRef
 
 log = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ def _send(
     channel: str,
     payload: dict[str, Any],
 ) -> EventRef:
-    from lca_kernel.events.mechanism import EventMechanism
+    from lca_kernel.events.bus import EventBus
 
     cat_str = _SPINE_EP_TO_CATEGORY[execution_point]
     sp = SpineEventPayload(
@@ -41,7 +41,7 @@ def _send(
         channel=channel,
         payload=payload,
     )
-    return EventMechanism.default().send(sp, plugin=ReflectorClass)
+    return EventBus.default().publish(sp, producer=ReflectorClass)
 
 
 # ── writable.step.start / .end ────────────────────────────────────────

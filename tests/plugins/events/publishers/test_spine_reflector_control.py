@@ -5,22 +5,22 @@ from pathlib import Path
 
 import pytest
 
-from lca_kernel.events.mechanism import EventMechanism
+from lca_kernel.events.bus import EventBus
 from lca_kernel.events.registry import EventRegistry
 
 
 @pytest.fixture
-def mechanism() -> EventMechanism:
+def bus() -> EventBus:
     config_dir = Path(__file__).resolve().parents[4] / "lca_kernel" / "events" / "config"
-    return EventMechanism(EventRegistry.load(config_dir))
+    return EventBus(EventRegistry.load(config_dir))
 
 
-def test_emit_control_all(mechanism: EventMechanism) -> None:
+def test_emit_control_all(bus: EventBus) -> None:
     from lca.plugins.events.publishers.spine_reflector_control import (
         plugin,
     )
 
-    EventMechanism.set_default(mechanism)
+    EventBus.set_default(bus)
     try:
         ref = plugin.emit_control_dispatch(run_id="r1", target="t", intent="i")
         assert ref.category == "spine.control.dispatch"
@@ -45,4 +45,4 @@ def test_emit_control_all(mechanism: EventMechanism) -> None:
         ref = plugin.emit_control_accept(run_id="r1", request_id="q")
         assert ref.category == "spine.control.accept"
     finally:
-        EventMechanism.set_default(None)
+        EventBus.set_default(None)

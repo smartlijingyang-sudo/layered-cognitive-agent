@@ -5,22 +5,22 @@ from pathlib import Path
 
 import pytest
 
-from lca_kernel.events.mechanism import EventMechanism
+from lca_kernel.events.bus import EventBus
 from lca_kernel.events.registry import EventRegistry
 
 
 @pytest.fixture
-def mechanism() -> EventMechanism:
+def bus() -> EventBus:
     config_dir = Path(__file__).resolve().parents[4] / "lca_kernel" / "events" / "config"
-    return EventMechanism(EventRegistry.load(config_dir))
+    return EventBus(EventRegistry.load(config_dir))
 
 
-def test_emit_phase_all(mechanism: EventMechanism) -> None:
+def test_emit_phase_all(bus: EventBus) -> None:
     from lca.plugins.events.publishers.spine_reflector_phase import (
         plugin,
     )
 
-    EventMechanism.set_default(mechanism)
+    EventBus.set_default(bus)
     try:
         ref = plugin.emit_perceive_phase_fold(step=1, run_id="r1")
         assert ref.category == "spine.perceive.phase.fold"
@@ -49,4 +49,4 @@ def test_emit_phase_all(mechanism: EventMechanism) -> None:
         ref = plugin.emit_phase_tool_denied(step=1, run_id="r1", tool_name="search", reason="denied")
         assert ref.category == "spine.phase.tool.denied"
     finally:
-        EventMechanism.set_default(None)
+        EventBus.set_default(None)

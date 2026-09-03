@@ -5,22 +5,22 @@ from pathlib import Path
 
 import pytest
 
-from lca_kernel.events.mechanism import EventMechanism
+from lca_kernel.events.bus import EventBus
 from lca_kernel.events.registry import EventRegistry
 
 
 @pytest.fixture
-def mechanism() -> EventMechanism:
+def bus() -> EventBus:
     config_dir = Path(__file__).resolve().parents[4] / "lca_kernel" / "events" / "config"
-    return EventMechanism(EventRegistry.load(config_dir))
+    return EventBus(EventRegistry.load(config_dir))
 
 
-def test_emit_boot_all(mechanism: EventMechanism) -> None:
+def test_emit_boot_all(bus: EventBus) -> None:
     from lca.plugins.events.publishers.spine_reflector_boot import (
         plugin,
     )
 
-    EventMechanism.set_default(mechanism)
+    EventBus.set_default(bus)
     try:
         ref = plugin.emit_boot_profile_resolved(profile="p", plugins=10)
         assert ref.category == "spine.boot.profile.resolved"
@@ -29,4 +29,4 @@ def test_emit_boot_all(mechanism: EventMechanism) -> None:
         ref = plugin.emit_boot_observability_assembled(sinks=3, derivers=2)
         assert ref.category == "spine.boot.observability.assembled"
     finally:
-        EventMechanism.set_default(None)
+        EventBus.set_default(None)

@@ -1,4 +1,4 @@
-"""spine_reflector_writable — ADR-0181 PR-5。
+"""spine_reflector_writable — ADR-0181 PR-5 / ADR-0183 PR-7。
 
 writable matrix 全迁（7 EP）：
 - writable.step.start / .end
@@ -7,7 +7,7 @@ writable matrix 全迁（7 EP）：
 
 签名与旧 lca/plugins/observability/spine/reflectors/source.py 对齐（实际
 emit 通过 cursor._append + WritePort 走，PR-5 提供 typed publisher 作为
-EventMechanism 兜底入口）。
+EventBus 兜底入口）。
 """
 
 from lca.plugins.events.publishers.spine_reflector_writable.plugin import (

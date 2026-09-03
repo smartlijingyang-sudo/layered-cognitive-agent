@@ -2,7 +2,7 @@
 
 旧 body_llm reflector 全部 9 emit（tool.execute.start/end + retry +
 sandbox.enter/exit + decision.start/end + llm.call.start/end +
-stream.token + stream.stall）在 EventMechanism 路径下能正常 send + 鉴权通过。
+stream.token + stream.stall）在 EventBus 路径下能正常 publish + 鉴权通过。
 """
 from __future__ import annotations
 
@@ -10,23 +10,23 @@ from pathlib import Path
 
 import pytest
 
-from lca_kernel.events.mechanism import EventMechanism
+from lca_kernel.events.bus import EventBus
 from lca_kernel.events.registry import EventRegistry
 
 
 @pytest.fixture
-def mechanism() -> EventMechanism:
+def bus() -> EventBus:
     """用工作区 lca_kernel/events/config 构造机制。"""
     config_dir = Path(__file__).resolve().parents[4] / "lca_kernel" / "events" / "config"
-    return EventMechanism(EventRegistry.load(config_dir))
+    return EventBus(EventRegistry.load(config_dir))
 
 
-def _run(mechanism: EventMechanism) -> None:
+def _run(bus: EventBus) -> None:
     from lca.plugins.events.publishers.spine_reflector_body_llm import (
         plugin,
     )
 
-    EventMechanism.set_default(mechanism)
+    EventBus.set_default(bus)
     try:
         # tool execute
         ref = plugin.emit_body_tool_execute_start(
@@ -68,14 +68,14 @@ def _run(mechanism: EventMechanism) -> None:
         ref = plugin.emit_llm_stream_stall(model="gpt-4", idle_ms=500, seq=1)
         assert ref.category == "spine.llm.stream.stall"
     finally:
-        EventMechanism.set_default(None)
+        EventBus.set_default(None)
 
 
-def test_emit_body_llm_all(mechanism: EventMechanism) -> None:
-    _run(mechanism)
+def test_emit_body_llm_all(bus: EventBus) -> None:
+    _run(bus)
 
 
-def test_unauthorized_publisher_rejected(mechanism: EventMechanism) -> None:
+def test_unauthorized_publisher_rejected(bus: EventBus) -> None:
     from lca_kernel.events.errors import UnauthorizedPublishError
     from lca_kernel.events.payloads import SpineEventPayload
 
@@ -83,11 +83,11 @@ def test_unauthorized_publisher_rejected(mechanism: EventMechanism) -> None:
         pass
 
     with pytest.raises(UnauthorizedPublishError):
-        mechanism.send(
+        bus.publish(
             SpineEventPayload(
                 execution_point="body.tool.execute.start",
                 channel="control",
                 payload={"tool_name": "t", "invocation_id": "i", "attempt": 1},
             ),
-            plugin=NotInWhitelist,
+            producer=NotInWhitelist,
         )

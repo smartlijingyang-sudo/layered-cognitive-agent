@@ -1,9 +1,9 @@
-"""spine_reflector_team plugin（ADR-0181 PR-6）。
+"""spine_reflector_team plugin（ADR-0181 PR-6 / ADR-0183 PR-7）。
 
-PR-6：team 维度 7 EP 下沉到 EventMechanism.send（新加，old manifest 没有）。
+PR-6：team 维度 7 EP 下沉到 EventBus.publish（新加，old manifest 没有）。
 
 签名沿用 pilot delegation_cache 已落地的接口语义（typed payload + 业务方
-一行 send）。本 publisher 是 spine 侧 typed 入口，业务方在 EventMechanism
+一行 publish）。本 publisher 是 spine 侧 typed 入口，业务方在 EventBus
 路径下统一调用。
 """
 from __future__ import annotations
@@ -11,10 +11,12 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from lca_kernel.events.bus import EventBus
 from lca_kernel.events.payloads import Category, SpineEventPayload
+from lca_kernel.events.payloads import TeamDelegationCacheHit as TeamCacheHitPayload
 
 if TYPE_CHECKING:
-    from lca_kernel.events.mechanism import EventRef
+    from lca_kernel.events.bus import EventRef
 
 log = logging.getLogger(__name__)
 
@@ -30,7 +32,7 @@ def _send(
     channel: str,
     payload: dict[str, Any],
 ) -> EventRef:
-    from lca_kernel.events.mechanism import EventMechanism
+    from lca_kernel.events.bus import EventBus
 
     sp = SpineEventPayload(
         category=category,
@@ -38,7 +40,7 @@ def _send(
         channel=channel,
         payload=payload,
     )
-    return EventMechanism.default().send(sp, plugin=ReflectorClass)
+    return EventBus.default().publish(sp, producer=ReflectorClass)
 
 
 # ── team.casting.{started,completed,failed} ──────────────────────────
@@ -147,17 +149,17 @@ def emit_team_delegation_cache_hit(
     step: int,
     run_id: str,
 ) -> EventRef:
-    return _send(
-        category=Category("spine.team.delegation.cache_hit"),
-        execution_point="team.delegation.cache_hit",
-        channel="fact",
-        payload={
-            "team_id": team_id,
-            "callee_role": callee_role,
-            "subtask": subtask,
-            "step": step,
-            "run_id": run_id,
-        },
+    """Emit ``spine.team.delegation.cache_hit`` typed via
+    :class:`TeamDelegationCacheHit`（yaml SSOT 强制 payload class）。
+    """
+    return EventBus.default().publish(
+        TeamCacheHitPayload(
+            category=Category("spine.team.delegation.cache_hit"),
+            callee_role=callee_role,
+            subtask=subtask,
+            step=step,
+        ),
+        producer=ReflectorClass,
     )
 
 

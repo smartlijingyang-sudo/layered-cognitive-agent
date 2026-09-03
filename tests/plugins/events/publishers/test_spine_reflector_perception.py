@@ -5,22 +5,22 @@ from pathlib import Path
 
 import pytest
 
-from lca_kernel.events.mechanism import EventMechanism
+from lca_kernel.events.bus import EventBus
 from lca_kernel.events.registry import EventRegistry
 
 
 @pytest.fixture
-def mechanism() -> EventMechanism:
+def bus() -> EventBus:
     config_dir = Path(__file__).resolve().parents[4] / "lca_kernel" / "events" / "config"
-    return EventMechanism(EventRegistry.load(config_dir))
+    return EventBus(EventRegistry.load(config_dir))
 
 
-def test_emit_perception_all(mechanism: EventMechanism) -> None:
+def test_emit_perception_all(bus: EventBus) -> None:
     from lca.plugins.events.publishers.spine_reflector_perception import (
         plugin,
     )
 
-    EventMechanism.set_default(mechanism)
+    EventBus.set_default(bus)
     try:
         ref = plugin.emit_perception_observe(run_id="r1", source="s1")
         assert ref.category == "spine.perception.observe"
@@ -35,4 +35,4 @@ def test_emit_perception_all(mechanism: EventMechanism) -> None:
         ref = plugin.emit_perception_artifact_built(run_id="r1", artifact_id="a1", size_bytes=1024)
         assert ref.category == "spine.perception.artifact.built"
     finally:
-        EventMechanism.set_default(None)
+        EventBus.set_default(None)

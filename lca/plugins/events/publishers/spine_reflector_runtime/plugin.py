@@ -1,6 +1,6 @@
-"""spine_reflector_runtime plugin（ADR-0181 PR-3）。
+"""spine_reflector_runtime plugin（ADR-0181 PR-3 / ADR-0183 PR-7）。
 
-PR-3：runtime 全部 8 emit 下沉到 EventMechanism.send：
+PR-3：runtime 全部 8 emit 下沉到 EventBus.publish：
 - exception.caught / exception.finally / lifecycle.finally
 - runtime.reducer.apply（start + end）/ checkpoint.create /
   resume.start / resume.end / event_publisher.publish
@@ -9,9 +9,9 @@ signature 严格对齐旧 lca/plugins/observability/spine/reflectors/runtime.py
 调用方零改动。
 
 业务方一行调：
-    EventMechanism.send(
+    EventBus.default().publish(
         SpineEventPayload(execution_point="...", channel="...", payload={...}),
-        plugin=ReflectorClass,
+        producer=ReflectorClass,
     )
 """
 from __future__ import annotations
@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from lca_kernel.events.mechanism import EventMechanism
+from lca_kernel.events.bus import EventBus
 from lca_kernel.events.payloads import Category, SpineEventPayload
 from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
 
@@ -36,7 +36,7 @@ def _send(
     channel: str,
     payload: dict[str, Any],
 ) -> Any:
-    """内部 helper：构造 SpineEventPayload + EventMechanism.send。
+    """内部 helper：构造 SpineEventPayload + EventBus.publish。
 
     category 由 execution_point 通过 _SPINE_EP_TO_CATEGORY 派生。
     outcome（旧 reflector EventRecord.outcome）写进 payload，保留旧 API。
@@ -48,7 +48,7 @@ def _send(
         channel=channel,
         payload=payload,
     )
-    return EventMechanism.default().send(sp, plugin=ReflectorClass)
+    return EventBus.default().publish(sp, producer=ReflectorClass)
 
 
 # ADR-2026-09-02-i17-traceback §D5: runtime reflector 需要 thread

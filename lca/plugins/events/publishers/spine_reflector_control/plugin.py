@@ -1,4 +1,4 @@
-"""spine_reflector_control plugin（ADR-0181 PR-6）。
+"""spine_reflector_control plugin（ADR-0181 PR-6 / ADR-0183 PR-7）。
 
 PR-6：control 维度 11 EP（新加，old manifest 没有）。
 
@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 from lca_kernel.events.payloads import Category, SpineEventPayload
 
 if TYPE_CHECKING:
-    from lca_kernel.events.mechanism import EventRef
+    from lca_kernel.events.bus import EventRef
 
 log = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ def _send(
     channel: str,
     payload: dict[str, Any],
 ) -> EventRef:
-    from lca_kernel.events.mechanism import EventMechanism
+    from lca_kernel.events.bus import EventBus
 
     sp = SpineEventPayload(
         category=Category(category),
@@ -38,7 +38,7 @@ def _send(
         channel=channel,
         payload=payload,
     )
-    return EventMechanism.default().send(sp, plugin=ReflectorClass)
+    return EventBus.default().publish(sp, producer=ReflectorClass)
 
 
 # ── dispatch / invoke / signal ────────────────────────────────────────

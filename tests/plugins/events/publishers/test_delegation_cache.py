@@ -1,4 +1,4 @@
-"""ADR-0180 试点：DelegationCachePlugin (publisher) 测试。"""
+"""ADR-0180 试点：DelegationCachePlugin (publisher) 测试 / ADR-0183 PR-7。"""
 
 from __future__ import annotations
 
@@ -12,7 +12,8 @@ from lca.plugins.events.publishers.delegation_cache.plugin import (
     PUBLISHER_PLUGIN_ID,
     DelegationCachePlugin,
 )
-from lca_kernel.events import EventMechanism, EventRef, TeamDelegationCacheHit
+from lca_kernel.events import TeamDelegationCacheHit
+from lca_kernel.events.bus import EventBus, EventRef
 from lca_kernel.events.mechanism import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.registry import EventRegistry
 
@@ -52,21 +53,21 @@ def test_publisher_plugin_id_matches_yaml() -> None:
     assert PUBLISHER_PLUGIN_ID == "delegation_cache"
 
 
-def test_delegation_cache_plugin_emits_event_via_mechanism() -> None:
-    """业务方 plugin 类直接 send → 机制按 yaml 鉴权通过 → 事件被路由。"""
+def test_delegation_cache_plugin_emits_event_via_bus() -> None:
+    """业务方 plugin 类直接 publish → EventBus 按 yaml 鉴权通过 → 事件被路由。"""
     registry = EventRegistry.load(_DEFAULT_CONFIG_DIR)
-    mechanism = EventMechanism(registry)
-    EventMechanism.set_default(mechanism)
+    bus = EventBus(registry)
+    EventBus.set_default(bus)
 
     received: list[EventRef] = []
     from lca.plugins.events.subscribers.console_projector.subscriber import (
         ConsoleProjectorSubscriber,
     )
 
-    mechanism.subscribe(
+    bus.subscribe(
         plugin=ConsoleProjectorSubscriber,
         category=Category.TEAM_DELEGATION_CACHE_HIT,
-        callback=lambda p, r: received.append(r),
+        on_event=lambda p, r: received.append(r),
     )
 
     try:
@@ -74,7 +75,7 @@ def test_delegation_cache_plugin_emits_event_via_mechanism() -> None:
         spec = DelegationSpec(target_role="analyst", subtask="汇总")
         observation = DelegationCachePlugin().cached_observation(spec, state)
     finally:
-        EventMechanism.reset_singleton()
+        EventBus.reset_singleton()
 
     assert isinstance(observation, Observation)
     assert observation.success is True
@@ -94,18 +95,18 @@ def test_compatibility_shell_delegates_to_plugin() -> None:
     from lca.cognition.body.delegation_cache import cached_delegation_observation
 
     registry = EventRegistry.load(_DEFAULT_CONFIG_DIR)
-    mechanism = EventMechanism(registry)
-    EventMechanism.set_default(mechanism)
+    bus = EventBus(registry)
+    EventBus.set_default(bus)
 
     received: list = []
     from lca.plugins.events.subscribers.console_projector.subscriber import (
         ConsoleProjectorSubscriber,
     )
 
-    mechanism.subscribe(
+    bus.subscribe(
         plugin=ConsoleProjectorSubscriber,
         category=Category.TEAM_DELEGATION_CACHE_HIT,
-        callback=lambda p, r: received.append(p),
+        on_event=lambda p, r: received.append(p),
     )
 
     try:
@@ -113,7 +114,7 @@ def test_compatibility_shell_delegates_to_plugin() -> None:
         spec = DelegationSpec(target_role="analyst", subtask="汇总")
         observation = cached_delegation_observation(spec, state)
     finally:
-        EventMechanism.reset_singleton()
+        EventBus.reset_singleton()
 
     assert isinstance(observation, Observation)
     assert len(received) == 1
@@ -126,17 +127,17 @@ def test_unauthorized_plugin_class_cannot_publish() -> None:
         pass
 
     registry = EventRegistry.load(_DEFAULT_CONFIG_DIR)
-    mechanism = EventMechanism(registry)
-    EventMechanism.set_default(mechanism)
+    bus = EventBus(registry)
+    EventBus.set_default(bus)
     try:
         with __import__("pytest").raises(
             __import__(
                 "lca_kernel.events.errors", fromlist=["UnauthorizedPublishError"]
             ).UnauthorizedPublishError
         ):
-            mechanism.send(
+            bus.publish(
                 TeamDelegationCacheHit(callee_role="x", subtask="y", step=0),
-                plugin=_RoguePlugin,
+                producer=_RoguePlugin,
             )
     finally:
-        EventMechanism.reset_singleton()
+        EventBus.reset_singleton()

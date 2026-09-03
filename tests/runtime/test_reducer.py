@@ -17,7 +17,7 @@ from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.core.stop import StopDecision
 from lca.runtime.reducer import DefaultReducer
 from lca_kernel.events.bus import EventBus
-from lca_kernel.events.mechanism import _DEFAULT_CONFIG_DIR, EventMechanism
+from lca_kernel.events.mechanism import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.payloads_spine import SpineEventPayload
 from lca_kernel.events.registry import EventRegistry
 
@@ -329,26 +329,27 @@ class TestInstrumentApply:
         assert [m["phase"] for m in markers] == ["start", "end"]
         assert markers[1]["outcome"] == "failure"
 
-    def test_instrument_apply_does_not_use_event_mechanism(self) -> None:
-        """Dispatch happens on the EventBus only; an EventMechanism subscriber
-        for the same category receives nothing."""
+    def test_instrument_apply_dispatches_on_default_event_bus(self) -> None:
+        """Reducer fold dispatches each ``apply_*`` mark via EventBus.publish
+        to whichever bus is bound as the default singleton; an isolated bus
+        instance receives nothing."""
         from lca.plugins.events.sinks.spine_chain_sink.sink import SpineChainSink
 
-        mechanism = EventMechanism(EventRegistry.load(_DEFAULT_CONFIG_DIR))
-        mechanism_seen: list[EventPayload] = []
-        mechanism.subscribe(
+        registry = EventRegistry.load(_DEFAULT_CONFIG_DIR)
+        isolated_bus = EventBus(registry)
+        isolated_seen: list[EventPayload] = []
+        isolated_bus.subscribe(
             plugin=SpineChainSink,
             category=Category("spine.runtime.reducer.apply"),
-            callback=lambda payload, ref: mechanism_seen.append(payload),
+            on_event=lambda payload, ref: isolated_seen.append(payload),
         )
         bus, seen = _make_collecting_bus()
         EventBus.set_default(bus)
-        EventMechanism.set_default(mechanism)
         try:
             DefaultReducer().apply_paused(_state(), "snap-ref")
         finally:
             EventBus.set_default(None)
-            EventMechanism.set_default(None)
 
         assert len(seen) == 2
-        assert mechanism_seen == []
+        # 隔离实例未被 set_default,reducer 不可能路由到它
+        assert isolated_seen == []
