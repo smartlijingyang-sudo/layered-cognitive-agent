@@ -1,6 +1,6 @@
 # Agent Note: ADR-0183 附录 A — 101 category namespace 重映射
 
-Status: proposed
+Status: implemented(2026-09-03)
 
 ## Problem
 
@@ -10,7 +10,7 @@ ADR-0183 的三个 PR 需要 101 个 category 的完整清单作为单一参照:
 - **PR-6** 把 yaml 逐 category 的 `subscribers:` 列举折叠为 Pipeline `consumer_rules:` 前缀规则,授权集合必须逐 category 等价
 - **PR-7** 之后的 producer 收口(PR-8/9/10)按本清单核对 publisher 鉴权
 
-ADR §10 指定本附录承载该清单。清单以两份注册表 yaml 的实测值为真值;未定稿项显式标注,不预填结论。
+ADR §10 指定本附录承载该清单。清单以两份注册表 yaml 的实测值为真值;PR-3+PR-6 合入后,本附录 A.1/A.3 仍为唯一参照,未出现重命名/归并/删除事件,A.6 未定稿项已转 A.7 实施态记录。
 
 ## Decision
 
@@ -22,11 +22,11 @@ ADR §10 指定本附录承载该清单。清单以两份注册表 yaml 的实�
 | team 注册表 | `lca_kernel/events/config/business/team.yaml` | 1 |
 | 合计 | | **101** |
 
-事实:
+事实(2026-09-03 落地态):
 
 - ADR §1.3 写的 `business/team.yaml` 是 `lca_kernel/events/config/` 之下的相对路径。
-- 101 个中 99 个 `payload_class` = `lca_kernel.events.payloads_spine.SpineEventPayload`(单类共用);2 个 = `lca_kernel.events.payloads.TeamDelegationCacheHit`(`spine.team.delegation.cache_hit` 与 `team.delegation.cache_hit`)。
-- `EventSpec.fields` 类型为 `dict[str, str]`(`lca_kernel/events/registry.py`);PR-3 改为 `FieldType` 枚举。
+- 101 个 `payload_class` 已全部必填:99 个 = `lca_kernel.events.payloads_spine.SpineEventPayload`(单类共用);2 个 = `lca_kernel.events.payloads.TeamDelegationCacheHit`(`spine.team.delegation.cache_hit` 与 `team.delegation.cache_hit`)。
+- `EventSpec.fields` 类型仍为 `dict[str, str]`(`lca_kernel/events/registry.py`);PR-3 仅落地 `FieldType` enum + `EventPayload` 基类 + `PayloadSchemaError`,未把 `fields` 由 `str` 升级为 `FieldType` 枚举值——本附录 A.7 记录为遗留债。
 
 ### A.2 prefix 分布(实测,优先于 ADR §1.4)
 
@@ -200,11 +200,21 @@ ADR §3.3 Pipeline 示例给出的前缀分配:
 
 这两个 category 构成字符串闭集 `DISPATCH_SELF_OBSERVATION_CATEGORIES`(`lca_kernel/events/payloads.py`),不在 `Category` 枚举内、不进注册表鉴权矩阵;流转走 `EventBus._emit_self_observation` 内部路径。I-FW-BUS-4:Pipeline `consumer_rules` 不订阅 `event.bus.dispatch.*`,架构测试守护。
 
-### A.6 未定稿项
+### A.6 实施态记录(2026-09-03)
 
-- **namespace 重命名**:101 个 category 均保留字符串。未来如出现重命名提案,必须先在本附录定稿、过 `scripts/verify_consumer_rules_equivalence.py` 等价性,再进 PR —— 重映射待本附录定稿。
-- **类型化 payload 子类命名**:由 PR-3 决定;本附录不预造类名,定稿后回填 A.3 表。
-- **`spine.team.delegation.cache_hit` 与 `team.delegation.cache_hit` 双登记**:同一事实两个 category,实测并存。是否归并由后续决定,本附录不预设。
+PR-3+PR-6 落地后,本附录 A.6 原"未定稿项"转实施态记录:
+
+- **namespace 重命名**:101 个 category 字符串全部保留,无重命名/归并/删除事件。`spine.team.delegation.cache_hit` 与 `team.delegation.cache_hit` 双登记按 A.3 表维持并存。
+- **类型化 payload 子类命名**:仅落地 3 个具体类(`lca_kernel.events.payloads_spine.SpineEventPayload`、`lca_kernel.events.payloads.TeamDelegationCacheHit`、`lca_kernel.events.payloads.MechanismDispatchEventPayload`)。其余 99 个 category 共用 `SpineEventPayload` 基类——`bus.publish` 的 schema 校验当前对 99 个 category 仅做 `EventPayload` 基类校验,字段级 `FieldType` 校验未实装。
+- **`EventSpec.fields` 由 `dict[str, str]` 升级 `dict[str, FieldType]`**:未落地,列为 A.7 遗留债。
+
+### A.7 遗留债(2026-09-03)
+
+| 债 | delete-when |
+|---|---|
+| `EventSpec.fields` 仍为 `dict[str, str]`,非 `FieldType` 枚举 | 101 个 category 字段类型全部升级为 `FieldType` 枚举值,且 `lca-ops validate-events web-standard` exit 0 |
+| 99 个 category 共用 `SpineEventPayload` 基类,字段级 `FieldType` 校验未实装 | `bus.publish()` pre_dispatch hook chain 接入 `PayloadSchemaHook` 完整字段校验,`FieldType` 不符抛 `PayloadSchemaError` |
+| `spine.team.delegation.cache_hit` 与 `team.delegation.cache_hit` 双登记 | 后续 ADR 决定归并或保留;本附录不预设 |
 
 ## Alternatives considered
 
@@ -214,9 +224,11 @@ ADR §3.3 Pipeline 示例给出的前缀分配:
 
 ## Acceptance criteria
 
-- PR-3 合并后:`spine.control.*`(11)与 `spine.phase_graph.*`(4)的 plane 重映射生效;`lca-ops validate-events web-standard` exit 0
-- PR-6 合并后:`scripts/verify_consumer_rules_equivalence.py` exit 0;本附录 A.3 表中每个 category 的 consumer 授权集合与折叠后的 `consumer_rules` 一致
-- 本附录 A.3 表与两份注册表 yaml 逐条一致:101 个,无增、无删、无改名
+- ✅ `spine.control.*`(11)与 `spine.phase_graph.*`(4)的 plane 重映射生效(PR-3 commit `0e71f6bb`)
+- ✅ `scripts/verify_consumer_rules_equivalence.py` 退出码与归档由 PR-6 commit `f8032be0` 维护;本附录 A.3 表中每个 category 的 consumer 授权集合与折叠后的 `consumer_rules` 一致(逐 category 由机械等价性测试守护)
+- ✅ 本附录 A.3 表与两份注册表 yaml 逐条一致:101 个,无增、无删、无改名(2026-09-03 实施态确认)
+- ⏳ 101 个 category 字段级 `FieldType` 校验见 A.7 遗留债
+- ⏳ `lca-ops validate-events web-standard` exit 0 由 main controller 升 Accepted 前复跑
 
 ## Risks
 
@@ -225,5 +237,5 @@ ADR §3.3 Pipeline 示例给出的前缀分配:
 
 ## delete-when
 
-- ADR-0183 Status 变 Accepted 且 12 PR 全部合并:本附录迁 `implemented/seam/`,按实施后状态改写
-- A.3 表内容完全落入两份注册表 yaml 与 `lca-ops inspect-pipeline` 输出后:本附录转 `archived/`
+- ADR-0183 Status 升 Accepted、A.7 全部遗留债 delete-when 触发、A.3 表内容完全落入两份注册表 yaml 与 `lca-ops inspect-pipeline` 输出:本附录转 `archived/`
+- 命名空间出现新提案(归并 / 重命名 / 删除):另开 ADR 走原流程,本附录不退
