@@ -161,6 +161,9 @@ class SpineEventRecord:
     causation_id: str | None = None
     prev_event_hash: str | None = None
     event_hash: str | None = None
+    # ADR-0183 §3.9 PR-12:trace_id 由 EventBus.publish 解析后注入;
+    # ref.trace_id(可空)透传到落盘字节布局,供跨事件因果追踪。
+    trace_id: str | None = None
 
     @classmethod
     def build(
@@ -175,6 +178,9 @@ class SpineEventRecord:
         chain 显式传才算 chain（causation_id + prev_event_hash + event_hash）。
         传 chain 时 prev_event_hash 可 None（chain 起点）。
         不传 chain = 不算 chain（causation_id/prev_event_hash/event_hash 均为 None）。
+
+        trace_id(ADR-0183 §3.9 PR-12)从 ref.trace_id 透传;ref 无 trace_id 时
+        落到 None,SinkBackend 序列化输出 null。
         """
         record = cls(
             event_id=ref.event_id,
@@ -183,6 +189,7 @@ class SpineEventRecord:
             channel=payload.channel,
             payload=dict(payload.payload),
             ts=SpineClock.now_iso(),
+            trace_id=ref.trace_id,
         )
         if chain is None:
             return record
@@ -204,6 +211,7 @@ class SpineEventRecord:
             causation_id=causation,
             prev_event_hash=chain.prev_hash,
             event_hash=event_hash,
+            trace_id=record.trace_id,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -211,6 +219,7 @@ class SpineEventRecord:
 
         字段一律输出（值可 None），保证下游消费者 dict.get() / d["k"] 行为一致。
         chain 字段（causation_id / prev_event_hash / event_hash）未启用时为 None。
+        trace_id(ADR-0183 §3.9 PR-12)从 ref 透传,ref 无 trace_id 时为 None。
         """
         return {
             "event_id": self.event_id,
@@ -222,6 +231,7 @@ class SpineEventRecord:
             "causation_id": self.causation_id,
             "prev_event_hash": self.prev_event_hash,
             "event_hash": self.event_hash,
+            "trace_id": self.trace_id,
         }
 
     @classmethod

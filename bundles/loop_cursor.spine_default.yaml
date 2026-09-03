@@ -86,6 +86,17 @@ entries:
   # FieldProducer（PR-8 derivers 全迁时统一处理）。本 bundle 在 PR-5
   # 范围内仅装载 L1/L2 + 旧 field_producer（preserve_compat=true）。
   # 删-when：PR-8 derivers + PR-9 旧 spine 全退役。
+  #
+  # 注:spine.reflector.source 必装(I17 strict contract, ADR-0165.1 §96)。
+  # context / runtime reflector 的 .py 实现文件被 ADR-0181 PR-5 删除,
+  # 等下次重写恢复;source.py 已恢复,本次补 entries 让 SourceAttacher
+  # 在 I17 strict 检查前注入 source_location。
+
+  # ── L0 reflectors (1, source only — context/runtime 待重写) ──
+  - id: spine.reflector.source
+    name: spine_reflector_source
+    $module: lca.plugins.observability.spine.reflectors.source
+    config: {}
 
   # ── L0 classifiers (2) ──────────────────────────────────────────
   - id: spine.classifier.exception.builtin

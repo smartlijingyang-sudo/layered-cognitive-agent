@@ -65,6 +65,7 @@ def spine_port_append(
     phase: Phase = "live",
     reason: str | None = None,
     when: datetime | None = None,
+    ref: Any = None,
 ) -> EventRecord:
     """唯一 spine 写入实现(ADR-0183 PR-9)。
 
@@ -118,6 +119,9 @@ def spine_port_append(
         causality_id=causality_id,
         outcome=outcome,
         when=now,
+        # trace_id 由 EventBus.publish 经 ref 注入(ADR-0183 §3.9 PR-12);
+        # 老路径不接 ref 时为 None,保持向后兼容。
+        trace_id=getattr(ref, "trace_id", None),
         when_corrected=now,
         prev_event_hash=prev_hash,
         run_id=run_id,
