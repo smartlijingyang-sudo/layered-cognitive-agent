@@ -22,7 +22,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.observability.spine.runtime_hooks import install_ctx_effect_hook
 
 
@@ -34,7 +34,7 @@ from lca.plugins.observability.spine.runtime_hooks import install_ctx_effect_hoo
     requires=(),
     layer="L0",
     kind=PluginKind.SEAM,
-    effects=EffectClass.NONE,
+    effects="none",
     description=(
         "ctx_effect wrap kind — emits a context-lifecycle start event on "
         "install and an end event from a ctx.effect disposer, both routed "

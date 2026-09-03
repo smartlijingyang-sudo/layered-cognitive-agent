@@ -36,6 +36,7 @@ class OTelEmitter:
     provides=("emitter",),
     layer="L0",
     kind=PluginKind.SEAM,
+    effects="network",
     description="OTel-style emitter; defers to an attached OTLP delegate.",
 )
 def setup(ctx: PluginContext, config: Any) -> None:

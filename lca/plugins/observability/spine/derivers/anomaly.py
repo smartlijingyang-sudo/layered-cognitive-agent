@@ -311,6 +311,7 @@ class AnomalyDetector(Deriver):
     provides=("deriver.anomaly",),
     layer="L0",
     kind=PluginKind.SEAM,
+    effects="none",
     description=(
         "I15/I16 anomaly deriver — emits invariant-violation records "
         "via 8 _check_* detectors (near_timeout, cycle, stuck, stalled, "

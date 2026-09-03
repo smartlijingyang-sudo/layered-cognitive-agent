@@ -27,6 +27,7 @@ from lca.infrastructure.observability.writable_matrix import (
     requires=("event_spine",),
     layer="L2",
     kind=PluginKind.SEAM,
+    effects="filesystem",
     description=(
         "Default 5-face writable matrix (ADR-0167 D11). The single source of"
         " truth for default assembly — profile / bundle replacement plugins"

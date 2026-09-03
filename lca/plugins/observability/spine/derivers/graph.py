@@ -32,6 +32,7 @@ def _config_path(config: Any) -> Path:
     provides=("graph",),
     layer="L0",
     kind=PluginKind.SEAM,
+    effects="filesystem",
     description=(
         "Graph deriver — accumulates execution_point edges and writes "
         "a minimal Graphviz digraph to phase_graph.dot."

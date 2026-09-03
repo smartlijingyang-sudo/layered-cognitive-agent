@@ -39,7 +39,7 @@ from lca.contracts.protocols.think.learning import (
     LearningReviewTicketStore,
     SkillAcquirer,
 )
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.learning.review_service import (
     LearningReviewAssessment,
     LearningReviewService,
@@ -96,7 +96,7 @@ _REVIEWABLE_STATUSES = frozenset(
     ],
     implements=[RuntimeLifecycleSubscriber],
     layer="L2",
-    effects=EffectClass.NONE,
+    effects="none",
     description="Queue terminal evidence references for candidate-only learning review.",
     test_suite="tests/architecture/test_learning_review_lifecycle.py",
     kind=PluginKind.PROVIDER,

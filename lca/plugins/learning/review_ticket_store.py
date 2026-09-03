@@ -20,7 +20,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.think.learning import LearningReviewTicketStore
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.learning.review_ticket_sqlite import SqliteLearningReviewTicketStore
 
 
@@ -39,7 +39,7 @@ class Config(BaseModel):
     requires=[],
     implements=[LearningReviewTicketStore],
     layer="L0",
-    effects=EffectClass.NONE,
+    effects="filesystem",
     description="Provide durable SQLite storage and leasing for learning-review tickets.",
     test_suite="tests/architecture/test_learning_review_ticket_store.py",
     kind=PluginKind.PROVIDER,

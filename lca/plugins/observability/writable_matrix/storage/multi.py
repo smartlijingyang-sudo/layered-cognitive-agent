@@ -34,6 +34,7 @@ class MultiStorage:
     provides=("storage",),
     layer="L0",
     kind=PluginKind.SEAM,
+    effects="filesystem",
     description="Fan-out storage; collects multiple EventStorage.",
 )
 def setup(ctx: PluginContext, config: Any) -> None:

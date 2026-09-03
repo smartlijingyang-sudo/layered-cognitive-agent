@@ -22,7 +22,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.observability.spine.runtime_hooks import install_ctx_intercept_hook
 
 
@@ -33,7 +33,7 @@ from lca.plugins.observability.spine.runtime_hooks import install_ctx_intercept_
     requires=(),
     layer="L0",
     kind=PluginKind.SEAM,
-    effects=EffectClass.NONE,
+    effects="none",
     description=(
         "ctx_intercept wrap kind — replaces a named host attribute with a "
         "start/end bracketing wrapper routed through emit_pipeline; the "

@@ -37,6 +37,7 @@ def _config_path(config: Any) -> Path:
     provides=("narrative",),
     layer="L0",
     kind=PluginKind.SEAM,
+    effects="filesystem",
     description=(
         "Narrative deriver — wraps StepNarrativeWriter / NarrativeDeriver; "
         "on_event is a no-op log; write_document renders journal.narrative.md."

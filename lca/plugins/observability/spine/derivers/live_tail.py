@@ -22,6 +22,7 @@ log = logging.getLogger(__name__)
     provides=("live_tail",),
     layer="L0",
     kind=PluginKind.SEAM,
+    effects="none",
     description=(
         "Live-tail deriver — wraps LiveTail ring buffer as a spine "
         "Deriver; SSE fan-out is available via subscribe()."

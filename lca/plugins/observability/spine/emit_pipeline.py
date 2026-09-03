@@ -67,7 +67,6 @@ from lca.contracts.protocols.declarative.declarative_plugin import (
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import (
-    EffectClass,
     PluginContext,
     PluginKind,
     plugin,
@@ -369,7 +368,7 @@ def _looks_like_field_producer(value: object) -> bool:
     requires=("field_producer.*", "deriver.anomaly"),
     layer="L1",
     kind=PluginKind.SEAM,
-    effects=EffectClass.NONE,
+    effects="none",
     description=(
         "Emit pipeline — composes all enabled field_producer.* plugins by "
         "priority ascending, merges their pre-phase dicts, layers caller "

@@ -24,7 +24,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.declarative.compile.instrument_wrap import wrap_instrument
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 @plugin(
@@ -34,7 +34,7 @@ from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugi
     requires=(),
     layer="L0",
     kind=PluginKind.SEAM,
-    effects=EffectClass.NONE,
+    effects="none",
     description=(
         "assembler wrap kind — publishes wrap_instrument so every phase "
         "graph node is bracketed with start/end events routed through "
