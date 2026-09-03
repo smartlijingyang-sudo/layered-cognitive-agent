@@ -68,6 +68,7 @@ def test_file_sink_write_after_close_raises(tmp_path: Path):
     fs = FileSink(tmp_path, run_id="r1")
     fs.close()
     import pytest
+
     with pytest.raises(RuntimeError):
         fs.write(_make_rec())
 

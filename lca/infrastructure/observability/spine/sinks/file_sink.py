@@ -1,23 +1,32 @@
-"""FileSink — single append-only truth file per run.
+"""FileSink — single append-only truth file per run plus per-run exception index.
 
-Atomic single-line writes via O_APPEND + size ≤ PIPE_BUF (4096 bytes
-on Linux guarantees atomic append). Events > 4 KB are offloaded to
-``<event_hash>.json`` sidecars (I10).
+Append-only JSONL sink writing to ``<run_dir>/<run_id>.spine.jsonl``.
+Any ``exception.caught`` event **also** lands in
+``<run_dir>/<run_id>.exceptions.jsonl`` so an operator can ``grep
+exception_class`` and recover the traceback without consulting the
+sidecar map.
 
-Fsync runs on a counter (every N events) and timer (every T ms). Both
-default to ``100`` — small enough for crash consistency, large enough
-that fsync is not on the hot path.
+Atomic single-line writes: PIPE_BUF (4096 on Linux) guarantees atomic
+append. Events ``> 4 KiB`` *or* marked for force-offload
+(``exception.caught``) route to a sidecar file and emit a placeholder
+in the main ledger.
 
-ADR-0169 PR-27:默认文件名 = ``$run_id.spine.jsonl`` 模板,实例化时通过
-:func:`resolve_filename` 替换为 ``<run_id>.spine.jsonl``(L10 / D9)。
-旧字面 ``events.jsonl`` 仍可显式传入,获得向后兼容的旧布局。
+Sidecar naming is human-readable: ``<sha8>-<safe_class>.json`` —
+e.g. ``8a7397b2-CancelledError.json``. The placeholder schema
+is uniform: ``{execution_point, offloaded, sidecar}``.
+
+Fsync runs every N events or T ms. Both default to 100, small
+enough for crash consistency, large enough that fsync is not on the
+hot path.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -29,106 +38,63 @@ from lca.infrastructure.observability.spine.sinks.naming import (
     spine_filename_for_run,
 )
 
+log = logging.getLogger(__name__)
+
 _ATOMIC_THRESHOLD = 4096  # Linux PIPE_BUF; do NOT change without kernel docs check
 _DEFAULT_BATCH = 100
 _DEFAULT_INTERVAL_MS = 100
 
-# 异常事件必须 sidecar —— 不论 payload 大小;traceback 必须能从磁盘
-# 重建,这是观测层契约,不是"碰巧超 4 KiB 才 offload"。任何 EP 在此集合
-# 内都强制走 offload 路径,主 ledger 写 {execution_point, offloaded} 占位符。
-# 历史 sidecar 来自装饰器路径靠"反射增强字段碰巧超 4 KiB"自动触发;
-# 任何路径任何时机的异常都进 SSOT (:mod:`spine.exception_emit`),
-# 单一 emitter 写出后由 FileSink 强制 sidecar。
 _FORCE_OFFLOAD_EPS: frozenset[str] = frozenset({"exception.caught"})
 
+# ``ValueError`` → ``ValueError``; ``my.module.Error`` → ``my_module_Error``.
+_SAFE_CLASS_RE = re.compile(r"[^A-Za-z0-9_]+")
 
-class FileSink:
-    """Append-only JSONL sink 默认落盘 ``<run_dir>/<run_id>.spine.jsonl``。
 
-    ADR-0169 L10:
-    - 默认 ``file_name`` 模板 = ``$run_id.spine.jsonl`` → 实例化为
-      ``<run_id>.spine.jsonl``(PR-27)。
-    - ``spine_filename=True`` 时同样解析为 ``<run_id>.spine.jsonl``;
-      默认值已等价于 ``spine_filename=True``,保留该参数仅为兼容既有调用方。
-    - 显式 ``file_name="events.jsonl"`` 仍生效,获得旧布局(向后兼容)。
+def safe_class_name(exception_class: str) -> str:
+    """Sanitize an exception class name into a human-eyeballable token."""
+    cleaned = _SAFE_CLASS_RE.sub("_", exception_class).strip("_")
+    return cleaned or "Unknown"
+
+
+def offload_sidecar_path(
+    run_dir: Path,
+    record: EventRecord,
+    encoded: bytes,
+    *,
+    legacy_sha256_only: bool = False,
+) -> tuple[Path, str, str]:
+    """Compute sidecar path for an offloaded event.
+
+    Returns ``(path, digest, sidecar_name)``. The default naming is
+    ``<sha8>-<safe_class>.json`` (human-readable). Pass
+    ``legacy_sha256_only=True`` to get the original ``<sha256>.json``
+    layout for older readers.
     """
-
-    def __init__(
-        self,
-        run_dir: Path,
-        *,
-        run_id: str,
-        file_name: str = DEFAULT_SPINE_TEMPLATE,
-        fsync_batch: int = _DEFAULT_BATCH,
-        fsync_interval_ms: int = _DEFAULT_INTERVAL_MS,
-        spine_filename: bool = False,
-    ) -> None:
-        self._run_dir = Path(run_dir)
-        self._run_id = run_id
-        # 解析 $run_id 占位符 → 实际 per-run 文件名
-        if spine_filename or file_name == DEFAULT_SPINE_TEMPLATE:
-            file_name = spine_filename_for_run(run_id)
-        else:
-            file_name = resolve_filename(file_name, run_id)
-        self._path = self._run_dir / file_name
-        self._fsync_batch = fsync_batch
-        self._fsync_interval_ms = fsync_interval_ms / 1000.0
-
-        self._run_dir.mkdir(parents=True, exist_ok=True)
-        self._fd = os.open(
-            str(self._path),
-            os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_CLOEXEC,
-            0o644,
-        )
-        self._writes_since_fsync = 0
-        self._last_fsync_at = time.monotonic()
-        self._closed = False
-
-    @property
-    def path(self) -> Path:
-        return self._path
-
-    def write(self, record: EventRecord) -> None:
-        if self._closed:
-            raise RuntimeError("FileSink already closed")
-        line = json.dumps(_serializable(record), default=str, sort_keys=False)
-        encoded = line.encode("utf-8") + b"\n"
-        force_offload = record.execution_point in _FORCE_OFFLOAD_EPS
-        if len(encoded) <= _ATOMIC_THRESHOLD and not force_offload:
-            os.write(self._fd, encoded)
-        else:
-            digest = hashlib.sha256(encoded).hexdigest()
-            sidecar = self._run_dir / f"{digest}.json"
-            sidecar.write_bytes(encoded)
-            placeholder = json.dumps(
-                {
-                    "execution_point": record.execution_point,
-                    "offloaded": digest,
-                }
-            )
-            os.write(self._fd, placeholder.encode("utf-8") + b"\n")
-
-        self._writes_since_fsync += 1
-        now = time.monotonic()
-        if (
-            self._writes_since_fsync >= self._fsync_batch
-            or (now - self._last_fsync_at) >= self._fsync_interval_ms
-        ):
-            os.fsync(self._fd)
-            self._writes_since_fsync = 0
-            self._last_fsync_at = now
-
-    def close(self) -> None:
-        if self._closed:
-            return
-        os.fsync(self._fd)
-        os.close(self._fd)
-        self._closed = True
+    digest = hashlib.sha256(encoded).hexdigest()
+    if legacy_sha256_only:
+        sidecar_name = f"{digest}.json"
+    else:
+        exc_class = str(record.payload.get("exception_class") or "Unknown")
+        sidecar_name = f"{digest[:8]}-{safe_class_name(exc_class)}.json"
+    return run_dir / sidecar_name, digest, sidecar_name
 
 
-def _serializable(rec: EventRecord) -> dict[str, Any]:
-    """Convert EventRecord → JSON-safe dict (datetime → isoformat)."""
-    d = {
+def offload_placeholder(*, execution_point: str, offloaded: str, sidecar: str) -> bytes:
+    """Build the placeholder line that stands in for an offloaded event.
+
+    Schema is stable — readers grep on ``offloaded``/``sidecar`` keys.
+    """
+    return (
+        json.dumps(
+            {"execution_point": execution_point, "offloaded": offloaded, "sidecar": sidecar}
+        ).encode("utf-8")
+        + b"\n"
+    )
+
+
+def serializable_event(rec: EventRecord) -> dict[str, Any]:
+    """Convert ``EventRecord`` → JSON-safe dict (datetime → isoformat)."""
+    return {
         "execution_point": rec.execution_point,
         "channel": rec.channel,
         "span_id": rec.span_id,
@@ -146,4 +112,198 @@ def _serializable(rec: EventRecord) -> dict[str, Any]:
         "phase": rec.phase,
         "reason": rec.reason,
     }
-    return d
+
+
+class FileSink:
+    """Append-only JSONL sink with optional per-run exception index.
+
+    Default behaviour:
+
+    - Main ledger: ``<run_dir>/<run_id>.spine.jsonl`` (or ``$run_id.spine.jsonl``
+      template via :func:`resolve_filename`).
+    - Exception index: ``<run_dir>/<run_id>.exceptions.jsonl``. Every
+      ``exception.caught`` event is appended verbatim — grep ``exception_class``
+      to triage. Set ``write_exception_index=False`` to disable.
+
+    Backward compatibility:
+
+    - ``file_name="events.jsonl"`` still resolves to the legacy layout.
+    - ``spine_filename=True`` is the default; passing it is a no-op.
+    - Disable the exception index for legacy test fixtures that don't want
+      the extra file.
+    """
+
+    def __init__(
+        self,
+        run_dir: Path,
+        *,
+        run_id: str,
+        file_name: str = DEFAULT_SPINE_TEMPLATE,
+        exceptions_file_name: str | None = None,
+        write_exception_index: bool = True,
+        fsync_batch: int = _DEFAULT_BATCH,
+        fsync_interval_ms: int = _DEFAULT_INTERVAL_MS,
+        spine_filename: bool = False,
+        legacy_sha256_only: bool = False,
+    ) -> None:
+        self._run_dir = Path(run_dir)
+        self._run_id = run_id
+        if spine_filename or file_name == DEFAULT_SPINE_TEMPLATE:
+            file_name = spine_filename_for_run(run_id)
+        else:
+            file_name = resolve_filename(file_name, run_id)
+        self._path = self._run_dir / file_name
+        self._fsync_batch = fsync_batch
+        self._fsync_interval_ms = fsync_interval_ms / 1000.0
+        self._write_exception_index = write_exception_index
+        self._legacy_sha256_only = legacy_sha256_only
+
+        self._run_dir.mkdir(parents=True, exist_ok=True)
+        self._fd = os.open(
+            str(self._path),
+            os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_CLOEXEC,
+            0o644,
+        )
+
+        # Exception index — separate append-only fd so an index glitch
+        # never blocks the main ledger path.
+        self._exceptions_path: Path | None = None
+        self._exceptions_fd: int | None = None
+        self._exceptions_count = 0
+        if self._write_exception_index:
+            exc_name = exceptions_file_name or f"{run_id}.exceptions.jsonl"
+            self._exceptions_path = self._run_dir / exc_name
+            try:
+                self._exceptions_fd = os.open(
+                    str(self._exceptions_path),
+                    os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_CLOEXEC,
+                    0o644,
+                )
+            except OSError as exc:
+                log.error(
+                    "file_sink: exceptions index open failed run_id=%s err=%s",
+                    run_id,
+                    exc,
+                )
+                self._exceptions_fd = None
+
+        self._writes_since_fsync = 0
+        self._last_fsync_at = time.monotonic()
+        self._closed = False
+
+    @property
+    def path(self) -> Path:
+        return self._path
+
+    @property
+    def exceptions_path(self) -> Path | None:
+        return self._exceptions_path
+
+    @property
+    def exceptions_count(self) -> int:
+        return self._exceptions_count
+
+    def write(self, record: EventRecord) -> str | None:
+        """Write an event. Returns ``None`` on success, or a short
+        ``reason`` token if the **exception index** write failed
+        (so the caller — typically :class:`TracingFileSink` — can
+        route through its fallback).
+        """
+        if self._closed:
+            raise RuntimeError("FileSink already closed")
+        encoded = self._render_encoded(record)
+        force_offload = record.execution_point in _FORCE_OFFLOAD_EPS
+        if force_offload or len(encoded) > _ATOMIC_THRESHOLD:
+            self._offload(record, encoded)
+        else:
+            os.write(self._fd, encoded)
+        self._maybe_fsync(self._fd)
+        if force_offload:
+            return self._append_exception_index(record)
+        return None
+
+    def _render_encoded(self, record: EventRecord) -> bytes:
+        line = json.dumps(serializable_event(record), default=str, sort_keys=False)
+        return line.encode("utf-8") + b"\n"
+
+    def _offload(self, record: EventRecord, encoded: bytes) -> None:
+        sidecar, digest, sidecar_name = offload_sidecar_path(
+            self._run_dir, record, encoded, legacy_sha256_only=self._legacy_sha256_only
+        )
+        sidecar.write_bytes(encoded)
+        os.write(
+            self._fd,
+            offload_placeholder(
+                execution_point=record.execution_point,
+                offloaded=digest,
+                sidecar=sidecar_name,
+            ),
+        )
+
+    def _append_exception_index(self, record: EventRecord) -> None:
+        """Append the full record to the exception index file descriptor.
+
+        Returns the ``reason`` if the write failed (so callers can
+        signal up a fallback), or ``None`` on success. Failure modes:
+        ``"exceptions_index_failed"`` (write raised) and
+        ``"no_exceptions_index"`` (index not configured / already lost).
+        """
+        if self._exceptions_fd is None:
+            return "no_exceptions_index" if not self._write_exception_index else None
+        self._exceptions_count += 1
+        try:
+            line = json.dumps(serializable_event(record), default=str, sort_keys=False)
+            os.write(self._exceptions_fd, line.encode("utf-8") + b"\n")
+            return None
+        except OSError as exc:
+            log.error(
+                "file_sink: exceptions index write failed run_id=%s err=%s",
+                self._run_id,
+                exc,
+            )
+            self._exceptions_fd = None
+            return "exceptions_index_failed"
+
+    def _maybe_fsync(self, fd: int) -> None:
+        self._writes_since_fsync += 1
+        now = time.monotonic()
+        if (
+            self._writes_since_fsync >= self._fsync_batch
+            or (now - self._last_fsync_at) >= self._fsync_interval_ms
+        ):
+            try:
+                os.fsync(fd)
+            except OSError as exc:
+                log.error("file_sink: fsync failed run_id=%s err=%s", self._run_id, exc)
+            self._writes_since_fsync = 0
+            self._last_fsync_at = now
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        try:
+            os.fsync(self._fd)
+            os.close(self._fd)
+        except OSError as exc:
+            log.error("file_sink: close failed run_id=%s err=%s", self._run_id, exc)
+        if self._exceptions_fd is not None:
+            try:
+                os.fsync(self._exceptions_fd)
+                os.close(self._exceptions_fd)
+            except OSError as exc:
+                log.error(
+                    "file_sink: exceptions index close failed run_id=%s err=%s",
+                    self._run_id,
+                    exc,
+                )
+            self._exceptions_fd = None
+        self._closed = True
+
+
+__all__ = [
+    "FileSink",
+    "offload_placeholder",
+    "offload_sidecar_path",
+    "safe_class_name",
+    "serializable_event",
+]

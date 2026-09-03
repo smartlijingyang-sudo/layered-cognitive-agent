@@ -33,23 +33,24 @@ def _safe_append(
     payload: dict[str, Any] | None = None,
     outcome: Outcome | None = None,
 ) -> EventRecord | None:
+    """Append a spine event via the process-local accessor.
+
+    Returns ``None`` only when **no** active spine is installed (e.g.
+    boot / shutdown / unit-test). Once a spine *is* installed the
+    append is fail-loud — any validation error propagates to the
+    caller, which is the right blast radius for a contract violation.
+    Silently dropping invalid events masks bugs and has historically
+    been how tracebacks disappeared from runs.
+    """
     spine = resolve_active_spine()
     if spine is None:
         return None
-    try:
-        return spine.append(
-            execution_point=execution_point,
-            channel=channel,
-            caller_payload=payload,
-            outcome=outcome,
-        )
-    except ValueError as exc:
-        log.warning(
-            "transport_emit: drop invalid event ep=%s err=%s",
-            execution_point,
-            exc,
-        )
-        return None
+    return spine.append(
+        execution_point=execution_point,
+        channel=channel,
+        caller_payload=payload,
+        outcome=outcome,
+    )
 
 
 def emit_transport_route_enter(

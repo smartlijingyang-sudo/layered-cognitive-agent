@@ -130,10 +130,7 @@ def test_sidecar_legacy_pure_sha256(tmp_path: Path) -> None:
     big_record.payload["traceback_text"] = "x" * 5000
     sink.write(big_record)
     sink.close()
-    sidecars = [
-        p for p in tmp_path.glob("*.json")
-        if p.name != "run_test.exceptions.jsonl"
-    ]
+    sidecars = [p for p in tmp_path.glob("*.json") if p.name != "run_test.exceptions.jsonl"]
     assert any(re.fullmatch(r"[0-9a-f]{64}\.json", p.name) for p in sidecars)
 
 
@@ -171,8 +168,9 @@ def test_main_close_failure_does_not_propagate(tmp_path: Path) -> None:
 
 def test_exceptions_index_failure_falls_back(tmp_path: Path, caplog) -> None:
     sink = TracingFileSink(tmp_path, run_id="run_test")
-    # 让 exceptions fd 失效
-    sink._exceptions_fd = -999  # type: ignore[assignment]
+    # 让 FileSink 内的 exceptions index fd 失效 —— TracingFileSink 已
+    # 委派给底层 FileSink, attribute 由 self._main 持有。
+    sink._main._exceptions_fd = -999  # type: ignore[attr-defined]
     with caplog.at_level(logging.ERROR):
         sink.write(_make_exception_record(exc_class="AttributeError"))
     sink.close()
@@ -186,9 +184,7 @@ def test_exceptions_index_failure_falls_back(tmp_path: Path, caplog) -> None:
 # ── 4. FALLBACK.log 也失败 → structlog ERROR ──────────────────────────
 
 
-def test_all_filesystems_fail_goes_to_structlog(
-    tmp_path: Path, caplog
-) -> None:
+def test_all_filesystems_fail_goes_to_structlog(tmp_path: Path, caplog) -> None:
     sink = TracingFileSink(tmp_path, run_id="run_test")
     # 关掉所有 fd,让 os.open / write / file open 全部失败
     sink._exceptions_fd = None
@@ -209,10 +205,9 @@ def test_all_filesystems_fail_goes_to_structlog(
         sink.write(_make_exception_record(exc_class="AttributeError"))
     sink.close()
     # 必须有 structlog ERROR 记录
-    assert any(
-        "FALLBACK write FAILED" in r.message
-        for r in caplog.records
-    ), f"structlog ERROR 必须发出,实际 {[(r.levelname, r.message) for r in caplog.records]}"
+    assert any("FALLBACK write FAILED" in r.message for r in caplog.records), (
+        f"structlog ERROR 必须发出,实际 {[(r.levelname, r.message) for r in caplog.records]}"
+    )
 
 
 # ── 5. sink closed 后 write ────────────────────────────────────────────

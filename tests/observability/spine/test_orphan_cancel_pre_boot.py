@@ -149,7 +149,9 @@ def test_orphan_trail_round_trips_via_file_sink(tmp_path: Path) -> None:
     spine.close()
 
     # ADR-0169 PR-27:默认 = <run_id>.spine.jsonl
-    records = [json.loads(line) for line in (tmp_path / "r-roundtrip.spine.jsonl").read_text().splitlines()]
+    records = [
+        json.loads(line) for line in (tmp_path / "r-roundtrip.spine.jsonl").read_text().splitlines()
+    ]
     assert len(records) == 3
     for rec, reason in zip(records, reasons, strict=True):
         assert rec["phase"] == "orphan"
