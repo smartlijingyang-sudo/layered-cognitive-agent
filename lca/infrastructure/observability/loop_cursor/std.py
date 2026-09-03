@@ -79,6 +79,19 @@ class StdLoopCursor:
         """暴露当前 cursor 的显式身份(ADR-0169 D6);供 fork / Capture 读取。"""
         return self._state.incarnation
 
+    @property
+    def plan_ref(self) -> str:
+        """Plan identity 顶层 accessor — ``cursor.plan_ref`` 等价于 ``cursor.incarnation.plan_ref``。
+
+        ADR-0068 §决策二 + ADR-0169 D6:plan_ref 是 cursor 的显式身份之一
+        (与 run_id / incarnation_seq 同级),reader 不必穿透 incarnation 字段
+        就能拿到 16-hex plan ID。让 interpreter / fork / capture 都能直读,
+        避免 ``getattr(cursor, "plan_ref", None)`` 这种 duck-type 谎言。
+
+        与 :attr:`Incarnation.plan_ref` 同源(永远相等),只是 alias。
+        """
+        return self._state.incarnation.plan_ref
+
     # ── spine append helper ─────────────────────────────────────
     def _append(self, execution_point: str, payload: dict) -> int:
         s = self._state

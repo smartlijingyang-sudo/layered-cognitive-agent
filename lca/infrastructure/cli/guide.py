@@ -106,6 +106,21 @@ SIGTERM/SIGINT LIFO dispose)。本地改完代码 / 换 profile / 强制刷新:
   ./scripts/lca-ops diagnose <alias>
 
 ────────────────────────────────
+Run 触发  创建新 run（carrier-aligned，唯一入口）
+────────────────────────────────
+  ./scripts/lca-ops runs create --user-text "..."   # 走 POST /runs，返回 run_id + trace_id
+  ./scripts/lca-ops runs create --user-text "..." --wait   # 阻塞直到 terminal
+  ./scripts/lca-ops runs create --user-text "..." --json    # 原始 carrier receipt
+
+  HTTP 等价（外部脚本用）：
+  curl -X POST http://127.0.0.1:8765/runs -H 'Content-Type: application/json' \
+    -d '{"messages":[{"role":"user","content":"..."}],"mode":"solo","agent":"agt_aVxY6ag9MbMc"}'
+
+  ❌ /v1/chat/completions 不是 run 创建入口——它是 LobeHub webui 的 OpenAI 兼容
+     代理（ADR-0099），不会注册 run_id，也不会写 traces/runs/<id>/。需要可调试的
+     run 必须走 POST /runs（包装见 lca-ops runs create）。
+
+────────────────────────────────
 Run 复盘  coding-agent tools(ADR-0065 §六 / PR-9,只读)
 ────────────────────────────────
   7 个只读工具 —— trace / explain / optimize / graph-run / minimal-repro /

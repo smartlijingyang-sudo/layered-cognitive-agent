@@ -6,11 +6,12 @@ Profile YAML 通过 ``loop_cursor.spine_default`` bundle 注入本工厂;
 incarnation 显式身份(ADR-0169 D6 / L14):
 - 首次 :meth:`from_profile` 调用 → incarnation_seq = 1
 - fork 路径 → ``cursor.fork(...)`` 内部 ``Incarnation.child()`` 自增
-- plan_ref 从 profile 上读;无则 fallback ``"default"``
-
-返回值:
-- :meth:`from_profile` 返回 ``(StdLoopCursor, Incarnation)`` 二元组;
-  调用方可同时拿到 cursor 和其 incarnation 身份(供 fork / Capture 读取)。
+- plan_ref 从 profile 上读(协议面 ``plan_ref: str``,无该字段视为构造错误 —
+  不再 silent fallback ``"default"``,因为生产路径 profile duck-type 由
+  :class:`lca.plugins.transport.webserver.handlers.runs.session.builder._ProfileProxy`
+  注入,且 :meth:`RunSessionBuilder._compute_plan_ref` 已经在 build 阶段
+  把真 plan_ref 填到 SSOT ``session.plan_ref``,这里再读 duck-typed
+  ``getattr(profile, "plan_ref", "default")`` 反而是历史回退)。
 """
 
 from __future__ import annotations
@@ -56,7 +57,22 @@ class LoopCursorFactory:
         tuple[StdLoopCursor, Incarnation]
             cursor + incarnation 二元组;incarnation 供 fork / Capture 读取。
         """
-        plan_ref = getattr(profile, "plan_ref", "default")
+        # ADR-0068 §决策二 + ADR-0169 D6:cursor 的 plan_ref 直接来自
+        # profile.``plan_ref`` 字段(由 RunSessionBuilder._compute_plan_ref
+        # 写入的 SSOT)。这是 cursor.incarnation.plan_ref 的唯一来源。
+        # 之前的 ``getattr(profile, "plan_ref", "default")`` 历史兜底
+        # 已被删:cursor 的 identity 不应 silent 落到 ``"default"``。
+        # profile 必须显式声明 ``plan_ref``,构造时缺字段向上抛清晰错误
+        # 而不是 silent 默认。
+        if not hasattr(profile, "plan_ref"):
+            raise TypeError(
+                "LoopCursorFactory.from_profile requires profile.plan_ref; "
+                "got "
+                f"{type(profile).__name__} (no plan_ref attribute). "
+                "Use RunSessionBuilder._compute_plan_ref to derive it before "
+                "constructing the cursor."
+            )
+        plan_ref = profile.plan_ref
         incarnation = Incarnation(
             run_id=run_id,
             plan_ref=str(plan_ref),

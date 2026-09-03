@@ -58,6 +58,7 @@ LCA（Layered Cognitive Agent）是基于 vendored Cordis 的 Python 插件化�
 
 ```text
 docs/                         规范、设计、ADR、计划和专题说明
+docs/notes/                   Agent Notes — 单点契约 / 原语 / Seam / Profile / runbook / postmortem 的新决策(老 ADR 不动);详见 docs/notes/README.md
 lca/contracts/                Protocol、枚举、ID、模型、事件和跨层契约
 lca/infrastructure/             LLM、工具、传输、沙箱、文件、观测、插件内核
 lca/infrastructure/env/         进程级 env 白名单 + K7 BOOTSTRAP_NAMES(ADR-0117)
@@ -218,6 +219,7 @@ SIDECAR=$(ls traces/runs/"$LATEST"/*.json 2>/dev/null \
 |---|---|---|
 | 不知道 LCA 服务在不在跑 | `./scripts/lca-ops status --json` | `./scripts/lca-ops heal` |
 | 刚改完代码想重启 | `./scripts/lca-ops kernel-restart` | `./scripts/lca-ops kernel_serve` 打印启动命令 |
+| **触发一个新 run** | **`./scripts/lca-ops runs create --user-text "..."`** | `curl -X POST http://127.0.0.1:8765/runs -d '{"messages":...}'` |
 | run 失败定位 | **`./scripts/lca-ops debug-run <run_id>`** | `debug-env <run_id>` 只看摘要 |
 | 看完整流程 | `./scripts/lca-ops trace <run_id> --focus llm\|tools\|delegation` | `./scripts/lca-ops journal trace`（**默认 --human** + 默认最新 run） |
 | 失败原因投影 | `./scripts/lca-ops explain <run_id>` | `minimal-repro <run_id>` |

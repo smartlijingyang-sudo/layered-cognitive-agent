@@ -22,7 +22,8 @@ LCA 的"高级工程师自助定位"基础设施入口。所有 debug / observab
 
 | 命令 | 用途 |
 |---|---|
-| `lca-ops journal replay <run_id> --step K` | 重放失败,不消耗 token(原 `lca-ops replay --no-llm` 未实现) |
+| `lca-ops journal replay <run_id> --step K` | 重放失败:重读 `traces/runs/<id>/model_visible/`,**不调 LLM、不消耗 token**。`--no-llm` 不是 flag,因为默认就是只读不调。 |
+| `lca-ops runs create --user-text "..."` | 触发一个新 run(走 `POST /runs` carrier,**唯一**创建 run 的入口) |
 | `lca-ops optimize <run_id>` | 优化候选(延迟/token/重试) |
 | `lca-ops graph-run <run_id>` | Mermaid 插件交互图 |
 | `lca-ops minimal-repro <run_id>` | 失败因果链 + evidence refs |
@@ -30,6 +31,11 @@ LCA 的"高级工程师自助定位"基础设施入口。所有 debug / observab
 | `lca-ops diff-runs <a> <b>` | 两次 run 对比 |
 | `lca-ops cost <run_id>` | LLM 成本累加 |
 | `lca-ops evidence <run_id> <ref>` | evidence payload 查询 |
+
+> **历史命令修正**:`lca-ops replay <run_id> --no-llm` **不存在**。`lca-ops replay`
+> 不是顶层命令。真实命令是 `lca-ops journal replay <run_id> --step K`,且
+> 默认就**不消耗 token**(只 dump messages + actions)。如果你在文档里看到
+> `lca-ops replay`,请按上面这条改正。
 
 ### Live
 

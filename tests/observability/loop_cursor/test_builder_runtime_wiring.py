@@ -173,11 +173,18 @@ def test_builder_cursor_comes_from_observability_runtime(tmp_path: Path) -> None
 
 
 def test_builder_cursor_plan_ref_uses_request_mode(tmp_path: Path) -> None:
-    """``cursor.incarnation.plan_ref`` 来自 ``request.mode``(不是硬编码 "default")。
+    """``cursor.incarnation.plan_ref`` 来自真 plan_ref,不是硬编码 ``"default"``。
 
-    锚定 Runtime.profile duck-typed 读取 contract。如果有人退回手工
-    ``Incarnation(plan_ref="default")``,本测试直接 fail。
+    锚定 Runtime.profile duck-typed 读取 contract。2026-09 重构(ADR-0068 §决策二)
+    之后,plan_ref 不再是 HTTP mode 字面量(旧:`"solo"`),也不再是 hard-coded
+    ``"default"`` fallback —— 而是
+    :func:`RunSessionBuilder._compute_plan_ref` 派生的 16-hex 稳定 ID
+    (declarative 路径 = ``compiled_run_plan_ref(plan)``;solo 路径 =
+    ``sha256(profile_path|mode|role|execution_target)[:16]``)。
+    测试锁"不是 default"+"是 16-hex"两件事,任何退回旧行为的提交都会 fail。
     """
+    import re
+
     from lca.infrastructure.observability.backends.run_locator_fs import (
         FilesystemRunLocator,
     )
@@ -194,7 +201,23 @@ def test_builder_cursor_plan_ref_uses_request_mode(tmp_path: Path) -> None:
         mode="solo",
     )
     try:
-        assert session.loop_cursor.incarnation.plan_ref == "solo"
+        plan_ref = session.loop_cursor.incarnation.plan_ref
+        # 关键断言 1:不是 hardcoded "default"
+        assert plan_ref != "default", (
+            f"plan_ref must not be the legacy 'default' fallback, got {plan_ref!r}"
+        )
+        # 关键断言 2:不是 HTTP mode 字面量 "solo"(旧谎言)
+        assert plan_ref != "solo", (
+            f"plan_ref must not be the legacy HTTP-mode literal 'solo', got {plan_ref!r}"
+        )
+        # 关键断言 3:是 16-hex 稳定 ID(declarative path 或 sha256 fingerprint)
+        assert re.fullmatch(r"[0-9a-f]{16}", plan_ref), (
+            f"plan_ref must be 16-hex stable ID, got {plan_ref!r}"
+        )
+        # 一致性:cursor.plan_ref property 必须 == incarnation.plan_ref
+        assert session.loop_cursor.plan_ref == plan_ref, (
+            "StdLoopCursor.plan_ref property must alias incarnation.plan_ref"
+        )
     finally:
         _reset_session_contextvars(session)
 

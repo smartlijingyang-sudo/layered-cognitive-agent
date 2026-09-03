@@ -233,3 +233,78 @@ async def test_simple_body_act_without_bound_cursor_is_noop_for_phase() -> None:
     with pytest.raises((AttributeError, UnregisteredActionError)) as exc_info:
         await body.act(_make_decision(ActionType.USE_TOOL), _make_state())
     assert not isinstance(exc_info.value, CursorError)
+
+
+# ── 6. action_type=str(契约)回归锁 — run_3b30e4c5b107 root cause ─────────
+#
+# 2026-09 ``run_3b30e4c5b10e`` 失败:``RuntimeError("'str' object has no attribute
+# 'value'")``。直接原因:``SimpleBody._advance_cursor_for_action(decision.action_type)``
+# 内部写 ``CursorRecord.try_advance(target, action_type=action_type.value)``,
+# 但 ``Decision.action_type: str``(contracts/models/core/decision.py:69)——
+# action_type 是 str 而非 enum,``"respond".value`` 抛 AttributeError,升级
+# 成 session RuntimeError。
+#
+# 修复:签名改成 ``action_type: str``,``.value`` 删掉。本测试用原生 str
+# 构造 Decision,锁住契约层 str 的事实,阻止回归。
+# ─────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_simple_body_act_with_str_action_type_does_not_raise_attribute_error() -> None:
+    """Decision.action_type 是 str(契约层):直接喂 str 不应抛 AttributeError。
+
+    这是 run_3b30e4c5b10e 的回归锁。修复前 SimpleBody 在 _advance_cursor_for_action
+    里写 ``action_type.value``,str 上没有 .value → 整个 session RuntimeError。
+    修复后签名 ``action_type: str`` + 直接传 str 给 CursorRecord.try_advance,
+    ``_ACTION_TO_PHASE`` 是 ``dict[str, PhaseName]`` 查表,str key 直接命中。
+    """
+    cursor, _ = _make_cursor_in_think()
+    token = bind_current_cursor(cursor)
+    try:
+        body = _make_dummy_body()
+        # 契约层 Decision.action_type: str —— 用原生 str 而非 enum
+        raw_str_decision = _make_decision_raw_str("respond")
+        # 我们只验证 _advance_cursor_for_action 不抛 AttributeError。
+        # action_registry=None 仍然会 AttributeError,但不是 .value 路径的错。
+        with pytest.raises((AttributeError, UnregisteredActionError)) as exc_info:
+            await body.act(raw_str_decision, _make_state())
+        # 关键断言:错误信息不能是 "'str' object has no attribute 'value'"
+        assert "value" not in str(exc_info.value) or "no attribute 'value'" not in str(
+            exc_info.value
+        ), f"str action_type must not trigger .value AttributeError, got {exc_info.value!r}"
+    finally:
+        reset_current_cursor(token)
+
+    # RESPOND 不在 _ACTION_TO_PHASE 表里 → cursor 应留在 think phase
+    assert cursor.snapshot.phase == "think"
+
+
+@pytest.mark.asyncio
+async def test_simple_body_act_with_str_use_tool_advances_to_act() -> None:
+    """str action_type='use_tool' → 命中 _ACTION_TO_PHASE[str] → cursor 推到 act。
+
+    验证 _ACTION_TO_PHASE 字典改用 str key 之后,str action_type 能正常查表。
+    """
+    cursor, _ = _make_cursor_in_think()
+    token = bind_current_cursor(cursor)
+    try:
+        body = _make_dummy_body()
+        raw_str_decision = _make_decision_raw_str("use_tool")
+        with pytest.raises((AttributeError, UnregisteredActionError)):
+            await body.act(raw_str_decision, _make_state())
+    finally:
+        reset_current_cursor(token)
+
+    assert cursor.snapshot.phase == "act", (
+        f"str 'use_tool' must advance to act, got {cursor.snapshot.phase!r}"
+    )
+
+
+def _make_decision_raw_str(action_type: str) -> Decision:
+    """用原生 str action_type 构造 Decision —— 模拟契约层 fact。"""
+    return Decision(
+        decision_id="dec-str-1",
+        action_type=action_type,  # type: ignore[arg-type]  # 契约事实
+        rationale="str action_type regression test",
+        confidence=1.0,
+    )

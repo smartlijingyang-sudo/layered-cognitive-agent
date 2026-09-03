@@ -24,12 +24,12 @@ from lca.infrastructure.component_registry import RegistryKeyError
 # Body 是 phase=act 执行平面;advance(phase) 是把 cursor 推到对应窗口的 SSOT。
 # ADR-0169 §D1 + PR-26 task-25:phase 推进责任钉死在 SimpleBody,
 # SafeExecutor / 下游 record_* 只在合法 phase 内写证据 EP。
-_ACTION_TO_PHASE: dict[ActionType, PhaseName] = {
-    ActionType.USE_TOOL: "act",
-    ActionType.DELEGATE: "act",
-    ActionType.HANDOFF: "act",
-    ActionType.STOP: "stop",
-    ActionType.ASK_HUMAN: "stop",
+_ACTION_TO_PHASE: dict[str, PhaseName] = {
+    ActionType.USE_TOOL.value: "act",
+    ActionType.DELEGATE.value: "act",
+    ActionType.HANDOFF.value: "act",
+    ActionType.STOP.value: "stop",
+    ActionType.ASK_HUMAN.value: "stop",
     # RESPOND: think phase 内 emit response;不进 act/stop。
 }
 
@@ -106,15 +106,19 @@ class SimpleBody(Body):
         return self._propagate_degradation(decision, observation)
 
     @staticmethod
-    def _advance_cursor_for_action(action_type: ActionType) -> None:
+    def _advance_cursor_for_action(action_type: str) -> None:
         """Bound cursor 已就位 → 按 action_type 推进 phase;否则 no-op (R2).
 
         best-effort:取不到 cursor 或 advance 抛 CursorError → warning + 继续。
+
+        ``action_type`` 是 ``Decision.action_type`` 的字符串值
+        (contracts/models/core/decision.py:69),不是 ``ActionType`` enum。
+        字典 key 用 ``.value`` 是为了字典查表类型诚实,与调用者传入形态一致。
         """
         target = _ACTION_TO_PHASE.get(action_type)
         if target is None:
             return
-        CursorRecord.try_advance(target, action_type=action_type.value)
+        CursorRecord.try_advance(target, action_type=action_type)
 
     async def finalize(self, observation: Observation, state: AgentState) -> None:
         """手平面 finalize（v3 §9.2：OfficeWorksSealer 迁移点）。
@@ -125,6 +129,9 @@ class SimpleBody(Body):
         from lca.contracts.models.core.budget import TERMINAL_RESERVE_STEPS
 
         last_decision = state.history[-1].decision if state.history else None
+        # ``Decision.action_type`` 是 str(contracts/models/core/decision.py:69),
+        # 与 ``ActionType(str, Enum)`` 字面量等价;这里用 enum 表达 closure set
+        # 只是为了 IDE 跳转 / 重构追踪,运行时比较仍然走 str 值。
         should_seal = last_decision is not None and last_decision.action_type in {
             ActionType.RESPOND,
             ActionType.STOP,

@@ -43,10 +43,16 @@ class ManifestEvidence:
 
 @dataclass(frozen=True, slots=True)
 class RunManifest:
-    """terminal materialization(0065 §一 + L7)。"""
+    """terminal materialization(0065 §一 + L7)。
+
+    ADR-0068 §决策二:``plan_ref`` 是 CompiledRunPlan 的 16-hex 稳定 ID,
+    终端 manifest 必须以顶层字段携带(不是 ``extra.plan_ref``),
+    让任何 reader 一行 grep 就能拿到图指纹、按 plan 复现/对比。
+    """
 
     schema: str = "lca.run_manifest/1"
     run_id: str = ""
+    plan_ref: str = ""  # ADR-0068 §决策二:CompiledRunPlan.plan_ref,16-hex 稳定 ID
     terminal_event_seq: int = 0
     ledger_high_watermark: int = 0
     ledger_summary: str = ""
@@ -68,6 +74,7 @@ class RunManifest:
         return {
             "schema": self.schema,
             "run_id": self.run_id,
+            "plan_ref": self.plan_ref,
             "terminal_event_seq": self.terminal_event_seq,
             "ledger_high_watermark": self.ledger_high_watermark,
             "ledger_summary": self.ledger_summary,
@@ -103,6 +110,7 @@ class RunManifest:
         return cls(
             schema=str(payload.get("schema", "lca.run_manifest/1")),
             run_id=str(payload.get("run_id", "")),
+            plan_ref=str(payload.get("plan_ref", "")),
             terminal_event_seq=int(payload.get("terminal_event_seq", 0)),
             ledger_high_watermark=int(payload.get("ledger_high_watermark", 0)),
             ledger_summary=str(payload.get("ledger_summary", "")),

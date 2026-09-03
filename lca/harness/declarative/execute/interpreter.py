@@ -138,11 +138,15 @@ class GenericPlanInterpreter:
             raise DeclarativeValidationError("PG-001", "plan has no phase graph")
         require_valid(plan.validation_report)
         expected_plan_ref = compiled_run_plan_ref(plan)
-        if getattr(cursor, "plan_ref", None) != expected_plan_ref:
+        # ADR-0068 §决策二 + ADR-0169 D6:cursor.plan_ref 是顶层 accessor
+        # (StdLoopCursor.plan_ref property),与 cursor.incarnation.plan_ref
+        # 同源。reader 不再需要 ``getattr(cursor, "plan_ref", None)`` —
+        # 那是对 cursor 协议的 duck-type 谎言,incarnation 才是 plan_ref
+        # 的合法承载位置。
+        if cursor.plan_ref != expected_plan_ref:
             raise DeclarativeValidationError(
                 "PG-008",
-                "cursor plan_ref "
-                f"{getattr(cursor, 'plan_ref', None)!r} does not match executable plan "
+                f"cursor plan_ref {cursor.plan_ref!r} does not match executable plan "
                 f"{expected_plan_ref!r}",
             )
         return await self._drive(

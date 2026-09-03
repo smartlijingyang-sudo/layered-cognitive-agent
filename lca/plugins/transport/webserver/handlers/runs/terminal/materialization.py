@@ -56,6 +56,12 @@ def record_terminal_materialization(session: RunSession) -> None:
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest = RunManifest(
             run_id=session.run_id,
+            # ADR-0068 §决策二:plan_ref 顶层字段(declarative: compiled_run_plan_ref
+            # 16-hex;solo: profile+mode+role fingerprint)。空串 = 未走 declarative plan。
+            # ``RunSession.plan_ref`` 由 ``RunSessionBuilder._compute_plan_ref`` 在
+            # build 阶段填好(PR 修复);此处不再 ``getattr`` 兜底,字段缺失应
+            # fail-loud 而不是 silent 默认 ""(之前 diagnostics 也清理过同类兜底)。
+            plan_ref=str(session.plan_ref),
             terminal_event_seq=terminal_event_seq_for(session),
             ledger_high_watermark=ledger_high_watermark_for(session),
             ledger_summary=ledger_summary_for(session),

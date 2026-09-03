@@ -1,16 +1,22 @@
 """Build one coherent legacy RunSession from request and runtime bindings.
 
-ADR-0167 D11 简化:
+ADR-0068 §决策二 + ADR-0167 D11:
     - 不再注入 ``StepLifecycleStore``;改构造 ``StepCoordinator``。
     - deriver (StepTreeAccumulator / Narrative / Graph) 由 transport
       在 ``RunSessionBuilder.build`` 阶段构造并 subscribe 到 spine。
     - journal.json 落盘由 StepTreeAccumulatorDeriver.flush() 触发。
     - narrative.md 落盘由 NarrativeDeriver.write() 触发。
     - phase_graph.dot 落盘由 GraphDeriver.flush() 触发。
+    - ``session.plan_ref`` 是 CompiledRunPlan 的 16-hex 稳定 ID(declarative
+      路径)或 mode/profile/agent 的稳定 fingerprint(solo 路径),由
+      :func:`_compute_plan_ref` 在 build 阶段一锤定音,后续 reader(manifest、
+      profile_snapshot、deriver、_ProfileProxy)都读同一个值,避免字段重复
+      声明成"三个不同含义"的 plan_ref。
 """
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import time
 from collections.abc import Sequence
@@ -19,6 +25,8 @@ from typing import Any, cast
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
 from lca.contracts.observability.run_journal import RunJournalFactory
+from lca.harness.plan import compiled_run_plan_ref
+from lca.harness.profile.boot_products import compiled_plan_from_scope
 from lca.infrastructure.observability.loop_cursor import (
     install_model_visible_capture,
 )
@@ -45,6 +53,42 @@ from lca_kernel.observability import ObservabilityRuntime
 log = logging.getLogger(__name__)
 
 
+def _compute_plan_ref(ctx: Any, request: RunSessionRequest) -> str:
+    """SSOT for transport-layer plan_ref resolution.
+
+    Resolution order (声明 ADR-0068 §决策二 的 "一条 plan_ref"):
+        1. Declarative 路径(有 ``compiled_run_plan`` 在 ctx 上):
+           直接用 ``compiled_run_plan_ref(plan)`` —— 16-hex 稳定 ID,
+           与 ``DeclarativeRuntimeBindings.plan_ref()`` 同一来源。
+        2. Solo / lobehub 路径(没有 declarative plan):
+           fallback = ``sha256(profile_path|mode|agent_role|strategy)[:16]``
+           —— 短但稳定,标识"哪个 profile / 哪种 agent / 哪种模式",
+           未来需要严格 plan 复现时再走第 3 步(declarative path)。
+        3. 都没有:返回空串 —— 与历史 ``session.plan_ref = ""`` 兼容,
+           reader 看到空应理解为"未走 declarative plan 的 solo run"。
+
+    旧实现里 ``request.mode`` 直接当 plan_ref("solo" 字面量),把"transport
+    intent" 与 "runtime plan identity" 混为一谈,语义上撒谎。 本函数把两者
+    显式分开:intent 仍走 ``request.mode`` 决定 driver;plan_ref 只走真值。
+    """
+    try:
+        plan = compiled_plan_from_scope(ctx)
+    except MissingCapabilityError:
+        plan = None
+    if plan is not None:
+        return compiled_run_plan_ref(plan)
+    # Solo fallback:fingerprint = profile_path + mode + role
+    # 字段缺失时全部空串 join,保持稳定。
+    parts = (
+        getattr(request, "profile_path", "") or "default",
+        request.mode or "solo",
+        request.agent.name if request.agent is not None else "",
+        request.execution_target or "",
+    )
+    payload = "|".join(parts)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
 class RunSessionBuilder:
     """Own identity allocation, carrier normalization, and run-local assembly."""
 
@@ -64,6 +108,10 @@ class RunSessionBuilder:
         started_at = time.time()
         agent = request.agent if request.agent is not None else default_agent_ref()
         cleaned_attachment_ids = _clean_attachment_ids(request.attachment_ids)
+
+        # ADR-0068 §决策二:session.plan_ref 必须在 build 阶段就确定,
+        # 是后续 manifest / profile_snapshot / deriver 的 SSOT。
+        plan_ref = _compute_plan_ref(self._ctx, request)
 
         journal_factory = cast(
             "RunJournalFactory", require_capability(self._ctx, "run_ledger_factory")
@@ -122,8 +170,11 @@ class RunSessionBuilder:
         # 后续 PR(0170 deriver migration)再把 step_tree_deriver 从
         # ``event_spine.subscribe`` 切到 ``host.register(LoopProjectionDefinition)``。
         spine_for_cursor = SpineWritePortAdapter(event_spine)
+        # ``_ProfileProxy.plan_ref`` 之前误用 ``request.mode``(transport intent
+        # 而非 plan identity),导致下游 ``loop_cursor`` 的 incarnation.plan_ref
+        # 拿到 "solo" 而不是真 plan ID;这里统一读 SSOT(session.plan_ref)。
         profile_proxy = _ProfileProxy(
-            plan_ref=str(request.mode or "default"),
+            plan_ref=plan_ref,
             runs_root=str(run_dir.parent) if run_dir is not None else "traces/runs",
         )
         runtime = ObservabilityRuntime.from_profile(
@@ -147,12 +198,15 @@ class RunSessionBuilder:
 
         step_tree_deriver: StepTreeAccumulatorDeriver | None = None
         if run_dir is not None:
+            # deriver.plan_ref 之前硬编码 ""(ADR-0068 §决策二 长期违约),
+            # 修复后从 session.plan_ref 拿,确保 journal.metadata.plan_ref
+            # 与 manifest.plan_ref 是同一个值。
             step_tree_deriver = StepTreeAccumulatorDeriver(
                 run_id=run_id,
                 run_dir=run_dir,
                 agent_role=agent.name or agent.agent_id or "",
                 strategy_key=request.mode or "solo",
-                plan_ref="",
+                plan_ref=plan_ref,
                 # objective 早先未传,deriver._objective 永远空字符串,
                 # journal.metadata.objective 渲染为 "(unobserved)"。
                 # 这里从已构造的 BuildJournalMetadata 取,保证两处一致。
@@ -209,6 +263,7 @@ class RunSessionBuilder:
             question=request.question,
             user_text=request.user_text,
             mode=request.mode,
+            plan_ref=plan_ref,
             prior_turns=tuple(request.prior_turns),
             attachment_ids=cleaned_attachment_ids,
             agent=agent,

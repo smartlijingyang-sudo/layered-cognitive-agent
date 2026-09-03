@@ -87,14 +87,16 @@ Each step has five labels you should expect to find in your own output:
 
 **OUTPUT.** 8 sections. Important nuances:
 
-- `[1/8] manifest` shows `status` (failed/passed) and `broken_hop` (e.g. `H3` = the 3rd hop in the phase graph).
+- `[1/8] manifest` shows `status` (failed/passed) and `broken_hop` (e.g. `H3` = the 3rd hop in the phase graph). Also `manifest.plan_ref` if present (16-hex stable ID; see `§按 plan 复现` below).
 - `[2/8] journal` shows spine event count and `missing_seqs` (gaps in seq numbers).
 - `[3/8] kernel.log` is a tail of `traces/runs/<id>/kernel.log`. **Most runs do not have this file** — its absence is *not* evidence of failure loss. (See sidecar step below.)
 - `[4/8] phase.cursor` — last completed phase.
 - `[5/8] error_ref` — a *typed label* like `node=think.main error_kind=internal attempts=1[1:permanent:ValueError]`. **It is not the traceback.**
 - `[6/8] stack frames` — top 8 frames only.
 - `[7/8] suggested_action` — human hint.
-- `[8/8] replay command` — copy-paste replay for the user.
+- `[8/8] plan_ref + replay commands` — `plan_ref` (16-hex from manifest) + multi-line **copy-paste-runnable** commands:
+  - `lca-ops journal replay <run_id> --step K --diff-only` (model-visible 重放)
+  - `grep -rl <plan_ref> traces/runs/*/manifest.json` (反查同 plan 所有 run)
 
 **NEXT.** If `status=passed` → done; the user is wrong about the failure. If `status=failed`, advance to Step 2.
 
@@ -305,12 +307,50 @@ When you (the agent) write the bug summary for the user:
 
 ## Don'ts (also enforced by sync check)
 
-- ❌ `lca-ops replay <run_id>` — that is not a top-level command. Use `./scripts/lca-ops journal replay <run_id> --step N` (`--step` is required).
+- ❌ `lca-ops replay <run_id>` — that is not a top-level command. Use `./scripts/lca-ops journal replay <run_id> --step N` (`--step` is required). There is no `--no-llm` flag because journal replay only dumps messages + actions and never calls the LLM — that mode is already the default.
+- ❌ `/v1/chat/completions` to "trigger a run" — it's a LobeHub UI proxy (ADR-0099) that streams OpenAI-compatible chunks **without** registering a run_id or writing `traces/runs/<id>/`. If you want a debuggable run, use `lca-ops runs create` (CLI) or `POST /runs` (HTTP).
 - ❌ `lca-ops diagnose phase-error` — alias removed.
 - ❌ `LCA_DEBUG=1` — env var does not exist (replaced by fail-loud).
 - ❌ `cat traces/lca_journal.jsonl` — dead path; the journal SSOT is `traces/runs/<id>/events.jsonl`.
 - ❌ `cat traces/runs/<id>/kernel.log` and concluding "no kernel log = bug": see Step 1 — most runs don't write one.
 - ❌ Patching source + restart as the *first* move. ADR-0122 says one command should locate any bug; if it doesn't, that's a missing ADR, not a missing grep.
+
+## How to trigger a run (canonical entry point)
+
+The LCA carrier has exactly **one** run-creation seam: `POST /runs`
+(`handlers/runs/api/command_endpoints.create_run`). It allocates the
+`run_id`, registers the session, and starts the agent loop. Everything
+else in `traces/runs/<id>/` (manifest, profile_snapshot, spine.jsonl,
+sidecars) is downstream of that one call.
+
+```sh
+# CLI (preferred for coding agents):
+lca-ops runs create --user-text "请把昨日的 csv 按 region 汇总"
+
+# HTTP (for shell scripts / external integrations):
+curl -X POST http://127.0.0.1:8765/runs \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "messages": [{"role": "user", "content": "..."}],
+    "mode": "solo",
+    "agent": "agt_aVxY6ag9MbMc",
+    "profile": "web-standard"
+  }'
+# → {"run_id": "...", "trace_id": "...", "live_url": "/runs/<id>/live"}
+```
+
+After dispatch, immediately query the terminal state with
+`lca-ops debug-run <run_id>` (8 sections, including the new
+`plan_ref` + runnable replay commands in `[8/8]`) or stream
+`lca-ops journal trace <run_id>` for the human-readable tree view.
+
+> **Why this is not `/v1/chat/completions`:** that endpoint exists for
+> the LobeHub Next.js UI (ADR-0099). It accepts OpenAI-shaped payloads
+> and returns OpenAI-shaped chunks, but **does not** write any
+> `traces/runs/<id>/` artifact. Hitting it as if it were "the run API"
+> silently produces zero debug evidence — the most common
+> "I asked the kernel to do X and got nothing" failure. If you need a
+> run you can debug-run, you must go through `POST /runs`.
 
 ---
 

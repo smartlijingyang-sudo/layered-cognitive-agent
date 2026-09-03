@@ -83,6 +83,10 @@ class RunSession:
     question: str
     user_text: str
     mode: str
+    # ADR-0068 §决策二:session.plan_ref 是本 run 使用的真 plan 身份,
+    # declarative 路径 = compiled_run_plan_ref;solo 路径 = mode/profile/role
+    # fingerprint(16-hex)。manifest / profile_snapshot / deriver 都读这一个值。
+    plan_ref: str = ""
     hub: BoundObservability | None = None
     prior_turns: tuple[ConversationTurn, ...] = field(default_factory=tuple)
     attachment_ids: tuple[str, ...] = field(default_factory=tuple)

@@ -38,6 +38,7 @@ from lca.infrastructure.cli.commands import (
     kernel,
     package_organization,
     profile_inspect,
+    runs,
     services,
     tools,
     workflow,
@@ -65,6 +66,7 @@ def _root(ctx: typer.Context) -> None:
 workflow.register(app)
 services.register(app)
 journal.register(app)
+runs.register(app)
 tools.register(app)
 profile_inspect.register(app)
 diagnostics.register(app)

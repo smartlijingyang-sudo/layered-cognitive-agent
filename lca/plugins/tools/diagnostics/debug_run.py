@@ -17,10 +17,17 @@ This adapter collapses all of the above into one invocation that prints:
     [5] error_ref           StopDecision.failure → typed RunDiagnostic
     [6] stack frames        top frames from the diagnostic
     [7] suggested_action    human-readable next step
-    [8] replay command      `lca-ops replay <run_id> [--no-llm]`
+    [8] replay commands    `lca-ops journal replay <run_id> --step K` (model-visible)
+                            + ``grep <plan_ref> traces/runs/*/manifest.json`` (plan 复现)
 
 Both the agent and a human can consume the output directly. JSON mode is
 available via ``--json`` for downstream tooling.
+
+Note on ``lca-ops replay``: the legacy ``lca-ops replay <run_id> --no-llm`` command
+is **not** a top-level command. Real replay lives at
+``lca-ops journal replay <run_id> --step K`` (ADR-0167 D10);--step is required,
+and ``--no-llm`` is the default (it only dumps model-visible + actions, never
+calls the LLM). See ``docs/debug/run-debug-guide.md`` for the canonical reference.
 """
 
 from __future__ import annotations
@@ -35,7 +42,14 @@ from lca.contracts.observability.run_locator import RunLocator
 
 @dataclass(frozen=True, slots=True)
 class DebugRunReport:
-    """8-section diagnostic for one run (ADR-0122)."""
+    """8-section diagnostic for one run (ADR-0122).
+
+    ADR-0068 §决策二 + ADR-0167 D10:``[8/8]`` 现在输出**多行真实可跑命令**
+    —— journal replay(模型可见)+ 按 plan_ref 反查(plan 复现)。
+    旧的 ``replay_command`` 单字段已弃用,改成 ``replay_commands: tuple[str, ...]``
+    + 新增 ``plan_ref: str``(从 manifest 顶层读,空串 = 旧 manifest 或 solo
+    未走 declarative 路径)。
+    """
 
     run_id: str
     manifest_path: str
@@ -53,7 +67,11 @@ class DebugRunReport:
     stack_frames: tuple[dict[str, Any], ...]
     attempts: tuple[dict[str, Any], ...]
     suggested_action: str | None
-    replay_command: str
+    # ADR-0068 §决策二:plan_ref 是 CompiledRunPlan 的 16-hex 稳定 ID,
+    # 从 ``manifest.plan_ref`` 顶层字段读(declarative 路径)或空串。
+    plan_ref: str = ""
+    # ADR-0167 D10:replay 是多命令组合——dump messages、grep 同 plan、复现骨架。
+    replay_commands: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -73,7 +91,8 @@ class DebugRunReport:
             "stack_frames": list(self.stack_frames),
             "attempts": list(self.attempts),
             "suggested_action": self.suggested_action,
-            "replay_command": self.replay_command,
+            "plan_ref": self.plan_ref,
+            "replay_commands": list(self.replay_commands),
         }
 
     def render_text(self) -> str:
@@ -108,7 +127,17 @@ class DebugRunReport:
                 f"in {frame.get('name', '?')}"
             )
         lines.append("[7/8] suggested_action    " + (self.suggested_action or "(none)"))
-        lines.append(f"[8/8] replay command      {self.replay_command}")
+        # [8/8] 复现命令:journal replay (model-visible) + plan_ref grep (图复现)。
+        # ADR-0068 §决策二:plan_ref 是 run 的 16-hex 稳定 ID,可一锤定音反查。
+        lines.append(
+            f"[8/8] plan_ref            {self.plan_ref or '(no plan_ref on this manifest)'}"
+        )
+        if self.replay_commands:
+            for idx, cmd in enumerate(self.replay_commands):
+                prefix = "      └─" if idx == len(self.replay_commands) - 1 else "      ├─"
+                lines.append(f"{prefix} {cmd}")
+        else:
+            lines.append("      (no replay commands)")
         return "\n".join(lines)
 
 
@@ -153,6 +182,21 @@ class DebugRunToolAdapter:
 
         tail = _tail_lines(kernel_log_path)
 
+        # ADR-0068 §决策二:plan_ref 从 manifest 顶层字段读,SSOT,16-hex。
+        # ADR-0167 D10:replay 是多命令组合 —— journal replay 走 model-visible
+        # 重放;``grep plan_ref`` 走 plan 拓扑反查。``lca-ops replay --no-llm``
+        # 这个旧命令**不存在**(曾误写在 AGENTS.md / ADR-0122 / debug-run 输出
+        # 里);真实命令是 ``lca-ops journal replay <run_id> --step K``,且
+        # 默认就是 --no-llm 模式(只 dump messages + actions,不调 LLM)。
+        plan_ref = str(manifest_summary.get("plan_ref", "") or "").strip()
+        replay_commands: list[str] = [
+            f"lca-ops journal replay {run_id} --step 1 --diff-only",
+        ]
+        if plan_ref:
+            replay_commands.append(
+                f"grep -rl {plan_ref} traces/runs/*/manifest.json  # 找同 plan 的所有 run"
+            )
+
         return DebugRunReport(
             run_id=run_id,
             manifest_path=str(manifest_path),
@@ -170,7 +214,8 @@ class DebugRunToolAdapter:
             stack_frames=stack_frames,
             attempts=attempts,
             suggested_action=suggested,
-            replay_command=f"lca-ops replay {run_id} --no-llm",
+            plan_ref=plan_ref,
+            replay_commands=tuple(replay_commands),
         )
 
 

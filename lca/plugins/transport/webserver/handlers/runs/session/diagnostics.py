@@ -90,7 +90,11 @@ class RunBootSnapshotRecorder:
             RunBootSnapshot().write(
                 run_id=str(session.run_id),
                 outdir=outdir,
-                plan_ref=str(getattr(session, "plan_ref", "") or ""),
+                # ADR-0068 §决策二:RunSession.plan_ref 由 builder 阶段 _compute_plan_ref
+                # 填好,字段已固化(2026-09 引入)。这里直接读,不再 ``getattr`` 兜底,
+                # 因为缺字段应 fail-loud 而不是 silent 默认 "" —— silent 默认会让
+                # "session.plan_ref 没被 builder 填" 这类回归永远藏起来。
+                plan_ref=str(session.plan_ref),
                 plugins=plugins,
                 capabilities=capabilities,
                 control_plan={
