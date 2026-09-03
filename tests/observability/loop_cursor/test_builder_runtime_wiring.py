@@ -109,6 +109,48 @@ class _Context:
             "event_spine": spine,
             "process_journal": object(),
         }
+        # PR-7:observability five-seam registries. Pre-populated with the
+        # same factories that observability-default bundle injects in prod.
+        from lca.infrastructure.observability import NamedRegistry
+        from lca.infrastructure.observability.loop_cursor.close_barrier_impl import (
+            StdCloseBarrier,
+        )
+        from lca.infrastructure.observability.loop_cursor.factory import (
+            LoopCursorFactory,
+        )
+        from lca.infrastructure.observability.loop_cursor.model_visible_capture import (
+            StdModelVisibleCapture,
+        )
+        from lca.infrastructure.observability.loop_cursor.persistence_coordinator import (
+            NullPersistenceCoordinator,
+        )
+        from lca.infrastructure.observability.loop_cursor.projection_host import (
+            StdProjectionHost,
+        )
+
+        self._services["observability.loop_cursor"] = NamedRegistry()
+        self._services["observability.projection_host"] = NamedRegistry()
+        self._services["observability.model_visible"] = NamedRegistry()
+        self._services["observability.close_barrier"] = NamedRegistry()
+        self._services["observability.persistence"] = NamedRegistry()
+        self._services["observability.loop_cursor"].register(
+            "standard", LoopCursorFactory
+        )
+        self._services["observability.projection_host"].register(
+            "standard", lambda initial=None, **_: StdProjectionHost(initial=initial)
+        )
+        self._services["observability.model_visible"].register(
+            "standard", lambda run_dir, **_: StdModelVisibleCapture(run_dir=run_dir)
+        )
+        self._services["observability.close_barrier"].register(
+            "standard",
+            lambda persistence, host, close_emitter, **_: StdCloseBarrier(
+                persistence=persistence, host=host, close_emitter=close_emitter
+            ),
+        )
+        self._services["observability.persistence"].register(
+            "null", lambda **_: NullPersistenceCoordinator()
+        )
 
     def inject(self, key: str, *, default: Any = ...) -> Any:
         if key in self._services:

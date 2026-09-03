@@ -66,17 +66,32 @@ from lca.contracts.observability.model_visible_capture import (
 from lca.harness.observability import assemble_observability
 from lca.infrastructure.observability import (
     BoundObservability,
+    NamedRegistry,
     ObservabilitySettings,
 )
-from lca.infrastructure.observability.loop_cursor.close_barrier_impl import StdCloseBarrier
-from lca.infrastructure.observability.loop_cursor.factory import LoopCursorFactory
-from lca.infrastructure.observability.loop_cursor.model_visible_capture import (
-    StdModelVisibleCapture,
-)
-from lca.infrastructure.observability.loop_cursor.persistence_coordinator import (
-    NullPersistenceCoordinator,
-)
-from lca.infrastructure.observability.loop_cursor.projection_host import StdProjectionHost
+
+# PR-7:五缝的实现由 registry 解析并实例化;kernel 不再持有具体类引用。
+# 下列五个 import 仍保留在 docstring(:class:`Foo`)的引用中以便阅读,
+# 但本模块运行时不再 import 它们 —— providers 注册它们,
+# from_profile 通过 NamedRegistry.lookup 拿到的实例 duck-types
+# 这些 Protocol / class。仓库 migration 完成时(rg from lca.infrastructure
+# .observability.loop_cursor = 0)删除这些 impl 文件,本模块零修改。
+__all__ = [
+    "ObservabilityRuntime",
+    "install_observability",
+]
+
+
+# PR-7:每个 seam 的默认 provider id;profile ``observability.X.implementation``
+# 可显式覆盖。persistence 默认 = null(ADR-0169 D8 调用方注入面永不空);
+# 其他四缝默认 = standard(Std* 默认实现)。
+_DEFAULT_PROVIDER_KEY: dict[str, str] = {
+    "observability.loop_cursor": "standard",
+    "observability.projection_host": "standard",
+    "observability.model_visible": "standard",
+    "observability.close_barrier": "standard",
+    "observability.persistence": "null",
+}
 
 
 def install_observability(ctx: Any) -> BoundObservability:
@@ -130,8 +145,8 @@ class ObservabilityRuntime:
         → barrier.close(reason) → Persistence.flush → Host.flush_all → close EP emit
     """
 
-    cursor_factory: LoopCursorFactory
-    projection_host: StdProjectionHost
+    cursor_factory: Any  # PR-7:registry-resolved factory (LoopCursorFactory contract)
+    projection_host: Any  # PR-7:registry-resolved ProjectionHost instance
     persistence: Any  # PersistenceCoordinator(protocol 位;由调用方注入)
     capture: ModelVisibleCapture
     barrier: CloseBarrier
@@ -148,7 +163,7 @@ class ObservabilityRuntime:
         persistence: Any = None,
         run_dir: Path | str | None = None,
     ) -> ObservabilityRuntime:
-        """Profile → 五缝 + CloseBarrier 装配(ADR-0169 §D8 / PR-25)。
+        """Profile → 五缝 + CloseBarrier 装配(ADR-0169 §D8 / PR-25 + PR-7)。
 
         Parameters
         ----------
@@ -156,47 +171,75 @@ class ObservabilityRuntime:
             Profile / ResolvedProfile / 任意 duck-typed 对象;读 ``plan_ref`` /
             ``observability`` 段(可缺省)。
         ctx:
-            cordis Context(留作未来 K5 接入点;PR-25 仅占位)。
+            cordis Context,持有五缝 seam registry 提供的能力(PR-7 注入面)。
         persistence:
             :class:`PersistenceCoordinator` 实例;``None`` 时 fallback 到
+            seam registry 里 ``observability.persistence['null']`` 提供的
             :class:`NullPersistenceCoordinator`(barrier 注入面永不空)。
-            PR-25 阶段 runtime 不自己构造 file persistence —— 生产路径
-            由调用方注入 :class:`FilePersistenceCoordinator`(PR-15 边界)。
+            生产路径仍由调用方注入 :class:`FilePersistenceCoordinator`。
         run_dir:
-            run 输出目录;用于 ModelVisibleCapture。缺省 ``traces/runs/<run_id>``。
+            run 输出目录;用于 ModelVisibleCapture。缺省 ``profile.runs_root``。
 
         Returns
         -------
         ObservabilityRuntime
             已 frozen 的五缝容器;调用方存到 ctx / ProfileBootProducts。
+
+        Notes
+        -----
+        PR-7 改造:原硬编码 ``LoopCursorFactory()`` /
+        ``StdProjectionHost(initial=...)`` / ``StdModelVisibleCapture(...)`` /
+        ``NullPersistenceCoordinator()`` / ``StdCloseBarrier(...)`` 改为
+        从 ``ctx.inject("observability.<seam>")`` 拿到 NamedRegistry,
+        按 ``profile.observability.<seam>.implementation``(缺省 = standard / null)
+        选中 provider 的 factory。``from_profile`` 现在只读 profile 用于
+        plan_ref / initial deriver 列表 / runs_root 等**hints**;真正的
+        实例化由 registry 完成。
+
+        delete-when: ``rg "ObservabilityRuntime.from_profile" lca/ lca_kernel/ = 0``
+        (transport 装配改走 capability 注入面后,本 wrapper 删除)
         """
         plan_ref = str(getattr(profile, "plan_ref", "default"))
 
-        # 1) cursor factory —— 单一实例,每次 make_cursor 派生新 cursor
-        cursor_factory = LoopCursorFactory()
+        # ── 1) cursor factory —— registry lookup ──────────────────
+        # The registry holds a callable that, when invoked with
+        # (profile=, run_id=, trace_id=, spine=), returns (cursor, incarnation).
+        # The standard provider registers ``LoopCursorFactory.from_profile``
+        # (staticmethod) directly;replacement providers (test stub / null)
+        # register their own callables with the same signature.
+        cursor_key = _select_provider_key(profile, "loop_cursor", default="standard")
+        cursor_registry = _require_registry(ctx, "observability.loop_cursor")
+        cursor_factory = _lookup_provider(cursor_registry, cursor_key)
 
-        # 2) projection host —— 默认注册清单(profile.observability.projection_host.initial)
+        # ── 2) projection host —— registry lookup,initial 作 key hint ──
+        host_key = _select_provider_key(profile, "projection_host", default="standard")
+        host_registry = _require_registry(ctx, "observability.projection_host")
+        host_factory = _lookup_provider(host_registry, host_key)
         initial = _extract_projection_initial(profile)
-        projection_host = StdProjectionHost(initial=initial or None)
+        projection_host = host_factory(initial=initial or None)
 
-        # 3) model visible capture —— run_dir 来自 profile.runs_root 或入参
+        # ── 3) model visible capture —— registry lookup,run_dir 注入 ──
+        capture_key = _select_provider_key(profile, "model_visible", default="standard")
+        capture_registry = _require_registry(ctx, "observability.model_visible")
+        capture_factory = _lookup_provider(capture_registry, capture_key)
         resolved_run_dir = (
             Path(run_dir) if run_dir is not None else Path(_extract_runs_root(profile))
         )
-        capture: ModelVisibleCapture = StdModelVisibleCapture(run_dir=resolved_run_dir)
+        capture: ModelVisibleCapture = capture_factory(run_dir=resolved_run_dir)
 
-        # 4) persistence —— 由调用方注入;None 时 fallback Null(ADR-0169 D8,
-        #    barrier 注入面不能为空;调用方便利契约,PR-15 File sink 仍走外部注入)。
+        # ── 4) persistence —— 由调用方注入;None 时 fallback null provider ──
         resolved_persistence: Any = (
-            persistence if persistence is not None else NullPersistenceCoordinator()
+            persistence if persistence is not None else _instantiate_null_persistence(ctx)
         )
 
-        # 5) close barrier —— 由 runtime 持有;cursor 关闭时委托给它
-        #    barrier 需要 persistence / host / emitter;emitter = cursor 自身
-        barrier: CloseBarrier = StdCloseBarrier(
-            persistence=resolved_persistence,  # type: ignore[arg-type]
+        # ── 5) close barrier —— registry lookup,collaborators 注入 ──
+        barrier_key = _select_provider_key(profile, "close_barrier", default="standard")
+        barrier_registry = _require_registry(ctx, "observability.close_barrier")
+        barrier_factory = _lookup_provider(barrier_registry, barrier_key)
+        barrier: CloseBarrier = barrier_factory(
+            persistence=resolved_persistence,
             host=projection_host,
-            close_emitter=_NullCloseEmitter(),  # cursor 自身是 emitter,barrier 仅协调顺序
+            close_emitter=_NullCloseEmitter(),
         )
 
         return cls(
@@ -222,6 +265,10 @@ class ObservabilityRuntime:
         spine 是 :class:`WritePort` 协议位(ADR-0169 D1 / L10);每次 run
         / 子代理派一个新 cursor;**不**复用 cursor 实例(ADR-0169 D6 / L14)。
 
+        PR-7:``cursor_factory`` 是 NamedRegistry 提供的 callable(默认 =
+        ``LoopCursorFactory.from_profile`` 静态方法),直接调用即可
+        派生新 cursor。
+
         Returns
         -------
         StdLoopCursor
@@ -235,7 +282,7 @@ class ObservabilityRuntime:
                 "run_id": run_id,
             },
         )()
-        cursor, _incarnation = self.cursor_factory.from_profile(
+        cursor, _incarnation = self.cursor_factory(
             profile=profile_proxy,
             run_id=run_id,
             trace_id=trace_id,
@@ -256,6 +303,89 @@ class ObservabilityRuntime:
 
 
 # ── 内部辅助 ────────────────────────────────────────────────
+
+
+def _require_registry(ctx: Any, capability_key: str) -> NamedRegistry:
+    """从 cordis Context 拿 seam registry;能力缺失时给清晰错误(PR-7)。"""
+    if ctx is None:
+        raise RuntimeError(
+            f"{capability_key!r} seam registry not available: ctx is None; "
+            "ObservabilityRuntime.from_profile requires a booted cordis Context "
+            "with observability-default bundle loaded."
+        )
+    inject = getattr(ctx, "inject", None)
+    if not callable(inject):
+        raise RuntimeError(
+            f"{capability_key!r} seam registry not available: ctx lacks inject(); "
+            f"got {type(ctx).__name__}."
+        )
+    try:
+        registry = inject(capability_key)
+    except KeyError as exc:
+        raise RuntimeError(
+            f"{capability_key!r} seam registry not bound; "
+            "profile must load observability-default bundle (PR-7)."
+        ) from exc
+    if not isinstance(registry, NamedRegistry):
+        raise RuntimeError(
+            f"{capability_key!r} seam registry has wrong type: "
+            f"got {type(registry).__name__}, expected NamedRegistry."
+        )
+    return registry
+
+
+def _select_provider_key(
+    profile: Any,
+    seam_short: str,
+    *,
+    default: str,
+) -> str:
+    """读 ``profile.observability.<seam>.implementation`` 选 provider id。"""
+    section = getattr(profile, "observability", None)
+    if section is None:
+        return default
+    if isinstance(section, dict):
+        seam_section = section.get(seam_short) or {}
+    else:
+        seam_section = getattr(section, seam_short, None) or {}
+    if isinstance(seam_section, dict):
+        candidate = seam_section.get("implementation")
+    else:
+        candidate = getattr(seam_section, "implementation", None)
+    if isinstance(candidate, str) and candidate:
+        return candidate
+    return default
+
+
+def _lookup_provider(registry: NamedRegistry, key: str) -> Any:
+    """从 NamedRegistry 查 provider factory;缺失时给清晰错误。"""
+    factory = registry.get(key)
+    if factory is None:
+        available = sorted(registry.all().keys())
+        raise RuntimeError(
+            f"observability provider {key!r} not registered; "
+            f"available keys: {available}."
+        )
+    return factory
+
+
+def _instantiate_null_persistence(ctx: Any) -> Any:
+    """Resolve the null persistence factory through ``observability.persistence['null']``."""
+    registry = _require_registry(ctx, "observability.persistence")
+    factory = registry.get("null")
+    if factory is None:
+        # fallback to "default" alias;both null and standard providers register both keys
+        factory = registry.get("default")
+    if factory is None:
+        raise RuntimeError(
+            "observability.persistence seam has no null/default provider; "
+            "load observability-default bundle."
+        )
+    import inspect
+
+    if inspect.isclass(factory):
+        return factory()
+    return factory()
 
 
 def _extract_projection_initial(profile: Any) -> list[Any]:

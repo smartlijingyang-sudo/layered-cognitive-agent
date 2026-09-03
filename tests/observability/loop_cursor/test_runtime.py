@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, dataclass, field
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -60,11 +61,46 @@ class _Profile:
     runs_root: str = "traces/runs/r-test"
 
 
+
+
+def _build_seam_ctx() -> Any:
+    """Build a cordis Context pre-populated with the five observability seam registries (PR-7)."""
+    from cordis import Context
+    from lca.infrastructure.observability import NamedRegistry
+    from lca.infrastructure.observability.loop_cursor.persistence_coordinator import (
+        NullPersistenceCoordinator,
+    )
+
+    ctx = Context()
+    ctx.provide("observability.loop_cursor", NamedRegistry())
+    ctx.provide("observability.projection_host", NamedRegistry())
+    ctx.provide("observability.model_visible", NamedRegistry())
+    ctx.provide("observability.close_barrier", NamedRegistry())
+    ctx.provide("observability.persistence", NamedRegistry())
+    ctx.inject("observability.loop_cursor").register("standard", LoopCursorFactory.from_profile)
+    ctx.inject("observability.projection_host").register(
+        "standard", lambda initial=None, **_: StdProjectionHost(initial=initial)
+    )
+    ctx.inject("observability.model_visible").register(
+        "standard", lambda run_dir, **_: StdModelVisibleCapture(run_dir=run_dir)
+    )
+    ctx.inject("observability.close_barrier").register(
+        "standard",
+        lambda persistence, host, close_emitter, **_: StdCloseBarrier(
+            persistence=persistence, host=host, close_emitter=close_emitter
+        ),
+    )
+    ctx.inject("observability.persistence").register(
+        "null", lambda **_: NullPersistenceCoordinator()
+    )
+    return ctx
+
+
 def _build_runtime(tmp_path: Path) -> ObservabilityRuntime:
     persistence = _StubPersistence()
     return ObservabilityRuntime.from_profile(
         profile=_Profile(),
-        ctx=None,
+        ctx=_build_seam_ctx(),
         persistence=persistence,
         run_dir=tmp_path,
     )
@@ -77,7 +113,7 @@ def test_runtime_holds_five_seam_components(tmp_path: Path) -> None:
     """``ObservabilityRuntime`` 五缝字段都被填:cursor_factory / host / persistence / capture / barrier(ADR-0169 D8)。"""
     runtime = _build_runtime(tmp_path)
 
-    assert isinstance(runtime.cursor_factory, LoopCursorFactory)
+    assert callable(runtime.cursor_factory) and getattr(runtime.cursor_factory, "__func__", runtime.cursor_factory) is LoopCursorFactory.from_profile
     assert isinstance(runtime.projection_host, StdProjectionHost)
     # persistence 是调用方注入的 stub
     assert runtime.persistence is not None

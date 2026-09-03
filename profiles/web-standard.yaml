@@ -4,31 +4,13 @@
 # 但启用受 model=cordis-creator 请求触发 + RoleProfile.tool_permission_manifest 闸控）
 # + loop_cursor.spine_default (PR-8 §7.6.6 — 19-plugin EventSpine composition with
 # source-level introspection **mandatory**; ADR-2026-09-02 §D3; ADR-0174 profile 装配).
+# + observability-default (PR-7 五缝 plugin 装配 — LoopCursor / ProjectionHost /
+# ModelVisibleCapture / CloseBarrier / Persistence seam + provider).
 # LLM secrets are owned by lca-llm-resolver (loads project .env at setup).
-
-# ADR-0169 PR-25:observability 五缝装配段(Profile 读取 SSOT,见 ADR-0169 §D8)。
-# LoopCursor 由 LoopCursorFactory.from_profile 装配;ProjectionHost /
-# PersistenceCoordinator / ModelVisibleCapture / CloseBarrier 由
-# ObservabilityRuntime.from_profile 装配。Profile 提供 plan_ref 与
-# initial deriver 列表,实现细节(StdLoopCursor / StdProjectionHost 等)
-# 在 PR-25 阶段尚未拆成独立 plugin,本段先给 wiring 与读路径。
-observability:
-  loop_cursor:
-    implementation: std                              # 默认实现(PR-14 LoopCursorFactory)
-    spine_default: loop_cursor.spine_default         # 复用 bundles/loop_cursor.spine_default.yaml 的 bundle
-  projection_host:
-    initial: [step_tree, narrative, graph, cost]     # 默认 deriver 注册
-  persistence:
-    coalescer: default
-    sink: routing_file
-  model_visible:
-    enabled: true
-  close_barrier:
-    enabled: true
-  plan_ref: web-standard
 
 bundles:
   - bundles/base.yaml
+  - bundles/observability-default.yaml
   - bundles/web-app.yaml
   - bundles/scenario-cordis-creator.yaml
   - bundles/declarative-phase-graph.yaml

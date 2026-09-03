@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, dataclass, field
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -65,11 +66,52 @@ class _Profile:
     runs_root: str = "traces/runs/r-test"
 
 
+def _build_seam_ctx() -> Any:
+    """Build a cordis Context pre-populated with the five observability seam registries
+    (PR-7). Each registry carries the standard / null providers used by tests.
+    """
+    from cordis import Context
+
+    from lca.infrastructure.observability import NamedRegistry
+    from lca.infrastructure.observability.loop_cursor.persistence_coordinator import (
+        NullPersistenceCoordinator,
+    )
+
+    ctx = Context()
+    # Five seam registries keyed by observability.<seam>.
+    ctx.provide("observability.loop_cursor", NamedRegistry())
+    ctx.provide("observability.projection_host", NamedRegistry())
+    ctx.provide("observability.model_visible", NamedRegistry())
+    ctx.provide("observability.close_barrier", NamedRegistry())
+    ctx.provide("observability.persistence", NamedRegistry())
+    # Register the same providers the bundle would inject at boot.
+    ctx.inject("observability.loop_cursor").register("standard", LoopCursorFactory.from_profile)
+    ctx.inject("observability.projection_host").register(
+        "standard", lambda initial=None, **_: StdProjectionHost(initial=initial)
+    )
+    ctx.inject("observability.model_visible").register(
+        "standard",
+        lambda run_dir, **_: StdModelVisibleCapture(run_dir=run_dir),
+    )
+    ctx.inject("observability.close_barrier").register(
+        "standard",
+        lambda persistence, host, close_emitter, **_: StdCloseBarrier(
+            persistence=persistence,
+            host=host,
+            close_emitter=close_emitter,
+        ),
+    )
+    ctx.inject("observability.persistence").register(
+        "null", lambda **_: NullPersistenceCoordinator()
+    )
+    return ctx
+
+
 def _build_runtime(tmp_path: Path) -> ObservabilityRuntime:
     persistence = _StubPersistence()
     return ObservabilityRuntime.from_profile(
         profile=_Profile(),
-        ctx=None,
+        ctx=_build_seam_ctx(),
         persistence=persistence,
         run_dir=tmp_path,
     )
@@ -83,7 +125,7 @@ def test_from_profile_returns_runtime_with_five_seams(tmp_path: Path) -> None:
     runtime = _build_runtime(tmp_path)
 
     assert runtime.cursor_factory is not None
-    assert isinstance(runtime.cursor_factory, LoopCursorFactory)
+    assert callable(runtime.cursor_factory) and getattr(runtime.cursor_factory, "__func__", runtime.cursor_factory) is LoopCursorFactory.from_profile
     assert runtime.projection_host is not None
     assert isinstance(runtime.projection_host, StdProjectionHost)
     assert runtime.persistence is not None
@@ -155,7 +197,7 @@ def test_runtime_default_runs_root_from_profile(tmp_path: Path) -> None:
     persistence = _StubPersistence()
     runtime = ObservabilityRuntime.from_profile(
         profile=_Profile(),
-        ctx=None,
+        ctx=_build_seam_ctx(),
         persistence=persistence,
         # run_dir 缺省 → 从 profile.runs_root 拿
     )
@@ -176,7 +218,7 @@ def test_runtime_persistence_injected_unchanged(tmp_path: Path) -> None:
     persistence = _StubPersistence()
     runtime = ObservabilityRuntime.from_profile(
         profile=_Profile(),
-        ctx=None,
+        ctx=_build_seam_ctx(),
         persistence=persistence,
         run_dir=tmp_path,
     )
@@ -188,7 +230,7 @@ def test_runtime_capture_run_dir_override(tmp_path: Path) -> None:
     persistence = _StubPersistence()
     runtime = ObservabilityRuntime.from_profile(
         profile=_Profile(),
-        ctx=None,
+        ctx=_build_seam_ctx(),
         persistence=persistence,
         run_dir=tmp_path / "alt",
     )
