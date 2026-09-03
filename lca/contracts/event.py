@@ -35,6 +35,8 @@ class Category(str, Enum):
     TEAM_DELEGATION_COMPLETED = "team.delegation.completed"
     TEAM_DELEGATION_CACHE_HIT = "team.delegation.cache_hit"
     TEAM_MESSAGE_PUBLISHED = "team.message.published"
+    # observability/spine — ADR-0181 试点 1 个；PR-2 全量补
+    SPINE_COGNITION_BRAIN_PERCEIVE_START = "spine.cognition.brain.perceive.start"
 
 
 class Plane(str, Enum):
@@ -43,11 +45,13 @@ class Plane(str, Enum):
     SURFACE = "surface"
     STRUCTURAL = "structural"
     EXPLANATION = "explanation"
+    OBSERVABILITY = "observability"
 
 
 # 试点 category 与 plane 的映射（与 yaml SSOT 保持同步；boot 时机制会校验一致）。
 CATEGORY_DEFAULT_PLANE: dict[Category, Plane] = {
     Category.TEAM_DELEGATION_CACHE_HIT: Plane.STRUCTURAL,
+    Category.SPINE_COGNITION_BRAIN_PERCEIVE_START: Plane.OBSERVABILITY,
 }
 
 

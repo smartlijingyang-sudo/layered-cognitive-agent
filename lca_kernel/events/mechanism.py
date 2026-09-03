@@ -62,6 +62,10 @@ class EventRef:
 
 
 ConsumerCallback = Callable[["EventPayload", EventRef], None]
+# ADR-0181 D6: sink 与 subscriber 性质不同：sink 写盘（fail-fast），subscriber
+# 派生（contained）。试点 1 个 SpineChainSink 通过 sinks 注册；0180 业务方
+# DelegationCachePlugin 仍走 subscribers 路径，行为不变。
+SinkCallback = Callable[["EventPayload", EventRef], None]
 
 
 # ── 机制本体 ──────────────────────────────────────────────────────────────
@@ -71,13 +75,15 @@ _DEFAULT_CONFIG_DIR = Path(__file__).parent / "config"
 
 
 class EventMechanism:
-    """事件机制（kernel 元层，ADR-0180 D1）。"""
+    """事件机制（kernel 元层，ADR-0180 D1 + ADR-0181 D6）。"""
 
     _singleton_instance: EventMechanism | None = None
 
     def __init__(self, registry: EventRegistry) -> None:
         self._registry = registry
         self._subscribers: dict[Any, list[tuple[type, ConsumerCallback]]] = defaultdict(list)
+        # ADR-0181 D6: sinks 落盘路径，FD-1 fail-fast（首个 sink 抛错上抛 sender）。
+        self._sinks: dict[Any, list[tuple[type, SinkCallback]]] = defaultdict(list)
 
     # ── 进程级单例 ────────────────────────────────────────────────────────
 
@@ -113,7 +119,9 @@ class EventMechanism:
             trace_id="",
             ts=time.time(),
         )
-        self._dispatch(payload, ref)
+        # ADR-0181 D6: FD-1 sink fail-fast（先），FD-2 subscriber contained（后）。
+        self._dispatch_sinks(payload, ref)
+        self._dispatch_subscribers(payload, ref)
         return ref
 
     def subscribe(
@@ -123,7 +131,7 @@ class EventMechanism:
         category: Category,
         callback: ConsumerCallback,
     ) -> None:
-        """sink / subscriber plugin 唯一订阅入口。
+        """subscriber plugin 唯一订阅入口（派生型，FD-2 contained）。
 
         ``plugin`` 必须是 Python class；机制按 yaml subscribers 解析后的 type 比对。
         """
@@ -133,9 +141,34 @@ class EventMechanism:
             raise UnauthorizedSubscribeError(plugin.__qualname__, category.value)
         self._subscribers[category].append((plugin, callback))
 
-    # ── 内部 ──────────────────────────────────────────────────────────────
+    def register_sink(
+        self,
+        *,
+        plugin: type,
+        category: Category,
+        callback: SinkCallback,
+    ) -> None:
+        """sink plugin 唯一注册入口（落盘型，FD-1 fail-fast）。
 
-    def _dispatch(self, payload: EventPayload, ref: EventRef) -> None:
+        ``plugin`` 必须是 Python class；机制按 yaml subscribers 解析后的 type 比对
+        （sink 复用 subscribers 白名单，因 sink 是 subscriber 的子集）。
+        """
+        if plugin is None or not isinstance(plugin, type):
+            raise MissingPluginIdentityError("register_sink")
+        if not self._registry.can_subscribe(plugin, category):
+            raise UnauthorizedSubscribeError(plugin.__qualname__, category.value)
+        self._sinks[category].append((plugin, callback))
+
+    # ── 内部（ADR-0181 D6 FD-1 / FD-2）────────────────────────────────────
+
+    def _dispatch_sinks(self, payload: EventPayload, ref: EventRef) -> None:
+        """FD-1: 首个 sink 抛错 → 上抛 sender（fail-fast）。"""
+        category = payload.category
+        for _plugin_cls, callback in self._sinks.get(category, ()):
+            callback(payload, ref)  # 不 try/except；sink 失败即上抛
+
+    def _dispatch_subscribers(self, payload: EventPayload, ref: EventRef) -> None:
+        """FD-2: subscriber 抛错 → contained，原事件仍落盘。"""
         category = payload.category
         for _plugin_cls, callback in self._subscribers.get(category, ()):
             try:

@@ -1,0 +1,21 @@
+# spine 事件 SSOT（ADR-0181 D3）
+#
+# 试点 PR 只 1 行：`spine.cognition.brain.perceive.start`。
+# PR-2 起按"层次 × 维度"扩行，PR-9 全量迁完后标旧
+# `lca/infrastructure/observability/spine/manifest.py` 删-when
+# （rg "EXECUTION_POINTS" lca/ = 0）。
+events:
+  - category: spine.cognition.brain.perceive.start
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      state_id: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.spine_step_tree_accumulator.subscriber.SpineStepTreeAccumulator
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
