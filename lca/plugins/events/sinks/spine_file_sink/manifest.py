@@ -54,13 +54,14 @@ class _Config(BaseModel):
         emits=("event.sink.spine_file.written",),
         state_mutation="forbidden",
     ),
+    marker_class=SINK_PLUGIN_CLASS,
 )
 async def setup(ctx: PluginContext, config: _Config) -> None:
     """SpineFileSink boot：构造 sink + 订阅 EventBus 所有 spine 类别。"""
     from lca_kernel.events.bus import EventBus
     from lca_kernel.events.hooks import FailureSemantics
 
-    bus_obj = ctx.soft_get("event.bus")
+    from lca_kernel.events.bus import EventBus as _EB; bus_obj = ctx.soft_get("event.bus") or _EB.default()
     if not isinstance(bus_obj, EventBus):
         msg = "event.sink.spine_file boot 失败：event.bus 未装载"
         raise RuntimeError(msg)

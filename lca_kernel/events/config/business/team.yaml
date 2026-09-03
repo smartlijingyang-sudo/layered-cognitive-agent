@@ -13,8 +13,8 @@
 consumer_rules:
   - prefix: "team."
     subscribers:
-      - lca.events.sink.journal
-      - lca.events.subscriber.console_projector
+      - lca.plugins.events.sinks.journal.sink.JournalSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
 events:
   - category: team.delegation.cache_hit
     plane: lca.contracts.event.Plane.STRUCTURAL

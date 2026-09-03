@@ -203,7 +203,7 @@ class _Config(BaseModel):
 @plugin(
     id="events.spine.reflector.control",
     provides=["event.bus.reflector.control"],
-    requires=["event.bus"],
+    requires=[],
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
@@ -241,6 +241,7 @@ class _Config(BaseModel):
         ),
         state_mutation="forbidden",
     ),
+    marker_class=ReflectorClass,
 )
 async def setup(ctx: PluginContext, config: _Config) -> None:
     """events.spine.reflector.control boot：注册 publisher marker 给 ctx。"""

@@ -70,7 +70,7 @@ class SpineChainSink:
 @plugin(
     id="events.spine.chain_sink",
     provides=["event.bus.chain_sink"],
-    requires=["event.bus"],
+    requires=[],
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
@@ -95,6 +95,7 @@ class SpineChainSink:
         emits=("event.bus.chain_sink.written",),
         state_mutation="forbidden",
     ),
+    marker_class=SpineChainSink,
 )
 async def setup(ctx: PluginContext, config: _Config) -> None:
     """spine_chain_sink boot：构造 sink + 订阅 yaml spine.* 类别。
@@ -105,7 +106,7 @@ async def setup(ctx: PluginContext, config: _Config) -> None:
     """
     from lca_kernel.events.bus import EventBus
 
-    bus_obj = ctx.soft_get("event.bus")
+    from lca_kernel.events.bus import EventBus as _EB; bus_obj = ctx.soft_get("event.bus") or _EB.default()
     if not isinstance(bus_obj, EventBus):
         msg = "event.bus.chain_sink boot 失败：event.bus 未装载"
         raise RuntimeError(msg)

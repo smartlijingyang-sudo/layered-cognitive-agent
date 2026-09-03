@@ -69,7 +69,7 @@ async def setup(ctx: PluginContext, config: _Config) -> None:
     """
     from lca_kernel.events.bus import EventBus
 
-    bus_obj = ctx.soft_get("event.bus")
+    from lca_kernel.events.bus import EventBus as _EB; bus_obj = ctx.soft_get("event.bus") or _EB.default()
     if not isinstance(bus_obj, EventBus):
         return
     subscriber = ConsoleProjectorSubscriber()

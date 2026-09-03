@@ -289,7 +289,7 @@ __all__ = [
 @plugin(
     id="events.spine.reflector.cognition",
     provides=["event.bus.reflector.cognition"],
-    requires=["event.bus"],
+    requires=[],
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
@@ -333,6 +333,7 @@ __all__ = [
         ),
         state_mutation="forbidden",
     ),
+    marker_class=ReflectorClass,
 )
 async def setup(ctx: PluginContext, config: _Config) -> None:
     """spine_reflector_cognition boot：注册 publisher marker 给 ctx。"""

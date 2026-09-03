@@ -348,7 +348,7 @@ __all__ = [
 @plugin(
     id="events.spine.reflector.body_llm",
     provides=["event.bus.reflector.body_llm"],
-    requires=["event.bus"],
+    requires=[],
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
@@ -387,6 +387,7 @@ __all__ = [
         ),
         state_mutation="forbidden",
     ),
+    marker_class=ReflectorClass,
 )
 async def setup(ctx: PluginContext, config: _Config) -> None:
     """spine_reflector_body_llm boot：注册 publisher marker 给 ctx。"""

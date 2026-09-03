@@ -70,7 +70,7 @@ class LoopCursorPlugin:
 @plugin(
     id="events.spine.loop_cursor",
     provides=["event.bus.loop_cursor"],
-    requires=["event.bus"],
+    requires=[],
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
@@ -109,6 +109,7 @@ class LoopCursorPlugin:
         ),
         state_mutation="forbidden",
     ),
+    marker_class=LoopCursorPlugin,
 )
 async def setup(ctx: PluginContext, config: _Config) -> None:
     """spine_loop_cursor boot：注册 publisher marker 给 ctx。"""

@@ -164,7 +164,7 @@ class _Config(BaseModel):
 @plugin(
     id="events.spine.reflector.writable",
     provides=["event.bus.reflector.writable"],
-    requires=["event.bus"],
+    requires=[],
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
@@ -198,6 +198,7 @@ class _Config(BaseModel):
         ),
         state_mutation="forbidden",
     ),
+    marker_class=ReflectorClass,
 )
 async def setup(ctx: PluginContext, config: _Config) -> None:
     """events.spine.reflector.writable boot：注册 publisher marker 给 ctx。"""

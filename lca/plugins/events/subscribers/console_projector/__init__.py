@@ -5,7 +5,7 @@ PR-4 可见性：本 ``__init__.py`` re-export ``setup_console_projector`` 为 `
 能被 profile resolver 经 ``getattr(module, "setup")`` 取到 plugin Manifest。
 """
 from lca.plugins.events.subscribers.console_projector.manifest import (
-    setup_console_projector as setup,
+    setup as setup,
 )
 from lca.plugins.events.subscribers.console_projector.subscriber import (
     ConsoleProjectorSubscriber,

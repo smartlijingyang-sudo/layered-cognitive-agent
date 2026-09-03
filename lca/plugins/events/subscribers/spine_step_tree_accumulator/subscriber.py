@@ -63,7 +63,7 @@ class SpineStepTreeAccumulator:
 @plugin(
     id="events.spine.step_tree_accumulator",
     provides=["event.bus.step_tree_accumulator"],
-    requires=["event.bus"],
+    requires=[],
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
@@ -90,6 +90,7 @@ class SpineStepTreeAccumulator:
         emits=("event.bus.step_tree_accumulator.appended",),
         state_mutation="forbidden",
     ),
+    marker_class=SpineStepTreeAccumulator,
 )
 async def setup(ctx: PluginContext, config: _Config) -> None:
     """spine_step_tree_accumulator boot：注册 subscriber marker 给 ctx。

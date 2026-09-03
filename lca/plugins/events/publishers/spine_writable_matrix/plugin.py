@@ -71,7 +71,7 @@ class WritableMatrixPlugin:
 @plugin(
     id="events.spine.writable_matrix",
     provides=["event.bus.writable_matrix"],
-    requires=["event.bus"],
+    requires=[],
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
@@ -104,6 +104,7 @@ class WritableMatrixPlugin:
         ),
         state_mutation="forbidden",
     ),
+    marker_class=WritableMatrixPlugin,
 )
 async def setup(ctx: PluginContext, config: _Config) -> None:
     """spine_writable_matrix boot：注册 publisher marker 给 ctx。"""
