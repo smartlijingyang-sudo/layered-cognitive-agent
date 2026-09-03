@@ -1,12 +1,72 @@
-# 观测性默认 bundle（ADR-0063 PR-7 source inversion 后引入）。
+# 观测性默认 bundle(PR-7 五缝 plugin 装配)。
 #
-# 启动 EventDescriptorRegistry seam + bootstrap 49 个内置 EventDescriptor。
-# 其它 bundle（web-app / scenario-*）通过 requires 间接依赖本 bundle。
+# PR-7 扩展:在 base.yaml 已装的 EventDescriptor registry 之外,新增五缝
+# (LoopCursor / ProjectionHost / ModelVisibleCapture / CloseBarrier /
+# Persistence)seam + provider 装配。profile.yaml 不再持有 ``observability:``
+# 段;一切五缝选择经 capability lookup 走本 bundle 的 NamedRegistry。
+#
+# 默认 provider 选择:
+# - loop_cursor / projection_host / model_visible / close_barrier = standard
+# - persistence = null(ADR-0169 D8 调用方注入面永不空;生产路径由 transport
+#   注入 FilePersistenceCoordinator,barrier flush 时仍走 File sink 路径)
+#
+# 其它 bundle(web-app / scenario-*)通过 requires 间接依赖本 bundle。
 name: observability-default
 description: |
-  EventDescriptor registry（49 个内置事件描述符的单一源）。
+  PR-7 五缝 LoopCursor / ProjectionHost / ModelVisibleCapture / CloseBarrier /
+  Persistence seam + provider 装配。EventDescriptor registry 见 base.yaml。
 requires:
   - base
-plugins:
-  - lca-event-descriptor-registry
-  - lca-event-descriptor-bootstrap
+
+entries:
+  # ── PR-7 五缝 seam(声明 capability,提供 NamedRegistry)──────
+  - id: observability.loop_cursor.factory
+    name: observability_loop_cursor_factory
+    $module: lca.plugins.observability.seams.loop_cursor_factory
+    config: {}
+
+  - id: observability.projection_host
+    name: observability_projection_host
+    $module: lca.plugins.observability.seams.projection_host
+    config: {}
+
+  - id: observability.model_visible
+    name: observability_model_visible
+    $module: lca.plugins.observability.seams.model_visible_capture
+    config: {}
+
+  - id: observability.close_barrier
+    name: observability_close_barrier
+    $module: lca.plugins.observability.seams.close_barrier
+    config: {}
+
+  - id: observability.persistence
+    name: observability_persistence
+    $module: lca.plugins.observability.seams.persistence_coordinator
+    config: {}
+
+  # ── PR-7 五缝默认 provider(把 Std* / Null factory 注册到 NamedRegistry)──
+  - id: observability.loop_cursor.standard
+    name: observability_loop_cursor_standard
+    $module: lca.plugins.observability.providers.loop_cursor.standard
+    config: {}
+
+  - id: observability.projection_host.standard
+    name: observability_projection_host_standard
+    $module: lca.plugins.observability.providers.projection_host.standard
+    config: {}
+
+  - id: observability.model_visible.standard
+    name: observability_model_visible_standard
+    $module: lca.plugins.observability.providers.model_visible_capture.standard
+    config: {}
+
+  - id: observability.close_barrier.standard
+    name: observability_close_barrier_standard
+    $module: lca.plugins.observability.providers.close_barrier.standard
+    config: {}
+
+  - id: observability.persistence.null
+    name: observability_persistence_null
+    $module: lca.plugins.observability.providers.persistence_coordinator.null
+    config: {}
