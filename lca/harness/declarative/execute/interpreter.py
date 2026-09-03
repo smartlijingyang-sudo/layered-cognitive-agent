@@ -214,6 +214,18 @@ class GenericPlanInterpreter:
         # 兜底取;取不到就退化为 trace_id(空串等价于 non-run context,
         # exception 仍落 spine 但 run_id 字段空)。
         derived_run_id, derived_trace_id = _extract_run_identity(state, artifacts)
+        # ADR-0183 §3.9 PR-12:把 derived_trace_id 推到 SpineContext contextvars,
+        # 让 wrap_instrument 装饰的 phase emit 走 spine_port_append 时能从
+        # contextvars 拿到 trace_id(decorator 不接 trace_id 参数)。
+        if derived_trace_id:
+            try:
+                from lca.infrastructure.observability.spine.context import (
+                    SpineContext,
+                )
+
+                SpineContext.set_trace_id(derived_trace_id)
+            except ImportError:
+                pass
         if derived_run_id or derived_trace_id:
             self._outcomes = RunOutcomeProjector(
                 self._journal,

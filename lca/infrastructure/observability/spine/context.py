@@ -38,6 +38,9 @@ class SpineContext:
     _epoch: ContextVar[int] = ContextVar("lca_spine_epoch", default=0)
     _span_counter: ContextVar[int] = ContextVar("lca_spine_span_counter", default=0)
     _hash_chain: ContextVar[str | None] = ContextVar("lca_spine_prev_hash", default=None)
+    # ADR-0183 §3.9 PR-12:trace_id 由 EventBus.publish 注入;cursor 走
+    # ``write_port_append`` 老路径不接 ref,通过本 contextvars 兜底拿。
+    _trace_id: ContextVar[str | None] = ContextVar("lca_spine_trace_id", default=None)
 
     # ── run / step ─────────────────────────────────────────────────────
     @classmethod
@@ -55,6 +58,15 @@ class SpineContext:
     @classmethod
     def get_step(cls) -> str | None:
         return cls._step_id.get()
+
+    # ── trace_id(ADR-0183 §3.9 PR-12)─────────────────────────
+    @classmethod
+    def set_trace_id(cls, trace_id: str | None) -> None:
+        cls._trace_id.set(trace_id)
+
+    @classmethod
+    def get_trace_id(cls) -> str | None:
+        return cls._trace_id.get()
 
     # ── monotonic counters ─────────────────────────────────────────────
     @classmethod

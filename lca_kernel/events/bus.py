@@ -214,6 +214,17 @@ class EventBus(Generic[P]):
             ts=ctx.ts,
         )
 
+        # ADR-0183 §3.9 PR-12:把 trace_id 写入 SpineContext contextvars,让老
+        # cursor 路径(spine_port_append)不接 ref 也能拿到 trace_id。EventBus
+        # 在同一个 asyncio task 里连续 publish,contextvars 自动隔离。
+        # 延迟 import 避免循环:SpineContext 在 lca/,bus 在 lca_kernel/。
+        try:
+            from lca.infrastructure.observability.spine.context import SpineContext
+
+            SpineContext.set_trace_id(ref.trace_id)
+        except ImportError:
+            pass  # SpineContext 不可用时退回 None
+
         self._dispatch_sinks(effective, ref)
         results = self._fanout(effective, ref)
         self._run_post_dispatch(effective, ref, results)

@@ -109,6 +109,20 @@ def spine_port_append(
         "sha256:" + hashlib.sha256(((prev_hash or "") + causality_id).encode("utf-8")).hexdigest()
     )
 
+    # trace_id 解析链(ADR-0183 §3.9 PR-12):
+    # 1) EventBus.publish 显式 trace_id → 经 ref 传入(ref 优先)
+    # 2) caller_payload["trace_id"] 字段(老路径兼容)
+    # 3) SpineContext contextvars(_trace_id,EventBus 默认注入)
+    # 4) 全 None(无 trace 关联)
+    _ref_trace_id = getattr(ref, "trace_id", None) if ref is not None else None
+    _payload_trace_id = (caller_payload or {}).get("trace_id")
+    if _ref_trace_id is not None:
+        _resolved_trace_id: str | None = _ref_trace_id
+    elif _payload_trace_id is not None:
+        _resolved_trace_id = str(_payload_trace_id)
+    else:
+        _resolved_trace_id = SpineContext.get_trace_id()
+
     record = EventRecord(
         execution_point=execution_point,
         channel=channel,
@@ -120,8 +134,8 @@ def spine_port_append(
         outcome=outcome,
         when=now,
         # trace_id 由 EventBus.publish 经 ref 注入(ADR-0183 §3.9 PR-12);
-        # 老路径不接 ref 时为 None,保持向后兼容。
-        trace_id=getattr(ref, "trace_id", None),
+        # 老路径走 SpineContext contextvars 兜底,保持向后兼容。
+        trace_id=_resolved_trace_id,
         when_corrected=now,
         prev_event_hash=prev_hash,
         run_id=run_id,
