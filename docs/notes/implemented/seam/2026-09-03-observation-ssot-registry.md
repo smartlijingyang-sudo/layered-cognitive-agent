@@ -1,10 +1,42 @@
 # Agent Note: 观测面 SSOT 全量收口与约束保证
 
-Status: proposed
+Status: implemented
+
+## Decision
+
+`lca/contracts/observability/ssot.py` 是观测面 SSOT 唯一权威:`find_spine_file` + `spine_filename_for_run` / `exceptions_filename_for_run` 派生文件名;`RunLifecycleStatus` enum + `TERMINAL_RUN_STATUSES` / `SUCCESS_RUN_STATUSES` / `FAILURE_RUN_STATUSES` 冻结集 + `is_terminal_run_status` / `is_success_run_status` / `is_failure_run_status` 判定函数;`ExecutionOutcome` enum + `is_terminal_outcome`;`to_jsonable` 单一来源(合并原 `_capture_io` + `journal/step/projector` 两份);`provider_schema` 工具 schema 序列化最高优先级。
+
+`RunLocator` Protocol 扩展 3 个方法:`kernel_log_path` / `exceptions_path` / `profile_snapshot_path`;`events_path` 实现委托 `find_spine_file`。
+
+`scripts/check_observation_ssot.py` 是 CI 守门(9 条规则):文件名裸字符串、Status 字面、ExecutionOutcome Literal、RunStatus 反向耦合、`to_jsonable` 重复、`seam_key: str` 字面。当前 0 命中。
+
+## Implementation status (2026-09-03)
+
+- ✅ PR-1: ssot.py + RunLocator Protocol 补全(已合并到 feat/observation-ssot-registry)
+- ✅ PR-2: scripts/check_observation_ssot.py CI lint(同上)
+- ✅ PR-3: to_jsonable 合并(同上)
+- ✅ PR-4: RunStatus 反向耦合消除(同上)
+- ✅ PR-5: Status 字面迁移到 ExecutionOutcome / is_terminal(同上)
+- ✅ PR-6: seam_key: str → CapabilityKey(同上)
+- ✅ PR-7: 文件名硬编码 → RunLocator(同上)
+- 📋 PR-8: H-xref 退化 + ADR 提案(deferred — 当前 5-segment 检测保留,需新 ADR)
+- 📋 PR-9: model_visible 拆 LLMCallTrace Protocol + post-call capture(deferred)
+
+PR #5: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/pull/5
+
+## Consequences
+
+42 处反模式全部消解(24 文件名 + 5 Status 字面 + 3 Literal + 3 反向耦合 + 2 to_jsonable 重复 + 5 seam_key 字面)。`check_observation_ssot.py` 守门确保未来不再新增。新增 reader / Status / 文件名必须走 SSOT;`# noqa: observation_ssot` 行级豁免允许 legacy fallback(per-step artifact 命名空间隔离)。
+
+修复的两个 debug 关键 BUG:
+- BUG #1:doctor H-xref 永远 ok 因为漏读 spine.jsonl
+- BUG #4:`runs create --wait` 不退出因为硬编码终态集漏 completed
+
+仍 deferred:
+- model_visible projection 丢 assistant 回复 / 工具 schema 序列化(proposal 在 `docs/notes/implemented/seam/2026-09-03-model-visible-incomplete-projection.md`,未落实现)
+- H-xref 退化(proposal 在根 note §L4,需 ADR 后再实施)
 
 ## Problem
-
-debug agent 的 4 个真 BUG 背后,加上全 repo 扫描,共发现 **5 类 13 处 SSOT 散落反模式**。同一根因:**SSOT 已在 contracts/observability/ 或 contracts/atoms/ 落地,但消费方未走 SSOT,直接用字面字符串 / 文件名 / 路径 / 集合**。新增字段、reader、Status 值,任意一处硬编码未被 lint 拦下,就会重蹈覆辙。
 
 ### 反模式 1:文件名 / 路径硬编码(7 处)
 

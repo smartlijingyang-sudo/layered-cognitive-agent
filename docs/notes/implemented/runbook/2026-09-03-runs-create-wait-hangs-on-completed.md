@@ -1,6 +1,8 @@
 # Agent Note: `runs create --wait` 把 "completed" run 当成永不终止
 
-Status: proposed
+Status: implemented
+
+> **Superseded by**: [观测面 SSOT 全量收口与约束保证](../seam/2026-09-03-observation-ssot-registry.md)(root note, implemented 2026-09-03)。本 note 作为 BUG 现场诊断证据保留;修法已并入根 note PR-1~7。
 
 ## Problem
 
