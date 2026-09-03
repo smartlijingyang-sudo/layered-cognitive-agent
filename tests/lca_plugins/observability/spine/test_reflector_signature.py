@@ -13,7 +13,22 @@ The plugin is the first concrete implementation of the
 documented surface so future refactors do not silently drop keys.
 """
 
+# ADR-0181 PR-5：signature reflector 是 D11 FieldProducer，本测试覆盖旧
+# reflector 路径；PR-8 derivers 全迁时一并处理。
 from __future__ import annotations
+
+import pytest
+
+
+pytestmark = pytest.mark.xfail(
+    reason=(
+        "ADR-0181 PR-5：旧 spine FieldProducer（context / signature / source）"
+        " 已迁到 PR-8 derivers。本测试覆盖旧 reflector，本文件在 PR-8 旧 spine "
+        "全退役时删（rg lca.plugins.observability.spine.reflectors.signature "
+        "lca/ = 0 触发）。"
+    ),
+    strict=True,
+)
 
 import inspect
 import typing

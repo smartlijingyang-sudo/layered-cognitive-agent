@@ -764,3 +764,387 @@ events:
     default_subscribers:
       - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
       - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  # ── Writable matrix（PR-5）───────────────────────────────────────
+  - category: spine.writable.step.start
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      step: int
+      run_id: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_writable.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  - category: spine.writable.step.end
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      step: int
+      run_id: str
+      outcome: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_writable.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  - category: spine.writable.segment.start
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      segment: int
+      step: int
+      run_id: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_writable.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  - category: spine.writable.segment.end
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      segment: int
+      step: int
+      run_id: str
+      outcome: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_writable.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  - category: spine.writable.iteration.halt
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      run_id: str
+      reason: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_writable.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  - category: spine.writable.iteration.closing
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      run_id: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_writable.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  - category: spine.writable.iteration.close
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      run_id: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_writable.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  # ── Phase（PR-5）────────────────────────────────────────────────
+  - category: spine.perceive.phase.fold
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      step: int
+      run_id: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  - category: spine.phase.perceive.fold
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      step: int
+      run_id: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  - category: spine.phase.think.fold
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      step: int
+      run_id: str
+      decision_path: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  - category: spine.phase.gate.fold
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      step: int
+      run_id: str
+      verdict: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  - category: spine.phase.remember.fold
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      step: int
+      run_id: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  - category: spine.phase.stop.fold
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      step: int
+      run_id: str
+      outcome: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  - category: spine.phase.reflect.fold
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      step: int
+      run_id: str
+      lessons: int
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  - category: spine.phase.act.fold.start
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      step: int
+      run_id: str
+      tool_name: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  - category: spine.phase.act.fold.end
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      step: int
+      run_id: str
+      tool_name: str
+      outcome: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  - category: spine.phase.act.fold
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      step: int
+      run_id: str
+      tool_name: str
+      outcome: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  - category: spine.phase.tool.call.start
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      step: int
+      run_id: str
+      tool_name: str
+      invocation_id: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  - category: spine.phase.tool.call.end
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      step: int
+      run_id: str
+      tool_name: str
+      invocation_id: str
+      outcome: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  - category: spine.phase.tool.denied
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      step: int
+      run_id: str
+      tool_name: str
+      reason: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  # ── Phase graph（PR-5）──────────────────────────────────────────
+  - category: spine.phase_graph.node.start
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      node_id: str
+      run_id: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_phase_graph.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  - category: spine.phase_graph.node.end
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      node_id: str
+      run_id: str
+      outcome: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_phase_graph.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  - category: spine.phase_graph.edge.transit
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      from_node: str
+      to_node: str
+      run_id: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_phase_graph.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+
+  - category: spine.phase_graph.instrument.coverage
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      covered_nodes: int
+      total_nodes: int
+      run_id: str
+    publishers:
+      - lca.plugins.events.publishers.spine_reflector_phase_graph.plugin.ReflectorClass
+    subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+    default_subscribers:
+      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber

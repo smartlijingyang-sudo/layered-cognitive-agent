@@ -175,9 +175,33 @@ _SPINE_EP_TO_CATEGORY: dict[str, str] = {
     "agent.spawn": "spine.agent.spawn",
     "agent.iteration": "spine.agent.iteration",
     "agent.final": "spine.agent.final",
-    "agent.spawn": "spine.agent.spawn",
-    "agent.iteration": "spine.agent.iteration",
-    "agent.final": "spine.agent.final",
+    # Writable matrix (PR-5)
+    "writable.step.start": "spine.writable.step.start",
+    "writable.step.end": "spine.writable.step.end",
+    "writable.segment.start": "spine.writable.segment.start",
+    "writable.segment.end": "spine.writable.segment.end",
+    "writable.iteration.halt": "spine.writable.iteration.halt",
+    "writable.iteration.closing": "spine.writable.iteration.closing",
+    "writable.iteration.close": "spine.writable.iteration.close",
+    # Phase (PR-5)
+    "perceive.phase.fold": "spine.perceive.phase.fold",
+    "phase.perceive.fold": "spine.phase.perceive.fold",
+    "phase.think.fold": "spine.phase.think.fold",
+    "phase.gate.fold": "spine.phase.gate.fold",
+    "phase.remember.fold": "spine.phase.remember.fold",
+    "phase.stop.fold": "spine.phase.stop.fold",
+    "phase.reflect.fold": "spine.phase.reflect.fold",
+    "phase.act.fold.start": "spine.phase.act.fold.start",
+    "phase.act.fold.end": "spine.phase.act.fold.end",
+    "phase.act.fold": "spine.phase.act.fold",
+    "phase.tool.call.start": "spine.phase.tool.call.start",
+    "phase.tool.call.end": "spine.phase.tool.call.end",
+    "phase.tool.denied": "spine.phase.tool.denied",
+    # Phase graph (PR-5)
+    "phase_graph.node.start": "spine.phase_graph.node.start",
+    "phase_graph.node.end": "spine.phase_graph.node.end",
+    "phase_graph.edge.transit": "spine.phase_graph.edge.transit",
+    "phase_graph.instrument.coverage": "spine.phase_graph.instrument.coverage",
 }
 
 

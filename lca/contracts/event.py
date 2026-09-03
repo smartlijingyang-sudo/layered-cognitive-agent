@@ -91,6 +91,31 @@ class Category(str, Enum):
     SPINE_AGENT_SPAWN = "spine.agent.spawn"
     SPINE_AGENT_ITERATION = "spine.agent.iteration"
     SPINE_AGENT_FINAL = "spine.agent.final"
+    # observability/spine — PR-5 writable / phase / phase_graph 全迁 24 EP
+    SPINE_WRITABLE_STEP_START = "spine.writable.step.start"
+    SPINE_WRITABLE_STEP_END = "spine.writable.step.end"
+    SPINE_WRITABLE_SEGMENT_START = "spine.writable.segment.start"
+    SPINE_WRITABLE_SEGMENT_END = "spine.writable.segment.end"
+    SPINE_WRITABLE_ITERATION_HALT = "spine.writable.iteration.halt"
+    SPINE_WRITABLE_ITERATION_CLOSING = "spine.writable.iteration.closing"
+    SPINE_WRITABLE_ITERATION_CLOSE = "spine.writable.iteration.close"
+    SPINE_PERCEIVE_PHASE_FOLD = "spine.perceive.phase.fold"
+    SPINE_PHASE_PERCEIVE_FOLD = "spine.phase.perceive.fold"
+    SPINE_PHASE_THINK_FOLD = "spine.phase.think.fold"
+    SPINE_PHASE_GATE_FOLD = "spine.phase.gate.fold"
+    SPINE_PHASE_REMEMBER_FOLD = "spine.phase.remember.fold"
+    SPINE_PHASE_STOP_FOLD = "spine.phase.stop.fold"
+    SPINE_PHASE_REFLECT_FOLD = "spine.phase.reflect.fold"
+    SPINE_PHASE_ACT_FOLD_START = "spine.phase.act.fold.start"
+    SPINE_PHASE_ACT_FOLD_END = "spine.phase.act.fold.end"
+    SPINE_PHASE_ACT_FOLD = "spine.phase.act.fold"
+    SPINE_PHASE_TOOL_CALL_START = "spine.phase.tool.call.start"
+    SPINE_PHASE_TOOL_CALL_END = "spine.phase.tool.call.end"
+    SPINE_PHASE_TOOL_DENIED = "spine.phase.tool.denied"
+    SPINE_PHASE_GRAPH_NODE_START = "spine.phase_graph.node.start"
+    SPINE_PHASE_GRAPH_NODE_END = "spine.phase_graph.node.end"
+    SPINE_PHASE_GRAPH_EDGE_TRANSIT = "spine.phase_graph.edge.transit"
+    SPINE_PHASE_GRAPH_INSTRUMENT_COVERAGE = "spine.phase_graph.instrument.coverage"
 
 
 class Plane(str, Enum):
@@ -154,6 +179,30 @@ CATEGORY_DEFAULT_PLANE: dict[Category, Plane] = {
     Category.SPINE_AGENT_SPAWN: Plane.OBSERVABILITY,
     Category.SPINE_AGENT_ITERATION: Plane.OBSERVABILITY,
     Category.SPINE_AGENT_FINAL: Plane.OBSERVABILITY,
+    Category.SPINE_WRITABLE_STEP_START: Plane.OBSERVABILITY,
+    Category.SPINE_WRITABLE_STEP_END: Plane.OBSERVABILITY,
+    Category.SPINE_WRITABLE_SEGMENT_START: Plane.OBSERVABILITY,
+    Category.SPINE_WRITABLE_SEGMENT_END: Plane.OBSERVABILITY,
+    Category.SPINE_WRITABLE_ITERATION_HALT: Plane.OBSERVABILITY,
+    Category.SPINE_WRITABLE_ITERATION_CLOSING: Plane.OBSERVABILITY,
+    Category.SPINE_WRITABLE_ITERATION_CLOSE: Plane.OBSERVABILITY,
+    Category.SPINE_PERCEIVE_PHASE_FOLD: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_PERCEIVE_FOLD: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_THINK_FOLD: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_GATE_FOLD: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_REMEMBER_FOLD: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_STOP_FOLD: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_REFLECT_FOLD: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_ACT_FOLD_START: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_ACT_FOLD_END: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_ACT_FOLD: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_TOOL_CALL_START: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_TOOL_CALL_END: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_TOOL_DENIED: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_GRAPH_NODE_START: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_GRAPH_NODE_END: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_GRAPH_EDGE_TRANSIT: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_GRAPH_INSTRUMENT_COVERAGE: Plane.OBSERVABILITY,
 }
 
 

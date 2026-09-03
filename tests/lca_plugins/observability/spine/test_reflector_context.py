@@ -9,7 +9,24 @@ profile boot picks the producer up via
 ``ctx.require("field_producer.context")``.
 """
 
+# ADR-0181 PR-5：context reflector 已迁到
+# lca.plugins.events.publishers.spine_reflector_phase 系列（PR-5 范围）
+# + D11 FieldProducer（PR-8 derivers 全迁时统一处理）。本测试在 PR-8 旧
+# spine 全退役时一并删除。
 from __future__ import annotations
+
+import pytest
+
+
+pytestmark = pytest.mark.xfail(
+    reason=(
+        "ADR-0181 PR-5：旧 spine FieldProducer（context / signature / source）"
+        " 已迁到 EventMechanism 路径（spine_reflector_phase + PR-8 derivers）。"
+        "本测试覆盖旧 reflector，本文件在 PR-8 旧 spine 全退役时删（rg "
+        "lca.plugins.observability.spine.reflectors.context lca/ = 0 触发）。"
+    ),
+    strict=True,
+)
 
 # ── protocol conformance ─────────────────────────────────────────────
 
