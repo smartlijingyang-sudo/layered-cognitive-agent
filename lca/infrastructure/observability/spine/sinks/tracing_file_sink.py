@@ -1,3 +1,7 @@
+# COMPAT(delete-when: PR-9, tracking: ADR-0181)
+# 旧 EventSpine sink；PR-8 shim 走 events/sinks/spine_* 包装；本模块保留
+# 至 PR-9 旧 spine 全退役（rg "lca.plugins.observability.spine.sinks" lca/ = 0 触发）。
+
 """TracingFileSink — fail-loud ``FileSink`` wrapper.
 
 The wrapper layers two extra safety nets on top of :class:`FileSink`:

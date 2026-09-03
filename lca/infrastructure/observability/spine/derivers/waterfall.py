@@ -1,3 +1,7 @@
+# COMPAT(delete-when: PR-9, tracking: ADR-0181)
+# 旧 EventSpine deriver；PR-8 shim 走 events/subscribers/spine_* 包装；
+# 本模块保留至 PR-9 旧 spine 全退役（rg "lca.plugins.observability.spine.derivers" lca/ = 0 触发）。
+
 """Waterfall HTML deriver —— DSH Trajectory 风格（ADR-0167 D9）。
 
 订阅 ``EventSpine``，on flush 渲染一份静态 HTML：
