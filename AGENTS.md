@@ -179,17 +179,18 @@ LATEST=$(jq -r .run_id traces/latest.json)
 ./scripts/lca-ops journal trace            # 最新 run
 ./scripts/lca-ops journal trace "$LATEST"  # 显式 run_id
 
-# 3.5 【必跑】读 run 目录的 <sha256>.json sidecar：traceback 通常在这里
-#      不是在 events.jsonl（大 event > 4 KB → I10 offload：FileSink._ATOMIC_THRESHOLD）。
-#      debug-run [2/8] journal 只读主 ledger，看不到完整 traceback。
-SIDECAR=$(ls traces/runs/"$LATEST"/*.json 2>/dev/null \
-  | grep -vE 'events\.jsonl|manifest\.json|profile_snapshot\.json' | head -1)
-[ -n "$SIDECAR" ] && jq -r '
-  "exception_class: \(.payload.exception_class // "-")",
-  "exception_message: \(.payload.exception_message // "-")",
-  "source_location: \(.payload.source_location // "-")",
-  (.payload.traceback_text // "(no traceback_text)")
-' "$SIDECAR"
+# 3.5 【必跑】读 traceback：从专用索引或 sidecar 拿（ADR-2026-09-03）
+#      首选:`./scripts/lca-ops journal exceptions "$LATEST"` (人读+grep+--json)
+#      它读 <run_id>.exceptions.jsonl —— 每个 exception.caught EP 必落盘的专用索引,
+#      不论 payload 大小,绝不丢(底层 TracingFileSink 三道防线 + 必落盘保证)。
+#      Sidecar (旧路径, > 4 KiB offload) 文件名现在是 <sha8>-<SafeClass>.json
+#      (e.g. 1a2b3c4d-AttributeError.json),可读不靠 hash 猜。
+./scripts/lca-ops journal exceptions "$LATEST"
+./scripts/lca-ops journal exceptions "$LATEST" --grep AttributeError
+./scripts/lca-ops journal exceptions "$LATEST" --json | jq '.records[0].payload'
+# Last-resort:FALLBACK.log 只在主 ledger + exceptions index 都写不进去时出现,
+# 是 TracingFileSink 的兜底(进程级最后一道)。
+[ -f traces/runs/"$LATEST"/FALLBACK.log ] && cat traces/runs/"$LATEST"/FALLBACK.log
 
 # 4. 失败原因投影（仅 run 失败时有意义）
 ./scripts/lca-ops explain "$LATEST"
@@ -203,15 +204,18 @@ SIDECAR=$(ls traces/runs/"$LATEST"/*.json 2>/dev/null \
 
 | 用户说 | 走的流程 |
 |---|---|
-| "最新一次 run" / "刚才那个" / "上次" / "最近" | 上面 5 步全套**含 3.5 sidecar** |
-| "分析一下这次" / "看看发生了什么" | 上面 1-3 + **3.5 sidecar** |
-| "为啥这次失败" / "这次出错了" | 上面 1-2 + **3.5 sidecar**(traceback 的第一站) + 4 |
+| "最新一次 run" / "刚才那个" / "上次" / "最近" | 上面 5 步全套**含 3.5 exceptions** |
+| "分析一下这次" / "看看发生了什么" | 上面 1-3 + **3.5 exceptions** |
+| "为啥这次失败" / "这次出错了" / "traceback 呢" | 上面 1-2 + **3.5 exceptions**(`lca-ops journal exceptions` 拿 traceback) + 4 |
 | "理解一下过程" / "走了一遍啥逻辑" | 上面 1 + 3 + 5 |
 | "DSH 风格轨迹" / "给我个 HTML" | 加 `./scripts/lca-ops journal trajectory "$LATEST"` |
 | "模型都做了啥" / "调了啥工具" | `./scripts/lca-ops trace "$LATEST" --focus llm\|tools\|delegation`（`--focus` 是 trace 的选项；`journal logs` 不支持） |
 | "给我个像 journal 那样的树视图" / "人读 trace" | `./scripts/lca-ops journal trace`（**默认 --human**：树缩进 + Δms + payload 原文，默认最新 run） |
+| "所有 traceback 一刀命中" / "grep 异常类" | `./scripts/lca-ops journal exceptions "$LATEST" --grep AttributeError` |
 
 **取 run_id 的硬规则**：永远 `jq -r .run_id traces/latest.json`，**不要** ls、find、按 mtime 排序——pointer 文件是 SSOT。
+
+**traceback 必落盘** (ADR-2026-09-03):`exception.caught` EP 必写 `<run_id>.exceptions.jsonl`(专用索引,TracingFileSink 三道防线,IOError 不抛)。失败兜底走 `<run_id>.FALLBACK.log` + structlog。grep 一行: `jq -r 'select(.payload.exception_class=="X")' traces/runs/<id>/<id>.exceptions.jsonl`。
 
 ### 最常用命令指针
 
@@ -223,10 +227,14 @@ SIDECAR=$(ls traces/runs/"$LATEST"/*.json 2>/dev/null \
 | run 失败定位 | **`./scripts/lca-ops debug-run <run_id>`** | `debug-env <run_id>` 只看摘要 |
 | 看完整流程 | `./scripts/lca-ops trace <run_id> --focus llm\|tools\|delegation` | `./scripts/lca-ops journal trace`（**默认 --human** + 默认最新 run） |
 | 失败原因投影 | `./scripts/lca-ops explain <run_id>` | `minimal-repro <run_id>` |
+| traceback 一刀命中 | `./scripts/lca-ops journal exceptions <run_id>` | `--grep <Class>` / `--json` |
 | profile 拓扑 | `./scripts/lca-ops inspect-tree <profile>` | `dump-profile <profile>` |
 | 能力归属 | `./scripts/lca-ops why <capability>` / `why-plugin <id>` | `graph <profile>` |
 | 审计 hardcode / Reducer 单写 | `./scripts/lca-ops audit-control-surface` / `audit-state-writers` / `audit-direct-commands` / `audit-hook-attach` | `audit` |
 | ADR 监督 / 历史迁移 | `./scripts/lca-ops status-adr-supervision` | `./scripts/lca-ops diagnose-package-organization` |
+| notes/ 体检(新决策门禁) | `./scripts/lca-ops notes-check` | `python scripts/check_notes_tree.py` |
+| ADR 健康审计(诊断 only,不动 ADR) | `./scripts/lca-ops notes-audit` | `python scripts/audit_adr_health.py --out docs/notes/audit-<date>.md` |
+| docs/ 散文 stale-time 扫描 | `./scripts/lca-ops notes-slop` | `python scripts/verify_doc_slop.py` |
 | 预设症状诊断 | `./scripts/lca-ops diagnose-{model-not-seen,loop-stuck,memory-poisoned,approval-rejected}` | `docs/debug/run-debug-guide.md` §5 |
 | DSH 风格 HTML 轨迹 | `./scripts/lca-ops journal trajectory` | `journal narrative` |
 

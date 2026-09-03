@@ -14,10 +14,12 @@ import threading
 from pathlib import Path
 
 from lca.infrastructure.observability.spine.event_record import EventRecord
-from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
 from lca.infrastructure.observability.spine.sinks.naming import (
     DEFAULT_SPINE_TEMPLATE,
     resolve_filename,
+)
+from lca.infrastructure.observability.spine.sinks.tracing_file_sink import (
+    TracingFileSink,
 )
 
 _BOOT_RUN_IDS = frozenset({"", "boot", "default-run"})
@@ -40,12 +42,15 @@ class RunRoutingFileSink:
         self._spine_filename = spine_filename
         self._boot_path.parent.mkdir(parents=True, exist_ok=True)
         self._runs_root.mkdir(parents=True, exist_ok=True)
-        self._boot = FileSink(
+        # 异常必落盘保证 (ADR-2026-09-03 + TracingFileSink):任何 IOError
+        # 退化到 FALLBACK.log / structlog,绝不抛。这是观测层最严的
+        # 不变量 —— 否则 webserver 入口异常会让 caller 整条 request 崩。
+        self._boot = TracingFileSink(
             self._boot_path.parent,
             run_id="boot",
             file_name=self._boot_path.name,
         )
-        self._runs: dict[str, FileSink] = {}
+        self._runs: dict[str, TracingFileSink] = {}
         self._lock = threading.Lock()
         self._closed = False
 
@@ -99,13 +104,13 @@ class RunRoutingFileSink:
             return spine_filename_for_run(run_id)
         return resolve_filename(self._file_name, run_id)
 
-    def _sink_for(self, run_id: str) -> FileSink:
+    def _sink_for(self, run_id: str) -> TracingFileSink:
         with self._lock:
             existing = self._runs.get(run_id)
             if existing is not None:
                 return existing
             run_dir = self._runs_root / run_id
-            sink = FileSink(
+            sink = TracingFileSink(
                 run_dir,
                 run_id=run_id,
                 file_name=self._file_name,

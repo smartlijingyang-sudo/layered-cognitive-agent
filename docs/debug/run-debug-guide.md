@@ -140,19 +140,36 @@ Each step has five labels you should expect to find in your own output:
 
 ---
 
-### Step 3 — Read the sidecar for the full traceback (most-skipped step)
+### Step 3 — Read the traceback from `<run_id>.exceptions.jsonl` (preferred) or sidecar
 
-**WHY.** Spine events > 4 KB are offloaded to `<sha256>.json` sidecar files by `FileSink._ATOMIC_THRESHOLD` (I10). Any event containing a full Python traceback is *always* over 4 KB, so its traceback is in the sidecar, **not** in `events.jsonl`. `debug-run [5/8] error_ref` only carries the label, not the traceback. If you skip this step, you're guessing.
+**WHY.** Since ADR-2026-09-03 traceback-ssot-hook, every `exception.caught` event is double-written:
+- **Dedicated index**: `<run_id>.exceptions.jsonl` — one JSON line per exception, full payload. **Preferred** for grep.
+- **Spine ledger**: `<run_id>.spine.jsonl` — main event log, exception rows are placeholder `{execution_point, offloaded}` if > 4 KiB.
+- **Offloaded sidecar**: `<sha8>-<SafeClass>.json` (e.g. `1a2b3c4d-AttributeError.json`) — readable name, holds the full encoded event for offloaded exceptions.
+
+`debug-run [5/8] error_ref` only carries the label, not the traceback. If you skip this step, you're guessing.
 
 **DO.**
 
 ```sh
-# List sidecars in the run directory.
-ls traces/runs/"$LATEST" | grep -vE '^(events\.jsonl|manifest\.json|profile_snapshot\.json|\..*\.swp)$'
+# Preferred: dedicated exceptions index (every exception EP, full payload).
+./scripts/lca-ops journal exceptions "$LATEST"
 
-# Pick the first sidecar (usually exactly one), pull the traceback.
-SIDECAR=$(ls traces/runs/"$LATEST"/*.json 2>/dev/null \
-  | grep -vE 'events\.jsonl|manifest\.json|profile_snapshot\.json' | head -1)
+# Or grep by class:
+./scripts/lca-ops journal exceptions "$LATEST" --grep AttributeError
+
+# Or agent-friendly JSON:
+./scripts/lca-ops journal exceptions "$LATEST" --json | jq '.records[0].payload'
+
+# Manual jq on the index file:
+jq -r 'select(.payload.exception_class=="AttributeError") | .payload.traceback_text' \
+  traces/runs/"$LATEST"/"$LATEST".exceptions.jsonl
+
+# Sidecars (readable names) — only for offloaded exceptions > 4 KiB.
+ls traces/runs/"$LATEST" | grep -E '^[0-9a-f]{8}-[A-Za-z]+\.json$'
+
+# Pick a sidecar and dump its traceback.
+SIDECAR=$(ls traces/runs/"$LATEST"/[0-9a-f]*-*.json 2>/dev/null | head -1)
 [ -n "$SIDECAR" ] && jq -r '
   "exception_class:   \(.payload.exception_class // "-")",
   "exception_message: \(.payload.exception_message // "-")",
@@ -160,13 +177,17 @@ SIDECAR=$(ls traces/runs/"$LATEST"/*.json 2>/dev/null \
   "---traceback---",
   (.payload.traceback_text // "(no traceback_text)")
 ' "$SIDECAR"
+
+# Last-resort: FALLBACK.log fires only when main ledger AND exceptions index both failed.
+# Its presence indicates a serious I/O problem (disk full / perms / FS gone).
+[ -f traces/runs/"$LATEST"/FALLBACK.log ] && cat traces/runs/"$LATEST"/FALLBACK.log
 ```
 
 **OUTPUT.** The exact `ValueError` / `RuntimeError` / etc., the file:line where it raised, and the full Python traceback.
 
 **NEXT.** You now have the exception class + message + source. Advance to Step 4.
 
-**FAIL.** No sidecar files at all → the failure was a control-point failure (outcome=failure, no Python traceback). Read the event payload from `events.jsonl` directly: `jq -r 'select(.seq==N) | .payload' traces/runs/"$LATEST"/events.jsonl`.
+**FAIL.** No exceptions file and no sidecar → the failure was a control-point failure (outcome=failure, no Python traceback). Read the event payload from `<run_id>.spine.jsonl` directly: `jq -r 'select(.seq==N) | .payload' traces/runs/"$LATEST"/"$LATEST".spine.jsonl`.
 
 ---
 

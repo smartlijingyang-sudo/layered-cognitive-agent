@@ -32,10 +32,12 @@ from lca.infrastructure.cli.commands import (
     declarative,
     diagnostics,
     journal,
+    journal_exceptions,
     journal_replay,
     journal_steps,
     journal_trace,
     kernel,
+    notes,
     package_organization,
     profile_inspect,
     runs,
@@ -82,7 +84,9 @@ journal.register(app, group=_journal_group)
 journal_steps.register(_journal_group)
 journal_trace.register(_journal_group)
 journal_replay.register(_journal_group)
+journal_exceptions.register(_journal_group)
 kernel.register(app)
+notes.register(app)
 
 
 # ── legacy alias: `lca-ops logs` → `journal logs` ──────────────────
