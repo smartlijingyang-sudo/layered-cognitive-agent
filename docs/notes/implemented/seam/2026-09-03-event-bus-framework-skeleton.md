@@ -57,15 +57,15 @@ ADR-0183(事件总线框架 SSOT,Proposed,2026-09-03)把 10 篇 ADR(0167/0170/01
 3. **`build_record` 放在新模块** — ADR §3.5 写"框架自带",但旧 spine_runtime.py 已含 `SpineEventRecord`。物理上追加 `build_record` 到同文件避免拆分 `to_dict()` 配套(同 dataclass 同 lifecycle)。**采纳**,加在 `spine_runtime.py` 末尾。
 4. **不写架构不变量测试** — 5 条不变量是关键门禁,机械守护是唯一可信屏障。**采纳**,本 PR 加 8 个测试 + 2 个 xfail(已知债)。
 
-## delete-when / 兼容性
+## delete-when / 兼容性(2026-09-03 落点对齐)
 
-| 路径 | 兼容窗口 | 删除触发器 |
-|---|---|---|
-| `lca_kernel/events/mechanism.py` `EventMechanism.send / subscribe / register_sink` | 本 PR → PR-7 装载 Pipeline 之后 | `rg "EventMechanism" lca/ lca_kernel/ tests/` = 0(允许 archive/ 与 tests/architecture/ 负向断言) |
-| `lca/infrastructure/observability/spine/event_spine.py` `append` + `bind.py:80 append` | 本 PR → PR-9 cursor 收口 | `rg "def append" lca/infrastructure/observability/spine/event_spine.py lca/infrastructure/observability/loop_cursor/bind.py` = 0 |
-| `lca/plugins/events/sinks/spine_file_sink/_build_event_record` + 2 处 `except ValueError` | 本 PR → PR-5 record 单一入口 | `rg "_build_event_record" lca/` = 0 且 `rg "except ValueError" lca/plugins/events/sinks/` = 0 |
-| `events.jsonl` legacy reader 全仓(105 处) | 本 PR → PR-4 follow-up sweep | `rg "events\.jsonl" lca/ lca_kernel/` = 0(允许负向断言与 tests/fixtures) |
-| `TraceContextHook` / `MechanismDispatchObserver` stub | 本 PR → PR-12 | trace_id contextvars 注入 + 自指派观察事件 |
+| 路径 | 兼容窗口 | 删除触发器 | 2026-09-03 落点 |
+|---|---|---|---|
+| `lca_kernel/events/mechanism.py` `EventMechanism.send / subscribe / register_sink` | 本 PR → PR-7 装载 Pipeline 之后 | `rg "EventMechanism" lca/ lca_kernel/ tests/` = 0(允许 archive/ 与 tests/architecture/ 负向断言) | ❌ 仍 347 处(`mechanism.py` deprecated 源 + 21 publisher dual-import + 22 manifest);仍延后 |
+| `lca/infrastructure/observability/spine/event_spine.py` `append` + `bind.py:80 append` | 本 PR → PR-9 cursor 收口 | `rg "def append" lca/infrastructure/observability/spine/event_spine.py lca/infrastructure/observability/loop_cursor/bind.py` = 0 | ❌ 仍 2 处(cursor 走 `WritePort` 而非 ADR 原话 `bus.publish`,实际为 adapter facade);仍延后(架构测试 `test_i_fw_bus_1_loop_cursor_debt_xfail` 跟踪) |
+| `lca/plugins/events/sinks/spine_file_sink/_build_event_record` + 2 处 `except ValueError` | 本 PR → PR-5 record 单一入口 | `rg "_build_event_record" lca/` = 0 且 `rg "except ValueError" lca/plugins/events/sinks/` = 0 | ✅ 已合(commit `ff907239`);0 处 |
+| `events.jsonl` legacy reader 全仓(96 处) | 本 PR → PR-4 follow-up sweep | `rg "events\.jsonl" lca/ lca_kernel/` = 0(允许负向断言与 tests/fixtures) | ❌ 仍 96 处;仍延后(架构测试 `test_i_fw_ssot_1_no_legacy_events_jsonl_reader_in_production` xfail 跟踪) |
+| `TraceContextHook` / `MechanismDispatchObserver` stub | 本 PR → PR-12 | trace_id contextvars 注入 + 自指派观察事件 | ✅ 已合(commit `1b8ce7a8`);contextvars 注入 + 自指派观察事件实装 |
 
 ## 落地清单
 
@@ -85,9 +85,9 @@ ADR-0183(事件总线框架 SSOT,Proposed,2026-09-03)把 10 篇 ADR(0167/0170/01
 
 ruff / format / mypy: `All checks passed!`(mypy 仅 pre-existing 错,与本 PR 新增文件无关)。
 
-## 后续 PR 触发器
+## 后续 PR 触发器(2026-09-03 已全部落地)
 
-- **PR-7(SinkBackend + Profile 装载 Pipeline)**:本 PR 的 Pipeline dataclass + HookSpec/SinkSpec/ConsumerRule 已就绪,PR-7 只需加 `pipeline_loader.py` 装载段到 Profile
-- **PR-5(record 单一入口)**:本 PR 的 `build_record` 已就绪,PR-5 只需删 `spine_file_sink._build_event_record` + 2 处 `except ValueError`,并让 `spine_chain_sink` / `spine_file_sink` 改调 `build_record`
-- **PR-6(yaml 前缀规则)**:`ConsumerRule` dataclass 已就绪,本 PR 测试已覆盖 `test_consumer_rule_matches_prefix`,PR-6 只需把 yaml 100 处 `subscribers:` 折叠为前缀规则 + 删 `default_subscribers:` 死配置
-- **PR-12(trace_id + 自观察)**:`TraceContextHook` / `MechanismDispatchObserver` stub 已就绪,PR-12 启用 contextvars 注入 + 自指派观察事件
+- **PR-7(SinkBackend + Profile 装载 Pipeline)** 已合(commit `1b8ce7a8`)。`pipeline_loader.py` + `profiles/event-pipeline/web-standard.yaml` 落地态见[附录 C 已实装态](../../contract/2026-09-03-event-bus-pipeline-spec.md) §C.1。
+- **PR-5(record 单一入口)** 已合(commit `ff907239`)。`_build_event_record` 与 2 处 `except ValueError` fallback 已删;`spine_chain_sink` / `spine_file_sink` 改调 `build_record`。
+- **PR-6(yaml 前缀规则)** 已合(commit `f8032be0`)。yaml 100 处 `subscribers:` 折叠为前缀规则 + `default_subscribers:` 死配置清理完成,等价性脚本归档。
+- **PR-12(trace_id + 自观察)** 已合(commit `1b8ce7a8` 集成补漏)。`TraceContextHook` / `MechanismDispatchObserver` 实装,contextvars 注入 + 自指派观察事件启用。
