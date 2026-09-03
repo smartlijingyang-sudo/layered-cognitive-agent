@@ -80,20 +80,20 @@ def test_default_filename_is_spine_jsonl(tmp_path: Path) -> None:
     assert obj["run_id"] == run_id
 
 
-def test_legacy_events_jsonl_still_readable(tmp_path: Path) -> None:
-    """向后兼容:FilesystemJournalStore 仍可 bootstrap 旧 ``events.jsonl``。
+def test_legacy_events_jsonl_no_longer_loaded(tmp_path: Path) -> None:
+    """PR-4 收口:旧 ``events.jsonl`` 文件不再被 bootstrap(不再透明兼容)。
 
-    迁移前 run 目录下只有 ``events.jsonl``,新代码实例化时:
+    run 目录下只有旧 ``events.jsonl`` 时,新 FilesystemJournalStore:
     - 默认 ``self._path`` 指向 ``<run_id>.spine.jsonl``(新写入将落此);
-    - 但构造函数 bootstrap 阶段检测到 ``events.jsonl`` 存在 → 加载旧数据;
-    - 内存中 ``self._events`` 包含旧 ledger 的事件。
+    - bootstrap 不再 fallback 旧 layout → ``self._events`` 为空;
+    - 旧 ledger 数据由 importer 一次性迁移(已迁移完毕),reader 不再透明兜底。
     """
     run_id = "run_legacy_only"
     root = tmp_path / run_id
     legacy = root / "events.jsonl"
     legacy.parent.mkdir(parents=True, exist_ok=True)
 
-    # 预先写一条旧 ledger 数据(events.jsonl)
+    # 预先写一条旧 ledger 数据
     legacy.write_text(
         json.dumps(
             {
@@ -112,11 +112,10 @@ def test_legacy_events_jsonl_still_readable(tmp_path: Path) -> None:
     store = FilesystemJournalStore(root, run_id=run_id)
     # 新默认写入目标 = <run_id>.spine.jsonl
     assert store.path.name == f"{run_id}.spine.jsonl"
-    # 旧 events.jsonl 仍存在(未被迁移破坏)
+    # 旧 events.jsonl 仍存在(未被破坏)
     assert legacy.exists()
-    # 旧 ledger 数据已 bootstrap 进内存
-    assert len(store.events()) == 1
-    assert store.events()[0].event_type == "KernelRunStart"
+    # PR-4 收口:旧 ledger 不再被 bootstrap 进内存
+    assert len(store.events()) == 0
 
     # 后续 append 写到 <run_id>.spine.jsonl(新默认)
     from lca.contracts.models.observability.journal import (

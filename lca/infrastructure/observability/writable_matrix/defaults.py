@@ -207,7 +207,7 @@ class RoutingFileStorage:
     - 默认 ``file_name`` 模板 = ``$run_id.spine.jsonl`` → 实例化为
       ``<run_id>.spine.jsonl``。
     - ``spine_filename=True`` 时等价于新默认。
-    - 显式 ``file_name=LEGACY_FILE_NAME`` 仍生效,获得旧布局(向后兼容)。
+    - PR-4 收口:旧 layout 字面不再被接受,只走 spine 命名。
     """
 
     def __init__(

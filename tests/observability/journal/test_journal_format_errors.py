@@ -87,7 +87,9 @@ def test_version_in_range_passes() -> None:
 
 
 def _write_line(tmp_path: Path, payload: dict) -> Path:
-    path = tmp_path / "events.jsonl"
+    # PR-4 收口:FilesystemJournalStore 只识别 spine 命名;旧 events.jsonl layout 已下线。
+    # default-run + tmp_path 根 → 派生文件名 = default-run.spine.jsonl。
+    path = tmp_path / "default-run.spine.jsonl"
     path.write_text(json.dumps(payload, ensure_ascii=False) + "\n", encoding="utf-8")
     return path
 

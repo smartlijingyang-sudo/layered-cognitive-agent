@@ -425,10 +425,10 @@ def test_diagnose_step_tree_outcome_in_report(tmp_path: Path) -> None:
 
 
 def _write_events_jsonl(run_dir: Path, events: list[dict[str, object]]) -> Path:
-    """写一个最小 events.jsonl 给 H-xref 测试用。"""
+    """写一个最小 spine ledger 给 H-xref 测试用(PR-4 收口后用新命名)。"""
     import json as _json
 
-    p = run_dir / "events.jsonl"
+    p = run_dir / "r1.spine.jsonl"
     p.parent.mkdir(parents=True, exist_ok=True)
     lines = [_json.dumps(e, ensure_ascii=False) for e in events]
     p.write_text("\n".join(lines) + "\n", encoding="utf-8")

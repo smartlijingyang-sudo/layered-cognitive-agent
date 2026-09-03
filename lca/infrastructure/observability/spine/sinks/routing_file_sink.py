@@ -4,12 +4,13 @@
 
 """Run-routing FileSink — boot vs per-run spine.jsonl (ADR-0165.1 layout + PR-27)。
 
-Boot / no-run events → ``boot_path`` (default ``.lca/spine/boot-events.jsonl``)。
+Boot / no-run events → ``boot_path`` (default ``.lca/spine/boot-spine.jsonl``)。
 Events with a real ``run_id`` → ``<runs_root>/<run_id>/<resolved_file_name>``。
 
 ADR-0169 PR-27:``file_name`` 默认 ``$run_id.spine.jsonl`` 模板,在
 :meth:`_sink_for` 实例化时按当前 ``run_id`` 解析为
-``<run_id>.spine.jsonl``。旧字面 :data:`LEGACY_FILE_NAME` 仍可显式传入(向后兼容)。
+``<run_id>.spine.jsonl``。PR-4 收口:不再支持旧单文件 layout 字面
+显式传入(boot 命名空间也迁到 ``boot-spine.jsonl``)。
 """
 
 from __future__ import annotations

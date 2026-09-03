@@ -48,7 +48,7 @@ patch:
   # the production web-standard path.
   - id: spine.sink.file
     config:
-      boot_path: .lca/spine/oii-debug-boot-events.jsonl
+      boot_path: .lca/spine/oii-debug-boot-spine.jsonl
       runs_root: traces/runs
 
   # OII-only source-level attacher overrides(migrated from the legacy

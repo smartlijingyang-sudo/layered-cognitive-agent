@@ -166,25 +166,19 @@ def register(app: typer.Typer) -> None:
 
 
 def _read_events_jsonl(run_id: str, traces_root: Path) -> list[EventRecord]:
-    """Read spine events file into ``EventRecord`` instances for derivers(PR-27)。
+    """Read spine ledger into ``EventRecord`` instances for derivers (PR-27 / PR-4)。
 
-    优先 ``<run_id>.spine.jsonl``(ADR-0169 PR-27 L10 默认);若不存在,回退
-    :data:`LEGACY_FILE_NAME`(旧 layout 向后兼容)。Returns empty list if neither exists。
-    Per-line parse errors are skipped(best-effort; trajectory page degrades gracefully)。
+    ADR-0169 PR-27 L10 + PR-4 收口:唯一 ``<run_id>.spine.jsonl``;缺失返回
+    空 list。Per-line parse errors are skipped(best-effort; trajectory page
+    degrades gracefully)。
     """
     from lca.infrastructure.observability.spine.sinks.naming import (
-        LEGACY_FILE_NAME,
         spine_filename_for_run,
     )
 
     run_dir = traces_root / "runs" / run_id
     spine_path = run_dir / spine_filename_for_run(run_id)
-    legacy_path = run_dir / LEGACY_FILE_NAME
-    events_path: Path | None = None
-    if spine_path.exists():
-        events_path = spine_path
-    elif legacy_path.exists():
-        events_path = legacy_path
+    events_path: Path | None = spine_path if spine_path.exists() else None
     if events_path is None:
         return []
     out: list[EventRecord] = []

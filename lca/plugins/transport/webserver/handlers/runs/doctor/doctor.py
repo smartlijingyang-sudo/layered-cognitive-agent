@@ -4,7 +4,7 @@
     - ``journal.json`` (step-tree) → ``diagnose_step_tree``
     - Session Spine 路径 → ``diagnose_session_projection``(沿用)
 
-新 boot 只产 ``<run_id>.spine.jsonl`` (spine SSOT) + ``journal.json`` (step-tree
+新 boot 只产 spine ledger (SSOT) + ``journal.json`` (step-tree
 materialization)。 ``journal.jsonl`` / ``journal.raw.jsonl`` 旧流式路径已
 彻底移除;doctor 不再保留 legacy fallback,非 step-tree 路径直接报错。
 
@@ -44,11 +44,11 @@ def diagnose(
 
     路由规则:
       - ``.json`` → ``diagnose_step_tree``(完整 step-tree 检查)。
-      - ``.jsonl`` → spine SSOT(``<run_id>.spine.jsonl``)兜底:journal.json 缺失,
+      - ``.jsonl`` → spine ledger(SSOT)兜底:journal.json 缺失,
         doctor 报告一个 H1=False 的最小诊断,不再回退到 legacy v2 hops。
 
     旧 ``journal.jsonl`` 流式布局已下线:该后缀只允许指向当前 boot 产出的
-    ``<run_id>.spine.jsonl``(spine SSOT),不接受历史 journal.jsonl 流。
+    spine ledger(SSOT),不接受历史 journal.jsonl 流。
     """
     del session  # step-tree 路径不需要 live session;保留签名以避免调用方改动
     if journal_path.suffix == ".json":
@@ -56,7 +56,7 @@ def diagnose(
     if journal_path.suffix == ".jsonl":
         return _diagnose_spine_only(journal_path, mode=mode)
     raise ValueError(
-        f"doctor.diagnose expects journal.json (step-tree) or <run_id>.spine.jsonl (spine SSOT), "
+        f"doctor.diagnose expects journal.json (step-tree) or spine ledger, "
         f"got suffix {journal_path.suffix!r}: {journal_path}"
     )
 
@@ -69,16 +69,16 @@ def _diagnose_spine_only(
     """Step-tree materialization 缺失时的最小诊断。
 
     仅提供:
-      - H1: journal.json 是否缺失 + spine ``<run_id>.spine.jsonl`` 状态
+      - H1: journal.json 是否缺失 + spine ledger 状态
       - 其他 hop: ok=None "not evaluated" (无 step-tree,无法诊断)
 
     不复用 legacy v2 hops; 不解析 spine 内容(留给后续 spine-only 工具)。
     """
     run_id = spine_path.parent.name
     detail = (
-        f"step-tree journal.json missing; spine <run_id>.spine.jsonl present at {spine_path}"
+        f"step-tree journal.json missing; spine ledger present at {spine_path}"
         if spine_path.exists()
-        else f"journal materialization missing: spine <run_id>.spine.jsonl not found at {spine_path}"
+        else f"journal materialization missing: spine ledger not found at {spine_path}"
     )
     return DoctorReport(
         schema="doctor.v3",

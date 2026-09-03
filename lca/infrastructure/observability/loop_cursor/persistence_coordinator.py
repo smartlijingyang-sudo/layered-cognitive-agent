@@ -88,7 +88,7 @@ class PersistenceCoordinator(Protocol):
         Iterator[EventRecord]
             按 seq 升序的事件迭代器;空迭代器表示无可回放事件。
         """
-        _ = from_seq  # noqa: F841 — part of the public Protocol surface
+        _ = from_seq
         ...
 
     def stats(self) -> PersistenceStats:
@@ -114,7 +114,7 @@ class NullPersistenceCoordinator:
 
     def restore(self, from_seq: int) -> Iterator[EventRecord]:
         """返回空迭代器。"""
-        _ = from_seq  # noqa: F841 — null-coordinator ignores the input
+        _ = from_seq
         return iter(())
 
     def stats(self) -> PersistenceStats:
@@ -196,7 +196,7 @@ class FilePersistenceCoordinator:
             implemented. ADR-0169 PR-15 will replace this with a
             real ``EventRecord`` reader.
         """
-        _ = from_seq  # noqa: F841 — referenced for documentation only
+        _ = from_seq
         raise PersistenceRestoreUnavailableError(
             "FilePersistenceCoordinator.restore is not implemented; "
             "checkpoint replay is delivered by ADR-0169 PR-15."

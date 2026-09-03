@@ -3,7 +3,7 @@
 删除说明
 --------
 ADR-0167 D11 / PR-3 删除了 ``StepLifecycleStore`` 双写桥(原
-``lca.runtime.step_lifecycle``); spine ``<run_id>.spine.jsonl`` 是 SSOT, 业务层
+``lca.runtime.step_lifecycle``); spine ledger 是 SSOT, 业务层
 唯一入口是 :class:`StepCoordinator` (Protocol + registry 解引用)。
 本模块负责在 run 创建期构造一个最小、最窄形态的 coordinator。
 
@@ -58,7 +58,7 @@ def build_step_coordinator(
     """造一个已 ``bind_run`` 的 coordinator。最窄形态,所有字段由调用方决定。
 
     返回的 coordinator 已绑定 run, 可以直接调 ``begin_step`` /
-    ``record_*`` / ``end_step``。 spine ``<run_id>.spine.jsonl`` 落盘由
+    ``record_*`` / ``end_step``。 spine ledger 落盘由
     :class:`RoutingFileSink` (registry 中 storage face) 负责。
     journal.json 落盘由 :class:`StepTreeAccumulatorDeriver`
     (subscribed to spine) 负责。

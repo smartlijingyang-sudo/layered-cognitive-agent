@@ -26,7 +26,7 @@ _KERNEL_SERVE_REFUSAL_CODES = {
     "legacy_process_journal_unavailable": (
         "Session Spine 已不再暴露全局 /journal/live；请改用下列任一路径查看 journal 事实：",
         [
-            "./scripts/lca-ops journal logs           # tail 最新 run 的 <run_id>.spine.jsonl",
+            "./scripts/lca-ops journal logs           # tail 最新 run 的 spine ledger",
             "./scripts/lca-ops journal logs --replay <run_id>  # 离线回放",
             "tail -f traces/runs/$(ls -t traces/runs | head -1)/<run_id>.spine.jsonl",
         ],
@@ -71,7 +71,7 @@ def register(app: typer.Typer, group: typer.Typer | None = None) -> None:
         ),
         config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
     ) -> None:
-        """事实流。默认 follow 最新 run 的 spine SSOT(<run_id>.spine.jsonl),不是 kernel_serve.log。"""
+        """事实流。默认 follow 最新 run 的 spine SSOT,不是 kernel_serve.log。"""
         ops_config = OpsConfig.load(config)
         if target in {"", "journal", "kernel_serve"}:
             _follow_spine_ssot(replay=replay, verbose=verbose)
@@ -108,23 +108,19 @@ def _find_latest_run_dir() -> Path | None:
     return Path("traces/runs") / run_id
 
 
-def _events_jsonl_for(run_dir: Path) -> Path | None:
-    """Return spine events file under a run directory if present (PR-27)。
+def _spine_path_for(run_dir: Path) -> Path | None:
+    """Return spine ledger path under a run directory if present (PR-27 / PR-4)。
 
-    ADR-0169 PR-27 L10:默认 ``<run_id>.spine.jsonl``;为向后兼容,旧
-    :data:`LEGACY_FILE_NAME` 也被接受,优先返回 spine 命名。
+    ADR-0169 PR-27 L10 + PR-4 收口:唯一 ``<run_id>.spine.jsonl``;旧
+    命名已退役,不再接受兜底。
     """
     from lca.infrastructure.observability.spine.sinks.naming import (
-        LEGACY_FILE_NAME,
         spine_filename_for_run,
     )
 
     spine = run_dir / spine_filename_for_run(run_dir.name)
     if spine.exists():
         return spine
-    legacy = run_dir / LEGACY_FILE_NAME
-    if legacy.exists():
-        return legacy
     return None
 
 
@@ -236,7 +232,7 @@ def _tail_events_jsonl(path: Path, *, verbose: bool, run_dir: Path | None = None
         except FileNotFoundError:
             # Run rotated out — try to recover.
             new_dir = _find_latest_run_dir()
-            new_path = _events_jsonl_for(new_dir) if new_dir else None
+            new_path = _spine_path_for(new_dir) if new_dir else None
             if new_path is None or not new_path.exists():
                 _time.sleep(1.0)
                 continue
@@ -271,7 +267,7 @@ def _follow_spine_ssot(*, replay: str, verbose: bool) -> None:
     """
     if replay:
         run_dir = Path("traces/runs") / replay
-        path = _events_jsonl_for(run_dir)
+        path = _spine_path_for(run_dir)
         if path is None:
             print(f"No spine ledger under {run_dir}")
             raise typer.Exit(1)
@@ -282,7 +278,7 @@ def _follow_spine_ssot(*, replay: str, verbose: bool) -> None:
     if latest is None:
         print("No runs under traces/runs/. Start a run first.")
         raise typer.Exit(1)
-    path = _events_jsonl_for(latest)
+    path = _spine_path_for(latest)
     if path is None:
         print(f"No spine ledger under {latest}")
         raise typer.Exit(1)

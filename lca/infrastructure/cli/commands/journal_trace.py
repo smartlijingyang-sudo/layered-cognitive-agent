@@ -1,7 +1,7 @@
 """Journal trace — print one event per line, optionally with I17 source columns.
 
 Task 9.3: ``./scripts/lca-ops journal trace [run_id] [--locals] [--source]``
-reads the append-only spine ledger written by the spine ``FileSink``
+reads the append-only ``<run_id>.spine.jsonl`` written by the spine ``FileSink``
 and prints a human-readable table. ``run_id`` is optional: when omitted
 the command picks the latest run via ``traces/latest.json`` (pointer
 preferred, mtime-sorted fallback). The default view shows ``seq /
@@ -102,7 +102,7 @@ class TraceRow:
 
 
 def _iter_events(events_path: Path) -> Iterator[dict[str, Any]]:
-    """Yield one decoded record per line of the spine ledger.
+    """Yield one decoded record per line of spine ledger.
 
     Blank lines are silently skipped (no count). JSON decode failures
     yield a sentinel ``{"__decode_error__": True}`` so the caller can
@@ -1015,10 +1015,10 @@ def _render_transport_pair(
 
 
 def _resolve_events_path(traces_root: Path, run_id: str) -> Path:
-    """Resolve spine events file under ``<run_dir>`` or surface a friendly error(PR-27)。
+    """Resolve spine ledger under ``<run_dir>`` or surface a friendly error (PR-27 / PR-4)。
 
-    ADR-0169 PR-27 L10:默认 ``<run_id>.spine.jsonl``;若不存在回退到
-    :data:`LEGACY_FILE_NAME`(向后兼容)。两者都不存在时给出友好错误。
+    ADR-0169 PR-27 L10 + PR-4:唯一 ``<run_id>.spine.jsonl``;不存在时给
+    出友好错误,不再回退到旧文件名。
     """
     locator = FilesystemRunLocator(traces_root)
     run_dir = locator.run_dir(run_id)
@@ -1029,10 +1029,9 @@ def _resolve_events_path(traces_root: Path, run_id: str) -> Path:
     spine_path = locator.events_path(run_id)
     if spine_path.exists():
         return spine_path
-    # locator.events_path 已包含 legacy 兜底,若仍不存在则提示
     print(
-        f"spine events file not found: {spine_path}\n"
-        f"  hint: spine FileSink 尚未写入 events,或 run {run_id} 不在 PR-9 之后",
+        f"spine ledger not found: {spine_path}\n"
+        f"  hint: spine FileSink 尚未写入,或 run {run_id} 不存在",
         file=sys.stderr,
     )
     raise SystemExit(1)
@@ -1178,7 +1177,7 @@ def register(app: typer.Typer) -> None:
         sys.stdout.write("\n")
         sys.stdout.write(
             f"\n── trace done: {len(rows)}/{total} events rendered, "
-            f"{skipped} skipped (spine={events_path}) ──\n"
+            f"{skipped} skipped (spine_ledger={events_path}) ──\n"
         )
 
 

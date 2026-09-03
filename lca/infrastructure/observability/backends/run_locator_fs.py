@@ -27,7 +27,6 @@ from typing import Any
 
 from lca.contracts.observability.run_locator import RunLocator
 from lca.infrastructure.observability.spine.sinks.naming import (
-    LEGACY_FILE_NAME,
     spine_filename_for_run,
 )
 
@@ -56,18 +55,10 @@ class FilesystemRunLocator(RunLocator):
     def events_path(self, run_id: str) -> Path:
         """SSOT 事件流路径(ADR-0165.1 / ADR-0167 D11 / ADR-0169 PR-27 L10)。
 
-        默认 ``<run_id>.spine.jsonl``(L10 单写);若该文件不存在但
-        :data:`LEGACY_FILE_NAME` 存在(legacy layout,迁移前 run),返回
-        :data:`LEGACY_FILE_NAME` 让 reader 仍可读到旧数据。
+        PR-4 收口:只返回 spine 命名 ``<run_id>.spine.jsonl``,不再向旧
+        layout 兜底;旧 run 的迁移由一次性 importer 完成(已迁移完毕)。
         """
-        run_dir = self.run_dir(run_id)
-        spine_path = run_dir / spine_filename_for_run(run_id)
-        if spine_path.exists():
-            return spine_path
-        legacy_path = run_dir / LEGACY_FILE_NAME
-        if legacy_path.exists():
-            return legacy_path
-        return spine_path
+        return self.run_dir(run_id) / spine_filename_for_run(run_id)
 
     def journal_narrative_path(self, run_id: str) -> Path:
         """Narrative markdown 路径(由 StepNarrativeWriter 写)。"""

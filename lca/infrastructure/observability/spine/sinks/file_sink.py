@@ -131,8 +131,6 @@ class FileSink:
 
     Backward compatibility:
 
-    - ``file_name`` set to the pre-PR-27 legacy per-run ledger name still resolves
-  to the legacy layout (see :data:`lca.infrastructure.observability.spine.sinks.naming.LEGACY_FILE_NAME`).
     - ``spine_filename=True`` is the default; passing it is a no-op.
     - Disable the exception index for legacy test fixtures that don't want
       the extra file.

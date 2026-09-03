@@ -41,8 +41,8 @@ patch:
       load_dotenv: true
 
   # EventSpine file sink — boot events process-local; run events under
-  # traces/runs/<run_id>/events.jsonl (ADR-0165.1 layout).
+  # traces/runs/<run_id>/<run_id>.spine.jsonl (ADR-0165.1 layout / PR-27 L10 / PR-4).
   - id: spine.sink.file
     config:
-      boot_path: .lca/spine/boot-events.jsonl
+      boot_path: .lca/spine/boot-spine.jsonl
       runs_root: traces/runs

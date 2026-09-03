@@ -61,18 +61,14 @@ def _resolve_journal_artifact(
         primary = nested / "journal.json"
         if primary.exists():
             return primary
-        # ADR-0169 PR-27 L10:默认 <run_id>.spine.jsonl;LEGACY_FILE_NAME 向后兼容
+        # ADR-0169 PR-27 L10 + PR-4:默认 <run_id>.spine.jsonl 唯一 SSOT
         from lca.infrastructure.observability.spine.sinks.naming import (
-            LEGACY_FILE_NAME,
             spine_filename_for_run,
         )
 
         spine = nested / spine_filename_for_run(trace_id)
         if spine.exists():
             return spine
-        ssot = nested / LEGACY_FILE_NAME
-        if ssot.exists():
-            return ssot
     return None
 
 
@@ -82,7 +78,7 @@ def resolve_journal_path(jsonl: Path | None, run_id: str | None) -> Path:
     if resolved is not None:
         return resolved
     typer.echo(
-        "No journal file found (tried --journal, traces/runs/<id>/journal.json, <run_id>.spine.jsonl)"
+        "No journal file found (tried --journal, traces/runs/<id>/journal.json, spine ledger)"
     )
     raise typer.Exit(1)
 

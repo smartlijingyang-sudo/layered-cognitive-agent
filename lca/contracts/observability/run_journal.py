@@ -93,7 +93,7 @@ class RunJournalFactory(Protocol):
         """Create the live tail for one run.
 
         参数:
-            spine_path:    落盘 spine 事件流路径(<run_id>.spine.jsonl;由 RunLocator 决定)
+            spine_path:    落盘 spine 事件流路径(``<run_id>.spine.jsonl``;由 RunLocator 决定)
         """
         ...
 

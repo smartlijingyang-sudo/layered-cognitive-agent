@@ -58,7 +58,7 @@ def _make_rec(**overrides: Any) -> EventRecord:
 def test_file_setup_provides_routing_sink(tmp_path: Path) -> None:
     """``spine.sink.file`` setup MUST provide a ``RunRoutingFileSink``."""
     ctx = _StubPluginContext()
-    boot = tmp_path / "spine" / "boot-events.jsonl"
+    boot = tmp_path / "spine" / "boot-spine.jsonl"
     runs = tmp_path / "traces" / "runs"
     asyncio.run(
         file_setup.setup(
@@ -81,7 +81,7 @@ def test_file_sink_plugin_routes_run_events(tmp_path: Path) -> None:
     实例化为 ``<run_id>.spine.jsonl``。
     """
     ctx = _StubPluginContext()
-    boot = tmp_path / "boot-events.jsonl"
+    boot = tmp_path / "boot-spine.jsonl"
     runs = tmp_path / "runs"
     asyncio.run(
         file_setup.setup(
@@ -101,13 +101,13 @@ def test_file_sink_plugin_routes_run_events(tmp_path: Path) -> None:
     assert obj["run_id"] == "run_r1"
 
 
-def test_legacy_path_config_maps_to_boot_events(tmp_path: Path) -> None:
-    """Legacy ``path: .../events.jsonl`` MUST map to boot-events.jsonl."""
+def test_legacy_path_config_maps_to_boot_spine(tmp_path: Path) -> None:
+    """Legacy ``path: .../events.jsonl`` MUST map to boot-spine.jsonl (PR-4 收口)。"""
     ctx = _StubPluginContext()
     legacy = tmp_path / "spine" / "events.jsonl"
     asyncio.run(file_setup.setup(ctx, {"path": str(legacy)}))
     sink: RunRoutingFileSink = ctx.provided["file_sink"]
-    assert sink.boot_path.name == "boot-events.jsonl"
+    assert sink.boot_path.name == "boot-spine.jsonl"
     sink.close()
 
 

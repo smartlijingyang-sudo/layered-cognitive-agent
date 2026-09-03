@@ -164,9 +164,9 @@ def _doctor_journal_path(session: RunSession, locator: RunLocator) -> Path:
     step_path = locator.journal_step_path(session.run_id)
     if step_path.exists():
         return step_path
-    events_path = locator.events_path(session.run_id)
-    if events_path.exists():
-        return events_path
+    spine_path = locator.events_path(session.run_id)
+    if spine_path.exists():
+        return spine_path
     return session.spine_path
 
 

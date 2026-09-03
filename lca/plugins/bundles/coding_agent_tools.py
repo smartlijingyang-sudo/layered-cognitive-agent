@@ -38,8 +38,8 @@ class Config(BaseModel):
     jsonl_path: str = "traces/lca_journal.jsonl"
     """Inspector 工具默认读取路径(spine events 流)。
 
-    旧 ``traces/lca_journal.jsonl`` 全局 fallback 已下线;``<run_id>.spine.jsonl``
-    是新 boot 的唯一 spine SSOT。 保留配置项以兼容 profile override;
+    旧 ``traces/lca_journal.jsonl`` 全局 fallback 已下线;spine ledger
+    是新 boot 的唯一 SSOT。 保留配置项以兼容 profile override;
     默认值指向全局事件流仍存在的等价位置。
     """
 

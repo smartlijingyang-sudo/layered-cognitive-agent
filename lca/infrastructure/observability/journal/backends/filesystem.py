@@ -7,10 +7,8 @@ ADR-0169 PR-27(L10 / D9):默认 ``DEFAULT_FILENAME`` 改为 ``$run_id.spine.json
 模板,通过 ``run_id`` 推导 / 占位符替换得到 ``<run_id>.spine.jsonl``。
 ``run_id`` 默认 = ``root`` 目录 basename(单 run 实例目录约定)。
 
-向后兼容:
-- 显式传入 ``filename=LEGACY_FILE_NAME`` 时仍生效,获得旧布局。
-- :meth:`_load_existing` 同时尝试 :data:`LEGACY_FILE_NAME` 兜底,让旧的 ledger 文件仍
-  可被新代码读到(reader 透明)。
+PR-4 收口:旧 layout 已退役;新 reader / writer 只能识别 spine 命名。
+journal store 的 bootstrap 只看新 spine 路径。
 
 特性:
 - 每次 ``append`` 走"写 staging + fsync + atomic rename"协议,崩溃时不破坏
@@ -54,7 +52,6 @@ class FilesystemJournalStore(JournalStoreBackend):
         fsync_each_append: bool = True,
     ) -> None:
         from lca.infrastructure.observability.spine.sinks.naming import (
-            LEGACY_DEFAULT_NAME,
             resolve_filename,
         )
 
@@ -67,15 +64,9 @@ class FilesystemJournalStore(JournalStoreBackend):
         self._path = self._root / resolved
         self._fsync_each_append = fsync_each_append
         self._events: list[StampedEvent] = []
-        # bootstrap:优先 spine;若 spine 不存在但 legacy ledger 存在,
-        # 从 legacy ledger 加载历史(不切换写入路径 — 后续 append 仍落 spine)
+        # bootstrap:仅识别 spine 命名;旧 layout 已下线
         if self._path.exists():
             self._load_existing()
-        else:
-            legacy_path = self._root / LEGACY_DEFAULT_NAME
-            if legacy_path.exists():
-                # 临时 bootstrap legacy 数据(不动 self._path)
-                self._load_existing_at(legacy_path)
 
     @property
     def path(self) -> Path:

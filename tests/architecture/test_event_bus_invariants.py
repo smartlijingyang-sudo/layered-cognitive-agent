@@ -323,9 +323,8 @@ class TestIFwSsot1:
     def test_i_fw_ssot_1_no_legacy_events_jsonl_reader_in_production(self) -> None:
         """I-FW-SSOT-1:events.jsonl legacy reader 必须迁到 SpineReader。
 
-        当前债务:生产路径 ~20 处硬编码 events.jsonl(在 lca/contracts/、
-        lca/plugins/、lca/runtime/ 等)。本测试标 xfail 说明债务范围,
-        待 PR-4 后续 sweep 收口。
+        PR-4 收口后:本测试 strict 守护,任何生产 / 配置路径出现
+        ``events.jsonl`` 字面立即 fail(I-FW-SSOT-1 reader SSOT)。
         """
         search_roots = [
             _REPO_ROOT / "lca",
@@ -341,11 +340,10 @@ class TestIFwSsot1:
                 if _is_excluded(line, self._DOC_ALLOW_SUBSTRINGS):
                     continue
                 all_matches.append(line)
-        if all_matches:
-            pytest.xfail(
-                f"PR-4 收口债:events.jsonl legacy reader 仍 {len(all_matches)} 处"
-                f"(非 SSOT 路径);等 follow-up sweep 收口后改 strict"
-            )
+        assert not all_matches, (
+            "I-FW-SSOT-1 违规:events.jsonl legacy reader 仍在生产路径\n"
+            + "\n".join(all_matches[:5])
+        )
 
     def test_i_fw_ssot_1_spine_jsonl_writer_is_single(self) -> None:
         """lca_kernel/events/sinks/ 唯一写 .write( = spine_sink。"""

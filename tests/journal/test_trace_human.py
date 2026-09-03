@@ -69,11 +69,12 @@ def _record(
 
 
 def _write_jsonl(run_dir: Path, records: list[EventRecord]) -> Path:
-    sink = FileSink(run_dir, run_id="run_human", file_name="events.jsonl")
+    # PR-4 收口:FileSink 默认 spine 命名 = <run_id>.spine.jsonl;旧 events.jsonl layout 已下线。
+    sink = FileSink(run_dir, run_id="run_human")
     for r in records:
         sink.write(r)
     sink.close()
-    return run_dir / "events.jsonl"
+    return run_dir / "run_human.spine.jsonl"
 
 
 @pytest.fixture
