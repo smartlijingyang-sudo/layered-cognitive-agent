@@ -8,6 +8,9 @@
 - PR-5:``_build_event_record`` 旧入口残留(目标 0)+ ``build_record`` 新入口
 - EventBus 骨架模块 / Pipeline 装载点 / 鉴权矩阵 yaml 存在性
 
+12 PR 落地态见 docs/adr/0183 §5.2 与 docs/notes/implemented/runbook/2026-09-03-event-bus-pr-matrix.md §B.1。
+PR 全部合入但部分 grep 仍未归零(详见附录 B §B.2 验收行)。
+
 风格参考 ``scripts/audit_adr_health.py``:纯标准库,人类可读表格 + ``--json``。
 用法::
 
@@ -201,7 +204,7 @@ def render_table(results: list[CheckResult]) -> str:
     lines += [
         "",
         "目标态:events.jsonl legacy = 0;RunStatus 类 = 1;_build_event_record = 0。",
-        "本脚本只读;状态为迁移进度提示,不是门禁。",
+        "本脚本只读;状态为迁移进度提示,不是门禁。12 PR 落地态由 commit hash 见 docs/adr/0183 §5.2 与附录 B §B.1。",
     ]
     return "\n".join(lines)
 

@@ -1,46 +1,40 @@
 # Agent Note: ADR-0183 附录 C — Pipeline YAML 规范与 4 hook 默认实现契约
 
-Status: proposed
+Status: implemented(2026-09-03)
 
 ## Problem
 
-ADR-0183 §3.2(4 个 hook Protocol)、§3.3(Pipeline YAML 示例)、§3.4(SinkBackend 协议)是 Profile 作者与 plugin 作者的契约面。ADR 示例中的类路径、字段结构与实际代码存在未落地间隙,直接照抄会装不上。本附录把三段契约落成 contract note:完整 YAML 示例、Protocol 签名、默认实现清单逐项对照 PR-1~PR-4 已落地的代码,类路径以实际模块为准,未落地项显式标注决策点。
+ADR-0183 §3.2(4 个 hook Protocol)、§3.3(Pipeline YAML 示例)、§3.4(SinkBackend 协议)是 Profile 作者与 plugin 作者的契约面。ADR 示例中的类路径、字段结构与实际代码存在未落地间隙,直接照抄会装不上。本附录把三段契约落成 contract note:完整 YAML 示例、Protocol 签名、默认实现清单逐项对照 PR-1~PR-7 已落地的代码,类路径以实际模块为准,未落地项显式标注决策点;PR-7 合入后本附录转实施态,C.1 实际 YAML 路径以 `profiles/event-pipeline/web-standard.yaml` 为准(`lca_kernel/events/config/observability/spine.yaml` 仅承载 category 注册表,与 Pipeline 装载无关)。
 
 类路径基线(2026-09-03 实测):
 
-- **已落地**:`lca_kernel/events/{bus,hooks,pipeline,registry,reader,spine_runtime,payloads,payloads_spine,errors}.py`、`lca_kernel/events/sinks/{__init__,spine_sink}.py`
-- **ADR 给出路径但未落地**:`lca.plugins.observability.hooks.ModelVisibleHook`、`lca.plugins.observability.exporters.langfuse.LangfuseExporterHook`、`lca.plugins.events.sinks.remote_replicator.RemoteReplicatorSink`、`lca/harness/profile/pipeline_loader.py`(决策点均见各表)
+- **已落地**:`lca_kernel/events/{bus,hooks,pipeline,registry,reader,spine_runtime,payloads,payloads_spine,errors}.py`、`lca_kernel/events/sinks/{__init__,spine_sink}.py`、`lca/harness/profile/pipeline_loader.py`、`profiles/event-pipeline/web-standard.yaml`
+- **ADR 给出路径但未落地**:`lca.plugins.observability.hooks.ModelVisibleHook`、`lca.plugins.observability.exporters.langfuse.LangfuseExporterHook`、`lca.plugins.events.sinks.remote_replicator.RemoteReplicatorSink`(决策点均见各表)
 
 ## Decision
 
-### C.1 Pipeline YAML 目标形态(ADR §3.3 完整示例)
+### C.1 Pipeline YAML 落地形态(`profiles/event-pipeline/web-standard.yaml`,2026-09-03 实测)
+
+PR-7 合入后,`profiles/event-pipeline/web-standard.yaml` 落地态是精简版(4 hooks + 1 sink + 1 兜底 consumer_rules + options),不是 ADR §3.3 给出的 6 hooks + 2 sinks + 8 路由规则的完整示例。完整示例的扩张点仍记录在本附录 C.1.1(待 PR-N 落地)。
 
 ```yaml
-# profiles/event-pipeline/web-standard.yaml
+# profiles/event-pipeline/web-standard.yaml(实际落地态,2026-09-03)
 pipeline:
   name: web-standard-event-pipeline
   version: 1
 
-  # ====== A. hooks(自定义逻辑) ======
   hooks:
     - id: trace-context-injection
       hook: lca_kernel.events.hooks.TraceContextHook
       stage: pre_dispatch
       config:
-        trace_id_source: contextvars
+        trace_id_source: contextvars   # PR-12 启用;当前 stub 原样透传
 
     - id: payload-schema-validation
       hook: lca_kernel.events.hooks.PayloadSchemaHook
       stage: pre_dispatch
       config:
         fail_fast_on_missing_field: true
-
-    - id: model-visible-capture
-      hook: lca.plugins.observability.hooks.ModelVisibleHook
-      stage: pre_dispatch
-      config:
-        capture_prompts: true
-        capture_categories: ["spine.llm.", "spine.cognition."]
 
     - id: mechanism-self-observation
       hook: lca_kernel.events.hooks.MechanismDispatchObserver
@@ -53,21 +47,11 @@ pipeline:
       hook: lca_kernel.events.hooks.DefaultFailureHook
       stage: on_failure
       config:
-        emit_event: event.bus.dispatch.consumers.end
         swallow: true
 
-    - id: langfuse-exporter
-      hook: lca.plugins.observability.exporters.langfuse.LangfuseExporterHook
-      stage: post_dispatch
-      config:
-        host: "${from_env: LANGFUSE_HOST}"
-        public_key: "${from_env: LANGFUSE_PUBLIC_KEY}"
-        secret_key: "${from_env: LANGFUSE_SECRET_KEY}"
-
-  # ====== B. sinks(落盘后端) ======
   sinks:
     - id: spine-fact-chain
-      backend: lca_kernel.events.sinks.SpineSink
+      backend: lca_kernel.events.sinks.spine_sink.SpineSink
       failure: fail_fast
       config:
         path_template: "{run_id}.spine.jsonl"
@@ -76,63 +60,23 @@ pipeline:
         fsync_interval_ms: 50
         checksum_on_open: true
 
-    - id: spine-remote-mirror         # 可选:派生链镜像
-      backend: lca.plugins.events.sinks.remote_replicator.RemoteReplicatorSink
-      failure: contained
-      config:
-        target: "kafka://lca.spine.events"
-        depends_on: spine-fact-chain    # fact chain 成功后才走
-        compression: zstd
-
-  # ====== C. consumer rules(路由) ======
   consumer_rules:
-    # 认知平面:contain 失败语义,允许部分派生失败
-    - prefix: "spine.cognition."
-      consumers:
-        - plugin: lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-          failure: contained
-
-    # 模型可见事实:必须落盘(fail_fast)
-    - prefix: "spine.llm."
-      consumers:
-        - plugin: lca.plugins.events.subscribers.model_visible_writer.subscriber.ModelVisibleWriter
-          failure: fail_fast
-
-    # 异常事实:必须 fail_fast 落盘
-    - prefix: "spine.exception."
-      consumers:
-        - plugin: lca.plugins.events.subscribers.exception_index_writer.subscriber.ExceptionIndexWriter
-          failure: fail_fast
-
-    # 派生 phase 事实:contain 即可
-    - prefix: "spine.phase."
-      consumers:
-        - plugin: lca.plugins.events.subscribers.spine_step_tree_accumulator.subscriber.SpineStepTreeAccumulator
-          failure: contained
-
-    # writable matrix:fail_fast,关键事实
-    - prefix: "spine.writable."
-      consumers:
-        - plugin: lca.plugins.events.subscribers.writable_persist.subscriber.WritablePersist
-          failure: fail_fast
-
-    # 通用兜底:所有 spine.* 落 spine-fact-chain
     - prefix: "spine."
-      consumers:
-        - plugin: lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-          failure: fail_fast
+      plugins:
+        - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
+      failure: fail_fast
 
-    # 团队委派业务
-    - prefix: "team."
-      consumers:
-        - plugin: lca.plugins.events.subscribers.team_bus.subscriber.TeamBus
-          failure: contained
-
-    # 框架自观察事件:I-FW-BUS-4 守护,业务不订阅
-    # (默认空 list;架构测试断言 event.bus.dispatch.* 不在 consumer_rules 内)
+  options:
+    trace_id_source: contextvars
+    self_observation: false            # PR-12 启用 MechanismDispatchObserver 实装
+    schema_validation: strict
 ```
 
-示例中的类路径状态:已落地与未落地逐项见 C.4 / C.5;骨架解析器对示例结构的支持边界见 C.2。`spine.llm.` / `spine.exception.` / `spine.writable.` 的 fail_fast 归属与[附录 A](../seam/2026-09-03-event-bus-101-mapping.md) §A.4 一致。
+### C.1.1 ADR §3.3 完整示例(设计期样例,未装载)
+
+ADR §3.3 给出的 6 hooks(含 `ModelVisibleHook` / `LangfuseExporterHook`) + 2 sinks(含 `RemoteReplicatorSink`) + 8 路由规则(含 `spine.llm.` / `spine.exception.` / `spine.writable.` 等细前缀)在本批次未实装,作为 PR-N 扩张点留底;装载侧一旦实装,本附录 C.1.1 同步更新为新落地态。
+
+示例中的类路径状态:已落地与未落地逐项见 C.4 / C.5;骨架解析器对示例结构的支持边界见 C.2。`spine.llm.` / `spine.exception.` / `spine.writable.` 的 fail_fast 归属与[附录 A](../../implemented/seam/2026-09-03-event-bus-101-mapping.md) §A.4 一致。
 
 ### C.2 骨架解析器边界(`lca_kernel/events/pipeline.py`,PR-2 落地)
 
@@ -229,11 +173,13 @@ class SinkBackend(Protocol):
 
 读取入口 `lca_kernel/events.reader.SpineReader(run_id, *, path=None)`:`events()` 全量迭代、`filter(category_prefix=...)` 前缀过滤(I-FW-SSOT-1 唯一读盘者)。
 
-### C.6 装配流程
+### C.6 装配流程(2026-09-03 落地态)
 
-`parse_pipeline_yaml(path)` → Profile 启动时调 `EventBus.register_pipeline(pipeline)`(`lca_kernel/events/bus.py`)一次,装载后不可热替换。
+`lca/harness/profile/pipeline_loader.py` 在 Profile 启动时按约定路径(`<profile 目录>/event-pipeline/<profile stem>.yaml`)或内联 `pipeline:` 段发现 YAML,构造 `Pipeline` 后调 `EventBus.default().register_pipeline(pipeline)` 一次;装载后不可热替换(YAGNI)。
 
-骨架 `register_pipeline` 只装载 hooks 段:按 `stage` 分桶到 `_pre_hooks` / `_post_hooks` / `_failure_hooks`,以 `before_publish` / `after_dispatch` / `on_consumer_failure` 的 hasattr duck-type 判别;实例化为零参 `spec.hook()`,`HookSpec.config` 已解析但实例化不传参——config 传参与 sinks / consumer_rules 段的装载决策点 = PR-7。
+`register_pipeline` 只装载 hooks 段:按 `stage` 分桶到 `_pre_hooks` / `_post_hooks` / `_failure_hooks`,以 `before_publish` / `after_dispatch` / `on_consumer_failure` 的 hasattr duck-type 判别;实例化为零参 `spec.hook()`,`HookSpec.config` 已解析但实例化不传参。sink 装载走 `apply_pipeline` 调 `bus.mount_sink`(分离设计见骨架 note 的 `register_pipeline 与 sink 装载分离`);consumer_rules 装载走 `apply_pipeline` 调 `bus.subscribe(*, plugin, category, on_event, failure=...)`。
+
+`scripts/lca-ops inspect-pipeline <profile>`(PR-7 实装)输出 4 段:hooks / sinks / consumer_rules / options。
 
 ### C.7 相关不变量
 
@@ -252,9 +198,10 @@ class SinkBackend(Protocol):
 
 ## Acceptance criteria
 
-- PR-7 合并后:`parse_pipeline_yaml` 解析 C.1 完整示例(含 per-consumer failure、options、`${from_env}`),`lca-ops inspect-pipeline web-standard` 输出与 C.1 结构一致
-- 本附录标"已落地"的类路径全部可 import;标"未落地"的类路径在实现 PR 内同 PR 更新本附录
-- `hooks.py` / `sinks/` 的契约变化(签名、构造参数、失败语义)必须同改本附录与对应测试
+- ✅ `parse_pipeline_yaml` 解析 C.1 落地态 YAML(4 hooks + 1 sink + 1 兜底 consumer_rules + options);`lca-ops inspect-pipeline web-standard` 输出 4 段(commit `1b8ce7a8`)
+- ⏳ per-consumer failure 字段、`${from_env}` 占位符、6 hooks / 2 sinks / 8 路由规则的 ADR §3.3 完整示例:本附录 C.1.1 留底,PR-N 扩张点
+- ✅ 本附录标"已落地"的类路径全部可 import;标"未落地"的类路径在实现 PR 内同 PR 更新本附录
+- ✅ `hooks.py` / `sinks/` 的契约变化(签名、构造参数、失败语义)必须同改本附录与对应测试
 
 ## Risks
 
@@ -264,5 +211,5 @@ class SinkBackend(Protocol):
 
 ## delete-when
 
-- 12 PR 全部合并、C.1 示例可被完整装载且 C.2 差距表清空:本附录迁 `implemented/contract/`,按实施后状态改写
+- ADR-0183 Status 升 Accepted、C.1.1 完整示例实装且与 C.1 落地态合并:本附录转 `archived/`
 - Pipeline 契约被代码 docstring 与 `lca-ops inspect-pipeline` 输出完整承载后:本附录转 `archived/`

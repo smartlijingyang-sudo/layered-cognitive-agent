@@ -2,7 +2,7 @@
 
 ## 状态
 
-Proposed（2026-09-03 起草）。落地进度：PR-1~4 已落地骨架，PR-5~12 并行落地中（2026-09-03）；附录 A/B/C 见 §10 指向的三个 note 文件。
+Proposed（2026-09-03 起草；2026-09-03 PR-A/B/C/D 已合入 worktree）。本 ADR 的 12 PR 全部落地（§5.2 列出 commit hash），但 Status 升 Accepted 由主控合并全部 4 PR 后统一执行；附录 note 状态见 §10。
 
 ## 0. 决策摘要
 
@@ -12,8 +12,8 @@ Proposed（2026-09-03 起草）。落地进度：PR-1~4 已落地骨架，PR-5~1
 （EventMechanism 框架化）共 10 篇合并为**单 ADR**，吸收为一个新的「事件总线框架
 + 单 SSOT 落盘链 + 声明式编排」。
 
-理由：10 篇 ADR 各自打补丁，已形成循环——每篇 PR 暴露前一篇的隐藏 bug，根因是
-缺少**单点真值 + 单点编排机制**。本 ADR 一次性收敛：
+理由：10 篇 ADR 各自打补丁形成循环——每篇 PR 暴露前一篇的隐藏 bug，根因是缺少
+**单点真值 + 单点编排机制**。本 ADR 一次性收敛：
 
 - 单一事件总线 `EventBus`（机制壳 + 4 个 hook 协议）
 - 单一落盘链 `<run_id>.spine.jsonl`（事实链 SSOT）
@@ -24,22 +24,24 @@ Proposed（2026-09-03 起草）。落地进度：PR-1~4 已落地骨架，PR-5~1
 生产者和消费者可声明自定义 plugin、可插拔，但 **SSOT 不让步**：plugin 不能改总线
 内部、不能改 record 字节布局、不能改状态机 enum。
 
+落地进度：12 PR 见 §5.2(已合入 worktree,见每条 commit hash);附录 A/B/C note 状态见 §10。
+
 ## 1. 背景与现状（事实）
 
-### 1.1 现有 ADR 的执行债
+### 1.1 现有 ADR 状态清单
 
-| ADR | 完成状态 | 隐藏债 |
-|---|---|---|
-| 0167 spine SSOT | Accepted | `events.jsonl` legacy 仍在；FileSink 双 fd |
-| 0170 writable matrix | Accepted | 与 spine chain 并行写,易漂移 |
-| 0172 exporters | Accepted | `span_kind` 占位未实装；两套 trace 并存 |
-| 0175 prompt trace | Accepted | model_visible capture 散在 3 处 |
-| 0176 step-tree deriver | Accepted | deriver 闭包但 reader 路径散乱 |
-| 0177 EnvelopeEmitter | Accepted | Protocol 与 `ExceptionRecord` 类型不一致 |
-| 0178 4 级收敛 | Proposed | L1/L2/L3/L4 全空 |
-| 0180 v2 event-layer pilot | Reverted | 单 sender + typed payload 概念 |
-| 0181 publishers/subscribers | Accepted | 22 个 manifest + 16 处 `coord.emit_phase` 遗留 |
-| 0182 EventMechanism 框架化 | Proposed | D2/D3/D7 隐藏漏洞；不覆盖协议与状态机 |
+| ADR | 完成状态 |
+|---|---|
+| 0167 spine SSOT | Accepted |
+| 0170 writable matrix | Accepted |
+| 0172 exporters | Accepted |
+| 0175 prompt trace | Accepted |
+| 0176 step-tree deriver | Accepted |
+| 0177 EnvelopeEmitter | Accepted |
+| 0178 4 级收敛 | Proposed |
+| 0180 v2 event-layer pilot | Reverted |
+| 0181 publishers/subscribers | Accepted |
+| 0182 EventMechanism 框架化 | Proposed |
 
 ### 1.2 当前事件消费链路（实测）
 
@@ -751,6 +753,7 @@ PR-1 (EventBus 骨架)
 | **架构测试** | `tests/architecture/test_event_bus_invariants.py::test_i_fw_bus_2`(subscribe 收口) |
 | **验收** | `rg "EventMechanism\.(send\|subscribe\|register_sink)" lca/ lca_kernel/` 仅命中 `lca_kernel/events/mechanism.py`(deprecated) |
 | **delete-when** | PR-7 后 `rg "EventMechanism" lca/ lca_kernel/` = 0 |
+| **落地 commit** | `0e71f6bb`(骨架,含 PR-1+2+3+4)+ 集成补漏 `1b8ce7a8` |
 
 #### PR-2 4 个 hook 协议 + Pipeline 编排
 
@@ -762,6 +765,7 @@ PR-1 (EventBus 骨架)
 | **删除** | 无 |
 | **架构测试** | Pipeline dataclass 验证:hook 必须有 stage;stage ∈ {pre_dispatch, post_dispatch, on_failure} |
 | **验收** | `lca-ops inspect-pipeline web-standard` 输出全部 hook(stub) |
+| **落地 commit** | `0e71f6bb`(骨架,含 PR-1+2+3+4)+ 集成补漏 `1b8ce7a8` |
 
 #### PR-3 类型化 payload
 
@@ -773,6 +777,7 @@ PR-1 (EventBus 骨架)
 | **删除** | 无 |
 | **架构测试** | `rg "payload={[^}]*}" lca/runtime/` = 0(无裸 dict);yaml `fields:` 字段必须是 `FieldType` enum 值 |
 | **验收** | yaml schema 校验通过;`lca-ops validate-events web-standard` exit 0 |
+| **落地 commit** | `0e71f6bb`(骨架,含 PR-1+2+3+4) |
 
 #### PR-4 单 SSOT 链
 
@@ -784,6 +789,7 @@ PR-1 (EventBus 骨架)
 | **删除** | `lca/plugins/events/sinks/journal/` 整个目录;`events.jsonl` reader;`lca/plugins/events/sinks/spine_file_sink/`(并入 `lca_kernel/events/sinks/spine_file_sink.py`) |
 | **架构测试** | `test_i_fw_ssot_1`;`test_no_dual_sink` 仍通过 |
 | **验收** | `rg "events\.jsonl" lca/ lca_kernel/` = 0;`rg "sinks.journal" lca/` = 0;`test_no_dual_sink` 通过 |
+| **落地 commit** | `0e71f6bb`(骨架,含 PR-1+2+3+4) |
 
 #### PR-5 record 单一入口
 
@@ -795,6 +801,7 @@ PR-1 (EventBus 骨架)
 | **删除** | `SpineFileSink._build_event_record`;两处 `except ValueError` 静默 fallback |
 | **架构测试** | `tests/architecture/test_spine_record_single_builder.py` —— `lca/plugins/events/sinks/*/sink.py` 内无 `Channel(` / `Outcome(` 字面构造,无 `except ValueError` 后接 enum fallback |
 | **验收** | `rg "_build_event_record" lca/` = 0;`rg "except ValueError" lca/plugins/events/sinks/` = 0 |
+| **落地 commit** | `ff907239` |
 
 #### PR-6 yaml 前缀规则 + 死配置清理
 
@@ -806,6 +813,7 @@ PR-1 (EventBus 骨架)
 | **删除** | `spine.yaml` 中 100 处 `subscribers:` 块 + 100 处 `default_subscribers:` 块;`team.yaml` 同上 |
 | **架构测试** | `scripts/verify_consumer_rules_equivalence.py` —— 逐 category 比对前后授权集合全等 |
 | **验收** | 等价性脚本 exit 0;`grep -c "subscribers:" spine.yaml` = 0;`grep -c "default_subscribers:" spine.yaml` = 0;`rg "default_subscribers" lca/ lca_kernel/ tests/` = 0(允许 `archive/` 与 `tests/architecture/test_*.py` 内的负向断言) |
+| **落地 commit** | `f8032be0` |
 
 #### PR-7 SinkBackend 协议 + Profile 装配 Pipeline
 
@@ -817,6 +825,7 @@ PR-1 (EventBus 骨架)
 | **删除** | `lca_kernel/events/mechanism.py`(整个文件);`lca_kernel/events/config/observability/spine.yaml`(替换为精简版,只剩 `events:` 段);旧 `subscribers:` 字段 |
 | **架构测试** | `test_i_fw_ssot_1` 仍通过;`lca-ops inspect-pipeline <profile>` 输出 4 段(hooks/sinks/consumer_rules/options) |
 | **验收** | `rg "EventMechanism" lca/ lca_kernel/ tests/` = 0(允许 `archive/` 与 `tests/architecture/test_*.py` 负向断言);`lca-ops inspect-pipeline web-standard` exit 0 |
+| **落地 commit** | `1b8ce7a8`(PR-1+2+7+8+12 集成补漏) |
 
 #### PR-8 reducer 收口
 
@@ -828,6 +837,7 @@ PR-1 (EventBus 骨架)
 | **删除** | `CoordinatorAdapter.emit_phase` 方法;16 处注释引用 |
 | **架构测试** | `rg "coord\.emit_phase\|coord\.begin_step\|coord\.record_" lca/cognition lca/body lca/runtime lca/agent` = 0(已实测:5 处仅余 archive/注释) |
 | **验收** | `lca-ops runs create --user-text "..."` 端到端通过;reducer.apply_* 全部走 bus.publish;`tests/runtime/test_reducer.py::test_instrument_apply_*` 通过 |
+| **落地 commit** | `1b8ce7a8`(PR-1+2+7+8+12 集成补漏) |
 
 #### PR-9 cursor 收口
 
@@ -839,6 +849,7 @@ PR-1 (EventBus 骨架)
 | **删除** | `event_spine.py:60 append`(`append` 走 `_spine_port`);`bind.py:80 append`(同上) |
 | **架构测试** | `rg "def append" lca/infrastructure/observability/spine/event_spine.py lca/infrastructure/observability/loop_cursor/bind.py` = 0;`_spine_port.py` 唯一 append 实现 |
 | **验收** | `_spine_port.py` 唯一 append;cursor step 写入正常;`tests/integration/test_loop_cursor_wiring.py` 通过 |
+| **落地 commit** | `477c8a35` |
 
 #### PR-10 runtime_loop 收口
 
@@ -850,6 +861,7 @@ PR-1 (EventBus 骨架)
 | **删除** | 4 键裸 dict 调用 |
 | **架构测试** | `rg "emit_exception_caught\(boundary\s*=" lca/` = 0;`rg "emit_exception_caught\(record" lca/` ≥ 1 |
 | **验收** | `tests/runtime/test_runtime_loop_exception_path.py` 通过;integration run 触发异常后 `<run_id>.spine.jsonl` 含 `spine.exception.caught` event |
+| **落地 commit** | `b84e750b` |
 
 #### PR-11 状态机收敛
 
@@ -861,6 +873,7 @@ PR-1 (EventBus 骨架)
 | **删除** | `_map_finish_status` 函数;`journal_to_session_status` 映射表;`lca/infrastructure/observability/journal/engine/reducer.py:RunStatus` 类定义 |
 | **架构测试** | `test_i_fw_ssot_2`;`rg "class RunStatus\b" lca/` = 0;`rg "class JournalRunStatus\b" lca/` = 0 |
 | **验收** | 39 处 `RunStatus.` 引用全部走 `RunLifecycleStatus`;`_instrument_apply` 装饰器中 `outcome` 字符串 → `RunLifecycleStatus` 枚举;webstandard run 状态切换正常 |
+| **落地 commit** | `84a3f946` |
 
 #### PR-12 trace_id + 自观察
 
@@ -872,6 +885,7 @@ PR-1 (EventBus 骨架)
 | **删除** | 21 个 publisher 直接传 `trace_id=""` 兼容路径(改为由机制注入) |
 | **架构测试** | `tests/integration/test_webserver_trace_isolation.py`(并发请求 trace_id 不串);`rg "trace_id=[\"']" lca/plugins/events/publishers/` = 0 |
 | **验收** | webserver run 1 + run 2 链上 trace_id 不串;机制自观察事件 `event.bus.dispatch.consumers.end` 在 spine.jsonl 中可见;Pipeline consumer_rules 不订阅 event.bus.dispatch.*(I-FW-BUS-4) |
+| **落地 commit** | `1b8ce7a8`(PR-1+2+7+8+12 集成补漏) |
 
 ### 5.3 PR 顺序约束(理由)
 
@@ -982,8 +996,12 @@ uv run lca-ops event-bus-status
 
 ## 10. 附录(独立文件)
 
-附录 A:101 个 category → 新 namespace 重映射表 → `docs/notes/proposed/seam/2026-09-03-event-bus-101-mapping.md`
+附录 A:101 个 category → 新 namespace 重映射表 → `docs/notes/implemented/seam/2026-09-03-event-bus-101-mapping.md`
 
-附录 B:12 PR 兼容性矩阵(每个 PR 的兼容窗口、delete-when、合并顺序) → `docs/notes/proposed/runbook/2026-09-03-event-bus-pr-matrix.md`
+附录 B:12 PR 兼容性矩阵(每个 PR 的兼容窗口、delete-when、合并顺序) → `docs/notes/implemented/runbook/2026-09-03-event-bus-pr-matrix.md`
 
-附录 C:Pipeline YAML 完整示例 + 4 hook 默认实现 → `docs/notes/proposed/contract/2026-09-03-event-bus-pipeline-spec.md`
+附录 C:Pipeline YAML 完整示例 + 4 hook 默认实现 → `docs/notes/implemented/contract/2026-09-03-event-bus-pipeline-spec.md`
+
+## 11. 状态升 Accepted 待办
+
+PR-A(附录 A note → implemented)、PR-B(附录 B note → implemented)、PR-C(附录 C note → implemented)、PR-D(本文档收口)合入 worktree 后,主控合并全部 4 PR 后再把 Status 升 Accepted;现行 Status 保留 Proposed。本节为升档交接信号。
