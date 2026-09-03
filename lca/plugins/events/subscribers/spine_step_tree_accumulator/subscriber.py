@@ -5,12 +5,13 @@
 
 PR-2 复审：用 :func:`is_spine_event` 替换散落的 ``hasattr`` 守卫。
 """
+
 from __future__ import annotations
 
 import logging
 from typing import Any, ClassVar
 
-from lca_kernel.events.mechanism import EventRef
+from lca_kernel.events import EventRef
 from lca_kernel.events.spine_runtime import is_spine_event
 
 log = logging.getLogger(__name__)

@@ -17,7 +17,7 @@ event_plugin_spec = EventPluginSpec(
 plugin_spec: dict[str, object] = {
     "id": _PLUGIN_ID,
     "provides": ("events.sink",),
-    "requires": ("lca.events.mechanism",),
+    "requires": ("event.bus",),
     "layer": "plugin",
     "kind": "events.sink",
     "effects": ("writes:spine_chain.jsonl",),

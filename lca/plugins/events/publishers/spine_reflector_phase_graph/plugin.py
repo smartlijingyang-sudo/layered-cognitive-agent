@@ -1,6 +1,6 @@
-"""spine_reflector_phase_graph plugin（ADR-0181 PR-5）。
+"""spine_reflector_phase_graph plugin（ADR-0181 PR-5 / ADR-0183 PR-7）。
 
-PR-5：phase_graph 全部 4 emit 下沉到 EventMechanism.send：
+PR-5：phase_graph 全部 4 emit 下沉到 EventBus.publish：
 - phase_graph.node.start / .end
 - phase_graph.edge.transit
 - phase_graph.instrument.coverage
@@ -14,7 +14,7 @@ from lca_kernel.events.payloads import Category, SpineEventPayload
 from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
 
 if TYPE_CHECKING:
-    from lca_kernel.events.mechanism import EventRef
+    from lca_kernel.events.bus import EventRef
 
 log = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ def _send(
     channel: str,
     payload: dict[str, Any],
 ) -> EventRef:
-    from lca_kernel.events.mechanism import EventMechanism
+    from lca_kernel.events.bus import EventBus
 
     cat_str = _SPINE_EP_TO_CATEGORY[execution_point]
     sp = SpineEventPayload(
@@ -38,7 +38,7 @@ def _send(
         channel=channel,
         payload=payload,
     )
-    return EventMechanism.default().send(sp, plugin=ReflectorClass)
+    return EventBus.default().publish(sp, producer=ReflectorClass)
 
 
 # ── phase_graph.node.start / .end ─────────────────────────────────────

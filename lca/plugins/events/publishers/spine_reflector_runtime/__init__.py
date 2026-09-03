@@ -3,7 +3,7 @@
 PR-3：runtime 全量迁（exception + lifecycle + runtime.observed）。
 
 旧 lca/plugins/observability/spine/reflectors/runtime.py 全部 8 emit
-下沉到 EventMechanism.send：
+下沉到 EventBus.publish：
 - exception.caught / exception.finally / lifecycle.finally (PR-3 本)
 - runtime.reducer.apply / runtime.checkpoint.create /
   runtime.resume.start / runtime.resume.end /

@@ -1,9 +1,9 @@
-"""spine_reflector_runtime publisher 端到端测试（ADR-0181 PR-3）。
+"""spine_reflector_runtime publisher 端到端测试（ADR-0181 PR-3 / ADR-0183 PR-7）。
 
 旧 runtime reflector 全部 8 emit（exception.caught + exception.finally +
 lifecycle.finally + runtime.reducer.apply/start + checkpoint.create +
-resume.start/end + event_publisher.publish）在 EventMechanism 路径下能正常
-send + 鉴权通过。
+resume.start/end + event_publisher.publish）在 EventBus 路径下能正常
+publish + 鉴权通过。
 """
 from __future__ import annotations
 
@@ -11,23 +11,23 @@ from pathlib import Path
 
 import pytest
 
-from lca_kernel.events.mechanism import EventMechanism
+from lca_kernel.events.bus import EventBus
 from lca_kernel.events.registry import EventRegistry
 
 
 @pytest.fixture
-def mechanism() -> EventMechanism:
-    """用工作区 lca_kernel/events/config 构造机制。"""
+def bus() -> EventBus:
+    """用工作区 lca_kernel/events/config 构造 EventBus。"""
     config_dir = Path(__file__).resolve().parents[4] / "lca_kernel" / "events" / "config"
-    return EventMechanism(EventRegistry.load(config_dir))
+    return EventBus(EventRegistry.load(config_dir))
 
 
-def _run(mechanism: EventMechanism) -> None:
+def _run(bus: EventBus) -> None:
     from lca.plugins.events.publishers.spine_reflector_runtime import (
         plugin,
     )
 
-    EventMechanism.set_default(mechanism)
+    EventBus.set_default(bus)
     try:
         # exception
         ref = plugin.emit_exception_caught(
@@ -63,14 +63,14 @@ def _run(mechanism: EventMechanism) -> None:
         )
         assert ref.category == "spine.runtime.observed"
     finally:
-        EventMechanism.set_default(None)
+        EventBus.set_default(None)
 
 
-def test_emit_runtime_all(mechanism: EventMechanism) -> None:
-    _run(mechanism)
+def test_emit_runtime_all(bus: EventBus) -> None:
+    _run(bus)
 
 
-def test_unauthorized_publisher_rejected(mechanism: EventMechanism) -> None:
+def test_unauthorized_publisher_rejected(bus: EventBus) -> None:
     from lca_kernel.events.errors import UnauthorizedPublishError
     from lca_kernel.events.payloads import SpineEventPayload
 
@@ -78,11 +78,11 @@ def test_unauthorized_publisher_rejected(mechanism: EventMechanism) -> None:
         pass
 
     with pytest.raises(UnauthorizedPublishError):
-        mechanism.send(
+        bus.publish(
             SpineEventPayload(
                 execution_point="exception.caught",
                 channel="error",
                 payload={"boundary": "x", "exc_type": "y", "message": "z", "trace_id": "t"},
             ),
-            plugin=NotInWhitelist,
+            producer=NotInWhitelist,
         )

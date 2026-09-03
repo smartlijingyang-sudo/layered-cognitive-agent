@@ -13,7 +13,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from lca_kernel.events.mechanism import EventRef
+from lca_kernel.events import EventRef
 from lca_kernel.events.spine_runtime import (
     SpineChainContext,
     build_record,

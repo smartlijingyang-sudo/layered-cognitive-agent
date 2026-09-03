@@ -1,6 +1,6 @@
-"""spine_reflector_kernel_loop plugin（ADR-0181 PR-4）。
+"""spine_reflector_kernel_loop plugin（ADR-0181 PR-4 / ADR-0183 PR-7）。
 
-PR-4：kernel.boot / loop.fork 全部 3 emit 下沉到 EventMechanism.send：
+PR-4：kernel.boot / loop.fork 全部 3 emit 下沉到 EventBus.publish：
 - kernel.boot.start / .completed
 - loop.fork
 """
@@ -13,7 +13,7 @@ from lca_kernel.events.payloads import Category, SpineEventPayload
 from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
 
 if TYPE_CHECKING:
-    from lca_kernel.events.mechanism import EventRef
+    from lca_kernel.events.bus import EventRef
 
 log = logging.getLogger(__name__)
 
@@ -28,12 +28,12 @@ def _send(
     channel: str,
     payload: dict[str, Any],
 ) -> EventRef:
-    """内部 helper：构造 SpineEventPayload + EventMechanism.send。
+    """内部 helper：构造 SpineEventPayload + EventBus.publish。
 
-    EventMechanism 走函数内 lazy import，避免 plugin import 时触发
+    EventBus 走函数内 lazy import，避免 plugin import 时触发
     lca.infrastructure.observability ↔ lca_kernel 链路 circular import。
     """
-    from lca_kernel.events.mechanism import EventMechanism
+    from lca_kernel.events.bus import EventBus
 
     cat_str = _SPINE_EP_TO_CATEGORY[execution_point]
     sp = SpineEventPayload(
@@ -42,7 +42,7 @@ def _send(
         channel=channel,
         payload=payload,
     )
-    return EventMechanism.default().send(sp, plugin=ReflectorClass)
+    return EventBus.default().publish(sp, producer=ReflectorClass)
 
 
 # ── kernel.boot.start / .completed ────────────────────────────────────

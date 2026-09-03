@@ -1,4 +1,4 @@
-"""spine_reflector_cognition plugin（ADR-0181 试点 + PR-2 cognition 全迁）。
+"""spine_reflector_cognition plugin（ADR-0181 试点 + PR-2 cognition 全迁 / ADR-0183 PR-7）。
 
 试点（已合并）：emit_brain_perceive_start
 PR-2（本）：cognition 余 15 emit 全迁；signature 严格对齐旧
@@ -8,9 +8,9 @@ lca/cognition/brain/reasoner.py 等调用方零改动。旧 _safe_append
 承载，不另开字段，保留旧 API 兼容）。
 
 业务方一行调：
-    EventMechanism.send(
+    EventBus.default().publish(
         SpineEventPayload(execution_point="...", channel="...", payload={...}),
-        plugin=ReflectorClass,
+        producer=ReflectorClass,
     )
 """
 from __future__ import annotations
@@ -19,7 +19,7 @@ import logging
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from lca_kernel.events.mechanism import EventMechanism
+from lca_kernel.events.bus import EventBus
 from lca_kernel.events.payloads import Category, SpineEventPayload
 from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
 
@@ -36,7 +36,7 @@ def _send(
     channel: str,
     payload: dict[str, Any],
 ) -> Any:
-    """内部 helper：构造 SpineEventPayload + EventMechanism.send。
+    """内部 helper：构造 SpineEventPayload + EventBus.publish。
 
     category 由 execution_point 通过 _SPINE_EP_TO_CATEGORY 派生。
     """
@@ -47,7 +47,7 @@ def _send(
         channel=channel,
         payload=payload,
     )
-    return EventMechanism.default().send(sp, plugin=ReflectorClass)
+    return EventBus.default().publish(sp, producer=ReflectorClass)
 
 
 def emit_brain_perceive_start(*, state_id: str) -> Any:

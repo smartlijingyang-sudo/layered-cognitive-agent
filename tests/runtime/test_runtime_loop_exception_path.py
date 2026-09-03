@@ -30,7 +30,7 @@ from lca.contracts.protocols.runtime.runtime_lifecycle import (
 from lca.harness.declarative.compile.instrument_wrap import set_active_spine_accessor
 from lca.infrastructure.observability.facade.run_context import run_scope
 from lca.runtime.runtime_loop import CognitiveRuntime
-from lca_kernel.events.mechanism import EventMechanism
+from lca_kernel.events.bus import EventBus
 
 
 class _RecordingSpine:
@@ -70,18 +70,18 @@ def recording_spine() -> Iterator[_RecordingSpine]:
 
 @pytest.fixture
 def sent_payloads() -> Iterator[list[Any]]:
-    """Capture envelope emits routed through the default EventMechanism."""
+    """Capture envelope emits routed through the default EventBus."""
     sent: list[Any] = []
 
-    class _RecordingMechanism:
-        def send(self, payload: Any, *, plugin: type) -> None:
+    class _RecordingBus:
+        def publish(self, payload: Any, *, producer: type, trace_id: str | None = None) -> None:
             sent.append(payload)
 
-    EventMechanism.set_default(cast("Any", _RecordingMechanism()))
+    EventBus.set_default(cast("Any", _RecordingBus()))
     try:
         yield sent
     finally:
-        EventMechanism.set_default(None)
+        EventBus.set_default(None)
 
 
 @dataclass

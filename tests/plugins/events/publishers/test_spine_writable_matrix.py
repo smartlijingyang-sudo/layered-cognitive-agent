@@ -8,22 +8,22 @@ from pathlib import Path
 
 import pytest
 
-from lca_kernel.events.mechanism import EventMechanism
+from lca_kernel.events.bus import EventBus
 from lca_kernel.events.registry import EventRegistry
 
 
 @pytest.fixture
-def mechanism() -> EventMechanism:
+def bus() -> EventBus:
     config_dir = Path(__file__).resolve().parents[4] / "lca_kernel" / "events" / "config"
-    return EventMechanism(EventRegistry.load(config_dir))
+    return EventBus(EventRegistry.load(config_dir))
 
 
-def test_writable_matrix_send(mechanism: EventMechanism) -> None:
+def test_writable_matrix_send(bus: EventBus) -> None:
     from lca.plugins.events.publishers.spine_writable_matrix.plugin import (
         WritableMatrixPlugin,
     )
 
-    EventMechanism.set_default(mechanism)
+    EventBus.set_default(bus)
     try:
         ref = WritableMatrixPlugin.send(
             execution_point="writable.iteration.halt",
@@ -32,10 +32,10 @@ def test_writable_matrix_send(mechanism: EventMechanism) -> None:
         )
         assert ref.category == "spine.writable.iteration.halt"
     finally:
-        EventMechanism.set_default(None)
+        EventBus.set_default(None)
 
 
-def test_writable_matrix_send_unknown_ep(mechanism: EventMechanism) -> None:
+def test_writable_matrix_send_unknown_ep(bus: EventBus) -> None:
     from lca.plugins.events.publishers.spine_writable_matrix.plugin import (
         WritableMatrixPlugin,
     )
@@ -48,14 +48,14 @@ def test_writable_matrix_send_unknown_ep(mechanism: EventMechanism) -> None:
         )
 
 
-def test_writable_matrix_send_unauthorized(mechanism: EventMechanism) -> None:
+def test_writable_matrix_send_unauthorized(bus: EventBus) -> None:
     """未注册 plugin 类无法 send：WritableMatrixPlugin 类在 yaml publishers 中。"""
     from lca_kernel.events.payloads import SpineEventPayload
 
-    EventMechanism.set_default(mechanism)
+    EventBus.set_default(bus)
     try:
         with pytest.raises(Exception):
-            mechanism.send(
+            bus.publish(
                 SpineEventPayload(
                     execution_point="writable.iteration.halt",
                     channel="control",
@@ -64,4 +64,4 @@ def test_writable_matrix_send_unauthorized(mechanism: EventMechanism) -> None:
                 plugin=int,  # int is not a plugin class
             )
     finally:
-        EventMechanism.set_default(None)
+        EventBus.set_default(None)

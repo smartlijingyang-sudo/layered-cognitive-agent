@@ -17,7 +17,7 @@ event_plugin_spec = EventPluginSpec(
 plugin_spec: dict[str, object] = {
     "id": _PLUGIN_ID,
     "provides": ("events.subscriber",),
-    "requires": ("lca.events.mechanism",),
+    "requires": ("event.bus",),
     "layer": "plugin",
     "kind": "events.subscriber",
     "effects": ("derives:step_tree",),

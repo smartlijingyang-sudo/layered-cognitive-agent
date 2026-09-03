@@ -1,4 +1,4 @@
-"""Journal sink plugin Manifest（ADR-0180）。
+"""Journal sink plugin Manifest（ADR-0180 / ADR-0183 PR-7）。
 
 统一目录：``lca/plugins/events/sinks/<sink_name>/manifest.py``。
 sinks / publishers / subscribers 在 :mod:`lca_kernel.events.config` SSOT 中按
@@ -23,7 +23,6 @@ from lca.contracts.harness.composition.plugin_contract import (
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.events.sinks.journal.sink import JournalSink
-from lca_kernel.events import EventMechanism
 
 # sink 的 plugin class（必须在 yaml subscribers 全路径登记）。
 SINK_PLUGIN_CLASS = JournalSink
@@ -36,13 +35,13 @@ class _Config(BaseModel):
 @plugin(
     id="lca.events.sink.journal",
     provides=["event.sink.journal"],
-    requires=["event.mechanism"],
+    requires=["event.bus"],
     layer="L0",
     kind=PluginKind.PROVIDER,
     effects="none",
     description=(
-        "Journal sink（ADR-0180）：机制默认 sink；缓存 EventRecord，"
-        "后续 PR 接 BoundObservability.journal 真正写盘。"
+        "Journal sink（ADR-0180 / ADR-0183 PR-7）：缓存 EventRecord，"
+        "订阅 EventBus 所有 category。"
     ),
     test_suite="tests/plugins/events/sinks/test_journal.py",
     functional_group=FunctionalGroup.G0_CON_KERNEL,
@@ -57,23 +56,25 @@ class _Config(BaseModel):
         observability=EvidenceContract(descriptors=("event.sink.journal.written",)),
     ),
     ownership=OwnershipDeclaration(
-        reads=("event.mechanism",),
+        reads=("event.bus",),
         emits=("event.sink.journal.written",),
         state_mutation="forbidden",
     ),
 )
 async def setup_journal_sink(ctx: PluginContext, config: _Config) -> None:
-    """Journal sink boot：构造 sink + 订阅机制所有 category。"""
-    mechanism_obj = ctx.soft_get("event.mechanism")
-    if not isinstance(mechanism_obj, EventMechanism):
-        msg = "event.sink.journal boot 失败：event.mechanism 未装载"
+    """Journal sink boot：构造 sink + 订阅 EventBus 所有 category。"""
+    from lca_kernel.events.bus import EventBus
+
+    bus_obj = ctx.soft_get("event.bus")
+    if not isinstance(bus_obj, EventBus):
+        msg = "event.sink.journal boot 失败：event.bus 未装载"
         raise RuntimeError(msg)
     sink = JournalSink()
-    for spec in mechanism_obj.registry.specs:
-        mechanism_obj.subscribe(
+    for spec in bus_obj.registry.specs:
+        bus_obj.subscribe(
             plugin=SINK_PLUGIN_CLASS,
             category=spec.category,
-            callback=sink.on_event,
+            on_event=sink.on_event,
         )
     ctx.provide("event.sink.journal", sink)
 

@@ -1,4 +1,4 @@
-"""业务方 plugin: DelegationCachePlugin（ADR-0180）。
+"""业务方 plugin: DelegationCachePlugin（ADR-0180 / ADR-0183 PR-7）。
 
 ADR-0180 要求"一切都是插件"——业务方也是 plugin。
 本 plugin 由 :mod:`lca_kernel.events.manifest` 通过 Manifest 装载；机制按
@@ -20,7 +20,8 @@ from lca.contracts.atoms.semantic_keys import (
 from lca.contracts.models.core.decision import DelegationSpec, Observation
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.team.delegation import find_result
-from lca_kernel.events import EventMechanism, TeamDelegationCacheHit
+from lca_kernel.events import TeamDelegationCacheHit
+from lca_kernel.events.bus import EventBus
 
 # 业务方 plugin id（与 yaml publishers 白名单一致）。
 PUBLISHER_PLUGIN_ID = "delegation_cache"
@@ -48,14 +49,14 @@ class DelegationCachePlugin:
         )
         if hit is None:
             return None
-        # 业务方一行发送入口（ADR-0180）：构造 pydantic payload；机制按 yaml 鉴权。
-        EventMechanism.default().send(
+        # 业务方一行发送入口（ADR-0183 §3.1）：构造 typed payload；EventBus 按 yaml 鉴权。
+        EventBus.default().publish(
             TeamDelegationCacheHit(
                 callee_role=hit.target_role,
                 subtask=spec.subtask,
                 step=state.step,
             ),
-            plugin=DelegationCachePlugin,
+            producer=DelegationCachePlugin,
         )
         observation = Observation(
             observation_id=new_id("obs"),

@@ -7,7 +7,7 @@
 - D2：Category 由机制在 boot 时从 ``lca_kernel/events/config/**/*.yaml`` 加载；
        本枚举给出试点最小闭集，PR 2–13 逐个补齐。
 - D3：每个 EventPayload 必须声明 ``category`` 字段，子类覆盖 default。
-- D4：本模块不导出 send/subscribe；那由机制 :class:`lca_kernel.events.mechanism.EventMechanism` 暴露。
+- D4：本模块不导出 publish/subscribe；那由机制 :class:`lca_kernel.events.bus.EventBus` 暴露。
 """
 
 from __future__ import annotations
@@ -49,9 +49,7 @@ class Category(str, Enum):
     SPINE_COGNITION_PROMPT_ASSEMBLER_ASSEMBLE_START = (
         "spine.cognition.prompt_assembler.assemble.start"
     )
-    SPINE_COGNITION_PROMPT_ASSEMBLER_ASSEMBLE_END = (
-        "spine.cognition.prompt_assembler.assemble.end"
-    )
+    SPINE_COGNITION_PROMPT_ASSEMBLER_ASSEMBLE_END = "spine.cognition.prompt_assembler.assemble.end"
     SPINE_COGNITION_SYNTHESIZER_MERGE = "spine.cognition.synthesizer.merge"
     SPINE_COGNITION_SKILL_ROUTER_ROUTE = "spine.cognition.skill_router.route"
     SPINE_COGNITION_MEMORY_READ = "spine.cognition.memory.read"
@@ -278,7 +276,7 @@ def default_plane(category: Category) -> Plane:
 class EventPayload(BaseModel):
     """所有事件 payload 的基类。
 
-    业务方构造一个具体子类（typed 字段），调机制 :func:`EventMechanism.send`；
+    业务方构造一个具体子类（typed 字段），调机制 :func:`EventBus.publish`；
     机制读 ``payload.category`` 决定路由，不要求业务方传 category。
     """
 

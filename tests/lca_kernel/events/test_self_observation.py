@@ -17,7 +17,7 @@ from lca_kernel.events import TeamDelegationCacheHit
 from lca_kernel.events.bus import EventBus, FailureSemantics, reset_trace_id, set_trace_id
 from lca_kernel.events.errors import MissingPluginIdentityError, UnauthorizedSubscribeError
 from lca_kernel.events.hooks import MechanismDispatchObserver
-from lca_kernel.events.mechanism import _DEFAULT_CONFIG_DIR, EventRef
+from lca_kernel.events import EventRef, _DEFAULT_CONFIG_DIR
 from lca_kernel.events.payloads import (
     DISPATCH_SELF_OBSERVATION_CATEGORIES,
     MechanismDispatchEventPayload,

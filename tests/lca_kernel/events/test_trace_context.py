@@ -1,10 +1,9 @@
-"""PR-12 trace_id contextvars 注入 + 解析链单元测试。
+"""PR-12 trace_id contextvars 注入 + 解析链单元测试（迁移 EventBus-only / ADR-0183 PR-7）。
 
 覆盖:
 - set_trace_id / reset_trace_id / current_trace_id 三件套
 - publish 解析链:显式参数 > payload.trace_id > contextvars > new_id("trc")
 - TraceContextHook 透传(解析由 EventBus 单点承担)
-- EventMechanism.send 注入 trace_id(不再恒为空串)
 """
 
 from __future__ import annotations
@@ -13,7 +12,7 @@ import pytest
 
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.event import EventPayload
-from lca_kernel.events import EventMechanism, TeamDelegationCacheHit
+from lca_kernel.events import TeamDelegationCacheHit
 from lca_kernel.events.bus import (
     EventBus,
     current_trace_id,
@@ -21,7 +20,7 @@ from lca_kernel.events.bus import (
     set_trace_id,
 )
 from lca_kernel.events.hooks import PublishContext, TraceContextHook
-from lca_kernel.events.mechanism import _DEFAULT_CONFIG_DIR
+from lca_kernel.events import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.registry import EventRegistry
 
 
@@ -150,31 +149,6 @@ class TestTraceContextHook:
         ctx = PublishContext(bus=bus, producer=authorized_plugin, ts=0.0)
         result = hook.before_publish(p, authorized_plugin, ctx)
         assert result is p
-
-
-# ── EventMechanism.send 注入 ────────────────────────────────────────────
-
-
-class TestMechanismTraceInjection:
-    def test_send_injects_trace_id(self, authorized_plugin: type) -> None:
-        """send 的 EventRef.trace_id 不再恒为空串。"""
-        registry = EventRegistry.load(_DEFAULT_CONFIG_DIR)
-        mechanism = EventMechanism(registry)
-        p = TeamDelegationCacheHit(callee_role="a", subtask="b", step=1)
-        ref = mechanism.send(p, plugin=authorized_plugin)
-        assert ref.trace_id != ""
-        assert ref.trace_id.startswith("trc")
-
-    def test_send_uses_ambient_contextvar(self, authorized_plugin: type) -> None:
-        registry = EventRegistry.load(_DEFAULT_CONFIG_DIR)
-        mechanism = EventMechanism(registry)
-        ambient = set_trace_id("trc_mech_ambient")
-        try:
-            p = TeamDelegationCacheHit(callee_role="a", subtask="b", step=1)
-            ref = mechanism.send(p, plugin=authorized_plugin)
-            assert ref.trace_id == "trc_mech_ambient"
-        finally:
-            reset_trace_id(ambient)
 
 
 # ── new_id 格式一致性 ──────────────────────────────────────────────────

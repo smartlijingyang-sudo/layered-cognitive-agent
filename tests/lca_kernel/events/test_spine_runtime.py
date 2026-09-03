@@ -1,4 +1,5 @@
 """spine_runtime helpers 测试（ADR-0181 PR-2 提取层）。"""
+
 from __future__ import annotations
 
 import io
@@ -20,7 +21,7 @@ from lca_kernel.events.spine_runtime import (
     default_chain_path,
     is_spine_event,
 )
-from lca_kernel.events.mechanism import EventRef
+from lca_kernel.events import EventRef
 
 
 # ── is_spine_event ───────────────────────────────────────────────────────

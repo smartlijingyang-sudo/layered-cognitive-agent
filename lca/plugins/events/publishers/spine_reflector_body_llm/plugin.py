@@ -1,15 +1,15 @@
-"""spine_reflector_body_llm plugin（ADR-0181 PR-3）。
+"""spine_reflector_body_llm plugin（ADR-0181 PR-3 / ADR-0183 PR-7）。
 
 PR-3：body + llm 全部 9 emit（tool.execute.start/end + retry + sandbox.enter/exit
 + decision.start/end + llm.call.start/end + llm.stream.token + llm.stream.stall）
-下沉到 EventMechanism.send；signature 严格对齐旧
+下沉到 EventBus.publish；signature 严格对齐旧
 lca/plugins/observability/spine/reflectors/body_llm.py 调用方零改动（仅
 import 路径换到 lca.plugins.events.publishers.spine_reflector_body_llm）。
 
 业务方一行调：
-    EventMechanism.send(
+    EventBus.default().publish(
         SpineEventPayload(execution_point="...", channel="...", payload={...}),
-        plugin=ReflectorClass,
+        producer=ReflectorClass,
     )
 """
 from __future__ import annotations
@@ -21,7 +21,7 @@ from lca_kernel.events.payloads import Category, SpineEventPayload
 from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
 
 if TYPE_CHECKING:
-    from lca_kernel.events.mechanism import EventRef
+    from lca_kernel.events.bus import EventRef
 
 log = logging.getLogger(__name__)
 
@@ -36,17 +36,17 @@ def _send(
     channel: str,
     payload: dict[str, Any],
 ) -> EventRef:
-    """内部 helper：构造 SpineEventPayload + EventMechanism.send。
+    """内部 helper：构造 SpineEventPayload + EventBus.publish。
 
     category 由 execution_point 通过 _SPINE_EP_TO_CATEGORY 派生。
     outcome（旧 reflector EventRecord.outcome）写进 payload，保留旧 API。
 
-    注：EventMechanism import 走函数内 lazy，避免 lca_kernel.events 顶层
+    注：EventBus import 走函数内 lazy，避免 lca_kernel.events 顶层
     被 lca.infrastructure.observability 启动时倒灌触发 circular import
     （lca_kernel.boot → lca.harness.observability → adapters →
     spine_reflector_body_llm）。
     """
-    from lca_kernel.events.mechanism import EventMechanism
+    from lca_kernel.events.bus import EventBus
 
     cat_str = _SPINE_EP_TO_CATEGORY[execution_point]
     sp = SpineEventPayload(
@@ -55,7 +55,7 @@ def _send(
         channel=channel,
         payload=payload,
     )
-    return EventMechanism.default().send(sp, plugin=ReflectorClass)
+    return EventBus.default().publish(sp, producer=ReflectorClass)
 
 
 # ── body.tool.execute.start / end（invocation 层，ADR-0166 S2）───────────

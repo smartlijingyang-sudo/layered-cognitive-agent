@@ -37,7 +37,7 @@ from lca_kernel.events.hooks import (
     PublishContext,
     SkipDispatch,
 )
-from lca_kernel.events.mechanism import (
+from lca_kernel.events import (
     _DEFAULT_CONFIG_DIR,
     EventRef,
 )

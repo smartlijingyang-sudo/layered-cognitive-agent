@@ -1,4 +1,5 @@
-"""spine_chain_sink 端到端（ADR-0181 试点盖章条件 5: chain 完整性）。"""
+"""spine_chain_sink 端到端（ADR-0181 试点盖章条件 5: chain 完整性 / ADR-0183 PR-7）。"""
+
 from __future__ import annotations
 
 import json
@@ -6,56 +7,53 @@ from pathlib import Path
 
 import pytest
 
+from lca.contracts.event import Category
 from lca.plugins.events.publishers.spine_reflector_cognition.plugin import (
     ReflectorClass,
 )
 from lca.plugins.events.sinks.spine_chain_sink.sink import SpineChainSink
-from lca_kernel.events.mechanism import EventMechanism
+from lca_kernel.events.bus import EventBus
+from lca_kernel.events.hooks import FailureSemantics
+from lca_kernel.events import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.payloads import SpineEventPayload
 from lca_kernel.events.registry import EventRegistry
 
 
 @pytest.fixture
-def mechanism(tmp_path) -> EventMechanism:
-    from pathlib import Path
-
-    # PR-2 复审：chain_sink 改无状态（prev_hash 走实例属性），fixture 重建
-    # sink 实例即可重置 chain；旧 SpineChainSink.reset() classmethod 已删。
+def bus(tmp_path) -> EventBus:
+    """独立 EventBus 实例,sink 直接挂在它上面。"""
     config_dir = Path(__file__).resolve().parents[4] / "lca_kernel" / "events" / "config"
-    m = EventMechanism(EventRegistry.load(config_dir))
+    b = EventBus(EventRegistry.load(config_dir))
     sink = SpineChainSink(output_path=tmp_path / "chain.jsonl")
-    m.register_sink(
+    b.subscribe(
         plugin=SpineChainSink,
-        category=__import__("lca.contracts.event", fromlist=["Category"]).Category(
-            "spine.cognition.brain.perceive.start"
-        ),
-        callback=sink,
+        category=Category("spine.cognition.brain.perceive.start"),
+        on_event=sink,
+        failure=FailureSemantics.FAIL_FAST,
     )
-    return m
+    return b
 
 
-def test_chain_sink_writes_two_records_with_hashes(
-    mechanism: EventMechanism, tmp_path: Path
-) -> None:
-    """盖章 5: sink 落盘时算 hash chain，2 个 record 形成 prev_event_hash 链。"""
+def test_chain_sink_writes_two_records_with_hashes(bus: EventBus, tmp_path: Path) -> None:
+    """盖章 5: sink 落盘时算 hash chain,2 个 record 形成 prev_event_hash 链。"""
     chain_path = tmp_path / "chain.jsonl"
     assert not chain_path.exists()
 
-    mechanism.send(
+    bus.publish(
         SpineEventPayload(
             execution_point="brain.perceive.start",
             channel="fact",
             payload={"state_id": "s1"},
         ),
-        plugin=ReflectorClass,
+        producer=ReflectorClass,
     )
-    mechanism.send(
+    bus.publish(
         SpineEventPayload(
             execution_point="brain.perceive.start",
             channel="fact",
             payload={"state_id": "s2"},
         ),
-        plugin=ReflectorClass,
+        producer=ReflectorClass,
     )
 
     assert chain_path.exists()

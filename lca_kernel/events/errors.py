@@ -1,18 +1,21 @@
-"""事件机制错误（ADR-0180）。
+"""事件总线错误（ADR-0183 / ADR-0183 PR-7 收口）。
 
 机制在以下情况 fail-fast：
-- E1：plugin 调 send 时未在 yaml publishers 白名单 → UnauthorizedPublishError
+- E1：plugin 调 publish 时未在 yaml publishers 白名单 → UnauthorizedPublishError
 - E2：plugin 调 subscribe 时未在 yaml subscribers 白名单 → UnauthorizedSubscribeError
 - E3：plugin manifest 声明的 event_publishes/event_subscribes 与 yaml 不一致 → AuthMatrixMismatchError
 - E4：yaml 中 category 与 contracts Category 闭集不一致 → UnknownCategoryError
-- E5：plugin 调 send 时未传 plugin_id → MissingPluginIdentityError
+- E5：plugin 调 publish/subscribe 时未传 plugin_id → MissingPluginIdentityError
+
+PR-7：EventMechanism 已删除，但 ``EventMechanismError`` 类名保留作为
+公开错误基类（业务方已 import 该名）；新错误请直接继承该类。
 """
 
 from __future__ import annotations
 
 
 class EventMechanismError(Exception):
-    """事件机制错误基类。"""
+    """事件总线错误基类（保留旧名以兼容 import）。"""
 
 
 class UnauthorizedPublishError(EventMechanismError):

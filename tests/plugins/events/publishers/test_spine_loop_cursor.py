@@ -5,22 +5,22 @@ from pathlib import Path
 
 import pytest
 
-from lca_kernel.events.mechanism import EventMechanism
+from lca_kernel.events.bus import EventBus
 from lca_kernel.events.registry import EventRegistry
 
 
 @pytest.fixture
-def mechanism() -> EventMechanism:
+def bus() -> EventBus:
     config_dir = Path(__file__).resolve().parents[4] / "lca_kernel" / "events" / "config"
-    return EventMechanism(EventRegistry.load(config_dir))
+    return EventBus(EventRegistry.load(config_dir))
 
 
-def test_loop_cursor_send(mechanism: EventMechanism) -> None:
+def test_loop_cursor_send(bus: EventBus) -> None:
     from lca.plugins.events.publishers.spine_loop_cursor.plugin import (
         LoopCursorPlugin,
     )
 
-    EventMechanism.set_default(mechanism)
+    EventBus.set_default(bus)
     try:
         ref = LoopCursorPlugin.send(
             execution_point="phase.think.fold",
@@ -29,4 +29,4 @@ def test_loop_cursor_send(mechanism: EventMechanism) -> None:
         )
         assert ref.category == "spine.phase.think.fold"
     finally:
-        EventMechanism.set_default(None)
+        EventBus.set_default(None)

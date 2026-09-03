@@ -11,7 +11,7 @@ _PUBLISHES: tuple[Category, ...] = (
     Category("spine.cognition.brain.perceive.start"),
 )
 
-# Typed 鉴权声明（ADR-0180 D3，EventMechanism.validate_auth_matrix 接收）。
+# Typed 鉴权声明（ADR-0180 D3，EventBus 鉴权矩阵接收）。
 # plugin_id 必须是 plugin class 全路径，与 yaml publishers 解析后 class 一致。
 event_plugin_spec = EventPluginSpec(
     plugin_id="lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass",
