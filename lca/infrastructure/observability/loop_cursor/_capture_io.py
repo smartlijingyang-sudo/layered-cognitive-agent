@@ -17,55 +17,18 @@ must accept ``sha256:<hex>`` and may reject other forms.
 
 from __future__ import annotations
 
-import dataclasses
 import hashlib
 import json
 import logging
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from lca.contracts.observability.ssot import to_jsonable
+
 _log = logging.getLogger(__name__)
 
 _DIGEST_PREFIX = "sha256:"
 """Digest string prefix; matches step_tree_accumulator and other model-visible writers."""
-
-
-def to_jsonable(value: Any) -> Any:
-    """Convert arbitrary objects to JSON-compatible structures.
-
-    Priority:
-      1. Already JSON-compatible primitives / containers -> as-is.
-      2. ``dataclasses`` instance -> ``dataclasses.asdict`` (covers frozen + slots).
-      3. ``to_dict`` / ``model_dump`` / ``dict()`` -> call.
-      4. ``__dict__`` -> take it.
-      5. ``repr(value)`` as final fallback.
-
-    Guarantees ``json.dumps(...)`` does not raise TypeError.
-    """
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
-    if isinstance(value, dict):
-        return {str(k): to_jsonable(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [to_jsonable(item) for item in value]
-    if dataclasses.is_dataclass(value) and not isinstance(value, type):
-        try:
-            return to_jsonable(dataclasses.asdict(value))
-        except Exception as exc:
-            _log.debug("capture_io asdict failed: %s", exc)
-    for proto_name in ("to_dict", "model_dump", "dict"):
-        proto = getattr(value, proto_name, None)
-        if callable(proto):
-            try:
-                return to_jsonable(proto())
-            except Exception as exc:
-                _log.debug("capture_io %s() failed: %s", proto_name, exc)
-    if hasattr(value, "__dict__"):
-        try:
-            return to_jsonable(vars(value))
-        except Exception as exc:
-            _log.debug("capture_io vars() failed: %s", exc)
-    return repr(value)
 
 
 def sha256_digest(payload: Any) -> str:

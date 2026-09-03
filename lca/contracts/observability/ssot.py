@@ -89,12 +89,16 @@ class RunLifecycleStatus(str, Enum):
     与 ExecutionOutcome 的语义边界(不要合并):
     - RunLifecycleStatus:run 整体 lifecycle 的宏观状态(对外可观察)。
     - ExecutionOutcome:step / phase / declarative 单次执行的微观 outcome。
+
+    注意:本 enum 当前与 carrier 私有 ``RunStatus``(session.py)字段对齐
+    (6 值,无 PAUSED);PAUSED 是微观 outcome 而非 run lifecycle 终态,见
+    :class:`ExecutionOutcome.PAUSED` 与 ``lca/contracts/models/core/lifecycle.py``
+    的 ``TaskStatus.PAUSED``。新增 run lifecycle 状态时同步更新 carrier enum。
     """
 
     PENDING = "pending"
     RUNNING = "running"
     WAITING_INPUT = "waiting_input"
-    PAUSED = "paused"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELED = "canceled"
@@ -102,7 +106,6 @@ class RunLifecycleStatus(str, Enum):
 
 TERMINAL_RUN_STATUSES: Final[frozenset[RunLifecycleStatus]] = frozenset(
     {
-        RunLifecycleStatus.PAUSED,
         RunLifecycleStatus.COMPLETED,
         RunLifecycleStatus.FAILED,
         RunLifecycleStatus.CANCELED,

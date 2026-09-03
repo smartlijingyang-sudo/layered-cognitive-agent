@@ -113,7 +113,6 @@ class TestRunLifecycleStatus:
         assert (
             frozenset(
                 {
-                    RunLifecycleStatus.PAUSED,
                     RunLifecycleStatus.COMPLETED,
                     RunLifecycleStatus.FAILED,
                     RunLifecycleStatus.CANCELED,
@@ -137,7 +136,6 @@ class TestRunLifecycleStatus:
             (RunLifecycleStatus.PENDING, False, False, False),
             (RunLifecycleStatus.RUNNING, False, False, False),
             (RunLifecycleStatus.WAITING_INPUT, False, False, False),
-            (RunLifecycleStatus.PAUSED, True, False, False),
             (RunLifecycleStatus.COMPLETED, True, True, False),
             (RunLifecycleStatus.FAILED, True, False, True),
             (RunLifecycleStatus.CANCELED, True, False, True),
@@ -160,7 +158,6 @@ class TestRunLifecycleStatus:
             ("completed", True),
             ("failed", True),
             ("canceled", True),
-            ("paused", True),
             ("running", False),
             ("pending", False),
             ("waiting_input", False),

@@ -13,24 +13,10 @@ from __future__ import annotations
 
 import json
 import tempfile
-from dataclasses import asdict, is_dataclass
 from pathlib import Path
-from typing import Any
 
 from lca.contracts.models.observability.journal_doc import JournalDocument
-
-
-def to_jsonable(obj: Any) -> Any:
-    """递归把 dataclass / tuple 转 dict / list(jsonable)。"""
-    if is_dataclass(obj) and not isinstance(obj, type):
-        return {k: to_jsonable(v) for k, v in asdict(obj).items()}
-    if isinstance(obj, dict):
-        return {k: to_jsonable(v) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
-        return [to_jsonable(v) for v in obj]
-    if isinstance(obj, (str, int, float, bool, type(None))):
-        return obj
-    return repr(obj)
+from lca.contracts.observability.ssot import to_jsonable
 
 
 class JournalDocumentWriter:
