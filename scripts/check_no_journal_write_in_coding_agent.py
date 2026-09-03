@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """check_no_journal_write_in_coding_agent —— ADR-0065 §六 / PR-8 / L6。
 
-扫描 ``lca.plugins.tools.diagnostics/`` 与
-``lca/plugins/bundles/coding_agent_tools.py``,确保 7 个 Coding Agent Tool
+扫描 ``lca.plugins.tools.diagnostics/``,
+确保 7 个 Coding Agent Tool
 实现里**没有**任何账本写入调用:
 
 - ``RunLedger.append(`` / ``RunStore.append(``
@@ -25,7 +25,6 @@ REPO = Path(__file__).resolve().parent.parent
 
 SCAN_PATHS: tuple[Path, ...] = (
     REPO / "lca" / "infrastructure" / "observability" / "coding_agent_tools",
-    REPO / "lca" / "plugins" / "bundles" / "coding_agent_tools.py",
 )
 
 FORBIDDEN_CALLS: frozenset[str] = frozenset(

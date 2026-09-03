@@ -52,21 +52,27 @@ profile_aliases:
 
 # Informational: which spine-side plugins this bundle wires.
 plugins:
-  - spine.reflector.signature
-  - spine.reflector.transport
   - spine.wrap.ctx_effect
   - spine.wrap.ctx_intercept
 
 entries:
-  - id: spine.reflector.signature
-    name: spine_reflector_signature
-    $module: lca.plugins.observability.spine.reflectors.signature
-    config: {}
+  # DEPRECATED: dead module reference — see PR-3 of agent note 2026-09-04-plugin-universe-single-entry.md
+  # reflector.signature plugin entry was never instantiated; the
+  # unprefixed capability id (spine.reflector.signature) reveals the
+  # originally intended $module path. Restore if a consumer re-adds it.
+  # - id: spine.reflector.signature
+  #   name: spine_reflector_signature
+  #   $module: lca.plugins.observability.spine.<REDACTED-PATH>
+  #   config: {}
 
-  - id: spine.reflector.transport
-    name: spine_reflector_transport
-    $module: lca.plugins.observability.spine.reflectors.transport
-    config: {}
+  # DEPRECATED: dead module reference — see PR-3 of agent note 2026-09-04-plugin-universe-single-entry.md
+  # reflector.transport plugin entry was never instantiated; the
+  # unprefixed capability id (spine.reflector.transport) reveals the
+  # originally intended $module path. Restore if a consumer re-adds it.
+  # - id: spine.reflector.transport
+  #   name: spine_reflector_transport
+  #   $module: lca.plugins.observability.spine.<REDACTED-PATH>
+  #   config: {}
 
   - id: spine.wrap.ctx_effect
     name: spine_wrap_ctx_effect
