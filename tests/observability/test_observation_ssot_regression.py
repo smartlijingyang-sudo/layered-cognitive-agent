@@ -339,3 +339,74 @@ def test_outcome_projector_failed_emits_exception_caught(
     run_failed = next(f for f in journal.facts if getattr(f, "kind", "") == "run.failed")
     assert run_failed.payload["traceback"], "traceback must be on RunFact"
     assert "PG-007" in run_failed.payload["traceback"]
+
+
+# ── 4. H-seg 一致性:act.fold 在 step close 之后到达也 attach ────────────
+
+
+def test_phase_act_fold_after_step_close_attaches_to_closed_step(
+    tmp_path: Path,
+) -> None:
+    """``brain.think.end`` 之后 cursor 还在 act 窗口发 ``phase.act.fold``,
+    deriver 必须把它 attach 到刚 close 的 step (而不是 orphan 到 _phases),
+    让 H-seg 报 ``sum(steps.segments) == totals.segments`` —— 否则
+    doctor 永远抓不到这一类物化漏算。
+
+    这是 run_6f2b73a32d32 那种"totals.segments=8 但 sum(steps.segments)=6"
+    的直接根因 (verifiable on the shipped StepTreeAccumulatorDeriver)。
+    """
+    SpineContext.set_run("r_hseg")
+    run_dir = tmp_path / "r_hseg"
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_hseg",
+        run_dir=run_dir,
+        agent_role="agt",
+        strategy_key="solo",
+        plan_ref="plan",
+    )
+
+    # step_001: brain.think.start → 3 think.fold → brain.think.end
+    # 然后 phase.act.fold 在 think.end 之后到达(orphan 路径)
+    deriver.on_event(_make_event(
+        run_id="r_hseg",
+        execution_point="brain.think.start",
+        sequence=1,
+        payload={"state_id": "x"},
+    ))
+    for i, seq in enumerate((2, 3, 4), start=1):
+        deriver.on_event(_make_event(
+            run_id="r_hseg",
+            execution_point="phase.think.fold",
+            sequence=seq,
+            payload={"phase": "think", "summary": "t1"},
+        ))
+    deriver.on_event(_make_event(
+        run_id="r_hseg",
+        execution_point="brain.think.end",
+        sequence=5,
+        outcome="success",
+        payload={"state_id": "x"},
+    ))
+    # 这里 _open_step 已被 close step_001,_closed_frames[-1] = step_001
+    deriver.on_event(_make_event(
+        run_id="r_hseg",
+        execution_point="phase.act.fold",
+        sequence=6,
+        payload={"phase": "act", "summary": "orphan-act"},
+    ))
+
+    deriver.flush()
+
+    doc = read_step_document(run_dir / "journal.json")
+    assert len(doc.steps) == 1, f"expected 1 step, got {len(doc.steps)}"
+    step = doc.steps[0]
+    # 3 think.fold + 1 act.fold 都必须 attach 到 step_001
+    seg_kinds = [seg.kind for seg in step.segments]
+    assert seg_kinds.count("think") == 3, f"expected 3 think segs, got {seg_kinds.count('think')}"
+    assert seg_kinds.count("act") == 1, f"act.fold must attach to closed step_001, got segs={seg_kinds}"
+
+    # H-seg 校验:sum(steps.segments) == totals.segments(都是 4)
+    sum_segs = sum(len(s.segments) for s in doc.steps)
+    assert sum_segs == doc.totals.segments, (
+        f"H-seg 不一致:sum(steps.segments)={sum_segs} != totals.segments={doc.totals.segments}"
+    )

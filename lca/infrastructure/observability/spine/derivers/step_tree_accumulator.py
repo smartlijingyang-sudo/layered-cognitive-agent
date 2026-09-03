@@ -692,11 +692,29 @@ class StepTreeAccumulatorDeriver(Deriver):
         self._open_segment_id = None
 
     def _record_phase(self, event: EventRecord, kind: StepPhase, ts: float) -> None:
+        # SSOT 收口(2026-09-03):phase.fold 在 ``brain.think.end`` 之后
+        # cursor 还在 act 窗口发 ``phase.act.fold``,这时 ``_open_step``
+        # 已 close。旧实现 ``if self._open_step is not None and kind in
+        # {"think","act"}`` 会让 act.fold 落到孤儿 ``_phases``,
+        # ``totals.segments`` 累积了但任何 step.segments 都没接上 →
+        # H-seg 报 ``sum(steps.segments)=N != totals.segments=N+act_fold``。
+        # 解析规则:
+        # 1. ``self._open_step`` 仍在 → 归到当前 open step(原行为)。
+        # 2. ``_open_step is None`` → 归到 ``_closed_frames[-1]``(最近
+        #    一个 closed step);cursor 在 close 之后到下一个 step begin
+        #    之前的 phase.fold 全部归这同一个 closed step —— 这是 SSOT
+        #    的"step 时间窗"语义。
+        # 注意:phase.fold event 不带 ``payload.step_index``(cursor 不写),
+        # 不能走 ``_resolve_step_target``(后者依赖 step_index);这里独立
+        # 用时间窗逻辑,与 tool_call/result record 的契约互不干扰。
+        target: _StepFrame | None = self._open_step
+        if target is None and self._closed_frames:
+            target = self._closed_frames[-1]
         self._phase_seq += 1
         ph = PhaseRecord(
             phase_id=f"phase_{self._phase_seq:04d}",
             kind=kind,
-            step_id=self._open_step.step_id if self._open_step else None,
+            step_id=target.step_id if target is not None else None,
             segment_id=self._open_segment_id,
             entered_at=int(ts),
             exited_at=None,
@@ -704,12 +722,13 @@ class StepTreeAccumulatorDeriver(Deriver):
             outcome=event.outcome or None,
         )
         self._phases.append(ph)
-        # ADR-0176 D1 §1 (2):phase.fold(think / act)累计到当前 _open_step.segments
-        # —— 替代旧实现「只在 writable.segment.* 累计」造成的 backend ReAct 路径
-        # segments 永远空的缺陷。segs 只用于人读叙事聚合,不参与 _resolve_outcome。
-        if self._open_step is not None and kind in {"think", "act"}:
+        # ADR-0176 D1 §1 (2):phase.fold(think / act)累计到当前 step 的
+        # segments —— 替代旧实现「只在 writable.segment.* 累计」造成的
+        # backend ReAct 路径 segments 永远空的缺陷。segs 只用于人读叙事
+        # 聚合,不参与 _resolve_outcome。
+        if target is not None and kind in {"think", "act"}:
             self._seg_seq += 1
-            self._open_step.segments.append(
+            target.segments.append(
                 SegmentRecord(
                     segment_id=f"seg_{self._seg_seq:04d}",
                     kind=kind,
