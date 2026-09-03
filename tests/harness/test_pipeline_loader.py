@@ -28,7 +28,7 @@ from lca_kernel.events import TeamDelegationCacheHit
 from lca_kernel.events.bus import EventBus, FailureSemantics
 from lca_kernel.events.errors import UnauthorizedSubscribeError
 from lca_kernel.events.hooks import DefaultFailureHook, PayloadSchemaHook
-from lca_kernel.events.mechanism import _DEFAULT_CONFIG_DIR
+from lca_kernel.events import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.pipeline import HookSpec, Pipeline, Stage
 from lca_kernel.events.registry import EventRegistry
 from lca_kernel.events.sinks.spine_sink import SpineSink, SpineSinkClosedError

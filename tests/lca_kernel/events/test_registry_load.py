@@ -8,7 +8,7 @@ import pytest
 
 from lca.contracts.event import Category, EventPayload, Plane
 from lca_kernel.events.errors import UnknownCategoryError
-from lca_kernel.events.mechanism import _DEFAULT_CONFIG_DIR
+from lca_kernel.events import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.registry import EventRegistry, EventSpec
 
 

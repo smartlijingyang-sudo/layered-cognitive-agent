@@ -20,7 +20,7 @@ from lca_kernel.events.bus import (
     set_trace_id,
 )
 from lca_kernel.events.hooks import PublishContext, TraceContextHook
-from lca_kernel.events.mechanism import _DEFAULT_CONFIG_DIR
+from lca_kernel.events import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.registry import EventRegistry
 
 

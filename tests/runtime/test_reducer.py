@@ -17,7 +17,7 @@ from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.core.stop import StopDecision
 from lca.runtime.reducer import DefaultReducer
 from lca_kernel.events.bus import EventBus
-from lca_kernel.events.mechanism import _DEFAULT_CONFIG_DIR
+from lca_kernel.events import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.payloads_spine import SpineEventPayload
 from lca_kernel.events.registry import EventRegistry
 

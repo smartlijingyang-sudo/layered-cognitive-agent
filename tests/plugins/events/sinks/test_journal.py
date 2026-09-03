@@ -12,7 +12,7 @@ from lca.plugins.events.subscribers.console_projector.subscriber import (
 )
 from lca_kernel.events.bus import EventBus, EventRef
 from lca_kernel.events.hooks import FailureSemantics
-from lca_kernel.events.mechanism import _DEFAULT_CONFIG_DIR
+from lca_kernel.events import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.registry import EventRegistry
 
 

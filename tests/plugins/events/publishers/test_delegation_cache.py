@@ -14,7 +14,7 @@ from lca.plugins.events.publishers.delegation_cache.plugin import (
 )
 from lca_kernel.events import TeamDelegationCacheHit
 from lca_kernel.events.bus import EventBus, EventRef
-from lca_kernel.events.mechanism import _DEFAULT_CONFIG_DIR
+from lca_kernel.events import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.registry import EventRegistry
 
 

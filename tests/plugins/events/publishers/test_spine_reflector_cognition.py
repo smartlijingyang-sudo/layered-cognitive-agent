@@ -1,11 +1,12 @@
 """spine_reflector_cognition publisher 端到端（ADR-0181 试点盖章条件 1+2 / ADR-0183 PR-7）。"""
+
 from __future__ import annotations
 
 import pytest
 
 from lca_kernel.events.bus import EventBus
 from lca_kernel.events.errors import UnauthorizedPublishError
-from lca_kernel.events.mechanism import _DEFAULT_CONFIG_DIR
+from lca_kernel.events import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.payloads import SpineEventPayload
 from lca_kernel.events.registry import EventRegistry
 
@@ -41,6 +42,7 @@ def test_authorized_publisher_sends(bus: EventBus) -> None:
 
 def test_unauthorized_publisher_rejected(bus: EventBus) -> None:
     """盖章 2: 未在 yaml publishers 白名单的 plugin 调 publish → UnauthorizedPublish。"""
+
     class NotInWhitelist:
         pass
 

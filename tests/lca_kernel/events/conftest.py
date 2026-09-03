@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from lca_kernel.events.bus import EventBus
-from lca_kernel.events.mechanism import _DEFAULT_CONFIG_DIR
+from lca_kernel.events import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.registry import EventRegistry
 
 

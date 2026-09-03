@@ -1,4 +1,5 @@
 """spine_step_tree_accumulator subscriber 端到端（ADR-0181 试点盖章条件 3 / ADR-0183 PR-7）。"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -14,7 +15,7 @@ from lca.plugins.events.subscribers.spine_step_tree_accumulator.subscriber impor
 )
 from lca_kernel.events.bus import EventBus
 from lca_kernel.events.errors import UnauthorizedSubscribeError
-from lca_kernel.events.mechanism import _DEFAULT_CONFIG_DIR
+from lca_kernel.events import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.payloads import SpineEventPayload
 from lca_kernel.events.registry import EventRegistry
 
@@ -47,6 +48,7 @@ def test_authorized_subscriber_receives(bus: EventBus) -> None:
 
 def test_unauthorized_subscriber_rejected(bus: EventBus) -> None:
     """盖章 3: 偷听 — 未在 yaml subscribers 白名单的 plugin 调 subscribe → raise。"""
+
     class NotInWhitelist:
         pass
 

@@ -2,7 +2,7 @@
 
 webserver 请求作用域的 ambient trace_id 接入点:请求进入时
 :func:`lca_kernel.events.bus.set_trace_id` 一个新 trace,离开时用
-token reset。EventBus / EventMechanism publish 缺显式 trace_id 时回退
+token reset。EventBus.publish 缺显式 trace_id 时回退
 到该 ambient 值,同一请求内的事件链共享一个 trace_id;contextvars 按
 asyncio Task 复制,并发请求互不串。
 

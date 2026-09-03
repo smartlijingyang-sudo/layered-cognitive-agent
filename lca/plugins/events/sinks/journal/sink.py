@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.event import EventPayload
-from lca_kernel.events.mechanism import EventRef
+from lca_kernel.events import EventRef
 
 
 @dataclass(frozen=True, slots=True)

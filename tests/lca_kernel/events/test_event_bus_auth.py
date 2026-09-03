@@ -17,7 +17,7 @@ from lca_kernel.events.errors import (
     UnauthorizedSubscribeError,
 )
 from lca_kernel.events.hooks import FailureSemantics as HookFailureSemantics
-from lca_kernel.events.mechanism import _DEFAULT_CONFIG_DIR
+from lca_kernel.events import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.registry import EventRegistry
 
 

@@ -1,6 +1,8 @@
-"""EventBus —— ADR-0183 §3.1。
+"""EventBus —— ADR-0183 §3.1 / ADR-0183 PR-7 收口。
 
-LCA 事件总线唯一入口。旧 EventMechanism 保留兼容(14 天过渡),EventBus 是新 SSOT。
+LCA 事件总线唯一入口（SSOT）。原 EventMechanism（ADR-0180）在 PR-7 收口
+删除，EventBus.publish 是 producer 唯一入口，EventBus.subscribe(*, failure=...)
+是 consumer 唯一入口。
 
 不变量:
 - I-FW-BUS-1: publish 是 producer 唯一入口;subscribers 是 consumer 唯一入口
@@ -45,7 +47,6 @@ from lca_kernel.events.hooks import (
     PublishContext,
     SkipDispatch,
 )
-from lca_kernel.events.mechanism import EventRef
 from lca_kernel.events.payloads import (
     DISPATCH_SELF_OBSERVATION_CATEGORIES,
     MechanismDispatchEventPayload,
@@ -60,6 +61,19 @@ _log = logging.getLogger(__name__)
 P = TypeVar("P", bound=EventPayload)
 
 
+# ── EventRef(从 mechanism.py 收口迁入)────────────────────────────────────
+
+
+@dataclass(frozen=True, slots=True)
+class EventRef:
+    """机制返回给发送方的轻量引用。"""
+
+    event_id: str
+    category: str
+    trace_id: str
+    ts: float
+
+
 # ── ambient trace_id(ADR-0183 §3.9)─────────────────────────────────────
 
 _current_trace_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
@@ -68,7 +82,7 @@ _current_trace_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 """当前上下文的 ambient trace_id。
 
 由请求/任务入口(webserver lifespan_adapter)在边界 set、离开时 reset;
-EventBus.publish 与 EventMechanism.send 缺显式 trace_id 时回退到本值。
+EventBus.publish 缺显式 trace_id 时回退到本值。
 contextvars 随 asyncio Task / copy_context 隔离,跨请求不串。
 """
 
@@ -94,8 +108,7 @@ def current_trace_id() -> str | None:
 class PayloadSchemaError(EventMechanismError):
     """payload 与 spec 不符(ADR-0183 §3.1 step 4)。
 
-    在 lca_kernel.events.errors 已有 EventMechanismError 基类;本类作为最小
-    占位,本 PR 不修改 errors.py(PR-3 同步加入 errors)。
+    EventMechanismError 类名保留以兼容(详见 errors.py 顶部 docstring)。
     """
 
 
@@ -156,13 +169,12 @@ class EventBus(Generic[P]):
 
     @classmethod
     def default(cls) -> EventBus[P]:
-        # 推迟导入避免循环(bus 引用 mechanism,mechanism 不应 import bus)
-        from lca_kernel.events.mechanism import EventMechanism
-
         if cls._default_instance is None:
-            mechanism = EventMechanism.default()
-            bus: EventBus[P] = cls(mechanism.registry)
-            cls._default_instance = bus
+            from pathlib import Path
+
+            config_dir = Path(__file__).parent / "config"
+            registry = EventRegistry.load(config_dir)
+            cls._default_instance = cls(registry)
         return cls._default_instance
 
     @classmethod
@@ -222,8 +234,8 @@ class EventBus(Generic[P]):
         """唯一消费入口。failure=FAIL_FAST 走 sink 路径(失败上抛);
         failure=CONTAINED 走 subscriber 路径(失败吞错)。
 
-        鉴权用 registry.can_subscribe(EventMechanism 已有白名单;sink 复用
-        subscribers 白名单,见 mechanism.py:140 注释)。
+        鉴权用 registry.can_subscribe（yaml subscribers 白名单装载时已物化
+        进 ``subscribers`` 映射,sink 复用 subscribers 白名单）。
         """
         if plugin is None or not isinstance(plugin, type):
             raise MissingPluginIdentityError("subscribe")
@@ -479,6 +491,7 @@ class EventBus(Generic[P]):
 __all__ = [
     "ConsumerHandle",
     "EventBus",
+    "EventRef",
     "FailureSemantics",
     "PayloadSchemaError",
     "current_trace_id",

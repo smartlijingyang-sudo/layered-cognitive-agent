@@ -1,7 +1,7 @@
-"""Spine 壳类 payload（ADR-0181 D2）。
+"""Spine 壳类 payload（ADR-0181 D2 / ADR-0183 PR-7）。
 
 承载 spine EP 字符串 + caller payload dict + chain 字段，套进
-:class:`EventMechanism` 发送。SPINE_EXECUTION_POINTS 是 spine EP 字符串闭集,
+:class:`EventBus` 发送。SPINE_EXECUTION_POINTS 是 spine EP 字符串闭集，
 完整迁移自 ``lca/infrastructure/observability/spine/manifest.py`` 的
 ``EXECUTION_POINTS`` 75 EP（试点 PR 已迁 1 个，余 74 个按 ADR-0181 §迁移
 PR 切分逐个扩到 ``lca_kernel/events/config/observability/spine.yaml``）。
@@ -303,9 +303,7 @@ class SpineEventPayload(EventPayload):
             ep = data["execution_point"]
             cat_str = _SPINE_EP_TO_CATEGORY.get(ep)
             if cat_str is None:
-                raise ValueError(
-                    f"spine EP {ep!r} 未登记 category 映射（ADR-0181 后续 PR 补）"
-                )
+                raise ValueError(f"spine EP {ep!r} 未登记 category 映射（ADR-0181 后续 PR 补）")
             data = {**data, "category": Category(cat_str)}
         return data
 

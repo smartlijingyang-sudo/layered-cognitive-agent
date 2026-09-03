@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink
-from lca_kernel.events.mechanism import EventRef
+from lca_kernel.events import EventRef
 from lca_kernel.events.payloads import SpineEventPayload
 
 _NINE_KEYS = {

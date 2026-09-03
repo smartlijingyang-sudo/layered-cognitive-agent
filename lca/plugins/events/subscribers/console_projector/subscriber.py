@@ -9,7 +9,7 @@ import sys
 from typing import TextIO
 
 from lca.contracts.event import EventPayload
-from lca_kernel.events.mechanism import EventRef
+from lca_kernel.events import EventRef
 
 
 class ConsoleProjectorSubscriber:

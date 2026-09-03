@@ -1,4 +1,5 @@
 """spine_chain_sink 端到端（ADR-0181 试点盖章条件 5: chain 完整性 / ADR-0183 PR-7）。"""
+
 from __future__ import annotations
 
 import json
@@ -13,7 +14,7 @@ from lca.plugins.events.publishers.spine_reflector_cognition.plugin import (
 from lca.plugins.events.sinks.spine_chain_sink.sink import SpineChainSink
 from lca_kernel.events.bus import EventBus
 from lca_kernel.events.hooks import FailureSemantics
-from lca_kernel.events.mechanism import _DEFAULT_CONFIG_DIR
+from lca_kernel.events import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.payloads import SpineEventPayload
 from lca_kernel.events.registry import EventRegistry
 
@@ -33,9 +34,7 @@ def bus(tmp_path) -> EventBus:
     return b
 
 
-def test_chain_sink_writes_two_records_with_hashes(
-    bus: EventBus, tmp_path: Path
-) -> None:
+def test_chain_sink_writes_two_records_with_hashes(bus: EventBus, tmp_path: Path) -> None:
     """盖章 5: sink 落盘时算 hash chain,2 个 record 形成 prev_event_hash 链。"""
     chain_path = tmp_path / "chain.jsonl"
     assert not chain_path.exists()

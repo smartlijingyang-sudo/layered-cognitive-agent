@@ -40,7 +40,7 @@ from typing import TYPE_CHECKING, Any, TextIO, TypeGuard
 
 if TYPE_CHECKING:
     from lca.contracts.event import EventPayload
-    from lca_kernel.events.mechanism import EventRef
+    from lca_kernel.events import EventRef
     from lca_kernel.events.payloads_spine import SpineEventPayload
 
 log = logging.getLogger(__name__)
