@@ -23,8 +23,8 @@ ADR-0169 §D11 PR-1 之后业务路径只允许两件事:``cursor.advance(phase)
 - Adapter **不** 替代 StepCoordinator;Coord 的 begin_step / end_step / segment
   状态机仍由 StepCoordinator 持有(派生驱动 cursor 的 step_index)。
 - ``coord.record_thinking / tool_call / tool_result`` 优先走 cursor;
-  ``coord.begin_step / end_step / segment_* / emit_phase / emit`` 由
-  StepCoordinator 内部派生 cursor.advance(phase)。
+  ``coord.begin_step / end_step / segment_*`` 由 StepCoordinator 内部派生
+  cursor.advance(phase)。
 - 删除条件:grep ``coord.begin_step`` in ``lca/`` = 0 + grep
   ``coord.record_thinking`` in ``lca/`` = 0(ADR-0169 §D9,绑定 PR-21~24 后)。
 
@@ -32,12 +32,12 @@ COMPAT 块(AGENTS.md §1 + G15 模板)
 -----------------------------------
 # COMPAT(delete-when: PR-21~24 grep 全部为 0, tracking: ADR-0169-task-25)
 # 兼容窗口:web-standard 业务迁移(PR-21~24)期间,coord.* 必须继续工作。
-# 删除条件:``grep -rn "coord.begin_step|coord.record_thinking|coord.emit_phase" lca/cognition lca/body lca/runtime lca/agent`` 输出 0。
+# 删除条件:``grep -rn "coord.begin_step|coord.record_thinking" lca/cognition lca/body lca/runtime lca/agent`` 输出 0。
 """
 
 from __future__ import annotations
 
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from typing import Any
 
 from lca.contracts.models.observability.journal_step import (
@@ -75,7 +75,7 @@ def get_current_cursor() -> LoopCursor | None:
     return _current_cursor.get()
 
 
-def bind_current_cursor(cursor: LoopCursor) -> Any:
+def bind_current_cursor(cursor: LoopCursor) -> Token[LoopCursor | None]:
     """绑定 cursor;返回 reset token,由调用方在 finally 释放。"""
     return _current_cursor.set(cursor)
 
@@ -108,8 +108,6 @@ class CoordinatorAdapter:
             coord.begin_step(phase, **ctx) → cursor.advance(phase)
         ``end_step(...)`` →
             coord.end_step(...) + cursor.advance('stop')(当 phase == 'act')
-        ``emit_phase(phase, objective, summary, outcome)`` →
-            cursor.advance(phase)(phase 派生 EP)
         ``emit(...)`` →
             coord.emit(...) 只走(不翻译,cursor 不暴露任意 EP 入口)
 
@@ -139,7 +137,7 @@ class CoordinatorAdapter:
         step_id = self._coord.begin_step(phase, **ctx)
         # 仅当 cursor 当前 phase != phase 时 advance(避免重复 EP)
         snap = self._cursor.snapshot
-        if snap.phase != phase:  # type: ignore[comparison-overlap]
+        if snap.phase != phase:
             self._cursor.advance(phase)  # type: ignore[arg-type]
         return step_id
 
@@ -151,29 +149,6 @@ class CoordinatorAdapter:
     ) -> None:
         """Step 结束 —— coord 切走,cursor 转到 stop 候选(由调用方决定是否 advance)。"""
         self._coord.end_step(outcome, error=error)
-
-    # ── phase 边(perceive/reflect/remember/stop 不开 step) ──────
-
-    def emit_phase(
-        self,
-        *,
-        phase: str,
-        objective: str,
-        summary: str,
-        outcome: str = "ok",
-    ) -> None:
-        r"""兼容壳 —— SSOT 收口后由调用方直接走 cursor.advance。
-
-        COMPAT(delete-when: ``rg "CoordinatorAdapter.emit_phase\|coord.emit_phase" lca/`` = 0,
-        tracking: ADR-0169-task-25)。业务路径必须改用 cursor.advance 并显式
-        标 objective_kind;不再由 Adapter 暗中翻译,杜绝 keyword 错位 bug
-        (历史:``objective=model`` 误传导致同 EP 出两条 payload)。
-        """
-        del outcome  # outcome 已统一在 cursor.advance 不传,由 caller 决定
-        raise NotImplementedError(
-            "CoordinatorAdapter.emit_phase 已废弃;调用方请改用 cursor.advance(phase, "
-            "objective_kind=..., objective=..., summary=...)"
-        )
 
     # ── record_*: 同时调 cursor + coord(双写) ──────────────────
 

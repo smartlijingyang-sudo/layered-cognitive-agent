@@ -5,7 +5,8 @@
 - ``adapter.begin_step(phase)`` → ``cursor.advance(phase)`` 派生 phase fold EP
 - ``adapter.record_thinking / record_tool_call / record_tool_result`` →
   cursor.record_* 派生对应 EP(payload 字段映射正确)
-- ``adapter.emit_phase(phase=...)`` → cursor.advance(phase) 派生 phase fold
+- ``adapter`` 不再定义 ``emit_phase``(ADR-0183 PR-9);phase fold 由
+  cursor.advance 唯一派生
 - ``adapter.close(reason)`` → cursor.close(reason) 触发 writable.iteration.closing
 - 旧 ``coord.*`` 仍可用(双写 compat)
 
@@ -28,11 +29,11 @@ from lca.contracts.models.observability.journal_step import (
     ToolResult as LegacyToolResult,
 )
 from lca.contracts.observability.incarnation import Incarnation
+from lca.contracts.observability.loop_cursor import CursorSnapshot
+from lca.infrastructure.observability.loop_cursor import StdLoopCursor
 from lca.infrastructure.observability.loop_cursor._capture_io import (
     sha256_digest,
 )
-from lca.contracts.observability.loop_cursor import CursorSnapshot
-from lca.infrastructure.observability.loop_cursor import StdLoopCursor
 from lca.infrastructure.observability.loop_cursor._spine_port import WritePort
 from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
     CoordinatorAdapter,
@@ -258,13 +259,19 @@ def test_adapter_record_tool_result_emits_cursor_tool_result_ep() -> None:
     assert result_ep["payload"]["tool_name"] == ""
 
 
-def test_adapter_emit_phase_is_deprecated() -> None:
-    """SSOT 收口后 emit_phase raise,业务路径必须直接调 cursor.advance(phase, ...) 派生 phase.<x>.fold EP。
+def test_adapter_emit_phase_is_removed() -> None:
+    """ADR-0183 PR-9:``CoordinatorAdapter`` 不再定义 ``emit_phase``。
 
-    删除条件(SSOT-Compat):``rg "CoordinatorAdapter.emit_phase|coord.emit_phase" lca/`` = 0 时,
-    CoordinatorAdapter.emit_phase 整体删除(包括本测试)。
+    phase.<x>.fold EP 由 ``cursor.advance`` 唯一派生;adapter 自己的
+    ``emit_phase`` 兼容壳已删(残留调用经 ``__getattr__`` 透传到
+    ``StepCoordinator.emit_phase``,被 SSOT 守护拦下抛
+    NotImplementedError,行为与删除前一致)。
     """
     adapter, _, _ = _build_adapter()
+
+    assert "emit_phase" not in vars(CoordinatorAdapter), (
+        "CoordinatorAdapter.emit_phase must be removed (ADR-0183 PR-9)"
+    )
 
     raised = False
     try:
@@ -276,7 +283,7 @@ def test_adapter_emit_phase_is_deprecated() -> None:
         )
     except NotImplementedError:
         raised = True
-    assert raised, "adapter.emit_phase must raise NotImplementedError"
+    assert raised, "adapter.emit_phase passthrough must hit coord SSOT guard"
 
     # cursor.advance 仍然派生 phase.<x>.fold EP,SSOT 唯一 writer。
     adapter.cursor.advance(

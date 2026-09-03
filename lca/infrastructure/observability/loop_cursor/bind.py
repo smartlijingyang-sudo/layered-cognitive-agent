@@ -2,9 +2,10 @@
 
 本模块**仅**提供两个薄壳,不在此引入新控制面:
 
-- :class:`SpineWritePortAdapter` —— 把 :class:`EventSpine` 包成
-  :class:`WritePort` 协议位,让 :class:`StdLoopCursor` 可走同一 spine 句柄
-  (事件不二次落盘;cursor 是事件源端而非 sink)。
+- :class:`SpineWritePortAdapter` —— 把 spine 句柄包成 :class:`WritePort`
+  协议位的 façade;字段映射与写入实现收口在
+  ``_spine_port.write_port_append`` / ``spine_port_append``(ADR-0183 PR-9
+  单一 spine 写入入口),本类只保签名兼容,不重复实现 append。
 - :func:`install_run_cursor` —— 把 cursor 绑到 ContextVar 并返回 reset token,
   wiring 层拿到 token 在 run 结束 (close) 时释放。
 
@@ -28,46 +29,19 @@ from contextvars import Token
 from typing import Any
 
 from lca.contracts.observability.loop_cursor import LoopCursor
-
-# EventSpine.append 的真实签名跟 WritePort 协议位不同;这里给出
-# 字段名映射,只把 cursor 关心的 4 个字段映射过去。
-#
-#   EventSpine.append(
-#       execution_point, caller_payload, channel, outcome, span_ctx,
-#       phase, reason, when,
-#   )
-#   ↳ WritePort.append(
-#       execution_point, payload, run_id, seq, incarnation, phase,
-#   )
-#
-# seq / run_id / incarnation 由 EventSpine 内部 SpineContext 主导分配;
-# cursor 给的 seq / incarnation / run_id 仅当 EventSpine 接受,本 adapter
-# 用 ``SpineContext.set_run`` 同步,然后 :meth:`EventSpine.append` 内部
-# 依然以 SpineContext 为准(SSOT 不漂)。
-
-
-def _set_run_on_spine(event_spine: Any, run_id: str, seq: int) -> None:
-    """让 :class:`EventSpine` 接下来 ``append`` 时把这条事件关联到当前 run。
-
-    :class:`EventSpine` 通过 :func:`SpineContext.get_run` 取 run_id
-    (见 ``event_spine.append`` 的内部实现);这里复用同一 :class:`SpineContext`
-    钩子,而**不**给 :class:`EventSpine` 加新方法。
-    """
-    from lca.infrastructure.observability.spine.context import SpineContext
-
-    SpineContext.set_run(run_id)
+from lca.infrastructure.observability.loop_cursor._spine_port import write_port_append
 
 
 class SpineWritePortAdapter:
-    """EventSpine → :class:`WritePort` 协议位薄壳。
+    """spine 句柄 → :class:`WritePort` 协议位的 façade。
 
-    cursor 唯一允许调用的 spine 面是 :class:`WritePort` (ADR-0169 D1 / L10);
-    EventSpine 字段更多但语义同构(都是单写 append-only)。
-    本 adapter **不** 二次写盘,只是把 cursor 的 WritePort API 翻译到
-    EventSpine 真实 API。
-
-    与 ADR-0169 L10 的关系:L10 是「events.jsonl 由 EventSpine.append 唯一写入」
-    —— cursor 通过本 adapter 调到的也是 EventSpine.append,故 L10 不漂。
+    cursor 唯一允许调用的 spine 面是 :class:`WritePort`(ADR-0169 D1 / L10);
+    ADR-0183 PR-9 之后字段映射与写入实现收口在
+    :func:`lca.infrastructure.observability.loop_cursor._spine_port.write_port_append`
+    → ``spine_port_append``(单一写入实现),本 adapter 不重复实现
+    ``append``,只保签名兼容(外部调用方与 :class:`WritePort` 契约不破)。
+    与 L10 的关系不变:events 仍由单一写入实现经 FileSink 落
+    ``<run_id>.spine.jsonl``,cursor 是事件源端而非 sink。
     """
 
     __slots__ = ("_spine",)
@@ -87,29 +61,16 @@ class SpineWritePortAdapter:
         incarnation: int,
         phase: str | None,
     ) -> int:
-        """L10 单写: 直接落 EventSpine.append,字段映射一次。
-
-        Note
-        ----
-        :class:`EventSpine.append` 内部 seq / run_id 走 :class:`SpineContext`
-        自增;cursor 给的 seq 仅当 :class:`EventSpine` 接受 (as payload),
-        真实 seq 由 SpineContext 决定。payload 携带 incarnation 字段供
-        ADR-0169 L14 envelope 校验。
-        """
-        _set_run_on_spine(self._spine, run_id, seq)
-        # incarnation 进 payload(L14 envelope);seq / run_id 由 SpineContext 管。
-        merged_payload = {**payload, "incarnation": incarnation}
-        self._spine.append(
+        """Façade — 转发 ``_spine_port.write_port_append`` 单一写入入口。"""
+        return write_port_append(
+            self._spine,
             execution_point=execution_point,
-            caller_payload=merged_payload,
-            channel="fact",
-            outcome=None,
-            span_ctx=None,
-            phase="live" if phase is None else str(phase),
-            reason=None,
-            when=None,
+            payload=payload,
+            run_id=run_id,
+            seq=seq,
+            incarnation=incarnation,
+            phase=phase,
         )
-        return seq
 
 
 def install_run_cursor(cursor: LoopCursor) -> Token[Any]:

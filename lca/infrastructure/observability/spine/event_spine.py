@@ -3,6 +3,11 @@
 All callers go through ``spine.append(...)``. Direct calls to legacy
 ``RunStore.append`` etc. are forbidden at runtime by I4.
 
+ADR-0183 PR-9: the write implementation is collapsed into
+``loop_cursor._spine_port.spine_port_append``; this class keeps assembly
+(sinks / subscribers), ``subscribe`` and ``flush`` / ``close`` lifecycle,
+and forwards ``append`` to the single port.
+
 FD-1 sink errors propagate to caller (fail-fast).
 FD-2 deriver errors are contained: a logged spine.deriver_failed event
        is emitted; the original event still reaches the sink.
@@ -10,14 +15,12 @@ FD-2 deriver errors are contained: a logged spine.deriver_failed event
 
 from __future__ import annotations
 
-import hashlib
-import json
-import logging
 from collections.abc import Callable
 from contextlib import suppress
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
+from lca.infrastructure.observability.loop_cursor._spine_port import spine_port_append
 from lca.infrastructure.observability.spine.context import SpineContext
 from lca.infrastructure.observability.spine.event_record import (
     Channel,
@@ -26,8 +29,6 @@ from lca.infrastructure.observability.spine.event_record import (
     Phase,
 )
 from lca.infrastructure.observability.spine.sinks.base import EventSink
-
-log = logging.getLogger(__name__)
 
 
 class EventSpine:
@@ -69,76 +70,23 @@ class EventSpine:
         reason: str | None = None,
         when: datetime | None = None,
     ) -> EventRecord:
-        """Stamp and dispatch an event to all sinks (FD-1) and subscribers (FD-2)."""
+        """Façade — forward to ``spine_port_append``, the single write impl.
 
-        now = when or datetime.now(timezone.utc)
-        seq = SpineContext.next_sequence()
-        epoch = SpineContext.next_epoch()
-        parent_id = (
-            span_ctx.parent_span_id
-            if span_ctx is not None
-            else (SpineContext.current_span().span_id if SpineContext.current_span() else None)
-        )
-        span_id = span_ctx.span_id if span_ctx is not None else f"lca-seq-{seq:08x}"
-        run_id = SpineContext.get_run() or "default-run"
-        step_id = SpineContext.get_step()
-        prev_hash = SpineContext.last_hash()
-        causality_payload = json.dumps(
-            {
-                "execution_point": execution_point,
-                "channel": channel,
-                "payload": caller_payload or {},
-                "span_id": span_id,
-                "epoch": epoch,
-            },
-            sort_keys=True,
-            default=str,
-        )
-        causality_id = "sha256:" + hashlib.sha256(causality_payload.encode()).hexdigest()
-        new_hash = (
-            "sha256:"
-            + hashlib.sha256(((prev_hash or "") + causality_id).encode("utf-8")).hexdigest()
-        )
-
-        record = EventRecord(
+        Signature and failure semantics (FD-1 / FD-2) are unchanged; the
+        implementation lives in ``loop_cursor._spine_port`` (ADR-0183 PR-9).
+        """
+        return spine_port_append(
+            self._sinks,
+            self._subscribers,
             execution_point=execution_point,
             channel=channel,
-            span_id=span_id,
-            parent_span_id=parent_id,
-            sequence=seq,
-            epoch=epoch,
-            causality_id=causality_id,
+            caller_payload=caller_payload,
             outcome=outcome,
-            when=now,
-            when_corrected=now,
-            prev_event_hash=prev_hash,
-            run_id=run_id,
-            step_id=step_id,
-            payload=caller_payload or {},
+            span_ctx=span_ctx,
             phase=phase,
             reason=reason,
+            when=when,
         )
-
-        # FD-1: sinks fail-fast; first error propagates
-        for sink in self._sinks:
-            sink.write(record)
-
-        SpineContext.chain_hash(new_hash)
-
-        # FD-2: subscribers contained; failures logged, never propagated
-        for fn in tuple(self._subscribers):
-            try:
-                fn(record)
-            except Exception as exc:
-                log.warning(
-                    "spine.deriver_failed execution_point=%s deriver=%s err=%s",
-                    record.execution_point,
-                    getattr(fn, "__qualname__", repr(fn)),
-                    exc,
-                    exc_info=True,
-                )
-
-        return record
 
     def flush(self) -> None:
         for sink in self._sinks:
