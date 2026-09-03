@@ -191,20 +191,31 @@ class EventBus(Generic[P]):
         self,
         payload: EventPayload,
         *,
-        producer: type,
+        producer: type | str,
         trace_id: str | None = None,
     ) -> EventRef:
-        """唯一发送入口。流程见 ADR-0183 §3.1 publish 流程 1–9。"""
-        if producer is None or not isinstance(producer, type):
-            raise MissingPluginIdentityError("publish")
+        """唯一发送入口。流程见 ADR-0183 §3.1 publish 流程 1–9。
+
+        PR-5：``producer`` 可为 plugin ``type``（legacy）或 plugin ``id``
+        字符串（catalog 解析）。id 形态未在 catalog → 视为未授权，抛
+        :class:`UnauthorizedPublishError` 并附加更清晰的错误信息。
+        """
+        producer_cls = self._coerce_producer(producer)
+        if producer_cls is None:
+            raise MissingPluginIdentityError(
+                "publish" if producer is None else f"publish(producer={producer!r})"
+            )
         category = payload.category
 
-        if not self._registry.can_publish(producer, category):
-            raise UnauthorizedPublishError(producer.__qualname__, category.value)
+        if not self._registry.can_publish(producer_cls, category):
+            identifier = producer_cls.__qualname__
+            if isinstance(producer, str):
+                identifier = f"id={producer!r}"
+            raise UnauthorizedPublishError(identifier, category.value)
 
-        ctx = PublishContext(bus=self, producer=producer, ts=time.time(), trace_id=trace_id)
+        ctx = PublishContext(bus=self, producer=producer_cls, ts=time.time(), trace_id=trace_id)
 
-        effective = self._run_pre_dispatch(payload, producer, ctx)
+        effective = self._run_pre_dispatch(payload, producer_cls, ctx)
         self._validate_schema(category, effective)
 
         ref = EventRef(
@@ -237,7 +248,7 @@ class EventBus(Generic[P]):
     def subscribe(
         self,
         *,
-        plugin: type,
+        plugin: type | str,
         category: Category | str,
         on_event: Callable[[EventPayload, EventRef], None],
         failure: FailureSemantics = FailureSemantics.CONTAINED,
@@ -245,16 +256,25 @@ class EventBus(Generic[P]):
         """唯一消费入口。failure=FAIL_FAST 走 sink 路径(失败上抛);
         failure=CONTAINED 走 subscriber 路径(失败吞错)。
 
+        PR-5：``plugin`` 可为 plugin ``type``（legacy）或 plugin ``id``
+        字符串（catalog 解析）。id 形态未在 catalog → 视为未授权。
+
         鉴权用 registry.can_subscribe（yaml subscribers 白名单装载时已物化
         进 ``subscribers`` 映射,sink 复用 subscribers 白名单）。
         """
-        if plugin is None or not isinstance(plugin, type):
-            raise MissingPluginIdentityError("subscribe")
+        plugin_cls = self._coerce_producer(plugin)
+        if plugin_cls is None:
+            raise MissingPluginIdentityError(
+                "subscribe" if plugin is None else f"subscribe(plugin={plugin!r})"
+            )
         cat = self._coerce_category(category)
-        if not self._registry.can_subscribe(plugin, cat):
-            raise UnauthorizedSubscribeError(plugin.__qualname__, cat.value)
-        self._subscribers[cat].append((plugin, on_event, failure))
-        return ConsumerHandle(plugin=plugin, category=cat)
+        if not self._registry.can_subscribe(plugin_cls, cat):
+            identifier = plugin_cls.__qualname__
+            if isinstance(plugin, str):
+                identifier = f"id={plugin!r}"
+            raise UnauthorizedSubscribeError(identifier, cat.value)
+        self._subscribers[cat].append((plugin_cls, on_event, failure))
+        return ConsumerHandle(plugin=plugin_cls, category=cat)
 
     def subscribe_self_observation(
         self,
@@ -493,6 +513,18 @@ class EventBus(Generic[P]):
     @staticmethod
     def _coerce_category(category: Category | str) -> Category:
         return category if isinstance(category, Category) else Category(category)
+
+    def _coerce_producer(self, producer: type | str | None) -> type | None:
+        """PR-5：``type`` 形态原样返回；``str`` 走 registry catalog；其余 None。
+
+        与 :meth:`EventRegistry._coerce_plugin` 行为对齐；保留 EventBus
+        端独立一份以便 audit / logging 时直接用 id 字符串做上下文。
+        """
+        if isinstance(producer, type):
+            return producer
+        if isinstance(producer, str):
+            return self._registry.resolve_entity(producer)
+        return None
 
     @property
     def registry(self) -> EventRegistry:

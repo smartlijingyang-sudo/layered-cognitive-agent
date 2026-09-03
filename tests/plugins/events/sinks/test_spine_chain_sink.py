@@ -14,16 +14,15 @@ from lca.plugins.events.publishers.spine_reflector_cognition.plugin import (
 from lca.plugins.events.sinks.spine_chain_sink.sink import SpineChainSink
 from lca_kernel.events.bus import EventBus
 from lca_kernel.events.hooks import FailureSemantics
-from lca_kernel.events import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.payloads import SpineEventPayload
-from lca_kernel.events.registry import EventRegistry
 
 
 @pytest.fixture
 def bus(tmp_path) -> EventBus:
     """独立 EventBus 实例,sink 直接挂在它上面。"""
     config_dir = Path(__file__).resolve().parents[4] / "lca_kernel" / "events" / "config"
-    b = EventBus(EventRegistry.load(config_dir))
+    from lca_kernel.events.test_catalog import build_test_bus
+    b = build_test_bus(config_dir)
     sink = SpineChainSink(output_path=tmp_path / "chain.jsonl")
     b.subscribe(
         plugin=SpineChainSink,

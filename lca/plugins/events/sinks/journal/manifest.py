@@ -35,7 +35,7 @@ class _Config(BaseModel):
 @plugin(
     id="lca.events.sink.journal",
     provides=["event.sink.journal"],
-    requires=["event.bus"],
+    requires=[],
     layer="L0",
     kind=PluginKind.PROVIDER,
     effects="none",
@@ -59,15 +59,21 @@ class _Config(BaseModel):
         emits=("event.sink.journal.written",),
         state_mutation="forbidden",
     ),
+    marker_class=JournalSink,
 )
-async def setup_journal_sink(ctx: PluginContext, config: _Config) -> None:
-    """Journal sink boot：构造 sink + 订阅 EventBus 所有 category。"""
+async def setup(ctx: PluginContext, config: _Config) -> None:
+    """Journal sink boot：构造 sink + 订阅 EventBus 所有 category。
+
+    注：原 setup 会自动订阅 EventBus 所有 category,本 manifest 保留该行为
+    以保证 ``lca.application.spawn`` 路径下 JournalSink 可被 discover。
+    """
     from lca_kernel.events.bus import EventBus
 
     bus_obj = ctx.soft_get("event.bus")
     if not isinstance(bus_obj, EventBus):
-        msg = "event.sink.journal boot 失败：event.bus 未装载"
-        raise RuntimeError(msg)
+        # PR-5：bus 缺位时不抛（profile resolve 完成前 event.bus 可能未到位），
+        # 改由 :meth:`EventRegistry.refresh` 后的实际 bus 自动 subscribe。
+        return
     sink = JournalSink()
     for spec in bus_obj.registry.specs:
         bus_obj.subscribe(

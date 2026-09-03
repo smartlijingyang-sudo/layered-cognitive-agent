@@ -64,6 +64,24 @@ class UnknownCategoryError(EventMechanismError):
         self.source = source
 
 
+class UnknownPluginIdError(EventMechanismError):
+    """PR-5：yaml token 是 id-form 但不在 EventRegistry catalog。
+
+    双轨迁移期错误面之一：token 既不是可 import 的 class-path，又不在
+    已注册的 plugin catalog（id → marker class）内 → 机制 fail-fast，
+    不允许"未登记的 id 静默通过"。delete-when 详见
+    ``2026-09-04-plugin-universe-single-entry`` PR-5。
+    """
+
+    def __init__(self, plugin_id: str, source: str) -> None:
+        super().__init__(
+            f"未知 plugin id={plugin_id!r}（来源 {source!r}）；"
+            "id 不在 EventRegistry catalog，且 class-path 形态 import 失败"
+        )
+        self.plugin_id = plugin_id
+        self.source = source
+
+
 class MissingPluginIdentityError(EventMechanismError):
     """调 send/subscribe 时未传 plugin_id。"""
 
@@ -78,4 +96,5 @@ __all__ = [
     "UnauthorizedPublishError",
     "UnauthorizedSubscribeError",
     "UnknownCategoryError",
+    "UnknownPluginIdError",
 ]

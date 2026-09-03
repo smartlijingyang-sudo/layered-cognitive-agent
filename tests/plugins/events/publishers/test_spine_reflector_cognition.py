@@ -6,16 +6,14 @@ import pytest
 
 from lca_kernel.events.bus import EventBus
 from lca_kernel.events.errors import UnauthorizedPublishError
-from lca_kernel.events import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.payloads import SpineEventPayload
-from lca_kernel.events.registry import EventRegistry
 
 
 @pytest.fixture
 def bus() -> EventBus:
     """用工作区 lca_kernel/events/config 构造 EventBus。"""
-    registry = EventRegistry.load(_DEFAULT_CONFIG_DIR)
-    return EventBus(registry)
+    from lca_kernel.events.test_catalog import build_test_bus
+    return build_test_bus()
 
 
 def test_authorized_publisher_sends(bus: EventBus) -> None:

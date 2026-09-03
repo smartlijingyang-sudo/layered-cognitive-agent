@@ -127,6 +127,12 @@ def _register_event_pipeline(resolved: ResolvedProfile) -> None:
     机制装载（observability 组装）之后执行。未声明且约定文件不存在时
     直接跳过——Pipeline 是可选装配。同名同版 Pipeline 每进程只装载一次；
     sink 的 run_id 绑定由运行时在 run 开始时完成，此处只装配。
+
+    PR-5：从 ``ResolvedProfile.plugins`` 收集声明了 ``marker_class=`` 的
+    插件的 ``id → marker class`` 注入到 ``EventRegistry._plugins`` catalog，
+    并触发 :meth:`EventRegistry.refresh` 重解析 yaml token。然后把 catalog
+    传给 :func:`load_pipeline_for_profile` 让 hooks / sinks 段 ``plugin:``
+    字段按 id 解析。
     """
     from lca.harness.profile.pipeline_loader import (
         load_pipeline_for_profile,
@@ -134,15 +140,42 @@ def _register_event_pipeline(resolved: ResolvedProfile) -> None:
     )
     from lca_kernel.events.bus import EventBus
 
-    pipeline = load_pipeline_for_profile(resolved)
+    bus = EventBus.default()
+    catalog = _collect_marker_catalog(resolved)
+    if catalog:
+        for plugin_id, marker in catalog.items():
+            bus.registry.register_marker(plugin_id, marker)
+        bus.registry.refresh()
+        _log.info(
+            "event registry catalog populated",
+            entries=len(catalog),
+        )
+
+    pipeline = load_pipeline_for_profile(resolved, catalog=catalog)
     if pipeline is None:
         return
-    if register_pipeline_once(EventBus.default(), pipeline):
+    if register_pipeline_once(bus, pipeline):
         _log.info(
             "event pipeline registered",
             pipeline=pipeline.name,
             version=pipeline.version,
         )
+
+
+def _collect_marker_catalog(resolved: ResolvedProfile) -> dict[str, type]:
+    """PR-5：从 ResolvedProfile.plugins 收集 ``id → marker_class``。
+
+    仅收集 ``PluginDefinition.marker_class`` 非 None 的插件；其余插件无
+    marker（不参与事件 yaml id 鉴权）。重复 id → 后者覆盖前者（按
+    ResolvedProfile 已校验的拓扑序，结果唯一）。
+    """
+    out: dict[str, type] = {}
+    for plugin in resolved.plugins:
+        marker = plugin.definition.marker_class
+        if marker is None:
+            continue
+        out[plugin.id] = marker
+    return out
 
 
 async def boot_profile(

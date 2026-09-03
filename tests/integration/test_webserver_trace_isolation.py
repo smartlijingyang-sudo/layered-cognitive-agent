@@ -32,7 +32,8 @@ from lca_kernel.events.registry import EventRegistry
 
 @pytest.fixture
 def bus() -> EventBus[EventPayload]:
-    return EventBus(EventRegistry.load(_DEFAULT_CONFIG_DIR))
+    from lca_kernel.events.test_catalog import build_test_bus
+    return build_test_bus()
 
 
 @pytest.fixture(autouse=True)

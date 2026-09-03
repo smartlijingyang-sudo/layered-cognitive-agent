@@ -59,11 +59,19 @@ class _Config(BaseModel):
         emits=(f"event.{Category.TEAM_DELEGATION_CACHE_HIT.value}",),
         state_mutation="forbidden",
     ),
+    marker_class=DelegationCachePlugin,
 )
-async def setup_delegation_cache(ctx: PluginContext, config: _Config) -> None:
-    """DelegationCachePlugin boot：构造单例 + provide 给 ctx。"""
+async def setup(ctx: PluginContext, config: _Config) -> None:
+    """DelegationCachePlugin boot：构造单例并 provide capability。
+
+    PR-5：原 manifest ``ctx.provide(PUBLISHER_PLUGIN_ID, ...)`` 会触发
+    ``UndeclaredInteractionError``（provide key 与 Manifest provides
+    列表不匹配）。本 manifest 改按 declared capability ``delegation.cache_observation``
+    提供实例，marker class 通过 :attr:`marker_class` 注入 EventRegistry
+    catalog,业务方按 ``producer=DelegationCachePlugin`` 调用 publish。
+    """
     plugin_instance = DelegationCachePlugin()
-    ctx.provide(PUBLISHER_PLUGIN_ID, plugin_instance)
+    ctx.provide("delegation.cache_observation", plugin_instance)
 
 
-__all__ = ["PUBLISHER_PLUGIN_ID"]
+__all__ = ["PUBLISHER_PLUGIN_ID", "setup"]

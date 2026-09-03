@@ -1,0 +1,136 @@
+# bundles/event-bus-components.yaml — 事件总线业务插件装配（PR-5 单入口宇宙）。
+#
+# PR-4 / PR-5：把 lca.plugins.events.publishers / sinks / subscribers 的所有
+# 组件集中到一个 bundle，确保 EventRegistry 的 catalog（id → marker class）
+# 在 profile boot 期被填充。Yaml ``publishers:`` / ``subscribers:`` 按 id
+# 引用这些插件。
+#
+# 删除条件：本目录 17 个组件在 PR-10 收口后由 bundles/observability-default.yaml
+# 一并管理；届时本 bundle 删除。tracking: 2026-09-04-plugin-universe-single-entry
+
+name: event-bus-components
+kind: event_bus_components
+description: |
+  事件总线业务插件装配 bundle。Publisher / sink / subscriber 组件各按其
+  物理目录挂入；marker_class 绑定由本 bundle 在 profile resolve 期
+  注入到 EventRegistry catalog。
+profile_aliases:
+  - web-standard
+
+plugins:
+  - delegation_cache
+  - events.spine_reflector_cognition
+  - events.spine_reflector_body_llm
+  - events.spine_reflector_runtime
+  - events.spine_reflector_agent_spawn
+  - events.spine_reflector_transport
+  - events.spine_reflector_kernel_loop
+  - events.spine_reflector_boot
+  - events.spine_reflector_perception
+  - events.spine_reflector_phase
+  - events.spine_reflector_phase_graph
+  - events.spine_reflector_control
+  - events.spine_reflector_team
+  - events.spine_reflector_writable
+  - events.spine_writable_matrix
+  - events.spine_loop_cursor
+  - events.spine_chain_sink
+  - events.spine_step_tree_accumulator
+
+entries:
+  # ── Publishers ────────────────────────────────────────────────────
+  - id: delegation_cache
+    name: delegation_cache_publisher
+    $module: lca.plugins.events.publishers.delegation_cache.manifest
+    config: {}
+
+  - id: events.spine_reflector_cognition
+    name: spine_reflector_cognition
+    $module: lca.plugins.events.publishers.spine_reflector_cognition.manifest
+    config: {}
+
+  - id: events.spine_reflector_body_llm
+    name: spine_reflector_body_llm
+    $module: lca.plugins.events.publishers.spine_reflector_body_llm.manifest
+    config: {}
+
+  - id: events.spine_reflector_runtime
+    name: spine_reflector_runtime
+    $module: lca.plugins.events.publishers.spine_reflector_runtime.manifest
+    config: {}
+
+  - id: events.spine_reflector_agent_spawn
+    name: spine_reflector_agent_spawn
+    $module: lca.plugins.events.publishers.spine_reflector_agent_spawn.manifest
+    config: {}
+
+  - id: events.spine_reflector_transport
+    name: spine_reflector_transport
+    $module: lca.plugins.events.publishers.spine_reflector_transport.manifest
+    config: {}
+
+  - id: events.spine_reflector_kernel_loop
+    name: spine_reflector_kernel_loop
+    $module: lca.plugins.events.publishers.spine_reflector_kernel_loop.manifest
+    config: {}
+
+  - id: events.spine_reflector_boot
+    name: spine_reflector_boot
+    $module: lca.plugins.events.publishers.spine_reflector_boot.manifest
+    config: {}
+
+  - id: events.spine_reflector_perception
+    name: spine_reflector_perception
+    $module: lca.plugins.events.publishers.spine_reflector_perception.manifest
+    config: {}
+
+  - id: events.spine_reflector_phase
+    name: spine_reflector_phase
+    $module: lca.plugins.events.publishers.spine_reflector_phase.manifest
+    config: {}
+
+  - id: events.spine_reflector_phase_graph
+    name: spine_reflector_phase_graph
+    $module: lca.plugins.events.publishers.spine_reflector_phase_graph.manifest
+    config: {}
+
+  - id: events.spine_reflector_control
+    name: spine_reflector_control
+    $module: lca.plugins.events.publishers.spine_reflector_control.manifest
+    config: {}
+
+  - id: events.spine_reflector_team
+    name: spine_reflector_team
+    $module: lca.plugins.events.publishers.spine_reflector_team.manifest
+    config: {}
+
+  - id: events.spine_reflector_writable
+    name: spine_reflector_writable
+    $module: lca.plugins.events.publishers.spine_reflector_writable.manifest
+    config: {}
+
+  - id: events.spine_writable_matrix
+    name: spine_writable_matrix
+    $module: lca.plugins.events.publishers.spine_writable_matrix.manifest
+    config: {}
+
+  - id: events.spine_loop_cursor
+    name: spine_loop_cursor
+    $module: lca.plugins.events.publishers.spine_loop_cursor.manifest
+    config: {}
+
+  # ── Sinks ─────────────────────────────────────────────────────────
+  - id: events.spine_chain_sink
+    name: spine_chain_sink
+    $module: lca.plugins.events.sinks.spine_chain_sink.manifest
+    config: {}
+
+  # ── Subscribers ───────────────────────────────────────────────────
+  - id: events.spine_step_tree_accumulator
+    name: spine_step_tree_accumulator
+    $module: lca.plugins.events.subscribers.spine_step_tree_accumulator.manifest
+    config: {}
+  # PR-5：journal / console_projector 不再随 bundle 启动；它们作为
+  # marker-only 形态由 :func:`lca_kernel.events.test_catalog` 与生产
+  # `_register_event_pipeline` 按 id 注入 catalog。
+  # PR-10 收口时由 bundles/observability-default.yaml 一并管理。

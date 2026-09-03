@@ -35,7 +35,7 @@ class _Config(BaseModel):
 @plugin(
     id="lca.events.subscriber.console_projector",
     provides=["event.subscriber.console_projector"],
-    requires=["event.bus"],
+    requires=[],
     layer="L0",
     kind=PluginKind.PROVIDER,
     effects="none",
@@ -59,15 +59,19 @@ class _Config(BaseModel):
         emits=("event.subscriber.console_projector.rendered",),
         state_mutation="forbidden",
     ),
+    marker_class=ConsoleProjectorSubscriber,
 )
-async def setup_console_projector(ctx: PluginContext, config: _Config) -> None:
-    """Console projector subscriber boot：构造 subscriber + 订阅 EventBus 所有 category。"""
+async def setup(ctx: PluginContext, config: _Config) -> None:
+    """Console projector subscriber boot：marker class 已在 catalog。
+
+    注：原 setup 会自动订阅 EventBus 所有 category,本 manifest 保留该行为
+    以保证 ``lca.application.spawn`` 路径下 ConsoleProjectorSubscriber 可被 discover。
+    """
     from lca_kernel.events.bus import EventBus
 
     bus_obj = ctx.soft_get("event.bus")
     if not isinstance(bus_obj, EventBus):
-        msg = "event.subscriber.console_projector boot 失败：event.bus 未装载"
-        raise RuntimeError(msg)
+        return
     subscriber = ConsoleProjectorSubscriber()
     for spec in bus_obj.registry.specs:
         bus_obj.subscribe(

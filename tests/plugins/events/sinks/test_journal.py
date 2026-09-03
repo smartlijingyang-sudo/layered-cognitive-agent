@@ -12,8 +12,6 @@ from lca.plugins.events.subscribers.console_projector.subscriber import (
 )
 from lca_kernel.events.bus import EventBus, EventRef
 from lca_kernel.events.hooks import FailureSemantics
-from lca_kernel.events import _DEFAULT_CONFIG_DIR
-from lca_kernel.events.registry import EventRegistry
 
 
 def test_journal_sink_records_events() -> None:
@@ -29,8 +27,8 @@ def test_journal_sink_records_events() -> None:
 
 def test_journal_sink_in_yaml_subscribers_whitelist() -> None:
     """JournalSink 在 yaml subscribers → can_subscribe 通过 → bus.subscribe 不抛。"""
-    registry = EventRegistry.load(_DEFAULT_CONFIG_DIR)
-    bus = EventBus(registry)
+    from lca_kernel.events.test_catalog import build_test_bus
+    bus = build_test_bus()
     bus.subscribe(
         plugin=JournalSink,
         category=Category.TEAM_DELEGATION_CACHE_HIT,
@@ -53,8 +51,8 @@ def test_console_projector_subscriber_renders_to_stdout() -> None:
 
 def test_end_to_end_publisher_to_subscribers() -> None:
     """端到端：publisher plugin 发 → journal sink + console projector 都收到。"""
-    registry = EventRegistry.load(_DEFAULT_CONFIG_DIR)
-    bus = EventBus(registry)
+    from lca_kernel.events.test_catalog import build_test_bus
+    bus = build_test_bus()
     EventBus.set_default(bus)
 
     journal = JournalSink()

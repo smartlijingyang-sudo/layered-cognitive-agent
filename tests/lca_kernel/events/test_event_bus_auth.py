@@ -16,14 +16,11 @@ from lca_kernel.events.errors import (
     UnauthorizedPublishError,
     UnauthorizedSubscribeError,
 )
-from lca_kernel.events.hooks import FailureSemantics as HookFailureSemantics
-from lca_kernel.events import _DEFAULT_CONFIG_DIR
-from lca_kernel.events.registry import EventRegistry
 
 
 def _make_bus() -> EventBus:
-    registry = EventRegistry.load(_DEFAULT_CONFIG_DIR)
-    return EventBus(registry)
+    from lca_kernel.events.test_catalog import build_test_bus
+    return build_test_bus()
 
 
 @pytest.fixture

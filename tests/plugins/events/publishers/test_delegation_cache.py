@@ -14,8 +14,6 @@ from lca.plugins.events.publishers.delegation_cache.plugin import (
 )
 from lca_kernel.events import TeamDelegationCacheHit
 from lca_kernel.events.bus import EventBus, EventRef
-from lca_kernel.events import _DEFAULT_CONFIG_DIR
-from lca_kernel.events.registry import EventRegistry
 
 
 def _state_with_hit_result(
@@ -55,8 +53,8 @@ def test_publisher_plugin_id_matches_yaml() -> None:
 
 def test_delegation_cache_plugin_emits_event_via_bus() -> None:
     """业务方 plugin 类直接 publish → EventBus 按 yaml 鉴权通过 → 事件被路由。"""
-    registry = EventRegistry.load(_DEFAULT_CONFIG_DIR)
-    bus = EventBus(registry)
+    from lca_kernel.events.test_catalog import build_test_bus
+    bus = build_test_bus()
     EventBus.set_default(bus)
 
     received: list[EventRef] = []
@@ -93,9 +91,8 @@ def test_cached_observation_no_hit_returns_none() -> None:
 def test_compatibility_shell_delegates_to_plugin() -> None:
     """cognition 模块的 cached_delegation_observation 兼容壳 → DelegationCachePlugin。"""
     from lca.cognition.body.delegation_cache import cached_delegation_observation
-
-    registry = EventRegistry.load(_DEFAULT_CONFIG_DIR)
-    bus = EventBus(registry)
+    from lca_kernel.events.test_catalog import build_test_bus
+    bus = build_test_bus()
     EventBus.set_default(bus)
 
     received: list = []
@@ -126,8 +123,8 @@ def test_unauthorized_plugin_class_cannot_publish() -> None:
     class _RoguePlugin:
         pass
 
-    registry = EventRegistry.load(_DEFAULT_CONFIG_DIR)
-    bus = EventBus(registry)
+    from lca_kernel.events.test_catalog import build_test_bus
+    bus = build_test_bus()
     EventBus.set_default(bus)
     try:
         with __import__("pytest").raises(

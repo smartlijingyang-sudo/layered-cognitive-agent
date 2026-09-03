@@ -21,6 +21,11 @@
 
 解析复用 :mod:`lca_kernel.events.pipeline` 的段解析器(``_parse_hooks`` /
 ``_parse_sinks`` / ``_parse_rules``),内联段与文件引用因此只有一套语义。
+
+PR-5：hooks / sinks 段接受 ``plugin: <id>`` 字段,经 catalog 解析为 class。
+catalog 来源 = ``EventRegistry._plugins``（同 PR-5 兼容期 token 解析
+用同一份）。``load_pipeline_for_profile`` 系列入口接受可选 ``catalog`` 参数,
+缺省 = 仅 class-path 形态可用（向后兼容）。
 """
 
 from __future__ import annotations
@@ -86,13 +91,25 @@ class AppliedPipeline:
 # ── 发现 + 构造 ──────────────────────────────────────────────────────────
 
 
-def load_pipeline_for_profile(profile: ResolvedProfile | Path | str) -> Pipeline | None:
-    """Profile 声明了 Pipeline 则返回之,否则 ``None``(装载可选)。"""
-    bundle = load_profile_pipeline(profile)
+def load_pipeline_for_profile(
+    profile: ResolvedProfile | Path | str,
+    *,
+    catalog: Mapping[str, type] | None = None,
+) -> Pipeline | None:
+    """Profile 声明了 Pipeline 则返回之,否则 ``None``(装载可选)。
+
+    PR-5：``catalog`` 是可选 ``id → marker class`` 映射；hooks / sinks 段
+    ``plugin:`` 字段据此解析。
+    """
+    bundle = load_profile_pipeline(profile, catalog=catalog)
     return bundle.pipeline if bundle is not None else None
 
 
-def load_profile_pipeline(profile: ResolvedProfile | Path | str) -> ProfilePipeline | None:
+def load_profile_pipeline(
+    profile: ResolvedProfile | Path | str,
+    *,
+    catalog: Mapping[str, type] | None = None,
+) -> ProfilePipeline | None:
     """三级发现 + 构造;皆无 → ``None``。Profile 文件不存在 → ``None``
     (程序化 entries 无文件,属正常路径)。"""
     profile_path = _profile_path(profile)
@@ -103,12 +120,12 @@ def load_profile_pipeline(profile: ResolvedProfile | Path | str) -> ProfilePipel
 
     if isinstance(section, str):
         ref = _resolve_reference(profile_path, section)
-        pipeline = parse_pipeline_yaml(ref)
+        pipeline = parse_pipeline_yaml(ref, catalog=catalog)
         return ProfilePipeline(pipeline=pipeline, options=_read_options(ref), source=str(ref))
     if isinstance(section, Mapping):
         options = section.get("options")
         return ProfilePipeline(
-            pipeline=pipeline_from_mapping(section, name_fallback=profile_path.stem),
+            pipeline=pipeline_from_mapping(section, name_fallback=profile_path.stem, catalog=catalog),
             options=(
                 MappingProxyType(dict(options))
                 if isinstance(options, Mapping)
@@ -120,7 +137,7 @@ def load_profile_pipeline(profile: ResolvedProfile | Path | str) -> ProfilePipel
     conventional = profile_path.parent / "event-pipeline" / f"{profile_path.stem}.yaml"
     if conventional.is_file():
         return ProfilePipeline(
-            pipeline=parse_pipeline_yaml(conventional),
+            pipeline=parse_pipeline_yaml(conventional, catalog=catalog),
             options=_read_options(conventional),
             source=str(conventional),
         )
@@ -128,15 +145,18 @@ def load_profile_pipeline(profile: ResolvedProfile | Path | str) -> ProfilePipel
 
 
 def pipeline_from_mapping(
-    mapping: Mapping[str, Any], *, name_fallback: str = "pipeline"
+    mapping: Mapping[str, Any],
+    *,
+    name_fallback: str = "pipeline",
+    catalog: Mapping[str, type] | None = None,
 ) -> Pipeline:
     """从 ``pipeline:`` mapping 构造 Pipeline;段解析复用 pipeline.py 解析器。"""
     return Pipeline(
         name=str(mapping.get("name") or name_fallback),
         version=int(mapping.get("version", 1)),
-        hooks=_parse_hooks(list(mapping.get("hooks") or [])),
-        sinks=_parse_sinks(list(mapping.get("sinks") or [])),
-        consumer_rules=_parse_rules(list(mapping.get("consumer_rules") or [])),
+        hooks=_parse_hooks(list(mapping.get("hooks") or []), catalog=catalog),
+        sinks=_parse_sinks(list(mapping.get("sinks") or []), catalog=catalog),
+        consumer_rules=_parse_rules(list(mapping.get("consumer_rules") or []), catalog=catalog),
     )
 
 

@@ -7,12 +7,12 @@
 consumer_rules:
   - prefix: "spine."
     subscribers:
-      - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
+      - events.spine_chain_sink
+      - lca.events.subscriber.console_projector
   # perceive 子树：SpineStepTreeAccumulator 额外构建 step tree
   - prefix: "spine.cognition.brain.perceive."
     subscribers:
-      - lca.plugins.events.subscribers.spine_step_tree_accumulator.subscriber.SpineStepTreeAccumulator
+      - events.spine_step_tree_accumulator
 
 events:
   # ── Cognition（试点 + PR-2 一次性全迁，删-when：cognition reflector 旧
@@ -24,7 +24,7 @@ events:
     fields:
       state_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
+      - events.spine_reflector_cognition
 
   - category: spine.cognition.brain.perceive.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -33,7 +33,7 @@ events:
       state_id: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
+      - events.spine_reflector_cognition
 
   - category: spine.cognition.brain.think.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -41,7 +41,7 @@ events:
     fields:
       state_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
+      - events.spine_reflector_cognition
 
   - category: spine.cognition.brain.think.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -50,7 +50,7 @@ events:
       state_id: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
+      - events.spine_reflector_cognition
 
   - category: spine.cognition.brain.gate.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -58,7 +58,7 @@ events:
     fields:
       state_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
+      - events.spine_reflector_cognition
 
   - category: spine.cognition.brain.gate.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -67,7 +67,7 @@ events:
       state_id: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
+      - events.spine_reflector_cognition
 
   - category: spine.cognition.critic.eval.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -75,7 +75,7 @@ events:
     fields:
       state_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
+      - events.spine_reflector_cognition
 
   - category: spine.cognition.critic.eval.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -84,7 +84,7 @@ events:
       state_id: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
+      - events.spine_reflector_cognition
 
   - category: spine.cognition.reasoner.reason.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -92,7 +92,7 @@ events:
     fields:
       state_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
+      - events.spine_reflector_cognition
 
   - category: spine.cognition.reasoner.reason.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -101,7 +101,7 @@ events:
       state_id: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
+      - events.spine_reflector_cognition
 
   - category: spine.cognition.prompt_assembler.assemble.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -110,7 +110,7 @@ events:
       state_id: str
       template_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
+      - events.spine_reflector_cognition
 
   - category: spine.cognition.prompt_assembler.assemble.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -120,7 +120,7 @@ events:
       template_id: str
       section_count: int
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
+      - events.spine_reflector_cognition
 
   - category: spine.cognition.synthesizer.merge
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -128,7 +128,7 @@ events:
     fields:
       state_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
+      - events.spine_reflector_cognition
 
   - category: spine.cognition.skill_router.route
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -137,7 +137,7 @@ events:
       state_id: str
       decision_path: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
+      - events.spine_reflector_cognition
 
   - category: spine.cognition.memory.read
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -146,7 +146,7 @@ events:
       state_id: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
+      - events.spine_reflector_cognition
 
   - category: spine.cognition.memory.write
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -155,7 +155,7 @@ events:
       state_id: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_cognition.plugin.ReflectorClass
+      - events.spine_reflector_cognition
 
   # ── Body（PR-3）─────────────────────────────────────────────
   - category: spine.body.tool.execute.start
@@ -166,7 +166,7 @@ events:
       invocation_id: str
       attempt: int
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_body_llm.plugin.ReflectorClass
+      - events.spine_reflector_body_llm
 
   - category: spine.body.tool.execute.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -177,7 +177,7 @@ events:
       attempt: int
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_body_llm.plugin.ReflectorClass
+      - events.spine_reflector_body_llm
 
   - category: spine.body.tool.retry
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -188,7 +188,7 @@ events:
       attempt: int
       reason: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_body_llm.plugin.ReflectorClass
+      - events.spine_reflector_body_llm
 
   - category: spine.body.sandbox.enter
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -197,7 +197,7 @@ events:
       invocation_id: str
       tool_name: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_body_llm.plugin.ReflectorClass
+      - events.spine_reflector_body_llm
 
   - category: spine.body.sandbox.exit
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -207,7 +207,7 @@ events:
       tool_name: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_body_llm.plugin.ReflectorClass
+      - events.spine_reflector_body_llm
 
   # ── Lifecycle normalization（PR-3，ADR-0166 S5）───────────────
   - category: spine.lifecycle.finally
@@ -217,7 +217,7 @@ events:
       boundary: str
       trace_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_runtime.plugin.ReflectorClass
+      - events.spine_reflector_runtime
 
   # ── LLM（PR-3）──────────────────────────────────────────────
   - category: spine.llm.call.start
@@ -228,7 +228,7 @@ events:
       stream: bool
       prompt_preview: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_body_llm.plugin.ReflectorClass
+      - events.spine_reflector_body_llm
 
   - category: spine.llm.call.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -238,7 +238,7 @@ events:
       stream: bool
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_body_llm.plugin.ReflectorClass
+      - events.spine_reflector_body_llm
 
   - category: spine.llm.stream.token
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -249,7 +249,7 @@ events:
       seq: int
       channel_kind: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_body_llm.plugin.ReflectorClass
+      - events.spine_reflector_body_llm
 
   - category: spine.llm.stream.stall
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -259,7 +259,7 @@ events:
       idle_ms: int
       seq: int
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_body_llm.plugin.ReflectorClass
+      - events.spine_reflector_body_llm
 
   - category: spine.llm.request.header
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -268,7 +268,7 @@ events:
       model: str
       prompt_preview: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_body_llm.plugin.ReflectorClass
+      - events.spine_reflector_body_llm
 
   # ── Exception（PR-3）─────────────────────────────────────────
   - category: spine.exception.caught
@@ -280,7 +280,7 @@ events:
       message: str
       trace_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_runtime.plugin.ReflectorClass
+      - events.spine_reflector_runtime
 
   - category: spine.exception.finally
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -290,7 +290,7 @@ events:
       trace_id: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_runtime.plugin.ReflectorClass
+      - events.spine_reflector_runtime
 
   # ── Runtime observed（PR-3 与 exception 一起迁，PR-6 新加 runtime.observed 类别）──
   - category: spine.runtime.reducer.apply
@@ -301,7 +301,7 @@ events:
       phase: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_runtime.plugin.ReflectorClass
+      - events.spine_reflector_runtime
 
   - category: spine.runtime.checkpoint.create
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -312,7 +312,7 @@ events:
       node_id: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_runtime.plugin.ReflectorClass
+      - events.spine_reflector_runtime
 
   - category: spine.runtime.resume.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -322,7 +322,7 @@ events:
       state_ref: str
       node_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_runtime.plugin.ReflectorClass
+      - events.spine_reflector_runtime
 
   - category: spine.runtime.resume.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -333,7 +333,7 @@ events:
       node_id: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_runtime.plugin.ReflectorClass
+      - events.spine_reflector_runtime
 
   - category: spine.runtime.event_publisher.publish
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -343,7 +343,7 @@ events:
       trace_id: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_runtime.plugin.ReflectorClass
+      - events.spine_reflector_runtime
 
   # ── Transport（PR-4）─────────────────────────────────────────────
   - category: spine.transport.route.enter
@@ -354,7 +354,7 @@ events:
       method: str
       run_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_transport.plugin.ReflectorClass
+      - events.spine_reflector_transport
 
   - category: spine.transport.route.exit
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -365,7 +365,7 @@ events:
       run_id: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_transport.plugin.ReflectorClass
+      - events.spine_reflector_transport
 
   - category: spine.transport.sse.publish
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -374,7 +374,7 @@ events:
       path: str
       run_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_transport.plugin.ReflectorClass
+      - events.spine_reflector_transport
 
   # ── Kernel lifecycle（PR-4）─────────────────────────────────────
   - category: spine.kernel.boot.start
@@ -383,7 +383,7 @@ events:
     fields:
       profile: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_kernel_loop.plugin.ReflectorClass
+      - events.spine_reflector_kernel_loop
 
   - category: spine.kernel.boot.completed
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -392,7 +392,7 @@ events:
       profile: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_kernel_loop.plugin.ReflectorClass
+      - events.spine_reflector_kernel_loop
 
   - category: spine.kernel.run.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -401,7 +401,7 @@ events:
       run_id: str
       trace_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_transport.plugin.ReflectorClass
+      - events.spine_reflector_transport
 
   - category: spine.kernel.run.stop
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -411,7 +411,7 @@ events:
       trace_id: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_transport.plugin.ReflectorClass
+      - events.spine_reflector_transport
 
   - category: spine.kernel.run.cancelled
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -420,7 +420,7 @@ events:
       run_id: str
       trace_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_transport.plugin.ReflectorClass
+      - events.spine_reflector_transport
 
   # ── Agent loop + agent + loop fork（PR-4）─────────────────────────
   - category: spine.agent_loop.iteration.start
@@ -431,7 +431,7 @@ events:
       role: str
       iteration_kind: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_agent_spawn.plugin.ReflectorClass
+      - events.spine_reflector_agent_spawn
 
   - category: spine.agent_loop.iteration.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -442,7 +442,7 @@ events:
       iteration_kind: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_agent_spawn.plugin.ReflectorClass
+      - events.spine_reflector_agent_spawn
 
   - category: spine.loop.fork
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -451,7 +451,7 @@ events:
       child_role: str
       parent_step: int
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_kernel_loop.plugin.ReflectorClass
+      - events.spine_reflector_kernel_loop
 
   - category: spine.agent.spawn
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -461,7 +461,7 @@ events:
       role: str
       agent_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_agent_spawn.plugin.ReflectorClass
+      - events.spine_reflector_agent_spawn
 
   - category: spine.agent.iteration
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -472,7 +472,7 @@ events:
       agent_id: str
       iteration: int
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_agent_spawn.plugin.ReflectorClass
+      - events.spine_reflector_agent_spawn
 
   - category: spine.agent.final
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -483,7 +483,7 @@ events:
       agent_id: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_agent_spawn.plugin.ReflectorClass
+      - events.spine_reflector_agent_spawn
 
   # ── Writable matrix（PR-5）───────────────────────────────────────
   - category: spine.writable.step.start
@@ -493,8 +493,8 @@ events:
       step: int
       run_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_writable.plugin.ReflectorClass
-      - lca.plugins.events.publishers.spine_writable_matrix.plugin.WritableMatrixPlugin
+      - events.spine_reflector_writable
+      - events.spine_writable_matrix
 
   - category: spine.writable.step.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -504,8 +504,8 @@ events:
       run_id: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_writable.plugin.ReflectorClass
-      - lca.plugins.events.publishers.spine_writable_matrix.plugin.WritableMatrixPlugin
+      - events.spine_reflector_writable
+      - events.spine_writable_matrix
 
   - category: spine.writable.segment.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -515,8 +515,8 @@ events:
       step: int
       run_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_writable.plugin.ReflectorClass
-      - lca.plugins.events.publishers.spine_writable_matrix.plugin.WritableMatrixPlugin
+      - events.spine_reflector_writable
+      - events.spine_writable_matrix
 
   - category: spine.writable.segment.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -527,8 +527,8 @@ events:
       run_id: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_writable.plugin.ReflectorClass
-      - lca.plugins.events.publishers.spine_writable_matrix.plugin.WritableMatrixPlugin
+      - events.spine_reflector_writable
+      - events.spine_writable_matrix
 
   - category: spine.writable.iteration.halt
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -537,8 +537,8 @@ events:
       run_id: str
       reason: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_writable.plugin.ReflectorClass
-      - lca.plugins.events.publishers.spine_writable_matrix.plugin.WritableMatrixPlugin
+      - events.spine_reflector_writable
+      - events.spine_writable_matrix
 
   - category: spine.writable.iteration.closing
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -546,8 +546,8 @@ events:
     fields:
       run_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_writable.plugin.ReflectorClass
-      - lca.plugins.events.publishers.spine_writable_matrix.plugin.WritableMatrixPlugin
+      - events.spine_reflector_writable
+      - events.spine_writable_matrix
 
   - category: spine.writable.iteration.close
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -555,8 +555,8 @@ events:
     fields:
       run_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_writable.plugin.ReflectorClass
-      - lca.plugins.events.publishers.spine_writable_matrix.plugin.WritableMatrixPlugin
+      - events.spine_reflector_writable
+      - events.spine_writable_matrix
 
   # ── Phase（PR-5）────────────────────────────────────────────────
   - category: spine.perceive.phase.fold
@@ -566,8 +566,8 @@ events:
       step: int
       run_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
-      - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
+      - events.spine_reflector_phase
+      - events.spine_loop_cursor
 
   - category: spine.phase.perceive.fold
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -576,8 +576,8 @@ events:
       step: int
       run_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
-      - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
+      - events.spine_reflector_phase
+      - events.spine_loop_cursor
 
   - category: spine.phase.think.fold
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -587,8 +587,8 @@ events:
       run_id: str
       decision_path: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
-      - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
+      - events.spine_reflector_phase
+      - events.spine_loop_cursor
 
   - category: spine.phase.gate.fold
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -598,8 +598,8 @@ events:
       run_id: str
       verdict: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
-      - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
+      - events.spine_reflector_phase
+      - events.spine_loop_cursor
 
   - category: spine.phase.remember.fold
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -608,8 +608,8 @@ events:
       step: int
       run_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
-      - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
+      - events.spine_reflector_phase
+      - events.spine_loop_cursor
 
   - category: spine.phase.stop.fold
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -619,8 +619,8 @@ events:
       run_id: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
-      - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
+      - events.spine_reflector_phase
+      - events.spine_loop_cursor
 
   - category: spine.phase.reflect.fold
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -630,8 +630,8 @@ events:
       run_id: str
       lessons: int
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
-      - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
+      - events.spine_reflector_phase
+      - events.spine_loop_cursor
 
   - category: spine.phase.act.fold.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -641,8 +641,8 @@ events:
       run_id: str
       tool_name: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
-      - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
+      - events.spine_reflector_phase
+      - events.spine_loop_cursor
 
   - category: spine.phase.act.fold.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -653,8 +653,8 @@ events:
       tool_name: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
-      - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
+      - events.spine_reflector_phase
+      - events.spine_loop_cursor
 
   - category: spine.phase.act.fold
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -665,8 +665,8 @@ events:
       tool_name: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
-      - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
+      - events.spine_reflector_phase
+      - events.spine_loop_cursor
 
   - category: spine.phase.tool.call.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -677,8 +677,8 @@ events:
       tool_name: str
       invocation_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
-      - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
+      - events.spine_reflector_phase
+      - events.spine_loop_cursor
 
   - category: spine.phase.tool.call.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -690,8 +690,8 @@ events:
       invocation_id: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
-      - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
+      - events.spine_reflector_phase
+      - events.spine_loop_cursor
 
   - category: spine.phase.tool.denied
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -702,8 +702,8 @@ events:
       tool_name: str
       reason: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_phase.plugin.ReflectorClass
-      - lca.plugins.events.publishers.spine_loop_cursor.plugin.LoopCursorPlugin
+      - events.spine_reflector_phase
+      - events.spine_loop_cursor
 
   # ── Phase graph（PR-5）──────────────────────────────────────────
   - category: spine.phase_graph.node.start
@@ -713,7 +713,7 @@ events:
       node_id: str
       run_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_phase_graph.plugin.ReflectorClass
+      - events.spine_reflector_phase_graph
 
   - category: spine.phase_graph.node.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -723,7 +723,7 @@ events:
       run_id: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_phase_graph.plugin.ReflectorClass
+      - events.spine_reflector_phase_graph
 
   - category: spine.phase_graph.edge.transit
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -733,7 +733,7 @@ events:
       to_node: str
       run_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_phase_graph.plugin.ReflectorClass
+      - events.spine_reflector_phase_graph
 
   - category: spine.phase_graph.instrument.coverage
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -743,7 +743,7 @@ events:
       total_nodes: int
       run_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_phase_graph.plugin.ReflectorClass
+      - events.spine_reflector_phase_graph
 
   # ── Team（PR-6 新加）─────────────────────────────────────────
   - category: spine.team.casting.started
@@ -754,7 +754,7 @@ events:
       requested_roles: str
       run_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_team.plugin.ReflectorClass
+      - events.spine_reflector_team
 
   - category: spine.team.casting.completed
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -764,7 +764,7 @@ events:
       selected_roles: str
       run_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_team.plugin.ReflectorClass
+      - events.spine_reflector_team
 
   - category: spine.team.casting.failed
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -774,7 +774,7 @@ events:
       reason: str
       run_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_team.plugin.ReflectorClass
+      - events.spine_reflector_team
 
   - category: spine.team.delegation.issued
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -785,7 +785,7 @@ events:
       subtask: str
       run_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_team.plugin.ReflectorClass
+      - events.spine_reflector_team
 
   - category: spine.team.delegation.completed
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -797,7 +797,7 @@ events:
       outcome: str
       run_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_team.plugin.ReflectorClass
+      - events.spine_reflector_team
 
   - category: spine.team.delegation.cache_hit
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -807,7 +807,7 @@ events:
       subtask: str
       step: int
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_team.plugin.ReflectorClass
+      - events.spine_reflector_team
 
   - category: spine.team.message.published
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -818,7 +818,7 @@ events:
       recipient: str
       run_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_team.plugin.ReflectorClass
+      - events.spine_reflector_team
 
   # ── Perception（PR-6）────────────────────────────────────────
   - category: spine.perception.observe
@@ -828,7 +828,7 @@ events:
       run_id: str
       source: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_perception.plugin.ReflectorClass
+      - events.spine_reflector_perception
 
   - category: spine.perception.attention.focus
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -837,7 +837,7 @@ events:
       run_id: str
       target: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_perception.plugin.ReflectorClass
+      - events.spine_reflector_perception
 
   - category: spine.perception.attention.blur
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -846,7 +846,7 @@ events:
       run_id: str
       target: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_perception.plugin.ReflectorClass
+      - events.spine_reflector_perception
 
   - category: spine.perception.signal.detected
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -856,7 +856,7 @@ events:
       signal_kind: str
       score: float
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_perception.plugin.ReflectorClass
+      - events.spine_reflector_perception
 
   - category: spine.perception.fused
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -866,7 +866,7 @@ events:
       artifact_id: str
       sources: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_perception.plugin.ReflectorClass
+      - events.spine_reflector_perception
 
   - category: spine.perception.artifact.built
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -876,7 +876,7 @@ events:
       artifact_id: str
       size_bytes: int
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_perception.plugin.ReflectorClass
+      - events.spine_reflector_perception
 
   # ── Control（PR-6）──────────────────────────────────────────
   - category: spine.control.dispatch
@@ -887,7 +887,7 @@ events:
       target: str
       intent: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_control.plugin.ReflectorClass
+      - events.spine_reflector_control
 
   - category: spine.control.invoke
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -896,7 +896,7 @@ events:
       run_id: str
       target: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_control.plugin.ReflectorClass
+      - events.spine_reflector_control
 
   - category: spine.control.signal
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -905,7 +905,7 @@ events:
       run_id: str
       name: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_control.plugin.ReflectorClass
+      - events.spine_reflector_control
 
   - category: spine.control.approve.request
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -915,7 +915,7 @@ events:
       request_id: str
       intent: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_control.plugin.ReflectorClass
+      - events.spine_reflector_control
 
   - category: spine.control.approve.response
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -926,7 +926,7 @@ events:
       verdict: str
       actor: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_control.plugin.ReflectorClass
+      - events.spine_reflector_control
 
   - category: spine.control.deny
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -936,7 +936,7 @@ events:
       request_id: str
       reason: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_control.plugin.ReflectorClass
+      - events.spine_reflector_control
 
   - category: spine.control.revoke
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -945,7 +945,7 @@ events:
       run_id: str
       target: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_control.plugin.ReflectorClass
+      - events.spine_reflector_control
 
   - category: spine.control.pause
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -954,7 +954,7 @@ events:
       run_id: str
       reason: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_control.plugin.ReflectorClass
+      - events.spine_reflector_control
 
   - category: spine.control.resume
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -962,7 +962,7 @@ events:
     fields:
       run_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_control.plugin.ReflectorClass
+      - events.spine_reflector_control
 
   - category: spine.control.stop
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -971,7 +971,7 @@ events:
       run_id: str
       outcome: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_control.plugin.ReflectorClass
+      - events.spine_reflector_control
 
   - category: spine.control.accept
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -980,7 +980,7 @@ events:
       run_id: str
       request_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_control.plugin.ReflectorClass
+      - events.spine_reflector_control
 
   # ── Boot（PR-6）─────────────────────────────────────────────
   - category: spine.boot.profile.resolved
@@ -990,7 +990,7 @@ events:
       profile: str
       plugins: int
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_boot.plugin.ReflectorClass
+      - events.spine_reflector_boot
 
   - category: spine.boot.plugin.fiber.spawned
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -999,7 +999,7 @@ events:
       plugin_id: str
       layer: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_boot.plugin.ReflectorClass
+      - events.spine_reflector_boot
 
   - category: spine.boot.observability.assembled
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1008,7 +1008,7 @@ events:
       sinks: int
       derivers: int
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_boot.plugin.ReflectorClass
+      - events.spine_reflector_boot
 
   # ── Runtime observed（PR-6）──────────────────────────────────
   - category: spine.runtime.observed
@@ -1019,4 +1019,4 @@ events:
       detail: str
       run_id: str
     publishers:
-      - lca.plugins.events.publishers.spine_reflector_runtime.plugin.ReflectorClass
+      - events.spine_reflector_runtime

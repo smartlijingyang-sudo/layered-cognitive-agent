@@ -66,6 +66,10 @@ _PLANE_RULES: list[tuple[str, dict[str, object]]] = [
                 # candidates/decisions; they remain cross-cutting rather than
                 # introducing an ungoverned seventh runtime plane.
                 r"^lca/plugins/(skill|insight|profile|learning)/",
+                # PR-5：events publisher / sink / subscriber 都属 evidence
+                # （其本质是把「事实」与「派生证据」投递到总线的载体，与
+                # observability seam 同属 cross-cutting 平面）。
+                r"^lca/plugins/events/",
             ],
             "kind": None,
         },

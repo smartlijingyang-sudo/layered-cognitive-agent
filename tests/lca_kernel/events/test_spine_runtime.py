@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import io
-import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
+from lca_kernel.events import EventRef
 from lca_kernel.events.payloads import Category, SpineEventPayload
 from lca_kernel.events.spine_runtime import (
     SpineChain,
@@ -21,8 +19,6 @@ from lca_kernel.events.spine_runtime import (
     default_chain_path,
     is_spine_event,
 )
-from lca_kernel.events import EventRef
-
 
 # ── is_spine_event ───────────────────────────────────────────────────────
 
