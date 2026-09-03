@@ -54,15 +54,20 @@ def test_find_spine_file_prefers_new_naming(tmp_path: Path) -> None:
     assert find_spine_file(run_dir, "run_abc") == new
 
 
-def test_find_spine_file_legacy_fallback(tmp_path: Path) -> None:
-    """新命名不存在但 events.jsonl 存在 → 返回 legacy。"""
-    from lca.contracts.observability.ssot import find_spine_file
+def test_find_spine_file_legacy_fallback_removed(tmp_path: Path) -> None:
+    """PR-4 收口:旧 ``events.jsonl`` 兜底已下线。
+
+    新命名不存在 + legacy 存在 → 抛 ObservationSSOTError(不再 fallback)。
+    旧 run 迁移由 importer 一次性完成;不再有 reader 透明兜底。
+    """
+    from lca.contracts.observability.ssot import ObservationSSOTError, find_spine_file
 
     run_dir = tmp_path / "run_abc"
     run_dir.mkdir()
     legacy = run_dir / "events.jsonl"
     legacy.write_text("{}\n", encoding="utf-8")
-    assert find_spine_file(run_dir, "run_abc") == legacy
+    with pytest.raises(ObservationSSOTError):
+        find_spine_file(run_dir, "run_abc")
 
 
 def test_find_spine_file_missing_both_raises(tmp_path: Path) -> None:

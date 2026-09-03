@@ -74,11 +74,12 @@ def _make_record(
 
 def _write_events_jsonl(run_dir: Path, records: list[EventRecord]) -> Path:
     """Append one ``EventRecord`` per line via ``FileSink``. Returns the path."""
-    sink = FileSink(run_dir, run_id="run_test", file_name="events.jsonl")
+    # PR-4 收口:FileSink 默认 spine 命名 = <run_id>.spine.jsonl;旧 events.jsonl layout 已下线。
+    sink = FileSink(run_dir, run_id="run_test")
     for record in records:
         sink.write(record)
     sink.close()
-    return run_dir / "events.jsonl"
+    return run_dir / "run_test.spine.jsonl"
 
 
 @pytest.fixture
@@ -364,8 +365,8 @@ def test_missing_events_jsonl_friendly_error(tmp_path: Path) -> None:
         ["journal", "trace", "noevents", "--traces-root", str(root)],
     )
     assert result.exit_code == 1
-    # ADR-0169 PR-27:缺 spine 文件时友好错误提示使用 spine 路径
-    assert "spine events file not found" in result.stderr
+    # ADR-0169 PR-27 + PR-4:缺 spine 文件时友好错误提示使用 spine 路径
+    assert "spine ledger not found" in result.stderr
 
 
 # ── edge cases ─────────────────────────────────────────────────────
@@ -544,7 +545,7 @@ def test_no_run_id_picks_mtime_latest_when_pointer_missing(tmp_path: Path, monke
     newer.mkdir(parents=True)
 
     # Older run: one harmless event.
-    sink_old = FileSink(older, run_id="run_old", file_name="events.jsonl")
+    sink_old = FileSink(older, run_id="run_old")
     sink_old.write(
         _make_record(
             sequence=1,
@@ -560,7 +561,7 @@ def test_no_run_id_picks_mtime_latest_when_pointer_missing(tmp_path: Path, monke
     os.utime(older, (1_000_000, 1_000_000))
 
     # Newer run: identifiable event we can grep for.
-    sink_new = FileSink(newer, run_id="run_new", file_name="events.jsonl")
+    sink_new = FileSink(newer, run_id="run_new")
     sink_new.write(
         _make_record(
             sequence=1,

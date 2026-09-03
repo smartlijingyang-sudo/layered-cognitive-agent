@@ -88,7 +88,7 @@ def test_oii_debug_bundles_include_loop_cursor_spine_default_and_debug() -> None
 def test_oii_debug_patch_section_preserves_debug_boot_path() -> None:
     """OII 调试关键 invariants:``spine.sink.file`` patch 仍含 debug boot_path。
 
-    防止 PR-7.1 装配改革无意中删去 ``.lca/spine/oii-debug-boot-events.jsonl`` 路径,
+    防止 PR-7.1 装配改革无意中删去 ``.lca/spine/oii-debug-boot-spine.jsonl`` 路径,
     让 OII debug trace 误入生产 journal。
     """
     raw = yaml.safe_load(PROFILE_PATH.read_text(encoding="utf-8"))
@@ -96,7 +96,7 @@ def test_oii_debug_patch_section_preserves_debug_boot_path() -> None:
     sink_entries = [p for p in patch if isinstance(p, dict) and p.get("id") == "spine.sink.file"]
     assert sink_entries, "oii-debug.yaml must keep spine.sink.file patch"
     sink = sink_entries[0]
-    assert sink["config"]["boot_path"] == ".lca/spine/oii-debug-boot-events.jsonl"
+    assert sink["config"]["boot_path"] == ".lca/spine/oii-debug-boot-spine.jsonl"
 
 
 def test_oii_debug_model_visible_enabled() -> None:

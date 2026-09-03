@@ -85,7 +85,7 @@ def _write_run_dir(
         {"run_seq": 12, "descriptor": {"type": "AgentRunFinished"}, "data": {"attributes": {}}},
     ]
     (run_dir / "journal.jsonl").write_text("\n".join(json.dumps(e) for e in envelopes))
-    # spine events 与 envelopes run_seq 对齐(debug_run 现在只读 events.jsonl)
+    # spine events 与 envelopes run_seq 对齐(debug_run 现在只读 spine ledger)
     spine_events = [
         {"execution_point": "kernel.run.start", "run_id": run_id, "run_seq": 1},
         {"execution_point": "brain.think.start", "run_id": run_id, "run_seq": 2},
@@ -99,7 +99,7 @@ def _write_run_dir(
         {"execution_point": "phase.stop.fold", "run_id": run_id, "run_seq": 10},
         {"execution_point": "kernel.run.stop", "run_id": run_id, "run_seq": 12},
     ]
-    (run_dir / "events.jsonl").write_text("\n".join(json.dumps(e) for e in spine_events))
+    (run_dir / f"{run_id}.spine.jsonl").write_text("\n".join(json.dumps(e) for e in spine_events))
 
 
 def test_debug_run_extracts_8_section(tmp_path: Path) -> None:
@@ -116,7 +116,7 @@ def test_debug_run_extracts_8_section(tmp_path: Path) -> None:
     # [2] journal counts every event; missing seqs surface for review
     assert report.spine_event_count == 6
     assert report.spine_missing_seqs == (3, 4, 6, 7, 9, 11)
-    assert "events.jsonl" in report.spine_events_path
+    assert f"{run_id}.spine.jsonl" in report.spine_events_path
     assert report.spine_execution_points[-1] == "kernel.run.stop"
     assert "spine.events" in report.render_text()
 
