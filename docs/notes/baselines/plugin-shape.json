@@ -1,10 +1,386 @@
 {
-  "root": "/home/lichao/layered-cognitive-agent/lca/plugins",
+  "root": "lca/plugins",
   "total_plugins": 229,
   "by_kind": {
     "missing_effects": 0,
     "dual_form_residue": 0,
-    "duplicate_id": 0
+    "duplicate_id": 0,
+    "plugin_location": 6,
+    "orphan_plugin": 36,
+    "dead_bundle_ref": 10,
+    "plugin_in_init": 1
   },
-  "violations": []
+  "violations": [
+    {
+      "kind": "plugin_location",
+      "id": "lca-default-reducer",
+      "file": "lca/runtime/reducer.py",
+      "line": 458,
+      "detail": "@plugin 出现在非合法位置(允许: lca/plugins/, lca_kernel/events/manifest.py)"
+    },
+    {
+      "kind": "plugin_location",
+      "id": "lca-session-live-builder-provider",
+      "file": "lca/application/session_live_builder_provider.py",
+      "line": 18,
+      "detail": "@plugin 出现在非合法位置(允许: lca/plugins/, lca_kernel/events/manifest.py)"
+    },
+    {
+      "kind": "plugin_location",
+      "id": "lca-mode-solo-default",
+      "file": "lca/cognition/team/modes/solo_mode.py",
+      "line": 108,
+      "detail": "@plugin 出现在非合法位置(允许: lca/plugins/, lca_kernel/events/manifest.py)"
+    },
+    {
+      "kind": "plugin_location",
+      "id": "lca-mode-cordis-creator-default",
+      "file": "lca/cognition/team/modes/cordis_creator_mode.py",
+      "line": 120,
+      "detail": "@plugin 出现在非合法位置(允许: lca/plugins/, lca_kernel/events/manifest.py)"
+    },
+    {
+      "kind": "plugin_location",
+      "id": "lca-loop-cognitive",
+      "file": "lca/cognition/team/modes/cognitive_loop.py",
+      "line": 52,
+      "detail": "@plugin 出现在非合法位置(允许: lca/plugins/, lca_kernel/events/manifest.py)"
+    },
+    {
+      "kind": "plugin_location",
+      "id": "lca-mode-team-default",
+      "file": "lca/cognition/team/modes/team_mode.py",
+      "line": 135,
+      "detail": "@plugin 出现在非合法位置(允许: lca/plugins/, lca_kernel/events/manifest.py)"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-coding-agent-tools-bundle",
+      "file": "lca/plugins/bundles/coding_agent_tools.py",
+      "line": 47,
+      "detail": "module 'lca.plugins.bundles.coding_agent_tools' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-blackboard-memory",
+      "file": "lca/plugins/collaboration/blackboard.py",
+      "line": 26,
+      "detail": "module 'lca.plugins.collaboration.blackboard' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-plan-sub-composers",
+      "file": "lca/plugins/composer/composition/sub_composers.py",
+      "line": 33,
+      "detail": "module 'lca.plugins.composer.composition.sub_composers' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "delegation_cache",
+      "file": "lca/plugins/events/publishers/delegation_cache/manifest.py",
+      "line": 34,
+      "detail": "module 'lca.plugins.events.publishers.delegation_cache.manifest' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca.events.sink.journal",
+      "file": "lca/plugins/events/sinks/journal/manifest.py",
+      "line": 35,
+      "detail": "module 'lca.plugins.events.sinks.journal.manifest' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca.events.sink.spine_file",
+      "file": "lca/plugins/events/sinks/spine_file_sink/manifest.py",
+      "line": 29,
+      "detail": "module 'lca.plugins.events.sinks.spine_file_sink.manifest' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca.events.subscriber.console_projector",
+      "file": "lca/plugins/events/subscribers/console_projector/manifest.py",
+      "line": 35,
+      "detail": "module 'lca.plugins.events.subscribers.console_projector.manifest' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-retrieval-null",
+      "file": "lca/plugins/memory/null_retrieval.py",
+      "line": 28,
+      "detail": "module 'lca.plugins.memory.null_retrieval' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-memory-tree-cache",
+      "file": "lca/plugins/memory/tree_cache.py",
+      "line": 41,
+      "detail": "module 'lca.plugins.memory.tree_cache' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "writable.coalescer.passthrough",
+      "file": "lca/plugins/observability/writable_matrix/coalescer/passthrough.py",
+      "line": 29,
+      "detail": "module 'lca.plugins.observability.writable_matrix.coalescer.passthrough' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "writable.emitter.otel",
+      "file": "lca/plugins/observability/writable_matrix/emitter/otel.py",
+      "line": 34,
+      "detail": "module 'lca.plugins.observability.writable_matrix.emitter.otel' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "writable.serializer.label",
+      "file": "lca/plugins/observability/writable_matrix/serializer/label.py",
+      "line": 29,
+      "detail": "module 'lca.plugins.observability.writable_matrix.serializer.label' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "writable.storage.multi",
+      "file": "lca/plugins/observability/writable_matrix/storage/multi.py",
+      "line": 32,
+      "detail": "module 'lca.plugins.observability.writable_matrix.storage.multi' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "writable.storage.s3",
+      "file": "lca/plugins/observability/writable_matrix/storage/s3.py",
+      "line": 36,
+      "detail": "module 'lca.plugins.observability.writable_matrix.storage.s3' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-decision-classifier-provider",
+      "file": "lca/plugins/providers/gate/decision_classifier.py",
+      "line": 100,
+      "detail": "module 'lca.plugins.providers.gate.decision_classifier' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-gate-chain-composer-provider",
+      "file": "lca/plugins/providers/gate/gate_chain_composer.py",
+      "line": 78,
+      "detail": "module 'lca.plugins.providers.gate.gate_chain_composer' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-attachment-provider",
+      "file": "lca/plugins/providers/memory/attachment.py",
+      "line": 28,
+      "detail": "module 'lca.plugins.providers.memory.attachment' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-workspace-provider",
+      "file": "lca/plugins/providers/memory/workspace.py",
+      "line": 31,
+      "detail": "module 'lca.plugins.providers.memory.workspace' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-evidence-store-inmemory-override",
+      "file": "lca/plugins/providers/observability/evidence_store_filesystem.py",
+      "line": 34,
+      "detail": "module 'lca.plugins.providers.observability.evidence_store_filesystem' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-session-service",
+      "file": "lca/plugins/seams/collaboration/session_service.py",
+      "line": 45,
+      "detail": "module 'lca.plugins.seams.collaboration.session_service' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-gate-chain-composer-seam",
+      "file": "lca/plugins/seams/gate/gate_chain_composer.py",
+      "line": 26,
+      "detail": "module 'lca.plugins.seams.gate.gate_chain_composer' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-artifact-closure-seam",
+      "file": "lca/plugins/seams/journal/artifact_closure.py",
+      "line": 26,
+      "detail": "module 'lca.plugins.seams.journal.artifact_closure' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-attachment-service",
+      "file": "lca/plugins/seams/memory/attachment.py",
+      "line": 49,
+      "detail": "module 'lca.plugins.seams.memory.attachment' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-remember-effects-seam",
+      "file": "lca/plugins/seams/memory/remember_effects.py",
+      "line": 26,
+      "detail": "module 'lca.plugins.seams.memory.remember_effects' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-workspace-service",
+      "file": "lca/plugins/seams/memory/workspace.py",
+      "line": 47,
+      "detail": "module 'lca.plugins.seams.memory.workspace' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-event-identity-seam",
+      "file": "lca/plugins/seams/observability/event_identity.py",
+      "line": 30,
+      "detail": "module 'lca.plugins.seams.observability.event_identity' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-journal-schema-seam",
+      "file": "lca/plugins/seams/observability/journal_schema.py",
+      "line": 53,
+      "detail": "module 'lca.plugins.seams.observability.journal_schema' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-profile-snapshot-seam",
+      "file": "lca/plugins/seams/observability/profile_snapshot.py",
+      "line": 31,
+      "detail": "module 'lca.plugins.seams.observability.profile_snapshot' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-run-locator-seam",
+      "file": "lca/plugins/seams/observability/run_locator.py",
+      "line": 32,
+      "detail": "module 'lca.plugins.seams.observability.run_locator' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-w3c-validator-seam",
+      "file": "lca/plugins/seams/observability/w3c_validator.py",
+      "line": 31,
+      "detail": "module 'lca.plugins.seams.observability.w3c_validator' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-reasoner-template-catalog-builtin",
+      "file": "lca/plugins/seams/think/reasoner_template_catalog.py",
+      "line": 60,
+      "detail": "module 'lca.plugins.seams.think.reasoner_template_catalog' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-system-prompt-service",
+      "file": "lca/plugins/seams/think/system_prompt.py",
+      "line": 37,
+      "detail": "module 'lca.plugins.seams.think.system_prompt' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-synthesizer-concat",
+      "file": "lca/plugins/synthesizer/concat.py",
+      "line": 27,
+      "detail": "module 'lca.plugins.synthesizer.concat' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-critic-null",
+      "file": "lca/plugins/think/null_critic.py",
+      "line": 27,
+      "detail": "module 'lca.plugins.think.null_critic' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-synthesizer-null",
+      "file": "lca/plugins/think/null_synthesizer.py",
+      "line": 27,
+      "detail": "module 'lca.plugins.think.null_synthesizer' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "orphan_plugin",
+      "id": "lca-tool-cordis-control",
+      "file": "lca/plugins/tools/cordis_control/__init__.py",
+      "line": 78,
+      "detail": "module 'lca.plugins.tools.cordis_control.__init__' 未被任何 bundles/*.yaml $module 引用"
+    },
+    {
+      "kind": "dead_bundle_ref",
+      "id": "lca-tool-team-message-publish",
+      "file": "bundles/lead-standard.yaml",
+      "line": 0,
+      "detail": "$module 'lca.plugins.tools.team_message_publish' import 失败: ModuleNotFoundError: No module named 'lca.plugins.tools.team_message_publish'"
+    },
+    {
+      "kind": "dead_bundle_ref",
+      "id": "lca-tool-team-message-reply",
+      "file": "bundles/lead-standard.yaml",
+      "line": 0,
+      "detail": "$module 'lca.plugins.tools.team_message_reply' import 失败: ModuleNotFoundError: No module named 'lca.plugins.tools.team_message_reply'"
+    },
+    {
+      "kind": "dead_bundle_ref",
+      "id": "lca-sensor-clock",
+      "file": "bundles/scenario-standard.yaml",
+      "line": 0,
+      "detail": "entry id='lca-sensor-clock' 与模块 @plugin(id='sensor.clock') 不一致"
+    },
+    {
+      "kind": "dead_bundle_ref",
+      "id": "lca-sensor-workspace-artifacts",
+      "file": "bundles/scenario-standard.yaml",
+      "line": 0,
+      "detail": "entry id='lca-sensor-workspace-artifacts' 与模块 @plugin(id='sensor.workspace-artifacts') 不一致"
+    },
+    {
+      "kind": "dead_bundle_ref",
+      "id": "lca-sensor-inbox-facts",
+      "file": "bundles/scenario-standard.yaml",
+      "line": 0,
+      "detail": "entry id='lca-sensor-inbox-facts' 与模块 @plugin(id='sensor.inbox-facts') 不一致"
+    },
+    {
+      "kind": "dead_bundle_ref",
+      "id": "lca-sensor-skill-catalog",
+      "file": "bundles/scenario-standard.yaml",
+      "line": 0,
+      "detail": "entry id='lca-sensor-skill-catalog' 与模块 @plugin(id='sensor.skill-catalog') 不一致"
+    },
+    {
+      "kind": "dead_bundle_ref",
+      "id": "lca-gate-repeat-tool-call",
+      "file": "bundles/scenario-standard.yaml",
+      "line": 0,
+      "detail": "entry id='lca-gate-repeat-tool-call' 与模块 @plugin(id='gate.repeat-tool-call') 不一致"
+    },
+    {
+      "kind": "dead_bundle_ref",
+      "id": "lca-gate-loop-breaker",
+      "file": "bundles/scenario-standard.yaml",
+      "line": 0,
+      "detail": "entry id='lca-gate-loop-breaker' 与模块 @plugin(id='gate.tool-loop-breaker') 不一致"
+    },
+    {
+      "kind": "dead_bundle_ref",
+      "id": "lca-gate-progress-detector",
+      "file": "bundles/scenario-standard.yaml",
+      "line": 0,
+      "detail": "entry id='lca-gate-progress-detector' 与模块 @plugin(id='gate.progress-loop-detector') 不一致"
+    },
+    {
+      "kind": "dead_bundle_ref",
+      "id": "lca-tool-test-run",
+      "file": "bundles/scenario-voyager.yaml",
+      "line": 0,
+      "detail": "$module 'lca.plugins.tools.test_run' import 失败: ModuleNotFoundError: No module named 'lca.plugins.tools.test_run'"
+    },
+    {
+      "kind": "plugin_in_init",
+      "id": "lca-tool-cordis-control",
+      "file": "lca/plugins/tools/cordis_control/__init__.py",
+      "line": 78,
+      "detail": "@plugin(...) 出现在 __init__.py(违反 AGENTS.md §5)"
+    }
+  ]
 }
