@@ -254,6 +254,41 @@ For narrower comparisons, `optimize <run_id>` ranks candidates by latency/token/
 
 ---
 
+### Step 6.5 — Acknowledge the live-kernel invariant (READ BEFORE Step 7)
+
+**WHY.** LCA 的 kernel 是常驻 Python 进程(`uv run lca_kernel serve`,
+PID/port 用 `./scripts/lca-ops status` 查)。所有 spine deriver、LLM adapter、
+facade、命令 handler 都是 kernel 进程内 import 的对象 —— **修改 `lca/` /
+`lca_kernel/` 任何文件不重启,对线上 run 不生效**。`pytest` 跑的是隔离逻辑,
+绕开 kernel,不等于"线上生效"。
+
+**何时一定要 kernel-restart:**
+
+- 修改 `lca/` 内任何 `.py`(除纯 `tests/` + CLI 单文件测试)。
+- 修改 `lca_kernel/` 内任何 `.py`。
+- 修改 Profile / Bundle / Plugin / Manifest 配置。
+- 修改 spine 的 deriver / sink / sundry reflective plugins —— 这些是
+  runtime-loaded,改了不重启不会重新 import。
+
+**何时不需要 kernel-restart:**
+
+- 改 docs / Agent Notes / tests:`pytest` 验证即可。
+- 改 CLI 单文件测试:`pytest tests/cli/...` 已能验证。
+- 改 Profile YAML:`kernel-restart` 还是会重新加载它。
+
+**DO.**
+
+```sh
+# Step 6.5 在 Step 7 之前的状态核查
+./scripts/lca-ops status --json | jq '.services[] | select(.name=="kernel_serve") | .pid'
+# 记下 PID;kernel-restart 后 PID 会变,PID 不变 ⇒ 老进程仍在跑。
+```
+
+**FAIL.** PID 不变 ⇒ restart 没生效。运行 `lca-ops logs` 看 boot 摘要,
+确认 `<pid>` 与新 spawn 一致。
+
+---
+
 ### Step 7 — Verify the fix on the live system (do not skip)
 
 **WHY.** Debugging is read-only. *Verifying* the fix requires a new run. Don't tell the user "fixed" until you've reproduced.
