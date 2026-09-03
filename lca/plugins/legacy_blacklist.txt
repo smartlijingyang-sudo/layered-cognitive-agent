@@ -7,7 +7,8 @@
 # Examples:
 #   my-factory-only-plugin  # test fixture, never deployed to runtime
 #
-# Currently empty: all 194 plugins declare logic_address.
+# Currently empty: all 229 plugins declare logic_address
+# (see `uv run python scripts/check_plugin_metadata.py` for the live count).
 # Add entries only when a plugin genuinely cannot have logic_address
 # (e.g. test fixtures, factory-only modules with no runtime instance).
 
