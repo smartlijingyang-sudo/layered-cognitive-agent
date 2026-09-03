@@ -141,7 +141,7 @@ class CognitiveAgent(AgentUnit):
         model-visible work and recovery path auditable.
         """
         # PR-3.1: spine envelope for the agent_loop.iteration execution point.
-        from lca.plugins.observability.spine.reflectors.agent_spawn import (
+        from lca.plugins.events.publishers.spine_reflector_agent_spawn import (
             emit_agent_loop_iteration_end,
             emit_agent_loop_iteration_start,
         )

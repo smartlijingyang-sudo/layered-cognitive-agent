@@ -18,15 +18,38 @@ offload,sidecar 永远不出现;同时装饰器路径 (``instrument_wrap``) 直�
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from lca.contracts.observability import ExceptionRecord as ExceptionRecordT
+from lca.harness.declarative.compile.instrument_wrap import resolve_active_spine
 from lca.infrastructure.observability.spine.event_record import EventRecord
-from lca.infrastructure.observability.spine.transport_emit import _safe_append
 
 _EXECUTION_POINT = "exception.caught"
 _CHANNEL_ERROR: Literal["error"] = "error"
 _OUTCOME_FAILURE: Literal["failure"] = "failure"
+
+
+def _safe_append(
+    *,
+    execution_point: str,
+    channel: str,
+    payload: dict[str, Any] | None = None,
+    outcome: str | None = None,
+) -> EventRecord | None:
+    """Append a spine event via the process-local accessor。
+
+    内联自 transport_emit（PR-4 与 transport_emit 一起退役）；语义未变。
+    spine is None → None；wire 后 fail-loud。
+    """
+    spine = resolve_active_spine()
+    if spine is None:
+        return None
+    return spine.append(
+        execution_point=execution_point,
+        channel=channel,
+        caller_payload=payload,
+        outcome=outcome,
+    )
 
 
 def emit_exception_caught(record: ExceptionRecordT) -> EventRecord | None:

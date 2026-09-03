@@ -81,20 +81,11 @@ entries:
     config: {}
 
   # ── L0 reflectors (3) ───────────────────────────────────────────
-  - id: spine.reflector.source
-    name: spine_reflector_source
-    $module: lca.plugins.observability.spine.reflectors.source
-    config: {}
-
-  - id: spine.reflector.context
-    name: spine_reflector_context
-    $module: lca.plugins.observability.spine.reflectors.context
-    config: {}
-
-  - id: spine.reflector.runtime
-    name: spine_reflector_runtime
-    $module: lca.plugins.observability.spine.reflectors.runtime
-    config: {}
+  # ADR-0181 PR-5：source / context reflectors 已迁到
+  # lca.plugins.events.publishers.spine_reflector_phase 系列 + D11
+  # FieldProducer（PR-8 derivers 全迁时统一处理）。本 bundle 在 PR-5
+  # 范围内仅装载 L1/L2 + 旧 field_producer（preserve_compat=true）。
+  # 删-when：PR-8 derivers + PR-9 旧 spine 全退役。
 
   # ── L0 classifiers (2) ──────────────────────────────────────────
   - id: spine.classifier.exception.builtin

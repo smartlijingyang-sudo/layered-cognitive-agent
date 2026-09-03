@@ -76,11 +76,13 @@ class RunLifecycleCoordinator:
         from lca.infrastructure.observability.spine.exception_emit import (
             emit_exception_caught,
         )
-        from lca.infrastructure.observability.spine.transport_emit import (
-            emit_carrier_exception_finally,
+        from lca.plugins.events.publishers.spine_reflector_transport import (
             emit_kernel_run_cancelled,
             emit_kernel_run_start,
             emit_kernel_run_stop,
+        )
+        from lca.plugins.events.publishers.spine_reflector_runtime import (
+            emit_exception_finally as emit_carrier_exception_finally,
         )
 
         SpineContext.set_run(session.run_id)

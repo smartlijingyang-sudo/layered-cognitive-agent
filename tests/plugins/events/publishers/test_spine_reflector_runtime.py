@@ -57,6 +57,11 @@ def _run(mechanism: EventMechanism) -> None:
             event_type="TURN_STARTED", trace_id="t1"
         )
         assert ref.category == "spine.runtime.event_publisher.publish"
+        # PR-6 runtime.observed marker
+        ref = plugin.emit_runtime_observed(
+            observed_at="checkpoint_persist", detail="x", run_id="r1"
+        )
+        assert ref.category == "spine.runtime.observed"
     finally:
         EventMechanism.set_default(None)
 

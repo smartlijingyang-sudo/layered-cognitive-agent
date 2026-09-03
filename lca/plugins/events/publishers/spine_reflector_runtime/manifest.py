@@ -15,6 +15,7 @@ _PUBLISHES: tuple[Category, ...] = (
     Category("spine.runtime.resume.start"),
     Category("spine.runtime.resume.end"),
     Category("spine.runtime.event_publisher.publish"),
+    Category("spine.runtime.observed"),
 )
 
 event_plugin_spec = EventPluginSpec(

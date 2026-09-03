@@ -48,3 +48,6 @@ tests/.scratch_cordis_creator_real/
 # vim swap files
 *.swp
 .lca-run/
+
+# SpineFileSink default-run.* JSONL artifacts
+default-run.*.jsonl

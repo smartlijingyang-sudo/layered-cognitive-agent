@@ -76,6 +76,75 @@ class Category(str, Enum):
     SPINE_RUNTIME_RESUME_START = "spine.runtime.resume.start"
     SPINE_RUNTIME_RESUME_END = "spine.runtime.resume.end"
     SPINE_RUNTIME_EVENT_PUBLISHER_PUBLISH = "spine.runtime.event_publisher.publish"
+    # observability/spine — PR-4 transport / kernel / agent_loop / agent / loop 14 EP
+    SPINE_TRANSPORT_ROUTE_ENTER = "spine.transport.route.enter"
+    SPINE_TRANSPORT_ROUTE_EXIT = "spine.transport.route.exit"
+    SPINE_TRANSPORT_SSE_PUBLISH = "spine.transport.sse.publish"
+    SPINE_KERNEL_BOOT_START = "spine.kernel.boot.start"
+    SPINE_KERNEL_BOOT_COMPLETED = "spine.kernel.boot.completed"
+    SPINE_KERNEL_RUN_START = "spine.kernel.run.start"
+    SPINE_KERNEL_RUN_STOP = "spine.kernel.run.stop"
+    SPINE_KERNEL_RUN_CANCELLED = "spine.kernel.run.cancelled"
+    SPINE_AGENT_LOOP_ITERATION_START = "spine.agent_loop.iteration.start"
+    SPINE_AGENT_LOOP_ITERATION_END = "spine.agent_loop.iteration.end"
+    SPINE_LOOP_FORK = "spine.loop.fork"
+    SPINE_AGENT_SPAWN = "spine.agent.spawn"
+    SPINE_AGENT_ITERATION = "spine.agent.iteration"
+    SPINE_AGENT_FINAL = "spine.agent.final"
+    # observability/spine — PR-5 writable / phase / phase_graph 全迁 24 EP
+    SPINE_WRITABLE_STEP_START = "spine.writable.step.start"
+    SPINE_WRITABLE_STEP_END = "spine.writable.step.end"
+    SPINE_WRITABLE_SEGMENT_START = "spine.writable.segment.start"
+    SPINE_WRITABLE_SEGMENT_END = "spine.writable.segment.end"
+    SPINE_WRITABLE_ITERATION_HALT = "spine.writable.iteration.halt"
+    SPINE_WRITABLE_ITERATION_CLOSING = "spine.writable.iteration.closing"
+    SPINE_WRITABLE_ITERATION_CLOSE = "spine.writable.iteration.close"
+    SPINE_PERCEIVE_PHASE_FOLD = "spine.perceive.phase.fold"
+    SPINE_PHASE_PERCEIVE_FOLD = "spine.phase.perceive.fold"
+    SPINE_PHASE_THINK_FOLD = "spine.phase.think.fold"
+    SPINE_PHASE_GATE_FOLD = "spine.phase.gate.fold"
+    SPINE_PHASE_REMEMBER_FOLD = "spine.phase.remember.fold"
+    SPINE_PHASE_STOP_FOLD = "spine.phase.stop.fold"
+    SPINE_PHASE_REFLECT_FOLD = "spine.phase.reflect.fold"
+    SPINE_PHASE_ACT_FOLD_START = "spine.phase.act.fold.start"
+    SPINE_PHASE_ACT_FOLD_END = "spine.phase.act.fold.end"
+    SPINE_PHASE_ACT_FOLD = "spine.phase.act.fold"
+    SPINE_PHASE_TOOL_CALL_START = "spine.phase.tool.call.start"
+    SPINE_PHASE_TOOL_CALL_END = "spine.phase.tool.call.end"
+    SPINE_PHASE_TOOL_DENIED = "spine.phase.tool.denied"
+    SPINE_PHASE_GRAPH_NODE_START = "spine.phase_graph.node.start"
+    SPINE_PHASE_GRAPH_NODE_END = "spine.phase_graph.node.end"
+    SPINE_PHASE_GRAPH_EDGE_TRANSIT = "spine.phase_graph.edge.transit"
+    SPINE_PHASE_GRAPH_INSTRUMENT_COVERAGE = "spine.phase_graph.instrument.coverage"
+    # observability/spine — PR-6 team / perception / control / boot / runtime.observed 新加 28 EP
+    SPINE_TEAM_CASTING_STARTED = "spine.team.casting.started"
+    SPINE_TEAM_CASTING_COMPLETED = "spine.team.casting.completed"
+    SPINE_TEAM_CASTING_FAILED = "spine.team.casting.failed"
+    SPINE_TEAM_DELEGATION_ISSUED = "spine.team.delegation.issued"
+    SPINE_TEAM_DELEGATION_COMPLETED = "spine.team.delegation.completed"
+    SPINE_TEAM_DELEGATION_CACHE_HIT = "spine.team.delegation.cache_hit"
+    SPINE_TEAM_MESSAGE_PUBLISHED = "spine.team.message.published"
+    SPINE_PERCEPTION_OBSERVE = "spine.perception.observe"
+    SPINE_PERCEPTION_ATTENTION_FOCUS = "spine.perception.attention.focus"
+    SPINE_PERCEPTION_ATTENTION_BLUR = "spine.perception.attention.blur"
+    SPINE_PERCEPTION_SIGNAL_DETECTED = "spine.perception.signal.detected"
+    SPINE_PERCEPTION_FUSED = "spine.perception.fused"
+    SPINE_PERCEPTION_ARTIFACT_BUILT = "spine.perception.artifact.built"
+    SPINE_CONTROL_DISPATCH = "spine.control.dispatch"
+    SPINE_CONTROL_INVOKE = "spine.control.invoke"
+    SPINE_CONTROL_SIGNAL = "spine.control.signal"
+    SPINE_CONTROL_APPROVE_REQUEST = "spine.control.approve.request"
+    SPINE_CONTROL_APPROVE_RESPONSE = "spine.control.approve.response"
+    SPINE_CONTROL_DENY = "spine.control.deny"
+    SPINE_CONTROL_REVOKE = "spine.control.revoke"
+    SPINE_CONTROL_PAUSE = "spine.control.pause"
+    SPINE_CONTROL_RESUME = "spine.control.resume"
+    SPINE_CONTROL_STOP = "spine.control.stop"
+    SPINE_CONTROL_ACCEPT = "spine.control.accept"
+    SPINE_BOOT_PROFILE_RESOLVED = "spine.boot.profile.resolved"
+    SPINE_BOOT_PLUGIN_FIBER_SPAWNED = "spine.boot.plugin.fiber.spawned"
+    SPINE_BOOT_OBSERVABILITY_ASSEMBLED = "spine.boot.observability.assembled"
+    SPINE_RUNTIME_OBSERVED = "spine.runtime.observed"
 
 
 class Plane(str, Enum):
@@ -125,6 +194,72 @@ CATEGORY_DEFAULT_PLANE: dict[Category, Plane] = {
     Category.SPINE_RUNTIME_RESUME_START: Plane.OBSERVABILITY,
     Category.SPINE_RUNTIME_RESUME_END: Plane.OBSERVABILITY,
     Category.SPINE_RUNTIME_EVENT_PUBLISHER_PUBLISH: Plane.OBSERVABILITY,
+    Category.SPINE_TRANSPORT_ROUTE_ENTER: Plane.OBSERVABILITY,
+    Category.SPINE_TRANSPORT_ROUTE_EXIT: Plane.OBSERVABILITY,
+    Category.SPINE_TRANSPORT_SSE_PUBLISH: Plane.OBSERVABILITY,
+    Category.SPINE_KERNEL_BOOT_START: Plane.OBSERVABILITY,
+    Category.SPINE_KERNEL_BOOT_COMPLETED: Plane.OBSERVABILITY,
+    Category.SPINE_KERNEL_RUN_START: Plane.OBSERVABILITY,
+    Category.SPINE_KERNEL_RUN_STOP: Plane.OBSERVABILITY,
+    Category.SPINE_KERNEL_RUN_CANCELLED: Plane.OBSERVABILITY,
+    Category.SPINE_AGENT_LOOP_ITERATION_START: Plane.OBSERVABILITY,
+    Category.SPINE_AGENT_LOOP_ITERATION_END: Plane.OBSERVABILITY,
+    Category.SPINE_LOOP_FORK: Plane.OBSERVABILITY,
+    Category.SPINE_AGENT_SPAWN: Plane.OBSERVABILITY,
+    Category.SPINE_AGENT_ITERATION: Plane.OBSERVABILITY,
+    Category.SPINE_AGENT_FINAL: Plane.OBSERVABILITY,
+    Category.SPINE_WRITABLE_STEP_START: Plane.OBSERVABILITY,
+    Category.SPINE_WRITABLE_STEP_END: Plane.OBSERVABILITY,
+    Category.SPINE_WRITABLE_SEGMENT_START: Plane.OBSERVABILITY,
+    Category.SPINE_WRITABLE_SEGMENT_END: Plane.OBSERVABILITY,
+    Category.SPINE_WRITABLE_ITERATION_HALT: Plane.OBSERVABILITY,
+    Category.SPINE_WRITABLE_ITERATION_CLOSING: Plane.OBSERVABILITY,
+    Category.SPINE_WRITABLE_ITERATION_CLOSE: Plane.OBSERVABILITY,
+    Category.SPINE_PERCEIVE_PHASE_FOLD: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_PERCEIVE_FOLD: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_THINK_FOLD: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_GATE_FOLD: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_REMEMBER_FOLD: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_STOP_FOLD: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_REFLECT_FOLD: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_ACT_FOLD_START: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_ACT_FOLD_END: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_ACT_FOLD: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_TOOL_CALL_START: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_TOOL_CALL_END: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_TOOL_DENIED: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_GRAPH_NODE_START: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_GRAPH_NODE_END: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_GRAPH_EDGE_TRANSIT: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_GRAPH_INSTRUMENT_COVERAGE: Plane.OBSERVABILITY,
+    Category.SPINE_TEAM_CASTING_STARTED: Plane.STRUCTURAL,
+    Category.SPINE_TEAM_CASTING_COMPLETED: Plane.STRUCTURAL,
+    Category.SPINE_TEAM_CASTING_FAILED: Plane.STRUCTURAL,
+    Category.SPINE_TEAM_DELEGATION_ISSUED: Plane.STRUCTURAL,
+    Category.SPINE_TEAM_DELEGATION_COMPLETED: Plane.STRUCTURAL,
+    Category.SPINE_TEAM_DELEGATION_CACHE_HIT: Plane.STRUCTURAL,
+    Category.SPINE_TEAM_MESSAGE_PUBLISHED: Plane.STRUCTURAL,
+    Category.SPINE_PERCEPTION_OBSERVE: Plane.OBSERVABILITY,
+    Category.SPINE_PERCEPTION_ATTENTION_FOCUS: Plane.OBSERVABILITY,
+    Category.SPINE_PERCEPTION_ATTENTION_BLUR: Plane.OBSERVABILITY,
+    Category.SPINE_PERCEPTION_SIGNAL_DETECTED: Plane.OBSERVABILITY,
+    Category.SPINE_PERCEPTION_FUSED: Plane.OBSERVABILITY,
+    Category.SPINE_PERCEPTION_ARTIFACT_BUILT: Plane.OBSERVABILITY,
+    Category.SPINE_CONTROL_DISPATCH: Plane.STRUCTURAL,
+    Category.SPINE_CONTROL_INVOKE: Plane.STRUCTURAL,
+    Category.SPINE_CONTROL_SIGNAL: Plane.STRUCTURAL,
+    Category.SPINE_CONTROL_APPROVE_REQUEST: Plane.STRUCTURAL,
+    Category.SPINE_CONTROL_APPROVE_RESPONSE: Plane.STRUCTURAL,
+    Category.SPINE_CONTROL_DENY: Plane.STRUCTURAL,
+    Category.SPINE_CONTROL_REVOKE: Plane.STRUCTURAL,
+    Category.SPINE_CONTROL_PAUSE: Plane.STRUCTURAL,
+    Category.SPINE_CONTROL_RESUME: Plane.STRUCTURAL,
+    Category.SPINE_CONTROL_STOP: Plane.STRUCTURAL,
+    Category.SPINE_CONTROL_ACCEPT: Plane.STRUCTURAL,
+    Category.SPINE_BOOT_PROFILE_RESOLVED: Plane.STRUCTURAL,
+    Category.SPINE_BOOT_PLUGIN_FIBER_SPAWNED: Plane.STRUCTURAL,
+    Category.SPINE_BOOT_OBSERVABILITY_ASSEMBLED: Plane.STRUCTURAL,
+    Category.SPINE_RUNTIME_OBSERVED: Plane.OBSERVABILITY,
 }
 
 

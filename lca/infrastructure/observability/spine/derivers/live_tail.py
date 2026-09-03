@@ -1,3 +1,7 @@
+# COMPAT(delete-when: PR-9, tracking: ADR-0181)
+# 旧 EventSpine deriver；PR-8 shim 走 events/subscribers/spine_* 包装；
+# 本模块保留至 PR-9 旧 spine 全退役（rg "lca.plugins.observability.spine.derivers" lca/ = 0 触发）。
+
 """LiveTailDeriver — wraps ``LiveTail`` as a spine deriver (Task 2.2).
 
 PR-2 parallel-write phase: the deriver exists alongside the legacy
