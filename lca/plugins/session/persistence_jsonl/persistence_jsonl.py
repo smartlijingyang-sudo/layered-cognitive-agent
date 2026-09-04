@@ -31,7 +31,7 @@ from __future__ import annotations
 import contextlib
 import json
 import threading
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -104,6 +104,8 @@ class JsonlSessionPersistence:
         self._files: dict[str, _SessionFile] = {}
         self._files_lock = threading.Lock()
         self._header_written: set[str] = set()
+        # SessionStore.add_observer_hook 返回的反注册闭包；全量 close 时释放。
+        self._store_hooks: list[Callable[[], None]] = []
 
     # ── 公开面 ──────────────────────────────────────────────────────
 
@@ -137,7 +139,11 @@ class JsonlSessionPersistence:
                 sfile.flush()
 
     def close(self, session_id: str | None = None) -> None:
-        """flush + 关闭文件;``session_id`` 缺省 = 全量。"""
+        """flush + 关闭文件;``session_id`` 缺省 = 全量。
+
+        全量 close 同时释放 ``SessionStore.add_observer_hook`` 反注册闭包；
+        per-session close 不动 store 接管。
+        """
         with self._files_lock:
             targets = self._select(session_id)
             for sid, sfile in targets:
@@ -146,6 +152,10 @@ class JsonlSessionPersistence:
                 finally:
                     self._files.pop(sid, None)
                     self._header_written.discard(sid)
+        if session_id is None:
+            for cancel in self._store_hooks:
+                cancel()
+            self._store_hooks.clear()
 
     def local_path(self, session_id: str) -> Path:
         """返回 ``session_id`` 对应的落盘路径(不创建文件)。"""
@@ -335,9 +345,9 @@ async def setup(ctx: PluginContext, config: Config) -> None:
 def register_to_session_store(ctx: PluginContext, persistence: JsonlSessionPersistence) -> None:
     """把 observer 挂到当前 SessionStore(活 Session + 未来新 Session)。
 
-    Session 未装载时 no-op:SessionStore 由后续 PR 接入 run 路径时
-    才有可消费方,当前 PR-3c 骨架下 SessionStore 默认装载但不暴露
-    接管钩子;本函数只对当前活 Session 一次性挂入。
+    SessionStore 未装载时 no-op(保留 capability 供测试后注册);装载时
+    经 ``add_observer_hook`` 接管未来 ``create`` / ``restore`` 的 Session,
+    并对当前活 Session 一次性挂入(兜底已存在条目)。
     """
     store = ctx.soft_get("session.store")
     if store is None:
@@ -352,9 +362,12 @@ def register_to_session_store(ctx: PluginContext, persistence: JsonlSessionPersi
 def _attach_to_store(store: Any, persistence: JsonlSessionPersistence) -> None:
     """对 store 当前活 Session 注册 observer,并接管未来创建的新 Session。
 
-    接管机制：通过 store 提供 ``add_observer_hook`` 或等价的
-    ``on_create`` 钩子,本函数会检测并挂入；没有该面时只挂当前活 Session。
-    SessionStore 暂未提供该钩子,本实现是 best-effort。
+    时序:先对 ``store.list()`` 现存 Session 一次性 ``register_to``(restore
+    hook 不重放已存在条目的补偿),再经 ``store.add_observer_hook`` 接管未来
+    ``create`` / ``restore``。
+    失败语义:``store`` 未提供 ``add_observer_hook`` 时抛 ``TypeError``
+    (fail-loud,禁止静默降级成"只挂当前活 Session");单个 Session 挂入
+    失败 contained(记 warning,继续其余)。
     """
     for session in getattr(store, "list", lambda: ())():
         try:
@@ -366,17 +379,20 @@ def _attach_to_store(store: Any, persistence: JsonlSessionPersistence) -> None:
                 exc_info=True,
             )
     hook = getattr(store, "add_observer_hook", None)
-    if callable(hook):
+    if not callable(hook):
+        msg = f"SessionStore 必须提供 add_observer_hook;got {type(store).__name__} without it"
+        raise TypeError(msg)
 
-        def _on_create(session: Any) -> None:
-            try:
-                persistence.register_to(session)
-            except Exception:
-                _log.warning(
-                    "session.persistence.attach_failed",
-                    session_id=getattr(session, "id", None),
-                    exc_info=True,
-                )
+    def _on_create(session: Any) -> None:
+        try:
+            persistence.register_to(session)
+        except Exception:
+            _log.warning(
+                "session.persistence.attach_failed",
+                session_id=getattr(session, "id", None),
+                exc_info=True,
+            )
 
-        with contextlib.suppress(Exception):
-            hook(_on_create)
+    cancel = hook(_on_create)
+    if callable(cancel):
+        persistence._store_hooks.append(cancel)

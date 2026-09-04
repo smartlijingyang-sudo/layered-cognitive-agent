@@ -276,6 +276,58 @@ def test_store_list_keeps_creation_order() -> None:
     assert store.list() == (b,)
 
 
+# ── add_observer_hook（新 Session 接管面）─────────────────────────
+
+
+def test_store_observer_hook_fanout_on_create() -> None:
+    store = SessionStore()
+    seen: list[Any] = []
+    store.add_observer_hook(seen.append)
+
+    session = store.create("hooked")
+    assert seen == [session]
+
+
+def test_store_observer_hook_fanout_on_restore() -> None:
+    store = SessionStore()
+    seen: list[Any] = []
+    store.add_observer_hook(seen.append)
+
+    restored = store.restore(
+        "hooked-restore",
+        SessionHeader(version=SESSION_FORMAT_VERSION, id="hooked-restore", created_at=0),
+        (),
+    )
+    assert seen == [restored]
+
+
+def test_store_observer_hook_cancel_idempotent() -> None:
+    store = SessionStore()
+    seen: list[Any] = []
+    cancel = store.add_observer_hook(seen.append)
+
+    cancel()
+    cancel()  # 幂等,不抛
+    store.create("after-cancel")
+    assert seen == []
+
+
+def test_store_observer_hook_failure_contained() -> None:
+    store = SessionStore()
+    good: list[Any] = []
+
+    def bad_hook(session: Any) -> None:
+        raise RuntimeError("hook boom")
+
+    store.add_observer_hook(bad_hook)
+    store.add_observer_hook(good.append)
+
+    # 单个 hook 抛错不打断其他 hook 与 Session 入仓。
+    session = store.create("contained")
+    assert store.get("contained") is session
+    assert good == [session]
+
+
 # ── flush（ADR-0186）────────────────────────────────────────────────
 
 
@@ -608,7 +660,6 @@ def test_bus_facade_append_maps_payload_into_session_log() -> None:
     assert "category" not in spine_event.data
 
 
-
 def test_bus_facade_observe_projects_original_payload_and_ref() -> None:
     from lca.plugins.session.runtime.bus_facade import SessionBusFacade
 
@@ -625,7 +676,6 @@ def test_bus_facade_observe_projects_original_payload_and_ref() -> None:
     assert len(seen) == 1
     assert seen[0][0] is payload
     assert seen[0][1] == ref
-
 
 
 def test_bus_facade_observe_contains_callback_failure() -> None:
@@ -648,7 +698,6 @@ def test_bus_facade_observe_contains_callback_failure() -> None:
     assert seen == [payload]
     assert ref.event_id == "s-contain:0"
     assert session.seq == 1
-
 
 
 def test_as_bus_facade_wraps_session_only() -> None:

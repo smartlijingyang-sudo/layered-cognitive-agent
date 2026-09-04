@@ -13,13 +13,18 @@ restore（ADR-0186）：从持久化层或父 session fork 重建 in-memory sess
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import contextlib
+from collections.abc import Callable, Sequence
+
+import structlog
 
 from lca.plugins.session.runtime.session import Session
 from lca_kernel.events.fold import foldRequestHeader
 from lca_kernel.events.session import SessionEvent, SessionHeader
 
 __all__ = ["SessionStore"]
+
+_log = structlog.get_logger("lca.session.store")
 
 
 class SessionStore:
@@ -32,6 +37,38 @@ class SessionStore:
     def __init__(self) -> None:
         self._sessions: dict[str, Session] = {}
         self._counter = 0
+        self._creation_hooks: list[Callable[[Session], None]] = []
+
+    def add_observer_hook(self, hook: Callable[[Session], None]) -> Callable[[], None]:
+        """注册「新 Session 诞生」的 fan-out 回调；返回幂等反注册函数。
+
+        时序：此后每个经 :meth:`create` / :meth:`restore` 入仓的 Session 都
+        同步调一次 ``hook(session)``。``restore`` 路径不重放 seed 事件——
+        hook 侧只拿 Session 引用（典型用法：``session.observe(...)`` 接管
+        之后的 append 落盘）；对已存在 Session 的补偿由注册方自行 ``list()``。
+
+        失败语义：单个 hook 抛错 contained（记 warning，不打断其他 hook 与
+        Session 入仓），与 :meth:`Session.append` 的 observer 失败形态一致。
+        所有权：返回的闭包幂等；重复调用不再移除。
+        """
+        self._creation_hooks.append(hook)
+
+        def _cancel() -> None:
+            with contextlib.suppress(ValueError):
+                self._creation_hooks.remove(hook)
+
+        return _cancel
+
+    def _fanout_creation_hooks(self, session: Session) -> None:
+        for hook in tuple(self._creation_hooks):
+            try:
+                hook(session)
+            except Exception:
+                _log.warning(
+                    "session_store.creation_hook_failed",
+                    session_id=session.id,
+                    exc_info=True,
+                )
 
     def create(self, session_id: str | None = None) -> Session:
         """创建并入仓一个 Session。
@@ -51,6 +88,7 @@ class SessionStore:
             raise ValueError(f"session {session_id!r} 已存在")
         session = Session(session_id)
         self._sessions[session_id] = session
+        self._fanout_creation_hooks(session)
         return session
 
     def restore(
@@ -92,6 +130,9 @@ class SessionStore:
         session._header_fold_seq = len(events)
 
         self._sessions[session_id] = session
+        # Fan-out 只交付 Session 引用供接管之后的 append；seed 事件本身
+        # 不重放给 observer（restore 时序契约）。
+        self._fanout_creation_hooks(session)
         return session
 
     def get(self, session_id: str) -> Session | None:

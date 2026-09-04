@@ -281,6 +281,81 @@ async def test_setup_uses_config_fsync(tmp_path: Path) -> None:
     assert "evt" in _event_types(lines)
 
 
+async def test_setup_attaches_to_future_sessions(tmp_path: Path) -> None:
+    """setup 之后才 create 的 Session 也必须被 observer 接管(A3 回归锁)。
+
+    历史 bug:``_attach_to_store`` 只挂当前活 Session,``add_observer_hook``
+    缺失时静默跳过,未来 Session 完全不落盘。
+    """
+    store = SessionStore()
+    ctx = _fake_ctx(store)
+
+    await setup.setup(ctx, Config(runs_root=str(tmp_path)))
+    persistence = ctx.provided["session.persistence.jsonl"]
+
+    # setup 之后创建的未来 Session
+    future = store.create("future")
+    future.append("future-evt", {"k": 1})
+    persistence.flush()
+
+    lines = _read_jsonl(persistence.local_path("future"))
+    assert "future-evt" in _event_types(lines)
+
+
+async def test_setup_restored_sessions_get_observer_via_hook(tmp_path: Path) -> None:
+    """setup 之后 restore 的 Session 也经 add_observer_hook 被接管。"""
+    from lca_kernel.events.session import SESSION_FORMAT_VERSION, SessionHeader
+
+    store = SessionStore()
+    ctx = _fake_ctx(store)
+    await setup.setup(ctx, Config(runs_root=str(tmp_path)))
+    persistence = ctx.provided["session.persistence.jsonl"]
+
+    restored = store.restore(
+        "restored",
+        SessionHeader(version=SESSION_FORMAT_VERSION, id="restored", created_at=0),
+        (),
+    )
+    restored.append("post-restore", {"k": 1})
+    persistence.flush()
+
+    lines = _read_jsonl(persistence.local_path("restored"))
+    assert "post-restore" in _event_types(lines)
+
+
+async def test_close_releases_store_hook(tmp_path: Path) -> None:
+    """全量 close 释放 add_observer_hook;之后 create 的 Session 不再落盘。"""
+    store = SessionStore()
+    ctx = _fake_ctx(store)
+    await setup.setup(ctx, Config(runs_root=str(tmp_path)))
+    persistence = ctx.provided["session.persistence.jsonl"]
+
+    persistence.close()  # 全量 → 释放 store hook
+
+    late = store.create("late")
+    late.append("late-evt", {"k": 1})
+    persistence.flush()
+    assert not persistence.local_path("late").exists()
+
+
+def test_attach_to_store_requires_observer_hook() -> None:
+    """store 无 add_observer_hook 时 fail-loud(禁止静默降级)。"""
+    import pytest
+
+    from lca.plugins.session.persistence_jsonl.persistence_jsonl import _attach_to_store
+
+    class _NoHookStore:
+        def list(self):
+            return ()
+
+    persistence = JsonlSessionPersistence(runs_root=Path("traces/runs"))
+    try:
+        with pytest.raises(TypeError, match="add_observer_hook"):
+            _attach_to_store(_NoHookStore(), persistence)
+    finally:
+        persistence.close()
+
+
 def test_plugin_manifest_metadata() -> None:
     from lca.harness.plugin_declaration import definition_from_plugin
     from lca.plugins.session.persistence_jsonl import persistence_jsonl as plugin_module
