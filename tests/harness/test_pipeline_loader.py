@@ -5,7 +5,7 @@
 - ``pipeline_from_mapping`` 与 parse_pipeline_yaml 同语义
 - ``register_pipeline_once`` 幂等(同名同版只装载一次)
 - ``apply_pipeline``:sinks 实例化进 ``AppliedPipeline.sinks``(不
-  ``bus.mount_sink``)+ consumer_rules 经 bus.subscribe 接线
+  ``bus.mount_sink``);consumer_rules 只解析为元数据,不 ``bus.subscribe``
 - ``inspect-pipeline`` CLI(web-standard;生产 yaml sinks/rules 为空)
 """
 
@@ -26,7 +26,6 @@ from lca.harness.profile.pipeline_loader import (
 )
 from lca_kernel.events import TeamDelegationCacheHit
 from lca_kernel.events.bus import EventBus, FailureSemantics
-from lca_kernel.events.errors import UnauthorizedSubscribeError
 from lca_kernel.events.hooks import DefaultFailureHook, PayloadSchemaHook
 from lca_kernel.events.pipeline import HookSpec, Pipeline, Stage
 from lca_kernel.events.sinks.spine_sink import SpineSink, SpineSinkClosedError
@@ -260,7 +259,8 @@ class TestRegisterAndApply:
         assert json.loads(lines[0])["event_id"] == "evt-1"
 
     def test_apply_pipeline_wires_consumer_rules(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """team. 前缀规则经 subscribe 接线:publish 命中插件回调。"""
+        """consumer_rules 只作元数据:apply 不 subscribe;显式 subscribe 后 publish 才命中。"""
+        from lca.contracts.event import Category
         from lca.plugins.events.subscribers.console_projector.subscriber import (
             ConsoleProjectorSubscriber,
         )
@@ -276,28 +276,41 @@ class TestRegisterAndApply:
                 ),
             ),
         )
-        applied = apply_pipeline(_make_bus(), pipeline)
-        assert applied.consumer_handles  # 至少订阅了授权矩阵内的 team.* category
-
         bus = _make_bus()
         applied = apply_pipeline(bus, pipeline)
+        assert applied.consumer_handles == ()
+        assert applied.pipeline.consumer_rules  # 规则仍可解析 / 检视
+
+        bus.publish(
+            TeamDelegationCacheHit(callee_role="cache", subtask="s", step=1),
+            producer=_authorized_producer(),
+        )
+        assert "幂等短路" not in capsys.readouterr().out
+
+        projector = ConsoleProjectorSubscriber()
+        bus.subscribe(
+            plugin=ConsoleProjectorSubscriber,
+            category=Category.TEAM_DELEGATION_CACHE_HIT,
+            on_event=projector.on_event,
+            failure=FailureSemantics.CONTAINED,
+        )
         bus.publish(
             TeamDelegationCacheHit(callee_role="cache", subtask="s", step=1),
             producer=_authorized_producer(),
         )
         assert "幂等短路" in capsys.readouterr().out
-        assert applied.consumer_handles
 
-    def test_apply_pipeline_unauthorized_plugin_raises(self) -> None:
-        """规则插件在鉴权矩阵零授权 → 上抛(不静默跳过)。"""
+    def test_apply_pipeline_unauthorized_plugin_parses_without_subscribe(self) -> None:
+        """零授权规则仍可进 Pipeline;apply 不 subscribe,故不上抛。"""
         from lca_kernel.events.pipeline import ConsumerRule
 
         pipeline = Pipeline(
             name="bad-rule",
             consumer_rules=(ConsumerRule(prefix="spine.", plugins=(_authorized_producer(),)),),
         )
-        with pytest.raises(UnauthorizedSubscribeError):
-            apply_pipeline(_make_bus(), pipeline)
+        applied = apply_pipeline(_make_bus(), pipeline)
+        assert applied.consumer_handles == ()
+        assert len(applied.pipeline.consumer_rules) == 1
 
 
 def _sink_spec(template: str):

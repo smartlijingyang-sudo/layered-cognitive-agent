@@ -1,8 +1,7 @@
-# COMPAT(delete-when: ADR-0186 PR-3g SSE 投影迁 Session observer,
-#        tracking: ADR-0186 PR-3g / I-SESSION-5)
-# ``subscribe()`` is SSE carrier fan-out (LiveTail passthrough), not an
-# EventSpine.subscribe / fold path. Keep the API until Session observer
-# push replaces this bridge.
+# RETAINED(SSE carrier; tracking: ADR-0186 PR-3g / I-SESSION-5)
+# ``subscribe()`` is SSE transport fan-out (LiveTail passthrough), not an
+# EventSpine.subscribe / fold path. Permanent until a separate transport
+# ADR; does not block Session SSOT.
 
 """spine.deriver.live_tail — wraps infrastructure LiveTailDeriver.
 

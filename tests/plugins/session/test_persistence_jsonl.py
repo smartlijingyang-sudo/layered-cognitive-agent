@@ -2,7 +2,7 @@
 
 覆盖契约:
 
-- observer 注册 → Session.append 自动写到 traces/runs/<id>/<id>.spine.jsonl
+- observer 注册 → Session.append 自动写到 traces/runs/<id>/<id>.session.jsonl
 - header 仅写一次,事件按时间顺序追加;每行 JSONL
 - SessionObserver 失败 contained(由 Session 保证,本测试验证插件自身不抛)
 - cancel 函数(register_to 返回值)切断后续观察
@@ -74,7 +74,7 @@ def test_register_to_writes_header_then_events(tmp_path: Path) -> None:
     session.append("spine.turn.delta", {"tokens": 5})
     persistence.flush()
 
-    lines = _read_jsonl(tmp_path / "s-alpha" / "s-alpha.spine.jsonl")
+    lines = _read_jsonl(tmp_path / "s-alpha" / "s-alpha.session.jsonl")
     assert len(lines) == 3
     assert lines[0]["kind"] == "header"
     assert lines[0]["id"] == "s-alpha"
@@ -124,7 +124,7 @@ def test_cancel_disconnects_observer(tmp_path: Path) -> None:
 def test_local_path_does_not_create_file(tmp_path: Path) -> None:
     persistence = JsonlSessionPersistence(runs_root=tmp_path)
     path = persistence.local_path("ghost")
-    assert path == tmp_path / "ghost" / "ghost.spine.jsonl"
+    assert path == tmp_path / "ghost" / "ghost.session.jsonl"
     assert not path.exists()
     assert not path.parent.exists()
 
@@ -229,7 +229,7 @@ def test_session_id_authoritative(tmp_path: Path) -> None:
     persistence.on_session_event(session, event)
     persistence.flush()
 
-    expected_path = tmp_path / "session-authoritative" / "session-authoritative.spine.jsonl"
+    expected_path = tmp_path / "session-authoritative" / "session-authoritative.session.jsonl"
     assert expected_path.exists()
     lines = _read_jsonl(expected_path)
     assert lines[-1]["type"] == "custom"

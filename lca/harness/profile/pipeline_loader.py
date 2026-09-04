@@ -16,8 +16,9 @@
 - :func:`apply_pipeline` / :func:`register_pipeline_once`:
   把 Pipeline 声明接到已有公开面。生产 boot 走 ``register_pipeline_once``
   (只装 hooks)。``apply_pipeline`` 另实例化 sinks 写入回执 map(不
-  ``bus.mount_sink``),并按 consumer_rules ``bus.subscribe``;Session SSOT
-  路径下持久化由 Session.observe / JsonlSessionPersistence 负责
+  ``bus.mount_sink``);``consumer_rules`` 仅作可检视元数据,不调用
+  :meth:`~lca_kernel.events.bus.EventBus.subscribe`。Session SSOT 路径下
+  投递 / 持久化由 Session.observe / JsonlSessionPersistence 负责
   (ADR-0186 PR-3f)。
 
 解析复用 :mod:`lca_kernel.events.pipeline` 的段解析器(``_parse_hooks`` /
@@ -47,7 +48,6 @@ from lca_kernel.events.pipeline import (
     _parse_hooks,
     _parse_rules,
     _parse_sinks,
-    matches_rule,
     parse_pipeline_yaml,
 )
 
@@ -81,8 +81,10 @@ class AppliedPipeline:
     """apply_pipeline 的装配回执。
 
     ``sinks`` 已按 ``spec.backend(**spec.config)`` 实例化并放入 map,供调用方
-    检视;**不** ``bus.mount_sink``。Session SSOT 路径下持久化由
-    Session.observe / JsonlSessionPersistence 负责(ADR-0186 PR-3f)。
+    检视;**不** ``bus.mount_sink``。``consumer_handles`` 恒为空元组:
+    consumer_rules 只作声明式元数据,本函数不订阅 EventBus。
+    Session SSOT 路径下投递 / 持久化由 Session.observe /
+    JsonlSessionPersistence 负责(ADR-0186 PR-3f)。
     """
 
     pipeline: Pipeline
@@ -186,76 +188,28 @@ def register_pipeline_once(bus: EventBus[Any], pipeline: Pipeline) -> bool:
 
 
 def apply_pipeline(bus: EventBus[Any], pipeline: Pipeline) -> AppliedPipeline:
-    """装配 Pipeline:hooks 注册 + sinks 实例化(不 mount) + consumer 订阅。
+    """装配 Pipeline:hooks 注册 + sinks 实例化(不 mount)。
 
     - hooks: 经 ``register_pipeline_once`` → ``bus.register_pipeline``;
     - sinks: 按 ``spec.backend(**spec.config)`` 实例化写入回执 ``sinks`` map,
       **不** ``bus.mount_sink``。持久化由 Session.observe /
       JsonlSessionPersistence 在 Session SSOT 路径负责(ADR-0186 PR-3f);
-    - consumer_rules: 按前缀展开到闭集 Category,经 ``bus.subscribe``
-      逐条订阅;插件必须可无参构造,回调取实例 ``__call__`` 或
-      ``on_event``。鉴权失败 → ``UnauthorizedSubscribeError`` 上抛。
+    - consumer_rules: 声明式元数据,供 inspect / CLI 解析与展示;
+      本函数不订阅 EventBus。投递由 Session.observe 负责;需要总线
+      订阅时由调用方显式调用 :meth:`EventBus.subscribe`。
+      ``consumer_handles`` 恒为空。
 
     生产 boot 仍只用 ``register_pipeline_once``(hooks);本函数供检视
-    sinks map 或显式装配 consumer_rules 的调用方。
+    sinks map 的调用方。
     """
     register_pipeline_once(bus, pipeline)
     sinks: dict[str, Any] = {}
     for spec in pipeline.sinks:
         sinks[spec.id] = spec.backend(**spec.config)
-    handles = _apply_consumer_rules(bus, pipeline)
-    return AppliedPipeline(pipeline=pipeline, sinks=sinks, consumer_handles=tuple(handles))
+    return AppliedPipeline(pipeline=pipeline, sinks=sinks, consumer_handles=())
 
 
 # ── 内部 ─────────────────────────────────────────────────────────────────
-
-
-def _apply_consumer_rules(bus: EventBus[Any], pipeline: Pipeline) -> list[ConsumerHandle]:
-    """前缀规则展开到闭集 Category,经 bus.subscribe 逐条订阅。
-
-    鉴权矩阵是 SSOT:只对 ``registry.can_subscribe`` 已授权的 (plugin,
-    category) 订阅;无 spec 的 category 本就无法 publish,跳过。某插件在
-    其规则前缀下一个授权 category 都没有 → 配置错误,上抛。
-    """
-    from lca.contracts.event import Category
-    from lca_kernel.events.errors import UnauthorizedSubscribeError
-
-    handles: list[ConsumerHandle] = []
-    for rule in pipeline.consumer_rules:
-        for plugin in rule.plugins:
-            categories = [
-                category
-                for category in Category
-                if matches_rule(category, rule) and bus.registry.can_subscribe(plugin, category)
-            ]
-            if not categories:
-                raise UnauthorizedSubscribeError(plugin.__qualname__, f"{rule.prefix}*")
-            callback = _plugin_callback(plugin)
-            for category in categories:
-                # COMPAT(delete-when: consumer_rules empty in production yaml and rg "bus.subscribe" lca/harness/profile/pipeline_loader.py = 0; Session.observe sole delivery for catalog plugins e.g. SpineChainSink, tracking: ADR-0186 PR-3f)
-                # PR-3f removed bus.mount_sink; subscribe kept until yaml consumer_rules cleared.
-                handles.append(
-                    bus.subscribe(
-                        plugin=plugin,
-                        category=category,
-                        on_event=callback,
-                        failure=rule.failure,
-                    )
-                )
-    return handles
-
-
-def _plugin_callback(plugin: type) -> Any:
-    """实例化插件并取其 ``(payload, ref)`` 回调形态(__call__ 或 on_event)。"""
-    instance = plugin()
-    if callable(instance):
-        return instance
-    on_event = getattr(instance, "on_event", None)
-    if callable(on_event):
-        return on_event
-    raise TypeError(
-        f"consumer plugin {plugin.__qualname__} 既不可调用也无 on_event,无法作为 pipeline 回调装配"
-    )
 
 
 def _profile_path(profile: ResolvedProfile | Path | str) -> Path | None:

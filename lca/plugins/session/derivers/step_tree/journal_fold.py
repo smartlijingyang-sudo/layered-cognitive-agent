@@ -14,10 +14,9 @@
 3. **可测试** — 任何测试 fixture 传 list[dict] 即可驱动 fold,不需要
    SpineReader / EventSpine / 运行中的 run。
 
-生产路径: RunSessionBuilder 装配 StepTreeFoldDeriver,flush 时 fold 本函数。
-COMPAT 旧 callback deriver: StepTreeAccumulatorDeriver
-(delete-when: rg "StepTreeAccumulatorDeriver(" lca/ = 0 except 其定义文件,
-tracking: ADR-0186 PR-3g)。
+生产路径: RunSessionBuilder 装配 StepTreeFoldDeriver,flush 时 fold 本函数
+（I-SESSION-5）。StepTreeAccumulatorDeriver 保留给单元测试 / CLI replay /
+capability provide，非 EventSpine.subscribe 生产 builder 路径。
 """
 
 from __future__ import annotations

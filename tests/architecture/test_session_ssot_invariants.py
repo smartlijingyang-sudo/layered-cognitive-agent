@@ -256,9 +256,7 @@ def test_pipeline_loader_has_no_mount_sink() -> None:
     assert "bus.mount_sink(" not in text, (
         "ADR-0186 PR-3f: pipeline_loader still calls bus.mount_sink("
     )
-    assert ".mount_sink(" not in text, (
-        "ADR-0186 PR-3f: pipeline_loader still calls .mount_sink("
-    )
+    assert ".mount_sink(" not in text, "ADR-0186 PR-3f: pipeline_loader still calls .mount_sink("
 
 
 def test_event_session_has_no_eventbus_dual_write() -> None:
@@ -278,4 +276,41 @@ def test_event_session_has_no_eventbus_dual_write() -> None:
     text = path.read_text(encoding="utf-8")
     assert "EventBus.default().publish" not in text, (
         "ADR-0186 PR-3f: event_session still dual-writes via EventBus.default().publish"
+    )
+
+
+def test_session_publish_has_no_eventbus_fallback() -> None:
+    """ADR-0186 hard closure: _session_publish 不得 EventBus.default().publish。"""
+    path = _REPO_ROOT / "lca" / "plugins" / "events" / "publishers" / "_session_publish.py"
+    assert path.exists(), "_session_publish.py missing"
+    text = path.read_text(encoding="utf-8")
+    assert "EventBus.default().publish" not in text, (
+        "ADR-0186: _session_publish still falls back to EventBus.default().publish"
+    )
+
+
+def test_pipeline_loader_has_no_bus_subscribe() -> None:
+    """ADR-0186 hard closure: pipeline_loader 不得 bus.subscribe / .subscribe(。"""
+    path = _REPO_ROOT / "lca" / "harness" / "profile" / "pipeline_loader.py"
+    assert path.exists(), "pipeline_loader.py missing"
+    text = path.read_text(encoding="utf-8")
+    assert "bus.subscribe(" not in text, "ADR-0186: pipeline_loader still calls bus.subscribe("
+    assert ".subscribe(" not in text, "ADR-0186: pipeline_loader still calls .subscribe("
+
+
+def test_persistence_jsonl_has_no_spine_suffix() -> None:
+    """ADR-0186 hard closure: persistence_jsonl 路径后缀为 .session.jsonl。"""
+    root = _REPO_ROOT / "lca" / "plugins" / "session" / "persistence_jsonl"
+    assert root.is_dir(), "persistence_jsonl/ missing"
+    hits: list[str] = []
+    for path in root.rglob("*"):
+        if not path.is_file() or path.suffix == ".pyc" or "__pycache__" in path.parts:
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        if ".spine.jsonl" in text:
+            rel = path.relative_to(_REPO_ROOT)
+            hits.append(str(rel))
+    assert not hits, (
+        "ADR-0186: persistence_jsonl still references .spine.jsonl "
+        "(session log must be .session.jsonl)\n" + "\n".join(hits)
     )

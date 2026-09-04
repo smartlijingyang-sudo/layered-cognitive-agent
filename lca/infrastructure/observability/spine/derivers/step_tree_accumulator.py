@@ -1,8 +1,8 @@
-# COMPAT(delete-when: rg "StepTreeAccumulatorDeriver(" lca/ = 0 except this file,
-#        tracking: ADR-0186 PR-3g / I-SESSION-5)
-# 生产 step_tree 走 StepTreeFoldDeriver（RunSessionBuilder 用 fold，
-# 不 EventSpine.subscribe；I-SESSION-5 已锁）。本 in-memory callback
-# deriver 仅供测试与尚未迁走的调用方；生产引用清零后删除本模块。
+# RETAINED(test/CLI/capability; tracking: ADR-0186 PR-3g / I-SESSION-5)
+# Production step_tree uses StepTreeFoldDeriver (RunSessionBuilder fold-only;
+# I-SESSION-5). This in-memory on_event accumulator is not on the
+# EventSpine.subscribe production builder path; kept for unit tests,
+# CLI replay, and capability provide.
 
 """spine-deriver step_tree_accumulator —— in-memory callback 路径（ADR-0167 D11）。
 

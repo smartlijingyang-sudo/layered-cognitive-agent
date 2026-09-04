@@ -8,10 +8,12 @@ publish → pre_dispatch hook → schema 校验 → sink 派发(FD-1)→ SpineSi
 临时目录,不污染 cwd。
 
 sink 装配:
-- ``apply_pipeline(bus, pipeline)``:声明式装 hooks + consumer_rules,并把
-  sinks 实例化进 ``AppliedPipeline.sinks``(不自动 ``mount_sink``)。
+- ``apply_pipeline(bus, pipeline)``:声明式装 hooks,并把 sinks 实例化进
+  ``AppliedPipeline.sinks``(不自动 ``mount_sink`` / ``bus.subscribe``)。
 - ``bus.mount_sink(id, backend)``:命令式挂落盘后端;publish→disk 场景须在
   ``apply_pipeline`` 之后显式 mount 回执里的 sink。
+- ``bus.subscribe(...)``:consumer_rules 不再由 ``apply_pipeline`` 自动接线;
+  需要 fan-out 时由测试 / 调用方显式订阅。
 - 生产 boot 仅走 ``register_pipeline_once`` 装 hook(迁移期不启用 sink 派发)。
 """
 
@@ -25,13 +27,13 @@ import pytest
 
 from lca.contracts.event import Category, EventPayload, Plane
 from lca.harness.profile.pipeline_loader import apply_pipeline
+from lca_kernel.events import EventRef
 from lca_kernel.events.bus import EventBus, FailureSemantics, PayloadSchemaError
 from lca_kernel.events.errors import (
     UnauthorizedPublishError,
     UnauthorizedSubscribeError,
 )
 from lca_kernel.events.hooks import PublishContext, SkipDispatch
-from lca_kernel.events import EventRef
 from lca_kernel.events.payloads_spine import SpineEventPayload
 from lca_kernel.events.pipeline import (
     ConsumerRule,
@@ -75,8 +77,7 @@ class TestProducer:
 class TestSinkPlugin:
     """registry 授权的 sink 消费方(FAIL_FAST 路径)。
 
-    ``apply_pipeline`` 的 consumer_rules 经 ``_plugin_callback`` 取实例
-    ``__call__``,故提供 (payload, ref) 形态。
+    提供 (payload, ref) ``__call__`` 形态,供测试显式 ``bus.subscribe``。
     """
 
     seen: ClassVar[list[str]] = []
@@ -391,8 +392,8 @@ def test_apply_pipeline_mounts_sinks_declaratively(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """apply_pipeline 装 hooks + consumer_rules 并返回 sinks;测试显式
-    ``mount_sink`` 后 publish 经 _dispatch_sinks 落盘 <run_id>.spine.jsonl。
+    """apply_pipeline 装 hooks 并返回 sinks;测试显式 ``mount_sink`` +
+    ``bus.subscribe`` 后 publish 经 _dispatch_sinks 落盘 <run_id>.spine.jsonl。
     """
     RecordingPreDispatchHook.calls.clear()
     TestSinkPlugin.seen.clear()
@@ -402,8 +403,17 @@ def test_apply_pipeline_mounts_sinks_declaratively(
     applied = apply_pipeline(bus, pipeline)
     spine = applied.sinks["spine"]
     assert isinstance(spine, SpineSink)
+    assert applied.consumer_handles == ()
     sink_failure = next(spec.failure for spec in pipeline.sinks if spec.id == "spine")
     bus.mount_sink("spine", spine, failure=sink_failure)
+    # apply_pipeline 不再按 consumer_rules 自动 subscribe;测试显式接线。
+    rule = next(r for r in pipeline.consumer_rules if r.prefix == "spine.cognition.")
+    bus.subscribe(
+        plugin=TestSinkPlugin,
+        category=CAT,
+        on_event=TestSinkPlugin(),
+        failure=rule.failure,
+    )
     spine.set_run_id(RUN_ID)
 
     refs = [bus.publish(_spine_payload(i), producer=TestProducer) for i in range(2)]
@@ -416,5 +426,5 @@ def test_apply_pipeline_mounts_sinks_declaratively(
     assert [line["event_id"] for line in raw_lines] == [ref.event_id for ref in refs]
     # pre_dispatch hook 已跑(声明式装载生效)。
     assert RecordingPreDispatchHook.calls == [(SpineEventPayload, TestProducer)] * 2
-    # consumer_rules 也跑(TestSinkPlugin.__call__ 记录了 ref.event_id)。
+    # 显式 subscribe 的 TestSinkPlugin.__call__ 记录了 ref.event_id。
     assert TestSinkPlugin.seen == [ref.event_id for ref in refs]

@@ -1,8 +1,8 @@
-# COMPAT(delete-when: ADR-0186 PR-3g anomaly fold/snapshot 替代直接调用,
-#        tracking: ADR-0186 PR-3g / I-SESSION-5)
-# anomaly 由 ``EmitPipeline.emit`` 在 record seal 后直接调 ``on_event``
-# （不经 EventSpine.subscribe）。收口时改为 Session observer 从
-# SpineReader snapshot 跑 8-detector scan，再去掉 EmitPipeline 持有引用。
+# RETAINED(test/CLI/capability; tracking: ADR-0186 PR-3g / I-SESSION-5)
+# Production step_tree uses StepTreeFoldDeriver (I-SESSION-5 fold-only builder).
+# Anomaly is invoked by ``EmitPipeline.emit`` after record seal (not via
+# EventSpine.subscribe). Kept for unit tests, CLI replay, and capability
+# provide; not the production step_tree builder path.
 
 """AnomalyDetector — I15 / I16 spine deriver with 8 invariant-violation detectors.
 

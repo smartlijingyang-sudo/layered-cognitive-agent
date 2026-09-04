@@ -1,19 +1,12 @@
-"""Session-优先 publish helper(ADR-0183)。
+"""Session-required publish helper(ADR-0183)。
 
-publisher 单点入口优先 ``Session.append``;无 active Session 时走
-:func:`lca_kernel.events.bus.EventBus.default().publish`(单路径 no-Session
-路由,供测试与 early boot)。这不是 Bridge dual-write——同时刻只走一条路径。
-
-# COMPAT(delete-when: production publishers never hit fallback —
-#   Session always bound for runs, OR
-#   rg -n "EventBus\\.default\\(\\)\\.publish" lca/plugins/events/publishers/
-#   _session_publish.py 外零命中且无生产 no-Session 调用方;
-#   tracking: ADR-0183.
-#   保留本 fallback:tests / early-boot 仍依赖;勿与 Bridge dual-write 拆除混为一谈。)
+publisher 单点入口走 ``Session.append``;调用方必须先经
+:func:`set_publish_session` / run bind 绑定 Session。无 active Session
+时 fail-loud(``RuntimeError``),不走 EventBus.publish。
 
 设计边界:
-- helper 只承载入口路由(优先 Session,无 Session 则 EventBus);payload/producer
-  语义由调用方负责,本模块不重写。
+- helper 只承载入口路由(Session.append);payload/producer 语义由调用方
+  负责,本模块不重写。
 - Session.append 接受 ``payload`` 与 ``producer``;返回 :class:`EventRef`
   (ref.category / ref.event_id)。
 - Session 与 EventBus 共用 ``EventRegistry.can_publish``(S1);在
@@ -78,7 +71,7 @@ _current_session: contextvars.ContextVar[_PublishSession | None] = contextvars.C
 """当前上下文的 active Session。
 
 wiring 层通过 :func:`set_publish_session` 在 run / request 边界 set,
-离开时 reset。无 Session 时走 EventBus fallback(单路径,非 dual-write)。
+离开时 reset。无 Session 时 ``publish_via_session`` 抛 ``RuntimeError``。
 contextvars 随 asyncio.Task / copy_context 隔离,跨 run 不串。
 """
 
@@ -114,7 +107,7 @@ def publish_via_session(
     *,
     producer: Any,
 ) -> EventRef:
-    """优先 Session.append;无 Session 时单路径 fallback EventBus.publish。
+    """Session.append after S1 auth; require active Session(fail-loud)。
 
     参数:
     - ``payload``:typed 事件 payload(SpineEventPayload 或其它 EventPayload 子类);
@@ -122,18 +115,22 @@ def publish_via_session(
     - ``producer``:publisher plugin class(EventBus 鉴权用)。
 
     返回:
-    :class:`EventRef`。Session 路径返回 ``append`` 回执（runtime Session
-    由 bus facade 从 SessionEvent 合成）;无 Session 时返回 EventBus
-    EventRef。两条路径互斥,不是 Bridge dual-write。
+    :class:`EventRef`——``Session.append`` 回执（runtime Session 由 bus
+    facade 从 SessionEvent 合成）。
+
+    抛出:
+    ``RuntimeError``——当前上下文未绑定 Session(须先
+    :func:`set_publish_session` / run bind)。
+    ``UnauthorizedPublishError``——S1 registry 拒绝该 producer/category。
     """
     session = _current_session.get()
-    if session is not None:
-        _authorize_producer(payload, producer)
-        return session.append(payload, producer=producer)
-    from lca_kernel.events.bus import EventBus
-
-    # no-Session path (tests / early boot); keep until delete-when above
-    return EventBus.default().publish(payload, producer=producer)
+    if session is None:
+        raise RuntimeError(
+            "publish_via_session requires an active Session; "
+            "bind via set_publish_session / run bind before publish"
+        )
+    _authorize_producer(payload, producer)
+    return session.append(payload, producer=producer)
 
 
 __all__ = [

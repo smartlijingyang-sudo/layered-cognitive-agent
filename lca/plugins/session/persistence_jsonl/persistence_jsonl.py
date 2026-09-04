@@ -2,20 +2,21 @@
 
 DSH ``JsonlSessionPersistence.onEvent()`` 形态的 LCA 实现：作为
 :class:`SessionObserver` 注册到 :class:`Session`,把每条 :class:`SessionEvent`
-追加写到 ``traces/runs/<session_id>/<session_id>.spine.jsonl``,作为
+追加写到 ``traces/runs/<session_id>/<session_id>.session.jsonl``,作为
 in-process log 的 durable 镜像。
 
 设计要点：
 
 - **观察者形态**：append 提交后才被 fire；observer 失败 contained 由
   :class:`Session` 实现层保证,不外抛(PR-3c 契约)。
-- **JSONL SSOT**：每行 = 一个 SessionEvent JSON；header 在文件首行,
+- **JSONL 布局**：每行 = 一个 SessionEvent JSON；header 在文件首行,
   后续行为事件,与 :class:`lca.harness.session.persistence.JsonlSessionPersistence`
   字节布局兼容(``kind`` 字段区分)。**不**复用 :class:`SpineSink`
   的 9-键 ``SpineEventRecord`` 字节布局 —— SessionEvent 是 in-memory
   真值层的形态,经 ``to_dict()`` 走 SessionEvent 信封
   (``type/seq/time/data/session_id/actor/provider/visibility/scope``)。
-  PR-3f 阶段两条 SSOT 并存(见模块 COMPAT 块)。
+  路径后缀 ``.session.jsonl``，与 ADR-0183 I-FW-SSOT-1 spine
+  (SpineFileSink / SpineEventRecord)分离，无双写风险。
 - **flush hook**：当 :class:`Session` 在 PR-3e 之后提供 ``add_flush_hook``
   时注册幂等刷新回调；当前 PR-3c 骨架尚未提供该面,实现为 best-effort
   接管 store 的活 Session,不阻塞契约外能力。
@@ -23,18 +24,6 @@ in-process log 的 durable 镜像。
 注册路径：``setup`` 在 boot 时把 :class:`JsonlSessionPersistence` 注册到当前
 :class:`SessionStore` 的所有活 Session;若 store 提供接管钩子,新 Session
 也会自动挂入。
-
-COMPAT(delete-when: rg "lca.events.sink.spine_file" profiles/ bundles/ = 0
-且同 Session 上 SpineFileSink Session.observe 与 JsonlSessionPersistence
-不会写同一 ``*.spine.jsonl`` 路径;tracking: ADR-0186 PR-3f):
-剩余双写风险面仅此一条:
-
-- 同 Session 上 ``SpineFileSink``(Session.observe catalog,SpineEventRecord 9 键)
-  与本 plugin(SessionEvent 信封)并行挂 observer → 可能写同一
-  ``<run_id>.spine.jsonl``(ADR-0183 I-FW-SSOT-1)。
-
-Profile 装载本 plugin 时应**同时**禁用 ``lca.events.sink.spine_file``
-(由 profile resolver / bundle 实现,本 plugin 不强制)。
 """
 
 from __future__ import annotations
@@ -69,7 +58,7 @@ __all__ = ["Config", "JsonlSessionPersistence", "setup"]
 _RUNS_ROOT_DEFAULT = "traces/runs"
 _HEADER_KIND = "header"
 _EVENT_KIND = "event"
-_FILE_SUFFIX = ".spine.jsonl"
+_FILE_SUFFIX = ".session.jsonl"
 
 
 class Config(BaseModel):
@@ -95,7 +84,7 @@ class JsonlSessionPersistence:
       返回幂等取消函数。
     - **提供 ``flush`` / ``close`` 方法**：per-session 文件句柄管理,
       与 Session 未来的 ``add_flush_hook`` 配套。
-    - **路径决定**：``traces/runs/<session_id>/<session_id>.spine.jsonl``,
+    - **路径决定**：``traces/runs/<session_id>/<session_id>.session.jsonl``,
       session_id 取自 Session.id。
     """
 
@@ -304,7 +293,7 @@ def _session_event_to_dict(event: SessionEvent) -> dict[str, Any]:
     effects="filesystem",
     description=(
         "JsonlSessionPersistence（ADR-0186 PR-3e/3f）：SessionObserver 形态的"
-        " JSONL 落盘；写 traces/runs/<session_id>/<session_id>.spine.jsonl。"
+        " JSONL 落盘；写 traces/runs/<session_id>/<session_id>.session.jsonl。"
         "挂到 session.store 当前活 Session；observer 失败由 Session contained。"
         "提供 session.persistence.jsonl capability。"
     ),

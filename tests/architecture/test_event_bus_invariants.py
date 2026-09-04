@@ -186,7 +186,6 @@ class TestIFwBus2:
     _ALLOW_PATH_SUBSTRINGS: tuple[str, ...] = (
         "lca_kernel/events/",  # EventMechanism / EventBus 框架本体
         "lca/plugins/events/",  # 业务方 plugin manifest 内部走 EventMechanism
-        "lca/harness/profile/pipeline_loader.py",  # Pipeline 装配:consumer_rules → bus.subscribe
         "archive/",  # 归档
         str(_THIS_TEST_FILE.name),  # 本测试文件
     )

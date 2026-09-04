@@ -1,7 +1,8 @@
-# COMPAT(delete-when: ADR-0186 PR-3g otel fold 替代 callback deriver,
-#        tracking: ADR-0186 PR-3g / I-SESSION-5)
-# otel_trace 用 on_event 累积 span 树。收口时改为 SpineReader snapshot
-# fold 出 OtelSpan 树（纯函数，events → root span），再删本 callback 路径。
+# RETAINED(test/CLI/capability; tracking: ADR-0186 PR-3g / I-SESSION-5)
+# Production step_tree uses StepTreeFoldDeriver (I-SESSION-5 fold-only builder).
+# otel_trace accumulates an in-memory OtelSpan tree via on_event. Not on
+# the EventSpine.subscribe production builder path; kept for unit tests,
+# CLI replay, and capability provide.
 
 """OTel-style trace deriver —— DSH ENTRY→AGENT→STEP→LLM|TOOL 投影（ADR-0167 D9）。
 

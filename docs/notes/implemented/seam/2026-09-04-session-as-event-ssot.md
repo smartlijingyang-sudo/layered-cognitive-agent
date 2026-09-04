@@ -4,7 +4,7 @@ Status: implemented
 
 ## Progress (2026-09-04)
 
-主路径与 PR-3f 两项 COMPAT 均已收口；deriver 切流仍部分（callback deriver COMPAT）。
+主路径与 PR-3f 两项 COMPAT 均已收口；生产 deriver 已 fold-only（I-SESSION-5）；callback deriver 类保留给测试 / CLI / capability。
 
 | 项 | 状态 | 证据 |
 |---|---|---|
@@ -12,7 +12,7 @@ Status: implemented
 | `lca_kernel/events/fold.py` 纯函数 | 落地 | 无 I/O / 无 `print` / 无 `logging` / 无 `datetime`；`canonicalHeader` / `headerEquals` / `foldRequestHeader` / `_sameSchema` 实现完成 |
 | `lca_kernel/events/persistence.py` Observer 化 | 落地 | `PersistenceObserver` 同步落盘；已删 `DeliveryQueue` / `_consume_loop`；`/health` 与 `events-delivery` 读 Observer |
 | `PersistenceWorker` 别名 | 已删 | 生产路径 `rg PersistenceWorker` = 0；I-SESSION-4 翻正 |
-| `deriver` fold 切流 | 部分 | 生产 step_tree 走 `StepTreeFoldDeriver`（I-SESSION-5 通过）；`live_tail.subscribe` 是 SSE carrier fan-out，不是 EventSpine.subscribe / fold 派生主路径；旧 `StepTreeAccumulatorDeriver` 与 graph/waterfall/otel/anomaly `on_event` 留 COMPAT(delete-when: ADR-0186 PR-3g) |
+| `deriver` fold 切流 | 落地 | 生产 step_tree 走 `StepTreeFoldDeriver`（I-SESSION-5）；`live_tail.subscribe` 为 SSE carrier（独立 transport ADR 前保留，不挡 Session SSOT）；`StepTreeAccumulatorDeriver` 与 graph/waterfall/otel/anomaly/narrative 保留给单元测试 / CLI replay / capability provide，非 EventSpine.subscribe 生产 builder 路径 |
 | sinks/subscribers observe | 落地 | boot 只入 `_session_observe` 目录；run bind `set_session` 整表挂上；journal / spine_file / console / chain / step_tree 均无 `mount_sink`/`bus.subscribe` |
 | `tests/architecture/test_session_ssot_invariants.py` | 落地 | I-SESSION-1/2/3/4/5 无条件通过 |
 | `RunEventSessionBridge.append` EventBus 双写 | 已删 | `event_session.py` 无 `EventBus.default().publish`；`append` 只 `Session.append` + 合成 `EventRef`；`test_event_session_has_no_eventbus_dual_write` 锁 |

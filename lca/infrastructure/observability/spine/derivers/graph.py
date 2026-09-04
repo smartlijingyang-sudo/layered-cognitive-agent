@@ -1,8 +1,8 @@
-# COMPAT(delete-when: ADR-0186 PR-3g graph fold 替代 callback deriver,
-#        tracking: ADR-0186 PR-3g / I-SESSION-5)
-# graph 用 on_event 累积 execution_point 边 → phase_graph.dot；生产路径
-# 未硬 subscribe（仅 capability）。收口时改为 SpineReader snapshot fold
-# 出 edge list，再删本 mutable 累积器。
+# RETAINED(test/CLI/capability; tracking: ADR-0186 PR-3g / I-SESSION-5)
+# Production step_tree uses StepTreeFoldDeriver (I-SESSION-5 fold-only builder).
+# Graph accumulates execution_point edges via on_event → phase_graph.dot.
+# Not on the EventSpine.subscribe production builder path; kept for unit
+# tests, CLI replay, and capability provide.
 
 """GraphDeriver — accumulate execution-point edges into a Graphviz digraph.
 

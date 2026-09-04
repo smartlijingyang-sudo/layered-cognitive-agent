@@ -1,12 +1,11 @@
-"""publish_via_session helper 单测（ADR-0183 PR-3d-sample）。
+"""publish_via_session helper 单测（ADR-0183）。
 
 helper 行为契约:
-1. 无 active Session 时 → fallback EventBus.default().publish,返回真实 EventRef;
+1. 无 active Session 时 → RuntimeError(fail-loud;须 set_publish_session / run bind);
 2. 有 active Session 时 → Session.append(payload, producer=...),返回 Session 给的 EventRef;
 3. ContextVar set/reset 隔离:跨 token reset 行为正确;
-4. Session.append 拿到的 payload/producer 与调用方传入一致。
-
-helper 不做鉴权 / schema 校验;鉴权由 EventBus 在 fallback 路径负责。
+4. Session.append 拿到的 payload/producer 与调用方传入一致;
+5. append 前走 EventBus registry S1 鉴权。
 """
 
 from __future__ import annotations
@@ -64,25 +63,21 @@ def test_set_reset_publish_session_roundtrip() -> None:
     assert current_publish_session() is None
 
 
-# ── fallback 路径(无 Session) ─────────────────────────────────────────────
+# ── 无 Session → fail-loud ─────────────────────────────────────────────────
 
 
-def test_publish_via_session_falls_back_to_eventbus(bus: EventBus) -> None:
-    """无 Session 时 → 走 EventBus.default().publish,返回真实 EventRef。"""
+def test_publish_via_session_requires_bound_session() -> None:
+    """无 Session 时 → RuntimeError,不走 EventBus.publish。"""
     from lca.plugins.events.publishers.spine_reflector_cognition.plugin import (
         ReflectorClass,
     )
 
-    EventBus.set_default(bus)
-    try:
-        ref = publish_via_session(
+    assert current_publish_session() is None
+    with pytest.raises(RuntimeError, match="set_publish_session"):
+        publish_via_session(
             _sp_payload("brain.perceive.start"),
             producer=ReflectorClass,
         )
-        assert ref.category == "spine.cognition.brain.perceive.start"
-        assert ref.event_id
-    finally:
-        EventBus.set_default(None)
 
 
 # ── Session 路径 ─────────────────────────────────────────────────────────
@@ -139,6 +134,7 @@ def test_publish_via_session_does_not_call_eventbus_when_session_set(
     token = set_publish_session(FakeSession())
     try:
         from lca.plugins.events.publishers.spine_reflector_cognition.plugin import ReflectorClass
+
         ref = publish_via_session(payload, producer=ReflectorClass)
         assert ref is not None
     finally:

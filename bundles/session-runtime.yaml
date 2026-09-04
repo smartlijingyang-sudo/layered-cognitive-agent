@@ -8,9 +8,10 @@
 # RunSessionBuilder 按 run_id create Session，绑定 publish/observe 槽位；
 # 缺 session.store 时 publishers 降级 EventBus。
 #
-# 持久化经 Session.observe：JsonlSessionPersistence + SpineFileSink plugin
-# （ADR-0186）。Pipeline sinks / consumer_rules 不写 durable spine
-# （web-standard event-pipeline 已空）；Session 为唯一 SSOT 写方。
+# 持久化经 Session.observe：JsonlSessionPersistence 写 *.session.jsonl；
+# SpineFileSink（若装载）写 *.spine.jsonl（ADR-0183 I-FW-SSOT-1）。
+# Pipeline sinks / consumer_rules 不写 durable spine
+# （web-standard event-pipeline 已空）。
 
 name: session-runtime
 description: |

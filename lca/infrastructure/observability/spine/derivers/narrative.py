@@ -1,16 +1,15 @@
-# COMPAT(delete-when: ADR-0186 PR-3g Session-observer 收口 narrative 投影,
-#        tracking: ADR-0186 PR-3g / I-SESSION-5)
-# narrative 是 document-driven：on_event 仅 debug-log；写盘由
-# _StepTreeBundle.flush → NarrativeWriter.write(document) 触发。
-# StepTreeFoldDeriver → journal.json 已产出 JournalDocument；收口时
-# narrative 改读 fold snapshot，无需独立 fold 函数，再删本桥接。
+# RETAINED(test/CLI/capability; tracking: ADR-0186 PR-3g / I-SESSION-5)
+# Production step_tree uses StepTreeFoldDeriver (I-SESSION-5 fold-only builder).
+# Narrative is document-driven: on_event is debug-log only; write_document
+# consumes a JournalDocument. Not on the EventSpine.subscribe production
+# builder path; kept for unit tests, CLI replay, and capability provide.
 
 """NarrativeDeriver — wraps ``StepNarrativeWriter`` as a spine deriver.
 
 ``on_event`` is a no-op log. Narrative is built from a complete
 ``JournalDocument`` via ``write_document`` (terminalizer /
-``_StepTreeBundle.flush``). Capability-only today; not the I-SESSION-5
-fold derivation path.
+``_StepTreeBundle.flush``). Capability / test / CLI surface; not the
+I-SESSION-5 fold derivation path.
 """
 
 from __future__ import annotations

@@ -1,12 +1,13 @@
-# COMPAT(delete-when: ADR-0186 PR-3g waterfall fold 替代 callback deriver,
-#        tracking: ADR-0186 PR-3g / I-SESSION-5)
-# waterfall 是 on_event 累积 → 静态 HTML。收口时改为 SpineReader snapshot
-# fold 渲染（events → render），不再需要 callback 订阅。CLI
-# ``lca-ops journal trajectory`` 保留，底层数据源迁 snapshot。
+# RETAINED(test/CLI/capability; tracking: ADR-0186 PR-3g / I-SESSION-5)
+# Production step_tree uses StepTreeFoldDeriver (I-SESSION-5 fold-only builder).
+# Waterfall accumulates on_event → static HTML for CLI
+# ``lca-ops journal trajectory``. Not on the EventSpine.subscribe
+# production builder path; kept for unit tests, CLI replay, and
+# capability provide.
 
 """Waterfall HTML deriver —— DSH Trajectory 风格（ADR-0167 D9 + ADR-0185 PR-3）。
 
-订阅 ``EventSpine``，on flush 渲染一份静态 HTML：
+Consumes spine events; on flush renders static HTML:
 - 每条 spine event 一行（按 sequence 升序）
 - 时间轴 / 状态色 / token 切片
 - 每个 think 段的 "model saw" 链接由 caller 传入的 ``model_visible_root``

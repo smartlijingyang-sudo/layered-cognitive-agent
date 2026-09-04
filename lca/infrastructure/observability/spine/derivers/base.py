@@ -1,16 +1,19 @@
-# COMPAT(delete-when: ADR-0186 PR-3g 全部 Deriver.on_event 路径迁完且实现清零,
-#        tracking: ADR-0186 PR-3g / I-SESSION-5)
-# Deriver Protocol 仍描述 on_event 回调；I-SESSION-5 派生主路径已是
-# Session 快照 / SpineReader + fold。callback deriver 全部删除后再删本 Protocol。
+# RETAINED(test/CLI/capability; tracking: ADR-0186 PR-3g / I-SESSION-5)
+# Production step_tree uses StepTreeFoldDeriver (I-SESSION-5 fold-only builder).
+# This Protocol describes on_event for retained test / CLI / capability
+# derivers; it is not the EventSpine.subscribe production builder path.
 
 """Deriver Protocol — derive secondary artefacts from spine events.
 
-A deriver is a subscriber to ``EventSpine`` that consumes each
-``EventRecord`` to produce a derived view (step-tree, narrative,
-live tail, ...). Unlike a sink — the destination of truth — a deriver
-is best-effort: per FD-2 its exceptions are contained by the spine
-and logged on the ``spine.deriver_failed`` channel. Business must
-never be blocked by a deriver failure.
+A deriver consumes each ``EventRecord`` to produce a derived view
+(step-tree, narrative, live tail, ...). Unlike a sink — the destination
+of truth — a deriver is best-effort: per FD-2 its exceptions are
+contained by the spine and logged on the ``spine.deriver_failed``
+channel. Business must never be blocked by a deriver failure.
+
+Production step_tree derivation is Session snapshot / SpineReader +
+fold (I-SESSION-5). This Protocol remains for unit tests, CLI replay,
+and capability-provided on_event derivers.
 
 The Protocol mirrors the convention used by ``sinks/base.py``:
 structural typing via ``runtime_checkable`` so test doubles and
