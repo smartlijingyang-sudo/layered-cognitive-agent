@@ -5,7 +5,8 @@ fork_for_run 会把工厂 bind 进本 profile 的每个 run；web-standard 不�
 本插件（I-A1/I-A10），工具自然缺省。
 
 依赖注入：``assistant.catalog``（require，创建真值入口）+
-``assistant.frontend_bridge``（soft，缺省时工具仍可用，仅无前端注册）。
+``assistant.frontend_bridge``（require 保证 boot 序；运行期工具对
+bridge=None 仍容错，仅无前端注册）。
 """
 
 from __future__ import annotations
@@ -31,7 +32,7 @@ from lca.infrastructure.tools.assistant.create_tool import AssistantCreateTool
 
 @plugin(
     id="lca.plugins.assistant.tools",
-    requires=(ASSISTANT_CATALOG.key, "tools"),
+    requires=(ASSISTANT_CATALOG.key, ASSISTANT_FRONTEND_BRIDGE.key, "tools"),
     implements=[Tool],
     layer="L4",
     kind=PluginKind.PROVIDER,
@@ -61,10 +62,15 @@ from lca.infrastructure.tools.assistant.create_tool import AssistantCreateTool
     ),
 )
 async def setup(ctx: PluginContext, config: Any) -> None:
-    """注册 ``assistant`` 工具工厂；工厂闭包持有 boot 期注入的 catalog/bridge。"""
+    """注册 ``assistant`` 工具工厂；工厂闭包持有 boot 期注入的 catalog/bridge。
+
+    ``assistant.frontend_bridge`` 列为硬依赖以保证 boot 序（webserver_bridge
+    先于本插件），同属 assistant-runtime bundle；运行期工具仍对 bridge=None
+    容错（fail-soft）。
+    """
     del config
     catalog = ctx.require(ASSISTANT_CATALOG.key)
-    bridge = ctx.soft_get(ASSISTANT_FRONTEND_BRIDGE.key)
+    bridge = ctx.require(ASSISTANT_FRONTEND_BRIDGE.key)
 
     def _assistant_tools_factory(run: object | None = None) -> list[Any] | None:
         del run  # create_assistant 不依赖 run bindings（catalog/bridge boot 期注入）

@@ -33,6 +33,8 @@ class _FakeCtx:
     def require(self, key: str) -> Any:
         if key == "assistant.catalog":
             return self._catalog
+        if key == "assistant.frontend_bridge":
+            return self._bridge
         if key == "tools":
             return self._tools
         raise KeyError(key)
