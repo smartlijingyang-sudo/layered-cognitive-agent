@@ -2,6 +2,8 @@
 
 Status: proposed
 
+实施进度(与 ADR-0185 §状态同步,2026-09-04):PR-0~PR-3 已合并;PR-3.1 webserver handlers + doctor fold 进行中(`feat/adr-0185-pr-3.1-handlers`);PR-4 删旁路 + Note 迁 `implemented/` 未合并(另 agent)。本 Note 仍留 `proposed/` — Status 与路径对齐,PR-4 合并后再翻 `implemented`。
+
 ## Problem
 
 当前 `lca.infrastructure.observability.loop_cursor` 下的 model_visible 实现走**旁路文件** + **digest 留痕**两条路径,违反 ADR-0183 "统一 event bus 单 SSOT" 的精神,且与 deepseek-harness 的"model-visible ⟺ logged" 设计原则方向不一致。三个具体缺陷:
@@ -90,16 +92,17 @@ yaml 注册:`lca_kernel/events/config/observability/spine.yaml` 新增 2 个 cat
 
 **废 ADR-0169 D7 I-MV1** "每次真实 LLM 请求,必须存在可解析的 `ModelVisibleArtifact` 与 `llm.request.header` EP",由新不变量 **I-MV-2** 接管:"每次 LLM 请求,`foldRequestHeader(<run_id>.spine.jsonl, step_id)` 可重建 effective header;缺失则 fail-fast(等价 dsh `requestHeader()` 行为)"。
 
-### PR 切分(5 PR,全部独立可 revert)
+### PR 切分(6 PR,全部独立可 revert)
 
-PR-0 spike(本 ADR 通过后立即开)单独验证 fold 模块的 1:1 dsh 翻译保真度,作为后续 PR 的语义锚点。
+PR-0 spike 验证 fold 模块与 dsh 字节级一致,作为后续 PR 的语义锚点。
 
 ```
-PR-0 spike:fold 模块 1:1 翻译 dsh request-header.ts + 5 种场景单测
-  └─→ PR-1 (EventPayload 类型化 + yaml 注册 2 个 category)
-        └─→ PR-2 (ModelVisiblePublisher plugin + ModelVisibleHook 实现;双轨共存)
-              └─→ PR-3 (替换 ModelVisibleLLMAdapter + viewer/测试迁移;双轨共存)
-                    └─→ PR-4 (删旁路文件 + 废 ADR + 收尾)
+PR-0 spike:fold 模块 1:1 翻译 dsh request-header.ts + 5 种场景单测   [已合并]
+  └─→ PR-1 (EventPayload 类型化 + yaml 注册 2 个 category)          [已合并]
+        └─→ PR-2 (ModelVisiblePublisher + Hook;双轨共存)            [已合并]
+              └─→ PR-3 (core viewer / CLI / replay 迁 fold;双轨)     [已合并]
+                    ├─→ PR-3.1 (webserver handlers + doctor fold)    [进行中]
+                    └─→ PR-4 (删旁路文件 + 废 ADR + 收尾)            [未合并 / 另 agent]
 ```
 
 ### 现有可复用资产(本提案零新开平行机制)
@@ -209,7 +212,7 @@ plugin 不可改 `to_dict()` 字节布局;`SpineSink.append(record)` 落 `<run_i
 | 风险 | 缓解 |
 |---|---|
 | **journal 体积膨胀**(原文每次 change 都塞) | `headerEquals` fold 优化(PR-0 fold 模块 + PR-2 publisher 内部状态);实测:100 step run 期望 ~10-20 个完整 header 事件,不是 100 |
-| **PR-3 viewer 改造面大**(所有 `lca-ops` 子命令 + webserver handler) | PR-3 单独提 viewer 改动清单;一次性迁移;integration 测试夹具断言 viewer 输出与 fold 结果一致 |
+| **viewer 改造面大**(`lca-ops` + webserver handler) | PR-3 只迁 core viewer/CLI;PR-3.1 迁 handlers/doctor;integration 测试夹具断言 fold 输出 |
 | **PR-4 删旁路文件影响旧 viewer / 旧 run** | 旧 run 的 `<run_dir>/model_visible/` 文件保留但不再被读;viewer 走 fold 后报错信息明确("该 run 是旧格式,无法 fold");迁移窗口 14 天 |
 | **`ModelVisibleHook` per-instance 状态 + ContextVar 隔离** | 与现有 `CurrentReasonerPrompt` ContextVar 同样实现,基于 ADR-0169 D5 已验证的 ContextVar 模式 |
 | **assistant payload 与现有 `body.tool.execute.*` / `spine.tool.*` 重复** | `SpineLlmRequestHeaderAssistantPayload` 只承担"模型可见上下文"语义,**不**承担 tool 执行证据;后者仍走 `spine.tool.*` EP。架构测试断言两类事件字段不重叠 |
@@ -219,13 +222,14 @@ plugin 不可改 `to_dict()` 字节布局;`SpineSink.append(record)` 落 `<run_i
 
 ## Migration plan
 
-PR 落地顺序:
+PR 落地顺序与现状:
 
-1. **PR-0 spike**(本 ADR 通过后立即开):`lca_kernel/events/fold.py` + `tests/lca_kernel/events/test_fold.py` + `tests/lca_kernel/events/test_fold_dsh_parity.py`,**纯加法**,无破坏。fold 模块可被现有 spine.jsonl fixture 直接测试,验证 foldRequestHeader 与 dsh 一致。**本 PR 是后续所有 PR 的语义锚点,不通过不开 PR-1**。
-2. **PR-1 类型化 + yaml 注册**:新增 `SpineLlmRequestHeaderPayload` + `SpineLlmRequestHeaderAssistantPayload`,在 `spine.yaml` 注册 2 个 category。**纯加法**,无破坏。
-3. **PR-2 Publisher + Hook**:`lca/plugins/events/publishers/model_visible/publisher.py` + `lca/plugins/events/hooks/model_visible/hook.py` + `bundles/event-bus-components.yaml` 增一行。**双轨共存**,旧 `ModelVisibleLLMAdapter` 仍存在。
-4. **PR-3 替换 + viewer 迁移**:把 composer / webserver / tests 全部从 `ModelVisibleLLMAdapter` 切到 `ModelVisiblePublisher`;viewer 改造。**双轨共存**,旧 capture 路径仍可运行(但不再被生产代码调用)。
-5. **PR-4 删旁路 + 废 ADR**:删 7 个旧文件 + 旧 ADR Superseded 注脚 + 新 ADR-0185。**终态**,旧路径 `rg = 0`。
+1. **PR-0 spike**【已合并 `1eefe053`】:`lca_kernel/events/fold.py` + fold / dsh-parity 单测。纯加法。
+2. **PR-1 类型化 + yaml 注册**【已合并 `b0723d55`】:`SpineLlmRequestHeaderPayload` + `SpineLlmRequestHeaderAssistantPayload` + `spine.yaml` 2 category。纯加法。
+3. **PR-2 Publisher + Hook**【已合并 `a334098e`】:`ModelVisiblePublisher` + `ModelVisibleHook` + bundle 一行。双轨共存。
+4. **PR-3 core viewer / CLI / replay**【已合并 `6ce3bc0e`】:`fold_source` + `StandardCursor` fold 优先 + journal CLI。双轨共存。webserver handlers 不在本 PR。
+5. **PR-3.1 handlers + doctor fold**【进行中】:webserver `handlers/runs/{trace,explain,doctor,...}` 切 spine fold;doctor step_check 用 fold 计数。
+6. **PR-4 删旁路 + 废 ADR**【未合并;另 agent】:删 sidecar 文件 + 旧 ADR Superseded 注脚 + 本 Note 迁 `implemented/seam/` + ADR 状态翻 `Accepted(落地完成)`。终态 `rg` 旧路径 = 0。
 
 ## Related
 

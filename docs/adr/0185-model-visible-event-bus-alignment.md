@@ -2,7 +2,19 @@
 
 ## 状态
 
-Proposed(待审)。
+Accepted — 落地中(2026-09-04)。
+
+**实施状态**:
+| PR | 范围 | 状态 | 基线 |
+|---|---|---|---|
+| PR-0 | fold 模块 1:1 翻译 dsh | 已合并 | `1eefe053` / merge `6e1c61d2` |
+| PR-1 | EventPayload 类型化 + yaml 注册 | 已合并 | `b0723d55` / merge `36ad90a2` |
+| PR-2 | `ModelVisiblePublisher` + Hook(双轨) | 已合并 | `a334098e` / merge `5d5c63e9` |
+| PR-3 | core viewer / CLI / replay 迁 fold(双轨) | 已合并 | `6ce3bc0e` / merge `7841acc6` |
+| PR-3.1 | webserver handlers + doctor fold | 进行中 | branch `feat/adr-0185-pr-3.1-handlers` |
+| PR-4 | 删旁路文件 + 废旧 ADR + Note 迁 implemented | 未合并 | 另 agent 负责;勿在本分支宣称完成 |
+
+PR-3 只迁 core viewer(`fold_source` / `StandardCursor` / `lca-ops journal*` / 架构与集成测试)。webserver handlers 与 doctor fold 落 PR-3.1。PR-4 删除 sidecar 与状态翻转为 Accepted(落地完成)由独立 worktree 执行。
 
 **Supersedes / 吸收**: ADR-0169 D7 I-MV1(`StdModelVisibleCapture` 5 件套 SSOT)、ADR-0175 D3(`StdReasonerPromptCapture` 单独 capture)、ADR-0176 D4(`system.json` 合并到 `messages.json`)。
 
@@ -10,7 +22,7 @@ Proposed(待审)。
 
 **对齐参考**: deepseek-harness `request/header` event 形态(`packages/core/agent-loop/src/agent.ts:498-517`)+ `foldRequestHeader` fold 优化(`packages/core/session/src/request-header.ts`)。deepseek-harness `AGENTS.md:111`:**"Model-visible ⟺ logged: anything that reaches a model request must be reconstructable from the session log; a new model-visible input requires a session event."**
 
-**本文档配套 Note**: [`docs/notes/proposed/seam/2026-09-04-model-visible-bus-alignment.md`](../notes/proposed/seam/2026-09-04-model-visible-bus-alignment.md)。
+**本文档配套 Note**: [`docs/notes/proposed/seam/2026-09-04-model-visible-bus-alignment.md`](../notes/proposed/seam/2026-09-04-model-visible-bus-alignment.md)(PR-4 合并后迁 `implemented/seam/`)。
 
 ## 0. 决策摘要
 
@@ -504,16 +516,17 @@ def foldRequestHeader(
 
 **不破坏 ADR-0183 不变量**:仍走 I-FW-BUS-1(producer 唯一入口)、I-FW-SSOT-1(spine.jsonl 唯一 SSOT)、I-FW-BUS-2(consumer 唯一入口)、I-FW-BUS-3(plugin 不可改 EventBus 内部 / SpineSink 字节布局)、I-FW-BUS-4(业务不订阅 `event.bus.dispatch.*`)。
 
-## 5. PR 切分(5 PR,全部独立可 revert)
+## 5. PR 切分(6 PR,全部独立可 revert)
 
 依赖图:
 
 ```
-PR-0 spike (fold 模块 1:1 翻译 dsh)
-  └─→ PR-1 (EventPayload 类型化 + yaml 注册)
-        └─→ PR-2 (Publisher plugin + Hook 实现)
-              └─→ PR-3 (替换 adapter + viewer/测试迁移)
-                    └─→ PR-4 (删旁路文件 + 废 ADR + 收尾)
+PR-0 spike (fold 模块 1:1 翻译 dsh)                         [已合并]
+  └─→ PR-1 (EventPayload 类型化 + yaml 注册)                [已合并]
+        └─→ PR-2 (Publisher plugin + Hook 实现)             [已合并]
+              └─→ PR-3 (core viewer / CLI / replay 迁 fold)  [已合并]
+                    ├─→ PR-3.1 (webserver handlers + doctor fold)  [进行中]
+                    └─→ PR-4 (删旁路文件 + 废 ADR + 收尾)          [未合并 / 另 agent]
 ```
 
 ### PR-0 spike — fold 模块 1:1 翻译 dsh
@@ -557,21 +570,31 @@ PR-0 spike (fold 模块 1:1 翻译 dsh)
 | **验收** | `uv run pytest tests/plugins/events/publishers/model_visible/ -q` 全过;`rg "publish.*spine\.llm\.request\.header" lca/` 仅命中 `model_visible/publisher.py` |
 | **delete-when** | 无(双轨共存到 PR-4) |
 
-### PR-3 — 替换 ModelVisibleLLMAdapter + viewer/测试迁移(双轨共存)
+### PR-3 — core viewer / CLI / replay 迁 fold(双轨共存)【已合并 `6ce3bc0e`】
 
 | 项 | 内容 |
 |---|---|
-| **目标** | 把 composer / webserver / tests 全部从 `ModelVisibleLLMAdapter` 切到 `ModelVisiblePublisher`;viewer 改造;**双轨共存**,旧 capture 路径仍可运行但不再被生产代码调用 |
-| **修改** | composer / brain 装载逻辑(若存在)从装饰 `ModelVisibleLLMAdapter` 切到装载 `ModelVisiblePublisher` plugin |
-| **修改** | `lca/infrastructure/observability/journal/step/reader.py` 等 viewer:把"读 `<run_dir>/model_visible/` 反查"改成"读 spine.jsonl 后 foldRequestHeader" |
-| **修改** | `tests/integration/test_e2e_journal_wiring.py` 等 fixture:期望从"`model_visible/step-001/` 文件存在"改成"`spine.jsonl` 含 2 类 model-visible 事件 + fold 可重建" |
-| **修改** | `lca/plugins/transport/webserver/handlers/runs/{trace,explain,...}.py`:viewer 反查路径改走 foldRequestHeader |
-| **新增** | `tests/integration/test_model_visible_e2e.py`:端到端 fixture run,断言 (a) spine.jsonl 含两类 model-visible 事件,(b) fold 后 header 与 adapter 实际发的字节级相等,(c) assistant content / tool_calls 可重建 |
-| **架构测试** | 新增 `test_i_mv_2` — fold 可重建 |
-| **验收** | `uv run lca-ops runs create --user-text "ping"` 端到端通过;`<run_id>.spine.jsonl` 含两类 model-visible 事件;`uv run pytest tests/integration tests/plugins/events tests/architecture -q` 全过 |
+| **目标** | core viewer 读路径切到 `foldRequestHeader`;**双轨共存**,旧 capture / sidecar 仍可运行 |
+| **新增** | `lca/infrastructure/observability/replay/fold_source.py`(`fold_model_visible` → `FoldedModelVisible`) |
+| **修改** | `StandardCursor.at()` 优先 fold;`lca-ops journal trajectory / replay / verify-model-visible / step --model-visible` 走 fold,无 spine 时回退 sidecar |
+| **修改** | `waterfall` / `narrative_writer` 的 model-visible 链接优先 `<run_id>.spine.jsonl` |
+| **新增** | `tests/architecture/test_model_visible_fold.py` + `tests/integration/test_model_visible_e2e.py` |
+| **范围外** | webserver handlers / doctor fold → PR-3.1;composer `instrument_llm` 仍挂旧 `ModelVisibleLLMAdapter`(delete-when: PR-4) |
+| **架构测试** | I-MV-2 fold 可重建 |
+| **验收** | spine.jsonl 含两类 model-visible 事件;fold header 字节级等于 publisher payload;assistant 可重建 |
 | **delete-when** | 无(双轨共存到 PR-4) |
 
-### PR-4 — 删旁路文件 + 废 ADR + 收尾
+### PR-3.1 — webserver handlers + doctor fold【进行中】
+
+| 项 | 内容 |
+|---|---|
+| **目标** | 把 webserver run handlers(trace / explain / doctor 等)从反查 `<run_dir>/model_visible/` 切到 spine fold;`doctor` step_check 用 fold 计数/校验 |
+| **修改** | `lca/plugins/transport/webserver/handlers/runs/{trace,explain,doctor,...}.py` |
+| **依赖** | PR-3 的 `fold_source` / `StandardCursor` |
+| **验收** | doctor H-xref / model-visible hop 在默认 `<run_id>.spine.jsonl` 布局下非全零;handler 渲染 system + tools + messages + assistant |
+| **delete-when** | 无(双轨共存到 PR-4) |
+
+### PR-4 — 删旁路文件 + 废 ADR + 收尾【未合并;另 agent 负责】
 
 | 项 | 内容 |
 |---|---|
@@ -614,7 +637,7 @@ PR-0 spike (fold 模块 1:1 翻译 dsh)
 | 风险 | 缓解 |
 |---|---|
 | **journal 体积膨胀**(原文每次 change 都塞) | `headerEquals` fold 优化(PR-0 fold 模块 + PR-2 publisher 内部状态);实测:100 step run 期望 ~10-20 个完整 header 事件,不是 100 |
-| **PR-3 viewer 改造面大**(所有 `lca-ops` 子命令 + webserver handler) | PR-3 单独提 viewer 改动清单;一次性迁移;integration 测试夹具断言 viewer 输出与 fold 结果一致 |
+| **viewer 改造面大**(`lca-ops` + webserver handler) | PR-3 只迁 core viewer/CLI;PR-3.1 迁 handlers/doctor;integration 测试夹具断言 fold 输出 |
 | **PR-4 删旁路文件影响旧 viewer / 旧 run** | 旧 run 的 `<run_dir>/model_visible/` 文件保留但不再被读;viewer 走 fold 后报错信息明确("该 run 是旧格式,无法 fold");迁移窗口 14 天 |
 | **`ModelVisibleHook` per-instance 状态 + ContextVar 隔离** | 与现有 `CurrentReasonerPrompt` ContextVar 同样实现,基于 ADR-0169 D5 已验证的 ContextVar 模式 |
 | **assistant payload 与现有 `body.tool.execute.*` / `spine.tool.*` 重复** | `SpineLlmRequestHeaderAssistantPayload` 只承担"模型可见上下文"语义,**不**承担 tool 执行证据;后者仍走 `spine.tool.*` EP。架构测试断言两类事件字段不重叠 |
@@ -622,7 +645,7 @@ PR-0 spike (fold 模块 1:1 翻译 dsh)
 | **与 ADR-0169 / 0175 / 0176 废止影响历史追溯** | 旧 ADR 全文保留(`Superseded by` 注脚),不被 git rm;`_capture_io` 等历史文件进 `docs/notes/archive/` |
 | **PR-0 落地的 fold 模块在没 producer 之前是个孤儿** | PR-0 的 fold 模块自带单测 + CLI `lca-ops fold-test` 验证(可用现成 spine.jsonl fixture 测试) |
 
-**回滚**:5 个 PR 各自独立 revert。PR-0 / PR-1 / PR-2 只动加法,回滚成本最低;PR-3 动 viewer / webserver,回滚后旧路径恢复;PR-4 动 producer 端 + 删旧文件,回滚后旧 capture 路径恢复(双轨期保证)。
+**回滚**:6 个 PR 各自独立 revert。PR-0 / PR-1 / PR-2 只动加法,回滚成本最低;PR-3 动 core viewer/CLI,回滚后旧路径恢复;PR-3.1 动 webserver handlers/doctor;PR-4 动 producer 端 + 删旧文件,回滚后旧 capture 路径恢复(双轨期保证)。
 
 ## 8. 试点判定(每个 PR 合并前必答)
 
@@ -645,9 +668,14 @@ PR-0 spike (fold 模块 1:1 翻译 dsh)
 
 ### 8.4 PR-3 合并前
 
-9. **端到端事件计数一致**:`uv run lca-ops runs create --user-text "ping"` 产生的 spine.jsonl 含 2 类 model-visible 事件,数量与 PR-3 之前 producer 路径一致
-10. **viewer 渲染完整**:webserver trajectory / `lca-ops explain` 显示 system 全文 + tools 列表 + messages + assistant 回复 + tool_calls
-11. **旧 capture 路径仍可运行**(双轨):`StdModelVisibleCapture.capture(...)` 单独调用不报错;但生产代码不再调用
+9. **端到端事件计数一致**:`uv run lca-ops runs create --user-text "ping"` 产生的 spine.jsonl 含 2 类 model-visible 事件
+10. **core viewer 渲染完整**:`lca-ops explain` / journal trajectory / verify-model-visible 显示 system 全文 + tools + messages + assistant
+11. **旧 capture 路径仍可运行**(双轨):`StdModelVisibleCapture.capture(...)` 单独调用不报错;生产代码不再调用(composer `instrument_llm` 例外,delete-when PR-4)
+
+### 8.4.1 PR-3.1 合并前
+
+11a. **handlers 走 fold**:webserver trace / explain / doctor 不再硬编码反查 `<run_dir>/model_visible/`
+11b. **doctor 非全零**:默认 `<run_id>.spine.jsonl` 布局下 H-xref / model-visible hop 计数可用
 
 ### 8.5 PR-4 合并前
 
@@ -668,9 +696,12 @@ uv run lca-ops inspect-pipeline web-standard
 # PR-2: Publisher 测试
 uv run pytest tests/plugins/events/publishers/model_visible/ -q
 
-# PR-3: 端到端
+# PR-3: 端到端(core viewer)
 uv run lca-ops runs create --user-text "ping"
-uv run pytest tests/integration tests/plugins/events tests/architecture -q
+uv run pytest tests/integration/test_model_visible_e2e.py tests/architecture/test_model_visible_fold.py tests/plugins/events -q
+
+# PR-3.1: handlers / doctor
+uv run pytest tests/plugins/transport/webserver -q
 
 # PR-4: 收尾 + 架构测试
 uv run pytest tests/ tests/integration tests/architecture tests/plugins/events -q
