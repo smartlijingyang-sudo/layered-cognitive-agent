@@ -107,7 +107,7 @@ def test_fork_produces_independent_child() -> None:
 
 
 def test_open_step_advances_step_index_without_ep() -> None:
-    """open_step 与 StdLoopCursor 同口径:L6 自增,不落 EP。"""
+    """open_step 与 StdLoopCursor 同口径:L6 自增;无 spine 时不落 EP。"""
     c = InMemoryLoopCursor(run_id="r1", trace_id="t1", incarnation=_inc(1))
     c.advance("think")
     c.open_step("step-001")
@@ -115,6 +115,47 @@ def test_open_step_advances_step_index_without_ep() -> None:
     assert snap.step_index == 1
     assert snap.step_id == "step-001"
     assert snap.attempt_in_step == 0
+
+
+class _RecordingSpine:
+    """最小 spine stub:记录 append 调用。"""
+
+    def __init__(self) -> None:
+        self.records: list[dict] = []
+
+    def append(self, **kw: object) -> int:
+        self.records.append(dict(kw))
+        return int(kw["seq"])  # type: ignore[arg-type]
+
+
+def test_spine_mode_emits_explicit_step_boundaries() -> None:
+    """有 spine 时与 StdLoopCursor 同口径发射显式 step 边界(ADR-0184 D6)。
+
+    record_request_header → writable.step.start(先于 llm.request.header);
+    advance("stop") → writable.step.end。
+    """
+    spine = _RecordingSpine()
+    c = InMemoryLoopCursor(run_id="r1", trace_id="t1", incarnation=_inc(1), spine=spine)
+    c.advance("think")
+
+    class _Header:
+        step_id = "step-001"
+        incarnation = 1
+        reason = "initial"
+        model = "m"
+
+    c.record_request_header(_Header())
+    c.advance("stop")
+    eps = [r["execution_point"] for r in spine.records]
+    assert eps == [
+        "phase.think.fold",
+        "writable.step.start",
+        "llm.request.header",
+        "phase.stop.fold",
+        "writable.step.end",
+    ]
+    assert spine.records[1]["payload"]["step_id"] == "step-001"
+    assert spine.records[-1]["payload"]["outcome"] == "success"
 
 
 def test_open_step_after_close_raises_cursor_error() -> None:

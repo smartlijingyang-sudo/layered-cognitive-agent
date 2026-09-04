@@ -98,6 +98,8 @@ def _map_session_event(
     - ``event_id``: ``data.event_id`` 非空,否则 ``{session.id}:{event.seq}``
     - ``trace_id``: ``data.trace_id`` 非空,否则 ``session.id``
     - ``category``: ``event.type``
+    - ``execution_point``: ``data.execution_point`` 非空;缺失时按
+      ``event.type``(category)反查裸 EP;仍无则 ``"unknown"``
     - ``ts``: ``event.time`` 毫秒 → 秒
     - inner payload: ``data.payload`` 若为 dict,否则去掉信封键后的 ``data``
     """
@@ -110,7 +112,13 @@ def _map_session_event(
     trace_id = str(raw_trace) if raw_trace not in (None, "") else session.id
     execution_point = data.get("execution_point")
     if not isinstance(execution_point, str) or not execution_point:
-        execution_point = "unknown"
+        # typed payload(如 model-visible 族)只携带 category、无
+        # execution_point 字段 —— 按 category 反查归一为裸 EP,
+        # 落盘事件才可被 reader / fold 按 EP 查询(ADR-0184 D7);
+        # 非 spine category 才落 "unknown"。
+        from lca_kernel.events.payloads_spine import category_to_spine_ep
+
+        execution_point = category_to_spine_ep(event.type) or "unknown"
     channel = data.get("channel")
     if not isinstance(channel, str) or not channel:
         channel = "fact"

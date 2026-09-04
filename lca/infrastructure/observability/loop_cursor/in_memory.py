@@ -70,6 +70,51 @@ class InMemoryLoopCursor:
         if self._state.halted:
             raise CursorError("cursor halted; awaiting resume")
 
+    # ── 显式 step 边界(与 StdLoopCursor 同口径,ADR-0184 D6)────────
+    def _emit_step_start(self, *, step_id: str) -> None:
+        """有 spine 时发 ``writable.step.start``;无 spine 纯状态机则只置位。"""
+        s = self._state
+        s.step_open = True
+        if self._spine is None:
+            return
+        s.seq += 1
+        self._spine.append(
+            execution_point="writable.step.start",
+            payload={
+                "step": s.step_index,
+                "run_id": s.run_id,
+                "step_id": step_id,
+                "phase": s.phase or "think",
+            },
+            run_id=s.run_id,
+            seq=s.seq,
+            incarnation=s.incarnation.incarnation_seq,
+            phase=s.phase,
+        )
+
+    def _emit_step_end(self, *, outcome: str) -> None:
+        """有开窗才发 ``writable.step.end``(幂等);无 spine 只清位。"""
+        s = self._state
+        if not s.step_open:
+            return
+        s.step_open = False
+        if self._spine is None:
+            return
+        s.seq += 1
+        self._spine.append(
+            execution_point="writable.step.end",
+            payload={
+                "step": s.step_index,
+                "run_id": s.run_id,
+                "step_id": s.step_id or "",
+                "outcome": outcome,
+            },
+            run_id=s.run_id,
+            seq=s.seq,
+            incarnation=s.incarnation.incarnation_seq,
+            phase=s.phase,
+        )
+
     def advance(
         self,
         phase: PhaseName,
@@ -111,6 +156,9 @@ class InMemoryLoopCursor:
                 incarnation=s.incarnation.incarnation_seq,
                 phase=s.phase,
             )
+        # ADR-0184 D6:stop 边界显式收口(与 StdLoopCursor 同口径)。
+        if phase == "stop":
+            self._emit_step_end(outcome="success")
         return self.snapshot
 
     def halt(self, reason: CloseReason) -> None:
@@ -144,6 +192,8 @@ class InMemoryLoopCursor:
         s = self._state
         s.closed = True
         s.stop_signal = reason
+        # ADR-0184 D6:close 兜底收口未闭合 step(与 StdLoopCursor 同口径)。
+        self._emit_step_end(outcome="success" if reason == "completed" else "cancelled")
         s.phase = None
 
     # ── record_*:在正确 phase window 才能调(L5 / L6) ──────────
@@ -195,7 +245,8 @@ class InMemoryLoopCursor:
         - 必须 THINK 窗口(L6)
         - step_id 由 header 传入(Protocol 钉定;cursor 不派生 step_id 字面)
         - step_index += 1, attempt_in_step = 0
-        - spine 不为 None 时,落 ``llm.request.header`` EP (与 StdLoopCursor 同口径)
+        - spine 不为 None 时,落 ``writable.step.start`` + ``llm.request.header``
+          EP(与 StdLoopCursor 同口径,边界先于 header,ADR-0184 D6)
         """
         self._ensure_open()
         self._ensure_not_halted()
@@ -209,6 +260,7 @@ class InMemoryLoopCursor:
         s.step_index += 1
         s.step_id = step_id
         s.attempt_in_step = 0
+        self._emit_step_start(step_id=step_id)
         if self._spine is not None:
             s.seq += 1
             self._spine.append(
@@ -238,13 +290,18 @@ class InMemoryLoopCursor:
             )
 
     def open_step(self, step_id: str) -> None:
-        """LLM 边界 step 推进 —— L6 自增,不落 EP(与 StdLoopCursor 同口径)。"""
+        """LLM 边界 step 推进 —— L6 自增 + 显式 ``writable.step.start``。
+
+        与 StdLoopCursor 同口径(ADR-0184 D6);``llm.request.header`` 仍由
+        hook 侧唯一发射,本方法不派生。
+        """
         self._ensure_open()
         self._ensure_not_halted()
         s = self._state
         s.step_index += 1
         s.step_id = step_id
         s.attempt_in_step = 0
+        self._emit_step_start(step_id=step_id)
 
     def fork(self, reason: Literal["child_agent", "delegation"]) -> LoopCursor:
         """派生 child cursor —— Incarnation.child() 继承 run_id + plan_ref,seq += 1。

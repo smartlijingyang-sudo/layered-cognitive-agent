@@ -34,6 +34,11 @@ class _CursorState:
     # ADR-0173 D1 halt != close:halt 保留 cursor 实例等待重建,
     # 但 record_* / advance 锁住(spatial-temporal runtime 持有 resume 协议)。
     halted: bool = False
+    # ADR-0184 D6 显式 step 边界:有未闭合的 writable step 时为 True。
+    # record_request_header / open_step 置 True(同点发 writable.step.start);
+    # advance("stop") / close 消费(发 writable.step.end)后归 False,
+    # 保证 end 不与 start 错配、不重复发射。
+    step_open: bool = False
 
 
 __all__ = ["_CursorState"]

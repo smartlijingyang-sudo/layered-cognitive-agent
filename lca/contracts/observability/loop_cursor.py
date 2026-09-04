@@ -70,14 +70,23 @@ class LoopCursor(Protocol):
     """Loop 控制面状态机。
 
     业务路径唯一允许做的:
-        - advance(phase)            : 转移 phase 窗口
+        - advance(phase)            : 转移 phase 窗口;phase="stop" 时收口
+                                      当前开窗的 step(落 writable.step.end,
+                                      ADR-0184 D6)
         - halt(reason)              : 终止当前 iteration
-        - close(reason)             : 关闭 cursor(发 closing 信号给 CloseBarrier)
+        - close(reason)             : 关闭 cursor;未闭合 step 先落
+                                      writable.step.end,再发 closing 信号
+                                      给 CloseBarrier(ADR-0184 D6)
         - record_thinking(...)      : 落 step.thinking.record EP
         - record_tool_call(...)     : 落 step.tool_call.record EP
         - record_tool_result(...)   : 落 step.tool_result.record EP
-        - record_request_header(...): 落 llm.request.header EP + 5 件套
-        - open_step(step_id)          : LLM 边界 step 自增(不落 EP)
+        - record_request_header(...): 落 writable.step.start(显式 step 边界,
+                                      先于 header)+ llm.request.header EP
+                                      + 5 件套(ADR-0184 D6)
+        - open_step(step_id)          : LLM 边界 step 自增 + 落
+                                      writable.step.start;不落
+                                      llm.request.header(该 EP 由 hook 侧
+                                      Session 路径唯一发射,ADR-0185)
         - fork(reason) -> LoopCursor  : subagent / delegation
             (per ADR-0171:child cursor 共享 parent 的 spine handle,
              Incarnation 继承 run_id + plan_ref,incarnation_seq += 1;
@@ -88,9 +97,9 @@ class LoopCursor(Protocol):
         emit_phase / emit / subscribe / flush / close_storage
         register_projection / subscribe_projection / drive_projection
 
-    ``open_step`` 与 ``begin_step`` 的边界:前者只做 L6 step_index 自增
-    (状态机),不发任何 EP;``begin_step`` 是 writable-matrix step 生命
-    周期原语,仍不暴露。
+    ``open_step`` 与 ``begin_step`` 的边界:前者做 L6 step_index 自增
+    (状态机)+ 显式 ``writable.step.start`` 边界(ADR-0184 D6);
+    ``begin_step`` 是 writable-matrix step 生命周期原语,仍不暴露。
     """
 
     @property
@@ -112,7 +121,10 @@ class LoopCursor(Protocol):
 
     # ── 事实记录(4) ──────────────────────────────────────────────
     def record_thinking(
-        self, payload: ThinkingRecord, *, text_preview: str = ""  # noqa: F821
+        self,
+        payload: ThinkingRecord,
+        *,
+        text_preview: str = "",  # noqa: F821
     ) -> None: ...
     def record_tool_call(self, payload: ToolCallRecord) -> None: ...  # noqa: F821
     def record_tool_result(self, payload: ToolResultRecord) -> None: ...  # noqa: F821

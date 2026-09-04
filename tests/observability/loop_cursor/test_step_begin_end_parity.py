@@ -15,12 +15,12 @@ commit a half-open step. The §D3 invariant table calls for grep-based
 verification on ``events.jsonl``; this test is the in-process counterpart
 that runs without I/O so failures surface in the unit-test loop.
 
-The stub spine mirrors the legacy ``CoordinatorAdapter`` semantics:
-``record_request_header`` opens a step (``writable.step.start``),
-``phase.gate.fold`` (leaving THINK) closes the step
-(``writable.step.end``); segment boundaries track the think window in the
-same way. This is faithful to the bridge behaviour without depending on
-its internal wiring.
+``writable.step.start`` / ``writable.step.end`` are emitted by the cursor
+itself (ADR-0184 D6): ``record_request_header`` / ``open_step`` open a
+step, ``advance("stop")`` / ``close`` close it. The stub spine is a plain
+recorder for those EPs. Segment boundaries (``writable.segment.*``) still
+mirror the legacy ``CoordinatorAdapter`` semantics (think window open /
+gate close) because segment emission has not moved onto the cursor.
 """
 
 from __future__ import annotations
@@ -36,22 +36,23 @@ from lca.infrastructure.observability.loop_cursor import StdLoopCursor
 
 @dataclass
 class _StubSpine:
-    """Captures every append call; emits paired begin/end EPs for segments.
+    """Records every cursor append; mirrors legacy segment boundaries.
 
-    Lifecycle mirroring the legacy ``CoordinatorAdapter`` (ADR-0169 PR-15
-    PersistenceCoordinator integration):
-        - ``llm.request.header`` fires while in THINK → pair emits
-          ``writable.step.start`` (step open).
-        - ``phase.gate.fold`` (leaving THINK) → emits ``writable.step.end``
-          (step close) and closes any open segment.
+    ``writable.step.*`` are the cursor's own emissions (ADR-0184 D6) —
+    this stub records them verbatim without injecting anything.
+
+    Segment lifecycle still mirrors the legacy ``CoordinatorAdapter``
+    (ADR-0169 PR-15 PersistenceCoordinator integration), because
+    ``writable.segment.*`` emission has not moved onto the cursor:
         - ``phase.think.fold`` → opens a segment.
-        - ``phase.act.fold`` followed by ``phase.reflect.fold`` →
-          closes the ACT segment.
+        - ``phase.gate.fold`` (leaving THINK) → closes the open segment.
 
     For ``writable.iteration.closing``: legacy ordering is
-    ``step.end → segment.end → closing`` (close path first closes any
-    open step / segment, then emits the closing signal). The stub
-    prepends the close-out EPs before the cursor's own closing EP.
+    ``segment.end → closing`` (close path first closes any open segment,
+    then the cursor emits the closing signal). The stub prepends the
+    segment close-out EP before the cursor's own closing EP. The
+    ``writable.step.end`` for an open step is emitted by the cursor
+    itself before the closing EP.
 
     The bookkeeping guarantees ``count(start) == count(end)`` whenever the
     caller drives the cursor through legal phase sequences — which is the
@@ -60,7 +61,6 @@ class _StubSpine:
 
     records: list[dict] = field(default_factory=list)
     _segment_open: bool = False
-    _step_open: bool = False
 
     def append(
         self,
@@ -72,34 +72,21 @@ class _StubSpine:
         incarnation: int,
         phase: str | None,
     ) -> int:
-        # close path:prepend close-out EPs before cursor's closing EP
+        # close path:prepend segment close-out before cursor's closing EP
         # so the cursor's writable.iteration.closing stays as the last
         # record in the trace (faithful to legacy coord ordering).
-        if execution_point == "writable.iteration.closing":
-            if self._step_open:
-                self.records.append(
-                    {
-                        "execution_point": "writable.step.end",
-                        "payload": {"outcome": "close"},
-                        "run_id": run_id,
-                        "seq": seq,
-                        "incarnation": incarnation,
-                        "phase": phase,
-                    }
-                )
-                self._step_open = False
-            if self._segment_open:
-                self.records.append(
-                    {
-                        "execution_point": "writable.segment.end",
-                        "payload": {"phase": "close"},
-                        "run_id": run_id,
-                        "seq": seq,
-                        "incarnation": incarnation,
-                        "phase": phase,
-                    }
-                )
-                self._segment_open = False
+        if execution_point == "writable.iteration.closing" and self._segment_open:
+            self.records.append(
+                {
+                    "execution_point": "writable.segment.end",
+                    "payload": {"phase": "close"},
+                    "run_id": run_id,
+                    "seq": seq,
+                    "incarnation": incarnation,
+                    "phase": phase,
+                }
+            )
+            self._segment_open = False
         self.records.append(
             {
                 "execution_point": execution_point,
@@ -110,32 +97,6 @@ class _StubSpine:
                 "phase": phase,
             }
         )
-        # step begin
-        if execution_point == "llm.request.header":
-            self._step_open = True
-            self.records.append(
-                {
-                    "execution_point": "writable.step.start",
-                    "payload": {"phase": phase},
-                    "run_id": run_id,
-                    "seq": seq,
-                    "incarnation": incarnation,
-                    "phase": phase,
-                }
-            )
-        # step end (leaving THINK window)
-        if execution_point == "phase.gate.fold" and self._step_open:
-            self.records.append(
-                {
-                    "execution_point": "writable.step.end",
-                    "payload": {"outcome": "success"},
-                    "run_id": run_id,
-                    "seq": seq,
-                    "incarnation": incarnation,
-                    "phase": phase,
-                }
-            )
-            self._step_open = False
         # segment begin
         if execution_point == "phase.think.fold":
             self._segment_open = True
@@ -269,10 +230,10 @@ def test_count_segment_start_equals_count_segment_end_three_phases() -> None:
 
 
 def test_segment_begin_end_pairing_with_record_request_header() -> None:
-    """verify:step.begin/end 也必须在 record_request_header 触发时配对。
+    """verify:step.begin/end 必须由 cursor 显式发射且配对(ADR-0184 D6)。
 
     同一 iteration 内,每次 record_request_header → writable.step.start;
-    离开 THINK 窗口 → writable.step.end。三次完整 iteration 后
+    advance("stop") → writable.step.end。三次完整 iteration 后
     count(start) == count(end) == 3。
     """
     c, spine = _make_cursor()
