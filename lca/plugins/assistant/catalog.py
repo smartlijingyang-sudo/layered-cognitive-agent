@@ -243,24 +243,24 @@ class _AssistantCatalogImpl(AssistantCatalog):
                 summaries.append(summary)
         return tuple(summaries)
 
-    # COMPAT(delete-when: revise API 在 PR-5 落 ProfilePatch)
+    # COMPAT(delete-when: 2026-12-31, scope: revise_profile / reimport 落实现并补 I-A7 验收)
     def revise_profile(self, assistant_id: str, patch: ProfilePatch) -> PlanRevision:
-        del assistant_id, patch  # PR-3 占位;PR-5 落 ProfilePatch API
+        del assistant_id, patch  # PR-3 占位;待 ProfilePatch 语义 + I-A7 验收的 PR 落地
         raise NotImplementedError(
-            "AssistantCatalog.revise_profile 在 PR-3 范围不实现;PR-5 落 ProfilePatch API"
+            "AssistantCatalog.revise_profile 在 PR-3 范围不实现;待 revise/reimport 落地后删除本占位"
         )
 
-    # COMPAT(delete-when: reimport API 在 PR-5 落裸改恢复路径)
+    # COMPAT(delete-when: 2026-12-31, scope: revise_profile / reimport 落实现并补 I-A7 验收)
     def reimport(self, assistant_id: str, reason: str) -> PlanRevision:
-        del assistant_id, reason  # PR-3 占位;PR-5 落裸改恢复路径
+        del assistant_id, reason  # PR-3 占位;待裸改恢复路径落地
         raise NotImplementedError(
-            "AssistantCatalog.reimport 在 PR-3 范围不实现;PR-5 落裸改恢复路径"
+            "AssistantCatalog.reimport 在 PR-3 范围不实现;待 reimport 路径落地后删除本占位"
         )
 
-    # COMPAT(delete-when: retire API 在 PR-7 落 create-assistant skill / HTTP 入口)
+    # COMPAT(delete-when: 2026-12-31, scope: retire 入口 + create-assistant skill 落实现)
     def retire(self, assistant_id: str, reason: str) -> None:
-        del assistant_id, reason  # PR-3 占位;PR-7 落 retire 入口
-        raise NotImplementedError("AssistantCatalog.retire 在 PR-3 范围不实现;PR-7 落 retire 入口")
+        del assistant_id, reason  # PR-3 占位;待 retire 入口落地
+        raise NotImplementedError("AssistantCatalog.retire 在 PR-3 范围不实现;待 retire 入口落地后删除本占位")
 
     # ── 内部 ──────────────────────────────────────────────────────────
 
