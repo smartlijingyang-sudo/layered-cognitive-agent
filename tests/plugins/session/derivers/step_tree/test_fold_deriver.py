@@ -239,3 +239,155 @@ def test_derive_step_tree_function(tmp_path: Path) -> None:
     assert doc.metadata.outcome == "completed"
     assert doc.totals is not None
     assert doc.totals.phases >= 1
+
+
+def test_fold_metadata_passthrough() -> None:
+    """agent_role / plan_ref / objective 写入 JournalMetadata。"""
+    doc = fold_step_tree(
+        [],
+        run_id="r_meta",
+        outcome="completed",
+        agent_role="coder",
+        strategy_key="solo",
+        plan_ref="abcd1234abcd1234",
+        objective="ship fold path",
+    )
+    assert doc.metadata.agent_role == "coder"
+    assert doc.metadata.strategy_key == "solo"
+    assert doc.metadata.plan_ref == "abcd1234abcd1234"
+    assert doc.metadata.objective == "ship fold path"
+    assert doc.metadata.outcome == "completed"
+
+
+def test_fold_iso_when_and_session_event() -> None:
+    """ISO when 字符串 + SessionEvent 信封都能 fold 出 step。"""
+    from lca_kernel.events.session import SessionEvent
+
+    events = [
+        {
+            "execution_point": "writable.step.start",
+            "payload": {"phase": "think"},
+            "when": "2026-09-01T12:00:00+00:00",
+        },
+        SessionEvent(
+            type="writable.step.end",
+            seq=1,
+            time=1_756_728_001_000,
+            data={"outcome": "success"},
+        ),
+    ]
+    doc = fold_step_tree(events, run_id="r_coerce")
+    assert len(doc.steps) == 1
+    assert doc.steps[0].outcome == "success"
+    assert doc.steps[0].duration_ms is not None
+    assert doc.steps[0].duration_ms >= 0
+
+
+def test_deriver_flush_from_spine_reader(tmp_path: Path) -> None:
+    """flush 从 SpineReader 读 spine.jsonl 再 fold 写 journal.json。"""
+    run_id = "r_flush_spine"
+    spine_path = tmp_path / f"{run_id}.spine.jsonl"
+    events = [
+        {
+            "execution_point": "writable.step.start",
+            "payload": {"phase": "think"},
+            "outcome": None,
+            "when": "2026-09-01T12:00:00+00:00",
+        },
+        {
+            "execution_point": "writable.step.end",
+            "payload": {},
+            "outcome": "success",
+            "when": "2026-09-01T12:00:01+00:00",
+        },
+    ]
+    spine_path.write_text(
+        "".join(json.dumps(event) + "\n" for event in events),
+        encoding="utf-8",
+    )
+    deriver = StepTreeFoldDeriver(
+        run_id=run_id,
+        run_dir=tmp_path,
+        spine_path=spine_path,
+        objective="flush from spine",
+    )
+    deriver.flush(outcome="completed")
+
+    assert (tmp_path / "journal.json").exists()
+    assert deriver.document is not None
+    assert deriver.document.metadata.outcome == "completed"
+    assert deriver.document.metadata.objective == "flush from spine"
+    assert deriver.document.totals is not None
+    assert deriver.document.totals.steps == 1
+
+
+def test_deriver_flush_prefers_session_snapshot(tmp_path: Path) -> None:
+    """Session.snapshot_events 优先于 SpineReader。"""
+    from lca.plugins.session.runtime.session import Session
+
+    session = Session("r_sess")
+    session.append("writable.step.start", {"phase": "act"})
+    session.append("writable.step.end", {"outcome": "success"})
+    # 盘上若有平行 spine,也必须被忽略。
+    spine_path = tmp_path / "r_sess.spine.jsonl"
+    spine_path.write_text(
+        json.dumps(
+            {
+                "execution_point": "writable.step.start",
+                "payload": {"phase": "think"},
+                "when": "2026-09-01T12:00:00+00:00",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    deriver = StepTreeFoldDeriver(
+        run_id="r_sess",
+        run_dir=tmp_path,
+        spine_path=spine_path,
+        session=session,
+    )
+    deriver.flush(outcome="completed")
+    assert deriver.document is not None
+    assert deriver.document.totals is not None
+    assert deriver.document.totals.steps == 1
+    assert deriver.document.steps[0].phase == "act"
+
+
+def test_step_tree_bundle_flush_passes_outcome(tmp_path: Path) -> None:
+    """_StepTreeBundle.flush 把 outcome 传给 fold deriver 并写 narrative。"""
+    from lca.plugins.observability.run_ledger_seam import _StepTreeBundle
+
+    class _Narrative:
+        def __init__(self) -> None:
+            self.docs: list[object] = []
+
+        def write(self, document: object) -> None:
+            self.docs.append(document)
+
+    spine_path = tmp_path / "r_bundle.spine.jsonl"
+    spine_path.write_text(
+        json.dumps(
+            {
+                "execution_point": "kernel.run.stop",
+                "payload": {},
+                "outcome": "success",
+                "when": "2026-09-01T12:00:00+00:00",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    deriver = StepTreeFoldDeriver(
+        run_id="r_bundle",
+        run_dir=tmp_path,
+        spine_path=spine_path,
+    )
+    narrative = _Narrative()
+    bundle = _StepTreeBundle(deriver=deriver, narrative_writer=narrative)
+    bundle.flush(outcome="failed")
+
+    assert (tmp_path / "journal.json").exists()
+    assert deriver.document is not None
+    assert deriver.document.metadata.outcome == "failed"
+    assert narrative.docs == [deriver.document]

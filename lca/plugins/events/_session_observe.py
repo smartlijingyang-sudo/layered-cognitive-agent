@@ -45,18 +45,27 @@ class SessionObserverTarget(Protocol):
 _current_session: SessionObserverTarget | None = None
 
 
-def set_session(session: SessionObserverTarget | None) -> None:
+def set_session(session: object | None) -> None:
     """装载 / 清空进程级 Session 观察目标。
 
     所有权：机制方（per-run Session owner）是唯一调用方 —— Session 构造
     时装载，teardown 时传 ``None`` 清空。传入不带 ``observe`` 的对象抛
     :class:`TypeError`（fail-loud，禁止静默降级成无观察态）。
+    runtime :class:`~lca.plugins.session.runtime.session.Session` 自动包成
+    bus Protocol facade（``observe(plugin, callback)``）；已是该形态的对象
+    原样装载。
     """
     global _current_session
-    if session is not None and not isinstance(session, SessionObserverTarget):
+    if session is None:
+        _current_session = None
+        return
+    from lca.plugins.session.runtime.bus_facade import as_bus_facade
+
+    bound = as_bus_facade(session)
+    if not isinstance(bound, SessionObserverTarget):
         msg = f"Session 观察目标必须提供 observe()；got {type(session).__name__}"
         raise TypeError(msg)
-    _current_session = session
+    _current_session = bound
 
 
 def current_session() -> SessionObserverTarget | None:

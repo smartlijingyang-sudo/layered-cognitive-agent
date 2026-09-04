@@ -8,7 +8,8 @@
 - I-SESSION-4: 持久化以 SessionObserver 形态存在；spine.jsonl 物理写方唯一。
 - I-SESSION-5: deriver 走 fold；禁止新挂 EventSpine._subscribers 派生主路径。
 
-PR-3i 只挂锁：未落地项 ``xfail(strict=False)``，reason 写明翻正 PR。
+PR-3i 挂锁：未落地项 ``xfail(strict=False)``，reason 写明翻正 PR。
+I-SESSION-5 由 PR-3g 收口（生产 step_tree 走 fold）。
 delete-when:N/A（长期回归锁；xfail 在对应 PR 收口时翻正）。
 """
 
@@ -197,22 +198,36 @@ class TestISession4:
 class TestISession5:
     """I-SESSION-5: deriver 走 fold，不新挂 EventSpine._subscribers 派生主路径。"""
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="ADR-0186 PR-3g: deriver fold 切流未完成；EventSpine.subscribe 派生仍在",
-    )
     def test_i_session_5_deriver_uses_fold(self) -> None:
-        """observability deriver / spine derivers 不得依赖 EventSpine.subscribe 作为派生主路径。"""
-        search_roots = [
-            _REPO_ROOT / "lca" / "infrastructure" / "observability" / "spine" / "derivers",
-            _REPO_ROOT / "lca" / "plugins" / "observability",
-        ]
+        """生产 step_tree 走 fold；builder 不得 EventSpine.subscribe 作为派生主路径。"""
+        builder = (
+            _REPO_ROOT
+            / "lca"
+            / "plugins"
+            / "transport"
+            / "webserver"
+            / "handlers"
+            / "runs"
+            / "session"
+            / "builder.py"
+        )
+        assert builder.exists(), "RunSessionBuilder missing"
+        builder_text = builder.read_text(encoding="utf-8")
+        assert "StepTreeFoldDeriver" in builder_text, (
+            "I-SESSION-5: production builder must assemble StepTreeFoldDeriver"
+        )
+        assert "event_spine.subscribe" not in builder_text, (
+            "I-SESSION-5 违规:builder 仍挂 EventSpine.subscribe 作为 step_tree 主路径"
+        )
+        assert "StepTreeAccumulatorDeriver(" not in builder_text, (
+            "I-SESSION-5 违规:builder 仍构造 StepTreeAccumulatorDeriver"
+        )
+
+        fold_root = _REPO_ROOT / "lca" / "plugins" / "session" / "derivers" / "step_tree"
         matches: list[str] = []
-        for root in search_roots:
-            if not root.exists():
-                continue
-            matches.extend(_rg(r"\.subscribe\(", root))
-            matches.extend(_rg(r"_subscribers", root))
-        assert not matches, "I-SESSION-5 违规:deriver 仍挂 in-memory subscribe\n" + "\n".join(
+        if fold_root.exists():
+            matches.extend(_rg(r"\.subscribe\(", fold_root))
+            matches.extend(_rg(r"_subscribers", fold_root))
+        assert not matches, "I-SESSION-5 违规:fold deriver 仍挂 in-memory subscribe\n" + "\n".join(
             matches[:8]
         )

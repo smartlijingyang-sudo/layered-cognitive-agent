@@ -15,20 +15,41 @@ session_service/SessionStore 留 hook 位);无 Session 时 fallback
   payload/producer 字段语义由调用方负责,本模块不重写。
 - Session.append 接受 ``payload`` 与 ``producer``;返回 :class:`EventRef`
   以兼容现有 publisher 测试(ref.category / ref.event_id 断言)。
-- helper **不**做鉴权 / schema 校验:鉴权仍由 EventBus 入口在 fallback
-  路径执行;Session 路径由 Session.append 内部负责。
+- Session 路径与 EventBus 路径共用同一 ``EventRegistry.can_publish`` 鉴权矩阵
+  （S1）;本 helper 在 ``session.append`` 前执行,避免 active Session 时绕过授权。
 - ContextVar 隔离:Session 跨 asyncio.Task/copy_context 不串。
 """
 
 from __future__ import annotations
 
 import contextvars
-from typing import TYPE_CHECKING, Any, Protocol
-
-from lca.contracts.atoms.ids import new_id
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 if TYPE_CHECKING:
     from lca_kernel.events.bus import EventRef
+
+
+def _authorize_producer(payload: Any, producer: Any) -> None:
+    """Run EventBus S1 authorization before Session.append.
+
+    Uses the same ``EventBus.default().registry.can_publish`` matrix as
+    ``EnvelopeBus.publish``. Raises ``UnauthorizedPublishError`` on deny.
+    Missing plugin identity / category defers to EventBus / schema checks.
+    """
+    from lca_kernel.events.bus import EventBus
+    from lca_kernel.events.errors import UnauthorizedPublishError
+
+    bus = EventBus.default()
+    coerce = getattr(bus, "_coerce_producer", None)
+    producer_cls = coerce(producer) if callable(coerce) else producer
+    category = getattr(payload, "category", None)
+    if category is None or producer_cls is None:
+        return
+    registry = bus.registry
+    if not registry.can_publish(producer_cls, category):
+        identifier = getattr(producer_cls, "__name__", str(producer_cls))
+        cat_value = getattr(category, "value", category)
+        raise UnauthorizedPublishError(identifier, cat_value)
 
 
 class _PublishSession(Protocol):
@@ -62,10 +83,17 @@ wiring 层通过 :func:`set_publish_session` 在 run / request 边界 set,
 
 
 def set_publish_session(
-    session: _PublishSession | None,
+    session: object | None,
 ) -> contextvars.Token[_PublishSession | None]:
-    """设置当前上下文的 active Session;返回 token 供 reset。"""
-    return _current_session.set(session)
+    """设置当前上下文的 active Session;返回 token 供 reset。
+
+    runtime :class:`~lca.plugins.session.runtime.session.Session` 自动包成
+    bus Protocol facade；已是 ``append(payload, *, producer)`` 形态的对象
+    原样装载。
+    """
+    from lca.plugins.session.runtime.bus_facade import as_bus_facade
+
+    return _current_session.set(cast("_PublishSession | None", as_bus_facade(session)))
 
 
 def reset_publish_session(
@@ -78,26 +106,6 @@ def reset_publish_session(
 def current_publish_session() -> _PublishSession | None:
     """读当前上下文的 active Session;未设置返回 None。"""
     return _current_session.get()
-
-
-def _synthetic_ref(payload: Any) -> EventRef:
-    """Session.append 返回路径合成的 EventRef(用于 fallback 兼容)。
-
-    Session 路径暂未绑定 EventBus,需构造一个最小 EventRef 满足现有
-    publisher 测试断言(ref.category / ref.event_id)。
-    """
-    from lca_kernel.events.bus import EventRef
-
-    category = getattr(payload, "category", None)
-    cat_str = getattr(category, "value", None) or str(category or "")
-    return EventRef(
-        event_id=new_id("evt"),
-        category=cat_str,
-        trace_id="",
-        ts=0.0,
-        persisted=False,
-        subscriber_count=0,
-    )
 
 
 def publish_via_session(
@@ -113,12 +121,13 @@ def publish_via_session(
     - ``producer``:publisher plugin class(EventBus 鉴权用)。
 
     返回:
-    :class:`EventRef`。Session 路径返回合成的最小 EventRef(后续 PR 接入
-    session_service 后会换成 SessionEvent 与 EventRef 的映射);EventBus
-    fallback 路径返回真实 EventRef,与改造前等价。
+    :class:`EventRef`。Session 路径返回 ``append`` 回执（runtime Session
+    由 bus facade 从 SessionEvent 合成）;EventBus fallback 路径返回真实
+    EventRef,与改造前等价。
     """
     session = _current_session.get()
     if session is not None:
+        _authorize_producer(payload, producer)
         return session.append(payload, producer=producer)
     from lca_kernel.events.bus import EventBus
 

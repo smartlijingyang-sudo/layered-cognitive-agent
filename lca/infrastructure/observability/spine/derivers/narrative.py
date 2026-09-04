@@ -1,6 +1,13 @@
 # COMPAT(delete-when: PR-9, tracking: ADR-0181)
 # 旧 EventSpine deriver；PR-8 shim 走 events/subscribers/spine_* 包装；
 # 本模块保留至 PR-9 旧 spine 全退役（rg "lca.plugins.observability.spine.derivers" lca/ = 0 触发）。
+#
+# COMPAT(delete-when: ADR-0186 PR-3g Session-observer 收口 narrative 投影,
+#        tracking: ADR-0186 PR-3g)
+# narrative 是 document-driven:on_event 仅 debug-log,真值写盘由
+# _StepTreeBundle.flush → NarrativeWriter.write(document) 触发。
+# PR-3g fold 路径(StepTreeFoldDeriver → journal.json)已产出 JournalDocument,
+# narrative 投影改为读 fold 输出的 snapshot 即可;无需独立 fold 函数。
 
 """NarrativeDeriver — wraps ``StepNarrativeWriter`` as a spine deriver (Task 2.2).
 

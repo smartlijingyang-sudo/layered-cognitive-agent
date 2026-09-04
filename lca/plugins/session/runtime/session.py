@@ -10,6 +10,8 @@
   ``session/event`` 全局派发；store 层装配观察者由后续 PR 接管。
 - 事件词表开放：``type`` 即 spine category 字符串，无 close-set 校验
   （新 category 走 yaml 注册，ADR-0183）。
+- flush 链路（ADR-0186）：``flush()`` 异步 await 全部已注册 durability
+  listener + observer duck-type ``.flush(session)``；单个失败 contained。
 """
 
 from __future__ import annotations
@@ -25,6 +27,8 @@ import structlog
 from lca_kernel.events.fold import EpochHeader, foldRequestHeader
 from lca_kernel.events.session import (
     SESSION_FORMAT_VERSION,
+    FlushListener,
+    FlushResult,
     SessionEvent,
     SessionHeader,
     SessionObserver,
@@ -72,6 +76,12 @@ class Session(SessionProtocol):
     3. 置重入标记 → observer 快照 → 事件入日志 → 失效快照缓存 →
        逐个 fire observer（单个失败 contained，不打断后续）→ 返回事件；
     4. ``finally`` 清重入标记，保证失败路径也恢复可 append 状态。
+
+    flush 链（ADR-0186）：
+
+    1. 取当前 listener + observer 快照；
+    2. 依次 await ``listener.flush(session)``，失败 contained 记 ``FlushResult(ok=False)``；
+    3. 对每个 observer 探测 ``getattr(observer, 'flush', None)`` 并 await，同样 contained。
     """
 
     def __init__(self, session_id: str, header: SessionHeader | None = None) -> None:
@@ -98,6 +108,7 @@ class Session(SessionProtocol):
         self._header = header
         self._log: list[SessionEvent] = []
         self._observers: list[SessionObserver] = []
+        self._flush_listeners: list[FlushListener] = []
         self._appending = False
         self._events_snapshot: tuple[SessionEvent, ...] | None = None
         self._header_fold: EpochHeader | None = None
@@ -107,6 +118,11 @@ class Session(SessionProtocol):
     def event_count(self) -> int:
         """当前 in-memory log 长度(= next seq)。"""
         return len(self._log)
+
+    @property
+    def flush_listener_count(self) -> int:
+        """当前注册的显式 flush listener 数量（不含 observer-duck-typed flush）。"""
+        return len(self._flush_listeners)
 
     @property
     def header(self) -> SessionHeader:
@@ -160,6 +176,84 @@ class Session(SessionProtocol):
             return event
         finally:
             self._appending = False
+
+    async def flush(self) -> list[FlushResult]:
+        """await 全部 durability listener + observer-duck-typed flush（contained）。
+
+        顺序：先跑 ``_flush_listeners``，再对每个 ``_observers`` 探测 duck-type
+        ``flush`` 方法。单个 listener 抛错被 contained（记 ``FlushResult.ok=False`` +
+        结构化日志），不打断其余 listener。返回结果按调用顺序排列。
+        """
+        results: list[FlushResult] = []
+        event_count = len(self._log)
+
+        # 快照后遍历：flush 期间新注册的 listener 不收本次调用。
+        for listener in tuple(self._flush_listeners):
+            results.append(await self._invoke_flush_listener(listener, event_count))
+
+        for observer in tuple(self._observers):
+            flush_fn = getattr(observer, "flush", None)
+            if flush_fn is None or not callable(flush_fn):
+                continue
+            try:
+                maybe_coro = flush_fn(self)
+                # duck-type observer.flush 若是 async，await 它；同步则直接忽略返回值。
+                if hasattr(maybe_coro, "__await__"):
+                    await maybe_coro
+                results.append(
+                    FlushResult(
+                        listener=observer,  # type: ignore[arg-type]
+                        ok=True,
+                        event_count=event_count,
+                    )
+                )
+            except Exception as exc:
+                _log.warning(
+                    "session.observer_flush.failed",
+                    session_id=self.id,
+                    event_count=event_count,
+                    exc_info=True,
+                )
+                results.append(
+                    FlushResult(
+                        listener=observer,  # type: ignore[arg-type]
+                        ok=False,
+                        event_count=event_count,
+                        error=exc,
+                    )
+                )
+
+        return results
+
+    async def _invoke_flush_listener(
+        self, listener: FlushListener, event_count: int
+    ) -> FlushResult:
+        """await 单个显式 flush listener，失败 contained 并记录结构化日志。"""
+        try:
+            await listener.flush(self)
+            return FlushResult(listener=listener, ok=True, event_count=event_count)
+        except Exception as exc:
+            _log.warning(
+                "session.flush_listener.failed",
+                session_id=self.id,
+                event_count=event_count,
+                exc_info=True,
+            )
+            return FlushResult(listener=listener, ok=False, event_count=event_count, error=exc)
+
+    def register_flush_listener(self, listener: FlushListener) -> Callable[[], None]:
+        """注册显式 flush durability listener；返回幂等取消函数。
+
+        时序：只对后续 ``flush()`` 调用生效；取消后下次 flush 不再调用该
+        listener；幂等取消：重复取消静默通过。
+        """
+        self._flush_listeners.append(listener)
+
+        def cancel() -> None:
+            with contextlib.suppress(ValueError):
+                self._flush_listeners.remove(listener)
+
+        return cancel
 
     def snapshot_events(
         self, from_seq: int = 0, to_seq_exclusive: int | None = None

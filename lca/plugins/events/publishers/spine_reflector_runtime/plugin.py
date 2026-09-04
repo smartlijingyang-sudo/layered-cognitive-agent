@@ -1,6 +1,6 @@
 """spine_reflector_runtime plugin（ADR-0181 PR-3 / ADR-0183 PR-7）。
 
-Runtime envelope emits 下沉到 EventBus.publish：
+Runtime envelope emits via publish_via_session：
 - exception.finally / lifecycle.finally
 - runtime.reducer.apply（start + end）/ checkpoint.create /
   resume.start / resume.end / event_publisher.publish / runtime.observed
@@ -10,7 +10,7 @@ Runtime envelope emits 下沉到 EventBus.publish：
 ``lca.infrastructure.observability.spine.exception_emit``.
 
 业务方一行调：
-    EventBus.default().publish(
+    publish_via_session(
         SpineEventPayload(execution_point="...", channel="...", payload={...}),
         producer=ReflectorClass,
     )
@@ -36,7 +36,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca_kernel.events.bus import EventBus
+from lca.plugins.events.publishers._session_publish import publish_via_session
 from lca_kernel.events.payloads import Category, SpineEventPayload
 from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
 
@@ -53,7 +53,7 @@ def _send(
     channel: str,
     payload: dict[str, Any],
 ) -> Any:
-    """内部 helper：构造 SpineEventPayload + EventBus.publish。
+    """内部 helper：构造 SpineEventPayload + publish_via_session（PR-3d）。
 
     category 由 execution_point 通过 _SPINE_EP_TO_CATEGORY 派生。
     outcome（旧 reflector EventRecord.outcome）写进 payload，保留旧 API。
@@ -65,7 +65,7 @@ def _send(
         channel=channel,
         payload=payload,
     )
-    return EventBus.default().publish(sp, producer=ReflectorClass)
+    return publish_via_session(sp, producer=ReflectorClass)
 
 
 # ADR-2026-09-02-i17-traceback §D5: runtime reflector 需要 thread

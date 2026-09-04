@@ -65,10 +65,10 @@ class ProcessJournalProjection(Protocol):
 class RunJournalComponents:
     """Run-scoped writer and live tail created as one coherent unit.
 
-    ADR-0167 D11 简化: 移除 ``lifecycle_store`` 注入。journal.json 由
-    ``StepTreeAccumulatorDeriver`` 落盘(transport 在 prepare 时
-    构造 + subscribe)。``step_tree_writer`` 现在是 ``_StepTreeBundle``
-    引用, 由 RunSessionBuilder 装配 deriver 后再填回。
+    ADR-0167 D11 / ADR-0186 PR-3g: 移除 ``lifecycle_store`` 注入。journal.json 由
+    ``StepTreeFoldDeriver`` 落盘(transport 在 prepare 时装配 fold deriver)。
+    ``step_tree_writer`` 是 ``_StepTreeBundle`` 引用,由 RunSessionBuilder
+    装配 deriver 后再填回。
     """
 
     writer: JournalProjector

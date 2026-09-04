@@ -79,7 +79,10 @@ class ModelVisiblePublisher:
 
 @plugin(
     id="events.model_visible.publisher",
-    provides=["event.bus.publisher.model_visible"],
+    provides=[
+        "event.bus.publisher.model_visible",
+        "llm.adapter.hook.model_visible",
+    ],
     requires=["event.bus"],
     layer="L2",
     kind=PluginKind.PROVIDER,

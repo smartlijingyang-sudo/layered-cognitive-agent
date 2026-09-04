@@ -2,6 +2,17 @@
 
 Status: proposed
 
+## Progress (2026-09-04)
+
+| 项 | 状态 | 证据 |
+|---|---|---|
+| `lca_kernel/events/session.py` 契约面 | 落地 | `SessionProtocol` / `SessionObserver` / `SessionEvent` / `SessionHeader` / `SessionReentryError` 已声明；`tests/lca_kernel/events/test_session_contract.py` 覆盖 |
+| `lca_kernel/events/fold.py` 纯函数 | 落地 | 无 I/O / 无 `print` / 无 `logging` / 无 `datetime`；`canonicalHeader` / `headerEquals` / `foldRequestHeader` / `_sameSchema` 实现完成 |
+| `lca_kernel/events/persistence.py` Observer 化 | 部分 | `PersistenceObserver` 类实现 `EnvelopeDeliveryObserver` 协议（`(payload, ref)` 入参，非 DSH `(session, event)` 形态）；后台 `_consume_loop` 仍拉 `DeliveryQueue`（queue worker 残留）|
+| `PersistenceWorker = PersistenceObserver` 别名 | 收口未完 | `lca_kernel/events/bus.py` flush 路径、`event_spine.py` / `_spine_port.py` async 路径、`query_endpoints.py` / `events_delivery.py` 观测面仍引用 `PersistenceWorker` 字面量 |
+| `deriver` fold 切流 | 未做 | `lca/infrastructure/observability/spine/derivers/live_tail.py` 仍暴露 `subscribe` 透传 |
+| `tests/architecture/test_session_ssot_invariants.py` | 骨架在位 | I-SESSION-1/2/3 通过；I-SESSION-4/5 xfail(strict=False)，xfail reason 写明翻正 PR |
+
 ## Problem
 
 LCA 事件链路把 durable 文件链当作唯一真值，却缺少 DSH 式的有状态 Session：`EventBus` 是无状态 dispatch，`PersistenceWorker` / `SpineSink` 挂在总线内部，deriver 仍大量订阅 `EventSpine` in-memory callback。结果是：

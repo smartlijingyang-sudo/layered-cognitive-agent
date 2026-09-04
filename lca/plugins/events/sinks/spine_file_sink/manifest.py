@@ -82,8 +82,8 @@ async def setup(ctx: PluginContext, config: _Config) -> None:
     if not isinstance(bus_obj, EventBus):
         msg = "event.sink.spine_file boot 失败：event.bus 未装载"
         raise RuntimeError(msg)
-    # COMPAT(delete-when: PR-3 cursor 完全迁 EventBus.publish_async,所有 spine category
-    # 经 _dispatch_sinks 统一落盘后;tracking: ADR-0184 PR-2;45 天窗口)
+    # COMPAT(delete-when: 所有 spine category 经 _dispatch_sinks 统一落盘后;
+    # tracking: ADR-0184 PR-2;45 天窗口)
     bus_obj.mount_sink(
         sink_id="lca.events.sink.spine_file",
         backend=sink,

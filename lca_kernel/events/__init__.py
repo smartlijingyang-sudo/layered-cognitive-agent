@@ -4,7 +4,6 @@
 - :class:`EnvelopeBus` —— ADR-0184 PR-1 统一入口(主)
 - :class:`EventBus` —— EnvelopeBus 兼容 shim(30 天窗口)
 - :class:`EnvelopeRef` / :class:`EventRef` —— publish 返回值
-- :class:`DeliveryQueue` / :class:`NotificationBus` —— 投递拆分件
 - :class:`Category` / :class:`Plane` / :class:`EventPayload` —— 协议类型
   （实际定义在 :mod:`lca.contracts.event`，本模块 re-export）
 
@@ -43,7 +42,6 @@ from lca_kernel.events.fold import (
     foldRequestHeader,
     headerEquals,
 )
-from lca_kernel.events.notification import NotificationBus
 from lca_kernel.events.persistence import (
     FsyncPolicy,
     PersistenceFlushTimeout,
@@ -51,7 +49,6 @@ from lca_kernel.events.persistence import (
     PersistenceObserver,
     PersistenceWorker,
 )
-from lca_kernel.events.queue import DeliveryQueue, DeliveryQueueFull
 from lca_kernel.events.session import (
     SESSION_FORMAT_VERSION,
     SessionEvent,
@@ -71,8 +68,6 @@ __all__ = [
     "ConsumerHandle",
     "ConsumerResult",
     "DeliveryPolicy",
-    "DeliveryQueue",
-    "DeliveryQueueFull",
     "EnvelopeBus",
     "EnvelopeRef",
     "EpochHeader",
@@ -80,7 +75,6 @@ __all__ = [
     "EventPayload",
     "EventRef",
     "FsyncPolicy",
-    "NotificationBus",
     "PersistenceFlushTimeout",
     "PersistenceHealthSnapshot",
     "PersistenceObserver",

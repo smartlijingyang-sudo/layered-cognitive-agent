@@ -51,7 +51,7 @@ def _reset_session_contextvars(session: Any) -> None:
 
 
 class _StubSpine:
-    """EventSpine stub —— 仅暴露 ``subscribe``(builder 调 step_tree_deriver 用)。"""
+    """EventSpine stub —— cursor 经 WritePort 写 spine;step_tree 不 subscribe。"""
 
     def __init__(self) -> None:
         self.subscribers: list[Any] = []
@@ -134,7 +134,7 @@ class _Context:
         self._services["observability.close_barrier"] = NamedRegistry()
         self._services["observability.persistence"] = NamedRegistry()
         self._services["observability.loop_cursor"].register(
-            "standard", LoopCursorFactory
+            "standard", LoopCursorFactory.from_profile
         )
         self._services["observability.projection_host"].register(
             "standard", lambda initial=None, **_: StdProjectionHost(initial=initial)
@@ -332,6 +332,68 @@ def test_builder_capture_comes_from_runtime(tmp_path: Path) -> None:
         # ContextVar 已 install —— get_current_model_visible_capture 必须返回同一实例
         bound = get_current_model_visible_capture()
         assert bound is capture
+    finally:
+        _reset_session_contextvars(session)
+
+
+def test_builder_step_tree_uses_fold_deriver_not_subscribe(tmp_path: Path) -> None:
+    """生产 step_tree 走 StepTreeFoldDeriver;builder 不 EventSpine.subscribe。
+
+    flush 从 spine.jsonl fold 出 journal.json,outcome 由 flush 传入。
+    """
+    import json
+
+    from lca.infrastructure.observability.backends.run_locator_fs import (
+        FilesystemRunLocator,
+    )
+    from lca.plugins.session.derivers.step_tree import StepTreeFoldDeriver
+
+    locator = FilesystemRunLocator(root=tmp_path)
+    registry = RunRegistry(locator=locator)
+    ctx = _build_ctx()
+    spine = ctx._services["event_spine"]
+
+    session = create_run_session(
+        registry,
+        question="hello",
+        user_text="hi",
+        ctx=ctx,  # type: ignore[arg-type]
+    )
+    try:
+        assert isinstance(session.thread_tree_writer, StepTreeFoldDeriver)
+        assert spine.subscribers == [], (
+            "I-SESSION-5: builder must not EventSpine.subscribe step_tree"
+        )
+        spine_path = session.spine_path
+        spine_path.parent.mkdir(parents=True, exist_ok=True)
+        events = [
+            {
+                "execution_point": "writable.step.start",
+                "payload": {"phase": "think"},
+                "outcome": None,
+                "when": "2026-09-01T12:00:00+00:00",
+            },
+            {
+                "execution_point": "writable.step.end",
+                "payload": {},
+                "outcome": "success",
+                "when": "2026-09-01T12:00:01+00:00",
+            },
+        ]
+        spine_path.write_text(
+            "".join(json.dumps(event) + "\n" for event in events),
+            encoding="utf-8",
+        )
+        session.thread_tree_writer.flush(outcome="completed")
+        journal_path = locator.journal_step_path(session.run_id)
+        assert journal_path.exists(), "fold flush must write journal.json"
+        doc = session.thread_tree_writer.document
+        assert doc is not None
+        assert doc.schema == "lca.journal/3.1"
+        assert doc.metadata.outcome == "completed"
+        assert doc.metadata.objective == "hi"
+        assert doc.totals is not None
+        assert doc.totals.steps == 1
     finally:
         _reset_session_contextvars(session)
 

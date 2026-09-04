@@ -1,6 +1,13 @@
 # COMPAT(delete-when: PR-9, tracking: ADR-0181)
 # 旧 EventSpine deriver；PR-8 shim 走 events/subscribers/spine_* 包装；
 # 本模块保留至 PR-9 旧 spine 全退役（rg "lca.plugins.observability.spine.derivers" lca/ = 0 触发）。
+#
+# COMPAT(delete-when: ADR-0186 PR-3g SSE 投影迁 Session observer,
+#        tracking: ADR-0186 PR-3g)
+# live_tail 是唯一仍需要实时 on_event → ring buffer 的 deriver:SSE
+# 消费者依赖 LiveTail.subscribe 的 register-first-replay-then-live 语义。
+# PR-3g 收口时改为 Session observer 直接推送 StampedEvent,ring buffer
+# 不再需要 EventSpine.subscribe 桥接。当前保留 subscribe 通路不破坏 SSE。
 
 """LiveTailDeriver — wraps ``LiveTail`` as a spine deriver (Task 2.2).
 
@@ -75,7 +82,13 @@ class LiveTailDeriver(Deriver):
 
     # ── pass-through convenience for boot wiring ──
     def subscribe(self, *args: object, **kwargs: object):
-        """Pass through to the wrapped tail's subscribe."""
+        """Pass through to the wrapped tail's subscribe.
+
+        COMPAT(delete-when: ADR-0186 PR-3g SSE 投影迁 Session observer,
+               tracking: ADR-0186 PR-3g)
+        SSE 消费者经本方法拿到 LiveTail 的 register-replay-live 迭代器。
+        PR-3g 收口后 Session observer 直接推送,本方法随 LiveTailDeriver 整体删除。
+        """
         return self._tail.subscribe(*args, **kwargs)
 
     def close(self) -> None:

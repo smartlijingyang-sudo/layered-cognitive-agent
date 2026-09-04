@@ -8,6 +8,8 @@ import pytest
 
 from lca_kernel.events.session import (
     SESSION_FORMAT_VERSION,
+    FlushListener,
+    FlushResult,
     SessionEvent,
     SessionHeader,
     SessionObserver,
@@ -52,3 +54,26 @@ def test_session_protocol_structural_via_runtime() -> None:
 
     s = Session(session_id="s-test")
     assert isinstance(s, SessionProtocol)
+
+
+def test_flush_listener_protocol_structural() -> None:
+    class Listener:
+        async def flush(self, session: Any) -> None:
+            return None
+
+    assert isinstance(Listener(), FlushListener)
+
+
+def test_flush_result_frozen_and_fields() -> None:
+    listener: Any = object()
+    r = FlushResult(listener=listener, ok=True, event_count=5)
+    assert r.ok is True
+    assert r.event_count == 5
+    assert r.error is None
+    with pytest.raises(Exception):
+        r.ok = False  # type: ignore[misc]
+
+    err = RuntimeError("x")
+    r2 = FlushResult(listener=listener, ok=False, event_count=3, error=err)
+    assert r2.ok is False
+    assert r2.error is err

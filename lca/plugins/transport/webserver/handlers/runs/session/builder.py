@@ -1,10 +1,10 @@
 """Build one coherent legacy RunSession from request and runtime bindings.
 
-ADR-0068 §决策二 + ADR-0167 D11:
-    - 不再注入 ``StepLifecycleStore``;改构造 ``StepCoordinator``。
-    - deriver (StepTreeAccumulator / Narrative / Graph) 由 transport
-      在 ``RunSessionBuilder.build`` 阶段构造并 subscribe 到 spine。
-    - journal.json 落盘由 StepTreeAccumulatorDeriver.flush() 触发。
+ADR-0068 §决策二 + ADR-0167 D11 + ADR-0186 PR-3g:
+    - 构造 ``StepCoordinator``。
+    - step_tree 由 transport 在 ``RunSessionBuilder.build`` 装配
+      ``StepTreeFoldDeriver``;flush 时从 Session 快照或 SpineReader fold。
+    - journal.json 落盘由 StepTreeFoldDeriver.flush() 触发。
     - narrative.md 落盘由 NarrativeDeriver.write() 触发。
     - phase_graph.dot 落盘由 GraphDeriver.flush() 触发。
     - ``session.plan_ref`` 是 CompiledRunPlan 的 16-hex 稳定 ID(declarative
@@ -20,6 +20,7 @@ import hashlib
 import logging
 import time
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Any, cast
 
 from lca.contracts.atoms.ids import new_id
@@ -37,14 +38,16 @@ from lca.infrastructure.observability.loop_cursor.bind import (
 from lca.infrastructure.observability.loop_cursor.persistence_coordinator import (
     NullPersistenceCoordinator,
 )
-from lca.infrastructure.observability.spine.derivers.step_tree_accumulator import (
-    StepTreeAccumulatorDeriver,
-)
 from lca.infrastructure.observability.writable_matrix.registry import (
     WritableFaceRegistry,
 )
+from lca.plugins.session.derivers.step_tree import StepTreeFoldDeriver
 from lca.plugins.transport.webserver.handlers.runs.observability.binding import assemble_run_hub
 from lca.plugins.transport.webserver.handlers.runs.observability.identity import default_agent_ref
+from lca.plugins.transport.webserver.handlers.runs.session.event_session import (
+    bind_run_event_session,
+    unbind_run_event_session,
+)
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunSession
 from lca.plugins.transport.webserver.handlers.runs.session.setup_types import RunSessionRequest
 from lca.runtime.journal_setup import BuildJournalMetadata, build_step_coordinator
@@ -99,9 +102,9 @@ class RunSessionBuilder:
     def build(self, request: RunSessionRequest) -> RunSession:
         """Build a journal-enabled session without publishing it to the registry.
 
-        ADR-0167 D11: 在 builder 阶段构造 ``StepCoordinator`` + 装配
-        per-run derivers。 derivers 必须 subscribe 到 ``event_spine``
-        才能累积 events → journal.json / narrative.md / phase_graph.dot。
+        ADR-0167 D11 / ADR-0186 PR-3g: 在 builder 阶段构造 ``StepCoordinator``
+        + 装配 per-run ``StepTreeFoldDeriver``。flush 时从 Session 快照或
+        SpineReader fold → journal.json / narrative.md。
         """
         run_id = new_id("run")
         trace_id = new_id("trace")
@@ -158,6 +161,7 @@ class RunSessionBuilder:
         # ── 2) 取 spine / locator / deriver(必须在 1.5 cursor 之前) ──
         locator = self._registry.locator()
         run_dir = locator.run_dir(run_id) if locator is not None else None
+        spine_path = self._registry.spine_path_for(run_id)
 
         spine_core = require_capability(self._ctx, "event_spine")
         # duck-type: SpineCore 有 .event_spine; tests / stub 提供裸 EventSpine
@@ -167,8 +171,6 @@ class RunSessionBuilder:
         # 业务路径走 :meth:`ObservabilityRuntime.make_cursor` 派生 cursor
         # (不再手工 ``StdLoopCursor(...)``);capture 由 Runtime 持有;persistence
         # 缺省 fallback 到 NullPersistenceCoordinator(barrier 注入面不空)。
-        # 后续 PR(0170 deriver migration)再把 step_tree_deriver 从
-        # ``event_spine.subscribe`` 切到 ``host.register(LoopProjectionDefinition)``。
         spine_for_cursor = SpineWritePortAdapter(event_spine)
         # ``_ProfileProxy.plan_ref`` 之前误用 ``request.mode``(transport intent
         # 而非 plan identity),导致下游 ``loop_cursor`` 的 incarnation.plan_ref
@@ -196,84 +198,129 @@ class RunSessionBuilder:
         # 安装保持,测试场景下 capture.run_dir 落在 traces/runs/unknown 也不影响。
         capture_token = install_model_visible_capture(runtime.capture)
 
-        step_tree_deriver: StepTreeAccumulatorDeriver | None = None
-        if run_dir is not None:
-            # deriver.plan_ref 之前硬编码 ""(ADR-0068 §决策二 长期违约),
-            # 修复后从 session.plan_ref 拿,确保 journal.metadata.plan_ref
-            # 与 manifest.plan_ref 是同一个值。
-            step_tree_deriver = StepTreeAccumulatorDeriver(
+        # ADR-0186: bind Session before fold deriver so snapshot_events is available.
+        event_session = bind_run_event_session(self._ctx, run_id)
+        try:
+            agent_role = agent.name or agent.agent_id or ""
+            strategy_key = request.mode or "solo"
+            objective = request.user_text or ""
+            step_tree_deriver = _make_step_tree_deriver(
+                ctx=self._ctx,
                 run_id=run_id,
                 run_dir=run_dir,
-                agent_role=agent.name or agent.agent_id or "",
-                strategy_key=request.mode or "solo",
+                spine_path=spine_path,
+                agent_role=agent_role,
+                strategy_key=strategy_key,
                 plan_ref=plan_ref,
-                # objective 早先未传,deriver._objective 永远空字符串,
-                # journal.metadata.objective 渲染为 "(unobserved)"。
-                # 这里从已构造的 BuildJournalMetadata 取,保证两处一致。
-                objective=request.user_text or "",
-            )
-            event_spine.subscribe(step_tree_deriver.on_event)
-            log.debug(
-                "run_session_builder: subscribed step_tree deriver run=%s dir=%s",
-                run_id,
-                run_dir,
+                objective=objective,
             )
 
-        # ── 3) 注入 factory → 拿 LiveTail + 空 step_tree_writer ──
-        components = journal_factory.create_run_components(
-            spine_path=self._registry.spine_path_for(run_id),
-        )
+            # ── 3) 注入 factory → 拿 LiveTail + 空 step_tree_writer ──
+            components = journal_factory.create_run_components(
+                spine_path=spine_path,
+            )
 
-        # ── 4) 把 step_tree_deriver + narrative_writer 装到 bundle ──
-        bundle = components.step_tree_writer
-        # bundle 是 frozen dataclass (_StepTreeBundle); 字段替换
-        if bundle is not None and step_tree_deriver is not None:
-            from dataclasses import replace as _dc_replace
+            # ── 4) 把 step_tree_deriver + narrative_writer 装到 bundle ──
+            bundle = components.step_tree_writer
+            # bundle 是 frozen dataclass (_StepTreeBundle); 字段替换
+            if bundle is not None and step_tree_deriver is not None:
+                from dataclasses import replace as _dc_replace
 
-            components = components.__class__(
-                writer=components.writer,
+                components = components.__class__(
+                    writer=components.writer,
+                    tail=components.tail,
+                    step_tree_writer=_dc_replace(
+                        bundle,
+                        deriver=step_tree_deriver,
+                    ),
+                )
+
+            # ── 5) assemble hub ──
+            hub = assemble_run_hub(
+                jsonl_writer=components.writer,
                 tail=components.tail,
-                step_tree_writer=_dc_replace(
-                    bundle,
-                    deriver=step_tree_deriver,
-                ),
+                ctx=self._ctx,
+                extra_projectors=(self._registry.bind_process_journal(journal_factory),),
             )
 
-        # ── 5) assemble hub ──
-        hub = assemble_run_hub(
-            jsonl_writer=components.writer,
-            tail=components.tail,
-            ctx=self._ctx,
-            extra_projectors=(self._registry.bind_process_journal(journal_factory),),
-        )
+            return RunSession(
+                run_id=run_id,
+                trace_id=trace_id,
+                spine_path=spine_path,
+                tail=components.tail,
+                hub=hub,
+                thread_tree_writer=step_tree_deriver,
+                step_tree_bundle=components.step_tree_writer,
+                coordinator=coordinator,
+                loop_cursor=cursor,
+                loop_cursor_token=cursor_token,
+                model_visible_capture=runtime.capture,
+                model_visible_capture_token=capture_token,
+                question=request.question,
+                user_text=request.user_text,
+                mode=request.mode,
+                plan_ref=plan_ref,
+                prior_turns=tuple(request.prior_turns),
+                attachment_ids=cleaned_attachment_ids,
+                agent=agent,
+                device_id=request.device_id.strip(),
+                plane=request.plane.strip(),
+                extra_plane=request.extra_plane.strip(),
+                execution_target=request.execution_target.strip(),
+                started_at=started_at,
+                locator=locator,
+                event_session=event_session,
+            )
+        except BaseException:
+            unbind_run_event_session(event_session)
+            raise
 
-        return RunSession(
-            run_id=run_id,
-            trace_id=trace_id,
-            spine_path=self._registry.spine_path_for(run_id),
-            tail=components.tail,
-            hub=hub,
-            thread_tree_writer=step_tree_deriver,
-            step_tree_bundle=components.step_tree_writer,
-            coordinator=coordinator,
-            loop_cursor=cursor,
-            loop_cursor_token=cursor_token,
-            model_visible_capture=runtime.capture,
-            model_visible_capture_token=capture_token,
-            question=request.question,
-            user_text=request.user_text,
-            mode=request.mode,
-            plan_ref=plan_ref,
-            prior_turns=tuple(request.prior_turns),
-            attachment_ids=cleaned_attachment_ids,
-            agent=agent,
-            device_id=request.device_id.strip(),
-            plane=request.plane.strip(),
-            extra_plane=request.extra_plane.strip(),
-            execution_target=request.execution_target.strip(),
-            started_at=started_at,
-            locator=locator,
-        )
+
+def _lookup_event_session(ctx: Any, run_id: str) -> Any | None:
+    """Return the in-process Session for ``run_id`` when ``session.store`` is wired."""
+    try:
+        store = require_capability(ctx, "session.store")
+    except MissingCapabilityError:
+        return None
+    getter = getattr(store, "get", None)
+    if not callable(getter):
+        return None
+    session = getter(run_id)
+    if session is None or not callable(getattr(session, "snapshot_events", None)):
+        return None
+    return session
+
+
+def _make_step_tree_deriver(
+    *,
+    ctx: Any,
+    run_id: str,
+    run_dir: Path | None,
+    spine_path: Path,
+    agent_role: str,
+    strategy_key: str,
+    plan_ref: str,
+    objective: str,
+) -> StepTreeFoldDeriver | None:
+    """Assemble the production fold deriver. ``run_dir is None`` → skip journal.json."""
+    if run_dir is None:
+        return None
+    deriver = StepTreeFoldDeriver(
+        run_id=run_id,
+        run_dir=run_dir,
+        spine_path=spine_path,
+        session=_lookup_event_session(ctx, run_id),
+        agent_role=agent_role,
+        strategy_key=strategy_key,
+        plan_ref=plan_ref,
+        objective=objective,
+    )
+    log.debug(
+        "run_session_builder: fold step_tree deriver run=%s dir=%s",
+        run_id,
+        run_dir,
+    )
+    return deriver
 
 
 def _clean_attachment_ids(values: Sequence[str]) -> tuple[str, ...]:

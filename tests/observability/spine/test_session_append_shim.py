@@ -2,10 +2,13 @@
 
 骨架期无真实 Session runtime;转发缝由桩钩子钉死:
 
-- 钩子已绑定:``append_via_session`` 转发写入,钩子返回的 record 原样回传,
-  同步直写路径不触发(不触 sink、不通知 subscribers);
+- 钩子已绑定:``append_via_session`` / ``append`` 均转发写入,钩子返回的
+  record 原样回传,同步直写路径不触发(不触 sink、不通知 subscribers);
 - 钩子未绑定 / 转发抛错:落回原同步直写路径,落盘与 subscriber 语义与
   :meth:`EventSpine.append` 一致。
+
+ADR-0186 PR-3h 起 ``spine_port_append`` 自动读取 ContextVar,``EventSpine.append``
+与 ``append_via_session`` 行为等价(均优先 Session)。
 """
 
 from __future__ import annotations
@@ -136,3 +139,62 @@ def test_append_via_session_falls_back_to_sync_path(tmp_path: Path, hook_kind: s
     obj = json.loads(lines[0])
     assert obj["execution_point"] == "brain.think.start"
     assert obj["payload"] == {"via": "fallback"}
+
+
+# ── ADR-0186 PR-3h: EventSpine.append 自动优先 Session ────────────────────
+
+
+def test_append_prefers_session_hook_when_bound(tmp_path: Path) -> None:
+    """ADR-0186 PR-3h: ``EventSpine.append`` 在钩子绑定时自动走 Session 路径。
+
+    ``spine_port_append`` 自动读取 ContextVar,调用方无需显式传 hook。
+    """
+    SpineContext.set_run("r-append-prefers-session")
+    sink = FileSink(tmp_path, run_id="r-append-prefers-session")
+    seen: list[EventRecord] = []
+    spine = EventSpine(sinks=[sink], subscribers=[seen.append])
+    hook = _ForwardRecorder()
+    token = bind_session_append_hook(hook)
+    try:
+        rec = spine.append(
+            execution_point="brain.think.start",
+            channel="fact",
+            caller_payload={"via": "append-session"},
+        )
+    finally:
+        reset_session_append_hook(token)
+        spine.close()
+
+    assert len(hook.calls) == 1
+    assert hook.calls[0]["execution_point"] == "brain.think.start"
+    assert hook.calls[0]["caller_payload"] == {"via": "append-session"}
+    # 钩子返回值原样回传;同步路径未触 sink / subscribers
+    assert rec.payload == {"via": "session-stub"}
+    assert seen == []
+    ledger = tmp_path / "r-append-prefers-session.spine.jsonl"
+    assert ledger.read_text(encoding="utf-8") == ""
+
+
+def test_append_falls_back_when_no_hook(tmp_path: Path) -> None:
+    """ADR-0186 PR-3h: 无钩子绑定时 ``EventSpine.append`` 走同步直写路径(行为不变)。"""
+    SpineContext.set_run("r-append-no-hook")
+    sink = FileSink(tmp_path, run_id="r-append-no-hook")
+    seen: list[EventRecord] = []
+    spine = EventSpine(sinks=[sink], subscribers=[seen.append])
+    try:
+        rec = spine.append(
+            execution_point="brain.think.start",
+            channel="fact",
+            caller_payload={"via": "sync-path"},
+        )
+    finally:
+        spine.close()
+
+    assert rec.run_id == "r-append-no-hook"
+    assert rec.sequence >= 1
+    assert len(seen) == 1
+    lines = (tmp_path / "r-append-no-hook.spine.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    obj = json.loads(lines[0])
+    assert obj["execution_point"] == "brain.think.start"
+    assert obj["payload"] == {"via": "sync-path"}

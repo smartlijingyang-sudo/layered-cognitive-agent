@@ -2,12 +2,12 @@
 
 PR-3：body + llm 全部 9 emit（tool.execute.start/end + retry + sandbox.enter/exit
 + decision.start/end + llm.call.start/end + llm.stream.token + llm.stream.stall）
-下沉到 EventBus.publish；signature 严格对齐旧
+via publish_via_session；signature 严格对齐旧
 lca/plugins/observability/spine/reflectors/body_llm.py 调用方零改动（仅
 import 路径换到 lca.plugins.events.publishers.spine_reflector_body_llm）。
 
 业务方一行调：
-    EventBus.default().publish(
+    publish_via_session(
         SpineEventPayload(execution_point="...", channel="...", payload={...}),
         producer=ReflectorClass,
     )
@@ -33,6 +33,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.events.publishers._session_publish import publish_via_session
 from lca_kernel.events.payloads import Category, SpineEventPayload
 from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
 
@@ -56,18 +57,11 @@ def _send(
     channel: str,
     payload: dict[str, Any],
 ) -> EventRef:
-    """内部 helper：构造 SpineEventPayload + EventBus.publish。
+    """内部 helper：构造 SpineEventPayload + publish_via_session（PR-3d）。
 
     category 由 execution_point 通过 _SPINE_EP_TO_CATEGORY 派生。
     outcome（旧 reflector EventRecord.outcome）写进 payload，保留旧 API。
-
-    注：EventBus import 走函数内 lazy，避免 lca_kernel.events 顶层
-    被 lca.infrastructure.observability 启动时倒灌触发 circular import
-    （lca_kernel.boot → lca.harness.observability → adapters →
-    spine_reflector_body_llm）。
     """
-    from lca_kernel.events.bus import EventBus
-
     cat_str = _SPINE_EP_TO_CATEGORY[execution_point]
     sp = SpineEventPayload(
         category=Category(cat_str),
@@ -75,7 +69,7 @@ def _send(
         channel=channel,
         payload=payload,
     )
-    return EventBus.default().publish(sp, producer=ReflectorClass)
+    return publish_via_session(sp, producer=ReflectorClass)
 
 
 # ── body.tool.execute.start / end（invocation 层，ADR-0166 S2）───────────
@@ -383,7 +377,6 @@ __all__ = [
             "spine.llm.call.end",
             "spine.llm.stream.token",
             "spine.llm.stream.stall",
-            "spine.llm.request.header",
         ),
         state_mutation="forbidden",
     ),

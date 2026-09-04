@@ -1,8 +1,8 @@
 """Run ledger and journal factory seam —— ADR-0065 L9 + ADR-0167 D11。
 
-ADR-0167 D11 简化: spine ledger 是 SSOT, journal.json 由
-:class:`StepTreeAccumulatorDeriver` 累积 events 后落盘,
-journal.narrative.md 由 :class:`NarrativeDeriver` 从同一 events
+ADR-0167 D11 / ADR-0186 PR-3g: spine ledger 是 SSOT, journal.json 由
+:class:`StepTreeFoldDeriver` 在 flush 时 fold 事件后落盘,
+journal.narrative.md 由 :class:`NarrativeDeriver` 从同一 document
 推导。
 
 职责: profile-selected factory 装配每个 run 的:
@@ -75,9 +75,9 @@ class FilesystemRunLedgerFactory(RunLedgerFactory, RunJournalFactory):
     ) -> RunJournalComponents:
         """Create the live tail for one resolved run path.
 
-        ADR-0167 D11: 删除 StepGroupedBackend 适配。journal.json 由
-        ``StepTreeAccumulatorDeriver``(已 subscribe 到 spine)落盘,
-        narrative.md 由 ``NarrativeDeriver`` 落盘。 factory 只提供
+        ADR-0167 D11 / ADR-0186 PR-3g: journal.json 由
+        ``StepTreeFoldDeriver`` 在 flush 时 fold Session 快照或 SpineReader
+        落盘,narrative.md 由 ``NarrativeDeriver`` 落盘。 factory 只提供
         LiveTail(SSE 投影)+ step_tree_writer bundle 引用。
         """
         from lca.infrastructure.observability.journal.step.narrative_writer import (
@@ -91,7 +91,7 @@ class FilesystemRunLedgerFactory(RunLedgerFactory, RunJournalFactory):
 
         # step_tree_writer 是 _StepTreeBundle 的 placeholder —— deriver 与
         # narrative_writer 由 transport 在 RunSessionBuilder.build 阶段
-        # 真正构造 + subscribe, 然后 session.step_tree_bundle 持有。
+        # 装配 fold deriver,然后 session.step_tree_bundle 持有。
         return RunJournalComponents(
             writer=LiveTail(),
             tail=LiveTail(),
@@ -113,7 +113,7 @@ class _StepTreeBundle:
     """ADR-0167 D11 简化: bundle 只持 deriver + narrative_writer。
 
     flush() 调用顺序(都 idempotent):
-      1. ``deriver.flush()`` —— 写 journal.json(累积 events → JournalDocument)
+      1. ``deriver.flush(outcome=...)`` —— fold 事件流 → 写 journal.json
       2. ``deriver.document`` —— 拿到 closed JournalDocument
       3. ``narrative_writer.write(document)`` —— 写 journal.narrative.md
 
@@ -121,14 +121,14 @@ class _StepTreeBundle:
     bundle.flush() 仅在 narrative_writer.write() 异常时抛。
     """
 
-    deriver: object | None  # StepTreeAccumulatorDeriver
+    deriver: object | None  # StepTreeFoldDeriver
     narrative_writer: object  # StepNarrativeWriter
 
     def flush(self, *, outcome: str = "stopped") -> None:
         """写 journal.json + narrative.md。"""
         if self.deriver is None:
             return
-        self.deriver.flush()
+        self.deriver.flush(outcome=outcome)
         document = getattr(self.deriver, "document", None)
         if document is not None and hasattr(self.narrative_writer, "write"):
             self.narrative_writer.write(document)

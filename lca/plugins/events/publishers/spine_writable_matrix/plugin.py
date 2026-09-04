@@ -27,6 +27,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.events.publishers._session_publish import publish_via_session
 from lca_kernel.events.payloads import Category, SpineEventPayload
 from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
 
@@ -51,8 +52,6 @@ class WritableMatrixPlugin:
         payload: dict[str, Any],
     ) -> EventRef:
         """cursor 一行 EventBus 入口（PR-10 旧 _spine.append 替身）。"""
-        from lca_kernel.events.bus import EventBus
-
         cat_str = _SPINE_EP_TO_CATEGORY.get(execution_point)
         if cat_str is None:
             raise ValueError(
@@ -65,7 +64,7 @@ class WritableMatrixPlugin:
             channel=channel,
             payload=payload,
         )
-        return EventBus.default().publish(sp, producer=WritableMatrixPlugin)
+        return publish_via_session(sp, producer=WritableMatrixPlugin)
 
 
 @plugin(

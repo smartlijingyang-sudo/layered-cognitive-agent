@@ -200,7 +200,6 @@ class TestIFwBus2:
         "lca/infrastructure/observability/spine/derivers/live_tail.py",  # self._tail.subscribe
         "lca/harness/agent/activation.py",  # store.subscribe (projection 订阅)
         "lca/plugins/transport/webserver/handlers/runs/terminal/registry_queries.py",  # session.tail.subscribe
-        "lca/plugins/transport/webserver/handlers/runs/session/builder.py",  # event_spine.subscribe
     )
 
     def test_i_fw_bus_2_subscribe_outside_framework_blocked(self) -> None:

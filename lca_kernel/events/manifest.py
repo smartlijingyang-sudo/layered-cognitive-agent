@@ -69,3 +69,7 @@ async def setup_bus(ctx: PluginContext, config: _BusConfig) -> None:
     ctx.provide("event.bus", bus)
     # 进程级单例：业务方无 ctx 也能调 EventBus.default()（ADR-0183 §3.1）。
     EventBus.set_default(bus)
+
+
+# Profile `$module` 解析要求模块级 ``setup`` 符号（见 resolve._resolve_plugins）。
+setup = setup_bus

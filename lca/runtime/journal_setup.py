@@ -60,8 +60,8 @@ def build_step_coordinator(
     返回的 coordinator 已绑定 run, 可以直接调 ``begin_step`` /
     ``record_*`` / ``end_step``。 spine ledger 落盘由
     :class:`RoutingFileSink` (registry 中 storage face) 负责。
-    journal.json 落盘由 :class:`StepTreeAccumulatorDeriver`
-    (subscribed to spine) 负责。
+    journal.json 落盘由 :class:`StepTreeFoldDeriver`
+    (flush 时 fold Session 快照或 SpineReader) 负责。
     """
     coord = StepCoordinator(registry=registry, run_id=run_id)
     coord.bind_run(

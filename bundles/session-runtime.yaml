@@ -1,14 +1,15 @@
-# bundles/session-runtime.yaml — Session runtime plugin（PR-3c 骨架）。
+# bundles/session-runtime.yaml — Session runtime plugin（ADR-0186 PR-3c）。
 #
 # DSH 风格 in-memory Session runtime：append-only 日志真值 +
 # observer contained fire + reentry 拒绝 + 增量 request_header fold。
 #
-# 骨架期约定：
-#   - 尚无任何 profile 引用本 bundle —— 后续 PR 把 session.store 接入
-#     run 路径时在此叠加引用；接入前本文件只完成 plugin id ↔ $module
-#     绑定（plugin-shape gate orphan 维度 + lca-ops inspect-tree 可见）。
-#   - 不接 PersistenceWorker / DeliveryQueue（ADR-0184 落盘链）；
-#     不发任何事件（与 16 个 publisher / EventSpine 正交）。
+# Profile 装配：profiles/web-standard.yaml 在 event-bus-components 之前
+# 引用本 bundle，使 session.store 在 event-bus plugin boot 前可用。
+# RunSessionBuilder 按 run_id create Session，绑定 publish/observe 槽位；
+# 缺 session.store 时 publishers 降级 EventBus。
+#
+# 持久化经 SessionObserver JsonlSessionPersistence（ADR-0186）；
+# 与 EventBus SpineFileSink 双轨时 profile 应择一写方。
 
 name: session-runtime
 description: |
@@ -19,3 +20,11 @@ entries:
     name: session_runtime
     $module: lca.plugins.session.runtime.plugin
     config: {}
+
+  - id: lca.plugins.session.persistence_jsonl
+    name: session_persistence_jsonl
+    $module: lca.plugins.session.persistence_jsonl.persistence_jsonl
+    config:
+      runs_root: traces/runs
+      fsync: false
+

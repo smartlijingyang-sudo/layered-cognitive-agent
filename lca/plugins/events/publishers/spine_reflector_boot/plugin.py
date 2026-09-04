@@ -28,6 +28,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.events.publishers._session_publish import publish_via_session
 
 log = logging.getLogger(__name__)
 
@@ -43,15 +44,13 @@ def _send(
     channel: str,
     payload: dict[str, Any],
 ) -> EventRef:
-    from lca_kernel.events.bus import EventBus
-
     sp = SpineEventPayload(
         category=Category(category),
         execution_point=execution_point,
         channel=channel,
         payload=payload,
     )
-    return EventBus.default().publish(sp, producer=ReflectorClass)
+    return publish_via_session(sp, producer=ReflectorClass)
 
 
 def emit_boot_profile_resolved(*, profile: str, plugins: int) -> EventRef:

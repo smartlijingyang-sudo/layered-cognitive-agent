@@ -12,6 +12,9 @@ SessionHeader / SessionEvent / observer 语义；实现在
 - ``SessionProtocol.request_header`` 的 fold 复用 :mod:`lca_kernel.events.fold`
   （ADR-0185 PR-0）；``SessionEvent`` 暴露只读 ``category`` / ``payload``
   投影满足 :func:`lca_kernel.events.fold.foldRequestHeader` 的入参形态。
+- flush 链路（ADR-0186）：``flush()`` 异步等待注册过的 durability listener，
+  同时对已注册的 append observer duck-type 探测 ``.flush(session)``；
+  单个 listener 失败 contained + 记入 :class:`FlushResult`，不中断其余 listener。
 
 失败语义：契约层不抛错；``SessionReentryError`` 由实现层在嵌套 append 时抛出。
 """
@@ -19,7 +22,7 @@ SessionHeader / SessionEvent / observer 语义；实现在
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
 from lca_kernel.events.fold import EpochHeader
@@ -95,9 +98,40 @@ class SessionObserver(Protocol):
 
     时序：事件已入日志后才被调用；单个观察者抛错被实现层 contained
     （记录后继续下一个），不改变 append 返回值，不阻止后续观察者。
+
+    Duck-type flush 探测（ADR-0186）：实现层 ``flush()`` 对注册的 observer
+    调用 ``getattr(observer, 'flush', None)``；若有且可调用，视为该 observer
+    自带 durability 回调，由 ``flush()`` 一并 await。
     """
 
     def __call__(self, session: SessionProtocol, event: SessionEvent) -> None: ...
+
+
+@runtime_checkable
+class FlushListener(Protocol):
+    """显式注册的 flush 回调：持久化 / 投递等 durability 副作用。
+
+    ``flush(session)`` 在 ``flush()`` 调用时被 await；单个 listener 抛错
+    被 contained，记入 :class:`FlushResult`，不中断其余 listener。
+    返回值的 ``event_count`` 由实现层统一填充，listener 自身只返回成功标记。
+    """
+
+    async def flush(self, session: SessionProtocol) -> None: ...
+
+
+@dataclass(frozen=True, slots=True)
+class FlushResult:
+    """单次 flush 调用的结果记录。
+
+    ``ok`` 标记该 listener 是否成功完成；``error`` 仅当 ``ok=False`` 时
+    持有异常对象；``event_count`` 是 flush 时刻 session 的日志长度
+    （给 listener 做幂等 / 断点判断）。
+    """
+
+    listener: FlushListener
+    ok: bool
+    event_count: int
+    error: BaseException | None = field(default=None, compare=False)
 
 
 @runtime_checkable
@@ -110,6 +144,8 @@ class SessionProtocol(Protocol):
     - ``append`` 在 observer fire 期间拒绝重入（抛 :class:`SessionReentryError`）。
     - ``request_header`` 是 ``foldRequestHeader(snapshot_events())`` 的增量
       等价形态：每条 header 事件只在首次见到时被 fold 一次。
+    - ``flush`` 异步等待全部 flush listener + observer-duck-typed flush，
+      单个失败 contained，返回每个 listener 的 :class:`FlushResult`。
     """
 
     @property
@@ -162,9 +198,30 @@ class SessionProtocol(Protocol):
         """注册 append 观察者；返回幂等取消函数。"""
         ...
 
+    async def flush(self) -> list[FlushResult]:
+        """await 全部 durability listener + observer-duck-typed flush。
+
+        调用顺序：先跑显式 ``register_flush_listener`` 注册的 listener，再对每个
+        ``observe`` 注册的 observer 探测 ``getattr(observer, 'flush', None)``
+        并按同样语义 await。单个 listener/observer flush 抛错被 contained：
+        记入 :class:`FlushResult.ok=False`，不打断其余 listener。
+        返回结果列表按调用顺序排列。
+        """
+        ...
+
+    def register_flush_listener(self, listener: FlushListener) -> Callable[[], None]:
+        """注册 flush durability listener；返回幂等取消函数。
+
+        时序：注册只对**后续** ``flush()`` 调用生效；取消后下次 flush 不再
+        调用该 listener，已在跑的 flush 不受影响。
+        """
+        ...
+
 
 __all__ = [
     "SESSION_FORMAT_VERSION",
+    "FlushListener",
+    "FlushResult",
     "SessionEvent",
     "SessionHeader",
     "SessionObserver",

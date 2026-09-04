@@ -38,6 +38,10 @@ from lca.plugins.transport.webserver.handlers.runs.observability.identity import
 from lca.plugins.transport.webserver.handlers.runs.observability.journal_projection_binding import (
     ProcessJournalBinding,
 )
+from lca.plugins.transport.webserver.handlers.runs.session.event_session import (
+    BoundRunEventSession,
+    unbind_run_event_session,
+)
 from lca.plugins.transport.webserver.handlers.runs.session.health import RunHealthProjection
 from lca.plugins.transport.webserver.handlers.runs.session.index import (
     DEFAULT_MAX_TERMINAL,
@@ -100,6 +104,7 @@ class RunSession:
     model_visible_capture_token: object | None = (
         None  # ADR-0169 PR-12.7: ContextVar reset token (close 时释放)
     )
+    event_session: BoundRunEventSession | None = None  # ADR-0186: per-run DSH Session 绑定
 
     _closed: bool = field(
         default=False,
@@ -108,13 +113,14 @@ class RunSession:
     )
 
     def close(self, reason: CloseReason) -> bool:
-        """释放 run-local ContextVar token,run 终止时由 terminalizer 调一次。
+        """释放 run-local ContextVar token 与 per-run Session 绑定。
 
         PR-1.5 / PR-12.5 builder 里 ``install_run_cursor`` 与
         ``install_model_visible_capture`` 配对操作。原本两者只 set token 不
         reset,在多 run 时 ContextVar 内部字典无限增长(单进程 leak)。
         是 PR-12.7 close hook 入口,被 :class:`RunTerminalizer.terminalize`
-        在 finalize 后调一次。
+        在 finalize 后调一次。ADR-0186:同时 reset publish/observe 槽位并
+        dispose SessionStore 条目。
 
         ADR-0169 D5/L10 + PR-12.7:reset 不可重复 — 调用后清字段,
         第二次调用返回 ``False`` 告知 terminalizer 「已 close」,防双 close 重入。
@@ -135,6 +141,10 @@ class RunSession:
             with contextlib.suppress(Exception):
                 reset_model_visible_capture(self.model_visible_capture_token)
             self.model_visible_capture_token = None
+        bound = getattr(self, "event_session", None)
+        with contextlib.suppress(Exception):
+            unbind_run_event_session(bound)
+        self.event_session = None
         self._closed = True
         return True
 

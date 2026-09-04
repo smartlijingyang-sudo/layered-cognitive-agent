@@ -1,22 +1,15 @@
-"""ADR-0184 PR-1:EnvelopeBus / DeliveryQueue / NotificationBus / EventBus compat shim 测试。
+"""ADR-0184 PR-1:EnvelopeBus / EventBus compat shim 测试。
 
 覆盖(plan §PR-1 验证清单):
 - test_envelope_bus_publish_returns_envelope_ref:EnvelopeBus.publish 返回 4 字段 EnvelopeRef
-- test_envelope_bus_queue_submit_and_depth:DeliveryQueue.submit 后 depth == 1
-- test_envelope_bus_dropped_queue_full_counter:max_size=1 第 2 条触发 DeliveryQueueFull + dropped
-- test_envelope_bus_notification_default_none_noop:默认未注入 notification;S4 为 no-op
-- test_envelope_bus_notification_subscribe_notify:显式注入后,订阅 + notify 同步触发 callback
 - test_event_bus_compat_shim_preserves_persisted_subscriber_count:EventBus.publish EventRef 6 字段
 - test_event_bus_compat_shim_no_regression_on_existing_wire:跑现 test_event_bus 全部 test,无回归
 """
 
 from __future__ import annotations
 
-import pytest
-
 from lca.contracts.event import Category, EventPayload
 from lca_kernel.events import (
-    DeliveryQueueFull,
     EnvelopeBus,
     EnvelopeRef,
     EventBus,
@@ -73,74 +66,7 @@ class TestEnvelopeBusPublish:
             assert isinstance(ref.subscriber_count, int)
 
 
-# ── 2:DeliveryQueue.submit + depth ──────────────────────────────────────
-
-
-class TestDeliveryQueue:
-    def test_envelope_bus_queue_submit_and_depth(self) -> None:
-        """入队一条后,DeliveryQueue.depth == 1。"""
-        bus = _make_envelope_bus()
-        # 触发一次 publish 让 EnvelopeBus 走完生命周期
-        pre_depth = bus.queue.depth
-        bus.publish(_authorized_payload(), producer=_authorized_producer())
-        post_depth = bus.queue.depth
-        # publish 后事件入队但本 PR 无 consumer → 留在队列
-        assert post_depth == pre_depth + 1
-
-    def test_envelope_bus_dropped_queue_full_counter(self) -> None:
-        """max_size=1 时,第 2 条入队 → DeliveryQueueFull + dropped += 1。"""
-        bus = _make_envelope_bus()
-        # 替换 queue 为 max_size=1,走 publish 一次先填满队列
-        from lca_kernel.events.queue import DeliveryQueue
-
-        bus._queue = DeliveryQueue(max_size=1)
-        # 第一条入队成功
-        bus.publish(_authorized_payload(), producer=_authorized_producer())
-        assert bus.queue.depth == 1
-        # 第二条入队触发 DeliveryQueueFull
-        with pytest.raises(DeliveryQueueFull):
-            bus.publish(_authorized_payload(), producer=_authorized_producer())
-        # dropped_queue_full 计数自增
-        assert bus.queue.dropped_queue_full == 1
-
-
-# ── 3:NotificationBus.subscribe + notify 同步形态(可选注入)──────────
-
-
-class TestNotificationBus:
-    def test_envelope_bus_notification_default_none_noop(self) -> None:
-        """默认构造不注入 NotificationBus;S4 notify 为 no-op,publish 正常返回。"""
-        bus = _make_envelope_bus()
-        assert bus.notification is None
-        # S4 no-op 不阻塞 publish,仍返回 4 字段 EnvelopeRef
-        ref = bus.publish(_authorized_payload(), producer=_authorized_producer())
-        assert isinstance(ref, EnvelopeRef)
-        assert ref.event_id and isinstance(ref.event_id, str)
-
-    def test_envelope_bus_notification_subscribe_notify(self) -> None:
-        """显式注入 NotificationBus 后,订阅 + notify 调 callback(同步形态)。"""
-        from lca_kernel.events.notification import NotificationBus
-
-        notification = NotificationBus()
-        bus = _make_envelope_bus()
-        bus._notification = notification  # 显式注入,走可选派发路径
-        seen: list[tuple[EnvelopeRef, EventPayload]] = []
-
-        def _cb(ref: EnvelopeRef, payload: EventPayload) -> None:
-            seen.append((ref, payload))
-
-        assert bus.notification is notification
-        bus.notification.subscribe(Category.TEAM_DELEGATION_CACHE_HIT, _cb)
-        assert bus.notification.observer_count(Category.TEAM_DELEGATION_CACHE_HIT) == 1
-        ref = bus.publish(_authorized_payload(), producer=_authorized_producer())
-        # publish → super().publish → S4 notify(注入态)→ callback
-        assert len(seen) == 1
-        cb_ref, cb_payload = seen[0]
-        assert cb_ref.event_id == ref.event_id
-        assert cb_payload.category == Category.TEAM_DELEGATION_CACHE_HIT
-
-
-# ── 4:EventBus 兼容 shim — EventRef 6 字段保留 ──────────────────────────
+# ── 3:EventBus 兼容 shim — EventRef 6 字段保留 ──────────────────────────
 
 
 class TestEventBusCompatShim:

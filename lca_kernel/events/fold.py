@@ -22,6 +22,10 @@
 3. **foldRequestHeader** — 单次走完事件流,保留最近一条 ``spine.llm.request.header``
    的 canonical 形态;``from_`` 续接上次 fold 结果,``step_id`` 限定 fold
    范围(对齐 ADR-0185 §3.4 dsh 对位)。
+4. **foldSurface** — 单次走完事件流,按 ``surfaceOp`` append / replace 重建
+   当前模型可见节点序列(ADR-0186 I-SESSION-2;对齐 dsh
+   ``packages/core/session/src/surface.ts`` ``foldSurface``)。词表是 LCA
+   spine / model-visible category,不是 dsh ``user/message`` 三件套。
 
 不动 production 行为:无 ``Bus.publish``、无 sink 写入、无 EventBus 内部状态;
 仅作为 viewer / explain / replay / debug-run 的离线重建函数。
@@ -35,7 +39,7 @@ from __future__ import annotations
 import json
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 REQUEST_HEADER_CATEGORY: str = "spine.llm.request.header"
 """fold 识别的事件 category 字符串。
@@ -451,18 +455,412 @@ def fold_step_tree(
     )
 
 
+# ── Surface fold(对齐 DSH foldSurface;ADR-0186 I-SESSION-2)────────────
+
+SURFACE_USER_TYPE: str = "spine.llm.request.header"
+"""模型可见 user / prompt 节点的 spine category。
+
+dsh ``user/message`` 的 LCA 对位:header payload 的 ``messages`` 是发给
+模型的原文序列,本 fold 只把该事件当作 surface 节点,不展开 messages。
+"""
+
+SURFACE_ASSISTANT_TYPE: str = "spine.llm.request.header.assistant"
+"""模型可见 assistant 产出节点的 spine category。
+
+dsh ``assistant/message`` 的 LCA 对位。允许 ``sourceEventSeqs=[]``
+(空 provider 流);其他 surface 类型在该字段出现时必须非空。
+"""
+
+SURFACE_TOOL_RESULT_TYPE: str = "spine.body.tool.execute.end"
+"""模型可见 tool 回执节点的 spine category。
+
+dsh ``tool/result`` 的 LCA 对位。replace 只能改 content 类字段
+(``outcome`` / ``content`` / ``result``,或 dsh ``message.content[0].content``),
+身份字段必须与被替换节点一致。
+"""
+
+SURFACE_EVENT_TYPES: frozenset[str] = frozenset(
+    {
+        SURFACE_USER_TYPE,
+        SURFACE_ASSISTANT_TYPE,
+        SURFACE_TOOL_RESULT_TYPE,
+    }
+)
+"""可进入模型可见 surface 的 category 闭集。
+
+词表映射(dsh → LCA spine):
+
+- ``user/message`` → ``spine.llm.request.header``
+- ``assistant/message`` → ``spine.llm.request.header.assistant``
+- ``tool/result`` → ``spine.body.tool.execute.end``
+
+只有这些类型可携带 ``surfaceOp`` / ``sourceEventSeqs``;其它 category
+(含 ``turn/start``、``spine.llm.call.*``、dsh 原名)出现这两字段即失败。
+"""
+
+_MISSING: object = object()
+"""事件信封缺省标记;与显式 ``None`` 区分(``surfaceOp: null`` 是非法值)。"""
+
+
+@dataclass(frozen=True, slots=True)
+class SurfaceReplaceOp:
+    """positional replace:用本节点替换 surface 上 ``start``..``end`` 闭区间。
+
+    ``start`` / ``end`` 是当前 surface 上已有节点的 seq,不是 log 下标。
+    ``start == end`` 替换单节点。precondition:两者都在 fold 当时的
+    ``nodes`` 里且 ``index(start) <= index(end)``。
+    """
+
+    op: Literal["replace"]
+    start: int
+    end: int
+
+
+SurfaceOp = Literal["append"] | SurfaceReplaceOp
+"""surface 进入方式:``append`` 接到尾部,或 :class:`SurfaceReplaceOp`。"""
+
+
+@dataclass(frozen=True, slots=True)
+class SurfaceFoldReplacement:
+    """fold 过程中观察到的一次 replace。
+
+    - ``seq`` — 替换节点自身的 log seq
+    - ``start`` / ``end`` — 声明的被替换区间(含端点)
+    - ``shadowed_seqs`` — 实际从 surface 摘掉的节点,surface 顺序
+    """
+
+    seq: int
+    start: int
+    end: int
+    shadowed_seqs: tuple[int, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class SurfaceFoldResult:
+    """``foldSurface`` 的完整结果。
+
+    - ``nodes`` — 当前模型可见 surface 的 seq,顺序即模型可见顺序
+    - ``replacements`` — 按事件顺序记录的 replace;空 tuple 表示从未替换
+    """
+
+    nodes: tuple[int, ...]
+    replacements: tuple[SurfaceFoldReplacement, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class _EventView:
+    """fold 内部统一信封;不对外暴露。"""
+
+    type: str
+    seq: object
+    data: Mapping[str, Any]
+    surface_op: object
+    source_event_seqs: object
+    has_surface_op: bool
+    has_source_event_seqs: bool
+
+
+def isSurfaceEligibleType(type_: str) -> bool:  # noqa: N802 (dsh parity)
+    """``type_`` 是否属于 :data:`SURFACE_EVENT_TYPES`。"""
+    return type_ in SURFACE_EVENT_TYPES
+
+
+def isSurfaceEvent(event: Any) -> bool:  # noqa: N802 (dsh parity)
+    """事件是否已带 surface 标记:类型合格且 ``surfaceOp`` 字段存在。"""
+    view = _parse_event(event)
+    return isSurfaceEligibleType(view.type) and view.has_surface_op
+
+
+def isAppendSurfaceEvent(event: Any) -> bool:  # noqa: N802 (dsh parity)
+    """surface 事件且 ``surfaceOp == 'append'``(本节点从未作为 replace 副本)。"""
+    if not isSurfaceEvent(event):
+        return False
+    return _parse_event(event).surface_op == "append"
+
+
+def isReplacementSurfaceEvent(event: Any) -> bool:  # noqa: N802 (dsh parity)
+    """surface 事件且 ``surfaceOp`` 不是 ``append``(replace 进入 surface)。"""
+    if not isSurfaceEvent(event):
+        return False
+    return _parse_event(event).surface_op != "append"
+
+
+def _field(event: Any, *names: str) -> object:
+    """从 Mapping 键或对象属性取信封字段;都没有返回 ``_MISSING``。"""
+    if isinstance(event, Mapping):
+        for name in names:
+            if name in event:
+                return event[name]
+        return _MISSING
+    for name in names:
+        if hasattr(event, name):
+            return getattr(event, name)
+    return _MISSING
+
+
+def _parse_event(event: Any) -> _EventView:
+    """把 SessionEvent / spine dict / 任意信封归一成 :class:`_EventView`。
+
+    字段别名(LCA snake_case 与 dsh camelCase 都认,读到即停):
+
+    - type: ``type`` / ``category``
+    - data: ``data`` / ``payload``
+    - surfaceOp: ``surfaceOp`` / ``surface_op``
+    - sourceEventSeqs: ``sourceEventSeqs`` / ``source_event_seqs``
+    """
+    raw_type = _field(event, "type", "category")
+    event_type = "" if raw_type is _MISSING else str(raw_type)
+    seq = _field(event, "seq")
+    raw_data = _field(event, "data", "payload")
+    data: Mapping[str, Any] = raw_data if isinstance(raw_data, Mapping) else {}
+    surface_op = _field(event, "surfaceOp", "surface_op")
+    sources = _field(event, "sourceEventSeqs", "source_event_seqs")
+    return _EventView(
+        type=event_type,
+        seq=None if seq is _MISSING else seq,
+        data=data,
+        surface_op=surface_op,
+        source_event_seqs=sources,
+        has_surface_op=surface_op is not _MISSING,
+        has_source_event_seqs=sources is not _MISSING,
+    )
+
+
+def _is_event_seq(value: object) -> bool:
+    """非负 int;拒绝 bool(``True`` 是 ``int`` 子类)。"""
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _as_replace_op(value: object) -> SurfaceReplaceOp | None:
+    """把运行时值收成 :class:`SurfaceReplaceOp`;形状不对返回 None。"""
+    if isinstance(value, SurfaceReplaceOp):
+        if _is_event_seq(value.start) and _is_event_seq(value.end):
+            return value
+        return None
+    if not isinstance(value, Mapping) or set(value.keys()) != {"op", "start", "end"}:
+        return None
+    if value.get("op") != "replace":
+        return None
+    start, end = value["start"], value["end"]
+    if not (_is_event_seq(start) and _is_event_seq(end)):
+        return None
+    return SurfaceReplaceOp(op="replace", start=start, end=end)
+
+
+def _surface_op_of(view: _EventView) -> SurfaceOp | None:
+    """校验类型与 marker 的配对,返回规范化 ``surfaceOp``。
+
+    失败语义(``ValueError``):非合格类型携带 marker / 合格类型缺 marker /
+    marker 既不是 ``append`` 也不是三字段 replace 对象。
+    """
+    if not isSurfaceEligibleType(view.type):
+        if view.has_surface_op:
+            raise ValueError(
+                f'session event "{view.type}" is not surface-eligible and cannot carry surfaceOp'
+            )
+        if view.has_source_event_seqs:
+            raise ValueError(
+                f'session event "{view.type}" is not surface-eligible '
+                "and cannot carry sourceEventSeqs"
+            )
+        return None
+    if not view.has_surface_op:
+        raise ValueError(
+            f'session event "{view.type}" is surface-eligible and requires a surfaceOp marker'
+        )
+    op = view.surface_op
+    if op == "append":
+        return "append"
+    if op is None or not isinstance(op, (Mapping, SurfaceReplaceOp)):
+        raise ValueError(f'session event "{view.type}" carries an invalid surfaceOp')
+    parsed = _as_replace_op(op)
+    if parsed is None:
+        raise ValueError(f'session event "{view.type}" carries an invalid replace surfaceOp')
+    return parsed
+
+
+def _assert_provenance(view: _EventView, shadowed_seqs: tuple[int, ...]) -> None:
+    """校验 ``sourceEventSeqs``:形态、早于本 seq、覆盖全部被 shadow 的节点。"""
+    sources: set[int] = set()
+    if view.has_source_event_seqs:
+        raw = view.source_event_seqs
+        if not isinstance(raw, (list, tuple)):
+            raise ValueError(
+                f"sourceEventSeqs on event at seq {view.seq} must be an array when present"
+            )
+        if len(raw) == 0 and view.type != SURFACE_ASSISTANT_TYPE:
+            raise ValueError(
+                f"sourceEventSeqs must not be empty except on {SURFACE_ASSISTANT_TYPE}"
+            )
+        non_earlier: object = None
+        for source in raw:
+            if not _is_event_seq(source):
+                raise ValueError(
+                    f'session event "{view.type}" sourceEventSeqs must densely '
+                    "contain non-negative safe integers"
+                )
+            sources.add(source)
+            if non_earlier is None and isinstance(view.seq, int) and source >= view.seq:
+                non_earlier = source
+        if len(sources) != len(raw):
+            raise ValueError("sourceEventSeqs must not contain duplicates")
+        if non_earlier is not None:
+            raise ValueError(
+                f"sourceEventSeqs must reference earlier events: "
+                f"{non_earlier} >= current seq {view.seq}"
+            )
+    missing = [seq for seq in shadowed_seqs if seq not in sources]
+    if missing:
+        joined = ", ".join(str(seq) for seq in missing)
+        raise ValueError(
+            "surface replace: sourceEventSeqs must include every shadowed "
+            f"surface node; missing {joined}"
+        )
+
+
+def _replacement_range(nodes: list[int], op: SurfaceReplaceOp) -> tuple[int, int, tuple[int, ...]]:
+    """定位 replace 区间;不改 ``nodes``。返回 ``(start_idx, end_idx, shadowed)``。"""
+    try:
+        start_idx = nodes.index(op.start)
+    except ValueError:
+        raise ValueError(f"surface replace: start seq {op.start} not found in surface") from None
+    try:
+        end_idx = nodes.index(op.end)
+    except ValueError:
+        raise ValueError(f"surface replace: end seq {op.end} not found in surface") from None
+    if start_idx > end_idx:
+        raise ValueError(
+            f"surface replace: start seq {op.start} (index {start_idx}) "
+            f"is after end seq {op.end} (index {end_idx})"
+        )
+    return start_idx, end_idx, tuple(nodes[start_idx : end_idx + 1])
+
+
+def _json_equal(a: object, b: object) -> bool:
+    """JSON 值域结构相等(键排序);非 JSON 值走 ``default=str``。"""
+    return json.dumps(a, sort_keys=True, default=str) == json.dumps(b, sort_keys=True, default=str)
+
+
+def _tool_result_rest(data: Mapping[str, Any]) -> object:
+    """去掉可变 content 后的 tool-result payload,供 rewrite 比对。
+
+    dsh 形态(``data.message.content[0]``):只允许改 ``content[0].content``。
+    LCA 形态:只允许改顶层 ``outcome`` / ``content`` / ``result``。
+    """
+    message = data.get("message")
+    if isinstance(message, Mapping):
+        content = message.get("content")
+        if isinstance(content, (list, tuple)) and content:
+            first = content[0]
+            nulled_first: object = (
+                {**first, "content": None} if isinstance(first, Mapping) else first
+            )
+            nulled_message = {**message, "content": [nulled_first, *list(content[1:])]}
+            return {**data, "message": nulled_message}
+    return {k: v for k, v in data.items() if k not in {"outcome", "content", "result"}}
+
+
+def _assert_tool_result_rewrite(
+    view: _EventView,
+    shadowed_seqs: tuple[int, ...],
+    log: tuple[_EventView, ...],
+) -> None:
+    """tool-result replace:必须覆盖恰好一个当前 tool-result 节点,且只改 content。"""
+    if view.type != SURFACE_TOOL_RESULT_TYPE:
+        return
+    if len(shadowed_seqs) != 1:
+        raise ValueError(
+            f"{SURFACE_TOOL_RESULT_TYPE} surface replacement must rewrite exactly one current node"
+        )
+    original_seq = shadowed_seqs[0]
+    if (
+        original_seq < 0
+        or original_seq >= len(log)
+        or log[original_seq].type != SURFACE_TOOL_RESULT_TYPE
+    ):
+        raise ValueError(
+            f"{SURFACE_TOOL_RESULT_TYPE} surface replacement must target a current "
+            f"{SURFACE_TOOL_RESULT_TYPE}"
+        )
+    if not _json_equal(_tool_result_rest(log[original_seq].data), _tool_result_rest(view.data)):
+        raise ValueError(f"{SURFACE_TOOL_RESULT_TYPE} surface replacement may change only content")
+
+
+def foldSurface(events: Iterable[Any]) -> SurfaceFoldResult:  # noqa: N802 (dsh parity)
+    """离线 fold — 扫一遍事件流,重建当前模型可见 surface(对齐 dsh ``foldSurface``)。
+
+    输入是从 seq 0 起连续的完整 log(或 log 前缀)。每条事件占用一个 seq 槽;
+    非 surface 事件不进 ``nodes``,但仍参与连续性校验。
+
+    词表映射见 :data:`SURFACE_EVENT_TYPES`。信封同时接受 SessionEvent
+    (``type`` / ``data``)与 spine 形态(``category`` / ``payload``);
+    ``surfaceOp`` / ``surface_op``、``sourceEventSeqs`` / ``source_event_seqs``
+    等价。
+
+    失败语义(``ValueError``):seq 不连续、合格类型缺 marker、非合格类型
+    带 marker、replace 区间不在当前 surface、provenance 不覆盖被
+    shadow 节点、tool-result replace 改了 content 以外的字段。
+
+    所有权:返回新 tuple,不修改入参。无 I/O。不导出 SurfaceManager
+    (增量 live view 由 Session 运行时持有,不在本纯函数模块)。
+    """
+    log = tuple(_parse_event(event) for event in events)
+    nodes: list[int] = []
+    replacements: list[SurfaceFoldReplacement] = []
+
+    for index, view in enumerate(log):
+        if view.seq != index:
+            raise ValueError(f"session event seq {view.seq} is not contiguous; expected {index}")
+        surface_op = _surface_op_of(view)
+        if surface_op is None:
+            continue
+        if not _is_event_seq(view.seq):
+            raise ValueError(f"session event seq {view.seq} is not contiguous; expected {index}")
+        seq = int(view.seq)
+        if surface_op == "append":
+            _assert_provenance(view, ())
+            nodes.append(seq)
+            continue
+        start_idx, end_idx, shadowed = _replacement_range(nodes, surface_op)
+        _assert_provenance(view, shadowed)
+        _assert_tool_result_rewrite(view, shadowed, log)
+        nodes[start_idx : end_idx + 1] = [seq]
+        replacements.append(
+            SurfaceFoldReplacement(
+                seq=seq,
+                start=surface_op.start,
+                end=surface_op.end,
+                shadowed_seqs=shadowed,
+            )
+        )
+
+    return SurfaceFoldResult(nodes=tuple(nodes), replacements=tuple(replacements))
+
+
 __all__ = [
     "REQUEST_HEADER_CATEGORY",
     "STEP_END_TYPE",
     "STEP_START_TYPE",
+    "SURFACE_ASSISTANT_TYPE",
+    "SURFACE_EVENT_TYPES",
+    "SURFACE_TOOL_RESULT_TYPE",
+    "SURFACE_USER_TYPE",
     "TURN_END_TYPE",
     "TURN_START_TYPE",
     "EpochHeader",
     "StepEntry",
     "StepTree",
+    "SurfaceFoldReplacement",
+    "SurfaceFoldResult",
+    "SurfaceReplaceOp",
     "TurnEntry",
     "canonicalHeader",
     "foldRequestHeader",
+    "foldSurface",
     "fold_step_tree",
     "headerEquals",
+    "isAppendSurfaceEvent",
+    "isReplacementSurfaceEvent",
+    "isSurfaceEligibleType",
+    "isSurfaceEvent",
 ]

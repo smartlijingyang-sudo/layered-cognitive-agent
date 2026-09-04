@@ -6,11 +6,18 @@ cordis fiber 生命周期绑定，由后续 PR 按 LCA 装配需要叠加。
 
 持久化不在本层（dsh 边界一致）：persistence 是订阅者关注点，订阅
 session 事件流自行落盘；store 只持有活 Session 索引。
+
+restore（ADR-0186）：从持久化层或父 session fork 重建 in-memory session，
+带 ``is_seeded=True`` 标记、预填充事件日志、不触发 observer 派发。
 """
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from lca.plugins.session.runtime.session import Session
+from lca_kernel.events.fold import foldRequestHeader
+from lca_kernel.events.session import SessionEvent, SessionHeader
 
 __all__ = ["SessionStore"]
 
@@ -43,6 +50,47 @@ class SessionStore:
         elif session_id in self._sessions:
             raise ValueError(f"session {session_id!r} 已存在")
         session = Session(session_id)
+        self._sessions[session_id] = session
+        return session
+
+    def restore(
+        self,
+        session_id: str,
+        header: SessionHeader,
+        events: Sequence[SessionEvent],
+    ) -> Session:
+        """从持久化或 fork 重建 session：预填事件日志，不入 observer 派发。
+
+        precondition：
+
+        - ``session_id`` 非空，不与活 session 冲突（冲突抛 ``ValueError``）。
+        - ``header.id`` 必须等于 ``session_id``。
+        - ``events`` 必须连续：``event.seq == index`` 且 ``event.type`` 非空；
+          违反抛 ``ValueError``。
+
+        时序：seed 期间不触发任何 observer / flush listener；``header.is_seeded``
+        被强制为 ``True``（无论传入值）。header fold 从 seed 事件初始化，
+        首次 ``request_header()`` 不需重算。
+        """
+        if session_id in self._sessions:
+            raise ValueError(f"session {session_id!r} 已存在")
+        if header.id != session_id:
+            raise ValueError(f"header.id {header.id!r} 与 session_id {session_id!r} 不一致")
+
+        session = Session(session_id, header=header)
+        for index, event in enumerate(events):
+            if event.seq != index:
+                raise ValueError(f"seed 事件 seq 不连续: 期望 {index}, 实际 {event.seq}")
+            if not event.type:
+                raise ValueError(f"seed 事件 #{index} type 为空")
+            session._log.append(event)
+        # 强制 is_seeded=True（无论传入 header 的值）
+        object.__setattr__(session._header, "is_seeded", True)
+
+        # header fold 冷启动：从 seed 事件初始化，首读 O(1)。
+        session._header_fold = foldRequestHeader(tuple(events))
+        session._header_fold_seq = len(events)
+
         self._sessions[session_id] = session
         return session
 

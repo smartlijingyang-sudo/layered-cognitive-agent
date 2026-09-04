@@ -22,6 +22,7 @@ from lca_kernel.events.fold import EpochHeader, foldRequestHeader, headerEquals
 from lca_kernel.events.session import (
     SESSION_FORMAT_VERSION,
     SessionEvent,
+    SessionHeader,
     SessionProtocol,
     SessionReentryError,
 )
@@ -275,6 +276,262 @@ def test_store_list_keeps_creation_order() -> None:
     assert store.list() == (b,)
 
 
+# ── flush（ADR-0186）────────────────────────────────────────────────
+
+
+async def test_flush_awaits_all_registered_listeners() -> None:
+    session = SessionStore().create()
+    call_log: list[str] = []
+
+    class ListenerA:
+        async def flush(self, target: Any) -> None:
+            call_log.append("a")
+
+    class ListenerB:
+        async def flush(self, target: Any) -> None:
+            call_log.append("b")
+
+    session.register_flush_listener(ListenerA())
+    session.register_flush_listener(ListenerB())
+
+    session.append("x", {"k": 1})
+    session.append("y", {"k": 2})
+
+    results = await session.flush()
+
+    assert call_log == ["a", "b"]
+    assert len(results) == 2
+    assert all(r.ok for r in results)
+    assert all(r.event_count == 2 for r in results)
+
+
+async def test_flush_listener_failure_contained() -> None:
+    session = SessionStore().create()
+
+    class BadListener:
+        async def flush(self, target: Any) -> None:
+            raise RuntimeError("boom")
+
+    class GoodListener:
+        def __init__(self) -> None:
+            self.called = False
+
+        async def flush(self, target: Any) -> None:
+            self.called = True
+
+    bad = BadListener()
+    good = GoodListener()
+    session.register_flush_listener(bad)
+    session.register_flush_listener(good)
+
+    results = await session.flush()
+
+    assert len(results) == 2
+    assert results[0].ok is False
+    assert isinstance(results[0].error, RuntimeError)
+    assert results[0].error.args[0] == "boom"
+    assert results[1].ok is True
+    assert good.called
+
+
+async def test_flush_duck_types_observer_flush() -> None:
+    session = SessionStore().create()
+    flush_log: list[int] = []
+
+    class ObserverWithFlush:
+        def __call__(self, target: Any, event: Any) -> None:
+            pass
+
+        async def flush(self, target: Any) -> None:
+            flush_log.append(target.seq)
+
+    obs = ObserverWithFlush()
+    session.observe(obs)  # type: ignore[arg-type]
+    session.append("x", {"k": 1})
+
+    results = await session.flush()
+
+    assert len(results) == 1
+    assert results[0].ok is True
+    assert flush_log == [1]
+
+
+async def test_flush_duck_typed_observer_failure_contained() -> None:
+    session = SessionStore().create()
+
+    class BadObserverWithFlush:
+        def __call__(self, target: Any, event: Any) -> None:
+            pass
+
+        async def flush(self, target: Any) -> None:
+            raise ValueError("observer flush boom")
+
+    session.observe(BadObserverWithFlush())  # type: ignore[arg-type]
+
+    results = await session.flush()
+
+    assert len(results) == 1
+    assert results[0].ok is False
+    assert isinstance(results[0].error, ValueError)
+
+
+async def test_flush_cancel_listener_skips_next_flush() -> None:
+    session = SessionStore().create()
+    calls = 0
+
+    class CountingListener:
+        async def flush(self, target: Any) -> None:
+            nonlocal calls
+            calls += 1
+
+    listener = CountingListener()
+    cancel = session.register_flush_listener(listener)
+
+    await session.flush()
+    assert calls == 1
+
+    cancel()
+    await session.flush()
+    assert calls == 1  # 取消后不再被调用
+
+    cancel()  # 幂等
+
+
+async def test_flush_with_no_listeners_returns_empty() -> None:
+    session = SessionStore().create()
+    results = await session.flush()
+    assert results == []
+
+
+async def test_flush_listener_count_reflects_registrations() -> None:
+    session = SessionStore().create()
+    assert session.flush_listener_count == 0
+
+    class L:
+        async def flush(self, target: Any) -> None:
+            pass
+
+    cancel = session.register_flush_listener(L())
+    assert session.flush_listener_count == 1
+
+    cancel()
+    assert session.flush_listener_count == 0
+
+
+# ── restore（ADR-0186）─────────────────────────────────────────────
+
+
+def test_restore_seeds_log_without_firing_observers() -> None:
+    store = SessionStore()
+    header = SessionHeader(version=SESSION_FORMAT_VERSION, id="s-restored", created_at=1000)
+    events = [
+        SessionEvent(type="a", seq=0, time=1001, data={"k": 1}),
+        SessionEvent(type="b", seq=1, time=1002, data={"k": 2}),
+    ]
+
+    session = store.restore("s-restored", header, events)
+
+    # observer 在 seed 期间不应被 fire（本 session 未注册 observer，
+    # 后续 append 也只触发新事件）
+    seen: list[SessionEvent] = []
+    session.observe(lambda target, event: seen.append(event))
+
+    # restore 后状态：
+    assert session.seq == 2
+    assert session.event_count == 2
+    assert session.header.is_seeded is True
+    assert session.snapshot_events() == tuple(events)
+    assert session.event_at(0) is events[0]
+    assert session.event_at(1) is events[1]
+
+    # append 新事件：observer 只收新事件，不收 seed 事件
+    new_event = session.append("c", {"k": 3})
+    assert new_event.seq == 2
+    assert seen == [new_event]
+
+
+def test_restore_sets_is_seeded_even_when_header_says_false() -> None:
+    store = SessionStore()
+    header = SessionHeader(
+        version=SESSION_FORMAT_VERSION, id="s-seeded", created_at=2000, is_seeded=False
+    )
+    events = [SessionEvent(type="x", seq=0, time=2001, data={})]
+
+    session = store.restore("s-seeded", header, events)
+
+    # 无论传入 header.is_seeded 值如何，restore 后强制 True
+    assert session.header.is_seeded is True
+
+
+def test_restore_empty_events_is_still_seeded() -> None:
+    store = SessionStore()
+    header = SessionHeader(version=SESSION_FORMAT_VERSION, id="s-empty", created_at=3000)
+
+    session = store.restore("s-empty", header, [])
+
+    assert session.seq == 0
+    assert session.header.is_seeded is True
+    assert session.snapshot_events() == ()
+
+
+def test_restore_with_header_events_initializes_fold() -> None:
+    store = SessionStore()
+    header = SessionHeader(version=SESSION_FORMAT_VERSION, id="s-fold", created_at=4000)
+    header_event = SessionEvent(
+        type=REQUEST_HEADER,
+        seq=0,
+        time=4001,
+        data=_header_payload(system="restored-sys", model="m-restored"),
+    )
+
+    session = store.restore("s-fold", header, [header_event])
+
+    folded = session.request_header()
+    assert folded is not None
+    assert folded.system == "restored-sys"
+    assert folded.config == {"provider": "p", "model": "m-restored"}
+
+    # 新 header 事件覆盖：增量 fold 接续正确
+    session.append(REQUEST_HEADER, _header_payload(system="sys-v2", model="m2"))
+    new_fold = session.request_header()
+    assert new_fold is not None
+    assert new_fold.system == "sys-v2"
+
+
+def test_store_restore_rejects_duplicate_id() -> None:
+    store = SessionStore()
+    store.create("dup")
+    header = SessionHeader(version=SESSION_FORMAT_VERSION, id="dup", created_at=5000)
+    with pytest.raises(ValueError, match="已存在"):
+        store.restore("dup", header, [])
+
+
+def test_store_restore_rejects_header_id_mismatch() -> None:
+    store = SessionStore()
+    header = SessionHeader(version=SESSION_FORMAT_VERSION, id="other", created_at=6000)
+    with pytest.raises(ValueError, match="不一致"):
+        store.restore("target", header, [])
+
+
+def test_store_restore_rejects_discontinuous_seq() -> None:
+    store = SessionStore()
+    header = SessionHeader(version=SESSION_FORMAT_VERSION, id="bad-seq", created_at=7000)
+    events = [
+        SessionEvent(type="a", seq=0, time=1, data={}),
+        SessionEvent(type="b", seq=2, time=2, data={}),  # 跳 seq
+    ]
+    with pytest.raises(ValueError, match="seq 不连续"):
+        store.restore("bad-seq", header, events)
+
+
+def test_store_restore_appears_in_get_and_list() -> None:
+    store = SessionStore()
+    header = SessionHeader(version=SESSION_FORMAT_VERSION, id="listed", created_at=8000)
+    session = store.restore("listed", header, [])
+    assert store.get("listed") is session
+    assert session in store.list()
+
+
 # ── plugin 装配 ─────────────────────────────────────────────────────
 
 
@@ -308,3 +565,106 @@ def test_plugin_manifest_metadata() -> None:
     assert definition.spec.layer == "L2"
     assert "session.store" in definition.provided_capability_keys
     assert definition.required_capability_keys == ()
+
+
+class _FacadeProducer:
+    """publisher marker；facade 不入日志。"""
+
+
+def _hit(*, role: str = "worker") -> Any:
+    from lca.contracts.event import TeamDelegationCacheHit
+
+    return TeamDelegationCacheHit(callee_role=role, subtask="t", step=1)
+
+
+def test_bus_facade_append_maps_payload_into_session_log() -> None:
+    from lca.plugins.session.runtime.bus_facade import SessionBusFacade
+    from lca_kernel.events.payloads import SpineEventPayload
+
+    session = SessionStore().create("s-bus")
+    facade = SessionBusFacade(session)
+
+    hit = _hit()
+    ref = facade.append(hit, producer=_FacadeProducer)
+    assert ref.event_id == "s-bus:0"
+    assert ref.category == "team.delegation.cache_hit"
+    event = session.event_at(0)
+    assert event is not None
+    assert event.type == "team.delegation.cache_hit"
+    assert event.data == {"callee_role": "worker", "subtask": "t", "step": 1}
+
+    spine = SpineEventPayload(
+        execution_point="brain.perceive.start",
+        channel="fact",
+        payload={"state_id": "s1"},
+    )
+    spine_ref = facade.append(spine, producer=_FacadeProducer)
+    assert spine_ref.category == "spine.cognition.brain.perceive.start"
+    spine_event = session.event_at(1)
+    assert spine_event is not None
+    assert spine_event.type == "spine.cognition.brain.perceive.start"
+    assert spine_event.data["execution_point"] == "brain.perceive.start"
+    assert spine_event.data["payload"] == {"state_id": "s1"}
+    assert "category" not in spine_event.data
+
+
+
+def test_bus_facade_observe_projects_original_payload_and_ref() -> None:
+    from lca.plugins.session.runtime.bus_facade import SessionBusFacade
+
+    session = SessionStore().create("s-obs")
+    publish = SessionBusFacade(session)
+    observe = SessionBusFacade(session)
+    seen: list[tuple[Any, Any]] = []
+
+    observe.observe(_FacadeProducer, lambda payload, ref: seen.append((payload, ref)))
+
+    payload = _hit()
+    ref = publish.append(payload, producer=_FacadeProducer)
+
+    assert len(seen) == 1
+    assert seen[0][0] is payload
+    assert seen[0][1] == ref
+
+
+
+def test_bus_facade_observe_contains_callback_failure() -> None:
+    from lca.plugins.session.runtime.bus_facade import SessionBusFacade
+
+    session = SessionStore().create("s-contain")
+    facade = SessionBusFacade(session)
+    seen: list[Any] = []
+
+    def boom(payload: Any, ref: Any) -> None:
+        del payload, ref
+        raise RuntimeError("boom")
+
+    facade.observe(_FacadeProducer, boom)
+    facade.observe(_FacadeProducer, lambda payload, ref: seen.append(payload))
+
+    payload = _hit()
+    ref = facade.append(payload, producer=_FacadeProducer)
+
+    assert seen == [payload]
+    assert ref.event_id == "s-contain:0"
+    assert session.seq == 1
+
+
+
+def test_as_bus_facade_wraps_session_only() -> None:
+    from lca.plugins.session.runtime.bus_facade import SessionBusFacade, as_bus_facade
+
+    session = SessionStore().create("s-coerce")
+    wrapped = as_bus_facade(session)
+    assert isinstance(wrapped, SessionBusFacade)
+    assert wrapped.session is session
+    assert as_bus_facade(wrapped) is wrapped
+    assert as_bus_facade(None) is None
+
+    class Stub:
+        def append(self, payload: Any, *, producer: Any) -> Any:
+            del payload, producer
+            return None
+
+    stub = Stub()
+    assert as_bus_facade(stub) is stub

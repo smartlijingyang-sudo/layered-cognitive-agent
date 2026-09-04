@@ -1,6 +1,11 @@
 # COMPAT(delete-when: PR-9, tracking: ADR-0181)
 # 旧 EventSpine deriver；PR-8 shim 走 events/subscribers/spine_* 包装；
 # 本模块保留至 PR-9 旧 spine 全退役（rg "lca.plugins.observability.spine.derivers" lca/ = 0 触发）。
+#
+# COMPAT(delete-when: ADR-0186 PR-3g otel fold 替代 callback deriver,
+#        tracking: ADR-0186 PR-3g)
+# otel_trace 累积 span 树;PR-3g 收口时改为从 SpineReader snapshot
+# fold 出 OtelSpan 树(纯函数,events → root span),不再需要 on_event。
 
 """OTel-style trace deriver —— DSH ENTRY→AGENT→STEP→LLM|TOOL 投影（ADR-0167 D9）。
 

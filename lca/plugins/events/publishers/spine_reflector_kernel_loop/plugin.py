@@ -31,6 +31,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.events.publishers._session_publish import publish_via_session
 
 log = logging.getLogger(__name__)
 
@@ -45,13 +46,7 @@ def _send(
     channel: str,
     payload: dict[str, Any],
 ) -> EventRef:
-    """内部 helper：构造 SpineEventPayload + EventBus.publish。
-
-    EventBus 走函数内 lazy import，避免 plugin import 时触发
-    lca.infrastructure.observability ↔ lca_kernel 链路 circular import。
-    """
-    from lca_kernel.events.bus import EventBus
-
+    """内部 helper：构造 SpineEventPayload + publish_via_session（PR-3d）。"""
     cat_str = _SPINE_EP_TO_CATEGORY[execution_point]
     sp = SpineEventPayload(
         category=Category(cat_str),
@@ -59,7 +54,7 @@ def _send(
         channel=channel,
         payload=payload,
     )
-    return EventBus.default().publish(sp, producer=ReflectorClass)
+    return publish_via_session(sp, producer=ReflectorClass)
 
 
 # ── kernel.boot.start / .completed ────────────────────────────────────

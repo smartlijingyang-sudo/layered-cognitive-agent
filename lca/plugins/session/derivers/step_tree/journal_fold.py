@@ -1,4 +1,4 @@
-"""fold_step_tree —— 从事件流纯 fold 出 JournalDocument(PRD-3g 样本)。
+"""fold_step_tree —— 从事件流纯 fold 出 JournalDocument(ADR-0186 PR-3g)。
 
 纯函数集,无 I/O,无 ``logging`` / ``datetime.now`` 等副作用。消费
 :class:`EventRecord` 或兼容 ``Mapping`` 形态的事件流,产出
@@ -14,14 +14,17 @@
 3. **可测试** — 任何测试 fixture 传 list[dict] 即可驱动 fold,不需要
    SpineReader / EventSpine / 运行中的 run。
 
-delete-when: PR-9 旧 spine 全退役后 fold 路径取代旧 callback deriver。
-tracking: PR-3g-sample。
+生产路径: RunSessionBuilder 装配 StepTreeFoldDeriver,flush 时 fold 本函数。
+COMPAT 旧 callback deriver: StepTreeAccumulatorDeriver
+(delete-when: rg "StepTreeAccumulatorDeriver(" lca/ = 0 except 其定义文件,
+tracking: ADR-0186 PR-3g)。
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
 from lca.contracts.models.observability.journal_doc import (
@@ -55,37 +58,95 @@ PHASE_FOLD_EPS: dict[str, StepPhase] = {
 }
 
 
+def _epoch_seconds(value: Any) -> float | None:
+    """把 when / ts / time 投影成 Unix epoch 秒;无法解析返回 None。"""
+    if value is None:
+        return None
+    if hasattr(value, "timestamp"):
+        try:
+            return float(value.timestamp())
+        except (TypeError, ValueError):
+            return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        numeric = float(value)
+        # SessionEvent.time 是 epoch 毫秒;spine when 是 epoch 秒。
+        if numeric > 1e11:
+            return numeric / 1000.0
+        return numeric
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            return datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            try:
+                numeric = float(text)
+            except ValueError:
+                return None
+            if numeric > 1e11:
+                return numeric / 1000.0
+            return numeric
+    return None
+
+
 def _coerce(event: Any) -> Mapping[str, Any] | None:
     """统一事件形态为 dict-like。
 
-    支持 :class:`EventRecord`(属性访问)和 ``Mapping``(dict fixture)。
+    支持 :class:`EventRecord` / :class:`SpineEventRecord`(属性访问)、
+    :class:`SessionEvent` (``type`` + ``data``)、以及 ``Mapping``。
     不识别返回 ``None``,调用方 skip。
     """
     if isinstance(event, Mapping):
-        return event
+        ep = event.get("execution_point")
+        if ep:
+            return event
+        ep = event.get("type") or event.get("category")
+        if not ep:
+            return event
+        payload = event.get("payload") or event.get("data") or {}
+        if not isinstance(payload, Mapping):
+            payload = {}
+        return {
+            "execution_point": str(ep),
+            "payload": payload,
+            "outcome": event.get("outcome") or payload.get("outcome"),
+            "phase": event.get("phase", "live"),
+            "run_id": event.get("run_id"),
+            "when": event.get("when") or event.get("ts") or event.get("time"),
+        }
     if hasattr(event, "execution_point") and hasattr(event, "payload"):
+        when = getattr(event, "when", None)
+        if when is None:
+            when = getattr(event, "ts", None)
         return {  # type: ignore[return-value]
             "execution_point": event.execution_point,
             "payload": event.payload if isinstance(event.payload, Mapping) else {},
             "outcome": getattr(event, "outcome", None),
             "phase": getattr(event, "phase", "live"),
             "run_id": getattr(event, "run_id", None),
-            "when": getattr(event, "when", None),
+            "when": when,
+        }
+    if hasattr(event, "type") and hasattr(event, "data"):
+        payload = event.data if isinstance(event.data, Mapping) else {}
+        return {
+            "execution_point": str(event.type),
+            "payload": payload,
+            "outcome": payload.get("outcome") if isinstance(payload, Mapping) else None,
+            "when": getattr(event, "time", None),
         }
     return None
 
 
 def _ts(event: Mapping[str, Any]) -> float:
-    """从 event 提取时间戳;缺省 0.0。"""
-    when = event.get("when")
-    if when is None:
-        return 0.0
-    if hasattr(when, "timestamp"):
-        return when.timestamp()  # type: ignore[no-any-return]
-    try:
-        return float(when)
-    except (TypeError, ValueError):
-        return 0.0
+    """从 event 提取 Unix epoch 秒;缺省 0.0。"""
+    for key in ("when", "ts", "time"):
+        parsed = _epoch_seconds(event.get(key))
+        if parsed is not None:
+            return parsed
+    return 0.0
 
 
 @dataclass
@@ -318,6 +379,10 @@ def _materialize(
     *,
     run_id: str,
     outcome: str | None = None,
+    agent_role: str = "",
+    strategy_key: str = "",
+    plan_ref: str = "",
+    objective: str = "",
 ) -> JournalDocument:
     """从终态 state 构造 JournalDocument(物化,不修改 state)。"""
     if outcome is not None:
@@ -348,10 +413,10 @@ def _materialize(
     final_outcome = state.terminal_outcome or ("completed" if state.phases else "in_progress")
 
     meta = JournalMetadata(
-        agent_role="",
-        strategy_key="",
-        plan_ref="",
-        objective="(unobserved)",
+        agent_role=agent_role,
+        strategy_key=strategy_key,
+        plan_ref=plan_ref,
+        objective=objective or "(unobserved)",
         outcome=final_outcome,  # type: ignore[arg-type]
         started_at=state.first_ts or 0.0,
         closed_at=state.last_ts,
@@ -376,14 +441,19 @@ def fold_step_tree(
     *,
     run_id: str,
     outcome: str | None = None,
+    agent_role: str = "",
+    strategy_key: str = "",
+    plan_ref: str = "",
+    objective: str = "",
 ) -> JournalDocument:
     """纯 fold:从事件流左折出 JournalDocument。
 
     Parameters:
-        events: 可迭代事件(:class:`EventRecord` 或 ``Mapping``)。
+        events: 可迭代事件(:class:`EventRecord` / :class:`SessionEvent` 或 ``Mapping``)。
             非 fold 目标的事件被 skip(不抛)。
         run_id: 目标 run 标识,写入 document.run_id / trace_id。
         outcome: 显式终态覆盖;None 时由 terminal EP 或启发式推导。
+        agent_role / strategy_key / plan_ref / objective: 写入 ``JournalMetadata``。
 
     Returns:
         JournalDocument(lca.journal/3.1),永远不抛。
@@ -397,7 +467,15 @@ def fold_step_tree(
             _apply(state, coerced)
         except Exception:  # noqa: S112 — 纯函数不 log;单 event 失败 skip 不中断 fold
             continue
-    return _materialize(state, run_id=run_id, outcome=outcome)
+    return _materialize(
+        state,
+        run_id=run_id,
+        outcome=outcome,
+        agent_role=agent_role,
+        strategy_key=strategy_key,
+        plan_ref=plan_ref,
+        objective=objective,
+    )
 
 
 __all__ = [

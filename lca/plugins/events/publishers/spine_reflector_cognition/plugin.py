@@ -8,7 +8,7 @@ lca/cognition/brain/reasoner.py 等调用方零改动。旧 _safe_append
 承载，不另开字段，保留旧 API 兼容）。
 
 业务方一行调：
-    EventBus.default().publish(
+    publish_via_session(
         SpineEventPayload(execution_point="...", channel="...", payload={...}),
         producer=ReflectorClass,
     )
@@ -59,7 +59,7 @@ def _send(
     """内部 helper：构造 SpineEventPayload + 走 publish_via_session（PR-3d）。
 
     category 由 execution_point 通过 _SPINE_EP_TO_CATEGORY 派生。
-    Session 未注入时 fallback :func:`EventBus.default().publish`,
+    Session 未注入时 fallback EventBus（由 publish_via_session 内部处理），
     行为与 PR-3d 之前等价。
     """
     cat_str = _SPINE_EP_TO_CATEGORY[execution_point]

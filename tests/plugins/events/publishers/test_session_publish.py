@@ -90,8 +90,8 @@ def test_publish_via_session_falls_back_to_eventbus(bus: EventBus) -> None:
 
 def test_publish_via_session_delegates_to_session_when_set(bus: EventBus) -> None:
     """有 Session 时 → Session.append(payload, producer=...) 被调用,且 payload/producer 不变。"""
-    from lca.plugins.events.publishers.spine_loop_cursor.plugin import (
-        LoopCursorPlugin,
+    from lca.plugins.events.publishers.spine_reflector_cognition.plugin import (
+        ReflectorClass,
     )
 
     captured: dict[str, Any] = {}
@@ -103,25 +103,27 @@ def test_publish_via_session_delegates_to_session_when_set(bus: EventBus) -> Non
             return MagicMock(name="SessionRef")
 
     payload = _sp_payload("brain.perceive.start")
+    EventBus.set_default(bus)
     token = set_publish_session(FakeSession())
     try:
-        ref = publish_via_session(payload, producer=LoopCursorPlugin)
+        ref = publish_via_session(payload, producer=ReflectorClass)
     finally:
         reset_publish_session(token)
+        EventBus.set_default(None)
 
     assert captured["payload"] is payload
-    assert captured["producer"] is LoopCursorPlugin
+    assert captured["producer"] is ReflectorClass
     assert ref is not None
 
 
 def test_publish_via_session_does_not_call_eventbus_when_session_set(
     bus: EventBus,
 ) -> None:
-    """Session 已注入时,EventBus.default() 不应被触达。"""
+    """Session 已注入时,鉴权后走 Session.append,不触达 EventBus.publish。"""
     from lca_kernel.events.payloads import Category, SpineEventPayload
 
     # 不装载 sink,EventBus 走 zero-sink strict 路径会抛 ——
-    # 但 Session 路径不走 EventBus,所以此 publish 应无异常。
+    # 但 Session 路径不走 EventBus.publish,所以此 publish 应无异常。
     payload = SpineEventPayload(
         category=Category("spine.cognition.brain.perceive.start"),
         execution_point="brain.perceive.start",
@@ -133,13 +135,15 @@ def test_publish_via_session_does_not_call_eventbus_when_session_set(
         def append(self, payload: Any, *, producer: Any) -> Any:
             return MagicMock(name="SessionRef")
 
+    EventBus.set_default(bus)
     token = set_publish_session(FakeSession())
     try:
-        # 不应抛错,也不应触达 EventBus(EventNoSinkError 是 fallback 路径才会看到的)。
-        ref = publish_via_session(payload, producer=FakeSession)
+        from lca.plugins.events.publishers.spine_reflector_cognition.plugin import ReflectorClass
+        ref = publish_via_session(payload, producer=ReflectorClass)
         assert ref is not None
     finally:
         reset_publish_session(token)
+        EventBus.set_default(None)
 
 
 # ── ContextVar 隔离 ─────────────────────────────────────────────────────
@@ -174,3 +178,53 @@ def test_contextvar_isolation_across_tasks() -> None:
     assert a is sentinel_a
     assert b is sentinel_b
     assert current_publish_session() is None
+
+
+# ── runtime Session 自动包装 ─────────────────────────────────────────────
+
+
+class _Producer:
+    """publisher 鉴权用 marker；Session 路径不读它。"""
+
+
+def test_set_publish_session_wraps_runtime_session(bus: EventBus) -> None:
+    """runtime Session 装载后 current 是 facade，append 写入 Session 日志。"""
+    from lca.contracts.event import TeamDelegationCacheHit
+    from lca.plugins.events.publishers.delegation_cache.plugin import (
+        DelegationCachePlugin,
+    )
+    from lca.plugins.session.runtime.bus_facade import SessionBusFacade
+    from lca.plugins.session.runtime.session import Session
+
+    session = Session("pub-wrap")
+    EventBus.set_default(bus)
+    token = set_publish_session(session)
+    try:
+        bound = current_publish_session()
+        assert isinstance(bound, SessionBusFacade)
+        assert bound.session is session
+
+        payload = TeamDelegationCacheHit(callee_role="worker", subtask="t", step=1)
+        ref = publish_via_session(payload, producer=DelegationCachePlugin)
+        assert ref.category == "team.delegation.cache_hit"
+        assert ref.event_id == "pub-wrap:0"
+        event = session.event_at(0)
+        assert event is not None
+        assert event.type == "team.delegation.cache_hit"
+        assert event.data["callee_role"] == "worker"
+        assert "category" not in event.data
+    finally:
+        reset_publish_session(token)
+        EventBus.set_default(None)
+
+
+def test_set_publish_session_does_not_rewrap_facade() -> None:
+    from lca.plugins.session.runtime.bus_facade import SessionBusFacade
+    from lca.plugins.session.runtime.session import Session
+
+    facade = SessionBusFacade(Session("pub-once"))
+    token = set_publish_session(facade)
+    try:
+        assert current_publish_session() is facade
+    finally:
+        reset_publish_session(token)

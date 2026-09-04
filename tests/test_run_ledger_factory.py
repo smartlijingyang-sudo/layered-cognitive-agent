@@ -33,6 +33,47 @@ from lca.plugins.transport.webserver.handlers.runs.execute import (
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry
 
 
+def _install_observability_seams(services: dict[str, object]) -> None:
+    """Bind ObservabilityRuntime five-seam registries for stub ctx."""
+    from lca.infrastructure.observability import NamedRegistry
+    from lca.infrastructure.observability.loop_cursor.close_barrier_impl import (
+        StdCloseBarrier,
+    )
+    from lca.infrastructure.observability.loop_cursor.factory import LoopCursorFactory
+    from lca.infrastructure.observability.loop_cursor.model_visible_capture import (
+        StdModelVisibleCapture,
+    )
+    from lca.infrastructure.observability.loop_cursor.persistence_coordinator import (
+        NullPersistenceCoordinator,
+    )
+    from lca.infrastructure.observability.loop_cursor.projection_host import (
+        StdProjectionHost,
+    )
+
+    loop_cursor = NamedRegistry()
+    projection_host = NamedRegistry()
+    model_visible = NamedRegistry()
+    close_barrier = NamedRegistry()
+    persistence = NamedRegistry()
+    loop_cursor.register("standard", LoopCursorFactory.from_profile)
+    projection_host.register(
+        "standard", lambda initial=None, **_: StdProjectionHost(initial=initial)
+    )
+    model_visible.register("standard", lambda run_dir, **_: StdModelVisibleCapture(run_dir=run_dir))
+    close_barrier.register(
+        "standard",
+        lambda persistence, host, close_emitter, **_: StdCloseBarrier(
+            persistence=persistence, host=host, close_emitter=close_emitter
+        ),
+    )
+    persistence.register("null", lambda **_: NullPersistenceCoordinator())
+    services["observability.loop_cursor"] = loop_cursor
+    services["observability.projection_host"] = projection_host
+    services["observability.model_visible"] = model_visible
+    services["observability.close_barrier"] = close_barrier
+    services["observability.persistence"] = persistence
+
+
 def test_default_profile_exposes_ledger_factory() -> None:
     ctx = asyncio.run(boot_profile("profiles/web-standard.yaml"))
 
@@ -76,7 +117,8 @@ def test_run_session_consumes_profile_selected_journal_factory(tmp_path: Path) -
 
     class _Context:
         def __init__(self, factory: _SpyFactory, registry_obj: WritableFaceRegistry) -> None:
-            # event_spine 提供一个 stub (Mock SpineCore w/ event_spine.subscribe 接受)
+            # event_spine stub:cursor 仍经 SpineWritePortAdapter 写 spine;
+            # step_tree 走 fold,不再 subscribe。
             class _StubSpine:
                 def subscribe(self, fn: object) -> object:
                     del fn
@@ -90,6 +132,7 @@ def test_run_session_consumes_profile_selected_journal_factory(tmp_path: Path) -
                 "writable_face_registry": registry_obj,
                 "event_spine": _StubSpine(),
             }
+            _install_observability_seams(self._services)
 
         def inject(self, key: str, *, default: object = ...) -> object:
             if key in self._services:
@@ -114,29 +157,31 @@ def test_run_session_consumes_profile_selected_journal_factory(tmp_path: Path) -
     assert registry.journal is factory.process
     assert registry.live_totals()["journal_subscribers"] == 0
 
-    # 每 run 独立的 StepCoordinator + 独立的 StepTreeAccumulatorderiver
+    # 每 run 独立的 StepCoordinator + 独立的 StepTreeFoldDeriver
     assert first.coordinator is not None
     assert second.coordinator is not None
     assert first.coordinator is not second.coordinator
     assert first.coordinator.run_id == first.run_id
     assert second.coordinator.run_id == second.run_id
-    # deriver 是 None (RunSessionBuilder 不在 spy ctx 中构造 spine deriver;
-    # 真实路径由 event_spine.subscribe 注入, 见 test_runtime_journal_binding_integration)
-    # 在这个 stub factory 场景下,deriver 不会被 subscribe, journal.json 不会写
-    # (符合"真实 wire 由 spine 装配"的设计)。
+    from lca.plugins.session.derivers.step_tree import StepTreeFoldDeriver
+
+    assert isinstance(first.thread_tree_writer, StepTreeFoldDeriver)
+    assert isinstance(second.thread_tree_writer, StepTreeFoldDeriver)
+    assert first.thread_tree_writer is not second.thread_tree_writer
 
 
 def test_session_step_tree_bundle_is_wired_for_terminalizer_flush(tmp_path: Path) -> None:
     """Regression: ``RunSession.step_tree_bundle`` must be the bundle that owns
-    ``StepTreeAccumulatorDeriver.flush()``.
+    ``StepTreeFoldDeriver.flush()``.
 
     Without this, ``materialization._flush_step_tree`` early-returns on
     ``bundle is None`` and ``journal.json`` never gets written.
 
-    ADR-0167 D11: terminalize flushes via ``session.step_tree_bundle.flush()``;
-    the bundle is constructed by the factory and ``RunSessionBuilder.build``
-    must propagate it into the session.
+    ADR-0167 D11 / ADR-0186 PR-3g: terminalize flushes via
+    ``session.step_tree_bundle.flush()``; the bundle is constructed by the
+    factory and ``RunSessionBuilder.build`` must propagate it into the session.
     """
+
     class _BundleSpyFactory:
         def __init__(self) -> None:
             self.process = ProcessJournal()
@@ -178,6 +223,7 @@ def test_session_step_tree_bundle_is_wired_for_terminalizer_flush(tmp_path: Path
                 "writable_face_registry": wfr,
                 "event_spine": _StubSpine(),
             }
+            _install_observability_seams(self._services)
 
         def inject(self, key: str, *, default: object = ...) -> object:
             if key in self._services:
@@ -200,5 +246,5 @@ def test_session_step_tree_bundle_is_wired_for_terminalizer_flush(tmp_path: Path
     assert session.step_tree_bundle is not None, (
         "session.step_tree_bundle must be wired by RunSessionBuilder; "
         "otherwise materialization._flush_step_tree early-returns and "
-        "StepTreeAccumulatorDeriver.flush() never produces journal.json"
+        "StepTreeFoldDeriver.flush() never produces journal.json"
     )

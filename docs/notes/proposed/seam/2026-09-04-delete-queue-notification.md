@@ -1,6 +1,6 @@
 # Agent Note: DeliveryQueue / NotificationBus 删除矩阵 — ADR-0184 投递拆分件收口
 
-Status: proposed
+Status: proposed (级别 1–3 已执行;级别 4 待执行)
 
 ## Problem
 
@@ -36,15 +36,15 @@ ADR-0184 PR-1 给 `EnvelopeBus` 引入两个投递拆分件:S3 入队的 `Delive
 
 `EnvelopeBus.__init__` 不再默认构造 `NotificationBus`;`notification` kwarg 保留为可选注入点,未注入时 `notification` 属性返回 `None`、S4 为 no-op。`lca_kernel/events/__init__.py` 包根移除导出。`EventBus.publish` 同步签名与返回 `EventRef` 6 字段不变。
 
-### 级别 2 — 删 `notification.py`
+### 级别 2 — 删 `notification.py` ✅
 
 delete-when:`rg "NotificationBus" lca/ lca_kernel/ tests/` 仅剩 `notification.py` 自身(允许 `docs/` 归档与负向架构断言)。
 
 动作:删 `lca_kernel/events/notification.py`;删 `bus.py` 的 kwarg / 属性 / 守卫 / TYPE_CHECKING import 与 COMPAT 块;删 `TestNotificationBus` 两个测试。
 
-### 级别 3 — 同步 publish 去队列化 + `publish_async` 处置
+### 级别 3 — 同步 publish 去队列化 + `publish_async` 处置 ✅
 
-前置决策:`publish_async` 全链生产零调用方,二选一——(a) 整条删除(`publish_async` + `spine_port_append_async` + `EventSpine.append_async` + `write_port_append_async`),(b) 改为不经队列直写 `PersistenceWorker` sink。选 (a) 时级别 4 直接可达;选 (b) 时 `PersistenceWorker` 保留,仅删 `DeliveryQueue`(worker 改持内部 `asyncio.Queue`)。
+前置决策:`publish_async` 全链生产零调用方,二选一——(a) 整条删除(`publish_async` + `spine_port_append_async` + `EventSpine.append_async` + `write_port_append_async`),(b) 改为不经队列直写 `PersistenceWorker` sink。选 (a)(已执行);级别 4 直接可达。
 
 delete-when:`rg "publish_async|spine_port_append_async|append_async|write_port_append_async" lca/ lca_kernel/` = 0(选 (a);允许测试同删),且 `rg "_queue\.submit|queue\.submit" lca_kernel/events/bus.py` = 0。
 

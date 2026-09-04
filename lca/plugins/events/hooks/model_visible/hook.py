@@ -284,11 +284,12 @@ class ModelVisibleHook:
         )
         ref: EventRef | None
         try:
+            from lca.plugins.events.publishers._session_publish import publish_via_session
             from lca.plugins.events.publishers.model_visible.publisher import (
                 ModelVisiblePublisher,
             )
 
-            ref = self._bus.publish(payload_obj, producer=ModelVisiblePublisher)
+            ref = publish_via_session(payload_obj, producer=ModelVisiblePublisher)
         except Exception as exc:  # INTENTIONAL: L10 + D5 不挡业务
             _log.warning("model_visible_pre_publish_failed: %s", exc)
             return None
@@ -348,11 +349,12 @@ class ModelVisibleHook:
             header_digest=digest,
         )
         try:
+            from lca.plugins.events.publishers._session_publish import publish_via_session
             from lca.plugins.events.publishers.model_visible.publisher import (
                 ModelVisiblePublisher,
             )
 
-            return self._bus.publish(payload_obj, producer=ModelVisiblePublisher)
+            return publish_via_session(payload_obj, producer=ModelVisiblePublisher)
         except Exception as exc:  # INTENTIONAL: L10 + D5 不挡业务
             _log.warning("model_visible_post_publish_failed: %s", exc)
             return None

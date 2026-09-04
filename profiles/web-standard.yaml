@@ -6,6 +6,9 @@
 # source-level introspection **mandatory**; ADR-2026-09-02 §D3; ADR-0174 profile 装配).
 # + observability-default (PR-7 五缝 plugin 装配 — LoopCursor / ProjectionHost /
 # ModelVisibleCapture / CloseBarrier / Persistence seam + provider).
+# + session-runtime (ADR-0186 Session SSOT: session.store before event-bus so
+#   the capability is live when publishers/sinks boot; RunSessionBuilder binds
+#   a per-run Session onto publish/observe slots).
 # LLM secrets are owned by lca-llm-resolver (loads project .env at setup).
 
 bundles:
@@ -15,6 +18,7 @@ bundles:
   - bundles/scenario-cordis-creator.yaml
   - bundles/declarative-phase-graph.yaml
   - bundles/loop_cursor.spine_default.yaml
+  - bundles/session-runtime.yaml
   - bundles/event-bus-components.yaml
 
 patch:

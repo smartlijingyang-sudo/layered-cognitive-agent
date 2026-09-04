@@ -8,8 +8,7 @@ ADR-0184 PR-1:本模块引入 :class:`EnvelopeBus` 作为统一入口,继承该�
 并保留现有 :class:`EventBus` 全部方法 — :class:`EventBus` 自此是
 :class:`EnvelopeBus` 的兼容 shim(EventRef 6 字段 / _dispatch_sinks /
 _fanout / delivery_snapshot / configure_delivery_policy 等所有现有 wire
-行为原样保留,仅入队路径改走 DeliveryQueue 单 SSOT 流;NotificationBus
-派发为可选注入,未注入时 S4 为 no-op)。
+行为原样保留)。
 
 不变量:
 - I-FW-BUS-1: publish 是 producer 唯一入口;subscribers 是 consumer 唯一入口
@@ -65,11 +64,9 @@ from lca_kernel.events.payloads import (
     DISPATCH_SELF_OBSERVATION_CATEGORIES,
     MechanismDispatchEventPayload,
 )
-from lca_kernel.events.queue import DeliveryQueue
 from lca_kernel.events.registry import EventRegistry, EventSpec
 
 if TYPE_CHECKING:
-    from lca_kernel.events.notification import NotificationBus
     from lca_kernel.events.sinks import SinkBackend
 
 _log = logging.getLogger(__name__)
@@ -197,13 +194,10 @@ class ConsumerHandle:
 class EnvelopeBus(Generic[P]):
     """ADR-0184 PR-1:事件总线统一入口。
 
-    四段生命周期(ADR-0184 §1):
+    三段生命周期(ADR-0184 §1):
         S1 ACCEPT  鉴权 + schema 校验
         S2 RECORD  构造 EnvelopeRef(4 字段)
-        S3 PERSIST DeliveryQueue.submit(本 PR 仅入队,PR-2 接 PersistenceWorker)
-        S4 DELIVER 可选 NotificationBus.notify;未注入时为 no-op,
-                   实际派发走 EventBus._fanout(删除评估见
-                   docs/notes/proposed/seam/2026-09-04-delete-queue-notification.md)
+        S3 PERSIST 由 EventBus 子类 _dispatch_sinks 同步落盘
 
     本类发布最小入口。``EventBus`` 继承并扩展(兼容 shim) ——
     现有 EventRef / persisted / subscriber_count / _dispatch_sinks /
@@ -221,21 +215,11 @@ class EnvelopeBus(Generic[P]):
     def __init__(
         self,
         registry: EventRegistry,
-        *,
-        queue: DeliveryQueue | None = None,
-        notification: NotificationBus | None = None,
     ) -> None:
         self._registry = registry
         self._spec_by_category: dict[Category, EventSpec] = {
             spec.category: spec for spec in registry.specs
         }
-        self._queue = queue if queue is not None else DeliveryQueue()
-        # COMPAT(delete-when: rg "NotificationBus" lca/ lca_kernel/ tests/ 仅剩
-        # notification.py 自身,
-        # tracking: docs/notes/proposed/seam/2026-09-04-delete-queue-notification.md)
-        # notification 为可选注入:未注入时 S4 notify 为 no-op(生产零观察者,
-        # 实际派发走 EventBus._fanout)。不再默认构造 NotificationBus 实例。
-        self._notification = notification
         # 投递计数器(ADR-0184 D2):按 category 累计四值;EnvelopeBus 维持
         # 原 EventBus 同结构(PR-1 不变更计数器 shape),PR-3 可能改为读
         # DeliveryQueue.depth 等新字段。
@@ -246,14 +230,6 @@ class EnvelopeBus(Generic[P]):
         # tracking: ADR-0184 PR-C)
         # 迁移窗口默认 strict=False(由 EventBus 兼容 shim 处理零 sink 行为)。
         self._delivery_policy = DeliveryPolicy(strict=False)
-
-    @property
-    def queue(self) -> DeliveryQueue:
-        return self._queue
-
-    @property
-    def notification(self) -> NotificationBus | None:
-        return self._notification
 
     @property
     def registry(self) -> EventRegistry:
@@ -268,15 +244,13 @@ class EnvelopeBus(Generic[P]):
         producer: type | str,
         trace_id: str | None = None,
     ) -> EnvelopeRef:
-        """EnvelopeBus.publish —— S1 鉴权 + S2 构造 + S3 入队 + S4 通知。
+        """EnvelopeBus.publish —— S1 鉴权 + S2 构造。
 
         返回 :class:`EnvelopeRef`(4 字段)。EventBus 子类重写为返回
         :class:`EventRef`(6 字段),保留 wire 兼容。
 
-        PR-2 后,S3 会接 PersistenceWorker(同步等 writer flush);
-        本 PR 仅入队。S4 notify 仅当显式注入 NotificationBus 时触发
-        (生产未注入,为 no-op);实际落盘走 _dispatch_sinks 或 PR-2
-        后端 worker。
+        本基类仅做鉴权 + 构造 EnvelopeRef;落盘与派发由 EventBus 子类
+        的 _dispatch_sinks + _fanout 路径处理。
         """
         producer_cls = self._coerce_producer(producer)
         if producer_cls is None:
@@ -309,14 +283,8 @@ class EnvelopeBus(Generic[P]):
         except ImportError:
             pass  # SpineContext 不可用时退回 None
 
-        # S3 —— DeliveryQueue.submit
-        self._queue.submit(ref, payload)
         counts = self._delivery_counts[category.value]
         counts["published"] += 1
-
-        # S4 —— NotificationBus.notify(可选注入;未注入为 no-op)
-        if self._notification is not None:
-            self._notification.notify(ref, payload)
 
         return ref
 
@@ -466,14 +434,9 @@ class EventBus(EnvelopeBus[P]):
            保持现有 wire 行为(persisted / subscriber_count 立即填齐)。
         3. 计数器四值(published / persisted / delivered / dropped)由本类
            累加;super().publish 已记 published,本类重新读+更新。
-
-        PR-2 后:S3 路径会由 PersistenceWorker 接管,本方法的
-        ``_dispatch_sinks`` 会替换为 ``await worker.flush_for(ref.event_id)``
-        或类似同步等机制,wire 兼容 shim 因此保留。
         """
         # NOTE:鉴权 + schema 已在 super().publish 内完成;super()
-        # 已记 published 计数 + DeliveryQueue 入队(+ 可选 NotificationBus.notify,
-        # 生产未注入为 no-op)。
+        # 已记 published 计数。
         # 本方法不重复计数 published,在 finally 内追加 persisted/delivered/dropped。
         producer_cls = self._coerce_producer(producer)
         if producer_cls is None:
@@ -512,7 +475,7 @@ class EventBus(EnvelopeBus[P]):
             # S3:落盘路径保持原 _dispatch_sinks 同步行为;空 sink 走 zero-sink 策略。
             persisted = self._dispatch_sinks(effective, ref)
             ref = replace(ref, persisted=persisted)
-            # S4:同步 fanout 保持原 _fanout 行为;不重复走 NotificationBus。
+            # S4:同步 fanout 保持原 _fanout 行为。
             self._fanout(effective, ref, results)
         finally:
             if persisted:
@@ -528,68 +491,6 @@ class EventBus(EnvelopeBus[P]):
         if any(r.exc is not None for r in results):
             self._run_failure_hooks(effective, ref, results)
 
-        return ref
-
-    async def publish_async(
-        self,
-        payload: EventPayload,
-        *,
-        producer: type | str,
-        trace_id: str | None = None,
-    ) -> EventRef:
-        """异步版 publish:走 :class:`EnvelopeBus.publish` 入队后,
-        同步等 :class:`lca_kernel.events.persistence.PersistenceWorker` 将
-        该 envelope 落盘(经 fsync)。
-
-        用途:
-        - ``EventSpine.append_async`` / ``spine_port_append_async`` 新入口;
-        - 任何需要"事件已落盘"语义的生产端调用点(取代 sync ``publish``
-          中"立刻 expect persisted=True"的兼容语义)。
-
-        与 sync :meth:`publish` 的差别:
-        - sync :meth:`publish` 保持 PR-1 兼容 shim(``_dispatch_sinks`` 同步
-          写已装载 sink),适合 wire 兼容场景;
-        - async :meth:`publish_async` 走后台 worker,S3 真实落盘由 worker
-          串行执行,不阻塞 caller 在 send 后立即 await 之前返回;
-        - 在 ``persisted`` 语义上:async 路径返回 ``persisted=True``(worker
-          flush_for 确认);sync 路径保留 PR-1 行为(``_dispatch_sinks`` 返
-          回值,无 sink 时 False)。
-
-        事件流:S1 鉴权 + S2 构造(走 EnvelopeBus.publish)→ S3 enqueue →
-        await PersistenceWorker.flush_for(ref.event_id)(fsync 完成)→
-        S4 _fanout。
-
-        错误:worker.flush_for 超时抛 :class:`PersistenceFlushTimeout`;
-        super().publish 仍走鉴权 + schema 校验(同 sync publish)。
-        """
-        envelope_ref = super().publish(payload, producer=producer, trace_id=trace_id)
-        # 启动 worker(幂等);让 consumer 拉这条 envelope 并落盘。
-        from lca_kernel.events.persistence import PersistenceWorker
-
-        worker = PersistenceWorker.default()
-        await worker.flush_for(envelope_ref.event_id)
-
-        # 同步 fanout(同 sync publish);不重复 super().publish 已做的 notify,
-        # 但 _fanout 仍按 EventBus 兼容层路径走。
-        ref = EventRef(
-            event_id=envelope_ref.event_id,
-            category=envelope_ref.category,
-            trace_id=envelope_ref.trace_id,
-            ts=envelope_ref.ts,
-            persisted=True,
-            subscriber_count=0,
-        )
-        counts = self._delivery_counts[envelope_ref.category]
-        if envelope_ref.category in counts:
-            counts["persisted"] += 1
-        results: list[ConsumerResult] = []
-        self._fanout(payload, ref, results)
-        if results:
-            counts["delivered"] += 1
-        ref = replace(ref, subscriber_count=len(results))
-        self._run_post_dispatch(payload, ref, results)
-        if any(r.exc is not None for r in results):
-            self._run_failure_hooks(payload, ref, results)
         return ref
 
     def subscribe(

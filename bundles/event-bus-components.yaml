@@ -20,6 +20,12 @@
 #     走 classpath 白名单 + hooks/sinks 段,与本 bundle 是平行通道)。
 
 entries:
+  # ── Kernel event bus（ADR-0183）：providers 依赖 event.bus ──
+  - id: lca.events.bus
+    name: events_bus
+    $module: lca_kernel.events.manifest
+    config: {}
+
   # ── Publishers: cursor + writable matrix ──
   - id: events.spine.loop_cursor
     name: events_spine_loop_cursor

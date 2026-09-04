@@ -24,6 +24,13 @@ The deriver is wrapped with the project ``@plugin`` decorator under
 ``AnomalyDetector`` class are exported for downstream Profile boot
 wiring.
 
+COMPAT(delete-when: ADR-0186 PR-3g anomaly fold/snapshot 替代直接调用,
+       tracking: ADR-0186 PR-3g)
+  当前 anomaly 由 ``EmitPipeline.emit`` 在 record seal 后直接调
+  ``on_event``(不经 EventSpine.subscribe)。PR-3g 收口时改为 Session
+  observer 从 SpineReader snapshot 跑 8-detector scan,不再需要
+  EmitPipeline 持有 anomaly 引用。
+
 References
 ----------
 * ``docs/superpowers/specs/2026-09-01-spine-execution-points-design.md`` §7.5.4.1

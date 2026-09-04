@@ -12,7 +12,6 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from lca_kernel.events.bus import EventBus
 from lca_kernel.events.payloads import Category, SpineEventPayload
 from lca_kernel.events.payloads import TeamDelegationCacheHit as TeamCacheHitPayload
 
@@ -34,6 +33,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.events.publishers._session_publish import publish_via_session
 
 log = logging.getLogger(__name__)
 
@@ -49,15 +49,13 @@ def _send(
     channel: str,
     payload: dict[str, Any],
 ) -> EventRef:
-    from lca_kernel.events.bus import EventBus
-
     sp = SpineEventPayload(
         category=category,
         execution_point=execution_point,
         channel=channel,
         payload=payload,
     )
-    return EventBus.default().publish(sp, producer=ReflectorClass)
+    return publish_via_session(sp, producer=ReflectorClass)
 
 
 # ── team.casting.{started,completed,failed} ──────────────────────────
@@ -169,7 +167,7 @@ def emit_team_delegation_cache_hit(
     """Emit ``spine.team.delegation.cache_hit`` typed via
     :class:`TeamDelegationCacheHit`（yaml SSOT 强制 payload class）。
     """
-    return EventBus.default().publish(
+    return publish_via_session(
         TeamCacheHitPayload(
             category=Category("spine.team.delegation.cache_hit"),
             callee_role=callee_role,

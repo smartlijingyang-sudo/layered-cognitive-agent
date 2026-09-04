@@ -44,7 +44,7 @@ class Config(BaseModel):
     kind=PluginKind.PROVIDER,
     effects="none",
     description=(
-        "Session runtime（PR-3c 骨架）：提供 session.store（in-memory SessionStore）。"
+        "Session runtime：提供 session.store（in-memory SessionStore）。"
         "DSH 风格 Session 实体：append-only 日志真值 + observer contained fire + "
         "reentry 拒绝 + 增量 request_header fold。不接落盘链，不发事件。"
     ),
@@ -64,8 +64,8 @@ class Config(BaseModel):
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Session runtime boot：provide 一个全新 SessionStore（每次 profile 启动一个）。
 
-    外部后果：``session.store`` capability 可被后续 PR 的 run 路径注入；
-    本 PR 无消费方，provide 即全部行为。
+    外部后果：``session.store`` 由 RunSessionBuilder 按 run_id 消费；
+    缺席时 publishers 降级 EventBus。
     """
     del config
     ctx.provide("session.store", SessionStore())

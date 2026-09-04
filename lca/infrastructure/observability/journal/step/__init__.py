@@ -4,8 +4,8 @@
 事件真相: ``traces/runs/<run_id>/<run_id>.spine.jsonl``(SSOT, 单一 append-only)。
 两者的关系:
     - SSOT 是 spine ledger
-    - journal.json 是由 :class:`StepTreeAccumulatorDeriver` 重放 events
-      累积出来的可重建视图(ADR-0167 I-MV3: Replay ≡ finalize)
+    - journal.json 是由 :class:`StepTreeFoldDeriver` 从事件流 fold
+      出来的可重建视图(ADR-0167 I-MV3: Replay ≡ finalize)
     - narrative.md 是 NarrativeDeriver 从同一 events 推导出的另一视图
 
 公开 API:

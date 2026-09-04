@@ -6,14 +6,7 @@
 - test_persistence_worker_flush_for_blocks_until_written:慢 aiter 下 flush_for 阻塞至落盘
 - test_persistence_worker_health_snapshot_fields:7 字段齐(含 consumer_running)
 - test_persistence_worker_fsync_policy_sync_flushes_per_event:SYNC 策略每条 flush
-- test_event_bus_publish_async_routes_through_persistence:EventBus.publish_async
-  走 super().publish → PersistenceObserver.flush_for
-- test_spine_port_append_async_dispatches_to_persistence:spine_port_append_async
-  走 EventBus.publish_async → flush_for
-- test_event_spine_append_async_dispatches_to_persistence:同上,EventSpine.append_async 路径
 - test_spine_file_sink_uses_mount_sink_not_subscribe:验证 manifest 走 mount_sink
-- test_persistence_worker_default_shares_envelope_bus_queue:进程级默认 observer
-  与 EnvelopeBus.default() 共享 DeliveryQueue
 
 PR-3e 新增(PersistenceObserver + EnvelopeDeliveryObserver 路径):
 - test_persistence_observer_is_session_observer:运行时 isinstance 判定
@@ -34,7 +27,6 @@ import pytest
 
 from lca.contracts.event import EventPayload
 from lca_kernel.events import (
-    DeliveryQueue,
     EnvelopeBus,
     EnvelopeRef,
     EventBus,
@@ -42,6 +34,7 @@ from lca_kernel.events import (
     PersistenceObserver,
     TeamDelegationCacheHit,
 )
+from lca_kernel.events.queue import DeliveryQueue
 from lca_kernel.events.persistence import (
     EnvelopeDeliveryObserver,
     EnvelopeDeliveryObserver as DirectEnvelopeDeliveryObserver,
@@ -212,141 +205,7 @@ class TestHealthSnapshot:
         assert snap.consumer_running is False
 
 
-# ── 4:EventBus.publish_async 走 worker ────────────────────────────────────
-
-
-class TestEventBusPublishAsync:
-    async def test_event_bus_publish_async_routes_through_persistence(self) -> None:
-        """EventBus.publish_async → super().publish(入队)→ PersistenceWorker.flush_for
-        等落盘 → 返回 EventRef.persisted=True。
-
-        技巧:让 ``EnvelopeBus.default()`` 返回带本地 queue 的 bus,从而
-        ``PersistenceWorker.default()`` 拿到的是共享该 queue 的 worker;
-        这样 publish_async 走 super().publish 把 envelope 入到 worker
-        也观察得到的同一个 queue,flush_for 不会饿死。
-        """
-        bus: EventBus[EventPayload] = build_test_bus()
-        # 把本实例注册为 EnvelopeBus 进程级默认 → PersistenceWorker.default
-        # 也会拿到同一个 queue。
-        EnvelopeBus.set_default(bus)
-        # 触发 PersistenceWorker 进程级 default:它会取 EnvelopeBus.default().queue
-        worker = PersistenceWorker.default()
-        # 用 stub sink 替换 worker 的 sink,这样我们可以断言落盘结果
-        # 注意:share_queue 后 worker 已经构造,得替换其内部 _sink
-        stub_sink = _StubSink()
-        worker._sink = stub_sink  # type: ignore[attr-defined]
-        await worker.start()
-        ref = await bus.publish_async(_authorized_payload(), producer=_authorized_producer())
-        assert isinstance(ref, EventRef)
-        assert ref.persisted is True
-        # stub sink 收到 1 条 record
-        assert len(stub_sink.records) == 1
-        # cleanup
-        await worker.stop()
-        EnvelopeBus.reset_singleton()
-        PersistenceWorker.reset_singleton()
-
-
-# ── 5:spine_port_append_async + EventSpine.append_async ──────────────────
-
-
-class TestSpineAsyncPaths:
-    async def test_spine_port_append_async_dispatches_to_persistence(self) -> None:
-        """spine_port_append_async → EventBus.publish_async → worker.flush_for 落盘。
-
-        技巧:必须用 ``EventBus.set_default(bus)`` 而非 ``EnvelopeBus.set_default(bus)``——
-        conftest 的 :func:`_reset_singleton` 调用 ``EventBus.reset_singleton()`` 创建
-        ``EventBus._default_instance`` 单独 slot,与 ``EnvelopeBus._default_instance``
-        不共享(类变量继承语义:写子类创建独立 slot)。``EnvelopeBus.set_default(bus)``
-        写不到 ``EventBus._default_instance``,后续 ``EventBus.default()`` 拿到空 cache
-        后构造一个无 test catalog 的新 bus,鉴权失败。``PersistenceWorker.default()``
-        走 :func:`EnvelopeBus.default()`,所以必须用对应的 :func:`EventBus.set_default`。
-        """
-        from lca.infrastructure.observability.loop_cursor._spine_port import (
-            spine_port_append_async,
-        )
-        from lca.infrastructure.observability.spine.sinks.base import EventSink
-
-        bus: EventBus[EventPayload] = build_test_bus()
-        # 必须用 EventBus.set_default,因为 conftest 的 _reset_singleton 调用
-        # EventBus.reset_singleton() 创建 EventBus._default_instance 独立 slot。
-        EventBus.set_default(bus)
-        EnvelopeBus.set_default(bus)
-        worker = PersistenceWorker.default()
-        stub_sink = _StubSink()
-        worker._sink = stub_sink  # type: ignore[attr-defined]
-        await worker.start()
-
-        class _DummySink(EventSink):
-            def __init__(self) -> None:
-                self.records: list[Any] = []
-
-            def write(self, record: Any) -> None:
-                self.records.append(record)
-
-            def close(self) -> None:
-                pass
-
-        dummy_sink = _DummySink()
-        seen: list[Any] = []
-
-        def _subscriber(record: Any) -> None:
-            seen.append(record)
-
-        record = await spine_port_append_async(
-            [dummy_sink],
-            [_subscriber],
-            execution_point="brain.perceive.start",
-            channel="fact",
-            caller_payload={"state_id": "s1"},
-        )
-        assert record.execution_point == "brain.perceive.start"
-        assert len(seen) == 1
-        assert len(stub_sink.records) == 1
-        await worker.stop()
-        EventBus.reset_singleton()
-        EnvelopeBus.reset_singleton()
-        PersistenceWorker.reset_singleton()
-
-    async def test_event_spine_append_async_dispatches_to_persistence(self) -> None:
-        """EventSpine.append_async → spine_port_append_async → EventBus.publish_async。"""
-        from lca.infrastructure.observability.spine.event_spine import EventSpine
-        from lca.infrastructure.observability.spine.sinks.base import EventSink
-
-        bus: EventBus[EventPayload] = build_test_bus()
-        EventBus.set_default(bus)
-        EnvelopeBus.set_default(bus)
-        worker = PersistenceWorker.default()
-        stub_sink = _StubSink()
-        worker._sink = stub_sink  # type: ignore[attr-defined]
-        await worker.start()
-
-        class _DummySink(EventSink):
-            def __init__(self) -> None:
-                self.records: list[Any] = []
-
-            def write(self, record: Any) -> None:
-                self.records.append(record)
-
-            def close(self) -> None:
-                pass
-
-        dummy_sink = _DummySink()
-        spine = EventSpine(sinks=[dummy_sink])
-        record = await spine.append_async(
-            execution_point="brain.perceive.start",
-            channel="fact",
-            caller_payload={"state_id": "s1"},
-        )
-        assert record.execution_point == "brain.perceive.start"
-        assert len(stub_sink.records) == 1
-        await worker.stop()
-        EventBus.reset_singleton()
-        EnvelopeBus.reset_singleton()
-        PersistenceWorker.reset_singleton()
-
-
-# ── 6:spine_file_sink manifest 走 mount_sink ─────────────────────────────
+# ── 5:spine_file_sink manifest 走 mount_sink ─────────────────────────────
 
 
 class TestSpineFileSinkManifest:
@@ -375,30 +234,7 @@ class TestSpineFileSinkManifest:
         )
 
 
-# ── 7:进程级默认 worker 共享 EnvelopeBus.queue ───────────────────────────
-
-
-class TestDefaultSingleton:
-    def test_persistence_worker_default_shares_envelope_bus_queue(self) -> None:
-        """``PersistenceWorker.default()`` 必须与 ``EnvelopeBus.default()``
-        共享同一 DeliveryQueue 实例,否则 flush_for 永远等不到 enqueue。
-
-        注:本测试需要先 reset conftest 创建的 EventBus._default_instance
-        独立 slot —— 直接调 :func:`EventBus.reset_singleton` 与
-        :func:`EnvelopeBus.reset_singleton` 把两侧都清空,然后让 worker 重新
-        走 :func:`EnvelopeBus.default` (注意:不走 EventBus.default,以免走
-        到 EventBus 的独立 cache)。
-        """
-        EventBus.reset_singleton()
-        EnvelopeBus.reset_singleton()
-        PersistenceWorker.reset_singleton()
-        # 用 EnvelopeBus.default()—— PersistenceWorker.default() 内部也走它。
-        bus = EnvelopeBus.default()
-        worker = PersistenceWorker.default()
-        assert worker.queue is bus.queue
-
-
-# ── 8:PR-3e PersistenceObserver + EnvelopeDeliveryObserver 协议 ───────────────────
+# ── 6:PR-3e PersistenceObserver + EnvelopeDeliveryObserver 协议 ───────────────────
 
 
 class _RaisingSink:

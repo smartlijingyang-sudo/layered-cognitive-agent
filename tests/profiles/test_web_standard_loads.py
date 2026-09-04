@@ -31,10 +31,13 @@ def test_web_standard_loads_without_error() -> None:
     assert src is not None
     assert src.bundles == (
         "bundles/base.yaml",
+        "bundles/observability-default.yaml",
         "bundles/web-app.yaml",
         "bundles/scenario-cordis-creator.yaml",
         "bundles/declarative-phase-graph.yaml",
         "bundles/loop_cursor.spine_default.yaml",
+        "bundles/session-runtime.yaml",
+        "bundles/event-bus-components.yaml",
     )
 
 

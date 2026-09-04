@@ -1,17 +1,20 @@
-"""PersistenceObserver —— ADR-0184 PR-3e 落盘 observer。
+"""PersistenceObserver —— ADR-0186 PR-3e 落盘 observer。
 
 唯一 :class:`lca_kernel.events.sinks.SinkBackend`(<run_id>.spine.jsonl)
 异步消费者:后台 :class:`asyncio.Task` 拉 :class:`lca_kernel.events.queue.DeliveryQueue`
 逐 envelope 调 :func:`lca_kernel.events.spine_runtime.build_record` + ``backend.append``,
 fsync 策略可配。
 
-PR-3e(对齐 DSH ``JsonlSessionPersistence``):observer 形态取代 worker 形态。
-- 实现 :class:`EnvelopeDeliveryObserver` 协议(``on_session_event``);后续对齐 Session.observe
-  直接调 observer 而不是后台 consumer loop 拉 queue。
+PR-3e(对齐 DSH ``JsonlSessionPersistence``):observer 形态,两条入口共享同一 sink。
+- 实现 :class:`lca_kernel.events.session.SessionObserver` (``__call__(session, event)``):
+  可直接 ``Session.observe(observer)``。SessionEvent 映射为 payload/ref 后写
+  同一 sink(保留 ``trace_id``)。
+- 实现 :class:`EnvelopeDeliveryObserver` (``on_session_event(payload, ref)``)。
 - 后台 consumer 路径保留,仍走 ``queue.aiter`` + ``on_session_event``(内
   部等价),便于 :class:`EventBus.publish_async` 的强一致 flush_for 复用。
-- 失败 ``contained``:单条 envelope 落盘失败 / build_record 失败仅记日
-  志 + ``mark_drained``,不杀 consumer loop(与 DSH 一致)。
+- 失败 ``contained``:单条 envelope 落盘失败 / build_record / SessionEvent 映射
+  失败仅记日志 + ``mark_drained``,不杀 consumer loop、不上抛 Session.append
+  (与 DSH 一致)。
 
 责任边界:
 - 唯一 ``seq/epoch/hash`` 分配链消费者(经 :mod:`lca.infrastructure.observability.spine.context`
@@ -30,7 +33,8 @@ PR-3e(对齐 DSH ``JsonlSessionPersistence``):observer 形态取代 worker 形�
   SYNC/BATCH 在 consume loop 内 inline 调用 ``backend.flush``;ASYNC 留给上层 Profile 接入。
 - ``PersistenceHealthSnapshot`` 暴露给 ``/health`` + ``lca-ops events-delivery --policy``。
 
-COMPAT(delete-when: 2026-10-04 后无人引用,tracking: ADR-0184 PR-3e):
+COMPAT(delete-when: 2026-10-04 后无人引用 PersistenceWorker 符号,
+       tracking: ADR-0186 PR-3e):
 :class:`PersistenceWorker` 是 :class:`PersistenceObserver` 的别名,保留 30 天
 以兼容 PR-2 引入期间已发布的内部引用(bus / event_spine / webserver handler / CLI)。
 """
@@ -43,12 +47,13 @@ import enum
 import logging
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from lca.contracts.event import EventPayload
     from lca_kernel.events.bus import EnvelopeRef
     from lca_kernel.events.queue import DeliveryQueue
+    from lca_kernel.events.session import SessionEvent, SessionObserver, SessionProtocol
     from lca_kernel.events.sinks import SinkBackend
     from lca_kernel.events.spine_runtime import SpineEventRecord
 
@@ -78,6 +83,101 @@ class EnvelopeDeliveryObserver(Protocol):
         payload: EventPayload,
         ref: EnvelopeRef,
     ) -> None: ...
+
+
+# SessionEvent.data 里若携带这些键,视为信封字段而非 inner payload。
+_SESSION_EVENT_ENVELOPE_KEYS: frozenset[str] = frozenset(
+    {"event_id", "trace_id", "execution_point", "channel", "payload", "prev_event_hash"}
+)
+
+
+@dataclass(frozen=True, slots=True)
+class _MappedSessionPayload:
+    """SessionEvent → build_record 的鸭子 payload(非公开 EventPayload 子类)。
+
+    ``build_record`` 只读 ``execution_point`` / ``channel`` / ``payload`` /
+    ``prev_event_hash``;Session 事件词表开放,不能强制 :class:`Category`。
+    """
+
+    execution_point: str
+    channel: str
+    payload: dict[str, Any]
+    prev_event_hash: str | None = None
+
+
+def _map_session_event(
+    session: SessionProtocol,
+    event: SessionEvent,
+) -> tuple[_MappedSessionPayload, EnvelopeRef]:
+    """Best-effort SessionEvent → (payload, EnvelopeRef)。
+
+    映射规则(缺字段用稳定默认,不抛):
+
+    - ``event_id``: ``data.event_id`` 非空,否则 ``{session.id}:{event.seq}``
+    - ``trace_id``: ``data.trace_id`` 非空,否则 ``session.id``
+    - ``category``: ``event.type``
+    - ``ts``: ``event.time`` 毫秒 → 秒
+    - inner payload: ``data.payload`` 若为 dict,否则去掉信封键后的 ``data``
+    """
+    from lca_kernel.events.bus import EnvelopeRef
+
+    data = event.data
+    raw_id = data.get("event_id")
+    event_id = str(raw_id) if raw_id not in (None, "") else f"{session.id}:{event.seq}"
+    raw_trace = data.get("trace_id")
+    trace_id = str(raw_trace) if raw_trace not in (None, "") else session.id
+    execution_point = data.get("execution_point")
+    if not isinstance(execution_point, str) or not execution_point:
+        execution_point = "unknown"
+    channel = data.get("channel")
+    if not isinstance(channel, str) or not channel:
+        channel = "fact"
+    nested = data.get("payload")
+    if isinstance(nested, dict):
+        inner: dict[str, Any] = dict(nested)
+    else:
+        inner = {k: v for k, v in data.items() if k not in _SESSION_EVENT_ENVELOPE_KEYS}
+    raw_hash = data.get("prev_event_hash")
+    prev_hash = raw_hash if isinstance(raw_hash, str) else None
+    ref = EnvelopeRef(
+        event_id=event_id,
+        category=event.type,
+        trace_id=trace_id,
+        ts=event.time / 1000.0,
+    )
+    payload = _MappedSessionPayload(
+        execution_point=execution_point,
+        channel=channel,
+        payload=inner,
+        prev_event_hash=prev_hash,
+    )
+    return payload, ref
+
+
+def _spine_record_from_mapped(
+    mapped: _MappedSessionPayload,
+    ref: EnvelopeRef,
+) -> SpineEventRecord:
+    """Session 路径:把映射后的 payload/ref 写成 SpineEventRecord,保留 trace_id。
+
+    ``build_record`` 不透传 ``ref.trace_id``;Session 事件以 session.id 为默认
+    trace,必须写进 durable 记录,不能走那条丢失路径。
+    """
+    from datetime import datetime, timezone
+
+    from lca_kernel.events.spine_runtime import SpineEventRecord
+
+    ts = datetime.fromtimestamp(ref.ts, tz=timezone.utc).isoformat()
+    return SpineEventRecord(
+        event_id=ref.event_id,
+        category=ref.category,
+        execution_point=mapped.execution_point,
+        channel=mapped.channel,
+        payload=dict(mapped.payload),
+        ts=ts,
+        prev_event_hash=mapped.prev_event_hash,
+        trace_id=ref.trace_id,
+    )
 
 
 # ── 公开 enum / dataclass ────────────────────────────────────────────────
@@ -131,13 +231,16 @@ class PersistenceHealthSnapshot:
 
 
 class PersistenceObserver:
-    """Session observer + 后台 consumer + fsync 策略承载者(PR-3e)。
+    """SessionObserver + EnvelopeDeliveryObserver + 后台 consumer(PR-3e)。
 
-    实现 :class:`EnvelopeDeliveryObserver` 协议:外部(SyncEventBus / SessionBus 等)
-    可直接调 :meth:`on_session_event`,等价于 enqueue + 后台 consumer 消费。
+    实现 :class:`SessionObserver`:``Session.observe(observer)`` 在 append 提交后
+    调 :meth:`__call__`,内部映射 SessionEvent → payload/ref 再走
+    :meth:`on_session_event`。
+    实现 :class:`EnvelopeDeliveryObserver`:外部(SyncEventBus / SessionBus 等)
+    可直接调 :meth:`on_session_event`。
     后台 ``_consume_loop`` 内部也走 :meth:`on_session_event`(统一 sink 写入
-    入口),保证两条路径(直接 observer 回调 vs queue 异步消费)共享同一
-    fsync 策略 + 计数器。
+    入口),保证三条路径(Session.observe / 直接 observer 回调 / queue 异步消费)
+    共享同一 fsync 策略 + 计数器。
 
     进程级单例(:meth:`default`);与 :class:`lca_kernel.events.bus.EventBus.default`
     的 DeliveryQueue **解耦**——sync :meth:`EventBus.publish` 仍走
@@ -178,6 +281,44 @@ class PersistenceObserver:
 
     # ── SessionObserver 协议 ─────────────────────────────────────────────
 
+    def __call__(self, session: SessionProtocol, event: SessionEvent) -> None:
+        """SessionObserver 入口:``Session.observe(self)`` 注册后,append 提交即调用。
+
+        失败 **contained**:SessionEvent → payload/ref 映射失败只记日志 +
+        通知 flush_for,不向 :meth:`SessionProtocol.append` 上抛。落盘失败
+        由 :meth:`on_session_event` 同样 contained。
+
+        Args:
+            session: 已提交本事件的 Session(日志已含 ``event``)。
+            event: 刚入日志的 :class:`SessionEvent`。
+        """
+        try:
+            mapped_payload, ref = _map_session_event(session, event)
+            record = _spine_record_from_mapped(mapped_payload, ref)
+        except Exception:
+            event_id = f"{session.id}:{event.seq}"
+            log.exception(
+                "session event mapping failed; envelope not persisted",
+                extra={
+                    "event_id": event_id,
+                    "session_id": session.id,
+                    "seq": event.seq,
+                },
+            )
+            self._notify_flush(event_id)
+            return
+        self._persist_record(record, ref.event_id)
+
+    def as_session_observer(self) -> SessionObserver:
+        """Adapter:本实例作为 :class:`SessionObserver` 交给 ``Session.observe``。
+
+        返回 ``self``(:meth:`__call__` 即 Protocol 入口)。显式方法让注册意图
+        可检索,不必把 PersistenceObserver 当裸 callable 传递。
+        """
+        return self
+
+    # ── EnvelopeDeliveryObserver 协议 ────────────────────────────────────
+
     def on_session_event(
         self,
         payload: EventPayload,
@@ -206,44 +347,20 @@ class PersistenceObserver:
             )
             self._notify_flush(ref.event_id)
             return
-        try:
-            self._sink.append(record)
-        except Exception:
-            log.exception(
-                "sink append failed; envelope not persisted",
-                extra={
-                    "event_id": ref.event_id,
-                    "sink_id": type(self._sink).__name__,
-                },
-            )
-            self._notify_flush(ref.event_id)
-            return
-        # 落盘成功:更新计数 + 触发 fsync + 通知 flush_for。
-        self._written_event_ids.add(ref.event_id)
-        self._written_total += 1
-        if self._fsync_policy is FsyncPolicy.SYNC:
-            self._sink.flush()
-            self._last_flush_ms = int(time.time() * 1000)
-        elif self._fsync_policy is FsyncPolicy.BATCH and self._fsync_interval_ms > 0:
-            self._maybe_fsync_batched()
-        self._notify_flush(ref.event_id)
+        self._persist_record(record, ref.event_id)
 
     # ── 进程级单例 ───────────────────────────────────────────────────────
 
     @classmethod
     def default(cls) -> PersistenceObserver:
-        """进程级默认实例。多次调用返回同一对象,共享其 DeliveryQueue 与 sink。
+        """进程级默认实例。多次调用返回同一对象。
 
-        与 :meth:`lca_kernel.events.bus.EnvelopeBus.default` 共享
-        :class:`lca_kernel.events.queue.DeliveryQueue` —— 这是单实例 SSOT 的关键:
-        ``EnvelopeBus.publish`` 入队的 envelope 与本 observer consumer 的拉取源
-        必须是**同一队列**,否则 :meth:`flush_for` 永远等不到。
+        ADR-0186 PR-3b 后 ``EnvelopeBus`` 不再持有 ``DeliveryQueue``；
+        默认实例自建内部队列（仅服务仍走 ``on_session_event`` / flush 的路径）。
+        Session.observe 主写路径不依赖本单例与 bus 共享队列。
         """
         if cls._default_instance is None:
-            from lca_kernel.events.bus import EnvelopeBus
-
-            bus = EnvelopeBus.default()
-            cls._default_instance = cls(queue=bus.queue)
+            cls._default_instance = cls()
         return cls._default_instance
 
     @classmethod
@@ -438,6 +555,33 @@ class PersistenceObserver:
             self._sink.flush()
             self._last_flush_ms = now_ms
 
+    def _persist_record(self, record: SpineEventRecord, event_id: str) -> None:
+        """写一条 record 到 sink;失败 contained。
+
+        成功则更新 written 计数、按 fsync_policy flush、通知 flush_for。
+        Session.observe 与 EnvelopeDeliveryObserver 共用本入口。
+        """
+        try:
+            self._sink.append(record)
+        except Exception:
+            log.exception(
+                "sink append failed; envelope not persisted",
+                extra={
+                    "event_id": event_id,
+                    "sink_id": type(self._sink).__name__,
+                },
+            )
+            self._notify_flush(event_id)
+            return
+        self._written_event_ids.add(event_id)
+        self._written_total += 1
+        if self._fsync_policy is FsyncPolicy.SYNC:
+            self._sink.flush()
+            self._last_flush_ms = int(time.time() * 1000)
+        elif self._fsync_policy is FsyncPolicy.BATCH and self._fsync_interval_ms > 0:
+            self._maybe_fsync_batched()
+        self._notify_flush(event_id)
+
     def _notify_flush(self, event_id: str) -> None:
         """通知 ``flush_for`` 等待方。事件未必"成功 fsync"(只是离开 queue)。"""
         event: asyncio.Event | None = self._flush_events.pop(event_id, None)
@@ -459,13 +603,15 @@ class PersistenceObserver:
 
 
 # COMPAT(delete-when: 2026-10-04 后无人引用 PersistenceWorker 符号,
-#        tracking: ADR-0184 PR-3e):PR-2 引入期已发布的内部引用
+#        tracking: ADR-0186 PR-3e):PR-2 引入期已发布的内部引用
 #        (lca_kernel.events.bus.publish_async / lca.infrastructure.observability
 #        .spine.event_spine.append_async / lca.infrastructure.cli.commands
 #        .events_delivery / webserver handler query_endpoints)在 PR-3e 收口前
 #        已锁定为 PersistenceWorker 字面量;为避免一次性大范围 churn 触发
 #        回归,保留同名字符串别名 30 天,后续 PR-3e-followup 逐文件迁移。
-PersistenceWorker = PersistenceObserver
+PersistenceWorker = (
+    PersistenceObserver  # COMPAT(delete-when: 2026-10-04 后无人引用, tracking: ADR-0186 PR-3e)
+)
 
 
 __all__ = [

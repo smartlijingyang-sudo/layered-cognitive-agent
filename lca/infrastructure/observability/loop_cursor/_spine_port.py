@@ -147,9 +147,10 @@ def spine_port_append(
     ``session_hook`` 参数与同步直写回退调用方清零;
     tracking: ADR-0185 PR-3h 骨架)
     """
-    if session_hook is not None:
+    effective_hook = session_hook or get_session_append_hook()
+    if effective_hook is not None:
         try:
-            return session_hook(
+            return effective_hook(
                 sinks,
                 subscribers,
                 execution_point=execution_point,
@@ -297,119 +298,6 @@ def write_port_append(
     return seq
 
 
-# ── ADR-0184 PR-2:spine_port_append_async + EventSpine.append_async 兼容 shim ──
-
-
-async def spine_port_append_async(
-    sinks: Sequence[EventSink],
-    subscribers: Sequence[Callable[[EventRecord], None]],
-    *,
-    execution_point: str,
-    channel: Channel,
-    caller_payload: dict[str, Any] | None = None,
-    outcome: Outcome | None = None,
-    span_ctx: Any | None = None,
-    phase: Phase = "live",
-    reason: str | None = None,
-    when: datetime | None = None,
-    ref: Any = None,
-) -> EventRecord:
-    """spine_port_append 异步版 — ADR-0184 PR-2 入口,走 EnvelopeBus + PersistenceWorker。
-
-    同步版 :func:`spine_port_append` 仍走 FileSink 直写(SSR 兼容 shim);异步版
-    经 :class:`lca_kernel.events.bus.EventBus.publish_async` 入队 + 等 worker
-    落盘,构造 :class:`lca.infrastructure.observability.spine.event_record.EventRecord`
-    返回给 caller(供老 subscribers 链收尾)。
-
-    ``subscribers`` 仍按原顺序同步调(callback 失败 contained 吞错);这是与
-    老路径的唯一同步钩子,可让 :class:`step_tree_accumulator_step_tree_accumulator` 一类
-    deriver 收到事件后做模型可见状态。
-    """
-    from lca.contracts.event import Category
-    from lca_kernel.events.bus import EventBus
-    from lca_kernel.events.payloads import SpineEventPayload
-    from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
-    from lca_kernel.events.spine_runtime import build_record
-
-    cat_str = _SPINE_EP_TO_CATEGORY.get(execution_point)
-    if cat_str is None:
-        raise ValueError(f"spine EP {execution_point!r} 未登记 category 映射(ADR-0181 后续 PR 补)")
-
-    payload = SpineEventPayload(
-        category=Category(cat_str),
-        execution_point=execution_point,
-        channel=str(channel),
-        payload=caller_payload or {},
-    )
-
-    # 调 EnvelopeBus.publish_async → super().publish 入队 → worker.flush_for 落盘。
-    # producer 用 spine_reflector_cognition 的 marker 类(已在注册表)通过鉴权。
-    # 生产 plugin 主体仍走老 sync :func:`spine_port_append` 直写;本 async 入口
-    # 是 PR-3 迁入准备。
-    from lca.plugins.events.publishers.spine_reflector_cognition.plugin import (
-        ReflectorClass,
-    )
-
-    event_ref = await EventBus.default().publish_async(payload, producer=ReflectorClass)
-
-    # 同老路径:构造 EventRecord 给老 subscribers 同步回调(供 deriver)。
-    record = build_record(payload, event_ref)
-    for fn in subscribers:
-        try:
-            fn(record)
-        except Exception:
-            log.warning(
-                "spine.deriver_failed (async path) execution_point=%s deriver=%s",
-                record.execution_point,
-                getattr(fn, "__qualname__", repr(fn)),
-                exc_info=True,
-            )
-
-    return record
-
-
-def write_port_append_async(
-    spine: Any,
-    *,
-    execution_point: str,
-    payload: dict[str, Any],
-    run_id: str,
-    seq: int,
-    incarnation: int,
-    phase: str | None,
-) -> int:
-    """WritePort 异步版本(ADR-0184 PR-2 shim)。
-
-    生产路径仍走老 :func:`write_port_append`;本函数保留作为新入口,
-    仅当 spine 句柄支持 ``append_async`` 时被驱动,否则退回老路径。
-
-    # COMPAT(delete-when: PR-3 把 cursor 完全迁到 EventBus.publish_async,
-    # tracking: ADR-0184 PR-2)
-    """
-    if not hasattr(spine, "append_async"):
-        return write_port_append(
-            spine,
-            execution_point=execution_point,
-            payload=payload,
-            run_id=run_id,
-            seq=seq,
-            incarnation=incarnation,
-            phase=phase,
-        )
-    SpineContext.set_run(run_id)
-    merged_payload = {**payload, "incarnation": incarnation}
-    return spine.append_async(
-        execution_point=execution_point,
-        caller_payload=merged_payload,
-        channel="fact",
-        outcome=None,
-        span_ctx=None,
-        phase="live" if phase is None else str(phase),
-        reason=None,
-        when=None,
-    )
-
-
 __all__ = [
     "SessionAppendHook",
     "WritePort",
@@ -417,7 +305,5 @@ __all__ = [
     "get_session_append_hook",
     "reset_session_append_hook",
     "spine_port_append",
-    "spine_port_append_async",
     "write_port_append",
-    "write_port_append_async",
 ]

@@ -93,13 +93,29 @@ class SpineStepTreeAccumulator:
     marker_class=SpineStepTreeAccumulator,
 )
 async def setup(ctx: PluginContext, config: _Config) -> None:
-    """spine_step_tree_accumulator boot：注册 subscriber marker 给 ctx。
+    """spine_step_tree_accumulator boot — Session.observe 优先；缺席回退 marker。
+
+    PR-3f-sample：subscriber 优先经
+    :func:`lca.plugins.events._session_observe.register_as_session_observer`
+    注册到 Session 观察面；Session 未装载时回退原 wire —— 仅注册 marker
+    并提供 capability（plugin 鉴权受 ``spine.cognition.brain.perceive.*``
+    子树白名单限制，由 yaml consumer_rules 物化；具体 category 的
+    subscribe 发生在下游被装配时）。
 
     # COMPAT(delete-when: PR-6 鉴权三方一致, tracking: ADR-0183)
     # yaml consumer_rules 当前仍按类路径订阅；plugin 上线后逐步迁至
     # registry-based 订阅，PR-6 收口。setup 内部仅注册 marker + 提供 capability。
     """
-    ctx.provide("event.bus.step_tree_accumulator", SpineStepTreeAccumulator())
+    from lca.plugins.events._session_observe import register_as_session_observer
+
+    subscriber = SpineStepTreeAccumulator()
+    if register_as_session_observer(SpineStepTreeAccumulator, subscriber):
+        ctx.provide("event.bus.step_tree_accumulator", subscriber)
+        return
+
+    # COMPAT(delete-when: Session.observe 机制落地且 spine step tree 全迁，本文件
+    # rg "ctx.provide" = 0；tracking: ADR-0183 后续 PR-3f-sample)
+    ctx.provide("event.bus.step_tree_accumulator", subscriber)
 
 
 __all__ = ["SpineStepTreeAccumulator", "setup"]
