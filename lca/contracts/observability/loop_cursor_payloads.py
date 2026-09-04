@@ -23,15 +23,61 @@ class ThinkingRecord:
     content_digest: str
     content_path: str | None
     token_count: int | None
-    thinking_kind: Literal["reasoning", "final_response", "compaction"]
+    thinking_kind: Literal[
+        "reasoning",
+        "final_response",
+        "compaction",
+        "tool_call_response",
+        "tool_use_response",
+    ]
+    """Thinking record 闭集(ADR-0185 spec §2.4 P4)。
+
+    - ``reasoning`` —— 模型内部推理(无对外工具调用)
+    - ``final_response`` —— 模型产出的纯文本回复
+    - ``compaction`` —— 上下文压缩阶段
+    - ``tool_call_response`` —— 模型产出含 tool_calls;fold 重建时按
+      ``SpineLlmRequestHeaderAssistantPayload.tool_calls`` 长度 > 0
+      分类,不再打 ``final_response``(修复 spec §0.3 "thinking_kind=
+      final_response 但实际是 tool_call" BUG)
+    - ``tool_use_response`` —— fold 折叠后看到的同 tool_call_response,
+      保留区分值让 caller(doctpr / viewer)按 fold 状态判定;
+
+    修复前后:旧 capture 一律打 ``final_response``;P4 后 producer
+    透传 ``tool_call_response`` / ``tool_use_response``,fold 折叠
+    后的最终 thinking_kind 由 producer 端在调用前判定(见 spec §2.4
+    "P4 必须在 P0 之后才能由 fold 派出来")。
+
+    delete-when:N/A(纯加法,后续 PR-2 publisher fold 状态、PR-3
+    viewer 重建、PR-4 删旁路文件都依赖本模块做语义锚点)。
+    """
 
 
 @dataclass(frozen=True)
 class ToolCallRecord:
+    """cursor 侧 tool_call 记录。
+
+    - ``tool_name`` —— 工具名(主字段,canonical)
+    - ``call_seq`` —— cursor 内自增,保留。
+    - ``args_digest`` —— **deprecated**(ADR-0185 spec §2.5 P5)。
+      digest 引用;原承担 sidecar 文件指针。保留 1 个 minor 版本以兼容
+      ``StdLoopCursor.record_tool_call`` + fold / spine 现有 consumer;
+      caller 应读 ``tool_name`` + 由 caller 端 caller-projected 字段。
+      delete-when:下个 minor 版本后,或所有 caller 迁移完毕时。
+      tracking: ADR-0185 spec §2.5 P5。
+    - ``args_payload_path`` —— 同上 deprecated(原 sidecar payload path)。
+
+    字段命名冻结(ADR-0185 spec §2.5):``tool_name`` / ``call_seq`` 是
+    canonical,``args_digest`` / ``args_payload_path`` 下个 minor 版本删。
+    """
+
     tool_name: str
-    args_digest: str
-    args_payload_path: str | None
     call_seq: int  # cursor 内自增
+    # COMPAT(delete-when: 下个 minor 版本,或所有 caller 迁完;
+    #   tracking: ADR-0185 spec §2.5 P5)
+    args_digest: str = ""
+    # COMPAT(delete-when: 下个 minor 版本,或所有 caller 迁完;
+    #   tracking: ADR-0185 spec §2.5 P5)
+    args_payload_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -44,14 +90,23 @@ class ToolResultRecord:
 
 @dataclass(frozen=True)
 class RequestHeader:
-    """cursor 注入 step_id / incarnation;业务路径不能填(ADR-0169 D4)。"""
+    """cursor 注入 step_id / incarnation;业务路径不能填(ADR-0169 D4)。
+
+    字段命名冻结(ADR-0185 spec §2.5 P5):
+
+    - ``messages_digest`` / ``messages_path`` —— 唯一权威;同时承担
+      旧 ``system_digest`` / ``system_path`` 的语义(system 文本已合并
+      进 messages.json,见 ADR-0176 D4)。
+    - ``system_digest`` / ``system_path`` —— **deprecated**;保留1个
+      minor 版本以兼容 sidecar(`StdModelVisibleCapture` / `StdReasonerPromptCapture`
+      / `ModelVisibleLLMAdapter`)及其测试,SA-3 删旁路文件时一并
+      删这两个字段。caller 应读 ``messages_*`` 字段。
+    """
 
     step_id: str
     incarnation: int
     reason: Literal["initial", "next_step", "series", "change", "inherited"]
     model: str
-    system_digest: str
-    system_path: str
     tools_digest: str
     tools_path: str
     messages_digest: str
@@ -59,6 +114,10 @@ class RequestHeader:
     manifest_digest: str
     manifest_path: str
     inherited_from_step: str | None = None
+    # COMPAT(delete-when: SA-3 删旁路文件 + 旁路测试一并落地;或 1 个
+    #   minor 版本后强制退役,tracking: ADR-0185 spec §2.5 P5)
+    system_digest: str = ""
+    system_path: str = ""
 
 
 @dataclass(frozen=True)

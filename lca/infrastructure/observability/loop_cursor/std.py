@@ -364,8 +364,10 @@ class StdLoopCursor:
                 "plan_ref": self._state.incarnation.plan_ref,
                 "reason": header.reason,
                 "model": header.model,
-                "system_digest": header.system_digest,
-                "system_path": header.system_path,
+                # ADR-0185 spec §2.5 P5:system_digest / system_path 已
+                # 合并到 messages_digest / messages_path(ADR-0176 D4),
+                # 本写入只发 messages_* —— caller 从 messages_path 读
+                # system 段。1 个 minor 版本兼容期后纯 messages_*。
                 "tools_digest": header.tools_digest,
                 "tools_path": header.tools_path,
                 "messages_digest": header.messages_digest,

@@ -134,6 +134,24 @@ class SectionTrace:
     text: str = ""  # ADR-0176 D3:section 实际渲染正文(replay 可零 token 重建)
 
 
+AvailableSkillsReason = Literal["not_enabled", "no_match", "activated"]
+"""SkillRouter 决策原因闭集(ADR-0185 spec §2.4 P4)。
+
+区分 SkillRouter 三种状态:
+
+- ``not_enabled`` —— profile / agent 未启用 skill_router(等价
+  ``activated_skill_ids=()`` 且 ``available_skills_count=0``)
+- ``no_match`` —— skill_router 已启用,但本 step 关键词未命中
+  任何规则,回退到 default_template(``activated_skill_ids=()``)
+- ``activated`` —— skill_router 命中规则并返回非 default 模板
+  (``activated_skill_ids`` 非空)
+
+设计上,``available_skills_count`` 与 ``activated_skill_ids`` 的
+真实状态由 producer 端(assembler)在 trace 上落,本闭集只是 caller
+侧 truthiness → 原因的派生。
+"""
+
+
 @dataclass(frozen=True, slots=True)
 class PromptTrace:
     """Full render trace produced by :class:`PromptAssembler` (ADR-0175 D2).
@@ -153,6 +171,23 @@ class PromptTrace:
     tools_count: int
     available_skills_count: int
     system_prompt_text: str
+    available_skills_reason: AvailableSkillsReason = "not_enabled"
+    """SkillRouter 决策原因(ADR-0185 spec §2.4 P4)。
+
+    由 assembler 在构造 trace 时基于 ``activated_skill_ids`` /
+    ``available_skills_count`` 派生:
+
+    - ``not_enabled`` —— ``available_skills_count == 0`` 且
+      ``activated_skill_ids == ()``
+    - ``no_match`` —— ``available_skills_count > 0`` 但
+      ``activated_skill_ids == ()``
+    - ``activated`` —— ``activated_skill_ids`` 非空
+
+    旧字段 ``activated_skill_ids=[]`` 与 ``available_skills_count=0``
+    不区分原因(spec §0.3 病灶),本字段统一解释。
+
+    delete-when:N/A(纯加法,narrative 章节 P1 与 viewer 都依赖)。
+    """
 
 
 SelectorDecisionPath = Literal[
@@ -336,6 +371,7 @@ def normalize_assembler_result(
 
 
 __all__ = [
+    "AvailableSkillsReason",
     "BrainPromptCatalog",
     "MissingPromptSectionError",
     "MissingSectionKindError",
