@@ -33,7 +33,7 @@ class BrainComposer:
     ) -> AgentGraphContribution:
         """Return the graph contribution selected for this Agent's think cluster."""
 
-        llm = instrument_llm(request.spec.llm)
+        llm = instrument_llm(request.spec.llm, ctx=scope)
         brain = resolve_brain(request.spec, llm, scope=scope)
         if request.decision_gate is not None:
             brain = apply_lead_brain(brain, request.decision_gate)
