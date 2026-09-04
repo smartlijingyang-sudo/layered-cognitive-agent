@@ -111,6 +111,7 @@ class RunExecutionEnvironment:
             trace_id=session.trace_id,
             attachment_ids=tuple(session.attachment_ids or ()),
             file_store=cast("FileStore | None", providers.file_store),
+            assistant_id=(getattr(session, "assistant_id", "") or "").strip(),
         )
         # ADR-0167 D11: bind StepCoordinator + facade RunContext。
         # StepCoordinator 是 Agent 唯一可见写入口 (D2); 通过 ContextVar 注入,
@@ -130,11 +131,17 @@ class RunExecutionEnvironment:
             coordinator_token = bind_current_coordinator(coordinator)
 
         agent = session.agent
-        agent_role = (
-            agent.name
-            if agent is not None and agent.name
-            else (agent.agent_id if agent is not None and agent.agent_id else "")
-        )
+        assistant_id = (getattr(session, "assistant_id", "") or "").strip()
+        if assistant_id:
+            # I-A2：带 assistant_id 的 run，agent 级载体值 = 该 id；
+            # Spine EP 的 source / actor_role 以此为身份。
+            agent_role = assistant_id
+        else:
+            agent_role = (
+                agent.name
+                if agent is not None and agent.name
+                else (agent.agent_id if agent is not None and agent.agent_id else "")
+            )
         facade_ctx = FacadeRunContext(
             run_id=cast("RunId", session.run_id),
             trace_id=cast("TraceId", session.trace_id),
@@ -148,10 +155,13 @@ class RunExecutionEnvironment:
             run_attachment_scope(session.attachment_ids),
             search_run_scope(),
         ):
-            structlog.contextvars.bind_contextvars(
-                run_id=session.run_id,
-                trace_id=session.trace_id,
-            )
+            log_context: dict[str, str] = {
+                "run_id": session.run_id,
+                "trace_id": session.trace_id,
+            }
+            if assistant_id:
+                log_context["assistant_id"] = assistant_id
+            structlog.contextvars.bind_contextvars(**log_context)
             try:
                 with (
                     run_workspace_scope(session.run_id) as workspace,

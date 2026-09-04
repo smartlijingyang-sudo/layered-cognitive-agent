@@ -252,6 +252,8 @@ def test_fire_assistant_job_returns_501_when_jobs_missing() -> None:
     response = client.post("/v1/assistants/asst_1/jobs/daily_brief:fire")
     assert response.status_code == 501
     assert response.json()["error"]["code"] == "jobs_unavailable"
+
+
 # ── PR-6: install handler wired behavior ─────────────────────────────
 
 
@@ -515,3 +517,101 @@ def test_handlers_are_coroutine_callables() -> None:
         fire_assistant_job,
     ):
         assert inspect.iscoroutinefunction(fn), f"{fn.__name__} must be async"
+
+
+# ── catalog-present behavior（PR-7 wiring：create/list/get 实装）──────
+
+
+def _app_with_catalog(tmp_path: Any) -> tuple[Starlette, Any]:
+    """Materialise routes with a live AssistantCatalog on app.state."""
+    from pathlib import Path
+
+    from lca.plugins.assistant.catalog import AssistantCatalogImpl
+
+    plugin, router, ctx = _setup_plugin()
+    _run_plugin_setup(plugin, ctx)
+    app = Starlette()
+    router.install(app)
+    catalog = AssistantCatalogImpl(root=Path(tmp_path) / "assistants")
+    app.state.assistant_catalog = catalog
+    return app, catalog
+
+
+def test_post_assistants_creates_with_catalog(tmp_path: Any) -> None:
+    app, _ = _app_with_catalog(tmp_path)
+    client = TestClient(app)
+    response = client.post(
+        "/v1/assistants",
+        json={"name": "小研", "description": "深度研究", "template_id": "assistant.research"},
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["assistant_id"].startswith("asst_")
+    assert body["profile"]["name"] == "小研"
+    assert body["profile"]["emoji"] == "🔍"
+    assert body["template_id"] == "assistant.research"
+
+
+def test_post_assistants_rejects_missing_name(tmp_path: Any) -> None:
+    app, _ = _app_with_catalog(tmp_path)
+    client = TestClient(app)
+    response = client.post("/v1/assistants", json={"description": "无名"})
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_request"
+
+
+def test_post_assistants_rejects_unknown_template(tmp_path: Any) -> None:
+    app, _ = _app_with_catalog(tmp_path)
+    client = TestClient(app)
+    response = client.post("/v1/assistants", json={"name": "x", "template_id": "assistant.nope"})
+    assert response.status_code == 400
+
+
+def test_get_assistants_lists_created(tmp_path: Any) -> None:
+    app, catalog = _app_with_catalog(tmp_path)
+    from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
+
+    catalog.create(CreateAssistantRequest(name="列表助理"))
+    client = TestClient(app)
+    response = client.get("/v1/assistants")
+    assert response.status_code == 200
+    items = response.json()["assistants"]
+    assert len(items) == 1
+    assert items[0]["name"] == "列表助理"
+
+
+def test_get_assistant_by_id_returns_spec_view(tmp_path: Any) -> None:
+    app, catalog = _app_with_catalog(tmp_path)
+    from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
+
+    handle = catalog.create(CreateAssistantRequest(name="单个助理", description="职责"))
+    client = TestClient(app)
+    response = client.get(f"/v1/assistants/{handle.assistant_id}")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["assistant_id"] == handle.assistant_id
+    assert body["profile_name"] == "单个助理"
+    assert body["bootstrap"]["soul_digest"]
+
+
+def test_get_assistant_unknown_returns_404(tmp_path: Any) -> None:
+    app, _ = _app_with_catalog(tmp_path)
+    client = TestClient(app)
+    response = client.get("/v1/assistants/asst_missing")
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "assistant_not_found"
+
+
+def test_get_assistant_digest_mismatch_returns_409(tmp_path: Any) -> None:
+    app, catalog = _app_with_catalog(tmp_path)
+    from pathlib import Path
+
+    from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
+
+    handle = catalog.create(CreateAssistantRequest(name="篡改目标"))
+    soul = Path(handle.home_path) / "SOUL.md"
+    soul.write_text(soul.read_text(encoding="utf-8") + "\n# tamper", encoding="utf-8")
+    client = TestClient(app)
+    response = client.get(f"/v1/assistants/{handle.assistant_id}")
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "digest_mismatch"

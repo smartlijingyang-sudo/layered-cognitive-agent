@@ -17,6 +17,7 @@ from typing import Any
 from lca.contracts.observability.assistant_ep_closure import ASSISTANT_REQUIRED_FIELDS
 
 __all__ = [
+    "AssistantBootstrapCompletedEventPayload",
     "AssistantCreatedEventPayload",
     "AssistantJobFiredEventPayload",
     "AssistantJobRegisteredEventPayload",
@@ -76,6 +77,32 @@ class AssistantCreatedEventPayload:
             payload["home_path"] = self.home_path
         if self.template_id:
             payload["template_id"] = self.template_id
+        return payload
+
+
+@dataclass(frozen=True)
+class AssistantBootstrapCompletedEventPayload:
+    """``assistant.bootstrap.completed`` EP payload（ADR-0187 §3 D8）。
+
+    引导式创建（``create`` 带 ``seed_user_md``）写 USER.md 后删除
+    BOOTSTRAP.md 并发本 EP；四个必含字段与 ``ASSISTANT_REQUIRED_FIELDS``
+    对齐，缺失抛 ``ValueError``。
+    """
+
+    assistant_id: str
+    revision_seq: int
+    manifest_digest: str
+    actor: str
+    home_path: str = ""
+
+    def __post_init__(self) -> None:
+        _validate_required_fields(self, "AssistantBootstrapCompletedEventPayload")
+
+    def to_dict(self) -> dict[str, Any]:
+        """按四件套必含字段 + 额外字段序列化；空字段不进 payload。"""
+        payload: dict[str, Any] = _required_dict(self)
+        if self.home_path:
+            payload["home_path"] = self.home_path
         return payload
 
 

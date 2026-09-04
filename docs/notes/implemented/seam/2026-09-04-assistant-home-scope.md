@@ -1,10 +1,11 @@
 # Agent Note: AssistantHome — 助理域 seam 边界、配置/记忆/工作区三类真值分层与 ScopePlan 隔离载体
 
-Status: proposed
+Status: implemented
 
-> 配套 ADR：[ADR-0187](../adr/0187-assistant-agent.md)（Accepted — 2026-09-04）。
-> 本 Note 不引入新决策；记录 ADR-0187 §3 D2/D3/D5/D7 钉下的 seam 边界与不变量的当前口径，待 PR-2/3/4/5 落地后迁 `implemented/`。
-> lifecycle=proposed 与 ADR 状态正交：ADR 是设计门禁（已评审通过），Note 记录的是 seam 边界，等实施合入后再升 `implemented/`。
+> 配套 ADR：[ADR-0187](../../../adr/0187-assistant-agent.md)（Accepted — 2026-09-04）。
+> 本 Note 记录 ADR-0187 §3 D2/D3/D5/D7 钉下的 seam 边界与不变量的落地口径；
+> PR-2…PR-5 已合入（contracts / catalog 插件 / bootstrap+workspace+web-assistant
+> profile / gateway 解析），故升 `implemented/`。
 
 ## Problem
 
@@ -79,16 +80,17 @@ Home 解析是**数据投影**，不是运行期重装配插件图；boot 期能
 
 解析失败（未知 id / digest 不匹配）→ **fail-closed** 4xx，不静默回落默认助理（除非显式 `fallback=default`）。
 
-## Proposal
+## Decision
 
-按 ADR-0187 §7 PR-2…PR-5 顺序推进，本 Note 仅记录 seam 边界；PR 实施本身由后续编码 PR 承担（不在本 Note 范围）：
+ADR-0187 §7 PR-2…PR-5 的 seam 边界已落地；下表是各 seam 的现况落点：
 
-| PR | seam 边界落点 |
-|---|---|
-| PR-2 | `contracts/models/assistant/spec.py` AssistantSpec；`contracts/protocols/assistant/catalog.py` Catalog Protocol；capability 键（`assistant.catalog` / `assistant.skill_overlay` / `assistant.evolve` / `assistant.jobs`）；EP 描述符（`assistant.created` / `bootstrap.completed` / `profile.revised` / `paused` / `resumed` / `skill.installed` / `skill.activated` / `skill.evolved.proposed` / `skill.evolved.promoted` / `job.registered` / `job.fired` / `retired`） |
-| PR-3 | `assistant.catalog` 插件 + AssistantHome 目录布局 + create/get/list |
-| PR-4 | bootstrap 注入 ContextManifest + workspace 绑定 ExecutionSpace + `web-assistant` profile；验收含跨助理 memory 隔离测试（I-A6）+ memory seam 按 agent scope 作用域验证 |
-| PR-5 | gateway `/assistants` + session/run `assistant_id` 解析 + persistence_jsonl 持久化；web-standard 回归绿 |
+| PR | seam 边界落点 | 状态 |
+|---|---|---|
+| PR-2 | `contracts/models/assistant/spec.py` AssistantSpec；`contracts/protocols/assistant/catalog.py` Catalog Protocol；capability 键（`assistant.catalog` / `assistant.skill_overlay` / `assistant.evolve` / `assistant.jobs` / `assistant.frontend_bridge`）；EP 描述符（`assistant.created` / `bootstrap.completed` / `profile.revised` / `paused` / `resumed` / `skill.installed` / `skill.activated` / `skill.evolved.proposed` / `skill.evolved.promoted` / `job.registered` / `job.fired` / `retired`） | 已合入 |
+| PR-3 | `assistant.catalog` 插件 + AssistantHome 目录布局 + create/get/list | 已合入 |
+| PR-4 | bootstrap 注入 ContextManifest + workspace 绑定 ExecutionSpace + `web-assistant` profile；验收含跨助理 memory 隔离测试（I-A6）+ memory seam 按 agent scope 作用域验证 | 已合入 |
+| PR-5 | gateway `/assistants` + session/run `assistant_id` 解析 + persistence_jsonl 持久化；web-standard 回归绿 | 已合入 |
+| PR-7 | 对话创建流（角色模板 + `create_assistant` 工具 + 前端投影 + run 绑定 + 人设注入）；边界见 [assistant-create-flow](./2026-09-04-assistant-create-flow.md) | 已合入 |
 
 **禁止动作**（来自 ADR-0187 §6 删除条件）：
 
@@ -100,7 +102,29 @@ Home 解析是**数据投影**，不是运行期重装配插件图；boot 期能
 - 兼容 shim 无 delete-day
 - jobs 绕过 ADR-0093 自建调度线程或队列表
 
-## Acceptance criteria
+## Alternatives considered
+
+### Why not 记忆面也进 manifest digest？
+
+配置低频修订、记忆高频追加，共用一套 digest 变更机制会让每次记忆写入都触发
+`revision_seq++` 与快照抖动。分开后记忆走 memory seam 追加、配置走
+`revise`+digest（I-A13）。代价是两套变更机制要分别守护——由 I-A13 双向单测承担。
+
+### Why not 用 SpacetimeContext 的 IdentitySpace / VisibilitySpace 子空间做隔离？
+
+这两个子空间是 tracker §三裁剪的推迟项，尚未实现。隔离落在已实现的
+`ScopePlan` 最小版（lifecycle 8 级 scope + visibility + acl_grants + budget）
+上，子空间落地后按 D5 迁移条款切换。代价是迁移时要换验证对象——已在
+Acceptance/Verification 注明。
+
+### Why not 平行编译一条 `compile_assistant_plan()`？
+
+会绕开既有 Resolve→Compile 管线、形成第二套 AgentSpec 编译器，违反
+「同一条编译器」原则（ADR-0187 §6 删除条件）。Home 解析是数据投影：
+产出 AgentSpec 形状输入喂同一条管线。代价是 resolve 期必须做 digest 校验
+（I-A3 fail-closed），换来源真值可信。
+
+## Verification
 
 - 架构测试（`tests/architecture/test_assistant_*.py`）守护 I-A1…I-A13：
   - I-A1：无 `assistant_id` 的 run 行为 = 启用前基线（web-standard 回归绿）
@@ -121,9 +145,11 @@ Home 解析是**数据投影**，不是运行期重装配插件图；boot 期能
 - `assistant.evolve` 实现 `SkillAcquirer`（`lca/plugins/skill/auto_acquire.py`），不引入平行进化协议
 - EP 描述符全部登记进 `lca/contracts/observability/event_descriptor_registry.py`，cordis event 表映射在 `lca/contracts/observability/cordis_event_table.py`，发射方全部在 `lca/plugins/assistant/*`
 
-## Risks
+## Consequences
 
-| 风险 | 缓解 |
+落地后仍持有的代价与对应守护：
+
+| 代价 | 守护 |
 |---|---|
 | **digest 纪律对「随手改配置 md」不友好** | 有意为之；用户应走 `revise` API/skill。裸改通过 `revise_reimport` 收编，**禁止告警后放行** |
 | **Home（长期面）vs RunWorkspace（run 账本）两层目录语义混淆** | 文档说清（ADR-0187 §6 负面/代价已记录）；产品面介绍阶段补一张拓扑图 |
@@ -134,15 +160,13 @@ Home 解析是**数据投影**，不是运行期重装配插件图；boot 期能
 | **jobs 隐藏在 assistant.jobs 内的线程/定时器** | I-A12 架构测试扫描 import（`threading` / `asyncio.create_task` / `apscheduler` 等）= 0 |
 | **`web-assistant` profile 误进 web-standard** | I-A10 profile resolve 快照测试 |
 
-## Migration plan
+## Migration status
 
-1. **PR-1**【本次合入】：ADR-0187 评审通过（状态行）+ 本 Note 落地（`proposed/seam/`）
-2. **PR-2**（后续）：contracts 层 AssistantSpec / Catalog Protocol / capability 键 / EP 描述符；type test
-3. **PR-3**（后续）：assistant.catalog 插件 + AssistantHome 布局 + create/get/list；集成：创建后磁盘与 digest
-4. **PR-4**（后续）：bootstrap 注入 + workspace 绑定 + web-assistant profile；一次对话 run + 跨助理 memory 隔离测试
-5. **PR-5**（后续）：gateway `/assistants` + session/run `assistant_id`；API 测试 + web-standard 回归
-6. **PR-6 / PR-7 / PR-8**（后续）：skill_overlay + install URL + create-assistant skill + evolve（experiment only）+ jobs 注册/手动 fire
-7. **本 Note 跃迁**：PR-3/4 落地后（Catalog 插件 + 隔离测试通过）由同 PR 迁 `implemented/seam/`，Status `proposed` → `implemented`，`## Proposal` 改写为现在时的 `## Decision`
+PR-1…PR-5 已合入；PR-7 对话创建流已合入（边界见
+[assistant-create-flow](./2026-09-04-assistant-create-flow.md)）。PR-6
+（skill_overlay + install URL）与 PR-8（evolve experiment + jobs 注册/手动
+fire）由并行工作推进中。本 Note 已由 `proposed/seam/` 迁至
+`implemented/seam/`（PR-3/4 落地后的同批迁移）。
 
 ## Related
 

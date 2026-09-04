@@ -121,7 +121,7 @@ class KernelServeService:
                     "lca_kernel",
                     "serve",
                     "--profile",
-                    "profiles/web-standard.yaml",
+                    self._config.profile,
                     "--host",
                     self._config.host,
                     "--port",

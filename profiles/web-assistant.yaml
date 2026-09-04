@@ -52,3 +52,8 @@ patch:
   - id: lca.plugins.assistant.catalog
     config:
       assistants_root: "~/.lca/assistants"
+  # 兜底:LCA_LOBEHUB_URL 未设置时指向本机 lobehub dev 端口(3010);
+  # 空字符串 = 关闭前端注册。
+  - id: lca.plugins.assistant.webserver_bridge
+    config:
+      lobehub_url: "http://127.0.0.1:3010"

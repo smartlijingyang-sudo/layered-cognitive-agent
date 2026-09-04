@@ -159,6 +159,8 @@ def _jobs_not_implemented(code: str, detail: str = "") -> JSONResponse:
     if detail:
         payload["error"]["detail"] = detail
     return _json(payload, status_code=501)
+
+
 def _error_envelope(
     code: str,
     *,
@@ -199,17 +201,130 @@ def _parse_skill_source(raw: Any) -> SkillSource | None:
 
 
 async def create_assistant(request: Request) -> JSONResponse:
-    """``POST /v1/assistants`` —— ``AssistantCatalog.create`` entry."""
-    if _catalog_from_request(request) is None:
+    """``POST /v1/assistants`` —— ``AssistantCatalog.create`` entry.
+
+    状态码契约（ADR-0187 §3 D7 fail-closed）：
+
+    - catalog capability 不在场 ⇒ 501 ``catalog_unavailable``；
+    - body 非法 / name 缺失 / 未知 template ⇒ 400；
+    - 成功 ⇒ 201 + handle + profile 视图。
+    """
+    catalog = _catalog_from_request(request)
+    if catalog is None:
         return _not_implemented("catalog_unavailable", "AssistantCatalog.create")
-    return _not_implemented("catalog_pending", "PR-3 catalog handler not wired")
+
+    try:
+        body = await request.json()
+    except (ValueError, OSError):
+        return _error_envelope("invalid_json", status_code=400, error_type="invalid_request")
+    if not isinstance(body, dict):
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail="body 必须是 JSON object",
+        )
+
+    from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
+
+    name = body.get("name")
+    if not isinstance(name, str) or not name.strip():
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail="name 必须为非空字符串",
+        )
+    description = body.get("description") or ""
+    template_id = body.get("template_id") or "assistant.default"
+    seed_user_md = body.get("seed_user_md") or None
+    if not isinstance(description, str):
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail="description 必须为字符串",
+        )
+    if not isinstance(template_id, str):
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail="template_id 必须为字符串",
+        )
+    if seed_user_md is not None and not isinstance(seed_user_md, str):
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail="seed_user_md 必须为字符串",
+        )
+
+    try:
+        handle = catalog.create(
+            CreateAssistantRequest(
+                name=name.strip(),
+                description=description.strip(),
+                template_id=template_id,
+                seed_user_md=seed_user_md,
+            )
+        )
+    except AssistantCatalogError as exc:
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail=str(exc),
+        )
+
+    return _json(
+        {
+            "assistant_id": handle.assistant_id,
+            "home_path": handle.home_path,
+            "revision_seq": handle.revision_seq,
+            "template_id": template_id,
+            "profile": _profile_view(handle.home_path),
+        },
+        status_code=201,
+    )
+
+
+def _profile_view(home_path: str) -> dict[str, Any]:
+    """Read ``profile.json`` next to the created Home for the 201 response.
+
+    Failure: unreadable/invalid profile.json → empty view (creation already
+    succeeded; the response stays 201 with a degraded profile block).
+    """
+    import json
+    from pathlib import Path
+
+    try:
+        raw = json.loads((Path(home_path) / "profile.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return raw if isinstance(raw, dict) else {}
 
 
 async def list_assistants(request: Request) -> JSONResponse:
     """``GET /v1/assistants`` —— ``AssistantCatalog.list``."""
-    if _catalog_from_request(request) is None:
+    catalog = _catalog_from_request(request)
+    if catalog is None:
         return _not_implemented("catalog_unavailable", "AssistantCatalog.list")
-    return _not_implemented("catalog_pending", "PR-3 catalog handler not wired")
+    summaries = [
+        {
+            "assistant_id": item.assistant_id,
+            "name": item.name,
+            "status": item.status,
+            "template_id": item.template_id,
+            "revision_seq": item.revision_seq,
+            "home_path": item.home_path,
+            "skill_count": item.skill_count,
+            "job_count": item.job_count,
+            "updated_at": item.updated_at,
+        }
+        for item in catalog.list()
+    ]
+    return _json({"assistants": summaries}, status_code=200)
 
 
 async def assistants_root(request: Request) -> JSONResponse:
@@ -225,10 +340,51 @@ async def assistants_root(request: Request) -> JSONResponse:
 
 
 async def get_assistant(request: Request) -> JSONResponse:
-    """``GET /v1/assistants/{assistant_id}`` —— ``AssistantCatalog.get``."""
-    if _catalog_from_request(request) is None:
+    """``GET /v1/assistants/{assistant_id}`` —— ``AssistantCatalog.get``.
+
+    Response projects the serializable ``AssistantSpec`` fields only;
+    ``agent_spec`` carries a live LLM adapter and never leaves the process.
+
+    状态码契约：未知 id ⇒ 404；digest 不匹配 ⇒ 409（fail-closed，
+    唯一恢复路径 = reimport）。
+    """
+    catalog = _catalog_from_request(request)
+    if catalog is None:
         return _not_implemented("catalog_unavailable", "AssistantCatalog.get")
-    return _not_implemented("catalog_pending", "PR-3 catalog handler not wired")
+    assistant_id = str(request.path_params.get("assistant_id") or "")
+
+    try:
+        spec = catalog.get(assistant_id)
+    except AssistantDigestMismatch as exc:
+        return _error_envelope(
+            "digest_mismatch", status_code=409, error_type="conflict", detail=str(exc)
+        )
+    except AssistantCatalogError as exc:
+        return _error_envelope(
+            "assistant_not_found", status_code=404, error_type="not_found", detail=str(exc)
+        )
+
+    return _json(
+        {
+            "assistant_id": spec.assistant_id,
+            "home_path": spec.home_path,
+            "revision_seq": spec.revision_seq,
+            "template_id": spec.template_id,
+            "profile_name": spec.profile_name,
+            "profile_description": spec.profile_description,
+            "bootstrap": {
+                "soul_digest": spec.bootstrap.soul_digest,
+                "identity_digest": spec.bootstrap.identity_digest,
+                "user_digest": spec.bootstrap.user_digest,
+                "agents_digest": spec.bootstrap.agents_digest,
+            },
+            "skill_ids": list(spec.skill_ids),
+            "job_ids": list(spec.job_ids),
+            "grant_digest": spec.grant_digest,
+            "tools_policy_digest": spec.tools_policy_digest,
+        },
+        status_code=200,
+    )
 
 
 async def revise_assistant_profile(request: Request) -> JSONResponse:
@@ -395,7 +551,7 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
 
 @plugin(
     id="lca.plugins.transport.webserver.routes_assistants",
-    provides=("webserver.routes.assistants",),
+    provides=(),
     requires=("route_registry",),
     layer="L1",
     kind=PluginKind.PROVIDER,

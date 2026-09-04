@@ -51,7 +51,10 @@ from lca.contracts.models.team.role_team import (
     RoleProfile,
     ToolPermissionManifest,
 )
-from lca.contracts.observability.assistant_ep_closure import ASSISTANT_CREATED
+from lca.contracts.observability.assistant_ep_closure import (
+    ASSISTANT_BOOTSTRAP_COMPLETED,
+    ASSISTANT_CREATED,
+)
 from lca.contracts.protocols.assistant.catalog import (
     AssistantCatalog,
     AssistantHandle,
@@ -63,18 +66,23 @@ from lca.contracts.protocols.assistant.catalog import (
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.journal.spec import AgentSpec
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
-from lca.plugins.assistant._events import AssistantCreatedEventPayload
+from lca.plugins.assistant._events import (
+    AssistantBootstrapCompletedEventPayload,
+    AssistantCreatedEventPayload,
+)
 from lca.plugins.assistant._home_layout import (
     DEFAULT_TEMPLATE_ID,
+    TEMPLATE_REGISTRY,
     HomePaths,
     build_manifest,
     cleanup_home,
     compute_digests,
     count_yaml_in,
     diff_digests,
+    known_template_ids,
     list_children_dirs,
     load_manifest,
-    render_default_template,
+    render_template,
     write_home_files,
     write_manifest,
 )
@@ -124,10 +132,20 @@ class _AssistantCatalogImpl(AssistantCatalog):
     # ── 公开面 ────────────────────────────────────────────────────────
 
     def create(self, req: CreateAssistantRequest) -> AssistantHandle:
-        """物化 Home + manifest;发 ``assistant.created`` EP。"""
-        if req.template_id != DEFAULT_TEMPLATE_ID:
+        """物化 Home + manifest;发 ``assistant.created`` EP。
+
+        template_id 必须已登记进 ``_home_layout.TEMPLATE_REGISTRY``
+        （ADR-0187 §3 D11/D12 的角色模板面）;未知值抛
+        ``_CatalogConfigError``（REST 层映射 400,不回落 default）。
+
+        ``seed_user_md`` 非空 = 引导式创建:覆盖 USER.md 后删除
+        BOOTSTRAP.md 并补发 ``assistant.bootstrap.completed`` EP
+        （ADR-0187 §3 D12 完成流;BOOTSTRAP 不在配置面 digest 内,
+        删除不影响 manifest）。
+        """
+        if req.template_id not in TEMPLATE_REGISTRY:
             raise _CatalogConfigError(
-                f"PR-3 范围仅支持 template_id={DEFAULT_TEMPLATE_ID!r},得到 {req.template_id!r}"
+                f"未知 template_id={req.template_id!r};已登记: {', '.join(known_template_ids())}"
             )
 
         assistant_id = _new_assistant_id()
@@ -136,7 +154,7 @@ class _AssistantCatalogImpl(AssistantCatalog):
             raise _CatalogConfigError(f"assistant home 已存在: {home.root}")
 
         # 1. 物化文件(失败 ⇒ 半成品 Home 清理)
-        rendered = render_default_template(name=req.name, description=req.description)
+        rendered = render_template(req.template_id, name=req.name, description=req.description)
         try:
             write_home_files(home.root, rendered.files)
         except Exception:
@@ -149,7 +167,12 @@ class _AssistantCatalogImpl(AssistantCatalog):
             if req.seed_user_md:
                 (home.root / "USER.md").write_text(req.seed_user_md, encoding="utf-8")
 
-            # 3. manifest.digests + revision_seq=0
+            # 3. 引导式创建完成流:删除 BOOTSTRAP.md（EP 在 manifest 写盘后发,
+            #    携带事件时刻的 manifest_digest）
+            if req.seed_user_md and home.bootstrap_md.is_file():
+                home.bootstrap_md.unlink()
+
+            # 4. manifest.digests + revision_seq=0
             manifest = build_manifest(
                 assistant_id=assistant_id,
                 template_id=req.template_id,
@@ -161,17 +184,28 @@ class _AssistantCatalogImpl(AssistantCatalog):
             cleanup_home(home.root)
             raise
 
-        # 4. EP
+        # 5. EP
+        manifest_digest = str(manifest["manifest_digest"])
         self._emit_created(
             AssistantCreatedEventPayload(
                 assistant_id=assistant_id,
                 revision_seq=0,
-                manifest_digest=str(manifest["manifest_digest"]),
+                manifest_digest=manifest_digest,
                 actor="system",
                 home_path=str(home.root),
                 template_id=req.template_id,
             )
         )
+        if req.seed_user_md:
+            self._emit_bootstrap_completed(
+                AssistantBootstrapCompletedEventPayload(
+                    assistant_id=assistant_id,
+                    revision_seq=0,
+                    manifest_digest=manifest_digest,
+                    actor="system",
+                    home_path=str(home.root),
+                )
+            )
 
         return AssistantHandle(
             assistant_id=assistant_id,
@@ -260,7 +294,9 @@ class _AssistantCatalogImpl(AssistantCatalog):
     # COMPAT(delete-when: 2026-12-31, scope: retire 入口 + create-assistant skill 落实现)
     def retire(self, assistant_id: str, reason: str) -> None:
         del assistant_id, reason  # PR-3 占位;待 retire 入口落地
-        raise NotImplementedError("AssistantCatalog.retire 在 PR-3 范围不实现;待 retire 入口落地后删除本占位")
+        raise NotImplementedError(
+            "AssistantCatalog.retire 在 PR-3 范围不实现;待 retire 入口落地后删除本占位"
+        )
 
     # ── 内部 ──────────────────────────────────────────────────────────
 
@@ -274,6 +310,17 @@ class _AssistantCatalogImpl(AssistantCatalog):
             )
             return
         self._emit(ASSISTANT_CREATED, payload.to_dict())
+
+    def _emit_bootstrap_completed(self, payload: AssistantBootstrapCompletedEventPayload) -> None:
+        """发 ``assistant.bootstrap.completed`` EP;无 emitter 时仅 log。"""
+        if self._emit is None:
+            log.info(
+                "assistant.catalog.ep.no_emitter",
+                ep=ASSISTANT_BOOTSTRAP_COMPLETED,
+                payload=payload.to_dict(),
+            )
+            return
+        self._emit(ASSISTANT_BOOTSTRAP_COMPLETED, payload.to_dict())
 
 
 # ── 占位 AgentSpec(PR-3 范围)────────────────────────────────────────
@@ -469,7 +516,7 @@ def _int_or_default(value: object, default: int) -> int:
     ),
     ownership=OwnershipDeclaration(
         reads=("event.bus", "event_descriptor_registry"),
-        emits=(ASSISTANT_CREATED,),
+        emits=(ASSISTANT_CREATED, ASSISTANT_BOOTSTRAP_COMPLETED),
         state_mutation="reducer-only",
     ),
 )

@@ -88,6 +88,8 @@ class CreateRunRequest:
     execution_target: str
     options: dict[str, Any]
     ctx: object
+    assistant_id: str = ""
+    """ADR-0187 §3 D7 一次性 run 绑定（``asst_*``）；空 = 遗留默认 agent。"""
 
 
 async def decode_create_run(
@@ -108,6 +110,18 @@ async def decode_create_run(
     if not isinstance(messages, list):
         return _err("messages must be an array", status_code=400)
 
+    assistant_raw = body.get("assistant_id")
+    if assistant_raw is None or (isinstance(assistant_raw, str) and not assistant_raw.strip()):
+        assistant_id = ""
+    elif isinstance(assistant_raw, str):
+        assistant_id = assistant_raw.strip()
+    else:
+        return _err(
+            f"assistant_id must be a string, got {type(assistant_raw).__name__}",
+            status_code=400,
+            code="invalid_assistant_id",
+        )
+
     mode = str(body.get("mode") or body.get("model") or "solo")
     resolved_mode = resolve_mode(ctx, mode)
 
@@ -126,11 +140,10 @@ async def decode_create_run(
         device_id=str(body.get("device_id") or ""),
         plane=str(body.get("plane") or ""),
         extra_plane=str(body.get("extra_plane") or ""),
-        execution_target=str(
-            body.get("execution_target") or body.get("executionTarget") or ""
-        ),
+        execution_target=str(body.get("execution_target") or body.get("executionTarget") or ""),
         options=dict(body.get("options") or {}),
         ctx=ctx,
+        assistant_id=assistant_id,
     )
 
 
@@ -174,7 +187,44 @@ def _to_run_request(carrier: CreateRunRequest) -> RunRequest:
         execution_target=carrier.execution_target,
         options=carrier.options,
         ctx=carrier.ctx,
+        assistant_id=carrier.assistant_id,
     )
+
+
+def _validate_assistant_binding(request: Request, assistant_id: str) -> JSONResponse | None:
+    """Fail-closed 校验 run 的 assistant 绑定（ADR-0187 §3 D7）。
+
+    - 无绑定 ⇒ ``None``（遗留路径逐字不变，I-A1）；
+    - 有绑定但 catalog 未装配（web-standard）⇒ 400；
+    - 未知 id ⇒ 404；digest 不匹配 ⇒ 409（唯一恢复路径 = reimport）。
+    """
+    if not assistant_id:
+        return None
+    catalog = getattr(request.app.state, "assistant_catalog", None)
+    if catalog is None:
+        return _err(
+            "assistant capability not enabled on this profile",
+            status_code=400,
+            code="assistant_unavailable",
+        )
+    try:
+        catalog.get(assistant_id)
+    except Exception as exc:
+        from lca.plugins.assistant._home_layout import (
+            AssistantCatalogError,
+            AssistantDigestMismatch,
+        )
+
+        if isinstance(exc, AssistantDigestMismatch):
+            return _err(
+                f"assistant {assistant_id!r} 配置面 digest 不一致",
+                status_code=409,
+                code="digest_mismatch",
+            )
+        if isinstance(exc, AssistantCatalogError):
+            return _err(str(exc), status_code=404, code="assistant_not_found")
+        return _err(str(exc), status_code=500, code="internal_error")
+    return None
 
 
 async def create_run(request: Request) -> JSONResponse:
@@ -199,6 +249,10 @@ async def create_run(request: Request) -> JSONResponse:
     )
     if isinstance(decoded, JSONResponse):
         return decoded
+
+    binding_error = _validate_assistant_binding(request, decoded.assistant_id)
+    if binding_error is not None:
+        return binding_error
 
     receipt = await _run_port_of(request).create_and_dispatch(_to_run_request(decoded))
     if not receipt.accepted:

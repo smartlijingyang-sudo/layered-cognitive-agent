@@ -45,3 +45,26 @@ entries:
     name: lca_plugins_assistant_skill_overlay
     $module: lca.plugins.assistant.skill_overlay
     config: {}
+
+  # ── PR-7: web 面桥（app.state.assistant_catalog + 前端 agents 投影）──
+  - id: lca.plugins.assistant.webserver_bridge
+    name: lca_plugins_assistant_webserver_bridge
+    $module: lca.plugins.assistant.webserver_bridge
+    config:
+      # 前端 lobehub 地址;空 = 关闭前端注册(仅后端创建)。优先 env,缺失时
+      # profile patch 段提供默认值。不直读 os.environ(§6 删除条件)。
+      lobehub_url:
+        from_env: LCA_LOBEHUB_URL
+        required: false
+
+  # ── PR-5/7: /v1/assistants REST surface ────────────────────────
+  - id: lca.plugins.transport.webserver.routes_assistants
+    name: lca_webserver_routes_assistants
+    $module: lca.plugins.transport.webserver.routes_assistants
+    config: {}
+
+  # ── PR-7: create_assistant 工具工厂（对话创建助理执行面）────────
+  - id: lca.plugins.assistant.tools
+    name: lca_plugins_assistant_tools
+    $module: lca.plugins.assistant.tools
+    config: {}

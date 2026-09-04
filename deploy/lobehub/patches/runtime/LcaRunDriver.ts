@@ -195,23 +195,29 @@ function hrefFile(name: string, url: string): ArtifactFile {
 }
 
 export function planeFieldsFromAgent(agentId: string | undefined): {
+  assistant_id?: string;
   device_id?: string;
   plane?: string;
   execution_target?: string;
 } {
   if (!agentId) return {};
   const config = agentByIdSelectors.getAgencyConfigById(agentId)(useAgentStore.getState());
+  // LCA assistants (ADR-0187): the create-assistant flow stores the backend
+  // assistant id in agencyConfig.lcaAssistantId; forward it so the kernel
+  // binds this run to the assistant (POST /runs assistant_id, D7).
+  const lcaAssistantId = (config as { lcaAssistantId?: string } | undefined)?.lcaAssistantId;
   const target = config?.executionTarget;
   const deviceId = config?.boundDeviceId;
+  const assistantFields = lcaAssistantId ? { assistant_id: lcaAssistantId } : {};
   if (target === 'local' || target === 'device') {
     return deviceId
-      ? { device_id: deviceId, plane: 'machine', execution_target: 'device' }
-      : { plane: 'machine', execution_target: 'device' };
+      ? { device_id: deviceId, plane: 'machine', execution_target: 'device', ...assistantFields }
+      : { plane: 'machine', execution_target: 'device', ...assistantFields };
   }
-  if (target === 'sandbox') return { plane: 'sandbox', execution_target: 'sandbox' };
-  if (target === 'auto') return { execution_target: 'auto' };
-  if (target === 'none') return { execution_target: 'none' };
-  return {};
+  if (target === 'sandbox') return { plane: 'sandbox', execution_target: 'sandbox', ...assistantFields };
+  if (target === 'auto') return { execution_target: 'auto', ...assistantFields };
+  if (target === 'none') return { execution_target: 'none', ...assistantFields };
+  return { ...assistantFields };
 }
 
 export type LcaRunOptions = {

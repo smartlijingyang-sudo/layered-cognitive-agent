@@ -336,6 +336,14 @@ ASSISTANT_WORKSPACE = Capability[object]("assistant.workspace", cardinality="one
 物化 ExecutionSpace dataclass，不直接世界写；ACL ⊆ home/workspace/（I-A5）。
 """
 
+ASSISTANT_FRONTEND_BRIDGE = Capability[object]("assistant.frontend_bridge", cardinality="one")
+"""助理 → 前端 agent 投影桥（ADR-0187 §3 D12 创建流 + D7 前端可见）。
+
+把新建助理投影成 LobeHub agents 行（TRPC ``agent.createAgent``），
+映射真值 = agents 行 ``agencyConfig.lcaAssistantId``。fail-soft：
+注册失败返回 None，不阻断 catalog.create。
+"""
+
 ACT_EXECUTION_SPACE = Capability[object]("act.execution_space", cardinality="one")
 """G2 空间事实契约（PR-4）：assistant.workspace 物化的 ExecutionSpace dataclass 的入口。"""
 

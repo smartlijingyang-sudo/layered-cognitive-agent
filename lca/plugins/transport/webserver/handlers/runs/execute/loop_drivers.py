@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING, Any, Protocol
 from lca.agent.role_library import FileRoleLibrary
 from lca.application.api import Agent, Team
 from lca.application.casting import LLMTeamCaster
-from lca.plugins.collaboration.modes.team import build_runnable_team
 from lca.cognition.team.modes_catalog import SOLO_MODE_KEY, SOLO_ROLE
 from lca.contracts.mechanisms.capability import provider_current, require_capability
 from lca.contracts.models.core.lifecycle import TaskStatus
@@ -27,6 +26,7 @@ from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols.collaboration.casting import RoleLibrary, TeamCaster
 from lca.contracts.protocols.runtime.infra import Tool
 from lca.infrastructure.observability import BoundObservability, record
+from lca.plugins.collaboration.modes.team import build_runnable_team
 from lca.plugins.loop_drivers.registry import (
     RunLoopDriverRegistry as RunLoopDriverRegistry,
 )
@@ -117,10 +117,13 @@ class CognitiveRunDriver:
             scope = None
         tools = _tools_from_ctx(scope, bindings)
         if mode == SOLO_MODE_KEY:
+            persona = _assistant_persona(scope, session)
             runnable: Agent | Team = _build_solo_agent(
                 llm,
                 observability=hub,
-                role=session.agent.name,
+                role=persona.role or session.agent.name,
+                goal=persona.goal,
+                backstory=persona.backstory,
                 scope=scope,
                 tools=tools,
             )
@@ -177,21 +180,61 @@ def _build_solo_agent(
     *,
     observability: Any,
     role: str = SOLO_ROLE,
+    goal: str = "",
+    backstory: str = "",
     bindings: PlaneBindings | None = None,
     scope: Context | None = None,
     tools: Sequence[Tool] | None = None,
 ) -> Agent:
-    """Solo agent — identity from AgentRef.name; prompt sections left empty."""
+    """Solo agent — identity from AgentRef.name（助理绑定时由人设覆盖）。"""
     del bindings
     return Agent(
         role=role,
-        goal="",
-        backstory="",
+        goal=goal,
+        backstory=backstory,
         tools=tools if tools is not None else (),
         llm=llm,
         observability=observability,
         scope=scope,
     )
+
+
+def _assistant_persona(scope: Context | None, session: RunSession) -> Any:
+    """解析 run 绑定的助理人设（ADR-0187 §3 D12 人设注入）。
+
+    - 无 assistant_id / 无 catalog capability（web-standard）⇒ 空人设，
+      路径逐字不变（I-A1）；
+    - catalog.get 失败（未知 id / digest 不匹配）⇒ 空人设 + 不阻断
+      （创建侧入口已做 fail-closed 校验，此处是运行期兜底）。
+
+    返回 :class:`AssistantPersona`（role/goal/backstory 三元组）。
+    """
+    from lca.contracts.mechanisms.capability import (
+        MissingCapabilityError,
+        provider_current,
+        require_capability,
+    )
+    from lca.plugins.assistant.persona import AssistantPersona, persona_from_home
+
+    empty = AssistantPersona()
+    assistant_id = str(getattr(session, "assistant_id", "") or "").strip()
+    if not assistant_id or scope is None:
+        return empty
+    try:
+        svc = require_capability(scope, "assistant.catalog")
+    except MissingCapabilityError:
+        return empty
+    catalog = provider_current(svc)
+    if catalog is None:
+        return empty
+    try:
+        spec = catalog.get(assistant_id)
+    except Exception:
+        return empty
+    try:
+        return persona_from_home(spec.home_path)
+    except Exception:
+        return empty
 
 
 async def _build_team(

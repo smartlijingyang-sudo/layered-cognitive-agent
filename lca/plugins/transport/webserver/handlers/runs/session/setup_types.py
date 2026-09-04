@@ -24,6 +24,8 @@ class RunSessionRequest:
     plane: str = ""
     extra_plane: str = ""
     execution_target: str = ""
+    assistant_id: str = ""
+    """ADR-0187 §3 D7 一次性 run 绑定（``asst_*``）；空 = 遗留默认 agent。"""
 
 
 __all__ = ["RunSessionRequest"]

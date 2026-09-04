@@ -27,6 +27,7 @@ import typer
 # the registry before any command runs.
 import lca.infrastructure.cli.steps  # noqa: F401  -- step registration
 from lca.infrastructure.cli.commands import (
+    assistants,
     audit,
     creator_plan,
     declarative,
@@ -72,6 +73,7 @@ workflow.register(app)
 services.register(app)
 journal.register(app)
 runs.register(app)
+assistants.register(app)
 e2e.register(app)
 tools.register(app)
 profile_inspect.register(app)

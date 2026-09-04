@@ -31,6 +31,9 @@ class KernelServeConfig(BaseModel):
     host: str = "0.0.0.0"  # noqa: S104 — default bind all interfaces for LAN access
     port: int = 8765
     health_path: str = "/health"
+    profile: str = "profiles/web-standard.yaml"
+    """``lca-ops heal`` spawn ``lca_kernel serve`` 时使用的 profile。
+    助理域部署改为 ``profiles/web-assistant.yaml``（ADR-0187）。"""
 
     @property
     def base_url(self) -> str:

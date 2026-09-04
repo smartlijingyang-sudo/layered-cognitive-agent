@@ -15,6 +15,9 @@ kernel_serve:
   host: "127.0.0.1"
   port: 8765
   health_path: /health
+  # 助理域（ADR-0187）：web-assistant = web-standard + assistant-runtime bundle。
+  # 换回 profiles/web-standard.yaml 即关闭助理能力（存量路径不受影响，I-A1）。
+  profile: profiles/web-assistant.yaml
 
 # ── LobeHub (Next.js frontend) ────────────────────────────────────────
 lobehub:

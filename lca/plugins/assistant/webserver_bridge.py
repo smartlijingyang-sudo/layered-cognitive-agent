@@ -209,10 +209,16 @@ def _extract_agent_id(response_text: str) -> str | None:
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    """安装 app.state.assistant_catalog + 提供 assistant.frontend_bridge。
+    """安装 app.state.assistant_catalog + 延迟挂载 /v1/assistants 路由。
 
     时序：requires ``web_server`` ⇒ 本插件在 ``lca-web-server`` 建好
-    Starlette app 之后 boot；``app.state`` 此时可写。
+    Starlette app 之后 boot；``app.state`` 与 ``app.router.routes`` 此时可写。
+
+    路由延迟挂载原因：``assistant-runtime`` bundle 在 profile 的 bundles 列表
+    中排在 ``web-app`` 之后，``routes_assistants`` 的 RouteSpec 注册晚于
+    ``lca-web-server`` 的 ``registry.install(app)``；由本插件（boot 序保证
+    在 app 就绪后）把 ``ROUTE_SPECS`` 物化进 ``app.router.routes``。
+    已存在同路径路由时跳过（防 bundle 顺序变化导致重复）。
     """
     catalog = ctx.require(ASSISTANT_CATALOG.key)
     handle = ctx.require("web_server")
@@ -220,11 +226,41 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     if app is not None and hasattr(app, "state"):
         app.state.assistant_catalog = catalog
 
+    if app is not None and hasattr(app, "router"):
+        _mount_assistant_routes(ctx, app)
+
     bridge = AssistantFrontendBridge(
         lobehub_url=config.lobehub_url,
         timeout_s=config.timeout_s,
     )
     ctx.provide(ASSISTANT_FRONTEND_BRIDGE.key, bridge)
+
+
+def _mount_assistant_routes(ctx: PluginContext, app: Any) -> None:
+    """把 ``/v1/assistants`` 路由物化进已就绪的 Starlette app。
+
+    幂等：``app.router.routes`` 已有同 path 路由时跳过该 spec。
+    dispose 经 ``ctx.effect`` 收口（kernel teardown LIFO）。
+    """
+    from lca.plugins.transport.webserver.route_register import _starlette_route
+    from lca.plugins.transport.webserver.routes_assistants import ROUTE_SPECS
+
+    existing = {getattr(route, "path", None) for route in app.router.routes}
+    for spec in ROUTE_SPECS:
+        if spec.path in existing:
+            continue
+        route = _starlette_route(spec)
+        app.router.routes.append(route)
+        existing.add(spec.path)
+
+        def _dispose(_route: Any = route) -> None:
+            try:
+                app.router.routes.remove(_route)
+            except ValueError:
+                pass
+
+        inner: Any = ctx._runtime()  # type: ignore[attr-defined]
+        inner.effect(_dispose, label=f"route:{spec.path}")
 
 
 __all__ = ["AssistantFrontendBridge", "Config", "setup"]

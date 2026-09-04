@@ -36,6 +36,7 @@ from lca.infrastructure.file_store import FileStore
 __all__ = [
     "RunAmbit",
     "bind_run_ambit",
+    "current_assistant_id",
     "current_attachment_ids",
     "current_file_store",
     "current_plan_ref",
@@ -63,6 +64,10 @@ class RunAmbit:
     search_state: Any | None = None
     plan_ref: str = ""
     role: str = ""
+    assistant_id: str = ""
+    """ADR-0187 §3 D7：本 run 绑定的助理 id（``asst_*``）；空 = 遗留默认
+    agent 路径（I-A1）。载体侧（``ScopePlan.lifecycle`` agent 级）与
+    人设注入（RoleProfile 覆盖）都从本字段取真值。"""
 
 
 _run_ambit: ContextVar[RunAmbit | None] = ContextVar("lca_run_ambit", default=None)
@@ -106,3 +111,9 @@ def current_plan_ref() -> str:
 def current_role() -> str:
     a = current_run_ambit()
     return a.role if a is not None else ""
+
+
+def current_assistant_id() -> str:
+    """Return the assistant_id bound to the current run ('' = legacy path)."""
+    a = current_run_ambit()
+    return a.assistant_id if a is not None else ""

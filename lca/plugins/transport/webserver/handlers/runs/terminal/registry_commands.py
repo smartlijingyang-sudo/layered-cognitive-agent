@@ -59,6 +59,7 @@ class RegistryRunCommands:
                 plane=request.plane,
                 extra_plane=request.extra_plane,
                 execution_target=request.execution_target,
+                assistant_id=request.assistant_id or "",
                 ctx=request.ctx,
             )
             schedule_run(

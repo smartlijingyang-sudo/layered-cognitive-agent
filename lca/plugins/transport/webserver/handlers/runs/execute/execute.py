@@ -67,6 +67,7 @@ def create_run_session(
     plane: str = "",
     extra_plane: str = "",
     execution_target: str = "",
+    assistant_id: str = "",
     ctx: Any | None = None,
 ) -> RunSession:
     """Build a RunSession through the unified factory.
@@ -92,15 +93,14 @@ def create_run_session(
             question=question,
             user_text=user_text,
             mode=mode,
-            attachment_ids=tuple(
-                str(i).strip() for i in attachment_ids if str(i).strip()
-            ),
+            attachment_ids=tuple(str(i).strip() for i in attachment_ids if str(i).strip()),
             prior_turns=tuple(prior_turns),
             agent=agent,
             device_id=device_id.strip(),
             plane=plane.strip(),
             extra_plane=extra_plane.strip(),
             execution_target=execution_target.strip(),
+            assistant_id=assistant_id.strip(),
         )
     )
 
@@ -125,9 +125,7 @@ async def execute_run(
     # ``execute`` module) take effect at call time.
     import lca.plugins.transport.webserver.handlers.runs.execute as _self_pkg
 
-    await _self_pkg.RunLifecycleCoordinator(
-        registry, machine_resolver=machine_resolver
-    ).execute(
+    await _self_pkg.RunLifecycleCoordinator(registry, machine_resolver=machine_resolver).execute(
         run_id=run_id,
         question=question,
         mode=mode,

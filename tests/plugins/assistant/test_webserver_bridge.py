@@ -136,3 +136,50 @@ class TestRegister:
             )
         _, kwargs = fake_client.post.call_args
         assert len(kwargs["json"]["json"]["config"]["systemRole"]) <= 2000
+
+
+class _FakeInner:
+    def __init__(self) -> None:
+        self.effects: list[Any] = []
+
+    def effect(self, dispose: Any, *, label: str = "effect") -> None:
+        self.effects.append((dispose, label))
+
+
+class _FakeMountCtx:
+    def __init__(self) -> None:
+        self._inner = _FakeInner()
+
+    def _runtime(self) -> _FakeInner:
+        return self._inner
+
+
+class _FakeRouter:
+    def __init__(self) -> None:
+        self.routes: list[Any] = []
+
+
+class _FakeApp:
+    def __init__(self) -> None:
+        self.router = _FakeRouter()
+
+
+class TestMountAssistantRoutes:
+    def test_mount_adds_all_route_paths(self) -> None:
+        from lca.plugins.assistant.webserver_bridge import _mount_assistant_routes
+        from lca.plugins.transport.webserver.routes_assistants import ROUTE_SPECS
+
+        app = _FakeApp()
+        _mount_assistant_routes(_FakeMountCtx(), app)  # type: ignore[arg-type]
+        mounted = {getattr(route, "path", None) for route in app.router.routes}
+        assert mounted == {spec.path for spec in ROUTE_SPECS}
+
+    def test_mount_is_idempotent(self) -> None:
+        from lca.plugins.assistant.webserver_bridge import _mount_assistant_routes
+
+        app = _FakeApp()
+        ctx = _FakeMountCtx()
+        _mount_assistant_routes(ctx, app)  # type: ignore[arg-type]
+        first_count = len(app.router.routes)
+        _mount_assistant_routes(ctx, app)  # type: ignore[arg-type]
+        assert len(app.router.routes) == first_count

@@ -25,14 +25,17 @@ __all__ = [
     "DEFAULT_TEMPLATE_DIR_NAME",
     "DEFAULT_TEMPLATE_ID",
     "SCHEMA_VERSION",
+    "TEMPLATE_REGISTRY",
     "AssistantAlreadyExists",
     "AssistantCatalogError",
     "AssistantDigestMismatch",
     "HomePaths",
     "build_manifest",
     "compute_digests",
+    "known_template_ids",
     "load_manifest",
     "render_default_template",
+    "render_template",
     "scaffold_subdirs",
     "sha256_digest",
     "write_manifest",
@@ -210,13 +213,41 @@ def scaffold_subdirs(home: Path) -> None:
 
 # ── 模板渲染 ─────────────────────────────────────────────────────────
 
+# 模板注册表：template_id → templates/ 下的目录名（ADR-0187 §3 D11 +
+# D12 对话创建的选项面）。新增角色模板 = 数据扩展；catalog.create 仅接受
+# 本表内的 template_id（未知 ⇒ 4xx，防拼写错误静默落成 default）。
+TEMPLATE_REGISTRY: dict[str, str] = {
+    "assistant.default": "assistant_default",
+    "assistant.research": "assistant_research",
+    "assistant.writing": "assistant_writing",
+    "assistant.coding": "assistant_coding",
+    "assistant.translation": "assistant_translation",
+    "assistant.daily": "assistant_daily",
+}
 
-def _template_dir() -> Path:
-    """返回默认模板目录(``assistant_default/``)的文件系统路径。
 
-    模板是 data:与插件 module 同目录 ``templates/`` 子树,不打包成 module。
+def known_template_ids() -> tuple[str, ...]:
+    """已登记 template_id 的稳定排序视图（选项菜单与错误信息用）。"""
+    return tuple(sorted(TEMPLATE_REGISTRY))
+
+
+def _templates_root() -> Path:
+    """模板根目录（``templates/``）：data 与插件 module 同目录，不打包成 module。"""
+    return Path(__file__).resolve().parent / "templates"
+
+
+def _template_dir(template_id: str = DEFAULT_TEMPLATE_ID) -> Path:
+    """解析 template_id 对应的模板目录路径。
+
+    Failure：未登记的 template_id ⇒ ``AssistantCatalogError``（4xx 语义，
+    由调用方决定状态码；不回落 default）。
     """
-    return Path(__file__).resolve().parent / "templates" / DEFAULT_TEMPLATE_DIR_NAME
+    dir_name = TEMPLATE_REGISTRY.get(template_id)
+    if dir_name is None:
+        raise AssistantCatalogError(
+            f"未知 template_id={template_id!r};已登记: {', '.join(known_template_ids())}"
+        )
+    return _templates_root() / dir_name
 
 
 @dataclass(frozen=True)
@@ -227,15 +258,17 @@ class TemplateRender:
     """{相对路径: 文本内容};相对根 = AssistantHome。"""
 
 
-def render_default_template(*, name: str, description: str) -> TemplateRender:
-    """物化模板:替换 ``{{ name }}`` / ``{{ description }}`` 占位。
+def render_template(template_id: str, *, name: str, description: str) -> TemplateRender:
+    """物化指定模板:替换 ``{{ name }}`` / ``{{ description }}`` 占位。
 
     不复制文件目录本身;只生成需要写入 Home 的 file payload 字典。
     模板目录由 :func:`_template_dir` 解析,**不**走 ``os.environ``。
+
+    Failure：未登记 template_id / 模板目录缺失 ⇒ ``AssistantCatalogError``。
     """
-    tpl_dir = _template_dir()
+    tpl_dir = _template_dir(template_id)
     if not tpl_dir.is_dir():
-        raise AssistantCatalogError(f"default template 目录不存在: {tpl_dir}")
+        raise AssistantCatalogError(f"template 目录不存在: {tpl_dir}")
 
     files: dict[str, str] = {}
     for entry in CONFIG_FACE_FILES:
@@ -244,12 +277,17 @@ def render_default_template(*, name: str, description: str) -> TemplateRender:
         text = text.replace("{{ name }}", name).replace("{{ description }}", description)
         files[entry] = text
 
-    # BOOTSTRAP.md 在 PR-3 创建时存在;PR-7 完成流删除并发 EP。
+    # BOOTSTRAP.md 创建时存在;引导式创建（带 seed_user_md）完成流删除并发 EP。
     bootstrap_src = tpl_dir / _BOOTSTRAP_FILE
     if bootstrap_src.is_file():
         files[_BOOTSTRAP_FILE] = bootstrap_src.read_text(encoding="utf-8")
 
     return TemplateRender(files=files)
+
+
+def render_default_template(*, name: str, description: str) -> TemplateRender:
+    """``assistant.default`` 模板的渲染入口（等价 ``render_template(DEFAULT_TEMPLATE_ID, ...)``）。"""
+    return render_template(DEFAULT_TEMPLATE_ID, name=name, description=description)
 
 
 def write_home_files(home: Path, files: Mapping[str, str]) -> None:
