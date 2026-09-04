@@ -4,7 +4,6 @@ from __future__ import annotations
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
-from lca.agent.orchestration_strategies import HandoffStrategy
 from lca.contracts.models.core.decision import Decision, DelegationSpec
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import Result
@@ -18,6 +17,7 @@ from lca.plugins.composer.runtime.runtime_factory import (
     RuntimeDeps,
     build_fixture_cognitive_runtime,
 )
+from lca.plugins.strategies.peer_relay import HandoffStrategy
 from tests.phase_executors import standard_phase_executors
 from tests.support.action_authority import build_test_action_registry, build_test_body
 from tests.support.strategy_registry import build_strategy_registry
@@ -202,8 +202,8 @@ class TestHandoffRuntimeStop(unittest.IsolatedAsyncioTestCase):
 
     async def test_runtime_stops_on_handoff(self) -> None:
         """handoff action 应触发 StopPolicy 返回 should_stop=True。"""
-        from lca.plugins.phase_graph.stop_policy import DefaultStopPolicy
         from lca.plugins.journal.artifact_closure_provider import DefaultArtifactClosure
+        from lca.plugins.phase_graph.stop_policy import DefaultStopPolicy
 
         brain = MagicMock()
         body = MagicMock()

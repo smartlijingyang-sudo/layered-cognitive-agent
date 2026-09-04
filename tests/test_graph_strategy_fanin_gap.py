@@ -8,7 +8,6 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lca.agent.member_invoke import TransportMemberInvoker
-from lca.agent.orchestration_strategies import GraphStrategy
 from lca.application.api import Agent
 from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.lifecycle import TaskStatus
@@ -16,6 +15,7 @@ from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.team.graph import EdgeType, ExecutionGraph, GraphEdge, GraphNode, NodeType
 from lca.contracts.protocols import LLMAdapter, TeamStage
 from lca.plugins.composer.collaboration.team_transport import build_team_transport
+from lca.plugins.strategies.graph import GraphStrategy
 from tests.support.graph_node_executors import build_default_graph_node_executor_registry
 
 

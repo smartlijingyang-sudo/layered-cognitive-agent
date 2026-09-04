@@ -6,10 +6,6 @@ import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
-from lca.agent.orchestration_strategies import (
-    LeadStrategy,
-    SwarmStrategy,
-)
 from lca.cognition.body.tool_registry import SimpleToolRegistry
 from lca.cognition.brain.decision_gates.must_consult_all import MustConsultAllMembers
 from lca.cognition.member_status import InMemoryMemberStatus
@@ -23,6 +19,8 @@ from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
 from lca.contracts.protocols.journal.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
 from lca.infrastructure.transport.agent_transport import InternalTransport
 from lca.infrastructure.transport.transport_registry import TransportRegistry
+from lca.plugins.strategies.lead import LeadStrategy
+from lca.plugins.strategies.peer_swarm import SwarmStrategy
 from tests.support.action_authority import build_test_body
 from tests.support.team_stage import stage_with_invoker
 

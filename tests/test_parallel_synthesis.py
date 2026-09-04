@@ -8,14 +8,12 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.agent.orchestration_strategies import (
-    ParallelStrategy,
-)
 from lca.cognition.brain.synthesizer import ConcatSynthesizer
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import Result
 from lca.contracts.models.core.state import Budget
 from lca.contracts.protocols import Synthesizer
+from lca.plugins.strategies.fan_out import ParallelStrategy
 from tests.support.team_stage import stage_with_invoker
 
 

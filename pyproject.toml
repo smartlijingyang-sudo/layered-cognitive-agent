@@ -384,28 +384,6 @@ public_api = [
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.agent.orchestration_strategies"]
-responsibility = "lca.agent.orchestration_strategies: 编排策略。本 README 由脚手架生成，待包负责人补充具体细节。"
-not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
-allowed_dependencies = [
-    "lca.contracts",
-    "lca.infrastructure",
-    "lca.cognition",
-    "lca.runtime",
-    "lca.agent",
-]
-forbidden_dependencies = [
-    "lca.application",
-    "lca.harness",
-    "lca.plugins",
-    "gateway",
-]
-side_effects = []
-public_api = [
-    "lca.agent.orchestration_strategies",
-]
-schema_version = "1.0.0"
-
 [tool.lca.package_contracts."lca.application"]
 responsibility = "lca.application: 组合根、用例入口、依赖注入、命令处理。本 README 由脚手架生成，待包负责人补充具体细节。"
 not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
@@ -2079,6 +2057,10 @@ responsibility = "lca.plugins.strategies: 策略插件。本 README 由脚手架
 not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
 allowed_dependencies = [
     "lca.contracts",
+    "lca.infrastructure",
+    "lca.cognition",
+    "lca.agent",
+    "lca.harness",
     "lca.plugins",
 ]
 forbidden_dependencies = [
