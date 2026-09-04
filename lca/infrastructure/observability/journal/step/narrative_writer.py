@@ -363,16 +363,31 @@ class StepNarrativeWriter:
         # 详述
         lines.append("## 🔍 Steps 详述")
         lines.append("")
-        # ADR-0167 D3 / D4: Model saw 链接区（指向 model_visible/step_NN/）
+        # ADR-0185 PR-3:Model saw 链接区优先指向 <run_id>.spine.jsonl
+        # (foldRequestHeader 重建 SSOT);无 spine 时回退 <run_dir>/model_visible/
+        # (双轨期,PR-4 收口后删除)。
         lines.append("### 🪞 Model saw (per step)")
         lines.append("")
+        from lca.infrastructure.observability.spine.sinks.naming import (
+            spine_filename_for_run,
+        )
+
+        spine_path = (
+            Path("traces") / "runs" / document.run_id / spine_filename_for_run(document.run_id)
+        )
+        spine_exists = spine_path.exists()
         for step in document.steps:
-            lines.append(
-                f"- `{step.step_id}` → "
-                f"`traces/runs/{document.run_id}/model_visible/{step.step_id}/` "
-                f"(request-header.json / system-prompt.md / tool-schemas.json / "
-                f"context-manifest.json / messages.json)"
-            )
+            if spine_exists:
+                lines.append(
+                    f"- `{step.step_id}` → "
+                    f"`{spine_path}` (fold 重建;见 `lca_kernel.events.fold.foldRequestHeader`)"
+                )
+            else:
+                lines.append(
+                    f"- `{step.step_id}` → "
+                    f"`traces/runs/{document.run_id}/model_visible/{step.step_id}/` "
+                    f"(legacy sidecar;PR-3 双轨期)"
+                )
         lines.append("")
         for step in document.steps:
             lines.extend(_render_step(step))

@@ -1,16 +1,20 @@
-"""Journal trajectory / replay / verify-model-visible (ADR-0167 D9 / D10)。
+"""Journal trajectory / replay / verify-model-visible (ADR-0167 D9 / D10 + ADR-0185 PR-3)。
 
 新子命令:
 
 - ``lca-ops journal trajectory <run_id> [--out PATH]``
-  渲染 DSH Trajectory 风格 HTML（waterfall）；默认写到
-  ``traces/runs/<id>/journal.trajectory.html``。
+  渲染 DSH Trajectory 风格 HTML(waterfall);默认写到
+  ``traces/runs/<id>/journal.trajectory.html``。model-visible 链接
+  优先指向 ``<run_id>.spine.jsonl``(fold 路径 ADR-0185 §3.7);无 spine
+  时回退 ``<run_dir>/model_visible/``(PR-3 双轨期,PR-4 收口后删除)。
 - ``lca-ops journal replay <run_id> --step N [--tool NAME=JSON ...]``
-  打印 step 的模型所见 + 所做；``--tool`` 仅算 diff，绝不私自执行。
+  打印 step 的模型所见 + 所做;``--tool`` 仅算 diff,绝不私自执行。``at()``
+  走 :class:`StandardCursor`,内部 fold 优先 + sidecar 兜底(双轨期)。
 - ``lca-ops journal verify-model-visible <run_id>``
-  校验 ``request-header.digest`` 与 messages / tools / manifest 的 sha256 一致。
+  校验 ``header_digest`` 与 fold canonical sha256 一致(fold 路径)或
+  ``request-header.json`` 4 digest 一致(sidecar 路径)。
 
-设计：纯只读；不调 LLM / tool；不依赖 boot；走 FilesystemRunLocator 直读。
+设计:纯只读;不调 LLM / tool;不依赖 boot;走 FilesystemRunLocator 直读。
 """
 
 from __future__ import annotations
@@ -54,7 +58,14 @@ def register(app: typer.Typer) -> None:
     ) -> None:
         """DSH Trajectory 风格 HTML —— 与 LobeHub / WebServer 解耦。"""
         run_dir = traces_root / "runs" / run_id
-        mv_path = run_dir / "model_visible" if (run_dir / "model_visible").exists() else None
+        # ADR-0185 PR-3:trajectory 「model saw」链接优先指向 spine.jsonl
+        # (fold SSOT);无 spine 时回退 <run_dir>/model_visible/ (PR-3 双轨期)。
+        mv_path: Path | None = None
+        spine_path = _spine_path(run_id, traces_root)
+        if spine_path is not None:
+            mv_path = spine_path
+        elif (run_dir / "model_visible").exists():
+            mv_path = run_dir / "model_visible"
         deriver = WaterfallDeriver(run_id, model_visible_root=mv_path)
         for record in _read_events_jsonl(run_id, traces_root):
             deriver.on_event(record)
@@ -172,17 +183,11 @@ def _read_events_jsonl(run_id: str, traces_root: Path) -> list[EventRecord]:
     空 list。Per-line parse errors are skipped(best-effort; trajectory page
     degrades gracefully)。
     """
-    from lca.infrastructure.observability.spine.sinks.naming import (
-        spine_filename_for_run,
-    )
-
-    run_dir = traces_root / "runs" / run_id
-    spine_path = run_dir / spine_filename_for_run(run_id)
-    events_path: Path | None = spine_path if spine_path.exists() else None
-    if events_path is None:
+    spine_path = _spine_path(run_id, traces_root)
+    if spine_path is None:
         return []
     out: list[EventRecord] = []
-    for line in events_path.read_text(encoding="utf-8").splitlines():
+    for line in spine_path.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
         try:
@@ -191,6 +196,20 @@ def _read_events_jsonl(run_id: str, traces_root: Path) -> list[EventRecord]:
             # Unknown EP / missing field — skip, not fail (graceful degrade)
             continue
     return out
+
+
+def _spine_path(run_id: str, traces_root: Path) -> Path | None:
+    """解析 ``<run_id>.spine.jsonl`` 物理路径;缺失返回 ``None``(不抛)。
+
+    ADR-0185 PR-3:trajectory / replay 一致使用此 helper;production 路径
+    ``find_spine_file`` 抛错,此处 fail-soft(CLI 偏好 silent degrade)。
+    """
+    from lca.infrastructure.observability.spine.sinks.naming import (
+        spine_filename_for_run,
+    )
+
+    spine_path = traces_root / "runs" / run_id / spine_filename_for_run(run_id)
+    return spine_path if spine_path.exists() else None
 
 
 __all__ = ["register"]

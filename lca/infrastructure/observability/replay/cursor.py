@@ -1,12 +1,15 @@
-"""StandardCursor —— 零 token 确定性回放（ADR-0167 D10）。
+"""StandardCursor —— 零 token 确定性回放(ADR-0167 D10 + ADR-0185 PR-3)。
 
-读取 ``traces/runs/<run_id>/journal.json`` + ``model_visible/step_N/``：
+读取 ``traces/runs/<run_id>/journal.json`` + ``model_visible/step_N/`` 或
+``<run_id>.spine.jsonl`` fold 重建：
 
-- ``messages``: 优先 ``model_visible/step_N/messages.json``；缺失则用
-  ``journal.json`` 推导并标 ``inferred=True``。
-- ``actions``: 直接读 step 的 ``tool_calls[]`` + ``tool_results[]``，已为
+- ``messages``: 优先 fold 路径(``spine.llm.request.header`` payload
+  原文,ADR-0185 §3.7);缺失时回退 ``model_visible/step_N/messages.json``
+  (PR-3 双轨期);两者均缺失则由 ``journal.json`` 推导并标 ``inferred=True``。
+- ``actions``: 直接读 step 的 ``tool_calls[]`` + ``tool_results[]``,已为
   事实记录。
-- ``digest_verified``: sha256(messages) / sha256(tool_schemas) / sha256(manifest)
+- ``digest_verified``: fold 路径 = True(fold canonical header 字节级稳定);
+  sidecar 路径 = sha256(messages) / sha256(tool_schemas) / sha256(manifest)
   vs ``request-header.json`` 里的 digest。
 
 ``with_override(...)`` 仅返回 diff；**绝不私自执行工具**。
@@ -52,6 +55,10 @@ class StandardCursor:
         from lca.infrastructure.observability.journal.step.reader import (
             read_step_document,
         )
+        from lca.infrastructure.observability.replay.fold_source import (
+            SOURCE_FOLD,
+            fold_model_visible,
+        )
 
         run_dir = self._root / "runs" / run_id
         journal_path = run_dir / "journal.json"
@@ -62,6 +69,28 @@ class StandardCursor:
         if step is None:
             raise IndexError(f"step_index={step_index} not in {journal_path}")
 
+        # ADR-0185 PR-3:fold 路径优先;sidecar 双轨兜底(PR-4 收口后删)。
+        folded = fold_model_visible(
+            run_dir=run_dir,
+            run_id=run_id,
+            step_id=step.step_id,
+        )
+        if folded is not None:
+            # fold 命中:header 来自 canonical fold,messages/tools/manifest 来自
+            # 最近一条 request/header payload 原文。
+            return StepContextAt(
+                step_index=step_index,
+                step_id=step.step_id,
+                request_header=self._header_dict_from_fold(folded),
+                messages=folded.messages,
+                tool_schemas=folded.tool_schemas,
+                context_manifest=folded.manifest or {},
+                actions=self._actions_from_step(step),
+                source=SOURCE_FOLD,
+                inferred=False,
+                digest_verified=folded.digest_verified,
+            )
+
         sidecar = self._load_model_visible(
             run_dir / "model_visible" / step.step_id.replace("/", "_")
         )
@@ -70,13 +99,6 @@ class StandardCursor:
         messages = sidecar.messages if not inferred else self._infer_messages(step)
         tool_schemas = sidecar.tool_schemas or []
         manifest = sidecar.manifest or {}
-
-        actions: list[Any] = []
-        if step.tool_call is not None:
-            actions.append({"kind": "tool_call", "data": step.tool_call})
-        if step.tool_result is not None:
-            actions.append({"kind": "tool_result", "data": step.tool_result})
-        # 3.1 多工具（待 PR-1 落地时切换到 step.tool_calls[]）
 
         digest_verified = self._verify_digest(
             sidecar.header,
@@ -92,7 +114,7 @@ class StandardCursor:
             messages=tuple(messages),
             tool_schemas=tuple(tool_schemas),
             context_manifest=manifest,
-            actions=tuple(actions),
+            actions=self._actions_from_step(step),
             source="replayed",
             inferred=inferred,
             digest_verified=digest_verified,
@@ -143,6 +165,40 @@ class StandardCursor:
             tool_schemas=self._read_json(mv_dir / "tool-schemas.json") or [],
             manifest=self._read_json(mv_dir / "context-manifest.json") or {},
         )
+
+    @staticmethod
+    def _actions_from_step(step: Any) -> tuple[Any, ...]:
+        """step → actions 序列;fold 路径与 sidecar 路径共用。"""
+        actions: list[Any] = []
+        if step.tool_call is not None:
+            actions.append({"kind": "tool_call", "data": step.tool_call})
+        if step.tool_result is not None:
+            actions.append({"kind": "tool_result", "data": step.tool_result})
+        return tuple(actions)
+
+    @staticmethod
+    def _header_dict_from_fold(folded: Any) -> dict[str, Any]:
+        """``FoldedModelVisible`` → ``request_header`` dict。
+
+        形态对齐 :class:`ModelVisibleSidecar.header` 字典口径(便于
+        ``lca-ops journal replay`` JSON 输出与旧 sidecar 形态并行;
+        ``header_digest`` 字段额外提供 fold canonical sha256,viewer
+        可用其对位 publisher ``previous_header_digest``)。
+        """
+        header = folded.header
+        if header is None:
+            return {}
+        out: dict[str, Any] = {
+            "system": header.system or "",
+            "tools": list(header.tools or ()),
+            "config": dict(header.config) if header.config is not None else None,
+            "adapter_defaults": (
+                dict(header.adapter_defaults) if header.adapter_defaults is not None else None
+            ),
+            "header_digest": folded.header_digest,
+            "source": folded.source,
+        }
+        return out
 
     @staticmethod
     def _read_json(path: Path) -> Any:
