@@ -310,6 +310,39 @@ def test_capture_post_llm_emits_assistant_payload(hook: Any) -> None:
     assert isinstance(ModelVisiblePublisher, type)
 
 
+def test_capture_post_llm_reads_llmresponse_text_field(hook: Any, monkeypatch: Any) -> None:
+    """回归锁:``LLMResponse`` 契约字段是 ``text``,assistant_content 必须读到。
+
+    旧实现读 ``.content``(``LLMResponse`` 无此属性)→ 模型输出文本恒为空。
+    本测试用真实 :class:`LLMResponse`(``.text`` 有值)断言 assistant_content
+    捕获到文本,防字段名回归。
+    """
+    from lca.contracts.models.core.llm import LLMResponse
+
+    captured: dict[str, Any] = {}
+
+    def _fake_publish(payload: Any, *, producer: Any = None) -> Any:
+        captured["payload"] = payload
+        return None
+
+    monkeypatch.setattr(
+        "lca.plugins.events.publishers._session_publish.publish_via_session",
+        _fake_publish,
+    )
+
+    response = LLMResponse(
+        text="模型真实思考输出",
+        model="test-model",
+        finish_reason="stop",
+        tool_calls=[],
+    )
+    hook.hook.capture_post_llm(run_id="run-text", step_index=0, incarnation=1, response=response)
+
+    payload = captured.get("payload")
+    assert payload is not None
+    assert payload.assistant_content == "模型真实思考输出"
+
+
 def test_capture_post_llm_without_prior_header(hook: Any) -> None:
     """无前置 capture_pre_llm → assistant publish 仍发,header_digest = 空字符串。"""
 
