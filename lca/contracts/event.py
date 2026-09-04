@@ -66,6 +66,7 @@ class Category(str, Enum):
     SPINE_LLM_STREAM_TOKEN = "spine.llm.stream.token"  # noqa: S105  # enum 名,非密码
     SPINE_LLM_STREAM_STALL = "spine.llm.stream.stall"
     SPINE_LLM_REQUEST_HEADER = "spine.llm.request.header"
+    SPINE_LLM_REQUEST_HEADER_ASSISTANT = "spine.llm.request.header.assistant"
     SPINE_EXCEPTION_CAUGHT = "spine.exception.caught"
     SPINE_EXCEPTION_FINALLY = "spine.exception.finally"
     # observability/spine — PR-3 runtime.observed 5 EP（runtime.py 整文件删前迁齐）
@@ -185,6 +186,7 @@ CATEGORY_DEFAULT_PLANE: dict[Category, Plane] = {
     Category.SPINE_LLM_STREAM_TOKEN: Plane.OBSERVABILITY,
     Category.SPINE_LLM_STREAM_STALL: Plane.OBSERVABILITY,
     Category.SPINE_LLM_REQUEST_HEADER: Plane.OBSERVABILITY,
+    Category.SPINE_LLM_REQUEST_HEADER_ASSISTANT: Plane.OBSERVABILITY,
     Category.SPINE_EXCEPTION_CAUGHT: Plane.OBSERVABILITY,
     Category.SPINE_EXCEPTION_FINALLY: Plane.OBSERVABILITY,
     Category.SPINE_RUNTIME_REDUCER_APPLY: Plane.OBSERVABILITY,
