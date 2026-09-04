@@ -14,8 +14,9 @@
 责任边界:
 - 唯一 ``seq/epoch/hash`` 分配链消费者(经 :mod:`lca.infrastructure.observability.spine.context`
   已在 :mod:`lca_kernel.events.spine_runtime.build_record` 注入,observer 不直接分配)。
-- ``fsync_policy``:SYNC(每事件 fsync)/ BATCH(50ms 间隔)/ ASYNC(与 BATCH 等效,
-  Profile 可挂自定义 SinkBackend)。
+- ``fsync_policy``:取契约枚举 :class:`lca.contracts.observability.fsync.FsyncProtocol`
+  —— PER_WRITE(每事件 fsync)/ BATCH(50ms 间隔,默认)/ COMMIT(运行期不
+  fsync,由 sink.close 决定);Profile 可挂自定义 SinkBackend。
 - ``PersistenceHealthSnapshot`` 暴露给 ``/health`` + ``lca-ops events-delivery --policy``;
   无队列后 ``queue_depth`` / ``pending_count`` / ``enqueued_total`` /
   ``dropped_queue_full`` 恒为 0,``consumer_running`` 恒为 False。
@@ -24,11 +25,12 @@
 from __future__ import annotations
 
 import asyncio
-import enum
 import logging
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, runtime_checkable
+
+from lca.contracts.observability.fsync import FsyncProtocol
 
 if TYPE_CHECKING:
     from lca.contracts.event import EventPayload
@@ -162,22 +164,10 @@ def _spine_record_from_mapped(
 
 # ── 公开 enum / dataclass ────────────────────────────────────────────────
 
-
-class FsyncPolicy(enum.Enum):
-    """fsync 策略枚举(ADR-0184 PR-2)。"""
-
-    SYNC = "sync"
-    """每事件 fsync(强一致,低吞吐)。"""
-
-    BATCH = "batch"
-    """默认。``fsync_interval_ms`` 间隔或 ``fsync_batch_size`` 累积到阈值时 fsync。
-    本 observer 默认 50ms 间隔;批次大小由底层 :class:`lca_kernel.events.sinks.spine_sink.SpineSink`
-    自身 ``fsync_batch_size`` 控制(默认 100)。
-    """
-
-    ASYNC = "async"
-    """后台线程 fsync(高吞吐,弱一致)。本 observer 不实装线程,默认与 BATCH 等效;
-    Profile 加载时可挂自定义 SinkBackend 实现真正的 ASYNC 路径。"""
+# fsync 节奏是契约,定义在 :mod:`lca.contracts.observability.fsync`
+# (PER_WRITE / BATCH / COMMIT);本模块只消费,不再私有条目。
+# 旧名映射:SYNC → PER_WRITE;ASYNC 无运行期语义差异,归入
+# BATCH / COMMIT 按落盘时机二选一。
 
 
 class PersistenceFlushTimeout(TimeoutError):
@@ -201,7 +191,7 @@ class PersistenceHealthSnapshot:
     ``dropped_queue_full`` 恒为 0;``consumer_running`` 恒为 False。
     """
 
-    policy: FsyncPolicy
+    policy: FsyncProtocol
     queue_depth: int
     pending_count: int
     last_flush_ms: int | None
@@ -233,7 +223,7 @@ class PersistenceObserver:
         self,
         *,
         sink: SinkBackend | None = None,
-        fsync_policy: FsyncPolicy = FsyncPolicy.BATCH,
+        fsync_policy: FsyncProtocol = FsyncProtocol.BATCH,
         fsync_interval_ms: int = 50,
     ) -> None:
         from lca_kernel.events.sinks.spine_sink import SpineSink
@@ -337,7 +327,7 @@ class PersistenceObserver:
     # ── 只读属性 ─────────────────────────────────────────────────────────
 
     @property
-    def fsync_policy(self) -> FsyncPolicy:
+    def fsync_policy(self) -> FsyncProtocol:
         return self._fsync_policy
 
     @property
@@ -451,11 +441,12 @@ class PersistenceObserver:
             return
         self._written_event_ids.add(event_id)
         self._written_total += 1
-        if self._fsync_policy is FsyncPolicy.SYNC:
+        if self._fsync_policy is FsyncProtocol.PER_WRITE:
             self._sink.flush()
             self._last_flush_ms = int(time.time() * 1000)
-        elif self._fsync_policy is FsyncPolicy.BATCH and self._fsync_interval_ms > 0:
+        elif self._fsync_policy is FsyncProtocol.BATCH and self._fsync_interval_ms > 0:
             self._maybe_fsync_batched()
+        # COMMIT:运行期不 fsync,落盘时机由 sink.close() 决定。
         self._notify_flush(event_id)
 
     def _notify_flush(self, event_id: str) -> None:
@@ -479,7 +470,6 @@ class PersistenceObserver:
 
 __all__ = [
     "EnvelopeDeliveryObserver",
-    "FsyncPolicy",
     "PersistenceFlushTimeout",
     "PersistenceHealthSnapshot",
     "PersistenceObserver",

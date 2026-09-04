@@ -4,6 +4,12 @@
 下列函数得到 per-run artifact 的物理路径,**禁止** 再有
 ``run_dir / "<run_id>.spine.jsonl"`` 之类的字符串拼接。
 
+本模块同时 re-export append 型持久化的 :class:`FsyncProtocol` 闭集
+(定义在 :mod:`lca.contracts.observability.fsync`,该模块零依赖):
+"何时 fsync" 是契约,落盘实现(sinks / persistence observer)必须
+按枚举显式声明自己的节奏,禁止隐式行为或平行枚举
+(见 docs/notes/proposed/seam/2026-09-03-2-seam-fsync-semantics.md)。
+
 历史回归根因:
 - spine 文件名字符串被多处 reader / writer 硬编码;
 - 一旦 FileSink 的默认文件名在 PR-27 改成 ``$run_id.spine.jsonl``,
@@ -30,6 +36,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from lca.contracts.observability.fsync import FsyncProtocol as FsyncProtocol
 from lca.infrastructure.observability.spine.sinks.naming import (
     exceptions_filename_for_run,
     kernel_log_filename,
@@ -88,6 +95,7 @@ def find_kernel_log(run_dir: Path, run_id: str) -> Path:
 
 
 __all__ = [
+    "FsyncProtocol",
     "ObservationSSOTError",
     "find_exceptions_file",
     "find_kernel_log",

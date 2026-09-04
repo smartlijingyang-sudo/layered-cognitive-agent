@@ -151,7 +151,7 @@ def test_read_event_bus_health_returns_dict_on_fresh_process() -> None:
     assert result["persisted_total"] == 0
     assert result["delivered_total"] == 0
     assert result["dropped_total"] == 0
-    # fsync_policy reads from PersistenceObserver; default FsyncPolicy.BATCH.
+    # fsync_policy reads from PersistenceObserver; default FsyncProtocol.BATCH.
     assert result["fsync_policy"] in {"batch", "n/a"}
     if result["fsync_policy"] != "n/a":
         assert result.get("queue_depth") == 0

@@ -1,9 +1,9 @@
 """ADR-0186 PR-3e / delete-queue Level 4: PersistenceObserver 同步落盘测试。
 
 覆盖:
-- 默认 FsyncPolicy.BATCH
+- 默认 FsyncProtocol.BATCH
 - on_session_event → sink.append
-- SYNC 策略每条 flush
+- PER_WRITE 策略每条 flush
 - health_snapshot 字段(无队列: queue/pending/enqueued/dropped=0)
 - EnvelopeDeliveryObserver 协议 + 失败 contained
 - spine_file_sink manifest 走 Session.observe
@@ -17,15 +17,18 @@ from typing import Any
 import pytest
 
 from lca.contracts.event import EventPayload
+from lca.contracts.observability.fsync import FsyncProtocol
 from lca_kernel.events import (
     EnvelopeBus,
     EnvelopeRef,
     PersistenceObserver,
     TeamDelegationCacheHit,
 )
+from lca_kernel.events import (
+    FsyncProtocol as ReexportedFsyncProtocol,
+)
 from lca_kernel.events.persistence import (
     EnvelopeDeliveryObserver,
-    FsyncPolicy,
     PersistenceHealthSnapshot,
 )
 from lca_kernel.events.persistence import (
@@ -72,15 +75,19 @@ def _isolate_singletons() -> Any:
     PersistenceObserver.reset_singleton()
 
 
-# ── 1:FsyncPolicy 默认值 ────────────────────────────────────────────────
+# ── 1:FsyncProtocol 默认值 ──────────────────────────────────────────────
 
 
-class TestFsyncPolicy:
+class TestFsyncProtocol:
     def test_persistence_observer_fsync_policy_default(self) -> None:
-        """默认 FsyncPolicy.BATCH(平衡 fsync 节奏)。"""
+        """默认 FsyncProtocol.BATCH(平衡 fsync 节奏)。"""
         observer = PersistenceObserver()
-        assert observer.fsync_policy is FsyncPolicy.BATCH
+        assert observer.fsync_policy is FsyncProtocol.BATCH
         assert observer.fsync_interval_ms == 50
+
+    def test_kernel_reexport_is_contract_enum(self) -> None:
+        """lca_kernel.events re-export 的枚举与契约层同一对象(无双枚举)。"""
+        assert ReexportedFsyncProtocol is FsyncProtocol
 
 
 # ── 2:同步落盘 ───────────────────────────────────────────────────────────
@@ -90,7 +97,7 @@ class TestPersistenceObserverWrites:
     def test_persistence_observer_writes_to_spine_sink(self) -> None:
         """on_session_event → StubSink.append。"""
         sink = _StubSink()
-        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)
         ref = EnvelopeRef(
             event_id="evt-w1",
             category="team.delegation.cache_hit",
@@ -108,7 +115,7 @@ class TestPersistenceObserverWrites:
     async def test_persistence_observer_flush_for_returns_when_written(self) -> None:
         """flush_for 对已写入 id 立即返回;consumer_running 恒 False。"""
         sink = _StubSink()
-        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)
         assert observer.consumer_running is False
         ref = EnvelopeRef(
             event_id="evt-w2b",
@@ -122,9 +129,9 @@ class TestPersistenceObserverWrites:
         assert observer.consumer_running is False
 
     def test_persistence_observer_fsync_policy_sync_flushes_per_event(self) -> None:
-        """SYNC 策略:每条事件 flush 一次。"""
+        """PER_WRITE 策略:每条事件 flush 一次。"""
         sink = _StubSink()
-        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.SYNC)
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.PER_WRITE)
         refs = [
             EnvelopeRef(
                 event_id=f"evt-s-{i}",
@@ -149,12 +156,12 @@ class TestHealthSnapshot:
         sink = _StubSink()
         observer = PersistenceObserver(
             sink=sink,
-            fsync_policy=FsyncPolicy.BATCH,
+            fsync_policy=FsyncProtocol.BATCH,
             fsync_interval_ms=50,
         )
         snap = observer.health_snapshot()
         assert isinstance(snap, PersistenceHealthSnapshot)
-        assert snap.policy is FsyncPolicy.BATCH
+        assert snap.policy is FsyncProtocol.BATCH
         assert snap.queue_depth == 0
         assert snap.pending_count == 0
         assert snap.last_flush_ms is None
@@ -228,7 +235,7 @@ class TestPersistenceObserverProtocol:
     def test_persistence_observer_on_session_event_writes_to_sink(self) -> None:
         """``on_session_event`` 同步回调:直接触发 build_record + sink.append。"""
         sink = _StubSink()
-        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)
         ref = EnvelopeRef(
             event_id="evt-o1",
             category="team.delegation.cache_hit",
@@ -247,7 +254,7 @@ class TestPersistenceObserverProtocol:
     ) -> None:
         """``sink.append`` 抛错 → observer 吞错,不向外冒泡,自身仍可用。"""
         sink = _RaisingSink()
-        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)
         ref = EnvelopeRef(
             event_id="evt-o2-fail",
             category="team.delegation.cache_hit",
@@ -274,7 +281,7 @@ class TestPersistenceObserverProtocol:
     ) -> None:
         """``build_record`` 抛错 → contained;observer 仍可用。"""
         sink = _StubSink()
-        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)
         import lca_kernel.events.persistence as persistence_mod
 
         original = persistence_mod.PersistenceObserver._build_persistable_record
