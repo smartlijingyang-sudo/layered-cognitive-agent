@@ -1,14 +1,15 @@
-"""事件总线 —— ADR-0183 §3 / ADR-0183 PR-7 收口。
+"""事件总线 —— ADR-0183 §3 / ADR-0183 PR-7 收口 / ADR-0184 PR-1。
 
 公开面：
-- :class:`EventBus` —— 唯一机制入口
-- :class:`EventRef` —— publish 返回值
+- :class:`EnvelopeBus` —— ADR-0184 PR-1 统一入口(主)
+- :class:`EventBus` —— EnvelopeBus 兼容 shim(30 天窗口)
+- :class:`EnvelopeRef` / :class:`EventRef` —— publish 返回值
+- :class:`DeliveryQueue` / :class:`NotificationBus` —— 投递拆分件
 - :class:`Category` / :class:`Plane` / :class:`EventPayload` —— 协议类型
   （实际定义在 :mod:`lca.contracts.event`，本模块 re-export）
 
 PR-7 收口：旧 EventMechanism(ADR-0180) 整个文件删除；
-producer 入口 = EventBus.publish(payload, *, producer=...)；
-consumer 入口 = EventBus.subscribe(*, plugin, category, on_event, failure=...)。
+PR-1 收口：EventBus 改为 EnvelopeBus 子类,保留全部现有方法。
 
 不在此暴露：
 - :class:`EventRegistry` —— SSOT 加载器，机制内部
@@ -25,7 +26,17 @@ from lca.contracts.event import (
     TeamDelegationCacheHit,
     default_plane,
 )
-from lca_kernel.events.bus import EventBus, EventRef
+from lca_kernel.events.bus import (
+    ConsumerHandle,
+    ConsumerResult,
+    DeliveryPolicy,
+    EnvelopeBus,
+    EnvelopeRef,
+    EventBus,
+    EventRef,
+)
+from lca_kernel.events.notification import NotificationBus
+from lca_kernel.events.queue import DeliveryQueue, DeliveryQueueFull
 
 _DEFAULT_CONFIG_DIR: Path = Path(__file__).parent / "config"
 """机制 SSOT yaml 目录（ADR-0183 §3.1 / ADR-0180 D2）。"""
@@ -33,9 +44,17 @@ _DEFAULT_CONFIG_DIR: Path = Path(__file__).parent / "config"
 __all__ = [
     "_DEFAULT_CONFIG_DIR",
     "Category",
+    "ConsumerHandle",
+    "ConsumerResult",
+    "DeliveryPolicy",
+    "DeliveryQueue",
+    "DeliveryQueueFull",
+    "EnvelopeBus",
+    "EnvelopeRef",
     "EventBus",
     "EventPayload",
     "EventRef",
+    "NotificationBus",
     "Plane",
     "TeamDelegationCacheHit",
     "default_plane",

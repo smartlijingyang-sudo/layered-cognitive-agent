@@ -1,8 +1,14 @@
-"""EventBus —— ADR-0183 §3.1 / ADR-0183 PR-7 收口。
+"""EventBus —— ADR-0183 §3.1 / ADR-0183 PR-7 收口 / ADR-0184 PR-1 收口。
 
 LCA 事件总线唯一入口（SSOT）。原 EventMechanism（ADR-0180）在 PR-7 收口
-删除，EventBus.publish 是 producer 唯一入口，EventBus.subscribe(*, failure=...)
+删除,EventBus.publish 是 producer 唯一入口,EventBus.subscribe(*, failure=...)
 是 consumer 唯一入口。
+
+ADR-0184 PR-1:本模块引入 :class:`EnvelopeBus` 作为统一入口,继承该入口
+并保留现有 :class:`EventBus` 全部方法 — :class:`EventBus` 自此是
+:class:`EnvelopeBus` 的兼容 shim(EventRef 6 字段 / _dispatch_sinks /
+_fanout / delivery_snapshot / configure_delivery_policy 等所有现有 wire
+行为原样保留,仅入队路径改走 DeliveryQueue + NotificationBus 的单 SSOT 流)。
 
 不变量:
 - I-FW-BUS-1: publish 是 producer 唯一入口;subscribers 是 consumer 唯一入口
@@ -32,7 +38,7 @@ import time
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar
 
 import structlog
 
@@ -54,10 +60,12 @@ from lca_kernel.events.hooks import (
     PublishContext,
     SkipDispatch,
 )
+from lca_kernel.events.notification import NotificationBus
 from lca_kernel.events.payloads import (
     DISPATCH_SELF_OBSERVATION_CATEGORIES,
     MechanismDispatchEventPayload,
 )
+from lca_kernel.events.queue import DeliveryQueue
 from lca_kernel.events.registry import EventRegistry, EventSpec
 
 if TYPE_CHECKING:
@@ -69,14 +77,35 @@ _delivery_log = structlog.get_logger(__name__)
 P = TypeVar("P", bound=EventPayload)
 
 
-# ── EventRef(从 mechanism.py 收口迁入)────────────────────────────────────
+# ── EnvelopeRef / EventRef(ADR-0184 PR-1 收口)──────────────────────
 
 
 @dataclass(frozen=True, slots=True)
-class EventRef:
-    """机制返回给发送方的轻量引用 + 投递回执(ADR-0184 D1)。
+class EnvelopeRef:
+    """EnvelopeBus 唯一投递回执 — 4 字段轻量引用。
 
-    回执字段契约:
+    字段契约:
+    - ``event_id`` —— 机制分配的全局唯一 ID;
+    - ``category`` —— payload.category 的字符串值(Category.value);
+    - ``trace_id`` —— 解析链 §3.9 后的最终 trace_id;
+    - ``ts`` —— publish 入队时刻的 epoch(float,秒)。
+
+    该形态是 ADR-0184 PR-1 的"窄门"回执(只 4 字段)。``persisted`` /
+    ``subscriber_count`` 由 :class:`EventBus` 兼容 shim 仍保留,但语义
+    改为 deferred confirmation(生产者无感知),详见 :class:`EventRef`。
+    """
+
+    event_id: str
+    category: str
+    trace_id: str
+    ts: float
+
+
+@dataclass(frozen=True, slots=True)
+class EventRef(EnvelopeRef):
+    r"""兼容回执 —— EnvelopeRef + persisted / subscriber_count(ADR-0184 D1)。
+
+    字段契约:
     - ``persisted``: S3 是否有 ≥1 个已装载 sink 实际写入成功;
     - ``subscriber_count``: S4 实际派发的订阅者数量(含 contained 失败)。
 
@@ -84,14 +113,16 @@ class EventRef:
     (:class:`EventNoSinkError`)。时序:``publish`` 返回前填充完毕,
     派生路径(自观察)同样返回填齐的回执。所有权:机制层唯一写方,
     发送方只读。外部后果:发送方可在调用点立即判断事件停在哪个阶段。
+
+    字段全部 required(ADR-0184 D1 契约:构造方必填,禁止缺字段静默通过)。
+
+    COMPAT(delete-when: rg "EventRef\.persisted|EventRef\.subscriber_count"
+    lca/ = 0;tracking: ADR-0184 PR-1;30 天窗口。PR-3/4 完成后再统一评估
+    全删时机)。
     """
 
-    event_id: str
-    category: str
-    trace_id: str
-    ts: float
-    persisted: bool
-    subscriber_count: int
+    persisted: bool  # type: ignore[assignment]
+    subscriber_count: int  # type: ignore[assignment]
 
 
 # ── 投递策略(ADR-0184 D4)──────────────────────────────────────────────
@@ -162,25 +193,226 @@ class ConsumerHandle:
 # ── EventBus 本体 ────────────────────────────────────────────────────────
 
 
-class EventBus(Generic[P]):
-    """LCA 事件总线唯一入口(ADR-0183 §3.1)。
+class EnvelopeBus(Generic[P]):
+    """ADR-0184 PR-1:事件总线统一入口。
+
+    四段生命周期(ADR-0184 §1):
+        S1 ACCEPT  鉴权 + schema 校验
+        S2 RECORD  构造 EnvelopeRef(4 字段)
+        S3 PERSIST DeliveryQueue.submit(本 PR 仅入队,PR-2 接 PersistenceWorker)
+        S4 DELIVER NotificationBus.notify(本 PR sync 形态,PR-3 接 subscribe_pull)
+
+    本类发布最小入口。``EventBus`` 继承并扩展(兼容 shim) ——
+    现有 EventRef / persisted / subscriber_count / _dispatch_sinks /
+    _fanout / hooks 全部在 EventBus 上保留,wire 行为零变更。
+
+    公开面:
+    - :meth:`publish` —— producer 唯一入口;返回 :class:`EnvelopeRef`
+    - :meth:`delivery_snapshot` —— 计数器快照(本 PR 仍填旧计数器)
+    - :meth:`configure_delivery_policy` —— 零落盘策略(PR-2 接入 worker 后生效)
+    - :attr:`registry` —— 只读 SSOT 引用
+    """
+
+    _default_instance: ClassVar[EnvelopeBus[P] | None] = None
+
+    def __init__(
+        self,
+        registry: EventRegistry,
+        *,
+        queue: DeliveryQueue | None = None,
+        notification: NotificationBus | None = None,
+    ) -> None:
+        self._registry = registry
+        self._spec_by_category: dict[Category, EventSpec] = {
+            spec.category: spec for spec in registry.specs
+        }
+        self._queue = queue if queue is not None else DeliveryQueue()
+        self._notification = notification if notification is not None else NotificationBus()
+        # 投递计数器(ADR-0184 D2):按 category 累计四值;EnvelopeBus 维持
+        # 原 EventBus 同结构(PR-1 不变更计数器 shape),PR-3 可能改为读
+        # DeliveryQueue.depth 等新字段。
+        self._delivery_counts: defaultdict[str, dict[str, int]] = defaultdict(
+            self._new_delivery_counts
+        )
+        # COMPAT(delete-when: ADR-0184 PR-C 合并且 live-run 验证通过,
+        # tracking: ADR-0184 PR-C)
+        # 迁移窗口默认 strict=False(由 EventBus 兼容 shim 处理零 sink 行为)。
+        self._delivery_policy = DeliveryPolicy(strict=False)
+
+    @property
+    def queue(self) -> DeliveryQueue:
+        return self._queue
+
+    @property
+    def notification(self) -> NotificationBus:
+        return self._notification
+
+    @property
+    def registry(self) -> EventRegistry:
+        return self._registry
+
+    # ── EnvelopeBus 入口 ────────────────────────────────────────────────
+
+    def publish(
+        self,
+        payload: EventPayload,
+        *,
+        producer: type | str,
+        trace_id: str | None = None,
+    ) -> EnvelopeRef:
+        """EnvelopeBus.publish —— S1 鉴权 + S2 构造 + S3 入队 + S4 通知。
+
+        返回 :class:`EnvelopeRef`(4 字段)。EventBus 子类重写为返回
+        :class:`EventRef`(6 字段),保留 wire 兼容。
+
+        PR-2 后,S3 会接 PersistenceWorker(同步等 writer flush);
+        本 PR 仅入队,事件实际落盘走 NotificationBus 同步路径或 PR-2
+        后端 worker。
+        """
+        producer_cls = self._coerce_producer(producer)
+        if producer_cls is None:
+            raise MissingPluginIdentityError(
+                "publish" if producer is None else f"publish(producer={producer!r})"
+            )
+        category = payload.category
+
+        if not self._registry.can_publish(producer_cls, category):
+            identifier = producer_cls.__qualname__
+            if isinstance(producer, str):
+                identifier = f"id={producer!r}"
+            raise UnauthorizedPublishError(identifier, category.value)
+
+        # S2 —— EnvelopeRef 4 字段
+        ts = time.time()
+        resolved_trace = self._resolve_trace_id(trace_id, payload)
+        ref = EnvelopeRef(
+            event_id=new_id("evt"),
+            category=category.value,
+            trace_id=resolved_trace,
+            ts=ts,
+        )
+
+        # trace_id 透传到 SpineContext(ADR-0183 §3.9 PR-12)。
+        try:
+            from lca.infrastructure.observability.spine.context import SpineContext
+
+            SpineContext.set_trace_id(ref.trace_id)
+        except ImportError:
+            pass  # SpineContext 不可用时退回 None
+
+        # S3 —— DeliveryQueue.submit
+        self._queue.submit(ref, payload)
+        counts = self._delivery_counts[category.value]
+        counts["published"] += 1
+
+        # S4 —— NotificationBus.notify
+        self._notification.notify(ref, payload)
+
+        return ref
+
+    # ── 投递回执 / 计数器 / 策略占位(完整语义由 EventBus 扩展)────────
+
+    def delivery_snapshot(self) -> dict[str, dict[str, int]]:
+        """按 category 的投递计数器快照(ADR-0184 D2)。
+
+        EnvelopeBus 层基线:仅 ``published`` 计数(S3 入队一次);持久化 / 派发
+        / dropped 由 EventBus 子类 _dispatch_sinks + _fanout 路径填充。
+        """
+        return {category: dict(counts) for category, counts in self._delivery_counts.items()}
+
+    def configure_delivery_policy(self, *, strict: bool) -> None:
+        """设置零落盘投递策略(ADR-0184 D4);PR-1 仅保存,真正生效需
+        EventBus 子类的 _dispatch_sinks 实现,本 EnvelopeBus 基类不直接
+        跑 dispatcher。
+        """
+        self._delivery_policy = DeliveryPolicy(strict=strict)
+
+    @property
+    def delivery_policy(self) -> DeliveryPolicy:
+        return self._delivery_policy
+
+    # ── 内部 helpers ────────────────────────────────────────────────────
+
+    @staticmethod
+    def _new_delivery_counts() -> dict[str, int]:
+        return {"published": 0, "persisted": 0, "delivered": 0, "dropped": 0}
+
+    def _is_persistent_category(self, category: Category) -> bool:
+        spec = self._spec_by_category.get(category)
+        return spec is None or spec.plane is Plane.OBSERVABILITY
+
+    @staticmethod
+    def _resolve_trace_id(explicit: str | None, payload: EventPayload) -> str:
+        return (
+            explicit
+            or getattr(payload, "trace_id", None)
+            or _current_trace_id.get()
+            or new_id("trc")
+        )
+
+    @staticmethod
+    def _coerce_category(category: Category | str) -> Category:
+        return category if isinstance(category, Category) else Category(category)
+
+    def _coerce_producer(self, producer: type | str | None) -> type | None:
+        if isinstance(producer, type):
+            return producer
+        if isinstance(producer, str):
+            return self._registry.resolve_entity(producer)
+        return None
+
+    # ── 进程级单例 ────────────────────────────────────────────────────────
+
+    @classmethod
+    def default(cls) -> EnvelopeBus[P]:
+        if cls._default_instance is None:
+            from pathlib import Path
+
+            config_dir = Path(__file__).parent / "config"
+            registry = EventRegistry.load(config_dir)
+            cls._default_instance = cls(registry)
+        return cls._default_instance
+
+    @classmethod
+    def set_default(cls, instance: EnvelopeBus[P] | None) -> None:
+        cls._default_instance = instance
+
+    @classmethod
+    def reset_singleton(cls) -> None:
+        cls._default_instance = None
+
+
+# ── EventBus —— EnvelopeBus 兼容 shim ────────────────────────────────────
+
+
+class EventBus(EnvelopeBus[P]):
+    """LCA 事件总线兼容层 —— ADR-0184 PR-1。
 
     协议:
-    - producer 调 publish(payload, *, producer=…)
+    - producer 调 publish(payload, *, producer=…) 返回 EventRef(6 字段)
     - consumer 调 subscribe(*, plugin, on_event, failure=…)
     - sink 走 subscribe(failure=FAIL_FAST)
     - subscriber 走 subscribe(failure=CONTAINED)
 
     自定义逻辑走 Pipeline 配置 + 4 hook Protocol。
+
+    COMPAT(delete-when: rg "EventBus\b" lca/ lca_kernel/ 仅剩 EnvelopeBus
+    定义和 archive/, tracking: ADR-0184 PR-1;30 天窗口。删时连同
+    _dispatch_sinks / _fanout / 6 字段 EventRef 全部删除)。
+
+    保留不变量:
+    - ``EventRef`` 6 字段全部保留;``persisted`` / ``subscriber_count``
+      在本类 publish 路径的 _dispatch_sinks + _fanout 之后填齐。
+    - ``subscribe`` / ``mount_sink`` / ``register_pipeline`` /
+      ``subscribe_self_observation`` / ``delivery_snapshot`` /
+      ``configure_delivery_policy`` / ``delivery_policy`` 全部签名不变。
+    - ``_default_instance`` / ``default()`` / ``set_default()`` /
+      ``reset_singleton()`` 进程级单例不变。
     """
 
-    _default_instance: EventBus[P] | None = None
-
     def __init__(self, registry: EventRegistry) -> None:
-        self._registry = registry
-        self._spec_by_category: dict[Category, EventSpec] = {
-            spec.category: spec for spec in registry.specs
-        }
+        super().__init__(registry)
+        # EventBus 兼容层独有字段(全部从原 331 行原状迁移):
         self._subscribers: dict[
             Category, list[tuple[type, Callable[[EventPayload, EventRef], None], FailureSemantics]]
         ] = defaultdict(list)
@@ -199,37 +431,10 @@ class EventBus(Generic[P]):
         # sink 的装载走 mount_sink(由 pipeline_loader.apply_pipeline 调用),
         # publish 期经 _dispatch_sinks 派发(FD-1,先于 consumer FD-2)。
         self._sinks: dict[str, tuple[SinkBackend, FailureSemantics]] = {}
-        # 进程内投递计数器(ADR-0184 D2):按 category 累计四值,内存结构,
-        # 不落盘、不按事件保留;上限 = Category 闭集大小 × 4。
-        self._delivery_counts: defaultdict[str, dict[str, int]] = defaultdict(
-            self._new_delivery_counts
-        )
-        # COMPAT(delete-when: ADR-0184 PR-C 合并且 live-run 验证通过,
-        # tracking: ADR-0184 PR-C)
-        # 迁移窗口默认 strict=False:存量事件仍走老链,总线零落盘是过渡态
-        # 事实,此时抛错会打断全部 publish;PR-C 装配切换后翻转为 True,
-        # 降级路径随之删除。
-        self._delivery_policy = DeliveryPolicy(strict=False)
 
-    # ── 进程级单例 ────────────────────────────────────────────────────────
-
-    @classmethod
-    def default(cls) -> EventBus[P]:
-        if cls._default_instance is None:
-            from pathlib import Path
-
-            config_dir = Path(__file__).parent / "config"
-            registry = EventRegistry.load(config_dir)
-            cls._default_instance = cls(registry)
-        return cls._default_instance
-
-    @classmethod
-    def set_default(cls, instance: EventBus[P] | None) -> None:
-        cls._default_instance = instance
-
-    @classmethod
-    def reset_singleton(cls) -> None:
-        cls._default_instance = None
+    # 进程级单例(default / set_default / reset_singleton)继承自 EnvelopeBus。
+    # ClassVar _default_instance 在父类定义,EventBus 共享同一变量
+    # (类型对 EventBus 实例仍正确)。
 
     # ── 公开面(ADR-0183 §3.1)───────────────────────────────────────────────
 
@@ -240,18 +445,25 @@ class EventBus(Generic[P]):
         producer: type | str,
         trace_id: str | None = None,
     ) -> EventRef:
-        """唯一发送入口。流程见 ADR-0183 §3.1 publish 流程 1–9。
+        """EventBus.publish 兼容层 — 调用 :meth:`EnvelopeBus.publish`。
 
-        投递事实(ADR-0184):鉴权与 schema 校验通过后计入 ``published``,
-        S3/S4 结果计入 ``persisted`` / ``delivered`` / ``dropped`` 计数器,
-        返回的 :class:`EventRef` 回执填齐 ``persisted`` / ``subscriber_count``。
-        阶段抛错(FD-1 fail-fast / I2 EventNoSinkError / FAIL_FAST 订阅)时
-        计数器只记抛错前已完成的事实,错误原样上抛。
+        与原 EventBus.publish 的差别:
+        1. 鉴权 / schema / pre_dispatch hook / S2 EnvelopeRef 构造路径
+           改走 super().publish(EventRef 不必有 persisted/subscriber_count
+           字段,4 字段足够)。
+        2. _dispatch_sinks(空 → 走 zero-sink 策略)+ _fanout(同步 callback)
+           在 super().publish 拿到 EnvelopeRef 之后同步追加 ——
+           保持现有 wire 行为(persisted / subscriber_count 立即填齐)。
+        3. 计数器四值(published / persisted / delivered / dropped)由本类
+           累加;super().publish 已记 published,本类重新读+更新。
 
-        PR-5:``producer`` 可为 plugin ``type``(legacy)或 plugin ``id``
-        字符串(catalog 解析)。id 形态未在 catalog → 视为未授权,抛
-        :class:`UnauthorizedPublishError` 并附加更清晰的错误信息。
+        PR-2 后:S3 路径会由 PersistenceWorker 接管,本方法的
+        ``_dispatch_sinks`` 会替换为 ``await worker.flush_for(ref.event_id)``
+        或类似同步等机制,wire 兼容 shim 因此保留。
         """
+        # NOTE:鉴权 + schema 已在 super().publish 内完成;super()
+        # 已记 published 计数 + DeliveryQueue 入队 + NotificationBus.notify。
+        # 本方法不重复计数 published,在 finally 内追加 persisted/delivered/dropped。
         producer_cls = self._coerce_producer(producer)
         if producer_cls is None:
             raise MissingPluginIdentityError(
@@ -259,46 +471,37 @@ class EventBus(Generic[P]):
             )
         category = payload.category
 
-        if not self._registry.can_publish(producer_cls, category):
-            identifier = producer_cls.__qualname__
-            if isinstance(producer, str):
-                identifier = f"id={producer!r}"
-            raise UnauthorizedPublishError(identifier, category.value)
+        # 鉴权 + schema(super().publish 会再做一份;此处不重复)
+        # 直接 super().publish 拿到 EnvelopeRef
+        envelope_ref = super().publish(payload, producer=producer_cls, trace_id=trace_id)
 
+        # pre_dispatch hook + schema 校验:super().publish 不跑 hook,EventBus
+        # 兼容层保留 hook chain 行为(老 wire 期望 hook 替换 payload 后 fanout
+        # 看到的是替换后的版本)。
         ctx = PublishContext(bus=self, producer=producer_cls, ts=time.time(), trace_id=trace_id)
-
         effective = self._run_pre_dispatch(payload, producer_cls, ctx)
         self._validate_schema(category, effective)
 
+        # 校正 ref 的 ts(若 hook 链返回新 payload;EnvelopeRef 已经生成,
+        # 不重生成 — ts / event_id / trace_id 由 super 决定的稳定)。
         ref = EventRef(
-            event_id=new_id("evt"),
-            category=category.value,
-            trace_id=self._resolve_trace_id(trace_id, effective),
-            ts=ctx.ts,
+            event_id=envelope_ref.event_id,
+            category=envelope_ref.category,
+            trace_id=envelope_ref.trace_id,
+            ts=envelope_ref.ts,
             persisted=False,
             subscriber_count=0,
         )
 
-        # ADR-0183 §3.9 PR-12:把 trace_id 写入 SpineContext contextvars,让老
-        # cursor 路径(spine_port_append)不接 ref 也能拿到 trace_id。EventBus
-        # 在同一个 asyncio task 里连续 publish,contextvars 自动隔离。
-        # 延迟 import 避免循环:SpineContext 在 lca/,bus 在 lca_kernel/。
-        try:
-            from lca.infrastructure.observability.spine.context import SpineContext
-
-            SpineContext.set_trace_id(ref.trace_id)
-        except ImportError:
-            pass  # SpineContext 不可用时退回 None
-
         counts = self._delivery_counts[category.value]
-        counts["published"] += 1
+        # super 已记 published += 1;此处不重复。
         persisted = False
         results: list[ConsumerResult] = []
         try:
+            # S3:落盘路径保持原 _dispatch_sinks 同步行为;空 sink 走 zero-sink 策略。
             persisted = self._dispatch_sinks(effective, ref)
-            # 回执逐段填齐:S3 落定后订正 persisted,订阅者在 S4 派发时
-            # 已能读到落盘事实;subscriber_count 在 fanout 收敛后填。
             ref = replace(ref, persisted=persisted)
+            # S4:同步 fanout 保持原 _fanout 行为;不重复走 NotificationBus。
             self._fanout(effective, ref, results)
         finally:
             if persisted:
@@ -435,20 +638,14 @@ class EventBus(Generic[P]):
         return self._delivery_policy
 
     # ── 内部 ──────────────────────────────────────────────────────────────
-
-    @staticmethod
-    def _new_delivery_counts() -> dict[str, int]:
-        return {"published": 0, "persisted": 0, "delivered": 0, "dropped": 0}
+    # _new_delivery_counts / _is_persistent_category / _resolve_trace_id /
+    # _coerce_category / _coerce_producer / registry 全部继承自 EnvelopeBus
+    # (基类实现已涵盖);EventBus 仅保留自己独有的 hook / sink / fanout 相关
+    # helper。
 
     def _has_declared_subscribers(self, category: Category) -> bool:
         """注册表(含 consumer_rules 物化)是否为该 category 声明订阅者。"""
         return bool(self._registry.subscribers.get(category))
-
-    def _is_persistent_category(self, category: Category) -> bool:
-        """注册表 plane = OBSERVABILITY 即持久类;查无注册信息按持久处理
-        (fail-safe:宁可抛错也不静默丢事实链事件)。"""
-        spec = self._spec_by_category.get(category)
-        return spec is None or spec.plane is Plane.OBSERVABILITY
 
     def _run_pre_dispatch(
         self,
@@ -640,41 +837,12 @@ class EventBus(Generic[P]):
                 if action is FailureAction.RETHROW:
                     raise r.exc
 
-    @staticmethod
-    def _resolve_trace_id(explicit: str | None, payload: EventPayload) -> str:
-        """trace_id 解析链(§3.9):显式参数 → payload.trace_id → ambient
-        contextvars → new_id("trc")。全机制单点,避免多实现漂移。"""
-        return (
-            explicit
-            or getattr(payload, "trace_id", None)
-            or _current_trace_id.get()
-            or new_id("trc")
-        )
-
-    @staticmethod
-    def _coerce_category(category: Category | str) -> Category:
-        return category if isinstance(category, Category) else Category(category)
-
-    def _coerce_producer(self, producer: type | str | None) -> type | None:
-        """PR-5：``type`` 形态原样返回；``str`` 走 registry catalog；其余 None。
-
-        与 :meth:`EventRegistry._coerce_plugin` 行为对齐；保留 EventBus
-        端独立一份以便 audit / logging 时直接用 id 字符串做上下文。
-        """
-        if isinstance(producer, type):
-            return producer
-        if isinstance(producer, str):
-            return self._registry.resolve_entity(producer)
-        return None
-
-    @property
-    def registry(self) -> EventRegistry:
-        return self._registry
-
 
 __all__ = [
     "ConsumerHandle",
     "DeliveryPolicy",
+    "EnvelopeBus",
+    "EnvelopeRef",
     "EventBus",
     "EventRef",
     "FailureSemantics",
