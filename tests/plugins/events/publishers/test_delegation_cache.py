@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from typing import Any
+
+import pytest
 
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.event import Category
@@ -51,11 +54,9 @@ def test_publisher_plugin_id_matches_yaml() -> None:
     assert PUBLISHER_PLUGIN_ID == "delegation_cache"
 
 
-def test_delegation_cache_plugin_emits_event_via_bus() -> None:
+def test_delegation_cache_plugin_emits_event_via_bus(bound_session: Any) -> None:
     """业务方 plugin 类直接 publish → EventBus 按 yaml 鉴权通过 → 事件被路由。"""
-    from lca_kernel.events.test_catalog import build_test_bus
-    bus = build_test_bus()
-    EventBus.set_default(bus)
+    bus = bound_session.bus
 
     received: list[EventRef] = []
     from lca.plugins.events.subscribers.console_projector.subscriber import (
@@ -68,12 +69,9 @@ def test_delegation_cache_plugin_emits_event_via_bus() -> None:
         on_event=lambda p, r: received.append(r),
     )
 
-    try:
-        state = _state_with_hit_result(_state())
-        spec = DelegationSpec(target_role="analyst", subtask="汇总")
-        observation = DelegationCachePlugin().cached_observation(spec, state)
-    finally:
-        EventBus.reset_singleton()
+    state = _state_with_hit_result(_state())
+    spec = DelegationSpec(target_role="analyst", subtask="汇总")
+    observation = DelegationCachePlugin().cached_observation(spec, state)
 
     assert isinstance(observation, Observation)
     assert observation.success is True
@@ -88,12 +86,11 @@ def test_cached_observation_no_hit_returns_none() -> None:
     assert DelegationCachePlugin().cached_observation(spec, state) is None
 
 
-def test_compatibility_shell_delegates_to_plugin() -> None:
+def test_compatibility_shell_delegates_to_plugin(bound_session: Any) -> None:
     """cognition 模块的 cached_delegation_observation 兼容壳 → DelegationCachePlugin。"""
     from lca.cognition.body.delegation_cache import cached_delegation_observation
-    from lca_kernel.events.test_catalog import build_test_bus
-    bus = build_test_bus()
-    EventBus.set_default(bus)
+
+    bus = bound_session.bus
 
     received: list = []
     from lca.plugins.events.subscribers.console_projector.subscriber import (
@@ -106,12 +103,9 @@ def test_compatibility_shell_delegates_to_plugin() -> None:
         on_event=lambda p, r: received.append(p),
     )
 
-    try:
-        state = _state_with_hit_result(_state())
-        spec = DelegationSpec(target_role="analyst", subtask="汇总")
-        observation = cached_delegation_observation(spec, state)
-    finally:
-        EventBus.reset_singleton()
+    state = _state_with_hit_result(_state())
+    spec = DelegationSpec(target_role="analyst", subtask="汇总")
+    observation = cached_delegation_observation(spec, state)
 
     assert isinstance(observation, Observation)
     assert len(received) == 1
@@ -119,19 +113,16 @@ def test_compatibility_shell_delegates_to_plugin() -> None:
 
 def test_unauthorized_plugin_class_cannot_publish() -> None:
     """未在 yaml publishers 白名单的 plugin class → UnauthorizedPublishError。"""
+    from lca_kernel.events.errors import UnauthorizedPublishError
+    from lca_kernel.events.test_catalog import build_test_bus
 
     class _RoguePlugin:
         pass
 
-    from lca_kernel.events.test_catalog import build_test_bus
     bus = build_test_bus()
     EventBus.set_default(bus)
     try:
-        with __import__("pytest").raises(
-            __import__(
-                "lca_kernel.events.errors", fromlist=["UnauthorizedPublishError"]
-            ).UnauthorizedPublishError
-        ):
+        with pytest.raises(UnauthorizedPublishError):
             bus.publish(
                 TeamDelegationCacheHit(callee_role="x", subtask="y", step=0),
                 producer=_RoguePlugin,

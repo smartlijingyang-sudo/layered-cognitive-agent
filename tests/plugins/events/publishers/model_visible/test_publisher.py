@@ -14,29 +14,19 @@ request header canonical header sha256 一致。
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from typing import Any, ClassVar
 
 import pytest
 
 from lca_kernel.events.bus import EventBus
-from lca_kernel.events.test_catalog import build_test_bus
 
 # ── fixtures ────────────────────────────────────────────────────────────
+# bus / bound_session 来自上层 conftest:publish 走绑定 Session 路径
+# (ADR-0186 fail-loud),EventBus.set_default / 复位由 bound_session 统一承担。
 
 
 @pytest.fixture
-def bus() -> EventBus[Any]:
-    """测试用 EventBus:yaml 装载 + catalog 注入(等价生产路径)。
-
-    :func:`build_test_bus` 无参时走 :data:`_DEFAULT_CONFIG_DIR` = 本工作区
-    ``lca_kernel/events/config`` 目录,与生产 boot 路径形态一致。
-    """
-    return build_test_bus()
-
-
-@pytest.fixture
-def hook(bus: EventBus[Any]) -> Iterator[Any]:
+def hook(bound_session: Any) -> Any:
     """单实例 :class:`ModelVisibleHook` + monkey-patch 的 cursor / prompt providers。"""
     from lca.infrastructure.observability.loop_cursor.reasoner_prompt_binding import (
         CurrentReasonerPrompt,
@@ -67,33 +57,28 @@ def hook(bus: EventBus[Any]) -> Iterator[Any]:
         return state["prompt"]
 
     h = ModelVisibleHook(
-        bus=bus,
+        bus=bound_session.bus,
         cursor_provider=cursor_provider,
         prompt_ctx_getter=prompt_provider,
     )
 
-    EventBus.set_default(bus)
-    try:
-
-        def make_prompt(template_id: str, text: str) -> Any:
-            return CurrentReasonerPrompt(
-                step_id="step-001",
-                template_id=template_id,
-                selector_decision_path="default",
-                system_prompt_text=text,
-            )
-
-        # 用 SimpleNamespace 避免 type() 类字典中函数被当 unbound method 处理。
-        from types import SimpleNamespace
-
-        yield SimpleNamespace(
-            hook=h,
-            state=state,
-            StubCursor=_StubCursor,
-            make_prompt=make_prompt,
+    def make_prompt(template_id: str, text: str) -> Any:
+        return CurrentReasonerPrompt(
+            step_id="step-001",
+            template_id=template_id,
+            selector_decision_path="default",
+            system_prompt_text=text,
         )
-    finally:
-        EventBus.set_default(None)
+
+    # 用 SimpleNamespace 避免 type() 类字典中函数被当 unbound method 处理。
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        hook=h,
+        state=state,
+        StubCursor=_StubCursor,
+        make_prompt=make_prompt,
+    )
 
 
 # ── 盖章 1: yaml 鉴权 + I-MV-1 ──────────────────────────────────────────

@@ -1,32 +1,18 @@
 """spine_loop_cursor publisher 端到端测试（ADR-0181 PR-10）。"""
+
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
-
-from lca_kernel.events.bus import EventBus
+from typing import Any
 
 
-@pytest.fixture
-def bus() -> EventBus:
-    config_dir = Path(__file__).resolve().parents[4] / "lca_kernel" / "events" / "config"
-    from lca_kernel.events.test_catalog import build_test_bus
-    return build_test_bus(config_dir)
-
-
-def test_loop_cursor_send(bus: EventBus) -> None:
+def test_loop_cursor_send(bound_session: Any) -> None:
     from lca.plugins.events.publishers.spine_loop_cursor.plugin import (
         LoopCursorPlugin,
     )
 
-    EventBus.set_default(bus)
-    try:
-        ref = LoopCursorPlugin.send(
-            execution_point="phase.think.fold",
-            channel="fact",
-            payload={"step": 1, "run_id": "r1"},
-        )
-        assert ref.category == "spine.phase.think.fold"
-    finally:
-        EventBus.set_default(None)
+    ref = LoopCursorPlugin.send(
+        execution_point="phase.think.fold",
+        channel="fact",
+        payload={"step": 1, "run_id": "r1"},
+    )
+    assert ref.category == "spine.phase.think.fold"

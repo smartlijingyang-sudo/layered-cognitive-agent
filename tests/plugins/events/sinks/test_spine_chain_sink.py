@@ -22,6 +22,7 @@ def bus(tmp_path) -> EventBus:
     """独立 EventBus 实例,sink 直接挂在它上面。"""
     config_dir = Path(__file__).resolve().parents[4] / "lca_kernel" / "events" / "config"
     from lca_kernel.events.test_catalog import build_test_bus
+
     b = build_test_bus(config_dir)
     sink = SpineChainSink(output_path=tmp_path / "chain.jsonl")
     b.subscribe(

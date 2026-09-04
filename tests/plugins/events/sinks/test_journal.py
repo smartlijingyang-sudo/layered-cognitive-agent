@@ -10,7 +10,6 @@ from lca.plugins.events.sinks.journal.sink import EventRecord, JournalSink
 from lca.plugins.events.subscribers.console_projector.subscriber import (
     ConsoleProjectorSubscriber,
 )
-from lca_kernel.events import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.bus import EventBus, EventRef
 from lca_kernel.events.hooks import FailureSemantics
 
@@ -36,6 +35,7 @@ def test_journal_sink_records_events() -> None:
 def test_journal_sink_in_yaml_subscribers_whitelist() -> None:
     """JournalSink 在 yaml subscribers → can_subscribe 通过 → bus.subscribe 不抛。"""
     from lca_kernel.events.test_catalog import build_test_bus
+
     bus = build_test_bus()
     bus.subscribe(
         plugin=JournalSink,
@@ -67,6 +67,7 @@ def test_console_projector_subscriber_renders_to_stdout() -> None:
 def test_end_to_end_publisher_to_subscribers() -> None:
     """端到端：publisher plugin 发 → journal sink + console projector 都收到。"""
     from lca_kernel.events.test_catalog import build_test_bus
+
     bus = build_test_bus()
     EventBus.set_default(bus)
 
