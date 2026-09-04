@@ -347,9 +347,9 @@ __all__ = [
     kind=PluginKind.PRIMITIVE,
     effects="none",
     description=(
-        "spine_reflector_body_llm publisher（ADR-0181 PR-3）：body + llm 10 emit 由本 plugin 发出；"
+        "spine_reflector_body_llm publisher（ADR-0181 PR-3）：body + llm 9 emit 由本 plugin 发出；"
         "覆盖 body.tool.execute.start/end + retry + sandbox.enter/exit + llm.call.start/end + "
-        "llm.stream.token + llm.stream.stall + llm.request.header。"
+        "llm.stream.token + llm.stream.stall。"
     ),
     test_suite="tests/plugins/events/publishers/test_spine_reflector_body_llm.py",
     functional_group=FunctionalGroup.G7_EXECUTION,
