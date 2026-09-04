@@ -49,7 +49,7 @@ from lca.contracts.models.team.delegation import DelegationResult
 from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.protocols import LLMAdapter, Tool
 from lca.infrastructure.observability import annotate
-from lca.infrastructure.observability.loop_cursor._capture_io import (
+from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
     sha256_digest as _sha256_digest,
 )
 
@@ -389,37 +389,20 @@ class PromptReasoner:
         call's assembler render; ``context_manifest`` is the ContextManifest
         read for the same think call (``None`` when perception produced
         none). Ownership: the Reasoner binds and resets around the LLM call;
-        the LLM boundary adapter reads prompt_trace / context_manifest to
-        make skill/prompt assembly recoverable under model_visible/step_<NN>/
-        (ADR-0167 D3/D4). Failures of the optional sidecar write are logged
-        and never block the business path (ADR-0169 L10 + D5).
+        the LLM boundary hook reads the bound prompt to make skill/prompt
+        assembly recoverable from ``spine.llm.request.header`` payloads
+        (ADR-0167 D3/D4, ADR-0185 PR-4).
         """
-        from lca.infrastructure.observability.loop_cursor.model_visible_binding import (
-            get_current_model_visible_capture,
-        )
         from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
             CurrentReasonerPrompt,
             bind_current_reasoner_prompt,
         )
-        from lca.infrastructure.observability.loop_cursor.reasoner_prompt_capture import (
-            StdReasonerPromptCapture,
-        )
 
-        # ADR-0175 D3: capture writes system_prompt.json to <run_dir>/model_visible/.
-        # We reuse the same run_dir that StdModelVisibleCapture is already bound to
-        # (installed by RunSessionBuilder at session build time). When capture
-        # is absent (e.g. tests), skip the file write but still bind the
-        # ContextVar so downstream code can see the rendered prompt text.
-        capture = get_current_model_visible_capture()
-        run_dir = getattr(capture, "run_dir", None)
+        # ADR-0185 PR-4 收口:旧 capture 旁路文件落盘退场;
+        # system prompt 原文由 ModelVisibleHook 在 LLM 边界走 spine event bus
+        # 统一发 ``spine.llm.request.header`` payload,reasoner 侧不再写盘。
+        # ContextVar 绑定保留,供同 run 后续 LLM 调用的 hook 读取。
         step_id = self._step_id_for_trace(trace)
-        if run_dir is not None:
-            try:
-                StdReasonerPromptCapture(run_dir=run_dir).capture(step_id=step_id, trace=trace)
-            except Exception as exc:  # ADR-0169 L10 + D5: 不挡业务
-                import logging as _logging
-
-                _logging.getLogger(__name__).warning("reasoner_prompt_capture_failed: %s", exc)
         return bind_current_reasoner_prompt(
             CurrentReasonerPrompt(
                 step_id=step_id,

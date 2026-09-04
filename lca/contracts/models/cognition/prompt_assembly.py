@@ -157,9 +157,9 @@ class PromptTrace:
     """Full render trace produced by :class:`PromptAssembler` (ADR-0175 D2).
 
     ``system_prompt_text`` is the joined string that the brain will hand
-    to the LLM; the trace fields are the structural breakdown so that
-    ``model_visible/step_<NN>/system_prompt_sections.json`` can be
-    reconstructed without re-rendering.
+    to the LLM; the trace fields are the structural breakdown so the
+    rendered prompt can be reconstructed without re-rendering
+    (ADR-0185 PR-4 后由 spine event bus 承载,不再写旁路文件)。
     """
 
     template_id: str

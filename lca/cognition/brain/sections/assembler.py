@@ -116,9 +116,9 @@ def render_template(
     """Render one template through the given registry.
 
     Returns ``(prompt_text, PromptTrace)`` per ADR-0175 D2. The trace
-    contains per-section metadata and the joined prompt so that
-    ``model_visible/step_<NN>/system_prompt_sections.json`` can be
-    reconstructed without re-rendering.
+    contains per-section metadata and the joined prompt so that the
+    rendered prompt can be reconstructed without re-rendering
+    (ADR-0185 PR-4 后由 spine event bus 承载,不再写旁路文件)。
 
     ``registry`` is optional because the legacy
     ``ReasonerTemplateCatalog.templates()`` shape returned a flat string
