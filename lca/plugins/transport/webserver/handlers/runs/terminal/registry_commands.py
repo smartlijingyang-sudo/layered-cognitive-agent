@@ -118,6 +118,18 @@ class RegistryRunCommands:
                 error_status=500,
             )
         session.status = RunStatus.RUNNING
+        # Resume 是新请求 = 新 context：create 时的 Session 绑定不在场。
+        # create_task 拷贝当前 context，run task 继承这里的绑定；
+        # 请求 context 随请求结束丢弃，无需 reset。
+        bound = session.event_session
+        if bound is not None:
+            from lca.plugins.events._session_observe import set_session
+            from lca.plugins.events.publishers._session_publish import (
+                set_publish_session,
+            )
+
+            set_publish_session(bound.bridge)
+            set_session(bound.bridge)
         session.task = asyncio.create_task(resume_run(session, self._registry, payload))
         return RunCommandReceipt(accepted=True, status="resumed")
 
