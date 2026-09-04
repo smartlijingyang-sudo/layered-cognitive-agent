@@ -59,8 +59,8 @@ def _send(
     """内部 helper：构造 SpineEventPayload + 走 publish_via_session（PR-3d）。
 
     category 由 execution_point 通过 _SPINE_EP_TO_CATEGORY 派生。
-    Session 未注入时 fallback EventBus（由 publish_via_session 内部处理），
-    行为与 PR-3d 之前等价。
+    无绑定 Session 时 fail-loud（RuntimeError）——调用方必须先经
+    ``set_publish_session`` / run bind 绑定（ADR-0186）。
     """
     cat_str = _SPINE_EP_TO_CATEGORY[execution_point]
     sp = SpineEventPayload(
