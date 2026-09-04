@@ -14,6 +14,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ContributionRole,
     DeclarativeRunOutcome,
     DeclarativeValidationError,
+    ExecutionOutcome,
     PhaseInput,
     PhaseResult,
     SemanticPhase,
@@ -242,7 +243,7 @@ def interpret_control_verdict(
             kind=outcome_kind,
             cursor=cursor,
             stop=stop,
-            error_fact=fact if outcome_kind == "failed" else None,
+            error_fact=fact if outcome_kind is ExecutionOutcome.FAILED else None,
             approval_request=approval_request,
         ),
     )
@@ -287,7 +288,7 @@ def _verdict_resolution(
     result: PhaseResult,
 ) -> tuple[
     str,
-    Literal["completed", "paused", "failed"] | None,
+    ExecutionOutcome | None,
     StopDecision | None,
     dict[str, object] | None,
 ]:
@@ -295,7 +296,7 @@ def _verdict_resolution(
     if verdict.kind is ControlVerdictKind.DENY:
         return (
             "control.denied",
-            "failed",
+            ExecutionOutcome.FAILED,
             control_stop_decision(
                 should_stop=True,
                 reason=StopReason.ERROR,
@@ -306,7 +307,7 @@ def _verdict_resolution(
     if verdict.kind is ControlVerdictKind.EXHAUSTED:
         return (
             "control.exhausted",
-            "failed",
+            ExecutionOutcome.FAILED,
             control_stop_decision(
                 should_stop=True,
                 reason=StopReason.BUDGET_EXCEEDED,
@@ -317,7 +318,7 @@ def _verdict_resolution(
     if verdict.kind is ControlVerdictKind.STOP:
         return (
             "control.stopped",
-            "completed",
+            ExecutionOutcome.COMPLETED,
             control_stop_decision(
                 should_stop=True,
                 reason=StopReason.TASK_COMPLETED,
@@ -329,7 +330,7 @@ def _verdict_resolution(
     if verdict.kind is ControlVerdictKind.ASK_HUMAN:
         return (
             "control.paused",
-            "paused",
+            ExecutionOutcome.PAUSED,
             control_stop_decision(
                 should_stop=False,
                 reason=StopReason.CONTINUE,

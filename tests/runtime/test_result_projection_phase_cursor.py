@@ -24,6 +24,7 @@ from lca.contracts.models.core.terminal_outcome import (
 )
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeRunOutcome,
+    ExecutionOutcome,
     PhaseRunCursor,
 )
 from lca.runtime.result_projection import TerminalResultProjection
@@ -68,7 +69,7 @@ async def test_waiting_input_writes_phase_cursor_exactly_once() -> None:
         journal_seq_end=12,
     )
     declarative = DeclarativeRunOutcome(
-        kind="paused",
+        kind=ExecutionOutcome.PAUSED,
         cursor=cursor,
         stop=object(),
         approval_request={"approval_id": "approval-1", "type": "tool_approval"},
@@ -99,7 +100,7 @@ async def test_waiting_input_phase_cursor_matches_declarative_outcome() -> None:
         journal_seq_end=12,
     )
     declarative = DeclarativeRunOutcome(
-        kind="paused",
+        kind=ExecutionOutcome.PAUSED,
         cursor=cursor,
         stop=object(),
         approval_request={"type": "tool_approval"},
@@ -122,7 +123,7 @@ async def test_add_approval_details_does_not_set_phase_cursor() -> None:
     extra: dict = {"phase_cursor": "preset-marker"}
     cursor = _cursor()
     declarative = DeclarativeRunOutcome(
-        kind="paused",
+        kind=ExecutionOutcome.PAUSED,
         cursor=cursor,
         stop=object(),
         approval_request={"type": "tool_approval"},

@@ -1,15 +1,20 @@
-"""ADR-0184 §2 D7 投递可达性回归锁（PR-B）。
+"""ADR-0184 §2 D7 投递可达性回归锁（PR-B / G7 部分翻正）。
 
-锁守的不变量：生产装配下经总线发布的事件必须全部落盘并派发 ——
-run 结束后 ``journal.json`` 有 step、doctor 无 broken hop、账本含认知族
-与显式 step 边界 EP、总线按 category 的投递计数 ``dropped == 0``。
+锁守的不变量分两段：
 
-翻正条件：ADR-0184 PR-C（boot 切 ``apply_pipeline`` + I1 装配校验 +
-共享写实例）与 PR-E（``writable.step.*`` 显式契约恢复发射）验收通过；
-翻正是 PR-C 的验收动作之一。当前装配存在投递黑洞（ADR-0184 §0），
-测试以 ``xfail(strict=True)`` 锁住：测试体失败 = 合法 xfail，
-意外通过 = XPASS failure。断言 4 的 ``delivery_snapshot()`` 访问器由
-PR-A 提供；PR-A 落地前访问失败是预期失败形态之一。
+- **显式 step 边界可达（无 xfail，G7 / ADR-0184 D6 + D7 断言 1–3）**：
+  cursor 发射的 ``writable.step.*`` 显式边界落账本，``journal.json``
+  有 step、doctor 无 broken hop、账本含认知族开窗信号 +
+  ``llm.request.header`` + ``writable.step.start``，且首步
+  ``extra.window_signal == "explicit"``。
+- **全 category 投递计数（仍 ``xfail(strict=True)``，D7 断言 4）**：
+  总线 ``delivery_snapshot()`` 每 category ``dropped == 0``。
+  剩余依赖 = ADR-0184 PR-C（boot 切 ``apply_pipeline`` + I1 装配校验 +
+  共享写实例）：当前生产 boot 走 ``register_pipeline_once``（仅装
+  hooks，不挂 sink），总线侧持久类 category（如
+  ``spine.runtime.reducer.apply``）零挂载 sink → ``persisted=False`` →
+  ``dropped > 0``。翻正是 PR-C 的验收动作之一：测试体失败 = 合法
+  xfail，意外通过 = XPASS failure。
 
 装配形态复用 ``tests/test_gateway_auto_run.py`` 的真 profile + 脚本化
 LLM 路径：``run_kernel_lifespan`` 启动 ``profiles/web-standard.yaml``，
@@ -48,7 +53,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 PROFILE_PATH = REPO_ROOT / "profiles" / "web-standard.yaml"
 
 # D7 断言 3 的账本 EP 集：认知族开窗信号 + LLM 请求头 + 显式 step 边界。
-# ``writable.step.start`` 由 PR-E 恢复发射（ADR-0184 §5）。
+# ``writable.step.start`` 由 cursor 显式发射（G7 / ADR-0184 D6，
+# record_request_header / open_step 发射点）。
 REQUIRED_LEDGER_EPS: tuple[str, ...] = (
     "brain.think.start",
     "llm.request.header",
@@ -99,12 +105,13 @@ def isolated_cwd(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return tmp_path
 
 
-@pytest.mark.xfail(strict=True, reason="ADR-0184: 投递黑洞在 PR-C 装配切换前存在")
-async def test_event_delivery_reachable(
-    isolated_cwd: Path,
-    event_singletons_reset: None,
-) -> None:
-    """真 profile boot + 最小 solo run 后，四条投递可达性断言全部成立。"""
+async def _run_solo(isolated_cwd: Path) -> tuple[RunSession, Path]:
+    """真 profile boot + 最小 solo run；返回已完成的 session 与 run 目录。
+
+    precondition：``isolated_cwd`` 已切 cwd（run 产物落临时目录）。
+    失败语义：run 未走完直接断言失败 —— 后续投递断言的失败原因
+    必须可归因到投递，不能归因到 run 本身。
+    """
     llm = ScriptedLLMAdapter({}, default_respond=True)
     registry = RunRegistry()
     async with run_kernel_lifespan(PROFILE_PATH) as state:
@@ -124,18 +131,37 @@ async def test_event_delivery_reachable(
             mode=session.mode,
             ctx=ctx,
         )
-    run_id = session.run_id
-
-    # 前置条件：run 本身必须走完，否则后续断言的失败原因不可归因到投递。
     assert session.status is RunStatus.COMPLETED, (
-        f"run {run_id} 未完成（status={session.status}, error={session.error!r}），投递断言不成立"
+        f"run {session.run_id} 未完成（status={session.status}, "
+        f"error={session.error!r}），投递断言不成立"
     )
+    return session, isolated_cwd / "traces" / "runs" / session.run_id
 
-    run_dir = isolated_cwd / "traces" / "runs" / run_id
+
+def _ledger_eps(ledger_path: Path) -> set[str]:
+    return {
+        json.loads(line)["execution_point"]
+        for line in ledger_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    }
+
+
+async def test_explicit_step_boundary_delivery_reachable(
+    isolated_cwd: Path,
+    event_singletons_reset: None,
+) -> None:
+    """G7 / ADR-0184 D6 + D7 断言 1–3：显式 step 边界投递可达。
+
+    cursor 在 step 边界显式发射 ``writable.step.start``（PR-E 恢复的
+    契约），journal step 由显式边界可查：``steps ≥ 1``、doctor 无
+    broken hop、账本含三个契约 EP、首步 ``window_signal == "explicit"``。
+    """
+    session, run_dir = await _run_solo(isolated_cwd)
+    run_id = session.run_id
     journal_path = run_dir / "journal.json"
     ledger_path = run_dir / f"{run_id}.spine.jsonl"
 
-    # 1. journal.json steps ≥ 1：step 开窗信号到达 step_tree_accumulator。
+    # 1. journal.json steps ≥ 1：step 开窗信号到达 step-tree fold。
     doc = json.loads(journal_path.read_text(encoding="utf-8"))
     steps = doc.get("steps", [])
     assert len(steps) >= 1, f"journal.json steps 为空（run {run_id}）：开窗事件未投递"
@@ -147,11 +173,45 @@ async def test_event_delivery_reachable(
     )
 
     # 3. 账本含三个契约 EP。
-    ledger_eps = {
-        json.loads(line)["execution_point"]
-        for line in ledger_path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    }
+    ledger_eps = _ledger_eps(ledger_path)
+    missing = [ep for ep in REQUIRED_LEDGER_EPS if ep not in ledger_eps]
+    assert not missing, f"账本缺 EP {missing}（run {run_id}）；实有 {sorted(ledger_eps)}"
+
+    # 4. 开窗来源可查（ADR-0184 PR-E）：首步由显式边界开窗。
+    assert steps[0].get("extra", {}).get("window_signal") == "explicit", (
+        f"首步 window_signal={steps[0].get('extra')!r}（run {run_id}）："
+        "显式 writable.step.start 未驱动开窗"
+    )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "ADR-0184 PR-C 未落地：boot 仍走 register_pipeline_once（不挂 sink），"
+        "总线持久类 category 零 sink → dropped > 0（投递黑洞，§0）"
+    ),
+)
+async def test_event_delivery_counters_zero_dropped(
+    isolated_cwd: Path,
+    event_singletons_reset: None,
+) -> None:
+    """D7 断言 4：总线按 category 的投递计数 ``dropped == 0``。
+
+    翻正条件：ADR-0184 PR-C（boot 切 ``apply_pipeline`` + I1 装配校验 +
+    共享写实例）验收通过；翻正是 PR-C 的验收动作之一。
+    """
+    session, run_dir = await _run_solo(isolated_cwd)
+    run_id = session.run_id
+    journal_path = run_dir / "journal.json"
+    ledger_path = run_dir / f"{run_id}.spine.jsonl"
+
+    # 断言 1–3 同 test_explicit_step_boundary_delivery_reachable；
+    # 本测试锁全量四条,翻正时四条必须同时成立。
+    doc = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert len(doc.get("steps", [])) >= 1, f"journal.json steps 为空（run {run_id}）"
+    report = diagnose_step_tree(journal_path)
+    assert report.broken_hop is None, f"doctor broken_hop={report.broken_hop}（run {run_id}）"
+    ledger_eps = _ledger_eps(ledger_path)
     missing = [ep for ep in REQUIRED_LEDGER_EPS if ep not in ledger_eps]
     assert not missing, f"账本缺 EP {missing}（run {run_id}）；实有 {sorted(ledger_eps)}"
 

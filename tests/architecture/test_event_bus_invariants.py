@@ -26,12 +26,28 @@
 - PR-12 trace_id + 自观察: 业务不订阅 event.bus.dispatch.* 由 Pipeline 装载保证(已合)
 - PR-3 payload FieldType 字符串化: EventSpec.fields 仍是 dict[str, str];运行期无影响,
   留作下一个 ADR
+
+Model-visible 类别单发布者不变量(DSH-GAP-AUDIT G10;note 语义面守护见
+tests/architecture/test_i_mv_*.py):
+- I-MV-1: 每个 model-visible 类别在 spine.yaml 恰好注册一个非空 publisher
+  token,两类别同为 ``events.model_visible.publisher``。
+- I-MV-2: 该 publisher plugin manifest ``ownership.emits`` ⟺ yaml 授权它的
+  类别集合,双向同集(无未注册类别被发布)。
+- I-MV-3: 注册发布者代码之外无 model-visible 类别的活跃 publish 调用 /
+  payload 构造(AST 判定,注释 / docstring / 死字符串天然排除)。
+- I-MV-4: yaml publisher token = 已注册 ``@plugin`` id,且全部 model-visible
+  publish 点的 ``producer=`` 恰为该 plugin 的 ``marker_class``。
+- I-MV-5: 每个 model-visible 类别 ``payload_class`` 非空、是类型化子类
+  (非 EventPayload 基类),其 ``category`` 默认值与 yaml 类别一致。
 """
 
 from __future__ import annotations
 
+import ast
+import importlib
 import shutil
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -362,3 +378,290 @@ class TestIFwSsot1:
             "I-FW-SSOT-1 反向断言:lca_kernel/events/sinks/spine_sink.py "
             "缺少 .write( 调用(SpineSink.append 落盘实现异常)"
         )
+
+
+# ── I-MV-1..5:model-visible 类别单发布者注册表(DSH-GAP-AUDIT G10)─────
+
+_SPINE_YAML = _REPO_ROOT / "lca_kernel" / "events" / "config" / "observability" / "spine.yaml"
+
+# model-visible 类别集合从 spine.yaml 的 payload_class 归属推导,不硬编码
+# 类别名;_EXPECTED 反向断言防推导退化为空集。
+_MV_PAYLOAD_MODULE = "lca_kernel.events.payloads_model_visible"
+_EXPECTED_MV_CATEGORIES = frozenset(
+    {"spine.llm.request.header", "spine.llm.request.header.assistant"}
+)
+# EP 短名经 _SPINE_EP_TO_CATEGORY 派生到 model-visible 类别,等价于类别引用。
+_MV_EP_SHORTS = frozenset({"llm.request.header"})
+_MV_PAYLOAD_CLASSES = frozenset(
+    {"SpineLlmRequestHeaderPayload", "SpineLlmRequestHeaderAssistantPayload"}
+)
+# 注册发布者代码 = publisher plugin + 其内嵌 hook(setup 时挂到 LLM adapter 链)。
+_MV_PUBLISHER_PATHS: tuple[str, ...] = (
+    "lca/plugins/events/publishers/model_visible/",
+    "lca/plugins/events/hooks/model_visible/",
+)
+
+
+@dataclass(frozen=True)
+class _PluginManifestFacts:
+    """AST 提取的 @plugin manifest 声明事实(不 import 插件模块)。"""
+
+    path: Path
+    plugin_id: str
+    marker_class: str | None
+    emits: tuple[str, ...]
+
+
+def _load_spine_specs() -> list[dict]:
+    """读 spine.yaml 的 events 规格列表。"""
+    import yaml
+
+    data = yaml.safe_load(_SPINE_YAML.read_text(encoding="utf-8"))
+    events = data.get("events") if isinstance(data, dict) else None
+    assert isinstance(events, list), "spine.yaml 缺少 events 列表,结构异常"
+    return [spec for spec in events if isinstance(spec, dict)]
+
+
+def _model_visible_specs(specs: list[dict]) -> list[dict]:
+    """payload_class 归属 payloads_model_visible 模块的类别规格。"""
+    return [
+        spec
+        for spec in specs
+        if str(spec.get("payload_class", "")).startswith(_MV_PAYLOAD_MODULE + ".")
+    ]
+
+
+def _mv_publisher_token(mv_specs: list[dict]) -> str:
+    """model-visible 类别共享的唯一 publisher token(I-MV-1 断言其唯一)。"""
+    tokens: set[str] = set()
+    for spec in mv_specs:
+        tokens.update(str(t) for t in (spec.get("publishers") or ()))
+    assert len(tokens) == 1, f"model-visible 类别的 publisher token 不唯一:{sorted(tokens)}"
+    return tokens.pop()
+
+
+def _iter_py_files(root: Path) -> list[Path]:
+    if not root.exists():
+        return []
+    return sorted(path for path in root.rglob("*.py") if path.is_file())
+
+
+def _parse(path: Path) -> ast.Module | None:
+    try:
+        return ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return None
+
+
+def _callee_name(call: ast.Call) -> str | None:
+    func = call.func
+    if isinstance(func, ast.Name):
+        return func.id
+    if isinstance(func, ast.Attribute):
+        return func.attr
+    return None
+
+
+def _keyword(call: ast.Call, name: str) -> ast.expr | None:
+    for kw in call.keywords:
+        if kw.arg == name:
+            return kw.value
+    return None
+
+
+def _scan_plugin_manifests(root: Path) -> list[_PluginManifestFacts]:
+    """AST 扫 @plugin 装饰器,提取 id / marker_class / ownership.emits。"""
+    out: list[_PluginManifestFacts] = []
+    for path in _iter_py_files(root):
+        tree = _parse(path)
+        if tree is None:
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or _callee_name(node) != "plugin":
+                continue
+            pid = _keyword(node, "id")
+            if not isinstance(pid, ast.Constant) or not isinstance(pid.value, str):
+                continue
+            marker = _keyword(node, "marker_class")
+            marker_name = marker.id if isinstance(marker, ast.Name) else None
+            emits: list[str] = []
+            ownership = _keyword(node, "ownership")
+            if isinstance(ownership, ast.Call):
+                emits_node = _keyword(ownership, "emits")
+                if isinstance(emits_node, (ast.Tuple, ast.List)):
+                    emits = [
+                        str(element.value)
+                        for element in emits_node.elts
+                        if isinstance(element, ast.Constant) and isinstance(element.value, str)
+                    ]
+            out.append(_PluginManifestFacts(path, pid.value, marker_name, tuple(emits)))
+    return out
+
+
+class TestIMvCategoryRegistry:
+    """I-MV-1..5:model-visible 类别 → 生产者单发布者注册表(DSH-GAP-AUDIT G10)。
+
+    DSH 原则:类别 → 生产者是单向注册表,同一类别多个发射方 = 硬错误。
+    spine.yaml ``publishers`` 注册已实现该语义,本组测试锁现状防回归。
+    note 语义面的补充守护(旁路文件 / 认知层直发 / fold 字节判等)见
+    tests/architecture/test_i_mv_*.py。
+    """
+
+    def test_i_mv_1_single_publisher_per_model_visible_category(self) -> None:
+        """I-MV-1:每个 model-visible 类别在 yaml 恰好一个非空 publisher,且同类别不重复注册、两类别同一 token。"""
+        specs = _load_spine_specs()
+        mv_specs = _model_visible_specs(specs)
+        derived = {str(spec["category"]) for spec in mv_specs}
+        assert derived == _EXPECTED_MV_CATEGORIES, (
+            f"I-MV-1 前提漂移:推导出的 model-visible 类别集 {sorted(derived)} "
+            f"≠ 期望 {sorted(_EXPECTED_MV_CATEGORIES)}"
+        )
+        # 同类别不得重复注册
+        counts: dict[str, int] = {}
+        for spec in specs:
+            category = str(spec.get("category", ""))
+            counts[category] = counts.get(category, 0) + 1
+        duplicates = [c for c in derived if counts[c] != 1]
+        assert not duplicates, f"I-MV-1 违规:类别在 spine.yaml 重复注册:{duplicates}"
+        # 每类别恰好一个非空 publisher token
+        for spec in mv_specs:
+            publishers = [str(t) for t in (spec.get("publishers") or ())]
+            assert len(publishers) == 1 and publishers[0].strip(), (
+                f"I-MV-1 违规:{spec['category']} publishers={publishers},必须恰好一个非空 token"
+            )
+        token = _mv_publisher_token(mv_specs)
+        assert token, "I-MV-1 违规:model-visible publisher token 为空"
+
+    def test_i_mv_2_publisher_emits_match_yaml_registration(self) -> None:
+        """I-MV-2:publisher manifest ``ownership.emits`` ⟺ yaml 授权类别,双向同集。"""
+        specs = _load_spine_specs()
+        mv_specs = _model_visible_specs(specs)
+        token = _mv_publisher_token(mv_specs)
+        yaml_categories = {str(spec["category"]) for spec in mv_specs}
+        manifests = _scan_plugin_manifests(_REPO_ROOT / "lca" / "plugins")
+        matched = [m for m in manifests if m.plugin_id == token]
+        assert len(matched) == 1, (
+            f"I-MV-2 违规:yaml token {token!r} 对应 {len(matched)} 个 @plugin manifest"
+            "(必须恰好 1 个)"
+        )
+        manifest_emits = set(matched[0].emits)
+        assert manifest_emits == yaml_categories, (
+            "I-MV-2 违规:manifest emits 与 yaml 授权类别不同集;"
+            f"manifest 多出 {sorted(manifest_emits - yaml_categories)},"
+            f"yaml 多出 {sorted(yaml_categories - manifest_emits)}"
+        )
+
+    # 已知债:InMemoryLoopCursor(ADR-0169 L13 测试替身)在
+    # record_request_header 里把 legacy digest 形 ``llm.request.header`` EP
+    # 直写自身 WritePort spine(in_memory.py:214),非总线 publish;与
+    # TestIFwBus1/2 的 loop_cursor PR-9 债务同族,测试替身对齐总线后删除本条。
+    _KNOWN_DEBT_FILES: tuple[str, ...] = (
+        "lca/infrastructure/observability/loop_cursor/in_memory.py",
+    )
+
+    def test_i_mv_3_no_active_publish_outside_registered_publisher(self) -> None:
+        """I-MV-3:注册发布者之外无 model-visible 活跃 publish / payload 构造。
+
+        AST 判定:注释、docstring、死字符串(如 @plugin description 残留)
+        不是代码节点,天然不算活跃调用;只有真实构造
+        ``SpineLlmRequestHeader*Payload(`` 或 publish 动词
+        (publish_via_session / publish / append)实参引用类别字面才判违规。
+        """
+        literals = _EXPECTED_MV_CATEGORIES | _MV_EP_SHORTS
+        publish_verbs = {"publish_via_session", "publish", "append"}
+        violations: list[str] = []
+        for root in (_REPO_ROOT / "lca", _REPO_ROOT / "lca_kernel"):
+            for path in _iter_py_files(root):
+                rel = str(path.relative_to(_REPO_ROOT))
+                if any(allowed in rel for allowed in _MV_PUBLISHER_PATHS):
+                    continue
+                if rel.endswith("lca_kernel/events/payloads_model_visible.py"):
+                    continue  # payload 类定义本体
+                if any(debt in rel for debt in self._KNOWN_DEBT_FILES):
+                    continue
+                tree = _parse(path)
+                if tree is None:
+                    continue
+                for node in ast.walk(tree):
+                    if not isinstance(node, ast.Call):
+                        continue
+                    # (a) payload 类构造 = publish 前置,仅注册发布者可持有
+                    if isinstance(node.func, ast.Name) and node.func.id in _MV_PAYLOAD_CLASSES:
+                        violations.append(f"{rel}:{node.lineno} 构造 {node.func.id}")
+                        continue
+                    # (b) publish 动词调用树内出现类别字面(含 EP 短名)
+                    if _callee_name(node) in publish_verbs:
+                        refs = {
+                            str(sub.value)
+                            for sub in ast.walk(node)
+                            if isinstance(sub, ast.Constant) and isinstance(sub.value, str)
+                        } & literals
+                        if refs:
+                            violations.append(
+                                f"{rel}:{node.lineno} {_callee_name(node)}() refs {sorted(refs)}"
+                            )
+        assert not violations, (
+            "I-MV-3 违规:注册发布者之外出现 model-visible 活跃 publish 路径\n"
+            + "\n".join(violations[:5])
+        )
+
+    def test_i_mv_4_yaml_token_registered_and_producer_is_marker(self) -> None:
+        """I-MV-4:授权一致性 —— yaml token = 已注册 @plugin id,且所有 model-visible publish 点 ``producer=`` 恰为该 plugin marker_class。"""
+        specs = _load_spine_specs()
+        token = _mv_publisher_token(_model_visible_specs(specs))
+        manifests = _scan_plugin_manifests(_REPO_ROOT / "lca" / "plugins")
+        by_id = {m.plugin_id: m for m in manifests}
+        assert token in by_id, (
+            f"I-MV-4 违规:yaml publisher token {token!r} 不是任何 @plugin 的 id"
+            "(yaml 授权 ⇄ 插件注册 失配)"
+        )
+        marker = by_id[token].marker_class
+        assert marker, f"I-MV-4 违规:@plugin {token!r} 未声明 marker_class"
+        # 注册发布者代码内全部 publish 点的 producer= 必须恰为 marker
+        producers: set[str] = set()
+        for sub in _MV_PUBLISHER_PATHS:
+            for path in _iter_py_files(_REPO_ROOT / sub):
+                tree = _parse(path)
+                if tree is None:
+                    continue
+                for node in ast.walk(tree):
+                    if not isinstance(node, ast.Call):
+                        continue
+                    if _callee_name(node) not in {"publish_via_session", "publish"}:
+                        continue
+                    producer = _keyword(node, "producer")
+                    if isinstance(producer, ast.Name):
+                        producers.add(producer.id)
+        assert producers == {marker}, (
+            "I-MV-4 违规:model-visible publish 点 producer= 集合 "
+            f"{sorted(producers)} ≠ yaml 授权 plugin 的 marker {marker!r}"
+        )
+
+    def test_i_mv_5_payload_class_typed_and_category_aligned(self) -> None:
+        """I-MV-5:每类别 ``payload_class`` 非空、类型化(非 EventPayload 基类),且类 ``category`` 默认值与 yaml 类别一致。"""
+        from lca.contracts.event import EventPayload
+
+        specs = _load_spine_specs()
+        mv_specs = _model_visible_specs(specs)
+        assert mv_specs, "I-MV-5 前提漂移:spine.yaml 无 model-visible 类别"
+        for spec in mv_specs:
+            category = str(spec["category"])
+            class_path = str(spec.get("payload_class") or "")
+            module_name, _, class_name = class_path.rpartition(".")
+            assert module_name and class_name, (
+                f"I-MV-5 违规:{category} payload_class 为空或不可解析:{class_path!r}"
+            )
+            assert class_name != "EventPayload", (
+                f"I-MV-5 违规:{category} payload_class 指向通用基类 EventPayload(未类型化)"
+            )
+            module = importlib.import_module(module_name)
+            cls = getattr(module, class_name, None)
+            assert isinstance(cls, type) and issubclass(cls, EventPayload), (
+                f"I-MV-5 违规:{class_path} 不存在或不是 EventPayload 子类"
+            )
+            assert cls is not EventPayload
+            default = cls.model_fields["category"].default
+            raw = getattr(default, "value", default)
+            assert str(raw) == category, (
+                f"I-MV-5 违规:{class_path} category 默认值 {str(raw)!r} ≠ yaml 类别 {category!r}"
+            )

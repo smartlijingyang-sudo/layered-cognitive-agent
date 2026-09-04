@@ -26,11 +26,12 @@ Conventions
 -----------
 - Stub spine captures every ``append`` call so invariants are readable as
   ``count(start) == count(end)`` over the recorded EPs.
-- Phase window simulation: when ``record_request_header`` fires (THINK
-  window open), the stub also emits ``writable.step.start`` to mirror the
-  legacy ``CoordinatorAdapter.begin_step``; when ``cursor.advance`` leaves
-  THINK (gate.fold) the stub emits ``writable.step.end``. Likewise for
-  segment begin/end pairs around the think/act phases. This keeps the
+- ``writable.step.start`` / ``writable.step.end`` are the cursor's own
+  emissions (ADR-0184 D6: ``record_request_header`` / ``open_step`` open,
+  ``advance("stop")`` / ``close`` close); the stub records them verbatim.
+- Segment begin/end pairs (``writable.segment.*``) are still simulated by
+  the stub around the think phase because segment emission has not moved
+  onto the cursor (legacy ``CoordinatorAdapter`` mirror). This keeps the
   test truthful without depending on the legacy adapter's internal wiring.
 - L3 transfer-order validation uses a strict test-only cursor that
   enforces the D2 transfer graph; the production cursor only enforces
@@ -74,18 +75,16 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 
 @dataclass
 class _StubSpine:
-    """Captures every append call; simulates step / segment begin/end pairing.
+    """Captures every append call; simulates segment begin/end pairing.
 
     Lifecycle simulation:
-        - ``llm.request.header`` fires while in THINK window → emit a paired
-          ``writable.step.start`` (legacy ``coord.begin_step`` mirror).
+        - ``writable.step.start`` / ``writable.step.end`` —— cursor 自身
+          发射(ADR-0184 D6),stub 原样记录,不注入。
         - first ``phase.think.fold`` → emit ``writable.segment.start``
           (legacy ``coord.begin_segment`` for THINK segment).
         - ``phase.gate.fold`` (closing THINK segment) → emit
           ``writable.segment.end``.
-        - ``phase.act.fold`` followed by ``phase.reflect.fold`` → emit
-          ``writable.segment.end`` for the ACT segment when leaving act.
-        - ``writable.iteration.closing`` → close any open step / segment.
+        - ``writable.iteration.closing`` → close any open segment.
 
     The bookkeeping guarantees ``count(start) == count(end)`` whenever the
     caller drives the cursor through legal phase sequences, which is what
@@ -94,7 +93,6 @@ class _StubSpine:
 
     records: list[dict] = field(default_factory=list)
     _segment_open: bool = False
-    _step_open: bool = False
 
     def append(
         self,
@@ -116,32 +114,6 @@ class _StubSpine:
                 "phase": phase,
             }
         )
-        # ── L1 step begin (record_request_header = step open) ────────
-        if execution_point == "llm.request.header":
-            self._step_open = True
-            self.records.append(
-                {
-                    "execution_point": "writable.step.start",
-                    "payload": {"phase": phase},
-                    "run_id": run_id,
-                    "seq": seq,
-                    "incarnation": incarnation,
-                    "phase": phase,
-                }
-            )
-        # ── L1 step end (leaving THINK window = step close) ─────────
-        if execution_point == "phase.gate.fold" and self._step_open:
-            self.records.append(
-                {
-                    "execution_point": "writable.step.end",
-                    "payload": {"outcome": "success"},
-                    "run_id": run_id,
-                    "seq": seq,
-                    "incarnation": incarnation,
-                    "phase": phase,
-                }
-            )
-            self._step_open = False
         # ── L2 segment begin / end bookkeeping ──────────────────────
         if execution_point == "phase.think.fold":
             self._segment_open = True
@@ -168,31 +140,18 @@ class _StubSpine:
                 }
             )
         # ── L7 close path ───────────────────────────────────────────
-        if execution_point == "writable.iteration.closing":
-            if self._step_open:
-                self.records.append(
-                    {
-                        "execution_point": "writable.step.end",
-                        "payload": {"outcome": "close"},
-                        "run_id": run_id,
-                        "seq": seq,
-                        "incarnation": incarnation,
-                        "phase": phase,
-                    }
-                )
-                self._step_open = False
-            if self._segment_open:
-                self.records.append(
-                    {
-                        "execution_point": "writable.segment.end",
-                        "payload": {"phase": "close"},
-                        "run_id": run_id,
-                        "seq": seq,
-                        "incarnation": incarnation,
-                        "phase": phase,
-                    }
-                )
-                self._segment_open = False
+        if execution_point == "writable.iteration.closing" and self._segment_open:
+            self.records.append(
+                {
+                    "execution_point": "writable.segment.end",
+                    "payload": {"phase": "close"},
+                    "run_id": run_id,
+                    "seq": seq,
+                    "incarnation": incarnation,
+                    "phase": phase,
+                }
+            )
+            self._segment_open = False
         return seq
 
 

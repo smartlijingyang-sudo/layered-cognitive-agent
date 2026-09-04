@@ -1,4 +1,11 @@
-"""Peer-relay strategy factory — registers into team_strategies."""
+"""Peer-relay strategy factory — registers into team_strategies.
+
+同文件承载 RaceStrategy —— PEER: sequential try, first COMPLETED wins
+(no output chaining)。
+
+命名说明：旧名 HandoffStrategy 与 ActionType.HANDOFF（非阻塞 body action）
+概念冲突，重命名为 RaceStrategy 以准确表达"竞速"语义。
+"""
 
 from __future__ import annotations
 
@@ -6,6 +13,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from lca.agent.member_invoke import invoke_members_sequential
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -18,15 +26,33 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.models.core.result import Result
 from lca.contracts.models.team.team_coordination import STRATEGY_KEY_PEER_RELAY
-from lca.contracts.protocols import TeamAssembly
+from lca.contracts.protocols import TeamAssembly, TeamStage, TeamStrategy
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
-def build_peer_relay_strategy(assembly: TeamAssembly) -> Any:
-    from lca.agent.orchestration_strategies import RaceStrategy
+class RaceStrategy(TeamStrategy):
+    """PEER topology: stop at the first member that completes."""
 
+    def __init__(self, stage: TeamStage) -> None:
+        self._stage = stage
+
+    async def run(self, objective: str) -> Result:
+        return await invoke_members_sequential(
+            self._stage,
+            objective,
+            pass_output_as_next_task=False,
+            stop_on_first_completed=True,
+        )
+
+
+# 向后兼容别名（下一大版本移除）
+HandoffStrategy = RaceStrategy
+
+
+def build_peer_relay_strategy(assembly: TeamAssembly) -> Any:
     return RaceStrategy(assembly.stage)
 
 

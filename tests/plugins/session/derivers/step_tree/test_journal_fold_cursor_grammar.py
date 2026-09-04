@@ -267,3 +267,187 @@ def test_residual_open_step_closes_success_on_terminal_completed() -> None:
     doc = fold_step_tree(events, run_id="r_residual_ok")
     assert doc.steps[0].outcome == "success"
     assert doc.metadata.outcome == "completed"
+
+
+# ── 显式 step 边界 + window_signal(ADR-0184 D6)────────────────────
+
+
+def test_explicit_step_boundary_marks_window_signal_explicit() -> None:
+    """writable.step.start/end 显式边界开窗 → extra.window_signal=explicit。"""
+    events = [
+        {
+            "execution_point": "writable.step.start",
+            "payload": {"step": 1, "run_id": "r", "step_id": "step-001", "phase": "think"},
+            "when": 1_788_512_186.0,
+        },
+        {
+            "execution_point": "writable.step.end",
+            "payload": {"step": 1, "run_id": "r", "step_id": "step-001", "outcome": "success"},
+            "when": 1_788_512_190.0,
+        },
+    ]
+    doc = fold_step_tree(events, run_id="r_explicit")
+    assert doc.totals is not None
+    assert doc.totals.steps == 1
+    step = doc.steps[0]
+    assert step.step_id == "step-001"
+    assert step.extra == {"window_signal": "explicit"}
+    assert step.outcome == "success"
+
+
+def test_implicit_think_fallback_marks_window_signal_implicit() -> None:
+    """无显式边界、仅 brain.think.start 兜底 → window_signal=implicit。"""
+    events = [
+        {"execution_point": "brain.think.start", "payload": {}, "when": 1_788_512_185.0},
+        {
+            "execution_point": "brain.think.end",
+            "payload": {},
+            "outcome": "success",
+            "when": 1_788_512_188.0,
+        },
+    ]
+    doc = fold_step_tree(events, run_id="r_implicit")
+    assert len(doc.steps) == 1
+    assert doc.steps[0].extra == {"window_signal": "implicit"}
+
+
+def test_merged_flow_think_header_start_single_explicit_step() -> None:
+    """生产合流序:think 隐式开窗 → header 升级 → 显式边界到达,仍一步。
+
+    Session 流 ``brain.think.start`` / ``llm.request.header`` 先于账本流
+    ``writable.step.start``(hook 路径);三个信号归同一步,
+    window_signal 记 explicit。
+    """
+    events = [
+        {"execution_point": "brain.think.start", "payload": {}, "when": 1_788_512_185.9},
+        {
+            "execution_point": "llm.request.header",
+            "payload": {"step_id": "step-001", "model": "m", "reason": "initial"},
+            "when": 1_788_512_186.0,
+        },
+        {
+            "execution_point": "writable.step.start",
+            "payload": {"step": 1, "run_id": "r", "step_id": "step-001", "phase": "think"},
+            "when": 1_788_512_186.01,
+        },
+        {
+            "execution_point": "brain.think.end",
+            "payload": {},
+            "outcome": "success",
+            "when": 1_788_512_188.0,
+        },
+        {
+            "execution_point": "writable.step.end",
+            "payload": {"step": 1, "run_id": "r", "step_id": "step-001", "outcome": "success"},
+            "when": 1_788_512_190.0,
+        },
+    ]
+    doc = fold_step_tree(events, run_id="r_merged", outcome="completed")
+    assert doc.totals is not None
+    assert doc.totals.steps == 1
+    step = doc.steps[0]
+    assert step.step_id == "step-001"
+    assert step.extra == {"window_signal": "explicit"}
+    assert step.outcome == "success"
+
+
+def test_boundary_first_order_start_then_header_single_step() -> None:
+    """账本序(边界先于 header,record_request_header 路径)仍归一步。"""
+    events = [
+        {
+            "execution_point": "writable.step.start",
+            "payload": {"step": 1, "run_id": "r", "step_id": "step-001", "phase": "think"},
+            "when": 1_788_512_186.0,
+        },
+        {
+            "execution_point": "llm.request.header",
+            "payload": {"step_id": "step-001", "model": "m", "reason": "initial"},
+            "when": 1_788_512_186.05,
+        },
+        {
+            "execution_point": "writable.step.end",
+            "payload": {"outcome": "success"},
+            "when": 1_788_512_190.0,
+        },
+    ]
+    doc = fold_step_tree(events, run_id="r_boundary_first")
+    assert doc.totals is not None
+    assert doc.totals.steps == 1
+    assert doc.steps[0].step_id == "step-001"
+    assert doc.steps[0].thinking is None
+    assert doc.steps[0].extra == {"window_signal": "explicit"}
+
+
+def test_two_explicit_boundaries_make_two_steps() -> None:
+    """两次 LLM 边界(start/end 配对)→ 两步,各自 explicit。"""
+    events = [
+        {
+            "execution_point": "writable.step.start",
+            "payload": {"step_id": "step-001", "phase": "think"},
+            "when": 1_788_512_186.0,
+        },
+        {
+            "execution_point": "step.thinking.record",
+            "payload": {"text_preview": "t", "step_index": 1},
+            "when": 1_788_512_187.0,
+        },
+        {
+            "execution_point": "writable.step.end",
+            "payload": {"step_id": "step-001", "outcome": "success"},
+            "when": 1_788_512_188.0,
+        },
+        {
+            "execution_point": "writable.step.start",
+            "payload": {"step_id": "step-002", "phase": "think"},
+            "when": 1_788_512_190.0,
+        },
+        {
+            "execution_point": "writable.step.end",
+            "payload": {"step_id": "step-002", "outcome": "success"},
+            "when": 1_788_512_192.0,
+        },
+    ]
+    doc = fold_step_tree(events, run_id="r_two_explicit")
+    assert doc.totals is not None
+    assert [s.step_id for s in doc.steps] == ["step-001", "step-002"]
+    assert all(s.extra == {"window_signal": "explicit"} for s in doc.steps)
+
+
+def test_step_end_outcome_falls_back_to_payload() -> None:
+    """record 级 outcome 缺失 → 读 payload.outcome(cursor 老链形态)。"""
+    events = [
+        {
+            "execution_point": "writable.step.start",
+            "payload": {"step_id": "step-001", "phase": "think"},
+            "when": 1_788_512_186.0,
+        },
+        {
+            "execution_point": "writable.step.end",
+            "payload": {"step_id": "step-001", "outcome": "cancelled"},
+            "when": 1_788_512_190.0,
+        },
+    ]
+    doc = fold_step_tree(events, run_id="r_end_outcome")
+    assert doc.steps[0].outcome == "cancelled"
+
+
+def test_step_end_without_open_frame_is_noop() -> None:
+    """隐式步已由 brain.think.end 关闭后,迟到的显式 end 不再开/关步。"""
+    events = [
+        {"execution_point": "brain.think.start", "payload": {}, "when": 1_788_512_185.0},
+        {
+            "execution_point": "brain.think.end",
+            "payload": {},
+            "outcome": "success",
+            "when": 1_788_512_188.0,
+        },
+        {
+            "execution_point": "writable.step.end",
+            "payload": {"outcome": "success"},
+            "when": 1_788_512_190.0,
+        },
+    ]
+    doc = fold_step_tree(events, run_id="r_late_end")
+    assert doc.totals is not None
+    assert doc.totals.steps == 1
+    assert doc.steps[0].extra == {"window_signal": "implicit"}

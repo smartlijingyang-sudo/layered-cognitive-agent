@@ -130,6 +130,12 @@ class _StepFrame:
     stream_final_chars_total: int = 0
     llm_started: bool = False
     llm_model: str = ""
+    # 开窗来源:``writable.step.start`` 显式开窗 / ``brain.think.start`` 隐式
+    # 兜底(与 fold ``_Frame.opened_by`` 同语义,供原地升级判定)。
+    opened_by: str = "writable"
+    # ADR-0184 D6:开窗边界信号 → ``JournalStep.extra.window_signal``。
+    # 显式边界 → "explicit";仅隐式兜底 → "implicit"。
+    window_signal: str = "implicit"
 
 
 class StepTreeAccumulatorDeriver(Deriver):
@@ -341,7 +347,12 @@ class StepTreeAccumulatorDeriver(Deriver):
         if ep == "writable.step.start":
             self._begin_step(event, ts)
         elif ep == "writable.step.end":
-            self._close_step(outcome=event.outcome or "success")
+            # record 级 outcome 缺失时回退读 payload.outcome(cursor 老链
+            # 写入路径 record 级 outcome 恒 None,outcome 在 payload 内)。
+            payload_outcome = (
+                event.payload.get("outcome") if isinstance(event.payload, dict) else None
+            )
+            self._close_step(outcome=event.outcome or payload_outcome or "success")
         elif ep == "writable.segment.start":
             self._begin_segment(event, ts)
         elif ep == "writable.segment.end":
@@ -608,20 +619,48 @@ class StepTreeAccumulatorDeriver(Deriver):
         return None
 
     def _begin_step(self, event: EventRecord, ts: float) -> None:
-        if self._open_step is not None:
+        """``writable.step.start`` 显式开窗(ADR-0184 D6)。
+
+        - 无开帧 → 开新帧,``window_signal="explicit"``;payload ``step_id``
+          非空时采用(与 ``_resolve_step_target`` 的 step 身份对齐),
+          否则回落 ``step_{seq:03d}``。
+        - 开帧为空且由隐式 ``brain.think.start`` 开 → 原地升级为显式帧
+          (显式 > 隐式,不重复计步)。
+        - 其余(开帧已有内容 / 已显式开)→ 嵌套 begin,按收口失败强制
+          close 后开新帧。
+        """
+        payload = event.payload if isinstance(event.payload, dict) else {}
+        start_step_id = str(payload.get("step_id") or "")
+        phase = payload.get("phase", "think")
+        if not isinstance(phase, str) or not phase:
+            phase = "think"
+        open_step = self._open_step
+        if (
+            open_step is not None
+            and open_step.opened_by == "think"
+            and open_step.thinking is None
+            and open_step.tool_call is None
+            and open_step.tool_result is None
+        ):
+            if start_step_id:
+                open_step.step_id = start_step_id
+            open_step.opened_by = "writable"
+            open_step.window_signal = "explicit"
+            open_step.phase = phase  # type: ignore[assignment]
+            return
+        if open_step is not None:
             # 嵌套 begin_step 视为上一 step 收口失败 → 强制 close
             self._close_step("fail")
             # _close_step 已 set _open_step=None,_begin_step 接管
         self._step_seq += 1
-        phase = event.payload.get("phase", "think")
-        if not isinstance(phase, str):
-            phase = "think"
         self._open_step = _StepFrame(
-            step_id=f"step_{self._step_seq:03d}",
+            step_id=start_step_id or f"step_{self._step_seq:03d}",
             step_index=self._step_seq,
             phase=phase,  # type: ignore[arg-type]
             entered_at=ts,
             context_before=StepContext(objective=self._objective),
+            opened_by="writable",
+            window_signal="explicit",
         )
 
     def _begin_implicit_step(self, event: EventRecord, ts: float, *, phase: str) -> None:
@@ -646,6 +685,8 @@ class StepTreeAccumulatorDeriver(Deriver):
             phase=phase,  # type: ignore[arg-type]
             entered_at=ts,
             context_before=StepContext(objective=self._objective),
+            opened_by="think",
+            window_signal="implicit",
         )
 
     def _close_step(self, outcome: str) -> None:
@@ -674,7 +715,11 @@ class StepTreeAccumulatorDeriver(Deriver):
         self._steps_by_index[f.step_index] = f
 
     def _build_step(self, frame: _StepFrame) -> JournalStep:
-        """从 _StepFrame 构造 JournalStep(deferred at flush time)。"""
+        """从 _StepFrame 构造 JournalStep(deferred at flush time)。
+
+        ``extra.window_signal`` 记录开窗边界来源(显式 / 隐式兜底,
+        ADR-0184 D6)。
+        """
         return JournalStep(
             step_id=frame.step_id,
             step_index=frame.step_index,
@@ -691,6 +736,7 @@ class StepTreeAccumulatorDeriver(Deriver):
             reflect=frame.reflect,
             segments=tuple(frame.segments),
             outcome=frame.outcome,
+            extra={"window_signal": frame.window_signal},
         )
 
     def _begin_segment(self, event: EventRecord, ts: float) -> None:

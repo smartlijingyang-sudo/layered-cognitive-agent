@@ -387,6 +387,132 @@ def test_brain_think_does_not_nest_explicit_step(tmp_path: Path) -> None:
     assert doc.totals.steps == 1
 
 
+def test_explicit_step_boundary_marks_window_signal_explicit(tmp_path: Path) -> None:
+    """ADR-0184 D6:writable.step.start 显式开窗 → extra.window_signal=explicit。"""
+    SpineContext.set_run("r_ws_exp")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_ws_exp",
+        run_dir=tmp_path / "r_ws_exp",
+        agent_role="agt",
+        strategy_key="solo",
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_ws_exp",
+            execution_point="writable.step.start",
+            payload={"phase": "think", "step_id": "step-001", "step": 1, "run_id": "r_ws_exp"},
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_ws_exp",
+            execution_point="writable.step.end",
+            payload={"step_id": "step-001", "outcome": "success"},
+            outcome="success",
+        )
+    )
+    deriver.flush()
+
+    doc = deriver.document
+    assert doc is not None
+    assert doc.totals.steps == 1
+    step = doc.steps[0]
+    assert step.step_id == "step-001"
+    assert step.extra == {"window_signal": "explicit"}
+
+
+def test_implicit_think_fallback_marks_window_signal_implicit(tmp_path: Path) -> None:
+    """无显式边界、仅 brain.think.start 兜底 → window_signal=implicit。"""
+    SpineContext.set_run("r_ws_imp")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_ws_imp",
+        run_dir=tmp_path / "r_ws_imp",
+        agent_role="agt",
+        strategy_key="solo",
+    )
+    deriver.on_event(
+        _make_event(run_id="r_ws_imp", execution_point="brain.think.start", payload={})
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_ws_imp",
+            execution_point="brain.think.end",
+            outcome="success",
+            payload={},
+        )
+    )
+    deriver.flush()
+
+    doc = deriver.document
+    assert doc is not None
+    assert doc.totals.steps == 1
+    assert doc.steps[0].extra == {"window_signal": "implicit"}
+
+
+def test_explicit_start_upgrades_implicit_think_frame(tmp_path: Path) -> None:
+    """think 隐式开窗尚无内容时,显式边界原地升级(不重复计步)。"""
+    SpineContext.set_run("r_ws_up")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_ws_up",
+        run_dir=tmp_path / "r_ws_up",
+        agent_role="agt",
+        strategy_key="solo",
+    )
+    deriver.on_event(_make_event(run_id="r_ws_up", execution_point="brain.think.start", payload={}))
+    deriver.on_event(
+        _make_event(
+            run_id="r_ws_up",
+            execution_point="writable.step.start",
+            payload={"phase": "think", "step_id": "step-001"},
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_ws_up",
+            execution_point="writable.step.end",
+            payload={"step_id": "step-001", "outcome": "success"},
+            outcome="success",
+        )
+    )
+    deriver.flush()
+
+    doc = deriver.document
+    assert doc is not None
+    assert doc.totals.steps == 1
+    assert doc.steps[0].step_id == "step-001"
+    assert doc.steps[0].extra == {"window_signal": "explicit"}
+
+
+def test_step_end_outcome_falls_back_to_payload(tmp_path: Path) -> None:
+    """record 级 outcome 缺失时读 payload.outcome(cursor 老链形态)。"""
+    SpineContext.set_run("r_ws_oc")
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_ws_oc",
+        run_dir=tmp_path / "r_ws_oc",
+        agent_role="agt",
+        strategy_key="solo",
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_ws_oc",
+            execution_point="writable.step.start",
+            payload={"phase": "think", "step_id": "step-001"},
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_ws_oc",
+            execution_point="writable.step.end",
+            payload={"step_id": "step-001", "outcome": "cancelled"},
+        )
+    )
+    deriver.flush()
+
+    doc = deriver.document
+    assert doc is not None
+    assert doc.steps[0].outcome == "cancelled"
+
+
 def test_empty_flush_writes_flush_error_to_manifest(tmp_path: Path) -> None:
     """ADR-0176 D1 §1 (3):空累积 → manifest.extra.flush_errors 写入。
 

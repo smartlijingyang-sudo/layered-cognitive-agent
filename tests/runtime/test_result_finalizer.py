@@ -9,6 +9,7 @@ from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.core.stop import StopDecision, StopReason
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeRunOutcome,
+    ExecutionOutcome,
     PhaseRunCursor,
 )
 from lca.harness.declarative.execute.outcome_projection import InterpretationResult
@@ -56,7 +57,7 @@ async def test_finalizer_projects_pause_from_one_terminal_fact() -> None:
         terminal_node="think.standard",
         cursor=cursor,
         outcome=DeclarativeRunOutcome(
-            kind="paused",
+            kind=ExecutionOutcome.PAUSED,
             cursor=cursor,
             stop=StopDecision(should_stop=False, reason=StopReason.CONTINUE),
             approval_request={"approval_id": "approval-1", "type": "tool_approval"},

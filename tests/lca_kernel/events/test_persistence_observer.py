@@ -1,9 +1,9 @@
 """ADR-0186 PR-3e / delete-queue Level 4: PersistenceObserver 同步落盘测试。
 
 覆盖:
-- 默认 FsyncPolicy.BATCH
+- 默认 FsyncProtocol.BATCH
 - on_session_event → sink.append
-- SYNC 策略每条 flush
+- PER_WRITE 策略每条 flush
 - health_snapshot 字段(无队列: queue/pending/enqueued/dropped=0)
 - EnvelopeDeliveryObserver 协议 + 失败 contained
 - spine_file_sink manifest 走 Session.observe
@@ -17,15 +17,18 @@ from typing import Any
 import pytest
 
 from lca.contracts.event import EventPayload
+from lca.contracts.observability.fsync import FsyncProtocol
 from lca_kernel.events import (
     EnvelopeBus,
     EnvelopeRef,
     PersistenceObserver,
     TeamDelegationCacheHit,
 )
+from lca_kernel.events import (
+    FsyncProtocol as ReexportedFsyncProtocol,
+)
 from lca_kernel.events.persistence import (
     EnvelopeDeliveryObserver,
-    FsyncPolicy,
     PersistenceHealthSnapshot,
 )
 from lca_kernel.events.persistence import (
@@ -72,15 +75,19 @@ def _isolate_singletons() -> Any:
     PersistenceObserver.reset_singleton()
 
 
-# ── 1:FsyncPolicy 默认值 ────────────────────────────────────────────────
+# ── 1:FsyncProtocol 默认值 ──────────────────────────────────────────────
 
 
-class TestFsyncPolicy:
+class TestFsyncProtocol:
     def test_persistence_observer_fsync_policy_default(self) -> None:
-        """默认 FsyncPolicy.BATCH(平衡 fsync 节奏)。"""
+        """默认 FsyncProtocol.BATCH(平衡 fsync 节奏)。"""
         observer = PersistenceObserver()
-        assert observer.fsync_policy is FsyncPolicy.BATCH
+        assert observer.fsync_policy is FsyncProtocol.BATCH
         assert observer.fsync_interval_ms == 50
+
+    def test_kernel_reexport_is_contract_enum(self) -> None:
+        """lca_kernel.events re-export 的枚举与契约层同一对象(无双枚举)。"""
+        assert ReexportedFsyncProtocol is FsyncProtocol
 
 
 # ── 2:同步落盘 ───────────────────────────────────────────────────────────
@@ -90,7 +97,7 @@ class TestPersistenceObserverWrites:
     def test_persistence_observer_writes_to_spine_sink(self) -> None:
         """on_session_event → StubSink.append。"""
         sink = _StubSink()
-        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)
         ref = EnvelopeRef(
             event_id="evt-w1",
             category="team.delegation.cache_hit",
@@ -108,7 +115,7 @@ class TestPersistenceObserverWrites:
     async def test_persistence_observer_flush_for_returns_when_written(self) -> None:
         """flush_for 对已写入 id 立即返回;consumer_running 恒 False。"""
         sink = _StubSink()
-        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)
         assert observer.consumer_running is False
         ref = EnvelopeRef(
             event_id="evt-w2b",
@@ -122,9 +129,9 @@ class TestPersistenceObserverWrites:
         assert observer.consumer_running is False
 
     def test_persistence_observer_fsync_policy_sync_flushes_per_event(self) -> None:
-        """SYNC 策略:每条事件 flush 一次。"""
+        """PER_WRITE 策略:每条事件 flush 一次。"""
         sink = _StubSink()
-        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.SYNC)
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.PER_WRITE)
         refs = [
             EnvelopeRef(
                 event_id=f"evt-s-{i}",
@@ -149,12 +156,12 @@ class TestHealthSnapshot:
         sink = _StubSink()
         observer = PersistenceObserver(
             sink=sink,
-            fsync_policy=FsyncPolicy.BATCH,
+            fsync_policy=FsyncProtocol.BATCH,
             fsync_interval_ms=50,
         )
         snap = observer.health_snapshot()
         assert isinstance(snap, PersistenceHealthSnapshot)
-        assert snap.policy is FsyncPolicy.BATCH
+        assert snap.policy is FsyncProtocol.BATCH
         assert snap.queue_depth == 0
         assert snap.pending_count == 0
         assert snap.last_flush_ms is None
@@ -228,7 +235,7 @@ class TestPersistenceObserverProtocol:
     def test_persistence_observer_on_session_event_writes_to_sink(self) -> None:
         """``on_session_event`` 同步回调:直接触发 build_record + sink.append。"""
         sink = _StubSink()
-        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)
         ref = EnvelopeRef(
             event_id="evt-o1",
             category="team.delegation.cache_hit",
@@ -247,7 +254,7 @@ class TestPersistenceObserverProtocol:
     ) -> None:
         """``sink.append`` 抛错 → observer 吞错,不向外冒泡,自身仍可用。"""
         sink = _RaisingSink()
-        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)
         ref = EnvelopeRef(
             event_id="evt-o2-fail",
             category="team.delegation.cache_hit",
@@ -274,10 +281,12 @@ class TestPersistenceObserverProtocol:
     ) -> None:
         """``build_record`` 抛错 → contained;observer 仍可用。"""
         sink = _StubSink()
-        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)
         import lca_kernel.events.persistence as persistence_mod
 
-        original = persistence_mod.PersistenceObserver._build_persistable_record
+        # 经 __dict__ 取 staticmethod 描述符本体:类属性访问返回解包后的
+        # 函数,直接回填会丢 staticmethod 语义,污染后续测试的实例调用。
+        original = persistence_mod.PersistenceObserver.__dict__["_build_persistable_record"]
 
         def _raising(
             payload: EventPayload,
@@ -312,3 +321,90 @@ class TestPersistenceObserverProtocol:
             assert sink.records[0].event_id == "evt-o3-ok"
         finally:
             persistence_mod.PersistenceObserver._build_persistable_record = original  # type: ignore[assignment]
+
+
+# ── EP 标注:缺 execution_point 时按 category 反查(ADR-0184 D7)────────
+
+
+class _StubSession:
+    """``SessionProtocol`` 最小形态:``_map_session_event`` 只读 ``.id``。"""
+
+    def __init__(self, session_id: str) -> None:
+        self.id = session_id
+
+
+class TestExecutionPointLabeling:
+    """落盘记录必须可按 EP 查询;typed payload 只带 category 时按反查归一。"""
+
+    def test_session_event_without_ep_derives_from_spine_category(self) -> None:
+        """SessionEvent data 无 execution_point → 按 category 反查裸 EP。"""
+        from lca_kernel.events.session import SessionEvent
+
+        sink = _StubSink()
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)
+        event = SessionEvent(
+            type="spine.llm.request.header",
+            seq=8,
+            time=1_788_512_186_015,
+            data={"step_id": "step-001", "reason": "initial"},
+        )
+        observer(_StubSession("run_ep_label"), event)
+        assert len(sink.records) == 1
+        record = sink.records[0]
+        assert record.execution_point == "llm.request.header"
+        assert record.category == "spine.llm.request.header"
+
+    def test_session_event_with_explicit_ep_kept_verbatim(self) -> None:
+        """data 携带 execution_point 时原样保留(反查不回退)。"""
+        from lca_kernel.events.session import SessionEvent
+
+        sink = _StubSink()
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)
+        event = SessionEvent(
+            type="spine.cognition.brain.think.start",
+            seq=1,
+            time=1_788_512_185_000,
+            data={"execution_point": "brain.think.start", "state_id": "s"},
+        )
+        observer(_StubSession("run_ep_keep"), event)
+        assert sink.records[0].execution_point == "brain.think.start"
+
+    def test_session_event_non_spine_category_stays_unknown(self) -> None:
+        """非 spine category 且无 execution_point → 保持 "unknown"。"""
+        from lca_kernel.events.session import SessionEvent
+
+        sink = _StubSink()
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)
+        event = SessionEvent(
+            type="app.custom.event",
+            seq=2,
+            time=1_788_512_186_000,
+            data={"foo": 1},
+        )
+        observer(_StubSession("run_ep_unknown"), event)
+        assert sink.records[0].execution_point == "unknown"
+
+    def test_typed_spine_payload_without_ep_attr_derives_from_category(self) -> None:
+        """typed payload 无 execution_point 属性(model-visible 族形态:
+        只携带 ``category`` + typed 字段)→ build_record 按 category
+        反查裸 EP(EnvelopeDeliveryObserver 路径)。"""
+        from lca.contracts.event import Category
+
+        class _TypedSpinePayload(EventPayload):
+            """与 SpineLlmRequestHeaderPayload 同形态:有 category、无
+            execution_point 属性、字段经 model_dump 序列化。"""
+
+            category: Category = Category.SPINE_LLM_REQUEST_HEADER
+            step_id: str = "step-001"
+
+        sink = _StubSink()
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)
+        ref = EnvelopeRef(
+            event_id="evt-ep-typed",
+            category="spine.llm.request.header",
+            trace_id="trc-ep",
+            ts=0.0,
+        )
+        observer.on_session_event(_TypedSpinePayload(), ref)
+        assert len(sink.records) == 1
+        assert sink.records[0].execution_point == "llm.request.header"

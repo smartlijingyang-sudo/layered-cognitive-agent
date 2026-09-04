@@ -17,6 +17,7 @@ from lca.contracts.protocols.declarative.declarative_common import (
 )
 from lca.contracts.protocols.declarative.declarative_execution import (
     DeclarativeRunOutcome,
+    ExecutionOutcome,
     JournalCommitter,
     PhaseResult,
     PhaseRunCursor,
@@ -120,7 +121,7 @@ class RunOutcomeProjector:
             terminal_node=node_id,
             cursor=cursor,
             outcome=DeclarativeRunOutcome(
-                kind="completed",
+                kind=ExecutionOutcome.COMPLETED,
                 cursor=cursor,
                 stop=_terminal_stop_decision_from_result(result),
                 error_fact=None,
@@ -206,7 +207,7 @@ class RunOutcomeProjector:
             terminal_node=traversal.current_node_id,
             cursor=cursor,
             outcome=DeclarativeRunOutcome(
-                kind="paused",
+                kind=ExecutionOutcome.PAUSED,
                 cursor=cursor,
                 stop=_stop_decision(should_stop=False),
                 error_fact=paused_fact,
@@ -251,7 +252,7 @@ class RunOutcomeProjector:
             terminal_node=node_id,
             cursor=cursor,
             outcome=DeclarativeRunOutcome(
-                kind="failed",
+                kind=ExecutionOutcome.FAILED,
                 cursor=cursor,
                 stop=_stop_decision(should_stop=True),
                 error_fact=error_fact,
@@ -319,7 +320,7 @@ class RunOutcomeProjector:
             terminal_node=node_id,
             cursor=cursor,
             outcome=DeclarativeRunOutcome(
-                kind="failed",
+                kind=ExecutionOutcome.FAILED,
                 cursor=cursor,
                 stop=StopDecision(
                     should_stop=True,

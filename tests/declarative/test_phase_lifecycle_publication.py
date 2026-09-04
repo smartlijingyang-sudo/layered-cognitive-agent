@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 import pytest
 
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
+    ExecutionOutcome,
     PhaseInput,
     PhaseResult,
     SemanticPhase,
@@ -137,7 +138,7 @@ async def test_phase_executor_failure_publishes_failed_without_a_completion_even
     result = await interpreter.run(_executable(plan, capabilities), state={"immutable": True})
 
     assert result.outcome is not None
-    assert result.outcome.kind == "failed"
+    assert result.outcome.kind is ExecutionOutcome.FAILED
     assert [event.type for event in events] == [
         RuntimeLifecycleEventType.PHASE_STARTED,
         RuntimeLifecycleEventType.PHASE_FAILED,

@@ -15,6 +15,7 @@ from lca.contracts.models.core.stop import StopDecision, StopReason
 from lca.contracts.protocols.act.command_envelope import RunDelta
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeRunOutcome,
+    ExecutionOutcome,
     PhaseInput,
     PhaseResult,
     PhaseRunCursor,
@@ -130,7 +131,7 @@ async def test_completed_run_returns_completed_outcome(standard_plan) -> None:
 
     assert result.outcome is not None
     assert isinstance(result.outcome, DeclarativeRunOutcome)
-    assert result.outcome.kind == "completed"
+    assert result.outcome.kind is ExecutionOutcome.COMPLETED
     assert result.outcome.cursor is not None
     assert result.outcome.stop is not None
     assert result.outcome.stop.should_stop is True
@@ -146,7 +147,7 @@ async def test_terminal_outcome_preserves_stop_decision_metadata(standard_plan) 
     result = await GenericPlanInterpreter().run(executable, state={"immutable": True})
 
     assert result.outcome is not None
-    assert result.outcome.kind == "completed"
+    assert result.outcome.kind is ExecutionOutcome.COMPLETED
     assert result.outcome.stop.final_output == "preserved output"
     assert result.outcome.stop.status is TaskStatus.COMPLETED
     assert result.outcome.stop.reason is StopReason.TASK_COMPLETED
@@ -162,7 +163,7 @@ async def test_terminal_phase_rejects_legacy_mapping_payload(standard_plan) -> N
     result = await GenericPlanInterpreter().run(executable, state={"immutable": True})
 
     assert result.outcome is not None
-    assert result.outcome.kind == "failed"
+    assert result.outcome.kind is ExecutionOutcome.FAILED
     assert result.outcome.error_fact is not None
     assert result.outcome.error_fact.payload["error_code"] == "RT-002"
 
@@ -209,27 +210,50 @@ async def test_validation_error_maps_to_failed_outcome(standard_plan) -> None:
     result = await interpreter.run(broken_executable, state={"immutable": True})
 
     assert result.outcome is not None
-    assert result.outcome.kind == "failed"
+    assert result.outcome.kind is ExecutionOutcome.FAILED
     assert result.outcome.error_fact is not None
     assert result.outcome.cursor is not None  # cursor captured at failure point
 
 
-@pytest.mark.asyncio
-async def test_outcome_kind_is_literal_type() -> None:
-    """DeclarativeRunOutcome.kind must be a Literal type."""
-    from typing import get_args, get_type_hints
+def test_outcome_kind_is_execution_outcome_enum() -> None:
+    """DeclarativeRunOutcome.kind is the closed ExecutionOutcome enum.
+
+    收敛契约(note-1):声明式单次执行结果词表与 ``RunLifecycleStatus``
+    分立;成员值与历史 Literal 逐字节一致,字符串构造仍被收编为 enum。
+    """
+    from typing import get_type_hints
 
     hints = get_type_hints(DeclarativeRunOutcome)
-    kind_type = hints.get("kind")
+    assert hints.get("kind") is ExecutionOutcome
+    assert {member.value for member in ExecutionOutcome} == {
+        "completed",
+        "paused",
+        "failed",
+        "effect_uncertain",
+    }
 
-    # Should be a Literal type
-    assert kind_type is not None
-    # Check that it's one of the expected kinds
-    literal_args = get_args(kind_type)
-    assert "completed" in literal_args
-    assert "paused" in literal_args
-    assert "failed" in literal_args
-    assert "effect_uncertain" in literal_args
+
+def test_outcome_kind_coerces_legacy_strings_and_rejects_unknown() -> None:
+    """历史字符串构造被收编为 enum;未知值仍按 PG-009 fail-closed。"""
+    from lca.contracts.protocols.declarative.declarative_common import (
+        DeclarativeValidationError,
+    )
+
+    cursor = PhaseRunCursor(
+        plan_ref="p",
+        node_id="n",
+        visit_counts=(),
+        edge_counts=(),
+        artifacts={},
+        causation_refs=(),
+        budget_snapshot={},
+    )
+    stop = StopDecision(should_stop=True, reason=StopReason.TASK_COMPLETED, final_output=None)
+    coerced = DeclarativeRunOutcome(kind="paused", cursor=cursor, stop=stop)
+    assert coerced.kind is ExecutionOutcome.PAUSED
+    assert coerced.kind == "paused"  # str-enum:wire 值逐字节兼容
+    with pytest.raises(DeclarativeValidationError, match="PG-009"):
+        DeclarativeRunOutcome(kind="not-a-kind", cursor=cursor, stop=stop)
 
 
 def test_outcome_projector_records_failure_without_executing_a_graph() -> None:
@@ -258,7 +282,7 @@ def test_outcome_projector_records_failure_without_executing_a_graph() -> None:
     )
 
     assert result.outcome is not None
-    assert result.outcome.kind == "failed"
+    assert result.outcome.kind is ExecutionOutcome.FAILED
     assert result.outcome.error_fact is not None
     assert result.outcome.error_fact.payload["error"] == "synthetic failure"
     assert journal.facts == [result.outcome.error_fact]
