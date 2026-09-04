@@ -225,3 +225,59 @@ def test_fork_produces_independent_child() -> None:
     assert isinstance(child, StdLoopCursor)
     assert child.snapshot.run_id == "r1"
     assert child.snapshot.phase is None
+
+
+# ── open_step(LLM 边界 step 推进,hook 路径)─────────────────────
+
+
+def test_open_step_advances_step_index_without_emitting_ep() -> None:
+    """open_step 只做 L6 自增:step_index += 1 / step_id / attempt 归零,不落 EP。
+
+    hook 路径自行经 Session 发 ``spine.llm.request.header`` payload;
+    cursor 若再派生 ``llm.request.header`` EP,fold 会看到双重 step 边。
+    """
+    c, spine = _make_cursor()
+    c.advance("think")
+    assert len(spine.records) == 1
+    c.open_step("step-001")
+    snap = c.snapshot
+    assert snap.step_index == 1
+    assert snap.step_id == "step-001"
+    assert snap.attempt_in_step == 0
+    assert len(spine.records) == 1, "open_step 不应派生任何 EP"
+
+
+def test_open_step_monotonic_across_llm_requests() -> None:
+    """连续 LLM 请求逐个 open_step,step_index 单调、step_id 跟随。"""
+    c, spine = _make_cursor()
+    c.advance("think")
+    c.open_step("step-001")
+    c.open_step("step-002")
+    c.open_step("step-003")
+    snap = c.snapshot
+    assert snap.step_index == 3
+    assert snap.step_id == "step-003"
+    assert len(spine.records) == 1  # 仅 advance 的 phase.think.fold
+
+
+def test_open_step_not_bound_to_think_window() -> None:
+    """team 委派时子 Agent LLM 边界可能在共享 cursor 的非 think 相位。"""
+    c, _ = _make_cursor()
+    c.advance("act")
+    c.open_step("step-001")
+    assert c.snapshot.step_index == 1
+
+
+def test_open_step_after_close_raises() -> None:
+    c, _ = _make_cursor()
+    c.close("completed")
+    with pytest.raises(CursorError):
+        c.open_step("step-001")
+
+
+def test_open_step_while_halted_raises() -> None:
+    c, _ = _make_cursor()
+    c.advance("think")
+    c.halt("approval_pending")
+    with pytest.raises(CursorError):
+        c.open_step("step-001")
