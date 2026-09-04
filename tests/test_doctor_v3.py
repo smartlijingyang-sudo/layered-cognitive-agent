@@ -609,7 +609,6 @@ def test_h_fold_not_attempted_when_journal_no_steps(tmp_path: Path) -> None:
 
     空 doc 没有 step 可 fold,医生不应视作 fold 故障。
     """
-    import json as _json
     from lca.contracts.models.observability import (
         JournalMetadata,
         empty_document,
