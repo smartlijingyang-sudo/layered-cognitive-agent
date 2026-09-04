@@ -1,0 +1,4 @@
+goals: []
+notes: |
+  助理目标与成功标准。
+  格式：每个 goal 含 `name` / `description` / `success_criteria`。
