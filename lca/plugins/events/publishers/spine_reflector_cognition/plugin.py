@@ -161,6 +161,7 @@ def emit_prompt_assembler_start(
     activated_skills: Sequence[str] | None = None,
     tools_count: int | None = None,
     available_skills_count: int | None = None,
+    variant: str | None = None,
 ) -> Any:
     payload: dict[str, Any] = {"state_id": state_id, "template_id": template_id}
     if sections is not None:
@@ -173,6 +174,8 @@ def emit_prompt_assembler_start(
         payload["tools_count"] = tools_count
     if available_skills_count is not None:
         payload["available_skills_count"] = available_skills_count
+    if variant is not None:
+        payload["variant"] = variant
     return _send(
         execution_point="prompt_assembler.assemble.start",
         channel="fact",
@@ -188,6 +191,7 @@ def emit_prompt_assembler_end(
     section_outputs: Sequence[Mapping[str, Any]] | None = None,
     total_chars: int | None = None,
     outcome: str = "success",
+    variant: str | None = None,
 ) -> Any:
     payload: dict[str, Any] = {
         "state_id": state_id,
@@ -201,6 +205,8 @@ def emit_prompt_assembler_end(
         ]
     if total_chars is not None:
         payload["total_chars"] = total_chars
+    if variant is not None:
+        payload["variant"] = variant
     return _send(
         execution_point="prompt_assembler.assemble.end",
         channel="fact",

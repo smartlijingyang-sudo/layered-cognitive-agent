@@ -111,6 +111,7 @@ events:
     fields:
       state_id: str
       template_id: str
+      variant: str
     publishers:
       - events.spine.reflector.cognition
 
@@ -121,6 +122,7 @@ events:
       state_id: str
       template_id: str
       section_count: int
+      variant: str
     publishers:
       - events.spine.reflector.cognition
 

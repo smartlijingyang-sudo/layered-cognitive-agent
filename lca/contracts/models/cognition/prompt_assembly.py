@@ -253,6 +253,7 @@ class PromptAssembler(Protocol):
         manifest: ContextManifest | None,
         tools: Sequence[Tool],
         activated_skills: tuple[ActivatedSkill, ...],
+        selector_decision_path: SelectorDecisionPath = "legacy",
     ) -> str | tuple[str, PromptTrace]: ...
 
 

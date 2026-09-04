@@ -68,6 +68,7 @@ class SectionManifestPromptAssembler(Protocol_):
         manifest: ContextManifest | None,
         tools: Sequence[Tool],
         activated_skills: tuple[ActivatedSkill, ...],
+        selector_decision_path: str = "legacy",
     ) -> tuple[str, PromptTrace]:
         template = self.template_provider.get_template(template_id)
         if template is None:
@@ -82,7 +83,7 @@ class SectionManifestPromptAssembler(Protocol_):
             tools=tools,
             activated_skills=activated_skills,
             strip_empty_fields=self.strip_empty_fields,
-            selector_decision_path=getattr(state, "_selector_decision_path", "legacy"),
+            selector_decision_path=selector_decision_path,
             catalog=self._catalog(),
         )
 

@@ -48,6 +48,9 @@ from lca.contracts.models.team.delegation import DelegationResult
 from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.protocols import LLMAdapter, Tool
 from lca.infrastructure.observability import annotate
+from lca.infrastructure.observability.loop_cursor._capture_io import (
+    sha256_digest as _sha256_digest,
+)
 
 
 def build_teammates_text(profiles: Sequence[RoleProfile]) -> str:
@@ -205,6 +208,7 @@ class PromptReasoner:
         # Sections preview from the template itself (available pre-render);
         # end EP carries the authoritative section_outputs.
         sections_preview: list[str] = self._template_section_names(template_id)
+        variant_preview = self._template_variant(template_id)
         emit_prompt_assembler_start(
             state_id=state_id,
             template_id=template_id,
@@ -213,16 +217,15 @@ class PromptReasoner:
             activated_skills=list(activated_skill_ids) or None,
             tools_count=tools_count,
             available_skills_count=available_skills_count,
+            variant=variant_preview,
         )
-        # Inject decision path into state so the assembler can stamp it
-        # into PromptTrace.selector_decision_path without a new parameter.
-        state._selector_decision_path = decision_path  # type: ignore[attr-defined]
         reasoner_prompt_token = None
         try:
             prompt, trace, section_count = self._render_prompt(
                 state,
                 manifest=manifest,
                 template_id=template_id,
+                decision_path=decision_path,
             )
         except BaseException:
             emit_prompt_assembler_end(
@@ -230,6 +233,7 @@ class PromptReasoner:
                 template_id=template_id,
                 section_count=0,
                 outcome="failure",
+                variant=variant_preview,
             )
             raise
         if trace is not None:
@@ -246,6 +250,10 @@ class PromptReasoner:
                     "used_fallback": s.used_fallback,
                     "skipped_empty": s.skipped_empty,
                     "text_chars": s.text_chars,
+                    # ADR-0176 D3 §5:EP payload 携带渲染正文与摘要，
+                    # viewer 无需回读 model_visible 旁路即可重建。
+                    "text": s.text,
+                    "content_digest": _sha256_digest(s.text) if s.text else None,
                 }
                 for s in trace.sections
             ]
@@ -260,6 +268,7 @@ class PromptReasoner:
             section_outputs=section_outputs,
             total_chars=total_chars,
             outcome="success",
+            variant=trace.variant if trace is not None else variant_preview,
         )
 
         emit_reasoner_reason_start(state_id=state_id)
@@ -294,6 +303,7 @@ class PromptReasoner:
         *,
         manifest: object | None,
         template_id: str,
+        decision_path: SelectorDecisionPath = "legacy",
     ) -> tuple[str, PromptTrace | None, int]:
         if self.assembler is not None:
             result = self.assembler.render(
@@ -304,6 +314,7 @@ class PromptReasoner:
                 manifest=manifest,  # type: ignore[arg-type]
                 tools=self.tools,
                 activated_skills=tuple(state.activated_skills),
+                selector_decision_path=decision_path,
             )
             prompt, trace = normalize_assembler_result(result)
             section_count = len(trace.sections) if trace is not None else 0
@@ -346,6 +357,23 @@ class PromptReasoner:
         if template is None:
             return []
         return [ref.name for ref in template.sections]
+
+    def _template_variant(self, template_id: str) -> str | None:
+        """Return the variant a template renders as (pre-render preview).
+
+        Falls back to ``None`` when no assembler/template_provider is wired
+        (legacy/test paths); the end EP then carries ``trace.variant``.
+        """
+        assembler = self.assembler
+        if assembler is None:
+            return None
+        provider = getattr(assembler, "template_provider", None)
+        if provider is None:
+            return None
+        template = provider.get_template(template_id)
+        if template is None:
+            return None
+        return getattr(template, "variant", None)
 
     def _bind_reasoner_prompt(self, trace: PromptTrace) -> Any:
         from lca.infrastructure.observability.loop_cursor.model_visible_binding import (
