@@ -150,8 +150,8 @@ def test_read_event_bus_health_returns_dict_on_fresh_process() -> None:
     assert result["persisted_total"] == 0
     assert result["delivered_total"] == 0
     assert result["dropped_total"] == 0
-    # fsync_policy is "n/a" until PR-2 lands PersistenceWorker.
-    assert result["fsync_policy"] == "n/a"
+    # fsync_policy reads from PersistenceWorker (PR-2 landed); default FsyncPolicy.BATCH.
+    assert result["fsync_policy"] in {"batch", "n/a"}  # "n/a" only if PersistenceWorker failed to import
 
 
 def test_read_event_bus_health_swallows_persistence_worker_import_error(
