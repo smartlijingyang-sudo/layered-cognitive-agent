@@ -14,6 +14,8 @@ Status: implemented
 | `PersistenceWorker` 别名 | 已删 | 生产路径 `rg PersistenceWorker` = 0；I-SESSION-4 翻正 |
 | `deriver` fold 切流 | 落地 | 生产 step_tree 走 `StepTreeFoldDeriver`（I-SESSION-5）；`live_tail.subscribe` 为 SSE carrier（独立 transport ADR 前保留，不挡 Session SSOT）；`StepTreeAccumulatorDeriver` 与 graph/waterfall/otel/anomaly/narrative 保留给单元测试 / CLI replay / capability provide，非 EventSpine.subscribe 生产 builder 路径 |
 | sinks/subscribers observe | 落地 | boot 只入 `_session_observe` 目录；run bind `set_session` 整表挂上；journal / spine_file / console / chain / step_tree 均无 `mount_sink`/`bus.subscribe` |
+| **Run bind 归属** | 落地 | 上移到 `lca/plugins/session/runtime/bind.py`；Carrier（RunSessionBuilder/resume）与 in-process（spawn_agent→CognitiveAgent/TeamHandle）共用；缺 `session.store` 时 binder=None，首次 publish fail-loud |
+| **provides ⊆ provide** | 落地 | boot 期 `_validate_audited_interactions` 对每个 plugin 校验：declared provides ⊆ audited.provided ∪ audited.registered.seams ∪ audited.required 前缀；selector 形态与 tool register 形态走豁免 |
 | `tests/architecture/test_session_ssot_invariants.py` | 落地 | I-SESSION-1/2/3/4/5 无条件通过 |
 | `RunEventSessionBridge.append` EventBus 双写 | 已删 | `event_session.py` 无 `EventBus.default().publish`；`append` 只 `Session.append` + 合成 `EventRef`；`test_event_session_has_no_eventbus_dual_write` 锁 |
 | `pipeline_loader.apply_pipeline` `mount_sink` | 已删 | `apply_pipeline` 只实例化 sinks 入回执 map，不 `bus.mount_sink`；`test_pipeline_loader_has_no_mount_sink` 锁 |

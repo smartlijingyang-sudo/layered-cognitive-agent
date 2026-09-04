@@ -325,6 +325,20 @@ def _validate_audited_interactions(
     declared_provide = set(definition.provided_capability_keys)
     declared_require = set(definition.required_capability_keys)
     undeclared_provide = audited.provided - declared_provide
+    # provides ⊆ setup 实际 ctx.provide / ctx.register / seam.register。
+    # selector 形态（registry[name]）与 tool 形态（register 到 seam）通过
+    # register() 兑现，audited.registered 含 (seam_key, entry) 元组。
+    # Tool 插件常走 ctx.require("tools").register(tool) 路径，audited
+    # 只记 required 不记 register — 以 `<required>.` 前缀视为已兑现。
+    registered_seams = {seam for seam, _ in audited.registered}
+    missing_provide = {
+        key
+        for key in (declared_provide - audited.provided)
+        if "[" not in key
+        and key not in registered_seams
+        and not any(key.startswith(seam + ".") for seam in registered_seams)
+        and not any(key.startswith(req + ".") for req in audited.required)
+    }
     # Concrete keys collected via require_matching("field_producer.") are
     # covered by a declared ``field_producer.*`` wildcard — same rule as
     # AuditedPluginContext.require(allow_wildcard=True).
@@ -334,11 +348,12 @@ def _validate_audited_interactions(
         if key not in declared_require
         and not any(requirement_covers_key(pattern, key) for pattern in declared_require)
     }
-    if undeclared_provide or undeclared_require:
+    if undeclared_provide or undeclared_require or missing_provide:
         raise ProfileResolveError(
             f"plugin {definition.spec.id}: undeclared interaction "
             f"provide={sorted(undeclared_provide)} "
-            f"require={sorted(undeclared_require)}"
+            f"require={sorted(undeclared_require)} "
+            f"missing_provide={sorted(missing_provide)}"
         )
 
 

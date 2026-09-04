@@ -65,8 +65,9 @@ class Config(BaseModel):
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Session runtime boot：provide 一个全新 SessionStore（每次 profile 启动一个）。
 
-    外部后果：``session.store`` 由 RunSessionBuilder 按 run_id 消费；
-    缺席时 publishers 降级 EventBus。
+    外部后果：``session.store`` 由 run 边界
+    :mod:`lca.plugins.session.runtime.bind` 按 run_id 消费（Carrier 与
+    in-process spawn 共用）；缺席时 ``publish_via_session`` fail-loud。
     """
     del config
     ctx.provide("session.store", SessionStore())

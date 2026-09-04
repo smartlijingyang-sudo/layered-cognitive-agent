@@ -15,7 +15,20 @@ from lca.contracts.models.observability.journal import (
     RunResumed,
 )
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
+from lca.plugins.session.runtime.bind import EventSessionBinder
+from lca.plugins.session.runtime.store import SessionStore
+from lca_kernel.events.bus import EventBus
+from lca_kernel.events.test_catalog import build_test_bus
 from tests.support.observability_helpers import _RunStoreBackend, make_test_bound
+
+
+@pytest.fixture(autouse=True)
+def _test_event_bus() -> None:
+    """Provide a configured test EventBus for Session-bound publishes."""
+    bus = build_test_bus()
+    EventBus.set_default(bus)
+    yield
+    EventBus.reset_singleton()
 
 
 class _ResumeRuntime:
@@ -82,7 +95,9 @@ def _role() -> RoleProfile:
 async def test_resume_uses_persisted_trace_and_records_full_agent_lifecycle() -> None:
     hub = make_test_bound()
     runtime = _ResumeRuntime()
-    agent = CognitiveAgent(runtime, _role(), hub)
+    agent = CognitiveAgent(
+        runtime, _role(), hub, event_session_binder=EventSessionBinder(SessionStore())
+    )
     snapshot = StateSnapshot(
         snapshot_id="snap-paused",
         step=2,
@@ -116,7 +131,9 @@ async def test_resume_uses_persisted_trace_and_records_full_agent_lifecycle() ->
 @pytest.mark.asyncio
 async def test_paused_snapshot_is_stamped_with_owning_run_scope() -> None:
     hub = make_test_bound()
-    agent = CognitiveAgent(_PauseRuntime(), _role(), hub)
+    agent = CognitiveAgent(
+        _PauseRuntime(), _role(), hub, event_session_binder=EventSessionBinder(SessionStore())
+    )
 
     result = await agent.run("需要审批的任务")
 

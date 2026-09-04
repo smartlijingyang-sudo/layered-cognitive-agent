@@ -19,7 +19,19 @@ from lca.contracts.models.core.result import Result
 from lca.contracts.models.observability.journal import AgentRunFinished, TeamRunFinished
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.infrastructure.observability.facade.team_profile import TeamTraceProfile
+from lca.plugins.session.runtime.bind import EventSessionBinder
+from lca.plugins.session.runtime.store import SessionStore
+from lca_kernel.events.bus import EventBus
+from lca_kernel.events.test_catalog import build_test_bus
 from tests.support.observability_helpers import make_test_bound
+
+
+@pytest.fixture(autouse=True)
+def _test_event_bus() -> None:
+    bus = build_test_bus()
+    EventBus.set_default(bus)
+    yield
+    EventBus.reset_singleton()
 
 
 class _HangRuntime:
@@ -48,7 +60,10 @@ def _role() -> RoleProfile:
 @pytest.mark.asyncio
 async def test_agent_run_finished_on_cancelled_error() -> None:
     hub = make_test_bound()
-    agent = CognitiveAgent(_HangRuntime(), _role(), hub)  # type: ignore[arg-type]
+    agent = CognitiveAgent(
+        _HangRuntime(), _role(), hub,  # type: ignore[arg-type]
+        event_session_binder=EventSessionBinder(SessionStore()),
+    )
     task = asyncio.create_task(agent.run("任务"))
     await asyncio.sleep(0)  # 让 AgentRunStarted 先落地
     task.cancel()
@@ -77,6 +92,7 @@ async def test_team_run_finished_on_cancelled_error() -> None:
         observability=hub,
         members=(),
         lead=None,
+        event_session_binder=EventSessionBinder(SessionStore()),
     )
     task = asyncio.create_task(handle.run("目标"))
     await asyncio.sleep(0)

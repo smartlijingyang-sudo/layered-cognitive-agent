@@ -109,7 +109,7 @@ class _Config(BaseModel):
 
 @plugin(
     id="delegation_cache",
-    provides=["delegation_cache", "delegation.cache_observation"],
+    provides=["delegation_cache"],
     requires=[],
     layer="L1",
     kind=PluginKind.PRIMITIVE,

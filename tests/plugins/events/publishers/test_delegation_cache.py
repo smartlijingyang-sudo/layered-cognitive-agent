@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 from lca.contracts.atoms.ids import new_id
-from lca.contracts.event import Category
 from lca.contracts.models.core.decision import DelegationSpec, Observation
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.plugins.events.publishers.delegation_cache.plugin import (
@@ -51,34 +50,54 @@ def test_publisher_plugin_id_matches_yaml() -> None:
     assert PUBLISHER_PLUGIN_ID == "delegation_cache"
 
 
-def test_delegation_cache_plugin_emits_event_via_bus() -> None:
-    """业务方 plugin 类直接 publish → EventBus 按 yaml 鉴权通过 → 事件被路由。"""
+def test_manifest_provides_match_setup_keys() -> None:
+    """provides 必须 ⊆ setup 实际 provide 的键（e2e bind_plan 回归）。
+
+    曾声明未 provide 的 ``delegation.cache_observation``，CompiledRunPlan
+    把它编进 ProviderBinding 后 spawn 全挂。
+    """
+    from lca.harness.plugin_declaration import definition_from_plugin
+    from lca.plugins.events.publishers.delegation_cache import plugin as mod
+
+    definition = definition_from_plugin(mod.setup, module=__name__)
+    assert definition.provided_capability_keys == (PUBLISHER_PLUGIN_ID,)
+
+
+def test_delegation_cache_plugin_emits_via_session() -> None:
+    """命中缓存 → Session.append(TeamDelegationCacheHit) + Observation。"""
+    from typing import Any
+    from unittest.mock import MagicMock
+
+    from lca.plugins.events.publishers._session_publish import (
+        reset_publish_session,
+        set_publish_session,
+    )
     from lca_kernel.events.test_catalog import build_test_bus
+
     bus = build_test_bus()
     EventBus.set_default(bus)
+    captured: dict[str, Any] = {}
 
-    received: list[EventRef] = []
-    from lca.plugins.events.subscribers.console_projector.subscriber import (
-        ConsoleProjectorSubscriber,
-    )
+    class FakeSession:
+        def append(self, payload: Any, *, producer: Any) -> EventRef:
+            captured["payload"] = payload
+            captured["producer"] = producer
+            return MagicMock(name="SessionRef", category="team.delegation.cache_hit")
 
-    bus.subscribe(
-        plugin=ConsoleProjectorSubscriber,
-        category=Category.TEAM_DELEGATION_CACHE_HIT,
-        on_event=lambda p, r: received.append(r),
-    )
-
+    token = set_publish_session(FakeSession())
     try:
         state = _state_with_hit_result(_state())
         spec = DelegationSpec(target_role="analyst", subtask="汇总")
         observation = DelegationCachePlugin().cached_observation(spec, state)
     finally:
+        reset_publish_session(token)
         EventBus.reset_singleton()
 
     assert isinstance(observation, Observation)
     assert observation.success is True
-    assert len(received) == 1
-    assert received[0].category == "team.delegation.cache_hit"
+    assert isinstance(captured["payload"], TeamDelegationCacheHit)
+    assert captured["producer"] is DelegationCachePlugin
+    assert captured["payload"].callee_role == "analyst"
 
 
 def test_cached_observation_no_hit_returns_none() -> None:
@@ -89,32 +108,39 @@ def test_cached_observation_no_hit_returns_none() -> None:
 
 
 def test_compatibility_shell_delegates_to_plugin() -> None:
-    """cognition 模块的 cached_delegation_observation 兼容壳 → DelegationCachePlugin。"""
+    """cognition 兼容壳 → DelegationCachePlugin → Session.append。"""
+    from typing import Any
+    from unittest.mock import MagicMock
+
     from lca.cognition.body.delegation_cache import cached_delegation_observation
+    from lca.plugins.events.publishers._session_publish import (
+        reset_publish_session,
+        set_publish_session,
+    )
     from lca_kernel.events.test_catalog import build_test_bus
+
     bus = build_test_bus()
     EventBus.set_default(bus)
+    captured: list[Any] = []
 
-    received: list = []
-    from lca.plugins.events.subscribers.console_projector.subscriber import (
-        ConsoleProjectorSubscriber,
-    )
+    class FakeSession:
+        def append(self, payload: Any, *, producer: Any) -> EventRef:
+            del producer
+            captured.append(payload)
+            return MagicMock(name="SessionRef")
 
-    bus.subscribe(
-        plugin=ConsoleProjectorSubscriber,
-        category=Category.TEAM_DELEGATION_CACHE_HIT,
-        on_event=lambda p, r: received.append(p),
-    )
-
+    token = set_publish_session(FakeSession())
     try:
         state = _state_with_hit_result(_state())
         spec = DelegationSpec(target_role="analyst", subtask="汇总")
         observation = cached_delegation_observation(spec, state)
     finally:
+        reset_publish_session(token)
         EventBus.reset_singleton()
 
     assert isinstance(observation, Observation)
-    assert len(received) == 1
+    assert len(captured) == 1
+    assert isinstance(captured[0], TeamDelegationCacheHit)
 
 
 def test_unauthorized_plugin_class_cannot_publish() -> None:
@@ -124,6 +150,7 @@ def test_unauthorized_plugin_class_cannot_publish() -> None:
         pass
 
     from lca_kernel.events.test_catalog import build_test_bus
+
     bus = build_test_bus()
     EventBus.set_default(bus)
     try:

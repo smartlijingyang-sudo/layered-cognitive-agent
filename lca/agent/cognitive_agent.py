@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from collections.abc import Awaitable, Callable
 
 from lca.contracts.mechanisms import Hook
@@ -62,6 +63,7 @@ class CognitiveAgent(AgentUnit):
         max_steps: int = DEFAULT_MAX_STEPS,
         max_wall_clock_seconds: int | None = None,
         plan_ref: str = "",
+        event_session_binder: object | None = None,
     ) -> None:
         self.runtime = runtime
         self.role_profile = role_profile
@@ -69,6 +71,8 @@ class CognitiveAgent(AgentUnit):
         self.max_steps = max_steps
         self.max_wall_clock_seconds = max_wall_clock_seconds
         self._plan_ref = plan_ref
+        # Composition-injected ADR-0186 run binder; None → publish fail-loud.
+        self._event_session_binder = event_session_binder
 
     @property
     def observability(self) -> BoundObservability:
@@ -79,6 +83,11 @@ class CognitiveAgent(AgentUnit):
     def plan_ref(self) -> str:
         """Immutable plan associated with this agent, if it was plan-bound."""
         return self._plan_ref
+
+    @property
+    def event_session_binder(self) -> object | None:
+        """Optional run-boundary Session binder from composition root."""
+        return self._event_session_binder
 
     async def run(
         self,
@@ -140,16 +149,51 @@ class CognitiveAgent(AgentUnit):
         but must not omit the durable start/resume/finish facts that make its
         model-visible work and recovery path auditable.
         """
+        iteration_kind = "resume" if resumed_snapshot is not None else "fresh"
+        iteration_trace_id = scope.trace_id or (
+            resumed_snapshot.trace_id if resumed_snapshot else ""
+        )
+
+        binder = self._event_session_binder
+        bound_cm = (
+            binder.bound(scope.run_id)  # type: ignore[union-attr]
+            if binder is not None and hasattr(binder, "bound")
+            else contextlib.nullcontext()
+        )
+
+        with bound_cm:
+            return await self._run_lifecycle_body(
+                objective=objective,
+                ctx=ctx,
+                role=role,
+                top_level=top_level,
+                scope=scope,
+                execute=execute,
+                resumed_snapshot=resumed_snapshot,
+                iteration_kind=iteration_kind,
+                iteration_trace_id=iteration_trace_id,
+            )
+
+    async def _run_lifecycle_body(
+        self,
+        *,
+        objective: str,
+        ctx: RunContext | None,
+        role: str,
+        top_level: bool,
+        scope: RunScope,
+        execute: Callable[[], Awaitable[Result]],
+        resumed_snapshot: StateSnapshot | None,
+        iteration_kind: str,
+        iteration_trace_id: str,
+    ) -> Result:
+        """Emit + execute inside an already-bound (or intentionally unbound) Session."""
         # PR-3.1: spine envelope for the agent_loop.iteration execution point.
         from lca.plugins.events.publishers.spine_reflector_agent_spawn import (
             emit_agent_loop_iteration_end,
             emit_agent_loop_iteration_start,
         )
 
-        iteration_kind = "resume" if resumed_snapshot is not None else "fresh"
-        iteration_trace_id = scope.trace_id or (
-            resumed_snapshot.trace_id if resumed_snapshot else ""
-        )
         emit_agent_loop_iteration_start(
             trace_id=iteration_trace_id,
             role=role,

@@ -141,6 +141,7 @@ def promote_lead(lead: CognitiveAgent, policy: BudgetPolicy) -> CognitiveAgent:
         max_steps=limits.max_steps,
         max_wall_clock_seconds=limits.max_wall_clock_seconds,
         plan_ref=lead.plan_ref,
+        event_session_binder=lead.event_session_binder,
     )
 
 
@@ -154,6 +155,8 @@ def _agent_from_bound_graph(
 ) -> CognitiveAgent:
     """Close the plan-bound complete AgentGraph into a CognitiveAgent."""
 
+    from lca.plugins.session.runtime.bind import event_session_binder_from_scope
+
     runtime = assemble_runtime_from_graph(spec, graph, plan=plan, scope=scope)
     return CognitiveAgent(
         runtime,
@@ -162,6 +165,7 @@ def _agent_from_bound_graph(
         max_steps=spec.max_steps,
         max_wall_clock_seconds=spec.max_wall_clock_seconds,
         plan_ref=plan_ref,
+        event_session_binder=event_session_binder_from_scope(scope),
     )
 
 

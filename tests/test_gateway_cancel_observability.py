@@ -11,9 +11,21 @@ import pytest
 
 from lca.agent.cognitive_agent import CognitiveAgent
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
+from lca.plugins.session.runtime.bind import EventSessionBinder
+from lca.plugins.session.runtime.store import SessionStore
 from lca.plugins.transport.webserver.handlers.runs.execute import create_run_session, schedule_run
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunStatus
+from lca_kernel.events.bus import EventBus
+from lca_kernel.events.test_catalog import build_test_bus
 from tests.support.gateway_scripted import ScriptedLLMResolver
+
+
+@pytest.fixture(autouse=True)
+def _test_event_bus() -> None:
+    bus = build_test_bus()
+    EventBus.set_default(bus)
+    yield
+    EventBus.reset_singleton()
 
 
 @pytest.fixture(autouse=True)
@@ -51,7 +63,10 @@ class _LazyHubAgent:
 
     async def run(self, objective: str) -> Any:
         hub = self._session.hub
-        self._inner = CognitiveAgent(_HangRuntime(), _role(), hub)  # type: ignore[arg-type]
+        self._inner = CognitiveAgent(
+            _HangRuntime(), _role(), hub,  # type: ignore[arg-type]
+            event_session_binder=EventSessionBinder(SessionStore()),
+        )
         return await self._inner.run(objective)
 
 

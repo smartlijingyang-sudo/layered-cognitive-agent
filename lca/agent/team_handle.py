@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+import contextlib
+
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.message import AgentMessage, agent_message_as_text
 from lca.contracts.models.core.result import Result
@@ -40,12 +42,14 @@ class TeamHandle(TeamUnit):
         observability: BoundObservability,
         members: tuple[AgentUnit, ...],
         lead: AgentUnit | None = None,
+        event_session_binder: object | None = None,
     ) -> None:
         self._strategy = strategy
         self._profile = profile
         self._observability = observability
         self.members = members
         self.lead = lead
+        self._event_session_binder = event_session_binder
 
     async def run(self, objective: str | AgentMessage) -> Result:
         text = (
@@ -66,7 +70,34 @@ class TeamHandle(TeamUnit):
 
         iteration_trace_id = scope.trace_id
         iteration_role = f"team:{self._profile.team_id}"
-        emit_agent_loop_iteration_start(
+
+        binder = self._event_session_binder
+        bound_cm = (
+            binder.bound(scope.run_id)  # type: ignore[union-attr]
+            if binder is not None and hasattr(binder, "bound")
+            else contextlib.nullcontext()
+        )
+
+        with bound_cm:
+            return await self._run_body(
+                text,
+                scope,
+                iteration_trace_id,
+                iteration_role,
+                emit_agent_loop_iteration_start,
+                emit_agent_loop_iteration_end,
+            )
+
+    async def _run_body(
+        self,
+        text: str,
+        scope: object,
+        iteration_trace_id: str,
+        iteration_role: str,
+        emit_agent_loop_iteration_start: object,
+        emit_agent_loop_iteration_end: object,
+    ) -> Result:
+        emit_agent_loop_iteration_start(  # type: ignore[operator]
             trace_id=iteration_trace_id,
             role=iteration_role,
             iteration_kind="fresh",
