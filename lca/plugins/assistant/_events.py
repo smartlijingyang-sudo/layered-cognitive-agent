@@ -1,6 +1,7 @@
 """助理域 EP payload 与发射契约（ADR-0187 §3 D8）。
 
-PR-3 落 ``assistant.created``；PR-8 落 evolve / jobs 四面：
+PR-3 落 ``assistant.created``；PR-6 落 ``assistant.skill.installed`` /
+``assistant.skill.activated``；PR-8 落 evolve / jobs 四面：
 ``assistant.skill.evolved.proposed`` / ``assistant.skill.evolved.promoted``
 / ``assistant.job.registered`` / ``assistant.job.fired``。
 
@@ -19,8 +20,10 @@ __all__ = [
     "AssistantCreatedEventPayload",
     "AssistantJobFiredEventPayload",
     "AssistantJobRegisteredEventPayload",
+    "AssistantSkillActivatedEventPayload",
     "AssistantSkillEvolvedPromotedEventPayload",
     "AssistantSkillEvolvedProposedEventPayload",
+    "AssistantSkillInstalledEventPayload",
 ]
 
 
@@ -197,4 +200,82 @@ class AssistantJobFiredEventPayload:
         payload["job_id"] = self.job_id
         payload["work_item_id"] = self.work_item_id
         payload["trigger_id"] = self.trigger_id
+        return payload
+
+
+@dataclass(frozen=True)
+class AssistantSkillInstalledEventPayload:
+    """``assistant.skill.installed`` EP payload（ADR-0187 §3 D8 + D9）。
+
+    发射时机：0067 三闸通过、包落盘 ``{home}/skills/`` 且 manifest
+    修订写盘之后（先写盘后发事件;失败不补发）。只记元数据
+    （id / digest / actor / state）,**不**携带 SKILL 全文。
+    """
+
+    assistant_id: str
+    revision_seq: int
+    manifest_digest: str
+    actor: str
+    skill_id: str
+    skill_digest: str
+    artifact_state: str
+    source: str = ""
+    version: str = ""
+    installed_at: str = ""
+
+    def __post_init__(self) -> None:
+        _validate_required_fields(self, "AssistantSkillInstalledEventPayload")
+        if not self.skill_id or not self.skill_id.strip():
+            raise ValueError("AssistantSkillInstalledEventPayload.skill_id 必须为非空字符串")
+        if not self.skill_digest or not self.skill_digest.strip():
+            raise ValueError("AssistantSkillInstalledEventPayload.skill_digest 必须为非空内容摘要")
+        if not self.artifact_state or not self.artifact_state.strip():
+            raise ValueError("AssistantSkillInstalledEventPayload.artifact_state 必须为非空状态值")
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = _required_dict(self)
+        payload["skill_id"] = self.skill_id
+        payload["skill_digest"] = self.skill_digest
+        payload["artifact_state"] = self.artifact_state
+        if self.source:
+            payload["source"] = self.source
+        if self.version:
+            payload["version"] = self.version
+        if self.installed_at:
+            payload["installed_at"] = self.installed_at
+        return payload
+
+
+@dataclass(frozen=True)
+class AssistantSkillActivatedEventPayload:
+    """``assistant.skill.activated`` EP payload（ADR-0187 §3 D8）。
+
+    activate 是 run 级事实：不写 Home、不触发 ``revision_seq`` 变化；
+    ``revision_seq`` / ``manifest_digest`` 取事件时刻 Home manifest 快照。
+    """
+
+    assistant_id: str
+    revision_seq: int
+    manifest_digest: str
+    actor: str
+    skill_id: str
+    activation_id: str
+    artifact_state: str = ""
+    activated_at: str = ""
+
+    def __post_init__(self) -> None:
+        _validate_required_fields(self, "AssistantSkillActivatedEventPayload")
+        if not self.skill_id or not self.skill_id.strip():
+            raise ValueError("AssistantSkillActivatedEventPayload.skill_id 必须为非空字符串")
+        if not self.activation_id or not self.activation_id.strip():
+            raise ValueError("AssistantSkillActivatedEventPayload.activation_id 必须为非空字符串")
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = _required_dict(self)
+        payload["skill_id"] = self.skill_id
+        payload["activation_id"] = self.activation_id
+        if self.artifact_state:
+            payload["artifact_state"] = self.artifact_state
+        if self.activated_at:
+            payload["activated_at"] = self.activated_at
         return payload

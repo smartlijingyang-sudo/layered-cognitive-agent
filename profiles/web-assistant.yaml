@@ -21,10 +21,11 @@
 #       config: { assistants_root: ~/.lca/assistants }
 #       兜底当 LCA_ASSISTANTS_ROOT 未设置时,落到用户数据盘默认路径。
 #
-# 启用后 plugin 列表新增 3 个:
+# 启用后 plugin 列表新增 4 个:
 #   - lca.plugins.assistant.catalog
 #   - lca.plugins.assistant.bootstrap
 #   - lca.plugins.assistant.workspace
+#   - lca.plugins.assistant.skill_overlay(PR-6 增量)
 # 验证: ``tests/architecture/test_assistant_runtime_invariants.py::TestWebAssistantProfileContains
 # AssistantPlugins`` 静态扫描 + ``resolve_profile('profiles/web-assistant.yaml')`` 双重锁。
 

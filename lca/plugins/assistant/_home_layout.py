@@ -141,9 +141,16 @@ def build_manifest(
     revision_seq: int,
     home: Path,
     created_at: str | None = None,
+    extra_digests: Mapping[str, str] | None = None,
 ) -> dict[str, object]:
-    """构造 manifest dict;manifest_digest 是 ``digests`` 序列化后的 sha256。"""
-    digests = compute_digests(home)
+    """构造 manifest dict;manifest_digest 是 ``digests`` 序列化后的 sha256。
+
+    ``extra_digests`` 合并进配置面 ``digests``(同名键以配置面重算值优先),
+    供 skills 索引等非 ``CONFIG_FACE_FILES`` 的配置面条目进入
+    manifest_digest 覆盖(digest SSOT 单点,ADR-0187 §3 D2)。
+    """
+    digests = dict(extra_digests or {})
+    digests.update(compute_digests(home))
     canonical = json.dumps(digests, sort_keys=True).encode()
     manifest_digest = f"sha256:{hashlib.sha256(canonical).hexdigest()}"
     return {

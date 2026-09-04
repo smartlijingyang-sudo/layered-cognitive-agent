@@ -191,14 +191,18 @@ def test_patch_assistant_profile_returns_501_when_catalog_missing() -> None:
     assert response.json()["error"]["code"] == "catalog_unavailable"
 
 
-def test_install_skill_returns_501_when_overlay_missing() -> None:
+def test_install_skill_returns_503_when_overlay_missing() -> None:
+    """PR-6: overlay capability 不在场 ⇒ 503 ``skill_overlay_unavailable``。"""
     plugin, router, ctx = _setup_plugin()
     _run_plugin_setup(plugin, ctx)
     app = _app_with_routes(router)
     client = TestClient(app)
-    response = client.post("/v1/assistants/asst_1/skills:install", json={"source": "url:foo"})
-    assert response.status_code == 501
-    assert response.json()["error"]["code"] == "catalog_unavailable"
+    response = client.post(
+        "/v1/assistants/asst_1/skills:install",
+        json={"source": {"url": "https://example.com/s.md"}},
+    )
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "skill_overlay_unavailable"
 
 
 def test_retire_assistant_returns_501_when_catalog_missing() -> None:
@@ -248,6 +252,139 @@ def test_fire_assistant_job_returns_501_when_jobs_missing() -> None:
     response = client.post("/v1/assistants/asst_1/jobs/daily_brief:fire")
     assert response.status_code == 501
     assert response.json()["error"]["code"] == "jobs_unavailable"
+# ── PR-6: install handler wired behavior ─────────────────────────────
+
+
+class _FakeOverlay:
+    """Programmable stand-in for ``AssistantSkillOverlay`` on ``app.state``."""
+
+    def __init__(self, *, outcome: str = "ok") -> None:
+        self.outcome = outcome
+        self.calls: list[tuple[str, Any, str]] = []
+
+    async def install(self, assistant_id: str, source: Any, *, actor: str = "system") -> Any:
+        self.calls.append((assistant_id, source, actor))
+        if self.outcome == "import_error":
+            from lca.contracts.protocols.memory.operational_skills import SkillImportError
+
+            raise SkillImportError("invariant 闸失败: 资源数超过上限")
+        if self.outcome == "not_found":
+            from lca.plugins.assistant.catalog import AssistantCatalogError
+
+            raise AssistantCatalogError("assistant home 不存在")
+        if self.outcome == "digest_mismatch":
+            from lca.plugins.assistant.catalog import AssistantDigestMismatch
+
+            raise AssistantDigestMismatch("digest mismatch")
+        from lca.contracts.protocols.assistant.skill_overlay import SkillInstallReceipt
+
+        return SkillInstallReceipt(
+            assistant_id=assistant_id,
+            skill_id="demo-skill",
+            version="1.0.0",
+            digest="sha256:abc",
+            artifact_state="verified",
+            installed_at="2026-09-04T00:00:00Z",
+            revision_seq=1,
+            manifest_digest="sha256:def",
+            actor=actor,
+            source=source.reference,
+            install_path=f"/home/{assistant_id}/skills/demo-skill",
+        )
+
+
+def _app_with_overlay(overlay: Any) -> TestClient:
+    """Materialise routes with ``app.state.assistant_skill_overlay`` set."""
+    plugin, router, ctx = _setup_plugin()
+    _run_plugin_setup(plugin, ctx)
+    app = _app_with_routes(router)
+    app.state.assistant_skill_overlay = overlay
+    return TestClient(app)
+
+
+def test_install_skill_success_returns_receipt() -> None:
+    client = _app_with_overlay(_FakeOverlay())
+    response = client.post(
+        "/v1/assistants/asst_1/skills:install",
+        json={"source": {"url": "https://example.com/s.md"}, "actor": "user:demo"},
+    )
+    assert response.status_code == 200
+    receipt = response.json()["receipt"]
+    assert receipt["skill_id"] == "demo-skill"
+    assert receipt["artifact_state"] == "verified"
+    assert receipt["revision_seq"] == 1
+    assert receipt["manifest_digest"] == "sha256:def"
+    assert receipt["actor"] == "user:demo"
+
+
+def test_install_skill_bare_url_string_source_accepted() -> None:
+    overlay = _FakeOverlay()
+    client = _app_with_overlay(overlay)
+    response = client.post(
+        "/v1/assistants/asst_1/skills:install",
+        json={"source": "https://example.com/s.md"},
+    )
+    assert response.status_code == 200
+    _assistant_id, source, _actor = overlay.calls[0]
+    assert source.url == "https://example.com/s.md"
+
+
+def test_install_skill_rejected_maps_to_422() -> None:
+    client = _app_with_overlay(_FakeOverlay(outcome="import_error"))
+    response = client.post(
+        "/v1/assistants/asst_1/skills:install",
+        json={"source": {"url": "https://example.com/s.md"}},
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "install_rejected"
+
+
+def test_install_skill_unknown_assistant_maps_to_404() -> None:
+    client = _app_with_overlay(_FakeOverlay(outcome="not_found"))
+    response = client.post(
+        "/v1/assistants/asst_x/skills:install",
+        json={"source": {"local_path": "/tmp/pkg"}},  # noqa: S108 - test fixture
+    )
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "assistant_not_found"
+
+
+def test_install_skill_digest_mismatch_maps_to_409() -> None:
+    client = _app_with_overlay(_FakeOverlay(outcome="digest_mismatch"))
+    response = client.post(
+        "/v1/assistants/asst_1/skills:install",
+        json={"source": {"url": "https://example.com/s.md"}},
+    )
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "digest_mismatch"
+
+
+def test_install_skill_invalid_source_shape_maps_to_400() -> None:
+    client = _app_with_overlay(_FakeOverlay())
+    response = client.post(
+        "/v1/assistants/asst_1/skills:install",
+        json={"source": {"url": "ftp://bad", "local_path": "/x"}},
+    )
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_source"
+
+
+def test_install_skill_missing_source_maps_to_400() -> None:
+    client = _app_with_overlay(_FakeOverlay())
+    response = client.post("/v1/assistants/asst_1/skills:install", json={})
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_source"
+
+
+def test_install_skill_invalid_json_maps_to_400() -> None:
+    client = _app_with_overlay(_FakeOverlay())
+    response = client.post(
+        "/v1/assistants/asst_1/skills:install",
+        content=b"{not-json",
+        headers={"content-type": "application/json"},
+    )
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_json"
 
 
 # ── Plugin manifest / ADR contract ────────────────────────────────────

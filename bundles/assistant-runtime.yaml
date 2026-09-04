@@ -1,15 +1,17 @@
 # bundles/assistant-runtime.yaml — Assistant domain opt-in bundle (ADR-0187 §3 D6 + §7 PR-4).
 #
-# 助理域 plugin 集合：catalog（Home CRUD）+ bootstrap（配置面投影）+ workspace（ExecutionSpace 物化）。
-# skill_overlay / jobs / evolve 由 PR-6/8 落，本 bundle 不预挂空壳。
+# 助理域 plugin 集合：catalog（Home CRUD）+ bootstrap（配置面投影）+
+# workspace（ExecutionSpace 物化）+ skill_overlay（0048/0067 安装激活）。
+# jobs / evolve 由 PR-8 落，本 bundle 不预挂空壳。
 #
 # **opt-in**：默认 profile（web-standard.yaml）不 include 本 bundle；
 # 助理用户显式启用 = `profiles/web-assistant.yaml` = web-standard + assistant-runtime。
 #
 # 依赖关系（plugin Manifest requires→provides）：
-#   - assistant.bootstrap  →  requires assistant.catalog
-#   - assistant.workspace →  requires assistant.catalog
-#   两条线都消费 catalog；cordis DAG 自动按 requires→provides 排序，
+#   - assistant.bootstrap    → requires assistant.catalog
+#   - assistant.workspace    → requires assistant.catalog
+#   - assistant.skill_overlay → requires assistant.catalog
+#   三条线都消费 catalog；cordis DAG 自动按 requires→provides 排序，
 # YAML 行顺序不参与 boot 顺序。
 
 entries:
@@ -36,4 +38,10 @@ entries:
   - id: lca.plugins.assistant.workspace
     name: lca_plugins_assistant_workspace
     $module: lca.plugins.assistant.workspace
+    config: {}
+
+  # ── PR-6: 助理域 skill overlay(0048 拉取 + 0067 三闸) ──────────
+  - id: lca.plugins.assistant.skill_overlay
+    name: lca_plugins_assistant_skill_overlay
+    $module: lca.plugins.assistant.skill_overlay
     config: {}

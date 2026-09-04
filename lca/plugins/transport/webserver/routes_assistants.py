@@ -23,20 +23,21 @@ Routes:
 - ``GET  /v1/assistants/{assistant_id}`` …… ``catalog.get``
 - ``PATCH /v1/assistants/{assistant_id}/profile`` …… ``catalog.revise_profile``
 - ``POST /v1/assistants/{assistant_id}/skills:install`` …… ``overlay.install``
+  (PR-6 wired: 503 when overlay absent, 4xx on rejection, 200 + receipt)
 - ``POST /v1/assistants/{assistant_id}/retire`` …… ``catalog.retire``
 - ``GET  /v1/assistants/{assistant_id}/jobs`` …… ``jobs.list_jobs``
 - ``POST /v1/assistants/{assistant_id}/jobs`` …… ``jobs.register``
 - ``POST /v1/assistants/{assistant_id}/jobs/{job_id}:fire`` …… ``jobs.fire``
 
-The handler body returns a stable JSON envelope with status code 501 and a
-``code="catalog_unavailable"`` field whenever the catalog is missing. The
-same envelope is returned for unknown ``assistant_id`` (404) once the
-catalog is present; both honour ADR-0187 §3 D7 "fail-closed 4xx, no silent
-fallback to default agent".
+The catalog handler bodies return a stable JSON envelope with status code
+501 and a ``code="catalog_unavailable"`` field whenever the catalog is
+missing. Both honour ADR-0187 §3 D7 "fail-closed 4xx, no silent fallback
+to default agent".
 """
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Any
 
 from starlette.requests import Request
@@ -58,9 +59,15 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.protocols.assistant.skill_overlay import SkillSource
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.memory.operational_skills import SkillImportError
 from lca.contracts.routing import RouteSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.assistant.catalog import (
+    AssistantCatalogError,
+    AssistantDigestMismatch,
+)
 from lca.plugins.transport.webserver.handlers.cors import CORS_HEADERS
 from lca.plugins.transport.webserver.route_register import register_routes
 
@@ -114,7 +121,11 @@ def _catalog_from_request(request: Request) -> Any | None:
 
 
 def _skill_overlay_from_request(request: Request) -> Any | None:
-    """Return the skill-overlay handle from ``app.state`` (PR-6)."""
+    """Return the skill-overlay handle from ``app.state``, else ``None``.
+
+    ``assistant.skill_overlay`` 由 ``lca.plugins.assistant.skill_overlay``
+    (PR-6) provide;未挂助理 bundle 的 profile 取不到 ⇒ handler 回 503。
+    """
     state = getattr(request, "app", None)
     if state is None:
         return None
@@ -148,6 +159,43 @@ def _jobs_not_implemented(code: str, detail: str = "") -> JSONResponse:
     if detail:
         payload["error"]["detail"] = detail
     return _json(payload, status_code=501)
+def _error_envelope(
+    code: str,
+    *,
+    status_code: int,
+    error_type: str,
+    detail: str = "",
+) -> JSONResponse:
+    """Stable error envelope for the wired assistant handlers (PR-6)."""
+    payload: dict[str, Any] = {"error": {"code": code, "type": error_type}}
+    if detail:
+        payload["error"]["detail"] = detail
+    return _json(payload, status_code=status_code)
+
+
+def _parse_skill_source(raw: Any) -> SkillSource | None:
+    """body ``source`` → :class:`SkillSource`;不支持的形状返回 ``None``。
+
+    支持:``{"url": ...}`` / ``{"local_path": ...}`` 对象,或裸字符串
+    (``http(s)://`` 前缀 ⇒ url;绝对路径 ⇒ local_path)。
+    """
+    if isinstance(raw, dict):
+        try:
+            return SkillSource(
+                url=str(raw.get("url") or ""),
+                local_path=str(raw.get("local_path") or ""),
+            )
+        except ValueError:
+            return None
+    if isinstance(raw, str) and raw.strip():
+        text = raw.strip()
+        try:
+            if text.startswith(("http://", "https://")):
+                return SkillSource(url=text)
+            return SkillSource(local_path=text)
+        except ValueError:
+            return None
+    return None
 
 
 async def create_assistant(request: Request) -> JSONResponse:
@@ -191,10 +239,76 @@ async def revise_assistant_profile(request: Request) -> JSONResponse:
 
 
 async def install_assistant_skill(request: Request) -> JSONResponse:
-    """``POST /v1/assistants/{assistant_id}/skills:install`` —— ``overlay.install`` (PR-6)."""
-    if _skill_overlay_from_request(request) is None:
-        return _not_implemented("catalog_unavailable", "AssistantSkillOverlay.install")
-    return _not_implemented("catalog_pending", "PR-6 overlay handler not wired")
+    """``POST /v1/assistants/{assistant_id}/skills:install`` —— ``overlay.install`` (PR-6).
+
+    状态码契约(ADR-0187 §3 D7 fail-closed):
+
+    - overlay capability 不在场 ⇒ 503 ``skill_overlay_unavailable``;
+    - body 非法 / source 形状不支持 ⇒ 400;
+    - 助理不存在 ⇒ 404;配置面 digest 不匹配 ⇒ 409;
+    - 拉取 / 格式 / 0067 三闸拒收 ⇒ 422 ``install_rejected``;
+    - 成功 ⇒ 200 + ``SkillInstallReceipt``(含四件套字段)。
+    """
+    overlay = _skill_overlay_from_request(request)
+    if overlay is None:
+        return _error_envelope(
+            "skill_overlay_unavailable",
+            status_code=503,
+            error_type="service_unavailable",
+            detail="assistant.skill_overlay capability 不在已解析 profile 中",
+        )
+    assistant_id = str(request.path_params.get("assistant_id") or "")
+    try:
+        body = await request.json()
+    except (ValueError, OSError):
+        return _error_envelope("invalid_json", status_code=400, error_type="invalid_request")
+    if not isinstance(body, dict):
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail="body 必须是 JSON object",
+        )
+    source = _parse_skill_source(body.get("source"))
+    if source is None:
+        return _error_envelope(
+            "invalid_source",
+            status_code=400,
+            error_type="invalid_request",
+            detail="source 必须为 {'url': ...} / {'local_path': ...} 或等价裸字符串",
+        )
+    actor = str(body.get("actor") or "").strip() or "system"
+    try:
+        receipt = await overlay.install(assistant_id, source, actor=actor)
+    except AssistantDigestMismatch as exc:
+        return _error_envelope(
+            "digest_mismatch",
+            status_code=409,
+            error_type="conflict",
+            detail=str(exc),
+        )
+    except AssistantCatalogError as exc:
+        return _error_envelope(
+            "assistant_not_found",
+            status_code=404,
+            error_type="not_found",
+            detail=str(exc),
+        )
+    except SkillImportError as exc:
+        return _error_envelope(
+            "install_rejected",
+            status_code=422,
+            error_type="validation_failed",
+            detail=str(exc),
+        )
+    except ValueError as exc:
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail=str(exc),
+        )
+    return _json({"receipt": dataclasses.asdict(receipt)}, status_code=200)
 
 
 async def retire_assistant(request: Request) -> JSONResponse:
