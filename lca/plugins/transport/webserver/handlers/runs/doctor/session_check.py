@@ -53,7 +53,27 @@ def diagnose_session_projection(
     else:
         h6 = HopVerdict(ok=None, detail="output not applicable before completion")
     h7 = HopVerdict(ok=None, detail="tool effectiveness is not exposed by projection")
-    hops = {"H1": h1, "H2": h2, "H3": h3, "H4": h4, "H5": h5, "H6": h6, "H7": h7}
+    h8 = HopVerdict(ok=None, detail="not evaluated (session spine mode)")
+    h_seg = HopVerdict(ok=None, detail="not evaluated")
+    h_phase = HopVerdict(ok=None, detail="not evaluated")
+    h_xref = HopVerdict(ok=None, detail="not evaluated")
+    h_ssot = HopVerdict(ok=None, detail="not evaluated")
+    h_mv = HopVerdict(ok=None, detail="not evaluated")
+    hops = {
+        "H1": h1,
+        "H2": h2,
+        "H3": h3,
+        "H4": h4,
+        "H5": h5,
+        "H6": h6,
+        "H7": h7,
+        "H8": h8,
+        "H-seg": h_seg,
+        "H-phase": h_phase,
+        "H-xref": h_xref,
+        "H-ssot": h_ssot,
+        "H-mv-journal": h_mv,
+    }
     broken = next((name for name, hop in hops.items() if hop.ok is False), None)
     summary = "ok" if broken is None else hops[broken].detail or "session diagnostic failed"
     return DoctorReport(
