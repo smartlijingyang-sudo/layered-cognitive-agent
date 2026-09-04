@@ -277,7 +277,7 @@ events:
       reason: str
       previous_header_digest: str
     publishers:
-      - events.spine.reflector.body_llm
+      - events.model_visible.publisher
 
   - category: spine.llm.request.header.assistant
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -291,7 +291,7 @@ events:
       usage: json
       header_digest: str
     publishers:
-      - events.spine.reflector.body_llm
+      - events.model_visible.publisher
 
   # ── Exception（PR-3）─────────────────────────────────────────
   - category: spine.exception.caught

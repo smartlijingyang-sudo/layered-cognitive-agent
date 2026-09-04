@@ -42,6 +42,11 @@ entries:
     $module: lca.plugins.events.publishers.spine_reflector_body_llm.plugin
     config: {}
 
+  - id: events.model_visible.publisher
+    name: events_model_visible_publisher
+    $module: lca.plugins.events.publishers.model_visible.publisher
+    config: {}
+
   - id: events.spine.reflector.runtime
     name: events_spine_reflector_runtime
     $module: lca.plugins.events.publishers.spine_reflector_runtime.plugin
