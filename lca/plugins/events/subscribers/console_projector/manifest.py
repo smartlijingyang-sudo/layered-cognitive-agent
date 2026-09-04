@@ -62,17 +62,27 @@ class _Config(BaseModel):
     marker_class=ConsoleProjectorSubscriber,
 )
 async def setup(ctx: PluginContext, config: _Config) -> None:
-    """Console projector subscriber boot：marker class 已在 catalog。
+    """Console projector subscriber boot — Session.observe 优先；缺席回退订阅。
 
-    注：原 setup 会自动订阅 EventBus 所有 category,本 manifest 保留该行为
-    以保证 ``lca.application.spawn`` 路径下 ConsoleProjectorSubscriber 可被 discover。
+    PR-3f-sample:observer 优先经
+    :func:`lca.plugins.events._session_observe.register_as_session_observer`
+    注册到 Session 观察面;Session 未装载时回退按 yaml 白名单逐条
+    ``bus.subscribe``(marker class 已在 catalog,``lca.application.spawn``
+    路径下 ConsoleProjectorSubscriber 可被 discover)。
     """
+    from lca.plugins.events._session_observe import register_as_session_observer
     from lca_kernel.events.bus import EventBus
 
-    from lca_kernel.events.bus import EventBus as _EB; bus_obj = ctx.soft_get("event.bus") or _EB.default()
+    subscriber = ConsoleProjectorSubscriber()
+    if register_as_session_observer(SUBSCRIBER_PLUGIN_CLASS, subscriber.on_event):
+        ctx.provide("event.subscriber.console_projector", subscriber)
+        return
+
+    # COMPAT(delete-when: Session.observe 机制落地且 console projector 全迁,本文件
+    # rg "bus_obj.subscribe" = 0;tracking: ADR-0183 后续 PR-3f-sample)
+    bus_obj = ctx.soft_get("event.bus") or EventBus.default()
     if not isinstance(bus_obj, EventBus):
         return
-    subscriber = ConsoleProjectorSubscriber()
     for spec in bus_obj.registry.specs:
         bus_obj.subscribe(
             plugin=SUBSCRIBER_PLUGIN_CLASS,

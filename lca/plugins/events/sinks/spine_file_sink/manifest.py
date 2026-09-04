@@ -57,15 +57,24 @@ class _Config(BaseModel):
     marker_class=SINK_PLUGIN_CLASS,
 )
 async def setup(ctx: PluginContext, config: _Config) -> None:
-    """SpineFileSink boot — ADR-0184 PR-2:走 mount_sink 不再绕道 subscribe。
+    """SpineFileSink boot — Session.observe 优先；缺席回退 mount_sink。
 
-    老路径 ``bus.subscribe(category=..., on_event=sink, failure=FAIL_FAST)``
-    把 sink 当 callback 注册,绕过了 :class:`lca_kernel.events.sinks.SinkBackend`
-    Protocol(SyncBus 只走 _fanout 路径而非 _dispatch_sinks);新路径 ``mount_sink``
-    直接挂 :class:`lca_kernel.events.sinks.SinkBackend`,让
-    :meth:`lca_kernel.events.bus.EventBus._dispatch_sinks` 在 publish 时把它
+    PR-3f-sample:sink callback 入口优先经
+    :func:`lca.plugins.events._session_observe.register_as_session_observer`
+    注册到 Session 观察面;Session 未装载时回退 ``EventBus.mount_sink``
+    (ADR-0184 PR-2 wire):直接挂 :class:`lca_kernel.events.sinks.SinkBackend`,
+    让 :meth:`lca_kernel.events.bus.EventBus._dispatch_sinks` 在 publish 时
     派发给 build_record(SpineEventRecord)+ sink.append 链。
     """
+    from lca.plugins.events._session_observe import register_as_session_observer
+
+    sink = SpineFileSink()
+    if register_as_session_observer(SINK_PLUGIN_CLASS, sink):
+        ctx.provide("event.sink.spine_file", sink)
+        return
+
+    # COMPAT(delete-when: Session.observe 机制落地且 spine sink 全迁,本文件
+    # rg "mount_sink" = 0;tracking: ADR-0183 后续 PR-3f-sample)
     from lca_kernel.events.bus import EventBus
     from lca_kernel.events.hooks import FailureSemantics
 
@@ -73,7 +82,6 @@ async def setup(ctx: PluginContext, config: _Config) -> None:
     if not isinstance(bus_obj, EventBus):
         msg = "event.sink.spine_file boot 失败：event.bus 未装载"
         raise RuntimeError(msg)
-    sink = SpineFileSink()
     # COMPAT(delete-when: PR-3 cursor 完全迁 EventBus.publish_async,所有 spine category
     # 经 _dispatch_sinks 统一落盘后;tracking: ADR-0184 PR-2;45 天窗口)
     bus_obj.mount_sink(
