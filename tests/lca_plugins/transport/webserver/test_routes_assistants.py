@@ -418,12 +418,18 @@ def test_routes_assistants_plugin_does_not_require_catalog_at_boot() -> None:
 
 
 def test_routes_assistants_provides_route_seam() -> None:
-    """Plugin provides ``webserver.routes.assistants`` capability."""
+    """Routes plugins declare no capability provides.
+
+    与 routes_device / routes_runs_sessions 等同级插件一致：路由插件把
+    RouteSpec 注册进 ``route_registry``，不 ``ctx.provide`` capability；
+    ``provides`` 声明而不在 setup 兑现会被 boot 审计拒收
+    （missing_provide）。
+    """
     from lca.plugins.transport.webserver.routes_assistants import setup as plugin
 
     defn = plugin._lca_definition
     provided = set(defn.provided_capability_keys)
-    assert "webserver.routes.assistants" in provided
+    assert provided == set()
 
 
 # ── Marker / COMPAT hygiene ───────────────────────────────────────────
