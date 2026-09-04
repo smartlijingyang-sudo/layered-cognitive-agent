@@ -52,12 +52,24 @@ load 阶段只做"尽可能多解析 + 收集诊断"。
 `_async_wrapper` / `_sync_wrapper` 的所有 `emit_transport_route_*` 调用
 改为走 `_safe_emit(execution_point, **kwargs)`。失败仅捕获
 `lca_kernel.events.errors.EventMechanismError` 族（`UnauthorizedPublishError`
-/ `EventNoSinkError` / 等），不裸 `Exception`。失败时 `log.warning` +
-递增 `_trace_emit_failures[execution_point]` 计数（模块级 dict，测试 /
-监控可通过 `trace_emit_failures()` 读快照），handler 继续返回业务结果。
+/ `EventNoSinkError` / `MissingPublishSessionError` / 等），不裸
+`Exception`。失败时 `log.warning` + 递增 `_trace_emit_failures[execution_point]`
+计数（模块级 dict，测试 / 监控可通过 `trace_emit_failures()` 读快照），
+handler 继续返回业务结果。
 
 非 `EventMechanismError` 异常照常上抛，代码 bug（`AttributeError` /
 `TypeError` 等）不被吞。
+
+`publish_via_session` 无 active Session 时抛 `MissingPublishSessionError`
+（E7，属 `EventMechanismError`），不再抛裸 `RuntimeError`。这样 carrier
+面 `/health` 等无 run Session 的路由不会被装饰性 trace 拖成 500；业务
+publish 路径仍 fail-loud。
+
+### 6. `http_ready` 以 2xx/3xx 判 ready
+
+`lca.infrastructure.cli.service.http_ready` 读 `curl -w %{http_code}`，
+仅 `200 <= code < 400` 为 True。4xx/5xx（含 `/health` 500）不得把
+`kernel_serve` 标成 healthy。
 
 ### 5. yaml 129 处 token 短形式 → 点分
 
@@ -72,17 +84,22 @@ load 阶段只做"尽可能多解析 + 收集诊断"。
 | `lca_kernel/events/registry.py` | `+validate_publisher_authorization` / `+check_manifest_emits_aligned`；`from_specs` 传 `strict=False` |
 | `lca/harness/profile/boot.py` | refresh() 后调 validate + check_manifest_emits_aligned；`_collect_marker_catalog` 返回 catalog + emits_by_id 双 tuple |
 | `lca/plugins/transport/webserver/route_register.py` | `_safe_emit` + `_trace_emit_failures` + `trace_emit_failures()`；`_instrument_route_handler` 全部 emit 走 `_safe_emit` |
+| `lca_kernel/events/errors.py` | `+MissingPublishSessionError`（E7） |
+| `lca/plugins/events/publishers/_session_publish.py` | 无 Session → `MissingPublishSessionError` |
+| `lca/infrastructure/cli/service.py` | `http_ready` 要求 2xx/3xx |
 | `lca_kernel/events/config/observability/spine.yaml` | 129 处 publisher token 下划线 → 点分（15 unique） |
 | `lca_kernel/events/test_catalog.py` | 15 个 catalog key 下划线 → 点分 |
 | `tests/lca_kernel/events/test_registry_authorization_drift.py` | 新建（7 个测试） |
-| `tests/transport/test_route_register_trace_is_decorative.py` | 新建（5 个测试） |
+| `tests/transport/test_route_register_trace_is_decorative.py` | 装饰性锁（含 MissingPublishSessionError） |
+| `tests/infrastructure/cli/test_http_ready.py` | `/health` 5xx 不得报 ready |
 | `scripts/check_events_catalog_consistency.py` | 新建（CI 门禁） |
 
 ## 失败模式不再有
 
 - yaml token miss → kernel boot 失败，错误信息含 category + token + 计数
 - plugin manifest emits 与 yaml 不一致 → kernel boot 失败，错误信息含 missing_publish
-- EventBus publish 失败 → 仅 log warning + 计数，handler 仍返回业务结果
+- EventBus publish / 无 Session publish 失败 → 仅 log warning + 计数，handler 仍返回业务结果
+- `/health` 500 时 `lca-ops status` 不再误报 kernel healthy
 - 代码 bug（非 EventMechanismError）→ fail-fast，不被吞
 
 ## 删除条件

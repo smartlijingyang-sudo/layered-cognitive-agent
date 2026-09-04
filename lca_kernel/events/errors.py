@@ -7,6 +7,7 @@
 - E4：yaml 中 category 与 contracts Category 闭集不一致 → UnknownCategoryError
 - E5：plugin 调 publish/subscribe 时未传 plugin_id → MissingPluginIdentityError
 - E6：持久 category 零挂载 sink 且投递策略为 strict（ADR-0184 I2）→ EventNoSinkError
+- E7：publish_via_session 时 ContextVar 无 active Session → MissingPublishSessionError
 
 PR-7：EventMechanism 已删除，但 ``EventMechanismError`` 类名保留作为
 公开错误基类（业务方已 import 该名）；新错误请直接继承该类。
@@ -26,6 +27,21 @@ class UnauthorizedPublishError(EventMechanismError):
         super().__init__(f"plugin {plugin_id!r} 未授权 publish category={category!r}")
         self.plugin_id = plugin_id
         self.category = category
+
+
+class MissingPublishSessionError(EventMechanismError):
+    """``publish_via_session`` 时当前上下文未绑定 Session。
+
+    须先 ``set_publish_session`` / run bind。属机制前置条件失败，不是
+    业务代码 bug；transport ``_safe_emit`` 等装饰性路径按
+    ``EventMechanismError`` 族吞掉，业务 publish 仍 fail-loud。
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            "publish_via_session requires an active Session; "
+            "bind via set_publish_session / run bind before publish"
+        )
 
 
 class UnauthorizedSubscribeError(EventMechanismError):
@@ -108,6 +124,7 @@ __all__ = [
     "EventMechanismError",
     "EventNoSinkError",
     "MissingPluginIdentityError",
+    "MissingPublishSessionError",
     "UnauthorizedPublishError",
     "UnauthorizedSubscribeError",
     "UnknownCategoryError",

@@ -242,19 +242,34 @@ def pid_on_port(port: int) -> int | None:
 
 
 def http_ready(url: str, timeout: float = 2.0) -> bool:
-    """Check if an HTTP endpoint is reachable.
+    """Check if an HTTP endpoint is ready (2xx/3xx).
 
-    Uses ``-sS`` (not ``-f``) so a 4xx/5xx still counts as "server is up".
+    4xx/5xx means the listener answered but is not ready — e.g. ``/health``
+    returning 500 must not report ``kernel_serve`` as healthy.
     """
     import subprocess
 
     try:
         r = subprocess.run(  # noqa: S603
-            ["curl", "-sS", "--max-time", str(timeout), "-o", "/dev/null", url],  # noqa: S607
+            [  # noqa: S607 — controlled argv, not user-provided
+                "curl",
+                "-sS",
+                "--max-time",
+                str(timeout),
+                "-o",
+                "/dev/null",
+                "-w",
+                "%{http_code}",
+                url,
+            ],
             capture_output=True,
             timeout=timeout + 1,
+            text=True,
         )
-        return r.returncode == 0
+        if r.returncode != 0:
+            return False
+        code = int((r.stdout or "").strip())
+        return 200 <= code < 400
     except Exception:
         # INTENTIONAL: HTTP 检查失败 → 回 False;这是 readiness probe,
         # caller 会重试或报错,不阻断启动流程。

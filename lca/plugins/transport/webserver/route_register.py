@@ -163,7 +163,8 @@ def _safe_emit(execution_point: str, **emit_kwargs: Any) -> None:
     """``emit_transport_route_*`` 的受限包装。
 
     仅吞掉 ``lca_kernel.events.errors.EventMechanismError`` 族
-    （UnauthorizedPublishError / EventNoSinkError / 等），其他异常上抛。
+    （UnauthorizedPublishError / EventNoSinkError /
+    MissingPublishSessionError / 等），其他异常上抛。
     失败时 ``log.warning`` + 递增 ``_trace_emit_failures`` 计数。
     """
     from lca.plugins.events.publishers.spine_reflector_transport import (

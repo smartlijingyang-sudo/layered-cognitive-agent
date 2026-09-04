@@ -1,7 +1,7 @@
 """publish_via_session helper 单测（ADR-0183）。
 
 helper 行为契约:
-1. 无 active Session 时 → RuntimeError(fail-loud;须 set_publish_session / run bind);
+1. 无 active Session 时 → MissingPublishSessionError(fail-loud;须 set_publish_session / run bind);
 2. 有 active Session 时 → Session.append(payload, producer=...),返回 Session 给的 EventRef;
 3. ContextVar set/reset 隔离:跨 token reset 行为正确;
 4. Session.append 拿到的 payload/producer 与调用方传入一致;
@@ -23,6 +23,7 @@ from lca.plugins.events.publishers._session_publish import (
     set_publish_session,
 )
 from lca_kernel.events.bus import EventBus
+from lca_kernel.events.errors import MissingPublishSessionError
 
 
 @pytest.fixture
@@ -67,13 +68,13 @@ def test_set_reset_publish_session_roundtrip() -> None:
 
 
 def test_publish_via_session_requires_bound_session() -> None:
-    """无 Session 时 → RuntimeError,不走 EventBus.publish。"""
+    """无 Session 时 → MissingPublishSessionError,不走 EventBus.publish。"""
     from lca.plugins.events.publishers.spine_reflector_cognition.plugin import (
         ReflectorClass,
     )
 
     assert current_publish_session() is None
-    with pytest.raises(RuntimeError, match="set_publish_session"):
+    with pytest.raises(MissingPublishSessionError, match="set_publish_session"):
         publish_via_session(
             _sp_payload("brain.perceive.start"),
             producer=ReflectorClass,

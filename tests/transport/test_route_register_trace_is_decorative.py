@@ -23,6 +23,7 @@ from lca.plugins.transport.webserver.route_register import (
 )
 from lca_kernel.events.errors import (
     EventNoSinkError,
+    MissingPublishSessionError,
     UnauthorizedPublishError,
 )
 
@@ -76,6 +77,22 @@ def test_async_handler_succeeds_when_enter_trace_fails(
     result = asyncio.run(wrapped(_StubRequest("GET")))
     assert result == {"ok": "true"}
     # 失败计数 +1
+    assert trace_emit_failures()["transport.route.enter"] == 1
+
+
+def test_async_handler_succeeds_when_missing_publish_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """无 active Session 时 MissingPublishSessionError 不拖死 handler（/health 回归）。"""
+
+    async def _handler(request: Any) -> dict[str, str]:
+        return {"ok": "true"}
+
+    _install_publisher_exception(monkeypatch, MissingPublishSessionError())
+
+    wrapped = _instrument_route_handler(_handler, path="/health")
+    result = asyncio.run(wrapped(_StubRequest("GET")))
+    assert result == {"ok": "true"}
     assert trace_emit_failures()["transport.route.enter"] == 1
 
 

@@ -2,7 +2,7 @@
 
 publisher 单点入口走 ``Session.append``;调用方必须先经
 :func:`set_publish_session` / run bind 绑定 Session。无 active Session
-时 fail-loud(``RuntimeError``),不走 EventBus.publish。
+时 fail-loud(``MissingPublishSessionError``),不走 EventBus.publish。
 
 设计边界:
 - helper 只承载入口路由(Session.append);payload/producer 语义由调用方
@@ -119,16 +119,16 @@ def publish_via_session(
     facade 从 SessionEvent 合成）。
 
     抛出:
-    ``RuntimeError``——当前上下文未绑定 Session(须先
-    :func:`set_publish_session` / run bind)。
+    ``MissingPublishSessionError``——当前上下文未绑定 Session(须先
+    :func:`set_publish_session` / run bind)。属 ``EventMechanismError``
+    族：装饰性 transport emit 可吞；业务 publish 仍 fail-loud。
     ``UnauthorizedPublishError``——S1 registry 拒绝该 producer/category。
     """
+    from lca_kernel.events.errors import MissingPublishSessionError
+
     session = _current_session.get()
     if session is None:
-        raise RuntimeError(
-            "publish_via_session requires an active Session; "
-            "bind via set_publish_session / run bind before publish"
-        )
+        raise MissingPublishSessionError()
     _authorize_producer(payload, producer)
     return session.append(payload, producer=producer)
 
