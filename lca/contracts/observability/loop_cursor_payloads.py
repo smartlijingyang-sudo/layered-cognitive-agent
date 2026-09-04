@@ -54,10 +54,30 @@ class ThinkingRecord:
 
 @dataclass(frozen=True)
 class ToolCallRecord:
+    """cursor 侧 tool_call 记录。
+
+    - ``tool_name`` —— 工具名(主字段,canonical)
+    - ``call_seq`` —— cursor 内自增,保留。
+    - ``args_digest`` —— **deprecated**(ADR-0185 spec §2.5 P5)。
+      digest 引用;原承担 sidecar 文件指针。保留 1 个 minor 版本以兼容
+      ``StdLoopCursor.record_tool_call`` + fold / spine 现有 consumer;
+      caller 应读 ``tool_name`` + 由 caller 端 caller-projected 字段。
+      delete-when:下个 minor 版本后,或所有 caller 迁移完毕时。
+      tracking: ADR-0185 spec §2.5 P5。
+    - ``args_payload_path`` —— 同上 deprecated(原 sidecar payload path)。
+
+    字段命名冻结(ADR-0185 spec §2.5):``tool_name`` / ``call_seq`` 是
+    canonical,``args_digest`` / ``args_payload_path`` 下个 minor 版本删。
+    """
+
     tool_name: str
-    args_digest: str
-    args_payload_path: str | None
     call_seq: int  # cursor 内自增
+    # COMPAT(delete-when: 下个 minor 版本,或所有 caller 迁完;
+    #   tracking: ADR-0185 spec §2.5 P5)
+    args_digest: str = ""
+    # COMPAT(delete-when: 下个 minor 版本,或所有 caller 迁完;
+    #   tracking: ADR-0185 spec §2.5 P5)
+    args_payload_path: str | None = None
 
 
 @dataclass(frozen=True)
