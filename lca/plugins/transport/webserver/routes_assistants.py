@@ -1,20 +1,20 @@
 """Register ``/v1/assistants`` REST surface (ADR-0187 §3 D7 + PR-5).
 
-Declarative :class:`RouteSpec` catalog with six endpoints that mirror the
-``AssistantCatalog`` / ``AssistantSkillOverlay`` protocols (PR-2). Handler
-bodies intentionally short-circuit with HTTP 501 + ``COMPAT`` markers until
-the catalog plugin (``lca.plugins.assistant.catalog``, PR-3) lands and the
-``assistant.catalog`` capability is populated by a real implementation.
+Declarative :class:`RouteSpec` catalog with nine endpoints that mirror the
+``AssistantCatalog`` / ``AssistantSkillOverlay`` / ``AssistantJobs``
+protocols (PR-2 / PR-8). Handler bodies intentionally short-circuit with
+HTTP 501 + ``COMPAT`` markers until the owning plugin lands and the
+capability is populated by a real implementation.
 
 Capability contract:
 
 - ``route_registry`` —— required; registration aborts when absent.
-- ``assistant.catalog`` / ``assistant.skill_overlay`` —— **not** declared as
-  plugin ``requires``; instead each handler consults
-  ``request.app.state.assistant_catalog`` (set by the catalog plugin in
-  PR-3) and falls back to the 501 envelope when absent. This keeps the
-  routes mountable on profiles without the catalog (web-standard today)
-  while preserving fail-closed semantics once the catalog lands.
+- ``assistant.catalog`` / ``assistant.skill_overlay`` / ``assistant.jobs``
+  —— **not** declared as plugin ``requires``; instead each handler consults
+  ``request.app.state.assistant_catalog`` / ``assistant_skill_overlay`` /
+  ``assistant_jobs`` and falls back to the 501 envelope when absent. This
+  keeps the routes mountable on profiles without the assistant plugins
+  (web-standard today) while preserving fail-closed semantics once they land.
 
 Routes:
 
@@ -24,6 +24,9 @@ Routes:
 - ``PATCH /v1/assistants/{assistant_id}/profile`` …… ``catalog.revise_profile``
 - ``POST /v1/assistants/{assistant_id}/skills:install`` …… ``overlay.install``
 - ``POST /v1/assistants/{assistant_id}/retire`` …… ``catalog.retire``
+- ``GET  /v1/assistants/{assistant_id}/jobs`` …… ``jobs.list_jobs``
+- ``POST /v1/assistants/{assistant_id}/jobs`` …… ``jobs.register``
+- ``POST /v1/assistants/{assistant_id}/jobs/{job_id}:fire`` …… ``jobs.fire``
 
 The handler body returns a stable JSON envelope with status code 501 and a
 ``code="catalog_unavailable"`` field whenever the catalog is missing. The
@@ -42,7 +45,11 @@ from starlette.responses import JSONResponse
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
-from lca.contracts.capabilities import ASSISTANT_CATALOG, ASSISTANT_SKILL_OVERLAY
+from lca.contracts.capabilities import (
+    ASSISTANT_CATALOG,
+    ASSISTANT_JOBS,
+    ASSISTANT_SKILL_OVERLAY,
+)
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     AuthorityContract,
@@ -60,6 +67,11 @@ from lca.plugins.transport.webserver.route_register import register_routes
 _ASSISTANT_NOT_IMPLEMENTED_MARKER = (
     "COMPAT(delete-when: assistant.catalog plugin present in resolved profile; "
     "tracking: ADR-0187 PR-3)"
+)
+
+_ASSISTANT_JOBS_MARKER = (
+    "COMPAT(delete-when: 2026-12-31, scope: assistant.jobs capability 接入 "
+    "app.state.assistant_jobs 后补真实 handler body)"
 )
 
 
@@ -110,6 +122,32 @@ def _skill_overlay_from_request(request: Request) -> Any | None:
     if state_obj is None:
         return None
     return getattr(state_obj, "assistant_skill_overlay", None)
+
+
+def _jobs_from_request(request: Request) -> Any | None:
+    """Return the assistant-jobs handle from ``app.state`` (PR-8)."""
+    state = getattr(request, "app", None)
+    if state is None:
+        return None
+    state_obj = getattr(state, "state", None)
+    if state_obj is None:
+        return None
+    return getattr(state_obj, "assistant_jobs", None)
+
+
+def _jobs_not_implemented(code: str, detail: str = "") -> JSONResponse:
+    """Return the stable 501 envelope for jobs routes until the jobs
+    capability is wired to ``app.state.assistant_jobs``."""
+    payload: dict[str, Any] = {
+        "error": {
+            "code": code,
+            "type": "not_implemented",
+            "marker": _ASSISTANT_JOBS_MARKER,
+        }
+    }
+    if detail:
+        payload["error"]["detail"] = detail
+    return _json(payload, status_code=501)
 
 
 async def create_assistant(request: Request) -> JSONResponse:
@@ -166,6 +204,42 @@ async def retire_assistant(request: Request) -> JSONResponse:
     return _not_implemented("catalog_pending", "PR-3 catalog handler not wired")
 
 
+async def list_assistant_jobs(request: Request) -> JSONResponse:
+    """``GET /v1/assistants/{assistant_id}/jobs`` —— ``AssistantJobs.list_jobs``."""
+    if _jobs_from_request(request) is None:
+        return _jobs_not_implemented("jobs_unavailable", "AssistantJobs.list_jobs")
+    return _jobs_not_implemented("jobs_pending", "AssistantJobs handler not wired")
+
+
+async def create_assistant_job(request: Request) -> JSONResponse:
+    """``POST /v1/assistants/{assistant_id}/jobs`` —— ``AssistantJobs.register``."""
+    if _jobs_from_request(request) is None:
+        return _jobs_not_implemented("jobs_unavailable", "AssistantJobs.register")
+    return _jobs_not_implemented("jobs_pending", "AssistantJobs handler not wired")
+
+
+async def assistant_jobs_root(request: Request) -> JSONResponse:
+    """``/v1/assistants/{assistant_id}/jobs`` method dispatcher (GET + POST)."""
+    method = str(getattr(request, "method", "")).upper()
+    if method == "POST":
+        return await create_assistant_job(request)
+    if method == "GET":
+        return await list_assistant_jobs(request)
+    if method == "OPTIONS":
+        return _json({}, status_code=200)
+    return _jobs_not_implemented("jobs_unavailable", f"unsupported method {method!r}")
+
+
+async def fire_assistant_job(request: Request) -> JSONResponse:
+    """``POST /v1/assistants/{assistant_id}/jobs/{job_id}:fire`` —— ``jobs.fire``.
+
+    Phase 1 仅人工投递（``actor="manual"`` Trigger → 0093 WorkQueue）。
+    """
+    if _jobs_from_request(request) is None:
+        return _jobs_not_implemented("jobs_unavailable", "AssistantJobs.fire")
+    return _jobs_not_implemented("jobs_pending", "AssistantJobs handler not wired")
+
+
 ROUTE_SPECS: tuple[RouteSpec, ...] = (
     # Path is shared between POST (create) and GET (list); the
     # :func:`assistants_root` dispatcher handles both methods.
@@ -188,6 +262,18 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
     RouteSpec(
         "/v1/assistants/{assistant_id}/retire",
         retire_assistant,
+        ("POST", "OPTIONS"),
+    ),
+    # Path is shared between POST (register) and GET (list); the
+    # :func:`assistant_jobs_root` dispatcher handles both methods.
+    RouteSpec(
+        "/v1/assistants/{assistant_id}/jobs",
+        assistant_jobs_root,
+        ("POST", "GET", "OPTIONS"),
+    ),
+    RouteSpec(
+        "/v1/assistants/{assistant_id}/jobs/{job_id}:fire",
+        fire_assistant_job,
         ("POST", "OPTIONS"),
     ),
 )
@@ -224,18 +310,20 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
             "route_registry",
             ASSISTANT_CATALOG.key,
             ASSISTANT_SKILL_OVERLAY.key,
+            ASSISTANT_JOBS.key,
         ),
         emits=("assistant_routes.registered",),
         state_mutation="forbidden",
     ),
 )
 async def setup(ctx: PluginContext, config: Any) -> None:
-    """Mount the six ``/v1/assistants`` routes.
+    """Mount the nine ``/v1/assistants`` routes.
 
     The routes always mount (``route_registry`` is the only required cap).
-    Catalog / overlay lookups happen inside each handler via
-    :func:`_catalog_from_request` so the plugin stays mountable on
-    profiles without the catalog (e.g. ``web-standard``).
+    Catalog / overlay / jobs lookups happen inside each handler via
+    :func:`_catalog_from_request` / :func:`_jobs_from_request` so the plugin
+    stays mountable on profiles without the assistant plugins
+    (e.g. ``web-standard``).
     """
     del config
     registry = ctx.require("route_registry")
@@ -249,10 +337,14 @@ async def setup(ctx: PluginContext, config: Any) -> None:
 
 __all__ = [
     "ROUTE_SPECS",
+    "assistant_jobs_root",
     "assistants_root",
     "create_assistant",
+    "create_assistant_job",
+    "fire_assistant_job",
     "get_assistant",
     "install_assistant_skill",
+    "list_assistant_jobs",
     "list_assistants",
     "retire_assistant",
     "revise_assistant_profile",

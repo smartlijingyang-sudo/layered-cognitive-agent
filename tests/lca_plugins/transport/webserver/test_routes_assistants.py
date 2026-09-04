@@ -1,7 +1,8 @@
 """lca.plugins.transport.webserver.routes_assistants — /v1/assistants (PR-5).
 
-Test the registry surface (6 routes) and the COMPAT 501 envelope used
-while PR-3 catalog plugin is absent. The handler bodies must remain
+Test the registry surface (7 routes: six catalog/overlay endpoints + two
+jobs endpoints sharing one path, PR-8) and the COMPAT 501 envelope used
+while the owning capability is absent. The handler bodies must remain
 "fail-closed 4xx" (ADR-0187 §3 D7) but never crash the registry boot.
 """
 
@@ -55,12 +56,14 @@ def _setup_plugin() -> tuple[Any, RouteRegistry]:
 
 
 @pytest.mark.asyncio
-async def test_routes_assistants_register_five_routes() -> None:
-    """Five :class:`RouteSpec` entries; ``/v1/assistants`` carries
-    both POST (create) and GET (list) via the dispatcher."""
+async def test_routes_assistants_register_seven_routes() -> None:
+    """Seven :class:`RouteSpec` entries; ``/v1/assistants`` carries
+    both POST (create) and GET (list) via the dispatcher, and
+    ``/v1/assistants/{assistant_id}/jobs`` carries POST (register) and
+    GET (list) via the jobs dispatcher (PR-8)."""
     plugin, router, ctx = _setup_plugin()
     await plugin.setup(ctx, None)
-    assert len(router._exact) == 5
+    assert len(router._exact) == 7
 
 
 @pytest.mark.asyncio
@@ -73,6 +76,8 @@ async def test_routes_assistants_paths_match_advertised_surface() -> None:
         "/v1/assistants/{assistant_id}/profile",
         "/v1/assistants/{assistant_id}/skills:install",
         "/v1/assistants/{assistant_id}/retire",
+        "/v1/assistants/{assistant_id}/jobs",
+        "/v1/assistants/{assistant_id}/jobs/{job_id}:fire",
     }
     assert expected.issubset(router._exact.keys())
 
@@ -81,7 +86,7 @@ async def test_routes_assistants_paths_match_advertised_surface() -> None:
 async def test_routes_assistants_effects_tracked() -> None:
     plugin, _router, ctx = _setup_plugin()
     await plugin.setup(ctx, None)
-    assert len(ctx._fake_runtime.effects) == 5
+    assert len(ctx._fake_runtime.effects) == 7
     labels = {label for _dispose, label in ctx._fake_runtime.effects}
     for path in (
         "/v1/assistants",
@@ -89,6 +94,8 @@ async def test_routes_assistants_effects_tracked() -> None:
         "/v1/assistants/{assistant_id}/profile",
         "/v1/assistants/{assistant_id}/skills:install",
         "/v1/assistants/{assistant_id}/retire",
+        "/v1/assistants/{assistant_id}/jobs",
+        "/v1/assistants/{assistant_id}/jobs/{job_id}:fire",
     ):
         assert f"route:{path}" in labels
 
@@ -104,6 +111,8 @@ def test_routes_assistants_exposes_public_routes_constant() -> None:
         "/v1/assistants/{assistant_id}/profile",
         "/v1/assistants/{assistant_id}/skills:install",
         "/v1/assistants/{assistant_id}/retire",
+        "/v1/assistants/{assistant_id}/jobs",
+        "/v1/assistants/{assistant_id}/jobs/{job_id}:fire",
     }
 
 
@@ -202,6 +211,45 @@ def test_retire_assistant_returns_501_when_catalog_missing() -> None:
     assert response.json()["error"]["code"] == "catalog_unavailable"
 
 
+# ── jobs routes: 501 COMPAT envelope until assistant.jobs wires ──────
+
+
+def test_get_assistant_jobs_returns_501_when_jobs_missing() -> None:
+    plugin, router, ctx = _setup_plugin()
+    _run_plugin_setup(plugin, ctx)
+    app = _app_with_routes(router)
+    client = TestClient(app)
+    response = client.get("/v1/assistants/asst_1/jobs")
+    assert response.status_code == 501
+    body = response.json()
+    assert body["error"]["code"] == "jobs_unavailable"
+    assert "COMPAT" in body["error"]["marker"]
+    assert "delete-when: 2026-12-31" in body["error"]["marker"]
+
+
+def test_post_assistant_jobs_returns_501_when_jobs_missing() -> None:
+    plugin, router, ctx = _setup_plugin()
+    _run_plugin_setup(plugin, ctx)
+    app = _app_with_routes(router)
+    client = TestClient(app)
+    response = client.post(
+        "/v1/assistants/asst_1/jobs",
+        json={"job_id": "daily_brief", "schedule": "0 9 * * *", "prompt": "x"},
+    )
+    assert response.status_code == 501
+    assert response.json()["error"]["code"] == "jobs_unavailable"
+
+
+def test_fire_assistant_job_returns_501_when_jobs_missing() -> None:
+    plugin, router, ctx = _setup_plugin()
+    _run_plugin_setup(plugin, ctx)
+    app = _app_with_routes(router)
+    client = TestClient(app)
+    response = client.post("/v1/assistants/asst_1/jobs/daily_brief:fire")
+    assert response.status_code == 501
+    assert response.json()["error"]["code"] == "jobs_unavailable"
+
+
 # ── Plugin manifest / ADR contract ────────────────────────────────────
 
 
@@ -262,6 +310,7 @@ def test_handlers_tolerate_missing_state() -> None:
     """
     from lca.plugins.transport.webserver.routes_assistants import (
         _catalog_from_request,
+        _jobs_from_request,
         _skill_overlay_from_request,
     )
 
@@ -271,18 +320,21 @@ def test_handlers_tolerate_missing_state() -> None:
     bare = _Bare()
     assert _catalog_from_request(bare) is None  # type: ignore[arg-type]
     assert _skill_overlay_from_request(bare) is None  # type: ignore[arg-type]
+    assert _jobs_from_request(bare) is None  # type: ignore[arg-type]
 
 
 def test_helpers_use_app_state_when_present() -> None:
     """When ``app.state`` carries the catalog, the helper returns it."""
     from lca.plugins.transport.webserver.routes_assistants import (
         _catalog_from_request,
+        _jobs_from_request,
         _skill_overlay_from_request,
     )
 
     class _State:
         assistant_catalog = "catalog-handle"
         assistant_skill_overlay = "overlay-handle"
+        assistant_jobs = "jobs-handle"
 
     class _App:
         state = _State()
@@ -292,6 +344,7 @@ def test_helpers_use_app_state_when_present() -> None:
 
     assert _catalog_from_request(_Bare()) == "catalog-handle"
     assert _skill_overlay_from_request(_Bare()) == "overlay-handle"
+    assert _jobs_from_request(_Bare()) == "jobs-handle"
 
 
 # ── Sentinel: ensure handlers are imported and callable ───────────────
@@ -303,8 +356,11 @@ def test_handlers_are_coroutine_callables() -> None:
 
     from lca.plugins.transport.webserver.routes_assistants import (
         create_assistant,
+        create_assistant_job,
+        fire_assistant_job,
         get_assistant,
         install_assistant_skill,
+        list_assistant_jobs,
         list_assistants,
         retire_assistant,
         revise_assistant_profile,
@@ -317,5 +373,8 @@ def test_handlers_are_coroutine_callables() -> None:
         revise_assistant_profile,
         install_assistant_skill,
         retire_assistant,
+        list_assistant_jobs,
+        create_assistant_job,
+        fire_assistant_job,
     ):
         assert inspect.iscoroutinefunction(fn), f"{fn.__name__} must be async"

@@ -14,7 +14,9 @@
   模块自身不直接发 EP（catalog 才发，PR-3），但路由可消费的 catalog 调用
   须走 ``assistant.catalog`` capability（路由 ``requires`` 不含 catalog，
   仅运行时探查 —— 契约层不在 PR-5 强制 EP 描述符消费）。
-- I-A12 jobs 必经 0093 WorkQueue（PR-8 范畴；本测试仅占位声明）。
+- I-A12 jobs 必经 0093 WorkQueue（PR-8 已落；守护测试 =
+  ``tests/architecture/test_assistant_evolve_jobs_invariants.py``，
+  本文件仅保留溯源锚点）。
 - I-A13 记忆面写入不参与 digest、不触发 ``revision_seq``（PR-3+ 范畴；
   本测试仅占位声明，不在本 PR 强制）。
 
@@ -195,18 +197,12 @@ class TestIAssistantRoutesEpSurface:
 
 
 class TestIAssistantInvariantsPlaceholder:
-    """占位声明：I-A12 / I-A13 由后续 PR 的测试守护（jobs 注册走 0093；
-    记忆面写入不参与 manifest digest）。本测试仅声明占位，避免后人
-    误以为 PR-5 已经落 I-A12 / I-A13 守护。
-
-    PR-5 delete-when: PR-3 (catalog + memory seam test) 与 PR-8 (jobs
-    arch test) 合入后由对应测试守护；本类保留为契约溯源锚点。
+    """占位声明：I-A13 由后续 PR 的测试守护（记忆面写入不参与 manifest
+    digest）。I-A12 已由 PR-8 落地,守护测试见
+    ``tests/architecture/test_assistant_evolve_jobs_invariants.py``
+    （jobs 无调度线程静态扫描 + 缺 ``continuous_control_plane_factory``
+    拒收）。本类保留为契约溯源锚点。
     """
-
-    def test_i_a12_placeholder(self) -> None:
-        pytest.skip(
-            "I-A12 owned by PR-8 (jobs registry arch test); PR-5 routes_assistants 不创建 jobs 插件"
-        )
 
     def test_i_a13_placeholder(self) -> None:
         pytest.skip(
