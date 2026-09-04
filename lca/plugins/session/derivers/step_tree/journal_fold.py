@@ -1,8 +1,23 @@
 """fold_step_tree —— 从事件流纯 fold 出 JournalDocument(ADR-0186 PR-3g)。
 
-纯函数集,无 I/O,无 ``logging`` / ``datetime.now`` 等副作用。消费
-:class:`EventRecord` 或兼容 ``Mapping`` 形态的事件流,产出
-:class:`JournalDocument`(lca.journal/3.1)。
+纯函数集,无 I/O,无 ``logging`` / ``datetime.now`` 等副作用。消费两路
+事件流,产出 :class:`JournalDocument`(lca.journal/3.1):
+
+- **spine 形态** —— ``execution_point`` 属性 / ``execution_point`` mapping
+  key 携带裸 EP(:class:`EventRecord`、``SpineReader.read_dicts()`` dict)。
+- **Session 形态** —— ``type`` + ``data`` 信封(:class:`SessionEvent` 或
+  同形 Mapping);``type`` 是 spine CATEGORY 前缀串(例
+  ``spine.cognition.brain.think.start``),经 :data:`_CATEGORY_TO_SPINE_EP`
+  反查归一为裸 EP,未登记的 type 原样透传。
+
+Step 边界语法(闭集,不引入新词表):
+
+- ``writable.step.start`` / ``writable.step.end`` —— 显式 step 边。
+- ``llm.request.header`` —— cursor step 边(StdLoopCursor.record_request_header):
+  已开 step 以 ``success`` 关闭;新 step 以 payload ``step_id`` 开启,
+  缺省 ``step_{seq:03d}``;payload ``model`` / ``reason`` 留在帧上。
+- ``brain.think.start`` / ``brain.think.end`` —— 无显式边时的隐式 think step。
+- ``phase.*.fold``(:data:`PHASE_FOLD_EPS`)—— phase 累计,不切 step。
 
 设计原则:
 
@@ -44,6 +59,7 @@ from lca.contracts.models.observability.journal_totals import (
     StepPhase,
     Totals,
 )
+from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
 
 # 闭集 phase EP 表 —— 与 StepTreeAccumulatorDeriver 对齐(ADR-0166 D4 闭集)。
 PHASE_FOLD_EPS: dict[str, StepPhase] = {
@@ -55,6 +71,18 @@ PHASE_FOLD_EPS: dict[str, StepPhase] = {
     "phase.reflect.fold": "reflect",
     "phase.stop.fold": "stop",
 }
+
+# Session 形态事件的 type 是 spine CATEGORY 前缀串(例
+# ``spine.cognition.brain.think.start``),fold 语法按裸 EP 匹配。反查表由
+# _SPINE_EP_TO_CATEGORY 反转而来;同 category 对应多 EP 时保留首个登记。
+_CATEGORY_TO_SPINE_EP: dict[str, str] = {}
+for _ep, _category in _SPINE_EP_TO_CATEGORY.items():
+    _CATEGORY_TO_SPINE_EP.setdefault(_category, _ep)
+
+
+def _resolve_execution_point(name: str) -> str:
+    """spine CATEGORY 前缀串 → 裸 EP;未登记的 type 原样返回。"""
+    return _CATEGORY_TO_SPINE_EP.get(name, name)
 
 
 def _epoch_seconds(value: Any) -> float | None:
@@ -96,6 +124,9 @@ def _coerce(event: Any) -> Mapping[str, Any] | None:
 
     支持 :class:`EventRecord` / :class:`SpineEventRecord`(属性访问)、
     :class:`SessionEvent` (``type`` + ``data``)、以及 ``Mapping``。
+    spine 形态(``execution_point`` key / 属性)已是裸 EP,原样透传;
+    Session 形态(``type`` / ``category`` key、``type`` 属性)的 category
+    前缀串经 :func:`_resolve_execution_point` 反查为裸 EP,未登记的原样透传。
     不识别返回 ``None``,调用方 skip。
     """
     if isinstance(event, Mapping):
@@ -109,7 +140,7 @@ def _coerce(event: Any) -> Mapping[str, Any] | None:
         if not isinstance(payload, Mapping):
             payload = {}
         return {
-            "execution_point": str(ep),
+            "execution_point": _resolve_execution_point(str(ep)),
             "payload": payload,
             "outcome": event.get("outcome") or payload.get("outcome"),
             "phase": event.get("phase", "live"),
@@ -120,7 +151,7 @@ def _coerce(event: Any) -> Mapping[str, Any] | None:
         when = getattr(event, "when", None)
         if when is None:
             when = getattr(event, "ts", None)
-        return {  # type: ignore[return-value]
+        return {
             "execution_point": event.execution_point,
             "payload": event.payload if isinstance(event.payload, Mapping) else {},
             "outcome": getattr(event, "outcome", None),
@@ -131,7 +162,7 @@ def _coerce(event: Any) -> Mapping[str, Any] | None:
     if hasattr(event, "type") and hasattr(event, "data"):
         payload = event.data if isinstance(event.data, Mapping) else {}
         return {
-            "execution_point": str(event.type),
+            "execution_point": _resolve_execution_point(str(event.type)),
             "payload": payload,
             "outcome": payload.get("outcome") if isinstance(payload, Mapping) else None,
             "when": getattr(event, "time", None),
@@ -150,7 +181,13 @@ def _ts(event: Mapping[str, Any]) -> float:
 
 @dataclass
 class _Frame:
-    """fold 中间态:一个 step 的累积帧。"""
+    """fold 中间态:一个 step 的累积帧。
+
+    ``model`` / ``request_reason`` 由 ``llm.request.header`` payload 写入;
+    ``step.thinking.record`` 构造 ThinkingTrace 时从 ``model`` 取模型名。
+    ``opened_by`` 记开帧来源(``writable`` / ``think`` / ``header``),
+    ``llm.request.header`` 据此判定「同一 think 步的 LLM 边界」还是「新步」。
+    """
 
     step_id: str
     step_index: int
@@ -164,6 +201,9 @@ class _Frame:
     segments: list[SegmentRecord] = field(default_factory=list)
     outcome: str | None = None
     exited_at: float | None = None
+    model: str = ""
+    request_reason: str = ""
+    opened_by: str = "writable"
 
 
 @dataclass
@@ -223,7 +263,7 @@ def _close_step(state: _StepTreeState, outcome: str) -> None:
     if state.open_step is None:
         return
     f = state.open_step
-    f.outcome = outcome  # type: ignore[assignment]
+    f.outcome = outcome
     f.exited_at = state.last_ts or f.entered_at
     if f.reflect is None and f.tool_result is not None:
         f.reflect = ReflectTrace(summary=f.tool_result.delta_summary[:200])
@@ -301,12 +341,59 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
             state.open_step = _Frame(
                 step_id=f"step_{state.step_seq:03d}",
                 step_index=state.step_seq,
-                phase="think",  # type: ignore[arg-type]
+                phase="think",
                 entered_at=ts,
+                opened_by="think",
             )
     elif ep == "brain.think.end":
         if state.open_step is not None:
             _close_step(state, str(event.get("outcome") or "success"))
+    elif ep == "llm.request.header":
+        # cursor step 边(StdLoopCursor.record_request_header,THINK 窗口内)。
+        # DSH 切步语义:一步 = 一次模型请求。``brain.think.start`` 开的隐式
+        # think 帧尚无内容时,header 是同一步的 LLM 边界 → 原地升级
+        # (采用 payload step_id / model / reason),不再关旧开新造成
+        # 一次 LLM 调用计两步;前一步已有内容时按正常收口关闭并开新步。
+        open_frame = state.open_step
+        header_step_id = str(payload.get("step_id") or "")
+        if (
+            open_frame is not None
+            and open_frame.opened_by == "think"
+            and open_frame.thinking is None
+            and open_frame.tool_call is None
+            and open_frame.tool_result is None
+        ):
+            if header_step_id:
+                open_frame.step_id = header_step_id
+            open_frame.model = str(payload.get("model") or "")
+            open_frame.request_reason = str(payload.get("reason") or "")
+            open_frame.opened_by = "header"
+        else:
+            if open_frame is not None:
+                _close_step(state, "success")
+            state.step_seq += 1
+            state.open_step = _Frame(
+                step_id=header_step_id or f"step_{state.step_seq:03d}",
+                step_index=state.step_seq,
+                phase="think",
+                entered_at=ts,
+                model=str(payload.get("model") or ""),
+                request_reason=str(payload.get("reason") or ""),
+                opened_by="header",
+            )
+    elif ep == "step.thinking.record":
+        target = _resolve_target(state, payload)
+        if target is not None:
+            token_count = payload.get("token_count")
+            target.thinking = ThinkingTrace(
+                model=target.model,
+                latency_ms=0,
+                reasoning=str(payload.get("text_preview") or ""),
+                raw_response_preview=str(
+                    payload.get("content_path") or payload.get("content_digest") or ""
+                ),
+                completion_tokens=token_count if isinstance(token_count, int) else None,
+            )
     elif ep == "critic.eval.start":
         _record_phase(state, "reflect", ts, event)
     elif ep == "critic.eval.end":
@@ -387,7 +474,10 @@ def _materialize(
     if outcome is not None:
         state.terminal_outcome = outcome
     if state.open_step is not None:
-        _close_step(state, "cancelled")
+        # run 已 completed 时,残留 open step 属正常收口;其余(中断 /
+        # 无终态信号)维持 cancelled。
+        residual_outcome = "success" if state.terminal_outcome == "completed" else "cancelled"
+        _close_step(state, residual_outcome)
         state.open_step = None
 
     steps_list = [
@@ -451,8 +541,11 @@ def fold_step_tree(
     """纯 fold:从事件流左折出 JournalDocument。
 
     Parameters:
-        events: 可迭代事件(:class:`EventRecord` / :class:`SessionEvent` 或 ``Mapping``)。
-            非 fold 目标的事件被 skip(不抛)。
+        events: 可迭代事件,两路形态均可:spine 形态(:class:`EventRecord` /
+            含 ``execution_point`` 的 Mapping,裸 EP)与 Session 形态
+            (:class:`SessionEvent` / 含 ``type`` + ``data`` 的 Mapping,
+            ``spine.*`` CATEGORY 前缀经反查表归一为裸 EP)。非 fold 目标
+            的事件被 skip(不抛)。
         run_id: 目标 run 标识,写入 document.run_id / trace_id。
         outcome: 显式终态覆盖;None 时由 terminal EP 或启发式推导。
         agent_role / strategy_key / plan_ref / objective: 写入 ``JournalMetadata``。

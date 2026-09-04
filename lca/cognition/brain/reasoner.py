@@ -43,6 +43,7 @@ from lca.contracts.models.cognition.prompt_assembly import (
 # these helpers stay so characterization tests pin the exact text
 # shape. They are *not* used by PromptReasoner itself anymore.
 from lca.contracts.models.core.llm import LLMResponse
+from lca.contracts.models.core.perception import ContextManifest
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.team.delegation import DelegationResult
 from lca.contracts.models.team.role_team import RoleProfile
@@ -261,7 +262,7 @@ class PromptReasoner:
                 }
                 for s in trace.sections
             ]
-            reasoner_prompt_token = self._bind_reasoner_prompt(trace)
+            reasoner_prompt_token = self._bind_reasoner_prompt(trace, manifest)
         else:
             total_chars = None
             section_outputs = None
@@ -379,7 +380,20 @@ class PromptReasoner:
             return None
         return getattr(template, "variant", None)
 
-    def _bind_reasoner_prompt(self, trace: PromptTrace) -> Any:
+    def _bind_reasoner_prompt(
+        self, trace: PromptTrace, context_manifest: ContextManifest | None
+    ) -> Any:
+        """Bind the rendered prompt truth into the LLM-boundary ContextVar.
+
+        Precondition: ``trace`` is the PromptTrace produced by this think
+        call's assembler render; ``context_manifest`` is the ContextManifest
+        read for the same think call (``None`` when perception produced
+        none). Ownership: the Reasoner binds and resets around the LLM call;
+        the LLM boundary adapter reads prompt_trace / context_manifest to
+        make skill/prompt assembly recoverable under model_visible/step_<NN>/
+        (ADR-0167 D3/D4). Failures of the optional sidecar write are logged
+        and never block the business path (ADR-0169 L10 + D5).
+        """
         from lca.infrastructure.observability.loop_cursor.model_visible_binding import (
             get_current_model_visible_capture,
         )
@@ -412,6 +426,8 @@ class PromptReasoner:
                 template_id=trace.template_id,
                 selector_decision_path=trace.selector_decision_path,
                 system_prompt_text=trace.system_prompt_text,
+                prompt_trace=trace,
+                context_manifest=context_manifest,
             )
         )
 

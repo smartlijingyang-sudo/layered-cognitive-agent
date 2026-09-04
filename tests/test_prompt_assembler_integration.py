@@ -9,7 +9,11 @@ mock production wiring.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterator
 from dataclasses import dataclass
+from typing import Any
+
+import pytest
 
 from lca.cognition.brain.reasoner import PromptReasoner
 from lca.cognition.brain.sections.assembler import (
@@ -27,6 +31,10 @@ from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.team.delegation import DelegationResult
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
+from lca.plugins.events.publishers._session_publish import (
+    reset_publish_session,
+    set_publish_session,
+)
 from lca.plugins.prompts.registry import _RegistryImpl
 from lca.plugins.prompts.sections import (
     ActivatedSkillsSection,
@@ -54,6 +62,8 @@ from lca.plugins.prompts.template_provider import (
     _builtin_templates,
     _ProviderImpl,
 )
+from lca_kernel.events.bus import EventBus
+from lca_kernel.events.test_catalog import build_test_bus
 
 
 @dataclass(frozen=True)
@@ -89,7 +99,7 @@ def _registry_with_builtins() -> _RegistryImpl:
     registry.register(GoalSection(), kind="pure", name="goal")
     registry.register(BackstorySection(), kind="pure", name="backstory")
     registry.register(
-        ToolsSection(catalog_tools_xml_provider=lambda: "<tool name=\"x\">x</tool>"),
+        ToolsSection(catalog_tools_xml_provider=lambda: '<tool name="x">x</tool>'),
         kind="pure",
         name="tools",
     )
@@ -99,9 +109,17 @@ def _registry_with_builtins() -> _RegistryImpl:
         name="available_skills",
     )
     registry.register(ReactWorkflowSection(text="<workflow/>"), kind="pure", name="react_workflow")
-    registry.register(ReactToolUsageSection(text="<usage/>"), kind="pure", name="react_tool_usage_guidelines")
-    registry.register(RoutingInstructionsSection(text="routing-rules"), kind="pure", name="routing_instructions")
-    registry.register(HierarchicalInstructionsSection(text="hier-rules"), kind="pure", name="hierarchical_instructions")
+    registry.register(
+        ReactToolUsageSection(text="<usage/>"), kind="pure", name="react_tool_usage_guidelines"
+    )
+    registry.register(
+        RoutingInstructionsSection(text="routing-rules"), kind="pure", name="routing_instructions"
+    )
+    registry.register(
+        HierarchicalInstructionsSection(text="hier-rules"),
+        kind="pure",
+        name="hierarchical_instructions",
+    )
     # Stateful sections
     registry.register(CurrentDateSection(), kind="stateful", name="current_date")
     registry.register(TaskSection(), kind="stateful", name="task")
@@ -119,6 +137,31 @@ def _registry_with_builtins() -> _RegistryImpl:
 # ── tests ──────────────────────────────────────────────────────────
 
 
+class _FakePublishSession:
+    """最小测试 Session:只收 append,不投递。"""
+
+    def append(self, payload: Any, *, producer: Any = None) -> Any:
+        del payload, producer
+        return None
+
+
+@pytest.fixture(autouse=True)
+def _bound_publish_session() -> Iterator[None]:
+    """Reasoner emit(prompt_assembler.assemble.*) 走 publish_via_session,
+    无绑定 Session 时 fail-loud(ADR-0186);S1 鉴权需要授权目录的
+    EventBus。绑测试 bus + 最小 fake Session 让 emit 通过
+    (与 tests/plugins/events/publishers/conftest.py 同形)。
+    """
+    bus = build_test_bus()
+    EventBus.set_default(bus)
+    token = set_publish_session(_FakePublishSession())
+    try:
+        yield
+    finally:
+        reset_publish_session(token)
+        EventBus.set_default(None)
+
+
 def test_assembler_walks_template_section_refs() -> None:
     """End-to-end assembly uses the real provider + registry + section classes."""
 
@@ -131,7 +174,7 @@ def test_assembler_walks_template_section_refs() -> None:
     )
 
     state = _empty_state()
-    prompt = assembler.render(
+    prompt, _trace = assembler.render(
         template_id="react_prompt",
         role_profile=_profile("solo"),
         state=state,
@@ -161,13 +204,13 @@ def test_selector_routes_to_hierarchical_when_consult_duty_set() -> None:
             ),
         ),
     )
-    assert selector.select(state=state) == "hierarchical_prompt"
+    assert selector.select(state=state) == ("hierarchical_prompt", "consult_duty")
 
 
 def test_selector_routes_to_routing_when_consult_duty_is_none() -> None:
     selector = TeamAwarenessTemplateSelector()
     state = _empty_state(team_awareness=TeamAwareness(teammates=[]))
-    assert selector.select(state=state) == "routing_prompt"
+    assert selector.select(state=state) == ("routing_prompt", "team_awareness_routing")
 
 
 def test_routing_prompt_renders_member_reports_and_excludes_duplicates() -> None:
@@ -211,7 +254,7 @@ def test_routing_prompt_renders_member_reports_and_excludes_duplicates() -> None
         )
     ]
 
-    prompt = assembler.render(
+    prompt, _trace = assembler.render(
         template_id="routing_prompt",
         role_profile=_profile("Lead"),
         state=state,

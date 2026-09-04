@@ -48,14 +48,16 @@ def test_both_captures_use_shared_to_jsonable(tmp_path: Path) -> None:
     private symbols.
     """
     import ast
+
     import lca.infrastructure.observability.loop_cursor.model_visible_capture as mvc_mod
-    import lca.infrastructure.observability.loop_cursor.reasoner_prompt_capture as rpc_mod
 
     def _imports_from_capture_io(module_path: str) -> bool:
         tree = ast.parse(Path(module_path).read_text())
         for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.module and node.module.endswith(
-                "_capture_io"
+            if (
+                isinstance(node, ast.ImportFrom)
+                and node.module
+                and node.module.endswith("_capture_io")
             ):
                 return True
         return False
@@ -73,9 +75,14 @@ def test_to_jsonable_produces_stable_digest() -> None:
     # Re-compute; deterministic across calls.
     assert digest == _capture_io.sha256_digest(payload)
     # The canonical SHA-256 of the canonical JSON encoding is stable.
-    expected = "sha256:" + __import__("hashlib").sha256(
-        json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")
-    ).hexdigest()
+    expected = (
+        "sha256:"
+        + __import__("hashlib")
+        .sha256(
+            json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")
+        )
+        .hexdigest()
+    )
     assert digest == expected
 
 

@@ -320,7 +320,7 @@ class _StrictTransferCursor:
         s.stop_signal = reason
         s.phase = None
 
-    def record_thinking(self, payload: object) -> None:
+    def record_thinking(self, payload: object, *, text_preview: str = "") -> None:
         self._ensure_open()
         if self._state.phase != "think":
             raise CursorError("record_thinking must be in THINK window")

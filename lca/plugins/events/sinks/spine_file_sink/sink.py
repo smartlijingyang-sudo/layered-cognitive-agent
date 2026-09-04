@@ -62,7 +62,12 @@ class SpineFileSink:
     """
 
     def __init__(self, run_dir: Path | None = None) -> None:
-        self._path_template = str((run_dir or Path.cwd()) / "{run_id}.spine.jsonl")
+        # 落点契约(模块 docstring / ADR-0165.1 layout)= per-run 目录
+        # ``traces/runs/<run_id>/<run_id>.spine.jsonl``,与 spine.sink.file
+        # 的 run 布局一致;run_dir 缺省曾退回 ``Path.cwd()`` 造成仓库根
+        # 散落游离镜像文件,已收口。
+        base = run_dir if run_dir is not None else Path("traces") / "runs" / "{run_id}"
+        self._path_template = str(base / "{run_id}.spine.jsonl")
         self._closed = False
 
     def __call__(self, payload: Any, ref: EventRef) -> None:
@@ -94,8 +99,11 @@ class SpineFileSink:
     def _append(self, record: SpineEventRecord, event_id: str) -> None:
         if self._closed:
             raise RuntimeError("SpineFileSink 已关闭，不可 append")
+        run_id = _run_id_of(event_id)
+        target = Path(self._path_template.replace("{run_id}", run_id))
+        target.parent.mkdir(parents=True, exist_ok=True)
         inner = SpineSink(path_template=self._path_template)
-        inner.set_run_id(_run_id_of(event_id))
+        inner.set_run_id(run_id)
         try:
             inner.append(record)
         finally:

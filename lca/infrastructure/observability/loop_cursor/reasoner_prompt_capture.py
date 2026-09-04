@@ -90,11 +90,7 @@ class StdReasonerPromptCapture(ReasonerPromptCapture):
                 {
                     **_to_jsonable(s),
                     # ADR-0176 D3 §4:content_digest = sha256(text),仅当 text 非空时写
-                    **(
-                        {"content_digest": _sha256_digest(s.text)}
-                        if s.text
-                        else {}
-                    ),
+                    **({"content_digest": _sha256_digest(s.text)} if s.text else {}),
                 }
                 for s in trace.sections
             ],

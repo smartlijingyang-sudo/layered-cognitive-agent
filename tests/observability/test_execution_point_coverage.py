@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from lca.cognition.brain.reasoner import PromptReasoner
 from lca.contracts.models.cognition.prompt_assembly import (
     PromptTemplate,
@@ -31,6 +33,42 @@ from lca.plugins.events.publishers.spine_reflector_cognition import (  # noqa: F
     ReflectorClass,
 )
 from lca_kernel.events.bus import EventBus
+from lca_kernel.events.test_catalog import build_test_bus
+
+
+@pytest.fixture(autouse=True)
+def _bound_publish_session():
+    """emit_* 走 publish_via_session:无绑定 Session fail-loud(ADR-0186)。
+
+    fake session 把 append 委托给当前 default EventBus —— 测试用
+    ``_CapturingBus`` 覆盖 default 时仍可捕获 emit(与
+    publishers/conftest.py 的 FakePublishSession 同形)。
+    """
+    from lca.plugins.events.publishers._session_publish import (
+        reset_publish_session,
+        set_publish_session,
+    )
+
+    class _FakePublishSession:
+        def append(self, payload: Any, *, producer: Any = None) -> Any:
+            return EventBus.default().publish(payload, producer=producer)
+
+    bus = build_test_bus()
+    EventBus.set_default(bus)
+    token = set_publish_session(_FakePublishSession())
+    try:
+        yield
+    finally:
+        reset_publish_session(token)
+        EventBus.set_default(None)
+
+
+class _AllowAllRegistry:
+    """S1 鉴权 stub:publish_via_session 的 _authorize_producer 只读 registry。"""
+
+    def can_publish(self, producer: Any, category: Any) -> bool:
+        del producer, category
+        return True
 
 
 class _CapturingBus:
@@ -38,8 +76,9 @@ class _CapturingBus:
 
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
+        self.registry = _AllowAllRegistry()
 
-    def publish(self, payload, *, producer, trace_id=None):  # noqa: ARG002
+    def publish(self, payload, *, producer, trace_id=None):
         self.calls.append(
             {
                 "execution_point": payload.execution_point,
@@ -148,7 +187,8 @@ async def test_prompt_assembler_eps_emitted_with_payload():
     )
 
     # ADR-0183 PR-7: _CapturingMechanism 退役，新 EventBus 走 _CapturingBus
-    spine = _CapturingBus(); EventBus.set_default(spine)
+    spine = _CapturingBus()
+    EventBus.set_default(spine)
     try:
         template = PromptTemplate(
             id="react_prompt",
@@ -199,7 +239,8 @@ def test_skill_router_route_emits_decision_path():
     from lca.cognition.brain.skill_router import KeywordSkillRouter
 
     # ADR-0183 PR-7: _CapturingMechanism 退役，新 EventBus 走 _CapturingBus
-    spine = _CapturingBus(); EventBus.set_default(spine)
+    spine = _CapturingBus()
+    EventBus.set_default(spine)
     try:
         router = KeywordSkillRouter(
             rules={"research_prompt": ["hello"]},

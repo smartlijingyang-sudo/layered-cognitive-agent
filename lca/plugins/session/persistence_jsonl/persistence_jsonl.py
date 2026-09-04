@@ -70,7 +70,11 @@ class Config(BaseModel):
     """traces/runs 等价基址;每个 session 在其下建子目录。"""
 
     fsync: bool = False
-    """每行 append 后是否 fsync;生产建议 ``True``(强一致),测试 ``False``。"""
+    """每行 append 后是否额外 ``os.fsync`` 强制落盘。
+
+    每行写入后必然 ``flush`` 到 OS(durable 镜像契约,与开关无关);
+    ``fsync=True`` 进一步保证物理介质持久(生产强一致,测试 ``False``)。
+    """
 
 
 class JsonlSessionPersistence:
@@ -132,20 +136,25 @@ class JsonlSessionPersistence:
         return session.observe(self.on_session_event)
 
     def flush(self, session_id: str | None = None) -> None:
-        """刷新文件缓冲到磁盘(per-session);``session_id`` 缺省 = 全量。"""
+        """刷新文件缓冲到磁盘(per-session);``session_id`` 缺省 = 全量。
+
+        ``session_id`` 也接受 Session-like对象:``Session.flush()`` 的
+        observer-duck-type 链以 ``observer.flush(session)`` 形态调用,
+        此处经 ``.id`` 归一为 session id(ADR-0186 flush 链)。
+        """
         with self._files_lock:
-            targets = self._select(session_id)
+            targets = self._select(_normalize_session_key(session_id))
             for _, sfile in targets:
                 sfile.flush()
 
     def close(self, session_id: str | None = None) -> None:
-        """flush + 关闭文件;``session_id`` 缺省 = 全量。
+        """flush + 关闭文件;``session_id`` 缺省 = 全量(接受同 :meth:`flush` 的归一)。
 
         全量 close 同时释放 ``SessionStore.add_observer_hook`` 反注册闭包；
         per-session close 不动 store 接管。
         """
         with self._files_lock:
-            targets = self._select(session_id)
+            targets = self._select(_normalize_session_key(session_id))
             for sid, sfile in targets:
                 try:
                     sfile.close()
@@ -210,10 +219,13 @@ class _SessionFile:
     def write_line(self, payload: Mapping[str, Any]) -> None:
         line = json.dumps(payload, ensure_ascii=False)
         self._handle.write(line + "\n")
-        if self._fsync:
-            self.flush()
+        self.flush()
 
     def flush(self) -> None:
+        # durable 镜像契约:每条 append 行立刻 flush 到 OS。依赖 buffered
+        # 写入时,长活进程会让尾部事件滞留进程缓冲,session.jsonl 在磁盘上
+        # 表现为截断(事件已入 Session 内存日志,但镜像缺尾)。
+        # ``fsync`` 只决定是否进一步强制落盘。
         self._handle.flush()
         if self._fsync:
             import os
@@ -227,6 +239,23 @@ class _SessionFile:
 
 
 # ── helpers ────────────────────────────────────────────────────────────
+
+
+def _normalize_session_key(value: object) -> str | None:
+    """把 flush / close 入参归一为 session id。
+
+    - ``None`` → ``None``(全量);
+    - ``str`` → 原样;
+    - Session-like(带 ``.id``)→ ``.id``(:class:`Session.flush` 的
+      observer-duck-type 链传 Session 对象,见 ADR-0186 flush 链);
+    - 其它形态 → 原样透传(查不到文件时 no-op,与既有语义一致)。
+    """
+    if value is None or isinstance(value, str):
+        return value
+    sid = getattr(value, "id", None)
+    if isinstance(sid, str) and sid:
+        return sid
+    return str(value)
 
 
 def _session_id(session: Any, event: SessionEvent) -> str:

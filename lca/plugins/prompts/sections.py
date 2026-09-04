@@ -326,7 +326,9 @@ class MemberStatusSection:
     ) -> SectionOutput:
         if awareness is None or awareness.consult_duty is None:
             return SectionOutput(text="(无状态板)")
-        return SectionOutput(text=label_line("MEMBER_STATUS", awareness.consult_duty.member_status.as_prompt_text()))
+        return SectionOutput(
+            text=label_line("MEMBER_STATUS", awareness.consult_duty.member_status.as_prompt_text())
+        )
 
 
 class EvidencePackSection:
@@ -436,9 +438,7 @@ def build_backstory_section(config: BaseModel) -> BackstorySection:
     return BackstorySection()
 
 
-def build_tools_section(
-    config: BaseModel, *, catalog: Callable[[], str]
-) -> ToolsSection:
+def build_tools_section(config: BaseModel, *, catalog: Callable[[], str]) -> ToolsSection:
     del config
     return ToolsSection(catalog_tools_xml_provider=catalog)
 
@@ -477,6 +477,7 @@ def build_hierarchical_instructions(config: BaseModel) -> StaticTextSection:
 
 # Stateful sections built from their config (none have knobs but kept
 # for symmetry with the pure section factories).
+
 
 def build_current_date(config: BaseModel) -> CurrentDateSection:
     del config
@@ -604,6 +605,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     # require the catalog at setup time — composition root order is
     # independent of which section plugin loads first.
     from lca.contracts.capabilities import BRAIN_PROMPT_CATALOG_FACTORY
+    from lca.contracts.mechanisms.capability import provider_current
     from lca.contracts.protocols.think.cognition import BrainPromptCatalogFactory
 
     try:
@@ -611,25 +613,40 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     except Exception:
         catalog_factory = None
 
+    class _EmptyStore:
+        def list_installed(self) -> tuple[object, ...]:
+            return ()
+
+    def _active_skill_store() -> object:
+        """渲染期取 ``skills`` capability 背后的真实 skill store。
+
+        capability 在场时 ``render_brain_skills`` 枚举已安装技能
+        (available_skills section 的真值,与 Reasoner 的 catalog hint
+        同源);缺失 / 解析失败回退空 store —— section 渲染为空、
+        assembler 标 skipped_empty,不挡业务。
+        """
+        try:
+            provider = ctx.soft_get("skills")
+        except Exception:
+            return _EmptyStore()
+        if provider is None:
+            return _EmptyStore()
+        try:
+            store = provider_current(provider)
+        except Exception:
+            return _EmptyStore()
+        return store if store is not None else _EmptyStore()
+
     def _catalog_render(render_method: str) -> Callable[[], str]:
-        if catalog_factory is None or not isinstance(
-            catalog_factory, BrainPromptCatalogFactory
-        ):
+        if catalog_factory is None or not isinstance(catalog_factory, BrainPromptCatalogFactory):
             return lambda: ""
 
         sentinel = object()
 
         def _render() -> str:
-            # Use an empty skill store + empty tool set as a stable
-            # fallback when the catalog has not been specialised yet.
             try:
-
-                class _EmptyStore:
-                    def list_installed(self) -> tuple[object, ...]:
-                        return ()
-
                 catalog = catalog_factory.create(
-                    skill_store=_EmptyStore(),  # type: ignore[arg-type]
+                    skill_store=_active_skill_store(),  # type: ignore[arg-type]
                     tools=(),
                 )
             except Exception:

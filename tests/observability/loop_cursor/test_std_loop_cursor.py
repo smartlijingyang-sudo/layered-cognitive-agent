@@ -100,6 +100,28 @@ def test_record_thinking_in_think_window_emits_ep() -> None:
     )
     assert spine.records[-1]["execution_point"] == "step.thinking.record"
     assert spine.records[-1]["payload"]["incarnation"] == 2
+    # 缺省无 text_preview ⇒ payload 不携带该键
+    assert "text_preview" not in spine.records[-1]["payload"]
+
+
+def test_record_thinking_text_preview_forwarded_into_payload() -> None:
+    """text_preview 非空时原样进 EP payload;为空时省略(与 record_tool_call arguments 同模式)。"""
+    c, spine = _make_cursor()
+    c.advance("think")
+    c.record_thinking(
+        ThinkingRecord(
+            content_digest="abc",
+            content_path="model_visible/step-001/thinking.json",
+            token_count=100,
+            thinking_kind="final_response",
+        ),
+        text_preview="the model said this",
+    )
+    payload = spine.records[-1]["payload"]
+    assert spine.records[-1]["execution_point"] == "step.thinking.record"
+    assert payload["text_preview"] == "the model said this"
+    assert payload["thinking_kind"] == "final_response"
+    assert payload["content_path"] == "model_visible/step-001/thinking.json"
 
 
 def test_record_tool_call_in_act_window() -> None:

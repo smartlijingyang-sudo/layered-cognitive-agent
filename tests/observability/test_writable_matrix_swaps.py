@@ -41,6 +41,7 @@ class _SpySpine:
 
 def _make_event(*, ep: str, seq: int, when=None, **kw) -> EventRecord:
     from datetime import datetime, timezone
+
     return EventRecord(
         execution_point=ep,
         channel="control",
@@ -122,14 +123,26 @@ def test_swap_storage_does_not_change_event_content(tmp_path: Path) -> None:
 
     spine_b = _SpySpine()
     coord_b = _build_coord(
-        spine_b, tmp_path / "b", storage=NullStorage(),
+        spine_b,
+        tmp_path / "b",
+        storage=NullStorage(),
     )
 
     _drive(coord_a, _scenario_events())
     _drive(coord_b, _scenario_events())
 
-    a_keys = sorted([(c["execution_point"], c.get("caller_payload") or c.get("payload", {})) for c in spine_a.calls])
-    b_keys = sorted([(c["execution_point"], c.get("caller_payload") or c.get("payload", {})) for c in spine_b.calls])
+    a_keys = sorted(
+        [
+            (c["execution_point"], c.get("caller_payload") or c.get("payload", {}))
+            for c in spine_a.calls
+        ]
+    )
+    b_keys = sorted(
+        [
+            (c["execution_point"], c.get("caller_payload") or c.get("payload", {}))
+            for c in spine_b.calls
+        ]
+    )
     assert a_keys == b_keys, "storage swap changed event content"
 
 
@@ -138,7 +151,9 @@ def test_swap_serializer_does_not_change_event_order(tmp_path: Path) -> None:
 
     class _DictSerializer:
         def serialize(self, record: EventRecord) -> bytes:
-            return (json.dumps({"ep": record.execution_point, "seq": record.sequence}) + "\n").encode()
+            return (
+                json.dumps({"ep": record.execution_point, "seq": record.sequence}) + "\n"
+            ).encode()
 
     spine_a = _SpySpine()
     coord_a = _build_coord(spine_a, tmp_path / "a")
@@ -196,6 +211,7 @@ def test_swap_driver_rejects_double_begin(tmp_path: Path) -> None:
 
     class _LenientDriver:
         """故意宽松的 driver：允许双重 begin。"""
+
         def begin_step(self, phase: str, **kw):
             return f"s-{len(kw)}"
 

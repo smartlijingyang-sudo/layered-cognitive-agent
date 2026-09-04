@@ -121,7 +121,9 @@ class StdLoopCursor:
         self,
         phase: PhaseName,
         *,
-        objective_kind: Literal["user_text", "agent_role", "system_role", "model_name"] = "system_role",
+        objective_kind: Literal[
+            "user_text", "agent_role", "system_role", "model_name"
+        ] = "system_role",
         objective: str = "",
         summary: str = "",
     ) -> CursorSnapshot:
@@ -221,23 +223,33 @@ class StdLoopCursor:
         )
 
     # ── record_*(4)— cursor 注入 incarnation(ADR-0169 L14) ──────────
-    def record_thinking(self, payload: ThinkingRecord) -> None:
+    def record_thinking(self, payload: ThinkingRecord, *, text_preview: str = "") -> None:
+        """Emit ``step.thinking.record`` with an optional bounded text preview.
+
+        Same forward-compat pattern as :meth:`record_tool_call`'s ``arguments``
+        kwargs: the frozen :class:`ThinkingRecord` carries digest / path /
+        token_count / kind, and callers may additionally attach
+        ``text_preview`` (a short prefix of the thinking text) so step-tree
+        readers can render the thinking without fetching the sidecar file.
+        Non-empty ``text_preview`` is forwarded verbatim into the spine event
+        payload; empty string is omitted from the payload.
+        """
         self._ensure_open()
         self._ensure_not_halted()
         if self._state.phase != "think":
             raise CursorError("record_thinking must be in THINK window")
-        self._append(
-            execution_point="step.thinking.record",
-            payload={
-                "content_digest": payload.content_digest,
-                "content_path": payload.content_path,
-                "token_count": payload.token_count,
-                "thinking_kind": payload.thinking_kind,
-                "incarnation": self._state.incarnation.incarnation_seq,
-                "plan_ref": self._state.incarnation.plan_ref,
-                "step_index": self._state.step_index,
-            },
-        )
+        event_payload: dict[str, object] = {
+            "content_digest": payload.content_digest,
+            "content_path": payload.content_path,
+            "token_count": payload.token_count,
+            "thinking_kind": payload.thinking_kind,
+            "incarnation": self._state.incarnation.incarnation_seq,
+            "plan_ref": self._state.incarnation.plan_ref,
+            "step_index": self._state.step_index,
+        }
+        if text_preview:
+            event_payload["text_preview"] = text_preview
+        self._append(execution_point="step.thinking.record", payload=event_payload)
 
     def record_tool_call(
         self,

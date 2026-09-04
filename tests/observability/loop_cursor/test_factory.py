@@ -97,6 +97,7 @@ def test_factory_raises_when_profile_missing_plan_ref() -> None:
     这是 ADR-0068 §决策二的回归锁:任何在 factory 路径重新引入
     ``getattr(profile, "plan_ref", "default")`` 的提交都会让本测试 fail。
     """
+
     @dataclass
     class _NoPlanRef:
         observability: dict = field(default_factory=dict)

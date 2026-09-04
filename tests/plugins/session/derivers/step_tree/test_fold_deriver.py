@@ -4,12 +4,14 @@
 - fold_step_tree: 从 dict 事件流 fold 出 JournalDocument
 - StepTreeFoldDeriver: derive 写 journal.json + document 可读
 - derive_step_tree: 一次性 fold + 写盘
-- 与旧 StepTreeAccumulatorDeriver 语义等价(fold 路径 vs callback 路径)
+- flush 合并 Session 快照(spine.* 前缀)+ spine ledger(裸 EP),精确重复去重
+- run_b2c1424d93d4 真实形态回归锁(journal steps/phases 非空)
 """
 
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -18,6 +20,7 @@ from lca.plugins.session.derivers.step_tree import (
     derive_step_tree,
 )
 from lca.plugins.session.derivers.step_tree.journal_fold import fold_step_tree
+from lca_kernel.events.session import SessionEvent
 
 # ── fold_step_tree 纯函数 ────────────────────────────────────────
 
@@ -328,8 +331,6 @@ def test_fold_metadata_passthrough() -> None:
 
 def test_fold_iso_when_and_session_event() -> None:
     """ISO when 字符串 + SessionEvent 信封都能 fold 出 step。"""
-    from lca_kernel.events.session import SessionEvent
-
     events = [
         {
             "execution_point": "writable.step.start",
@@ -388,12 +389,13 @@ def test_deriver_flush_from_spine_reader(tmp_path: Path) -> None:
     assert deriver.document.totals.steps == 1
 
 
-def test_deriver_flush_prefers_spine_over_session_snapshot(tmp_path: Path) -> None:
-    """spine ledger 优先于 Session.snapshot_events(H-xref 回归锁)。
+def test_deriver_flush_folds_spine_alongside_session_snapshot(tmp_path: Path) -> None:
+    """Session 快照含非 fold 词表时,spine ledger 的 step 事件仍被 fold(H-xref 回归锁)。
 
     生产 run 的 Session log 承载 runtime SSE 词表(无 fold 闭集 EP),
-    spine ledger 承载 phase/step 词表;fold 必须读 spine,否则 journal
-    totals 恒 0、doctor H-xref 断(回归:run_b2c1424d93d4 等 4 连发)。
+    spine ledger 承载 phase/step 词表;flush 取并集后 fold 必须仍能读
+    出 spine 侧的 step,否则 journal totals 恒 0、doctor H-xref 断
+    (回归:run_b2c1424d93d4 等 4 连发)。
     """
     from lca.plugins.session.runtime.session import Session
 
@@ -491,3 +493,216 @@ def test_step_tree_bundle_flush_passes_outcome(tmp_path: Path) -> None:
     assert deriver.document is not None
     assert deriver.document.metadata.outcome == "failed"
     assert narrative.docs == [deriver.document]
+
+
+# ── Session 快照 + spine ledger 并集 ─────────────────────────────
+
+
+class _FakeSession:
+    """snapshot_events duck-type:固定回归时间戳,不用真实 Session 的 now() 盖章。"""
+
+    def __init__(self, events: Sequence[SessionEvent]) -> None:
+        self._events = tuple(events)
+
+    def snapshot_events(self) -> tuple[SessionEvent, ...]:
+        return self._events
+
+
+def test_deriver_flush_merges_session_snapshot_and_spine_with_dedup(tmp_path: Path) -> None:
+    """Session 快照(spine.* 前缀)+ spine jsonl(裸 EP)按 epoch 合并;精确重复去重。"""
+    run_id = "r_merge"
+    session = _FakeSession(
+        (
+            SessionEvent(
+                type="spine.cognition.brain.think.start",
+                seq=0,
+                time=1_788_512_185_993,
+                data={"state_id": "t"},
+            ),
+            # 与 spine 文件的 phase.think.fold 同源:同 EP + 同时间戳 + 同 payload → 去重
+            SessionEvent(
+                type="spine.phase.think.fold",
+                seq=1,
+                time=1_788_512_186_013,
+                data={"summary": "respond", "step_index": 1},
+            ),
+            SessionEvent(
+                type="spine.runtime.event_publisher.publish",
+                seq=2,
+                time=1_788_512_188_973,
+                data={"event_type": "completed", "outcome": "success"},
+            ),
+        )
+    )
+    spine_path = tmp_path / f"{run_id}.spine.jsonl"
+    spine_path.write_text(
+        "".join(
+            json.dumps(event) + "\n"
+            for event in (
+                {
+                    "execution_point": "phase.think.fold",
+                    "payload": {"summary": "respond", "step_index": 1},
+                    "when": 1788512186.013,
+                },
+                {
+                    "execution_point": "llm.request.header",
+                    "payload": {
+                        "step_id": "step-001",
+                        "model": "qwen3.7-plus",
+                        "reason": "initial",
+                    },
+                    "when": 1788512186.015,
+                },
+            )
+        ),
+        encoding="utf-8",
+    )
+    deriver = StepTreeFoldDeriver(
+        run_id=run_id, run_dir=tmp_path, spine_path=spine_path, session=session
+    )
+    deriver.flush()
+
+    doc = deriver.document
+    assert doc is not None
+    assert doc.totals is not None
+    # DSH 切步:一步 = 一次模型请求。brain.think.start 开的隐式 think 帧
+    # 被 llm.request.header 原地升级(采用 step-001 / model / reason),
+    # 不重复计步。
+    assert doc.totals.steps == 1
+    assert [s.step_id for s in doc.steps] == ["step-001"]
+    assert doc.steps[0].outcome == "success"
+    # 去重:两流同条 phase.think.fold 只计一次
+    assert doc.totals.phases == 1
+    assert doc.totals.segments == sum(len(s.segments) for s in doc.steps)
+    assert doc.metadata.outcome == "completed"
+
+
+# ── 回归锁:run_b2c1424d93d4 真实形态 ───────────────────────────
+
+
+# traces/runs/run_b2c1424d93d4 Session 流(spine.* CATEGORY 前缀 type,epoch 毫秒)。
+_RUN_B2C1424D93D4_SESSION: tuple[tuple[str, int, dict[str, object]], ...] = (
+    (
+        "spine.transport.route.exit",
+        1788512185857,
+        {"path": "/runs", "method": "POST", "run_id": "", "outcome": "success", "carrier_seq": 3},
+    ),
+    (
+        "spine.kernel.run.start",
+        1788512185861,
+        {"run_id": "run_b2c1424d93d4", "trace_id": "trace_0af62ccdd1cb"},
+    ),
+    (
+        "spine.agent_loop.iteration.start",
+        1788512185904,
+        {"trace_id": "trace_0af62ccdd1cb", "role": "助手", "iteration_kind": "fresh"},
+    ),
+    (
+        "spine.runtime.event_publisher.publish",
+        1788512185929,
+        {"event_type": "started", "trace_id": "trace_0af62ccdd1cb", "outcome": "success"},
+    ),
+    ("spine.cognition.brain.think.start", 1788512185993, {"state_id": "trace_0af62ccdd1cb"}),
+    (
+        "spine.cognition.brain.think.end",
+        1788512188840,
+        {"state_id": "trace_0af62ccdd1cb", "outcome": "success"},
+    ),
+    (
+        "spine.runtime.event_publisher.publish",
+        1788512188973,
+        {"event_type": "completed", "trace_id": "trace_0af62ccdd1cb", "outcome": "success"},
+    ),
+    (
+        "spine.kernel.run.stop",
+        1788512188977,
+        {"run_id": "run_b2c1424d93d4", "trace_id": "trace_0af62ccdd1cb", "outcome": "success"},
+    ),
+)
+
+# traces/runs/run_b2c1424d93d4 spine ledger 的 fold 闭集 EP(裸 EP,ISO when)。
+_RUN_B2C1424D93D4_SPINE: tuple[dict[str, object], ...] = (
+    {
+        "execution_point": "phase.perceive.fold",
+        "outcome": None,
+        "when": "2026-09-04T08:56:25.989790+00:00",
+        "phase": "perceive",
+        "payload": {"phase": "perceive", "summary": "", "step_index": 0},
+    },
+    {
+        "execution_point": "phase.think.fold",
+        "outcome": None,
+        "when": "2026-09-04T08:56:26.013625+00:00",
+        "phase": "think",
+        "payload": {"phase": "think", "summary": "", "step_index": 0},
+    },
+    {
+        "execution_point": "llm.request.header",
+        "outcome": None,
+        "when": "2026-09-04T08:56:26.015711+00:00",
+        "phase": "think",
+        "payload": {
+            "step_id": "step-001",
+            "incarnation": 1,
+            "plan_ref": "70cf2314ccbcd0bf",
+            "reason": "initial",
+            "model": "qwen3.7-plus",
+            "messages_path": "model_visible/step-001/messages.json",
+        },
+    },
+    {
+        "execution_point": "phase.think.fold",
+        "outcome": None,
+        "when": "2026-09-04T08:56:26.015843+00:00",
+        "phase": "think",
+        "payload": {"phase": "think", "summary": "started", "step_index": 1},
+    },
+    {
+        "execution_point": "phase.think.fold",
+        "outcome": None,
+        "when": "2026-09-04T08:56:28.835821+00:00",
+        "phase": "think",
+        "payload": {"phase": "think", "summary": "respond", "step_index": 1},
+    },
+)
+
+
+def test_regression_run_b2c1424d93d4_journal_not_empty(tmp_path: Path) -> None:
+    """回归锁(run_b2c1424d93d4):Session 前缀事件 + spine 裸 EP 并集 fold 出非空 journal。
+
+    修复前症状:Session 流 type 是 spine.* CATEGORY 前缀,fold 按裸 EP
+    匹配 → 零命中 → journal.json steps=[] / phases=[]。
+    """
+    run_id = "run_b2c1424d93d4"
+    session = _FakeSession(
+        tuple(
+            SessionEvent(type=event_type, seq=seq, time=time_ms, data=data)
+            for seq, (event_type, time_ms, data) in enumerate(_RUN_B2C1424D93D4_SESSION)
+        )
+    )
+    spine_path = tmp_path / f"{run_id}.spine.jsonl"
+    spine_path.write_text(
+        "".join(json.dumps(event) + "\n" for event in _RUN_B2C1424D93D4_SPINE),
+        encoding="utf-8",
+    )
+    deriver = StepTreeFoldDeriver(
+        run_id=run_id,
+        run_dir=tmp_path,
+        spine_path=spine_path,
+        session=session,
+        objective="用一句话回答:1+1等于几?",
+    )
+    deriver.flush()
+
+    doc = deriver.document
+    assert doc is not None
+    assert doc.totals is not None
+    assert doc.totals.steps >= 1
+    assert doc.totals.phases >= 4
+    assert any(step.step_id == "step-001" for step in doc.steps)
+    assert doc.metadata.outcome == "completed"
+
+    journal = json.loads((tmp_path / "journal.json").read_text(encoding="utf-8"))
+    assert journal["steps"], "journal.json steps 不得为空(回归症状)"
+    assert journal["totals"]["steps"] >= 1
+    assert journal["totals"]["phases"] >= 4

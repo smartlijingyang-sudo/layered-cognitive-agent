@@ -147,11 +147,34 @@ class InMemoryLoopCursor:
         s.phase = None
 
     # ── record_*:在正确 phase window 才能调(L5 / L6) ──────────
-    def record_thinking(self, payload: object) -> None:
+    def record_thinking(self, payload: object, *, text_preview: str = "") -> None:
+        """THINK 窗口内记录;有 spine 时落 ``step.thinking.record`` EP(与 Std 同口径)。"""
         self._ensure_open()
         self._ensure_not_halted()
         if self._state.phase != "think":
             raise CursorError("record_thinking must be in THINK window")
+        if self._spine is not None:
+            s = self._state
+            s.seq += 1
+            event_payload: dict[str, object] = {
+                "content_digest": getattr(payload, "content_digest", None),
+                "content_path": getattr(payload, "content_path", None),
+                "token_count": getattr(payload, "token_count", None),
+                "thinking_kind": getattr(payload, "thinking_kind", None),
+                "incarnation": s.incarnation.incarnation_seq,
+                "plan_ref": s.incarnation.plan_ref,
+                "step_index": s.step_index,
+            }
+            if text_preview:
+                event_payload["text_preview"] = text_preview
+            self._spine.append(
+                execution_point="step.thinking.record",
+                payload=event_payload,
+                run_id=s.run_id,
+                seq=s.seq,
+                incarnation=s.incarnation.incarnation_seq,
+                phase=s.phase,
+            )
 
     def record_tool_call(self, payload: object) -> None:
         self._ensure_open()

@@ -142,6 +142,23 @@ def test_spine_file_sink_close_blocks_further_writes(tmp_path: Path) -> None:
         sink.flush()
 
 
+def test_spine_file_sink_default_path_lands_under_traces_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """run_dir 缺省时落 ``traces/runs/<run_id>/<run_id>.spine.jsonl``。
+
+    回归锁:缺省曾退回 ``Path.cwd()``,仓库根散落游离镜像文件。
+    """
+    monkeypatch.chdir(tmp_path)
+    sink = SpineFileSink()
+    sink(_payload(), _ref("run-default-path:0"))
+
+    target = tmp_path / "traces" / "runs" / "run-default-path" / "run-default-path.spine.jsonl"
+    assert target.exists()
+    assert json.loads(target.read_text(encoding="utf-8"))["event_id"] == "run-default-path:0"
+    assert not (tmp_path / "run-default-path.spine.jsonl").exists()
+
+
 @pytest.mark.parametrize(
     ("event_id", "expected"),
     [("run-1:0", "run-1"), ("ns:run-2:17", "ns:run-2"), ("run-x:3", "run-x")],

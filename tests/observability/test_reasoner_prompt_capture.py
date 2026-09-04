@@ -126,6 +126,63 @@ def _make_current_prompt():
     )
 
 
+def test_reasoner_binds_prompt_trace_and_context_manifest() -> None:
+    """``PromptReasoner._bind_reasoner_prompt`` 把 PromptTrace + ContextManifest 带进 ContextVar。
+
+    LLM 边界(ModelVisibleLLMAdapter)从绑定真值读 ``prompt_trace`` /
+    ``context_manifest`` 派生 model_visible 上下文清单(ADR-0167 D3/D4);
+    缺省 None 字段保留既有 4 标量构造的有效性。
+    """
+    from lca.cognition.brain.reasoner import PromptReasoner
+    from lca.contracts.models.core.perception import ContextItem, ContextManifest
+    from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
+
+    class _UnusedLLM:
+        name = "unused"
+
+        async def complete(self, prompt: str, **kwargs: object) -> object:  # pragma: no cover
+            raise AssertionError("llm not used by _bind_reasoner_prompt")
+
+        async def stream(self, prompt: str, **kwargs: object):  # pragma: no cover
+            raise AssertionError("llm not used by _bind_reasoner_prompt")
+            yield  # pragma: no cover
+
+    reasoner = PromptReasoner(
+        llm=_UnusedLLM(),
+        role_profile=RoleProfile(
+            role="r",
+            goal="g",
+            backstory="b",
+            tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
+        ),
+    )
+    trace = _trace()
+    manifest = ContextManifest(
+        items=(ContextItem(kind="clock", payload="2026-09-04", provenance="clock_sensor"),)
+    )
+
+    token = reasoner._bind_reasoner_prompt(trace, manifest)
+    try:
+        bound = get_current_reasoner_prompt()
+        assert bound is not None
+        assert bound.system_prompt_text == trace.system_prompt_text
+        assert bound.template_id == trace.template_id
+        assert bound.prompt_trace is trace
+        assert bound.context_manifest is manifest
+    finally:
+        reset_current_reasoner_prompt(token)
+
+    # manifest 缺席时绑定仍成立,context_manifest 为 None
+    token2 = reasoner._bind_reasoner_prompt(trace, None)
+    try:
+        bound2 = get_current_reasoner_prompt()
+        assert bound2 is not None
+        assert bound2.prompt_trace is trace
+        assert bound2.context_manifest is None
+    finally:
+        reset_current_reasoner_prompt(token2)
+
+
 # ── ADR-0176 D3/D4 regressions ────────────────────────────
 
 

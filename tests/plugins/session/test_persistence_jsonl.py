@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
+
+import pytest
 
 from lca.plugins.session.persistence_jsonl.persistence_jsonl import (
     Config,
@@ -26,9 +28,6 @@ from lca.plugins.session.persistence_jsonl.persistence_jsonl import (
 )
 from lca.plugins.session.runtime.store import SessionStore
 from lca_kernel.events.session import SessionEvent
-
-if TYPE_CHECKING:
-    import pytest
 
 # ── helpers ─────────────────────────────────────────────────────────
 
@@ -87,6 +86,23 @@ def test_register_to_writes_header_then_events(tmp_path: Path) -> None:
     assert lines[2]["seq"] == 1
 
 
+def test_append_durable_without_explicit_flush(tmp_path: Path) -> None:
+    """durable 镜像契约:append 后无需显式 flush,行已在磁盘。
+
+    回归锁:长活进程里依赖 buffered 写入会让尾部事件滞留进程缓冲,
+    session.jsonl 在磁盘上截断(事件已入 Session 内存日志,镜像缺尾)。
+    """
+    store = SessionStore()
+    session = store.create("s-durable")
+    persistence = JsonlSessionPersistence(runs_root=tmp_path)
+
+    persistence.register_to(session)
+    session.append("spine.turn.started", {"turn": 1})
+
+    lines = _read_jsonl(persistence.local_path("s-durable"))
+    assert _event_types(lines) == ["spine.turn.started"]
+
+
 def test_header_only_written_once(tmp_path: Path) -> None:
     """重复 append 不重复 header 行。"""
     store = SessionStore()
@@ -130,6 +146,38 @@ def test_local_path_does_not_create_file(tmp_path: Path) -> None:
 
 
 # ── flush / close ────────────────────────────────────────────────────
+
+
+def test_flush_accepts_session_object(tmp_path: Path) -> None:
+    """``Session.flush()`` duck-type 链以 ``observer.flush(session)`` 调用;
+    persistence 必须把 Session-like 入参经 ``.id`` 归一,而不是静默 no-op。
+    """
+    store = SessionStore()
+    session = store.create("s-obj-flush")
+    persistence = JsonlSessionPersistence(runs_root=tmp_path)
+
+    persistence.register_to(session)
+    session.append("evt", {"k": 1})
+    persistence.flush(session)
+
+    assert _event_types(_read_jsonl(persistence.local_path("s-obj-flush"))) == ["evt"]
+
+
+@pytest.mark.asyncio
+async def test_session_flush_chain_reaches_persistence(tmp_path: Path) -> None:
+    """端到端:``await session.flush()`` 经 observer-duck-type flush 落盘。
+
+    (``asyncio_mode = "auto"``,marker 仅为显式标注异步契约。)
+    """
+    store = SessionStore()
+    session = store.create("s-chain")
+    persistence = JsonlSessionPersistence(runs_root=tmp_path)
+
+    persistence.register_to(session)
+    session.append("evt", {"k": 1})
+    await session.flush()
+
+    assert _event_types(_read_jsonl(persistence.local_path("s-chain"))) == ["evt"]
 
 
 def test_flush_specific_session_does_not_touch_others(tmp_path: Path) -> None:

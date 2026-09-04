@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -68,6 +69,7 @@ class StdModelVisibleCapture(ModelVisibleCapture):
         <run_dir>/model_visible/<step_id>/messages.json  # messages_overview.system + messages[]
         <run_dir>/model_visible/<step_id>/manifest.json
         <run_dir>/model_visible/<step_id>/inherited.json   # 当 inherited_from_step 非 None
+        <run_dir>/model_visible/<step_id>/context-manifest.json  # 当 context_manifest 非 None
         # 注:system_prompt.json / system_prompt_sections.json 由 StdReasonerPromptCapture 写,
         #   不再由本 Capture 写。system 数据合并到 messages.json 的 messages_overview.system 区段。
     """
@@ -90,6 +92,7 @@ class StdModelVisibleCapture(ModelVisibleCapture):
         messages: list[Any],
         manifest: Any,
         inherited_from_step: str | None = None,
+        context_manifest: Mapping[str, Any] | None = None,
     ) -> ModelVisibleArtifact:
         # 路径就位:<run_dir>/model_visible/<step_id>/
         step_dir = self._run_dir / "model_visible" / step_id
@@ -105,9 +108,7 @@ class StdModelVisibleCapture(ModelVisibleCapture):
         # 但调用方仍可能传带 to_openai_dict() 方法的 SDK 对象;统一走 ToolSchema.from_any。
         from lca.contracts.observability.loop_cursor_payloads import ToolSchema
 
-        normalised = [
-            t if isinstance(t, ToolSchema) else ToolSchema.from_any(t) for t in tools
-        ]
+        normalised = [t if isinstance(t, ToolSchema) else ToolSchema.from_any(t) for t in tools]
         tools_digest = _write_json(
             tools_path,
             _to_jsonable([t.to_openai_dict() for t in normalised]),
@@ -146,6 +147,15 @@ class StdModelVisibleCapture(ModelVisibleCapture):
                 },
             )
 
+        # context-manifest.json:仅当 context_manifest 非 None 时写;原样落盘
+        # (不加包装元数据),replay cursor 读回后按 canonical sha256 对位
+        # RequestHeader.manifest_digest(ADR-0167 D3/D4)。
+        context_manifest_file: Path | None = None
+        context_manifest_digest: str | None = None
+        if context_manifest is not None:
+            context_manifest_file = step_dir / "context-manifest.json"
+            context_manifest_digest = _write_json(context_manifest_file, context_manifest)
+
         # ADR-0176 D4:system_path 不再指向独立 system.json,而是 messages.json
         # 的 messages_overview.system 区段;前端 viewer 据此找到完整 system 上下文。
         # COMPAT(delete-when: 所有调用方已迁移到 system_path 指向 messages.json,
@@ -161,12 +171,18 @@ class StdModelVisibleCapture(ModelVisibleCapture):
                 if inherited_path is not None
                 else None
             ),
+            context_manifest_path=(
+                _relative_posix(self._run_dir, context_manifest_file)
+                if context_manifest_file is not None
+                else None
+            ),
             # system_digest 复用 messages_digest;调用方需要时仍可读 system 段
             # 的 content_digest。本字段保留 Protocol 兼容性。
             system_digest=messages_digest,
             tools_digest=tools_digest,
             messages_digest=messages_digest,
             manifest_digest=manifest_digest,
+            context_manifest_digest=context_manifest_digest,
         )
 
 

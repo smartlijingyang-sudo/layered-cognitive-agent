@@ -31,10 +31,7 @@ from lca.infrastructure.observability.loop_cursor.projections.defaults import (
     _GraphState,
 )
 from lca.infrastructure.observability.spine.event_record import (
-    Channel,
     EventRecord,
-    Outcome,
-    Phase,
 )
 
 

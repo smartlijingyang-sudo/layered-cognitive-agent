@@ -106,7 +106,9 @@ class LoopCursor(Protocol):
     def close(self, reason: CloseReason) -> None: ...
 
     # ── 事实记录(4) ──────────────────────────────────────────────
-    def record_thinking(self, payload: ThinkingRecord) -> None: ...  # noqa: F821
+    def record_thinking(
+        self, payload: ThinkingRecord, *, text_preview: str = ""  # noqa: F821
+    ) -> None: ...
     def record_tool_call(self, payload: ToolCallRecord) -> None: ...  # noqa: F821
     def record_tool_result(self, payload: ToolResultRecord) -> None: ...  # noqa: F821
 

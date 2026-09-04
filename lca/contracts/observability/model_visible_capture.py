@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -34,6 +35,9 @@ class ModelVisibleArtifact:
       解析时由 ``run_dir / path`` 还原。
     - inherited_* 仅当 ``inherited_from_step`` 非 None 时有意义;
       inherited_path 为 None 表示「没有上一 step 可继承」语义(本 step 是初始)。
+    - context_manifest_* 仅当调用方传入 ``context_manifest`` 时有意义(写
+      ``context-manifest.json``,ADR-0167 D3/D4);None 表示未写,
+      RequestHeader.manifest_digest/path 回退指向 manifest.json。
     """
 
     step_id: str
@@ -47,6 +51,8 @@ class ModelVisibleArtifact:
     tools_digest: str
     messages_digest: str
     manifest_digest: str
+    context_manifest_path: str | None = None
+    context_manifest_digest: str | None = None
 
 
 class ModelVisibleCapture(Protocol):
@@ -74,6 +80,7 @@ class ModelVisibleCapture(Protocol):
         messages: list[Any],
         manifest: Any,
         inherited_from_step: str | None = None,
+        context_manifest: Mapping[str, Any] | None = None,
     ) -> ModelVisibleArtifact:
         """写 5 件套到 model_visible/step_<NN>/,并返回 digest + relpath 打包。
 
@@ -88,9 +95,16 @@ class ModelVisibleCapture(Protocol):
                                       由实现选择可 JSON 化字段。
             inherited_from_step     : 前一可继承 step 的 step_id;None ⇒ 本 step
                                       是初始(不写 inherited 文件)。
+            context_manifest        : 可选;非 None 时原样写 ``context-manifest.json``
+                                      (不加包装元数据),artifact 的
+                                      context_manifest_digest/path 指向该文件
+                                      (ADR-0167 D3/D4;replay cursor 据此对位
+                                      RequestHeader.manifest_digest)。None ⇒ 不写,
+                                      artifact 对应字段为 None。
 
         返回:
-            ``ModelVisibleArtifact``:5 个文件路径 + 4 个 digest。
+            ``ModelVisibleArtifact``:5 个文件路径 + 4 个 digest(外加可选
+            context_manifest_digest/path)。
             调用方负责把这份 artifact 喂给 ``cursor.record_request_header(...)``。
         """
         ...

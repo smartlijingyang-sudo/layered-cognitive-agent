@@ -125,7 +125,11 @@ def test_from_profile_returns_runtime_with_five_seams(tmp_path: Path) -> None:
     runtime = _build_runtime(tmp_path)
 
     assert runtime.cursor_factory is not None
-    assert callable(runtime.cursor_factory) and getattr(runtime.cursor_factory, "__func__", runtime.cursor_factory) is LoopCursorFactory.from_profile
+    assert (
+        callable(runtime.cursor_factory)
+        and getattr(runtime.cursor_factory, "__func__", runtime.cursor_factory)
+        is LoopCursorFactory.from_profile
+    )
     assert runtime.projection_host is not None
     assert isinstance(runtime.projection_host, StdProjectionHost)
     assert runtime.persistence is not None

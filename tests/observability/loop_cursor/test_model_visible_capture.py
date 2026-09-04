@@ -306,3 +306,57 @@ def test_files_under_model_visible_use_step_id_subdir(tmp_path: Path) -> None:
     assert not (base / "system.json").exists()
     for stem in ("tools", "messages", "manifest"):
         assert (base / f"{stem}.json").is_file(), f"missing {stem}.json"
+
+
+def test_capture_writes_context_manifest_when_provided(tmp_path: Path) -> None:
+    """context_manifest 非 None ⇒ 原样写 context-manifest.json,digest/path 上 artifact。"""
+    run_dir = tmp_path / "r7"
+    capture = StdModelVisibleCapture(run_dir=run_dir)
+    context_manifest = {
+        "source": "model_visible_llm_adapter",
+        "activated_skill_ids": ["skill.a"],
+        "sections": [{"name": "role", "text_chars": 5}],
+    }
+    artifact = capture.capture(
+        step_id="step-005",
+        incarnation=1,
+        system="s",
+        tools=[],
+        messages=[],
+        manifest={"objective": "x"},
+        context_manifest=context_manifest,
+    )
+
+    ctx_path = run_dir / "model_visible" / "step-005" / "context-manifest.json"
+    assert ctx_path.is_file()
+    # 原样落盘(无包装元数据)— replay cursor 读回后可直接对位 digest
+    assert json.loads(ctx_path.read_text(encoding="utf-8")) == context_manifest
+    assert artifact.context_manifest_path == "model_visible/step-005/context-manifest.json"
+    assert artifact.context_manifest_digest is not None
+    assert artifact.context_manifest_digest.startswith("sha256:")
+    # digest 与文件内容一致
+    raw = ctx_path.read_text(encoding="utf-8")
+    jsonable = json.loads(raw)
+    encoded = json.dumps(jsonable, sort_keys=True, ensure_ascii=False, default=str).encode(
+        "utf-8"
+    )
+    assert artifact.context_manifest_digest == _sha256(encoded)
+    # manifest.json 仍照常写(两文件并存)
+    assert (run_dir / "model_visible" / "step-005" / "manifest.json").is_file()
+
+
+def test_capture_context_manifest_absent_by_default(tmp_path: Path) -> None:
+    """context_manifest 缺省 None ⇒ 不写文件,artifact 对应字段为 None。"""
+    run_dir = tmp_path / "r8"
+    capture = StdModelVisibleCapture(run_dir=run_dir)
+    artifact = capture.capture(
+        step_id="step-006",
+        incarnation=1,
+        system="s",
+        tools=[],
+        messages=[],
+        manifest={"objective": "x"},
+    )
+    assert not (run_dir / "model_visible" / "step-006" / "context-manifest.json").exists()
+    assert artifact.context_manifest_path is None
+    assert artifact.context_manifest_digest is None

@@ -61,11 +61,10 @@ class _Profile:
     runs_root: str = "traces/runs/r-test"
 
 
-
-
 def _build_seam_ctx() -> Any:
     """Build a cordis Context pre-populated with the five observability seam registries (PR-7)."""
     from cordis import Context
+
     from lca.infrastructure.observability import NamedRegistry
     from lca.infrastructure.observability.loop_cursor.persistence_coordinator import (
         NullPersistenceCoordinator,
@@ -113,7 +112,11 @@ def test_runtime_holds_five_seam_components(tmp_path: Path) -> None:
     """``ObservabilityRuntime`` 五缝字段都被填:cursor_factory / host / persistence / capture / barrier(ADR-0169 D8)。"""
     runtime = _build_runtime(tmp_path)
 
-    assert callable(runtime.cursor_factory) and getattr(runtime.cursor_factory, "__func__", runtime.cursor_factory) is LoopCursorFactory.from_profile
+    assert (
+        callable(runtime.cursor_factory)
+        and getattr(runtime.cursor_factory, "__func__", runtime.cursor_factory)
+        is LoopCursorFactory.from_profile
+    )
     assert isinstance(runtime.projection_host, StdProjectionHost)
     # persistence 是调用方注入的 stub
     assert runtime.persistence is not None
