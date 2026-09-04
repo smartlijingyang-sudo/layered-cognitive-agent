@@ -120,6 +120,7 @@ class StepScan:
     phase_fold_objective_anomalies: tuple[dict[str, Any], ...] = ()
     tool_schema_count: int = -1  # -1 → fold 与 sidecar 均缺失
     tool_schema_empty_count: int = 0
+    tool_schema_source: str = "none"  # "fold" | "sidecar" | "none"
     # ADR-0185 PR-3.1:doctor fold 优先双轨 (fold → sidecar → journal 推导)。
     # ``fold_*`` 字段记录 doctor 走 :func:`fold_model_visible` 重建的命中统计;
     # 双轨期任一步 fold 命中即视为 fold 路径优先,``fold_source`` 表

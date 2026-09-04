@@ -169,23 +169,33 @@ def _scan_tool_schemas(
     run_dir: Path,
     run_id: str,
     spine_path: Path | None,
-) -> tuple[int, int]:
-    """H-mv-journal 计数:(非空, 空);均缺失 → (-1, 0)。
+) -> tuple[int, int, str]:
+    """H-mv-journal 计数:(非空, 空, source);均缺失 → (-1, 0, "none")。
 
-    优先 :func:`fold_model_visible`;fold 返回 None 时回退 sidecar
-    ``model_visible/<step_id>/tools.json``。任一 step 取首个命中源。
+    优先 :func:`fold_model_visible`;fold 返回 None 或 tools 空列表时回退
+    sidecar ``model_visible/<step_id>/tools.json``。
     """
     step_ids = _mv_candidate_step_ids(run_dir, spine_path)
     for step_id in step_ids:
         folded = fold_model_visible(run_dir=run_dir, run_id=run_id, step_id=step_id)
-        if folded is not None:
-            return _count_tool_schemas(folded.tool_schemas)
+        if folded is None:
+            continue
+        # fold_source 在 payload 缺字段时可能只 fold 出 EpochHeader.tools,
+        # tool_schemas 为空;两者任一非空即视为 fold 命中。
+        schemas: Any = folded.tool_schemas
+        if not schemas and folded.header is not None and folded.header.tools:
+            schemas = folded.header.tools
+        if not schemas:
+            continue
+        nonempty, empty = _count_tool_schemas(schemas)
+        return nonempty, empty, "fold"
     # COMPAT(delete-when: PR-4 收口 fold 为唯一 model-visible 入口, tracking: ADR-0185)
     for step_id in step_ids:
         data = _sidecar_tools_json(run_dir, step_id)
         if data is not None:
-            return _count_tool_schemas(data)
-    return -1, 0
+            nonempty, empty = _count_tool_schemas(data)
+            return nonempty, empty, "sidecar"
+    return -1, 0, "none"
 
 
 def _scan_xref(run_dir: Path, run_id: str, scan: StepScan) -> StepScan:
@@ -283,25 +293,9 @@ def _scan_xref(run_dir: Path, run_id: str, scan: StepScan) -> StepScan:
     # 用 dataclasses.replace 改 immutable 上的字段;slots 不会触发 FrozenInstanceError。
     from dataclasses import replace as _dc_replace
 
-    # H-mv-journal: model_visible/tools.json 非空 schema 数。
-    tool_schema_count: int = -1
-    tool_schema_empty_count: int = 0
-    mv_dir = run_dir / "model_visible"
-    if mv_dir.is_dir():
-        for step_dir in sorted(mv_dir.iterdir()):
-            tools_path = step_dir / "tools.json"
-            if tools_path.exists():
-                try:
-                    data = json.loads(tools_path.read_text(encoding="utf-8"))
-                    if isinstance(data, list):
-                        tool_schema_count = sum(1 for x in data if isinstance(x, dict) and x)
-                        tool_schema_empty_count = sum(
-                            1 for x in data if isinstance(x, dict) and not x
-                        )
-                except Exception as exc:
-                    _log = _safe_logger()
-                    _log.debug("h_xref.bad_tools_json", error=str(exc))
-                break
+    tool_schema_count, tool_schema_empty_count, tool_schema_source = _scan_tool_schemas(
+        run_dir, run_id, spine_path
+    )
 
     return _dc_replace(
         scan,
@@ -317,6 +311,7 @@ def _scan_xref(run_dir: Path, run_id: str, scan: StepScan) -> StepScan:
         phase_fold_objective_anomalies=tuple(phase_fold_objective_anomalies),
         tool_schema_count=tool_schema_count,
         tool_schema_empty_count=tool_schema_empty_count,
+        tool_schema_source=tool_schema_source,
     )
 
 
@@ -368,8 +363,10 @@ def _scan_fold(
         spine_path = None
 
     if spine_path is None:
-        # 没有 spine ledger → fold 路径不适用,但仍记录 attempted=True
-        # 让 H-fold 给出「spine 缺失,fold 路径不可用」的状态。
+        # 没有 spine ledger → fold 路径不可用,所有 step 视为 fold miss
+        # (非故障,走 sidecar / journal 推导兜底)。仍记录 attempted=True
+        # 让 H-fold 给出「spine 缺失,fold 路径不可用」的状态;fold_source
+        # 标 "sidecar" 表示"实际 viewer 会退化到 sidecar 兜底"。
         _log = _safe_logger()
         _log.debug(
             "h_fold.spine_missing",
@@ -381,7 +378,7 @@ def _scan_fold(
             fold_attempted=True,
             fold_hits=0,
             fold_misses=scan.total_steps,
-            fold_source="none",
+            fold_source="sidecar",
             fold_step_hits=(),
             fold_step_misses=tuple(s.step_index for s in doc.steps),
         )
@@ -793,6 +790,7 @@ def diagnose_step_tree(
             "flush_errors": list(xref_scan.flush_errors),
             "tool_schema_count": xref_scan.tool_schema_count,
             "tool_schema_empty_count": xref_scan.tool_schema_empty_count,
+            "tool_schema_source": xref_scan.tool_schema_source,
             "phase_fold_objective_anomalies": list(xref_scan.phase_fold_objective_anomalies),
             "fold_source": fold_scan.fold_source,
             "fold_attempted": fold_scan.fold_attempted,
@@ -912,6 +910,7 @@ def _hop_h_mv_journal(scan: StepScan) -> HopVerdict:
     extra: dict[str, Any] = {
         "tool_schema_count": scan.tool_schema_count,
         "tool_schema_empty_count": scan.tool_schema_empty_count,
+        "tool_schema_source": scan.tool_schema_source,
     }
     if scan.tool_schema_count < 0:
         return HopVerdict(
