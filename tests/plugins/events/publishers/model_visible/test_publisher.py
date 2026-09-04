@@ -185,6 +185,93 @@ def test_capture_pre_llm_transparent_when_cursor_missing(hook: Any) -> None:
     assert ref is not None
 
 
+def test_capture_pre_llm_narrows_tool_objects(hook: Any, bound_session: Any) -> None:
+    """真实 ``Tool`` 协议对象 → 边界窄化为 ``ToolSchema`` 后落 payload。
+
+    回归锁:kwargs.tools 承载认知 Tool 对象(llm_turn executor 透传
+    ``list[Tool]``);修复前 payload 构造命中 pydantic ValidationError 并
+    穿透 capture_pre_llm,``spine.llm.request.header`` 完全不落盘。
+    """
+    from lca.contracts.observability.loop_cursor_payloads import ToolSchema
+    from lca.plugins.events.publishers._session_publish import (
+        reset_publish_session,
+        set_publish_session,
+    )
+    from lca_kernel.events.payloads_model_visible import (
+        SpineLlmRequestHeaderPayload,
+    )
+
+    class _Tool:
+        """Tool 协议同形:无 ``to_openai_dict``,走 from_any 属性分支。"""
+
+        name = "bash"
+        description = "run shell commands"
+        parameters: ClassVar[dict[str, Any]] = {
+            "type": "object",
+            "properties": {"command": {"type": "string"}},
+        }
+        is_idempotent = False
+        default_timeout_s = 30
+
+        async def execute(self, args: dict[str, Any]) -> Any:
+            raise NotImplementedError
+
+    captured: list[Any] = []
+
+    class _CapturingSession:
+        """append 时留底 payload,再委托 bus 走完整鉴权路径。"""
+
+        def append(self, payload: Any, *, producer: Any = None) -> Any:
+            captured.append(payload)
+            return bound_session.bus.publish(payload, producer=producer)
+
+    hook.state["cursor"] = hook.StubCursor("run-narrow")
+    hook.state["prompt"] = hook.make_prompt("t1", "sys")
+
+    token = set_publish_session(_CapturingSession())
+    try:
+        ref = hook.hook.capture_pre_llm(
+            run_id="run-narrow",
+            step_index=0,
+            incarnation=1,
+            kwargs={"tools": [_Tool()], "messages": []},
+        )
+    finally:
+        reset_publish_session(token)
+
+    assert ref is not None
+    assert len(captured) == 1
+    payload = captured[0]
+    assert isinstance(payload, SpineLlmRequestHeaderPayload)
+    assert len(payload.tools) == 1
+    narrowed = payload.tools[0]
+    assert isinstance(narrowed, ToolSchema)
+    assert narrowed.name == "bash"
+    assert narrowed.description == "run shell commands"
+    assert narrowed.parameters == {
+        "type": "object",
+        "properties": {"command": {"type": "string"}},
+    }
+
+
+def test_capture_pre_llm_construction_failure_is_transparent(hook: Any) -> None:
+    """payload 构造失败(非法 manifest)→ 吞错 + 返回 ``None``,不外抛。
+
+    修复前构造在 try 之外,ValidationError 穿透到 adapter 的 debug 级兜底,
+    生产不可见;修复后构造与 publish 同 try,失败走 warning。
+    """
+    hook.state["cursor"] = hook.StubCursor("run-bad")
+    hook.state["prompt"] = hook.make_prompt("t1", "sys")
+
+    ref = hook.hook.capture_pre_llm(
+        run_id="run-bad",
+        step_index=0,
+        incarnation=1,
+        kwargs={"tools": [], "messages": [], "manifest": object()},
+    )
+    assert ref is None
+
+
 # ── 盖章 3: assistant payload + digest 关联 ─────────────────────────────
 
 
