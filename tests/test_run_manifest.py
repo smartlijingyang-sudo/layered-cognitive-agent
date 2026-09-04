@@ -1,9 +1,9 @@
 """RunManifest 测试(ADR-0065 PR-6)。
 
 - to_dict / from_dict round-trip 稳定
-- materializer_default_version 不抛错
-- evidence_integrity 状态枚举完整
-- IntegrityState 闭集
+- 删字段后(``materializer_version`` / ``evidence_integrity`` / ``pricing_ref``)
+  payload 与 from_dict 容忍旧 manifest 容错
+- IntegrityState 闭集(为下游 evidence schema 预留)
 """
 
 from __future__ import annotations
@@ -22,22 +22,62 @@ def test_manifest_round_trip() -> None:
         terminal_event_seq=7,
         ledger_high_watermark=42,
         ledger_summary="sha256:abc",
-        materializer_version="0.1.0",
-        evidence_integrity=(
-            ManifestEvidence(
-                ref_digest="d" * 64,
-                ref_algorithm="sha256",
-                state=IntegrityState.OK,
-            ),
-        ),
         started_at=1.0,
         closed_at=2.0,
-        pricing_ref="lca.cost/v1",
         extra={"foo": "bar"},
     )
     payload = m.to_dict()
     restored = RunManifest.from_dict(payload)
     assert restored == m
+
+
+def test_manifest_to_dict_omits_p3_slimmed_fields() -> None:
+    """P3 slim:删字段后 to_dict 不再输出 ``materializer_version`` /
+    ``evidence_integrity`` / ``pricing_ref``。任何 reader 都按这个新合约解析。
+    """
+    m = RunManifest(
+        run_id="run_a",
+        terminal_event_seq=1,
+        ledger_high_watermark=1,
+    )
+    payload = m.to_dict()
+    assert "materializer_version" not in payload
+    assert "evidence_integrity" not in payload
+    assert "pricing_ref" not in payload
+
+
+def test_manifest_from_dict_tolerates_legacy_fields() -> None:
+    """P3 slim:旧 manifest 含已删字段时,``from_dict`` 容错忽略,字段缺失默认空串。
+
+    让升级期的旧 trace manifest.json 仍可被 reader 读取(``extra='ignore'`` 范式
+    对 dataclass 不适用,这里通过 ``payload.get(..., default)`` 缺席兜底实现)。
+    """
+    legacy_payload = {
+        "schema": "lca.run_manifest/1",
+        "run_id": "run_legacy",
+        "plan_ref": "",
+        "terminal_event_seq": 5,
+        "ledger_high_watermark": 10,
+        "ledger_summary": "",
+        "materializer_version": "0.1.0",  # 已删,应被忽略
+        "evidence_integrity": [  # 已删,应被忽略
+            {
+                "ref_digest": "d" * 64,
+                "ref_algorithm": "sha256",
+                "state": "ok",
+                "detail": "",
+            },
+        ],
+        "started_at": 0.0,
+        "closed_at": 0.0,
+        "pricing_ref": "lca.cost/v1",  # 已删,应被忽略
+        "extra": {},
+    }
+    restored = RunManifest.from_dict(legacy_payload)
+    assert restored.run_id == "run_legacy"
+    assert restored.terminal_event_seq == 5
+    assert restored.ledger_high_watermark == 10
+    assert restored.extra == {}
 
 
 def test_manifest_minimal_round_trip() -> None:
@@ -63,12 +103,6 @@ def test_integrity_state_enum_is_closed() -> None:
 def test_manifest_evidence_default_values() -> None:
     ei = ManifestEvidence(ref_digest="d", ref_algorithm="sha256", state=IntegrityState.OK)
     assert ei.detail == ""
-
-
-def test_materializer_default_version_returns_string() -> None:
-    v = RunManifest.materializer_default_version()
-    assert isinstance(v, str)
-    assert v != ""
 
 
 # ── ADR-0068 §决策二:plan_ref 顶层字段(round-trip + 顶层位置) ──────

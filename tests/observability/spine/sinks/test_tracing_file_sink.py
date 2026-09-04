@@ -107,6 +107,24 @@ def test_exceptions_count_increments(tmp_path: Path) -> None:
     assert sink.exceptions_count == 2  # 不变
 
 
+def test_zero_exceptions_unlinks_empty_index_on_close(tmp_path: Path) -> None:
+    """P3 slim:0 异常的 run 在 close 时不留空 ``exceptions.jsonl``。
+
+    之前总是 open(O_CREAT) fd,即使全 run 没异常也会留下 0 字节文件。
+    reader 走 ``find_exceptions_file`` 看到 0 字节会被误会为合法空索引
+    —— 这里删掉占位文件,reader 走 "file not found" 路径。
+    """
+    from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
+
+    sink = FileSink(tmp_path, run_id="run_empty")
+    sink.write(_make_record(execution_point="brain.think.start", seq=1))
+    sink.close()
+    exc_path = tmp_path / "run_empty.exceptions.jsonl"
+    assert not exc_path.exists(), (
+        "P3 slim:0 异常应不保留空 exceptions.jsonl 占位文件"
+    )
+
+
 def test_sidecar_readable_name(tmp_path: Path) -> None:
     """异常 offload → <sha8>-AttributeError.json。"""
     sink = TracingFileSink(tmp_path, run_id="run_test")

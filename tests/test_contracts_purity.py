@@ -85,7 +85,7 @@ _GRANDFATHERED_METHODS: dict[str, frozenset[str]] = {
     "W3CValidationResult": frozenset({"reject"}),
     "CostCalculator": frozenset({"compute"}),
     "EvidenceRef": frozenset({"to_dict", "from_dict"}),
-    "RunManifest": frozenset({"materializer_default_version", "to_dict", "from_dict"}),
+    "RunManifest": frozenset({"to_dict", "from_dict"}),
     # 旧 API 行为类（refactor 留待 PR-0.5 大重构周期后）
     "MountResult": frozenset({"ok"}),
     "UnmountResult": frozenset({"ok"}),
