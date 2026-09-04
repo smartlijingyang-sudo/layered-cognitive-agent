@@ -543,3 +543,222 @@ def test_h_xref_consistent_when_no_spine_no_journal(tmp_path: Path) -> None:
     report = diagnose_step_tree(tmp_path / "journal.json")
     h = report.hops["H-xref"]
     assert h.ok is True, f"no spine no journal → H-xref 应 ok,got {h.detail}"
+
+
+# ── ADR-0185 PR-3.1:doctor fold 优先双轨 ─────────────────────────────
+
+
+def _write_spine_header_records(
+    run_dir: Path,
+    run_id: str,
+    step_ids: tuple[str, ...],
+) -> Path:
+    """写一份最小可 fold 的 ``<run_id>.spine.jsonl``。
+
+    每 step 对应一条 :class:`SpineLlmRequestHeaderPayload` EP,带
+    ``step_id`` + 必备字段(``system`` + 空 ``tools`` + 空
+    ``messages`` + ``reason="initial"`` + ``previous_header_digest=None``)。
+    SpineEventRecord 字段齐全(event_id / category / execution_point /
+    channel / payload / ts),由 :class:`SpineReader` 解析后被
+    :func:`fold_model_visible` 命中。
+    """
+    import json as _json
+
+    spine_path = run_dir / f"{run_id}.spine.jsonl"
+    lines: list[str] = []
+    for i, step_id in enumerate(step_ids):
+        record = {
+            "event_id": f"ev-{step_id}",
+            "category": "spine.llm.request.header",
+            "execution_point": "spine.llm.request.header",
+            "channel": "fact",
+            "payload": {
+                "step_id": step_id,
+                "incarnation": 0,
+                "config": {"provider": "mock", "model": "m"},
+                "system": f"system for {step_id}",
+                "tools": [],
+                "messages": [],
+                "manifest": None,
+                "reason": "initial",
+                "previous_header_digest": None,
+            },
+            "ts": f"2026-09-04T12:00:{i:02d}.000Z",
+            "causation_id": None,
+            "prev_event_hash": None,
+            "event_hash": None,
+            "trace_id": None,
+        }
+        lines.append(_json.dumps(record, ensure_ascii=False))
+    spine_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return spine_path
+
+
+def test_h_fold_absent_when_no_spine_no_journal(tmp_path: Path) -> None:
+    """ADR-0185 PR-3.1:既无 spine 又无 journal → H-fold ok=None(not evaluated)。"""
+    report = diagnose_step_tree(tmp_path / "journal.json")
+    h = report.hops["H-fold"]
+    assert h.ok is None
+    assert "not evaluated" in h.detail
+    assert h.extra["fold_attempted"] is False
+    assert h.extra["fold_source"] == "none"
+
+
+def test_h_fold_not_attempted_when_journal_no_steps(tmp_path: Path) -> None:
+    """ADR-0185 PR-3.1:journal.json 存在但 0 step → fold_attempted=False。
+
+    空 doc 没有 step 可 fold,医生不应视作 fold 故障。
+    """
+    import json as _json
+    from lca.contracts.models.observability import (
+        JournalMetadata,
+        empty_document,
+    )
+
+    meta = JournalMetadata(
+        agent_role="x", strategy_key="solo", plan_ref="", objective="empty"
+    )
+    empty = empty_document(
+        run_id="r1", trace_id="t1", metadata=meta, started_at=0.0
+    )
+    journal = _write_doc(tmp_path, empty)
+    report = diagnose_step_tree(journal)
+    h = report.hops["H-fold"]
+    assert h.ok is None
+    assert "no step to fold" in h.detail
+    assert h.extra["fold_attempted"] is False
+
+
+def test_h_fold_full_ok_when_all_steps_have_spine_headers(tmp_path: Path) -> None:
+    """ADR-0185 PR-3.1:每 step 在 spine 上有 model-visible header → fold_source=fold。
+
+    doctor 优先 fold 路径成功,所有 4 步走 fold。
+    """
+    doc = _build_doc()
+    journal = _write_doc(tmp_path, doc)
+    step_ids = tuple(f"step_{i}" for i in range(1, 5))
+    _write_spine_header_records(tmp_path, "r1", step_ids)
+
+    report = diagnose_step_tree(journal)
+    h = report.hops["H-fold"]
+    assert h.ok is True, f"full fold 应 ok,got {h.detail}"
+    assert h.extra["fold_source"] == "fold"
+    assert h.extra["fold_hits"] == 4
+    assert h.extra["fold_misses"] == 0
+    assert h.extra["fold_step_hits"] == [1, 2, 3, 4]
+    assert h.extra["fold_step_misses"] == []
+    # 报告 consistency 字段也反映 fold 命中统计
+    assert report.consistency["fold_source"] == "fold"
+    assert report.consistency["fold_hits"] == 4
+
+
+def test_h_fold_mixed_is_fail_when_partial_hit(tmp_path: Path) -> None:
+    """ADR-0185 PR-3.1:部分 step 在 spine 上有 model-visible header → fold_source=mixed。
+
+    部分 fold 命中部分 miss:doctor 报 ok=False,作为跨源一致性的可见
+    诊断信号(双轨期 publisher 落盘未全覆盖是预期形态,但要让 owner 看见)。
+    """
+    doc = _build_doc()
+    journal = _write_doc(tmp_path, doc)
+    # 只为 step_1 / step_2 写 spine header,step_3 / step_4 miss
+    _write_spine_header_records(tmp_path, "r1", ("step_1", "step_2"))
+
+    report = diagnose_step_tree(journal)
+    h = report.hops["H-fold"]
+    assert h.ok is False, f"mixed fold 应 ok=False,got {h.detail}"
+    assert h.extra["fold_source"] == "mixed"
+    assert h.extra["fold_hits"] == 2
+    assert h.extra["fold_misses"] == 2
+    assert h.extra["fold_step_hits"] == [1, 2]
+    assert h.extra["fold_step_misses"] == [3, 4]
+    assert "miss 起始 step=3" in h.detail
+    # mixed 状态打破 H-fold(其它 ok=False 的 hop 由 dict 顺序优先;
+    # H-fold 是这次新引入的可见诊断信号)
+
+
+def test_h_fold_sidecar_when_no_spine_but_journal_exists(tmp_path: Path) -> None:
+    """ADR-0185 PR-3.1:journal 存在但 spine 缺失 → fold_source=sidecar,ok=None。
+
+    所有 step 都走 sidecar / journal 推导兜底;不视为故障(publisher 未
+    接 PR-2 是部署态问题,不是诊断信号),只报告「fold 路径不可用」。
+    """
+    doc = _build_doc()
+    journal = _write_doc(tmp_path, doc)
+
+    report = diagnose_step_tree(journal)
+    h = report.hops["H-fold"]
+    assert h.ok is None, f"all-miss 应 ok=None,got {h.detail}"
+    assert h.extra["fold_source"] == "sidecar"
+    assert h.extra["fold_hits"] == 0
+    assert h.extra["fold_misses"] == 4
+    assert "sidecar" in h.detail or "兜底" in h.detail
+
+
+def test_h_fold_priority_prefers_spine_over_sidecar(tmp_path: Path) -> None:
+    """ADR-0185 PR-3.1:fold 命中即走 fold 路径,无视 ``<run_dir>/model_visible/``。
+
+    双轨期对照:同时写 spine fold 命中 + ``<run_dir>/model_visible/``
+    sidecar 目录;doctor 报 ``fold_source=fold``,与 sidecar 是否存在
+    解耦(PR-4 收口后 sidecar 删,fold 仍可重建)。
+    """
+    doc = _build_doc()
+    journal = _write_doc(tmp_path, doc)
+    step_ids = tuple(f"step_{i}" for i in range(1, 5))
+    _write_spine_header_records(tmp_path, "r1", step_ids)
+
+    # 同步写一份 sidecar 旁路目录;fold 命中后,doctor 不应回退 sidecar
+    mv_dir = tmp_path / "model_visible" / "step_1"
+    mv_dir.mkdir(parents=True, exist_ok=True)
+    (mv_dir / "messages.json").write_text("[]", encoding="utf-8")
+
+    report = diagnose_step_tree(journal)
+    h = report.hops["H-fold"]
+    assert h.ok is True
+    assert h.extra["fold_source"] == "fold"
+    # sidecar 目录存在与否,fold 路径优先,source marker 应为 fold
+    assert h.extra["source_marker"] == "replayed_fold"
+
+
+def test_h_fold_extra_consistency_keys_present(tmp_path: Path) -> None:
+    """ADR-0185 PR-3.1:DoctorReport.consistency 暴露 fold 关键事实。
+
+    caller(``lca-ops explain`` / webserver trajectory)可读 fold 命中
+    统计而无需 hop 到 H-fold.extra。
+    """
+    doc = _build_doc()
+    journal = _write_doc(tmp_path, doc)
+    _write_spine_header_records(
+        tmp_path, "r1", tuple(f"step_{i}" for i in range(1, 5))
+    )
+
+    report = diagnose_step_tree(journal)
+    payload = report.as_dict()
+    consistency = payload["consistency"]
+    assert "fold_source" in consistency
+    assert "fold_attempted" in consistency
+    assert "fold_hits" in consistency
+    assert "fold_misses" in consistency
+    assert "fold_step_hits" in consistency
+    assert "fold_step_misses" in consistency
+    assert consistency["fold_source"] == "fold"
+    assert consistency["fold_hits"] == 4
+    assert consistency["fold_step_misses"] == []
+
+
+def test_h_fold_mixed_in_broken_set(tmp_path: Path) -> None:
+    """ADR-0185 PR-3.1:fold mixed 时 H-fold 列入 broken hop 集合。
+
+    验证:fold partial-miss 让 H-fold.ok=False,与其他 broken hop
+    共存于 broken_hop 优先级集合(由 dict 迭代序决定首 broken);
+    这里只断言 H-fold 进入 broken 集合,不固定 broken_hop 顺序。
+    """
+    doc = _build_doc()
+    journal = _write_doc(tmp_path, doc)
+    _write_spine_header_records(tmp_path, "r1", ("step_1",))
+    report = diagnose_step_tree(journal)
+    broken_hops = [name for name, hop in report.hops.items() if hop.ok is False]
+    assert "H-fold" in broken_hops
+    # H-fold 应是混合 broken 集合的一员
+    assert report.hops["H-fold"].ok is False
+    # broken_hop 字段是第一个 broken hop(由 dict 顺序)
+    assert report.broken_hop in broken_hops
