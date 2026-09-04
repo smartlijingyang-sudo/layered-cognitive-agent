@@ -46,11 +46,21 @@ class SpineStepTreeAccumulator:
         cls._state = []
 
     def __call__(self, payload: Any, ref: EventRef) -> None:
-        """subscriber callback（FD-2：抛错被机制 try/except contained）。"""
+        """subscriber callback（FD-2：抛错被机制 try/except contained）。
+
+        仅消费 :class:`SpineEventPayload` 壳类(``execution_point`` +
+        ``payload`` dict 形态)。typed spine payload(ADR-0185 §3.3
+        ``SpineLlmRequestHeader*``)不属于 step tree,静默跳过;yaml
+        consumer_rules 已经按 ``spine.cognition.brain.perceive.*`` 子树
+        限制订阅,生产路径不会到达,但 fan-out 兜底仍需 contained。
+        """
         if not is_spine_event(payload):
             raise TypeError(
                 f"SpineStepTreeAccumulator 只接 SpineEventPayload；got {type(payload).__name__}"
             )
+        if not hasattr(payload, "execution_point"):
+            # typed spine payload(ADR-0185 §3.3)——不属于 step tree 关注范畴
+            return
         record = {
             "event_id": ref.event_id,
             "execution_point": payload.execution_point,
