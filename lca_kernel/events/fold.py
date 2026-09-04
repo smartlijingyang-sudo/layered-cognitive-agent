@@ -264,10 +264,205 @@ def foldRequestHeader(  # noqa: N802 (dsh parity)
     return state
 
 
+# ── StepTree fold(对齐 DSH turn/step 事件重建)────────────────────────
+
+STEP_START_TYPE: str = "step/start"
+"""step 开始事件的 type 字符串。"""
+
+STEP_END_TYPE: str = "step/end"
+"""step 结束事件的 type 字符串。"""
+
+TURN_START_TYPE: str = "turn/start"
+"""turn 开始事件的 type 字符串。"""
+
+TURN_END_TYPE: str = "turn/end"
+"""turn 结束事件的 type 字符串。"""
+
+
+@dataclass(frozen=True, slots=True)
+class StepEntry:
+    """单个 step 的折叠结果。
+
+    - ``step`` —— step 序号(在 turn 内从 0 递增)
+    - ``started`` —— 是否见过 ``step/start``
+    - ``ended`` —— 是否见过 ``step/end``
+    """
+
+    step: int
+    started: bool = False
+    ended: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class TurnEntry:
+    """单个 turn 的折叠结果。
+
+    - ``turn`` —— turn 序号
+    - ``started`` —— 是否见过 ``turn/start``
+    - ``ended`` —— 是否见过 ``turn/end``
+    - ``steps`` —— 该 turn 下已见过的 step(按 step 序号排序)
+    """
+
+    turn: int
+    started: bool = False
+    ended: bool = False
+    steps: tuple[StepEntry, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class StepTree:
+    """事件流折叠出的 turn/step 树(对齐 DSH SessionEventMap turn/step 语义)。
+
+    - ``turns`` —— 按 turn 序号排序的 turn 条目序列
+    - ``active_turn`` —— 最近 ``turn/start`` 且未 ``turn/end`` 的 turn 序号;
+      无活跃 turn 时为 None
+    - ``active_step`` —— 最近 ``step/start`` 且未 ``step/end`` 的 (turn, step)
+      对;无活跃 step 时为 None
+
+    frozen + slots 保证 fold 结果不被原地改;每次 fold 返回新实例。
+    """
+
+    turns: tuple[TurnEntry, ...] = ()
+    active_turn: int | None = None
+    active_step: tuple[int, int] | None = None
+
+
+def _coerce_step_tree_event(event: Any) -> tuple[str, Mapping[str, Any]] | None:
+    """统一 step tree fold 的事件形态。
+
+    支持三种入口:
+
+    - :class:`SessionEvent`(``type`` + ``data`` 属性)
+    - ``Mapping``(``type`` / ``data`` 键)
+    - :class:`SpineEventRecord`(``category`` + ``payload``;不识别则 None)
+
+    返回 ``(type, data)``;不是 step tree 目标则返回 None。
+    """
+    if hasattr(event, "type") and hasattr(event, "data") and not hasattr(event, "category"):
+        return str(event.type), event.data if isinstance(event.data, Mapping) else {}
+    if isinstance(event, Mapping):
+        event_type = event.get("type")
+        if event_type is not None:
+            return str(event_type), event.get("data") or {}
+        return None
+    return None
+
+
+def fold_step_tree(
+    events: Iterable[Any],
+    *,
+    from_: StepTree | None = None,
+) -> StepTree:
+    """离线 fold — 扫一遍事件流,重建 turn/step 树(对齐 DSH 事件语义)。
+
+    识别的事件类型:
+
+    - ``turn/start`` → 开新 turn
+    - ``turn/end`` → 关闭最近 turn
+    - ``step/start`` → 在活跃 turn 内开新 step
+    - ``step/end`` → 关闭活跃 turn 内最近 step
+
+    非上述类型一律跳过;``from_`` 续接上次 fold 结果(增量 fold)。
+    返回新 ``StepTree`` 实例;不修改入参。
+
+    与 DSH 差异(显式列出):
+
+    - DSH 的 turn/step 事件是 Session.append 的 typed event;
+      LCA 的 fold_step_tree 从任意事件流(内存 log / spine dict / SessionEvent)
+      重建,不限定具体容器
+    - DSH 不在 fold 模块暴露 step tree(由 Session 内部维护);
+      LCA 显式提取为纯函数,供 viewer / explain / debug-run 离线重建
+    """
+    turns_map: dict[int, dict[str, Any]] = {}
+    steps_map: dict[int, dict[int, dict[str, Any]]] = {}
+    active_turn: int | None = None
+    active_step: tuple[int, int] | None = None
+
+    if from_ is not None:
+        for te in from_.turns:
+            turn_d: dict[str, Any] = {"started": te.started, "ended": te.ended}
+            turns_map[te.turn] = turn_d
+            step_d: dict[int, dict[str, Any]] = {}
+            for se in te.steps:
+                step_d[se.step] = {"started": se.started, "ended": se.ended}
+            steps_map[te.turn] = step_d
+        active_turn = from_.active_turn
+        active_step = from_.active_step
+
+    for event in events:
+        coerced = _coerce_step_tree_event(event)
+        if coerced is None:
+            continue
+        event_type, data = coerced
+
+        if event_type == TURN_START_TYPE:
+            turn_num = data.get("turn")
+            if isinstance(turn_num, int):
+                turns_map.setdefault(turn_num, {"started": False, "ended": False})
+                turns_map[turn_num]["started"] = True
+                active_turn = turn_num
+                active_step = None
+
+        elif event_type == TURN_END_TYPE:
+            turn_num = data.get("turn")
+            if isinstance(turn_num, int) and turn_num in turns_map:
+                turns_map[turn_num]["ended"] = True
+                if active_turn == turn_num:
+                    active_turn = None
+                    active_step = None
+
+        elif event_type == STEP_START_TYPE:
+            turn_num = data.get("turn")
+            step_num = data.get("step")
+            if isinstance(turn_num, int) and isinstance(step_num, int):
+                steps_map.setdefault(turn_num, {})
+                steps_map[turn_num].setdefault(step_num, {"started": False, "ended": False})
+                steps_map[turn_num][step_num]["started"] = True
+                active_step = (turn_num, step_num)
+
+        elif event_type == STEP_END_TYPE:
+            turn_num = data.get("turn")
+            step_num = data.get("step")
+            if (
+                isinstance(turn_num, int)
+                and isinstance(step_num, int)
+                and turn_num in steps_map
+                and step_num in steps_map[turn_num]
+            ):
+                steps_map[turn_num][step_num]["ended"] = True
+                if active_step == (turn_num, step_num):
+                    active_step = None
+
+    turn_entries: list[TurnEntry] = []
+    for turn_num in sorted(turns_map):
+        td = turns_map[turn_num]
+        sd = steps_map.get(turn_num, {})
+        step_entries = tuple(
+            StepEntry(step=s, started=sd[s]["started"], ended=sd[s]["ended"]) for s in sorted(sd)
+        )
+        turn_entries.append(
+            TurnEntry(turn=turn_num, started=td["started"], ended=td["ended"], steps=step_entries)
+        )
+
+    return StepTree(
+        turns=tuple(turn_entries),
+        active_turn=active_turn,
+        active_step=active_step,
+    )
+
+
 __all__ = [
     "REQUEST_HEADER_CATEGORY",
+    "STEP_END_TYPE",
+    "STEP_START_TYPE",
+    "TURN_END_TYPE",
+    "TURN_START_TYPE",
     "EpochHeader",
+    "StepEntry",
+    "StepTree",
+    "TurnEntry",
     "canonicalHeader",
     "foldRequestHeader",
+    "fold_step_tree",
     "headerEquals",
 ]

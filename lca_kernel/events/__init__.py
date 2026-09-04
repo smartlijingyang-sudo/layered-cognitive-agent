@@ -35,8 +35,23 @@ from lca_kernel.events.bus import (
     EventBus,
     EventRef,
 )
+from lca_kernel.events.fold import (
+    EpochHeader,
+    StepTree,
+    canonicalHeader,
+    fold_step_tree,
+    foldRequestHeader,
+    headerEquals,
+)
 from lca_kernel.events.notification import NotificationBus
 from lca_kernel.events.queue import DeliveryQueue, DeliveryQueueFull
+from lca_kernel.events.session import (
+    SessionEvent,
+    SessionHeader,
+    SessionObserver,
+    SessionProtocol,
+    SessionReentryError,
+)
 
 _DEFAULT_CONFIG_DIR: Path = Path(__file__).parent / "config"
 """机制 SSOT yaml 目录（ADR-0183 §3.1 / ADR-0180 D2）。"""
@@ -51,11 +66,22 @@ __all__ = [
     "DeliveryQueueFull",
     "EnvelopeBus",
     "EnvelopeRef",
+    "EpochHeader",
     "EventBus",
     "EventPayload",
     "EventRef",
     "NotificationBus",
     "Plane",
+    "SessionEvent",
+    "SessionHeader",
+    "SessionObserver",
+    "SessionProtocol",
+    "SessionReentryError",
+    "StepTree",
     "TeamDelegationCacheHit",
+    "canonicalHeader",
     "default_plane",
+    "foldRequestHeader",
+    "fold_step_tree",
+    "headerEquals",
 ]

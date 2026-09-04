@@ -22,7 +22,11 @@ from typing import Any
 
 from lca_kernel.events.fold import (
     EpochHeader,
+    StepEntry,
+    StepTree,
+    TurnEntry,
     canonicalHeader,
+    fold_step_tree,
     foldRequestHeader,
     headerEquals,
 )
@@ -241,3 +245,114 @@ def test_fold_with_from_baseline_continues_prior_state() -> None:
     # baseline + 1 条新 header → 新 header 覆盖(走 canonical)
     result = foldRequestHeader(events, from_=baseline)
     assert result == canonicalHeader(EpochHeader(config=CONFIG_BASE, system="delta"))
+
+
+# ── fold_step_tree 场景 ──────────────────────────────────────────────────────
+
+
+def test_fold_step_tree_empty_stream_returns_empty_tree() -> None:
+    """fold_step_tree: 空流返回空 StepTree。"""
+    tree = fold_step_tree([])
+    assert tree == StepTree()
+    assert tree.turns == ()
+    assert tree.active_turn is None
+    assert tree.active_step is None
+
+
+def test_fold_step_tree_single_turn_two_steps() -> None:
+    """fold_step_tree: 单 turn + 两 step 完整开闭。"""
+    events: list[dict[str, Any]] = [
+        {"type": "turn/start", "data": {"turn": 0}},
+        {"type": "step/start", "data": {"turn": 0, "step": 0}},
+        {"type": "step/end", "data": {"turn": 0, "step": 0}},
+        {"type": "step/start", "data": {"turn": 0, "step": 1}},
+        {"type": "step/end", "data": {"turn": 0, "step": 1}},
+        {"type": "turn/end", "data": {"turn": 0}},
+    ]
+    tree = fold_step_tree(events)
+    assert len(tree.turns) == 1
+    assert tree.turns[0] == TurnEntry(
+        turn=0,
+        started=True,
+        ended=True,
+        steps=(
+            StepEntry(step=0, started=True, ended=True),
+            StepEntry(step=1, started=True, ended=True),
+        ),
+    )
+    assert tree.active_turn is None
+    assert tree.active_step is None
+
+
+def test_fold_step_tree_active_turn_and_step() -> None:
+    """fold_step_tree: 未关闭的 turn/step 反映在 active_* 字段。"""
+    events: list[dict[str, Any]] = [
+        {"type": "turn/start", "data": {"turn": 1}},
+        {"type": "step/start", "data": {"turn": 1, "step": 0}},
+    ]
+    tree = fold_step_tree(events)
+    assert tree.active_turn == 1
+    assert tree.active_step == (1, 0)
+    assert tree.turns[0].started is True
+    assert tree.turns[0].ended is False
+    assert tree.turns[0].steps[0].started is True
+    assert tree.turns[0].steps[0].ended is False
+
+
+def test_fold_step_tree_skips_unrelated_events() -> None:
+    """fold_step_tree: 非 turn/step 事件跳过。"""
+    events: list[dict[str, Any]] = [
+        {"type": "user/message", "data": {"content": "hi"}},
+        {"type": "turn/start", "data": {"turn": 0}},
+        {"type": "assistant/chunk", "data": {"text": "hello"}},
+        {"type": "turn/end", "data": {"turn": 0}},
+    ]
+    tree = fold_step_tree(events)
+    assert len(tree.turns) == 1
+    assert tree.turns[0].turn == 0
+    assert tree.turns[0].steps == ()
+
+
+def test_fold_step_tree_from_continues_prior_state() -> None:
+    """fold_step_tree: from_ 续接上次 fold 结果(增量 fold)。"""
+    prior = fold_step_tree(
+        [
+            {"type": "turn/start", "data": {"turn": 0}},
+            {"type": "step/start", "data": {"turn": 0, "step": 0}},
+            {"type": "step/end", "data": {"turn": 0, "step": 0}},
+        ]
+    )
+    assert prior.active_turn == 0
+
+    tree = fold_step_tree(
+        [
+            {"type": "step/start", "data": {"turn": 0, "step": 1}},
+            {"type": "step/end", "data": {"turn": 0, "step": 1}},
+            {"type": "turn/end", "data": {"turn": 0}},
+        ],
+        from_=prior,
+    )
+    assert len(tree.turns) == 1
+    assert len(tree.turns[0].steps) == 2
+    assert tree.turns[0].ended is True
+    assert tree.active_turn is None
+
+
+def test_fold_step_tree_multiple_turns() -> None:
+    """fold_step_tree: 多 turn 按序号排序。"""
+    events: list[dict[str, Any]] = [
+        {"type": "turn/start", "data": {"turn": 0}},
+        {"type": "step/start", "data": {"turn": 0, "step": 0}},
+        {"type": "step/end", "data": {"turn": 0, "step": 0}},
+        {"type": "turn/end", "data": {"turn": 0}},
+        {"type": "turn/start", "data": {"turn": 1}},
+        {"type": "step/start", "data": {"turn": 1, "step": 0}},
+    ]
+    tree = fold_step_tree(events)
+    assert len(tree.turns) == 2
+    assert tree.turns[0].turn == 0
+    assert tree.turns[0].ended is True
+    assert tree.turns[1].turn == 1
+    assert tree.turns[1].ended is False
+    assert tree.active_turn == 1
+    assert tree.active_step == (1, 0)
