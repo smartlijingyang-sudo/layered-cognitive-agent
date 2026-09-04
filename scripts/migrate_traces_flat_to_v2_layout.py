@@ -304,14 +304,6 @@ def _compose_manifest(*, journal: Path, doctor: FlatArtifact | None) -> dict[str
         except json.JSONDecodeError:
             doctor_report = None
 
-    # materializer_version 用 importlib.metadata 拿 lca-framework 版本;与 execute.py 同源
-    try:
-        import importlib.metadata
-
-        materializer_version = importlib.metadata.version("lca-framework")
-    except importlib.metadata.PackageNotFoundError:
-        materializer_version = "0.0.0+unknown"
-
     extra: dict[str, object] = {}
     if doctor_report is not None:
         extra["doctor_report"] = doctor_report
@@ -328,11 +320,8 @@ def _compose_manifest(*, journal: Path, doctor: FlatArtifact | None) -> dict[str
         "terminal_event_seq": terminal_event_seq,
         "ledger_high_watermark": ledger_high_watermark,
         "ledger_summary": ledger_summary,
-        "materializer_version": materializer_version,
-        "evidence_integrity": [],
         "started_at": 0.0,
         "closed_at": _mtime_of(journal),
-        "pricing_ref": "",
         "extra": extra,
     }
 

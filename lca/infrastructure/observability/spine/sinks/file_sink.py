@@ -305,6 +305,25 @@ class FileSink:
                     exc,
                 )
             self._exceptions_fd = None
+        # P3 slim:0 异常的 run 不留空 ``exceptions.jsonl`` —— close 时若
+        # ``exceptions_count == 0``,unlink 占位空文件。 Reader 走
+        # ``find_exceptions_file`` / ``journal_exceptions`` 命令已对缺失文件
+        # 输出友好提示,语义不变。
+        if (
+            self._write_exception_index
+            and self._exceptions_count == 0
+            and self._exceptions_path is not None
+        ):
+            try:
+                self._exceptions_path.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError as exc:
+                log.error(
+                    "file_sink: empty exceptions index unlink failed run_id=%s err=%s",
+                    self._run_id,
+                    exc,
+                )
         self._closed = True
 
 

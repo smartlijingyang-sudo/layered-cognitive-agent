@@ -1,4 +1,4 @@
-"""Materialize a terminal run manifest from Journal-owned facts and evidence blobs."""
+"""Materialize a terminal run manifest from Journal-owned facts."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from pathlib import Path
 import structlog
 
 from lca.contracts.observability.run_locator import RunLocator
-from lca.contracts.observability.run_manifest import IntegrityState, ManifestEvidence, RunManifest
+from lca.contracts.observability.run_manifest import RunManifest
 from lca.infrastructure.observability.journal.engine.journal_io import (
     load_journal_records,
     record_normalize,
@@ -65,8 +65,6 @@ def record_terminal_materialization(session: RunSession) -> None:
             terminal_event_seq=terminal_event_seq_for(session),
             ledger_high_watermark=ledger_high_watermark_for(session),
             ledger_summary=ledger_summary_for(session),
-            materializer_version=RunManifest.materializer_default_version(),
-            evidence_integrity=evidence_integrity_for(locator, session.run_id),
             started_at=session.started_at,
             closed_at=session.closed_at if session.closed_at is not None else time.time(),
             extra={
@@ -240,26 +238,6 @@ def terminal_event_seq_from_file(path: Path) -> int:
     return 0
 
 
-def evidence_integrity_for(locator: RunLocator, run_id: str) -> tuple[ManifestEvidence, ...]:
-    """Project integrity facts for the run's materialized evidence blobs."""
-    evidence_dir = locator.evidence_dir(run_id)
-    if not evidence_dir.exists():
-        return ()
-    evidence: list[ManifestEvidence] = []
-    for path in sorted(evidence_dir.iterdir()):
-        if not path.is_file() or not path.name.startswith("sha256-"):
-            continue
-        digest = path.name.removeprefix("sha256-").split(".", 1)[0]
-        if path.stat().st_size > 0:
-            state, detail = IntegrityState.OK, ""
-        else:
-            state, detail = IntegrityState.MISSING, f"empty evidence blob: {path.name}"
-        evidence.append(
-            ManifestEvidence(ref_digest=digest, ref_algorithm="sha256", state=state, detail=detail)
-        )
-    return tuple(evidence)
-
-
 def ledger_summary_for(session: RunSession) -> str:
     """Hash the terminal one megabyte of the Journal for integrity navigation."""
     path = session.spine_path
@@ -278,7 +256,6 @@ def ledger_summary_for(session: RunSession) -> str:
 
 
 __all__ = [
-    "evidence_integrity_for",
     "ledger_high_watermark_for",
     "ledger_summary_for",
     "record_terminal_materialization",
