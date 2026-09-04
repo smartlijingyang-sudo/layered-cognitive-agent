@@ -519,6 +519,68 @@ class EventBus(EnvelopeBus[P]):
 
         return ref
 
+    async def publish_async(
+        self,
+        payload: EventPayload,
+        *,
+        producer: type | str,
+        trace_id: str | None = None,
+    ) -> EventRef:
+        """异步版 publish:走 :class:`EnvelopeBus.publish` 入队后,
+        同步等 :class:`lca_kernel.events.persistence.PersistenceWorker` 将
+        该 envelope 落盘(经 fsync)。
+
+        用途:
+        - ``EventSpine.append_async`` / ``spine_port_append_async`` 新入口;
+        - 任何需要"事件已落盘"语义的生产端调用点(取代 sync ``publish``
+          中"立刻 expect persisted=True"的兼容语义)。
+
+        与 sync :meth:`publish` 的差别:
+        - sync :meth:`publish` 保持 PR-1 兼容 shim(``_dispatch_sinks`` 同步
+          写已装载 sink),适合 wire 兼容场景;
+        - async :meth:`publish_async` 走后台 worker,S3 真实落盘由 worker
+          串行执行,不阻塞 caller 在 send 后立即 await 之前返回;
+        - 在 ``persisted`` 语义上:async 路径返回 ``persisted=True``(worker
+          flush_for 确认);sync 路径保留 PR-1 行为(``_dispatch_sinks`` 返
+          回值,无 sink 时 False)。
+
+        事件流:S1 鉴权 + S2 构造(走 EnvelopeBus.publish)→ S3 enqueue →
+        await PersistenceWorker.flush_for(ref.event_id)(fsync 完成)→
+        S4 _fanout。
+
+        错误:worker.flush_for 超时抛 :class:`PersistenceFlushTimeout`;
+        super().publish 仍走鉴权 + schema 校验(同 sync publish)。
+        """
+        envelope_ref = super().publish(payload, producer=producer, trace_id=trace_id)
+        # 启动 worker(幂等);让 consumer 拉这条 envelope 并落盘。
+        from lca_kernel.events.persistence import PersistenceWorker
+
+        worker = PersistenceWorker.default()
+        await worker.flush_for(envelope_ref.event_id)
+
+        # 同步 fanout(同 sync publish);不重复 super().publish 已做的 notify,
+        # 但 _fanout 仍按 EventBus 兼容层路径走。
+        ref = EventRef(
+            event_id=envelope_ref.event_id,
+            category=envelope_ref.category,
+            trace_id=envelope_ref.trace_id,
+            ts=envelope_ref.ts,
+            persisted=True,
+            subscriber_count=0,
+        )
+        counts = self._delivery_counts[envelope_ref.category]
+        if envelope_ref.category in counts:
+            counts["persisted"] += 1
+        results: list[ConsumerResult] = []
+        self._fanout(payload, ref, results)
+        if results:
+            counts["delivered"] += 1
+        ref = replace(ref, subscriber_count=len(results))
+        self._run_post_dispatch(payload, ref, results)
+        if any(r.exc is not None for r in results):
+            self._run_failure_hooks(payload, ref, results)
+        return ref
+
     def subscribe(
         self,
         *,

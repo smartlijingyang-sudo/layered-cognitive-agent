@@ -74,8 +74,47 @@ class EventSpine:
 
         Signature and failure semantics (FD-1 / FD-2) are unchanged; the
         implementation lives in ``loop_cursor._spine_port`` (ADR-0183 PR-9).
+
+        COMPAT(delete-when: PR-3 cursor 迁完 EventBus.publish_async 之后
+        仅剩 sync 直写 fallback;tracking: ADR-0184 PR-2;45 天窗口)
         """
         return spine_port_append(
+            self._sinks,
+            self._subscribers,
+            execution_point=execution_point,
+            channel=channel,
+            caller_payload=caller_payload,
+            outcome=outcome,
+            span_ctx=span_ctx,
+            phase=phase,
+            reason=reason,
+            when=when,
+        )
+
+    async def append_async(
+        self,
+        *,
+        execution_point: str,
+        channel: Channel,
+        caller_payload: dict[str, Any] | None = None,
+        outcome: Outcome | None = None,
+        span_ctx: Any | None = None,
+        phase: Phase = "live",
+        reason: str | None = None,
+        when: datetime | None = None,
+    ) -> EventRecord:
+        """异步版 facade — ADR-0184 PR-2,走 EnvelopeBus.publish_async + PersistenceWorker。
+
+        与 :meth:`append` 的差别:S3 落盘改为经 :class:`lca_kernel.events.bus.EventBus.publish_async`
+        入队 + 等 :class:`lca_kernel.events.persistence.PersistenceWorker` flush_for,
+        fsync 策略可配;S4 deriver 链仍同步收尾(供 step_tree_accumulator 等老
+        subscriber 收到事件)。
+        """
+        from lca.infrastructure.observability.loop_cursor._spine_port import (
+            spine_port_append_async,
+        )
+
+        return await spine_port_append_async(
             self._sinks,
             self._subscribers,
             execution_point=execution_point,

@@ -31,6 +31,11 @@ class SpineFileSink:
 
     失败语义：sink path 失败上抛；订阅路径由机制 FD-1 fail-fast 显式记日志，
     无静默枚举 fallback。
+
+    实现 :class:`lca_kernel.events.sinks.SinkBackend` Protocol(PR-2 起):除老
+    ``__call__`` 兼容层外,新增 :meth:`append` / :meth:`flush` / :meth:`close`
+    三件套,允许 ``EventBus.mount_sink`` 直接装载。sink 写入仍走底层
+    :class:`lca_kernel.events.sinks.spine_sink.SpineSink` SSOT。
     """
 
     def __init__(self, run_dir: Path | None = None) -> None:
@@ -41,9 +46,22 @@ class SpineFileSink:
         self._inner.set_run_id("default-run")
 
     def __call__(self, payload: Any, ref: EventRef) -> None:
+        # COMPAT(跟踪:ADR-0181 PR-8 shim / ADR-0184 PR-1;老 EventBus.subscribe
+        # callback 路径仍可用,新路径走 mount_sink 后由 _dispatch_sinks →
+        # backend.append(record) 接管)。delete-when:EventBus.subscribe(零 sinks
+        # 路径)全部收口。
         if not is_spine_event(payload):
             raise TypeError(f"SpineFileSink 只接 SpineEventPayload；got {type(payload).__name__}")
         self._inner.append(build_record(payload, ref))
+
+    def append(self, record) -> None:
+        """SinkBackend Protocol 实现(ADR-0184 PR-2):接收已构造好的 record 直接落盘。
+
+        ``record`` 通常由 :meth:`lca_kernel.events.bus.EventBus._dispatch_sinks`
+        内部经 :func:`lca_kernel.events.spine_runtime.build_record` 构造,
+        本方法不重复序列化。
+        """
+        self._inner.append(record)
 
     def flush(self) -> None:
         self._inner.flush()

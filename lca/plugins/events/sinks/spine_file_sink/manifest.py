@@ -57,23 +57,30 @@ class _Config(BaseModel):
     marker_class=SINK_PLUGIN_CLASS,
 )
 async def setup(ctx: PluginContext, config: _Config) -> None:
-    """SpineFileSink boot：构造 sink + 订阅 EventBus 所有 spine 类别。"""
+    """SpineFileSink boot — ADR-0184 PR-2:走 mount_sink 不再绕道 subscribe。
+
+    老路径 ``bus.subscribe(category=..., on_event=sink, failure=FAIL_FAST)``
+    把 sink 当 callback 注册,绕过了 :class:`lca_kernel.events.sinks.SinkBackend`
+    Protocol(SyncBus 只走 _fanout 路径而非 _dispatch_sinks);新路径 ``mount_sink``
+    直接挂 :class:`lca_kernel.events.sinks.SinkBackend`,让
+    :meth:`lca_kernel.events.bus.EventBus._dispatch_sinks` 在 publish 时把它
+    派发给 build_record(SpineEventRecord)+ sink.append 链。
+    """
     from lca_kernel.events.bus import EventBus
     from lca_kernel.events.hooks import FailureSemantics
 
-    from lca_kernel.events.bus import EventBus as _EB; bus_obj = ctx.soft_get("event.bus") or _EB.default()
+    bus_obj = ctx.soft_get("event.bus") or EventBus.default()
     if not isinstance(bus_obj, EventBus):
         msg = "event.sink.spine_file boot 失败：event.bus 未装载"
         raise RuntimeError(msg)
     sink = SpineFileSink()
-    for spec in bus_obj.registry.specs:
-        if spec.category.value.startswith("spine."):
-            bus_obj.subscribe(
-                plugin=SINK_PLUGIN_CLASS,
-                category=spec.category,
-                on_event=sink,
-                failure=FailureSemantics.FAIL_FAST,
-            )
+    # COMPAT(delete-when: PR-3 cursor 完全迁 EventBus.publish_async,所有 spine category
+    # 经 _dispatch_sinks 统一落盘后;tracking: ADR-0184 PR-2;45 天窗口)
+    bus_obj.mount_sink(
+        sink_id="lca.events.sink.spine_file",
+        backend=sink,
+        failure=FailureSemantics.FAIL_FAST,
+    )
     ctx.provide("event.sink.spine_file", sink)
 
 
