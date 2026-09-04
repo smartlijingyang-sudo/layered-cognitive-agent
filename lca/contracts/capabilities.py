@@ -308,6 +308,22 @@ LEARNING_REVIEW_TICKET_STORE = Capability[object]("learning.review_ticket_store"
 LEARNING_REVIEW_SERVICE = Capability[object]("learning.review_service", cardinality="one")
 """Profile-owned terminal review ticket service with candidate-only assessment APIs."""
 
+# ── ADR-0187 PR-2: Assistant domain capability keys ─────────────────────
+#
+# 薄 Catalog / 助理域 overlay / 进化 / 定时 job 各自独立 capability key；
+# 禁止单类同时实现多个（arch test 守住 §6 删除条件「**无** God Catalog」）。
+ASSISTANT_CATALOG = Capability[object]("assistant.catalog", cardinality="one")
+"""薄 Catalog（Home CRUD + 配置面 revise/reimport + retire）；ADR-0187 §3 D4。"""
+
+ASSISTANT_SKILL_OVERLAY = Capability[object]("assistant.skill_overlay", cardinality="one")
+"""助理域 skill overlay（挂 0048 全局 store 之上的 per-assistant 索引）。"""
+
+ASSISTANT_EVOLVE = Capability[object]("assistant.evolve", cardinality="one")
+"""助理域 SkillAcquirer 实现（与 learning.skill_acquirer 平行但 capability 独立）。"""
+
+ASSISTANT_JOBS = Capability[object]("assistant.jobs", cardinality="one")
+"""JobSpec 收集器，向 continuous_control_plane_factory 注册 WorkItem；ADR-0093 复用。"""
+
 # ── Named factories / drivers ───────────────────────────────────────
 
 LLM_RESOLVER = Capability[object]("llm_resolver", cardinality="one")

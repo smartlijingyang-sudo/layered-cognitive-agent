@@ -113,6 +113,61 @@ _CORDIS_EVENT_TABLE_ENTRIES: Final[tuple[CordisEventTableEntry, ...]] = (
         execution_point="llm.request.header",
         cordis_name="agent.llm.request.header",
     ),
+    # ── ADR-0187 PR-2: Assistant domain EP closure ──────────────
+    # 12 项闭集(assistant.created / bootstrap.completed / profile.revised /
+    # paused / resumed / skill.installed / skill.activated /
+    # skill.evolved.proposed / skill.evolved.promoted / job.registered /
+    # job.fired / retired);cordis_name 收口为 agent.assistant.*(L12 不变)。
+    # 闭环不变量测试在 tests/contracts/observability/test_assistant_ep_closure.py;
+    # 此处字面列出避免与 assistant_ep_closure 模块形成 import 环。
+    CordisEventTableEntry(
+        execution_point="assistant.created",
+        cordis_name="agent.assistant.created",
+    ),
+    CordisEventTableEntry(
+        execution_point="assistant.bootstrap.completed",
+        cordis_name="agent.assistant.bootstrap.completed",
+    ),
+    CordisEventTableEntry(
+        execution_point="assistant.profile.revised",
+        cordis_name="agent.assistant.profile.revised",
+    ),
+    CordisEventTableEntry(
+        execution_point="assistant.paused",
+        cordis_name="agent.assistant.paused",
+    ),
+    CordisEventTableEntry(
+        execution_point="assistant.resumed",
+        cordis_name="agent.assistant.resumed",
+    ),
+    CordisEventTableEntry(
+        execution_point="assistant.skill.installed",
+        cordis_name="agent.assistant.skill.installed",
+    ),
+    CordisEventTableEntry(
+        execution_point="assistant.skill.activated",
+        cordis_name="agent.assistant.skill.activated",
+    ),
+    CordisEventTableEntry(
+        execution_point="assistant.skill.evolved.proposed",
+        cordis_name="agent.assistant.skill.evolved.proposed",
+    ),
+    CordisEventTableEntry(
+        execution_point="assistant.skill.evolved.promoted",
+        cordis_name="agent.assistant.skill.evolved.promoted",
+    ),
+    CordisEventTableEntry(
+        execution_point="assistant.job.registered",
+        cordis_name="agent.assistant.job.registered",
+    ),
+    CordisEventTableEntry(
+        execution_point="assistant.job.fired",
+        cordis_name="agent.assistant.job.fired",
+    ),
+    CordisEventTableEntry(
+        execution_point="assistant.retired",
+        cordis_name="agent.assistant.retired",
+    ),
 )
 
 _CORDIS_EVENT_TABLE_BY_EP: Final[dict[str, CordisEventTableEntry]] = {
