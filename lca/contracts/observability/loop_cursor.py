@@ -9,6 +9,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
+from lca.contracts.observability.loop_cursor_payloads import (
+    RequestHeader,
+    ThinkingRecord,
+    ToolCallRecord,
+    ToolResultRecord,
+)
+
 PhaseName = Literal[
     "perceive",
     "think",
@@ -124,13 +131,13 @@ class LoopCursor(Protocol):
         self,
         payload: ThinkingRecord,
         *,
-        text_preview: str = "",  # noqa: F821
+        text_preview: str = "",
     ) -> None: ...
-    def record_tool_call(self, payload: ToolCallRecord) -> None: ...  # noqa: F821
-    def record_tool_result(self, payload: ToolResultRecord) -> None: ...  # noqa: F821
+    def record_tool_call(self, payload: ToolCallRecord) -> None: ...
+    def record_tool_result(self, payload: ToolResultRecord) -> None: ...
 
     # ── 横切(3) ──────────────────────────────────────────────────
-    def record_request_header(self, header: RequestHeader) -> None: ...  # noqa: F821
+    def record_request_header(self, header: RequestHeader) -> None: ...
     def open_step(self, step_id: str) -> None: ...
     def fork(self, reason: Literal["child_agent", "delegation"]) -> LoopCursor: ...
 

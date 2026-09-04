@@ -341,7 +341,7 @@ class TestExecutionPointLabeling:
         from lca_kernel.events.session import SessionEvent
 
         sink = _StubSink()
-        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)
         event = SessionEvent(
             type="spine.llm.request.header",
             seq=8,
@@ -359,7 +359,7 @@ class TestExecutionPointLabeling:
         from lca_kernel.events.session import SessionEvent
 
         sink = _StubSink()
-        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)
         event = SessionEvent(
             type="spine.cognition.brain.think.start",
             seq=1,
@@ -374,7 +374,7 @@ class TestExecutionPointLabeling:
         from lca_kernel.events.session import SessionEvent
 
         sink = _StubSink()
-        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)
         event = SessionEvent(
             type="app.custom.event",
             seq=2,
@@ -398,7 +398,7 @@ class TestExecutionPointLabeling:
             step_id: str = "step-001"
 
         sink = _StubSink()
-        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)
         ref = EnvelopeRef(
             event_id="evt-ep-typed",
             category="spine.llm.request.header",
