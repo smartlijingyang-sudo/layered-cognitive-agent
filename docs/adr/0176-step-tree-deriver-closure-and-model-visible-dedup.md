@@ -1,6 +1,8 @@
 # ADR-0176: StepTreeAccumulator 闭环 + Model-Visible 去重重构 + Prompt Section 真值化
 
-- Status: Accepted
+> **§D4 "system.json 合并到 messages.json" 段已被 [ADR-0185](0185-model-visible-event-bus-alignment.md) 取代**;整个 `<run_dir>/model_visible/` 目录由 ADR-0185 删,`system.json` / `system_prompt.json` / `system_prompt_sections.json` / `messages.json` 都不再写盘。本文保留全文作历史。
+
+- Status: Accepted(§D4 段已被 ADR-0185 Superseded)
 - Date: 2026-09-03
 - Supersedes: none
 - Depends on:

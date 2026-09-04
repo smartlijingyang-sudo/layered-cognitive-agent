@@ -1,8 +1,10 @@
 # ADR-0169: LoopCursor 控制面收敛 — 与观测装配分离
 
+> **§D7 I-MV1 "model_visible 5 件套 SSOT" 已被 [ADR-0185](0185-model-visible-event-bus-alignment.md) 取代**;`ModelVisibleCapture` 缝、`StdModelVisibleCapture` / `StdReasonerPromptCapture` 默认实现、`<run_dir>/model_visible/` 旁路文件目录由 ADR-0185 收口。本文件保留全文作历史。
+
 ## 状态
 
-**Accepted — 2026-09-02**
+**Accepted — 2026-09-02**(§D7 I-MV1 段已被 ADR-0185 Superseded)
 
 > **实施状态(2026-09-02)**: 五缝文件全部落地(`StdLoopCursor` /
 > `StdProjectionHost` / `PersistenceCoordinator` / `ModelVisibleCapture` /
