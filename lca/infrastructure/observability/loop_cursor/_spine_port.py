@@ -15,6 +15,9 @@ cursor 直写)收口为本模块两个入口:
 cursor 不得直接 import EventSpine / Serializer / Storage(ADR-0169 L4
 I-PLUG1);本模块只 import spine 原语(EventRecord / EventSink /
 SpineContext),不 import EventSpine 类。
+
+ADR-0185 PR-3h:模块另持有 Session runtime 转发缝(:class:`SessionAppendHook`
++ ContextVar 注册);未绑定时全部写入行为与缝存在前逐字节一致。
 """
 
 from __future__ import annotations
@@ -23,6 +26,7 @@ import hashlib
 import json
 import logging
 from collections.abc import Callable, Sequence
+from contextvars import ContextVar, Token
 from datetime import datetime, timezone
 from typing import Any, Protocol
 
@@ -53,6 +57,58 @@ class WritePort(Protocol):
     ) -> int: ...
 
 
+# ── ADR-0185 PR-3h:Session runtime 转发缝(骨架)──────────────────────
+
+
+class SessionAppendHook(Protocol):
+    """Session runtime 转发钩子 — 签名与 :func:`spine_port_append` 同构。
+
+    钩子返回 :class:`EventRecord` 即代表该次写入由 Session runtime 完整
+    拥有(stamp / 落盘 / subscriber 派发均在钩子内完成);
+    :func:`spine_port_append` 只转发、不重复写。
+    """
+
+    def __call__(
+        self,
+        sinks: Sequence[EventSink],
+        subscribers: Sequence[Callable[[EventRecord], None]],
+        *,
+        execution_point: str,
+        channel: Channel,
+        caller_payload: dict[str, Any] | None = None,
+        outcome: Outcome | None = None,
+        span_ctx: Any | None = None,
+        phase: Phase = "live",
+        reason: str | None = None,
+        when: datetime | None = None,
+        ref: Any = None,
+    ) -> EventRecord: ...
+
+
+_session_append_hook: ContextVar[SessionAppendHook | None] = ContextVar(
+    "lca_spine_session_append_hook", default=None
+)
+
+
+def get_session_append_hook() -> SessionAppendHook | None:
+    """取当前绑定的 Session runtime 转发钩子;无则返回 ``None``(走原同步直写)。"""
+    return _session_append_hook.get()
+
+
+def bind_session_append_hook(hook: SessionAppendHook) -> Token[Any]:
+    """绑定 Session runtime 转发钩子;返回 reset token。
+
+    由 Session runtime 装配方调用(骨架期无生产调用方);未绑定 /
+    释放后全部 spine 写入走原同步路径,行为不变。
+    """
+    return _session_append_hook.set(hook)
+
+
+def reset_session_append_hook(token: Token[Any]) -> None:
+    """释放 ``bind_session_append_hook`` 返回的 token。"""
+    _session_append_hook.reset(token)
+
+
 def spine_port_append(
     sinks: Sequence[EventSink],
     subscribers: Sequence[Callable[[EventRecord], None]],
@@ -66,6 +122,7 @@ def spine_port_append(
     reason: str | None = None,
     when: datetime | None = None,
     ref: Any = None,
+    session_hook: SessionAppendHook | None = None,
 ) -> EventRecord:
     """唯一 spine 写入实现(ADR-0183 PR-9)。
 
@@ -79,7 +136,40 @@ def spine_port_append(
       原事件仍到达 sink。
 
     所有权:record 为新建 frozen 实例,sinks / subscribers 只读遍历。
+
+    ``session_hook``(ADR-0185 PR-3h 骨架):非 None 时先在本地
+    SpineContext 分配前转发给 Session runtime,钩子返回的
+    :class:`EventRecord` 直接回传;钩子抛错按 FD-2 容错(日志
+    ``spine.session_forward_failed``),落回下方原同步路径。传 ``None``
+    (默认)时行为与缝存在前逐字节一致。
+
+    COMPAT(delete-when: Session runtime 成为唯一 spine append 入口、
+    ``session_hook`` 参数与同步直写回退调用方清零;
+    tracking: ADR-0185 PR-3h 骨架)
     """
+    if session_hook is not None:
+        try:
+            return session_hook(
+                sinks,
+                subscribers,
+                execution_point=execution_point,
+                channel=channel,
+                caller_payload=caller_payload,
+                outcome=outcome,
+                span_ctx=span_ctx,
+                phase=phase,
+                reason=reason,
+                when=when,
+                ref=ref,
+            )
+        except Exception as exc:
+            log.warning(
+                "spine.session_forward_failed execution_point=%s err=%s",
+                execution_point,
+                exc,
+                exc_info=True,
+            )
+
     now = when or datetime.now(timezone.utc)
     seq = SpineContext.next_sequence()
     epoch = SpineContext.next_epoch()
@@ -321,7 +411,11 @@ def write_port_append_async(
 
 
 __all__ = [
+    "SessionAppendHook",
     "WritePort",
+    "bind_session_append_hook",
+    "get_session_append_hook",
+    "reset_session_append_hook",
     "spine_port_append",
     "spine_port_append_async",
     "write_port_append",

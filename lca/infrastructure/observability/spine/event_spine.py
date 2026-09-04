@@ -20,7 +20,10 @@ from contextlib import suppress
 from datetime import datetime
 from typing import Any
 
-from lca.infrastructure.observability.loop_cursor._spine_port import spine_port_append
+from lca.infrastructure.observability.loop_cursor._spine_port import (
+    get_session_append_hook,
+    spine_port_append,
+)
 from lca.infrastructure.observability.spine.context import SpineContext
 from lca.infrastructure.observability.spine.event_record import (
     Channel,
@@ -89,6 +92,42 @@ class EventSpine:
             phase=phase,
             reason=reason,
             when=when,
+        )
+
+    def append_via_session(
+        self,
+        *,
+        execution_point: str,
+        channel: Channel,
+        caller_payload: dict[str, Any] | None = None,
+        outcome: Outcome | None = None,
+        span_ctx: Any | None = None,
+        phase: Phase = "live",
+        reason: str | None = None,
+        when: datetime | None = None,
+    ) -> EventRecord:
+        """Session.append 兼容 shim(ADR-0185 PR-3h 骨架)。
+
+        Session runtime 钩子已绑定(:func:`bind_session_append_hook`)时,
+        写入经 ``spine_port_append`` 的 ``session_hook`` 转发给 Session
+        runtime,由钩子完整拥有该次写入;未绑定或转发失败时落回
+        :meth:`append` 的原同步直写路径,失败语义不变。
+
+        COMPAT(delete-when: Session runtime 成为唯一 spine append 入口、
+        同步直写回退调用方清零;tracking: ADR-0185 PR-3h 骨架)
+        """
+        return spine_port_append(
+            self._sinks,
+            self._subscribers,
+            execution_point=execution_point,
+            channel=channel,
+            caller_payload=caller_payload,
+            outcome=outcome,
+            span_ctx=span_ctx,
+            phase=phase,
+            reason=reason,
+            when=when,
+            session_hook=get_session_append_hook(),
         )
 
     async def append_async(
