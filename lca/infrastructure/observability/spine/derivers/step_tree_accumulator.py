@@ -14,9 +14,10 @@
 - 工具 / LLM EP 仅做引用累积（不写 tool_call / tool_result 主轨；这两
   个原语由 StepGroupedBackend 在 close_and_finalize 收口）。
 - ``flush()`` 把累积状态转 JournalDocument + 写盘。
-- **deriver 是纯订阅 + 物化**:不写 model_visible(ADR-0176 D2)。model_visible
-  由 :class:`ModelVisibleRecorder` 在 LLM 边界一次性写;deriver 只读
-  ``step_id`` 做 phase 累计。
+- **deriver 是纯订阅 + 物化**:不写 model_visible(ADR-0176 D2)。model-visible
+  真值在 ``<run_id>.spine.jsonl``(ADR-0185,``foldRequestHeader`` 重建);
+  双轨期旧 ``ModelVisibleRecorder`` 仍落 ``model_visible/step_NN/`` fallback
+  sidecar(PR-4 收口删除)。deriver 只读 ``step_id`` 做 phase 累计。
 """
 
 from __future__ import annotations
@@ -57,7 +58,9 @@ def _truncate_kept(text: str, *, head: int, tail: int) -> str:
 
     The middle is collapsed to ``"\\n… [truncated N chars] …\\n"``. Caller
     decides the budget; absolute limit is the journal.json size ceiling.
-    The full text continues to live in ``model_visible/<step_id>/...``
+    The full text lives in ``<run_id>.spine.jsonl`` (``llm.stream.token``
+    events carry the raw deltas; ADR-0185 fold SSOT), with the legacy
+    ``model_visible/<step_id>/`` sidecar as dual-rail fallback until PR-4,
     so no information is lost — this is a viewport projection only.
     """
     if not text:
@@ -369,7 +372,9 @@ class StepTreeAccumulatorDeriver(Deriver):
             # channel_kind 标注 — reasoning 通道写 reasoning, default 走
             # final。整段过长(> 16 KiB reasoning / > 32 KiB final)时
             # 仍继续记字符总数, 但截字串到 budgeting, 避免 journal.json
-            # size 爆炸; 全量继续落 model_visible/messages.json (SSOT)。
+            # size 爆炸; 全量在 <run_id>.spine.jsonl(llm.stream.token 事件
+            # SSOT; ADR-0185 fold 重建),双轨期 model_visible/messages.json
+            # 仍落 fallback 副本(PR-4 收口删除)。
             if self._open_step is not None and self._open_step.llm_started:
                 p = event.payload
                 delta = str(p.get("text_delta", "") or "")
@@ -385,7 +390,8 @@ class StepTreeAccumulatorDeriver(Deriver):
         elif ep == "llm.call.end":
             # 收口:把累积缓冲拼成 ThinkingTrace 写到 step.thinking。
             # reasoning/final 各自 cap 到 4 KiB 字符; 超出时 first + ... + last
-            # 拼接(可读性 > 完整性, 全文留在 model_visible)。
+            # 拼接(可读性 > 完整性, 全文在 <run_id>.spine.jsonl; 双轨期
+            # model_visible/ 为 fallback)。
             if self._open_step is not None:
                 p = event.payload
                 model = str(p.get("model", "unknown"))
@@ -645,8 +651,10 @@ class StepTreeAccumulatorDeriver(Deriver):
         # reflect 默认摘要
         if f.reflect is None and f.tool_result is not None:
             f.reflect = ReflectTrace(summary=f.tool_result.delta_summary[:200])
-        # ADR-0176 D2:deriver 是纯订阅 + 物化,不再落 model_visible。
-        # model_visible 由 ModelVisibleRecorder 在 LLM 边界一次性写。
+        # ADR-0176 D2:deriver 是纯订阅 + 物化,不写 model_visible。
+        # model-visible 真值在 <run_id>.spine.jsonl(ADR-0185 fold 重建);
+        # 双轨期旧 ModelVisibleRecorder 仍落 model_visible/ sidecar(fallback,
+        # PR-4 收口删除)。
         #
         # 观测面 SSOT 收口(2026-09-03):``brain.think.end`` 之后 cursor
         # 可能还在 ``act`` 窗口里产生 ``step.tool_call.record`` /

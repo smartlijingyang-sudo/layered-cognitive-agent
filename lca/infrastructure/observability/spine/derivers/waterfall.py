@@ -7,9 +7,10 @@
 订阅 ``EventSpine``，on flush 渲染一份静态 HTML：
 - 每条 spine event 一行（按 sequence 升序）
 - 时间轴 / 状态色 / token 切片
-- 每个 think 段链向 ``model_visible/step_N/`` (PR-3 双轨期,链接保留
-  为 <run_dir>/model_visible/) 或 ``<run_id>.spine.jsonl`` (PR-3 起新默认,
-  foldRequestHeader 重建; 见 ADR-0185 §3.7)。caller 决定传哪个路径。
+- 每个 think 段的 "model saw" 链接由 caller 传入的 ``model_visible_root``
+  拼接:PR-3 起默认指向 ``<run_id>.spine.jsonl``(fold SSOT,
+  ``foldRequestHeader`` 重建;见 ADR-0185 §3.7);双轨期仍可传
+  ``<run_dir>/model_visible/step_N/``(fallback sidecar,PR-4 收口删除)。
 
 不绑 LobeHub / WebServer;CLI 仅 ``lca-ops journal trajectory <run_id>``。
 """
@@ -85,6 +86,9 @@ class WaterfallDeriver:
             outcome_cls = ' class="ok"'
         ts = e.when.isoformat() if e.when else ""
         payload = self._payload_preview(e)
+        # 链接目标 = model_visible_root + step 子路径;root 语义由 caller 定:
+        # PR-3 起默认 <run_id>.spine.jsonl(fold SSOT),双轨期可 fallback
+        # <run_dir>/model_visible/(PR-4 收口删除)。
         step_link = ""
         if (
             self.model_visible_root is not None
