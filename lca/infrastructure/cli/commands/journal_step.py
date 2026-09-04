@@ -12,6 +12,8 @@ thinking + tool_call + tool_result 五个原语到一个干净块。
 3. tool_call.arguments / stdout_head 已经在 step.tool_call/result EP payload 直发;
    --json 给 agent,文本给人。
 4. --model-visible PATH 把 detail 路径附在末尾(不是自动打开, 避免副作用)。
+   PR-3(ADR-0185):路径优先指向 ``<run_id>.spine.jsonl`` (fold SSOT);无 spine 时
+   回退 ``<run_dir>/model_visible/<step_id>/``(双轨期,PR-4 收口后删除)。
 """
 
 from __future__ import annotations
@@ -174,7 +176,10 @@ def register(app: typer.Typer) -> None:
         model_visible: bool = typer.Option(
             False,
             "--model-visible",
-            help="step 后附上 model_visible/<step_id> 路径(不打开文件)",
+            help=(
+                "step 后附上 model-visible 路径(PR-3 优先 spine.jsonl + "
+                "foldRequestHeader 重建;无 spine 时回退 model_visible/<step_id>/)"
+            ),
         ),
         traces_root: Path = typer.Option(  # noqa: B008
             _DEFAULT_TRACES_ROOT, "--traces-root", help="traces 根目录"
@@ -207,9 +212,24 @@ def register(app: typer.Typer) -> None:
         print(_format_step_human(step), end="")
 
         if model_visible:
-            mv_dir = run_dir / "model_visible" / (step.get("step_id") or "")
-            print("")
-            print(f"model_visible: {mv_dir}  (messages.json / system_prompt.md / ...)")
+            # ADR-0185 PR-3:model-visible SSOT 优先 spine.jsonl (fold 重建);
+            # 无 spine 时回退 <run_dir>/model_visible/<step_id>/(双轨期)。
+            from lca.infrastructure.observability.spine.sinks.naming import (
+                spine_filename_for_run,
+            )
+
+            step_id = step.get("step_id") or ""
+            spine_file = run_dir / spine_filename_for_run(run_dir.name)
+            if spine_file.exists():
+                print("")
+                print(
+                    f"model_visible: spine.jsonl (fold 重建;step_id={step_id});"
+                    f" 调用 lca_kernel.events.fold.foldRequestHeader"
+                )
+            else:
+                mv_dir = run_dir / "model_visible" / step_id
+                print("")
+                print(f"model_visible: {mv_dir}  (legacy sidecar;PR-3 双轨期)")
 
 
 __all__ = ["register"]

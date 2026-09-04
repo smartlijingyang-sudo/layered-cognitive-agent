@@ -35,6 +35,17 @@ def instrument_llm(llm: LLMAdapter) -> LLMAdapter:
       usage(ADR-0169 §C7 控制/观察分离)
     - 任何 capture 缺失(profile 关闭 model_visible)cursor + capture contextvar
       未绑 ⇒ 透明透传(不写盘、不落 EP,业务继续)
+
+    # TODO(ADR-0185 PR-4, tracking: PR-4 delete-when):composer 装配
+    # 入口缺乏 PluginContext,无法在 instrument_llm 时从
+    # ``ctx.soft_get("llm.adapter.hook.model_visible")`` 拿到 PR-2
+    # ``ModelVisibleHook`` 实例。PR-3 不切:旧 ``ModelVisibleLLMAdapter``
+    # 装饰链仍工作(旁路文件 + 旧 EP),新 ``ModelVisiblePublisher`` plugin
+    # setup 后处于未挂载态(双轨期业务侧走旧 capture 路径,viewer 走新
+    # fold 路径读取 spine.jsonl)。PR-4 收口时一并改造 composer:
+    # 把 ``instrument_llm`` 签名扩成 ``(llm, *, ctx: PluginContext | None)``,
+    # 优先 ctx.soft_get('llm.adapter.hook.model_visible') 走 fold 路径,
+    # ctx=None 时回退旧 wiring(测试 / 离 boot 路径)。
     """
 
     # 已有 TelemetryLLMAdapter 时,复用之;否则用 llm 自身

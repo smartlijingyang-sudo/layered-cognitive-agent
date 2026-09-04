@@ -2,14 +2,16 @@
 # 旧 EventSpine deriver；PR-8 shim 走 events/subscribers/spine_* 包装；
 # 本模块保留至 PR-9 旧 spine 全退役（rg "lca.plugins.observability.spine.derivers" lca/ = 0 触发）。
 
-"""Waterfall HTML deriver —— DSH Trajectory 风格（ADR-0167 D9）。
+"""Waterfall HTML deriver —— DSH Trajectory 风格（ADR-0167 D9 + ADR-0185 PR-3）。
 
 订阅 ``EventSpine``，on flush 渲染一份静态 HTML：
 - 每条 spine event 一行（按 sequence 升序）
 - 时间轴 / 状态色 / token 切片
-- 每个 think 段链向 ``model_visible/step_N/``（0167 D3）
+- 每个 think 段链向 ``model_visible/step_N/`` (PR-3 双轨期,链接保留
+  为 <run_dir>/model_visible/) 或 ``<run_id>.spine.jsonl`` (PR-3 起新默认,
+  foldRequestHeader 重建; 见 ADR-0185 §3.7)。caller 决定传哪个路径。
 
-不绑 LobeHub / WebServer；CLI 仅 ``lca-ops journal trajectory <run_id>``。
+不绑 LobeHub / WebServer;CLI 仅 ``lca-ops journal trajectory <run_id>``。
 """
 
 from __future__ import annotations
