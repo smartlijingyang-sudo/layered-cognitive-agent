@@ -12,7 +12,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
+
+if TYPE_CHECKING:
+    from lca.contracts.models.core.tool import ToolManifest
 
 
 @dataclass(frozen=True)
@@ -128,6 +131,37 @@ class ToolSchema:
             description=str(description),
             parameters=dict(parameters) if isinstance(parameters, dict) else {},
             _extras=extras,
+        )
+
+    @staticmethod
+    def from_manifest(manifest: ToolManifest, api_name: str | None = None) -> ToolSchema:
+        """LobeHub 风格 ``ToolManifest`` → OpenAI 风格 ``ToolSchema`` 单向桥。
+
+        一个 manifest 可声明多个 ``api`` 条目；``api_name`` 选定其一，
+        省略时要求 manifest 恰好含一个 api，否则抛 ``ValueError``。
+        ``manifest.parameters``（typed ``ParameterSpec``）与 ``ui_hint``
+        是 renderer 侧概念（ADR-0101 §5.2），不进 LLM 边界 schema，仅在
+        ``_extras`` 留 identifier 供 trace，不参与 digest。
+        """
+        apis = tuple(getattr(manifest, "api", ()) or ())
+        if api_name is not None:
+            selected = next((api for api in apis if getattr(api, "name", "") == api_name), None)
+            if selected is None:
+                raise ValueError(
+                    f"ToolManifest {getattr(manifest, 'identifier', '?')!r} has no api {api_name!r}"
+                )
+        elif len(apis) == 1:
+            selected = apis[0]
+        else:
+            raise ValueError(
+                f"ToolManifest {getattr(manifest, 'identifier', '?')!r} declares "
+                f"{len(apis)} apis; pass api_name to select one"
+            )
+        return ToolSchema(
+            name=str(getattr(selected, "name", "")),
+            description=str(getattr(selected, "description", "") or ""),
+            parameters=dict(getattr(selected, "parameters", None) or {}),
+            _extras={"identifier": str(getattr(manifest, "identifier", ""))},
         )
 
 
