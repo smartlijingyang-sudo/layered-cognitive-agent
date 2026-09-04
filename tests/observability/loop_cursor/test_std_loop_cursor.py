@@ -161,8 +161,6 @@ def test_record_request_header_increments_step_index() -> None:
             incarnation=2,
             reason="initial",
             model="m",
-            system_digest="d1",
-            system_path="p1",
             tools_digest="d2",
             tools_path="p2",
             messages_digest="d3",

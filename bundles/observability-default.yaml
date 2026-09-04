@@ -1,25 +1,29 @@
-# 观测性默认 bundle(PR-7 五缝 plugin 装配)。
+# 观测性默认 bundle(缝族 plugin 装配)。
 #
-# PR-7 扩展:在 base.yaml 已装的 EventDescriptor registry 之外,新增五缝
-# (LoopCursor / ProjectionHost / ModelVisibleCapture / CloseBarrier /
-# Persistence)seam + provider 装配。profile.yaml 不再持有 ``observability:``
-# 段;一切五缝选择经 capability lookup 走本 bundle 的 NamedRegistry。
+# 在 base.yaml 已装的 EventDescriptor registry 之外,新增四缝
+# (LoopCursor / ProjectionHost / CloseBarrier / Persistence)seam + provider
+# 装配。profile.yaml 不再持有 ``observability:`` 段;一切四缝选择经
+# capability lookup 走本 bundle 的 NamedRegistry。
 #
 # 默认 provider 选择:
-# - loop_cursor / projection_host / model_visible / close_barrier = standard
+# - loop_cursor / projection_host / close_barrier = standard
 # - persistence = null(ADR-0169 D8 调用方注入面永不空;生产路径由 transport
 #   注入 FilePersistenceCoordinator,barrier flush 时仍走 File sink 路径)
+#
+# ADR-0185 PR-4:capture 缝已退场,改由 ``events.model_visible.publisher``
+# plugin 在 LLM adapter 边界走 spine event bus 统一注入,本 bundle 不再
+# 装配 ModelVisibleCapture seam + provider。
 #
 # 其它 bundle(web-app / scenario-*)通过 requires 间接依赖本 bundle。
 name: observability-default
 description: |
-  PR-7 五缝 LoopCursor / ProjectionHost / ModelVisibleCapture / CloseBarrier /
-  Persistence seam + provider 装配。EventDescriptor registry 见 base.yaml。
+  四缝 LoopCursor / ProjectionHost / CloseBarrier / Persistence seam +
+  provider 装配。EventDescriptor registry 见 base.yaml。
 requires:
   - base
 
 entries:
-  # ── PR-7 五缝 seam(声明 capability,提供 NamedRegistry)──────
+  # ── 四缝 seam(声明 capability,提供 NamedRegistry)──────────────
   - id: observability.loop_cursor.factory
     name: observability_loop_cursor_factory
     $module: lca.plugins.observability.seams.loop_cursor_factory
@@ -28,11 +32,6 @@ entries:
   - id: observability.projection_host
     name: observability_projection_host
     $module: lca.plugins.observability.seams.projection_host
-    config: {}
-
-  - id: observability.model_visible
-    name: observability_model_visible
-    $module: lca.plugins.observability.seams.model_visible_capture
     config: {}
 
   - id: observability.close_barrier
@@ -45,7 +44,7 @@ entries:
     $module: lca.plugins.observability.seams.persistence_coordinator
     config: {}
 
-  # ── PR-7 五缝默认 provider(把 Std* / Null factory 注册到 NamedRegistry)──
+  # ── 四缝默认 provider(把 Std* / Null factory 注册到 NamedRegistry)──
   - id: observability.loop_cursor.standard
     name: observability_loop_cursor_standard
     $module: lca.plugins.observability.providers.loop_cursor.standard
@@ -54,11 +53,6 @@ entries:
   - id: observability.projection_host.standard
     name: observability_projection_host_standard
     $module: lca.plugins.observability.providers.projection_host.standard
-    config: {}
-
-  - id: observability.model_visible.standard
-    name: observability_model_visible_standard
-    $module: lca.plugins.observability.providers.model_visible_capture.standard
     config: {}
 
   - id: observability.close_barrier.standard

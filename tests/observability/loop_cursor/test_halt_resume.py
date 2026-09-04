@@ -126,8 +126,6 @@ def test_halt_locks_record_calls_std() -> None:
                 incarnation=3,
                 reason="initial",
                 model="m",
-                system_digest="d1",
-                system_path="p1",
                 tools_digest="d2",
                 tools_path="p2",
                 messages_digest="d3",

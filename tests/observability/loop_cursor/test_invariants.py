@@ -221,8 +221,6 @@ def _req_header(step_id: str = "step-001", inc: int = 1) -> RequestHeader:
         incarnation=inc,
         reason="initial",
         model="m",
-        system_digest="sd",
-        system_path="sp",
         tools_digest="td",
         tools_path="tp",
         messages_digest="md",

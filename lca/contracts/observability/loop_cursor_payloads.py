@@ -2,7 +2,9 @@
 
 强类型契约(SSOT 收口):
 - step_id 与 incarnation 不让业务路径填(由 cursor 注入,见 PR-7)
-- system / tools / messages / manifest digest + path 由 ModelVisibleCapture 写(PR-12)
+- system / tools / messages / manifest 的原文 + digest 走 spine event bus
+  (ADR-0185 §3.7),由 ``ModelVisibleHook`` 在 LLM adapter 边界统一发出;
+  fold 重建由 ``foldRequestHeader`` 提供
 - tools schema 由 ``ToolSchema`` 强类型 dataclass 表达(避免 record_tools 接 ``Any``
   在 LLM adapter 边界丢 OpenAI-style schema 字段)
 - ``phase.<x>.fold`` EP payload 由 ``PhaseFoldPayload`` 强类型表达,杜绝历史 bug
@@ -92,15 +94,9 @@ class ToolResultRecord:
 class RequestHeader:
     """cursor 注入 step_id / incarnation;业务路径不能填(ADR-0169 D4)。
 
-    字段命名冻结(ADR-0185 spec §2.5 P5):
-
-    - ``messages_digest`` / ``messages_path`` —— 唯一权威;同时承担
-      旧 ``system_digest`` / ``system_path`` 的语义(system 文本已合并
-      进 messages.json,见 ADR-0176 D4)。
-    - ``system_digest`` / ``system_path`` —— **deprecated**;保留1个
-      minor 版本以兼容 sidecar(`StdModelVisibleCapture` / `StdReasonerPromptCapture`
-      / `ModelVisibleLLMAdapter`)及其测试,SA-3 删旁路文件时一并
-      删这两个字段。caller 应读 ``messages_*`` 字段。
+    字段命名冻结(ADR-0185 spec §2.5 P5):``messages_digest`` /
+    ``messages_path`` 是唯一权威,同时承担旧 system 字段的语义
+    (system 文本已合并进 messages 段,见 ADR-0176 D4)。
     """
 
     step_id: str
@@ -114,10 +110,6 @@ class RequestHeader:
     manifest_digest: str
     manifest_path: str
     inherited_from_step: str | None = None
-    # COMPAT(delete-when: SA-3 删旁路文件 + 旁路测试一并落地;或 1 个
-    #   minor 版本后强制退役,tracking: ADR-0185 spec §2.5 P5)
-    system_digest: str = ""
-    system_path: str = ""
 
 
 @dataclass(frozen=True)
@@ -125,7 +117,8 @@ class ToolSchema:
     """工具 schema 强类型表达 —— 单一权威形态。
 
     LLM adapter 边界用 ``ToolSchema.from_openai(...)`` / ``from_any(...)`` 把
-    异源对象规整成此形态,然后再传给 record_tools / ModelVisibleCapture。
+    异源对象规整成此形态,然后再传给 record_tools(由 ``ModelVisibleHook``
+    走 spine event bus 统一发出)。
     避免 ``tuple[Any, ...]`` 序列化路径里丢字段(历史 bug:17/22 个 schema
     落盘成空 dict,因为 ``vars()`` 抓不到 dataclass 字段之外的属性)。
     """

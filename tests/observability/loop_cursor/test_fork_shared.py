@@ -263,8 +263,6 @@ def _stub_header(*, step_id: str, incarnation: int) -> Any:
         incarnation=incarnation,
         reason="initial",
         model="m",
-        system_digest="d1",
-        system_path="p1",
         tools_digest="d2",
         tools_path="p2",
         messages_digest="d3",
