@@ -88,6 +88,9 @@ class ModelVisibleHookAdapter(LLMAdapter):
         return self._hook
 
     async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
+        # 同一次调用共用入站快照:step 身份在调用开始时锁定。
+        # capture_pre_llm 内部推进 cursor step(open_step),await 之后
+        # 重读 snapshot 会拿到新 step_index,pre/post 配对错位。
         attrs = _snapshot_attrs(self._cursor_provider())
         if attrs is not None:
             run_id, step_index, incarnation = attrs
@@ -101,9 +104,8 @@ class ModelVisibleHookAdapter(LLMAdapter):
             except Exception as exc:  # INTENTIONAL: L10 + D5 不挡业务
                 _log.debug("model_visible_pre_hook_failed: %s", exc)
         response = await self._inner.complete(prompt, **kwargs)
-        attrs_post = _snapshot_attrs(self._cursor_provider())
-        if attrs_post is not None:
-            run_id, step_index, incarnation = attrs_post
+        if attrs is not None:
+            run_id, step_index, incarnation = attrs
             try:
                 self._hook.capture_post_llm(
                     run_id=run_id,
@@ -116,6 +118,8 @@ class ModelVisibleHookAdapter(LLMAdapter):
         return response
 
     async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[LLMStreamEvent]:
+        # 与 complete() 同语义:pre/post 共用入站快照,避免 open_step
+        # 推进后 COMPLETED 时重读拿到新 step_index 造成配对错位。
         attrs = _snapshot_attrs(self._cursor_provider())
         if attrs is not None:
             run_id, step_index, incarnation = attrs
@@ -137,9 +141,8 @@ class ModelVisibleHookAdapter(LLMAdapter):
                 and event.type == LLMStreamEventType.COMPLETED
                 and event.response is not None
             ):
-                attrs_post = _snapshot_attrs(self._cursor_provider())
-                if attrs_post is not None:
-                    run_id, step_index, incarnation = attrs_post
+                if attrs is not None:
+                    run_id, step_index, incarnation = attrs
                     try:
                         self._hook.capture_post_llm(
                             run_id=run_id,

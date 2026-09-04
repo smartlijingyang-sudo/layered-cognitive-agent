@@ -77,6 +77,7 @@ class LoopCursor(Protocol):
         - record_tool_call(...)     : 落 step.tool_call.record EP
         - record_tool_result(...)   : 落 step.tool_result.record EP
         - record_request_header(...): 落 llm.request.header EP + 5 件套
+        - open_step(step_id)          : LLM 边界 step 自增(不落 EP)
         - fork(reason) -> LoopCursor  : subagent / delegation
             (per ADR-0171:child cursor 共享 parent 的 spine handle,
              Incarnation 继承 run_id + plan_ref,incarnation_seq += 1;
@@ -86,6 +87,10 @@ class LoopCursor(Protocol):
         begin_step / end_step / open_segment / close_segment
         emit_phase / emit / subscribe / flush / close_storage
         register_projection / subscribe_projection / drive_projection
+
+    ``open_step`` 与 ``begin_step`` 的边界:前者只做 L6 step_index 自增
+    (状态机),不发任何 EP;``begin_step`` 是 writable-matrix step 生命
+    周期原语,仍不暴露。
     """
 
     @property
@@ -112,8 +117,9 @@ class LoopCursor(Protocol):
     def record_tool_call(self, payload: ToolCallRecord) -> None: ...  # noqa: F821
     def record_tool_result(self, payload: ToolResultRecord) -> None: ...  # noqa: F821
 
-    # ── 横切(2) ──────────────────────────────────────────────────
+    # ── 横切(3) ──────────────────────────────────────────────────
     def record_request_header(self, header: RequestHeader) -> None: ...  # noqa: F821
+    def open_step(self, step_id: str) -> None: ...
     def fork(self, reason: Literal["child_agent", "delegation"]) -> LoopCursor: ...
 
 

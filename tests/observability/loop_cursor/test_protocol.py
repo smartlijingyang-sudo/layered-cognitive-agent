@@ -73,7 +73,7 @@ def test_cursor_error_is_exception_subclass() -> None:
     assert issubclass(CursorError, Exception)
 
 
-def test_loop_cursor_protocol_has_9_methods() -> None:
+def test_loop_cursor_protocol_has_10_methods() -> None:
     expected = {
         "advance",
         "halt",
@@ -82,6 +82,7 @@ def test_loop_cursor_protocol_has_9_methods() -> None:
         "record_tool_call",
         "record_tool_result",
         "record_request_header",
+        "open_step",
         "fork",
         "snapshot",
     }
