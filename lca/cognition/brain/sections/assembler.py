@@ -19,6 +19,7 @@ from dataclasses import dataclass
 
 from lca.cognition.brain.sections.types import join_lines, strip_empty_labeled_lines
 from lca.contracts.models.cognition.prompt_assembly import (
+    AvailableSkillsReason,
     MissingPromptSectionError,
     PromptSectionRegistry,
     PromptTemplate,
@@ -194,6 +195,14 @@ def render_template(
     activated_skill_ids = tuple(s.skill_id for s in activated_skills)
     tools_count = sum(1 for _ in tools)
     available_skills_count = _catalog_skill_count(catalog)
+    # ADR-0185 spec §2.4 P4:派生 SkillRouter 决策原因 — truthiness → 闭集值。
+    # 三态见 AvailableSkillsReason 定义;assembler 是 trace 上唯一写入者。
+    if activated_skill_ids:
+        available_skills_reason: AvailableSkillsReason = "activated"
+    elif available_skills_count > 0:
+        available_skills_reason = "no_match"
+    else:
+        available_skills_reason = "not_enabled"
     trace = PromptTrace(
         template_id=template.id,
         variant=template.variant,
@@ -203,6 +212,7 @@ def render_template(
         activated_skill_ids=activated_skill_ids,
         tools_count=tools_count,
         available_skills_count=available_skills_count,
+        available_skills_reason=available_skills_reason,
         system_prompt_text=text,
     )
     return text, trace

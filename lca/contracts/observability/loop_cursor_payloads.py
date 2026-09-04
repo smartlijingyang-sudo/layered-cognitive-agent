@@ -23,7 +23,33 @@ class ThinkingRecord:
     content_digest: str
     content_path: str | None
     token_count: int | None
-    thinking_kind: Literal["reasoning", "final_response", "compaction"]
+    thinking_kind: Literal[
+        "reasoning",
+        "final_response",
+        "compaction",
+        "tool_call_response",
+        "tool_use_response",
+    ]
+    """Thinking record 闭集(ADR-0185 spec §2.4 P4)。
+
+    - ``reasoning`` —— 模型内部推理(无对外工具调用)
+    - ``final_response`` —— 模型产出的纯文本回复
+    - ``compaction`` —— 上下文压缩阶段
+    - ``tool_call_response`` —— 模型产出含 tool_calls;fold 重建时按
+      ``SpineLlmRequestHeaderAssistantPayload.tool_calls`` 长度 > 0
+      分类,不再打 ``final_response``(修复 spec §0.3 "thinking_kind=
+      final_response 但实际是 tool_call" BUG)
+    - ``tool_use_response`` —— fold 折叠后看到的同 tool_call_response,
+      保留区分值让 caller(doctpr / viewer)按 fold 状态判定;
+
+    修复前后:旧 capture 一律打 ``final_response``;P4 后 producer
+    透传 ``tool_call_response`` / ``tool_use_response``,fold 折叠
+    后的最终 thinking_kind 由 producer 端在调用前判定(见 spec §2.4
+    "P4 必须在 P0 之后才能由 fold 派出来")。
+
+    delete-when:N/A(纯加法,后续 PR-2 publisher fold 状态、PR-3
+    viewer 重建、PR-4 删旁路文件都依赖本模块做语义锚点)。
+    """
 
 
 @dataclass(frozen=True)
