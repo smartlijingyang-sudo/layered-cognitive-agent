@@ -188,6 +188,18 @@ def test_extra_overrides_legacy_alias_but_not_canonical() -> None:
 # ── emit_exception_caught 端到端：sidecar 必有 ──────────────────────────────────
 
 
+def test_emit_exception_caught_has_single_definition() -> None:
+    """``def emit_exception_caught`` exists only in the SSOT emitter module."""
+    repo_root = Path(__file__).resolve().parents[3]
+    hits: list[str] = []
+    for path in (repo_root / "lca").rglob("*.py"):
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+            if line.lstrip().startswith("def emit_exception_caught"):
+                hits.append(f"{path.relative_to(repo_root)}:{lineno}")
+    assert len(hits) == 1, hits
+    assert hits[0].startswith("lca/infrastructure/observability/spine/exception_emit.py:")
+
+
 def test_emit_exception_caught_writes_sidecar_for_any_exception(tmp_path: Path) -> None:
     """任何异常事件 payload size > 4 KiB → FileSink 自动 offload → sidecar 必有。"""
     from lca.harness.declarative.compile.instrument_wrap import (

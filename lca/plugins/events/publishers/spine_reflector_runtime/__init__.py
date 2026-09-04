@@ -1,20 +1,17 @@
 """spine_reflector_runtime — ADR-0181 PR-3。
 
-PR-3：runtime 全量迁（exception + lifecycle + runtime.observed）。
-
-旧 lca/plugins/observability/spine/reflectors/runtime.py 全部 8 emit
-下沉到 EventBus.publish：
-- exception.caught / exception.finally / lifecycle.finally (PR-3 本)
+Runtime envelope emits 下沉到 EventBus.publish：
+- exception.finally / lifecycle.finally
 - runtime.reducer.apply / runtime.checkpoint.create /
   runtime.resume.start / runtime.resume.end /
-  runtime.event_publisher.publish (PR-3 + 旧 reflector 一起删)
+  runtime.event_publisher.publish / runtime.observed
 
-signature 严格对齐旧 reflector，调用方零改动（仅 import 路径换）。
+``exception.caught`` is not re-exported. Callers use
+``lca.infrastructure.observability.spine.exception_emit``.
 """
 
 from lca.plugins.events.publishers.spine_reflector_runtime.plugin import (
     ReflectorClass,
-    emit_exception_caught,
     emit_exception_finally,
     emit_lifecycle_finally,
     emit_runtime_checkpoint_create,
@@ -28,7 +25,6 @@ from lca.plugins.events.publishers.spine_reflector_runtime.plugin import (
 
 __all__ = [
     "ReflectorClass",
-    "emit_exception_caught",
     "emit_exception_finally",
     "emit_lifecycle_finally",
     "emit_runtime_checkpoint_create",

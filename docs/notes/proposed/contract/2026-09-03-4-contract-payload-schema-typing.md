@@ -70,19 +70,11 @@ class StepToolCallRecordPayload:
 
 `emit_*` 入口加校验:`payload = PayloadModel.model_validate(payload)`——任何字段缺失 / 类型错误直接抛 `EventPayloadValidationError`。
 
-### 第三阶段:L4 Protocol 签名收紧
+### 第三阶段:L4 调用点走 SSOT record
 
-承接 note 3,`EnvelopeEmitter` Protocol 收类型化 record:
+[note 3](../../implemented/seam/2026-09-03-3-seam-emit-single-entry.md) 规定 `EnvelopeEmitter` 不含 `emit_exception_caught`。本 note 的 payload 类型化落在 SSOT 入口 `lca.infrastructure.observability.spine.exception_emit.emit_exception_caught(record: ExceptionRecord)`,不把该方法加回 envelope Protocol。
 
-```python
-# 之前
-def emit_exception_caught(boundary: str, exc_type: str, message: str, trace_id: str | None) -> EventRecord | None
-
-# 之后
-def emit_exception_caught(record: ExceptionRecord) -> EventRecord | None
-```
-
-`ExceptionRecord` 已在 `lca/contracts/observability/exception_capture.py:117` 定义,扩展其字段对齐 `ExceptionCaughtPayload`。
+`ExceptionRecord` 已在 `lca/contracts/observability/exception_capture.py` 定义,扩展其字段对齐 `ExceptionCaughtPayload`。
 
 ### 第四阶段:EP 注册收口
 
@@ -106,7 +98,7 @@ _event_descriptor_registry: dict[str, EventDescriptor] = {
 - `lca/contracts/observability/event_payload_schema.py` 新建,定义 ≥ 20 个 EP payload dataclass
 - `event_descriptor_registry.py` 每个 EP 含 `payload_class`
 - `emit_*` 入口加 `model_validate(payload)`,缺字段抛 `EventPayloadValidationError`
-- `EnvelopeEmitter` Protocol 收类型化 record(承接 note 3)
+- `exception.caught` 的类型化入口是 SSOT emitter 的 `ExceptionRecord`(承接 [note 3](../../implemented/seam/2026-09-03-3-seam-emit-single-entry.md);`EnvelopeEmitter` 不含该方法)
 - 现有 `ExceptionRecord` 扩展对齐 `ExceptionCaughtPayload`
 
 ## Alternatives considered

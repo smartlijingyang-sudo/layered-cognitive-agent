@@ -6,14 +6,12 @@ This module wraps them in the :class:`EnvelopeEmitter` Protocol so that
 ``runtime`` and ``agent`` layers can use a bound capability instead of
 inline-importing the plugin tree.
 
-``emit_exception_caught`` is the exception: it forwards the normalized
-:class:`ExceptionRecord` to the single emitter
-``lca.infrastructure.observability.spine.exception_emit`` (ADR-0169
-SSOT) instead of the reflector tree, so the record's
-``traceback_text`` / ``call_frames`` / ``err_kind`` fields survive.
-
 When no spine is wired, the wrapped reflectors silently no-op (the
 plugin tree documents that behaviour); this class preserves it.
+
+``exception.caught`` is not forwarded here. Callers normalize via
+``exc_to_record`` and
+``lca.infrastructure.observability.spine.exception_emit``.
 
 The class lives in ``lca/runtime/`` because it is consumed exclusively
 by the runtime/agent layers as a default-impl seam; it lazy-imports
@@ -25,10 +23,7 @@ from __future__ import annotations
 
 import contextlib
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, TypeVar
-
-if TYPE_CHECKING:
-    from lca.contracts.observability import ExceptionRecord
+from typing import Any, TypeVar
 
 _F = TypeVar("_F", bound=Callable[..., Any])
 
@@ -97,13 +92,6 @@ class SpineEnvelopeEmitter:
             boundary=boundary,
             trace_id=trace_id,
         )
-
-    def emit_exception_caught(self, record: ExceptionRecord) -> None:
-        from lca.infrastructure.observability.spine.exception_emit import (
-            emit_exception_caught as _emit_record,
-        )
-
-        self._safe_emit(_emit_record, record=record)
 
     def emit_exception_finally(self, *, boundary: str, trace_id: str, outcome: str) -> None:
         self._safe_emit(

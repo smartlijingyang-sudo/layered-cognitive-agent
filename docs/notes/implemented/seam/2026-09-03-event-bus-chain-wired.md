@@ -74,6 +74,5 @@ E2E 测试由「`_wire_sink` 手工 subscribe + build_record」改为「`bus.mou
 | `register_pipeline` 与 sink 装载分离 | 21 个 publisher 全部走 `bus.publish` 后,生产 boot 改用 `apply_pipeline`;改用即删 COMPAT 块 |
 | `lca/infrastructure/observability/loop_cursor/` 内 4 处 `spine.append` 直写 | PR-9 follow-up sweep(已在 xfail 跟踪) |
 | `events.jsonl` legacy reader 104 处 | PR-4 follow-up sweep |
-| `lca/plugins/events/publishers/spine_reflector_runtime` 的 4 键 `emit_exception_caught` | runtime_loop PR-10 已迁 SSOT emitter,此函数零生产调用方;删函数 + `__init__` re-export |
 | `EnvelopeEmitter` Protocol 的 `emit_reducer_apply_*` | PR-8 已迁 EventBus 直发,`SpineEnvelopeEmitter` 这两个方法是死代码 |
 | Category 闭集扩展(`event.bus.dispatch.*`) | PR-12 自观察事件当前用 string category + DISPATCH_SELF_OBSERVATION_CATEGORIES 白名单;扩展需新 ADR |

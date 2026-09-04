@@ -29,7 +29,7 @@ Status: implemented
 
 具体收口:
 
-- **删** `lca/plugins/observability/spine/reflectors/runtime.py::emit_exception_caught`(连同 `__all__` 条目)。同文件保留 `emit_exception_finally` —— 它是 envelope,不承载异常内容。原位置留注释说明为何此处没有 `exception.caught`。
+- **删** `lca/plugins/events/publishers/spine_reflector_runtime` 的 `emit_exception_caught`(连同 `__all__` 与 `__init__` re-export)。同模块保留 `emit_exception_finally` —— 它是 envelope,不承载异常内容。原位置留注释说明为何此处没有 `exception.caught`。
 - **`lca/runtime/runtime_loop.py`** 两条 `except` 分支改走 `exc_to_record(exc, boundary=..., run_id=..., trace_id=...)` + SSOT emitter。`CancelledError` 分支同时改成 `except asyncio.CancelledError as exc` 绑定实例 —— 原来传的是硬编码字符串 `"asyncio.CancelledError"` 和 `"driver cancelled"`,不是真实异常。
 - **`EnvelopeEmitter` Protocol**(`lca/contracts/protocols/runtime/envelope_emitter.py`)删掉 `emit_exception_caught` 方法,docstring 写明该 EP 不属于本 Protocol:关键字参数面无法承载 `ExceptionRecord`。`lca/runtime/envelope_emitter.py::SpineEnvelopeEmitter` 同步删实现。
 - **`FileSink` 命名**(`lca/infrastructure/observability/spine/sinks/file_sink.py`)新增 `sidecar_label(record)`,按 offload 原因分流:`exception.caught` 用 `exception_class`,其它(size-driven)用 `execution_point`。`exception.caught` 缺 `exception_class` 时标签是 `UnnormalizedException` 而非通用兜底 —— **emitter 缺陷必须在文件名上可见**。`safe_class_name` 的"清洗后为空"回落改为 `Unlabelled`,与前者区分。
