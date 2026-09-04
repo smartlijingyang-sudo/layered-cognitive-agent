@@ -32,7 +32,7 @@ Status: proposed
 |---|---|---|---|---|
 | 1 | [1-architecture-1-convergence-contract.md](1-architecture-1-convergence-contract.md) | seam | L1 剩余消费方迁移(根 note PR-3 ~ PR-7) | 中 |
 | 2 | [2-seam-fsync-semantics.md](2-seam-fsync-semantics.md) | seam | L3 fd fsync 协议统一(根 note 不覆盖,**新 ADR 配套**) | 中 |
-| 3 | [3-seam-emit-single-entry.md](3-seam-emit-single-entry.md) | seam | L4 emit 入口收口到 1 个 + 删 reflector 平行的 `emit_exception_caught` | 中 |
+| 3 | [3-seam-emit-single-entry.md](../../implemented/seam/2026-09-03-3-seam-emit-single-entry.md) | seam | L4 emit 入口收口到 1 个 + 删 reflector 平行的 `emit_exception_caught` | 中 |
 | 4 | [4-contract-payload-schema-typing.md](../contract/4-contract-payload-schema-typing.md) | contract | L2 类型化 + L3 schema validation | 大 |
 | 5 | [5-runtime-invariants-and-lint.md](../runbook/5-runtime-invariants-and-lint.md) | runbook | 4 级 lint 守门规则 + runtime invariant 守门 + 防回归 | 中 |
 

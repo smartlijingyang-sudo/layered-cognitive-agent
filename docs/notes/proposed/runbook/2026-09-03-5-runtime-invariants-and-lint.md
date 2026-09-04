@@ -65,7 +65,7 @@ rg 'def emit_\w+\(.*: str,.*: str\)' lca/contracts/protocols/ # → 0
 新建,职责清晰:SSOT 守门 / invariant 守门**两个文件**。
 
 ```python
-# invariant 1:runtime_loop except 后必须 exc_to_record + envelope.emit_exception_caught(record)
+# invariant 1:runtime_loop except 后必须 exc_to_record + SSOT emit_exception_caught(record)
 rg 'except.*as \w+:' lca/runtime/runtime_loop.py | xargs -I {} rg -L 'exc_to_record' {}
 
 # invariant 2:FileSink 必须声明 fsync_protocol

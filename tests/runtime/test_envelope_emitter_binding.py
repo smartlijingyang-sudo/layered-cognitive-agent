@@ -12,12 +12,7 @@ both ends to prove:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from lca.runtime.envelope_emitter import SpineEnvelopeEmitter
-
-if TYPE_CHECKING:
-    import pytest
 
 
 def test_spine_envelope_emitter_satisfies_protocol() -> None:
@@ -31,7 +26,6 @@ def test_spine_envelope_emitter_satisfies_protocol() -> None:
         "emit_resume_start",
         "emit_resume_end",
         "emit_lifecycle_finally",
-        "emit_exception_caught",
         "emit_exception_finally",
         "emit_agent_loop_iteration_start",
         "emit_agent_loop_iteration_end",
@@ -64,30 +58,12 @@ def test_spine_envelope_emitter_dispatches_to_runtime_reflector() -> None:
     ]
 
 
-def test_spine_envelope_emitter_forwards_exception_record_to_ssot_emitter(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """``emit_exception_caught`` forwards the normalized record unchanged.
+def test_envelope_emitter_does_not_own_exception_caught() -> None:
+    """``exception.caught`` is observability SSOT, not an envelope method."""
+    from lca.contracts.protocols.runtime.envelope_emitter import EnvelopeEmitter
 
-    The record goes to the single emitter
-    (``lca.infrastructure.observability.spine.exception_emit``), never to
-    the 4-key reflector helper (ADR-0169 SSOT).
-    """
-    from lca.contracts.observability import exc_to_record
-    from lca.infrastructure.observability.spine import exception_emit
-
-    captured: list[object] = []
-
-    def _capture(record: object) -> None:
-        captured.append(record)
-
-    monkeypatch.setattr(exception_emit, "emit_exception_caught", _capture)
-
-    emitter = SpineEnvelopeEmitter()
-    record = exc_to_record(ValueError("boom"), boundary="terminal_driver", trace_id="trace-env")
-    emitter.emit_exception_caught(record)
-
-    assert captured == [record]
+    assert "emit_exception_caught" not in EnvelopeEmitter.__dict__
+    assert not hasattr(SpineEnvelopeEmitter, "emit_exception_caught")
 
 
 def test_spine_envelope_emitter_dispatches_to_agent_spawn_reflector() -> None:

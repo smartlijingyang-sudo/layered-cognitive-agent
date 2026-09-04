@@ -1,12 +1,13 @@
 """spine_reflector_runtime plugin（ADR-0181 PR-3 / ADR-0183 PR-7）。
 
-PR-3：runtime 全部 8 emit 下沉到 EventBus.publish：
-- exception.caught / exception.finally / lifecycle.finally
+Runtime envelope emits 下沉到 EventBus.publish：
+- exception.finally / lifecycle.finally
 - runtime.reducer.apply（start + end）/ checkpoint.create /
-  resume.start / resume.end / event_publisher.publish
+  resume.start / resume.end / event_publisher.publish / runtime.observed
 
-signature 严格对齐旧 lca/plugins/observability/spine/reflectors/runtime.py
-调用方零改动。
+``exception.caught`` is not emitted here. Callers normalize via
+``exc_to_record`` and the single emitter
+``lca.infrastructure.observability.spine.exception_emit``.
 
 业务方一行调：
     EventBus.default().publish(
@@ -19,10 +20,6 @@ from __future__ import annotations
 
 import logging
 from typing import Any
-
-from lca_kernel.events.bus import EventBus
-from lca_kernel.events.payloads import Category, SpineEventPayload
-from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
 
 from pydantic import BaseModel
 
@@ -39,6 +36,9 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca_kernel.events.bus import EventBus
+from lca_kernel.events.payloads import Category, SpineEventPayload
+from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
 
 log = logging.getLogger(__name__)
 
@@ -249,32 +249,12 @@ def emit_runtime_observed(
     )
 
 
-# ── exception.caught / exception.finally ──────────────────────────────
+# ── exception.finally ────────────────────────────────────────────────
 #
-# ``exception.caught`` 是 runner 抛出后转发时 emit；``exception.finally``
-# 是 paired envelope，upstream handler 已记录 boundary event 后，downstream
-# 消费者依赖严格 start/end 配对做清理。
-
-
-def emit_exception_caught(
-    *,
-    boundary: str,
-    exc_type: str,
-    message: str,
-    trace_id: str | None = None,
-) -> Any:
-    """Emit when the runtime layer catches an exception at a known boundary."""
-    return _send(
-        execution_point="exception.caught",
-        channel="error",
-        payload={
-            "boundary": boundary,
-            "exc_type": exc_type,
-            "message": message,
-            "trace_id": trace_id or "",
-            "outcome": "failure",
-        },
-    )
+# ``exception.caught`` is not emitted here. Callers normalize via
+# ``exc_to_record`` and ``lca.infrastructure.observability.spine.exception_emit``
+# so ``traceback_text`` / ``call_frames`` / ``err_kind`` survive.
+# This module owns the empty paired envelope ``exception.finally``.
 
 
 def emit_exception_finally(
@@ -318,7 +298,6 @@ def emit_lifecycle_finally(
 
 __all__ = [
     "ReflectorClass",
-    "emit_exception_caught",
     "emit_exception_finally",
     "emit_lifecycle_finally",
     "emit_runtime_checkpoint_create",
@@ -333,8 +312,6 @@ __all__ = [
 ]
 
 
-
-
 class _Config(BaseModel):
     model_config = {"extra": "forbid"}
 
@@ -346,9 +323,7 @@ class _Config(BaseModel):
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
-    description=(
-        "runtime publisher（ADR-0181）：event.bus.reflector.runtime 由本 plugin 发出。"
-    ),
+    description=("runtime publisher（ADR-0181）：event.bus.reflector.runtime 由本 plugin 发出。"),
     test_suite="tests/plugins/events/publishers/test_events_spine_reflector_runtime.py",
     functional_group=FunctionalGroup.G6_DECISION,
     contract=PluginContract(
@@ -367,7 +342,6 @@ class _Config(BaseModel):
         reads=("event.bus",),
         emits=(
             "spine.lifecycle.finally",
-            "spine.exception.caught",
             "spine.exception.finally",
             "spine.runtime.reducer.apply",
             "spine.runtime.checkpoint.create",
@@ -383,4 +357,3 @@ class _Config(BaseModel):
 async def setup(ctx: PluginContext, config: _Config) -> None:
     """events.spine.reflector.runtime boot：注册 publisher marker 给 ctx。"""
     ctx.provide("event.bus.reflector.runtime", ReflectorClass)
-
