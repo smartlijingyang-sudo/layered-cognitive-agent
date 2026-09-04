@@ -275,12 +275,61 @@ def health_payload(run_port: RunPort, *, ctx: Any) -> dict[str, Any]:
     Boot-period readiness is enforced by the routes plugin and the LLM
     resolver plugin; this projection is now run-port-only and fits inside
     the carrier surface.
+
+    Includes ``event_bus`` field (PR-4) aggregating EventBus delivery
+    counters and, when loaded, PersistenceWorker queue depth + fsync
+    policy. ``dropped_total > 0`` flips ``status`` to ``degraded``;
+    readiness is unaffected (frontend surfaces the warning).
     """
-    return {
+    base: dict[str, Any] = {
         "status": "ok",
         "runs": run_port.status_counts(),
         "live": run_port.live_totals(),
     }
+    event_bus = _read_event_bus_health()
+    if event_bus is not None:
+        base["event_bus"] = event_bus
+        if event_bus.get("dropped_total", 0) > 0:
+            base["status"] = "degraded"
+    return base
+
+
+def _read_event_bus_health() -> dict[str, Any] | None:
+    """Read EventBus delivery counters and PersistenceWorker status (if loaded).
+
+    Graceful degradation (PR-4): PersistenceWorker is imported lazily because
+    PR-2 (the file that creates it) is not merged yet. Any error — import,
+    attribute, or runtime — yields ``None`` so the health projection keeps
+    its core shape and readiness is never blocked by observability.
+    """
+    try:
+        from lca_kernel.events import EventBus
+
+        snapshot = EventBus.default().delivery_snapshot()
+        published_total = sum(c.get("published", 0) for c in snapshot.values())
+        persisted_total = sum(c.get("persisted", 0) for c in snapshot.values())
+        delivered_total = sum(c.get("delivered", 0) for c in snapshot.values())
+        dropped_total = sum(c.get("dropped", 0) for c in snapshot.values())
+        result: dict[str, Any] = {
+            "published_total": published_total,
+            "persisted_total": persisted_total,
+            "delivered_total": delivered_total,
+            "dropped_total": dropped_total,
+            "fsync_policy": "n/a",  # PR-2 merges → "sync" | "batch" | "async"
+        }
+        try:
+            from lca_kernel.events.persistence import (  # type: ignore[import-not-found]
+                PersistenceWorker,
+            )
+
+            worker = PersistenceWorker.default()
+            result["queue_depth"] = worker.pending_count
+            result["fsync_policy"] = worker.fsync_policy.value
+        except (ImportError, AttributeError):
+            pass  # PersistenceWorker not loaded (PR-2 not merged) or attrs not ready
+        return result
+    except Exception:
+        return None
 
 
 __all__ = [

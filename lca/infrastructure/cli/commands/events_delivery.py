@@ -22,14 +22,33 @@ def register(app: typer.Typer) -> None:
     def events_delivery_cmd(
         category: str = typer.Option(None, "--category", help="只看该 category"),
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
+        policy: bool = typer.Option(
+            False,
+            "--policy",
+            help="读 PersistenceWorker.fsync_policy + queue_depth（PR-4）",
+        ),
     ) -> None:
         """打印本进程 EventBus 的投递计数器快照（published/persisted/delivered/dropped）。
 
         计数器是进程内内存（ADR-0184 D2），不落盘；独立 CLI 进程显示
         自己总线的快照，空 = 本进程未 publish 过。``--category`` 只
-        保留该 category 的行（未出现过 = 空输出）。
+        保留该 category 的行（未出现过 = 空输出）。``--policy`` 切到
+        PersistenceWorker 观测（PR-2 未合时优雅降级，不打印计数器）。
         """
         from lca_kernel.events.bus import EventBus
+
+        if policy:
+            try:
+                from lca_kernel.events.persistence import (  # type: ignore[import-not-found]
+                    PersistenceWorker,
+                )
+
+                worker = PersistenceWorker.default()
+                print(f"fsync_policy: {worker.fsync_policy.value}")
+                print(f"queue_depth: {worker.pending_count}")
+            except (ImportError, AttributeError):
+                print("PersistenceWorker not loaded (PR-2 not merged yet)")
+            return
 
         snapshot = EventBus.default().delivery_snapshot()
         if category is not None:
