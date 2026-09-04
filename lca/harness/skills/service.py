@@ -11,6 +11,7 @@ from lca.contracts.atoms.enums import ContentType
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.harness.memory.events import (
     ContextInjected,
+    SkillActivated,
     SkillCatalogPublished,
     SkillLoaded,
     SkillUserInvoked,
@@ -105,7 +106,7 @@ class SkillCatalogService:
     async def load_for_model(
         self, name: str, session_id: str, events: SkillEventSink
     ) -> LoadedSkill:
-        return await self._load(name, session_id, events, invocation="model")
+        return await self._load(name, session_id, events, invocation="model", source="skill_tool")
 
     async def load_for_user(
         self, name: str, session_id: str, events: SkillEventSink
@@ -120,26 +121,48 @@ class SkillCatalogService:
         await events.append(
             SkillUserInvoked(skill_id=loaded.entry.skill_id, raw_text=raw_text), actor="user"
         )
-        await self._record_loaded(loaded, events, invocation="user")
+        await self._record_loaded(loaded, events, invocation="user", source="slash:/skill")
         return loaded
 
     async def _load(
-        self, name: str, session_id: str, events: SkillEventSink, *, invocation: str
+        self,
+        name: str,
+        session_id: str,
+        events: SkillEventSink,
+        *,
+        invocation: str,
+        source: str = "tool",
     ) -> LoadedSkill:
         loaded = await self._provider.load(name, session_id)
-        await self._record_loaded(loaded, events, invocation=invocation)
+        await self._record_loaded(loaded, events, invocation=invocation, source=source)
         return loaded
 
     async def _record_loaded(
-        self, loaded: LoadedSkill, events: SkillEventSink, *, invocation: str
+        self,
+        loaded: LoadedSkill,
+        events: SkillEventSink,
+        *,
+        invocation: str,
+        source: str = "tool",
     ) -> None:
+        """Append the load fact plus the paired activation fact for one loaded skill."""
+        actor = "agent" if invocation == "model" else "user"
         await events.append(
             SkillLoaded(
                 skill_id=loaded.entry.skill_id,
                 content_hash=loaded.entry.content_hash,
                 invocation=invocation,
             ),
-            actor="agent" if invocation == "model" else "user",
+            actor=actor,
+        )
+        await events.append(
+            SkillActivated(
+                skill_id=loaded.entry.skill_id,
+                name=loaded.entry.name,
+                content_hash=loaded.entry.content_hash,
+                source=source,
+            ),
+            actor=actor,
         )
 
 

@@ -49,5 +49,5 @@ tests/.scratch_cordis_creator_real/
 *.swp
 .lca-run/
 
-# SpineFileSink default-run.* JSONL artifacts
-default-run.*.jsonl
+# Per-run spine JSONL artifacts (<run_id>.spine.jsonl) written relative to process cwd
+*.spine.jsonl

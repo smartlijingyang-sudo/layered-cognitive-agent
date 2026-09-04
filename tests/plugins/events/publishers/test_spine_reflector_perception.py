@@ -1,38 +1,24 @@
-"""spine_reflector_perception publisher 端到端测试（ADR-0181 PR-6）。"""
+"""spine_reflector_perception publisher 端到端测试（ADR-0181 PR-6；Session 路径）。"""
+
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
-
-from lca_kernel.events.bus import EventBus
+from typing import Any
 
 
-@pytest.fixture
-def bus() -> EventBus:
-    config_dir = Path(__file__).resolve().parents[4] / "lca_kernel" / "events" / "config"
-    from lca_kernel.events.test_catalog import build_test_bus
-    return build_test_bus(config_dir)
-
-
-def test_emit_perception_all(bus: EventBus) -> None:
+def test_emit_perception_all(bound_session: Any) -> None:
     from lca.plugins.events.publishers.spine_reflector_perception import (
         plugin,
     )
 
-    EventBus.set_default(bus)
-    try:
-        ref = plugin.emit_perception_observe(run_id="r1", source="s1")
-        assert ref.category == "spine.perception.observe"
-        ref = plugin.emit_attention_focus(run_id="r1", target="t1")
-        assert ref.category == "spine.perception.attention.focus"
-        ref = plugin.emit_attention_blur(run_id="r1", target="t1")
-        assert ref.category == "spine.perception.attention.blur"
-        ref = plugin.emit_perception_signal_detected(run_id="r1", signal_kind="k", score=0.9)
-        assert ref.category == "spine.perception.signal.detected"
-        ref = plugin.emit_perception_fused(run_id="r1", artifact_id="a1", sources=["s1"])
-        assert ref.category == "spine.perception.fused"
-        ref = plugin.emit_perception_artifact_built(run_id="r1", artifact_id="a1", size_bytes=1024)
-        assert ref.category == "spine.perception.artifact.built"
-    finally:
-        EventBus.set_default(None)
+    ref = plugin.emit_perception_observe(run_id="r1", source="s1")
+    assert ref.category == "spine.perception.observe"
+    ref = plugin.emit_attention_focus(run_id="r1", target="t1")
+    assert ref.category == "spine.perception.attention.focus"
+    ref = plugin.emit_attention_blur(run_id="r1", target="t1")
+    assert ref.category == "spine.perception.attention.blur"
+    ref = plugin.emit_perception_signal_detected(run_id="r1", signal_kind="k", score=0.9)
+    assert ref.category == "spine.perception.signal.detected"
+    ref = plugin.emit_perception_fused(run_id="r1", artifact_id="a1", sources=["s1"])
+    assert ref.category == "spine.perception.fused"
+    ref = plugin.emit_perception_artifact_built(run_id="r1", artifact_id="a1", size_bytes=1024)
+    assert ref.category == "spine.perception.artifact.built"

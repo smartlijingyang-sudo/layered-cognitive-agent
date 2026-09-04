@@ -4,44 +4,33 @@ transport / kernel.run 全部 6 emit（route.enter / .exit / sse.publish +
 kernel.run.start / .stop / .cancelled）在 EventBus 路径下能正常 publish +
 鉴权通过。
 """
+
 from __future__ import annotations
 
-from pathlib import Path
+from typing import Any
 
 import pytest
 
 from lca_kernel.events.bus import EventBus
 
 
-@pytest.fixture
-def bus() -> EventBus:
-    """用工作区 lca_kernel/events/config 构造机制。"""
-    config_dir = Path(__file__).resolve().parents[4] / "lca_kernel" / "events" / "config"
-    from lca_kernel.events.test_catalog import build_test_bus
-    return build_test_bus(config_dir)
-
-
-def test_emit_transport_all(bus: EventBus) -> None:
+def test_emit_transport_all(bound_session: Any) -> None:
     from lca.plugins.events.publishers.spine_reflector_transport import (
         plugin,
     )
 
-    EventBus.set_default(bus)
-    try:
-        ref = plugin.emit_transport_route_enter(path="/runs", method="POST", run_id="r1")
-        assert ref.category == "spine.transport.route.enter"
-        ref = plugin.emit_transport_route_exit(path="/runs", method="POST", run_id="r1")
-        assert ref.category == "spine.transport.route.exit"
-        ref = plugin.emit_transport_sse_publish(path="/events", run_id="r1")
-        assert ref.category == "spine.transport.sse.publish"
-        ref = plugin.emit_kernel_run_start(run_id="r1", trace_id="t1")
-        assert ref.category == "spine.kernel.run.start"
-        ref = plugin.emit_kernel_run_stop(run_id="r1", outcome="success")
-        assert ref.category == "spine.kernel.run.stop"
-        ref = plugin.emit_kernel_run_cancelled(run_id="r1")
-        assert ref.category == "spine.kernel.run.cancelled"
-    finally:
-        EventBus.set_default(None)
+    ref = plugin.emit_transport_route_enter(path="/runs", method="POST", run_id="r1")
+    assert ref.category == "spine.transport.route.enter"
+    ref = plugin.emit_transport_route_exit(path="/runs", method="POST", run_id="r1")
+    assert ref.category == "spine.transport.route.exit"
+    ref = plugin.emit_transport_sse_publish(path="/events", run_id="r1")
+    assert ref.category == "spine.transport.sse.publish"
+    ref = plugin.emit_kernel_run_start(run_id="r1", trace_id="t1")
+    assert ref.category == "spine.kernel.run.start"
+    ref = plugin.emit_kernel_run_stop(run_id="r1", outcome="success")
+    assert ref.category == "spine.kernel.run.stop"
+    ref = plugin.emit_kernel_run_cancelled(run_id="r1")
+    assert ref.category == "spine.kernel.run.cancelled"
 
 
 def test_unauthorized_publisher_rejected(bus: EventBus) -> None:

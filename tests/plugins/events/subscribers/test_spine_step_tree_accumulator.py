@@ -23,6 +23,7 @@ def bus() -> EventBus:
     SpineStepTreeAccumulator.reset()
     config_dir = Path(__file__).resolve().parents[4] / "lca_kernel" / "events" / "config"
     from lca_kernel.events.test_catalog import build_test_bus
+
     b = build_test_bus(config_dir)
     b.subscribe(
         plugin=SpineStepTreeAccumulator,

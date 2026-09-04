@@ -8,6 +8,8 @@ from typing import Any
 from unittest import mock
 
 from lca.contracts.atoms.enums import LLMStreamEventType
+from lca.contracts.harness.memory.events import ThinkingCompleted, ThinkingDelta
+from lca.contracts.harness.tasks.session import event_type_of
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent, TokenUsage
 from lca.contracts.models.observability.journal import (
     LlmCallCompleted,
@@ -18,6 +20,13 @@ from lca.contracts.models.observability.journal import (
 )
 from lca.contracts.protocols import LLMAdapter
 from lca.infrastructure.observability.adapters import TelemetryLLMAdapter
+from lca.plugins.events.publishers._session_publish import (
+    reset_publish_session,
+    set_publish_session,
+)
+from lca.plugins.session.runtime.session import Session
+from lca_kernel.events.bus import EventBus
+from lca_kernel.events.test_catalog import build_test_bus
 
 
 class _FakeInner(LLMAdapter):
@@ -63,8 +72,15 @@ class TestTelemetryLLMAdapter(unittest.IsolatedAsyncioTestCase):
             side_effect=lambda event: self.recorded.append(event),
         )
         self.record_patcher.start()
+        # spine reflector 的 emit 走 publish_via_session（ADR-0183 fail-loud）：
+        # 需要 active Session + S1 授权 EventBus。生产由 run 边界绑定,
+        # 单测用 fixture 显式持有（形态同 test_session_publish.py）。
+        EventBus.set_default(build_test_bus())
+        self._session_token = set_publish_session(Session("telemetry-adapter-test"))
 
     def tearDown(self) -> None:
+        reset_publish_session(self._session_token)
+        EventBus.set_default(None)
         self.record_patcher.stop()
 
     async def test_complete_success_records_tokens_and_stream_false(self) -> None:
@@ -190,6 +206,69 @@ class TestTelemetryLLMAdapter(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(done[0].step, 3)
         self.assertEqual(done[0].content_preview, "想一下")
         self.assertGreaterEqual(done[0].duration_ms, 0)
+
+    async def test_stream_session_append_receives_thinking_events(self) -> None:
+        inner = _FakeInner()
+        inner.emit_reasoning = True
+        appended: list[Any] = []
+
+        async def session_append(payload: Any) -> None:
+            appended.append(payload)
+
+        adapter = TelemetryLLMAdapter(inner, session_append=session_append)
+        events = [e async for e in adapter.stream("prompt", step=3, turn=2)]
+        self.assertEqual(len(events), 5)
+        deltas = [p for p in appended if isinstance(p, ThinkingDelta)]
+        self.assertEqual(len(deltas), 2)
+        self.assertEqual(deltas[0].turn, 2)
+        self.assertEqual(deltas[0].step, 3)
+        self.assertEqual(deltas[0].text_delta, "想")
+        self.assertEqual(deltas[0].seq, 0)
+        self.assertEqual(deltas[1].text_delta, "一下")
+        self.assertEqual(deltas[1].seq, 1)
+        done = [p for p in appended if isinstance(p, ThinkingCompleted)]
+        self.assertEqual(len(done), 1)
+        self.assertEqual(done[0].turn, 2)
+        self.assertEqual(done[0].step, 3)
+        self.assertEqual(done[0].content_preview, "想一下")
+        self.assertGreaterEqual(done[0].duration_ms, 0)
+        self.assertEqual(event_type_of(deltas[0]), "thinking.delta.v1")
+        self.assertEqual(event_type_of(done[0]), "thinking.completed.v1")
+
+    async def test_stream_session_append_accepts_sync_callable(self) -> None:
+        inner = _FakeInner()
+        inner.emit_reasoning = True
+        appended: list[Any] = []
+        adapter = TelemetryLLMAdapter(inner, session_append=appended.append)
+        _events = [e async for e in adapter.stream("prompt", step=1)]
+        self.assertEqual(len(appended), 3)
+        self.assertEqual(sum(isinstance(p, ThinkingDelta) for p in appended), 2)
+        self.assertEqual(sum(isinstance(p, ThinkingCompleted) for p in appended), 1)
+        # turn 未传时默认 0
+        self.assertEqual(appended[0].turn, 0)
+
+    async def test_stream_session_append_skipped_without_reasoning(self) -> None:
+        appended: list[Any] = []
+
+        async def session_append(payload: Any) -> None:
+            appended.append(payload)
+
+        adapter = TelemetryLLMAdapter(_FakeInner(), session_append=session_append)
+        events = [e async for e in adapter.stream("prompt")]
+        self.assertEqual(len(events), 3)
+        self.assertEqual(appended, [])
+
+    async def test_stream_without_session_append_keeps_journal_only(self) -> None:
+        inner = _FakeInner()
+        inner.emit_reasoning = True
+        adapter = TelemetryLLMAdapter(inner)
+        events = [e async for e in adapter.stream("prompt", step=3)]
+        self.assertEqual(len(events), 5)
+        # 未注入时行为不变：Journal 平面照常记录
+        reasoning = [e for e in self.recorded if isinstance(e, ReasoningDelta)]
+        self.assertEqual(len(reasoning), 2)
+        done = [e for e in self.recorded if isinstance(e, ReasoningCompleted)]
+        self.assertEqual(len(done), 1)
 
 
 if __name__ == "__main__":
