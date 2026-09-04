@@ -11,6 +11,8 @@ import json
 from collections.abc import AsyncIterator
 from typing import Any, Protocol
 
+from lca.contracts.observability.status import RunLifecycleStatus
+
 _OUTPUT_TRUNCATE = 2000
 
 
@@ -114,14 +116,25 @@ class RunUiEncoder:
 
     @staticmethod
     def _map_status(status: str) -> str:
+        """归一化终态事件 status 到 LobeHub UI ``done`` 帧词表。
+
+        输入是终态事件 wire 词表(``RunLifecycleStatus`` 规范值 +
+        A2A / UI 别名);输出是 UI 词表闭集(``awaiting_human`` /
+        ``canceled`` / ``failed`` / ``completed``),不是生命周期 enum。
+        """
         key = status.strip().lower()
-        if key in {"waiting_input", "awaiting_human", "input_required", "paused"}:
+        if key in {
+            RunLifecycleStatus.WAITING_INPUT.value,
+            RunLifecycleStatus.PAUSED.value,
+            "awaiting_human",
+            "input_required",
+        }:
             return "awaiting_human"
-        if key in {"canceled", "cancelled"}:
+        if key in {RunLifecycleStatus.CANCELLED.value, "cancelled"}:
             return "canceled"
-        if key in {"failed", "error"}:
+        if key in {RunLifecycleStatus.FAILED.value, "error"}:
             return "failed"
-        if key in {"completed", ""}:
+        if key in {RunLifecycleStatus.COMPLETED.value, ""}:
             return "completed"
         if "wait" in key or "human" in key or "input" in key:
             return "awaiting_human"

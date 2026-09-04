@@ -13,6 +13,7 @@ import pytest
 
 from lca.contracts.models.core.result import ApprovalPendingError
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
+    ExecutionOutcome,
     PhaseEdge,
     PhaseInput,
     PhaseNode,
@@ -108,7 +109,7 @@ async def test_approval_pause_uses_plan_declared_resume_node(standard_plan) -> N
     result = await GenericPlanInterpreter().run(executable, state={"immutable": True})
 
     assert result.outcome is not None
-    assert result.outcome.kind == "paused"
+    assert result.outcome.kind is ExecutionOutcome.PAUSED
     assert result.cursor is not None
     assert result.cursor.node_id == approval_think_id
 
@@ -128,7 +129,7 @@ async def test_approval_pause_without_declared_resume_node_fails_closed(standard
     result = await GenericPlanInterpreter().run(executable, state={"immutable": True})
 
     assert result.outcome is not None
-    assert result.outcome.kind == "failed"
+    assert result.outcome.kind is ExecutionOutcome.FAILED
     assert result.outcome.error_fact is not None
     assert result.outcome.error_fact.payload["error_code"] == "PG-008"
 
@@ -184,7 +185,7 @@ async def test_resume_from_terminal_cursor_is_noop(standard_plan) -> None:
 
     assert resumed.terminal_node == "stop.main"
     assert resumed.outcome is not None
-    assert resumed.outcome.kind == "completed"
+    assert resumed.outcome.kind is ExecutionOutcome.COMPLETED
 
 
 @pytest.mark.asyncio

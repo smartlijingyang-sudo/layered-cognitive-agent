@@ -6,6 +6,7 @@ from lca.contracts.models.core.terminal_outcome import ResumeCursor
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeRunOutcome,
     DeclarativeValidationError,
+    ExecutionOutcome,
 )
 from lca.contracts.protocols.journal.artifact_closure import ArtifactClosure
 from lca.contracts.protocols.runtime.infra import StateStore
@@ -62,12 +63,12 @@ class RuntimeResultFinalizer(ResultFinalizer):
                 "RT-004",
                 "terminal interpreter result must carry a DeclarativeRunOutcome",
             )
-        if outcome.kind == "failed":
+        if outcome.kind is ExecutionOutcome.FAILED:
             final_state = self._reducer.apply_error(
                 final_state,
                 RuntimeError(_runtime_failure_message(outcome)),
             )
-        if outcome.kind == "paused":
+        if outcome.kind is ExecutionOutcome.PAUSED:
             final_state = self._reducer.apply_paused(final_state, outcome.cursor)
 
         # SSOT 收口(SSOT-Teardown):先 apply_stop,再 apply_terminal_outcome,
@@ -94,7 +95,7 @@ def _resume_cursor(
     journal_sequence: int,
 ) -> ResumeCursor | None:
     """Translate a declared pause into the terminal outcome's durable cursor."""
-    if outcome.kind != "paused":
+    if outcome.kind is not ExecutionOutcome.PAUSED:
         return None
     if not isinstance(journal_sequence, int) or isinstance(journal_sequence, bool):
         raise ValueError("journal_sequence must be an integer")

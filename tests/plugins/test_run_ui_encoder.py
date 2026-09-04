@@ -173,6 +173,25 @@ async def test_done_status_mapping() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("wire_status", "expected"),
+    [
+        # wire 回归:UI done 帧字符串逐字节稳定(生命周期值 + 拼写别名)。
+        ("waiting_input", "awaiting_human"),
+        ("paused", "awaiting_human"),
+        ("canceled", "canceled"),
+        ("cancelled", "canceled"),
+        ("failed", "failed"),
+        ("completed", "completed"),
+    ],
+)
+async def test_done_status_wire_values(wire_status: str, expected: str) -> None:
+    frames = await _encode(AgentRunFinished(status=wire_status, output_text=""))
+    assert frames[-1]["event"] == "done"
+    assert frames[-1]["data"]["status"] == expected
+
+
+@pytest.mark.asyncio
 async def test_failed_done_includes_error_when_no_text() -> None:
     frames = await _encode(AgentRunFinished(status="failed", error="boom", output_text=""))
     assert len(frames) == 1

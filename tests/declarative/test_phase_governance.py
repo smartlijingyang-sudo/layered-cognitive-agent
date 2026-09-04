@@ -7,7 +7,10 @@ import pytest
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.core.stop import StopDecision, StopReason
-from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseResult
+from lca.contracts.protocols.declarative.declarative_phase_graph import (
+    ExecutionOutcome,
+    PhaseResult,
+)
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.harness.declarative.compile.phase_governance import interpret_control_verdict
 from lca.harness.declarative.graph.traversal import PhaseTraversal
@@ -22,28 +25,28 @@ from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseConte
         (
             ControlVerdictKind.DENY,
             "control.denied",
-            "failed",
+            ExecutionOutcome.FAILED,
             StopReason.ERROR,
             TaskStatus.FAILED,
         ),
         (
             ControlVerdictKind.EXHAUSTED,
             "control.exhausted",
-            "failed",
+            ExecutionOutcome.FAILED,
             StopReason.BUDGET_EXCEEDED,
             TaskStatus.FAILED,
         ),
         (
             ControlVerdictKind.STOP,
             "control.stopped",
-            "completed",
+            ExecutionOutcome.COMPLETED,
             StopReason.TASK_COMPLETED,
             TaskStatus.COMPLETED,
         ),
         (
             ControlVerdictKind.ASK_HUMAN,
             "control.paused",
-            "paused",
+            ExecutionOutcome.PAUSED,
             StopReason.CONTINUE,
             TaskStatus.INPUT_REQUIRED,
         ),
@@ -52,7 +55,7 @@ from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseConte
 def test_interpret_control_verdict_centralizes_every_declared_meaning(
     kind: ControlVerdictKind,
     fact_kind: str | None,
-    outcome_kind: str | None,
+    outcome_kind: ExecutionOutcome | None,
     reason: StopReason | None,
     status: TaskStatus | None,
 ) -> None:
@@ -199,13 +202,13 @@ class _GovernExecutor:
     ("kind", "expected_fact", "expected_outcome", "commits_immediately"),
     [
         (ControlVerdictKind.REWRITE, "control.rewrite_requested", None, False),
-        (ControlVerdictKind.STOP, "control.stopped", "completed", True),
+        (ControlVerdictKind.STOP, "control.stopped", ExecutionOutcome.COMPLETED, True),
     ],
 )
 async def test_phase_governance_keeps_rewrite_nonblocking_and_stops_explicitly(
     kind: ControlVerdictKind,
     expected_fact: str,
-    expected_outcome: str | None,
+    expected_outcome: ExecutionOutcome | None,
     commits_immediately: bool,
 ) -> None:
     """Governance owns verdict interpretation while the transaction owns later commits."""
