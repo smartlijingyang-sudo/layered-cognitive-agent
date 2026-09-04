@@ -333,7 +333,12 @@ class ModelVisibleHook:
         previous = self._last_headers.get(key)
         digest = _canonical_digest(previous) if previous is not None else ""
 
-        assistant_content = getattr(response, "content", "") or ""
+        # LLMResponse 契约字段是 ``text``(lca/contracts/models/core/llm.py);
+        # 旧实现读 ``.content`` 恒为空 → 模型输出文本全丢。优先 ``.text``,
+        # 回退 ``.content`` 兼容 OpenAI 风格裸响应。
+        assistant_content = (
+            getattr(response, "text", "") or getattr(response, "content", "") or ""
+        )
         finish_reason = getattr(response, "finish_reason", "") or ""
         usage = getattr(response, "usage", None) or {}
         tool_calls_raw = getattr(response, "tool_calls", None) or ()
