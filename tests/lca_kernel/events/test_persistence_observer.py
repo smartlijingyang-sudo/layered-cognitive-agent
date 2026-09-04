@@ -1,21 +1,12 @@
-"""ADR-0184 PR-2 + PR-3e:PersistenceObserver + PersistenceWorker 别名测试。
+"""ADR-0186 PR-3e / delete-queue Level 4: PersistenceObserver 同步落盘测试。
 
-覆盖(plan §PR-2 验证清单 + 测试设计):
-- test_persistence_worker_fsync_policy_default:默认 FsyncPolicy.BATCH
-- test_persistence_worker_writes_to_spine_sink:enqueue → consumer → sink.append
-- test_persistence_worker_flush_for_blocks_until_written:慢 aiter 下 flush_for 阻塞至落盘
-- test_persistence_worker_health_snapshot_fields:7 字段齐(含 consumer_running)
-- test_persistence_worker_fsync_policy_sync_flushes_per_event:SYNC 策略每条 flush
-- test_spine_file_sink_uses_mount_sink_not_subscribe:验证 manifest 走 mount_sink
-
-PR-3e 新增(PersistenceObserver + EnvelopeDeliveryObserver 路径):
-- test_persistence_observer_is_session_observer:运行时 isinstance 判定
-- test_persistence_observer_on_session_event_writes_to_sink:同步回调直接落盘
-- test_persistence_observer_on_session_event_contained_on_sink_failure:失败
-  不冒泡、不杀 observer
-- test_persistence_observer_on_session_event_contained_on_build_failure:
-  build_record 抛错被 contained
-- test_persistence_observer_alias_persistence_worker:别名同对象
+覆盖:
+- 默认 FsyncPolicy.BATCH
+- on_session_event → sink.append
+- SYNC 策略每条 flush
+- health_snapshot 字段(无队列: queue/pending/enqueued/dropped=0)
+- EnvelopeDeliveryObserver 协议 + 失败 contained
+- spine_file_sink manifest 走 mount_sink
 """
 
 from __future__ import annotations
@@ -29,21 +20,20 @@ from lca.contracts.event import EventPayload
 from lca_kernel.events import (
     EnvelopeBus,
     EnvelopeRef,
-    EventBus,
-    EventRef,
     PersistenceObserver,
     TeamDelegationCacheHit,
 )
-from lca_kernel.events.queue import DeliveryQueue
 from lca_kernel.events.persistence import (
     EnvelopeDeliveryObserver,
-    EnvelopeDeliveryObserver as DirectEnvelopeDeliveryObserver,
     FsyncPolicy,
     PersistenceHealthSnapshot,
-    PersistenceObserver as DirectPersistenceObserver,
-    PersistenceWorker,
 )
-from lca_kernel.events.test_catalog import build_test_bus
+from lca_kernel.events.persistence import (
+    EnvelopeDeliveryObserver as DirectEnvelopeDeliveryObserver,
+)
+from lca_kernel.events.persistence import (
+    PersistenceObserver as DirectPersistenceObserver,
+)
 
 # ── 公共 helpers ─────────────────────────────────────────────────────────
 
@@ -72,95 +62,69 @@ def _authorized_payload() -> EventPayload:
     return TeamDelegationCacheHit(callee_role="a", subtask="b", step=1)
 
 
-def _authorized_producer() -> type:
-    from lca.plugins.events.publishers.delegation_cache.plugin import (
-        DelegationCachePlugin,
-    )
-
-    return DelegationCachePlugin
-
-
 @pytest.fixture(autouse=True)
 def _isolate_singletons() -> Any:
-    """每个测试清空 EnvelopeBus + PersistenceWorker 进程级单例,避免串扰。"""
+    """每个测试清空 EnvelopeBus + PersistenceObserver 进程级单例,避免串扰。"""
     EnvelopeBus.reset_singleton()
-    PersistenceWorker.reset_singleton()
+    PersistenceObserver.reset_singleton()
     yield
     EnvelopeBus.reset_singleton()
-    PersistenceWorker.reset_singleton()
+    PersistenceObserver.reset_singleton()
 
 
 # ── 1:FsyncPolicy 默认值 ────────────────────────────────────────────────
 
 
 class TestFsyncPolicy:
-    def test_persistence_worker_fsync_policy_default(self) -> None:
+    def test_persistence_observer_fsync_policy_default(self) -> None:
         """默认 FsyncPolicy.BATCH(平衡 fsync 节奏)。"""
-        worker = PersistenceWorker(queue=DeliveryQueue())
-        assert worker.fsync_policy is FsyncPolicy.BATCH
-        assert worker.fsync_interval_ms == 50
+        observer = PersistenceObserver()
+        assert observer.fsync_policy is FsyncPolicy.BATCH
+        assert observer.fsync_interval_ms == 50
 
 
-# ── 2:PersistenceWorker 落盘链路 ─────────────────────────────────────────
+# ── 2:同步落盘 ───────────────────────────────────────────────────────────
 
 
-class TestPersistenceWorkerWrites:
-    async def test_persistence_worker_writes_to_spine_sink(self) -> None:
-        """enqueue → 后台 consumer → StubSink.append 被调。"""
+class TestPersistenceObserverWrites:
+    def test_persistence_observer_writes_to_spine_sink(self) -> None:
+        """on_session_event → StubSink.append。"""
         sink = _StubSink()
-        queue = DeliveryQueue(max_size=128)
-        worker = PersistenceWorker(
-            sink=sink,
-            queue=queue,
-            fsync_policy=FsyncPolicy.ASYNC,  # 不 flush 干扰断言
-        )
-        # 构造 EnvelopeRef + payload 直接 enqueue
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
         ref = EnvelopeRef(
             event_id="evt-w1",
             category="team.delegation.cache_hit",
             trace_id="trc-1",
             ts=0.0,
         )
-        payload = _authorized_payload()
-        queue.submit(ref, payload)
-        assert queue.depth == 1
-        await worker.start()
-        # 等落盘
-        await worker.flush_for("evt-w1", timeout=2.0)
+        observer.on_session_event(_authorized_payload(), ref)
         assert sink.records and len(sink.records) == 1
-        # record 的 event_id 是被 write 的
         record = sink.records[0]
         assert record.event_id == "evt-w1"
         assert record.category == "team.delegation.cache_hit"
-        # pending 已清
-        assert queue.depth == 0
-        await worker.stop()
+        assert observer.pending_count == 0
+        assert observer.written_total == 1
 
-    async def test_persistence_worker_flush_for_blocks_until_written(self) -> None:
-        """无 consumer 启时调 flush_for → consumer 起 + 写到 sink 才解除。"""
+    async def test_persistence_observer_flush_for_returns_when_written(self) -> None:
+        """flush_for 对已写入 id 立即返回;consumer_running 恒 False。"""
         sink = _StubSink()
-        queue = DeliveryQueue()
-        worker = PersistenceWorker(sink=sink, queue=queue, fsync_policy=FsyncPolicy.ASYNC)
-        # 此时 consumer 还没启
-        assert worker.consumer_running is False
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
+        assert observer.consumer_running is False
         ref = EnvelopeRef(
-            event_id="evt-w2",
+            event_id="evt-w2b",
             category="team.delegation.cache_hit",
             trace_id="trc-1",
             ts=0.0,
         )
-        queue.submit(ref, _authorized_payload())
-        # flush_for 自动起 consumer 并等落盘
-        await worker.flush_for("evt-w2", timeout=3.0)
-        assert sink.records and sink.records[0].event_id == "evt-w2"
-        assert worker.consumer_running is True
-        await worker.stop()
+        observer.on_session_event(_authorized_payload(), ref)
+        await observer.flush_for("evt-w2b", timeout=1.0)
+        assert sink.records and sink.records[0].event_id == "evt-w2b"
+        assert observer.consumer_running is False
 
-    async def test_persistence_worker_fsync_policy_sync_flushes_per_event(self) -> None:
+    def test_persistence_observer_fsync_policy_sync_flushes_per_event(self) -> None:
         """SYNC 策略:每条事件 flush 一次。"""
         sink = _StubSink()
-        queue = DeliveryQueue()
-        worker = PersistenceWorker(sink=sink, queue=queue, fsync_policy=FsyncPolicy.SYNC)
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.SYNC)
         refs = [
             EnvelopeRef(
                 event_id=f"evt-s-{i}",
@@ -171,29 +135,24 @@ class TestPersistenceWorkerWrites:
             for i in range(3)
         ]
         for r in refs:
-            queue.submit(r, _authorized_payload())
-        for r in refs:
-            await worker.flush_for(r.event_id, timeout=2.0)
-        # SYNC 策略:每条事件过后都 flush,3 条 → flush_calls >= 3
+            observer.on_session_event(_authorized_payload(), r)
         assert sink.flush_calls >= 3
-        await worker.stop()
+        assert observer.written_total == 3
 
 
 # ── 3:PersistenceHealthSnapshot ─────────────────────────────────────────
 
 
 class TestHealthSnapshot:
-    def test_persistence_worker_health_snapshot_fields(self) -> None:
-        """HealthSnapshot 7 字段齐 + 类型对。"""
+    def test_persistence_observer_health_snapshot_fields(self) -> None:
+        """HealthSnapshot 字段齐;无队列相关计数恒 0。"""
         sink = _StubSink()
-        queue = DeliveryQueue()
-        worker = PersistenceWorker(
+        observer = PersistenceObserver(
             sink=sink,
-            queue=queue,
             fsync_policy=FsyncPolicy.BATCH,
             fsync_interval_ms=50,
         )
-        snap = worker.health_snapshot()
+        snap = observer.health_snapshot()
         assert isinstance(snap, PersistenceHealthSnapshot)
         assert snap.policy is FsyncPolicy.BATCH
         assert snap.queue_depth == 0
@@ -210,10 +169,8 @@ class TestHealthSnapshot:
 
 class TestSpineFileSinkManifest:
     def test_spine_file_sink_uses_mount_sink_not_subscribe(self) -> None:
-        """验证 PR-2:spine_file_sink setup 走 ``bus.mount_sink``,
+        """验证 spine_file_sink setup 走 ``bus.mount_sink``,
         不再 ``bus.subscribe(..., on_event=sink)`` 绕道 SinkBackend Protocol。
-
-        静态检查 — 读 manifest 源码确认关键字形态。
         """
 
         manifest_path = (
@@ -226,15 +183,13 @@ class TestSpineFileSinkManifest:
             / "manifest.py"
         )
         text = manifest_path.read_text(encoding="utf-8")
-        assert "bus_obj.mount_sink(" in text, (
-            "spine_file_sink manifest 应在 PR-2 走 mount_sink 形态"
-        )
+        assert "bus_obj.mount_sink(" in text, "spine_file_sink manifest 应走 mount_sink 形态"
         assert "bus_obj.subscribe(" not in text, (
             "spine_file_sink manifest 不应再走 subscribe(..., on_event=sink) 模拟 sink"
         )
 
 
-# ── 6:PR-3e PersistenceObserver + EnvelopeDeliveryObserver 协议 ───────────────────
+# ── 6:EnvelopeDeliveryObserver 协议 ─────────────────────────────────────
 
 
 class _RaisingSink:
@@ -254,17 +209,12 @@ class _RaisingSink:
         pass
 
 
-class TestPersistenceObserver:
-    """PR-3e:observer 形态替代 worker 形态;失败 contained。"""
+class TestPersistenceObserverProtocol:
+    """observer 形态;失败 contained。"""
 
-    def test_persistence_observer_is_session_observer(self) -> None:
-        """``PersistenceObserver`` 是 :class:`EnvelopeDeliveryObserver` 协议实现。
-
-        用 ``@runtime_checkable`` + ``isinstance`` 验证;``EnvelopeDeliveryObserver``
-        通过 ``lca_kernel.events`` 顶层与 ``lca_kernel.events.persistence``
-        两条路径 import 必须是同一对象。
-        """
-        observer = PersistenceObserver(queue=DeliveryQueue())
+    def test_persistence_observer_is_envelope_delivery_observer(self) -> None:
+        """``PersistenceObserver`` 是 :class:`EnvelopeDeliveryObserver` 协议实现。"""
+        observer = PersistenceObserver()
         assert isinstance(observer, EnvelopeDeliveryObserver)
         assert isinstance(observer, DirectEnvelopeDeliveryObserver)
         assert DirectEnvelopeDeliveryObserver is EnvelopeDeliveryObserver
@@ -273,44 +223,34 @@ class TestPersistenceObserver:
     def test_persistence_observer_on_session_event_writes_to_sink(self) -> None:
         """``on_session_event`` 同步回调:直接触发 build_record + sink.append。"""
         sink = _StubSink()
-        queue = DeliveryQueue()
-        observer = PersistenceObserver(sink=sink, queue=queue, fsync_policy=FsyncPolicy.ASYNC)
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
         ref = EnvelopeRef(
             event_id="evt-o1",
             category="team.delegation.cache_hit",
             trace_id="trc-o1",
             ts=0.0,
         )
-        # 同步调:observer.on_session_event 走 build_record → sink.append
         observer.on_session_event(_authorized_payload(), ref)
         assert len(sink.records) == 1
         assert sink.records[0].event_id == "evt-o1"
         assert sink.records[0].category == "team.delegation.cache_hit"
         assert observer.written_total == 1
-        # event_id 已记入 written 集合,后续 flush_for 立即返回。
         assert "evt-o1" in observer._written_event_ids
 
     def test_persistence_observer_on_session_event_contained_on_sink_failure(
         self,
     ) -> None:
-        """``sink.append`` 抛错 → observer 吞错,不向外冒泡,自身仍可用。
-
-        对齐 DSH JsonlSessionPersistence:失败 contained;observer 不应进入
-        不可用状态。后续 ``on_session_event`` 仍可继续处理下一条 envelope。
-        """
+        """``sink.append`` 抛错 → observer 吞错,不向外冒泡,自身仍可用。"""
         sink = _RaisingSink()
-        queue = DeliveryQueue()
-        observer = PersistenceObserver(sink=sink, queue=queue, fsync_policy=FsyncPolicy.ASYNC)
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
         ref = EnvelopeRef(
             event_id="evt-o2-fail",
             category="team.delegation.cache_hit",
             trace_id="trc-o2",
             ts=0.0,
         )
-        # 失败 contained:不抛
         observer.on_session_event(_authorized_payload(), ref)
         assert observer.written_total == 0
-        # observer 仍可用:换上正常 sink,下一条 envelope 落盘成功
         good_sink = _StubSink()
         observer._sink = good_sink
         ref2 = EnvelopeRef(
@@ -327,16 +267,9 @@ class TestPersistenceObserver:
     def test_persistence_observer_on_session_event_contained_on_build_failure(
         self,
     ) -> None:
-        """``build_record`` 抛错(不合法 payload) → contained;observer 仍可用。
-
-        ``build_record`` 失败的路径由 :mod:`lca_kernel.events.spine_runtime`
-        实装,这里通过 monkeypatch 模拟。observer 应吞错 + 不写 sink +
-        计数不增;后续正常 envelope 仍可处理。
-        """
+        """``build_record`` 抛错 → contained;observer 仍可用。"""
         sink = _StubSink()
-        queue = DeliveryQueue()
-        observer = PersistenceObserver(sink=sink, queue=queue, fsync_policy=FsyncPolicy.ASYNC)
-        # monkeypatch:让 build_record 在指定 id 上抛错
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
         import lca_kernel.events.persistence as persistence_mod
 
         original = persistence_mod.PersistenceObserver._build_persistable_record
@@ -374,18 +307,3 @@ class TestPersistenceObserver:
             assert sink.records[0].event_id == "evt-o3-ok"
         finally:
             persistence_mod.PersistenceObserver._build_persistable_record = original  # type: ignore[assignment]
-
-    def test_persistence_observer_alias_persistence_worker(self) -> None:
-        """``PersistenceWorker`` 是 :class:`PersistenceObserver` 的别名。
-
-        直接 import 路径与通过 ``lca_kernel.events.persistence`` 都拿到同一类,
-        ``isinstance`` 校验无歧义。30 天窗口内的旧调用方不受影响。
-        """
-        assert PersistenceWorker is PersistenceObserver
-        observer = PersistenceWorker(queue=DeliveryQueue())
-        assert isinstance(observer, PersistenceObserver)
-        assert isinstance(observer, EnvelopeDeliveryObserver)
-        # reset_singleton 走 alias 路径同样清空 _default_instance
-        assert PersistenceWorker._default_instance is None
-        PersistenceObserver.reset_singleton()
-        assert PersistenceWorker._default_instance is None

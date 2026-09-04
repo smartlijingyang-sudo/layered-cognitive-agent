@@ -57,14 +57,14 @@ class _Config(BaseModel):
     marker_class=SINK_PLUGIN_CLASS,
 )
 async def setup(ctx: PluginContext, config: _Config) -> None:
-    """SpineFileSink boot — Session.observe 优先；缺席回退 mount_sink。
+    """SpineFileSink boot — Session.observe 优先；boot 缺席走 mount_sink COMPAT。
 
-    PR-3f-sample:sink callback 入口优先经
+    Session 在场时只经
     :func:`lca.plugins.events._session_observe.register_as_session_observer`
-    注册到 Session 观察面;Session 未装载时回退 ``EventBus.mount_sink``
-    (ADR-0184 PR-2 wire):直接挂 :class:`lca_kernel.events.sinks.SinkBackend`,
-    让 :meth:`lca_kernel.events.bus.EventBus._dispatch_sinks` 在 publish 时
-    派发给 build_record(SpineEventRecord)+ sink.append 链。
+    注册。plugin boot 时 ``current_session`` 通常为空（run bind 才
+    ``set_session``），此时 ``EventBus.mount_sink`` 挂
+    :class:`lca_kernel.events.sinks.SinkBackend`，由
+    :meth:`~lca_kernel.events.bus.EventBus._dispatch_sinks` 派发落盘。
     """
     from lca.plugins.events._session_observe import register_as_session_observer
 
@@ -73,8 +73,11 @@ async def setup(ctx: PluginContext, config: _Config) -> None:
         ctx.provide("event.sink.spine_file", sink)
         return
 
-    # COMPAT(delete-when: Session.observe 机制落地且 spine sink 全迁,本文件
-    # rg "mount_sink" = 0;tracking: ADR-0183 后续 PR-3f-sample)
+    # COMPAT(delete-when: rg "mount_sink" lca/plugins/events/sinks = 0,
+    #   tracking: ADR-0186 PR-3f)
+    # Boot 时 Session 未 set；生产靠 EventBus 双写投递。删条件：run bind
+    # 经 Session.observe 挂上本 sink，且 observe 派发带原 payload；
+    # profile 以 JsonlSessionPersistence 为 spine.jsonl 唯一写方。
     from lca_kernel.events.bus import EventBus
     from lca_kernel.events.hooks import FailureSemantics
 
@@ -82,8 +85,6 @@ async def setup(ctx: PluginContext, config: _Config) -> None:
     if not isinstance(bus_obj, EventBus):
         msg = "event.sink.spine_file boot 失败：event.bus 未装载"
         raise RuntimeError(msg)
-    # COMPAT(delete-when: 所有 spine category 经 _dispatch_sinks 统一落盘后;
-    # tracking: ADR-0184 PR-2;45 天窗口)
     bus_obj.mount_sink(
         sink_id="lca.events.sink.spine_file",
         backend=sink,

@@ -62,13 +62,12 @@ class _Config(BaseModel):
     marker_class=JournalSink,
 )
 async def setup(ctx: PluginContext, config: _Config) -> None:
-    """Journal sink boot — Session.observe 优先；缺席回退订阅。
+    """Journal sink boot — Session.observe 优先；boot 缺席走 EventBus COMPAT。
 
-    PR-3f-sample：sink 优先经
+    Session 在场时只经
     :func:`lca.plugins.events._session_observe.register_as_session_observer`
-    注册到 Session 观察面；Session 未装载时按 yaml 白名单逐条
-    ``bus.subscribe`` 接线（marker class 已在 catalog，
-    ``lca.application.spawn`` 路径下 JournalSink 可被 discover）。
+    注册。plugin boot 时 ``current_session`` 通常为空（run bind 才
+    ``set_session``），此时按 yaml 白名单逐条 ``bus.subscribe``。
     """
     from lca.plugins.events._session_observe import register_as_session_observer
     from lca_kernel.events.bus import EventBus
@@ -78,11 +77,13 @@ async def setup(ctx: PluginContext, config: _Config) -> None:
         ctx.provide("event.sink.journal", sink)
         return
 
-    # COMPAT(delete-when: Session.observe 机制落地且 journal sink 全迁，本文件
-    # rg "bus_obj.subscribe" = 0；tracking: ADR-0183 后续 PR-3f-sample)
+    # COMPAT(delete-when: rg "bus_obj.subscribe" lca/plugins/events/sinks = 0,
+    #   tracking: ADR-0186 PR-3f)
+    # Boot 时 Session 未 set；生产靠 EventBus 双写投递。删条件：run bind
+    # 经 Session.observe 挂上本 sink，且 observe 派发带原 payload。
     bus_obj = ctx.soft_get("event.bus") or EventBus.default()
     if not isinstance(bus_obj, EventBus):
-        # PR-5：bus 缺位时不抛（profile resolve 完成前 event.bus 可能未到位），
+        # bus 缺位时不抛（profile resolve 完成前 event.bus 可能未到位），
         # 改由 :meth:`EventRegistry.refresh` 后的实际 bus 自动 subscribe。
         return
     for spec in bus_obj.registry.specs:

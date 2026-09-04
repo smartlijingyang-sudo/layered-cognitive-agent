@@ -1,48 +1,29 @@
-"""PersistenceObserver —— ADR-0186 PR-3e 落盘 observer。
+"""PersistenceObserver —— ADR-0186 PR-3e / delete-queue Level 4 落盘 observer。
 
-唯一 :class:`lca_kernel.events.sinks.SinkBackend`(<run_id>.spine.jsonl)
-异步消费者:后台 :class:`asyncio.Task` 拉 :class:`lca_kernel.events.queue.DeliveryQueue`
-逐 envelope 调 :func:`lca_kernel.events.spine_runtime.build_record` + ``backend.append``,
-fsync 策略可配。
+同步写 :class:`lca_kernel.events.sinks.SinkBackend`(<run_id>.spine.jsonl):
+``Session.observe`` / :meth:`on_session_event` 两条入口共享同一 sink + fsync
+策略。无投递队列、无后台 consumer。
 
-PR-3e(对齐 DSH ``JsonlSessionPersistence``):observer 形态,两条入口共享同一 sink。
 - 实现 :class:`lca_kernel.events.session.SessionObserver` (``__call__(session, event)``):
   可直接 ``Session.observe(observer)``。SessionEvent 映射为 payload/ref 后写
   同一 sink(保留 ``trace_id``)。
 - 实现 :class:`EnvelopeDeliveryObserver` (``on_session_event(payload, ref)``)。
-- 后台 consumer 路径保留,仍走 ``queue.aiter`` + ``on_session_event``(内
-  部等价),便于 :class:`EventBus.publish_async` 的强一致 flush_for 复用。
-- 失败 ``contained``:单条 envelope 落盘失败 / build_record / SessionEvent 映射
-  失败仅记日志 + ``mark_drained``,不杀 consumer loop、不上抛 Session.append
-  (与 DSH 一致)。
+- 失败 ``contained``:单条落盘失败 / build_record / SessionEvent 映射失败仅记
+  日志 + 通知 ``flush_for``,不上抛 Session.append(与 DSH 一致)。
 
 责任边界:
 - 唯一 ``seq/epoch/hash`` 分配链消费者(经 :mod:`lca.infrastructure.observability.spine.context`
   已在 :mod:`lca_kernel.events.spine_runtime.build_record` 注入,observer 不直接分配)。
-- 唯一 ``<run_id>.spine.jsonl`` 物理写入入口——前提是 caller 把同一个
-  :class:`lca_kernel.events.queue.DeliveryQueue` 传给 observer(**单实例 SSOT**)。
-  :class:`lca_kernel.events.bus.EventBus.publish` 默认与 :meth:`PersistenceObserver.default`
-  不共享 queue;因此 sync :meth:`EventBus.publish` 仍走 ``_dispatch_sinks`` 同步落盘
-  兼容路径(wire 兼容),async :meth:`EventBus.publish_async` 走 observer 落盘(强一致)。
-
-设计要点:
-- 后台 consumer task 在 :meth:`start` 时创建,持续 ``aiter`` 直到 :meth:`stop` 取消。
-- ``flush_for(event_id)`` 用于 caller 同步等指定 envelope 落盘;内部用
-  ``asyncio.Event`` per event 通知,避免 busy poll。
-- ``fsync_policy``:SYNC(每事件 fsync)/ BATCH(50ms 间隔)/ ASYNC(后台线程 fsync)。
-  SYNC/BATCH 在 consume loop 内 inline 调用 ``backend.flush``;ASYNC 留给上层 Profile 接入。
-- ``PersistenceHealthSnapshot`` 暴露给 ``/health`` + ``lca-ops events-delivery --policy``。
-
-COMPAT(delete-when: 2026-10-04 后无人引用 PersistenceWorker 符号,
-       tracking: ADR-0186 PR-3e):
-:class:`PersistenceWorker` 是 :class:`PersistenceObserver` 的别名,保留 30 天
-以兼容 PR-2 引入期间已发布的内部引用(bus / event_spine / webserver handler / CLI)。
+- ``fsync_policy``:SYNC(每事件 fsync)/ BATCH(50ms 间隔)/ ASYNC(与 BATCH 等效,
+  Profile 可挂自定义 SinkBackend)。
+- ``PersistenceHealthSnapshot`` 暴露给 ``/health`` + ``lca-ops events-delivery --policy``;
+  无队列后 ``queue_depth`` / ``pending_count`` / ``enqueued_total`` /
+  ``dropped_queue_full`` 恒为 0,``consumer_running`` 恒为 False。
 """
 
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import enum
 import logging
 import time
@@ -52,7 +33,6 @@ from typing import TYPE_CHECKING, Any, ClassVar, Protocol, runtime_checkable
 if TYPE_CHECKING:
     from lca.contracts.event import EventPayload
     from lca_kernel.events.bus import EnvelopeRef
-    from lca_kernel.events.queue import DeliveryQueue
     from lca_kernel.events.session import SessionEvent, SessionObserver, SessionProtocol
     from lca_kernel.events.sinks import SinkBackend
     from lca_kernel.events.spine_runtime import SpineEventRecord
@@ -74,8 +54,8 @@ class EnvelopeDeliveryObserver(Protocol):
     - 同一 ``ref.event_id`` 重复回调**幂等**;实现可依赖内部
       ``written_event_ids`` 去重。
 
-    设计意图:与 DSH ``JsonlSessionPersistence.onEvent()`` 形态一致,
-    让 SessionBus 之类组件无须关心 observer 内部后台 task/queue。
+    设计意图:与 DSH ``onEvent()`` 形态一致,让 SessionBus 之类组件无须关心
+    observer 内部实现细节。
     """
 
     def on_session_event(
@@ -204,7 +184,7 @@ class PersistenceFlushTimeout(TimeoutError):
     """``flush_for`` 在指定超时内未等到 envelope 落盘。
 
     单点错误面:caller 接 :class:`TimeoutError` 时区分本类,便于 caller 决定
-    是 retry 还是 fail-loud。事件可能已落盘或仍留在 queue(consumer 慢)。
+    是 retry 还是 fail-loud。事件可能已落盘或尚未经 observer 写入。
     """
 
     def __init__(self, event_id: str, timeout_s: float) -> None:
@@ -215,7 +195,11 @@ class PersistenceFlushTimeout(TimeoutError):
 
 @dataclass(frozen=True, slots=True)
 class PersistenceHealthSnapshot:
-    """observer 健康快照,供 ``/health`` + ``lca-ops events-delivery --policy`` 投影。"""
+    """observer 健康快照,供 ``/health`` + ``lca-ops events-delivery --policy`` 投影。
+
+    无投递队列后 ``queue_depth`` / ``pending_count`` / ``enqueued_total`` /
+    ``dropped_queue_full`` 恒为 0;``consumer_running`` 恒为 False。
+    """
 
     policy: FsyncPolicy
     queue_depth: int
@@ -231,21 +215,16 @@ class PersistenceHealthSnapshot:
 
 
 class PersistenceObserver:
-    """SessionObserver + EnvelopeDeliveryObserver + 后台 consumer(PR-3e)。
+    """SessionObserver + EnvelopeDeliveryObserver 同步落盘(无队列)。
 
     实现 :class:`SessionObserver`:``Session.observe(observer)`` 在 append 提交后
     调 :meth:`__call__`,内部映射 SessionEvent → payload/ref 再走
     :meth:`on_session_event`。
     实现 :class:`EnvelopeDeliveryObserver`:外部(SyncEventBus / SessionBus 等)
     可直接调 :meth:`on_session_event`。
-    后台 ``_consume_loop`` 内部也走 :meth:`on_session_event`(统一 sink 写入
-    入口),保证三条路径(Session.observe / 直接 observer 回调 / queue 异步消费)
-    共享同一 fsync 策略 + 计数器。
+    两条路径共享同一 sink 写入入口、fsync 策略与计数器。
 
-    进程级单例(:meth:`default`);与 :class:`lca_kernel.events.bus.EventBus.default`
-    的 DeliveryQueue **解耦**——sync :meth:`EventBus.publish` 仍走
-    ``_dispatch_sinks`` 同步落盘,async :meth:`EventBus.publish_async` 走
-    observer 异步落盘。两者不共享 sink 时不冲突。
+    进程级单例(:meth:`default`)。
     """
 
     _default_instance: ClassVar[PersistenceObserver | None] = None
@@ -254,30 +233,18 @@ class PersistenceObserver:
         self,
         *,
         sink: SinkBackend | None = None,
-        queue: DeliveryQueue | None = None,
         fsync_policy: FsyncPolicy = FsyncPolicy.BATCH,
         fsync_interval_ms: int = 50,
     ) -> None:
-        from lca_kernel.events.queue import DeliveryQueue
         from lca_kernel.events.sinks.spine_sink import SpineSink
 
         self._sink: SinkBackend = sink if sink is not None else SpineSink()
-        self._queue: DeliveryQueue = queue if queue is not None else DeliveryQueue()
         self._fsync_policy = fsync_policy
         self._fsync_interval_ms = fsync_interval_ms
-        self._consumer_task: asyncio.Task[None] | None = None
         self._written_event_ids: set[str] = set()
         self._written_total = 0
         self._last_flush_ms: int | None = None
         self._flush_events: dict[str, asyncio.Event] = {}
-        self._idle_event: asyncio.Event = asyncio.Event()
-        self._idle_event.set()  # queue 初始为空,允许 flush() 立即通过
-        # ``_written_event_ids`` 集合读多写少且修改都是原子(``add`` /
-        # ``in`` 是 GIL 临界区),无需显式锁。``_flush_events`` dict 的
-        # ``get`` / ``pop`` 在 :meth:`flush_for` 与 :meth:`_notify_flush`
-        # 之间没有跨事件循环的并发写,亦无需 ``asyncio.Lock``。
-        self._lock: asyncio.Lock | None = None  # 保留位,目前未使用
-        self._stopping = False
 
     # ── SessionObserver 协议 ─────────────────────────────────────────────
 
@@ -327,12 +294,7 @@ class PersistenceObserver:
         """EnvelopeDeliveryObserver 协议入口(PR-3e / DSH JsonlSessionPersistence 形态)。
 
         失败 **contained**:build_record / sink.append 抛错仅记日志 +
-        drain + 通知 flush_for 等待方;不向外冒泡,observer 自身不进入
-        不可用状态。
-
-        注:``on_session_event`` 是 sync 接口(对齐 DSH ``onEvent`` 形态),
-        ``build_record`` / ``sink.append`` 均为同步调用;后台 consumer 协
-        程从 :meth:`_consume_loop` 调到此方法时不需要 await。
+        通知 flush_for 等待方;不向外冒泡,observer 自身不进入不可用状态。
 
         Args:
             payload: 已鉴权的 :class:`EventPayload`。
@@ -353,12 +315,7 @@ class PersistenceObserver:
 
     @classmethod
     def default(cls) -> PersistenceObserver:
-        """进程级默认实例。多次调用返回同一对象。
-
-        ADR-0186 PR-3b 后 ``EnvelopeBus`` 不再持有 ``DeliveryQueue``；
-        默认实例自建内部队列（仅服务仍走 ``on_session_event`` / flush 的路径）。
-        Session.observe 主写路径不依赖本单例与 bus 共享队列。
-        """
+        """进程级默认实例。多次调用返回同一对象。"""
         if cls._default_instance is None:
             cls._default_instance = cls()
         return cls._default_instance
@@ -369,32 +326,13 @@ class PersistenceObserver:
 
     @classmethod
     def reset_singleton(cls) -> None:
-        """测试隔离:清空默认实例。下次 :meth:`default` 重新构造。
-
-        注:**不**等 consumer task 退出——若测试 fixture 需要先停止
-        consumer,显式 await :meth:`stop`。
-        """
+        """测试隔离:清空默认实例。下次 :meth:`default` 重新构造。"""
         cls._default_instance = None
 
     @classmethod
     async def stop_default_if_running(cls) -> None:
-        """测试隔离 helper:仅当 :meth:`default` 存在实例 + consumer 运行中,
-        await 停止 consumer;否则 no-op。fixture 链中出错不会因为僵尸
-        consumer task 阻塞事件循环。
-
-        必须在 ``event loop`` 内调用(async 上下文);不能跨 fixture 直接
-        调 :meth:`reset_singleton`,因为 consumer task 还可能被 await 阻塞。
-        """
-        if cls._default_instance is None:
-            return
-        inst = cls._default_instance
-        task = inst._consumer_task
-        if task is None or task.done():
-            return
-        inst._stopping = True
-        task.cancel()
-        with contextlib.suppress(asyncio.CancelledError, RuntimeError):
-            await task
+        """测试隔离 helper:无后台 consumer 后为 no-op,保留调用面。"""
+        return
 
     # ── 只读属性 ─────────────────────────────────────────────────────────
 
@@ -411,13 +349,9 @@ class PersistenceObserver:
         return self._sink
 
     @property
-    def queue(self) -> DeliveryQueue:
-        return self._queue
-
-    @property
     def pending_count(self) -> int:
-        """当前 queue 内未消费的 envelope 数。"""
-        return self._queue.depth
+        """无队列:恒为 0(同步落盘无 pending buffer)。"""
+        return 0
 
     @property
     def last_flush_ms(self) -> int | None:
@@ -431,54 +365,44 @@ class PersistenceObserver:
 
     @property
     def consumer_running(self) -> bool:
-        return self._consumer_task is not None and not self._consumer_task.done()
+        """无后台 consumer:恒为 False。"""
+        return False
 
     def health_snapshot(self) -> PersistenceHealthSnapshot:
         return PersistenceHealthSnapshot(
             policy=self._fsync_policy,
-            queue_depth=self._queue.depth,
-            pending_count=self.pending_count,
+            queue_depth=0,
+            pending_count=0,
             last_flush_ms=self._last_flush_ms,
-            enqueued_total=self._queue.enqueued_total,
-            dropped_queue_full=self._queue.dropped_queue_full,
+            enqueued_total=0,
+            dropped_queue_full=0,
             written_total=self._written_total,
-            consumer_running=self.consumer_running,
+            consumer_running=False,
         )
 
     # ── 生命周期 ────────────────────────────────────────────────────────
 
     async def start(self) -> None:
-        """启动后台 consumer task(幂等)。"""
-        if self._consumer_task is not None and not self._consumer_task.done():
-            return
-        self._stopping = False
-        self._consumer_task = asyncio.create_task(self._consume_loop(), name="persistence-observer")
+        """无后台 consumer:no-op(保留调用面)。"""
+        return
 
     async def stop(self) -> None:
-        """取消后台 consumer task 并 await 退出。"""
-        self._stopping = True
-        task = self._consumer_task
-        if task is None or task.done():
-            return
-        task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await task
+        """无后台 consumer:no-op(保留调用面)。"""
+        return
 
     # ── 同步等接口 ───────────────────────────────────────────────────────
 
     async def flush_for(self, event_id: str, *, timeout: float = 5.0) -> None:
-        """同步等指定 ``event_id`` 落盘并 fsync。
+        """同步等指定 ``event_id`` 落盘。
 
-        - 若 consumer 未启动则惰性启之(:meth:`start`)。
-        - 已在 ``written_event_ids`` 内 → 立即返回(已落盘)。
-        - 否则注册 ``asyncio.Event`` 等 consumer 通知;超时抛
-          :class:`PersistenceFlushTimeout`。
+        - 已在 ``written_event_ids`` 内 → 立即返回。
+        - 否则注册 ``asyncio.Event`` 等 :meth:`on_session_event` / :meth:`__call__`
+          通知;超时抛 :class:`PersistenceFlushTimeout`。
 
         Args:
             event_id: EnvelopeRef.event_id。
-            timeout: 最长等待秒数,默认 5s。生产端强一致路径可调高。
+            timeout: 最长等待秒数,默认 5s。
         """
-        await self.start()
         if event_id in self._written_event_ids:
             return
         event = self._flush_events.get(event_id)
@@ -491,64 +415,16 @@ class PersistenceObserver:
             raise PersistenceFlushTimeout(event_id, timeout) from exc
 
     async def flush(self, *, timeout: float = 30.0) -> None:
-        """flush 所有 pending envelope(lifespan shutdown / 测试用)。
+        """强制 sink fsync(lifespan shutdown / 测试用)。
 
-        启动 consumer 后等 ``queue.depth == 0``;最后做一次 fsync 把
-        buffer 余量推盘。超时抛 :class:`PersistenceFlushTimeout`。
-
-        实现:用 :class:`asyncio.Event` 与后台 consumer 协同 —— consumer
-        在 ``mark_drained`` 后若 ``queue.depth == 0`` 设 ``_idle_event``。
-        避免 sleep-poll(ruff ASYNC110)。
+        无队列可 drain;仅推盘 buffer。``timeout`` 保留签名兼容,未使用。
         """
-        await self.start()
-        deadline = time.monotonic() + timeout
-        # 清 idle 标志:接下来 consumer 至少需要 mark_drained 到 depth=0 才 set 它。
-        self._idle_event.clear()
-        while self._queue.depth > 0 and time.monotonic() < deadline:
-            try:
-                await asyncio.wait_for(
-                    self._idle_event.wait(),
-                    timeout=max(0.001, deadline - time.monotonic()),
-                )
-            except asyncio.TimeoutError:
-                continue
-            self._idle_event.clear()
-        if self._queue.depth > 0:
-            raise PersistenceFlushTimeout("<all-pending>", timeout)
-        # 已 drain:留 idle_event set 状态,下次 flush() 入口直接通过第一段 while。
-        self._idle_event.set()
+        _ = timeout
         self._sink.flush()
         self._last_flush_ms = int(time.time() * 1000)
 
-    # ── 后台 consumer loop ─────────────────────────────────────────────
-
-    async def _consume_loop(self) -> None:
-        """后台 task:持续从 queue 拉 envelope → 走 :meth:`on_session_event`。
-
-        错误语义(FD-1, ADR-0184):queue.aiter 内部异常日志吞错,循环不退出;
-        单条 envelope 处理失败由 :meth:`on_session_event` 自包含(contained),
-        不杀整个 observer。
-        """
-        while not self._stopping:
-            try:
-                ref, payload = await self._queue.aiter().__anext__()
-            except StopAsyncIteration:
-                break
-            except asyncio.CancelledError:
-                break
-            except Exception:
-                log.exception("persistence observer aiter failed")
-                continue
-            self.on_session_event(payload, ref)
-            self._queue.mark_drained(ref.event_id)
-            # 通知 flush() 等候方:队列空了就 set idle_event。
-            if self._queue.depth == 0:
-                self._idle_event.set()
-
     def _maybe_fsync_batched(self) -> None:
         """BATCH 策略:间隔 fsync_interval_ms 触发一次 fsync;计入 last_flush_ms。"""
-        if self._sink is None:
-            return
         last = self._last_flush_ms
         now_ms = int(time.time() * 1000)
         if last is None or (now_ms - last) >= self._fsync_interval_ms:
@@ -583,7 +459,7 @@ class PersistenceObserver:
         self._notify_flush(event_id)
 
     def _notify_flush(self, event_id: str) -> None:
-        """通知 ``flush_for`` 等待方。事件未必"成功 fsync"(只是离开 queue)。"""
+        """通知 ``flush_for`` 等待方(写入尝试结束,成功或 contained 失败)。"""
         event: asyncio.Event | None = self._flush_events.pop(event_id, None)
         if event is not None:
             event.set()
@@ -597,21 +473,8 @@ class PersistenceObserver:
     def __repr__(self) -> str:
         return (
             f"PersistenceObserver(policy={self._fsync_policy.value!r}, "
-            f"queue_depth={self._queue.depth}, written_total={self._written_total}, "
-            f"consumer_running={self.consumer_running})"
+            f"written_total={self._written_total})"
         )
-
-
-# COMPAT(delete-when: 2026-10-04 后无人引用 PersistenceWorker 符号,
-#        tracking: ADR-0186 PR-3e):PR-2 引入期已发布的内部引用
-#        (lca_kernel.events.bus.publish_async / lca.infrastructure.observability
-#        .spine.event_spine.append_async / lca.infrastructure.cli.commands
-#        .events_delivery / webserver handler query_endpoints)在 PR-3e 收口前
-#        已锁定为 PersistenceWorker 字面量;为避免一次性大范围 churn 触发
-#        回归,保留同名字符串别名 30 天,后续 PR-3e-followup 逐文件迁移。
-PersistenceWorker = (
-    PersistenceObserver  # COMPAT(delete-when: 2026-10-04 后无人引用, tracking: ADR-0186 PR-3e)
-)
 
 
 __all__ = [
@@ -620,5 +483,4 @@ __all__ = [
     "PersistenceFlushTimeout",
     "PersistenceHealthSnapshot",
     "PersistenceObserver",
-    "PersistenceWorker",  # COMPAT: 30 天窗口,见上方别名说明
 ]

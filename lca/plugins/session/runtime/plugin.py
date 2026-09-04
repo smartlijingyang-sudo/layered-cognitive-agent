@@ -7,7 +7,8 @@ header fold。
 
 本骨架不动：
 
-- ``PersistenceWorker`` / ``DeliveryQueue``（ADR-0184 落盘链，后续 PR 接订阅）；
+- 落盘由 SessionObserver（``JsonlSessionPersistence`` /
+  ``PersistenceObserver``）挂接，本 plugin 不拥有写盘；
 - 16 个 publisher plugin 与 EventSpine（ADR-0183 总线，本 plugin 不发事件）。
 """
 

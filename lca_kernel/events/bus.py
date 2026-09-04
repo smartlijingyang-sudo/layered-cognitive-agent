@@ -221,8 +221,7 @@ class EnvelopeBus(Generic[P]):
             spec.category: spec for spec in registry.specs
         }
         # 投递计数器(ADR-0184 D2):按 category 累计四值;EnvelopeBus 维持
-        # 原 EventBus 同结构(PR-1 不变更计数器 shape),PR-3 可能改为读
-        # DeliveryQueue.depth 等新字段。
+        # 原 EventBus 同结构(published/persisted/delivered/dropped)。
         self._delivery_counts: defaultdict[str, dict[str, int]] = defaultdict(
             self._new_delivery_counts
         )

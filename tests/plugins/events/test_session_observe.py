@@ -1,16 +1,15 @@
-"""PR-3f-sample 回归锁：Session.observe 注册接缝 + 全部 sink/subscriber 迁移。
+"""ADR-0186 PR-3f 回归锁：Session.observe 注册接缝 + sink/subscriber 迁移。
 
-守护六件事:
+守护:
 
-1. :func:`register_as_session_observer` 在 Session 未装载时返回 ``False``
-   (调用方走 bus fallback);
+1. :func:`register_as_session_observer` 在 Session 未装载时返回 ``False``;
 2. Session 装载后经 ``observe(plugin, callback)`` 完成注册;
-3. 所有 sink/subscriber plugin setup 优先 Session.observe —— Session 在场时
-   不触碰 EventBus:
-   - sinks: ``spine_file_sink`` / ``spine_chain_sink`` / ``journal``;
-   - subscribers: ``console_projector`` / ``spine_step_tree_accumulator``;
-4. Session 缺席时回退原 wire:sinks 走 ``mount_sink`` 落盘,subscribers 走
-   ``bus.subscribe`` 逐条接线。
+3. 全部 sink/subscriber setup 优先 Session.observe —— Session 在场时不触碰
+   EventBus（``spine_file_sink`` / ``spine_chain_sink`` / ``journal`` /
+   ``console_projector`` / ``spine_step_tree_accumulator``）;
+4. Session 缺席时：``journal`` / ``console_projector`` 走 ``bus.subscribe``,
+   ``spine_file_sink`` 走 ``mount_sink``（COMPAT）；``spine_chain_sink`` /
+   ``spine_step_tree_accumulator`` 仅 provide capability，无 EventBus 接线。
 """
 
 from __future__ import annotations
@@ -98,7 +97,7 @@ def _clean_session() -> Iterator[None]:
 
 
 def test_register_returns_false_without_session() -> None:
-    """Session 未装载 → False,调用方必须走 bus fallback。"""
+    """Session 未装载 → False（boot 常见；COMPAT 接线仅在此分支进入）。"""
 
     def callback(payload: EventPayload, ref: EventRef) -> None:
         del payload, ref
@@ -148,7 +147,7 @@ def test_spine_file_sink_setup_prefers_session_observe() -> None:
 
 
 def test_spine_file_sink_setup_falls_back_to_mount_sink(tmp_path, monkeypatch) -> None:
-    """Session 缺席:回退 mount_sink,publish 经 _dispatch_sinks 落盘。"""
+    """Session 缺席:COMPAT mount_sink,publish 经 _dispatch_sinks 落盘。"""
     monkeypatch.chdir(tmp_path)
     bus = build_test_bus()
     ctx = _StubPluginContext({"event.bus": bus})
@@ -191,7 +190,7 @@ def test_console_projector_setup_prefers_session_observe() -> None:
 
 
 def test_console_projector_setup_falls_back_to_bus_subscribe(capsys) -> None:
-    """Session 缺席:回退逐条 subscribe,publish 派发到 subscriber 渲染。"""
+    """Session 缺席:COMPAT 逐条 subscribe,publish 派发到 subscriber 渲染。"""
     bus = build_test_bus()
     ctx = _StubPluginContext({"event.bus": bus})
 
@@ -224,7 +223,7 @@ def test_journal_sink_setup_prefers_session_observe() -> None:
 
 
 def test_journal_sink_setup_falls_back_to_bus_subscribe() -> None:
-    """Session 缺席:回退逐条 subscribe,publish 派发到 journal 缓存。"""
+    """Session 缺席:COMPAT 逐条 subscribe,publish 派发到 journal 缓存。"""
     bus = build_test_bus()
     ctx = _StubPluginContext({"event.bus": bus})
 
@@ -257,14 +256,9 @@ def test_spine_chain_sink_setup_prefers_session_observe(tmp_path) -> None:
     assert callback is sink
 
 
-def test_spine_chain_sink_setup_falls_back_to_marker() -> None:
-    """Session 缺席:回退原 wire —— 验证 bus + 提供 marker,不自动 subscribe。
-
-    鉴权受 ``spine.`` 前缀白名单限制；yaml 物化后 plugin 上线时由装配路径
-    按 category 逐条订阅,setup 不重做（避免 PR-6 鉴权三方冲突）。
-    """
-    bus = build_test_bus()
-    ctx = _StubPluginContext({"event.bus": bus})
+def test_spine_chain_sink_setup_without_session_provides_only() -> None:
+    """Session 缺席:仅 provide capability,不 mount_sink / subscribe。"""
+    ctx = _StubPluginContext()
 
     asyncio.run(chain_setup.setup(ctx, chain_setup.Config()))
 
@@ -290,15 +284,10 @@ def test_spine_step_tree_accumulator_setup_prefers_session_observe() -> None:
     assert callback is subscriber
 
 
-def test_spine_step_tree_accumulator_setup_falls_back_to_marker() -> None:
-    """Session 缺席:回退原 wire —— 仅注册 marker 并提供 capability。
-
-    鉴权受 ``spine.cognition.brain.perceive.*`` 子树白名单限制；setup
-    不重做 category subscribe（避免 PR-6 鉴权三方冲突），下游装配路径
-    按 yaml 物化的 category 逐条订阅。
-    """
+def test_spine_step_tree_accumulator_setup_without_session_provides_only() -> None:
+    """Session 缺席:仅 provide capability,不 bus.subscribe。"""
     SpineStepTreeAccumulator.reset()
-    ctx = _StubPluginContext({"event.bus": build_test_bus()})
+    ctx = _StubPluginContext()
 
     asyncio.run(step_tree_setup.setup(ctx, step_tree_setup.Config()))
 

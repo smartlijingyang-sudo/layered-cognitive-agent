@@ -277,9 +277,10 @@ def health_payload(run_port: RunPort, *, ctx: Any) -> dict[str, Any]:
     the carrier surface.
 
     Includes ``event_bus`` field (PR-4) aggregating EventBus delivery
-    counters and, when loaded, PersistenceWorker queue depth + fsync
-    policy. ``dropped_total > 0`` flips ``status`` to ``degraded``;
-    readiness is unaffected (frontend surfaces the warning).
+    counters and, when loaded, PersistenceObserver fsync policy.
+    ``queue_depth`` is always 0 (sync observer; no queue). ``dropped_total > 0``
+    flips ``status`` to ``degraded``; readiness is unaffected (frontend
+    surfaces the warning).
     """
     base: dict[str, Any] = {
         "status": "ok",
@@ -295,12 +296,12 @@ def health_payload(run_port: RunPort, *, ctx: Any) -> dict[str, Any]:
 
 
 def _read_event_bus_health() -> dict[str, Any] | None:
-    """Read EventBus delivery counters and PersistenceWorker status (if loaded).
+    """Read EventBus delivery counters and PersistenceObserver status (if loaded).
 
-    Graceful degradation (PR-4): PersistenceWorker is imported lazily because
-    PR-2 (the file that creates it) is not merged yet. Any error — import,
-    attribute, or runtime — yields ``None`` so the health projection keeps
-    its core shape and readiness is never blocked by observability.
+    Graceful degradation: PersistenceObserver is imported lazily. Any error —
+    import, attribute, or runtime — yields core counters with
+    ``fsync_policy="n/a"`` so readiness is never blocked by observability.
+    ``queue_depth`` is 0 when the observer is available (sync path; no queue).
     """
     try:
         from lca_kernel.events import EventBus
@@ -315,18 +316,16 @@ def _read_event_bus_health() -> dict[str, Any] | None:
             "persisted_total": persisted_total,
             "delivered_total": delivered_total,
             "dropped_total": dropped_total,
-            "fsync_policy": "n/a",  # PR-2 merges → "sync" | "batch" | "async"
+            "fsync_policy": "n/a",
         }
         try:
-            from lca_kernel.events.persistence import (  # type: ignore[import-not-found]
-                PersistenceWorker,
-            )
+            from lca_kernel.events.persistence import PersistenceObserver
 
-            worker = PersistenceWorker.default()
-            result["queue_depth"] = worker.pending_count
-            result["fsync_policy"] = worker.fsync_policy.value
+            observer = PersistenceObserver.default()
+            result["queue_depth"] = 0
+            result["fsync_policy"] = observer.fsync_policy.value
         except (ImportError, AttributeError):
-            pass  # PersistenceWorker not loaded (PR-2 not merged) or attrs not ready
+            pass
         return result
     except Exception:
         return None

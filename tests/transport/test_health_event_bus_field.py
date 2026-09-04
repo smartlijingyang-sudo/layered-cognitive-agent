@@ -1,9 +1,10 @@
-"""PR-4: /health handler exposes ``event_bus`` field + PersistenceWorker observability.
+"""PR-4: /health handler exposes ``event_bus`` field + PersistenceObserver observability.
 
-The health payload now bundles EventBus delivery counters and, when loaded,
-PersistenceWorker fsync policy + queue depth. ``dropped_total > 0`` flips
-``status`` to ``degraded`` without breaking readiness. The field is omitted
-when EventBus is unavailable (graceful degradation).
+The health payload bundles EventBus delivery counters and, when loaded,
+PersistenceObserver fsync policy. ``queue_depth`` is 0 (sync observer).
+``dropped_total > 0`` flips ``status`` to ``degraded`` without breaking
+readiness. The field is omitted when EventBus is unavailable (graceful
+degradation).
 """
 
 from __future__ import annotations
@@ -150,22 +151,23 @@ def test_read_event_bus_health_returns_dict_on_fresh_process() -> None:
     assert result["persisted_total"] == 0
     assert result["delivered_total"] == 0
     assert result["dropped_total"] == 0
-    # fsync_policy reads from PersistenceWorker (PR-2 landed); default FsyncPolicy.BATCH.
-    assert result["fsync_policy"] in {"batch", "n/a"}  # "n/a" only if PersistenceWorker failed to import
+    # fsync_policy reads from PersistenceObserver; default FsyncPolicy.BATCH.
+    assert result["fsync_policy"] in {"batch", "n/a"}
+    if result["fsync_policy"] != "n/a":
+        assert result.get("queue_depth") == 0
 
 
-def test_read_event_bus_health_swallows_persistence_worker_import_error(
+def test_read_event_bus_health_swallows_persistence_observer_import_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """PersistenceWorker module absence must not poison the snapshot."""
-    # Pre-condition: persistence module does not exist on this branch (PR-2 pending).
+    """PersistenceObserver module absence must not poison the snapshot."""
     import builtins
 
     real_import = builtins.__import__
 
     def _guarded(name: str, *args: Any, **kwargs: Any):
         if name == "lca_kernel.events.persistence" or name.endswith(".events.persistence"):
-            raise ImportError("simulated PR-2 not merged")
+            raise ImportError("simulated persistence unavailable")
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", _guarded)

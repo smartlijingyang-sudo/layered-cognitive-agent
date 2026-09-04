@@ -47,7 +47,6 @@ from lca_kernel.events.persistence import (
     PersistenceFlushTimeout,
     PersistenceHealthSnapshot,
     PersistenceObserver,
-    PersistenceWorker,
 )
 from lca_kernel.events.session import (
     SESSION_FORMAT_VERSION,
@@ -78,7 +77,6 @@ __all__ = [
     "PersistenceFlushTimeout",
     "PersistenceHealthSnapshot",
     "PersistenceObserver",
-    "PersistenceWorker",
     "Plane",
     "SessionEvent",
     "SessionHeader",

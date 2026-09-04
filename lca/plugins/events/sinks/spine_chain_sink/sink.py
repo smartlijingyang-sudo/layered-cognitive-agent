@@ -98,32 +98,18 @@ class SpineChainSink:
     marker_class=SpineChainSink,
 )
 async def setup(ctx: PluginContext, config: _Config) -> None:
-    """spine_chain_sink boot — Session.observe 优先；缺席回退提供 marker。
+    """spine_chain_sink boot — Session.observe 优先；始终 provide marker。
 
-    PR-3f-sample：sink 优先经
+    Session 在场时经
     :func:`lca.plugins.events._session_observe.register_as_session_observer`
-    注册到 Session 观察面；Session 未装载时回退原 wire —— 验证
-    ``event.bus`` 装载并提供 marker（yaml 鉴权按 marker class-path 物化进
-    registry ``subscribers`` 映射，PR-6 收口前不重复 subscribe）。
-
-    # COMPAT(delete-when: PR-6 鉴权三方一致, tracking: ADR-0183)
-    # yaml consumer_rules 当前仍按类路径订阅；plugin 上线后逐步迁至
-    # registry-based 订阅，PR-6 收口。setup 内部仅注册 marker + 提供 capability。
+    注册。setup 不调用 ``bus.subscribe`` / ``mount_sink``：yaml 鉴权按
+    marker class-path 物化进 registry ``subscribers``；category 订阅在
+    下游装配路径完成。Session 缺席时仅提供 capability（无 EventBus 回退接线）。
     """
     from lca.plugins.events._session_observe import register_as_session_observer
-    from lca_kernel.events.bus import EventBus
 
     sink = SpineChainSink()
-    if register_as_session_observer(SpineChainSink, sink):
-        ctx.provide("event.bus.chain_sink", sink)
-        return
-
-    # COMPAT(delete-when: Session.observe 机制落地且 spine chain sink 全迁，本文件
-    # rg "bus_obj" = 0；tracking: ADR-0183 后续 PR-3f-sample)
-    bus_obj = ctx.soft_get("event.bus") or EventBus.default()
-    if not isinstance(bus_obj, EventBus):
-        msg = "event.bus.chain_sink boot 失败：event.bus 未装载"
-        raise RuntimeError(msg)
+    register_as_session_observer(SpineChainSink, sink)
     ctx.provide("event.bus.chain_sink", sink)
 
 

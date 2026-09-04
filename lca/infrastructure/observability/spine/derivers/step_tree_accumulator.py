@@ -1,8 +1,8 @@
 # COMPAT(delete-when: rg "StepTreeAccumulatorDeriver(" lca/ = 0 except this file,
-# tracking: ADR-0186 PR-3g)
+# tracking: ADR-0186 PR-3g / I-SESSION-5)
 # 生产 step_tree 走 lca.plugins.session.derivers.step_tree.StepTreeFoldDeriver
-# （RunSessionBuilder 不 EventSpine.subscribe）。本 in-memory callback deriver
-# 仅供测试与尚未迁走的调用方；生产引用清零后删除本模块。
+# （RunSessionBuilder 不 EventSpine.subscribe；I-SESSION-5 已锁）。本 in-memory
+# callback deriver 仅供测试与尚未迁走的调用方；生产引用清零后删除本模块。
 
 """spine-deriver step_tree_accumulator —— 闭 D11 路径（ADR-0167 D11）。
 

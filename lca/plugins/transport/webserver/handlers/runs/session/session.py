@@ -92,7 +92,7 @@ class RunSession:
     execution_target: str = ""
     started_at: float = 0.0
     locator: RunLocator | None = None  # ADR-0065 PR-11: run 级 locator 引用
-    thread_tree_writer: object | None = None  # ADR-0167 D11: per-run StepTreeAccumulatorDeriver
+    thread_tree_writer: object | None = None  # ADR-0186 PR-3g: per-run StepTreeFoldDeriver
     coordinator: object | None = None  # ADR-0167 D11: StepCoordinator (Agent 唯一写入口)
     loop_cursor: object | None = None  # ADR-0169 §D11 PR-1.5: LoopCursor(写入 cursor 的入口)
     loop_cursor_token: object | None = (

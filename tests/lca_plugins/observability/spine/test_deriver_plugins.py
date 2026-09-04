@@ -1,9 +1,9 @@
 """Tests for spine deriver plugins (narrative / graph / live_tail).
 
-ADR-0167 D11: spine.deriver.step_tree 已删除(plugin 是 boot-scope 但
-deriver 必须 per-run; 改由 transport 在 RunSessionBuilder 阶段构造
-+ subscribe)。本测试覆盖仍在的 deriver plugin: manifest 声明 +
-on_event FD-2 安全性。
+ADR-0167 D11 / ADR-0186 PR-3g: spine.deriver.step_tree 已删除(plugin 是
+boot-scope 但 deriver 必须 per-run);生产 step_tree 由 RunSessionBuilder
+装配 StepTreeFoldDeriver。本测试覆盖仍在的 deriver plugin: manifest 声明
++ on_event FD-2 安全性 + live_tail SSE carrier 契约。
 """
 
 from __future__ import annotations
@@ -117,3 +117,30 @@ def test_live_tail_on_event_does_not_raise() -> None:
 
     deriver = LiveTailDeriver(tail=LiveTail())
     deriver.on_event(_make_event())
+
+
+def test_live_tail_subscribe_is_carrier_passthrough_not_event_spine() -> None:
+    """LiveTailDeriver.subscribe is SSE fan-out to LiveTail, not EventSpine.subscribe.
+
+    I-SESSION-5 / ADR-0186 PR-3g: presence of subscribe() here must not be
+    read as unfinished fold derivation.
+    """
+    from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
+    from lca.infrastructure.observability.spine.derivers.live_tail import (
+        LiveTailDeriver,
+    )
+
+    class _SpyTail(LiveTail):
+        def __init__(self) -> None:
+            super().__init__()
+            self.subscribe_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+        def subscribe(self, *args: object, **kwargs: object):  # type: ignore[override]
+            self.subscribe_calls.append((args, kwargs))
+            return "passthrough-iter"
+
+    spy = _SpyTail()
+    deriver = LiveTailDeriver(tail=spy)
+    result = deriver.subscribe(after_seq=3)
+    assert result == "passthrough-iter"
+    assert spy.subscribe_calls == [((), {"after_seq": 3})]

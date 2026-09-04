@@ -124,17 +124,14 @@ class SpineCore:
 
 # ADR-0167 D11 / I-MV3: deriver 都是 per-run 的(run_dir / agent_role / 写
 # journal.json / narrative.md); 不应在 spine.core boot 阶段硬 subscribe。
-# transport 在 RunSessionBuilder.build 阶段构造 + subscribe(通过
-# SpineCore.event_spine.subscribe)。
 #
-# COMPAT(delete-when: ADR-0186 PR-3g 全部 deriver subscribe 迁完,
-#        tracking: ADR-0186 PR-3g)
-# PR-3g subscribe 站点清单(全部在 builder.py):
-#   1. step_tree_deriver.on_event — builder.py:215(已有 fold 替代)
-#   2. live_tail — SSE 实时路径,暂保留 subscribe,Session observer 迁完删除
-#   3. narrative / graph / waterfall / otel_trace — 仅 capability 注册,
-#      未在 builder 硬 subscribe;PR-3g 收口改为 snapshot fold
-#   4. anomaly — EmitPipeline 直接调用(不经 subscribe);PR-3g 迁 snapshot scan
+# COMPAT(delete-when: ADR-0186 PR-3g 残留 on_event deriver 清零,
+#        tracking: ADR-0186 PR-3g / I-SESSION-5)
+# PR-3g 状态:
+#   1. step_tree — 生产已走 StepTreeFoldDeriver(builder 不 EventSpine.subscribe)
+#   2. live_tail.subscribe — SSE carrier fan-out,非 fold 派生主路径
+#   3. narrative / graph / waterfall / otel_trace — 仅 capability;未硬 subscribe
+#   4. anomaly — EmitPipeline 直接 on_event;迁 snapshot scan 后删
 
 # Reflector modules that keep a process-local ``_active_spine`` for emit_*.
 # Soft-import so a partial profile without those plugins still boots.

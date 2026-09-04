@@ -1,9 +1,13 @@
-"""Session.observe 注册接缝 —— 事件 consumer plugin 迁移模式样本（PR-3f-sample）。
+"""Session.observe 注册接缝 —— 事件 consumer plugin 迁移样本（ADR-0186 PR-3f）。
 
-事件 consumer plugin（sinks / subscribers）优先把事件 callback 注册到
-Session 观察面（:meth:`SessionObserverTarget.observe`）；Session 未装载时
-调用方回退 ``EventBus.mount_sink`` / ``subscribe``，wire 行为与 bus 直挂
-形态一致。
+事件 consumer plugin（sinks / subscribers）把事件 callback 注册到
+Session 观察面（:meth:`SessionObserverTarget.observe`）。
+
+生产装配：``profiles/web-standard.yaml`` 固定引入 ``session-runtime``，
+``session.store`` 在 event-bus components 之前可用；per-run Session 由
+RunSessionBuilder 在 run bind 时经 :func:`set_session` 装载。plugin boot
+时 ``current_session()`` 通常仍为 ``None``，部分 sink 在返回 ``False``
+时保留 EventBus COMPAT 接线（见各 manifest，tracking ADR-0186 PR-3f）。
 
 所有权：进程级当前 Session 观察目标的本模块槽位 ``_current_session`` 是
 唯一真值；机制方（per-run Session owner）在 Session 构造时经
@@ -77,10 +81,10 @@ def register_as_session_observer(plugin: type, callback: EventObserverCallback) 
     """优先经 Session.observe 注册事件观察者。
 
     返回 ``True`` = Session 已装载且 ``observe`` 正常返回，注册完成；
-    返回 ``False`` = Session 未装载，调用方必须回退
-    ``EventBus.mount_sink`` / ``subscribe``。Session 已装载但 ``observe``
-    抛错时上抛 —— 机制在场却损坏是真实故障（fail-loud）；缺席是唯一
-    合法的回退触发条件。
+    返回 ``False`` = Session 未装载（plugin boot 常见）。调用方若仍保留
+    EventBus COMPAT 接线，仅在 ``False`` 时进入；Session 在场时禁止
+    ``mount_sink`` / ``bus.subscribe``。Session 已装载但 ``observe``
+    抛错时上抛 —— 机制在场却损坏是真实故障（fail-loud）。
 
     precondition：``plugin`` 是 plugin marker class（与
     ``EventBus.subscribe`` 的 ``plugin=`` 实参同源）；``callback`` 符合

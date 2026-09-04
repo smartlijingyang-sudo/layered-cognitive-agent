@@ -1,9 +1,9 @@
 """Bind observability projections for one Gateway run.
 
-ADR-0167 D11 简化:
+ADR-0167 D11 / ADR-0186 PR-3g:
     - ``ensure_session_hub`` 不再 lazy 构造 lifecycle_store。
-    - deriver (StepTreeAccumulator) 由 ``RunSessionBuilder.build`` 阶段
-      构造 + subscribe 到 spine; lifecycle_store 字段已被删除。
+    - 生产 step_tree 由 ``RunSessionBuilder.build`` 装配
+      ``StepTreeFoldDeriver``(不经 EventSpine.subscribe);lifecycle_store 已删。
     - 任何 ``ensure_session_hub`` 调用点都被保留,行为退化为"返回已 bind
       的 hub,或抛错"。 因为 RunSessionBuilder 现在总是把 hub 设上,
       真正的 fallback 不会发生 —— 但保留入口便于过渡期 regression。

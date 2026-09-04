@@ -1,8 +1,9 @@
 """spine.deriver.live_tail — wraps infrastructure LiveTailDeriver.
 
 ``LiveTail`` is zero-arg constructible, so this plugin boots a real
-ring-buffer deriver without webserver dependencies. SSE subscription
-wiring remains optional for later transport composition.
+ring-buffer capability without webserver dependencies. ``subscribe()``
+on the deriver is SSE carrier fan-out (LiveTail passthrough), not an
+EventSpine.subscribe fold path (I-SESSION-5 / ADR-0186 PR-3g).
 """
 
 from __future__ import annotations
@@ -24,8 +25,8 @@ log = logging.getLogger(__name__)
     kind=PluginKind.SEAM,
     effects="none",
     description=(
-        "Live-tail deriver — wraps LiveTail ring buffer as a spine "
-        "Deriver; SSE fan-out is available via subscribe()."
+        "Live-tail SSE carrier — wraps LiveTail ring buffer; "
+        "subscribe() is transport fan-out, not EventSpine fold derivation."
     ),
     test_suite="tests.lca_plugins.observability.spine.test_deriver_plugins",
 )

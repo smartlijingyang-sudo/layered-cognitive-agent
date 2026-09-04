@@ -4,23 +4,22 @@
 #
 # COMPAT(delete-when: ADR-0186 PR-3g SSE 投影迁 Session observer,
 #        tracking: ADR-0186 PR-3g)
-# live_tail 是唯一仍需要实时 on_event → ring buffer 的 deriver:SSE
-# 消费者依赖 LiveTail.subscribe 的 register-first-replay-then-live 语义。
-# PR-3g 收口时改为 Session observer 直接推送 StampedEvent,ring buffer
-# 不再需要 EventSpine.subscribe 桥接。当前保留 subscribe 通路不破坏 SSE。
+# live_tail.subscribe 是 SSE carrier fan-out（LiveTail ring buffer 的
+# register-replay-live 迭代器透传），不是 I-SESSION-5 fold 派生主路径，
+# 也不是 EventSpine.subscribe 回调累积。生产 SSE 读 session.tail；
+# 本 Deriver 的 on_event 仅作 EventRecord→StampedEvent 桥。收口时改为
+# Session observer 直接推送 StampedEvent，再删本桥接。
 
-"""LiveTailDeriver — wraps ``LiveTail`` as a spine deriver (Task 2.2).
+"""LiveTailDeriver — SSE carrier wrapper around ``LiveTail`` (not a fold deriver).
 
-PR-2 parallel-write phase: the deriver exists alongside the legacy
-``LiveTail`` ring buffer and is subscribed to ``EventSpine`` so the
-framework has a structural hook for the eventual spine-native live tail.
-For now ``on_event`` converts each ``EventRecord`` into the minimum
-``StampedEvent`` shape the legacy ring buffer accepts and forwards it;
-SSE subscribers see the same ring-buffer semantics as before.
+I-SESSION-5 / ADR-0186 PR-3g: production step_tree 走 ``StepTreeFoldDeriver``。
+本模块的 ``subscribe()`` 是 transport fan-out（透传 ``LiveTail.subscribe``），
+**不是** ``EventSpine.subscribe`` 派生主路径，也不得当作 fold 未完成的证据。
 
-The deriver does NOT remove or redirect any existing call site: both
-legacy ``LiveTail`` instances and ``LiveTailDeriver`` instances feed
-their own subscribers independently.
+``on_event`` 把 ``EventRecord`` 转成 ring buffer 需要的最小 ``StampedEvent``
+并转发；SSE 消费者经 ``subscribe()`` 拿到 register-first-replay-then-live
+语义。生产 run 的 ``session.tail`` 来自 RunJournalFactory 的 ``LiveTail``，
+与本 capability 实例独立。
 
 COMPAT(delete-when: ADR-0170 §D3 LiveTail 单身份重构完成,
        tracking: ADR-0170 §"删除条件" / issue 待开)
@@ -80,14 +79,15 @@ class LiveTailDeriver(Deriver):
                 exc_info=True,
             )
 
-    # ── pass-through convenience for boot wiring ──
+    # ── SSE carrier fan-out（非 EventSpine.subscribe / 非 fold）──
     def subscribe(self, *args: object, **kwargs: object):
-        """Pass through to the wrapped tail's subscribe.
+        """Pass through to ``LiveTail.subscribe`` (SSE carrier, not fold).
 
         COMPAT(delete-when: ADR-0186 PR-3g SSE 投影迁 Session observer,
                tracking: ADR-0186 PR-3g)
-        SSE 消费者经本方法拿到 LiveTail 的 register-replay-live 迭代器。
-        PR-3g 收口后 Session observer 直接推送,本方法随 LiveTailDeriver 整体删除。
+        返回 ring buffer 的 register-replay-live 迭代器。本方法不是
+        I-SESSION-5 派生主路径；生产 SSE 亦可直接读 ``session.tail``。
+        Session observer 直推收口后随 ``LiveTailDeriver`` 删除。
         """
         return self._tail.subscribe(*args, **kwargs)
 

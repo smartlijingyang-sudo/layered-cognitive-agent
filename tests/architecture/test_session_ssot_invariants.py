@@ -165,10 +165,6 @@ class TestISession3:
 class TestISession4:
     """I-SESSION-4: 持久化是 SessionObserver；禁止平行 PersistenceWorker 主路径。"""
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="ADR-0186 PR-3e/3f: PersistenceObserver + JsonlSessionPersistence 未收口",
-    )
     def test_i_session_4_persistence_is_observer(self) -> None:
         """生产路径应暴露 PersistenceObserver / JsonlSessionPersistence，而非 PersistenceWorker 主写。"""
         persistence = _REPO_ROOT / "lca_kernel" / "events" / "persistence.py"
@@ -199,7 +195,11 @@ class TestISession5:
     """I-SESSION-5: deriver 走 fold，不新挂 EventSpine._subscribers 派生主路径。"""
 
     def test_i_session_5_deriver_uses_fold(self) -> None:
-        """生产 step_tree 走 fold；builder 不得 EventSpine.subscribe 作为派生主路径。"""
+        """生产 step_tree 走 fold；builder 不得 EventSpine.subscribe 作为派生主路径.
+
+        ``live_tail.subscribe`` 是 SSE carrier fan-out(透传 LiveTail),不在本
+        不变量的 fold 派生主路径范围内。
+        """
         builder = (
             _REPO_ROOT
             / "lca"
@@ -231,3 +231,22 @@ class TestISession5:
         assert not matches, "I-SESSION-5 违规:fold deriver 仍挂 in-memory subscribe\n" + "\n".join(
             matches[:8]
         )
+
+        live_tail = (
+            _REPO_ROOT
+            / "lca"
+            / "infrastructure"
+            / "observability"
+            / "spine"
+            / "derivers"
+            / "live_tail.py"
+        )
+        assert live_tail.exists(), "live_tail deriver module missing"
+        live_tail_text = live_tail.read_text(encoding="utf-8")
+        assert "SSE carrier" in live_tail_text or "carrier fan-out" in live_tail_text, (
+            "I-SESSION-5: live_tail.subscribe must be documented as SSE carrier, not fold"
+        )
+        assert (
+            "EventSpine.subscribe"
+            not in live_tail_text.split("def subscribe", 1)[-1].split("def ", 1)[0]
+        ), "I-SESSION-5 违规:LiveTailDeriver.subscribe body must not call EventSpine.subscribe"

@@ -1,6 +1,6 @@
 # Agent Note: DeliveryQueue / NotificationBus 删除矩阵 — ADR-0184 投递拆分件收口
 
-Status: proposed (级别 1–3 已执行;级别 4 待执行)
+Status: proposed (级别 1–4 已执行)
 
 ## Problem
 
@@ -25,12 +25,12 @@ ADR-0184 PR-1 给 `EnvelopeBus` 引入两个投递拆分件:S3 入队的 `Delive
 | `tests/lca_kernel/events/test_envelope_bus.py` `TestNotificationBus` | 测试 | 已改为断言默认 `None` + 显式注入派发 | 级别 2 随模块删除 | 1 ✅ |
 | `lca_kernel/events/bus.py` S3 `self._queue.submit` | DeliveryQueue | 同步 publish 每次入队;生产无 consumer 拉取 | 级别 3 从同步路径移除 | 3 |
 | `lca_kernel/events/bus.py` `publish_async` | DeliveryQueue + PersistenceWorker | 生产零调用方,仅测试驱动 | 级别 3 删除或改直写 | 3 |
-| `lca_kernel/events/persistence.py` PersistenceWorker | DeliveryQueue 消费 | `/health` 与 `lca-ops events-delivery` 只读观测入口 | 级别 4 删文件 | 4 |
-| `lca/plugins/transport/webserver/handlers/runs/api/query_endpoints.py` `/health` | `worker.pending_count` → `queue_depth` | 已有 graceful degradation(`except (ImportError, AttributeError)` 分支) | 级别 4 删 `queue_depth` 分支 | 4 |
-| `lca/infrastructure/cli/commands/events_delivery.py` | `PersistenceWorker.default()` | 已有降级分支("PR-2 not merged yet") | 级别 4 删命令或改读 `delivery_snapshot` | 4 |
+| `lca_kernel/events/persistence.py` PersistenceWorker | DeliveryQueue 消费 | `/health` 与 `lca-ops events-delivery` 只读观测入口 | 级别 4 去队列 + 删 PersistenceWorker 别名,保留 PersistenceObserver | 4 ✅ |
+| `lca/plugins/transport/webserver/handlers/runs/api/query_endpoints.py` `/health` | `worker.pending_count` → `queue_depth` | 已有 graceful degradation(`except (ImportError, AttributeError)` 分支) | 级别 4 改读 PersistenceObserver;`queue_depth=0` | 4 ✅ |
+| `lca/infrastructure/cli/commands/events_delivery.py` | `PersistenceWorker.default()` | 已有降级分支("PR-2 not merged yet") | 级别 4 改读 PersistenceObserver | 4 ✅ |
 | `lca/plugins/events/sinks/spine_file_sink/manifest.py` COMPAT 注释 | "PR-3 cursor 完全迁 `EventBus.publish_async`" | 该迁移意图依赖级别 3 对 `publish_async` 的处置决定 | 级别 3 同 PR 更新 | 3 |
-| `lca_kernel/events/queue.py` 模块 + `pyproject.toml` N818 per-file ignore | DeliveryQueue / DeliveryQueueFull 定义 | 活跃 | 级别 4 删文件 + 删 ignore 条目 | 4 |
-| `tests/lca_kernel/events/test_persistence_worker.py` | 测试 | 绿 | 级别 3/4 随实现删除 | 3/4 |
+| `lca_kernel/events/queue.py` 模块 + `pyproject.toml` N818 per-file ignore | DeliveryQueue / DeliveryQueueFull 定义 | 活跃 | 级别 4 删文件 + 删 ignore 条目 | 4 ✅ |
+| `tests/lca_kernel/events/test_persistence_worker.py` | 测试 | 绿 | 级别 4 重写为 `test_persistence_observer.py` | 4 ✅ |
 
 ### 级别 1 — NotificationBus no-op 降级(已落地)
 
@@ -48,9 +48,11 @@ delete-when:`rg "NotificationBus" lca/ lca_kernel/ tests/` 仅剩 `notification.
 
 delete-when:`rg "publish_async|spine_port_append_async|append_async|write_port_append_async" lca/ lca_kernel/` = 0(选 (a);允许测试同删),且 `rg "_queue\.submit|queue\.submit" lca_kernel/events/bus.py` = 0。
 
-### 级别 4 — 删 `queue.py` + `persistence.py`
+### 级别 4 — 删 `queue.py` + 去 PersistenceWorker / DeliveryQueue ✅
 
-delete-when:`rg "DeliveryQueue|DeliveryQueueFull" lca/ lca_kernel/ tests/` = 0 且 `rg "PersistenceWorker" lca/ lca_kernel/ tests/` = 0(允许 `docs/` 归档与负向断言);`/health` 的 `queue_depth` 分支与 `events-delivery` CLI 同 PR 处置;`pyproject.toml` 的 `lca_kernel/events/queue.py` N818 ignore 条目同 PR 删除。
+delete-when:`rg "DeliveryQueue|DeliveryQueueFull" lca/ lca_kernel/ tests/` = 0 且 `rg "PersistenceWorker" lca/ lca_kernel/` 生产路径 = 0(允许 `docs/` 归档、COMPAT、测试负向断言);`/health` 与 `events-delivery` 改读 `PersistenceObserver`(`queue_depth=0`);`pyproject.toml` 的 `lca_kernel/events/queue.py` N818 ignore 条目同 PR 删除。
+
+动作:删 `lca_kernel/events/queue.py`;`PersistenceObserver` 去掉 queue ctor / `_consume_loop` / `.queue`;删 `PersistenceWorker` 别名与包根导出;重写 `tests/lca_kernel/events/test_persistence_observer.py`;翻正 I-SESSION-4。
 
 ## Alternatives considered
 

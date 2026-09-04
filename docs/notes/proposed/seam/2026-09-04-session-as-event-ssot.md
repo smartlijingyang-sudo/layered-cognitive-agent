@@ -8,10 +8,11 @@ Status: proposed
 |---|---|---|
 | `lca_kernel/events/session.py` 契约面 | 落地 | `SessionProtocol` / `SessionObserver` / `SessionEvent` / `SessionHeader` / `SessionReentryError` 已声明；`tests/lca_kernel/events/test_session_contract.py` 覆盖 |
 | `lca_kernel/events/fold.py` 纯函数 | 落地 | 无 I/O / 无 `print` / 无 `logging` / 无 `datetime`；`canonicalHeader` / `headerEquals` / `foldRequestHeader` / `_sameSchema` 实现完成 |
-| `lca_kernel/events/persistence.py` Observer 化 | 部分 | `PersistenceObserver` 类实现 `EnvelopeDeliveryObserver` 协议（`(payload, ref)` 入参，非 DSH `(session, event)` 形态）；后台 `_consume_loop` 仍拉 `DeliveryQueue`（queue worker 残留）|
-| `PersistenceWorker = PersistenceObserver` 别名 | 收口未完 | `lca_kernel/events/bus.py` flush 路径、`event_spine.py` / `_spine_port.py` async 路径、`query_endpoints.py` / `events_delivery.py` 观测面仍引用 `PersistenceWorker` 字面量 |
-| `deriver` fold 切流 | 未做 | `lca/infrastructure/observability/spine/derivers/live_tail.py` 仍暴露 `subscribe` 透传 |
-| `tests/architecture/test_session_ssot_invariants.py` | 骨架在位 | I-SESSION-1/2/3 通过；I-SESSION-4/5 xfail(strict=False)，xfail reason 写明翻正 PR |
+| `lca_kernel/events/persistence.py` Observer 化 | 落地 | `PersistenceObserver` 同步落盘；已删 `DeliveryQueue` / `_consume_loop`；`/health` 与 `events-delivery` 读 Observer |
+| `PersistenceWorker` 别名 | 已删 | 生产路径 `rg PersistenceWorker` = 0；I-SESSION-4 翻正 |
+| `deriver` fold 切流 | 部分 | 生产 step_tree 走 `StepTreeFoldDeriver`（I-SESSION-5 通过）；`live_tail.subscribe` 是 SSE carrier fan-out，不是 EventSpine.subscribe / fold 派生主路径；旧 `StepTreeAccumulatorDeriver` 与 graph/waterfall/otel/anomaly `on_event` 留 COMPAT(delete-when: ADR-0186 PR-3g) |
+| sinks/subscribers observe | 部分 | chain / step_tree accumulator 已 observe-only；journal / spine_file / console 仍 boot 时 `mount_sink`/`bus.subscribe` COMPAT（`current_session()` 在 plugin boot 常为 None） |
+| `tests/architecture/test_session_ssot_invariants.py` | 落地 | I-SESSION-1/2/3/4/5 通过（I-SESSION-1 仅在 session 模块缺失时条件 xfail） |
 
 ## Problem
 
