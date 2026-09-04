@@ -7,11 +7,6 @@ import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
-from lca.agent.orchestration_strategies import (
-    HandoffStrategy,
-    SequentialStrategy,
-    SwarmStrategy,
-)
 from lca.application.api import Agent, Team, ensure_default_ctx
 from lca.contracts.atoms.enums import DecisionGateName
 from lca.contracts.models.core.decision import Decision
@@ -23,6 +18,9 @@ from lca.contracts.models.team.graph import ExecutionGraph, GraphEdge, GraphNode
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.models.team.team_coordination import Graph, PeerRelay, PeerSwarm, Pipeline
 from lca.contracts.protocols import TeamAssembly
+from lca.plugins.strategies.peer_relay import HandoffStrategy
+from lca.plugins.strategies.peer_swarm import SwarmStrategy
+from lca.plugins.strategies.pipeline import SequentialStrategy
 from tests.support.strategy_registry import build_strategy_registry
 from tests.support.team_stage import stage_with_invoker
 
@@ -41,7 +39,7 @@ class TestDecisionSingleDelegationField(unittest.TestCase):
 
 class TestTypedProcessDispatch(unittest.TestCase):
     def test_no_string_topology_tables_in_strategies(self) -> None:
-        strat_dir = _ROOT / "lca" / "agent" / "orchestration_strategies"
+        strat_dir = _ROOT / "lca" / "plugins" / "strategies"
         banned = ("_DISPATCH", "topology: str", "mode: str", "ChoreographyStrategy", "PeerStrategy")
         for path in strat_dir.rglob("*.py"):
             text = path.read_text(encoding="utf-8")
@@ -206,7 +204,6 @@ class TestResidueGone(unittest.TestCase):
     def test_no_orphan_pyc_modules_without_py(self) -> None:
         agent_dir = _ROOT / "lca" / "agent"
         py_stems = {p.stem for p in agent_dir.glob("*.py")}
-        py_stems |= {p.stem for p in (agent_dir / "orchestration_strategies").glob("*.py")}
         orphans: list[str] = []
         for pyc in agent_dir.rglob("*.pyc"):
             # e.g. simple_agent.cpython-314.pyc
@@ -214,11 +211,7 @@ class TestResidueGone(unittest.TestCase):
             if name == "__init__":
                 continue
             parent = pyc.parent.parent if pyc.parent.name == "__pycache__" else pyc.parent
-            # strategy subpackage
-            if parent.name == "orchestration_strategies":
-                if name not in {s.stem for s in parent.glob("*.py")}:
-                    orphans.append(str(pyc.relative_to(agent_dir)))
-            elif parent == agent_dir and name not in py_stems:
+            if parent == agent_dir and name not in py_stems:
                 orphans.append(str(pyc.relative_to(agent_dir)))
         self.assertEqual(orphans, [], f"orphan pyc without source: {orphans}")
 

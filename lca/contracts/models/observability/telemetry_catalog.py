@@ -88,14 +88,14 @@ TELEMETRY_CATALOG: dict[str, VocabDef] = {
     ),
     SpanName.TEAM_ROUND.value: _span(
         VocabDomain.TEAM,
-        "lca.agent.orchestration_strategies",
+        "lca.plugins.strategies",
         required=(ATTR_ROUND,),
-        desc="对等协作轮次",
+        desc="对等协作轮次（发射方：debate / peer_swarm 策略）",
     ),
     SpanName.TEAM_SYNTHESIS.value: _span(
         VocabDomain.TEAM,
-        "lca.agent.orchestration_strategies",
-        desc="结果汇总",
+        "lca.plugins.strategies",
+        desc="结果汇总（发射方：fan_out 策略）",
     ),
     # ── 认知域：hook 边界自动发射 ──
     SpanName.LOOP_PHASE_PERCEIVE.value: _span(

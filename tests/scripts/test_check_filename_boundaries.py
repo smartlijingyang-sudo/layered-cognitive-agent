@@ -29,9 +29,9 @@ def test_package_for_path_one_level():
 
 
 def test_package_for_path_two_levels():
-    assert package_for_path("lca/agent/orchestration_strategies/swarm.py") in (
-        "lca.agent.orchestration_strategies",
-        "lca.agent",
+    assert package_for_path("lca/plugins/strategies/pipeline.py") in (
+        "lca.plugins.strategies",
+        "lca.plugins",
     )
 
 

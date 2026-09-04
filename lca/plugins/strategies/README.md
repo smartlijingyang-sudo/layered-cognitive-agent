@@ -11,13 +11,14 @@ LCA 框架的组成部分。具体职责参见同目录下各子包的 README �
 与下层契约的合规性检查（由 lint-imports 与 check_package_contracts 门禁统一处理）；任何不在本目录 schema_version 范围内的修改都不应提交。
 
 ## 3. 输入
-- 当前包内 `7` 个公开模块 + `9` 个公开符号（class / function）
+- 当前包内 `7` 个公开模块 + `34` 个公开符号（class / function）
+- 每个策略类与其消费它的 @plugin 工厂同文件（debate / fan_out / graph / lead / peer_relay / peer_swarm / pipeline）
 
 ## 4. 输出
-- 暴露的公共 API：无 个显式 __all__ 条目； 9 个定义符号中，9 个为公共命名
+- 暴露的公共 API：无 个显式 __all__ 条目； 38 个定义符号中，34 个为公共命名
 
 ## 5. 允许依赖
-—
+- `lca.contracts`、`lca.infrastructure`、`lca.cognition`、`lca.agent`、`lca.harness`、`lca.plugins`
 
 ## 6. 禁止依赖
 **pyproject.toml `[tool.lca.package_contracts.lca.plugins.strategies].forbidden_dependencies`**:

@@ -137,13 +137,17 @@ def test_architecture_25_runtime_recovery() -> None:
 
 
 def test_architecture_26_agent_team() -> None:
-    """守护 Team 协作模块的层次归属。"""
-    _require_path("lca", "agent", "orchestration_strategies")
+    """策略类归位 lca/plugins/strategies 后,lca/agent/orchestration_strategies 不应复活。
+    现位置由 test_architecture_36 守护;本测试是反向断言(编号保留)。"""
+    assert not (ROOT / "lca" / "agent" / "orchestration_strategies").exists(), (
+        "lca/agent/orchestration_strategies/ must stay removed; strategy classes "
+        "live in lca/plugins/strategies/ with their consuming plugins"
+    )
 
 
 def test_architecture_27_agent_delegation() -> None:
-    """守护 delegation 模块的层次归属。"""
-    _require_path("lca", "agent", "orchestration_strategies")
+    """test_architecture_26 的反向断言空壳,维持 test 编号稳定。"""
+    assert not (ROOT / "lca" / "agent" / "orchestration_strategies").exists()
 
 
 def test_architecture_28_app_spawn() -> None:
