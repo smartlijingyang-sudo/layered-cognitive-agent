@@ -6,7 +6,7 @@
 - SYNC 策略每条 flush
 - health_snapshot 字段(无队列: queue/pending/enqueued/dropped=0)
 - EnvelopeDeliveryObserver 协议 + 失败 contained
-- spine_file_sink manifest 走 mount_sink
+- spine_file_sink manifest 走 Session.observe
 """
 
 from __future__ import annotations

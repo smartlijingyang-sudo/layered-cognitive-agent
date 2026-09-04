@@ -6,8 +6,8 @@ DSH :class:`~lca.plugins.session.runtime.session.Session` speaks
 :func:`register_as_session_observer` speak ``append(payload, *, producer)``
 and ``observe(plugin, callback)``. This module is the run-scoped adapter.
 
-# COMPAT(delete-when: Bridge.append 不再 EventBus.publish 双写,
-# tracking: ADR-0186 PR-3f)
+# COMPAT(delete-when: rg "EventBus.default().publish" event_session.py = 0
+# 且 Bridge.append 不再 EventBus 双写, tracking: ADR-0186 PR-3f)
 # append 在 Session 提交后再 EventBus.publish；consumer 已改走
 # Session.observe 目录（set_session 挂上），双写仅服务仍挂在 bus 上的遗留面。
 """

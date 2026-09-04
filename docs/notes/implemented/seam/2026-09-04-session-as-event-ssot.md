@@ -1,8 +1,10 @@
 # Agent Note: Session 为事件 SSOT — append + observer + fold
 
-Status: proposed
+Status: implemented
 
 ## Progress (2026-09-04)
+
+主路径已落地。剩余两项为带 delete-when 的 COMPAT，不阻挡本 note 收口。
 
 | 项 | 状态 | 证据 |
 |---|---|---|
@@ -13,6 +15,8 @@ Status: proposed
 | `deriver` fold 切流 | 部分 | 生产 step_tree 走 `StepTreeFoldDeriver`（I-SESSION-5 通过）；`live_tail.subscribe` 是 SSE carrier fan-out，不是 EventSpine.subscribe / fold 派生主路径；旧 `StepTreeAccumulatorDeriver` 与 graph/waterfall/otel/anomaly `on_event` 留 COMPAT(delete-when: ADR-0186 PR-3g) |
 | sinks/subscribers observe | 落地 | boot 只入 `_session_observe` 目录；run bind `set_session` 整表挂上；journal / spine_file / console / chain / step_tree 均无 `mount_sink`/`bus.subscribe` |
 | `tests/architecture/test_session_ssot_invariants.py` | 落地 | I-SESSION-1/2/3/4/5 通过（I-SESSION-1 仅在 session 模块缺失时条件 xfail） |
+| `RunEventSessionBridge.append` EventBus 双写 | COMPAT | `event_session.py` 仍 `EventBus.default().publish`；COMPAT(delete-when: Bridge.append 不再 EventBus.publish 双写, tracking: ADR-0186 PR-3f) |
+| `pipeline_loader.apply_pipeline` | COMPAT | 仍 `bus.mount_sink`（平行 bus 路径；boot 生产走 `register_pipeline_once`，本函数保留声明式装配入口） |
 
 ## Problem
 
@@ -84,11 +88,11 @@ LCA 事件链路把 durable 文件链当作唯一真值，却缺少 DSH 式的�
 ## Acceptance criteria
 
 - `docs/adr/0186-session-as-event-ssot.md` 状态 Proposed；`docs/adr/README.md` 索引含 0186
-- 本 note 位于 `docs/notes/proposed/seam/`，`Status: proposed`
+- 本 note 位于 `docs/notes/implemented/seam/`，`Status: implemented`
 - `tests/architecture/test_session_ssot_invariants.py` 声明 I-SESSION-1..5；未落地用 `xfail(strict=False)` 标 PR 编号
 - `uv run pytest tests/architecture/test_session_ssot_invariants.py -q` 以声明状态通过（pass 或 xfail）
 - `./scripts/lca-ops notes-check` 不因本 note 失败
-- 运行时代码零改动（3i 范围）；ADR-0185 正文零改动
+- Bridge.append EventBus 双写与 `apply_pipeline`→`mount_sink` 保留 COMPAT(delete-when)，不阻塞主路径收口
 
 ## Risks
 
@@ -103,6 +107,6 @@ LCA 事件链路把 durable 文件链当作唯一真值，却缺少 DSH 式的�
 
 - [ADR-0186](../../../adr/0186-session-as-event-ssot.md)
 - [ADR-0183](../../../adr/0183-event-bus-framework-ssot.md) / [ADR-0184](../../../adr/0184-event-lifecycle-managed-delivery.md) / [ADR-0185](../../../adr/0185-model-visible-event-bus-alignment.md)
-- [Note: model-visible bus alignment](2026-09-04-model-visible-bus-alignment.md)
-- [Note: observation convergence root](2026-09-03-observation-convergence-root.md)
+- [Note: model-visible bus alignment](../../proposed/seam/2026-09-04-model-visible-bus-alignment.md)
+- [Note: observation convergence root](../../proposed/seam/2026-09-03-observation-convergence-root.md)
 - deepseek-harness `packages/core/session/src/index.ts`（append + observer + fold）

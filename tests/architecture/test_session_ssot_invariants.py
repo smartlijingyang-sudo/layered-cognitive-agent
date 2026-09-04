@@ -1,4 +1,4 @@
-"""Session 事件 SSOT 架构不变量 —— ADR-0186 §4（PR-3i 骨架）。
+"""Session 事件 SSOT 架构不变量 —— ADR-0186 §4。
 
 不变量（ADR-0186 §4）:
 
@@ -8,9 +8,7 @@
 - I-SESSION-4: 持久化以 SessionObserver 形态存在；spine.jsonl 物理写方唯一。
 - I-SESSION-5: deriver 走 fold；禁止新挂 EventSpine._subscribers 派生主路径。
 
-PR-3i 挂锁：未落地项 ``xfail(strict=False)``，reason 写明翻正 PR。
-I-SESSION-5 由 PR-3g 收口（生产 step_tree 走 fold）。
-delete-when:N/A（长期回归锁；xfail 在对应 PR 收口时翻正）。
+长期回归锁；delete-when:N/A。
 """
 
 from __future__ import annotations
@@ -72,11 +70,6 @@ def _rg(pattern: str, root: Path) -> list[str]:
 class TestISession1:
     """I-SESSION-1: SessionProtocol 存在；append 为公开生产入口。"""
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="ADR-0186 PR-3a: lca_kernel/events/session.py SessionProtocol 未落地",
-        condition=not _SESSION_MODULE.exists(),
-    )
     def test_i_session_1_session_protocol_exists(self) -> None:
         """SessionProtocol / SessionObserver / SessionEvent 可从 session 模块导入。"""
         assert _SESSION_MODULE.exists(), "lca_kernel/events/session.py missing"
@@ -250,3 +243,16 @@ class TestISession5:
             "EventSpine.subscribe"
             not in live_tail_text.split("def subscribe", 1)[-1].split("def ", 1)[0]
         ), "I-SESSION-5 违规:LiveTailDeriver.subscribe body must not call EventSpine.subscribe"
+
+
+# ── ADR-0186 PR-3f: pipeline_loader bus path is known COMPAT ─────────────
+
+
+def test_pipeline_loader_mount_sink_is_compat_marked() -> None:
+    """pipeline_loader.apply_pipeline still bus.mount_sink; marked COMPAT until Session-only delivery."""
+    path = _REPO_ROOT / "lca" / "harness" / "profile" / "pipeline_loader.py"
+    text = path.read_text(encoding="utf-8")
+    assert "bus.mount_sink(" in text
+    assert (
+        'COMPAT(delete-when: rg "mount_sink" lca/harness/profile/pipeline_loader.py = 0' in text
+    ), "pipeline_loader mount_sink must keep mechanical COMPAT(delete-when) (ADR-0186 PR-3f)"

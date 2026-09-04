@@ -813,6 +813,7 @@ class EventBus(EnvelopeBus[P]):
 
 __all__ = [
     "ConsumerHandle",
+    "ConsumerResult",
     "DeliveryPolicy",
     "EnvelopeBus",
     "EnvelopeRef",

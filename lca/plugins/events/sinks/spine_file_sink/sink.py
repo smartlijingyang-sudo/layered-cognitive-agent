@@ -23,19 +23,18 @@ log = logging.getLogger(__name__)
 
 
 class SpineFileSink:
-    """EventBus callback 入口；落盘委托 SpineSink SSOT 路径。
+    """Session.observe / SinkBackend 落盘入口；委托 SpineSink SSOT 路径。
 
-    manifest 订阅全部 spine EP category；每条事件经 ``build_record()`` 构造
-    ``SpineEventRecord`` 后交 ``SpineSink.append``。字节布局 =
-    ``SpineEventRecord.to_dict()`` 9 键（ADR-0183 §3.5 SSOT，plugin 不可改）。
+    生产 boot 经 Session.observe catalog 登记(ADR-0186 PR-3f；见同目录
+    manifest)。每条事件经 ``build_record()`` 构造 ``SpineEventRecord`` 后交
+    ``SpineSink.append``。字节布局 = ``SpineEventRecord.to_dict()`` 9 键
+    （ADR-0183 §3.5 SSOT，plugin 不可改）。
 
-    失败语义：sink path 失败上抛；订阅路径由机制 FD-1 fail-fast 显式记日志，
-    无静默枚举 fallback。
+    失败语义：sink path 失败上抛；无静默枚举 fallback。
 
-    实现 :class:`lca_kernel.events.sinks.SinkBackend` Protocol(PR-2 起):除老
-    ``__call__`` 兼容层外,新增 :meth:`append` / :meth:`flush` / :meth:`close`
-    三件套,允许 ``EventBus.mount_sink`` 直接装载。sink 写入仍走底层
-    :class:`lca_kernel.events.sinks.spine_sink.SpineSink` SSOT。
+    实现 :class:`lca_kernel.events.sinks.SinkBackend` Protocol：除老
+    ``__call__`` 兼容层外,提供 :meth:`append` / :meth:`flush` / :meth:`close`。
+    ``EventBus.mount_sink`` API 仍可用,但生产路径不经 mount_sink。
     """
 
     def __init__(self, run_dir: Path | None = None) -> None:
@@ -47,9 +46,9 @@ class SpineFileSink:
 
     def __call__(self, payload: Any, ref: EventRef) -> None:
         # COMPAT(跟踪:ADR-0181 PR-8 shim / ADR-0184 PR-1;老 EventBus.subscribe
-        # callback 路径仍可用,新路径走 mount_sink 后由 _dispatch_sinks →
-        # backend.append(record) 接管)。delete-when:EventBus.subscribe(零 sinks
-        # 路径)全部收口。
+        # callback 与 mount_sink→_dispatch_sinks→backend.append 仍可用。
+        # 生产 boot 走 Session.observe catalog,不经 mount_sink)。
+        # delete-when:EventBus.subscribe(零 sinks 路径)全部收口。
         if not is_spine_event(payload):
             raise TypeError(f"SpineFileSink 只接 SpineEventPayload；got {type(payload).__name__}")
         self._inner.append(build_record(payload, ref))

@@ -24,20 +24,18 @@ in-process log 的 durable 镜像。
 :class:`SessionStore` 的所有活 Session;若 store 提供接管钩子,新 Session
 也会自动挂入。
 
-COMPAT(delete-when: JsonlSessionPersistence 为唯一 Session→spine.jsonl 写方且
-Profile 禁用 spine_file sink 后双写路径 rg 为零,
+COMPAT(delete-when: rg "lca.events.sink.spine_file" profiles bundles = 0
+且同 Session 上 SpineFileSink observe + JsonlSessionPersistence 双挂 rg 为零;
 tracking: ADR-0186 PR-3e/3f / delete-queue Level 4):
-本 plugin 写出的 ``<run_id>.spine.jsonl`` 与 :class:`PersistenceObserver`
-(SpineEventRecord 9 键)可能指向**同一文件**(同一 durable SSOT,
-ADR-0183 I-FW-SSOT-1)。双轨期:
+当前双写风险面:
 
-- Envelope/Bus 旁路 → :class:`PersistenceObserver` 落盘 (SpineEventRecord 9 键)
-- ``Session.append`` 路径 → 本 plugin 落盘 (SessionEvent 字段信封)
+- 同 Session 上 ``SpineFileSink``(Session.observe catalog,SpineEventRecord 9 键)
+  与本 plugin(SessionEvent 信封)并行挂 observer → 可能写同一
+  ``<run_id>.spine.jsonl``(ADR-0183 I-FW-SSOT-1);
+- 或 EventBus ``pipeline_loader`` ``mount_sink`` 旁路与 Session 观察者并存。
 
-两条路径写入同一文件会冲突;**当前不并行启用 bus 旁路写盘**,
-只在 Session 路径独占落盘。Profile 装载本 plugin 时应**同时**禁用
-``lca.events.sink.spine_file`` (由 profile resolver / bundle 实现,本
-plugin 不强制)。
+Profile 装载本 plugin 时应**同时**禁用 ``lca.events.sink.spine_file``
+(由 profile resolver / bundle 实现,本 plugin 不强制)。
 """
 
 from __future__ import annotations

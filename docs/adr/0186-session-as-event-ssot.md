@@ -10,7 +10,7 @@ Proposed（2026-09-04 起草）。实施按 §5 PR-3a–3i 推进；本 PR-3i �
 
 **对齐参考**：deepseek-harness `packages/core/session/src/index.ts` — `Session.append` → in-memory log push → fire `session/event` observer；`foldRequestHeader` / `foldSurface` 纯函数重建；`JsonlSessionPersistence` 作为 observer 写盘。`AGENTS.md`：**Model-visible ⟺ logged**。
 
-**本文档配套 Note**：[`docs/notes/proposed/seam/2026-09-04-session-as-event-ssot.md`](../notes/proposed/seam/2026-09-04-session-as-event-ssot.md)。
+**本文档配套 Note**：[`docs/notes/implemented/seam/2026-09-04-session-as-event-ssot.md`](../notes/implemented/seam/2026-09-04-session-as-event-ssot.md)。
 
 ## 0. 决策摘要
 

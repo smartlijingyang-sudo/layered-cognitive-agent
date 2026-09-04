@@ -1,6 +1,6 @@
 # Agent Note: DeliveryQueue / NotificationBus 删除矩阵 — ADR-0184 投递拆分件收口
 
-Status: proposed (级别 1–4 已执行)
+Status: implemented
 
 ## Problem
 
@@ -12,7 +12,7 @@ ADR-0184 PR-1 给 `EnvelopeBus` 引入两个投递拆分件:S3 入队的 `Delive
 
 ## Proposal
 
-四级递进删除,每级一个机械 delete-when;级别之间独立可停。**级别 1(最小 no-op 降级)随本 note 同一提交落地**,级别 2–4 为待执行提案。
+四级递进删除,每级一个机械 delete-when;级别之间独立可停。级别 1–4 均已执行完毕。
 
 ### 删除矩阵
 
@@ -21,14 +21,14 @@ ADR-0184 PR-1 给 `EnvelopeBus` 引入两个投递拆分件:S3 入队的 `Delive
 | `lca_kernel/events/bus.py` `EnvelopeBus.__init__` | NotificationBus 默认构造 | 已改为可选注入,未注入不构造 | 级别 2 删 kwarg | 1 ✅ |
 | `lca_kernel/events/bus.py` S4 `notify` 调用 | NotificationBus | 已加 `is not None` 守卫(未注入为 no-op) | 级别 2 删守卫与调用 | 1 ✅ |
 | `lca_kernel/events/__init__.py` 包根导出 | NotificationBus | 已移除导出与 import | 无需再动 | 1 ✅ |
-| `lca_kernel/events/notification.py` 模块 | NotificationBus 定义 | COMPAT 标记,删除条件挂本 note | 级别 2 删文件 | 2 |
+| `lca_kernel/events/notification.py` 模块 | NotificationBus 定义 | COMPAT 标记,删除条件挂本 note | 级别 2 删文件 | 2 ✅ |
 | `tests/lca_kernel/events/test_envelope_bus.py` `TestNotificationBus` | 测试 | 已改为断言默认 `None` + 显式注入派发 | 级别 2 随模块删除 | 1 ✅ |
-| `lca_kernel/events/bus.py` S3 `self._queue.submit` | DeliveryQueue | 同步 publish 每次入队;生产无 consumer 拉取 | 级别 3 从同步路径移除 | 3 |
-| `lca_kernel/events/bus.py` `publish_async` | DeliveryQueue + PersistenceWorker | 生产零调用方,仅测试驱动 | 级别 3 删除或改直写 | 3 |
+| `lca_kernel/events/bus.py` S3 `self._queue.submit` | DeliveryQueue | 同步 publish 每次入队;生产无 consumer 拉取 | 级别 3 从同步路径移除 | 3 ✅ |
+| `lca_kernel/events/bus.py` `publish_async` | DeliveryQueue + PersistenceWorker | 生产零调用方,仅测试驱动 | 级别 3 删除或改直写 | 3 ✅ |
 | `lca_kernel/events/persistence.py` PersistenceWorker | DeliveryQueue 消费 | `/health` 与 `lca-ops events-delivery` 只读观测入口 | 级别 4 去队列 + 删 PersistenceWorker 别名,保留 PersistenceObserver | 4 ✅ |
 | `lca/plugins/transport/webserver/handlers/runs/api/query_endpoints.py` `/health` | `worker.pending_count` → `queue_depth` | 已有 graceful degradation(`except (ImportError, AttributeError)` 分支) | 级别 4 改读 PersistenceObserver;`queue_depth=0` | 4 ✅ |
 | `lca/infrastructure/cli/commands/events_delivery.py` | `PersistenceWorker.default()` | 已有降级分支("PR-2 not merged yet") | 级别 4 改读 PersistenceObserver | 4 ✅ |
-| `lca/plugins/events/sinks/spine_file_sink/manifest.py` COMPAT 注释 | "PR-3 cursor 完全迁 `EventBus.publish_async`" | 该迁移意图依赖级别 3 对 `publish_async` 的处置决定 | 级别 3 同 PR 更新 | 3 |
+| `lca/plugins/events/sinks/spine_file_sink/manifest.py` COMPAT 注释 | "PR-3 cursor 完全迁 `EventBus.publish_async`" | 该迁移意图依赖级别 3 对 `publish_async` 的处置决定 | 级别 3 同 PR 更新 | 3 ✅ |
 | `lca_kernel/events/queue.py` 模块 + `pyproject.toml` N818 per-file ignore | DeliveryQueue / DeliveryQueueFull 定义 | 活跃 | 级别 4 删文件 + 删 ignore 条目 | 4 ✅ |
 | `tests/lca_kernel/events/test_persistence_worker.py` | 测试 | 绿 | 级别 4 重写为 `test_persistence_observer.py` | 4 ✅ |
 

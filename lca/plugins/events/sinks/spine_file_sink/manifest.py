@@ -34,8 +34,9 @@ class _Config(BaseModel):
     kind=PluginKind.PROVIDER,
     effects="none",
     description=(
-        "SpineFileSink（ADR-0181 PR-8 / ADR-0183 PR-7）：旧 spine FileSink 包装；"
-        "EventBus callback 入口（failure=FAIL_FAST 落盘 fail-fast）；磁盘格式不变。"
+        "SpineFileSink（ADR-0181 PR-8 / ADR-0183 PR-7 / ADR-0186 PR-3f）："
+        "旧 spine FileSink 包装；boot 经 Session.observe 目录登记；"
+        "磁盘格式不变（fail-fast 落盘）。"
     ),
     test_suite="tests.plugins.events.sinks.test_spine_file_sink",
     functional_group=FunctionalGroup.G0_CON_KERNEL,

@@ -125,7 +125,9 @@ def load_profile_pipeline(
     if isinstance(section, Mapping):
         options = section.get("options")
         return ProfilePipeline(
-            pipeline=pipeline_from_mapping(section, name_fallback=profile_path.stem, catalog=catalog),
+            pipeline=pipeline_from_mapping(
+                section, name_fallback=profile_path.stem, catalog=catalog
+            ),
             options=(
                 MappingProxyType(dict(options))
                 if isinstance(options, Mapping)
@@ -198,6 +200,8 @@ def apply_pipeline(bus: EventBus[Any], pipeline: Pipeline) -> AppliedPipeline:
         sinks[spec.id] = instance
         # 装载到 bus:publish 期经 _dispatch_sinks 派发(FD-1)。
         # run_id 仍由运行时经 set_run_id 绑定;此处只装配实例。
+        # COMPAT(delete-when: rg "mount_sink" lca/harness/profile/pipeline_loader.py = 0 and sinks only via Session.observe catalog, tracking: ADR-0186 PR-3f)
+        # Parallel EventBus sink path until Session is the sole consumer delivery.
         bus.mount_sink(spec.id, instance, failure=spec.failure)
     handles = _apply_consumer_rules(bus, pipeline)
     return AppliedPipeline(pipeline=pipeline, sinks=sinks, consumer_handles=tuple(handles))
@@ -228,6 +232,8 @@ def _apply_consumer_rules(bus: EventBus[Any], pipeline: Pipeline) -> list[Consum
                 raise UnauthorizedSubscribeError(plugin.__qualname__, f"{rule.prefix}*")
             callback = _plugin_callback(plugin)
             for category in categories:
+                # COMPAT(delete-when: rg "bus.subscribe" lca/harness/profile/pipeline_loader.py = 0 and consumer_rules empty / Session.observe sole delivery for catalog plugins e.g. SpineChainSink, tracking: ADR-0186 PR-3f)
+                # Production web-standard still bus.subscribe(SpineChainSink); plugin setup also registers via Session.observe catalog.
                 handles.append(
                     bus.subscribe(
                         plugin=plugin,
