@@ -202,7 +202,11 @@ class PromptReasoner:
         )
 
         state_id = state.trace_id
-        activated_skill_ids: tuple[str, ...] = ()
+        # 渲染前的真实激活集（start EP 不再发空预览）；end EP 用
+        # trace.activated_skill_ids 权威覆盖。
+        activated_skill_ids: tuple[str, ...] = tuple(
+            skill.skill_id for skill in state.activated_skills
+        )
         tools_count = len(self.tools)
         available_skills_count = self._available_skills_count_hint()
         # Sections preview from the template itself (available pre-render);
