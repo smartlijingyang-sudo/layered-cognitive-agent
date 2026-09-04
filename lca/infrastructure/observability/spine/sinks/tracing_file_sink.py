@@ -8,8 +8,10 @@ The wrapper layers two extra safety nets on top of :class:`FileSink`:
 
 - **Local fallback** (``<run_dir>/FALLBACK.log``) — when the underlying
   FileSink raises OSError (disk full, closed fd, etc.), a summary
-  line lands in FALLBACK.log. The fallback file itself is wrapped;
-  its failure escalates to structlog ERROR.
+  line lands in FALLBACK.log. Each line is fsynced before returning
+  (``FALLBACK_FSYNC_PROTOCOL = PER_WRITE``) so a crash cannot lose the
+  traceback tail. The fallback file itself is wrapped; its failure
+  escalates to structlog ERROR.
 - **Optional legacy sidecar naming** (``legacy_sha256_only=True``)
   — emits ``<sha256>.json`` instead of ``<sha8>-<SafeClass>.json``
   for readers that depend on the legacy file name.
@@ -25,9 +27,11 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
+from lca.contracts.observability.fsync import FsyncProtocol
 from lca.infrastructure.observability.spine.event_record import EventRecord
 from lca.infrastructure.observability.spine.sinks.file_sink import (
     FileSink,
@@ -53,6 +57,12 @@ def _safe_class_name(exception_class: str) -> str:
 class TracingFileSink:
     """Fail-loud :class:`FileSink` wrapper with fallback logging."""
 
+    FALLBACK_FSYNC_PROTOCOL: ClassVar[FsyncProtocol] = FsyncProtocol.PER_WRITE
+    """Fallback log rhythm. The fallback path only runs when the main
+    sink / exception index already failed; losing its tail would lose
+    tracebacks permanently, so every line is fsynced before returning
+    (correctness over throughput)."""
+
     def __init__(
         self,
         run_dir: Path,
@@ -60,6 +70,7 @@ class TracingFileSink:
         run_id: str,
         file_name: str = DEFAULT_SPINE_TEMPLATE,
         exceptions_file_name: str | None = None,
+        fsync_protocol: FsyncProtocol = FsyncProtocol.BATCH,
         fsync_batch: int = _DEFAULT_BATCH,
         fsync_interval_ms: int = _DEFAULT_INTERVAL_MS,
         spine_filename: bool = False,
@@ -80,6 +91,7 @@ class TracingFileSink:
             run_id=run_id,
             file_name=file_name,
             exceptions_file_name=exceptions_file_name,
+            fsync_protocol=fsync_protocol,
             fsync_batch=fsync_batch,
             fsync_interval_ms=fsync_interval_ms,
             spine_filename=spine_filename,
@@ -89,6 +101,11 @@ class TracingFileSink:
     @property
     def path(self) -> Path:
         return self._main.path
+
+    @property
+    def fsync_protocol(self) -> FsyncProtocol:
+        """Declared main-ledger rhythm, forwarded to the wrapped FileSink."""
+        return self._main.fsync_protocol
 
     @property
     def exceptions_path(self) -> Path | None:
@@ -139,6 +156,10 @@ class TracingFileSink:
             )
             with self._fallback_path.open("a", encoding="utf-8") as fh:
                 fh.write(line + "\n")
+                # FALLBACK_FSYNC_PROTOCOL = PER_WRITE: flush + fsync before
+                # returning so a crash cannot lose the traceback tail.
+                fh.flush()
+                os.fsync(fh.fileno())
         except Exception as exc:
             log.error(
                 "tracing_sink: FALLBACK write FAILED run_id=%s ep=%s reason=%s err=%s",

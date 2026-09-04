@@ -27,6 +27,7 @@ from lca.contracts.event import (
     TeamDelegationCacheHit,
     default_plane,
 )
+from lca.contracts.observability.fsync import FsyncProtocol
 from lca_kernel.events.bus import (
     ConsumerHandle,
     ConsumerResult,
@@ -46,7 +47,6 @@ from lca_kernel.events.fold import (
 )
 from lca_kernel.events.persistence import (
     EnvelopeDeliveryObserver,
-    FsyncPolicy,
     PersistenceFlushTimeout,
     PersistenceHealthSnapshot,
     PersistenceObserver,
@@ -77,7 +77,7 @@ __all__ = [
     "EventBus",
     "EventPayload",
     "EventRef",
-    "FsyncPolicy",
+    "FsyncProtocol",
     "PersistenceFlushTimeout",
     "PersistenceHealthSnapshot",
     "PersistenceObserver",

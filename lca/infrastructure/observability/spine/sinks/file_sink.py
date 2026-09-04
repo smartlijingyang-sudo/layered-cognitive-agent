@@ -19,9 +19,12 @@ Sidecar naming is human-readable: ``<sha8>-<safe_class>.json`` —
 e.g. ``8a7397b2-CancelledError.json``. The placeholder schema
 is uniform: ``{execution_point, offloaded, sidecar}``.
 
-Fsync runs every N events or T ms. Both default to 100, small
-enough for crash consistency, large enough that fsync is not on the
-hot path.
+Fsync rhythm is an explicit contract, not an implicit default: each fd
+declares a :class:`lca.contracts.observability.fsync.FsyncProtocol`
+value (see :class:`FileSink` docstring for the per-fd table). The main
+ledger defaults to ``BATCH`` — fsync every ``fsync_batch`` events or
+``fsync_interval_ms`` (both default to 100, small enough for crash
+consistency, large enough that fsync is not on the hot path).
 """
 
 from __future__ import annotations
@@ -33,8 +36,9 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
+from lca.contracts.observability.fsync import FsyncProtocol
 from lca.infrastructure.observability.spine.event_record import EventRecord
 from lca.infrastructure.observability.spine.sinks.naming import (
     DEFAULT_SPINE_TEMPLATE,
@@ -134,12 +138,30 @@ class FileSink:
       ``exception.caught`` event is appended verbatim — grep ``exception_class``
       to triage. Set ``write_exception_index=False`` to disable.
 
+    Fsync protocol declarations (contract enum
+    :class:`lca.contracts.observability.fsync.FsyncProtocol`; crash-loss
+    bounds per member docstring):
+
+    - main ledger fd (``_fd``): constructor arg ``fsync_protocol``,
+      default ``BATCH`` (``fsync_batch`` / ``fsync_interval_ms``
+      thresholds while running, forced fsync on ``close``).
+    - exceptions index fd (``_exceptions_fd``): class constant
+      ``EXCEPTIONS_INDEX_PROTOCOL`` = ``COMMIT`` — no fsync while
+      running, one fsync on ``close``. Index entries duplicate the
+      sidecar payload, so a crash losing the index tail degrades grep
+      triage only, not evidence.
+    - The :class:`TracingFileSink` fallback log is the third fd in the
+      run directory; it declares ``PER_WRITE`` on its own class.
+
     Backward compatibility:
 
     - ``spine_filename=True`` is the default; passing it is a no-op.
     - Disable the exception index for legacy test fixtures that don't want
       the extra file.
     """
+
+    EXCEPTIONS_INDEX_PROTOCOL: ClassVar[FsyncProtocol] = FsyncProtocol.COMMIT
+    """Exceptions index fd rhythm: fsync on ``close`` only (see class docstring)."""
 
     def __init__(
         self,
@@ -149,6 +171,7 @@ class FileSink:
         file_name: str = DEFAULT_SPINE_TEMPLATE,
         exceptions_file_name: str | None = None,
         write_exception_index: bool = True,
+        fsync_protocol: FsyncProtocol = FsyncProtocol.BATCH,
         fsync_batch: int = _DEFAULT_BATCH,
         fsync_interval_ms: int = _DEFAULT_INTERVAL_MS,
         spine_filename: bool = False,
@@ -161,6 +184,7 @@ class FileSink:
         else:
             file_name = resolve_filename(file_name, run_id)
         self._path = self._run_dir / file_name
+        self._fsync_protocol = fsync_protocol
         self._fsync_batch = fsync_batch
         self._fsync_interval_ms = fsync_interval_ms / 1000.0
         self._write_exception_index = write_exception_index
@@ -211,6 +235,11 @@ class FileSink:
     def exceptions_count(self) -> int:
         return self._exceptions_count
 
+    @property
+    def fsync_protocol(self) -> FsyncProtocol:
+        """Declared main-ledger rhythm (contract enum, see class docstring)."""
+        return self._fsync_protocol
+
     def write(self, record: EventRecord) -> str | None:
         """Write an event. Returns ``None`` on success, or a short
         ``reason`` token if the **exception index** write failed
@@ -225,7 +254,7 @@ class FileSink:
             self._offload(record, encoded)
         else:
             os.write(self._fd, encoded)
-        self._maybe_fsync(self._fd)
+        self._maybe_fsync(self._fd, self._fsync_protocol)
         if force_offload:
             return self._append_exception_index(record)
         return None
@@ -248,7 +277,7 @@ class FileSink:
             ),
         )
 
-    def _append_exception_index(self, record: EventRecord) -> None:
+    def _append_exception_index(self, record: EventRecord) -> str | None:
         """Append the full record to the exception index file descriptor.
 
         Returns the ``reason`` if the write failed (so callers can
@@ -272,31 +301,45 @@ class FileSink:
             self._exceptions_fd = None
             return "exceptions_index_failed"
 
-    def _maybe_fsync(self, fd: int) -> None:
+    def _maybe_fsync(self, fd: int, protocol: FsyncProtocol) -> None:
+        """Apply ``protocol`` after an append (see FsyncProtocol contract)."""
+        if protocol is FsyncProtocol.PER_WRITE:
+            self._fsync_fd(fd)
+            return
+        if protocol is FsyncProtocol.COMMIT:
+            return
+        # BATCH: count or time threshold.
         self._writes_since_fsync += 1
         now = time.monotonic()
         if (
             self._writes_since_fsync >= self._fsync_batch
             or (now - self._last_fsync_at) >= self._fsync_interval_ms
         ):
-            try:
-                os.fsync(fd)
-            except OSError as exc:
-                log.error("file_sink: fsync failed run_id=%s err=%s", self._run_id, exc)
+            self._fsync_fd(fd)
             self._writes_since_fsync = 0
             self._last_fsync_at = now
+
+    def _fsync_fd(self, fd: int) -> None:
+        try:
+            os.fsync(fd)
+        except OSError as exc:
+            log.error("file_sink: fsync failed run_id=%s err=%s", self._run_id, exc)
 
     def close(self) -> None:
         if self._closed:
             return
         try:
-            os.fsync(self._fd)
+            # PER_WRITE already synced every append; the close-time fsync
+            # would be redundant. BATCH / COMMIT push buffers to disk here.
+            if self._fsync_protocol is not FsyncProtocol.PER_WRITE:
+                os.fsync(self._fd)
             os.close(self._fd)
         except OSError as exc:
             log.error("file_sink: close failed run_id=%s err=%s", self._run_id, exc)
         if self._exceptions_fd is not None:
             try:
-                os.fsync(self._exceptions_fd)
+                if self.EXCEPTIONS_INDEX_PROTOCOL is not FsyncProtocol.PER_WRITE:
+                    os.fsync(self._exceptions_fd)
                 os.close(self._exceptions_fd)
             except OSError as exc:
                 log.error(
