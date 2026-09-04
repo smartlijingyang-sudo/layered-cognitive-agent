@@ -96,6 +96,73 @@ def test_fold_phase_fold_creates_phase_record() -> None:
     assert any(p.kind == "think" for p in doc.phases)
 
 
+def test_fold_model_only_run_keeps_totals_contract() -> None:
+    """无 step 事件时:phases 计数,segments 不落 step 则不计数。
+
+    Totals 契约(journal_totals.py):totals.segments ==
+    sum(len(s.segments) for s in steps)。declarative model-only run 只有
+    phase.*.fold、无 writable.step.*/brain.think.*,旧实现把无主
+    think/act fold 也计入 totals.segments → doctor H-seg 断
+    (回归:run_6d2d7dee4a7e)。
+    """
+    events = [
+        {
+            "execution_point": "phase.perceive.fold",
+            "payload": {"summary": ""},
+            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+        },
+        {
+            "execution_point": "phase.think.fold",
+            "payload": {"summary": "started"},
+            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+        },
+        {
+            "execution_point": "phase.think.fold",
+            "payload": {"summary": "respond"},
+            "when": datetime(2026, 9, 1, 12, 0, 1, tzinfo=timezone.utc),
+        },
+        {
+            "execution_point": "phase.stop.fold",
+            "payload": {"summary": ""},
+            "when": datetime(2026, 9, 1, 12, 0, 2, tzinfo=timezone.utc),
+        },
+    ]
+    doc = fold_step_tree(events, run_id="r_model_only", outcome="completed")
+    assert doc.totals is not None
+    assert doc.totals.steps == 0
+    assert doc.totals.phases == 4
+    assert doc.totals.segments == 0
+    assert doc.totals.segments == sum(len(s.segments) for s in doc.steps)
+
+
+def test_fold_think_fold_with_open_step_counts_segment() -> None:
+    """step 打开期间的 think fold → step.segments 与 totals.segments 同步计数。"""
+    events = [
+        {
+            "execution_point": "writable.step.start",
+            "payload": {"phase": "think"},
+            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+        },
+        {
+            "execution_point": "phase.think.fold",
+            "payload": {"summary": "respond"},
+            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+        },
+        {
+            "execution_point": "writable.step.end",
+            "payload": {},
+            "outcome": "success",
+            "when": datetime(2026, 9, 1, 12, 0, 1, tzinfo=timezone.utc),
+        },
+    ]
+    doc = fold_step_tree(events, run_id="r_seg")
+    assert doc.totals is not None
+    assert doc.totals.steps == 1
+    assert doc.totals.segments == 1
+    assert len(doc.steps[0].segments) == 1
+    assert doc.totals.segments == sum(len(s.segments) for s in doc.steps)
+
+
 def test_fold_terminal_outcome_from_kernel_run_stop() -> None:
     """kernel.run.stop outcome=success → metadata.outcome='completed'。"""
     events = [
@@ -321,30 +388,63 @@ def test_deriver_flush_from_spine_reader(tmp_path: Path) -> None:
     assert deriver.document.totals.steps == 1
 
 
-def test_deriver_flush_prefers_session_snapshot(tmp_path: Path) -> None:
-    """Session.snapshot_events 优先于 SpineReader。"""
+def test_deriver_flush_prefers_spine_over_session_snapshot(tmp_path: Path) -> None:
+    """spine ledger 优先于 Session.snapshot_events(H-xref 回归锁)。
+
+    生产 run 的 Session log 承载 runtime SSE 词表(无 fold 闭集 EP),
+    spine ledger 承载 phase/step 词表;fold 必须读 spine,否则 journal
+    totals 恒 0、doctor H-xref 断(回归:run_b2c1424d93d4 等 4 连发)。
+    """
+    from lca.plugins.session.runtime.session import Session
+
+    session = Session("r_spine_first")
+    session.append("AgentRunStarted", {"run_id": "r_spine_first"})
+    session.append("ReasoningDelta", {"text_delta": "..."})
+    spine_path = tmp_path / "r_spine_first.spine.jsonl"
+    spine_path.write_text(
+        "".join(
+            json.dumps(event) + "\n"
+            for event in (
+                {
+                    "execution_point": "writable.step.start",
+                    "payload": {"phase": "think"},
+                    "when": "2026-09-01T12:00:00+00:00",
+                },
+                {
+                    "execution_point": "writable.step.end",
+                    "payload": {},
+                    "outcome": "success",
+                    "when": "2026-09-01T12:00:01+00:00",
+                },
+            )
+        ),
+        encoding="utf-8",
+    )
+    deriver = StepTreeFoldDeriver(
+        run_id="r_spine_first",
+        run_dir=tmp_path,
+        spine_path=spine_path,
+        session=session,
+    )
+    deriver.flush(outcome="completed")
+    assert deriver.document is not None
+    assert deriver.document.totals is not None
+    assert deriver.document.totals.steps == 1
+    assert deriver.document.steps[0].phase == "think"
+    assert deriver.document.steps[0].outcome == "success"
+
+
+def test_deriver_flush_falls_back_to_snapshot_without_spine(tmp_path: Path) -> None:
+    """spine 文件缺失时回落 Session.snapshot_events(in-process 路径)。"""
     from lca.plugins.session.runtime.session import Session
 
     session = Session("r_sess")
     session.append("writable.step.start", {"phase": "act"})
     session.append("writable.step.end", {"outcome": "success"})
-    # 盘上若有平行 spine,也必须被忽略。
-    spine_path = tmp_path / "r_sess.spine.jsonl"
-    spine_path.write_text(
-        json.dumps(
-            {
-                "execution_point": "writable.step.start",
-                "payload": {"phase": "think"},
-                "when": "2026-09-01T12:00:00+00:00",
-            }
-        )
-        + "\n",
-        encoding="utf-8",
-    )
     deriver = StepTreeFoldDeriver(
         run_id="r_sess",
         run_dir=tmp_path,
-        spine_path=spine_path,
+        spine_path=tmp_path / "r_sess.spine.jsonl",
         session=session,
     )
     deriver.flush(outcome="completed")

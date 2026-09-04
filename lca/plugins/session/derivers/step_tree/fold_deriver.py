@@ -7,7 +7,8 @@
    SpineReader 拉事件再 fold。
 
 不订阅 EventSpine。事件源优先级:
-``session.snapshot_events()`` → ``SpineReader.read_dicts()``。
+``SpineReader.read_dicts()``(spine ledger)→ ``session.snapshot_events()``
+兜底;理由与删除条件见 :meth:`StepTreeFoldDeriver._iter_events` 的 COMPAT 块。
 """
 
 from __future__ import annotations
@@ -124,7 +125,7 @@ class StepTreeFoldDeriver:
         return doc
 
     def flush(self, *, outcome: str | None = None) -> None:
-        """从 Session 快照或 SpineReader fold 并写 journal.json。
+        """从 spine ledger(缺省/空时回落 Session 快照)fold 并写 journal.json。
 
         ``outcome`` 覆盖 fold 推导的终态。无事件源且尚未 derive 时写空 document。
         """
@@ -136,15 +137,34 @@ class StepTreeFoldDeriver:
         self.derive(events)
 
     def _iter_events(self) -> Iterable[Any]:
-        """事件源:Session.snapshot_events 优先,否则 SpineReader.read_dicts。"""
-        session = self._session
-        snapshot = getattr(session, "snapshot_events", None) if session is not None else None
-        if callable(snapshot):
-            return snapshot()
+        """事件源:spine ledger 第一,缺失/空时回落 Session.snapshot_events。
+
+        # COMPAT(delete-when: ADR-0186 §5 producer 迁移完成 —— spine 词表事件
+        # 全部经 Session.append 进 in-process log、snapshot 含 phase.*.fold 等
+        # fold 闭集 EP(验证:对任一 completed run 的 snapshot fold 出
+        # totals.phases > 0),tracking: ADR-0186)
+
+        fold 消费 spine 词表闭集(:data:`PHASE_FOLD_EPS` / ``writable.*`` /
+        ``llm.call.*`` …)。迁移完成前,Session log 只承载 runtime SSE 词表
+        (``AgentRunStarted`` / ``ReasoningDelta`` …),feed 给 fold 全部 skip →
+        journal totals 恒 0 → doctor H-xref 断。spine ledger 是当前唯一承载
+        fold 词表的事件流,故为第一事件源;文件缺失或空时回落 snapshot,
+        保留无 spine 文件的 in-process 路径。
+        """
         path = self._spine_path
         if path is None:
             path = self._run_dir / f"{self._run_id}.spine.jsonl"
-        return SpineReader(self._run_id, path=path).read_dicts()
+        if path.exists():
+            spine_events = list(SpineReader(self._run_id, path=path).read_dicts())
+            if spine_events:
+                return iter(spine_events)
+        session = self._session
+        snapshot = getattr(session, "snapshot_events", None) if session is not None else None
+        if callable(snapshot):
+            snapshot_events = snapshot()
+            if isinstance(snapshot_events, Iterable):
+                return snapshot_events
+        return iter(())
 
 
 __all__ = ["StepTreeFoldDeriver", "derive_step_tree"]

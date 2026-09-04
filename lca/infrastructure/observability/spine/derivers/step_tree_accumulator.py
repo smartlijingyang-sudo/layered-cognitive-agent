@@ -768,7 +768,11 @@ class StepTreeAccumulatorDeriver(Deriver):
             )
 
     def _build_document(self) -> JournalDocument:
-        seg_count = sum(1 for p in self._phases if p.kind in ("think", "act"))
+        # Totals 契约(lca/contracts/models/observability/journal_totals.py):
+        # totals.segments == sum(len(s.segments) for s in steps) —— 只计已挂
+        # 进 step frame 的 segment;无 step 可挂的 think/act fold 只进
+        # phases 计数(flush 已把 open step 强制 close 进 _closed_frames)。
+        seg_count = sum(len(f.segments) for f in self._closed_frames)
         # SSOT 收口(2026-09-03):构造 JournalStep 时从 ``self._steps_by_index``
         # 重新读最新 frame(包括 close 之后 attach 的 tool_call / tool_result)。
         # 之前 ``_close_step`` 直接把 JournalStep 写入 ``self._steps``,后续
