@@ -37,6 +37,10 @@ class StdLoopCursor:
     - record_request_header 必在 THINK phase 调用,同时触发 step 自增
     - close() 之后所有 record_*/advance 抛 CursorError
 
+    显式 step 边界(ADR-0184 D6):
+    - record_request_header / open_step 发 ``writable.step.start``
+    - advance("stop") / close 发 ``writable.step.end``(有开窗才发,幂等)
+
     incarnation 显式身份(ADR-0169 D6 / L14):
     - cursor 持有 frozen Incarnation(run_id + plan_ref + incarnation_seq)
     - snapshot.incarnation 派生自 Incarnation.incarnation_seq
@@ -116,6 +120,64 @@ class StdLoopCursor:
         if self._state.halted:
             raise CursorError("cursor halted; awaiting resume")
 
+    # ── 显式 step 边界(ADR-0184 D6)────────────────────────────────
+    def _emit_step_start(self, *, step_id: str) -> None:
+        """发射显式 step 边界 ``writable.step.start``,并置 ``step_open``。
+
+        precondition:调用点已完成 step_index / step_id 推进
+        (:meth:`record_request_header` / :meth:`open_step`)。
+        写入路径:与 ``llm.request.header`` 同一 :class:`WritePort`
+        链(``_append`` → ``write_port_append`` → ``<run_id>.spine.jsonl``),
+        同源同步、无总线旁路。
+        payload 契约:``step``(当前 step_index)/ ``run_id`` / ``step_id`` /
+        ``phase``(开窗时所处相位,缺省 think)—— ``step`` / ``run_id``
+        与 spine.yaml ``spine.writable.step.start`` fields 对齐,
+        ``step_id`` / ``phase`` 为 cursor 侧补充键(老链不做 yaml schema 校验)。
+        所有权:本方法是 ``writable.step.start`` 的唯一发射点;
+        ``StepCoordinator``(writable_matrix)不再写该 EP。
+        外部后果:step-tree fold(:mod:`lca.plugins.session.derivers.step_tree.journal_fold`)
+        与 ``StepTreeAccumulatorDeriver`` 以本 EP 显式开窗,
+        ``JournalStep.extra.window_signal`` 记 ``explicit``。
+        """
+        s = self._state
+        s.step_open = True
+        self._append(
+            execution_point="writable.step.start",
+            payload={
+                "step": s.step_index,
+                "run_id": s.run_id,
+                "step_id": step_id,
+                "phase": s.phase or "think",
+            },
+        )
+
+    def _emit_step_end(self, *, outcome: str) -> None:
+        """发射显式 step 边界 ``writable.step.end``,并清 ``step_open``。
+
+        precondition:``step_open`` 为 True;无开窗中的 step 时静默返回
+        (advance("stop") 可能发生在无 LLM 边界的 iteration,close 可能在
+        advance("stop") 之后二次到达——两种情况都不允许补发 end)。
+        发射点:``advance("stop")``(正常收口,``outcome="success"``)与
+        :meth:`close`(``completed`` → success,其余 reason → cancelled)。
+        写入路径 / 所有权与 :meth:`_emit_step_start` 同。
+        payload 契约:``step`` / ``run_id`` / ``step_id`` / ``outcome``——
+        ``outcome`` 在 payload 内携带(老链 record 级 outcome 恒 None,
+        消费侧按 ``record.outcome or payload.outcome`` 回退读取)。
+        """
+        s = self._state
+        if not s.step_open:
+            return
+        s.step_open = False
+        self._append(
+            execution_point="writable.step.end",
+            payload={
+                "step": s.step_index,
+                "run_id": s.run_id,
+                "step_id": s.step_id or "",
+                "outcome": outcome,
+            },
+        )
+
     # ── 转移(3) ──────────────────────────────────────────────────
     def advance(
         self,
@@ -166,6 +228,9 @@ class StdLoopCursor:
                 "step_index": s.step_index,
             },
         )
+        # ADR-0184 D6:stop 边界显式收口当前 writable step(有开窗才发)。
+        if phase == "stop":
+            self._emit_step_end(outcome="success")
         return self.snapshot
 
     def halt(self, reason: CloseReason) -> None:
@@ -208,6 +273,9 @@ class StdLoopCursor:
         cursor._state.iteration = spec.iteration
         cursor._state.step_index = spec.step_index
         cursor._state.iteration_reason = spec.iteration_reason
+        # ADR-0184 D6:halt 不发 writable.step.end —— 被 halt 打断的 step
+        # 仍处于开窗态,由恢复后的 cursor 在 advance("stop") / close 收口。
+        cursor._state.step_open = spec.step_index > 0
         return cursor
 
     def close(self, reason: CloseReason) -> None:
@@ -215,6 +283,11 @@ class StdLoopCursor:
         s = self._state
         s.closed = True
         s.stop_signal = reason
+        # ADR-0184 D6:close 是 step 的兜底收口点 —— 未及 advance("stop")
+        # 就关闭(halt→close、error、中途终止)时在此补发 writable.step.end。
+        # 顺序:step.end 先于 writable.iteration.closing(与 legacy
+        # step.end → segment.end → closing 收口序一致)。
+        self._emit_step_end(outcome="success" if reason == "completed" else "cancelled")
         s.phase = None
         # 发 closing 信号(CloseBarrier 协调 flush 顺序,ADR-0169 D5 / L16)
         self._append(
@@ -347,6 +420,13 @@ class StdLoopCursor:
         self._append(execution_point="step.tool_result.record", payload=event_payload)
 
     def record_request_header(self, header: RequestHeader) -> None:
+        """落 ``llm.request.header`` EP + 显式 step 边界。
+
+        ADR-0184 D6:本方法是 ``writable.step.start`` 的契约发射点之一,
+        与 ``llm.request.header`` 同源同步 —— 先发射边界
+        (``writable.step.start``,boundary-first),再落 header 本体。
+        step 边界语义:一次模型请求 = 一个 step,``step_index`` 在此自增。
+        """
         self._ensure_open()
         self._ensure_not_halted()
         # L6 + D2 step 语义:record_request_header 必在 THINK phase 调用
@@ -356,6 +436,7 @@ class StdLoopCursor:
         s.step_index += 1
         s.step_id = header.step_id
         s.attempt_in_step = 0
+        self._emit_step_start(step_id=header.step_id)
         self._append(
             execution_point="llm.request.header",
             payload={
@@ -379,12 +460,14 @@ class StdLoopCursor:
         )
 
     def open_step(self, step_id: str) -> None:
-        """LLM 边界 step 推进 —— L6 自增的状态机部分,不派生 EP。
+        """LLM 边界 step 推进 —— L6 自增 + 显式 ``writable.step.start`` 发射。
 
         hook 路径(ADR-0185 ``ModelVisibleHook.capture_pre_llm``)自行经
-        Session 发 ``spine.llm.request.header`` payload;cursor 只推进
-        ``step_index += 1`` / ``step_id`` / ``attempt_in_step`` 归零。
-        若此处再派生 ``llm.request.header`` EP,fold 会看到双重 step 边。
+        Session 发 ``spine.llm.request.header`` payload;cursor 推进
+        ``step_index += 1`` / ``step_id`` / ``attempt_in_step`` 归零,并发
+        ``writable.step.start`` 显式边界(ADR-0184 D6)。
+        若此处再派生 ``llm.request.header`` EP,fold 会看到双重 step 边,
+        故 ``llm.request.header`` 仍由 hook 侧唯一发射,本方法不碰。
 
         与 ``record_request_header`` 不同,不强制 think 窗口:team 委派时
         子 Agent 的 LLM 边界可能发生在共享 cursor 的非 think 相位。
@@ -396,6 +479,7 @@ class StdLoopCursor:
         s.step_index += 1
         s.step_id = step_id
         s.attempt_in_step = 0
+        self._emit_step_start(step_id=step_id)
 
     def fork(self, reason: Literal["child_agent", "delegation"]) -> LoopCursor:
         """派生 child cursor —— 共享 parent spine handle,递增 incarnation_seq。

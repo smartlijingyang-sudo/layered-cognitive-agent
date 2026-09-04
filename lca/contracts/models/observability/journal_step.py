@@ -154,6 +154,17 @@ class JournalStep:
 
     spans 承载 step 内部的所有诊断事实(RuntimeObserved /
     ToolRetryProgress / ContextCompacted), 默认折叠, 不抢主线。
+
+    ``extra`` 是 step 派生侧的开放标注槽,值必须 JSON 可序列化。已登记键
+    (ADR-0184 D6 / PR-E):
+
+    - ``window_signal`` ∈ ``{"explicit", "implicit"}`` —— 本 step 开窗
+      边界信号的来源。``explicit``:边界由显式契约信号给出
+      (``writable.step.start`` EP,或 cursor 的 ``llm.request.header``
+      step 边);``implicit``:无显式边界,由 ``brain.think.start`` 隐式
+      兜底开窗(ADR-0176 D1 §1 (2) fallback)。step-tree fold /
+      accumulator 之外的构造方(回放、手工 step)缺省 ``{}``,reader 按
+      缺字段处理,不抛。
     """
 
     step_id: str
@@ -177,6 +188,7 @@ class JournalStep:
     outcome: StepOutcome | None = None
     error: str | None = None
     segments: tuple[SegmentRecord, ...] = ()  # 3.1; ADR-0166 D2
+    extra: dict[str, Any] = field(default_factory=dict)
 
 
 # ── helpers ──────────────────────────────────────────────

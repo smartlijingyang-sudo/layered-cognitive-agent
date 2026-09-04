@@ -141,6 +141,7 @@ def _from_jsonable(obj: Any, cls: Any) -> Any:
             outcome=obj.get("outcome"),
             error=obj.get("error"),
             segments=tuple(_from_jsonable(s, SegmentRecord) for s in obj.get("segments", [])),
+            extra=obj.get("extra", {}),
         )
     if cls is StepContext:
         attachments = tuple(_from_jsonable(a, AttachmentRef) for a in obj.get("attachments", ()))

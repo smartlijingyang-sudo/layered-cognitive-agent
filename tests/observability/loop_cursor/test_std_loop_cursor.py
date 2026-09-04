@@ -64,6 +64,21 @@ def _make_cursor() -> tuple[StdLoopCursor, _StubSpine]:
     return cursor, spine
 
 
+def _req_header(step_id: str = "step-001") -> RequestHeader:
+    return RequestHeader(
+        step_id=step_id,
+        incarnation=2,
+        reason="initial",
+        model="m",
+        tools_digest="td",
+        tools_path="tp",
+        messages_digest="md",
+        messages_path="mp",
+        manifest_digest="mf",
+        manifest_path="mfp",
+    )
+
+
 def test_advance_emits_phase_fold_ep() -> None:
     c, spine = _make_cursor()
     c.advance("perceive")
@@ -173,6 +188,84 @@ def test_record_request_header_increments_step_index() -> None:
     assert c.snapshot.step_id == "step-001"
 
 
+def test_record_request_header_emits_step_start_before_header() -> None:
+    """ADR-0184 D6:record_request_header 同源同步发射显式边界。
+
+    顺序钉死:``writable.step.start``(边界)先于 ``llm.request.header``
+    (边界内的首个事实),与 fold 的边界开窗语法一致。
+    """
+    c, spine = _make_cursor()
+    c.advance("think")
+    c.record_request_header(_req_header("step-001"))
+    eps = [r["execution_point"] for r in spine.records]
+    assert eps[-2:] == ["writable.step.start", "llm.request.header"]
+    start = spine.records[-2]
+    assert start["payload"] == {
+        "step": 1,
+        "run_id": "r1",
+        "step_id": "step-001",
+        "phase": "think",
+    }
+
+
+def test_advance_stop_emits_step_end_when_step_open() -> None:
+    """ADR-0184 D6:advance("stop") 收口开窗中的 step。"""
+    c, spine = _make_cursor()
+    c.advance("think")
+    c.record_request_header(_req_header("step-001"))
+    c.advance("stop")
+    rec = spine.records[-1]
+    assert rec["execution_point"] == "writable.step.end"
+    assert rec["payload"] == {
+        "step": 1,
+        "run_id": "r1",
+        "step_id": "step-001",
+        "outcome": "success",
+    }
+
+
+def test_advance_stop_without_open_step_emits_no_step_end() -> None:
+    """无 LLM 边界的 iteration 走到 stop 不补发 writable.step.end。"""
+    c, spine = _make_cursor()
+    c.advance("perceive")
+    c.advance("think")
+    c.advance("stop")
+    eps = [r["execution_point"] for r in spine.records]
+    assert "writable.step.end" not in eps
+    assert eps == ["phase.perceive.fold", "phase.think.fold", "phase.stop.fold"]
+
+
+def test_close_emits_step_end_for_open_step() -> None:
+    """ADR-0184 D6:close 是未及 advance("stop") 的 step 的兜底收口。"""
+    c, spine = _make_cursor()
+    c.advance("think")
+    c.record_request_header(_req_header("step-001"))
+    c.close("error")
+    eps = [r["execution_point"] for r in spine.records]
+    # step.end 先于 writable.iteration.closing
+    assert eps[-2:] == ["writable.step.end", "writable.iteration.closing"]
+    assert spine.records[-2]["payload"]["outcome"] == "cancelled"
+
+
+def test_close_completed_step_end_outcome_success() -> None:
+    c, spine = _make_cursor()
+    c.advance("think")
+    c.record_request_header(_req_header("step-001"))
+    c.close("completed")
+    assert spine.records[-2]["payload"]["outcome"] == "success"
+
+
+def test_close_after_advance_stop_does_not_double_step_end() -> None:
+    """advance("stop") 已收口 → close 不重复发 writable.step.end。"""
+    c, spine = _make_cursor()
+    c.advance("think")
+    c.record_request_header(_req_header("step-001"))
+    c.advance("stop")
+    c.close("completed")
+    ends = [r for r in spine.records if r["execution_point"] == "writable.step.end"]
+    assert len(ends) == 1
+
+
 def test_record_thinking_outside_think_raises() -> None:
     c, _ = _make_cursor()
     c.advance("perceive")
@@ -228,11 +321,12 @@ def test_fork_produces_independent_child() -> None:
 # ── open_step(LLM 边界 step 推进,hook 路径)─────────────────────
 
 
-def test_open_step_advances_step_index_without_emitting_ep() -> None:
-    """open_step 只做 L6 自增:step_index += 1 / step_id / attempt 归零,不落 EP。
+def test_open_step_emits_writable_step_start() -> None:
+    """open_step 做 L6 自增 + 落显式 ``writable.step.start`` 边界(ADR-0184 D6)。
 
     hook 路径自行经 Session 发 ``spine.llm.request.header`` payload;
-    cursor 若再派生 ``llm.request.header`` EP,fold 会看到双重 step 边。
+    cursor 不派生 ``llm.request.header`` EP(双重 step 边),但显式
+    step 边界由 cursor 唯一发射。
     """
     c, spine = _make_cursor()
     c.advance("think")
@@ -242,7 +336,13 @@ def test_open_step_advances_step_index_without_emitting_ep() -> None:
     assert snap.step_index == 1
     assert snap.step_id == "step-001"
     assert snap.attempt_in_step == 0
-    assert len(spine.records) == 1, "open_step 不应派生任何 EP"
+    assert len(spine.records) == 2
+    rec = spine.records[-1]
+    assert rec["execution_point"] == "writable.step.start"
+    assert rec["payload"]["step"] == 1
+    assert rec["payload"]["step_id"] == "step-001"
+    assert rec["payload"]["run_id"] == "r1"
+    assert rec["payload"]["phase"] == "think"
 
 
 def test_open_step_monotonic_across_llm_requests() -> None:
@@ -255,7 +355,8 @@ def test_open_step_monotonic_across_llm_requests() -> None:
     snap = c.snapshot
     assert snap.step_index == 3
     assert snap.step_id == "step-003"
-    assert len(spine.records) == 1  # 仅 advance 的 phase.think.fold
+    # phase.think.fold + 3 条 writable.step.start(每次 LLM 边界一条)
+    assert len(spine.records) == 4
 
 
 def test_open_step_not_bound_to_think_window() -> None:

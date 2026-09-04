@@ -84,8 +84,19 @@ def _event_epoch(event: Any) -> float:
     return 0.0
 
 
-def _dedup_key(event: Any) -> tuple[str, float, str] | None:
-    """精确重复判定键:(归一 EP, epoch 秒, payload 规范形)。
+def _dedup_key(event: Any, run_id: str) -> tuple[Any, ...] | None:
+    """精确重复判定键。
+
+    两种形态:
+
+    - **同源事件**(Session 事件与它的 spine 镜像)——两者共享同一
+      ``event_id``(``"{session.id}:{seq}"``,session.id == run_id):
+      键 = ``("id", 归一 EP, event_id)``。镜像经 :func:`build_record`
+      落盘,payload 含 ``category`` 键、ts 为落盘时刻,与 Session 侧
+      ``time`` / data 不完全同字节,内容键撞不上;``event_id`` 是两者
+      唯一稳定的同源标识。
+    - **其余事件**(cursor 老链写入,无 ``event_id``)——
+      键 = ``("content", 归一 EP, epoch 秒, payload 规范形)``。
 
     Session 形态 type 经 fold 的 CATEGORY 反查归一为裸 EP 后参与比较,
     跨流同源事件才会撞键。不可归一的事件返回 None,不参与去重。
@@ -93,6 +104,17 @@ def _dedup_key(event: Any) -> tuple[str, float, str] | None:
     coerced = _coerce(event)
     if coerced is None:
         return None
+    ep = str(coerced.get("execution_point") or "")
+    # spine 镜像记录携带原事件 event_id;cursor 老链记录无。
+    raw_event_id = (
+        event.get("event_id") if isinstance(event, Mapping) else getattr(event, "event_id", None)
+    )
+    if isinstance(raw_event_id, str) and raw_event_id:
+        return ("id", ep, raw_event_id)
+    # Session 形态:seq + run_id 还原同源 event_id。
+    seq = event.get("seq") if isinstance(event, Mapping) else getattr(event, "seq", None)
+    if isinstance(seq, int) and run_id:
+        return ("id", ep, f"{run_id}:{seq}")
     payload = coerced.get("payload")
     if not isinstance(payload, Mapping):
         payload = {}
@@ -100,16 +122,21 @@ def _dedup_key(event: Any) -> tuple[str, float, str] | None:
         payload_repr = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str)
     except (TypeError, ValueError):
         payload_repr = repr(payload)
-    return (str(coerced.get("execution_point") or ""), _event_epoch(event), payload_repr)
+    return ("content", ep, _event_epoch(event), payload_repr)
 
 
-def _merge_events(session_events: Sequence[Any], spine_events: Sequence[Any]) -> list[Any]:
+def _merge_events(
+    session_events: Sequence[Any],
+    spine_events: Sequence[Any],
+    *,
+    run_id: str,
+) -> list[Any]:
     """并集两路事件流:按 epoch 秒稳定排序(同刻 session 在前),精确重复去重。"""
     ordered = sorted([*session_events, *spine_events], key=_event_epoch)
-    seen: set[tuple[str, float, str]] = set()
+    seen: set[tuple[Any, ...]] = set()
     merged: list[Any] = []
     for event in ordered:
-        key = _dedup_key(event)
+        key = _dedup_key(event, run_id)
         if key is not None:
             if key in seen:
                 continue
@@ -222,7 +249,7 @@ class StepTreeFoldDeriver:
             return iter(spine_events)
         if not spine_events:
             return iter(snapshot_events)
-        return iter(_merge_events(snapshot_events, spine_events))
+        return iter(_merge_events(snapshot_events, spine_events, run_id=self._run_id))
 
 
 __all__ = ["StepTreeFoldDeriver", "derive_step_tree"]

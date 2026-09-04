@@ -519,7 +519,8 @@ def test_deriver_flush_merges_session_snapshot_and_spine_with_dedup(tmp_path: Pa
                 time=1_788_512_185_993,
                 data={"state_id": "t"},
             ),
-            # 与 spine 文件的 phase.think.fold 同源:同 EP + 同时间戳 + 同 payload → 去重
+            # 与 spine 文件的 phase.think.fold 同源:镜像记录携带同一
+            # event_id("{run_id}:{seq}") → 按同源标识去重
             SessionEvent(
                 type="spine.phase.think.fold",
                 seq=1,
@@ -540,9 +541,11 @@ def test_deriver_flush_merges_session_snapshot_and_spine_with_dedup(tmp_path: Pa
             json.dumps(event) + "\n"
             for event in (
                 {
+                    # Session seq=1 事件的镜像:同源 → 共享 event_id,去重命中
                     "execution_point": "phase.think.fold",
                     "payload": {"summary": "respond", "step_index": 1},
                     "when": 1788512186.013,
+                    "event_id": "r_merge:1",
                 },
                 {
                     "execution_point": "llm.request.header",

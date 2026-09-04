@@ -271,6 +271,28 @@ _SPINE_EP_TO_CATEGORY: dict[str, str] = {
 }
 
 
+def _build_category_to_ep() -> dict[str, str]:
+    """category → 裸 EP 反查表;同 category 对应多 EP 时保留首个登记。
+
+    落盘 / 派生侧在事件本体不携带 ``execution_point``(typed payload 只有
+    ``category``,如 model-visible 族)时,用本表把 category 归一为裸 EP,
+    避免 ``execution_point="unknown"`` 让 reader / fold 失去事件身份
+    (ADR-0184 D7 投递可达性:落盘事件必须可按 EP 查询)。
+    """
+    reverse: dict[str, str] = {}
+    for ep, category in _SPINE_EP_TO_CATEGORY.items():
+        reverse.setdefault(category, ep)
+    return reverse
+
+
+_SPINE_CATEGORY_TO_EP: dict[str, str] = _build_category_to_ep()
+
+
+def category_to_spine_ep(category: str) -> str | None:
+    """spine category 串 → 裸 EP;未登记返回 ``None``。"""
+    return _SPINE_CATEGORY_TO_EP.get(category)
+
+
 class SpineEventPayload(EventPayload):
     """spine 壳类 payload（ADR-0181 D2）。
 

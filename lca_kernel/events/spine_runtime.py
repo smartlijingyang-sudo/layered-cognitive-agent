@@ -342,12 +342,24 @@ def build_record(
       ``prev_event_hash`` 字段,``payload`` dict 直接复制。
     - typed ``EventPayload`` 子类(``category`` ∈ ``spine.*``,例如 ADR-0185 §3.3
       的 ``SpineLlmRequestHeaderPayload``):用 pydantic ``model_dump`` 把全部 typed
-      字段序列化进 ``record.payload``;``execution_point`` /
-      ``channel`` 不存在 → 默认 ``"unknown"`` / ``"fact"``。
+      字段序列化进 ``record.payload``;``execution_point`` 字段缺失时按
+      category 反查裸 EP(ADR-0184 D7:落盘事件必须可按 EP 查询),
+      非 spine category 才落 ``"unknown"``;``channel`` 不存在 → ``"fact"``。
     - 其它 ``EventPayload``(非 spine):``getattr`` 容错,channel 默认 ``"fact"``,
       prev_event_hash 默认 None。
     """
-    execution_point = getattr(payload, "execution_point", "unknown")
+    execution_point_attr = getattr(payload, "execution_point", None)
+    if isinstance(execution_point_attr, str) and execution_point_attr:
+        execution_point = execution_point_attr
+    else:
+        from lca_kernel.events.payloads_spine import category_to_spine_ep
+
+        category_attr = getattr(payload, "category", None)
+        category_str = getattr(category_attr, "value", None)
+        if category_str is None:
+            ref_category = getattr(ref, "category", None)
+            category_str = getattr(ref_category, "value", ref_category)
+        execution_point = category_to_spine_ep(str(category_str or "")) or "unknown"
     channel = getattr(payload, "channel", "fact")
     prev_event_hash_attr: str | None = getattr(payload, "prev_event_hash", None)
 

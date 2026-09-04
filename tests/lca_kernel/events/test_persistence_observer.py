@@ -277,7 +277,9 @@ class TestPersistenceObserverProtocol:
         observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
         import lca_kernel.events.persistence as persistence_mod
 
-        original = persistence_mod.PersistenceObserver._build_persistable_record
+        # 经 __dict__ 取 staticmethod 描述符本体:类属性访问返回解包后的
+        # 函数,直接回填会丢 staticmethod 语义,污染后续测试的实例调用。
+        original = persistence_mod.PersistenceObserver.__dict__["_build_persistable_record"]
 
         def _raising(
             payload: EventPayload,
@@ -312,3 +314,90 @@ class TestPersistenceObserverProtocol:
             assert sink.records[0].event_id == "evt-o3-ok"
         finally:
             persistence_mod.PersistenceObserver._build_persistable_record = original  # type: ignore[assignment]
+
+
+# ── EP 标注:缺 execution_point 时按 category 反查(ADR-0184 D7)────────
+
+
+class _StubSession:
+    """``SessionProtocol`` 最小形态:``_map_session_event`` 只读 ``.id``。"""
+
+    def __init__(self, session_id: str) -> None:
+        self.id = session_id
+
+
+class TestExecutionPointLabeling:
+    """落盘记录必须可按 EP 查询;typed payload 只带 category 时按反查归一。"""
+
+    def test_session_event_without_ep_derives_from_spine_category(self) -> None:
+        """SessionEvent data 无 execution_point → 按 category 反查裸 EP。"""
+        from lca_kernel.events.session import SessionEvent
+
+        sink = _StubSink()
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
+        event = SessionEvent(
+            type="spine.llm.request.header",
+            seq=8,
+            time=1_788_512_186_015,
+            data={"step_id": "step-001", "reason": "initial"},
+        )
+        observer(_StubSession("run_ep_label"), event)
+        assert len(sink.records) == 1
+        record = sink.records[0]
+        assert record.execution_point == "llm.request.header"
+        assert record.category == "spine.llm.request.header"
+
+    def test_session_event_with_explicit_ep_kept_verbatim(self) -> None:
+        """data 携带 execution_point 时原样保留(反查不回退)。"""
+        from lca_kernel.events.session import SessionEvent
+
+        sink = _StubSink()
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
+        event = SessionEvent(
+            type="spine.cognition.brain.think.start",
+            seq=1,
+            time=1_788_512_185_000,
+            data={"execution_point": "brain.think.start", "state_id": "s"},
+        )
+        observer(_StubSession("run_ep_keep"), event)
+        assert sink.records[0].execution_point == "brain.think.start"
+
+    def test_session_event_non_spine_category_stays_unknown(self) -> None:
+        """非 spine category 且无 execution_point → 保持 "unknown"。"""
+        from lca_kernel.events.session import SessionEvent
+
+        sink = _StubSink()
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
+        event = SessionEvent(
+            type="app.custom.event",
+            seq=2,
+            time=1_788_512_186_000,
+            data={"foo": 1},
+        )
+        observer(_StubSession("run_ep_unknown"), event)
+        assert sink.records[0].execution_point == "unknown"
+
+    def test_typed_spine_payload_without_ep_attr_derives_from_category(self) -> None:
+        """typed payload 无 execution_point 属性(model-visible 族形态:
+        只携带 ``category`` + typed 字段)→ build_record 按 category
+        反查裸 EP(EnvelopeDeliveryObserver 路径)。"""
+        from lca.contracts.event import Category
+
+        class _TypedSpinePayload(EventPayload):
+            """与 SpineLlmRequestHeaderPayload 同形态:有 category、无
+            execution_point 属性、字段经 model_dump 序列化。"""
+
+            category: Category = Category.SPINE_LLM_REQUEST_HEADER
+            step_id: str = "step-001"
+
+        sink = _StubSink()
+        observer = PersistenceObserver(sink=sink, fsync_policy=FsyncPolicy.ASYNC)
+        ref = EnvelopeRef(
+            event_id="evt-ep-typed",
+            category="spine.llm.request.header",
+            trace_id="trc-ep",
+            ts=0.0,
+        )
+        observer.on_session_event(_TypedSpinePayload(), ref)
+        assert len(sink.records) == 1
+        assert sink.records[0].execution_point == "llm.request.header"

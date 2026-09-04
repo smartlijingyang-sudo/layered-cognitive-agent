@@ -139,7 +139,9 @@ class StepCoordinator:
     def _block_ep_write(self, ep: str) -> None:
         r"""业务路径 EP 写入 SSOT 守护 —— cursor 才是唯一 writer。
 
-        COMPAT(delete-when: ``rg "step\.thinking\.record\|step\.tool_call\.record\|step\.tool_result\.record\|step\.reflect\.record\|step\.span\.record\|phase\..*\.fold\|writable\.step\|writable\.segment" lca/infrastructure/observability/writable_matrix/coordinator.py`` 仅剩 begin_step/end_step/begin_segment/end_segment 的内部 _write,
+        COMPAT(delete-when: ``rg "step\.thinking\.record\|step\.tool_call\.record\|step\.tool_result\.record\|step\.reflect\.record\|step\.span\.record\|phase\..*\.fold\|writable\.step\|writable\.segment" lca/infrastructure/observability/writable_matrix/coordinator.py``
+        命中全部为 SSOT 守护 docstring(``_write(`` 调用清零 ——
+        ``writable.step.*`` 显式边界由 cursor 发射,ADR-0184 D6),
         tracking: ADR-0169-task-25)。
         """
         raise NotImplementedError(
@@ -151,8 +153,9 @@ class StepCoordinator:
     def begin_step(self, phase: str, **ctx: Any) -> str:
         """SSOT 收口后,begin_step 仅保留 driver 派生 step_id 的内部状态。
 
-        不再写 ``writable.step.start`` EP —— step 派生由 cursor.record_request_header
-        完成(ADR-0169 D4,L6)。业务路径必须走 cursor。
+        不再写 ``writable.step.start`` EP —— 该显式边界由 cursor 发射:
+        ``record_request_header`` / ``open_step``(ADR-0184 D6)。
+        业务路径必须走 cursor。
         """
         if self._current_step is not None:
             raise RuntimeError(f"begin_step while step {self._current_step!r} still open")
@@ -168,7 +171,8 @@ class StepCoordinator:
     ) -> None:
         """仅做 driver.end_step 状态收尾,不再写 ``writable.step.end`` EP。
 
-        EP 派生由 cursor.advance('stop') 完成(ADR-0169 P2)。
+        该显式边界由 cursor 发射:``advance('stop')`` 与 ``close``
+        (ADR-0184 D6)。
         """
         if self._current_step is None:
             raise RuntimeError("end_step while no step open")
