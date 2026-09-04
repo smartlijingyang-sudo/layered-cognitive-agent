@@ -13,6 +13,7 @@ PR-4 可见性：re-export ``setup_spine_file_sink`` 为 ``setup``，使
 ``bundles/event-bus-components.yaml`` 的 ``$module`` 能被 profile resolver
 经 ``getattr(module, "setup")`` 取到 plugin Manifest。
 """
+
 from lca.plugins.events.sinks.spine_file_sink.manifest import setup
 from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink
 
