@@ -35,7 +35,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca_kernel.events.bus import EventBus
+from lca.plugins.events.publishers._session_publish import publish_via_session
 from lca_kernel.events.payloads import Category, SpineEventPayload
 from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
 
@@ -56,9 +56,11 @@ def _send(
     channel: str,
     payload: dict[str, Any],
 ) -> Any:
-    """内部 helper：构造 SpineEventPayload + EventBus.publish。
+    """内部 helper：构造 SpineEventPayload + 走 publish_via_session（PR-3d）。
 
     category 由 execution_point 通过 _SPINE_EP_TO_CATEGORY 派生。
+    Session 未注入时 fallback :func:`EventBus.default().publish`,
+    行为与 PR-3d 之前等价。
     """
     cat_str = _SPINE_EP_TO_CATEGORY[execution_point]
     sp = SpineEventPayload(
@@ -67,7 +69,7 @@ def _send(
         channel=channel,
         payload=payload,
     )
-    return EventBus.default().publish(sp, producer=ReflectorClass)
+    return publish_via_session(sp, producer=ReflectorClass)
 
 
 def emit_brain_perceive_start(*, state_id: str) -> Any:
