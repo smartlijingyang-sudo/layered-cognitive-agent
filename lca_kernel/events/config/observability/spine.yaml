@@ -265,10 +265,31 @@ events:
 
   - category: spine.llm.request.header
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads_model_visible.SpineLlmRequestHeaderPayload
     fields:
-      model: str
-      prompt_preview: str
+      step_id: str
+      incarnation: int
+      config: json
+      system: str
+      tools: json
+      messages: json
+      manifest: json
+      reason: str
+      previous_header_digest: str
+    publishers:
+      - events.spine.reflector.body_llm
+
+  - category: spine.llm.request.header.assistant
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_model_visible.SpineLlmRequestHeaderAssistantPayload
+    fields:
+      step_id: str
+      incarnation: int
+      assistant_content: str
+      tool_calls: json
+      finish_reason: str
+      usage: json
+      header_digest: str
     publishers:
       - events.spine.reflector.body_llm
 
