@@ -46,19 +46,33 @@ def _make_app(*, ctx: object | None = None) -> Starlette:
 
 def _write_snapshot(outdir: Path, *, run_id: str) -> dict[str, Any]:
     snapshot = RunBootSnapshot()
+    plugins = [
+        {
+            "id": "lca-llm",
+            "layer": "L2",
+            "kind": "provider",
+            "effects": ["llm", "network"],
+        },
+        {
+            "id": "lca-tools",
+            "layer": "L2",
+            "kind": "provider",
+            "effects": ["filesystem"],
+        },
+    ]
     snapshot.write(
         run_id=run_id,
         outdir=outdir,
         plan_ref="plan-hash",
-        plugins=["lca-llm", "lca-tools"],
-        capabilities={"llm": True},
+        plugins=plugins,
+        capabilities={"lca-llm": True, "lca-tools": True},
         control_plan={"version": "v3"},
     )
     return {
         "run_id": run_id,
         "plan_ref": "plan-hash",
-        "plugins": ["lca-llm", "lca-tools"],
-        "capabilities": {"llm": True},
+        "plugins": plugins,
+        "capabilities": {"lca-llm": True, "lca-tools": True},
         "control_plan": {"version": "v3"},
     }
 
@@ -73,7 +87,8 @@ def test_get_profile_returns_snapshot(tmp_path: Path) -> None:
     assert resp.status_code == 200
     data = resp.json()
     assert data["run_id"] == "r1"
-    assert "lca-llm" in data["plugins"]
+    plugin_ids = {entry["id"] for entry in data["plugins"]}
+    assert "lca-llm" in plugin_ids
     assert data == expected
 
 

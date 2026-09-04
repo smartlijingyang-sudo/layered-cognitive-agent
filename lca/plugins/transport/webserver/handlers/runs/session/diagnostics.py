@@ -7,7 +7,9 @@ once at run boot via ``RunBootSnapshot``.
 
 This module still owns:
 - ``plugin_inventory_from_boot_products`` — pure projection helper (used by
-  architecture tests and the snapshot payload).
+  architecture tests and the snapshot payload). P3 slim:返回 ``{id, layer,
+  kind, effects}`` 列表而不是 ``"id|requires=...|provides=..."`` 拼接字符串;
+  详细元数据随 ResolvedProfile 走 SSOT。
 - ``RunBootSnapshotRecorder`` — invokes ``RunBootSnapshot.write`` at run
   creation time. Uses the same path resolver as the GET endpoint
   (``_profile_snapshot_path``) so reader and writer always agree.
@@ -23,7 +25,10 @@ import structlog
 from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
 from lca.contracts.observability.run_locator import RunLocator
 from lca.harness.profile.boot_products import resolved_profile_from_scope
-from lca.plugins.observability.profile_snapshot_run_boot_provider import RunBootSnapshot
+from lca.plugins.observability.profile_snapshot_run_boot_provider import (
+    PluginSnapshotEntry,
+    RunBootSnapshot,
+)
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
 
 _log = structlog.get_logger(__name__)
@@ -33,22 +38,30 @@ _PROFILE_SNAPSHOT_NAME = "profile_snapshot.json"
 _DEFAULT_PROFILE_SNAPSHOT_ROOT = Path("traces") / "runs"
 
 
-def plugin_inventory_from_boot_products(ctx: Any) -> list[str]:
-    """Project active plugin declarations from immutable Profile boot products."""
+def plugin_inventory_from_boot_products(ctx: Any) -> list[PluginSnapshotEntry]:
+    """Project active plugin declarations from immutable Profile boot products.
+
+    P3 slim:返回 ``{id, layer, kind, effects}`` slim 形态,弃用旧 ``"|"`` 拼接串;
+    description / config 详情在 ResolvedProfile 里(SSOT),不复制到 snapshot。
+    """
     resolved = resolved_profile_from_scope(ctx)
     if resolved is None:
         return []
-    return [
-        "|".join(
-            (
-                entry.id,
-                f"requires={','.join(entry.definition.required_capability_keys)}",
-                f"provides={','.join(entry.definition.provided_capability_keys)}",
+    entries: list[PluginSnapshotEntry] = []
+    for entry in resolved.plugins:
+        if entry.disabled:
+            continue
+        spec = entry.definition.spec
+        # kind 在 PluginSpec 里是 PluginSpecKind(str Enum);effects 是 tuple[str]
+        entries.append(
+            PluginSnapshotEntry(
+                id=entry.id,
+                layer=spec.layer,
+                kind=str(spec.kind.value if hasattr(spec.kind, "value") else spec.kind),
+                effects=tuple(spec.effects),
             )
         )
-        for entry in resolved.plugins
-        if not entry.disabled
-    ]
+    return entries
 
 
 def _snapshot_outdir_for(run_id: str, ctx: Any) -> Path:
@@ -83,8 +96,8 @@ class RunBootSnapshotRecorder:
         plugins = plugin_inventory_from_boot_products(self._ctx)
         # Capability map: best-effort; consumers should treat missing keys as False
         capabilities: dict[str, bool] = {}
-        for entry_id in (p.split("|")[0] for p in plugins):
-            capabilities[entry_id] = True
+        for entry in plugins:
+            capabilities[str(entry["id"])] = True
         outdir = _snapshot_outdir_for(str(session.run_id), self._ctx)
         try:
             RunBootSnapshot().write(
