@@ -34,6 +34,10 @@ class RunRequest:
     execution_target: str
     options: dict[str, Any]
     ctx: object
+    assistant_id: str | None = None
+    """Optional ADR-0187 §3 D7 one-shot binding for this run (no session
+    binding). Non-empty ⇒ run binds to that assistant; ``None`` ⇒ inherit
+    legacy default agent (forward-compatible, I-A1)."""
 
 
 @dataclass(frozen=True, slots=True)

@@ -444,6 +444,78 @@ def test_harness_session_persistence_unchanged() -> None:
     assert hasattr(harness_persistence, "JsonlSessionPersistenceFactory")
 
 
+# ── ADR-0187 §3 D7: assistant_id 持久化（PR-5）───────────────────────
+
+
+def test_session_header_default_assistant_id_is_none() -> None:
+    """未指定时 ``assistant_id`` 默认为 None（fail-open 旧 header）。"""
+    from lca_kernel.events.session import SESSION_FORMAT_VERSION, SessionHeader
+
+    header = SessionHeader(version=SESSION_FORMAT_VERSION, id="x", created_at=0)
+    assert header.assistant_id is None
+
+
+def test_session_header_rejects_empty_assistant_id() -> None:
+    """空字符串视为非法；必须是 None 或非空。"""
+    from lca_kernel.events.session import SESSION_FORMAT_VERSION, SessionHeader
+
+    with pytest.raises(ValueError, match="assistant_id"):
+        SessionHeader(
+            version=SESSION_FORMAT_VERSION,
+            id="x",
+            created_at=0,
+            assistant_id="   ",  # 全空白
+        )
+
+
+def test_observer_persists_assistant_id_when_header_bound(tmp_path: Path) -> None:
+    """Session 携带 assistant_id 时,observer 写盘 header 行带 ``assistant_id``。"""
+    store = SessionStore()
+    session = store.create("s-observer-bind")
+    # 通过 monkey-patch 模拟 Session 携带 assistant_id 的情形
+    # （PR-5 不创建 Session 创建路径,但 observer 必须忠实写盘）。
+    object.__setattr__(session.header, "assistant_id", "asst_observer")
+    persistence = JsonlSessionPersistence(runs_root=tmp_path)
+    persistence.register_to(session)
+    session.append("evt", {"k": 1})
+    persistence.flush()
+
+    lines = _read_jsonl(tmp_path / "s-observer-bind" / "s-observer-bind.session.jsonl")
+    header_line = next(entry for entry in lines if entry["kind"] == "header")
+    assert header_line["assistant_id"] == "asst_observer"
+
+
+def test_observer_omits_assistant_id_when_unbound(tmp_path: Path) -> None:
+    """Session 未绑定时,observer 写盘 header 行不带 ``assistant_id`` 字段。"""
+    store = SessionStore()
+    session = store.create("s-observer-unbound")
+    # 默认 header.assistant_id = None
+    assert session.header.assistant_id is None
+    persistence = JsonlSessionPersistence(runs_root=tmp_path)
+    persistence.register_to(session)
+    session.append("evt", {"k": 1})
+    persistence.flush()
+
+    lines = _read_jsonl(tmp_path / "s-observer-unbound" / "s-observer-unbound.session.jsonl")
+    header_line = next(entry for entry in lines if entry["kind"] == "header")
+    assert "assistant_id" not in header_line
+
+
+def test_observer_omits_assistant_id_for_whitespace_only(tmp_path: Path) -> None:
+    """``assistant_id`` 全空白视为未绑定（write header 行不带字段）。"""
+    store = SessionStore()
+    session = store.create("s-observer-blank")
+    object.__setattr__(session.header, "assistant_id", "   ")
+    persistence = JsonlSessionPersistence(runs_root=tmp_path)
+    persistence.register_to(session)
+    session.append("evt", {"k": 1})
+    persistence.flush()
+
+    lines = _read_jsonl(tmp_path / "s-observer-blank" / "s-observer-blank.session.jsonl")
+    header_line = next(entry for entry in lines if entry["kind"] == "header")
+    assert "assistant_id" not in header_line
+
+
 # ── bundle 引用 ─────────────────────────────────────────────────────
 
 

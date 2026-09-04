@@ -47,6 +47,9 @@ class SessionCreateCommand:
     agent_options: dict | None = None
     session_id: str | None = None
     command_id: str = ""
+    assistant_id: str | None = None
+    """Optional ADR-0187 §3 D7 binding: non-empty string ⇒ session-level
+    assistant binding; ``None`` ⇒ inherit legacy default agent."""
 
     @property
     def kind(self) -> CommandKind:
@@ -61,6 +64,9 @@ class MessageSendCommand:
     content: str
     attachments: tuple[str, ...] = ()
     command_id: str = ""
+    assistant_id: str | None = None
+    """Optional ADR-0187 §3 D7 binding: must match session-level binding
+    when session is bound; mismatch ⇒ 409 from the route handler."""
 
     @property
     def kind(self) -> CommandKind:

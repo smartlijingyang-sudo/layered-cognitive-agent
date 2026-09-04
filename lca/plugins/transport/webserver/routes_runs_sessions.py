@@ -61,18 +61,10 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
     RouteSpec("/v1/sessions/{session_id}/messages", send_message, ("POST", "OPTIONS")),
     RouteSpec("/v1/sessions/{session_id}/snapshot", get_snapshot, ("GET", "OPTIONS")),
     RouteSpec("/v1/sessions/{session_id}/events", stream_events, ("GET", "OPTIONS")),
-    RouteSpec(
-        "/v1/sessions/{session_id}/commands/answer", command_answer, ("POST", "OPTIONS")
-    ),
-    RouteSpec(
-        "/v1/sessions/{session_id}/commands/cancel", command_cancel, ("POST", "OPTIONS")
-    ),
-    RouteSpec(
-        "/v1/sessions/{session_id}/commands/steer", command_steer, ("POST", "OPTIONS")
-    ),
-    RouteSpec(
-        "/v1/sessions/{session_id}/commands/inject", command_inject, ("POST", "OPTIONS")
-    ),
+    RouteSpec("/v1/sessions/{session_id}/commands/answer", command_answer, ("POST", "OPTIONS")),
+    RouteSpec("/v1/sessions/{session_id}/commands/cancel", command_cancel, ("POST", "OPTIONS")),
+    RouteSpec("/v1/sessions/{session_id}/commands/steer", command_steer, ("POST", "OPTIONS")),
+    RouteSpec("/v1/sessions/{session_id}/commands/inject", command_inject, ("POST", "OPTIONS")),
 )
 
 

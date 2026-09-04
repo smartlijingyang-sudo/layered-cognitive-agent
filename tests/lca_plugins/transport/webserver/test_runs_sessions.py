@@ -105,3 +105,109 @@ def test_routes_runs_sessions_exposes_public_routes_constant() -> None:
     paths = {spec.path for spec in ROUTE_SPECS}
     assert "/runs/{run_id}/profile" in paths
     assert "/runs/{run_id}/evidence/{ref:path}" in paths
+
+
+# ── ADR-0187 §3 D7: session/run assistant_id 绑定 (PR-5) ─────────────
+
+
+def test_session_create_command_carries_optional_assistant_id() -> None:
+    """``SessionCreateCommand`` 新增 ``assistant_id`` 字段（PR-5）。"""
+    from lca.contracts.harness.act.command import SessionCreateCommand
+
+    base = SessionCreateCommand(
+        idempotency_key="idem-1",
+        profile="web-standard",
+    )
+    assert base.assistant_id is None
+    bound = SessionCreateCommand(
+        idempotency_key="idem-2",
+        profile="web-standard",
+        assistant_id="asst_demo",
+    )
+    assert bound.assistant_id == "asst_demo"
+
+
+def test_message_send_command_carries_optional_assistant_id() -> None:
+    """``MessageSendCommand`` 新增 ``assistant_id`` 字段（PR-5）。"""
+    from lca.contracts.harness.act.command import MessageSendCommand
+
+    base = MessageSendCommand(
+        idempotency_key="idem-1",
+        session_id="ses-1",
+        role="user",
+        content="hi",
+    )
+    assert base.assistant_id is None
+    bound = MessageSendCommand(
+        idempotency_key="idem-2",
+        session_id="ses-1",
+        role="user",
+        content="hi",
+        assistant_id="asst_demo",
+    )
+    assert bound.assistant_id == "asst_demo"
+
+
+def test_run_request_carries_optional_assistant_id() -> None:
+    """``RunRequest`` 新增 ``assistant_id`` 字段（PR-5）。"""
+    from lca.plugins.transport.webserver.handlers.runs.terminal.port import RunRequest
+
+    base = RunRequest(
+        profile="web-standard",
+        question="",
+        user_text="hi",
+        mode="solo",
+        attachment_ids=(),
+        prior_turns=(),
+        agent=None,
+        device_id="",
+        plane="",
+        extra_plane="",
+        execution_target="",
+        options={},
+        ctx=None,
+    )
+    assert base.assistant_id is None
+
+
+def test_normalize_assistant_id_collapses_empty_and_whitespace() -> None:
+    """``_normalize_assistant_id`` 归一 None / 空 / 空白 → None。"""
+    from lca.plugins.transport.webserver.handlers.session_routes import (
+        _normalize_assistant_id,
+    )
+
+    assert _normalize_assistant_id(None) is None
+    assert _normalize_assistant_id("") is None
+    assert _normalize_assistant_id("   ") is None
+    assert _normalize_assistant_id("asst_1") == "asst_1"
+    assert _normalize_assistant_id("  asst_1  ") == "asst_1"
+
+
+def test_normalize_assistant_id_rejects_non_string() -> None:
+    """``_normalize_assistant_id`` 对非字符串抛 ``ValueError``。"""
+    import pytest
+
+    from lca.plugins.transport.webserver.handlers.session_routes import (
+        _normalize_assistant_id,
+    )
+
+    with pytest.raises(ValueError, match="assistant_id must be a string"):
+        _normalize_assistant_id(123)  # type: ignore[arg-type]
+
+
+def test_session_assistant_id_helper_returns_none_without_persistence() -> None:
+    """无 persistence backend 时 helper 返回 None,handler 不抛。"""
+    from lca.plugins.transport.webserver.handlers.session_routes import (
+        _session_assistant_id,
+    )
+
+    class _State:
+        pass
+
+    class _App:
+        state = _State()
+
+    class _Bare:
+        app = _App()
+
+    assert _session_assistant_id(_Bare(), "ses-x") is None

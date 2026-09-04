@@ -201,6 +201,14 @@ class JsonlSessionPersistence:
 
     def _write_header(self, sfile: _SessionFile, header: SessionHeader) -> None:
         payload: dict[str, Any] = {"kind": _HEADER_KIND, **asdict(header)}
+        # ADR-0187 §3 D7 session-level assistant binding (PR-5).
+        # ``assistant_id`` is an additive JSONL field: when present and
+        # non-empty, the header advertises the binding; ``None`` / whitespace
+        # is omitted to keep pre-PR-5 byte layout unchanged. Readers tolerate
+        # absence (forward-compatible).
+        assistant_id = payload.get("assistant_id")
+        if not (isinstance(assistant_id, str) and assistant_id.strip()):
+            payload.pop("assistant_id", None)
         sfile.write_line(payload)
 
     def _write_event(self, sfile: _SessionFile, event: SessionEvent) -> None:
@@ -272,17 +280,26 @@ def _session_id(session: Any, event: SessionEvent) -> str:
 
 
 def _header_for(session: Any, session_id: str) -> SessionHeader | None:
-    """从 Session 取 header;缺省时构造最小 header(仅 version + id + created_at=0)。"""
+    """从 Session 取 header;缺省时构造最小 header(仅 version + id + created_at=0)。
+
+    ADR-0187 §3 D7 binding（PR-5）：Session 实例可能携带 ``assistant_id``
+    属性（由 routing 层 session 创建时绑定），保留进 SessionHeader；
+    缺省 = None（fail-open 旧 session）。
+    """
     header = getattr(session, "header", None)
     if isinstance(header, SessionHeader):
         return header
     if header is not None:
         try:
+            assistant_id = getattr(header, "assistant_id", None)
+            if isinstance(assistant_id, str):
+                assistant_id = assistant_id.strip() or None
             return SessionHeader(
                 version=int(getattr(header, "version", 0)),
                 id=str(getattr(header, "id", session_id)),
                 created_at=int(getattr(header, "created_at", 0)),
                 is_seeded=bool(getattr(header, "is_seeded", False)),
+                assistant_id=assistant_id,
             )
         except (TypeError, ValueError):
             return None

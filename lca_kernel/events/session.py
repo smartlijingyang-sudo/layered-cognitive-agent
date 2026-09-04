@@ -53,12 +53,22 @@ class SessionHeader:
     - ``id`` — session 唯一标识（与所属 Session 的 id 一致）
     - ``created_at`` — 创建时刻 Unix epoch 毫秒（非负整数）
     - ``is_seeded`` — 是否含 fork/重放继承的事件前缀
+    - ``assistant_id`` —— ADR-0187 §3 D7 session 级助理绑定（PR-5）；
+      ``None``（默认）= 继承遗留默认 agent；非空字符串 = 绑定到该助理
+      id。落盘是 :class:`lca.plugins.session.persistence_jsonl.JsonlSessionPersistence`
+      的可选 JSONL header 字段；读端对缺字段做 fail-open，向前兼容
+      PR-5 之前的 session record。
     """
 
     version: int
     id: str
     created_at: int
     is_seeded: bool = False
+    assistant_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.assistant_id is not None and not self.assistant_id.strip():
+            raise ValueError("assistant_id must be None or non-empty string")
 
 
 @dataclass(frozen=True, slots=True)
