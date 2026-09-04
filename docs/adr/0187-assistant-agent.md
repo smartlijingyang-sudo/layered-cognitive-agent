@@ -134,12 +134,21 @@ G11 不可：runtime 直接 import 执行成生产能力；改其他助理 Home
 
 | 面 | 内容 | 变更机制 |
 |---|---|---|
-| 配置（digest SSOT） | profile.json / SOUL / IDENTITY / USER / AGENTS / goals / grants / tools / skills 索引 / routines | `revise` API ⇒ digest 重算 + `revision_seq++` + `revisions/` 快照 + EP |
-| 记忆（追加面） | MEMORY.md / `memory/` | 经 memory seam 写入 + EP；**不参与** manifest digest，**不触发** `revision_seq`（I-A13） |
+| 配置（digest SSOT） | profile.json / SOUL / IDENTITY / USER / AGENTS / goals / grants / tools / skills 索引 / routines | `revise` API（双模式，见下）⇒ digest 重算 + `revision_seq++` + `revisions/` 快照 + EP |
+| 记忆（追加面） | MEMORY.md / `memory/` | 经 memory seam（`memory.write_policy` / `memory.retrieval_policy`，`lca/contracts/capabilities.py`）写入 + EP；per-assistant 可见性经 `ScopePlan` 的 agent scope + visibility 隔离（D5）；**不参与** manifest digest，**不触发** `revision_seq`（I-A13） |
 | 工作区（执行面） | `workspace/` | 工具 effect 经 Body（G7）；产物沉淀见 D5 |
 | 运行事实 | — | 只写 Spine / Journal（0167）；不落 Home |
 
 解析器只信任 `manifest.json` 中的配置面 digest；裸改配置文件而未 `revise` 的，下次 resolve **一律拒收**（I-A3，fail-closed；告警不算通过）。记忆面文件与 digest 不一致不影响 resolve。
+
+**revise 双模式**（配置面唯一写入口 + 唯一恢复路径）：
+
+| 模式 | 语义 | 场景 |
+|---|---|---|
+| `revise`（patch） | 应用 patch ⇒ digest 重算 ⇒ `revision_seq++` ⇒ `revisions/` 快照 ⇒ EP | 常规配置变更 |
+| `revise_reimport` | 以磁盘当前文件为输入重算全部配置面 digest ⇒ `revision_seq++` ⇒ 快照 ⇒ EP（`actor="reimport"`） | I-A3 拒收后的恢复：用户手改 SOUL.md / goals.yaml 等 |
+
+两模式共用同一套 revision / EP 机制，不存在第三条写路径。裸改本身不是错误：它让下次 resolve 拒收生效，直到 `revise_reimport` 重新钉住 digest（把磁盘内容收编为新的受管真值）。
 
 **记忆三层**（进 prompt 的规则）：
 
@@ -154,7 +163,7 @@ G11 不可：runtime 直接 import 执行成生产能力；改其他助理 Home
 ### D3 · AssistantSpec（冻结视图，扩展 AgentSpec）
 
 ```python
-# lca/contracts/assistant/spec.py（新建）
+# lca/contracts/models/assistant/spec.py（新建；frozen dataclass 归 models/，对齐 models/cognition|core|observability|team）
 
 @dataclass(frozen=True)
 class AssistantBootstrapRefs:
@@ -202,7 +211,7 @@ Home 解析是**数据投影**，不是运行期重装配插件图；boot 期能
 ### D4 · 工厂 API（函数面，非上帝对象）
 
 ```python
-# lca/contracts/assistant/catalog.py  — 薄 Catalog：仅 Home CRUD
+# lca/contracts/protocols/assistant/catalog.py  — 薄 Catalog：仅 Home CRUD（Protocol 归 protocols/，对齐 protocols/session|memory|state）
 
 class AssistantCatalog(Protocol):
     """门面不得单类实现 install/evolve/job；架构测试禁止 God Catalog。"""
@@ -210,6 +219,7 @@ class AssistantCatalog(Protocol):
     def get(self, assistant_id: str) -> AssistantSpec: ...  # resolve 视图
     def list(self) -> tuple[AssistantSummary, ...]: ...
     def revise_profile(self, assistant_id: str, patch: ProfilePatch) -> PlanRevision: ...
+    def reimport(self, assistant_id: str, reason: str) -> PlanRevision: ...  # 裸改恢复（D2 revise 双模式）
     def retire(self, assistant_id: str, reason: str) -> None: ...
 
 # 委托（独立 Protocol / 插件）
@@ -231,11 +241,13 @@ Capability key 进 `lca/contracts/capabilities.py`，沿用点分小写惯例（
 |---|---|
 | Scope | 每次对话/run = 打开 assistant/run scope（父 = profile/agent）；lease 到期 disposer 回收 |
 | 文件系统 | 工具默认 `workspace_only=true`；根 = Home `workspace/`（ExecutionSpace 事实，非全局单例） |
-| 身份 | `IdentitySpace.agent_id = assistant_id`；Journal / Spine 以此为载体（I-A2） |
+| 身份 | `ScopePlan.lifecycle` 的 `agent` 级（`lca/contracts/atoms/scope.py`）取值 = `assistant_id`；Journal / Spine 以此为载体（I-A2） |
 | 能力 | 子 assistant / job / skill 的 capability **⊆ 父 grant**；`grants.yaml` 再收窄；扩大只经 G11 promote |
-| 记忆 | 默认不可读其他 `assistant_id` 的 MEMORY/memory/（VisibilitySpace 强制） |
+| 记忆 | 默认不可读其他 `assistant_id` 的 MEMORY/memory/（resolve 期经 `ScopePlan.visibility` 的 scope 集合隔离） |
 | 技能 | 助理 `skills/` overlay；bundled 只读；进化只写本 Home |
 | 禁令 | 禁止 assistant 模块持有平行 `Context` / 全局 service locator 绕开 ScopeKernel |
+
+**载体钉在已实现的 ScopePlan，不依赖推迟子空间**：SpacetimeContext 5 子空间（含 IdentitySpace / VisibilitySpace 类）是 tracker §三裁剪推迟项，未实现（`lca/contracts/protocols/state/scope_plan.py` docstring）。0187 的隔离全部落在 `ScopePlan` 已实现最小版上：`lifecycle` 8 级 scope（assistant_id 取 `agent` 级）+ `visibility` scope 集合 + `acl_grants` 衰减 + `budget_ceiling`。子空间落地后，助理身份与记忆可见性迁入子空间，I-A2 / I-A6 的验证对象随之切换；本 ADR 不以子空间为前置。
 
 **产物沉淀**：工具写入 cwd 的文件天然落在 `home/workspace/`（长期可见）；沙箱产物（`/mnt/data/outputs`）沉淀进 Home 必须经显式文件写 effect（G7），RunWorkspace `ArtifactLedger`（ADR-0051）保留 run 级引用。两层目录语义：Home = 助理长期面，RunWorkspace = 单次 run 的产物账本与 deadline。
 
@@ -252,7 +264,8 @@ Capability key 进 `lca/contracts/capabilities.py`，沿用点分小写惯例（
 | `lca.plugins.assistant.jobs` | G10 | collect | JobSpec 收集 → 向 0093 注册 WorkItem；无调度线程 |
 | `lca.plugins.assistant.evolve` | G11 | transform | 实现 `SkillAcquirer`，从 run 轨迹产候选（experiment） |
 | `lca.plugins.transport.webserver.routes_assistants` | G9 | — | REST：list/create/revise/install_skill |
-| run/session `assistant_id` 解析 | G9 | transform | session/run 请求绑定 assistant |
+| `lca.plugins.transport.webserver.routes_runs_sessions`（既有文件扩展，非新插件） | G9 | — | 解析 session/run 的 `assistant_id`：fail-closed 4xx / 绑定不一致 409，绑定透传给 resolve |
+| `lca.plugins.session.persistence_jsonl`（既有缝扩展） | G10 | transform | 会话级 `assistant_id` 绑定持久化（经 `SessionPersistence` 缝） |
 
 说明：`assistant.workspace` 只绑定 ExecutionSpace 事实；文件读写等世界 effect 仍走既有 Body / CommandEnvelope（G7），本插件不扩大 effect 面。
 
@@ -272,7 +285,7 @@ Capability key 进 `lca/contracts/capabilities.py`，沿用点分小写惯例（
 | `POST /runs` | 可选 `assistant_id`（一次性 run，不建立会话绑定） |
 | `POST /v1/assistants` / `GET /v1/assistants/{id}` / `PATCH .../profile` / `POST .../skills:install` | 助理管理面 |
 
-解析失败（未知 id / digest 不匹配）→ **fail-closed** 4xx，不静默回落默认助理（除非显式 `fallback=default`）。`assistant_id` 进 run 后，以 `IdentitySpace.agent_id` 为唯一载体贯穿 Journal / Spine。
+解析失败（未知 id / digest 不匹配）→ **fail-closed** 4xx，不静默回落默认助理（除非显式 `fallback=default`）。`assistant_id` 进 run 后，以 `ScopePlan.lifecycle` 的 `agent` 级为唯一载体贯穿 Journal / Spine。会话级绑定经 `SessionPersistence` 缝（`lca/contracts/protocols/session/session_persistence.py`）持久化；gateway 只解析与校验，不持有绑定状态。
 
 ### D8 · 事件与审计（对齐 0167）
 
@@ -340,9 +353,9 @@ enabled: true
 assistant_id: asst_...
 ```
 
-- `assistant.jobs`（contribution: collect）收集 JobSpec → 向 `continuous_control_plane` capability 注册 WorkItem；lease、去重、过期恢复、dead-letter 全部复用 0093。
+- `assistant.jobs`（contribution: collect）收集 JobSpec → 向 `continuous_control_plane_factory` capability（`lca/contracts/capabilities.py`）注册 WorkItem；lease、去重、过期恢复、dead-letter 全部复用 0093。
 - 触发是事实：`scheduled.fire`（Trigger fact）→ `SessionWorkActivator` → 打开 run scope → **既有** RuntimeKernel 解释；pause/resume 走既有 halt/resume。
-- profile 缺 `continuous_control_plane` capability ⇒ jobs 注册拒收（fail-closed），不降级为隐式线程。
+- profile 缺 `continuous_control_plane_factory` capability ⇒ jobs 注册拒收（fail-closed），不降级为隐式线程。
 - Phase 1：注册 + `POST .../jobs/{id}:fire`（人工/测试投递 Trigger）。
 - **禁止**在认知内核内嵌调度中间件；**禁止** job 持有超出父 assistant grant 的 capability。
 - ADR-0187.1 = timer/webhook 投递源，即 0093 的一个 Trigger 来源，不是独立调度器。
@@ -393,11 +406,11 @@ flowchart TB
 | ID | 内容 | 验证 |
 |---|---|---|
 | I-A1 | 无 assistant_id 时行为 = 启用前基线 | 回归 web-standard |
-| I-A2 | 任意 run 带 assistant_id ⇒ `IdentitySpace.agent_id` = 该 id | fixture / journal 重建 |
-| I-A3 | resolve 时配置面 digest 与文件一致，否则**仅拒收**（禁止「告警后放行」） | unit：篡改配置 md 不经 revise ⇒ resolve 失败 |
+| I-A2 | 任意 run 带 assistant_id ⇒ `ScopePlan.lifecycle` 的 `agent` 级值 = 该 id | fixture / journal 重建 |
+| I-A3 | resolve 时配置面 digest 与文件一致，否则**仅拒收**（禁止「告警后放行」）；唯一恢复路径 = `revise_reimport`（D2 双模式） | unit：篡改配置 md 不经 revise ⇒ resolve 失败；reimport 后 ⇒ resolve 通过且 `revision_seq++` |
 | I-A4 | grants ⊆ profile grant | property test |
 | I-A5 | 工具 cwd ⊆ home/workspace（除非显式更高 grant） | sandbox test |
-| I-A6 | 禁止跨助理读 memory | isolation test |
+| I-A6 | 禁止跨助理读 memory（经 `ScopePlan.visibility` 隔离） | isolation test |
 | I-A7 | 配置变更 ⇒ `revision_seq++` 且 `revisions/` 有快照 | unit |
 | I-A8 | evolve 提案默认 experiment，非 ACTIVE | gate test |
 | I-A9 | 不新增顶层 loop 类 | importlinter / arch test |
@@ -448,7 +461,7 @@ flowchart TB
 | PR-1 | 本 ADR 合入 + 术语表 | 评审通过 |
 | PR-2 | contracts：AssistantSpec / Catalog Protocol / capability 键 / EP 描述符 | 类型测试 |
 | PR-3 | `assistant.catalog` + Home 布局 + create/get/list | 集成：创建后磁盘与 digest |
-| PR-4 | bootstrap 注入 + workspace 绑定 + profile `web-assistant` | 一次对话 run |
+| PR-4 | bootstrap 注入 + workspace 绑定 + profile `web-assistant` | 一次对话 run + 跨助理 memory 隔离测试（I-A6）+ memory seam 按 agent scope 作用域验证 |
 | PR-5 | gateway `/assistants` + session/run `assistant_id` | API 测试；web-standard 回归绿 |
 | PR-6 | skill_overlay + install from URL（0048 + 0067 验证） | 安装 EP + activate |
 | PR-7 | create-assistant skill + BOOTSTRAP 流 | 对话创建 E2E |
@@ -489,6 +502,7 @@ flowchart TB
 
 1. `assistants_root` 默认在用户数据盘还是与 traces 同卷？（建议数据盘，traces 仍 run 级）
 2. 团队「作战室」多助理是否共享 workspace 只读层？（交给 0187.3）
+3. 记忆面可见性粒度：`memory.write_policy` / `memory.retrieval_policy` 是策略 capability，0187 经 `ScopePlan` 的 agent scope + visibility 隔离；若需记忆域专属的更细可见性规则，须待 SpacetimeContext 子空间的 owner 协调规则明文化（`scope_plan.py` 推迟项），届时按 D5 迁移条款切换。
 
 ---
 
@@ -534,3 +548,4 @@ flowchart TB
 |---|---|
 | 2026-09-04 | 初稿；编号两次冲突后收敛为 0187，登记进 `docs/adr/README.md` 索引 |
 | 2026-09-04 | 评审收敛：jobs 钉到 ADR-0093、evolve 复用 `SkillAcquirer` 缝、run 期 resolve 时序与 digest 缓存、`incarnation_seq` 改名 `revision_seq`（与 0169 Incarnation 正交）、记忆面移出 digest 纪律、Home/RunWorkspace 产物沉淀、install 与进化同一验证立场、EP 闭集触点清单、删除过程残留章节 |
+| 2026-09-04 | 评审修订二轮（对照代码库落点核实）：隔离载体钉到已实现的 `ScopePlan`（IdentitySpace/VisibilitySpace 为推迟项，不作 0187 前置，附迁移条款）；session 绑定钉两个落点（routes_runs_sessions 解析 + persistence_jsonl 持久化）；revise 双模式（patch / reimport）定义裸改恢复语义；capability key 钉为 `continuous_control_plane_factory`；contracts 落 `contracts/models/assistant/` + `contracts/protocols/assistant/`；PR-4 验收补 memory 隔离测试 |
