@@ -127,6 +127,11 @@ def build_test_catalog() -> dict[str, type]:
             "lca.plugins.events.subscribers.spine_step_tree_accumulator.subscriber",
             "SpineStepTreeAccumulator",
         ),
+        (
+            "events.model_visible.publisher",
+            "lca.plugins.events.publishers.model_visible.publisher",
+            "ModelVisiblePublisher",
+        ),
     )
     for marker_id, module_path, class_name in pairs:
         try:

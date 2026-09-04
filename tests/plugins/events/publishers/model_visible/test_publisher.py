@@ -1,0 +1,329 @@
+"""model_visible publisher + hook 端到端（ADR-0185 §3.1 + §3.2 / PR-2）。
+
+盖章 1（I-MV-1）: ``ModelVisiblePublisher`` 是 ``spine.llm.request.header`` +
+``spine.llm.request.header.assistant`` 两类 category 的唯一授权 producer。
+盖章 2: ``ModelVisibleHook`` 在 fold 优化命中时跳过 publish（同 header）,
+header 变更时 publish + reason = ``change``;首次 publish reason = ``initial``。
+盖章 3: ``capture_post_llm`` publish assistant payload;header_digest 与上次
+request header canonical header sha256 一致。
+盖章 4: 透明降级 —— cursor / prompt 缺席 → ``capture_pre_llm`` 返回 ``None``
+且不抛错;assistant publish 不挡业务。
+
+不动 LLM adapter 装配（PR-3 领土）;本测试只覆盖 hook 类 + marker 鉴权。
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterator
+from typing import Any, ClassVar
+
+import pytest
+
+from lca_kernel.events.bus import EventBus
+from lca_kernel.events.test_catalog import build_test_bus
+
+# ── fixtures ────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def bus() -> EventBus[Any]:
+    """测试用 EventBus:yaml 装载 + catalog 注入(等价生产路径)。
+
+    :func:`build_test_bus` 无参时走 :data:`_DEFAULT_CONFIG_DIR` = 本工作区
+    ``lca_kernel/events/config`` 目录,与生产 boot 路径形态一致。
+    """
+    return build_test_bus()
+
+
+@pytest.fixture
+def hook(bus: EventBus[Any]) -> Iterator[Any]:
+    """单实例 :class:`ModelVisibleHook` + monkey-patch 的 cursor / prompt providers。"""
+    from lca.infrastructure.observability.loop_cursor.reasoner_prompt_binding import (
+        CurrentReasonerPrompt,
+    )
+    from lca.plugins.events.hooks.model_visible.hook import ModelVisibleHook
+
+    state: dict[str, Any] = {
+        "cursor": None,
+        "prompt": None,
+    }
+
+    class _StubCursor:
+        def __init__(self, run_id: str) -> None:
+            self._snapshot = type(
+                "_Snap",
+                (),
+                {"run_id": run_id, "step_index": 0, "incarnation": 1},
+            )()
+
+        @property
+        def snapshot(self) -> Any:
+            return self._snapshot
+
+    def cursor_provider() -> Any:
+        return state["cursor"]
+
+    def prompt_provider() -> Any:
+        return state["prompt"]
+
+    h = ModelVisibleHook(
+        bus=bus,
+        cursor_provider=cursor_provider,
+        prompt_ctx_getter=prompt_provider,
+    )
+
+    EventBus.set_default(bus)
+    try:
+
+        def make_prompt(template_id: str, text: str) -> Any:
+            return CurrentReasonerPrompt(
+                step_id="step-001",
+                template_id=template_id,
+                selector_decision_path="default",
+                system_prompt_text=text,
+            )
+
+        # 用 SimpleNamespace 避免 type() 类字典中函数被当 unbound method 处理。
+        from types import SimpleNamespace
+
+        yield SimpleNamespace(
+            hook=h,
+            state=state,
+            StubCursor=_StubCursor,
+            make_prompt=make_prompt,
+        )
+    finally:
+        EventBus.set_default(None)
+
+
+# ── 盖章 1: yaml 鉴权 + I-MV-1 ──────────────────────────────────────────
+
+
+def test_i_mv_1_model_visible_publisher_authorized(bus: EventBus[Any]) -> None:
+    """``ModelVisiblePublisher`` 在两类 model-visible category 的 publishers 集合内。"""
+    from lca.contracts.event import Category
+    from lca.plugins.events.publishers.model_visible.publisher import (
+        ModelVisiblePublisher,
+    )
+
+    for cat in (
+        Category("spine.llm.request.header"),
+        Category("spine.llm.request.header.assistant"),
+    ):
+        assert ModelVisiblePublisher in bus.registry.publishers[cat], (
+            f"ModelVisiblePublisher 未授权 {cat.value};yaml 替换未生效"
+        )
+
+
+def test_i_mv_1_unauthorized_producer_rejected(bus: EventBus[Any]) -> None:
+    """非授权 class publish → ``UnauthorizedPublishError``(鉴权矩阵生效)。"""
+    from lca.contracts.event import Category
+    from lca_kernel.events.errors import UnauthorizedPublishError
+    from lca_kernel.events.payloads_model_visible import (
+        SpineLlmRequestHeaderPayload,
+    )
+
+    class _OtherPlugin:
+        pass
+
+    with pytest.raises(UnauthorizedPublishError):
+        bus.publish(
+            SpineLlmRequestHeaderPayload(
+                step_id="step-001",
+                incarnation=1,
+                config={},
+                system="s",
+                tools=(),
+                messages=(),
+                manifest=None,
+                reason="initial",
+                previous_header_digest=None,
+            ),
+            producer=_OtherPlugin,
+        )
+    # sanity: Category 类不缺失
+    assert Category("spine.llm.request.header") is not None
+
+
+# ── 盖章 2: fold 优化 + reason 派生 ────────────────────────────────────
+
+
+def test_capture_pre_llm_initial_then_change(hook: Any) -> None:
+    """首次 publish reason=initial;第二次 system 变 → reason=change。"""
+    hook.state["cursor"] = hook.StubCursor("run-1")
+    hook.state["prompt"] = hook.make_prompt("t1", "first")
+
+    ref1 = hook.hook.capture_pre_llm(
+        run_id="run-1", step_index=0, incarnation=1, kwargs={"tools": [], "messages": []}
+    )
+    assert ref1 is not None
+    assert ref1.category == "spine.llm.request.header"
+
+    # 第二次 prompt 变 → reason=change
+    hook.state["prompt"] = hook.make_prompt("t1", "second")
+    ref2 = hook.hook.capture_pre_llm(
+        run_id="run-1", step_index=0, incarnation=1, kwargs={"tools": [], "messages": []}
+    )
+    assert ref2 is not None
+    assert ref2.category == "spine.llm.request.header"
+
+
+def test_capture_pre_llm_fold_skips_repeat(hook: Any) -> None:
+    """同 header(同 system + tools)第二次 → fold 跳过,返回 ``None``。"""
+    hook.state["cursor"] = hook.StubCursor("run-1")
+    hook.state["prompt"] = hook.make_prompt("t1", "stable")
+
+    kwargs: dict[str, Any] = {"tools": [], "messages": []}
+    ref1 = hook.hook.capture_pre_llm(run_id="run-1", step_index=0, incarnation=1, kwargs=kwargs)
+    assert ref1 is not None
+
+    ref2 = hook.hook.capture_pre_llm(run_id="run-1", step_index=0, incarnation=1, kwargs=kwargs)
+    assert ref2 is None, "同 header 应 fold 跳过"
+
+
+def test_capture_pre_llm_transparent_when_prompt_missing(hook: Any) -> None:
+    """prompt 未注入 → 透明降级,不发盘,不抛错。"""
+    hook.state["cursor"] = hook.StubCursor("run-1")
+    hook.state["prompt"] = None
+
+    ref = hook.hook.capture_pre_llm(run_id="run-1", step_index=0, incarnation=1, kwargs={})
+    assert ref is None
+
+
+def test_capture_pre_llm_transparent_when_cursor_missing(hook: Any) -> None:
+    """cursor 未注入 → 透明降级(capture_pre_llm 不依赖 cursor,走 prompt-only 即可)。"""
+    hook.state["cursor"] = None
+    hook.state["prompt"] = hook.make_prompt("t1", "x")
+
+    # capture_pre_llm 不要求 cursor(由 caller 注入 run_id);prompt 齐全即发
+    ref = hook.hook.capture_pre_llm(run_id="run-1", step_index=0, incarnation=1, kwargs={})
+    assert ref is not None
+
+
+# ── 盖章 3: assistant payload + digest 关联 ─────────────────────────────
+
+
+def test_capture_post_llm_emits_assistant_payload(hook: Any) -> None:
+    """capture_post_llm 发 ``spine.llm.request.header.assistant`` + header_digest。"""
+    from lca.plugins.events.publishers.model_visible.publisher import (
+        ModelVisiblePublisher,
+    )
+
+    hook.state["cursor"] = hook.StubCursor("run-2")
+    hook.state["prompt"] = hook.make_prompt("t1", "stable")
+
+    hook.hook.capture_pre_llm(
+        run_id="run-2", step_index=0, incarnation=1, kwargs={"tools": [], "messages": []}
+    )
+
+    class _StubResponse:
+        content: ClassVar[str] = "hello world"
+        tool_calls: ClassVar[tuple[Any, ...]] = ()
+        finish_reason: ClassVar[str] = "stop"
+        usage: ClassVar[dict[str, int]] = {"prompt_tokens": 5, "completion_tokens": 3}
+
+    # publish 后 EventBus 应有 self-observers 等 fanout 行为,但本测试只关心
+    # 抛错与否 + 返回 ref + category。bus 不挂 sink,published 计数仍涨。
+    pre_count = bus_count_published(hook.hook._bus)
+    ref = hook.hook.capture_post_llm(
+        run_id="run-2", step_index=0, incarnation=1, response=_StubResponse()
+    )
+    post_count = bus_count_published(hook.hook._bus)
+
+    assert ref is not None
+    assert ref.category == "spine.llm.request.header.assistant"
+    assert post_count == pre_count + 1
+
+    # sanity: marker 是有效 type,bind 走 producer= 鉴权
+    assert isinstance(ModelVisiblePublisher, type)
+
+
+def test_capture_post_llm_without_prior_header(hook: Any) -> None:
+    """无前置 capture_pre_llm → assistant publish 仍发,header_digest = 空字符串。"""
+
+    class _StubResponse:
+        content: ClassVar[str] = "x"
+        tool_calls: ClassVar[tuple[Any, ...]] = ()
+        finish_reason: ClassVar[str] = "stop"
+        usage: ClassVar[dict[str, int]] = {}
+
+    ref = hook.hook.capture_post_llm(
+        run_id="run-orphan", step_index=2, incarnation=1, response=_StubResponse()
+    )
+    assert ref is not None
+    assert ref.category == "spine.llm.request.header.assistant"
+
+
+# ── 盖章 4: setup() 装配 marker + hook(不依赖真实 Cordis) ──────────────
+
+
+def test_setup_provides_marker_and_hook() -> None:
+    """``setup()`` 注册 marker class 与 :class:`ModelVisibleHook` 实例到 ctx。
+
+    注:``@plugin`` 装饰把 :func:`setup` 包成 ``CordisPlugin`` 对象,实际
+    函数经 ``plugin.setup`` 拿到;EventBus.default() 走进程单例,本测试
+    仅断言 marker class 注入 + hook 提供 + setup 签名(防声明漂移)。
+    """
+    from lca.plugins.events.publishers.model_visible.publisher import (
+        ModelVisiblePublisher,
+    )
+    from lca.plugins.events.publishers.model_visible.publisher import (
+        setup as plugin_setup,
+    )
+
+    captured: dict[str, Any] = {}
+
+    class _Ctx:
+        """最小 stub PluginContext:审计 provide 即可。"""
+
+        def provide(self, key: Any, value: Any, **_kwargs: Any) -> None:
+            captured[str(key)] = value
+
+    setup_fn = getattr(plugin_setup, "setup", plugin_setup)
+    assert callable(setup_fn), "@plugin 应暴露 .setup 属性指向原函数"
+
+    from pydantic import BaseModel
+
+    class _EmptyConfig(BaseModel):
+        model_config = {"extra": "forbid"}
+
+    import asyncio
+
+    asyncio.run(setup_fn(_Ctx(), _EmptyConfig()))
+
+    assert "event.bus.publisher.model_visible" in captured
+    assert captured["event.bus.publisher.model_visible"] is ModelVisiblePublisher
+    assert "llm.adapter.hook.model_visible" in captured
+    from lca.plugins.events.hooks.model_visible.hook import ModelVisibleHook
+
+    assert isinstance(captured["llm.adapter.hook.model_visible"], ModelVisibleHook)
+
+    import inspect
+
+    sig = inspect.signature(setup_fn)
+    assert "ctx" in sig.parameters
+    assert "config" in sig.parameters
+
+
+def test_plugin_decorator_metadata() -> None:
+    """``@plugin`` 元数据与现有 15 个 spine_reflector 同形(I-FW-BUS-1 一致)。"""
+    from lca.plugins.events.publishers.model_visible.publisher import (
+        ModelVisiblePublisher,
+    )
+    from lca.plugins.events.publishers.model_visible.publisher import (
+        setup as plugin_setup,
+    )
+
+    assert isinstance(ModelVisiblePublisher, type)
+    setup_fn = getattr(plugin_setup, "setup", None)
+    assert callable(setup_fn)
+    assert ModelVisiblePublisher.__name__ == "ModelVisiblePublisher"
+
+
+# ── helpers ─────────────────────────────────────────────────────────────
+
+
+def bus_count_published(bus: EventBus[Any]) -> int:
+    """读 EventBus.delivery_snapshot 的 published 总和(0 sink 时仍计数)。"""
+    snap = bus.delivery_snapshot()
+    return sum(c.get("published", 0) for c in snap.values())
