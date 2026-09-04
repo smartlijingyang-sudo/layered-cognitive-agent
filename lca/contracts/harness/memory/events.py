@@ -131,32 +131,6 @@ class ModelFailed:
     error: str
 
 
-@session_event("tool.called.v1")
-@dataclass(frozen=True)
-class ToolCalled:
-    call_id: str
-    tool_name: str
-    arguments_ref: str
-    provider_id: str | None = None
-
-
-@session_event("tool.completed.v1")
-@dataclass(frozen=True)
-class ToolCompleted:
-    call_id: str
-    success: bool
-    result_ref: str
-    error: str | None = None
-
-
-@session_event("tool.approval_requested.v1")
-@dataclass(frozen=True)
-class ToolApprovalRequested:
-    call_id: str
-    approval_type: str
-    description: str
-
-
 @session_event("approval.persisted.v1", visibility="internal")
 @dataclass(frozen=True)
 class ApprovalPersisted:

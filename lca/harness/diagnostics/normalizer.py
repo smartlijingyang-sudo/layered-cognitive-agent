@@ -131,21 +131,31 @@ def _status_bucket(status: str) -> str:
 
 
 def _extract_tool_calls(journal: list[SessionEvent]) -> list[NormalizedToolCall]:
+    """Fold the fact-log tool lifecycle into normalized calls.
+
+    Tool facts live in the Journal plane as ``ToolStarted`` / ``ToolInvoked``
+    events joined by ``invocation_id`` (ADR-0101 PR-2). The Session plane
+    carries no tool lifecycle vocabulary, so this reads those event names
+    from the journal stream rather than any ``tool.*.v1`` session type.
+    """
     open_calls: dict[str, SessionEvent] = {}
     done: list[NormalizedToolCall] = []
     for event in journal:
-        if event.type == "tool.called.v1":
-            open_calls[str(event.data.get("call_id"))] = event
-        elif event.type == "tool.completed.v1":
-            call_id = str(event.data.get("call_id"))
-            started = open_calls.pop(call_id, None)
-            name = started.data.get("tool_name") if started else ""
+        if event.type == "ToolStarted":
+            open_calls[str(event.data.get("invocation_id"))] = event
+        elif event.type == "ToolInvoked":
+            invocation_id = str(event.data.get("invocation_id"))
+            started = open_calls.pop(invocation_id, None)
+            name = started.data.get("tool_name") if started else event.data.get("tool_name")
+            arguments_ref = event.data.get("arguments_ref") or (
+                started.data.get("arguments_ref") if started else None
+            )
             done.append(
                 NormalizedToolCall(
-                    tool_name=str(name),
-                    arguments_hash=str(started.data.get("arguments_ref") if started else ""),
-                    success=bool(event.data.get("success")),
-                    result_hash=event.data.get("result_ref"),
+                    tool_name=str(name or ""),
+                    arguments_hash=str(arguments_ref or ""),
+                    success=bool(event.data.get("ok", True)),
+                    result_hash=event.data.get("output_ref"),
                 )
             )
     return done

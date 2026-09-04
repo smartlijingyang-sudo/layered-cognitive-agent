@@ -441,34 +441,12 @@ class ModelFailed:
     error: str
 
 # ── Tool ──
-@session_event("tool.called.v1")
-@dataclass(frozen=True)
-class ToolCalled:
-    call_id: str
-    tool_name: str
-    arguments_ref: str    # ContentRef
-    provider_id: str | None = None
-
-@session_event("tool.completed.v1")
-@dataclass(frozen=True)
-class ToolCompleted:
-    call_id: str
-    success: bool
-    result_ref: str       # ContentRef
-    error: str | None = None
-
-@session_event("tool.approval_requested.v1")
-@dataclass(frozen=True)
-class ToolApprovalRequested:
-    call_id: str
-    approval_type: str
-    description: str
-
-@session_event("tool.approval_resolved.v1")
-@dataclass(frozen=True)
-class ToolApprovalResolved:
-    call_id: str
-    decision: str         # "approved" | "denied"
+# The Session plane carries NO tool lifecycle vocabulary. Tool facts are owned
+# by the Journal plane (ToolStarted / ToolInvoked / ToolDenied, joined by
+# invocation_id — ADR-0101 PR-2) and surfaced through LoopCursor step records
+# (step.tool_call.record / step.tool_result.record). Adding tool.*.v1 session
+# events would create a second SSOT for the same fact; resume/approval durable
+# points use approval.persisted.v1 / approval.resolved.v1 below instead.
 
 # ── Skill ──
 @session_event("skill.catalog.published.v1", visibility="audit")
@@ -1764,9 +1742,11 @@ async def resume_run(session, registry, answer):
 # 新：
 async def handle_answer(cmd: AnswerCommand):
     # 1. append approval.resolved event
-    await session_store.append(ToolApprovalResolved(
-        call_id=cmd.answer,
-        decision="approved",
+    await session_store.append(ApprovalResolved(
+        approval_id=cmd.approval_id,
+        command_id=cmd.command_id,
+        payload=cmd.answer,
+        approved=True,
     ))
     # 2. agent registry resume 或 wake
     agent = agent_registry.get(cmd.session_id)

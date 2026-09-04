@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any
 
 from lca.contracts.harness.tasks.session import SessionEvent
 from lca.contracts.models.core.budget import Budget
-from lca.contracts.models.core.decision import Turn
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.state import AgentState
 
@@ -74,37 +73,6 @@ class AgentStateProjection:
             # Increment step counter
             if "step" in data:
                 state.step = data["step"] + 1
-
-        elif event_type == "tool.called.v1":
-            # Track tool call
-            call_id = data.get("call_id")
-            tool_name = data.get("tool_name")
-            arguments = data.get("arguments")
-            if call_id:
-                state.extra.setdefault("pending_tool_calls", {})[call_id] = {
-                    "tool_name": tool_name,
-                    "arguments": arguments,
-                }
-
-        elif event_type == "tool.completed.v1":
-            # Complete tool call
-            call_id = data.get("call_id")
-            success = data.get("success", False)
-            result = data.get("result")
-            if call_id and call_id in state.extra.get("pending_tool_calls", {}):
-                tool_info = state.extra["pending_tool_calls"].pop(call_id)
-                state.history.append(
-                    cast(
-                        "Turn",
-                        {
-                            "action_type": "tool_call",
-                            "tool_name": tool_info["tool_name"],
-                            "arguments": tool_info["arguments"],
-                            "success": success,
-                            "result": result,
-                        },
-                    )
-                )
 
         elif event_type == "session.checkpoint.v1":
             # Update status from checkpoint
