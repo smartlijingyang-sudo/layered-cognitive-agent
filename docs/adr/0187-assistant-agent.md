@@ -2,7 +2,9 @@
 
 ## 状态
 
-**Proposed — 2026-09-04**
+**Accepted — 2026-09-04**
+
+PR-1 推进记录：本 ADR 评审通过、状态落 Accepted；编码实施按 §7 PR-2…PR-8 推进。配套 Note 落 [`docs/notes/proposed/seam/2026-09-04-assistant-home-scope.md`](../notes/proposed/seam/2026-09-04-assistant-home-scope.md)（lifecycle=proposed；与本 ADR 状态正交，由 PR-2/3 落地后迁 `implemented/`）。
 
 > **一句话**：在现有 LCA 插件内核与认知闭环上，新增 **Assistant 产品面**——每个助理有独立 `AssistantHome`（workspace + 人设 + goals + skills + routines 的磁盘 SSOT），经工厂函数 / 对话 skill 装配；前端 session 带 `assistant_id` 解析进既有 Runtime；**不新开 Agent loop**；默认 profile 不受影响；行为全走 Spine 事件，可审计可回放；定时任务坐在 ADR-0093 持续执行控制面之上；技能自进化复用 `SkillAcquirer` 缝 + ADR-0067 闸门。
 
@@ -549,3 +551,4 @@ flowchart TB
 | 2026-09-04 | 初稿；编号两次冲突后收敛为 0187，登记进 `docs/adr/README.md` 索引 |
 | 2026-09-04 | 评审收敛：jobs 钉到 ADR-0093、evolve 复用 `SkillAcquirer` 缝、run 期 resolve 时序与 digest 缓存、`incarnation_seq` 改名 `revision_seq`（与 0169 Incarnation 正交）、记忆面移出 digest 纪律、Home/RunWorkspace 产物沉淀、install 与进化同一验证立场、EP 闭集触点清单、删除过程残留章节 |
 | 2026-09-04 | 评审修订二轮（对照代码库落点核实）：隔离载体钉到已实现的 `ScopePlan`（IdentitySpace/VisibilitySpace 为推迟项，不作 0187 前置，附迁移条款）；session 绑定钉两个落点（routes_runs_sessions 解析 + persistence_jsonl 持久化）；revise 双模式（patch / reimport）定义裸改恢复语义；capability key 钉为 `continuous_control_plane_factory`；contracts 落 `contracts/models/assistant/` + `contracts/protocols/assistant/`；PR-4 验收补 memory 隔离测试 |
+| 2026-09-04 | PR-1 推进：本 ADR 评审通过，状态 Proposed → Accepted；配套 Note `docs/notes/proposed/seam/2026-09-04-assistant-home-scope.md` 同 PR 落地（lifecycle=proposed，与 ADR 状态正交） |
