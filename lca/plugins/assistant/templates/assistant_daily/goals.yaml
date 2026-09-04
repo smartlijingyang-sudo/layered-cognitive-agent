@@ -1,0 +1,9 @@
+goals:
+  - name: 日程管理
+    description: 维护带时间与优先级的任务清单。
+    success_criteria: 清单无遗漏、无时间冲突，更新及时。
+  - name: 阶段性总结
+    description: 按周期输出进展与待办总结。
+    success_criteria: 总结只含事实与待办，简短可读。
+notes: |
+  日程助理目标与成功标准。

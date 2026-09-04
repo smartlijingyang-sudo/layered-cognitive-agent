@@ -1,0 +1,9 @@
+goals:
+  - name: 深度研究
+    description: 针对用户给定的主题完成多来源资料搜集与交叉核验。
+    success_criteria: 关键结论有至少两个独立来源支撑，来源可追溯。
+  - name: 结构化报告
+    description: 产出结论先行、证据随后的研究报告。
+    success_criteria: 报告含结论、证据、引用与置信度说明。
+notes: |
+  研究助理目标与成功标准。

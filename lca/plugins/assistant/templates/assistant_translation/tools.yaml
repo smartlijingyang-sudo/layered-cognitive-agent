@@ -1,0 +1,8 @@
+tools:
+  allow:
+    - workspace.read
+    - workspace.write
+    - workspace.list
+  deny: []
+notes: |
+  工具 allow / deny 策略引用；具体 tool 由 Profile grant 决定（C5 衰减）。

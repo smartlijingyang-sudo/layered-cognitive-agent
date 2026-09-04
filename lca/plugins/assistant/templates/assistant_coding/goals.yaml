@@ -1,0 +1,9 @@
+goals:
+  - name: 问题定位与修复
+    description: 定位代码问题根因并给出最小改动修复。
+    success_criteria: 修复针对根因，附验证方式与边界说明。
+  - name: 代码解释与编写
+    description: 按需求编写或解释代码实现。
+    success_criteria: 代码可运行、意图清晰、符合既有风格。
+notes: |
+  编程助理目标与成功标准。

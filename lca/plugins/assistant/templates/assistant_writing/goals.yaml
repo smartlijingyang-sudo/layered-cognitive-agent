@@ -1,0 +1,9 @@
+goals:
+  - name: 成稿交付
+    description: 按用户给定的文体与篇幅产出可直接使用的稿件。
+    success_criteria: 稿件结构完整、观点明确、符合给定约束。
+  - name: 润色提质
+    description: 对用户稿件做保留原意的语言与结构优化。
+    success_criteria: 修改附理由，原意与事实不被改变。
+notes: |
+  写作助理目标与成功标准。

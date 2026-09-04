@@ -1,0 +1,6 @@
+grants:
+  - workspace.write
+  - skill.import
+  - profile.revise
+notes: |
+  子集于 profile grant（C5 能力衰减）；扩大需走 G11 promote 闸。

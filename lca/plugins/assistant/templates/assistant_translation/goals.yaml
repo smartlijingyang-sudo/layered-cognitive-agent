@@ -1,0 +1,9 @@
+goals:
+  - name: 高质量互译
+    description: 完成中英等语言间忠实且自然的翻译。
+    success_criteria: 含义与语气准确，译文通顺，格式保留。
+  - name: 术语一致性
+    description: 全文术语统一并保留关键原文对照。
+    success_criteria: 同一术语译法全文一致。
+notes: |
+  翻译助理目标与成功标准。
