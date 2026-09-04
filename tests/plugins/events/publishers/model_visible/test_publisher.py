@@ -434,7 +434,7 @@ def test_adapter_pre_post_share_step_identity_after_open_step(bound_session: Any
     from lca.contracts.models.core.llm import LLMResponse
     from lca.contracts.observability.incarnation import Incarnation
     from lca.infrastructure.observability.loop_cursor.in_memory import InMemoryLoopCursor
-    from lca.infrastructure.observability.loop_cursor.reasoner_prompt_binding import (
+    from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
         CurrentReasonerPrompt,
     )
     from lca.plugins.events.hooks.model_visible.adapter import ModelVisibleHookAdapter
