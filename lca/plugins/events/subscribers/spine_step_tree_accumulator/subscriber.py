@@ -87,7 +87,7 @@ class SpineStepTreeAccumulator:
     ),
     ownership=OwnershipDeclaration(
         reads=("event.bus",),
-        emits=("event.bus.step_tree_accumulator.appended",),
+        emits=(),
         state_mutation="forbidden",
     ),
     marker_class=SpineStepTreeAccumulator,

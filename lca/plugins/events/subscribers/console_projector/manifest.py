@@ -56,7 +56,7 @@ class _Config(BaseModel):
     ),
     ownership=OwnershipDeclaration(
         reads=("event.bus",),
-        emits=("event.subscriber.console_projector.rendered",),
+        emits=(),
         state_mutation="forbidden",
     ),
     marker_class=ConsoleProjectorSubscriber,

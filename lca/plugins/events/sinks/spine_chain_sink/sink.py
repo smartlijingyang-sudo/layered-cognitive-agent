@@ -92,7 +92,7 @@ class SpineChainSink:
     ),
     ownership=OwnershipDeclaration(
         reads=("event.bus",),
-        emits=("event.bus.chain_sink.written",),
+        emits=(),
         state_mutation="forbidden",
     ),
     marker_class=SpineChainSink,

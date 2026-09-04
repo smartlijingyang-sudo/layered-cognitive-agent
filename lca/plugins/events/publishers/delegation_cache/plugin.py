@@ -132,9 +132,10 @@ class _Config(BaseModel):
     ),
     ownership=OwnershipDeclaration(
         reads=("team.awareness",),
-        emits=(f"event.{Category.TEAM_DELEGATION_CACHE_HIT.value}",),
+        emits=(Category.TEAM_DELEGATION_CACHE_HIT.value,),
         state_mutation="forbidden",
     ),
+    marker_class=DelegationCachePlugin,
 )
 async def setup(ctx: PluginContext, config: _Config) -> None:
     """DelegationCachePlugin boot：构造单例 + provide 给 ctx。"""

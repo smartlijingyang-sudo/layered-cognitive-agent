@@ -141,11 +141,30 @@ def _register_event_pipeline(resolved: ResolvedProfile) -> None:
     from lca_kernel.events.bus import EventBus
 
     bus = EventBus.default()
-    catalog = _collect_marker_catalog(resolved)
+    catalog, emits_by_id = _collect_marker_catalog(resolved)
     if catalog:
         for plugin_id, marker in catalog.items():
             bus.registry.register_marker(plugin_id, marker)
         bus.registry.refresh()
+        # Post-refresh hard gate:yaml publishers token 必须全部解析得到
+        # type。失败 = boot fail-fast,事件不进入 lifespan,避免首次请求
+        # 撞 UnauthorizedPublishError → 500(本 PR 修复的根因)。
+        try:
+            bus.registry.validate_publisher_authorization()
+        except Exception:
+            _log.exception("event_bus_publisher_authorization_drift")
+            raise
+        # 反向校验:plugin manifest 声明的 emits 必须被 yaml 授权,否则
+        # OwnershipDeclaration.emits 只是装饰,而不是契约。
+        for plugin_id, emits in emits_by_id.items():
+            try:
+                bus.registry.check_manifest_emits_aligned(plugin_id, emits)
+            except Exception:
+                _log.exception(
+                    "event_bus_manifest_emits_aligned_failed",
+                    plugin_id=plugin_id,
+                )
+                raise
         _log.info(
             "event registry catalog populated",
             entries=len(catalog),
@@ -162,20 +181,31 @@ def _register_event_pipeline(resolved: ResolvedProfile) -> None:
         )
 
 
-def _collect_marker_catalog(resolved: ResolvedProfile) -> dict[str, type]:
-    """PR-5：从 ResolvedProfile.plugins 收集 ``id → marker_class``。
+def _collect_marker_catalog(
+    resolved: ResolvedProfile,
+) -> tuple[dict[str, type], dict[str, tuple[str, ...]]]:
+    """PR-5：从 ResolvedProfile.plugins 收集 ``id → marker_class`` 与 emits。
 
     仅收集 ``PluginDefinition.marker_class`` 非 None 的插件；其余插件无
     marker（不参与事件 yaml id 鉴权）。重复 id → 后者覆盖前者（按
     ResolvedProfile 已校验的拓扑序，结果唯一）。
+
+    Returns:
+        ``(catalog, emits_by_id)``：catalog 是 ``id → marker class`` 注入
+        ``EventRegistry._plugins``；emits_by_id 是 ``id → OwnershipDeclaration.emits``，
+        供 boot 期 ``check_manifest_emits_aligned`` 反向校验使用。
     """
-    out: dict[str, type] = {}
+    catalog: dict[str, type] = {}
+    emits: dict[str, tuple[str, ...]] = {}
     for plugin in resolved.plugins:
         marker = plugin.definition.marker_class
         if marker is None:
             continue
-        out[plugin.id] = marker
-    return out
+        catalog[plugin.id] = marker
+        ownership = plugin.definition.ownership
+        if ownership is not None and ownership.emits:
+            emits[plugin.id] = tuple(ownership.emits)
+    return catalog, emits
 
 
 async def boot_profile(

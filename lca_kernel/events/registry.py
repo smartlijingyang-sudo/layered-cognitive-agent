@@ -41,7 +41,11 @@ from lca_kernel.events.config_parser import (
     SubscriberRule,
     subscribers_from_rules,
 )
-from lca_kernel.events.errors import UnknownCategoryError, UnknownPluginIdError
+from lca_kernel.events.errors import (
+    AuthMatrixMismatchError,
+    UnknownCategoryError,
+    UnknownPluginIdError,
+)
 
 _log = logging.getLogger(__name__)
 
@@ -231,7 +235,7 @@ class EventRegistry:
                         SubscriberRule(
                             prefix=rule.prefix,
                             subscribers=frozenset(
-                                _resolve_tokens(rule.subscribers_tokens, plugins)
+                                _resolve_tokens(rule.subscribers_tokens, plugins, strict=False)
                             ),
                         )
                     )
@@ -242,9 +246,7 @@ class EventRegistry:
                         SubscriberRule(
                             prefix=rule.prefix,
                             subscribers=frozenset(
-                                _resolve_classpath_only(
-                                    rule.subscribers_tokens, ctx=rule.prefix
-                                )
+                                _resolve_classpath_only(rule.subscribers_tokens, ctx=rule.prefix)
                             ),
                         )
                     )
@@ -261,8 +263,12 @@ class EventRegistry:
             seen.add(spec.category)
             if plugins:
                 # catalog 已就位：按 token 解析（含 id 与 class-path 形态）。
-                pub_set = frozenset(_resolve_tokens(spec.publishers_tokens, plugins))
-                sub_set = frozenset(_resolve_tokens(spec.subscribers_tokens, plugins))
+                # 双轨兼容期（ADR-0181+1）走 strict=False：token miss 静默
+                # 跳过，由 :meth:`EventRegistry.validate_publisher_authorization`
+                # 集中收集并 fail-fast 报告（避免 load 阶段某条 token miss
+                # 直接打断后续所有 category 的解析）。
+                pub_set = frozenset(_resolve_tokens(spec.publishers_tokens, plugins, strict=False))
+                sub_set = frozenset(_resolve_tokens(spec.subscribers_tokens, plugins, strict=False))
             else:
                 # PR-5 兼容：catalog 缺位时按 legacy class-path 解析。
                 # 这条路径只在测试场景（``EventRegistry.load`` 直调）或迁
@@ -290,9 +296,7 @@ class EventRegistry:
         )
 
     @classmethod
-    def _load_one(
-        cls, yaml_file: Path
-    ) -> tuple[list[EventSpec], list[_ConsumerRuleTokens]]:
+    def _load_one(cls, yaml_file: Path) -> tuple[list[EventSpec], list[_ConsumerRuleTokens]]:
         with yaml_file.open(encoding="utf-8") as fh:
             data: Any = yaml.safe_load(fh)
         if not isinstance(data, dict) or "events" not in data:
@@ -367,8 +371,7 @@ class EventRegistry:
         """
         if not isinstance(marker_class, type):
             raise TypeError(
-                f"register_marker({plugin_id!r}) expects type, got "
-                f"{type(marker_class).__name__}"
+                f"register_marker({plugin_id!r}) expects type, got {type(marker_class).__name__}"
             )
         self._plugins[plugin_id] = marker_class
 
@@ -407,9 +410,7 @@ class EventRegistry:
                 SubscriberRule(
                     prefix=raw.prefix,
                     subscribers=frozenset(
-                        _resolve_tokens(
-                            raw.subscribers_tokens, self._plugins, strict=False
-                        )
+                        _resolve_tokens(raw.subscribers_tokens, self._plugins, strict=False)
                     ),
                 )
             )
@@ -453,6 +454,89 @@ class EventRegistry:
         if cls is None:
             return False
         return cls in self.subscribers.get(category, frozenset())
+
+    def validate_publisher_authorization(self) -> None:
+        """PR-5 后置校验：yaml ``publishers`` token 全部解析得到 type。
+
+        ``refresh()`` 走 strict=False 是双轨兼容期行为:token miss
+        静默退化让 boot 不挂。本方法是后置硬门槛:任一 yaml token 既不在
+        catalog 也非可 import 的 class-path → 抛
+        :class:`UnknownPluginIdError`(E2/E3 已有的语义,无需新异常类)。
+
+        与 ``OwnershipDeclaration.emits`` 配套:plugin 声明的 emits 集合
+        必须由本 registry 的 publishers 集合覆盖(否则 manifest 自称"我会发 X"
+        但 yaml 不授权 → ``AuthMatrixMismatchError``)。
+
+        失败即让 boot 阶段 fail-fast,事件不进入 lifespan,避免首次请求才
+        暴露 500(本方法就是为修这个根因)。
+
+        Returns:
+            诊断信息列表(token 全部解析成功时为空)。生产 boot 调用应
+            ``raise`` 失败分支,本方法的 list 仅供 CI 脚本聚合展示。
+        """
+        diagnostics: list[str] = []
+        for spec in self.specs:
+            for token in spec.publishers_tokens:
+                if token in self._plugins:
+                    continue
+                if _looks_like_class_path(token):
+                    try:
+                        _resolve_class(token, base_cls=object, ctx=f"token={token!r}")
+                        continue
+                    except UnknownCategoryError:
+                        pass
+                diagnostics.append(
+                    f"yaml category={spec.category.value!r} "
+                    f"publisher token={token!r} 解析失败："
+                    "既不在 EventRegistry catalog,class-path 也 import 失败"
+                )
+        if diagnostics:
+            first = diagnostics[0]
+            token_value = first.split("publisher token=")[1].split(" ")[0]
+            extra = f"（另有 {len(diagnostics) - 1} 处同类失败）" if len(diagnostics) > 1 else ""
+            raise UnknownPluginIdError(
+                plugin_id=token_value,
+                source=f"event-bus-yaml；{len(diagnostics)} 处失败{extra}",
+            )
+
+    def check_manifest_emits_aligned(
+        self,
+        plugin_id: str,
+        emits: Sequence[str],
+    ) -> None:
+        """反向校验:plugin manifest 声明的 emits 必须被 yaml 授权。
+
+        走 ``OwnershipDeclaration.emits`` 契约面。plugin 自称"我会发 X"
+        时,``X`` 必须是某个 yaml category 的 ``publishers`` 之一,否则
+        第一次 send 即 fail-fast。
+
+        Args:
+            plugin_id: plugin manifest 的 ``id`` 字段。
+            emits: ``OwnershipDeclaration.emits`` 元组。
+
+        Raises:
+            AuthMatrixMismatchError: 任一 emit 找不到对应 category 或
+                当前 plugin id 不在该 category 的 publishers 集合里。
+        """
+        if not emits:
+            return
+        marker = self._plugins.get(plugin_id)
+        if marker is None:
+            raise UnknownPluginIdError(plugin_id, source=f"manifest id={plugin_id!r}")
+        known_categories: set[str] = {spec.category.value for spec in self.specs}
+        missing_publish: set[str] = set()
+        for ep in emits:
+            if ep not in known_categories:
+                missing_publish.add(ep)
+                continue
+            if marker not in self.publishers.get(Category(ep), frozenset()):
+                missing_publish.add(ep)
+        if missing_publish:
+            raise AuthMatrixMismatchError(
+                plugin_id,
+                missing_publish=missing_publish,
+                missing_subscribe=set(),
+            )
 
     def payload_class(self, category: Category) -> type[EventPayload]:
         return self.payload_by_category[category]

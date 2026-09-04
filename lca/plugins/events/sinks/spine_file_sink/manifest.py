@@ -51,7 +51,7 @@ class _Config(BaseModel):
     ),
     ownership=OwnershipDeclaration(
         reads=("event.bus",),
-        emits=("event.sink.spine_file.written",),
+        emits=(),
         state_mutation="forbidden",
     ),
     marker_class=SINK_PLUGIN_CLASS,

@@ -56,7 +56,7 @@ class _Config(BaseModel):
     ),
     ownership=OwnershipDeclaration(
         reads=("event.bus",),
-        emits=("event.sink.journal.written",),
+        emits=(),
         state_mutation="forbidden",
     ),
     marker_class=JournalSink,

@@ -16,12 +16,15 @@ ROUTES: if path == "/x"`` 路径-字符串判断全部消失。
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from lca.contracts.mechanisms.capability import MissingCapabilityError
 from lca.contracts.routing import RouteSpec
 
-__all__ = ["register_routes"]
+__all__ = ["register_routes", "trace_emit_failures"]
+
+_log = logging.getLogger(__name__)
 
 
 def _require_present(ctx: Any, key: str) -> bool:
@@ -141,16 +144,62 @@ def _next_carrier_seq() -> int:
     return _carrier_seq
 
 
-def _instrument_route_handler(handler: Any, *, path: str) -> Any:
-    """Wrap an HTTP handler with transport.route enter/exit spine events."""
-    import asyncio
-    import functools
-    import inspect
+# ── trace emit 是装饰,不能影响请求正确性(ADR-0181+1 / 本 PR 修复) ─────
+# EventBus 任何鉴权/落盘异常(EventMechanismError 族)只 log + 计数,
+# 不上抛到 handler。理由:trace 是 observability 副作用,如果 publisher
+# 授权或 sink 故障,正确性(用户能拿到响应)优先于可观测性。
+# 其他异常(代码 bug 等)照常上抛,让 fail-fast 可见。
+_trace_emit_failures: dict[str, int] = {}
+"""route trace emit 失败计数器：``{execution_point: 失败次数}``。
+供健康检查 / metrics endpoint 暴露;不引 prometheus_client 依赖。"""
 
+
+def trace_emit_failures() -> dict[str, int]:
+    """返回 trace emit 失败计数的快照(测试 / 监控用)。"""
+    return dict(_trace_emit_failures)
+
+
+def _safe_emit(execution_point: str, **emit_kwargs: Any) -> None:
+    """``emit_transport_route_*`` 的受限包装。
+
+    仅吞掉 ``lca_kernel.events.errors.EventMechanismError`` 族
+    （UnauthorizedPublishError / EventNoSinkError / 等），其他异常上抛。
+    失败时 ``log.warning`` + 递增 ``_trace_emit_failures`` 计数。
+    """
     from lca.plugins.events.publishers.spine_reflector_transport import (
         emit_transport_route_enter,
         emit_transport_route_exit,
     )
+    from lca_kernel.events.errors import EventMechanismError
+
+    emit = {
+        "transport.route.enter": emit_transport_route_enter,
+        "transport.route.exit": emit_transport_route_exit,
+    }.get(execution_point)
+    if emit is None:
+        raise ValueError(f"unknown execution_point={execution_point!r}")
+    try:
+        emit(**emit_kwargs)
+    except EventMechanismError as exc:
+        _trace_emit_failures[execution_point] = _trace_emit_failures.get(execution_point, 0) + 1
+        _log.warning(
+            "transport trace_emit_failed execution_point=%s exc_type=%s exc=%s",
+            execution_point,
+            type(exc).__name__,
+            exc,
+        )
+
+
+def _instrument_route_handler(handler: Any, *, path: str) -> Any:
+    """Wrap an HTTP handler with transport.route enter/exit spine events.
+
+    Trace emit 失败仅 log + 计数(``_trace_emit_failures``),不影响 handler
+    成功/失败(见 :func:`_safe_emit`)。本规则由
+    ``tests/transport/test_route_register_trace_is_decorative.py`` 锁住。
+    """
+    import asyncio
+    import functools
+    import inspect
 
     if inspect.iscoroutinefunction(handler):
 
@@ -159,7 +208,8 @@ def _instrument_route_handler(handler: Any, *, path: str) -> Any:
             method = str(getattr(request, "method", "") or "")
             run_id = _bind_run_from_request(request)
             seq = _next_carrier_seq()
-            emit_transport_route_enter(
+            _safe_emit(
+                "transport.route.enter",
                 path=path,
                 method=method,
                 run_id=run_id,
@@ -168,7 +218,8 @@ def _instrument_route_handler(handler: Any, *, path: str) -> Any:
             try:
                 result = await handler(request, *args, **kwargs)
             except BaseException:
-                emit_transport_route_exit(
+                _safe_emit(
+                    "transport.route.exit",
                     path=path,
                     method=method,
                     outcome="failure",
@@ -176,7 +227,8 @@ def _instrument_route_handler(handler: Any, *, path: str) -> Any:
                     carrier_seq=seq,
                 )
                 raise
-            emit_transport_route_exit(
+            _safe_emit(
+                "transport.route.exit",
                 path=path,
                 method=method,
                 outcome="success",
@@ -192,7 +244,8 @@ def _instrument_route_handler(handler: Any, *, path: str) -> Any:
         method = str(getattr(request, "method", "") or "")
         run_id = _bind_run_from_request(request)
         seq = _next_carrier_seq()
-        emit_transport_route_enter(
+        _safe_emit(
+            "transport.route.enter",
             path=path,
             method=method,
             run_id=run_id,
@@ -201,7 +254,8 @@ def _instrument_route_handler(handler: Any, *, path: str) -> Any:
         try:
             result = handler(request, *args, **kwargs)
         except BaseException:
-            emit_transport_route_exit(
+            _safe_emit(
+                "transport.route.exit",
                 path=path,
                 method=method,
                 outcome="failure",
@@ -215,7 +269,8 @@ def _instrument_route_handler(handler: Any, *, path: str) -> Any:
                 try:
                     value = await result
                 except BaseException:
-                    emit_transport_route_exit(
+                    _safe_emit(
+                        "transport.route.exit",
                         path=path,
                         method=method,
                         outcome="failure",
@@ -223,7 +278,8 @@ def _instrument_route_handler(handler: Any, *, path: str) -> Any:
                         carrier_seq=seq,
                     )
                     raise
-                emit_transport_route_exit(
+                _safe_emit(
+                    "transport.route.exit",
                     path=path,
                     method=method,
                     outcome="success",
@@ -233,7 +289,8 @@ def _instrument_route_handler(handler: Any, *, path: str) -> Any:
                 return value
 
             return _await_result()
-        emit_transport_route_exit(
+        _safe_emit(
+            "transport.route.exit",
             path=path,
             method=method,
             outcome="success",
