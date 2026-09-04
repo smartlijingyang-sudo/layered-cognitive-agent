@@ -100,7 +100,7 @@ class SkillImportTool(Tool):
         return Observation(
             observation_id=new_id("obs"),
             success=True,
-            payload={"text": text, "skill_id": package.skill_id, "name": package.name},
+            payload={"content": text, "skill_id": package.skill_id, "name": package.name},
             content_type=ContentType.TEXT,
             latency_ms=latency_ms,
         )

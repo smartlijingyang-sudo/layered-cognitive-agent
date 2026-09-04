@@ -258,7 +258,7 @@ class TestReadSkillReferenceTool(unittest.TestCase):
             self._read_reference(CORDIS_PLUGIN_DEVELOPMENT_SKILL_ID, "plugin-meta-fields.md")
         )
         self.assertTrue(observation.success)
-        body = observation.payload["text"]
+        body = observation.payload["content"]
         self.assertIn("layer", body)
         self.assertIn("implements", body)
         self.assertIn("policy_class", body)
@@ -268,7 +268,7 @@ class TestReadSkillReferenceTool(unittest.TestCase):
             self._read_reference(EDITING_LCA_COMPOSITIONS_SKILL_ID, "preset-schema.md")
         )
         self.assertTrue(observation.success)
-        body = observation.payload["text"]
+        body = observation.payload["content"]
         self.assertIn("plugin_meta", body)
         self.assertIn("source_path", body)
         self.assertIn("preset_id", body)

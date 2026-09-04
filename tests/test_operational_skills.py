@@ -34,6 +34,7 @@ from lca.infrastructure.skills.market_auth import (
 )
 from lca.infrastructure.skills.settings import SkillSettings
 from lca.infrastructure.skills.zip_security import extract_zip_bytes, find_skill_markdown
+from lca.infrastructure.tools.contract.project import project_tool_state
 from lca.infrastructure.tools.default_set import build_default_tools
 from lca.infrastructure.tools.skills.activate_tool import SkillActivateTool
 from lca.infrastructure.tools.skills.import_tool import SkillImportTool
@@ -170,6 +171,9 @@ class TestSkillTools(unittest.IsolatedAsyncioTestCase):
         obs = await tool.execute({"identifier": "anthropics-skills-pdf"})
         self.assertTrue(obs.success)
         self.assertEqual(obs.payload["skill_id"], "anthropics-skills-pdf")
+        # RenderContract join: content_field="content" 必须能在 payload 命中。
+        projected = project_tool_state("import_skill", {"identifier": "anthropics-skills-pdf"}, obs)
+        self.assertTrue(projected["content"])
 
     async def test_activate_and_read_reference(self) -> None:
         self.store.install_package(
@@ -197,7 +201,13 @@ class TestSkillTools(unittest.IsolatedAsyncioTestCase):
         read_tool = SkillReadReferenceTool(self.store)
         read_obs = await read_tool.execute({"skill_id": "demo", "path": "tips.md"})
         self.assertTrue(read_obs.success)
-        self.assertEqual(read_obs.payload["text"], "tip")
+        self.assertEqual(read_obs.payload["content"], "tip")
+        # RenderContract join: payload 键必须能被 project_tool_state 投影到
+        # wire state(content 字段),否则前端 renderer 拿不到结果。
+        projected = project_tool_state(
+            "read_skill_reference", {"skill_id": "demo", "path": "tips.md"}, read_obs
+        )
+        self.assertEqual(projected["content"], "tip")
 
     async def test_search_local_fallback(self) -> None:
         self.store.install_package(
@@ -214,7 +224,12 @@ class TestSkillTools(unittest.IsolatedAsyncioTestCase):
         ):
             obs = await tool.execute({"query": "pdf"})
         self.assertTrue(obs.success)
-        self.assertIn("pdf-helper", obs.payload["text"])
+        self.assertIn("pdf-helper", obs.payload["content"])
+        # RenderContract join: search_skill 的 content 必须投影到 wire state,
+        # 前端 searchSkill renderer 从这里读结果(缺 content = "无结果")。
+        projected = project_tool_state("search_skill", {"query": "pdf"}, obs)
+        self.assertIn("pdf-helper", projected["content"])
+        self.assertEqual(projected["total"], obs.payload["total"])
 
     async def test_tools_consume_importer_protocol_without_http_store_attribute(self) -> None:
         package = self.store.install_package(
@@ -228,7 +243,7 @@ class TestSkillTools(unittest.IsolatedAsyncioTestCase):
         search = SkillSearchTool(importer, self.store)
         search_obs = await search.execute({"query": "missing"})
         self.assertTrue(search_obs.success)
-        self.assertIn("protocol-demo", search_obs.payload["text"])
+        self.assertIn("protocol-demo", search_obs.payload["content"])
 
         import_tool = SkillImportTool(importer)
         import_obs = await import_tool.execute({"identifier": "protocol-demo"})

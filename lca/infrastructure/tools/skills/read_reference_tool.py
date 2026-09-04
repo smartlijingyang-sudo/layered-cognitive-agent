@@ -76,7 +76,7 @@ class SkillReadReferenceTool(Tool):
         return Observation(
             observation_id=new_id("obs"),
             success=True,
-            payload={"text": content, "path": path, "skill_id": skill_id},
+            payload={"content": content, "path": path, "skill_id": skill_id},
             content_type=ContentType.TEXT,
             latency_ms=latency_ms,
         )

@@ -80,7 +80,7 @@ class SkillSearchTool(Tool):
         return Observation(
             observation_id=new_id("obs"),
             success=True,
-            payload={"text": body, "total": result.total},
+            payload={"content": body, "total": result.total},
             content_type=ContentType.TEXT,
             latency_ms=latency_ms,
         )
