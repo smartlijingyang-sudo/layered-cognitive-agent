@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from lca.cognition.brain.modular_brain import ModularBrain
 from lca.cognition.brain.reasoner import PromptReasoner
 from lca.contracts.capabilities import BRAIN_PROMPT_CATALOG_FACTORY, BRAINS
@@ -21,31 +23,44 @@ from lca.infrastructure.observability.adapters import (
 )
 from lca.plugins.composer.composition.skill_store import active_skill_store
 
+_MODEL_VISIBLE_HOOK_KEY = "llm.adapter.hook.model_visible"
 
-def instrument_llm(llm: LLMAdapter) -> LLMAdapter:
-    """Wrap ``llm`` with model_visible + telemetry decorators (组合根 PR-12.5)。
+
+def instrument_llm(
+    llm: LLMAdapter,
+    *,
+    ctx: object | None = None,
+) -> LLMAdapter:
+    """Wrap ``llm`` with model-visible + telemetry decorators (组合根 PR-12.5 / PR-3)。
 
     装配顺序(外 → 内):
-        ModelVisibleLLMAdapter → TelemetryLLMAdapter → inner
+        ModelVisibleHookAdapter → TelemetryLLMAdapter → inner
 
-    这样:
-    - LLM 调用前先落 ``model_visible/step_<NN>/{...}.json`` + 1 条
-      ``llm.request.header`` EP(ADR-0169 D7 + I-MV1)
-    - 然后 TelemetryLLMAdapter 记 LlmCallCompleted / Otel projection / token
-      usage(ADR-0169 §C7 控制/观察分离)
-    - 任何 capture 缺失(profile 关闭 model_visible)cursor + capture contextvar
-      未绑 ⇒ 透明透传(不写盘、不落 EP,业务继续)
+    PR-3 切线(ADR-0185 §5 / PR-3):当 ``ctx`` 非 None 且能从
+    ``ctx.soft_get("llm.adapter.hook.model_visible")`` 拿到 PR-2
+    :class:`ModelVisibleHook` 实例,改用
+    :class:`ModelVisibleHookAdapter` 取代旧
+    :class:`ModelVisibleLLMAdapter`,把 model-visible 落盘从
+    ``<run_dir>/model_visible/step_<NN>/{...}.json`` + 旧
+    ``llm.request.header`` EP 切到 ``<run_id>.spine.jsonl`` 两条 model-visible
+    spine event(``spine.llm.request.header`` + ``spine.llm.request.header.assistant``)。
 
-    # TODO(ADR-0185 PR-4, tracking: PR-4 delete-when):composer 装配
-    # 入口缺乏 PluginContext,无法在 instrument_llm 时从
-    # ``ctx.soft_get("llm.adapter.hook.model_visible")`` 拿到 PR-2
-    # ``ModelVisibleHook`` 实例。PR-3 不切:旧 ``ModelVisibleLLMAdapter``
-    # 装饰链仍工作(旁路文件 + 旧 EP),新 ``ModelVisiblePublisher`` plugin
-    # setup 后处于未挂载态(双轨期业务侧走旧 capture 路径,viewer 走新
-    # fold 路径读取 spine.jsonl)。PR-4 收口时一并改造 composer:
-    # 把 ``instrument_llm`` 签名扩成 ``(llm, *, ctx: PluginContext | None)``,
-    # 优先 ctx.soft_get('llm.adapter.hook.model_visible') 走 fold 路径,
-    # ctx=None 时回退旧 wiring(测试 / 离 boot 路径)。
+    ctx 缺失 / hook 未挂载 / 不支持软查 ⇒ 回退旧 wiring(测试 + 离 boot 路径)。
+    双轨期(PR-3 → PR-4)用新 wiring 时旧 ``ModelVisibleLLMAdapter`` 不再被
+    composer 装配(还在仓里,供单测 / 直接 import 的消费者使用);PR-4 一并删
+    旧 adapter 与旁路文件。
+
+    - LLM 调用前 hook ``capture_pre_llm`` fold 优化 + publish
+      ``spine.llm.request.header``(ADR-0185 §3.5)
+    - LLM 调用后 hook ``capture_post_llm`` publish
+      ``spine.llm.request.header.assistant``,顺手修复 Note
+      ``2026-09-03-model-visible-incomplete-projection.md`` 的 3 BUG
+    - 任何 hook 缺席 / publish 抛错 ⇒ 透明透传(不写盘、不落 EP、业务继续)
+
+    Telemetry 部分:
+
+    - LLM 调用前后 TelemetryLLMAdapter 记 LlmCallCompleted / Otel projection /
+      token usage(ADR-0169 §C7 控制/观察分离)
     """
 
     # 已有 TelemetryLLMAdapter 时,复用之;否则用 llm 自身
@@ -53,16 +68,52 @@ def instrument_llm(llm: LLMAdapter) -> LLMAdapter:
     # session_append 接线位:thinking.* Session 双写需要 per-session
     # SessionStore(lca/harness/session/store.py),它由 SessionActivator 按
     # session 创建、经 build_live_agent 传给 CognitiveLiveAgent,不注册在
-    # cordis scope 上;composer 入口此处只有 scope(连 PluginContext 都缺,
-    # 见上方 ADR-0185 PR-4 TODO),拿不到 per-session store,故保持
-    # session_append=None。接线方式与 PR-4 同一收口:instrument_llm 扩签名
-    # 携带 ctx / session_append 后,在此透传给 TelemetryLLMAdapter。
+    # cordis scope 上;composer 入口此处只有 scope,拿不到 per-session store,
+    # 故保持 session_append=None。完整接线方式见 PR-4 同一收口:届时
+    # instrument_llm 扩签名携带 session_append,在此透传给 TelemetryLLMAdapter。
     # COMPAT(delete-when: PR-4 收口完成,或 thinking.* Session 双写按
     #   TelemetryLLMAdapter._append_thinking_session_event 的删除条件退役;
     #   tracking: thinking.* Session 双写改动, 2026-09-04)
     instrumented = TelemetryLLMAdapter(existing_telemetry)
     model_name = _resolve_model_name(instrumented)
+
+    hook = _resolve_model_visible_hook(ctx)
+    if hook is not None:
+        from lca.plugins.events.hooks.model_visible.adapter import (
+            ModelVisibleHookAdapter,
+        )
+
+        return ModelVisibleHookAdapter(instrumented, hook)
+
     return ModelVisibleLLMAdapter(instrumented, model=model_name)
+
+
+def _resolve_model_visible_hook(ctx: object | None) -> Any:
+    """从 ``ctx`` 软查 :class:`ModelVisibleHook` 实例,无则返回 ``None``。
+
+    兼容三种 ctx 形态(按优先级):
+    1. :class:`AuditedPluginContext` / 任何实现 ``soft_get(str) -> Any | None``
+       的 wrapper —— 首选(plugin setup 路径用)。
+    2. cordis :class:`Context`(Composer 装配路径收到 scope 即 cordis Context)
+       —— 走 :func:`collect_context_bindings` 沿 ``own_bindings`` + ``parent``
+       链查;子 scope 找不到时上溯到父 scope(对齐 :meth:`Context.inject` 解析
+       顺序)。
+    3. ``None`` / 其它 —— 直接返回 ``None``,由 caller 走旧 wiring。
+    """
+    if ctx is None:
+        return None
+    soft_get = getattr(ctx, "soft_get", None)
+    if callable(soft_get):
+        try:
+            return soft_get(_MODEL_VISIBLE_HOOK_KEY)
+        except Exception:  # INTENTIONAL: ctx 软查失败不挡装配
+            return None
+    own_bindings = getattr(ctx, "own_bindings", None)
+    if own_bindings is not None:
+        from lca.harness.plugin_context import collect_context_bindings
+
+        return collect_context_bindings(ctx).get(_MODEL_VISIBLE_HOOK_KEY)
+    return None
 
 
 def _resolve_model_name(adapter: LLMAdapter) -> str:
