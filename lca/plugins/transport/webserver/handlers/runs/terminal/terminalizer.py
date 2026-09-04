@@ -68,8 +68,8 @@ class RunTerminalizer:
                 self._materializer(session)
                 if session.hub is not None:
                     await _dispose_export(session.hub)
-                # ADR-0169 PR-12.7:释放 loop_cursor / model_visible_capture
-                # ContextVar token(单进程 leak 修复点);close 内部幂等,
+                # ADR-0169 PR-12.7:释放 loop_cursor ContextVar token
+                # (单进程 leak 修复点);close 内部幂等,
                 # 二重调用不再 reset(terminalizer 行为不受影响)。
                 try:
                     released = session.close(close_reason)

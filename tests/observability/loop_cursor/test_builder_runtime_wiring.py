@@ -1,13 +1,12 @@
-"""ADR-0169 §D8:RunSessionBuilder 五缝装配回归锁。
+"""ADR-0169 §D8:RunSessionBuilder 缝族装配回归锁。
 
 钉死 builder 装配 contract:
 - :meth:`RunSessionBuilder.build` 走 :class:`ObservabilityRuntime.from_profile`,
   不再手工 ``StdLoopCursor(...)``
 - ``cursor`` 由 :meth:`ObservabilityRuntime.make_cursor` 派生
-- ``capture`` 来自 Runtime,不是独立 ``StdModelVisibleCapture(...)`` 旁路
 - ``cursor.incarnation.plan_ref`` 来自 ``request.mode``
-- 五缝字段都在 Runtime 上被实例化(cursor_factory / projection_host /
-  persistence / capture / barrier)
+- 缝族字段都在 Runtime 上被实例化(cursor_factory / projection_host /
+  persistence / barrier)
 
 如果未来有人把 builder 退回 ``StdLoopCursor(...)`` 旁路,本测试直接 fail。
 """
@@ -20,14 +19,9 @@ from typing import Any
 
 from lca.infrastructure.observability.loop_cursor import (
     StdLoopCursor,
-    StdModelVisibleCapture,
 )
 from lca.infrastructure.observability.loop_cursor.bind import reset_run_cursor
 from lca.infrastructure.observability.loop_cursor.factory import LoopCursorFactory
-from lca.infrastructure.observability.loop_cursor.model_visible_binding import (
-    get_current_model_visible_capture,
-    reset_model_visible_capture,
-)
 from lca.infrastructure.observability.loop_cursor.projection_host import StdProjectionHost
 from lca.plugins.transport.webserver.handlers.runs.execute import create_run_session
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry
@@ -36,18 +30,13 @@ from lca.plugins.transport.webserver.handlers.runs.session.session import RunReg
 def _reset_session_contextvars(session: Any) -> None:
     """teardown helper:Reset builder 安装的 ContextVar,防污染后续测试。
 
-    Builder 在 :meth:`RunSessionBuilder.build` 内调 ``install_run_cursor``
-    和 ``install_model_visible_capture``;返回的 ``RunSession`` 带 token 字段,
-    测试结束时必须 reset —— 否则 ContextVar 跨测试泄漏,导致
-    ``test_model_visible_llm_adapter.test_adapter_without_capture_still_calls_inner``
-    等依赖 ContextVar 为空的测试 fail。
+    Builder 在 :meth:`RunSessionBuilder.build` 内调 ``install_run_cursor``;
+    返回的 ``RunSession`` 带 token 字段,测试结束时必须 reset —— 否则
+    ContextVar 跨测试泄漏。
     """
     cursor_token = getattr(session, "loop_cursor_token", None)
     if cursor_token is not None:
         reset_run_cursor(cursor_token)
-    capture_token = getattr(session, "model_visible_capture_token", None)
-    if capture_token is not None:
-        reset_model_visible_capture(capture_token)
 
 
 class _StubSpine:
@@ -109,7 +98,7 @@ class _Context:
             "event_spine": spine,
             "process_journal": object(),
         }
-        # PR-7:observability five-seam registries. Pre-populated with the
+        # PR-7:observability seam registries. Pre-populated with the
         # same factories that observability-default bundle injects in prod.
         from lca.infrastructure.observability import NamedRegistry
         from lca.infrastructure.observability.loop_cursor.close_barrier_impl import (
@@ -117,9 +106,6 @@ class _Context:
         )
         from lca.infrastructure.observability.loop_cursor.factory import (
             LoopCursorFactory,
-        )
-        from lca.infrastructure.observability.loop_cursor.model_visible_capture import (
-            StdModelVisibleCapture,
         )
         from lca.infrastructure.observability.loop_cursor.persistence_coordinator import (
             NullPersistenceCoordinator,
@@ -130,7 +116,6 @@ class _Context:
 
         self._services["observability.loop_cursor"] = NamedRegistry()
         self._services["observability.projection_host"] = NamedRegistry()
-        self._services["observability.model_visible"] = NamedRegistry()
         self._services["observability.close_barrier"] = NamedRegistry()
         self._services["observability.persistence"] = NamedRegistry()
         self._services["observability.loop_cursor"].register(
@@ -138,9 +123,6 @@ class _Context:
         )
         self._services["observability.projection_host"].register(
             "standard", lambda initial=None, **_: StdProjectionHost(initial=initial)
-        )
-        self._services["observability.model_visible"].register(
-            "standard", lambda run_dir, **_: StdModelVisibleCapture(run_dir=run_dir)
         )
         self._services["observability.close_barrier"].register(
             "standard",
@@ -299,39 +281,6 @@ def test_builder_cursor_fork_and_advance_methods_intact(tmp_path: Path) -> None:
             assert hasattr(cursor, method), f"missing {method}"
         # incarnation 显式身份
         assert cursor.incarnation.incarnation_seq == 1
-    finally:
-        _reset_session_contextvars(session)
-
-
-def test_builder_capture_comes_from_runtime(tmp_path: Path) -> None:
-    """``session.model_visible_capture`` 来自 Runtime —— 是 StdModelVisibleCapture 实例
-    且 ContextVar 已 install。
-
-    锚定 169 §D8 五缝的 capture 缝。如果有人退回独立
-    ``StdModelVisibleCapture(run_dir=...)`` 旁路,本测试仍能 pass(类型 + ContextVar
-    都满足);真正的 Runtime 路径契约由 ``test_builder_runtime_factory_and_host_are_real_instances``
-    钉死。
-    """
-    from lca.infrastructure.observability.backends.run_locator_fs import (
-        FilesystemRunLocator,
-    )
-
-    locator = FilesystemRunLocator(root=tmp_path)
-    registry = RunRegistry(locator=locator)
-    ctx = _build_ctx()
-
-    session = create_run_session(
-        registry,
-        question="hello",
-        user_text="hi",
-        ctx=ctx,  # type: ignore[arg-type]
-    )
-    try:
-        capture = session.model_visible_capture
-        assert isinstance(capture, StdModelVisibleCapture)
-        # ContextVar 已 install —— get_current_model_visible_capture 必须返回同一实例
-        bound = get_current_model_visible_capture()
-        assert bound is capture
     finally:
         _reset_session_contextvars(session)
 

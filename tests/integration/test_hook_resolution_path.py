@@ -2,9 +2,10 @@
 on a real cordis Context that's been booted with the model_visible publisher.
 
 If this test returns the hook, the wiring is fine.
-If it returns None, instrument_llm() falls back to ModelVisibleLLMAdapter and
+If it returns None, instrument_llm() degrades to telemetry-only wrapping and
 the spine events never get written.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -12,8 +13,6 @@ from typing import Any
 
 import pytest
 from cordis import Context
-
-from lca_kernel.events.bus import EventBus
 
 
 @pytest.fixture

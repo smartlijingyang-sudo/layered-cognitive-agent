@@ -1,10 +1,10 @@
 """Diagnostic test for instrument_llm: verify the hook wiring at the LLM boundary.
 
-If instrument_llm falls back to ModelVisibleLLMAdapter (because
-_resolve_model_visible_hook returned None), this test will see the old
-adapter. If it picks up the new ModelVisibleHookAdapter, this test will see
-the new one and a capture_pre_llm call will produce a spine event.
+If _resolve_model_visible_hook returns None (ctx 缺席 / 未挂载),
+instrument_llm 退化为仅包 telemetry,spine events 不落;挂载成功时外层是
+ModelVisibleHookAdapter,capture_pre_llm 产出 spine event。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -49,6 +49,7 @@ class _MockLLM:
 
     async def complete(self, prompt: str, **kwargs: Any) -> Any:
         from types import SimpleNamespace
+
         return SimpleNamespace(
             content="ok",
             text="ok",
@@ -65,7 +66,6 @@ class _MockLLM:
 def test_instrument_llm_uses_new_hook_adapter(booted_ctx: Any) -> None:
     """instrument_llm should pick ModelVisibleHookAdapter when ctx has the hook."""
     from lca.infrastructure.observability.adapters import (
-        ModelVisibleLLMAdapter,
         TelemetryLLMAdapter,
     )
     from lca.plugins.composer.think.brain import instrument_llm
@@ -78,19 +78,12 @@ def test_instrument_llm_uses_new_hook_adapter(booted_ctx: Any) -> None:
 
     print(f"\ninstrument_llm output type: {type(out).__name__}")
 
-    # If new wiring works: outer is ModelVisibleHookAdapter (or TelemetryLLMAdapter
-    # wrapping it)
+    # 新 wiring:外层是 ModelVisibleHookAdapter,或 TelemetryLLMAdapter
+    # 包着内层 hook。
     if isinstance(out, ModelVisibleHookAdapter):
         print("✓ ModelVisibleHookAdapter chosen")
         return
-    if isinstance(out, ModelVisibleLLMAdapter):
-        pytest.fail(
-            "instrument_llm returned ModelVisibleLLMAdapter (old wiring). "
-            "This means _resolve_model_visible_hook returned None even though "
-            "the hook was provided on ctx."
-        )
     if isinstance(out, TelemetryLLMAdapter):
-        # new path may also have outer=Telemetry+inner=Hook
         inner = getattr(out, "_inner", None)
         print(f"  inner type: {type(inner).__name__ if inner else None}")
         if isinstance(inner, ModelVisibleHookAdapter):
@@ -99,16 +92,17 @@ def test_instrument_llm_uses_new_hook_adapter(booted_ctx: Any) -> None:
     pytest.fail(f"Unexpected instrument_llm output type: {type(out).__name__}")
 
 
-def test_instrument_llm_falls_back_when_ctx_None() -> None:
-    """No ctx → old wiring (ModelVisibleLLMAdapter)."""
-    from lca.infrastructure.observability.adapters import ModelVisibleLLMAdapter
+def test_instrument_llm_telemetry_only_when_ctx_absent() -> None:
+    """No ctx → telemetry-only wiring (no model-visible decoration)."""
+    from lca.infrastructure.observability.adapters import TelemetryLLMAdapter
     from lca.plugins.composer.think.brain import instrument_llm
 
     base = _MockLLM()
     out = instrument_llm(base, ctx=None)
-    assert isinstance(out, ModelVisibleLLMAdapter), (
-        "Without ctx we expect the old ModelVisibleLLMAdapter fallback."
+    assert isinstance(out, TelemetryLLMAdapter), (
+        "Without ctx we expect a bare TelemetryLLMAdapter (hook absent)."
     )
+    assert getattr(out, "_inner", None) is base
 
 
 def test_resolve_hook_on_real_cordis_ctx(booted_ctx: Any) -> None:
@@ -129,16 +123,15 @@ def test_full_pipeline_publishes_spine_event(booted_ctx: Any) -> None:
     Bind a fake Session so publish_via_session succeeds; then check the bus
     delivery_snapshot for a spine.llm.request.header event.
     """
-    from lca.infrastructure.observability.loop_cursor.reasoner_prompt_binding import (
+    from lca.plugins.composer.think.brain import instrument_llm
+    from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
         CurrentReasonerPrompt,
     )
-    from lca.plugins.composer.think.brain import instrument_llm
-    from lca_kernel.events.bus import EventBus
-    from lca_kernel.events.test_catalog import build_test_bus
     from lca.plugins.events.publishers._session_publish import (
-        set_publish_session,
         reset_publish_session,
+        set_publish_session,
     )
+    from lca_kernel.events.test_catalog import build_test_bus
 
     bus = build_test_bus()
     EventBus.set_default(bus)
@@ -156,13 +149,13 @@ def test_full_pipeline_publishes_spine_event(booted_ctx: Any) -> None:
 
     try:
         from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
-            get_current_cursor,
             bind_current_cursor,
+            get_current_cursor,
             reset_current_cursor,
         )
-        from lca.infrastructure.observability.loop_cursor.reasoner_prompt_binding import (
-            get_current_reasoner_prompt,
+        from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
             bind_current_reasoner_prompt,
+            get_current_reasoner_prompt,
             reset_current_reasoner_prompt,
         )
 
@@ -212,8 +205,7 @@ def test_full_pipeline_publishes_spine_event(booted_ctx: Any) -> None:
         # (capture_pre_llm requires non-stable header; we provide one with tools)
         # The new adapter MUST have published the spine event if wired correctly.
         assert post_count > pre_count, (
-            "wrapped.complete() did not publish any spine events — "
-            "model-visible hook didn't fire."
+            "wrapped.complete() did not publish any spine events — model-visible hook didn't fire."
         )
     finally:
         reset_publish_session(session_token)
@@ -222,4 +214,3 @@ def test_full_pipeline_publishes_spine_event(booted_ctx: Any) -> None:
 def bus_count_published(bus: Any) -> int:
     snap = bus.delivery_snapshot()
     return sum(c.get("published", 0) for c in snap.values())
-

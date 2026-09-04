@@ -37,6 +37,8 @@ COMPAT 块(AGENTS.md §1 + G15 模板)
 
 from __future__ import annotations
 
+import hashlib
+import json
 from contextvars import ContextVar, Token
 from typing import Any
 
@@ -57,10 +59,26 @@ from lca.contracts.observability.loop_cursor_payloads import (
     ToolCallRecord,
     ToolResultRecord,
 )
-from lca.infrastructure.observability.loop_cursor._capture_io import (
-    sha256_digest,
-)
 from lca.infrastructure.observability.writable_matrix.coordinator import StepCoordinator
+
+_DIGEST_PREFIX = "sha256:"
+
+
+def sha256_digest(payload: Any) -> str:
+    """Stable digest in ``sha256:<hex>`` form — JSON 序列化 → sha256。
+
+    ADR-0185 PR-4 收口后为 ``sha256:<hex>`` digest 形态的唯一实现(承接
+    旁路 capture 退场前的同名 helper)。``ensure_ascii=False`` 保持
+    原字节级行为:非 ASCII 内容 digest 不因序列化转义改变。
+    """
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        ensure_ascii=False,
+        default=str,
+    ).encode("utf-8")
+    return _DIGEST_PREFIX + hashlib.sha256(encoded).hexdigest()
+
 
 # COMPAT(delete-when: PR-21~24 grep 全部为 0, tracking: ADR-0169-task-25)
 # 当前 cursor 由 CoordinatorAdapter 持有;PR-21~24 业务迁 cursor 期间,
@@ -159,7 +177,7 @@ class CoordinatorAdapter:
         decision / tool_call / prompt_tokens / completion_tokens /
         raw_response_preview;cursor ``ThinkingRecord`` 字段 = content_digest /
         content_path / token_count / thinking_kind。映射:
-            content_digest ← sha256:<hex> via _capture_io helper
+            content_digest ← sha256:<hex> via sha256_digest
             content_path   ← None
             token_count    ← prompt_tokens + completion_tokens
             thinking_kind  ← "reasoning"
@@ -184,7 +202,7 @@ class CoordinatorAdapter:
         arguments_summary;cursor ``ToolCallRecord`` 字段 = tool_name / args_digest /
         args_payload_path / call_seq。映射:
             tool_name       ← name
-            args_digest     ← sha256:<hex> via _capture_io helper
+            args_digest     ← sha256:<hex> via sha256_digest
             args_payload_path ← None(arguments 内容由 payload adapter 处理)
             call_seq        ← cursor's monotonic seq
         """

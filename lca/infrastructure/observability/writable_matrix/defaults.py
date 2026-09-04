@@ -245,20 +245,13 @@ class RoutingFileStorage:
 
 # ── ModelVisibleRecorder ─────────────────────────────────────────
 # ADR-0167 D11.1 / ADR-0176 D2:五面矩阵的 model_visible_recorder 槽提供默认实现 + Null 兜底。
-# 注意:本协议与 lca.contracts.observability.model_visible_capture.ModelVisibleCapture
-# 是两条不同路径:后者在 LLM 边界捕获五件套 + digest 写入 model_visible/step_NN/,
-# 前者是 registry 解引用 + 接收 deriver 派出的 record_* 事件。两者职责不重叠:
-# - Capture(ADR-0169 D7):接收 system / tools / messages / manifest / inherited 五件套
-#   写盘 + 返回 ModelVisibleArtifact。
-# - Recorder(ADR-0167 D11.1):通用 record_header / record_prompt / record_tools /
-#   record_manifest / record_messages;deriver 写入或外部 hook 调用均可。
-# Profiles 默认装配 FilesystemRecorder(写入 <run_dir>/model_visible/step_NN/<file>);
-# 测试场景可选 NullRecorder 零副作用。
+# ADR-0185 PR-4:LLM 边界 Capture Protocol 已退场;本 Recorder 由 deriver /
+# 外部 hook 写入,目录约定由 Recorder 实现决定(默认 = FilesystemRecorder)。
 # json 模块已在文件顶部 import(``import json``),FileSystemRecorder 直接用 json.dumps。
 
 
 class FilesystemRecorder:
-    """默认 ModelVisibleRecorder —— ``<run_dir>/model_visible/step_<NN>/<file>``。
+    """默认 ModelVisibleRecorder —— 把 record_* 写到 run_dir 下子目录。
 
     满足 ``lca.contracts.observability.writable_matrix.ModelVisibleRecorder``
     Protocol。``record_*`` 写对应 .json 文件;``run_dir`` 由构造期注入。

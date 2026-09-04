@@ -28,9 +28,6 @@ from lca.contracts.mechanisms.capability import MissingCapabilityError, require_
 from lca.contracts.observability.run_journal import RunJournalFactory
 from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.profile.boot_products import compiled_plan_from_scope
-from lca.infrastructure.observability.loop_cursor import (
-    install_model_visible_capture,
-)
 from lca.infrastructure.observability.loop_cursor.bind import (
     SpineWritePortAdapter,
     install_run_cursor,
@@ -167,23 +164,21 @@ class RunSessionBuilder:
         # duck-type: SpineCore 有 .event_spine; tests / stub 提供裸 EventSpine
         event_spine = getattr(spine_core, "event_spine", None) or spine_core
 
-        # ── 1.5) 装配 ObservabilityRuntime(ADR-0169 §D8 五缝) ────────────
+        # ── 1.5) 装配 ObservabilityRuntime(ADR-0169 §D8 缝族) ────────────
         # 业务路径走 :meth:`ObservabilityRuntime.make_cursor` 派生 cursor
-        # (不再手工 ``StdLoopCursor(...)``);capture 由 Runtime 持有;persistence
-        # 缺省 fallback 到 NullPersistenceCoordinator(barrier 注入面不空)。
+        # (不再手工 ``StdLoopCursor(...)``);persistence 缺省 fallback 到
+        # NullPersistenceCoordinator(barrier 注入面不空)。
+        # ADR-0185 PR-4:capture 缝已退场;model-visible 改由
+        # ``ModelVisibleHook`` 在 LLM 边界走 spine event bus 拦截。
         spine_for_cursor = SpineWritePortAdapter(event_spine)
         # ``_ProfileProxy.plan_ref`` 之前误用 ``request.mode``(transport intent
         # 而非 plan identity),导致下游 ``loop_cursor`` 的 incarnation.plan_ref
         # 拿到 "solo" 而不是真 plan ID;这里统一读 SSOT(session.plan_ref)。
-        profile_proxy = _ProfileProxy(
-            plan_ref=plan_ref,
-            runs_root=str(run_dir.parent) if run_dir is not None else "traces/runs",
-        )
+        profile_proxy = _ProfileProxy(plan_ref=plan_ref)
         runtime = ObservabilityRuntime.from_profile(
             profile=profile_proxy,
             ctx=self._ctx,
             persistence=NullPersistenceCoordinator(),  # 生产路径应注 File;此处 fallback
-            run_dir=run_dir,
         )
         cursor = runtime.make_cursor(
             run_id=run_id,
@@ -191,12 +186,6 @@ class RunSessionBuilder:
             spine=spine_for_cursor,
         )
         cursor_token = install_run_cursor(cursor)
-
-        # ADR-0169 PR-12.5: install Runtime 提供的 capture 到当前 run 的 ContextVar,
-        # 让 ModelVisibleLLMAdapter 在 LLM 调用前能拿到 capture 实例并落 5 件套。
-        # run_dir=None 时 Runtime 仍构造 capture(用 profile.runs_root);ContextVar
-        # 安装保持,测试场景下 capture.run_dir 落在 traces/runs/unknown 也不影响。
-        capture_token = install_model_visible_capture(runtime.capture)
 
         # ADR-0186: bind Session before fold deriver so snapshot_events is available.
         event_session = bind_run_event_session(self._ctx, run_id)
@@ -254,8 +243,6 @@ class RunSessionBuilder:
                 coordinator=coordinator,
                 loop_cursor=cursor,
                 loop_cursor_token=cursor_token,
-                model_visible_capture=runtime.capture,
-                model_visible_capture_token=capture_token,
                 question=request.question,
                 user_text=request.user_text,
                 mode=request.mode,
@@ -267,6 +254,7 @@ class RunSessionBuilder:
                 plane=request.plane.strip(),
                 extra_plane=request.extra_plane.strip(),
                 execution_target=request.execution_target.strip(),
+                assistant_id=(getattr(request, "assistant_id", "") or "").strip(),
                 started_at=started_at,
                 locator=locator,
                 event_session=event_session,
@@ -331,23 +319,20 @@ def _clean_attachment_ids(values: Sequence[str]) -> tuple[str, ...]:
 class _ProfileProxy:
     """``ObservabilityRuntime.from_profile`` 接受的 duck-typed profile。
 
-    ADR-0169 §D8 Runtime 是 profile duck-typed —— 只读 ``plan_ref`` /
-    ``runs_root``。web run 不持有完整 Profile 对象,只从
+    ADR-0169 §D8 Runtime 是 profile duck-typed —— 只读 ``plan_ref``。
+    web run 不持有完整 Profile 对象,只从
     :class:`RunSessionRequest` 派生必要字段。
 
     Attributes
     ----------
     plan_ref:
         profile 标识(用于 Incarnation.plan_ref);从 ``request.mode`` 派生。
-    runs_root:
-        run 输出根目录;Runtime 用来构造 StdModelVisibleCapture.run_dir 缺省值。
     """
 
-    __slots__ = ("plan_ref", "runs_root")
+    __slots__ = ("plan_ref",)
 
-    def __init__(self, *, plan_ref: str, runs_root: str) -> None:
+    def __init__(self, *, plan_ref: str) -> None:
         self.plan_ref = plan_ref
-        self.runs_root = runs_root
 
 
 __all__ = ["RunSessionBuilder"]

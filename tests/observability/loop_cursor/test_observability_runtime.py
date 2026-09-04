@@ -2,12 +2,12 @@
 
 验证:
 - ``from_profile(profile, ctx, persistence)`` 返回 frozen Runtime
-- 五缝字段都被填:cursor_factory / projection_host / persistence / capture / barrier
+- 缝族字段都被填:cursor_factory / projection_host / persistence / barrier
 - ``runtime.close(reason)`` 委托给 CloseBarrier
 - ``runtime.make_cursor(run_id, trace_id, spine)`` 派生新 StdLoopCursor
 - Runtime 是 frozen dataclass —— 字段不可改
 
-详细 cursor / host / capture 行为测试在各自模块的 test_*.py 中;
+详细 cursor / host 行为测试在各自模块的 test_*.py 中;
 本测试只验 Runtime 装配 + close 委托契约。
 """
 
@@ -25,9 +25,6 @@ from lca.infrastructure.observability.loop_cursor.close_barrier_impl import (
     StdCloseBarrier,
 )
 from lca.infrastructure.observability.loop_cursor.factory import LoopCursorFactory
-from lca.infrastructure.observability.loop_cursor.model_visible_capture import (
-    StdModelVisibleCapture,
-)
 from lca.infrastructure.observability.loop_cursor.projection_host import StdProjectionHost
 from lca_kernel.observability import ObservabilityRuntime
 
@@ -59,15 +56,13 @@ class _Profile:
         default_factory=lambda: {
             "projection_host": {"initial": ["step_tree", "narrative"]},
             "persistence": {"coalescer": "default", "sink": "routing_file"},
-            "model_visible": {"enabled": True},
             "close_barrier": {"enabled": True},
         }
     )
-    runs_root: str = "traces/runs/r-test"
 
 
 def _build_seam_ctx() -> Any:
-    """Build a cordis Context pre-populated with the five observability seam registries
+    """Build a cordis Context pre-populated with the observability seam registries
     (PR-7). Each registry carries the standard / null providers used by tests.
     """
     from cordis import Context
@@ -78,20 +73,15 @@ def _build_seam_ctx() -> Any:
     )
 
     ctx = Context()
-    # Five seam registries keyed by observability.<seam>.
+    # Seam registries keyed by observability.<seam>.
     ctx.provide("observability.loop_cursor", NamedRegistry())
     ctx.provide("observability.projection_host", NamedRegistry())
-    ctx.provide("observability.model_visible", NamedRegistry())
     ctx.provide("observability.close_barrier", NamedRegistry())
     ctx.provide("observability.persistence", NamedRegistry())
     # Register the same providers the bundle would inject at boot.
     ctx.inject("observability.loop_cursor").register("standard", LoopCursorFactory.from_profile)
     ctx.inject("observability.projection_host").register(
         "standard", lambda initial=None, **_: StdProjectionHost(initial=initial)
-    )
-    ctx.inject("observability.model_visible").register(
-        "standard",
-        lambda run_dir, **_: StdModelVisibleCapture(run_dir=run_dir),
     )
     ctx.inject("observability.close_barrier").register(
         "standard",
@@ -113,15 +103,14 @@ def _build_runtime(tmp_path: Path) -> ObservabilityRuntime:
         profile=_Profile(),
         ctx=_build_seam_ctx(),
         persistence=persistence,
-        run_dir=tmp_path,
     )
 
 
 # ── Tests ───────────────────────────────────────────────────
 
 
-def test_from_profile_returns_runtime_with_five_seams(tmp_path: Path) -> None:
-    """``from_profile`` 返回 Runtime,cursor_factory / host / persistence / capture / barrier 五件齐备。"""
+def test_from_profile_returns_runtime_with_seams(tmp_path: Path) -> None:
+    """``from_profile`` 返回 Runtime,cursor_factory / host / persistence / barrier 齐备。"""
     runtime = _build_runtime(tmp_path)
 
     assert runtime.cursor_factory is not None
@@ -133,8 +122,6 @@ def test_from_profile_returns_runtime_with_five_seams(tmp_path: Path) -> None:
     assert runtime.projection_host is not None
     assert isinstance(runtime.projection_host, StdProjectionHost)
     assert runtime.persistence is not None
-    assert runtime.capture is not None
-    assert isinstance(runtime.capture, StdModelVisibleCapture)
     assert runtime.barrier is not None
     assert isinstance(runtime.barrier, StdCloseBarrier)
 
@@ -196,18 +183,6 @@ def test_close_delegates_to_barrier(tmp_path: Path) -> None:
     assert persistence.flush_calls == 1
 
 
-def test_runtime_default_runs_root_from_profile(tmp_path: Path) -> None:
-    """Profile 提供 ``runs_root`` —— 缺省 run_dir 时 capture 拿它。"""
-    persistence = _StubPersistence()
-    runtime = ObservabilityRuntime.from_profile(
-        profile=_Profile(),
-        ctx=_build_seam_ctx(),
-        persistence=persistence,
-        # run_dir 缺省 → 从 profile.runs_root 拿
-    )
-    assert str(runtime.capture.run_dir) == "traces/runs/r-test"
-
-
 def test_runtime_projection_host_initial_keys(tmp_path: Path) -> None:
     """``profile.observability.projection_host.initial`` 列表传给 host。"""
     runtime = _build_runtime(tmp_path)
@@ -224,21 +199,8 @@ def test_runtime_persistence_injected_unchanged(tmp_path: Path) -> None:
         profile=_Profile(),
         ctx=_build_seam_ctx(),
         persistence=persistence,
-        run_dir=tmp_path,
     )
     assert runtime.persistence is persistence
-
-
-def test_runtime_capture_run_dir_override(tmp_path: Path) -> None:
-    """``run_dir`` 入参覆盖 profile.runs_root。"""
-    persistence = _StubPersistence()
-    runtime = ObservabilityRuntime.from_profile(
-        profile=_Profile(),
-        ctx=_build_seam_ctx(),
-        persistence=persistence,
-        run_dir=tmp_path / "alt",
-    )
-    assert runtime.capture.run_dir == tmp_path / "alt"
 
 
 def test_runtime_close_with_different_reasons(tmp_path: Path) -> None:

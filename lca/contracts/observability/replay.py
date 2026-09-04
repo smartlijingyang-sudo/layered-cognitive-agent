@@ -54,23 +54,8 @@ class CursorDiff:
     actions_b: tuple[Any, ...] = ()
 
 
-@dataclass(frozen=True)
-class ModelVisibleRecord:
-    """``traces/runs/<id>/model_visible/step_N/`` 的目录索引。"""
-
-    run_id: str
-    step_id: str
-    header_path: str | None = None
-    system_prompt_path: str | None = None
-    tool_schemas_path: str | None = None
-    context_manifest_path: str | None = None
-    messages_path: str | None = None
-    digest_verified: bool = False
-
-
 __all__ = [
     "CursorDiff",
-    "ModelVisibleRecord",
     "ReplayCursor",
     "StepContextAt",
 ]

@@ -18,10 +18,11 @@ Public surface
 - :func:`install_observability` —— 把各 seam registry 装配成
   :class:`~lca.infrastructure.observability.facade.facade.BoundObservability`
   并挂到 :class:`cordis.Context` 的 ``"observability"`` 键(ADR-0083)。
-- :class:`ObservabilityRuntime` —— ADR-0169 §D8 五缝 + CloseBarrier 装配
+- :class:`ObservabilityRuntime` —— ADR-0169 §D8 缝族 + CloseBarrier 装配
   入口;Profile 通过 :meth:`ObservabilityRuntime.from_profile` 一次性构造
   ``LoopCursorFactory / ProjectionHost / PersistenceCoordinator /
-  ModelVisibleCapture / CloseBarrier`` 五件套(ADR-0169 §D8)。
+  CloseBarrier``(ADR-0169 §D8;ADR-0185 PR-4 后 capture 缝退场,
+  model-visible 改由 ``ModelVisibleHook`` 走 spine event bus)。
 
 Why a dedicated module
 ----------------------
@@ -33,19 +34,22 @@ Context + Fiber 启动;观测走 :func:`install_observability` 单入口,
 
 ADR-0169 增量(PR-25)
 --------------------
-本文件同时承载 ``ObservabilityRuntime`` —— 五缝架构(ADR-0169 D8)的
-**唯一装配入口**。Runtime 是 ``frozen=True`` dataclass,持有五缝组件
+本文件同时承载 ``ObservabilityRuntime`` —— 缝族架构(ADR-0169 D8)的
+**唯一装配入口**。Runtime 是 ``frozen=True`` dataclass,持有缝族组件
 引用;不持 cursor 实例(每次 :meth:`make_cursor` 派生新 cursor,
 不同 run / 不同 step_id 互不污染)。
 
 Profile 装配步骤(plan §Task 25):
     1. 读 profile 的 ``observability`` 段(plan_ref / projection_host 列表 /
-       persistence 配置 / model_visible / close_barrier 等);
+       persistence 配置 / close_barrier 等);
     2. 构造 :class:`LoopCursorFactory`;
     3. 构造 :class:`StdProjectionHost`(带 default 初始 deriver 列表);
     4. 构造 :class:`StdCloseBarrier`(需要 Persistence / Host / Emitter);
-    5. 构造 :class:`StdModelVisibleCapture`(run_dir 来自 profile.runs_root);
-    6. 把五件套 + factory 一起冻进 :class:`ObservabilityRuntime`。
+    5. 把缝族 + factory 一起冻进 :class:`ObservabilityRuntime`。
+
+ADR-0185 PR-4:原 capture 装配步已删除;model-visible 改由
+``ModelVisibleHook`` 在 LLM adapter 边界走 spine event bus 统一注入,
+Runtime 不再持有 capture 字段。
 
 PersistenceCoordinator 不在 PR-25 装配范围 —— PR-15 已独立构造;
 本 Runtime 接受外部注入的 persistence;为调用方便,``persistence=None``
@@ -56,13 +60,9 @@ fallback 到 :class:`NullPersistenceCoordinator`(ADR-0169 D8 barrier 注入面
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 from lca.contracts.observability.close_barrier import CloseBarrier, CloseReason, CloseReport
-from lca.contracts.observability.model_visible_capture import (
-    ModelVisibleCapture,
-)
 from lca.harness.observability import assemble_observability
 from lca.infrastructure.observability import (
     BoundObservability,
@@ -70,8 +70,8 @@ from lca.infrastructure.observability import (
     ObservabilitySettings,
 )
 
-# PR-7:五缝的实现由 registry 解析并实例化;kernel 不再持有具体类引用。
-# 下列五个 import 仍保留在 docstring(:class:`Foo`)的引用中以便阅读,
+# PR-7:缝族实现由 registry 解析并实例化;kernel 不再持有具体类引用。
+# 下列 import 仍保留在 docstring(:class:`Foo`)的引用中以便阅读,
 # 但本模块运行时不再 import 它们 —— providers 注册它们,
 # from_profile 通过 NamedRegistry.lookup 拿到的实例 duck-types
 # 这些 Protocol / class。仓库 migration 完成时(rg from lca.infrastructure
@@ -84,11 +84,10 @@ __all__ = [
 
 # PR-7:每个 seam 的默认 provider id;profile ``observability.X.implementation``
 # 可显式覆盖。persistence 默认 = null(ADR-0169 D8 调用方注入面永不空);
-# 其他四缝默认 = standard(Std* 默认实现)。
+# 其他缝默认 = standard(Std* 默认实现)。
 _DEFAULT_PROVIDER_KEY: dict[str, str] = {
     "observability.loop_cursor": "standard",
     "observability.projection_host": "standard",
-    "observability.model_visible": "standard",
     "observability.close_barrier": "standard",
     "observability.persistence": "null",
 }
@@ -128,14 +127,17 @@ def install_observability(ctx: Any) -> BoundObservability:
 
 @dataclass(frozen=True)
 class ObservabilityRuntime:
-    """五缝 + CloseBarrier 装配容器(ADR-0169 D8 / PR-25)。
+    """缝族 + CloseBarrier 装配容器(ADR-0169 D8 / PR-25;ADR-0185 PR-4 capture 退场)。
 
-    五缝:
+    字段:
         cursor_factory  : LoopCursorFactory       —— 每次 make_cursor 派生新 cursor
         projection_host : StdProjectionHost       —— 默认注册清单(由 profile.initial 控制)
         persistence     : PersistenceCoordinator   —— 由调用方注入;本 Runtime 不构造
-        capture         : ModelVisibleCapture     —— LLM 边界 5 件套
-        barrier         : CloseBarrier            —— 协调 5 步 close 顺序
+        barrier         : CloseBarrier            —— 协调 close 顺序
+
+    ADR-0185 PR-4:原 capture 缝字段已删除;model-visible 改由
+    ``ModelVisibleHook`` 在 LLM adapter 边界走 spine event bus 统一注入,
+    Runtime 不再持有 capture 实例。
 
     Frozen:Runtime 装配后不可变;字段引用可换但不能原地改。与 ADR-0169
     G6 / L9 一致 —— 持有字段即 SSOT,projection 不再藏在 cursor 里。
@@ -148,7 +150,6 @@ class ObservabilityRuntime:
     cursor_factory: Any  # PR-7:registry-resolved factory (LoopCursorFactory contract)
     projection_host: Any  # PR-7:registry-resolved ProjectionHost instance
     persistence: Any  # PersistenceCoordinator(protocol 位;由调用方注入)
-    capture: ModelVisibleCapture
     barrier: CloseBarrier
     plan_ref: str = "default"  # 从 profile 读;make_cursor 派生 Incarnation 用
 
@@ -161,9 +162,8 @@ class ObservabilityRuntime:
         profile: Any,
         ctx: Any,
         persistence: Any = None,
-        run_dir: Path | str | None = None,
     ) -> ObservabilityRuntime:
-        """Profile → 五缝 + CloseBarrier 装配(ADR-0169 §D8 / PR-25 + PR-7)。
+        """Profile → 缝族 + CloseBarrier 装配(ADR-0169 §D8 / PR-25 + PR-7)。
 
         Parameters
         ----------
@@ -171,30 +171,33 @@ class ObservabilityRuntime:
             Profile / ResolvedProfile / 任意 duck-typed 对象;读 ``plan_ref`` /
             ``observability`` 段(可缺省)。
         ctx:
-            cordis Context,持有五缝 seam registry 提供的能力(PR-7 注入面)。
+            cordis Context,持有缝族 seam registry 提供的能力(PR-7 注入面)。
         persistence:
             :class:`PersistenceCoordinator` 实例;``None`` 时 fallback 到
             seam registry 里 ``observability.persistence['null']`` 提供的
             :class:`NullPersistenceCoordinator`(barrier 注入面永不空)。
             生产路径仍由调用方注入 :class:`FilePersistenceCoordinator`。
-        run_dir:
-            run 输出目录;用于 ModelVisibleCapture。缺省 ``profile.runs_root``。
 
         Returns
         -------
         ObservabilityRuntime
-            已 frozen 的五缝容器;调用方存到 ctx / ProfileBootProducts。
+            已 frozen 的缝族容器;调用方存到 ctx / ProfileBootProducts。
 
         Notes
         -----
         PR-7 改造:原硬编码 ``LoopCursorFactory()`` /
-        ``StdProjectionHost(initial=...)`` / ``StdModelVisibleCapture(...)`` /
+        ``StdProjectionHost(initial=...)`` /
         ``NullPersistenceCoordinator()`` / ``StdCloseBarrier(...)`` 改为
         从 ``ctx.inject("observability.<seam>")`` 拿到 NamedRegistry,
         按 ``profile.observability.<seam>.implementation``(缺省 = standard / null)
         选中 provider 的 factory。``from_profile`` 现在只读 profile 用于
-        plan_ref / initial deriver 列表 / runs_root 等**hints**;真正的
+        plan_ref / initial deriver 列表等**hints**;真正的
         实例化由 registry 完成。
+
+        ADR-0185 PR-4:capture 缝删除后,装配不再 lookup
+        ``observability.model_visible`` registry;model-visible 走
+        ``ModelVisibleHook`` 在 LLM adapter 边界拦截,装配由
+        ``events.model_visible.publisher`` plugin 完成。
 
         delete-when: ``rg "ObservabilityRuntime.from_profile" lca/ lca_kernel/ = 0``
         (transport 装配改走 capability 注入面后,本 wrapper 删除)
@@ -218,21 +221,12 @@ class ObservabilityRuntime:
         initial = _extract_projection_initial(profile)
         projection_host = host_factory(initial=initial or None)
 
-        # ── 3) model visible capture —— registry lookup,run_dir 注入 ──
-        capture_key = _select_provider_key(profile, "model_visible", default="standard")
-        capture_registry = _require_registry(ctx, "observability.model_visible")
-        capture_factory = _lookup_provider(capture_registry, capture_key)
-        resolved_run_dir = (
-            Path(run_dir) if run_dir is not None else Path(_extract_runs_root(profile))
-        )
-        capture: ModelVisibleCapture = capture_factory(run_dir=resolved_run_dir)
-
-        # ── 4) persistence —— 由调用方注入;None 时 fallback null provider ──
+        # ── 3) persistence —— 由调用方注入;None 时 fallback null provider ──
         resolved_persistence: Any = (
             persistence if persistence is not None else _instantiate_null_persistence(ctx)
         )
 
-        # ── 5) close barrier —— registry lookup,collaborators 注入 ──
+        # ── 4) close barrier —— registry lookup,collaborators 注入 ──
         barrier_key = _select_provider_key(profile, "close_barrier", default="standard")
         barrier_registry = _require_registry(ctx, "observability.close_barrier")
         barrier_factory = _lookup_provider(barrier_registry, barrier_key)
@@ -246,7 +240,6 @@ class ObservabilityRuntime:
             cursor_factory=cursor_factory,
             projection_host=projection_host,
             persistence=resolved_persistence,
-            capture=capture,
             barrier=barrier,
             plan_ref=plan_ref,
         )
@@ -363,8 +356,7 @@ def _lookup_provider(registry: NamedRegistry, key: str) -> Any:
     if factory is None:
         available = sorted(registry.all().keys())
         raise RuntimeError(
-            f"observability provider {key!r} not registered; "
-            f"available keys: {available}."
+            f"observability provider {key!r} not registered; available keys: {available}."
         )
     return factory
 
@@ -417,13 +409,6 @@ def _extract_projection_initial(profile: Any) -> list[Any]:
     from lca.contracts.observability.loop_projection import LoopProjectionDefinition
 
     return [item for item in initial_raw if isinstance(item, LoopProjectionDefinition)]
-
-
-def _extract_runs_root(profile: Any) -> str:
-    """从 profile 读 ``runs_root`` 路径;缺省 ``traces/runs/<unknown>``。"""
-    if hasattr(profile, "runs_root"):
-        return str(profile.runs_root)
-    return "traces/runs/unknown"
 
 
 class _NullCloseEmitter:

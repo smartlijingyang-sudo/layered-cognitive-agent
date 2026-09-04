@@ -397,7 +397,7 @@ class PromptReasoner:
         from lca.infrastructure.observability.loop_cursor.model_visible_binding import (
             get_current_model_visible_capture,
         )
-        from lca.infrastructure.observability.loop_cursor.reasoner_prompt_binding import (
+        from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
             CurrentReasonerPrompt,
             bind_current_reasoner_prompt,
         )
@@ -448,7 +448,7 @@ class PromptReasoner:
 
     @staticmethod
     def _reset_reasoner_prompt(token: Any) -> None:
-        from lca.infrastructure.observability.loop_cursor.reasoner_prompt_binding import (
+        from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
             reset_current_reasoner_prompt,
         )
 

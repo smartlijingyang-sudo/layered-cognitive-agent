@@ -23,10 +23,8 @@ LLM 调用前后:
 - prompt 缺席 → ``capture_pre_llm`` 直接返回（旧 capture 走同样路径）
 - 任一 publish 抛错 → 吞错 + log,绝不挡业务(L10)
 
-不动旧 capture
-- :mod:`lca.infrastructure.observability.adapters.model_visible_llm_adapter`
-  与 ``StdModelVisibleCapture`` / ``StdReasonerPromptCapture`` PR-4 删；
-  本 PR 仅添加,与旧路径双轨共存(I-MV-2 收口前的安全迁移期)。
+ADR-0185 PR-4 收口:旧 capture / LLM 装饰器路径全部删除,本 hook
+成为唯一 model-visible 投影入口。
 
 ADR-0185 §3.2 vs reality（偏差已显式记录）:
 
@@ -55,7 +53,7 @@ from lca_kernel.events.payloads_model_visible import (
 
 if TYPE_CHECKING:
     from lca.contracts.observability.loop_cursor import LoopCursor
-    from lca.infrastructure.observability.loop_cursor.reasoner_prompt_binding import (
+    from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
         CurrentReasonerPrompt,
     )
     from lca_kernel.events.bus import EventBus, EventRef
@@ -114,7 +112,7 @@ def _step_id_for(step_index: int) -> str:
     """``step-{step_index:03d}`` —— 与 :class:`LoopCursor` step_id 形态一致。
 
     ADR-0168 §D7 + ADR-0169 D7 step_id 约定 3 位零填充;cursor.snapshot.step_id
-    与 ModelVisibleCapture 派生同一形式。
+    与本 hook 派生同一形式。
     """
     return f"step-{int(step_index):03d}"
 

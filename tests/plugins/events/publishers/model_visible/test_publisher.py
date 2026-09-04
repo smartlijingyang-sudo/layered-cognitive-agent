@@ -28,10 +28,10 @@ from lca_kernel.events.bus import EventBus
 @pytest.fixture
 def hook(bound_session: Any) -> Any:
     """单实例 :class:`ModelVisibleHook` + monkey-patch 的 cursor / prompt providers。"""
-    from lca.infrastructure.observability.loop_cursor.reasoner_prompt_binding import (
+    from lca.plugins.events.hooks.model_visible.hook import ModelVisibleHook
+    from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
         CurrentReasonerPrompt,
     )
-    from lca.plugins.events.hooks.model_visible.hook import ModelVisibleHook
 
     state: dict[str, Any] = {
         "cursor": None,

@@ -1,48 +1,25 @@
-"""StandardCursor —— 零 token 确定性回放(ADR-0167 D10 + ADR-0185 PR-3)。
+"""StandardCursor —— 零 token 确定性回放(ADR-0167 D10 + ADR-0185 PR-3/PR-4)。
 
-读取 ``traces/runs/<run_id>/journal.json`` + ``model_visible/step_N/`` 或
-``<run_id>.spine.jsonl`` fold 重建：
+读取 ``traces/runs/<run_id>/journal.json`` + ``<run_id>.spine.jsonl`` fold 重建：
 
-- ``messages``: 优先 fold 路径(``spine.llm.request.header`` payload
-  原文,ADR-0185 §3.7);缺失时回退 ``model_visible/step_N/messages.json``
-  (PR-3 双轨期);两者均缺失则由 ``journal.json`` 推导并标 ``inferred=True``。
+- ``messages``: 走 fold 路径(``spine.llm.request.header`` payload
+  原文,ADR-0185 §3.7);fold 缺失时由 ``journal.json`` 推导并标
+  ``inferred=True``。
 - ``actions``: 直接读 step 的 ``tool_calls[]`` + ``tool_results[]``,已为
   事实记录。
 - ``digest_verified``: fold 路径 = True(fold canonical header 字节级稳定);
-  sidecar 路径 = sha256(messages) / sha256(tool_schemas) / sha256(manifest)
-  vs ``request-header.json`` 里的 digest。
+  journal 推导路径 = False。
 
 ``with_override(...)`` 仅返回 diff；**绝不私自执行工具**。
 """
 
 from __future__ import annotations
 
-import hashlib
-import json
-from dataclasses import dataclass
 from dataclasses import replace as dc_replace
 from pathlib import Path
 from typing import Any
 
 from lca.contracts.observability.replay import StepContextAt
-
-
-def _sha256(data: Any) -> str:
-    blob = json.dumps(data, ensure_ascii=False, sort_keys=True, default=str).encode("utf-8")
-    return "sha256:" + hashlib.sha256(blob).hexdigest()
-
-
-@dataclass(frozen=True)
-class ModelVisibleSidecar:
-    """``model_visible/step_N/`` 一次性读全 (ADR-0167 D3 / D10)。
-
-    4 个原始 JSON 字段以「None 表示缺省」对齐 reader 的 truthy 检查。
-    """
-
-    header: dict[str, Any] | None = None
-    messages: list[Any] | None = None
-    tool_schemas: list[Any] | None = None
-    manifest: dict[str, Any] | None = None
 
 
 class StandardCursor:
@@ -69,7 +46,8 @@ class StandardCursor:
         if step is None:
             raise IndexError(f"step_index={step_index} not in {journal_path}")
 
-        # ADR-0185 PR-3:fold 路径优先;sidecar 双轨兜底(PR-4 收口后删)。
+        # ADR-0185 PR-4:fold 路径是唯一重建入口;fold 缺失时退化为
+        # journal 推导(inferred=True)。
         folded = fold_model_visible(
             run_dir=run_dir,
             run_id=run_id,
@@ -91,33 +69,20 @@ class StandardCursor:
                 digest_verified=folded.digest_verified,
             )
 
-        sidecar = self._load_model_visible(
-            run_dir / "model_visible" / step.step_id.replace("/", "_")
-        )
-        # 缺失时由 journal 推导（inferred=True）
-        inferred = sidecar.messages is None
-        messages = sidecar.messages if not inferred else self._infer_messages(step)
-        tool_schemas = sidecar.tool_schemas or []
-        manifest = sidecar.manifest or {}
-
-        digest_verified = self._verify_digest(
-            sidecar.header,
-            messages,
-            tool_schemas,
-            manifest,
-        )
+        # fold 缺失:由 journal 推导（inferred=True）
+        messages = self._infer_messages(step)
 
         return StepContextAt(
             step_index=step_index,
             step_id=step.step_id,
-            request_header=sidecar.header,
+            request_header=None,
             messages=tuple(messages),
-            tool_schemas=tuple(tool_schemas),
-            context_manifest=manifest,
+            tool_schemas=(),
+            context_manifest={},
             actions=self._actions_from_step(step),
             source="replayed",
-            inferred=inferred,
-            digest_verified=digest_verified,
+            inferred=True,
+            digest_verified=False,
         )
 
     def with_override(
@@ -156,19 +121,9 @@ class StandardCursor:
 
     # ── helpers ─────────────────────────────────────────
 
-    def _load_model_visible(self, mv_dir: Path) -> ModelVisibleSidecar:
-        if not mv_dir.exists():
-            return ModelVisibleSidecar()
-        return ModelVisibleSidecar(
-            header=self._read_json(mv_dir / "request-header.json"),
-            messages=self._read_json(mv_dir / "messages.json") or [],
-            tool_schemas=self._read_json(mv_dir / "tool-schemas.json") or [],
-            manifest=self._read_json(mv_dir / "context-manifest.json") or {},
-        )
-
     @staticmethod
     def _actions_from_step(step: Any) -> tuple[Any, ...]:
-        """step → actions 序列;fold 路径与 sidecar 路径共用。"""
+        """step → actions 序列;fold 路径与 journal 推导路径共用。"""
         actions: list[Any] = []
         if step.tool_call is not None:
             actions.append({"kind": "tool_call", "data": step.tool_call})
@@ -180,10 +135,8 @@ class StandardCursor:
     def _header_dict_from_fold(folded: Any) -> dict[str, Any]:
         """``FoldedModelVisible`` → ``request_header`` dict。
 
-        形态对齐 :class:`ModelVisibleSidecar.header` 字典口径(便于
-        ``lca-ops journal replay`` JSON 输出与旧 sidecar 形态并行;
-        ``header_digest`` 字段额外提供 fold canonical sha256,viewer
-        可用其对位 publisher ``previous_header_digest``)。
+        ``header_digest`` 字段提供 fold canonical sha256,viewer 可用其
+        对位 publisher ``previous_header_digest``。
         """
         header = folded.header
         if header is None:
@@ -199,12 +152,6 @@ class StandardCursor:
             "source": folded.source,
         }
         return out
-
-    @staticmethod
-    def _read_json(path: Path) -> Any:
-        if not path.exists():
-            return None
-        return json.loads(path.read_text(encoding="utf-8"))
 
     @staticmethod
     def _infer_messages(step: Any) -> list[dict[str, Any]]:
@@ -243,28 +190,5 @@ class StandardCursor:
             )
         return msgs
 
-    @staticmethod
-    def _verify_digest(
-        header: dict[str, Any] | None,
-        messages: list[Any] | None,
-        tool_schemas: list[Any] | None,
-        manifest: dict[str, Any] | None,
-    ) -> bool:
-        if not header:
-            return False
-        messages = messages or []
-        tool_schemas = tool_schemas or []
-        actual = {
-            "messages": _sha256(messages),
-            "tools": _sha256(tool_schemas),
-            "manifest": _sha256(manifest or {}),
-        }
-        expected = {
-            "messages": header.get("messages_digest"),
-            "tools": header.get("tools_digest"),
-            "manifest": header.get("manifest_digest"),
-        }
-        return actual == expected
 
-
-__all__ = ["ModelVisibleSidecar", "StandardCursor"]
+__all__ = ["StandardCursor"]

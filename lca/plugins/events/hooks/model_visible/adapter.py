@@ -1,21 +1,19 @@
 """LLM adapter decorator invoking :class:`ModelVisibleHook` at the boundary.
 
-ADR-0185 §3.2 / PR-3 wiring seam:composer 装配 ``instrument_llm(llm, *, ctx=...)``
-从 ``ctx.soft_get("llm.adapter.hook.model_visible")`` 拿到 hook 实例后,用本
-装饰器替换旧 :class:`ModelVisibleLLMAdapter`(sidecar 文件路径)。装饰器内部:
+ADR-0185 §3.2 / PR-3 wiring seam(PR-4 收口后为唯一 model-visible 边界装饰器):
+composer 装配 ``instrument_llm(llm, *, ctx=...)`` 从
+``ctx.soft_get("llm.adapter.hook.model_visible")`` 拿到 hook 实例后,用本
+装饰器包 LLM 边界。装饰器内部:
 
 1. ``complete(prompt, **kwargs)`` 与 ``stream(prompt, **kwargs)`` 入站前调
    :meth:`ModelVisibleHook.capture_pre_llm`(LLM 边界 snapshot + kwargs);
 2. ``complete`` 返回 / ``stream`` COMPLETED 事件后调
    :meth:`ModelVisibleHook.capture_post_llm`(assistant 响应)。
 
-失败语义与旧装饰器一致(L10 + D5):hook 抛错 / publish 失败 ⇒ 吞错,不挡业务。
+失败语义(L10 + D5):hook 抛错 / publish 失败 ⇒ 吞错,不挡业务。
 装饰器自身只是「调用 hook」,不持有真值、不写盘;所有事实走 hook 内部 fold
 + EventBus.publish,落 :class:`SpineLlmRequestHeaderPayload` /
 :class:`SpineLlmRequestHeaderAssistantPayload` 至 ``<run_id>.spine.jsonl``。
-
-delete-when:PR-4 删旧 :class:`ModelVisibleLLMAdapter` 一并处置(本装饰器随之退役
-或下沉到 hook 模块内私有 helper)。
 """
 
 from __future__ import annotations
@@ -61,8 +59,8 @@ def _snapshot_attrs(cursor: Any) -> tuple[str, int, int] | None:
 class ModelVisibleHookAdapter(LLMAdapter):
     """LLM adapter decorator wiring :class:`ModelVisibleHook` to the boundary.
 
-    与旧 :class:`ModelVisibleLLMAdapter` 同位置(组合根 ``instrument_llm`` 装配
-    时位于 :class:`TelemetryLLMAdapter` 外侧)。装饰顺序(外 → 内):
+    组合根 ``instrument_llm`` 装配时位于 :class:`TelemetryLLMAdapter` 外侧。
+    装饰顺序(外 → 内):
 
         ModelVisibleHookAdapter → TelemetryLLMAdapter → inner
 

@@ -80,7 +80,7 @@ class EventStorage(Protocol):
 
 @runtime_checkable
 class ModelVisibleRecorder(Protocol):
-    """完整模型可见正文（默认 = FilesystemRecorder → model_visible/step_NN/）。"""
+    """完整模型可见正文(默认 = FilesystemRecorder,目录约定见实现)。"""
 
     def record_header(self, step_id: str, header: Any) -> None: ...
     def record_prompt(self, step_id: str, text: str) -> None: ...

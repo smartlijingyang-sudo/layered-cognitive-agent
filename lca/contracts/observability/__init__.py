@@ -37,19 +37,7 @@ from lca.contracts.observability.exception_capture import (
     exc_to_record as exc_to_record,
 )
 from lca.contracts.observability.ledger import RunLedgerFactory as RunLedgerFactory
-from lca.contracts.observability.model_visible_capture import (
-    ModelVisibleArtifact as ModelVisibleArtifact,
-)
-from lca.contracts.observability.model_visible_capture import (
-    ModelVisibleCapture as ModelVisibleCapture,
-)
 from lca.contracts.observability.outcome import Outcome as Outcome
-from lca.contracts.observability.reasoner_prompt_capture import (
-    ReasonerPromptArtifact as ReasonerPromptArtifact,
-)
-from lca.contracts.observability.reasoner_prompt_capture import (
-    ReasonerPromptCapture as ReasonerPromptCapture,
-)
 from lca.contracts.observability.status import (
     RunLifecycleStatus as RunLifecycleStatus,
 )
@@ -63,11 +51,7 @@ __all__ = [
     "EvidenceRef",
     "EvidenceStore",
     "ExceptionRecord",
-    "ModelVisibleArtifact",
-    "ModelVisibleCapture",
     "Outcome",
-    "ReasonerPromptArtifact",
-    "ReasonerPromptCapture",
     "RetentionClass",
     "RunLedgerFactory",
     "RunLifecycleStatus",

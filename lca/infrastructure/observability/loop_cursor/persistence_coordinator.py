@@ -6,8 +6,10 @@
 - ``restore(from_seq) -> Iterator[EventRecord]`` —— checkpoint replay
   从 ``from_seq`` 开始回放事件(由 halt-resume / checkpoint 路径调用)
 
-五缝之一(ADR-0169 D8):LoopCursor(控制) / ProjectionHost(投影) /
-**PersistenceCoordinator(持久化)** / ModelVisibleCapture(边界) / CloseBarrier(关闭)。
+缝族之一(ADR-0169 D8):LoopCursor(控制) / ProjectionHost(投影) /
+**PersistenceCoordinator(持久化)** / CloseBarrier(关闭)。ADR-0185 PR-4
+后 capture 缝退场,改由 ``ModelVisibleHook`` 在 LLM 边界走 spine event bus
+统一注入。
 cursor 不持本组件实例 —— 由 ObservabilityRuntime 持有,
 由 CloseBarrier 协调 flush 顺序。
 

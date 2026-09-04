@@ -1,12 +1,12 @@
-"""ADR-0175 D3:ReasonerPrompt ContextVar 注入。
+"""ADR-0175 D3:ReasonerPrompt ContextVar 注入 — ModelVisibleHook 配套。
 
+ADR-0185 PR-4 收口:该 ContextVar 随 hook 一起迁到
+``lca.plugins.events.hooks.model_visible`` 命名空间,所有权与占用点同位。
 职责:
-- 在 ``RunSessionBuilder.build`` 阶段与 ``install_run_cursor`` /
-  ``install_model_visible_capture`` 配套注入,让
-  :class:`ModelVisibleLLMAdapter` 在 LLM 调用时通过
+- Reasoner 渲染完成后绑定,让 :class:`ModelVisibleHook` 在 LLM 调用时通过
   :func:`get_current_reasoner_prompt` 拿到当前 step 的真 system prompt。
 - ContextVar 隔离多 run;reset token 由 caller 在 close 时释放。
-- Capture 失败 / 缺席时不挡业务(ADR-0169 L10 + D5)。
+- prompt 缺席时 hook 透明降级,不挡业务(ADR-0169 L10 + D5)。
 """
 
 from __future__ import annotations
@@ -23,18 +23,17 @@ from lca.contracts.models.core.perception import ContextManifest
 class CurrentReasonerPrompt:
     """Reasoner 注入到 ContextVar 的最小真值集合。
 
-    ``system_prompt_text`` 为空时,LLM adapter 走降级分支(原有占位)。
+    ``system_prompt_text`` 为空时,hook 走降级分支。
 
     所有权:Reasoner 在 prompt 渲染完成时绑定
     (:meth:`PromptReasoner._bind_reasoner_prompt`),LLM 边界
-    (:class:`ModelVisibleLLMAdapter`)只读 —— 从 ``prompt_trace`` /
-    ``context_manifest`` 派生 model_visible 的 manifest / context-manifest,
-    不修改本对象。
+    (:class:`ModelVisibleHook`)只读 —— 把 ``system_prompt_text`` 写进
+    ``SpineLlmRequestHeaderPayload.system``,不修改本对象。
 
     ``prompt_trace`` / ``context_manifest`` 默认 None,保留既有 4 标量
     构造;绑定时携带完整 :class:`PromptTrace`(section trace + skill ids)
-    与本 turn 的 :class:`ContextManifest`,使 model_visible/step_<NN>/ 可
-    重建 skill / prompt 装配(ADR-0167 D3/D4)。
+    与本 turn 的 :class:`ContextManifest`,使 spine event 可重建
+    skill / prompt 装配(ADR-0167 D3/D4)。
     """
 
     step_id: str

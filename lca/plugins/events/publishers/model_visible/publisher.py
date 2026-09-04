@@ -11,20 +11,17 @@ PR-2 目标:
 
 不动:
 
-- 旧 :mod:`lca.infrastructure.observability.adapters.model_visible_llm_adapter`
-  + :class:`StdModelVisibleCapture` / :class:`StdReasonerPromptCapture` 双轨共存
-  到 PR-4 收口;
 - fold 模块（PR-0 已合）;
 - typed payload（PR-1 已合）;
 - spine.yaml 非 publishers 字段。
 
-双轨期（PR-2 → PR-3 → PR-4）行为:
+ADR-0185 PR-4 收口后,旧 capture / LLM 装饰器路径全部删除,
+本 plugin 装配为唯一 producer:
 
-- 旧 capture 路径仍写 ``<run_dir>/model_visible/<step>/`` 旁路文件 +
-  旧 EP ``llm.request.header``;
-- 新 plugin setup 实例化 :class:`ModelVisibleHook`,但**不**主动挂到
-  LLM adapter 链（PR-3 装配,本 PR 避免重复挂载 / 双发）;
-- yaml 鉴权已把 producer 替换为本 plugin;旧 reflector 的
+- plugin setup 实例化 :class:`ModelVisibleHook` 并注入
+  ``llm.adapter.hook.model_visible``;composer ``instrument_llm`` 在
+  LLM adapter 装饰器链用它包边界;
+- yaml 鉴权把两类 category 的 producer 钉到本 plugin;旧 reflector 的
   ``emit_llm_call_*`` 类函数不触达这两类 category,无回归。
 """
 
@@ -50,15 +47,15 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
     get_current_cursor,
 )
-from lca.infrastructure.observability.loop_cursor.reasoner_prompt_binding import (
-    get_current_reasoner_prompt,
-)
 
 # Eager import 让 hook 模块的 module-level forward-ref rebuild 在 publisher
 # import 时跑(测试 / 业务方直接调 SpineLlmRequestHeaderPayload 不再需要
 # 先 model_rebuild)。
 from lca.plugins.events.hooks.model_visible import (
     hook as _hook_module,  # noqa: F401  (import for side effect)
+)
+from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
+    get_current_reasoner_prompt,
 )
 
 
@@ -117,31 +114,23 @@ class ModelVisiblePublisher:
     marker_class=ModelVisiblePublisher,
 )
 async def setup(ctx: PluginContext, config: _Config) -> None:
-    """model_visible publisher boot:注册 marker + 实例化 hook(由 PR-3 接入)。
+    """model_visible publisher boot:注册 marker + 实例化 hook。
 
-    本 PR 仅做两件事:
+    做两件事:
 
     1. ``ctx.provide("event.bus.publisher.model_visible", ModelVisiblePublisher)``
        —— yaml 鉴权矩阵按 id 解析到 marker,生产者 publish 时通过
        ``producer=ModelVisiblePublisher`` 鉴权通过。
-    2. 实例化 :class:`ModelVisibleHook` 并注入 ctx(键 ``llm.adapter.hook.model_visible``),
-       给 PR-3 装配用 —— PR-3 在 LLM adapter 装饰器链替换时调
-       ``ctx.soft_get("llm.adapter.hook.model_visible")`` 拿到实例,
-       挂到新的 ModelVisibleLLMAdapter 内。
-
-    不在本 PR 做的事(显式列出避免 scope creep):
-
-    - 不挂到现有 LLM adapter 装饰器链(旧 ``ModelVisibleLLMAdapter`` 已挂载;
-      双挂会导致双发,违反 I-FW-BUS-1);
-    - 不替换 ``cursor.record_request_header`` 调用(PR-3 改 cursor 内部);
-    - 不删旁路文件 / 旧 capture(PR-4 收口)。
+    2. 实例化 :class:`ModelVisibleHook` 并注入 ctx(键 ``llm.adapter.hook.model_visible``);
+       composer ``instrument_llm(llm, ctx=...)`` 软查该键,把
+       :class:`ModelVisibleHookAdapter` 挂到 LLM adapter 装饰器链最外层。
     """
     from lca_kernel.events.bus import EventBus
 
     ctx.provide("event.bus.publisher.model_visible", ModelVisiblePublisher)
 
-    # 实例化 hook 并 provide 给 PR-3 装配。EventBus.default() 走进程单例
-    # (与旧 capture 路径同一总栈);测试可注入 EventBus mock。
+    # 实例化 hook 并 provide 给 composer 装配。EventBus.default() 走进程单例;
+    # 测试可注入 EventBus mock。
     bus: Any = EventBus.default()
     hook = _build_hook(bus=bus)
     ctx.provide("llm.adapter.hook.model_visible", hook)

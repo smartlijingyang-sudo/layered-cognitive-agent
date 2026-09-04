@@ -1,8 +1,7 @@
 """ModelVisibleFoldSource —— 从 ``<run_id>.spine.jsonl`` 重建 model-visible。
 
-ADR-0185 §3.4 + §3.7:把"viewer 反查 ``<run_dir>/model_visible/``"路径切到
-``foldRequestHeader`` fold 重建,spine.jsonl 取代旁路文件为唯一 SSOT
-(I-FW-SSOT-1 + I-MV-2)。
+ADR-0185 §3.4 + §3.7:viewer 反查 model-visible 走 ``foldRequestHeader``
+fold 重建,spine.jsonl 为唯一 SSOT（I-FW-SSOT-1 + I-MV-2）。
 
 设计:
 
@@ -10,16 +9,11 @@ ADR-0185 §3.4 + §3.7:把"viewer 反查 ``<run_dir>/model_visible/``"路径切�
 - 走 :class:`lca_kernel.events.fold.foldRequestHeader` 离线 fold
 - 输入 = run_dir + run_id + step_id,输出 = 重建的 ``(header, messages,
   tool_schemas, manifest, source, digest_verified)``
-- spine 文件缺失 / 无 model-visible 事件 → 返回 ``None``(由 caller 决定
-  走旁路 fallback 还是 fail-fast)
+- spine 文件缺失 / 无 model-visible 事件 → 返回 ``None``(caller 退化为
+  journal 推导)
 
-不动旧 capture 路径(PR-3 双轨共存 → PR-4 收口):
-- :mod:`lca.infrastructure.observability.replay.cursor` 仍保留
-  :class:`ModelVisibleSidecar` + ``<run_dir>/model_visible/`` fallback;
-  本模块作为新的「优先 source」挂到 ``StandardCursor.at()`` 之前。
-
-delete-when:PR-4(收口后本模块取代 ``_load_model_visible``;本文件保留作
-PR-3 期间的 seam,PR-4 删 ``ModelVisibleSidecar`` + ``<run_dir>/model_visible/``)。
+ADR-0185 PR-4 收口:旧 ``<run_dir>/model_visible/`` 旁路读取已删除,
+本模块是唯一 model-visible viewer 重建入口。
 """
 
 from __future__ import annotations
@@ -89,12 +83,8 @@ class FoldedModelVisible:
       摘要;``""`` 表无 fold。
     - ``source`` —— 标记 fold 路径,常量化于
       :data:`SOURCE_FOLD`。
-    - ``digest_verified`` —— :data:`True`(fold 路径默认真;旧
-      sidecar ``messages_digest`` 字节级对位的语义由本字段统一表
-      达,fold 路径永远走 canonical = True)。
-
-    ``FoldedModelVisible`` 与旧 :class:`ModelVisibleSidecar` 是平行
-    概念;**不**继承;caller 决定走哪条(双轨期 fold 优先,sidecar 兜底)。
+    - ``digest_verified`` —— :data:`True`(fold 路径默认真;
+      fold 路径永远走 canonical = True)。
     """
 
     header: EpochHeader | None
@@ -217,23 +207,20 @@ def fold_model_visible(
 
     Returns:
         :class:`FoldedModelVisible` 重建结果;``None`` 表 spine 文件不存在
-        或该 step_id 无 model-visible 事件流(由 caller 决定 fail-fast
-        还是走旁路 fallback)。
+        或该 step_id 无 model-visible 事件流(caller 退化为 journal 推导)。
 
     失败语义:
 
-    - spine ledger 不存在 → ``None``(``SpineReader.events()`` 不抛;
-      caller 走旁路或 fail-fast 由 caller 决定)
+    - spine ledger 不存在 → ``None``(``SpineReader.events()`` 不抛)
     - spine 存在但该 step_id 无 request/header 事件 → ``None``
     - 解析 payload 失败 → ``None``(skip + log)
     - 任一环节失败均不抛;best-effort fold
 
     时序:无副作用;不调 LLM / tool / bus;纯 IO + 纯函数 fold。
 
-    所有权:本函数由 :class:`StandardCursor.at()` 在 PR-3 期间优先调用;
-    webserver / dashboard 调方(PR-3.1)同样走此 seam。PR-4 收口后
-    :class:`ModelVisibleSidecar` 删除,本函数成唯一 model-visible
-    viewer 入口。
+    所有权:本函数由 :class:`StandardCursor.at()` 调用;
+    webserver / dashboard 调方同样走此 seam,是唯一 model-visible
+    viewer 重建入口。
     """
     from lca.infrastructure.observability.spine.sinks.naming import (
         spine_filename_for_run,

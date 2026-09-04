@@ -105,9 +105,6 @@ class _Context:
             StdCloseBarrier,
         )
         from lca.infrastructure.observability.loop_cursor.factory import LoopCursorFactory
-        from lca.infrastructure.observability.loop_cursor.model_visible_capture import (
-            StdModelVisibleCapture,
-        )
         from lca.infrastructure.observability.loop_cursor.persistence_coordinator import (
             NullPersistenceCoordinator,
         )
@@ -117,7 +114,6 @@ class _Context:
 
         self._services["observability.loop_cursor"] = NamedRegistry()
         self._services["observability.projection_host"] = NamedRegistry()
-        self._services["observability.model_visible"] = NamedRegistry()
         self._services["observability.close_barrier"] = NamedRegistry()
         self._services["observability.persistence"] = NamedRegistry()
         self._services["observability.loop_cursor"].register(
@@ -125,9 +121,6 @@ class _Context:
         )
         self._services["observability.projection_host"].register(
             "standard", lambda initial=None, **_: StdProjectionHost(initial=initial)
-        )
-        self._services["observability.model_visible"].register(
-            "standard", lambda run_dir, **_: StdModelVisibleCapture(run_dir=run_dir)
         )
         self._services["observability.close_barrier"].register(
             "standard",

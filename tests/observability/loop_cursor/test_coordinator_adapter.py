@@ -31,12 +31,10 @@ from lca.contracts.models.observability.journal_step import (
 from lca.contracts.observability.incarnation import Incarnation
 from lca.contracts.observability.loop_cursor import CursorSnapshot
 from lca.infrastructure.observability.loop_cursor import StdLoopCursor
-from lca.infrastructure.observability.loop_cursor._capture_io import (
-    sha256_digest,
-)
 from lca.infrastructure.observability.loop_cursor._spine_port import WritePort
 from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
     CoordinatorAdapter,
+    sha256_digest,
 )
 from lca.infrastructure.observability.writable_matrix.coordinator import StepCoordinator
 from lca.infrastructure.observability.writable_matrix.registry import (
@@ -192,7 +190,7 @@ def test_adapter_record_thinking_emits_cursor_thinking_ep() -> None:
     # payload 字段映射:token_count = prompt + completion = 30
     thinking_ep = next(r for r in spine.records if r["execution_point"] == "step.thinking.record")
     assert thinking_ep["payload"]["content_digest"].startswith("sha256:")
-    # The digest is computed via ``_capture_io.sha256_digest``; we
+    # The digest is computed via ``coordinator_adapter.sha256_digest``; we
     # accept any sha256:<hex> with the right payload shape so the
     # test stays independent of the exact hash.
     expected_thinking_digest = sha256_digest({"reasoning": "reasoning text"})

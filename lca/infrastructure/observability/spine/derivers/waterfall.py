@@ -11,9 +11,8 @@ Consumes spine events; on flush renders static HTML:
 - 每条 spine event 一行（按 sequence 升序）
 - 时间轴 / 状态色 / token 切片
 - 每个 think 段的 "model saw" 链接由 caller 传入的 ``model_visible_root``
-  拼接:PR-3 起默认指向 ``<run_id>.spine.jsonl``(fold SSOT,
-  ``foldRequestHeader`` 重建;见 ADR-0185 §3.7);双轨期仍可传
-  ``<run_dir>/model_visible/step_N/``(fallback sidecar,PR-4 收口删除)。
+  拼接:默认指向 ``<run_id>.spine.jsonl``(fold SSOT,
+  ``foldRequestHeader`` 重建;见 ADR-0185 §3.7)。
 
 不绑 LobeHub / WebServer;CLI 仅 ``lca-ops journal trajectory <run_id>``。
 """

@@ -12,8 +12,6 @@ shows a complete inventory of legacy paths.
 |---|---|---|
 | `coordinator_adapter.py` (via re-export) | `CoordinatorAdapter`, `bind_current_cursor`, `current_cursor`, `get_current_cursor`, `reset_current_cursor` | `rg "coord.begin_step\\|coord.record_thinking\\|coord.emit_phase" lca/cognition lca/body lca/runtime lca/agent` = 0 |
 | `bind.py` (via re-export) | `install_run_cursor`, `reset_run_cursor` | `rg "bind_current_cursor\\|get_current_cursor" lca/` = 0 |
-| `model_visible_binding.py` (via re-export) | `install_model_visible_capture`, `bind_current_capture`, `reset_current_capture`, `reset_model_visible_capture` | n/a — already thin ContextVar shim |
-| `reasoner_prompt_binding.py` (via re-export) | `bind_current_reasoner_prompt`, `get_current_reasoner_prompt`, `install_reasoner_prompt`, `reset_current_reasoner_prompt`, `reset_reasoner_prompt` | n/a — already thin ContextVar shim |
 
 ## Sunsetting rule
 

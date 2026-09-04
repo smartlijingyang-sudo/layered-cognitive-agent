@@ -18,7 +18,6 @@ from lca.contracts.protocols import (
 )
 from lca.contracts.protocols.journal.spec import AgentSpec
 from lca.infrastructure.observability.adapters import (
-    ModelVisibleLLMAdapter,
     TelemetryLLMAdapter,
 )
 from lca.plugins.composer.composition.skill_store import active_skill_store
@@ -31,31 +30,26 @@ def instrument_llm(
     *,
     ctx: object | None = None,
 ) -> LLMAdapter:
-    """Wrap ``llm`` with model-visible + telemetry decorators (组合根 PR-12.5 / PR-3)。
+    """Wrap ``llm`` with model-visible + telemetry decorators (组合根)。
 
     装配顺序(外 → 内):
         ModelVisibleHookAdapter → TelemetryLLMAdapter → inner
 
-    PR-3 切线(ADR-0185 §5 / PR-3):当 ``ctx`` 非 None 且能从
-    ``ctx.soft_get("llm.adapter.hook.model_visible")`` 拿到 PR-2
-    :class:`ModelVisibleHook` 实例,改用
-    :class:`ModelVisibleHookAdapter` 取代旧
-    :class:`ModelVisibleLLMAdapter`,把 model-visible 落盘从
-    ``<run_dir>/model_visible/step_<NN>/{...}.json`` + 旧
-    ``llm.request.header`` EP 切到 ``<run_id>.spine.jsonl`` 两条 model-visible
-    spine event(``spine.llm.request.header`` + ``spine.llm.request.header.assistant``)。
+    ADR-0185 PR-4 收口:当 ``ctx`` 非 None 且能从
+    ``ctx.soft_get("llm.adapter.hook.model_visible")`` 拿到
+    :class:`ModelVisibleHook` 实例,用
+    :class:`ModelVisibleHookAdapter` 包边界,把 model-visible 真值落
+    ``<run_id>.spine.jsonl`` 两条 model-visible spine event
+    (``spine.llm.request.header`` + ``spine.llm.request.header.assistant``)。
 
-    ctx 缺失 / hook 未挂载 / 不支持软查 ⇒ 回退旧 wiring(测试 + 离 boot 路径)。
-    双轨期(PR-3 → PR-4)用新 wiring 时旧 ``ModelVisibleLLMAdapter`` 不再被
-    composer 装配(还在仓里,供单测 / 直接 import 的消费者使用);PR-4 一并删
-    旧 adapter 与旁路文件。
+    ctx 缺失 / hook 未挂载 / 不支持软查 ⇒ 只包 telemetry,
+    model-visible 透明缺席(测试 + 离 boot 路径不写 spine event)。
 
     - LLM 调用前 hook ``capture_pre_llm`` fold 优化 + publish
       ``spine.llm.request.header``(ADR-0185 §3.5)
     - LLM 调用后 hook ``capture_post_llm`` publish
-      ``spine.llm.request.header.assistant``,顺手修复 Note
-      ``2026-09-03-model-visible-incomplete-projection.md`` 的 3 BUG
-    - 任何 hook 缺席 / publish 抛错 ⇒ 透明透传(不写盘、不落 EP、业务继续)
+      ``spine.llm.request.header.assistant``
+    - 任何 hook 缺席 / publish 抛错 ⇒ 透明透传(不落 EP、业务继续)
 
     Telemetry 部分:
 
@@ -75,7 +69,6 @@ def instrument_llm(
     #   TelemetryLLMAdapter._append_thinking_session_event 的删除条件退役;
     #   tracking: thinking.* Session 双写改动, 2026-09-04)
     instrumented = TelemetryLLMAdapter(existing_telemetry)
-    model_name = _resolve_model_name(instrumented)
 
     hook = _resolve_model_visible_hook(ctx)
     if hook is not None:
@@ -85,7 +78,7 @@ def instrument_llm(
 
         return ModelVisibleHookAdapter(instrumented, hook)
 
-    return ModelVisibleLLMAdapter(instrumented, model=model_name)
+    return instrumented
 
 
 def _resolve_model_visible_hook(ctx: object | None) -> Any:
@@ -114,16 +107,6 @@ def _resolve_model_visible_hook(ctx: object | None) -> Any:
 
         return collect_context_bindings(ctx).get(_MODEL_VISIBLE_HOOK_KEY)
     return None
-
-
-def _resolve_model_name(adapter: LLMAdapter) -> str:
-    """从装饰链取模型名(供 ModelVisible 记录 manifest.model)。"""
-    inner = getattr(adapter, "_inner", None) or adapter
-    for attr in ("_model", "model"):
-        name = getattr(inner, attr, None)
-        if isinstance(name, str) and name:
-            return name
-    return "unknown"
 
 
 def resolve_brain(spec: AgentSpec, llm: LLMAdapter, *, scope: object) -> Brain:

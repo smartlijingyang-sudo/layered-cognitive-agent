@@ -34,15 +34,12 @@ from lca.plugins.transport.webserver.handlers.runs.session.session import RunReg
 
 
 def _install_observability_seams(services: dict[str, object]) -> None:
-    """Bind ObservabilityRuntime five-seam registries for stub ctx."""
+    """Bind ObservabilityRuntime seam registries for stub ctx."""
     from lca.infrastructure.observability import NamedRegistry
     from lca.infrastructure.observability.loop_cursor.close_barrier_impl import (
         StdCloseBarrier,
     )
     from lca.infrastructure.observability.loop_cursor.factory import LoopCursorFactory
-    from lca.infrastructure.observability.loop_cursor.model_visible_capture import (
-        StdModelVisibleCapture,
-    )
     from lca.infrastructure.observability.loop_cursor.persistence_coordinator import (
         NullPersistenceCoordinator,
     )
@@ -52,14 +49,12 @@ def _install_observability_seams(services: dict[str, object]) -> None:
 
     loop_cursor = NamedRegistry()
     projection_host = NamedRegistry()
-    model_visible = NamedRegistry()
     close_barrier = NamedRegistry()
     persistence = NamedRegistry()
     loop_cursor.register("standard", LoopCursorFactory.from_profile)
     projection_host.register(
         "standard", lambda initial=None, **_: StdProjectionHost(initial=initial)
     )
-    model_visible.register("standard", lambda run_dir, **_: StdModelVisibleCapture(run_dir=run_dir))
     close_barrier.register(
         "standard",
         lambda persistence, host, close_emitter, **_: StdCloseBarrier(
@@ -69,7 +64,6 @@ def _install_observability_seams(services: dict[str, object]) -> None:
     persistence.register("null", lambda **_: NullPersistenceCoordinator())
     services["observability.loop_cursor"] = loop_cursor
     services["observability.projection_host"] = projection_host
-    services["observability.model_visible"] = model_visible
     services["observability.close_barrier"] = close_barrier
     services["observability.persistence"] = persistence
 

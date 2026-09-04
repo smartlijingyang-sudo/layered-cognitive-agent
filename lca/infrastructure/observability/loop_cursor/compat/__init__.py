@@ -17,15 +17,6 @@ Re-exports kept alive here
   is 0 (tracked in the COMPAT block at the top of
   ``coordinator_adapter.py``).
 
-- ``bind_current_*`` / ``reset_current_*`` / ``install_*`` /
-  ``reset_*`` ContextVar helpers — the historic pair of thin
-  re-export pairs that exist only for backwards compatibility with
-  pre-consolidation imports.  The single source of truth lives in
-  :mod:`lca.infrastructure.observability.loop_cursor.model_visible_binding`
-  and :mod:`...reasoner_prompt_binding`; the ``bind_*`` aliases in
-  this subpackage forward to the canonical ``install_*`` / ``reset_*``
-  names.
-
 Sunset tracking
 ----------------
 
@@ -33,6 +24,9 @@ Each item below corresponds to one of the four ADR-mandated deletion
 conditions. When a grep drops to zero, the file is deleted and this
 manifest shrinks. See ``README.md`` adjacent.
 
+ADR-0185 PR-4:旧 capture / LLM 装饰器 / capture ContextVar 全部删除,
+本 compat 不再 re-export。ReasonerPrompt ContextVar 真值已迁至
+``lca.plugins.events.hooks.model_visible.reasoner_prompt``。
 """
 
 from __future__ import annotations
@@ -51,35 +45,13 @@ from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
     get_current_cursor,
     reset_current_cursor,
 )
-from lca.infrastructure.observability.loop_cursor.model_visible_binding import (
-    bind_current_capture,
-    install_model_visible_capture,
-    reset_current_capture,
-    reset_model_visible_capture,
-)
-from lca.infrastructure.observability.loop_cursor.reasoner_prompt_binding import (
-    bind_current_reasoner_prompt,
-    get_current_reasoner_prompt,
-    install_reasoner_prompt,
-    reset_current_reasoner_prompt,
-    reset_reasoner_prompt,
-)
 
 __all__ = [
     "CoordinatorAdapter",
-    "bind_current_capture",
     "bind_current_cursor",
-    "bind_current_reasoner_prompt",
     "current_cursor",
     "get_current_cursor",
-    "get_current_reasoner_prompt",
-    "install_model_visible_capture",
-    "install_reasoner_prompt",
     "install_run_cursor",
-    "reset_current_capture",
     "reset_current_cursor",
-    "reset_current_reasoner_prompt",
-    "reset_model_visible_capture",
-    "reset_reasoner_prompt",
     "reset_run_cursor",
 ]

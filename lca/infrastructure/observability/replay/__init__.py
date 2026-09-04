@@ -1,7 +1,6 @@
 """init."""
 
 from lca.infrastructure.observability.replay.cursor import (
-    ModelVisibleSidecar,
     StandardCursor,
 )
 from lca.infrastructure.observability.replay.fold_source import (
@@ -13,7 +12,6 @@ from lca.infrastructure.observability.replay.fold_source import (
 __all__ = [
     "SOURCE_FOLD",
     "FoldedModelVisible",
-    "ModelVisibleSidecar",
     "StandardCursor",
     "fold_model_visible",
 ]

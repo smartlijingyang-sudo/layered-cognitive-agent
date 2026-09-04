@@ -28,7 +28,6 @@ from lca.contracts.observability.status import RunLifecycleStatus
 from lca.contracts.protocols import JournalProjector
 from lca.infrastructure.observability import BoundObservability
 from lca.infrastructure.observability.loop_cursor import (
-    reset_model_visible_capture,
     reset_run_cursor,
 )
 from lca.plugins.transport.webserver.handlers.runs.observability.identity import (
@@ -90,6 +89,7 @@ class RunSession:
     plane: str = ""
     extra_plane: str = ""
     execution_target: str = ""
+    assistant_id: str = ""  # ADR-0187 §3 D7：本 run 绑定的助理 id（空 = 遗留路径）
     started_at: float = 0.0
     locator: RunLocator | None = None  # ADR-0065 PR-11: run 级 locator 引用
     thread_tree_writer: object | None = None  # ADR-0186 PR-3g: per-run StepTreeFoldDeriver
@@ -97,12 +97,6 @@ class RunSession:
     loop_cursor: object | None = None  # ADR-0169 §D11 PR-1.5: LoopCursor(写入 cursor 的入口)
     loop_cursor_token: object | None = (
         None  # ADR-0169 §D11 PR-1.5: ContextVar reset token (close 时释放)
-    )
-    model_visible_capture: object | None = (
-        None  # ADR-0169 PR-12.5: per-run ModelVisibleCapture 引用
-    )
-    model_visible_capture_token: object | None = (
-        None  # ADR-0169 PR-12.7: ContextVar reset token (close 时释放)
     )
     event_session: BoundRunEventSession | None = None  # ADR-0186: per-run DSH Session 绑定
 
@@ -115,14 +109,13 @@ class RunSession:
     def close(self, reason: CloseReason) -> bool:
         """释放 run-local ContextVar token 与 per-run Session 绑定。
 
-        PR-1.5 / PR-12.5 builder 里 ``install_run_cursor`` 与
-        ``install_model_visible_capture`` 配对操作。原本两者只 set token 不
-        reset,在多 run 时 ContextVar 内部字典无限增长(单进程 leak)。
-        是 PR-12.7 close hook 入口,被 :class:`RunTerminalizer.terminalize`
+        PR-1.5 builder 里 ``install_run_cursor`` 的配对操作。原本只 set token
+        不 reset,在多 run 时 ContextVar 内部字典无限增长(单进程 leak)。
+        是 close hook 入口,被 :class:`RunTerminalizer.terminalize`
         在 finalize 后调一次。ADR-0186:同时 reset publish/observe 槽位并
         dispose SessionStore 条目。
 
-        ADR-0169 D5/L10 + PR-12.7:reset 不可重复 — 调用后清字段,
+        ADR-0169 D5/L10:reset 不可重复 — 调用后清字段,
         第二次调用返回 ``False`` 告知 terminalizer 「已 close」,防双 close 重入。
 
         Returns
@@ -137,10 +130,6 @@ class RunSession:
             with contextlib.suppress(Exception):
                 reset_run_cursor(self.loop_cursor_token)
             self.loop_cursor_token = None
-        if self.model_visible_capture_token is not None:
-            with contextlib.suppress(Exception):
-                reset_model_visible_capture(self.model_visible_capture_token)
-            self.model_visible_capture_token = None
         bound = getattr(self, "event_session", None)
         with contextlib.suppress(Exception):
             unbind_run_event_session(bound)
