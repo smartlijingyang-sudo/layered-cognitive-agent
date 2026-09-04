@@ -106,6 +106,32 @@ class SkillUserInvoked:
     raw_text: str
 
 
+@session_event("skill.activated.v1", visibility="audit")
+@dataclass(frozen=True)
+class SkillActivated:
+    """One skill whose instructions entered agent context as active guidance.
+
+    ``source`` names the activation path, e.g. ``"tool:activate_skill"``,
+    ``"slash:/skill"``, ``"skill_tool"``.
+    """
+
+    skill_id: str
+    name: str
+    content_hash: str = ""
+    activated_at_step: int = 0
+    source: str = "tool"
+
+
+@session_event("skill.routed.v1", visibility="audit")
+@dataclass(frozen=True)
+class SkillRouted:
+    """One prompt-template routing decision produced by a SkillRouter."""
+
+    template_id: str
+    decision_path: str
+    source: str = "skill_router"
+
+
 @session_event("model.requested.v1", visibility="audit")
 @dataclass(frozen=True)
 class ModelRequested:

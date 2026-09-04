@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
+from lca.contracts.harness.memory.events import SkillRouted
 from lca.contracts.harness.tasks.session import SESSION_FORMAT_VERSION, SessionHeader
 from lca.harness.projection.registry import InMemoryProjectionRegistry
 from lca.harness.session.store import SessionStore
@@ -73,10 +74,14 @@ def test_model_tool_and_user_slash_share_provider_and_write_auditable_facts(tmp_
     assert [event.type for event in session.events()] == [
         "skill.catalog.published.v1",
         "skill.loaded.v1",
+        "skill.activated.v1",
         "skill.user_invoked.v1",
         "skill.loaded.v1",
+        "skill.activated.v1",
         "context.injected.v1",
     ]
+    activated = [event for event in session.events() if event.type == "skill.activated.v1"]
+    assert [event.data["source"] for event in activated] == ["skill_tool", "slash:/skill"]
 
 
 def test_user_slash_activation_loads_once_through_catalog_seam(tmp_path) -> None:
@@ -105,6 +110,7 @@ def test_user_slash_activation_loads_once_through_catalog_seam(tmp_path) -> None
     assert [event.type for event in session.events()] == [
         "skill.user_invoked.v1",
         "skill.loaded.v1",
+        "skill.activated.v1",
         "context.injected.v1",
     ]
 
@@ -116,6 +122,10 @@ def test_skills_projection_replays_durable_facts_without_disk_access(tmp_path) -
     async def scenario() -> None:
         await catalog.publish_catalog("ses-skills", session)
         await SkillSlashActivationPolicy(catalog).pre_step("ses-skills", "/reports", session)
+        await session.append(
+            SkillRouted(template_id="research_prompt", decision_path="keyword_match"),
+            actor="system",
+        )
 
     asyncio.run(scenario())
 
@@ -127,3 +137,51 @@ def test_skills_projection_replays_durable_facts_without_disk_access(tmp_path) -
     assert view["available"][0]["skill_id"] == "reports"
     assert view["loaded"][0]["invocation"] == "user"
     assert view["user_invocations"] == ["reports"]
+
+    (activated,) = view["activated"]
+    assert activated["skill_id"] == "reports"
+    assert activated["name"] == "Reporting"
+    assert activated["content_hash"] == view["loaded"][0]["content_hash"]
+    assert activated["activated_at_step"] == 0
+    assert activated["source"] == "slash:/skill"
+
+    (routed,) = view["routed"]
+    assert routed["template_id"] == "research_prompt"
+    assert routed["decision_path"] == "keyword_match"
+    assert routed["source"] == "skill_router"
+    assert routed["seq"] == session.events()[-1].seq
+
+
+def test_model_tool_load_emits_paired_loaded_and_activated_facts(tmp_path) -> None:
+    catalog = SkillCatalogService(DiskSkillProvider(_store(tmp_path)))
+    session = _session()
+
+    async def scenario() -> None:
+        tool = SkillLoadTool(catalog, session_id="ses-skills", events=session)
+        result = await tool.execute({"name": "Reporting"})
+        assert result.success is True
+
+    asyncio.run(scenario())
+    events = session.events()
+    assert [event.type for event in events] == ["skill.loaded.v1", "skill.activated.v1"]
+    activated = events[1]
+    assert activated.visibility == "audit"
+    assert activated.actor == "agent"
+    assert activated.data["skill_id"] == "reports"
+    assert activated.data["name"] == "Reporting"
+    assert activated.data["content_hash"] == events[0].data["content_hash"]
+    assert activated.data["activated_at_step"] == 0
+    assert activated.data["source"] == "skill_tool"
+
+
+def test_model_tool_load_failure_emits_no_activation_fact(tmp_path) -> None:
+    catalog = SkillCatalogService(DiskSkillProvider(_store(tmp_path)))
+    session = _session()
+
+    async def scenario() -> None:
+        tool = SkillLoadTool(catalog, session_id="ses-skills", events=session)
+        result = await tool.execute({"name": "missing"})
+        assert result.success is False
+
+    asyncio.run(scenario())
+    assert session.events() == ()
