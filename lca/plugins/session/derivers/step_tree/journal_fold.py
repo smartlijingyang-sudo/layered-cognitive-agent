@@ -273,13 +273,32 @@ def _close_step(state: _StepTreeState, outcome: str) -> None:
 
 
 def _resolve_target(state: _StepTreeState, payload: Mapping[str, Any]) -> _Frame | None:
+    """返回这条工具事件应该 attach 的 step 帧。
+
+    优先级:
+    1. ``open_step`` —— 当前开着的帧。
+    2. ``payload.step_index`` → ``step-{index:03d}``(与 cursor / hook 同
+       派生,ADR-0168 §D7)匹配已关帧的 ``step_id`` —— header 开的帧其
+       step_id 由 header payload 写入,即使帧索引与 cursor 索引漂移
+       (无 header 的隐式 think 步多占帧号)也能精确归属。
+    3. 最近一个已关帧(时间窗兜底)—— ``brain.think.end`` 关帧之后
+       cursor 仍在 act 窗口发 ``step.tool_call.record`` /
+       ``step.tool_result.record`` / ``body.tool.execute.*``;这些事件
+       属于刚关闭的那一步。``body.tool.execute.*`` 不携带 step_index,
+       直接走本条;语义与 :func:`_record_phase` 的 ``closed_frames[-1]``
+       一致。
+    4. 无任何帧(事件早于首个 step)→ None,调用方 drop。
+    """
     if state.open_step is not None:
         return state.open_step
     event_step_index = payload.get("step_index")
     if isinstance(event_step_index, int):
-        for frame in state.closed_frames:
-            if frame.step_index == event_step_index:
+        target_id = f"step-{event_step_index:03d}"
+        for frame in reversed(state.closed_frames):
+            if frame.step_id == target_id:
                 return frame
+    if state.closed_frames:
+        return state.closed_frames[-1]
     return None
 
 

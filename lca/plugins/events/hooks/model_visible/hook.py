@@ -233,6 +233,9 @@ class ModelVisibleHook:
         - cursor 缺席 / prompt 缺席 → 透明降级,返回 ``None``,不发盘。
         - fold 命中(headerEquals(prev, current) 且非 resume)→ 跳过,返回 ``None``。
         - payload 构造 / publish 抛错 → 吞错 + log(warning),返回 ``None``(L10)。
+        - publish 成功 → ``cursor.open_step(step_id)`` 推进 step(L6 自增,
+          不落 EP);fold 跳过分支不推进(同 step 重试)。open_step 抛错
+          吞错,不影响已返回的 ref。
         """
         prompt = self._prompt_ctx_getter()
         if prompt is None:
@@ -293,6 +296,19 @@ class ModelVisibleHook:
         except Exception as exc:  # INTENTIONAL: L10 + D5 不挡业务
             _log.warning("model_visible_pre_publish_failed: %s", exc)
             return None
+
+        # publish 成功 → 推进 cursor step(L6 自增)。header payload 已由
+        # Session 落盘,cursor.open_step 只动状态机不落 EP。仅在 publish
+        # 分支推进:fold 跳过 = 同 step 重试(attempt),不新开步;
+        # cursor step_index 是下游 ``step.*.record`` payload.step_index 的
+        # 真值,不推进会让 tool record 永远挂不上 step(回归:
+        # run_a7ead118420b)。失败吞错不挡业务(L10)。
+        cursor = self._cursor_provider()
+        if cursor is not None:
+            try:
+                cursor.open_step(step_id)
+            except Exception as exc:  # INTENTIONAL: L10 + D5 不挡业务
+                _log.debug("model_visible_cursor_open_step_failed: %s", exc)
 
         self._last_headers[key] = current
         # resume 一次性标记:publish 后清除(下次 capture_pre_llm 走 change/initial)

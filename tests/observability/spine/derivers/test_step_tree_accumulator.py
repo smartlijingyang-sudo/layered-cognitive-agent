@@ -1072,3 +1072,73 @@ def test_backend_react_path_flush_not_empty(tmp_path: Path) -> None:
         data = _json.loads(manifest_path.read_text(encoding="utf-8"))
         errors = data.get("extra", {}).get("flush_errors", [])
         assert not errors, f"backend ReAct 路径不应触发 flush_errors,得到 {errors}"
+
+
+def test_tool_records_attach_to_closed_step_after_think_end(tmp_path: Path) -> None:
+    """brain.think.end 关帧后到达的 act 窗口工具事件仍归属该步(与生产 fold 同口径)。
+
+    回归锁(缺口 H-xref,run_a7ead118420b):cursor 的 ``step.*.record``
+    在 think 关帧之后才发,``_open_step`` 已为 None;旧解析只认精确
+    ``step_index`` 匹配,帧号漂移时落空即 drop,journal.tool_total=0。
+    修复后精确匹配落空走时间窗兜底(最近已关帧)。
+    """
+    SpineContext.set_run("r_tool_attach")
+    run_dir = tmp_path / "r_tool_attach"
+    deriver = StepTreeAccumulatorDeriver(
+        run_id="r_tool_attach",
+        run_dir=run_dir,
+        agent_role="agt",
+        strategy_key="solo",
+    )
+    deriver.on_event(
+        _make_event(run_id="r_tool_attach", execution_point="brain.think.start", sequence=1)
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_tool_attach",
+            execution_point="brain.think.end",
+            sequence=2,
+            outcome="success",
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_tool_attach",
+            execution_point="step.tool_call.record",
+            sequence=3,
+            channel="fact",
+            phase="act",
+            payload={
+                "tool_name": "bash",
+                "invocation_id": "toolu_01",
+                "arguments": {"command": "echo proj"},
+                "step_index": 1,
+            },
+        )
+    )
+    deriver.on_event(
+        _make_event(
+            run_id="r_tool_attach",
+            execution_point="step.tool_result.record",
+            sequence=4,
+            channel="fact",
+            phase="act",
+            payload={
+                "tool_name": "bash",
+                "invocation_id": "toolu_01",
+                "ok": True,
+                "stdout_head": "proj",
+                "step_index": 1,
+            },
+        )
+    )
+    deriver.flush(outcome="completed")
+
+    doc = deriver.document
+    assert doc is not None
+    assert doc.totals.steps == 1
+    step = doc.steps[0]
+    assert step.tool_call is not None, "tool_call 未 attach 到已关闭的 step"
+    assert step.tool_call.name == "bash"
+    assert step.tool_result is not None
+    assert step.tool_result.stdout_head == "proj"

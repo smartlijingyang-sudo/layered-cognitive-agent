@@ -18,7 +18,7 @@ def _inc(seq: int = 1) -> Incarnation:
 
 def test_in_memory_loop_cursor_satisfies_protocol() -> None:
     c = InMemoryLoopCursor(run_id="r1", trace_id="t1", incarnation=_inc(1))
-    # 静态 duck-type 检查:9 个公共方法 + snapshot 属性
+    # 静态 duck-type 检查:10 个公共方法 + snapshot 属性
     expected = {
         "snapshot",
         "advance",
@@ -28,6 +28,7 @@ def test_in_memory_loop_cursor_satisfies_protocol() -> None:
         "record_tool_call",
         "record_tool_result",
         "record_request_header",
+        "open_step",
         "fork",
     }
     for name in expected:
@@ -103,3 +104,21 @@ def test_fork_produces_independent_child() -> None:
     assert child.snapshot.incarnation == 2
     # 子 cursor 独立(初始 phase=None)
     assert child.snapshot.phase is None
+
+
+def test_open_step_advances_step_index_without_ep() -> None:
+    """open_step 与 StdLoopCursor 同口径:L6 自增,不落 EP。"""
+    c = InMemoryLoopCursor(run_id="r1", trace_id="t1", incarnation=_inc(1))
+    c.advance("think")
+    c.open_step("step-001")
+    snap = c.snapshot
+    assert snap.step_index == 1
+    assert snap.step_id == "step-001"
+    assert snap.attempt_in_step == 0
+
+
+def test_open_step_after_close_raises_cursor_error() -> None:
+    c = InMemoryLoopCursor(run_id="r1", trace_id="t1", incarnation=_inc(1))
+    c.close("completed")
+    with pytest.raises(CursorError):
+        c.open_step("step-001")

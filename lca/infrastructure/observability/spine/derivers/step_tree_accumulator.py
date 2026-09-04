@@ -582,21 +582,29 @@ class StepTreeAccumulatorDeriver(Deriver):
     ) -> _StepFrame | None:
         """SSOT 收口:返回这条 tool event 应该 attach 的 step 帧。
 
-        优先级:
+        优先级(与生产 fold journal_fold._resolve_target 同规则):
         1. ``self._open_step`` —— 当前 open 的 step。
-        2. ``payload.step_index`` —— cursor 发 event 时已带上对应 step 索引,
-           即使 _open_step 已 close(``brain.think.end`` 之后 cursor 还在
-           ``act`` 窗口发 record),用 ``step_index`` 找 ``self._closed_frames``
-           里已 close 的 frame 并返回。
-        3. 没匹配上 → drop(此时一般是事件发生在首个 step 开启前)。
+        2. ``payload.step_index`` → ``step-{index:03d}``(与 cursor / hook
+           同派生,ADR-0168 §D7)匹配已关帧的 ``step_id`` —— 帧索引与
+           cursor 索引漂移时(无 header 的隐式 think 步多占帧号)仍按
+           step_id 精确归属。
+        3. 最近一个已关帧(时间窗兜底)—— ``brain.think.end`` 关帧之后
+           cursor 仍在 act 窗口发 ``step.*.record`` / ``body.tool.execute.*``,
+           这些事件属于刚关闭的那一步;``body.tool.execute.*`` 不携带
+           step_index,直接走本条,与 ``_record_phase`` 的
+           ``_closed_frames[-1]`` 规则一致。
+        4. 无任何帧(事件早于首个 step 开启)→ None,调用方 drop。
         """
         if self._open_step is not None:
             return self._open_step
         event_step_index = payload.get("step_index")
         if isinstance(event_step_index, int):
-            for frame in self._closed_frames:
-                if frame.step_index == event_step_index:
+            target_id = f"step-{event_step_index:03d}"
+            for frame in reversed(self._closed_frames):
+                if frame.step_id == target_id:
                     return frame
+        if self._closed_frames:
+            return self._closed_frames[-1]
         return None
 
     def _begin_step(self, event: EventRecord, ts: float) -> None:

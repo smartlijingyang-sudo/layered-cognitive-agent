@@ -237,6 +237,15 @@ class InMemoryLoopCursor:
                 phase=s.phase,
             )
 
+    def open_step(self, step_id: str) -> None:
+        """LLM 边界 step 推进 —— L6 自增,不落 EP(与 StdLoopCursor 同口径)。"""
+        self._ensure_open()
+        self._ensure_not_halted()
+        s = self._state
+        s.step_index += 1
+        s.step_id = step_id
+        s.attempt_in_step = 0
+
     def fork(self, reason: Literal["child_agent", "delegation"]) -> LoopCursor:
         """派生 child cursor —— Incarnation.child() 继承 run_id + plan_ref,seq += 1。
 

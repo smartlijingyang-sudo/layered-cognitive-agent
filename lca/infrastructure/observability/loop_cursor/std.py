@@ -378,6 +378,25 @@ class StdLoopCursor:
             },
         )
 
+    def open_step(self, step_id: str) -> None:
+        """LLM 边界 step 推进 —— L6 自增的状态机部分,不派生 EP。
+
+        hook 路径(ADR-0185 ``ModelVisibleHook.capture_pre_llm``)自行经
+        Session 发 ``spine.llm.request.header`` payload;cursor 只推进
+        ``step_index += 1`` / ``step_id`` / ``attempt_in_step`` 归零。
+        若此处再派生 ``llm.request.header`` EP,fold 会看到双重 step 边。
+
+        与 ``record_request_header`` 不同,不强制 think 窗口:team 委派时
+        子 Agent 的 LLM 边界可能发生在共享 cursor 的非 think 相位。
+        close / halt 后调用与其余 record 原语一致 raise CursorError。
+        """
+        self._ensure_open()
+        self._ensure_not_halted()
+        s = self._state
+        s.step_index += 1
+        s.step_id = step_id
+        s.attempt_in_step = 0
+
     def fork(self, reason: Literal["child_agent", "delegation"]) -> LoopCursor:
         """派生 child cursor —— 共享 parent spine handle,递增 incarnation_seq。
 
