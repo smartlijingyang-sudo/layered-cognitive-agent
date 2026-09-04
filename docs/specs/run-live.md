@@ -108,14 +108,17 @@ data: {"status":"completed"}
 
 ## 排障
 
+curl 路径走前端 wire(经 Next rewrite `/lca-api/runs` → gateway `/runs`),
+与浏览器 LobeHub 会发的请求一致;`LCA_FRONTEND_URL` 未设时默认本地 dev。
+
 ```
-RUN=$(curl -s -H "Authorization: Bearer lca-local" \
+RUN=$(curl -s -H "Authorization: Bearer ${LCA_TOKEN:-lca-local}" \
   -H "Content-Type: application/json" \
   -d '{"mode":"solo","messages":[{"role":"user","content":"hello"}]}' \
-  localhost:8765/runs | jq -r .run_id)
+  "${LCA_FRONTEND_URL:-http://127.0.0.1:3010}/lca-api/runs" | jq -r .run_id)
 
-curl -N -H "Authorization: Bearer lca-local" \
-  localhost:8765/runs/$RUN/live
+curl -N -H "Authorization: Bearer ${LCA_TOKEN:-lca-local}" \
+  "${LCA_FRONTEND_URL:-http://127.0.0.1:3010}/lca-api/runs/$RUN/live"
 ```
 
 | 现象 | 先查 |

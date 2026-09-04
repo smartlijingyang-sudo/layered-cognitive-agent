@@ -384,12 +384,14 @@ sidecars) is downstream of that one call.
 lca-ops runs create --user-text "请把昨日的 csv 按 region 汇总"
 
 # HTTP (for shell scripts / external integrations):
-curl -X POST http://127.0.0.1:8765/runs \
+# 等价于浏览器 LobeHub 会发的请求 —— 走 Next rewrite `/lca-api/runs` → gateway `/runs`。
+curl -X POST "${LCA_FRONTEND_URL:-http://127.0.0.1:3010}/lca-api/runs" \
+  -H "Authorization: Bearer ${LCA_TOKEN:-lca-local}" \
   -H 'Content-Type: application/json' \
   -d '{
     "messages": [{"role": "user", "content": "..."}],
     "mode": "solo",
-    "agent": "agt_aVxY6ag9MbMc",
+    "agent": {"id": "agt_aVxY6ag9MbMc", "name": "..."},
     "profile": "web-standard"
   }'
 # → {"run_id": "...", "trace_id": "...", "live_url": "/runs/<id>/live"}

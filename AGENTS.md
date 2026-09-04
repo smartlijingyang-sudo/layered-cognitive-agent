@@ -174,6 +174,7 @@ async def setup_<name>(ctx: PluginContext, config: Config) -> None: ...
 | 不知道 LCA 服务在不在跑 | `./scripts/lca-ops status --json` | `./scripts/lca-ops heal` |
 | 刚改完代码想重启 | `./scripts/lca-ops kernel-restart` | `./scripts/lca-ops kernel_serve` 打印启动命令 |
 | 触发一个新 run | `./scripts/lca-ops runs create --user-text "..."` | `curl -X POST http://127.0.0.1:8765/runs -d '{...}'` |
+| 端到端冒烟(浏览器 wire / in-process + opt-in HTTP) | `./scripts/lca-ops e2e timeline` \| `e2e boot [--http]` | 直接调 `scripts/e2e_*.py` + `LCA_FRONTEND_URL` |
 | run 失败定位 | `./scripts/lca-ops debug-run <run_id>` | `debug-env <run_id>` 只看摘要 |
 | 看完整流程 | `./scripts/lca-ops trace <run_id> --focus llm\|tools\|delegation` | `./scripts/lca-ops journal trace`(默认 --human + 默认最新 run) |
 | 失败原因投影 | `./scripts/lca-ops explain <run_id>` | `minimal-repro <run_id>` |

@@ -121,6 +121,18 @@ Run 触发  创建新 run（carrier-aligned，唯一入口）
      run 必须走 POST /runs（包装见 lca-ops runs create）。
 
 ────────────────────────────────
+Run 端到端  验证浏览器 wire 是否可达(ADR-0100)
+────────────────────────────────
+  ./scripts/lca-ops e2e timeline            # POST {frontend}/lca-api/runs + SSE /live
+  ./scripts/lca-ops e2e timeline --json     # 先打印 env,再驱动脚本
+  ./scripts/lca-ops e2e boot                # boot + compile + spawn + (默认无 HTTP)
+  ./scripts/lca-ops e2e boot --http         # 加 Step 7 走前端 wire
+
+  默认 LCA_FRONTEND_URL=http://10.36.6.252:3010、LCA_TOKEN=lca-local。
+  /lca-api/runs 前缀经 Next rewrite → gateway /runs;纯 gateway 端口
+  (:8765) 不响应这条路径,跑不通时先看 frontend_url 是否可达。
+
+────────────────────────────────
 Run 复盘  coding-agent tools(ADR-0065 §六 / PR-9,只读)
 ────────────────────────────────
   7 个只读工具 —— trace / explain / optimize / graph-run / minimal-repro /

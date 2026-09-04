@@ -1,5 +1,17 @@
 #!/usr/bin/env python3
-"""端到端冒烟测试：boot profile → compile plan → spawn agent → run task。"""
+"""端到端冒烟测试：boot profile → compile plan → spawn agent → run task。
+
+默认 6 步 in-process。设 ``LCA_E2E_HTTP=1`` 时追加 Step 7:模拟前端
+``POST {LCA_FRONTEND_URL}/lca-api/runs`` + SSE ``/live``,对齐
+``deploy/lobehub/patches/runtime/LcaRunDriver.ts`` 的请求形状。
+
+Equivalent CLI: ``lca-ops e2e boot [--http]`` (wraps this script with the same envs).
+
+Env:
+    LCA_E2E_HTTP        非空时启用 Step 7(frontend wire smoke)。
+    LCA_FRONTEND_URL    前端 base,默认 ``http://10.36.6.252:3010``。
+    LCA_TOKEN           bearer,默认 ``lca-local``(与 LcaRunDriver.ts 一致)。
+"""
 
 import asyncio
 import os
@@ -10,6 +22,9 @@ import traceback
 # 确保 lca 包可导入
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("UV_CACHE_DIR", os.path.join(tempfile.gettempdir(), "uv-cache"))
+
+# Step 7 (opt-in frontend wire smoke) 用的最小任务文本。
+TASK = "用一句话回答：1+1等于几？"
 
 
 async def main() -> int:
@@ -191,7 +206,73 @@ async def main() -> int:
     print("\n" + "=" * 60)
     print("ALL 6 STEPS PASSED ✓")
     print("=" * 60)
-    return 0
+
+    if not os.getenv("LCA_E2E_HTTP"):
+        return 0
+    print()  # separator before opt-in step
+
+    # ── Step 7 (opt-in): frontend wire smoke ─────────────────────
+    # Mirrors LcaRunDriver.ts: POST /lca-api/runs + SSE /live via the Next.js
+    # rewrite path. Off by default; enabled with LCA_E2E_HTTP=1 to verify the
+    # wire that the browser actually traverses, separate from in-process boot.
+    import time
+
+    import httpx
+
+    frontend_base = os.getenv("LCA_FRONTEND_URL", "http://10.36.6.252:3010").rstrip("/")
+    token = os.getenv("LCA_TOKEN", "lca-local")
+    auth = {"Authorization": f"Bearer {token}"}
+
+    print("\n[7/7] frontend wire smoke (LCA_E2E_HTTP=1) ...")
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            create = await client.post(
+                f"{frontend_base}/lca-api/runs",
+                json={
+                    "agent": {"id": "solo", "name": "助手"},
+                    "messages": [{"role": "user", "content": TASK}],
+                    "model": "solo",
+                },
+                headers={**auth, "Content-Type": "application/json"},
+            )
+            create.raise_for_status()
+            run_id = create.json()["run_id"]
+            print(f"  ✓ POST /lca-api/runs → run_id={run_id}")
+
+            types: list[str] = []
+            deadline = time.monotonic() + 120
+            async with client.stream(
+                "GET",
+                f"{frontend_base}/lca-api/runs/{run_id}/live",
+                headers={**auth, "Last-Event-ID": "0"},
+                timeout=130.0,
+            ) as resp:
+                resp.raise_for_status()
+                buf = ""
+                async for chunk in resp.aiter_text():
+                    if time.monotonic() > deadline:
+                        break
+                    buf += chunk
+                    while "\n\n" in buf:
+                        block, buf = buf.split("\n\n", 1)
+                        et = next(
+                            (
+                                ln[7:].strip()
+                                for ln in block.splitlines()
+                                if ln.startswith("event: ")
+                            ),
+                            "",
+                        )
+                        if et:
+                            types.append(et)
+                        if et in {"AgentRunFinished", "TeamRunFinished"}:
+                            print(f"  ✓ live events: {types}")
+                            return 0
+        print(f"  ✗ frontend wire incomplete: {types}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"  ✗ frontend wire FAILED: {type(e).__name__}: {e}")
+        return 1
 
 
 if __name__ == "__main__":
