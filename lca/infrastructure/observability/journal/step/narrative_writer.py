@@ -48,6 +48,7 @@ from lca.contracts.models.observability.journal_step import (
     ToolCallRecord,
     ToolResult,
 )
+from lca.infrastructure.observability.spine.sinks.naming import spine_filename_for_run
 
 # ── Phase emoji ──
 
@@ -364,20 +365,23 @@ class StepNarrativeWriter:
         lines.append("## 🔍 Steps 详述")
         lines.append("")
         # ADR-0185 PR-3:Model saw 链接区优先指向 <run_id>.spine.jsonl
-        # (foldRequestHeader 重建 SSOT);无 spine 时回退 <run_dir>/model_visible/
-        # (双轨期,PR-4 收口后删除)。
+        # (foldRequestHeader 重建 SSOT,ADR-0185 §3.7 / I-MV-2);无 spine 时
+        # 回退 <run_dir>/model_visible/(双轨期,PR-4 收口后删除)。
+        # COMPAT(delete-when: PR-4 删旁路文件,tracking: ADR-0185 §5 PR-4)
         lines.append("### 🪞 Model saw (per step)")
         lines.append("")
-        from lca.infrastructure.observability.spine.sinks.naming import (
-            spine_filename_for_run,
-        )
-
-        spine_path = (
-            Path("traces") / "runs" / document.run_id / spine_filename_for_run(document.run_id)
-        )
-        spine_exists = spine_path.exists()
+        # narrative.md 一定写在 <run_dir>/journal.narrative.md,output_path.parent
+        # 即 run_dir —— 与 journal_step.py / journal_replay.py PR-3 一致地走
+        # run_dir / spine_filename_for_run(run_id) 解析物理路径;非相对 CWD。
+        # 空 output_path(`StepNarrativeWriter("")`)只走 render(),无 run_dir,
+        # 跳过 spine 探测直接回退 model_visible/(无 race / 无误报)。
+        spine_exists = False
+        spine_path: Path | None = None
+        if self._path != Path() and self._path.parent != Path("."):
+            spine_path = self._path.parent / spine_filename_for_run(document.run_id)
+            spine_exists = spine_path.exists()
         for step in document.steps:
-            if spine_exists:
+            if spine_exists and spine_path is not None:
                 lines.append(
                     f"- `{step.step_id}` → "
                     f"`{spine_path}` (fold 重建;见 `lca_kernel.events.fold.foldRequestHeader`)"
