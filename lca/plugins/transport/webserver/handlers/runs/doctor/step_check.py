@@ -132,7 +132,9 @@ def _mv_candidate_step_ids(
                     continue
                 try:
                     rec = json.loads(ln)
-                except Exception:
+                except Exception as exc:
+                    _log = _safe_logger()
+                    _log.debug("h_mv_journal.bad_spine_line", error=str(exc))
                     continue
                 payload = rec.get("payload")
                 if isinstance(payload, dict):
