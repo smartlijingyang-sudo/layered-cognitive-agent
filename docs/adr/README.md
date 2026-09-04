@@ -129,7 +129,7 @@
 | [0182](0182-event-consumer-record-and-whitelist-convergence.md) | 消费入口收口 + 框架契约补齐（被 0183 吸收） | Superseded |
 | [0183](0183-event-bus-framework-ssot.md) | 事件总线框架 — 可组合 / 可配置 / 可插拔 + 单 SSOT 落盘链 | Accepted |
 | [0184](0184-event-lifecycle-managed-delivery.md) | 事件生命周期受管理投递 — 统一入口、阶段可查、丢失可定位 | Proposed |
-| [0185](0185-model-visible-event-bus-alignment.md) | Model-Visible 走 ADR-0183 统一 event bus — plugin 化 producer + fold 重建 | Proposed |
+| [0185](0185-model-visible-event-bus-alignment.md) | Model-Visible 走 ADR-0183 统一 event bus — plugin 化 producer + fold 重建 | Accepted |
 | [0186](0186-session-as-event-ssot.md) | Session 为事件 SSOT — append + observer + fold（延伸 0183/0184；互补 0185） | Proposed |
 | [0187](0187-assistant-agent.md) | AssistantAgent — 可配置、可隔离、可进化的个人助理产品面（Home SSOT + 同一 Resolve/Compile + 0093 jobs + G11 进化闸） | Accepted |
 
