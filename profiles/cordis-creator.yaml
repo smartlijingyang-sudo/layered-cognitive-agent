@@ -28,6 +28,7 @@ bundles:
   - bundles/web-app.yaml
   - bundles/scenario-cordis-creator.yaml
   - bundles/loop_cursor.spine_default.yaml
+  - bundles/declarative-phase-graph.yaml
 
 patch:
   - id: lca-llm-resolver
