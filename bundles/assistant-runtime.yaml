@@ -1,0 +1,39 @@
+# bundles/assistant-runtime.yaml — Assistant domain opt-in bundle (ADR-0187 §3 D6 + §7 PR-4).
+#
+# 助理域 plugin 集合：catalog（Home CRUD）+ bootstrap（配置面投影）+ workspace（ExecutionSpace 物化）。
+# skill_overlay / jobs / evolve 由 PR-6/8 落，本 bundle 不预挂空壳。
+#
+# **opt-in**：默认 profile（web-standard.yaml）不 include 本 bundle；
+# 助理用户显式启用 = `profiles/web-assistant.yaml` = web-standard + assistant-runtime。
+#
+# 依赖关系（plugin Manifest requires→provides）：
+#   - assistant.bootstrap  →  requires assistant.catalog
+#   - assistant.workspace →  requires assistant.catalog
+#   两条线都消费 catalog；cordis DAG 自动按 requires→provides 排序，
+# YAML 行顺序不参与 boot 顺序。
+
+entries:
+  # ── PR-3: Home CRUD + manifest digest 校验 ─────────────────────
+  - id: lca.plugins.assistant.catalog
+    name: lca_plugins_assistant_catalog
+    $module: lca.plugins.assistant.catalog
+    config:
+      # 根路径优先来自 env 注入(ADR-0187 §6 删除条件:不直读 os.environ);
+      # 缺失时 profile patch 段应负责提供 literal 默认值
+      # (见 profiles/web-assistant.yaml patch 段)。`required: false` 允许
+      # patch 覆盖为字面值。
+      assistants_root:
+        from_env: LCA_ASSISTANTS_ROOT
+        required: false
+
+  # ── PR-4: 配置面投影进 ContextManifest ─────────────────────────
+  - id: lca.plugins.assistant.bootstrap
+    name: lca_plugins_assistant_bootstrap
+    $module: lca.plugins.assistant.bootstrap
+    config: {}
+
+  # ── PR-4: 物化 ExecutionSpace 事实(workspace) ─────────────────
+  - id: lca.plugins.assistant.workspace
+    name: lca_plugins_assistant_workspace
+    $module: lca.plugins.assistant.workspace
+    config: {}

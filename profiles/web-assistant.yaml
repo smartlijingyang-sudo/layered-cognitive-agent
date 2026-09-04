@@ -1,0 +1,53 @@
+# web-assistant profile — ADR-0187 §7 PR-4.
+#
+# 助理域 opt-in profile = web-standard + assistant-runtime bundle。
+# 默认 web-standard.yaml 不进 assistant-runtime(ADR-0187 §3 D6 + I-A10);
+# 启用助理能力的部署 = 显式加载本 profile(``lca-ops runs create --profile
+# web-assistant`` 或 webserver ``POST /runs`` body ``profile=web-assistant``)。
+#
+# 三层结构:
+#   bundles:
+#     - bundles/base.yaml(继承 web-standard 的所有基础设施)
+#     - bundles/observability-default.yaml
+#     - bundles/web-app.yaml
+#     - bundles/scenario-cordis-creator.yaml
+#     - bundles/declarative-phase-graph.yaml
+#     - bundles/loop_cursor.spine_default.yaml
+#     - bundles/session-runtime.yaml
+#     - bundles/event-bus-components.yaml
+#     - bundles/assistant-runtime.yaml(PR-4 增量)
+#   patch:
+#     - id: lca-plugins-assistant-catalog
+#       config: { assistants_root: ~/.lca/assistants }
+#       兜底当 LCA_ASSISTANTS_ROOT 未设置时,落到用户数据盘默认路径。
+#
+# 启用后 plugin 列表新增 3 个:
+#   - lca.plugins.assistant.catalog
+#   - lca.plugins.assistant.bootstrap
+#   - lca.plugins.assistant.workspace
+# 验证: ``tests/architecture/test_assistant_runtime_invariants.py::TestWebAssistantProfileContains
+# AssistantPlugins`` 静态扫描 + ``resolve_profile('profiles/web-assistant.yaml')`` 双重锁。
+
+name: web-assistant
+description: |
+  Webserver + assistant-domain opt-in profile (ADR-0187 §7 PR-4).
+  Adds AssistantHome catalog, bootstrap projection and workspace binding
+  on top of web-standard. Default path (``web-standard.yaml``) untouched.
+
+bundles:
+  - bundles/base.yaml
+  - bundles/observability-default.yaml
+  - bundles/web-app.yaml
+  - bundles/scenario-cordis-creator.yaml
+  - bundles/declarative-phase-graph.yaml
+  - bundles/loop_cursor.spine_default.yaml
+  - bundles/session-runtime.yaml
+  - bundles/event-bus-components.yaml
+  - bundles/assistant-runtime.yaml
+
+patch:
+  # 兜底:LCA_ASSISTANTS_ROOT 未设置时落到用户数据盘默认路径;
+  # Profile 装配期优先 env,然后 patch literal。
+  - id: lca.plugins.assistant.catalog
+    config:
+      assistants_root: "~/.lca/assistants"

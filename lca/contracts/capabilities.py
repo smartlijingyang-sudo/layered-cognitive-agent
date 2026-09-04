@@ -324,6 +324,21 @@ ASSISTANT_EVOLVE = Capability[object]("assistant.evolve", cardinality="one")
 ASSISTANT_JOBS = Capability[object]("assistant.jobs", cardinality="one")
 """JobSpec 收集器，向 continuous_control_plane_factory 注册 WorkItem；ADR-0093 复用。"""
 
+ASSISTANT_BOOTSTRAP = Capability[object]("assistant.bootstrap", cardinality="one")
+"""将配置面 SOUL/IDENTITY/USER/AGENTS 投影进 ContextManifest（ADR-0187 §3 D5 + PR-4）。
+
+MEMORY.md / memory/ 不参与投影（I-A13）；只读 + 投影，不写文件。
+"""
+
+ASSISTANT_WORKSPACE = Capability[object]("assistant.workspace", cardinality="one")
+"""绑定 cwd = home/workspace/ 到 ExecutionSpace 事实（ADR-0187 §3 D5 + PR-4）。
+
+物化 ExecutionSpace dataclass，不直接世界写；ACL ⊆ home/workspace/（I-A5）。
+"""
+
+ACT_EXECUTION_SPACE = Capability[object]("act.execution_space", cardinality="one")
+"""G2 空间事实契约（PR-4）：assistant.workspace 物化的 ExecutionSpace dataclass 的入口。"""
+
 # ── Named factories / drivers ───────────────────────────────────────
 
 LLM_RESOLVER = Capability[object]("llm_resolver", cardinality="one")
