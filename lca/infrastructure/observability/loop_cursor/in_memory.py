@@ -219,8 +219,10 @@ class InMemoryLoopCursor:
                     "plan_ref": s.incarnation.plan_ref,
                     "reason": getattr(header, "reason", "initial"),
                     "model": getattr(header, "model", ""),
-                    "system_digest": getattr(header, "system_digest", ""),
-                    "system_path": getattr(header, "system_path", ""),
+                    # ADR-0185 spec §2.5 P5:system_digest / system_path 已
+                    # 合并到 messages_digest / messages_path(ADR-0176 D4),
+                    # 本写入只发 messages_* —— caller 从 messages_path 读
+                    # system 段。1 个 minor 版本兼容期后纯 messages_*。
                     "tools_digest": getattr(header, "tools_digest", ""),
                     "tools_path": getattr(header, "tools_path", ""),
                     "messages_digest": getattr(header, "messages_digest", ""),

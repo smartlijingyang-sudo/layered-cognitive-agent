@@ -70,14 +70,23 @@ class ToolResultRecord:
 
 @dataclass(frozen=True)
 class RequestHeader:
-    """cursor 注入 step_id / incarnation;业务路径不能填(ADR-0169 D4)。"""
+    """cursor 注入 step_id / incarnation;业务路径不能填(ADR-0169 D4)。
+
+    字段命名冻结(ADR-0185 spec §2.5 P5):
+
+    - ``messages_digest`` / ``messages_path`` —— 唯一权威;同时承担
+      旧 ``system_digest`` / ``system_path`` 的语义(system 文本已合并
+      进 messages.json,见 ADR-0176 D4)。
+    - ``system_digest`` / ``system_path`` —— **deprecated**;保留1个
+      minor 版本以兼容 sidecar(`StdModelVisibleCapture` / `StdReasonerPromptCapture`
+      / `ModelVisibleLLMAdapter`)及其测试,SA-3 删旁路文件时一并
+      删这两个字段。caller 应读 ``messages_*`` 字段。
+    """
 
     step_id: str
     incarnation: int
     reason: Literal["initial", "next_step", "series", "change", "inherited"]
     model: str
-    system_digest: str
-    system_path: str
     tools_digest: str
     tools_path: str
     messages_digest: str
@@ -85,6 +94,10 @@ class RequestHeader:
     manifest_digest: str
     manifest_path: str
     inherited_from_step: str | None = None
+    # COMPAT(delete-when: SA-3 删旁路文件 + 旁路测试一并落地;或 1 个
+    #   minor 版本后强制退役,tracking: ADR-0185 spec §2.5 P5)
+    system_digest: str = ""
+    system_path: str = ""
 
 
 @dataclass(frozen=True)
