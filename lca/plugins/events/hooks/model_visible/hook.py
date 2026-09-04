@@ -45,6 +45,7 @@ import logging
 from collections.abc import Callable, Iterable, Mapping
 from typing import TYPE_CHECKING, Any
 
+from lca.contracts.observability.loop_cursor_payloads import ToolSchema
 from lca_kernel.events.fold import EpochHeader, canonicalHeader, headerEquals
 from lca_kernel.events.payloads_model_visible import (
     ReasonType,
@@ -233,7 +234,7 @@ class ModelVisibleHook:
 
         - cursor 缺席 / prompt 缺席 → 透明降级,返回 ``None``,不发盘。
         - fold 命中(headerEquals(prev, current) 且非 resume)→ 跳过,返回 ``None``。
-        - 任一 publish 抛错 → 吞错 + log,返回 ``None``(L10)。
+        - payload 构造 / publish 抛错 → 吞错 + log(warning),返回 ``None``(L10)。
         """
         prompt = self._prompt_ctx_getter()
         if prompt is None:
@@ -266,24 +267,25 @@ class ModelVisibleHook:
         messages = _coerce_messages(kwargs.get("messages"))
         manifest = kwargs.get("manifest")
 
-        # tools 字段期望 ``tuple[ToolSchema, ...]``;EPOCH header 把 tools
-        # 视作 Mapping 序列(对齐 dsh 字节级比较)。Runtime 序列化由 pydantic
-        # model_serializer 决定;严格窄化留给 PR-3 真实 LLM 接入。
-        from typing import cast
-
-        payload_obj = SpineLlmRequestHeaderPayload(
-            step_id=step_id,
-            incarnation=incarnation,
-            config=current.config if current.config is not None else {},
-            system=current.system or "",
-            tools=cast("Any", tuple(current.tools or ())),
-            messages=cast("Any", messages),
-            manifest=manifest,
-            reason=reason,
-            previous_header_digest=previous_digest,
-        )
         ref: EventRef | None
         try:
+            # tools 强类型 ``tuple[ToolSchema, ...]``;kwargs.tools 承载认知
+            # Tool 协议对象(llm_turn executor 透传 ``list[Tool]``),边界经
+            # ``ToolSchema.from_any`` 窄化到权威形态。构造与 publish 同 try:
+            # pydantic ValidationError 同样吞错 + warning,不静默穿透到
+            # adapter 的 debug 级兜底。
+            tools_narrowed = tuple(ToolSchema.from_any(t) for t in current.tools or ())
+            payload_obj = SpineLlmRequestHeaderPayload(
+                step_id=step_id,
+                incarnation=incarnation,
+                config=current.config if current.config is not None else {},
+                system=current.system or "",
+                tools=tools_narrowed,
+                messages=messages,
+                manifest=manifest,
+                reason=reason,
+                previous_header_digest=previous_digest,
+            )
             from lca.plugins.events.publishers._session_publish import publish_via_session
             from lca.plugins.events.publishers.model_visible.publisher import (
                 ModelVisiblePublisher,
