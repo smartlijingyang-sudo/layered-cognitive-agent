@@ -465,12 +465,8 @@ def test_h_xref_broken_when_spine_tools_but_journal_empty(tmp_path: Path) -> Non
         empty_document,
     )
 
-    meta = JournalMetadata(
-        agent_role="x", strategy_key="solo", plan_ref="", objective="empty"
-    )
-    empty = empty_document(
-        run_id="r1", trace_id="t1", metadata=meta, started_at=0.0
-    )
+    meta = JournalMetadata(agent_role="x", strategy_key="solo", plan_ref="", objective="empty")
+    empty = empty_document(run_id="r1", trace_id="t1", metadata=meta, started_at=0.0)
     journal = _write_doc(tmp_path, empty)
     # spine 上写 body.tool.execute.start > 0
     events = [{"execution_point": "body.tool.execute.start", "channel": "fact"}]
@@ -609,18 +605,13 @@ def test_h_fold_not_attempted_when_journal_no_steps(tmp_path: Path) -> None:
 
     空 doc 没有 step 可 fold,医生不应视作 fold 故障。
     """
-    import json as _json
     from lca.contracts.models.observability import (
         JournalMetadata,
         empty_document,
     )
 
-    meta = JournalMetadata(
-        agent_role="x", strategy_key="solo", plan_ref="", objective="empty"
-    )
-    empty = empty_document(
-        run_id="r1", trace_id="t1", metadata=meta, started_at=0.0
-    )
+    meta = JournalMetadata(agent_role="x", strategy_key="solo", plan_ref="", objective="empty")
+    empty = empty_document(run_id="r1", trace_id="t1", metadata=meta, started_at=0.0)
     journal = _write_doc(tmp_path, empty)
     report = diagnose_step_tree(journal)
     h = report.hops["H-fold"]
@@ -727,9 +718,7 @@ def test_h_fold_extra_consistency_keys_present(tmp_path: Path) -> None:
     """
     doc = _build_doc()
     journal = _write_doc(tmp_path, doc)
-    _write_spine_header_records(
-        tmp_path, "r1", tuple(f"step_{i}" for i in range(1, 5))
-    )
+    _write_spine_header_records(tmp_path, "r1", tuple(f"step_{i}" for i in range(1, 5)))
 
     report = diagnose_step_tree(journal)
     payload = report.as_dict()
@@ -762,3 +751,119 @@ def test_h_fold_mixed_in_broken_set(tmp_path: Path) -> None:
     assert report.hops["H-fold"].ok is False
     # broken_hop 字段是第一个 broken hop(由 dict 顺序)
     assert report.broken_hop in broken_hops
+
+
+# ── ADR-0185 PR-3.1:H-mv-journal fold 优先,sidecar fallback ──────────
+
+
+def _write_sidecar_tools(run_dir: Path, step_id: str, tools: list[object]) -> None:
+    """写 sidecar ``model_visible/<step_id>/tools.json``。"""
+    import json as _json
+
+    step_dir = run_dir / "model_visible" / step_id
+    step_dir.mkdir(parents=True, exist_ok=True)
+    (step_dir / "tools.json").write_text(_json.dumps(tools), encoding="utf-8")
+
+
+def _write_spine_header_with_tools(
+    run_dir: Path,
+    run_id: str,
+    *,
+    step_id: str,
+    tools: list[dict[str, object]],
+) -> None:
+    """写一条可 fold 的 ``spine.llm.request.header``,tools 由调用方给定。"""
+    import json as _json
+
+    record = {
+        "event_id": f"ev-{step_id}",
+        "category": "spine.llm.request.header",
+        "execution_point": "spine.llm.request.header",
+        "channel": "fact",
+        "payload": {
+            "step_id": step_id,
+            "incarnation": 0,
+            "config": {"provider": "mock", "model": "m"},
+            "system": "sys",
+            "tools": tools,
+            "messages": [],
+            "manifest": None,
+            "reason": "initial",
+            "previous_header_digest": None,
+        },
+        "ts": "2026-09-04T12:00:00.000Z",
+        "causation_id": None,
+        "prev_event_hash": None,
+        "event_hash": None,
+        "trace_id": None,
+    }
+    spine_path = run_dir / f"{run_id}.spine.jsonl"
+    spine_path.write_text(_json.dumps(record) + "\n", encoding="utf-8")
+
+
+def test_h_mv_journal_prefers_fold_over_sidecar(tmp_path: Path) -> None:
+    """fold 命中非空 schema 时,忽略 sidecar 空 dict。"""
+    doc = _build_doc()
+    journal = _write_doc(tmp_path, doc)
+    _write_spine_header_with_tools(
+        tmp_path,
+        "r1",
+        step_id="step_1",
+        tools=[
+            {"name": "read_file", "parameters": {"type": "object"}},
+            {"name": "run_command", "parameters": {"type": "object"}},
+        ],
+    )
+    _write_sidecar_tools(tmp_path, "step_1", [{}, {}])
+
+    report = diagnose_step_tree(journal)
+    h = report.hops["H-mv-journal"]
+    assert h.ok is True, h.detail
+    assert h.extra["tool_schema_count"] == 2
+    assert h.extra["tool_schema_empty_count"] == 0
+    assert h.extra["tool_schema_source"] == "fold"
+    assert report.consistency["tool_schema_source"] == "fold"
+
+
+def test_h_mv_journal_sidecar_fallback_when_fold_none(tmp_path: Path) -> None:
+    """fold 返回 None 时回退 sidecar tools.json。"""
+    doc = _build_doc()
+    journal = _write_doc(tmp_path, doc)
+    _write_sidecar_tools(
+        tmp_path,
+        "step_1",
+        [{"name": "exec", "parameters": {"type": "object"}}],
+    )
+
+    report = diagnose_step_tree(journal)
+    h = report.hops["H-mv-journal"]
+    assert h.ok is True, h.detail
+    assert h.extra["tool_schema_count"] == 1
+    assert h.extra["tool_schema_source"] == "sidecar"
+
+
+def test_h_mv_journal_sidecar_empty_dicts_fail(tmp_path: Path) -> None:
+    """sidecar 全是 ``{}`` 且 fold 缺失 → H-mv-journal broken。"""
+    doc = _build_doc()
+    journal = _write_doc(tmp_path, doc)
+    _write_sidecar_tools(tmp_path, "step_1", [{}, {}])
+
+    report = diagnose_step_tree(journal)
+    h = report.hops["H-mv-journal"]
+    assert h.ok is False
+    assert h.extra["tool_schema_count"] == 0
+    assert h.extra["tool_schema_empty_count"] == 2
+    assert h.extra["tool_schema_source"] == "sidecar"
+    assert "非空 schema=0" in h.detail or "空 dict schema" in h.detail
+
+
+def test_h_mv_journal_missing_is_none(tmp_path: Path) -> None:
+    """fold 与 sidecar 均缺失 → ok=None。"""
+    doc = _build_doc()
+    journal = _write_doc(tmp_path, doc)
+    report = diagnose_step_tree(journal)
+    h = report.hops["H-mv-journal"]
+    assert h.ok is None
+    assert "均缺失" in h.detail
+    assert h.extra["tool_schema_count"] == -1
+    assert h.extra["tool_schema_source"] == "none"
