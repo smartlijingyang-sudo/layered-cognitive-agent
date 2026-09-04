@@ -131,6 +131,36 @@ class ModelFailed:
     error: str
 
 
+@session_event("thinking.delta.v1", visibility="audit")
+@dataclass(frozen=True)
+class ThinkingDelta:
+    """One model reasoning increment mirrored into the Session log.
+
+    Dual-write companion of journal ``ReasoningDelta``; ``seq`` is the
+    per-step reasoning delta sequence, not the Session event seq.
+    """
+
+    turn: int
+    step: int
+    text_delta: str
+    seq: int = 0
+
+
+@session_event("thinking.completed.v1", visibility="audit")
+@dataclass(frozen=True)
+class ThinkingCompleted:
+    """End of one model reasoning phase mirrored into the Session log.
+
+    Dual-write companion of journal ``ReasoningCompleted``;
+    ``content_preview`` carries the accumulated reasoning text.
+    """
+
+    turn: int
+    step: int
+    duration_ms: int
+    content_preview: str
+
+
 @session_event("approval.persisted.v1", visibility="internal")
 @dataclass(frozen=True)
 class ApprovalPersisted:

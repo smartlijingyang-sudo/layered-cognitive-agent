@@ -50,6 +50,16 @@ def instrument_llm(llm: LLMAdapter) -> LLMAdapter:
 
     # 已有 TelemetryLLMAdapter 时,复用之;否则用 llm 自身
     existing_telemetry = llm._inner if isinstance(llm, TelemetryLLMAdapter) else llm
+    # session_append 接线位:thinking.* Session 双写需要 per-session
+    # SessionStore(lca/harness/session/store.py),它由 SessionActivator 按
+    # session 创建、经 build_live_agent 传给 CognitiveLiveAgent,不注册在
+    # cordis scope 上;composer 入口此处只有 scope(连 PluginContext 都缺,
+    # 见上方 ADR-0185 PR-4 TODO),拿不到 per-session store,故保持
+    # session_append=None。接线方式与 PR-4 同一收口:instrument_llm 扩签名
+    # 携带 ctx / session_append 后,在此透传给 TelemetryLLMAdapter。
+    # COMPAT(delete-when: PR-4 收口完成,或 thinking.* Session 双写按
+    #   TelemetryLLMAdapter._append_thinking_session_event 的删除条件退役;
+    #   tracking: thinking.* Session 双写改动, 2026-09-04)
     instrumented = TelemetryLLMAdapter(existing_telemetry)
     model_name = _resolve_model_name(instrumented)
     return ModelVisibleLLMAdapter(instrumented, model=model_name)

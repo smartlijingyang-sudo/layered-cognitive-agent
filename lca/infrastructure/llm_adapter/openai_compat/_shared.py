@@ -29,7 +29,7 @@ __all__ = [
 ]
 
 # Observability-only kwargs forwarded by TelemetryLLMAdapter — must not reach provider APIs.
-_OBSERVABILITY_KWARG_KEYS = frozenset({"step"})
+_OBSERVABILITY_KWARG_KEYS = frozenset({"step", "turn"})
 
 # Chat Completions delta 上常见的思维链字段（DeepSeek / Qwen / 兼容网关）。
 _REASONING_ATTR_NAMES: tuple[str, ...] = (

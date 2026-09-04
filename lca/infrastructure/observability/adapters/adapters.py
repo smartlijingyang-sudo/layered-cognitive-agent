@@ -10,13 +10,15 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import inspect
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 
 import structlog
 
 from lca.contracts.atoms.enums import LLMStreamEventType, StreamChannel
+from lca.contracts.harness.memory.events import ThinkingCompleted, ThinkingDelta
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.observability.journal import (
     LlmCallCompleted,
@@ -36,6 +38,7 @@ from lca.infrastructure.observability.stream.llm_stream_activity import (
     LlmStreamActivityTracker,
 )
 from lca.infrastructure.observability.stream.response_text_stream import ResponseTextStreamExtractor
+
 # NOTE: spine_reflector_body_llm 走函数内 lazy import，避免 adapters →
 # lca.infrastructure.observability → lca_kernel.boot 链路触发 circular import。
 
@@ -57,6 +60,14 @@ def _body_llm_reflector() -> Any:
 _PERF_COUNTER_SCALE = 1000
 """perf_counter 秒 → 毫秒换算。"""
 
+SessionAppend = Callable[[Any], Awaitable[object] | None]
+"""Session thinking.* 双写注入口签名。
+
+接受一个 session 事件 payload dataclass（``ThinkingDelta`` /
+``ThinkingCompleted``）；实现可以是同步（返回 ``None``）或异步
+（返回 awaitable，由调用方 await）。append 失败向上抛，不吞。
+"""
+
 _log = structlog.get_logger("lca.telemetry_llm")
 
 
@@ -77,13 +88,20 @@ def _usage_of(response: LLMResponse) -> tuple[int, int]:
     return usage.prompt_tokens or 0, usage.completion_tokens or 0
 
 
-def _stream_observability_kwargs(kwargs: dict[str, Any]) -> tuple[int, dict[str, Any]]:
-    """Extract journal ``step`` before forwarding kwargs to provider adapters."""
+def _stream_observability_kwargs(kwargs: dict[str, Any]) -> tuple[int, int, dict[str, Any]]:
+    """Extract session ``turn`` / journal ``step`` before forwarding kwargs.
+
+    两个键都是观测专用（``_OBSERVABILITY_KWARG_KEYS`` 同步登记），不得
+    透传给 provider API。
+    """
+    turn = kwargs.get("turn", 0)
+    if not isinstance(turn, int):
+        turn = 0
     step = kwargs.get("step", 0)
     if not isinstance(step, int):
         step = 0
-    inner_kwargs = {k: v for k, v in kwargs.items() if k != "step"}
-    return step, inner_kwargs
+    inner_kwargs = {k: v for k, v in kwargs.items() if k not in ("turn", "step")}
+    return turn, step, inner_kwargs
 
 
 class TelemetryLLMAdapter(LLMAdapter):
@@ -96,17 +114,42 @@ class TelemetryLLMAdapter(LLMAdapter):
         inner: LLMAdapter,
         *,
         idle_timeout_s: float | None = None,
+        session_append: SessionAppend | None = None,
     ) -> None:
+        """装配参数。
+
+        ``session_append``：可选 Session 双写注入口（见 :data:`SessionAppend`）。
+        默认 ``None`` 时行为与历史一致（只写 Journal 平面）。非 ``None`` 时,
+        流式 reasoning 在 ``record(ReasoningDelta/ReasoningCompleted)`` 之外
+        追加 ``ThinkingDelta`` / ``ThinkingCompleted`` session 事件;
+        ``turn`` / ``step`` 取自 stream kwargs（缺省 0）。
+        """
         self._inner = inner
         self.name = f"telemetry({getattr(inner, 'name', type(inner).__name__)})"
         self._idle_timeout_s = (
             LLM_STREAM_IDLE_TIMEOUT_S if idle_timeout_s is None else idle_timeout_s
         )
+        self._session_append = session_append
 
     @property
     def inner(self) -> LLMAdapter:
         """被装饰的 LLM 适配器（组合无损性内省用）。"""
         return self._inner
+
+    # COMPAT(delete-when: UI / 子 session 完全改从 Session thinking.* fold 读取,
+    #   且 Journal ReasoningDelta / ReasoningCompleted 读取方清零(rg 计数为 0);
+    #   tracking: thinking.* Session 双写改动, 2026-09-04)
+    async def _append_thinking_session_event(self, payload: object) -> None:
+        """把 reasoning 事件追加到 Session 平面（双写,可选注入）。
+
+        未注入 ``session_append`` 时 no-op。append 抛错向上传播
+        （fail-loud,与 Journal record 同边界）。
+        """
+        if self._session_append is None:
+            return
+        result = self._session_append(payload)
+        if inspect.isawaitable(result):
+            await result
 
     async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
         model = _model_label(self._inner)
@@ -162,7 +205,7 @@ class TelemetryLLMAdapter(LLMAdapter):
         reasoning_started: float | None = None
         reasoning_seq = 0
         final_response: LLMResponse | None = None
-        step, inner_kwargs = _stream_observability_kwargs(dict(kwargs))
+        turn, step, inner_kwargs = _stream_observability_kwargs(dict(kwargs))
         delta_seq = 0
         recorded = False
         answer_extractor = ResponseTextStreamExtractor()
@@ -231,6 +274,14 @@ class TelemetryLLMAdapter(LLMAdapter):
                                 content_preview=reasoning_text,
                             )
                         )
+                        await self._append_thinking_session_event(
+                            ThinkingCompleted(
+                                turn=turn,
+                                step=step,
+                                duration_ms=duration_ms,
+                                content_preview=reasoning_text,
+                            )
+                        )
                     final_response = event.response
                     if final_response is not None:
                         prompt_tokens, completion_tokens = _usage_of(final_response)
@@ -269,6 +320,14 @@ class TelemetryLLMAdapter(LLMAdapter):
                         reasoning_text += delta_text
                         record(
                             ReasoningDelta(
+                                step=step,
+                                text_delta=delta_text,
+                                seq=reasoning_seq,
+                            )
+                        )
+                        await self._append_thinking_session_event(
+                            ThinkingDelta(
+                                turn=turn,
                                 step=step,
                                 text_delta=delta_text,
                                 seq=reasoning_seq,
