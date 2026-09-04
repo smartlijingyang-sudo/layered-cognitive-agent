@@ -44,8 +44,16 @@ from lca_kernel.events.fold import (
     headerEquals,
 )
 from lca_kernel.events.notification import NotificationBus
+from lca_kernel.events.persistence import (
+    FsyncPolicy,
+    PersistenceFlushTimeout,
+    PersistenceHealthSnapshot,
+    PersistenceObserver,
+    PersistenceWorker,
+)
 from lca_kernel.events.queue import DeliveryQueue, DeliveryQueueFull
 from lca_kernel.events.session import (
+    SESSION_FORMAT_VERSION,
     SessionEvent,
     SessionHeader,
     SessionObserver,
@@ -57,6 +65,7 @@ _DEFAULT_CONFIG_DIR: Path = Path(__file__).parent / "config"
 """机制 SSOT yaml 目录（ADR-0183 §3.1 / ADR-0180 D2）。"""
 
 __all__ = [
+    "SESSION_FORMAT_VERSION",
     "_DEFAULT_CONFIG_DIR",
     "Category",
     "ConsumerHandle",
@@ -70,7 +79,12 @@ __all__ = [
     "EventBus",
     "EventPayload",
     "EventRef",
+    "FsyncPolicy",
     "NotificationBus",
+    "PersistenceFlushTimeout",
+    "PersistenceHealthSnapshot",
+    "PersistenceObserver",
+    "PersistenceWorker",
     "Plane",
     "SessionEvent",
     "SessionHeader",

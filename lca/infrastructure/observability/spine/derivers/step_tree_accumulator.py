@@ -1,4 +1,6 @@
 # COMPAT(delete-when: PR-9, tracking: ADR-0181)
+# PR-3g-sample fold path: lca.plugins.session.derivers.step_tree (fold_step_tree → journal.json);
+# 本 in-memory callback deriver 保留兼容至 Session.observe + fold 切流完成。
 # 旧 EventSpine deriver；PR-8 shim 走 events/subscribers/spine_* 包装；
 # 本模块保留至 PR-9 旧 spine 全退役（rg "lca.plugins.observability.spine.derivers" lca/ = 0 触发）。
 

@@ -1,0 +1,66 @@
+"""SessionStore —— in-memory Session 仓库（PR-3c 骨架）。
+
+对齐 deepseek-harness ``packages/core/session/src/index.ts`` ``SessionStore``
+的 create / get / dispose 核心；dsh 的 prepare / enter / announce / fork 与
+cordis fiber 生命周期绑定，由后续 PR 按 LCA 装配需要叠加。
+
+持久化不在本层（dsh 边界一致）：persistence 是订阅者关注点，订阅
+session 事件流自行落盘；store 只持有活 Session 索引。
+"""
+
+from __future__ import annotations
+
+from lca.plugins.session.runtime.session import Session
+
+__all__ = ["SessionStore"]
+
+
+class SessionStore:
+    """活 Session 的进程内索引：创建、查找、移除。
+
+    id 策略对齐 dsh：显式 id 冲突抛错；缺省 id 按 ``session-<n>`` 单调
+    递增并跳过已占用值。
+    """
+
+    def __init__(self) -> None:
+        self._sessions: dict[str, Session] = {}
+        self._counter = 0
+
+    def create(self, session_id: str | None = None) -> Session:
+        """创建并入仓一个 Session。
+
+        precondition：``session_id`` 缺省时自动发号；显式 id 不得与活
+        session 冲突。失败语义：冲突抛 ``ValueError``。
+        所有权：返回的 Session 即仓内实例（``get`` 按同一对象返回）。
+        """
+        if session_id is None:
+            while True:
+                self._counter += 1
+                candidate = f"session-{self._counter}"
+                if candidate not in self._sessions:
+                    session_id = candidate
+                    break
+        elif session_id in self._sessions:
+            raise ValueError(f"session {session_id!r} 已存在")
+        session = Session(session_id)
+        self._sessions[session_id] = session
+        return session
+
+    def get(self, session_id: str) -> Session | None:
+        """查活 Session；不存在返回 ``None``（不抛）。"""
+        return self._sessions.get(session_id)
+
+    def dispose(self, session_id: str) -> bool:
+        """从仓内移除 Session；返回是否移除了活条目。
+
+        移除后 Session 对象变 detached（仍可读写自身日志，不再被 ``get``
+        命中）。重复 dispose 返回 ``False``，不抛。
+        """
+        return self._sessions.pop(session_id, None) is not None
+
+    def list(self) -> tuple[Session, ...]:
+        """全部活 Session，按创建顺序；返回新 tuple，改它不影响仓。"""
+        return tuple(self._sessions.values())
+
+    def __repr__(self) -> str:
+        return f"SessionStore(live={len(self._sessions)})"

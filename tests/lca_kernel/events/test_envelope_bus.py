@@ -4,7 +4,8 @@
 - test_envelope_bus_publish_returns_envelope_ref:EnvelopeBus.publish 返回 4 字段 EnvelopeRef
 - test_envelope_bus_queue_submit_and_depth:DeliveryQueue.submit 后 depth == 1
 - test_envelope_bus_dropped_queue_full_counter:max_size=1 第 2 条触发 DeliveryQueueFull + dropped
-- test_envelope_bus_notification_subscribe_notify:订阅 + notify 同步触发 callback
+- test_envelope_bus_notification_default_none_noop:默认未注入 notification;S4 为 no-op
+- test_envelope_bus_notification_subscribe_notify:显式注入后,订阅 + notify 同步触发 callback
 - test_event_bus_compat_shim_preserves_persisted_subscriber_count:EventBus.publish EventRef 6 字段
 - test_event_bus_compat_shim_no_regression_on_existing_wire:跑现 test_event_bus 全部 test,无回归
 """
@@ -103,22 +104,36 @@ class TestDeliveryQueue:
         assert bus.queue.dropped_queue_full == 1
 
 
-# ── 3:NotificationBus.subscribe + notify 同步形态 ──────────────────────
+# ── 3:NotificationBus.subscribe + notify 同步形态(可选注入)──────────
 
 
 class TestNotificationBus:
-    def test_envelope_bus_notification_subscribe_notify(self) -> None:
-        """订阅后,NotificationBus.notify 调 callback(同步形态)。"""
+    def test_envelope_bus_notification_default_none_noop(self) -> None:
+        """默认构造不注入 NotificationBus;S4 notify 为 no-op,publish 正常返回。"""
         bus = _make_envelope_bus()
+        assert bus.notification is None
+        # S4 no-op 不阻塞 publish,仍返回 4 字段 EnvelopeRef
+        ref = bus.publish(_authorized_payload(), producer=_authorized_producer())
+        assert isinstance(ref, EnvelopeRef)
+        assert ref.event_id and isinstance(ref.event_id, str)
+
+    def test_envelope_bus_notification_subscribe_notify(self) -> None:
+        """显式注入 NotificationBus 后,订阅 + notify 调 callback(同步形态)。"""
+        from lca_kernel.events.notification import NotificationBus
+
+        notification = NotificationBus()
+        bus = _make_envelope_bus()
+        bus._notification = notification  # 显式注入,走可选派发路径
         seen: list[tuple[EnvelopeRef, EventPayload]] = []
 
         def _cb(ref: EnvelopeRef, payload: EventPayload) -> None:
             seen.append((ref, payload))
 
+        assert bus.notification is notification
         bus.notification.subscribe(Category.TEAM_DELEGATION_CACHE_HIT, _cb)
         assert bus.notification.observer_count(Category.TEAM_DELEGATION_CACHE_HIT) == 1
         ref = bus.publish(_authorized_payload(), producer=_authorized_producer())
-        # publish → super().publish → S4 notify → callback
+        # publish → super().publish → S4 notify(注入态)→ callback
         assert len(seen) == 1
         cb_ref, cb_payload = seen[0]
         assert cb_ref.event_id == ref.event_id

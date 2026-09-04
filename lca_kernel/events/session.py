@@ -1,158 +1,170 @@
-"""Session 契约 —— ADR-0185 PR-3a。
+"""Session 契约 —— DSH 风格 append-only session 真值的最小契约面（PR-3c）。
 
-对齐 deepseek-harness ``packages/core/session/src/types.ts`` + ``index.ts``
-的 Session / SessionHeader / SessionEvent 语义;只写契约,不写 Session 实现类。
+对齐 deepseek-harness ``packages/core/session/src/types.ts`` + ``index.ts`` 的
+SessionHeader / SessionEvent / observer 语义；实现在
+:mod:`lca.plugins.session.runtime.session`。
 
-DSH Session 拥有 in-memory log 真值;fold 是纯函数离线重建。本模块定义:
+契约边界：
 
-- :class:`SessionHeader` —— 不可变存储元数据(version / id / 创建时间 / 谱系)
-- :class:`SessionEvent` —— 不可变日志条目(seq / time / type / data)
-- :class:`SessionObserver` Protocol —— ``on_session_event`` 观察入口
-- :class:`SessionProtocol` Protocol —— Session 公开面(id / header / event_count /
-  event_at / snapshot_events / append / request_header / step_tree)
-- :class:`SessionReentryError` —— append 重入守卫异常
+- 本模块只声明数据形态 + Protocol + 错误，不含 log / observer / fold 实现。
+- 事件词表开放：``SessionEvent.type`` 是 category 字符串，本契约不做
+  close-set 校验（新 category 走 yaml 注册，ADR-0183）。
+- ``SessionProtocol.request_header`` 的 fold 复用 :mod:`lca_kernel.events.fold`
+  （ADR-0185 PR-0）；``SessionEvent`` 暴露只读 ``category`` / ``payload``
+  投影满足 :func:`lca_kernel.events.fold.foldRequestHeader` 的入参形态。
 
-设计原则:
-
-- 全部 frozen + slots,与 :mod:`lca_kernel.events.fold` 的 ``EpochHeader`` 一致
-- Protocol 不含实现;SessionProtocol 描述 Session 实现的公开面,
-  实现类在 PR-3b 引入
-- ``SessionEvent.type`` 用字符串(对齐 DSH discriminated union),
-  LCA 不引入额外枚举层
-- 与 spine SpineEventRecord 解耦:SessionEvent 是 in-memory log 形态,
-  SpineEventRecord 是落盘字节布局;两者通过 projection 映射
-
-delete-when:PR-3b 实现 Session 类后,Protocol 转为 concrete class 的
-structural supertype 检查;tracking ADR-0185 PR-3。
+失败语义：契约层不抛错；``SessionReentryError`` 由实现层在嵌套 append 时抛出。
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
+
+from lca_kernel.events.fold import EpochHeader
+
+SESSION_FORMAT_VERSION: int = 0
+"""Session header 格式版本（对齐 dsh ``SESSION_FORMAT_VERSION``）。
+
+harness 未发布期固定为 0：不承诺兼容，持久化后端按该值校验加载。
+结构性变更（header 形态 / 事件信封 / 核心事件语义）才 bump。
+"""
+
+
+class SessionReentryError(RuntimeError):
+    """进行中的 append 尚未结束（observer 正在 fire）时再次 append。
+
+    实现层在 append 入口检测 ``_appending`` 标记后抛出；嵌套调用方
+    （通常是 observer 内部再次 append）必须自行处理，外层 append 不受影响。
+    """
 
 
 @dataclass(frozen=True, slots=True)
 class SessionHeader:
-    """不可变存储元数据(对齐 DSH ``SessionHeader``)。
+    """Session 存储元数据（不进事件日志，存储关注点而非可重放会话状态）。
 
-    字段语义:
+    字段对齐 dsh ``SessionHeader`` 最小集：
 
-    - ``version`` —— 磁盘格式版本,创建时打戳,加载时校验
-    - ``id`` —— Session 唯一标识
-    - ``created_at`` —— 创建时间(epoch 秒)
-    - ``cwd`` —— 创建时工作目录(可选)
-    - ``parent_session`` —— 父 Session id(fork 谱系,可选)
-    - ``is_seeded`` —— 是否含 fork 继承的事件前缀
-    - ``origin`` —— 粗粒度分类(目前仅 ``"subagent"``)
-    - ``delegation_depth`` —— 委派深度(0 = 顶层)
-    - ``agent_preset`` —— Agent 预设 id(可选)
+    - ``version`` — 创建时盖章 :data:`SESSION_FORMAT_VERSION`
+    - ``id`` — session 唯一标识（与所属 Session 的 id 一致）
+    - ``created_at`` — 创建时刻 Unix epoch 毫秒（非负整数）
+    - ``is_seeded`` — 是否含 fork/重放继承的事件前缀
     """
 
     version: int
     id: str
-    created_at: float
+    created_at: int
     is_seeded: bool = False
-    cwd: str | None = None
-    parent_session: str | None = None
-    origin: str | None = None
-    delegation_depth: int = 0
-    agent_preset: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class SessionEvent:
-    """不可变日志条目(对齐 DSH ``SessionEvent``)。
+    """Session 日志的一条不可变事件（对齐 dsh ``SessionEvent`` 信封）。
 
-    字段语义:
+    - ``type`` — 事件 category 字符串（spine category 是本仓原生词表）
+    - ``seq`` — 日志内单调连续序号，恒等于入日志时的 ``len(log)``
+    - ``time`` — append 时刻 Unix epoch 毫秒
+    - ``data`` — JSON 值域 payload；实现层入日志前做无损 JSON 快照，
+      读回的 ``data`` 是落日志的值，不是调用方可变输入的引用
 
-    - ``seq`` —— 单调递增序列号(= log 中的位置)
-    - ``time`` —— Unix epoch 秒
-    - ``type`` —— 事件类型(DSH discriminated union key)
-    - ``data`` —— 事件负载(JSON-compatible dict)
-    - ``ignorable`` —— True 表示 reader 不认识 type 时可跳过
-
-    frozen + slots 保证 append 后不可原地改;与 fold 纯函数配合:
-    fold 只读 ``type`` + ``data``,不修改 ``SessionEvent`` 实例。
+    ``category`` / ``payload`` 是只读投影，把信封适配成
+    :func:`lca_kernel.events.fold.foldRequestHeader` 的 spine 事件形态；
+    不引入第二份状态。
     """
 
-    seq: int
-    time: float
     type: str
-    data: dict[str, Any]
-    ignorable: bool = False
+    seq: int
+    time: int
+    data: Mapping[str, Any]
 
+    @property
+    def category(self) -> str:
+        """spine 事件形态投影：``foldRequestHeader`` 按 category 识别 fold 目标。"""
+        return self.type
 
-class SessionReentryError(RuntimeError):
-    """Session.append 重入守卫异常(对齐 DSH ``append cannot reenter``)。
-
-    DSH Session 在 append 执行期间禁止再次 append(防递归 / 保证
-    observer 通知时序)。本异常是该守卫的显式错误形态。
-    """
+    @property
+    def payload(self) -> Mapping[str, Any]:
+        """spine 事件形态投影：``foldRequestHeader`` 从 payload 还原 header 字段。"""
+        return self.data
 
 
 @runtime_checkable
 class SessionObserver(Protocol):
-    """Session 事件观察者(对齐 DSH ``session/event`` 事件回调)。
+    """append 提交后的同步观察者。
 
-    ``on_session_event`` 在 append 提交后同步调用;失败由 caller contained
-    吞错(不改变 append 返回值)。
+    时序：事件已入日志后才被调用；单个观察者抛错被实现层 contained
+    （记录后继续下一个），不改变 append 返回值，不阻止后续观察者。
     """
 
-    def on_session_event(self, session: SessionProtocol, event: SessionEvent) -> None:
-        """Session 日志增长后回调。
-
-        Precondition: ``event`` 已进入 session log,seq 有效。
-        Failure: 实现抛错由 caller contained;不影响后续 observer。
-        """
-        ...
+    def __call__(self, session: SessionProtocol, event: SessionEvent) -> None: ...
 
 
 @runtime_checkable
 class SessionProtocol(Protocol):
-    """Session 公开面契约(对齐 DSH ``Session`` 类公开面)。
+    """事件溯源 Session 的公开面（对齐 dsh ``Session`` 核心方法集）。
 
-    描述 Session 实现的只读 + append 面;不描述内部(如 surface manager、
-    derived message cache)。实现类在 PR-3b 引入;本 Protocol 先行锁定
-    语义边界,防止 PR-3b 实现漂移。
+    不变量：
 
-    属性语义:
-    - ``id`` —— Session 唯一标识(从 header.id 投影)
-    - ``header`` —— 不可变存储元数据
-    - ``event_count`` —— 当前日志长度(= next seq)
-
-    方法语义:
-    - ``event_at(seq)`` —— 按 seq 取单条事件;越界返回 None
-    - ``snapshot_events(from_seq, to_seq)`` —— 半开区间事件快照
-    - ``append(type, data)`` —— 追加事件;返回已入 log 的不可变事件
-    - ``request_header()`` —— 当前有效 EpochHeader(增量 fold)
-    - ``step_tree()`` —— 当前 StepTree(增量 fold)
+    - 日志是追加式唯一真值；``seq`` 从 0 连续递增（``seq = len(log)``）。
+    - ``append`` 在 observer fire 期间拒绝重入（抛 :class:`SessionReentryError`）。
+    - ``request_header`` 是 ``foldRequestHeader(snapshot_events())`` 的增量
+      等价形态：每条 header 事件只在首次见到时被 fold 一次。
     """
 
     @property
-    def id(self) -> str: ...
+    def header(self) -> SessionHeader:
+        """创建时盖章的不可变存储元数据。"""
+        ...
 
     @property
-    def header(self) -> SessionHeader: ...
+    def id(self) -> str:
+        """session 唯一标识，派生自 ``header.id`` 的单份真值。"""
+        ...
 
     @property
-    def event_count(self) -> int: ...
+    def seq(self) -> int:
+        """下一条事件的序号 —— 恒等于当前日志长度。"""
+        ...
 
-    def event_at(self, seq: int) -> SessionEvent | None: ...
+    def append(self, event_type: str, data: Mapping[str, Any]) -> SessionEvent:
+        """校验 → 入日志 → fire observers（contained）→ 返回落日志的事件。
+
+        precondition：``event_type`` 非空字符串；``data`` 可无损 JSON 序列化。
+        失败语义：校验不过抛 ``TypeError`` / ``ValueError``，日志不变；
+        observer 抛错被 contained，不影响返回值。重入抛
+        :class:`SessionReentryError`，同样不改日志。
+        """
+        ...
 
     def snapshot_events(
-        self, from_seq: int = 0, to_seq: int | None = None
-    ) -> Sequence[SessionEvent]: ...
+        self, from_seq: int = 0, to_seq_exclusive: int | None = None
+    ) -> tuple[SessionEvent, ...]:
+        """半开区间 ``[from_seq, to_seq_exclusive)`` 的不可变事件快照。
 
-    def append(self, type: str, data: dict[str, Any]) -> SessionEvent: ...
+        ``to_seq_exclusive`` 缺省 = 当前日志尾。全量快照在下次 append 前
+        复用同一对象；已返回的快照不被后续 append 改变。
+        """
+        ...
 
-    def request_header(self) -> Any | None: ...
+    def event_at(self, seq: int) -> SessionEvent | None:
+        """按精确序号取事件；不存在返回 ``None``。"""
+        ...
 
-    def step_tree(self) -> Any: ...
+    def request_header(self) -> EpochHeader | None:
+        """最后一条 header 事件生效后的 :class:`EpochHeader`；无 header 返回 ``None``。
+
+        增量维护：新事件才触发 fold，重复读是 O(1)。
+        """
+        ...
+
+    def observe(self, observer: SessionObserver) -> Callable[[], None]:
+        """注册 append 观察者；返回幂等取消函数。"""
+        ...
 
 
 __all__ = [
+    "SESSION_FORMAT_VERSION",
     "SessionEvent",
     "SessionHeader",
     "SessionObserver",

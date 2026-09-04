@@ -8,7 +8,8 @@ ADR-0184 PR-1:本模块引入 :class:`EnvelopeBus` 作为统一入口,继承该�
 并保留现有 :class:`EventBus` 全部方法 — :class:`EventBus` 自此是
 :class:`EnvelopeBus` 的兼容 shim(EventRef 6 字段 / _dispatch_sinks /
 _fanout / delivery_snapshot / configure_delivery_policy 等所有现有 wire
-行为原样保留,仅入队路径改走 DeliveryQueue + NotificationBus 的单 SSOT 流)。
+行为原样保留,仅入队路径改走 DeliveryQueue 单 SSOT 流;NotificationBus
+派发为可选注入,未注入时 S4 为 no-op)。
 
 不变量:
 - I-FW-BUS-1: publish 是 producer 唯一入口;subscribers 是 consumer 唯一入口
@@ -60,7 +61,6 @@ from lca_kernel.events.hooks import (
     PublishContext,
     SkipDispatch,
 )
-from lca_kernel.events.notification import NotificationBus
 from lca_kernel.events.payloads import (
     DISPATCH_SELF_OBSERVATION_CATEGORIES,
     MechanismDispatchEventPayload,
@@ -69,6 +69,7 @@ from lca_kernel.events.queue import DeliveryQueue
 from lca_kernel.events.registry import EventRegistry, EventSpec
 
 if TYPE_CHECKING:
+    from lca_kernel.events.notification import NotificationBus
     from lca_kernel.events.sinks import SinkBackend
 
 _log = logging.getLogger(__name__)
@@ -200,7 +201,9 @@ class EnvelopeBus(Generic[P]):
         S1 ACCEPT  鉴权 + schema 校验
         S2 RECORD  构造 EnvelopeRef(4 字段)
         S3 PERSIST DeliveryQueue.submit(本 PR 仅入队,PR-2 接 PersistenceWorker)
-        S4 DELIVER NotificationBus.notify(本 PR sync 形态,PR-3 接 subscribe_pull)
+        S4 DELIVER 可选 NotificationBus.notify;未注入时为 no-op,
+                   实际派发走 EventBus._fanout(删除评估见
+                   docs/notes/proposed/seam/2026-09-04-delete-queue-notification.md)
 
     本类发布最小入口。``EventBus`` 继承并扩展(兼容 shim) ——
     现有 EventRef / persisted / subscriber_count / _dispatch_sinks /
@@ -227,7 +230,12 @@ class EnvelopeBus(Generic[P]):
             spec.category: spec for spec in registry.specs
         }
         self._queue = queue if queue is not None else DeliveryQueue()
-        self._notification = notification if notification is not None else NotificationBus()
+        # COMPAT(delete-when: rg "NotificationBus" lca/ lca_kernel/ tests/ 仅剩
+        # notification.py 自身,
+        # tracking: docs/notes/proposed/seam/2026-09-04-delete-queue-notification.md)
+        # notification 为可选注入:未注入时 S4 notify 为 no-op(生产零观察者,
+        # 实际派发走 EventBus._fanout)。不再默认构造 NotificationBus 实例。
+        self._notification = notification
         # 投递计数器(ADR-0184 D2):按 category 累计四值;EnvelopeBus 维持
         # 原 EventBus 同结构(PR-1 不变更计数器 shape),PR-3 可能改为读
         # DeliveryQueue.depth 等新字段。
@@ -244,7 +252,7 @@ class EnvelopeBus(Generic[P]):
         return self._queue
 
     @property
-    def notification(self) -> NotificationBus:
+    def notification(self) -> NotificationBus | None:
         return self._notification
 
     @property
@@ -266,7 +274,8 @@ class EnvelopeBus(Generic[P]):
         :class:`EventRef`(6 字段),保留 wire 兼容。
 
         PR-2 后,S3 会接 PersistenceWorker(同步等 writer flush);
-        本 PR 仅入队,事件实际落盘走 NotificationBus 同步路径或 PR-2
+        本 PR 仅入队。S4 notify 仅当显式注入 NotificationBus 时触发
+        (生产未注入,为 no-op);实际落盘走 _dispatch_sinks 或 PR-2
         后端 worker。
         """
         producer_cls = self._coerce_producer(producer)
@@ -305,8 +314,9 @@ class EnvelopeBus(Generic[P]):
         counts = self._delivery_counts[category.value]
         counts["published"] += 1
 
-        # S4 —— NotificationBus.notify
-        self._notification.notify(ref, payload)
+        # S4 —— NotificationBus.notify(可选注入;未注入为 no-op)
+        if self._notification is not None:
+            self._notification.notify(ref, payload)
 
         return ref
 
@@ -462,7 +472,8 @@ class EventBus(EnvelopeBus[P]):
         或类似同步等机制,wire 兼容 shim 因此保留。
         """
         # NOTE:鉴权 + schema 已在 super().publish 内完成;super()
-        # 已记 published 计数 + DeliveryQueue 入队 + NotificationBus.notify。
+        # 已记 published 计数 + DeliveryQueue 入队(+ 可选 NotificationBus.notify,
+        # 生产未注入为 no-op)。
         # 本方法不重复计数 published,在 finally 内追加 persisted/delivered/dropped。
         producer_cls = self._coerce_producer(producer)
         if producer_cls is None:

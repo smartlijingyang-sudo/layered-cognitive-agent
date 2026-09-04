@@ -1,16 +1,16 @@
-"""NotificationBus —— ADR-0184 PR-1 in-memory pubsub。
+"""NotificationBus —— ADR-0184 PR-1 in-memory pubsub(降级:可选注入)。
 
-按 category 路由的轻量发布订阅层。``EnvelopeBus.publish`` 入队后
-调 :meth:`NotificationBus.notify` 同步通知 observers(本 PR 兼容 shim
-``EventBus`` 的 ``_fanout`` 也复用本协议);PR-3 扩
-:meth:`subscribe_pull` 提供 AsyncIterator(供
-:class:`lca_kernel.events.reader.SpineReader` 异步消费)。
+# COMPAT(delete-when: rg "NotificationBus" lca/ lca_kernel/ tests/ 仅剩本文件,
+# tracking: docs/notes/proposed/seam/2026-09-04-delete-queue-notification.md)
+
+按 category 路由的轻量发布订阅层。:class:`EnvelopeBus` 仅在构造时显式
+注入本类实例才在 S4 调 :meth:`NotificationBus.notify`;生产装配不注入,
+S4 为 no-op(实际派发走 ``EventBus._fanout``)。删除评估与删除矩阵见
+tracking note。
 
 设计要点(ADR-0184 §1):
-- 同步 ``notify`` 与异步 ``subscribe_pull`` 双形态共存,正交:同步
-  callback 适合 EventBus 兼容路径(立即 fire-and-forget),pull 形
-  态供 PR-3 deriver 重连到 SpineReader(seek-by-seq 而非从头读)。
-- 无消费者时 ``notify`` 为 no-op,不抛错;不阻塞 publish 主路径。
+- 同步 ``notify``:无消费者时为 no-op,不抛错;不阻塞 publish 主路径。
+- ``subscribe_pull``:骨架形态,无生产消费方。
 - category 接受 :class:`lca.contracts.event.Category` 或字符串
   ``Category.value``;key 一律取 ``str()`` 归一。
 """
@@ -39,9 +39,9 @@ def _category_key(category: Category | str) -> str:
 class NotificationBus:
     """按 category 路由的 in-memory pubsub。
 
-    本 PR 提供 sync ``notify`` / ``subscribe`` + skeleton ``subscribe_pull``;
-    PR-3 在 Subscribe_pull 内接 SpineReader 并暴露
-    :class:`lca_kernel.events.reader.SpineReader` 异步事件流。
+    提供 sync ``notify`` / ``subscribe`` + skeleton ``subscribe_pull``;
+    生产路径未接入(零观察者),仅作为可选注入件保留,删除条件见模块
+    docstring COMPAT 块。
     """
 
     def __init__(self) -> None:
@@ -75,10 +75,10 @@ class NotificationBus:
     async def subscribe_pull(
         self, category: Category | str
     ) -> AsyncIterator[tuple[EnvelopeRef, EventPayload]]:
-        """PR-3 用异步 pull 形态。本 PR 仅注册一个内部队列并 yield。
+        """异步 pull 形态骨架:注册一个内部队列并 yield。
 
-        当前实现为内存内 push-to-pull 桥(no-op 转换);PR-3 替换为
-        ``SpineReader`` seek-by-seq 实现,docstring 与行为不兼容本骨架。
+        当前实现为内存内 push-to-pull 桥;无生产消费方,随本模块删除
+        条件一并跟踪。
         """
         key = _category_key(category)
         queue: asyncio.Queue[tuple[EnvelopeRef, EventPayload]] = asyncio.Queue(maxsize=1024)
