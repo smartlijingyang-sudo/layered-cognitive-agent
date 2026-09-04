@@ -154,9 +154,18 @@ class SessionWorkActivator(Protocol):
 
 @runtime_checkable
 class ContinuousControlPlane(Protocol):
-    """Profile-selected service for trigger ingestion and leased dispatch."""
+    """Profile-selected service for trigger ingestion and leased dispatch.
+
+    ``get`` / ``status_of`` are read-only probes into the durable queue so
+    declarative producers (e.g. ``assistant.jobs``, ADR-0187 §3 D10) can
+    verify a submitted work item without owning lease or dispatch.
+    """
 
     def submit(self, item: WorkItem) -> WorkItem: ...
+
+    def get(self, work_id: str) -> WorkItem | None: ...
+
+    def status_of(self, work_id: str) -> WorkStatus | None: ...
 
     async def run_once(
         self, worker_id: str, activator: SessionWorkActivator

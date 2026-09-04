@@ -20,6 +20,7 @@ from lca.contracts.harness.tasks.continuous import (
     WorkItem,
     WorkLease,
     WorkQueue,
+    WorkStatus,
 )
 from lca.harness.continuous_queue import LeaseNotOwnedError, SqliteWorkQueue
 from lca.harness.continuous_serialization import require_aware
@@ -68,6 +69,16 @@ class SqliteContinuousControlPlane(ContinuousControlPlane):
         """Record an external trigger as a durable, deduplicated work request."""
 
         return self.queue.submit(item)
+
+    def get(self, work_id: str) -> WorkItem | None:
+        """Read-only probe for one submitted work item (None when absent)."""
+
+        return self.queue.get(work_id)
+
+    def status_of(self, work_id: str) -> WorkStatus | None:
+        """Read-only probe for one work item's durable status (None when absent)."""
+
+        return self.queue.status_of(work_id)
 
     async def run_once(self, worker_id: str, activator: SessionWorkActivator) -> WorkLease | None:
         """Claim and dispatch one item without embedding loop or Session details."""
