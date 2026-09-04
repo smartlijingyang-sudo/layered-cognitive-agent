@@ -25,15 +25,15 @@ class TaskStatus(str, Enum):
 
 
 _STATUS_MAP: dict[str, TaskStatus] = {
-    "completed": TaskStatus.COMPLETED,
-    "partial": TaskStatus.PARTIAL,
-    "failed": TaskStatus.FAILED,
-    "working": TaskStatus.WORKING,
+    TaskStatus.COMPLETED.value: TaskStatus.COMPLETED,
+    TaskStatus.PARTIAL.value: TaskStatus.PARTIAL,
+    TaskStatus.FAILED.value: TaskStatus.FAILED,
+    TaskStatus.WORKING.value: TaskStatus.WORKING,
     "running": TaskStatus.WORKING,
     "waiting_human": TaskStatus.INPUT_REQUIRED,
     "input_required": TaskStatus.INPUT_REQUIRED,
-    "input-required": TaskStatus.INPUT_REQUIRED,
-    "canceled": TaskStatus.CANCELED,
+    TaskStatus.INPUT_REQUIRED.value: TaskStatus.INPUT_REQUIRED,
+    TaskStatus.CANCELED.value: TaskStatus.CANCELED,
     "cancelled": TaskStatus.CANCELED,
 }
 

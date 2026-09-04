@@ -14,6 +14,7 @@ from lca.contracts.models.core.terminal_outcome import (
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeRunOutcome,
     DeclarativeValidationError,
+    ExecutionOutcome,
     PhaseRunCursor,
 )
 from lca.runtime.result_projection import TerminalResultProjection
@@ -83,7 +84,7 @@ async def test_terminal_projection_keeps_pause_resume_data_in_one_result() -> No
         journal_seq_end=12,
     )
     declarative = DeclarativeRunOutcome(
-        kind="paused",
+        kind=ExecutionOutcome.PAUSED,
         cursor=cursor,
         stop=object(),
         approval_request={"approval_id": "approval-1", "type": "tool_approval"},
@@ -125,7 +126,7 @@ async def test_terminal_projection_derives_failed_result_from_terminal_fact() ->
         _state(),
         terminal_outcome=terminal,
         declarative_outcome=DeclarativeRunOutcome(
-            kind="failed",
+            kind=ExecutionOutcome.FAILED,
             cursor=_cursor(),
             stop=object(),
         ),

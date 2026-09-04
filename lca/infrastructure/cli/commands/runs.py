@@ -33,6 +33,20 @@ import urllib.request
 
 import typer
 
+from lca.contracts.observability.status import RunLifecycleStatus
+
+# doctor ``--wait`` 终态词表:doctor status 是 journal outcome / doctor
+# verdict 投影词表。``"success"`` / ``"cancelled"`` 是历史 doctor verdict
+# 拼写,不属于 RunLifecycleStatus,保留字面量。
+_TERMINAL_DOCTOR_STATUSES = frozenset(
+    {
+        "success",
+        RunLifecycleStatus.FAILED.value,
+        "cancelled",
+        RunLifecycleStatus.PAUSED.value,
+    }
+)
+
 
 def register(app: typer.Typer) -> None:
     """Register the ``runs`` subcommand on the CLI app."""
@@ -154,7 +168,7 @@ def _create(
         if status and status != last_status:
             typer.echo(f"[doctor] status={status}")
             last_status = status
-        if status in {"success", "failed", "cancelled", "paused"}:
+        if status in _TERMINAL_DOCTOR_STATUSES:
             typer.echo(f"[lca-ops runs create] terminal status={status}")
             if json_mode:
                 typer.echo(json.dumps(doctor, indent=2, ensure_ascii=False))

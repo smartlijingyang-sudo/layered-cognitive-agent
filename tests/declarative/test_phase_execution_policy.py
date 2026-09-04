@@ -14,6 +14,7 @@ from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.core.stop import StopReason
 from lca.contracts.protocols.act.command_envelope import RunFact
 from lca.contracts.protocols.declarative.declarative_execution import (
+    ExecutionOutcome,
     PhaseExecutionFailure,
     PhaseInput,
     PhaseResult,
@@ -285,7 +286,7 @@ async def test_default_graph_routes_retry_exhaustion_to_stop_without_runtime_bra
 
     assert [visit.node_id for visit in result.visits] == ["perceive.main", "stop.main"]
     assert result.outcome is not None
-    assert result.outcome.kind == "completed"
+    assert result.outcome.kind is ExecutionOutcome.COMPLETED
     assert result.outcome.stop.reason is StopReason.ERROR
     assert result.outcome.stop.status is TaskStatus.FAILED
 

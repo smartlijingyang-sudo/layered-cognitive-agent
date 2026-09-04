@@ -64,23 +64,40 @@ class PhaseRunCursor:
             object.__setattr__(self, "causation_refs", tuple(self.causation_refs))
 
 
+class ExecutionOutcome(str, Enum):
+    """声明式单次执行结果闭集(收敛契约 note-1:与 ``RunLifecycleStatus`` 不合并)。
+
+    语义边界:``RunLifecycleStatus`` 是 run 生命周期状态;本 enum 是
+    step / phase / declarative 单次执行的结果。``DeclarativeRunOutcome``
+    不序列化 ``kind``,成员值仅用于进程内比较与投影分支。
+    """
+
+    COMPLETED = "completed"
+    PAUSED = "paused"
+    FAILED = "failed"
+    EFFECT_UNCERTAIN = "effect_uncertain"
+
+
 @dataclass(frozen=True, slots=True)
 class DeclarativeRunOutcome:
     """完成、暂停、失败或效果不确定时的统一运行结果。"""
 
-    kind: Literal["completed", "paused", "failed", "effect_uncertain"]
+    kind: ExecutionOutcome
     cursor: PhaseRunCursor
     stop: StopDecision
     error_fact: RunFact | None = None
     approval_request: dict[str, object] | None = None
 
     def __post_init__(self) -> None:
-        if self.kind not in {"completed", "paused", "failed", "effect_uncertain"}:
-            raise DeclarativeValidationError(
-                "PG-009",
-                "outcome kind must be one of: completed, paused, failed, effect_uncertain; "
-                f"got {self.kind!r}",
-            )
+        if not isinstance(self.kind, ExecutionOutcome):
+            try:
+                object.__setattr__(self, "kind", ExecutionOutcome(self.kind))
+            except ValueError:
+                raise DeclarativeValidationError(
+                    "PG-009",
+                    "outcome kind must be one of: completed, paused, failed, effect_uncertain; "
+                    f"got {self.kind!r}",
+                ) from None
         if not isinstance(self.cursor, PhaseRunCursor):
             raise DeclarativeValidationError("PG-009", "outcome must carry a PhaseRunCursor")
 
@@ -241,6 +258,7 @@ __all__ = [
     "DeclarativeRunOutcome",
     "DeltaReducer",
     "EffectDispatcher",
+    "ExecutionOutcome",
     "JournalCommitter",
     "PhaseAttemptFailure",
     "PhaseCapabilityReader",

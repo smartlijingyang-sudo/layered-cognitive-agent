@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from lca.contracts.models.core.result import ApprovalPendingError
 from lca.contracts.protocols.act.command_envelope import RunFact
+from lca.contracts.protocols.declarative.declarative_phase_graph import ExecutionOutcome
 from lca.harness.declarative.execute.outcome_projection import RunOutcomeProjector
 from lca.harness.declarative.graph.traversal import PhaseTraversal
 
@@ -48,7 +49,7 @@ def test_pause_projection_commits_replayable_facts_and_declared_resume_cursor() 
     )
 
     assert result.outcome is not None
-    assert result.outcome.kind == "paused"
+    assert result.outcome.kind is ExecutionOutcome.PAUSED
     assert result.cursor is not None and result.cursor.node_id == "think.after-approval"
     assert result.outcome.approval_request == {"approval_id": "approval-1", "tool": "write"}
     assert "think" not in traversal.artifacts
@@ -77,7 +78,7 @@ def test_pause_projection_fails_closed_without_a_plan_declared_resume_node() -> 
     )
 
     assert result.outcome is not None
-    assert result.outcome.kind == "failed"
+    assert result.outcome.kind is ExecutionOutcome.FAILED
     assert result.outcome.error_fact is not None
     assert result.outcome.error_fact.payload["error_code"] == "PG-008"
     assert result.cursor is not None and result.cursor.node_id == "act.main"

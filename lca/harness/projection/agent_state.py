@@ -9,6 +9,7 @@ from lca.contracts.harness.tasks.session import SessionEvent
 from lca.contracts.models.core.budget import Budget
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.state import AgentState
+from lca.contracts.observability.status import RunLifecycleStatus
 
 
 @dataclass
@@ -39,7 +40,6 @@ class AgentStateProjection:
             from_role="",
             team_awareness=None,
             history=[],
-            final_output=None,
             last_error=None,
             active_template=None,
             activated_skills=[],
@@ -76,7 +76,7 @@ class AgentStateProjection:
 
         elif event_type == "session.checkpoint.v1":
             # Update status from checkpoint
-            status_str = data.get("status", "working")
+            status_str = data.get("status", TaskStatus.WORKING.value)
             state.status = _parse_status(status_str)
             # ADR-0158 决策 四:AgentState.final_output 字段已删除。
             # answer 文本走 TerminalOutcome.final_output_ref 通道
@@ -115,14 +115,20 @@ class AgentStateProjection:
 
 
 def _parse_status(status_str: str) -> TaskStatus:
-    """Parse status string to TaskStatus enum."""
+    """Parse status string to TaskStatus enum.
+
+    键是 ``session.checkpoint.v1`` 的 wire 词表:规范值取自
+    ``TaskStatus`` / ``RunLifecycleStatus`` 成员;``"input_required"``
+    是 ``TaskStatus.INPUT_REQUIRED``(wire 值 ``input-required``)的
+    下划线拼写别名,保留字面量。未知值回退 ``WORKING``。
+    """
     status_map = {
-        "working": TaskStatus.WORKING,
-        "completed": TaskStatus.COMPLETED,
-        "failed": TaskStatus.FAILED,
-        "canceled": TaskStatus.CANCELED,
-        "paused": TaskStatus.PAUSED,
+        TaskStatus.WORKING.value: TaskStatus.WORKING,
+        TaskStatus.COMPLETED.value: TaskStatus.COMPLETED,
+        TaskStatus.FAILED.value: TaskStatus.FAILED,
+        TaskStatus.CANCELED.value: TaskStatus.CANCELED,
+        TaskStatus.PAUSED.value: TaskStatus.PAUSED,
         "input_required": TaskStatus.INPUT_REQUIRED,
-        "waiting_input": TaskStatus.INPUT_REQUIRED,
+        RunLifecycleStatus.WAITING_INPUT.value: TaskStatus.INPUT_REQUIRED,
     }
     return status_map.get(status_str.lower(), TaskStatus.WORKING)
