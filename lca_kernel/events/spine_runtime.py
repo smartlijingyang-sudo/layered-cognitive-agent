@@ -316,8 +316,8 @@ def build_record(
     """统一 record 构造入口 —— ADR-0183 §3.5 + PR-5。
 
     旧 ``_build_event_record(sp, ref)`` 反推 14 字段 ``EventRecord`` 的逻辑
-    被吸收；``SpineEventRecord``（9 字段）是新的字节布局 SSOT，plugin 不可改
-    ``to_dict()``。
+    被吸收；``SpineEventRecord``（10 字段，含 ``trace_id``）是新的字节布局
+    SSOT，plugin 不可改 ``to_dict()``。
 
     payload 形态兼容：
     - ``SpineEventPayload``：直接读 ``execution_point`` / ``channel`` /

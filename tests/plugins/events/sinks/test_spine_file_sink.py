@@ -1,7 +1,7 @@
 """spine_file_sink 端到端（ADR-0181 PR-8 shim；record 入口 ADR-0183 PR-5）。
 
 record 构造走 build_record() 单一入口；落盘走 SpineSink SSOT 路径；
-字节布局 = SpineEventRecord.to_dict() 9 键（sort_keys）。
+字节布局 = SpineEventRecord.to_dict() 10 键（sort_keys；含 ADR-0183 §3.9 trace_id）。
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink
 from lca_kernel.events import EventRef
 from lca_kernel.events.payloads import SpineEventPayload
 
-_NINE_KEYS = {
+_RECORD_KEYS = {
     "event_id",
     "category",
     "execution_point",
@@ -25,6 +25,7 @@ _NINE_KEYS = {
     "causation_id",
     "prev_event_hash",
     "event_hash",
+    "trace_id",
 }
 
 
@@ -47,14 +48,8 @@ def _payload() -> SpineEventPayload:
     )
 
 
-@pytest.mark.xfail(
-    reason=(
-        "ADR-0183 §3.9 PR-12 已把 trace_id 透传进 SpineEventRecord.to_dict()"
-        "(10 键);本断言仍是 9 键旧布局,待断言随布局更新后移除本标记。"
-    ),
-)
-def test_spine_file_sink_writes_nine_key_record(tmp_path: Path) -> None:
-    """build_record 单一入口落盘：9 键 SSOT 布局 + sort_keys 序列化。"""
+def test_spine_file_sink_writes_ten_key_record(tmp_path: Path) -> None:
+    """build_record 单一入口落盘：10 键 SSOT 布局（含 trace_id）+ sort_keys 序列化。"""
     sink = SpineFileSink(run_dir=tmp_path)
     try:
         sink(_payload(), _ref())
@@ -66,7 +61,7 @@ def test_spine_file_sink_writes_nine_key_record(tmp_path: Path) -> None:
     lines = target.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
     record = json.loads(lines[0])
-    assert set(record) == _NINE_KEYS
+    assert set(record) == _RECORD_KEYS
     assert record["event_id"] == "evt_test_1"
     assert record["category"] == "spine.cognition.brain.perceive.start"
     assert record["execution_point"] == "brain.perceive.start"
@@ -75,6 +70,8 @@ def test_spine_file_sink_writes_nine_key_record(tmp_path: Path) -> None:
     assert record["causation_id"] is None
     assert record["prev_event_hash"] is None
     assert record["event_hash"] is None
+    # build_record() 当前不透传 ref.trace_id；键必在、值为 null。
+    assert record["trace_id"] is None
     assert lines[0] == json.dumps(record, sort_keys=True)
 
 

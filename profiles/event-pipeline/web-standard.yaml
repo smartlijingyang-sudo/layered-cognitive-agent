@@ -6,7 +6,9 @@
 #
 # 约束（附录 C §C.1）：
 # - hooks 类必须可无参构造（register_pipeline 走 spec.hook() 实例化）；
-# - sinks 段有且仅有 1 个 fail_fast 的事实链 sink（spine-fact-chain）；
+# - sinks / consumer_rules 默认空：生产 boot 走 register_pipeline_once（hooks only）；
+#   持久化 spine 由 Session.observe / JsonlSessionPersistence / SpineFileSink plugin 写，
+#   不在 pipeline sinks 双写；
 # - consumer_rules 不允许覆盖 event.bus.dispatch.*（I-FW-BUS-4）。
 
 pipeline:
@@ -41,26 +43,15 @@ pipeline:
         swallow: true
 
   # ====== B. sinks（落盘后端） ======
-  # run_id 由运行时在 run 开始时经 set_run_id 绑定；boot 期只装配实例。
-  sinks:
-    - id: spine-fact-chain
-      backend: lca_kernel.events.sinks.spine_sink.SpineSink
-      failure: fail_fast
-      config:
-        path_template: "{run_id}.spine.jsonl"
-        fsync_strategy: batch
-        fsync_batch_size: 100
-        fsync_interval_ms: 50
-        checksum_on_open: true
+  # 空：durable spine 写由 Session.observe / JsonlSessionPersistence /
+  # SpineFileSink plugin 负责；pipeline sinks 仅 apply_pipeline（declarative/tests）
+  # 使用，生产 register_pipeline_once 不装 sinks，避免与 Session SSOT 双写。
+  sinks: []
 
   # ====== C. consumer_rules（前缀路由） ======
-  # 兜底：所有 spine.* 事实走 SpineChainSink（fail_fast 落盘）。
-  # 更细前缀规则（spine.llm. / spine.exception. 等）由后续 PR 按需追加。
-  consumer_rules:
-    - prefix: "spine."
-      plugins:
-        - lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink
-      failure: fail_fast
+  # 空：SpineChainSink 经 Session.observe catalog 在 plugin boot 注册，
+  # 不在此与 Session.observe 重叠装载。
+  consumer_rules: []
 
   # ====== D. options（可选元数据，inspect-pipeline 展示） ======
   options:

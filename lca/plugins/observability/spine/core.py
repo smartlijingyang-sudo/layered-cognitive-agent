@@ -127,11 +127,11 @@ class SpineCore:
 #
 # COMPAT(delete-when: ADR-0186 PR-3g 残留 on_event deriver 清零,
 #        tracking: ADR-0186 PR-3g / I-SESSION-5)
-# PR-3g 状态:
-#   1. step_tree — 生产已走 StepTreeFoldDeriver(builder 不 EventSpine.subscribe)
-#   2. live_tail.subscribe — SSE carrier fan-out,非 fold 派生主路径
-#   3. narrative / graph / waterfall / otel_trace — 仅 capability;未硬 subscribe
-#   4. anomaly — EmitPipeline 直接 on_event;迁 snapshot scan 后删
+# PR-3g 现状（I-SESSION-5）:
+#   1. step_tree — 生产已走 StepTreeFoldDeriver（builder 用 fold，不 subscribe）
+#   2. live_tail.subscribe — SSE carrier fan-out；保留 API，非 fold 派生主路径
+#   3. narrative / graph / waterfall / otel_trace — 仅 capability；未硬 subscribe
+#   4. anomaly — EmitPipeline 直接 on_event；迁 snapshot scan 后删
 
 # Reflector modules that keep a process-local ``_active_spine`` for emit_*.
 # Soft-import so a partial profile without those plugins still boots.

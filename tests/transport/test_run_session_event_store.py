@@ -244,7 +244,7 @@ def test_builder_without_session_store_degrades_to_eventbus(tmp_path: Path) -> N
         _teardown(session)
 
 
-def test_bound_session_append_records_log_and_dual_writes_eventbus(
+def test_bound_session_append_records_log_and_returns_eventref(
     tmp_path: Path,
 ) -> None:
     from lca.plugins.events.publishers.spine_reflector_cognition.plugin import (
@@ -267,7 +267,11 @@ def test_bound_session_append_records_log_and_dual_writes_eventbus(
         assert event.type == "spine.cognition.brain.perceive.start"
         assert event.data == {"state_id": "s1"}
         assert ref.category == "spine.cognition.brain.perceive.start"
-        assert ref.event_id
+        assert ref.event_id == f"{inner.id}:{event.seq}"
+        assert ref.persisted is False
+        assert ref.subscriber_count == 0
+        # Session is sole delivery; Bridge.append must not EventBus.publish.
+        assert bus.delivery_snapshot() == {}
     finally:
         EventBus.set_default(None)
         _teardown(session)

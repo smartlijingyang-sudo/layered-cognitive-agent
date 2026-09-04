@@ -1,31 +1,16 @@
-# COMPAT(delete-when: PR-9, tracking: ADR-0181)
-# 旧 EventSpine deriver；PR-8 shim 走 events/subscribers/spine_* 包装；
-# 本模块保留至 PR-9 旧 spine 全退役（rg "lca.plugins.observability.spine.derivers" lca/ = 0 触发）。
-#
 # COMPAT(delete-when: ADR-0186 PR-3g SSE 投影迁 Session observer,
-#        tracking: ADR-0186 PR-3g)
-# live_tail.subscribe 是 SSE carrier fan-out（LiveTail ring buffer 的
-# register-replay-live 迭代器透传），不是 I-SESSION-5 fold 派生主路径，
-# 也不是 EventSpine.subscribe 回调累积。生产 SSE 读 session.tail；
-# 本 Deriver 的 on_event 仅作 EventRecord→StampedEvent 桥。收口时改为
-# Session observer 直接推送 StampedEvent，再删本桥接。
+#        tracking: ADR-0186 PR-3g / I-SESSION-5)
+# ``subscribe()`` 是 SSE carrier fan-out（LiveTail register-replay-live
+# 透传），不是 I-SESSION-5 fold 派生，也不是 EventSpine.subscribe 累积。
+# 生产 SSE 可读 session.tail；本 Deriver.on_event 仅作
+# EventRecord→StampedEvent 桥。Session observer 直推 StampedEvent 后删桥接。
+# 在此之前保留 ``subscribe()`` API（不得当作 fold 未完成的证据）。
 
 """LiveTailDeriver — SSE carrier wrapper around ``LiveTail`` (not a fold deriver).
 
-I-SESSION-5 / ADR-0186 PR-3g: production step_tree 走 ``StepTreeFoldDeriver``。
-本模块的 ``subscribe()`` 是 transport fan-out（透传 ``LiveTail.subscribe``），
-**不是** ``EventSpine.subscribe`` 派生主路径，也不得当作 fold 未完成的证据。
-
-``on_event`` 把 ``EventRecord`` 转成 ring buffer 需要的最小 ``StampedEvent``
-并转发；SSE 消费者经 ``subscribe()`` 拿到 register-first-replay-then-live
-语义。生产 run 的 ``session.tail`` 来自 RunJournalFactory 的 ``LiveTail``，
-与本 capability 实例独立。
-
-COMPAT(delete-when: ADR-0170 §D3 LiveTail 单身份重构完成,
-       tracking: ADR-0170 §"删除条件" / issue 待开)
-# 当前保留 ``_to_stamped`` 是因为 ``LiveTail.on_event`` 仍只接受
-# ``StampedEvent``;LiveTail 改为接收 ``EventRecord`` + 单一身份后,
-# 本文件 + ``live_tail._to_stamped`` 整体迁出,deriver 直接转发。
+``subscribe()`` passes through ``LiveTail.subscribe`` (transport fan-out).
+``on_event`` converts ``EventRecord`` → ``StampedEvent`` for the ring buffer.
+Production step_tree uses ``StepTreeFoldDeriver`` (I-SESSION-5).
 """
 
 from __future__ import annotations
@@ -83,11 +68,8 @@ class LiveTailDeriver(Deriver):
     def subscribe(self, *args: object, **kwargs: object):
         """Pass through to ``LiveTail.subscribe`` (SSE carrier, not fold).
 
-        COMPAT(delete-when: ADR-0186 PR-3g SSE 投影迁 Session observer,
-               tracking: ADR-0186 PR-3g)
-        返回 ring buffer 的 register-replay-live 迭代器。本方法不是
-        I-SESSION-5 派生主路径；生产 SSE 亦可直接读 ``session.tail``。
-        Session observer 直推收口后随 ``LiveTailDeriver`` 删除。
+        Returns the ring buffer's register-replay-live iterator. Not the
+        I-SESSION-5 derivation path; see module-level COMPAT for delete-when.
         """
         return self._tail.subscribe(*args, **kwargs)
 
@@ -96,6 +78,10 @@ class LiveTailDeriver(Deriver):
         self._tail.close()
 
 
+# COMPAT(delete-when: ADR-0170 §D3 LiveTail 单身份重构完成,
+#        tracking: ADR-0170 §"删除条件" / issue 待开)
+# ``_to_stamped`` 保留因 ``LiveTail.on_event`` 仍只接受 ``StampedEvent``；
+# LiveTail 改为接收 ``EventRecord`` 后，本桥接整体迁出。
 def _to_stamped(event: EventRecord) -> StampedEvent:
     """Build a ``StampedEvent`` carrying the spine event's
     sequence/timestamp/scope plus a stub ``RuntimeObserved`` payload.

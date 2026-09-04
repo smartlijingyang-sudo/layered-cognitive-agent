@@ -15,7 +15,7 @@ in-process log 的 durable 镜像。
   的 9-键 ``SpineEventRecord`` 字节布局 —— SessionEvent 是 in-memory
   真值层的形态,经 ``to_dict()`` 走 SessionEvent 信封
   (``type/seq/time/data/session_id/actor/provider/visibility/scope``)。
-  PR-3f 阶段两条 SSOT 并存(见底部 COMPAT 块)。
+  PR-3f 阶段两条 SSOT 并存(见模块 COMPAT 块)。
 - **flush hook**：当 :class:`Session` 在 PR-3e 之后提供 ``add_flush_hook``
   时注册幂等刷新回调；当前 PR-3c 骨架尚未提供该面,实现为 best-effort
   接管 store 的活 Session,不阻塞契约外能力。
@@ -24,15 +24,14 @@ in-process log 的 durable 镜像。
 :class:`SessionStore` 的所有活 Session;若 store 提供接管钩子,新 Session
 也会自动挂入。
 
-COMPAT(delete-when: rg "lca.events.sink.spine_file" profiles bundles = 0
-且同 Session 上 SpineFileSink observe + JsonlSessionPersistence 双挂 rg 为零;
-tracking: ADR-0186 PR-3e/3f / delete-queue Level 4):
-当前双写风险面:
+COMPAT(delete-when: rg "lca.events.sink.spine_file" profiles/ bundles/ = 0
+且同 Session 上 SpineFileSink Session.observe 与 JsonlSessionPersistence
+不会写同一 ``*.spine.jsonl`` 路径;tracking: ADR-0186 PR-3f):
+剩余双写风险面仅此一条:
 
 - 同 Session 上 ``SpineFileSink``(Session.observe catalog,SpineEventRecord 9 键)
   与本 plugin(SessionEvent 信封)并行挂 observer → 可能写同一
-  ``<run_id>.spine.jsonl``(ADR-0183 I-FW-SSOT-1);
-- 或 EventBus ``pipeline_loader`` ``mount_sink`` 旁路与 Session 观察者并存。
+  ``<run_id>.spine.jsonl``(ADR-0183 I-FW-SSOT-1)。
 
 Profile 装载本 plugin 时应**同时**禁用 ``lca.events.sink.spine_file``
 (由 profile resolver / bundle 实现,本 plugin 不强制)。

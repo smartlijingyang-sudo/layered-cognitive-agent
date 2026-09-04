@@ -1,9 +1,14 @@
+# COMPAT(delete-when: ADR-0186 PR-3g SSE 投影迁 Session observer,
+#        tracking: ADR-0186 PR-3g / I-SESSION-5)
+# ``subscribe()`` is SSE carrier fan-out (LiveTail passthrough), not an
+# EventSpine.subscribe / fold path. Keep the API until Session observer
+# push replaces this bridge.
+
 """spine.deriver.live_tail — wraps infrastructure LiveTailDeriver.
 
 ``LiveTail`` is zero-arg constructible, so this plugin boots a real
 ring-buffer capability without webserver dependencies. ``subscribe()``
-on the deriver is SSE carrier fan-out (LiveTail passthrough), not an
-EventSpine.subscribe fold path (I-SESSION-5 / ADR-0186 PR-3g).
+on the deriver is transport fan-out, not I-SESSION-5 fold derivation.
 """
 
 from __future__ import annotations

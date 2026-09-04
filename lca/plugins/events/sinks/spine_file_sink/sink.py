@@ -3,7 +3,8 @@
 # COMPAT(delete-when: PR-9, tracking: ADR-0181)
 # shim：<run_dir>/default-run.spine.jsonl 落盘入口。record 构造 =
 # build_record() 单一入口（ADR-0183 §3.5）；落盘 = SpineSink（I-FW-SSOT-1
-# 唯一 writer）；字节布局 = SpineEventRecord.to_dict() 9 键（sort_keys）。
+# 唯一 writer）；字节布局 = SpineEventRecord.to_dict() 10 键含 trace_id
+# （sort_keys）。
 
 PR-9 旧 spine 全退役时一并删除本 shim（rg FileSink lca/infrastructure/
 = 0 触发）。
@@ -27,8 +28,8 @@ class SpineFileSink:
 
     生产 boot 经 Session.observe catalog 登记(ADR-0186 PR-3f；见同目录
     manifest)。每条事件经 ``build_record()`` 构造 ``SpineEventRecord`` 后交
-    ``SpineSink.append``。字节布局 = ``SpineEventRecord.to_dict()`` 9 键
-    （ADR-0183 §3.5 SSOT，plugin 不可改）。
+    ``SpineSink.append``。字节布局 = ``SpineEventRecord.to_dict()`` 10 键
+    （含 ``trace_id``；ADR-0183 §3.5 SSOT，plugin 不可改）。
 
     失败语义：sink path 失败上抛；无静默枚举 fallback。
 

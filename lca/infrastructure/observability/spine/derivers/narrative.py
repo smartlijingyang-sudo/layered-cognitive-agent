@@ -1,27 +1,16 @@
-# COMPAT(delete-when: PR-9, tracking: ADR-0181)
-# 旧 EventSpine deriver；PR-8 shim 走 events/subscribers/spine_* 包装；
-# 本模块保留至 PR-9 旧 spine 全退役（rg "lca.plugins.observability.spine.derivers" lca/ = 0 触发）。
-#
 # COMPAT(delete-when: ADR-0186 PR-3g Session-observer 收口 narrative 投影,
-#        tracking: ADR-0186 PR-3g)
-# narrative 是 document-driven:on_event 仅 debug-log,真值写盘由
+#        tracking: ADR-0186 PR-3g / I-SESSION-5)
+# narrative 是 document-driven：on_event 仅 debug-log；写盘由
 # _StepTreeBundle.flush → NarrativeWriter.write(document) 触发。
-# PR-3g fold 路径(StepTreeFoldDeriver → journal.json)已产出 JournalDocument,
-# narrative 投影改为读 fold 输出的 snapshot 即可;无需独立 fold 函数。
+# StepTreeFoldDeriver → journal.json 已产出 JournalDocument；收口时
+# narrative 改读 fold snapshot，无需独立 fold 函数，再删本桥接。
 
-"""NarrativeDeriver — wraps ``StepNarrativeWriter`` as a spine deriver (Task 2.2).
+"""NarrativeDeriver — wraps ``StepNarrativeWriter`` as a spine deriver.
 
-PR-2 parallel-write phase: the deriver exists alongside the legacy
-narrative writer and is subscribed to ``EventSpine`` so the framework
-has a structural hook for the eventual spine-native narrative projection.
-For now ``on_event`` is a no-op (the legacy narrative is built from a
-complete ``JournalDocument`` and triggered by terminalizer via
-``_StepTreeBundle.flush``); the deriver exposes ``write_document`` so
-the same trigger surface can drive the wrapped writer.
-
-The deriver does NOT remove or redirect any existing call site: both
-legacy ``StepNarrativeWriter`` and ``NarrativeDeriver`` produce their own
-``journal.narrative.md`` when ``write_document`` is called.
+``on_event`` is a no-op log. Narrative is built from a complete
+``JournalDocument`` via ``write_document`` (terminalizer /
+``_StepTreeBundle.flush``). Capability-only today; not the I-SESSION-5
+fold derivation path.
 """
 
 from __future__ import annotations

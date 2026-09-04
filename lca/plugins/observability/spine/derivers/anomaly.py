@@ -1,3 +1,9 @@
+# COMPAT(delete-when: ADR-0186 PR-3g anomaly fold/snapshot 替代直接调用,
+#        tracking: ADR-0186 PR-3g / I-SESSION-5)
+# anomaly 由 ``EmitPipeline.emit`` 在 record seal 后直接调 ``on_event``
+# （不经 EventSpine.subscribe）。收口时改为 Session observer 从
+# SpineReader snapshot 跑 8-detector scan，再去掉 EmitPipeline 持有引用。
+
 """AnomalyDetector — I15 / I16 spine deriver with 8 invariant-violation detectors.
 
 This module ships the spine ``AnomalyDetector`` deriver required by
@@ -23,13 +29,6 @@ The deriver is wrapped with the project ``@plugin`` decorator under
 ``spine.deriver.anomaly``; the Cordis carrier ``plugin`` and the
 ``AnomalyDetector`` class are exported for downstream Profile boot
 wiring.
-
-COMPAT(delete-when: ADR-0186 PR-3g anomaly fold/snapshot 替代直接调用,
-       tracking: ADR-0186 PR-3g)
-  当前 anomaly 由 ``EmitPipeline.emit`` 在 record seal 后直接调
-  ``on_event``(不经 EventSpine.subscribe)。PR-3g 收口时改为 Session
-  observer 从 SpineReader snapshot 跑 8-detector scan,不再需要
-  EmitPipeline 持有 anomaly 引用。
 
 References
 ----------

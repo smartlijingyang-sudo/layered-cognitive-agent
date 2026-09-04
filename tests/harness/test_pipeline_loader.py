@@ -4,9 +4,9 @@
 - ``load_profile_pipeline`` 三级发现:内联段 / 显式文件引用 / 约定路径
 - ``pipeline_from_mapping`` 与 parse_pipeline_yaml 同语义
 - ``register_pipeline_once`` 幂等(同名同版只装载一次)
-- ``apply_pipeline``:sink 实例化生命周期 + consumer_rules 经
-  bus.subscribe 的接线(鉴权矩阵 SSOT)
-- ``inspect-pipeline`` CLI(web-standard)
+- ``apply_pipeline``:sinks 实例化进 ``AppliedPipeline.sinks``(不
+  ``bus.mount_sink``)+ consumer_rules 经 bus.subscribe 接线
+- ``inspect-pipeline`` CLI(web-standard;生产 yaml sinks/rules 为空)
 """
 
 from __future__ import annotations
@@ -28,9 +28,7 @@ from lca_kernel.events import TeamDelegationCacheHit
 from lca_kernel.events.bus import EventBus, FailureSemantics
 from lca_kernel.events.errors import UnauthorizedSubscribeError
 from lca_kernel.events.hooks import DefaultFailureHook, PayloadSchemaHook
-from lca_kernel.events import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.pipeline import HookSpec, Pipeline, Stage
-from lca_kernel.events.registry import EventRegistry
 from lca_kernel.events.sinks.spine_sink import SpineSink, SpineSinkClosedError
 from lca_kernel.events.spine_runtime import SpineEventRecord
 
@@ -82,6 +80,7 @@ def _write_yaml(path: Path, data: object) -> Path:
 def _make_bus() -> EventBus:
     """独立 EventBus(默认鉴权矩阵),避免单例串扰。"""
     from lca_kernel.events.test_catalog import build_test_bus
+
     return build_test_bus()
 
 
@@ -179,17 +178,10 @@ class TestWebStandardPipeline:
         assert failure_hook.hook is DefaultFailureHook
         assert failure_hook.stage is Stage.ON_FAILURE
 
-        sink = pipeline.sinks[0]
-        assert sink.id == "spine-fact-chain"
-        assert sink.backend is SpineSink
-        assert sink.failure is FailureSemantics.FAIL_FAST
-        assert sink.config["path_template"] == "{run_id}.spine.jsonl"
-
-        rule = pipeline.consumer_rules[0]
-        assert rule.prefix == "spine."
-        from lca.plugins.events.sinks.spine_chain_sink.sink import SpineChainSink
-
-        assert SpineChainSink in rule.plugins
+        # 生产 yaml sinks / consumer_rules 为空:durable 写走 Session.observe
+        # / JsonlSessionPersistence / SpineFileSink(ADR-0186 PR-3f)。
+        assert pipeline.sinks == ()
+        assert pipeline.consumer_rules == ()
 
         assert bundle.options  # options 段存在且非空
 
@@ -229,15 +221,17 @@ class TestRegisterAndApply:
         assert len(calls) == 1
 
     def test_apply_pipeline_instantiates_sinks(self, tmp_path: Path) -> None:
-        """sink 按 config 实例化;run_id 绑定前不可 append。"""
+        """sink 进 AppliedPipeline.sinks;不 mount,publish 不经 bus 派发。"""
         template = str(tmp_path / "{run_id}.spine.jsonl")
         pipeline = Pipeline(
             name="sink-apply",
             sinks=(_sink_spec(template),),
         )
-        applied = apply_pipeline(_make_bus(), pipeline)
+        bus = _make_bus()
+        applied = apply_pipeline(bus, pipeline)
         sink = applied.sinks["spine-fact-chain"]
         assert isinstance(sink, SpineSink)
+        assert "spine-fact-chain" not in bus._sinks
 
         record = SpineEventRecord(
             event_id="evt-1",
@@ -251,9 +245,17 @@ class TestRegisterAndApply:
             sink.append(record)
 
         sink.set_run_id("run-x")
+        # set_run_id 已 open(a) 建空文件;publish 不得经 bus 写入。
+        bus.publish(
+            TeamDelegationCacheHit(callee_role="a", subtask="b", step=1),
+            producer=_authorized_producer(),
+        )
+        spine_path = tmp_path / "run-x.spine.jsonl"
+        assert spine_path.read_text(encoding="utf-8") == ""
+
         sink.append(record)
         sink.close()
-        lines = (tmp_path / "run-x.spine.jsonl").read_text(encoding="utf-8").splitlines()
+        lines = spine_path.read_text(encoding="utf-8").splitlines()
         assert len(lines) == 1
         assert json.loads(lines[0])["event_id"] == "evt-1"
 
@@ -323,7 +325,8 @@ class TestInspectPipelineCli:
         assert "web-standard-event-pipeline" in result.output
         for section in ("hooks (", "sinks (", "consumer_rules (", "options ("):
             assert section in result.output
-        assert "spine-fact-chain" in result.output
+        assert "sinks (0)" in result.output
+        assert "consumer_rules (0)" in result.output
 
     def test_web_standard_json(self) -> None:
         from typer.testing import CliRunner
@@ -334,7 +337,8 @@ class TestInspectPipelineCli:
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
         assert {"hooks", "sinks", "consumer_rules", "options"} <= set(data)
-        assert data["sinks"][0]["backend"] == "lca_kernel.events.sinks.spine_sink.SpineSink"
+        assert data["sinks"] == []
+        assert data["consumer_rules"] == []
 
     def test_missing_profile_reports_not_found(self) -> None:
         # tests/conftest.py 全局 monkeypatch 掉 sys.exit(K6 shutdown 语义),

@@ -68,7 +68,7 @@ def _rg(pattern: str, root: Path) -> list[str]:
 
 
 class TestISession1:
-    """I-SESSION-1: SessionProtocol 存在；append 为公开生产入口。"""
+    """I-SESSION-1: SessionProtocol 存在；append 为公开生产入口（无条件，无 xfail）。"""
 
     def test_i_session_1_session_protocol_exists(self) -> None:
         """SessionProtocol / SessionObserver / SessionEvent 可从 session 模块导入。"""
@@ -245,14 +245,37 @@ class TestISession5:
         ), "I-SESSION-5 违规:LiveTailDeriver.subscribe body must not call EventSpine.subscribe"
 
 
-# ── ADR-0186 PR-3f: pipeline_loader bus path is known COMPAT ─────────────
+# ── ADR-0186 PR-3f delete-when locks ─────────────────────────────────────
 
 
-def test_pipeline_loader_mount_sink_is_compat_marked() -> None:
-    """pipeline_loader.apply_pipeline still bus.mount_sink; marked COMPAT until Session-only delivery."""
+def test_pipeline_loader_has_no_mount_sink() -> None:
+    """ADR-0186 PR-3f: pipeline_loader 不得 bus.mount_sink / .mount_sink。"""
     path = _REPO_ROOT / "lca" / "harness" / "profile" / "pipeline_loader.py"
+    assert path.exists(), "pipeline_loader.py missing"
     text = path.read_text(encoding="utf-8")
-    assert "bus.mount_sink(" in text
-    assert (
-        'COMPAT(delete-when: rg "mount_sink" lca/harness/profile/pipeline_loader.py = 0' in text
-    ), "pipeline_loader mount_sink must keep mechanical COMPAT(delete-when) (ADR-0186 PR-3f)"
+    assert "bus.mount_sink(" not in text, (
+        "ADR-0186 PR-3f: pipeline_loader still calls bus.mount_sink("
+    )
+    assert ".mount_sink(" not in text, (
+        "ADR-0186 PR-3f: pipeline_loader still calls .mount_sink("
+    )
+
+
+def test_event_session_has_no_eventbus_dual_write() -> None:
+    """ADR-0186 PR-3f: Bridge.append 不得 EventBus.default().publish 双写。"""
+    path = (
+        _REPO_ROOT
+        / "lca"
+        / "plugins"
+        / "transport"
+        / "webserver"
+        / "handlers"
+        / "runs"
+        / "session"
+        / "event_session.py"
+    )
+    assert path.exists(), "event_session.py missing"
+    text = path.read_text(encoding="utf-8")
+    assert "EventBus.default().publish" not in text, (
+        "ADR-0186 PR-3f: event_session still dual-writes via EventBus.default().publish"
+    )

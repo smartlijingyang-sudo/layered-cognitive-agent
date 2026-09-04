@@ -1,22 +1,23 @@
-"""Session-优先 publish helper(PR-3d-sample,ADR-0183 PR-7 后置扩展位)。
+"""Session-优先 publish helper(ADR-0183)。
 
-publisher 单点入口优先走 active Session.append(为后续 PR 接入
-session_service/SessionStore 留 hook 位);无 Session 时 fallback
-:func:`lca_kernel.events.bus.EventBus.default().publish`,行为完全等同
-于改造前 publisher 直接调 ``EventBus.publish``。
+publisher 单点入口优先 ``Session.append``;无 active Session 时走
+:func:`lca_kernel.events.bus.EventBus.default().publish`(单路径 no-Session
+路由,供测试与 early boot)。这不是 Bridge dual-write——同时刻只走一条路径。
 
-# COMPAT(delete-when: 所有 publisher 完成 Session.append 迁移,
-# tracking: ADR-0183 PR-7 + PR-3d 后续批量 PR。fallback 路径在
-# rg "EventBus\\.default\\(\\)\\.publish" lca/plugins/events/publishers/ = 0
-# 后删除)
+# COMPAT(delete-when: production publishers never hit fallback —
+#   Session always bound for runs, OR
+#   rg -n "EventBus\\.default\\(\\)\\.publish" lca/plugins/events/publishers/
+#   _session_publish.py 外零命中且无生产 no-Session 调用方;
+#   tracking: ADR-0183.
+#   保留本 fallback:tests / early-boot 仍依赖;勿与 Bridge dual-write 拆除混为一谈。)
 
 设计边界:
-- helper 只承载 publisher 入口路由(优先 Session,fallback EventBus);
-  payload/producer 字段语义由调用方负责,本模块不重写。
+- helper 只承载入口路由(优先 Session,无 Session 则 EventBus);payload/producer
+  语义由调用方负责,本模块不重写。
 - Session.append 接受 ``payload`` 与 ``producer``;返回 :class:`EventRef`
-  以兼容现有 publisher 测试(ref.category / ref.event_id 断言)。
-- Session 路径与 EventBus 路径共用同一 ``EventRegistry.can_publish`` 鉴权矩阵
-  （S1）;本 helper 在 ``session.append`` 前执行,避免 active Session 时绕过授权。
+  (ref.category / ref.event_id)。
+- Session 与 EventBus 共用 ``EventRegistry.can_publish``(S1);在
+  ``session.append`` 前鉴权,避免 active Session 绕过授权。
 - ContextVar 隔离:Session 跨 asyncio.Task/copy_context 不串。
 """
 
@@ -74,11 +75,11 @@ _current_session: contextvars.ContextVar[_PublishSession | None] = contextvars.C
     "lca_publish_session",
     default=None,
 )
-"""当前上下文的 active Session(PR-3d-sample 引入)。
+"""当前上下文的 active Session。
 
 wiring 层通过 :func:`set_publish_session` 在 run / request 边界 set,
-离开时 reset。EventBus.publish 缺显式 Session 时,本 helper 走 fallback
-路径。contextvars 随 asyncio.Task / copy_context 隔离,跨 run 不串。
+离开时 reset。无 Session 时走 EventBus fallback(单路径,非 dual-write)。
+contextvars 随 asyncio.Task / copy_context 隔离,跨 run 不串。
 """
 
 
@@ -113,17 +114,17 @@ def publish_via_session(
     *,
     producer: Any,
 ) -> EventRef:
-    """优先 Session.append;无 Session 时 fallback EventBus.publish。
+    """优先 Session.append;无 Session 时单路径 fallback EventBus.publish。
 
     参数:
     - ``payload``:typed 事件 payload(SpineEventPayload 或其它 EventPayload 子类);
-      与原 ``EventBus.publish(payload, producer=...)`` 形态一致。
+      与 ``EventBus.publish(payload, producer=...)`` 形态一致。
     - ``producer``:publisher plugin class(EventBus 鉴权用)。
 
     返回:
     :class:`EventRef`。Session 路径返回 ``append`` 回执（runtime Session
-    由 bus facade 从 SessionEvent 合成）;EventBus fallback 路径返回真实
-    EventRef,与改造前等价。
+    由 bus facade 从 SessionEvent 合成）;无 Session 时返回 EventBus
+    EventRef。两条路径互斥,不是 Bridge dual-write。
     """
     session = _current_session.get()
     if session is not None:
@@ -131,6 +132,7 @@ def publish_via_session(
         return session.append(payload, producer=producer)
     from lca_kernel.events.bus import EventBus
 
+    # no-Session path (tests / early boot); keep until delete-when above
     return EventBus.default().publish(payload, producer=producer)
 
 

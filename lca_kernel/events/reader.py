@@ -147,7 +147,8 @@ class SpineReader:
         使用场景:
         - CLI / deriver 仍在消费旧 ``EventRecord`` 字段（``outcome`` /
           ``when`` / ``sequence`` / ``span_id`` 等）;这些字段不在
-          :class:`SpineEventRecord` 9 键 SSOT 内,要按 raw dict 透传。
+          :class:`SpineEventRecord` 10 键 SSOT（含 ``trace_id``）内,要按 raw
+          dict 透传。
         - PR-4 reader 唯一入口收口:即便读旧格式,走 SpineReader,不直 open。
 
         损坏行（json.JSONDecodeError）:log + skip,不 raise。

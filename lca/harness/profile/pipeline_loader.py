@@ -14,10 +14,11 @@
   三者皆无 → 返回 ``None``;Pipeline 装载是可选步骤,缺失不影响 boot。
 
 - :func:`apply_pipeline` / :func:`register_pipeline_once`:
-  把 Pipeline 声明挂到 EventBus 已有公开面。bus 本体不改;当前
-  ``register_pipeline`` 只装载 hooks,sinks / consumer_rules 的 publish 期
-  派发需要 bus 增强(见 ADR-0183 §5 集成阶段),本模块先把实例化与
-  订阅接线准备好。
+  把 Pipeline 声明接到已有公开面。生产 boot 走 ``register_pipeline_once``
+  (只装 hooks)。``apply_pipeline`` 另实例化 sinks 写入回执 map(不
+  ``bus.mount_sink``),并按 consumer_rules ``bus.subscribe``;Session SSOT
+  路径下持久化由 Session.observe / JsonlSessionPersistence 负责
+  (ADR-0186 PR-3f)。
 
 解析复用 :mod:`lca_kernel.events.pipeline` 的段解析器(``_parse_hooks`` /
 ``_parse_sinks`` / ``_parse_rules``),内联段与文件引用因此只有一套语义。
@@ -79,8 +80,9 @@ class ProfilePipeline:
 class AppliedPipeline:
     """apply_pipeline 的装配回执。
 
-    ``sinks`` 已按 ``spec.backend(**spec.config)`` 实例化,**未绑定**
-    run_id —— run 开始时由运行时调 ``set_run_id`` 后才可 append。
+    ``sinks`` 已按 ``spec.backend(**spec.config)`` 实例化并放入 map,供调用方
+    检视;**不** ``bus.mount_sink``。Session SSOT 路径下持久化由
+    Session.observe / JsonlSessionPersistence 负责(ADR-0186 PR-3f)。
     """
 
     pipeline: Pipeline
@@ -184,25 +186,23 @@ def register_pipeline_once(bus: EventBus[Any], pipeline: Pipeline) -> bool:
 
 
 def apply_pipeline(bus: EventBus[Any], pipeline: Pipeline) -> AppliedPipeline:
-    """把 Pipeline 三段挂到 bus 已有公开面(装配用,不取代集成阶段)。
+    """装配 Pipeline:hooks 注册 + sinks 实例化(不 mount) + consumer 订阅。
 
-    - hooks: 经 ``bus.register_pipeline`` 装载(bus 当前只实装本段);
-    - sinks: 按 ``spec.backend(**spec.config)`` 实例化并随回执返回;
-      publish 期落盘派发需 bus 支持(报告:集成阶段增强);
+    - hooks: 经 ``register_pipeline_once`` → ``bus.register_pipeline``;
+    - sinks: 按 ``spec.backend(**spec.config)`` 实例化写入回执 ``sinks`` map,
+      **不** ``bus.mount_sink``。持久化由 Session.observe /
+      JsonlSessionPersistence 在 Session SSOT 路径负责(ADR-0186 PR-3f);
     - consumer_rules: 按前缀展开到闭集 Category,经 ``bus.subscribe``
       逐条订阅;插件必须可无参构造,回调取实例 ``__call__`` 或
       ``on_event``。鉴权失败 → ``UnauthorizedSubscribeError`` 上抛。
+
+    生产 boot 仍只用 ``register_pipeline_once``(hooks);本函数供检视
+    sinks map 或显式装配 consumer_rules 的调用方。
     """
     register_pipeline_once(bus, pipeline)
     sinks: dict[str, Any] = {}
     for spec in pipeline.sinks:
-        instance = spec.backend(**spec.config)
-        sinks[spec.id] = instance
-        # 装载到 bus:publish 期经 _dispatch_sinks 派发(FD-1)。
-        # run_id 仍由运行时经 set_run_id 绑定;此处只装配实例。
-        # COMPAT(delete-when: rg "mount_sink" lca/harness/profile/pipeline_loader.py = 0 and sinks only via Session.observe catalog, tracking: ADR-0186 PR-3f)
-        # Parallel EventBus sink path until Session is the sole consumer delivery.
-        bus.mount_sink(spec.id, instance, failure=spec.failure)
+        sinks[spec.id] = spec.backend(**spec.config)
     handles = _apply_consumer_rules(bus, pipeline)
     return AppliedPipeline(pipeline=pipeline, sinks=sinks, consumer_handles=tuple(handles))
 
@@ -232,8 +232,8 @@ def _apply_consumer_rules(bus: EventBus[Any], pipeline: Pipeline) -> list[Consum
                 raise UnauthorizedSubscribeError(plugin.__qualname__, f"{rule.prefix}*")
             callback = _plugin_callback(plugin)
             for category in categories:
-                # COMPAT(delete-when: rg "bus.subscribe" lca/harness/profile/pipeline_loader.py = 0 and consumer_rules empty / Session.observe sole delivery for catalog plugins e.g. SpineChainSink, tracking: ADR-0186 PR-3f)
-                # Production web-standard still bus.subscribe(SpineChainSink); plugin setup also registers via Session.observe catalog.
+                # COMPAT(delete-when: consumer_rules empty in production yaml and rg "bus.subscribe" lca/harness/profile/pipeline_loader.py = 0; Session.observe sole delivery for catalog plugins e.g. SpineChainSink, tracking: ADR-0186 PR-3f)
+                # PR-3f removed bus.mount_sink; subscribe kept until yaml consumer_rules cleared.
                 handles.append(
                     bus.subscribe(
                         plugin=plugin,

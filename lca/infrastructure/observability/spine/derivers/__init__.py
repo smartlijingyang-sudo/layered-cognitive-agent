@@ -1,6 +1,7 @@
-# COMPAT(delete-when: PR-9, tracking: ADR-0181)
-# 旧 EventSpine deriver；PR-8 shim 走 events/subscribers/spine_* 包装；
-# 本模块保留至 PR-9 旧 spine 全退役（rg "lca.plugins.observability.spine.derivers" lca/ = 0 触发）。
+# COMPAT(delete-when: ADR-0186 PR-3g 残留 on_event callback deriver 清零,
+#        tracking: ADR-0186 PR-3g / I-SESSION-5)
+# 本包保留旧 EventSpine on_event deriver 实现。生产 step_tree 已走
+# StepTreeFoldDeriver；capability / CLI / 测试仍引用时保留本包。
 
 """Spine derivers sub-package — see ADR-0165 / ADR-0165.1 / ADR-0167 D9.
 

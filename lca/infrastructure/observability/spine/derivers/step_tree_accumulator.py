@@ -1,14 +1,14 @@
 # COMPAT(delete-when: rg "StepTreeAccumulatorDeriver(" lca/ = 0 except this file,
-# tracking: ADR-0186 PR-3g / I-SESSION-5)
-# 生产 step_tree 走 lca.plugins.session.derivers.step_tree.StepTreeFoldDeriver
-# （RunSessionBuilder 不 EventSpine.subscribe；I-SESSION-5 已锁）。本 in-memory
-# callback deriver 仅供测试与尚未迁走的调用方；生产引用清零后删除本模块。
+#        tracking: ADR-0186 PR-3g / I-SESSION-5)
+# 生产 step_tree 走 StepTreeFoldDeriver（RunSessionBuilder 用 fold，
+# 不 EventSpine.subscribe；I-SESSION-5 已锁）。本 in-memory callback
+# deriver 仅供测试与尚未迁走的调用方；生产引用清零后删除本模块。
 
-"""spine-deriver step_tree_accumulator —— 闭 D11 路径（ADR-0167 D11）。
+"""spine-deriver step_tree_accumulator —— in-memory callback 路径（ADR-0167 D11）。
 
-从 spine events 直接累积出 JournalDocument（lca.journal/3.1），最终
-由 ``flush()`` 一次性写到 ``journal.json``。 之前 spine → journal 路径
-是断的（replay 绕开 spine 直读 journal），本 deriver 是该路径的真正闭合。
+从 spine events 累积 JournalDocument（lca.journal/3.1），``flush()`` 写
+``journal.json``。生产派生主路径是 Session 快照 / SpineReader + fold
+（I-SESSION-5）；本模块不是生产 builder 路径。
 
 设计：
 - 单一真理表 ``PHASE_FOLD_EP`` 描述哪些 EP 对应「perceive / think / act」

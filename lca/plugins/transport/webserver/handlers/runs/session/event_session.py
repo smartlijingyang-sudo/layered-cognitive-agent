@@ -6,10 +6,10 @@ DSH :class:`~lca.plugins.session.runtime.session.Session` speaks
 :func:`register_as_session_observer` speak ``append(payload, *, producer)``
 and ``observe(plugin, callback)``. This module is the run-scoped adapter.
 
-# COMPAT(delete-when: rg "EventBus.default().publish" event_session.py = 0
-# 且 Bridge.append 不再 EventBus 双写, tracking: ADR-0186 PR-3f)
-# append 在 Session 提交后再 EventBus.publish；consumer 已改走
-# Session.observe 目录（set_session 挂上），双写仅服务仍挂在 bus 上的遗留面。
+Session is the sole delivery path for this bridge (ADR-0186 PR-3f):
+``append`` commits to the Session log and returns a synthetic
+:class:`~lca_kernel.events.bus.EventRef`; observers fire via
+``Session.observe`` (catalog attached at ``set_session``).
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ from lca.plugins.events.publishers._session_publish import (
     set_publish_session,
 )
 from lca.plugins.session.runtime.session import Session
-from lca_kernel.events.bus import EventBus, EventRef
+from lca_kernel.events.bus import EventRef
 from lca_kernel.events.session import SessionEvent, SessionProtocol
 
 _log = structlog.get_logger(__name__)
@@ -74,6 +74,18 @@ def _session_event_parts(payload: Any) -> tuple[str, dict[str, Any]]:
     raise TypeError(f"cannot project payload {type(payload).__name__} into session event data")
 
 
+def _event_ref_from_session(session: SessionProtocol, event: SessionEvent) -> EventRef:
+    """Build the EventRef shape Session observers already receive."""
+    return EventRef(
+        event_id=f"{session.id}:{event.seq}",
+        category=event.type,
+        trace_id="",
+        ts=event.time / 1000.0,
+        persisted=False,
+        subscriber_count=0,
+    )
+
+
 class RunEventSessionBridge:
     """Present a DSH Session as the publisher + observer ContextVar target.
 
@@ -94,14 +106,16 @@ class RunEventSessionBridge:
         return self._session
 
     def append(self, payload: Any, *, producer: Any) -> EventRef:
-        """Commit to Session log, then EventBus.publish (COMPAT dual-write).
+        """Commit to Session log and return a synthetic EventRef.
 
         precondition: ``payload`` projects to JSON-serializable data.
-        失败语义: Session 校验失败不改日志、不上 EventBus；Session 已提交后
-        EventBus 失败上抛，日志保留（append 已 commit）。
+        失败语义: Session 校验失败不改日志；成功则日志已 commit 且
+        Session.observe 已同步派发。
         时序: 先置 ``_inflight_payload``，再 ``Session.append``（同步通知
-        observer），再按 seq 固化到 ``_payloads``，最后 EventBus 双写。
+        observer），再按 seq 固化到 ``_payloads``，返回与 observer 同形的
+        EventRef。``producer`` 保留签名兼容，本桥不投递 EventBus。
         """
+        del producer
         event_type, data = _session_event_parts(payload)
         previous = self._inflight_payload
         self._inflight_payload = payload
@@ -110,7 +124,7 @@ class RunEventSessionBridge:
             self._payloads[event.seq] = payload
         finally:
             self._inflight_payload = previous
-        return EventBus.default().publish(payload, producer=producer)
+        return _event_ref_from_session(self._session, event)
 
     def observe(self, plugin: type, callback: EventObserverCallback) -> object:
         """Register an EventBus-shaped callback as a SessionObserver.
@@ -126,15 +140,7 @@ class RunEventSessionBridge:
                 payload = self._inflight_payload
             if payload is None or not isinstance(payload, EventPayload):
                 return
-            ref = EventRef(
-                event_id=f"{session.id}:{event.seq}",
-                category=event.type,
-                trace_id="",
-                ts=event.time / 1000.0,
-                persisted=False,
-                subscriber_count=0,
-            )
-            callback(payload, ref)
+            callback(payload, _event_ref_from_session(session, event))
 
         return self._session.observe(_on_event)
 

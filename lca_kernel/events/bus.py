@@ -656,7 +656,8 @@ class EventBus(EnvelopeBus[P]):
     def _dispatch_sinks(self, payload: EventPayload, ref: EventRef) -> bool:
         """把事实派发到已装载的落盘后端(FD-1,先于 consumer FD-2)。
 
-        每个后端收到 ``build_record(payload, ref)`` 的 9 键 ``SpineEventRecord``;
+        每个后端收到 ``build_record(payload, ref)`` 的 10 键 ``SpineEventRecord``
+        （含 ``trace_id``）;
         后端 ``append`` 抛错时按 :meth:`mount_sink` 声明的 ``failure`` 处理。
         返回 S3 持久回执:≥1 个后端写入成功为 True。
 

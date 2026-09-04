@@ -2,17 +2,17 @@
 
 覆盖链路(纯 EventBus 公开 API):
 publish → pre_dispatch hook → schema 校验 → sink 派发(FD-1)→ SpineSink 落盘
-``<run_id>.spine.jsonl`` → SpineReader 还原(9 键字节布局)。
+``<run_id>.spine.jsonl`` → SpineReader 还原(10 键字节布局,含 ``trace_id``)。
 
 落盘隔离:全部走 ``tmp_path``;SpineSink 用显式 ``path_template`` 绑定
 临时目录,不污染 cwd。
 
-sink 装配两条路:
-- ``bus.mount_sink(id, backend)``:命令式装载,``publish`` 经 ``_dispatch_sinks``
-  把 ``build_record`` 结果派发到后端。
-- ``apply_pipeline(bus, pipeline)``:声明式装配,一次装好 hooks + sinks +
-  consumer_rules(生产 boot 仅走 ``register_pipeline_once`` 装 hook,sink 派发
-  不在迁移期启用,避免与既有 FileSink 双写)。
+sink 装配:
+- ``apply_pipeline(bus, pipeline)``:声明式装 hooks + consumer_rules,并把
+  sinks 实例化进 ``AppliedPipeline.sinks``(不自动 ``mount_sink``)。
+- ``bus.mount_sink(id, backend)``:命令式挂落盘后端;publish→disk 场景须在
+  ``apply_pipeline`` 之后显式 mount 回执里的 sink。
+- 生产 boot 仅走 ``register_pipeline_once`` 装 hook(迁移期不启用 sink 派发)。
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ from lca_kernel.events.sinks.spine_sink import SpineSink
 CAT = Category.SPINE_COGNITION_BRAIN_PERCEIVE_START
 RUN_ID = "run-e2e-eventbus"
 
-# SpineEventRecord.to_dict() 的 9 键字节布局(下游消费者契约)。
+# SpineEventRecord.to_dict() 的 10 键字节布局(下游消费者契约;含 ADR-0183 §3.9 trace_id)。
 RECORD_KEYS = frozenset(
     {
         "event_id",
@@ -60,6 +60,7 @@ RECORD_KEYS = frozenset(
         "causation_id",
         "prev_event_hash",
         "event_hash",
+        "trace_id",
     }
 )
 
@@ -137,16 +138,28 @@ class WrongPayload(EventPayload):
 
 
 def _make_registry() -> EventRegistry:
-    """测试专属鉴权矩阵:不读生产 yaml,白名单全部是本文件的测试替身。"""
+    """测试专属鉴权矩阵:不读生产 yaml,白名单全部是本文件的测试替身。
+
+    直接构造 ``EventRegistry``:``from_specs`` 只吃 ``*_tokens`` / catalog,
+    不把 ``EventSpec.publishers`` / ``subscribers`` frozenset 抄进矩阵。
+    """
+    pubs = frozenset({TestProducer})
+    subs = frozenset({TestSinkPlugin, TestSubscriberPlugin})
     spec = EventSpec(
         category=CAT,
         plane=Plane.OBSERVABILITY,
         payload_class=SpineEventPayload,
         fields={"state_id": "str"},
-        publishers=frozenset({TestProducer}),
-        subscribers=frozenset({TestSinkPlugin, TestSubscriberPlugin}),
+        publishers=pubs,
+        subscribers=subs,
     )
-    return EventRegistry.from_specs([spec])
+    return EventRegistry(
+        specs=(spec,),
+        publishers={CAT: pubs},
+        subscribers={CAT: subs},
+        consumer_rules=(),
+        payload_by_category={CAT: SpineEventPayload},
+    )
 
 
 def _spine_payload(seq: int) -> SpineEventPayload:
@@ -221,7 +234,7 @@ def test_publish_hook_schema_fanout_spine_roundtrip(
     spine_path = tmp_path / f"{RUN_ID}.spine.jsonl"
     assert spine_path.exists()
 
-    # 字节布局:每行 9 键完整。
+    # 字节布局:每行 10 键完整。
     raw_lines = [json.loads(line) for line in spine_path.read_text(encoding="utf-8").splitlines()]
     assert len(raw_lines) == 3
     for line in raw_lines:
@@ -361,7 +374,7 @@ def test_register_pipeline_does_not_mount_sinks(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """register_pipeline 仅装 hook(生产 boot 安全形态);sink 装载走
-    mount_sink 或 apply_pipeline。
+    ``mount_sink``(``apply_pipeline`` 只把 sinks 放进回执,由调用方显式 mount)。
 
     COMPAT(delete-when: 21 个 publisher 全部迁移到 bus.publish 后,生产 boot
     改为 apply_pipeline,sink 派发在迁移完成时一并启用,tracking: ADR-0183)
@@ -378,16 +391,19 @@ def test_apply_pipeline_mounts_sinks_declaratively(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """apply_pipeline 一次装好 hooks + sinks + consumer_rules;publish
-    经 _dispatch_sinks 派发到 SpineSink,落盘 <run_id>.spine.jsonl。
+    """apply_pipeline 装 hooks + consumer_rules 并返回 sinks;测试显式
+    ``mount_sink`` 后 publish 经 _dispatch_sinks 落盘 <run_id>.spine.jsonl。
     """
     RecordingPreDispatchHook.calls.clear()
     TestSinkPlugin.seen.clear()
     monkeypatch.chdir(tmp_path)
 
-    applied = apply_pipeline(bus, _make_pipeline())
+    pipeline = _make_pipeline()
+    applied = apply_pipeline(bus, pipeline)
     spine = applied.sinks["spine"]
     assert isinstance(spine, SpineSink)
+    sink_failure = next(spec.failure for spec in pipeline.sinks if spec.id == "spine")
+    bus.mount_sink("spine", spine, failure=sink_failure)
     spine.set_run_id(RUN_ID)
 
     refs = [bus.publish(_spine_payload(i), producer=TestProducer) for i in range(2)]

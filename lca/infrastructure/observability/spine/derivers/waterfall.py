@@ -1,12 +1,8 @@
-# COMPAT(delete-when: PR-9, tracking: ADR-0181)
-# 旧 EventSpine deriver；PR-8 shim 走 events/subscribers/spine_* 包装；
-# 本模块保留至 PR-9 旧 spine 全退役（rg "lca.plugins.observability.spine.derivers" lca/ = 0 触发）。
-#
 # COMPAT(delete-when: ADR-0186 PR-3g waterfall fold 替代 callback deriver,
-#        tracking: ADR-0186 PR-3g)
-# waterfall 是纯累积 → 静态 HTML;PR-3g 收口时改为从 SpineReader
-# snapshot fold 渲染(已累积 events → render),不再需要 on_event 订阅。
-# CLI 入口 ``lca-ops journal trajectory`` 保持,底层数据源迁 snapshot。
+#        tracking: ADR-0186 PR-3g / I-SESSION-5)
+# waterfall 是 on_event 累积 → 静态 HTML。收口时改为 SpineReader snapshot
+# fold 渲染（events → render），不再需要 callback 订阅。CLI
+# ``lca-ops journal trajectory`` 保留，底层数据源迁 snapshot。
 
 """Waterfall HTML deriver —— DSH Trajectory 风格（ADR-0167 D9 + ADR-0185 PR-3）。
 

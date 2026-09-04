@@ -1,11 +1,7 @@
-# COMPAT(delete-when: PR-9, tracking: ADR-0181)
-# 旧 EventSpine deriver；PR-8 shim 走 events/subscribers/spine_* 包装；
-# 本模块保留至 PR-9 旧 spine 全退役（rg "lca.plugins.observability.spine.derivers" lca/ = 0 触发）。
-#
-# COMPAT(delete-when: ADR-0186 PR-3g 全部 Deriver.on_event 订阅路径迁完,
-#        tracking: ADR-0186 PR-3g)
-# Deriver Protocol 定义了 on_event 回调签名;PR-3g 把 callback 累积
-# 改为 fold/snapshot 纯函数。全部 deriver 迁完后 Protocol 本身也删除。
+# COMPAT(delete-when: ADR-0186 PR-3g 全部 Deriver.on_event 路径迁完且实现清零,
+#        tracking: ADR-0186 PR-3g / I-SESSION-5)
+# Deriver Protocol 仍描述 on_event 回调；I-SESSION-5 派生主路径已是
+# Session 快照 / SpineReader + fold。callback deriver 全部删除后再删本 Protocol。
 
 """Deriver Protocol — derive secondary artefacts from spine events.
 

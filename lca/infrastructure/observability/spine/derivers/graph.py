@@ -1,12 +1,8 @@
-# COMPAT(delete-when: PR-9, tracking: ADR-0181)
-# 旧 EventSpine deriver；PR-8 shim 走 events/subscribers/spine_* 包装；
-# 本模块保留至 PR-9 旧 spine 全退役（rg "lca.plugins.observability.spine.derivers" lca/ = 0 触发）。
-#
 # COMPAT(delete-when: ADR-0186 PR-3g graph fold 替代 callback deriver,
-#        tracking: ADR-0186 PR-3g)
-# graph 累积 execution_point 边 → phase_graph.dot;生产路径未在 builder
-# 硬 subscribe(只作为 capability 提供)。PR-3g 收口时改为从 SpineReader
-# snapshot fold 出 edge list,不再需要 mutable on_event 累积。
+#        tracking: ADR-0186 PR-3g / I-SESSION-5)
+# graph 用 on_event 累积 execution_point 边 → phase_graph.dot；生产路径
+# 未硬 subscribe（仅 capability）。收口时改为 SpineReader snapshot fold
+# 出 edge list，再删本 mutable 累积器。
 
 """GraphDeriver — accumulate execution-point edges into a Graphviz digraph.
 
