@@ -11,7 +11,7 @@ Status: proposed
 | `lca_kernel/events/persistence.py` Observer 化 | 落地 | `PersistenceObserver` 同步落盘；已删 `DeliveryQueue` / `_consume_loop`；`/health` 与 `events-delivery` 读 Observer |
 | `PersistenceWorker` 别名 | 已删 | 生产路径 `rg PersistenceWorker` = 0；I-SESSION-4 翻正 |
 | `deriver` fold 切流 | 部分 | 生产 step_tree 走 `StepTreeFoldDeriver`（I-SESSION-5 通过）；`live_tail.subscribe` 是 SSE carrier fan-out，不是 EventSpine.subscribe / fold 派生主路径；旧 `StepTreeAccumulatorDeriver` 与 graph/waterfall/otel/anomaly `on_event` 留 COMPAT(delete-when: ADR-0186 PR-3g) |
-| sinks/subscribers observe | 部分 | chain / step_tree accumulator 已 observe-only；journal / spine_file / console 仍 boot 时 `mount_sink`/`bus.subscribe` COMPAT（`current_session()` 在 plugin boot 常为 None） |
+| sinks/subscribers observe | 落地 | boot 只入 `_session_observe` 目录；run bind `set_session` 整表挂上；journal / spine_file / console / chain / step_tree 均无 `mount_sink`/`bus.subscribe` |
 | `tests/architecture/test_session_ssot_invariants.py` | 落地 | I-SESSION-1/2/3/4/5 通过（I-SESSION-1 仅在 session 模块缺失时条件 xfail） |
 
 ## Problem

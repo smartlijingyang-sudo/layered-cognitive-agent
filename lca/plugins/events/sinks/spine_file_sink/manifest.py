@@ -57,39 +57,16 @@ class _Config(BaseModel):
     marker_class=SINK_PLUGIN_CLASS,
 )
 async def setup(ctx: PluginContext, config: _Config) -> None:
-    """SpineFileSink boot — Session.observe 优先；boot 缺席走 mount_sink COMPAT。
+    """SpineFileSink boot — 只经 Session.observe 目录登记。
 
-    Session 在场时只经
     :func:`lca.plugins.events._session_observe.register_as_session_observer`
-    注册。plugin boot 时 ``current_session`` 通常为空（run bind 才
-    ``set_session``），此时 ``EventBus.mount_sink`` 挂
-    :class:`lca_kernel.events.sinks.SinkBackend`，由
-    :meth:`~lca_kernel.events.bus.EventBus._dispatch_sinks` 派发落盘。
+    写入进程级目录；Session 在场立即挂上，boot 缺席则等 run bind
+    ``set_session`` 整表挂上。不调用 ``mount_sink`` / ``bus.subscribe``。
     """
     from lca.plugins.events._session_observe import register_as_session_observer
 
     sink = SpineFileSink()
-    if register_as_session_observer(SINK_PLUGIN_CLASS, sink):
-        ctx.provide("event.sink.spine_file", sink)
-        return
-
-    # COMPAT(delete-when: rg "mount_sink" lca/plugins/events/sinks = 0,
-    #   tracking: ADR-0186 PR-3f)
-    # Boot 时 Session 未 set；生产靠 EventBus 双写投递。删条件：run bind
-    # 经 Session.observe 挂上本 sink，且 observe 派发带原 payload；
-    # profile 以 JsonlSessionPersistence 为 spine.jsonl 唯一写方。
-    from lca_kernel.events.bus import EventBus
-    from lca_kernel.events.hooks import FailureSemantics
-
-    bus_obj = ctx.soft_get("event.bus") or EventBus.default()
-    if not isinstance(bus_obj, EventBus):
-        msg = "event.sink.spine_file boot 失败：event.bus 未装载"
-        raise RuntimeError(msg)
-    bus_obj.mount_sink(
-        sink_id="lca.events.sink.spine_file",
-        backend=sink,
-        failure=FailureSemantics.FAIL_FAST,
-    )
+    register_as_session_observer(SINK_PLUGIN_CLASS, sink)
     ctx.provide("event.sink.spine_file", sink)
 
 

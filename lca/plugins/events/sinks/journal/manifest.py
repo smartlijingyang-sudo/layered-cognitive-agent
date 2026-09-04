@@ -62,36 +62,16 @@ class _Config(BaseModel):
     marker_class=JournalSink,
 )
 async def setup(ctx: PluginContext, config: _Config) -> None:
-    """Journal sink boot — Session.observe 优先；boot 缺席走 EventBus COMPAT。
+    """Journal sink boot — 只经 Session.observe 目录登记。
 
-    Session 在场时只经
     :func:`lca.plugins.events._session_observe.register_as_session_observer`
-    注册。plugin boot 时 ``current_session`` 通常为空（run bind 才
-    ``set_session``），此时按 yaml 白名单逐条 ``bus.subscribe``。
+    写入进程级目录；Session 在场立即挂上，boot 缺席则等 run bind
+    ``set_session`` 整表挂上。不调用 ``bus.subscribe`` / ``mount_sink``。
     """
     from lca.plugins.events._session_observe import register_as_session_observer
-    from lca_kernel.events.bus import EventBus
 
     sink = JournalSink()
-    if register_as_session_observer(SINK_PLUGIN_CLASS, sink.on_event):
-        ctx.provide("event.sink.journal", sink)
-        return
-
-    # COMPAT(delete-when: rg "bus_obj.subscribe" lca/plugins/events/sinks = 0,
-    #   tracking: ADR-0186 PR-3f)
-    # Boot 时 Session 未 set；生产靠 EventBus 双写投递。删条件：run bind
-    # 经 Session.observe 挂上本 sink，且 observe 派发带原 payload。
-    bus_obj = ctx.soft_get("event.bus") or EventBus.default()
-    if not isinstance(bus_obj, EventBus):
-        # bus 缺位时不抛（profile resolve 完成前 event.bus 可能未到位），
-        # 改由 :meth:`EventRegistry.refresh` 后的实际 bus 自动 subscribe。
-        return
-    for spec in bus_obj.registry.specs:
-        bus_obj.subscribe(
-            plugin=SINK_PLUGIN_CLASS,
-            category=spec.category,
-            on_event=sink.on_event,
-        )
+    register_as_session_observer(SINK_PLUGIN_CLASS, sink.on_event)
     ctx.provide("event.sink.journal", sink)
 
 

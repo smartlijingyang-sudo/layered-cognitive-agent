@@ -6,10 +6,10 @@ DSH :class:`~lca.plugins.session.runtime.session.Session` speaks
 :func:`register_as_session_observer` speak ``append(payload, *, producer)``
 and ``observe(plugin, callback)``. This module is the run-scoped adapter.
 
-# COMPAT(delete-when: PersistenceObserver 是 spine.jsonl 唯一写方且
-# sinks 在 run start 经 Session.observe 注册,
-# tracking: ADR-0186 PR-3e/3f)
-# append 在 Session 提交后再 EventBus.publish，boot 期挂上的 sink 仍收事件。
+# COMPAT(delete-when: Bridge.append 不再 EventBus.publish 双写,
+# tracking: ADR-0186 PR-3f)
+# append 在 Session 提交后再 EventBus.publish；consumer 已改走
+# Session.observe 目录（set_session 挂上），双写仅服务仍挂在 bus 上的遗留面。
 """
 
 from __future__ import annotations
@@ -84,6 +84,9 @@ class RunEventSessionBridge:
     def __init__(self, session: Session) -> None:
         self._session = session
         self._payloads: dict[int, Any] = {}
+        # append 进行中的原 payload；Session.append 同步 fire observer，
+        # 必须在拿到 seq 写入 _payloads 之前就能被 observe 适配器读到。
+        self._inflight_payload: Any | None = None
 
     @property
     def inner(self) -> Session:
@@ -96,10 +99,17 @@ class RunEventSessionBridge:
         precondition: ``payload`` projects to JSON-serializable data.
         失败语义: Session 校验失败不改日志、不上 EventBus；Session 已提交后
         EventBus 失败上抛，日志保留（append 已 commit）。
+        时序: 先置 ``_inflight_payload``，再 ``Session.append``（同步通知
+        observer），再按 seq 固化到 ``_payloads``，最后 EventBus 双写。
         """
         event_type, data = _session_event_parts(payload)
-        event = self._session.append(event_type, data)
-        self._payloads[event.seq] = payload
+        previous = self._inflight_payload
+        self._inflight_payload = payload
+        try:
+            event = self._session.append(event_type, data)
+            self._payloads[event.seq] = payload
+        finally:
+            self._inflight_payload = previous
         return EventBus.default().publish(payload, producer=producer)
 
     def observe(self, plugin: type, callback: EventObserverCallback) -> object:
@@ -112,6 +122,8 @@ class RunEventSessionBridge:
 
         def _on_event(session: SessionProtocol, event: SessionEvent) -> None:
             payload = self._payloads.get(event.seq)
+            if payload is None:
+                payload = self._inflight_payload
             if payload is None or not isinstance(payload, EventPayload):
                 return
             ref = EventRef(

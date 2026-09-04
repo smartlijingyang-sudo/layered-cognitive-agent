@@ -164,13 +164,13 @@ class TestHealthSnapshot:
         assert snap.consumer_running is False
 
 
-# ── 5:spine_file_sink manifest 走 mount_sink ─────────────────────────────
+# ── 5:spine_file_sink manifest 走 Session.observe 目录 ───────────────────
 
 
 class TestSpineFileSinkManifest:
-    def test_spine_file_sink_uses_mount_sink_not_subscribe(self) -> None:
-        """验证 spine_file_sink setup 走 ``bus.mount_sink``,
-        不再 ``bus.subscribe(..., on_event=sink)`` 绕道 SinkBackend Protocol。
+    def test_spine_file_sink_uses_session_observe_not_bus(self) -> None:
+        """验证 spine_file_sink setup 只经 Session.observe 目录登记，
+        不再 ``mount_sink`` / ``bus.subscribe``。
         """
 
         manifest_path = (
@@ -183,9 +183,14 @@ class TestSpineFileSinkManifest:
             / "manifest.py"
         )
         text = manifest_path.read_text(encoding="utf-8")
-        assert "bus_obj.mount_sink(" in text, "spine_file_sink manifest 应走 mount_sink 形态"
+        assert "register_as_session_observer(" in text, (
+            "spine_file_sink manifest 应走 Session.observe 目录登记"
+        )
+        assert "bus_obj.mount_sink(" not in text, (
+            "spine_file_sink manifest 不应再 mount_sink（ADR-0186 PR-3f）"
+        )
         assert "bus_obj.subscribe(" not in text, (
-            "spine_file_sink manifest 不应再走 subscribe(..., on_event=sink) 模拟 sink"
+            "spine_file_sink manifest 不应再走 subscribe(..., on_event=sink)"
         )
 
 

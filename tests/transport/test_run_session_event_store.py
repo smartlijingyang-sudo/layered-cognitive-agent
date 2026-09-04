@@ -18,7 +18,12 @@ import pytest
 import structlog
 
 from lca.infrastructure.observability.backends.run_locator_fs import FilesystemRunLocator
-from lca.plugins.events._session_observe import current_session, set_session
+from lca.plugins.events._session_observe import (
+    clear_observer_catalog,
+    current_session,
+    register_as_session_observer,
+    set_session,
+)
 from lca.plugins.events.publishers._session_publish import (
     current_publish_session,
     publish_via_session,
@@ -192,8 +197,10 @@ def _sp_payload() -> Any:
 @pytest.fixture(autouse=True)
 def _clear_observe_slot() -> Iterator[None]:
     set_session(None)
+    clear_observer_catalog()
     yield
     set_session(None)
+    clear_observer_catalog()
 
 
 def test_builder_binds_session_store_to_publish_and_observe_slots(tmp_path: Path) -> None:
@@ -261,6 +268,40 @@ def test_bound_session_append_records_log_and_dual_writes_eventbus(
         assert event.data == {"state_id": "s1"}
         assert ref.category == "spine.cognition.brain.perceive.start"
         assert ref.event_id
+    finally:
+        EventBus.set_default(None)
+        _teardown(session)
+
+
+def test_bind_attaches_boot_catalogued_observers(tmp_path: Path) -> None:
+    """Boot 先 register（无 Session）→ create_run_session set_session → append 派发。"""
+    from lca.contracts.event import EventPayload
+    from lca.plugins.events.publishers.spine_reflector_cognition.plugin import (
+        ReflectorClass,
+    )
+    from lca_kernel.events import EventRef
+
+    seen: list[tuple[EventPayload, EventRef]] = []
+
+    class _BootSink:
+        """Marker class for catalog registration."""
+
+    def _on_event(payload: EventPayload, ref: EventRef) -> None:
+        seen.append((payload, ref))
+
+    assert register_as_session_observer(_BootSink, _on_event) is False
+
+    store = SessionStore()
+    ctx, _spine = _build_ctx(session_store=store)
+    registry = RunRegistry(locator=FilesystemRunLocator(root=tmp_path))
+    bus = build_test_bus()
+    EventBus.set_default(bus)
+    session = create_run_session(registry, question="q", user_text="u", ctx=ctx)
+    try:
+        payload = _sp_payload()
+        publish_via_session(payload, producer=ReflectorClass)
+        assert len(seen) == 1
+        assert seen[0][0] is payload
     finally:
         EventBus.set_default(None)
         _teardown(session)
