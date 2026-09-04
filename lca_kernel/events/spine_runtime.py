@@ -49,13 +49,31 @@ log = logging.getLogger(__name__)
 # ── 类型守卫 ──────────────────────────────────────────────────────────────
 
 
-def is_spine_event(payload: Any) -> TypeGuard[SpineEventPayload]:
-    """类型守卫：payload 是 SpineEventPayload？
+def is_spine_event(payload: Any) -> TypeGuard[EventPayload]:
+    """类型守卫：payload 是 spine event ？
 
-    替代散落的 ``hasattr(payload, "execution_point")`` 模式。pydantic
-    v2 BaseModel 必有 ``execution_point`` 字段，鸭子类型判定足够。
+    接受两类 carrier:
+    1. :class:`lca_kernel.events.payloads_spine.SpineEventPayload`
+       —— ``execution_point`` + ``channel`` 必备。
+    2. typed ``EventPayload`` 子类,其 ``category`` 在
+       ``spine.*`` namespace 下 —— 例如
+       :class:`lca_kernel.events.payloads_model_visible.SpineLlmRequestHeaderPayload`
+       / ``SpineLlmRequestHeaderAssistantPayload`` (ADR-0185 §3.3)。
+       这些 typed payload 用直接 pydantic 字段代替 ``payload`` dict,
+       不走 ``SpineEventPayload`` 壳。
+
+    sink / subscriber 收到 typed spine event 视为 spine 投递;落盘字段
+    由 :func:`build_record` 走 ``model_dump`` 路径序列化全部 typed 字段。
     """
-    return hasattr(payload, "execution_point") and hasattr(payload, "channel")
+    if hasattr(payload, "execution_point") and hasattr(payload, "channel"):
+        return True
+    category = getattr(payload, "category", None)
+    if category is None:
+        return False
+    category_value = getattr(category, "value", category)
+    if not isinstance(category_value, str):
+        return False
+    return category_value.startswith("spine.")
 
 
 # ── 时钟 ────────────────────────────────────────────────────────────────
@@ -321,14 +339,35 @@ def build_record(
 
     payload 形态兼容：
     - ``SpineEventPayload``：直接读 ``execution_point`` / ``channel`` /
-      ``prev_event_hash`` 字段
-    - 其它 ``EventPayload``（非 spine）：``getattr(payload, "execution_point",
-      "unknown")`` 容错走位；channel 默认 ``"fact"``；prev_event_hash 默认 None
+      ``prev_event_hash`` 字段,``payload`` dict 直接复制。
+    - typed ``EventPayload`` 子类(``category`` ∈ ``spine.*``,例如 ADR-0185 §3.3
+      的 ``SpineLlmRequestHeaderPayload``):用 pydantic ``model_dump`` 把全部 typed
+      字段序列化进 ``record.payload``;``execution_point`` /
+      ``channel`` 不存在 → 默认 ``"unknown"`` / ``"fact"``。
+    - 其它 ``EventPayload``(非 spine):``getattr`` 容错,channel 默认 ``"fact"``,
+      prev_event_hash 默认 None。
     """
     execution_point = getattr(payload, "execution_point", "unknown")
     channel = getattr(payload, "channel", "fact")
-    inner_payload: dict[str, Any] = getattr(payload, "payload", {}) or {}
     prev_event_hash_attr: str | None = getattr(payload, "prev_event_hash", None)
+
+    if hasattr(payload, "payload") and isinstance(getattr(payload, "payload", None), dict):
+        inner_payload: dict[str, Any] = dict(payload.payload)
+    else:
+        # typed EventPayload subclass with typed fields (e.g. ADR-0185 §3.3
+        # model-visible payloads) — dump pydantic fields into payload dict
+        # so spine.jsonl readers see the full projection.
+        # SpineEventPayload 自身有 .payload,上分支已处理;此处仅落到
+        # 自定义 typed 子类。
+        dump = getattr(payload, "model_dump", None)
+        if callable(dump):
+            try:
+                dumped = dump(mode="json")
+            except TypeError:
+                dumped = dump()
+            inner_payload = dict(dumped) if isinstance(dumped, dict) else {}
+        else:
+            inner_payload = {}
 
     record = SpineEventRecord(
         event_id=ref.event_id,
