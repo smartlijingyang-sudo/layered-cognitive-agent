@@ -113,6 +113,9 @@ class RunExecutionEnvironment:
             file_store=cast("FileStore | None", providers.file_store),
             assistant_id=(getattr(session, "assistant_id", "") or "").strip(),
         )
+        # Capture the ambient snapshot on the session so a HIL resume can
+        # re-bind it (FileStore etc.) without re-resolving providers.
+        session.ambit = ambit
         # ADR-0167 D11: bind StepCoordinator + facade RunContext。
         # StepCoordinator 是 Agent 唯一可见写入口 (D2); 通过 ContextVar 注入,
         # adapter / facade 在 prepare 期间可直接拿当前 coordinator。

@@ -27,6 +27,7 @@ from lca.contracts.observability.run_locator import RunLocator
 from lca.contracts.observability.status import RunLifecycleStatus
 from lca.contracts.protocols import JournalProjector
 from lca.infrastructure.observability import BoundObservability
+from lca.infrastructure.observability.facade.run_ambit import RunAmbit
 from lca.infrastructure.observability.loop_cursor import (
     reset_run_cursor,
 )
@@ -85,6 +86,9 @@ class RunSession:
     approval_request: dict[str, Any] | None = None
     closed_at: float | None = None
     bindings: PlaneBindings | None = None
+    # ADR-0122 ambient snapshot captured at execute-prepare time; re-bound on
+    # HIL resume so prompt rendering / tool execution see the same FileStore.
+    ambit: RunAmbit | None = None
     device_id: str = ""
     plane: str = ""
     extra_plane: str = ""

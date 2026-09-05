@@ -11,8 +11,10 @@ import structlog
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.observability import exc_to_record
 from lca.contracts.protocols.runtime.infra import MachineResolver
+from lca.infrastructure.observability.facade.run_ambit import bind_run_ambit
 from lca.infrastructure.runtime_plane.resolve import PlaneBindingError
 from lca.infrastructure.runtime_plane.scope import plane_bindings_scope
+from lca.infrastructure.workspace import run_workspace_scope
 from lca.plugins.loop_drivers.registry import (
     _UnknownExecutionTargetError as _UnknownExecutionTargetError,
 )
@@ -178,8 +180,15 @@ class RunLifecycleCoordinator:
         session.status = RunStatus.RUNNING
         try:
             bindings = session.bindings
-            scope = plane_bindings_scope(bindings) if bindings is not None else nullcontext()
-            with scope:
+            ambit = session.ambit
+            # Re-enter the run's ambient environment for the resumed turn: the
+            # FileStore (prompt rendering), workspace, and plane bindings all
+            # reset when the pausing turn's scopes exit, so bind them again.
+            with (
+                bind_run_ambit(ambit) if ambit is not None else nullcontext(),
+                run_workspace_scope(session.run_id),
+                plane_bindings_scope(bindings) if bindings is not None else nullcontext(),
+            ):
                 result = await session.runnable.resume(session.snapshot, input=answer)
             if self._outcomes.apply_resume(session, result):
                 self._registry.mark_paused(session)
