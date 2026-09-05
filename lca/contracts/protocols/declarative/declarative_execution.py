@@ -144,11 +144,19 @@ def _derive_error_kind(attempts: tuple[PhaseAttemptFailure, ...]) -> str:
 
 @dataclass(frozen=True, slots=True)
 class PhaseAttemptFailure:
-    """Sanitized, replay-safe metadata for one failed phase attempt."""
+    """Sanitized, replay-safe metadata for one failed phase attempt.
+
+    ``error_message`` carries a bounded, single-line copy of the upstream
+    error text (e.g. provider 429 reason). It is display projection material,
+    not a fact source; the canonical exception record remains the spine
+    ``exception.caught`` / sidecar path. Callers own the cap and sanitization;
+    empty string means the message was not captured.
+    """
 
     attempt: int
     category: PhaseErrorCategory
     error_type: str
+    error_message: str = ""
 
 
 @dataclass(frozen=True, slots=True)

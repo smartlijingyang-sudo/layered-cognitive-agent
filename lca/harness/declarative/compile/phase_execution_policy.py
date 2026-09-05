@@ -103,6 +103,7 @@ class PhaseExecutionRunner:
                     attempt=attempt,
                     category=classify_phase_error(error),
                     error_type=type(error).__name__,
+                    error_message=_phase_error_message(error),
                 )
                 failures.append(failure)
                 # ADR-0162 决策 一:重试期内占位回收,emit best_effort 增量。
@@ -196,6 +197,23 @@ def classify_phase_error(error: Exception) -> PhaseErrorCategory:
     return "permanent"
 
 
+_PHASE_ERROR_MESSAGE_CAP = 512
+
+
+def _phase_error_message(error: Exception) -> str:
+    """Bounded, single-line copy of ``str(error)`` for display projection.
+
+    Whitespace is collapsed so multi-line provider payloads (e.g. HTTP 429
+    bodies) stay on one line; the cap keeps the attempt summary and
+    downstream envelope strings bounded. Deterministic for a given exception.
+    """
+
+    text = " ".join(str(error).split())
+    if len(text) > _PHASE_ERROR_MESSAGE_CAP:
+        text = text[:_PHASE_ERROR_MESSAGE_CAP].rstrip() + "…"
+    return text
+
+
 async def execute_with_policy(
     *,
     node_id: str,
@@ -237,6 +255,7 @@ def _phase_error_result(failure: PhaseExecutionFailure, *, plan_ref: str) -> Pha
             "attempt": attempt.attempt,
             "category": attempt.category,
             "error_type": attempt.error_type,
+            "error_message": attempt.error_message,
         }
         for attempt in failure.attempts
     )

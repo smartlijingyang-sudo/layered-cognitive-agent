@@ -26,6 +26,7 @@ from lca.harness.declarative.compile.assembler import ExecutableNode
 from lca.harness.declarative.compile.phase_execution_policy import (
     PhaseExecutionExhaustedError,
     RunDeadlineExceededError,
+    _phase_error_message,
 )
 from lca.harness.declarative.controls.validation import PhaseGraphValidator, validation_errors
 from lca.harness.declarative.graph.traversal import PhaseTraversal
@@ -162,8 +163,18 @@ async def test_timeout_exhaustion_becomes_a_typed_and_auditable_phase_error() ->
     assert failure_fact.payload == {
         "node_id": "perceive.main",
         "attempts": (
-            {"attempt": 1, "category": "timeout", "error_type": "TimeoutError"},
-            {"attempt": 2, "category": "timeout", "error_type": "TimeoutError"},
+            {
+                "attempt": 1,
+                "category": "timeout",
+                "error_type": "TimeoutError",
+                "error_message": "",
+            },
+            {
+                "attempt": 2,
+                "category": "timeout",
+                "error_type": "TimeoutError",
+                "error_message": "",
+            },
         ),
         "final_category": "timeout",
         "last_tool_call_id": None,  # ADR-0162: phase execution failure carries last_tool_call_id
@@ -247,6 +258,32 @@ async def test_terminal_phase_policy_remains_fail_closed_when_configured_to_rais
         await result_awaitable
 
     assert error.value.failure.attempts[-1].category == "transient"
+
+
+@pytest.mark.asyncio
+async def test_attempt_failure_captures_upstream_error_message() -> None:
+    """捕获点的上游错误原文进入 PhaseAttemptFailure,供展示链投影。"""
+    result_awaitable, _journal = _transaction_run(
+        _FlakyExecutor(failures=1),
+        PhaseExecutionPolicy(max_attempts=1, on_exhausted="route_to_stop"),
+    )
+
+    result = await result_awaitable
+
+    assert isinstance(result.effective_payload, PhaseExecutionFailure)
+    attempt = result.effective_payload.attempts[-1]
+    assert attempt.error_type == "ConnectionError"
+    assert attempt.error_message == "transient dependency unavailable"
+
+
+def test_phase_error_message_is_single_line_and_bounded() -> None:
+    """归一化:空白折叠为单行;超过上限截断并带省略号。"""
+    assert _phase_error_message(ValueError("first\nsecond\tthird")) == "first second third"
+
+    capped = _phase_error_message(ValueError("x" * 600))
+    assert capped.endswith("…")
+    assert len(capped) <= len("x" * 600)
+    assert capped[:-1] == "x" * 512
 
 
 @pytest.mark.asyncio

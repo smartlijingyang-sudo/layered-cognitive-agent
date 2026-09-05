@@ -112,3 +112,91 @@ def test_phase_failure_stop_result_message_is_machine_readable() -> None:
     assert "attempts=2" in msg
     # 关键:不再含旧长句开头
     assert not msg.startswith("The agent could not complete"), msg
+
+
+def test_failure_message_appends_root_cause_when_captured() -> None:
+    """捕获到上游错误原文时,展示串 = 机读标签 + `` | `` + 根因。"""
+    root = "Client error '429 Too Many Requests' for url 'https://provider.example/v1/messages'"
+    failure = PhaseExecutionFailure(
+        node_id="think.main",
+        attempts=(
+            PhaseAttemptFailure(
+                attempt=1,
+                category="permanent",
+                error_type="HTTPStatusError",
+                error_message=root,
+            ),
+        ),
+    )
+    res = phase_failure_stop_result(failure, plan_ref="p", run_id="r", trace_id="t")
+    msg = res.payload.failure.message
+    assert msg.startswith("node=think.main ")
+    assert "error_kind=internal" in msg
+    assert msg.endswith(f"| {root}")
+    # attempts summaries 同步携带每次 attempt 的原文
+    assert res.payload.failure.attempts[0].message == root
+
+
+def test_failure_message_has_no_suffix_without_root_cause() -> None:
+    """未捕获原文时保持纯机读标签,不追加尾缀。"""
+    failure = PhaseExecutionFailure(
+        node_id="think.main",
+        attempts=(PhaseAttemptFailure(attempt=1, category="timeout", error_type="TimeoutError"),),
+    )
+    res = phase_failure_stop_result(failure, plan_ref="p", run_id="r", trace_id="t")
+    msg = res.payload.failure.message
+    assert " | " not in msg
+    assert msg == _summarize_attempts(failure)
+    assert res.payload.failure.attempts[0].message is None
+
+
+def test_failure_message_prefers_latest_attempt_with_root_cause() -> None:
+    """多次 attempt 时取最后一次携带原文的作为终态根因。"""
+    failure = PhaseExecutionFailure(
+        node_id="think.main",
+        attempts=(
+            PhaseAttemptFailure(
+                attempt=1,
+                category="transient",
+                error_type="ConnectionError",
+                error_message="first failure",
+            ),
+            PhaseAttemptFailure(
+                attempt=2,
+                category="transient",
+                error_type="ConnectionError",
+                error_message="second failure",
+            ),
+        ),
+    )
+    res = phase_failure_stop_result(failure, plan_ref="p", run_id="r", trace_id="t")
+    assert res.payload.failure.message.endswith("| second failure")
+
+
+def test_frontend_display_string_carries_label_and_root_cause() -> None:
+    """前端展示链:合成串经 format_user_error 后同时含分类标签与上游根因。
+
+    reducer 对 ``stop.failure.message`` 是透传(见
+    tests/test_run_diagnostic.py::test_reducer_apply_stop_propagates_diagnostic_message),
+    故此处直接验证 failure_stop 合成串到前端格式化函数的完整投影。
+    """
+    from lca.plugins.transport.webserver.handlers.runs.observability.error_presentation import (
+        format_user_error,
+    )
+
+    root = "Client error '429 Too Many Requests' for url 'https://provider.example/v1/messages'"
+    failure = PhaseExecutionFailure(
+        node_id="think.main",
+        attempts=(
+            PhaseAttemptFailure(
+                attempt=1,
+                category="permanent",
+                error_type="HTTPStatusError",
+                error_message=root,
+            ),
+        ),
+    )
+    res = phase_failure_stop_result(failure, plan_ref="p", run_id="r", trace_id="t")
+    displayed = format_user_error(res.payload.failure.message, run_id="r", trace_id="t")
+    assert "node=think.main" in displayed
+    assert root in displayed

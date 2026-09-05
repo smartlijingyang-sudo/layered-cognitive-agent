@@ -92,7 +92,7 @@ Each step has five labels you should expect to find in your own output:
 - `[2/8] journal` shows spine event count and `missing_seqs` (gaps in seq numbers).
 - `[3/8] kernel.log` is a tail of `traces/runs/<id>/kernel.log`. **Most runs do not have this file** — its absence is *not* evidence of failure loss. (See sidecar step below.)
 - `[4/8] phase.cursor` — last completed phase.
-- `[5/8] error_ref` — a *typed label* like `node=think.main error_kind=internal attempts=1[1:permanent:ValueError]`. **It is not the traceback.**
+- `[5/8] error_ref` — a *typed label* like `node=think.main error_kind=internal attempts=1[1:permanent:ValueError]`, optionally followed by ` | <upstream root cause>` when the failing attempt captured provider error text (e.g. `… | Client error '429 Too Many Requests' for url '…'`). **The label is not the traceback** — the full traceback lives in the sidecar / exceptions index (Step 3).
 - `[6/8] stack frames` — top 8 frames only.
 - `[7/8] suggested_action` — human hint.
 - `[8/8] plan_ref + replay commands` — `plan_ref` (16-hex from manifest) + multi-line **copy-paste-runnable** commands:
