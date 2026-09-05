@@ -159,7 +159,7 @@ class TestISession4:
     """I-SESSION-4: 持久化是 SessionObserver；禁止平行 PersistenceWorker 主路径。"""
 
     def test_i_session_4_persistence_is_observer(self) -> None:
-        """生产路径应暴露 PersistenceObserver / JsonlSessionPersistence，而非 PersistenceWorker 主写。"""
+        """生产路径应暴露 PersistenceObserver，而非 PersistenceWorker 主写。"""
         persistence = _REPO_ROOT / "lca_kernel" / "events" / "persistence.py"
         assert persistence.exists(), "persistence.py missing"
 
@@ -296,21 +296,3 @@ def test_pipeline_loader_has_no_bus_subscribe() -> None:
     text = path.read_text(encoding="utf-8")
     assert "bus.subscribe(" not in text, "ADR-0186: pipeline_loader still calls bus.subscribe("
     assert ".subscribe(" not in text, "ADR-0186: pipeline_loader still calls .subscribe("
-
-
-def test_persistence_jsonl_has_no_spine_suffix() -> None:
-    """ADR-0186 hard closure: persistence_jsonl 路径后缀为 .session.jsonl。"""
-    root = _REPO_ROOT / "lca" / "plugins" / "session" / "persistence_jsonl"
-    assert root.is_dir(), "persistence_jsonl/ missing"
-    hits: list[str] = []
-    for path in root.rglob("*"):
-        if not path.is_file() or path.suffix == ".pyc" or "__pycache__" in path.parts:
-            continue
-        text = path.read_text(encoding="utf-8", errors="ignore")
-        if ".spine.jsonl" in text:
-            rel = path.relative_to(_REPO_ROOT)
-            hits.append(str(rel))
-    assert not hits, (
-        "ADR-0186: persistence_jsonl still references .spine.jsonl "
-        "(session log must be .session.jsonl)\n" + "\n".join(hits)
-    )

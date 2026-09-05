@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.event import Category, EventPayload
 from lca.contracts.models.core.activation import ActivatedSkill
 from lca.contracts.models.core.budget import create_budget
 from lca.contracts.models.core.decision import Decision, Observation, Reflection, Turn
@@ -16,10 +15,7 @@ from lca.contracts.models.core.perception import ContextItem, ContextManifest
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.core.stop import StopDecision
 from lca.plugins.runtime.reducer import DefaultReducer
-from lca_kernel.events.bus import EventBus
-from lca_kernel.events import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.payloads_spine import SpineEventPayload
-from lca_kernel.events.registry import EventRegistry
 
 
 def _state() -> AgentState:
@@ -252,41 +248,62 @@ class TestFailedTerminalCarriesErrorRef:
         assert outcome.error_ref.message == "explicit failure: cloud-sandbox unavailable"
 
 
-# ── _instrument_apply → EventBus(ADR-0183 PR-8) ──────────────────────────
+# ── _instrument_apply → Session publish(ADR-0183 PR-8 / ADR-0186 PR-3d) ──
 
 
-def _make_collecting_bus() -> tuple[EventBus[EventPayload], list[EventPayload]]:
-    """EventBus with the real yaml registry and a collecting subscriber.
+class _CollectingPublishSession:
+    """最小 publish Session:S1 鉴权走 EventBus,append 留底 payload。"""
 
-    The collector subscribes under the ``SpineChainSink`` identity: the yaml
-    subscribers whitelist of ``spine.runtime.reducer.apply`` authorizes that
-    class, so the test callback passes subscribe authorization.
-    """
-    from lca.plugins.events.sinks.spine_chain_sink.sink import SpineChainSink
+    def __init__(self, bus: object) -> None:
+        self._bus = bus
+        self.payloads: list[object] = []
 
-    bus: EventBus[EventPayload] = EventBus(EventRegistry.load(_DEFAULT_CONFIG_DIR))
-    seen: list[EventPayload] = []
-    bus.subscribe(
-        plugin=SpineChainSink,
-        category=Category("spine.runtime.reducer.apply"),
-        on_event=lambda payload, ref: seen.append(payload),
+    def append(self, payload: object, *, producer: object = None) -> object:
+        self.payloads.append(payload)
+        return self._bus.publish(payload, producer=producer)  # type: ignore[attr-defined]
+
+
+def _bind_collecting_session() -> tuple[_CollectingPublishSession, object, object]:
+    """绑定 test catalog EventBus + collecting Session;返回 (session, token, bus)。"""
+    from lca.plugins.events.publishers._session_publish import (
+        set_publish_session,
     )
-    return bus, seen
+    from lca_kernel.events.bus import EventBus
+    from lca_kernel.events.test_catalog import build_test_bus
+
+    bus = build_test_bus()
+    session = _CollectingPublishSession(bus)
+    EventBus.set_default(bus)
+    token = set_publish_session(session)
+    return session, token, bus
+
+
+def _reset_active_run_id() -> None:
+    """marker payload 的 run_id 取 thread active run;测试钉为空串(C8)。"""
+    from lca.plugins.events.publishers.spine_reflector_runtime.plugin import (
+        set_active_run_id,
+    )
+
+    set_active_run_id(None)
 
 
 class TestInstrumentApply:
-    """``_instrument_apply`` publishes ``runtime.reducer.apply`` via EventBus."""
+    """``_instrument_apply`` 经 ``publish_via_session`` 发 ``runtime.reducer.apply``。"""
 
     def test_instrument_apply_success_emits_paired_markers(self) -> None:
-        """One fold emits start + end markers with the spine payload shape."""
-        bus, seen = _make_collecting_bus()
-        EventBus.set_default(bus)
+        """One fold emits start + end markers to the bound publish Session."""
+        from lca.plugins.events.publishers._session_publish import reset_publish_session
+        from lca_kernel.events.bus import EventBus
+
+        _reset_active_run_id()
+        session, token, _bus = _bind_collecting_session()
         try:
             DefaultReducer().apply_step_advanced(_state(), 2)
         finally:
+            reset_publish_session(token)
             EventBus.set_default(None)
 
-        markers = [p for p in seen if isinstance(p, SpineEventPayload)]
+        markers = [p for p in session.payloads if isinstance(p, SpineEventPayload)]
         assert [m.payload for m in markers] == [
             {"method": "apply_step_advanced", "phase": "start", "run_id": ""},
             {
@@ -304,9 +321,11 @@ class TestInstrumentApply:
         from lca.contracts.protocols.declarative.declarative_phase_graph import (
             DeclarativeValidationError,
         )
+        from lca.plugins.events.publishers._session_publish import reset_publish_session
+        from lca_kernel.events.bus import EventBus
 
-        bus, seen = _make_collecting_bus()
-        EventBus.set_default(bus)
+        _reset_active_run_id()
+        session, token, _bus = _bind_collecting_session()
         try:
             stop = StopDecision(
                 should_stop=True,
@@ -319,37 +338,48 @@ class TestInstrumentApply:
                     state, stop, plan_ref="plan-x", journal_seq_end=1
                 )
         finally:
+            reset_publish_session(token)
             EventBus.set_default(None)
 
         markers = [
             p.payload
-            for p in seen
+            for p in session.payloads
             if isinstance(p, SpineEventPayload) and p.payload["method"] == "apply_terminal_outcome"
         ]
         assert [m["phase"] for m in markers] == ["start", "end"]
         assert markers[1]["outcome"] == "failure"
 
-    def test_instrument_apply_dispatches_on_default_event_bus(self) -> None:
-        """Reducer fold dispatches each ``apply_*`` mark via EventBus.publish
-        to whichever bus is bound as the default singleton; an isolated bus
-        instance receives nothing."""
-        from lca.plugins.events.sinks.spine_chain_sink.sink import SpineChainSink
+    def test_instrument_apply_routes_to_bound_session_only(self) -> None:
+        """marker 只落当前上下文绑定的 Session;未绑定的收集实例收不到。"""
+        from lca.plugins.events.publishers._session_publish import reset_publish_session
+        from lca_kernel.events.bus import EventBus
 
-        registry = EventRegistry.load(_DEFAULT_CONFIG_DIR)
-        isolated_bus = EventBus(registry)
-        isolated_seen: list[EventPayload] = []
-        isolated_bus.subscribe(
-            plugin=SpineChainSink,
-            category=Category("spine.runtime.reducer.apply"),
-            on_event=lambda payload, ref: isolated_seen.append(payload),
-        )
-        bus, seen = _make_collecting_bus()
-        EventBus.set_default(bus)
+        _reset_active_run_id()
+        bound, token, _bus = _bind_collecting_session()
+        isolated = _CollectingPublishSession(_bus)
         try:
             DefaultReducer().apply_paused(_state(), "snap-ref")
         finally:
+            reset_publish_session(token)
             EventBus.set_default(None)
 
-        assert len(seen) == 2
-        # 隔离实例未被 set_default,reducer 不可能路由到它
-        assert isolated_seen == []
+        assert len(bound.payloads) == 2
+        # 隔离实例未被 set_publish_session,reducer 不可能路由到它
+        assert isolated.payloads == []
+
+    def test_instrument_apply_without_bound_session_is_noop(self) -> None:
+        """run context 之外(boot/测试未 bind Session)→ marker no-op,不挡 fold。"""
+        from lca.plugins.events.publishers._session_publish import (
+            current_publish_session,
+            reset_publish_session,
+            set_publish_session,
+        )
+
+        token = set_publish_session(None)  # type: ignore[arg-type]
+        try:
+            assert current_publish_session() is None
+            state = DefaultReducer().apply_paused(_state(), "snap-ref")
+        finally:
+            reset_publish_session(token)
+
+        assert state.status == TaskStatus.INPUT_REQUIRED

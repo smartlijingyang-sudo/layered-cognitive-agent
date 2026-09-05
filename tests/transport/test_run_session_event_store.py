@@ -36,16 +36,18 @@ from lca_kernel.events.test_catalog import build_test_bus
 
 
 class _StubSpine:
-    """EventSpine stub — records subscribe so step_tree wiring stays observable."""
+    """EventSpine stub — records subscribe + append so cursor write routing is observable."""
 
     def __init__(self) -> None:
         self.subscribers: list[Any] = []
+        self.appends: list[dict[str, Any]] = []
 
     def subscribe(self, fn: Any) -> Any:
         self.subscribers.append(fn)
         return lambda: None
 
-    def append(self, **_: object) -> int:
+    def append(self, **kwargs: object) -> int:
+        self.appends.append(kwargs)
         return 0
 
     def close(self) -> None:
@@ -301,4 +303,62 @@ def test_bind_attaches_boot_catalogued_observers(tmp_path: Path) -> None:
         assert seen[0][0] is payload
     finally:
         EventBus.set_default(None)
+        _teardown(session)
+
+
+def test_builder_routes_cursor_writes_through_session_when_store_bound(
+    tmp_path: Path,
+) -> None:
+    """ADR-0186 convergence: session.store present → cursor WritePort = SessionWritePortAdapter.
+
+    cursor EP 事件经单一生产入口 ``Session.append`` 落 Session,不再写 legacy
+    spine 链(``SpineWritePortAdapter`` → ``EventSpine.append`` → FileSink)。
+    """
+    from lca.plugins.session.runtime.cursor_port import SessionWritePortAdapter
+
+    store = SessionStore()
+    ctx, spine = _build_ctx(session_store=store)
+    registry = RunRegistry(locator=FilesystemRunLocator(root=tmp_path))
+
+    session = create_run_session(registry, question="q", user_text="u", ctx=ctx)
+    try:
+        cursor = session.loop_cursor
+        assert isinstance(cursor._spine, SessionWritePortAdapter)
+        inner = store.get(session.run_id)
+        assert inner is not None
+        before = inner.seq
+        # 驱动 cursor 发射一条 EP 事件(phase.perceive.fold)。
+        cursor.advance("perceive")
+        events = inner.snapshot_events()
+        assert inner.seq == before + 1
+        new_event = events[-1]
+        assert new_event.type == "phase.perceive.fold"
+        assert new_event.data["incarnation"] == cursor.incarnation.incarnation_seq
+        # legacy spine 不再收到 cursor 写入。
+        assert spine.appends == []
+    finally:
+        _teardown(session)
+
+
+def test_builder_falls_back_to_spine_port_without_session_store(
+    tmp_path: Path,
+) -> None:
+    """缺 session.store → cursor WritePort 回退 legacy SpineWritePortAdapter。"""
+    from lca.infrastructure.observability.loop_cursor.bind import SpineWritePortAdapter
+
+    ctx, spine = _build_ctx(session_store=None)
+    registry = RunRegistry(locator=FilesystemRunLocator(root=tmp_path))
+
+    session = create_run_session(registry, question="q", user_text="u", ctx=ctx)
+    try:
+        cursor = session.loop_cursor
+        assert isinstance(cursor._spine, SpineWritePortAdapter)
+        assert session.event_session is None
+        cursor.advance("perceive")
+        # 回退路径:写入仍走 spine.append(execution_point + caller_payload.incarnation)。
+        assert len(spine.appends) == 1
+        rec = spine.appends[0]
+        assert rec["execution_point"] == "phase.perceive.fold"
+        assert rec["caller_payload"]["incarnation"] == cursor.incarnation.incarnation_seq
+    finally:
         _teardown(session)

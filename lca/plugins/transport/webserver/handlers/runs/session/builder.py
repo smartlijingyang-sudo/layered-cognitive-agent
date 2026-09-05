@@ -39,6 +39,7 @@ from lca.infrastructure.observability.writable_matrix.registry import (
     WritableFaceRegistry,
 )
 from lca.plugins.session.derivers.step_tree import StepTreeFoldDeriver
+from lca.plugins.session.runtime.cursor_port import SessionWritePortAdapter
 from lca.plugins.transport.webserver.handlers.runs.observability.binding import assemble_run_hub
 from lca.plugins.transport.webserver.handlers.runs.observability.identity import default_agent_ref
 from lca.plugins.transport.webserver.handlers.runs.session.event_session import (
@@ -170,26 +171,35 @@ class RunSessionBuilder:
         # NullPersistenceCoordinator(barrier 注入面不空)。
         # ADR-0185 PR-4:capture 缝已退场;model-visible 改由
         # ``ModelVisibleHook`` 在 LLM 边界走 spine event bus 拦截。
-        spine_for_cursor = SpineWritePortAdapter(event_spine)
-        # ``_ProfileProxy.plan_ref`` 之前误用 ``request.mode``(transport intent
-        # 而非 plan identity),导致下游 ``loop_cursor`` 的 incarnation.plan_ref
-        # 拿到 "solo" 而不是真 plan ID;这里统一读 SSOT(session.plan_ref)。
-        profile_proxy = _ProfileProxy(plan_ref=plan_ref)
-        runtime = ObservabilityRuntime.from_profile(
-            profile=profile_proxy,
-            ctx=self._ctx,
-            persistence=NullPersistenceCoordinator(),  # 生产路径应注 File;此处 fallback
-        )
-        cursor = runtime.make_cursor(
-            run_id=run_id,
-            trace_id=trace_id,
-            spine=spine_for_cursor,
-        )
-        cursor_token = install_run_cursor(cursor)
-
-        # ADR-0186: bind Session before fold deriver so snapshot_events is available.
+        #
+        # ADR-0186 convergence: 先 bind per-run Session,再派生 cursor ——
+        # cursor 的 WritePort 由此把 EP 事件(phase.*.fold / llm.request.header
+        # / step.*.record 等)经单一生产入口 ``Session.append`` 落 Session,不再
+        # 走 legacy spine 链(SpineWritePortAdapter → EventSpine.append → FileSink)。
+        # 缺 ``session.store``(tests / stub)时 ``bind_run_event_session`` 返回
+        # None,回退 legacy ``SpineWritePortAdapter(event_spine)``。
         event_session = bind_run_event_session(self._ctx, run_id)
         try:
+            if event_session is not None:
+                spine_for_cursor = SessionWritePortAdapter(event_session.bridge)
+            else:
+                spine_for_cursor = SpineWritePortAdapter(event_spine)
+            # ``_ProfileProxy.plan_ref`` 之前误用 ``request.mode``(transport intent
+            # 而非 plan identity),导致下游 ``loop_cursor`` 的 incarnation.plan_ref
+            # 拿到 "solo" 而不是真 plan ID;这里统一读 SSOT(session.plan_ref)。
+            profile_proxy = _ProfileProxy(plan_ref=plan_ref)
+            runtime = ObservabilityRuntime.from_profile(
+                profile=profile_proxy,
+                ctx=self._ctx,
+                persistence=NullPersistenceCoordinator(),  # 生产路径应注 File;此处 fallback
+            )
+            cursor = runtime.make_cursor(
+                run_id=run_id,
+                trace_id=trace_id,
+                spine=spine_for_cursor,
+            )
+            cursor_token = install_run_cursor(cursor)
+
             agent_role = agent.name or agent.agent_id or ""
             strategy_key = request.mode or "solo"
             objective = request.user_text or ""

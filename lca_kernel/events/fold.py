@@ -621,8 +621,8 @@ def _parse_event(event: Any) -> _EventView:
         data=data,
         surface_op=surface_op,
         source_event_seqs=sources,
-        has_surface_op=surface_op is not _MISSING,
-        has_source_event_seqs=sources is not _MISSING,
+        has_surface_op=surface_op is not _MISSING and surface_op is not None,
+        has_source_event_seqs=sources is not _MISSING and sources is not None,
     )
 
 
@@ -665,9 +665,9 @@ def _surface_op_of(view: _EventView) -> SurfaceOp | None:
             )
         return None
     if not view.has_surface_op:
-        raise ValueError(
-            f'session event "{view.type}" is surface-eligible and requires a surfaceOp marker'
-        )
+        # LCA 双用:``spine.llm.request.header`` 可无 surfaceOp 仅作 request_header fold,
+        # 带 surfaceOp 才进入 surface 序列(DSH 的 user/message 与 request/header 分立)。
+        return None
     op = view.surface_op
     if op == "append":
         return "append"

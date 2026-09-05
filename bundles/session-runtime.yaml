@@ -8,8 +8,9 @@
 # RunSessionBuilder 按 run_id create Session，绑定 publish/observe 槽位；
 # 缺 session.store 时 publishers 降级 EventBus。
 #
-# 持久化经 Session.observe：JsonlSessionPersistence 写 *.session.jsonl；
-# SpineFileSink（若装载）写 *.spine.jsonl（ADR-0183 I-FW-SSOT-1）。
+# 持久化经 Session.observe：SpineFileSink（event-bus-components 装载）写
+# *.spine.jsonl —— 唯一 durable 真值流（ADR-0183 I-FW-SSOT-1）。
+# *.session.jsonl 镜像（persistence_jsonl plugin）已退役删除。
 # Pipeline sinks / consumer_rules 不写 durable spine
 # （web-standard event-pipeline 已空）。
 
@@ -22,13 +23,6 @@ entries:
     name: session_runtime
     $module: lca.plugins.session.runtime.plugin
     config: {}
-
-  - id: lca.plugins.session.persistence_jsonl
-    name: session_persistence_jsonl
-    $module: lca.plugins.session.persistence_jsonl.persistence_jsonl
-    config:
-      runs_root: traces/runs
-      fsync: false
 
   - id: lca.plugins.session.checkpoint_policy
     name: session_checkpoint_policy
@@ -54,6 +48,11 @@ entries:
   - id: lca.plugins.session.session_turn_outline
     name: session_projection_turn_outline
     $module: lca.plugins.session.session_turn_outline.session_turn_outline
+    config: {}
+
+  - id: lca.plugins.session.token_usage
+    name: session_token_usage
+    $module: lca.plugins.session.token_usage.token_usage
     config: {}
 
   # ── 标题家族（DSH session-title 对齐；LLM provider 按部署选挂）────

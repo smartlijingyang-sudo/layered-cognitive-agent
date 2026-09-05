@@ -7,8 +7,9 @@ mutation 集中在此模块；``CognitiveRuntime._loop`` 不再直接写 state�
 from __future__ import annotations
 
 import functools
+import logging
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, overload
+from typing import TYPE_CHECKING, ParamSpec, TypeVar, overload
 
 from pydantic import BaseModel
 
@@ -32,6 +33,8 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 if TYPE_CHECKING:
     from lca.contracts.observability.outcome import Outcome
 
+_log = logging.getLogger(__name__)
+
 
 class Config(BaseModel):
     model_config = {"extra": "forbid"}
@@ -47,44 +50,48 @@ def _publish_apply_marker(
     phase: str,
     outcome: Outcome | None = None,
 ) -> None:
-    """Publish one ``runtime.reducer.apply`` marker through the EventBus.
+    """Publish one ``runtime.reducer.apply`` marker through the Session chain.
 
-    Contract (ADR-0183 PR-8): reducer fold 是 AgentState C4 单写边界,每次
-    fold 经 ``EventBus.publish`` 发一条 ``runtime.reducer.apply`` marker,
-    category 为 ``spine.runtime.reducer.apply``(与 execution_point 一一绑定,
-    :class:`SpineEventPayload` 校验两者一致)。
+    Contract (ADR-0183 PR-8 / ADR-0186 PR-3d): reducer fold 是 AgentState C4
+    单写边界,每次 fold 经 spine_reflector_runtime 的 emit helpers(内部
+    ``publish_via_session`` → ``Session.append``)发一条
+    ``runtime.reducer.apply`` marker,category 为
+    ``spine.runtime.reducer.apply``(与 execution_point 一一绑定,由 plugin
+    的 ``_SPINE_EP_TO_CATEGORY`` 派生)。
 
     producer 用 ``spine_reflector_runtime.plugin.ReflectorClass``:yaml SSOT
     (``lca_kernel/events/config/observability/spine.yaml``) 对该 category 只
     授权这一个 publish 身份;换独立身份需同步改 yaml 白名单。
 
     payload 字段 method/phase/outcome/run_id 与 ``journal_trace`` reader 的
-    字段集对齐。``run_id`` 恒为空串——进程内无 active-run 注入点,
-    trace 关联由 EventBus 的 trace_id 通道承担。
+    字段集对齐。``run_id`` 由 helper 按 thread active run
+    (``set_active_run_id`` 注入)补齐,未注入时为空串。
 
     Failure:鉴权或 payload 校验失败抛 ``UnauthorizedPublishError`` /
-    ``PayloadSchemaError``,不静默吞错。
+    ``PayloadSchemaError``,不静默吞错。``MissingPublishSessionError``
+    (run context 之外——boot / 测试未 bind Session)按装饰性 marker no-op:
+    与 :class:`~lca.runtime.envelope_emitter.SpineEnvelopeEmitter` 及
+    transport ``_safe_emit`` 的装饰性 emit 语义一致;fold 本体异常不受影响。
     """
-    from lca.contracts.event import Category
     from lca.plugins.events.publishers.spine_reflector_runtime.plugin import (
-        ReflectorClass,
+        emit_runtime_reducer_apply_end,
+        emit_runtime_reducer_apply_start,
     )
-    from lca_kernel.events.bus import EventBus
-    from lca_kernel.events.payloads import SpineEventPayload
+    from lca_kernel.events.errors import MissingPublishSessionError
 
-    inner: dict[str, Any] = {"method": method, "phase": phase}
-    if outcome is not None:
-        inner["outcome"] = outcome
-    inner["run_id"] = ""
-    EventBus.default().publish(
-        SpineEventPayload(
-            category=Category("spine.runtime.reducer.apply"),
-            execution_point="runtime.reducer.apply",
-            channel="fact",
-            payload=inner,
-        ),
-        producer=ReflectorClass,
-    )
+    try:
+        if phase == "start":
+            emit_runtime_reducer_apply_start(method=method)
+        else:
+            if outcome is None:
+                raise ValueError(f"phase='end' marker requires outcome: method={method}")
+            emit_runtime_reducer_apply_end(method=method, outcome=outcome)
+    except MissingPublishSessionError:
+        _log.debug(
+            "runtime.reducer.apply marker skipped (no bound publish session): method=%s phase=%s",
+            method,
+            phase,
+        )
 
 
 def _wrap_apply(fn: Callable[_P, _R], method_name: str) -> Callable[_P, _R]:

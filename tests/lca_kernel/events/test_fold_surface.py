@@ -226,9 +226,10 @@ def test_replace_op_dataclass_is_accepted() -> None:
 # ── 校验失败 ─────────────────────────────────────────────────────────────
 
 
-def test_eligible_event_requires_surface_op_marker() -> None:
-    with pytest.raises(ValueError, match="requires a surfaceOp marker"):
-        foldSurface([{"type": USER, "seq": 0, "data": {}}])
+def test_eligible_without_surface_op_marker_skipped_from_surface() -> None:
+    """Header-only ``spine.llm.request.header`` 无 surfaceOp → 不进 surface 序列。"""
+    result = foldSurface([{"type": USER, "seq": 0, "data": {"config": {"model": "m"}}}])
+    assert result.nodes == ()
 
 
 def test_non_eligible_cannot_carry_surface_op() -> None:
@@ -250,7 +251,6 @@ def test_seq_must_be_contiguous_from_zero() -> None:
     ("op", "match"),
     [
         ("nope", "invalid surfaceOp"),
-        (None, "invalid surfaceOp"),
         ({"op": "replace", "start": 0}, "invalid replace surfaceOp"),
         ({"op": "replace", "start": 0, "end": 0, "extra": 1}, "invalid replace surfaceOp"),
         ({"op": "replace", "start": -1, "end": 0}, "invalid replace surfaceOp"),

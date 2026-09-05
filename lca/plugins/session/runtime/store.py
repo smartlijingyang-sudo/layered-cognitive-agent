@@ -124,6 +124,15 @@ class SessionStore:
                 raise ValueError(f"seed 事件 seq 不连续: 期望 {index}, 实际 {event.seq}")
             if not event.type:
                 raise ValueError(f"seed 事件 #{index} type 为空")
+            from lca.plugins.session.runtime.event_catalog import (
+                UnknownSessionEventTypeError,
+                validate_event_type_for_read,
+            )
+
+            try:
+                validate_event_type_for_read(event.type, ignorable=event.ignorable)
+            except UnknownSessionEventTypeError as exc:
+                raise ValueError(str(exc)) from exc
             session._log.append(event)
         # 强制 is_seeded=True（无论传入 header 的值）
         object.__setattr__(session._header, "is_seeded", True)
@@ -137,6 +146,23 @@ class SessionStore:
         # 不重放给 observer（restore 时序契约）。
         self._fanout_creation_hooks(session)
         return session
+
+    def fork(
+        self,
+        source: Session | str,
+        boundary: int | None = None,
+        *,
+        child_session_id: str | None = None,
+    ) -> Session:
+        """Inclusive-boundary fork（DSH ``SessionStore.fork`` 对位）。"""
+        from lca.plugins.session.runtime.fork import fork_session
+
+        return fork_session(
+            self,
+            source,
+            boundary,
+            child_session_id=child_session_id,
+        )
 
     def get(self, session_id: str) -> Session | None:
         """查活 Session；不存在返回 ``None``（不抛）。"""

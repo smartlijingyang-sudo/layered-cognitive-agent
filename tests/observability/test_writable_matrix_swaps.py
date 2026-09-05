@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 
@@ -40,7 +41,7 @@ class _SpySpine:
 
 
 def _make_event(*, ep: str, seq: int, when=None, **kw) -> EventRecord:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     return EventRecord(
         execution_point=ep,
@@ -51,8 +52,8 @@ def _make_event(*, ep: str, seq: int, when=None, **kw) -> EventRecord:
         epoch=1,
         causality_id=f"c{seq}",
         outcome=None,
-        when=when or datetime.now(timezone.utc),
-        when_corrected=when or datetime.now(timezone.utc),
+        when=when or datetime.now(UTC),
+        when_corrected=when or datetime.now(UTC),
         prev_event_hash=None,
         run_id="r-fx",
         step_id=None,
@@ -234,6 +235,55 @@ def test_swap_driver_rejects_double_begin(tmp_path: Path) -> None:
 
 
 # ── SSOT 不变性：换面不动 hash chain ──────────────────────────
+
+
+# ── 默认装配:storage 面不再注册文件写入实现(单写者收口)──────
+
+
+class _FakePluginContext:
+    """assembly.setup 直调用的最小 ctx:require / provide 两个面。"""
+
+    def __init__(self, spine: _SpySpine) -> None:
+        self._spine = spine
+        self.provided: dict[str, Any] = {}
+
+    def require(self, key: str) -> Any:
+        assert key == "event_spine"
+        return self._spine
+
+    def provide(self, key: str, value: Any) -> None:
+        self.provided[key] = value
+
+
+def test_default_assembly_registers_null_storage_not_file_storage(tmp_path: Path) -> None:
+    """ADR-0186:assembly 的 storage 面必须是 NullStorage,不得是文件写入实现。
+
+    <run_id>.spine.jsonl 的唯一 durable 写者是 Session / spine-sink 链;
+    装配 RoutingFileStorage 会为同一 per-run ledger 开第二条写链。
+    同时断言装配零文件副作用:不建目录、不开文件。
+    """
+    from lca.plugins.observability.writable_matrix.assembly import (
+        setup as assembly_plugin,
+    )
+
+    ctx = _FakePluginContext(_SpySpine())
+    assembly_plugin.setup(ctx, {"run_dir": str(tmp_path / "run")})
+
+    reg = ctx.provided["writable_face_registry"]
+    assert isinstance(reg, WritableFaceRegistry)
+    assert set(reg.faces()) == {
+        "emitter",
+        "driver",
+        "coalescer",
+        "serializer",
+        "storage",
+    }
+    storage = reg.require("storage")
+    assert isinstance(storage, NullStorage)
+    assert not isinstance(storage, RoutingFileStorage)
+    # storage 面写路径是 no-op,且不产生任何文件。
+    storage.write(b'{"should":"not land"}\n')
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_swap_storage_preserves_hash_chain(tmp_path: Path) -> None:

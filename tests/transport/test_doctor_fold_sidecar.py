@@ -1,17 +1,14 @@
-"""Doctor fold/sidecar dual-rail 测试(ADR-0185 PR-3.1)。
+"""Doctor fold-only 读路径测试(ADR-0185 PR-4)。
 
-覆盖 ``_scan_xref`` 的 tool_schema_count 双轨逻辑:
+覆盖 ``_scan_xref`` 的 tool_schema_count 逻辑:
 
 1. spine 有 ``spine.llm.request.header`` 且 tools 非空 →
    ``tool_schema_count > 0``,``tool_schema_source == "fold"``;
    H-mv-journal ok=True。
-2. spine 无 model-visible 事件但 sidecar ``tools.json`` 存在 →
-   fallback 仍能计数,``tool_schema_source == "sidecar"``。
+2. spine 无 model-visible 事件 → fold miss;遗留 sidecar 被忽略。
 3. 两边都没有 → ``tool_schema_count == -1``,H-mv-journal ok=None。
 4. tools 全是 ``{}`` → ``tool_schema_count == 0`` /
    ``tool_schema_empty_count > 0``,H-mv-journal ok=False。
-
-不碰 PR-4(不删 capture 实现)。
 """
 
 from __future__ import annotations
@@ -159,12 +156,11 @@ def test_fold_path_takes_priority_over_sidecar(tmp_path: Path) -> None:
 # ── 场景 2: spine 无 model-visible 事件 + sidecar tools.json → fallback 计数 ──
 
 
-def test_sidecar_fallback_when_spine_has_no_model_visible_events(
+def test_no_fold_when_spine_has_no_model_visible_events(
     tmp_path: Path,
 ) -> None:
-    """spine 存在但无 ``spine.llm.request.header`` → 回退 sidecar tools.json。"""
+    """spine 存在但无 model-visible 事件 → fold miss;sidecar 不再读。"""
     run_id = "r1"
-    # spine 只有认知事件,没有 model-visible
     spine_events = [
         _make_spine_event(
             category="spine.cognition.brain.perceive.start",
@@ -173,27 +169,23 @@ def test_sidecar_fallback_when_spine_has_no_model_visible_events(
         ),
     ]
     _write_spine_jsonl(tmp_path, run_id, spine_events)
-    # sidecar tools.json:2 个有效 tools
     _write_sidecar_tools(
         tmp_path,
         "step-001",
-        [
-            {"name": "tool_a", "parameters": {"type": "object"}},
-            {"name": "tool_b", "parameters": {"type": "object"}},
-        ],
+        [{"name": "tool_a", "parameters": {"type": "object"}}],
     )
     journal = _write_minimal_journal(tmp_path, run_id=run_id)
 
     report = diagnose_step_tree(journal, mode="backend")
 
-    assert report.consistency["tool_schema_count"] == 2
-    assert report.consistency["tool_schema_source"] == "sidecar"
+    assert report.consistency["tool_schema_count"] == -1
+    assert report.consistency["tool_schema_source"] == "none"
     h_mv = report.hops["H-mv-journal"]
-    assert h_mv.ok is True
+    assert h_mv.ok is None
 
 
-def test_sidecar_fallback_when_no_spine_at_all(tmp_path: Path) -> None:
-    """spine 完全不存在 + sidecar 存在 → 回退 sidecar,source=sidecar。"""
+def test_no_fold_when_no_spine_at_all(tmp_path: Path) -> None:
+    """spine 不存在 → fold miss;sidecar 文件被忽略。"""
     run_id = "r1"
     _write_sidecar_tools(
         tmp_path,
@@ -204,8 +196,8 @@ def test_sidecar_fallback_when_no_spine_at_all(tmp_path: Path) -> None:
 
     report = diagnose_step_tree(journal, mode="backend")
 
-    assert report.consistency["tool_schema_count"] == 1
-    assert report.consistency["tool_schema_source"] == "sidecar"
+    assert report.consistency["tool_schema_count"] == -1
+    assert report.consistency["tool_schema_source"] == "none"
 
 
 # ── 场景 3: 两边都没有 → tool_schema_count == -1, hop ok=None ──
@@ -231,7 +223,7 @@ def test_both_missing_yields_negative_one_and_hop_none(tmp_path: Path) -> None:
     assert report.consistency["tool_schema_source"] == "none"
     h_mv = report.hops["H-mv-journal"]
     assert h_mv.ok is None
-    assert h_mv.ok is None and ("缺失" in h_mv.detail or "不存在" in h_mv.detail)
+    assert "无可用" in h_mv.detail or "缺失" in h_mv.detail
 
 
 def test_no_spine_no_sidecar_yields_negative_one(tmp_path: Path) -> None:
@@ -277,39 +269,37 @@ def test_fold_path_all_empty_tools_yields_ok_false(tmp_path: Path) -> None:
     assert h_mv.ok is False
 
 
-def test_sidecar_path_all_empty_tools_yields_ok_false(tmp_path: Path) -> None:
-    """sidecar fallback: tools.json 全是 ``{}`` → H-mv-journal ok=False。"""
+def test_empty_tools_from_fold_yields_ok_false(tmp_path: Path) -> None:
+    """fold tools 全是 ``{}`` → count=0, H-mv-journal ok=False。"""
     run_id = "r1"
-    # 无 fold 事件 → 走 sidecar
     spine_events = [
         _make_spine_event(
-            category="phase.think.fold",
-            payload={"phase": "think"},
-            execution_point="phase.think.fold",
+            category="spine.llm.request.header",
+            payload={
+                "step_id": "step-001",
+                "incarnation": 1,
+                "config": {"provider": "mock", "model": "m"},
+                "system": "p",
+                "tools": [{}, {}],
+                "messages": [],
+            },
+            execution_point="llm.call.start",
         ),
     ]
     _write_spine_jsonl(tmp_path, run_id, spine_events)
-    _write_sidecar_tools(tmp_path, "step-001", [{}, {}])
     journal = _write_minimal_journal(tmp_path, run_id=run_id)
 
     report = diagnose_step_tree(journal, mode="backend")
 
     assert report.consistency["tool_schema_count"] == 0
     assert report.consistency["tool_schema_empty_count"] == 2
-    assert report.consistency["tool_schema_source"] == "sidecar"
+    assert report.consistency["tool_schema_source"] == "fold"
     h_mv = report.hops["H-mv-journal"]
     assert h_mv.ok is False
 
 
-# ── 边界:fold 路径空 tools list(不是 [{},{}] 而是 []) ──
-
-
-def test_fold_path_empty_tools_list_falls_to_sidecar(tmp_path: Path) -> None:
-    """fold 事件 tools=[](空 list)→ fold 未命中(仍 -1),回退 sidecar。
-
-    ``tools`` 为空 list 时 ``isinstance(tools_list, list) and tools_list``
-    为 False,不算 fold 命中;继续检查 sidecar。
-    """
+def test_empty_tools_list_is_fold_miss(tmp_path: Path) -> None:
+    """fold 事件 tools=[] → 无 schema,source=none。"""
     run_id = "r1"
     spine_events = [
         _make_spine_event(
@@ -334,9 +324,8 @@ def test_fold_path_empty_tools_list_falls_to_sidecar(tmp_path: Path) -> None:
 
     report = diagnose_step_tree(journal, mode="backend")
 
-    # fold 空 list → fold 未命中 → 走 sidecar
-    assert report.consistency["tool_schema_count"] == 1
-    assert report.consistency["tool_schema_source"] == "sidecar"
+    assert report.consistency["tool_schema_count"] == -1
+    assert report.consistency["tool_schema_source"] == "none"
 
 
 # ── 边界:mixed empty/non-empty tools ──

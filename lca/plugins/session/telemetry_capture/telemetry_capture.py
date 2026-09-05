@@ -196,9 +196,22 @@ class SessionTelemetryCapture:
 
         返回 ``Session.observe`` 的幂等取消函数。on_demand 模式不订阅
         （canonical 日志即缓冲），返回 no-op 取消函数。
+
+        ``FEEDBACK_ONLY`` 共享策略:live 也不逐条外送,仅在见到
+        ``feedback.record.v1`` 时释放未释放前缀(DSH coordinator 对位)。
         """
         if self._capture_mode != "live":
             return lambda: None
+
+        backend = self._backend
+        if backend is not None and backend.sharing == SharingPolicy.FEEDBACK_ONLY:
+
+            def _feedback_observer(sess: Any, event: SessionEvent) -> None:
+                if event.type != "feedback.record.v1":
+                    return
+                self._contain(lambda: self.capture_session(sess, event.seq))
+
+            return session.observe(_feedback_observer)
 
         def _observer(sess: Any, event: SessionEvent) -> None:
             self._contain(lambda: self._release(_session_id(sess), event))

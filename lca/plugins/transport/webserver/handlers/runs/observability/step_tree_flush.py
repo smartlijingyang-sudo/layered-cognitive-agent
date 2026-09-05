@@ -1,7 +1,7 @@
 """Step-tree 派生产物的唯一写入入口(journal.json + narrative.md)。
 
-所有权:``<run_id>.spine.jsonl`` 与 ``<run_id>.session.jsonl`` 是真值流;
-本模块是两者到派生产物的唯一投影触发点。调用方只有两处:
+所有权:``<run_id>.spine.jsonl`` 是唯一 durable 真值流(``.session.jsonl``
+镜像已退役);本模块是它到派生产物的唯一投影触发点。调用方只有两处:
 
 - 终态物化(``terminal/materialization.py``)——run 收尾时的最后一次投影。
 - 暂停点(``lifecycle/lifecycle.py`` 的 WAITING_INPUT 分支)——运行中的

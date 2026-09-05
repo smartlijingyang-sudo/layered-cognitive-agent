@@ -7,14 +7,13 @@ serializer / storage 任一）。
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.observability.writable_matrix import (
     LineCoalescer,
     NdjsonSerializer,
-    RoutingFileStorage,
+    NullStorage,
     SpineEmitter,
     StandardDriver,
     WritableFaceRegistry,
@@ -27,7 +26,7 @@ from lca.infrastructure.observability.writable_matrix import (
     requires=("event_spine",),
     layer="L2",
     kind=PluginKind.SEAM,
-    effects="filesystem",
+    effects="none",
     description=(
         "Default 5-face writable matrix (ADR-0167 D11). The single source of"
         " truth for default assembly — profile / bundle replacement plugins"
@@ -35,9 +34,9 @@ from lca.infrastructure.observability.writable_matrix import (
     ),
 )
 def setup(ctx: PluginContext, config: Any) -> None:
-    """用 spine + run_dir 组装默认五面 registry。"""
+    """用 spine 组装默认五面 registry;storage 面固定 Null(不落盘)。"""
+    del config  # run_dir 已退役:storage 面不再写文件
     spine = ctx.require("event_spine")
-    run_dir = Path(str(config.get("run_dir", "traces/runs/_pending")))
     reg = WritableFaceRegistry()
     emitter = SpineEmitter()
     emitter.bind(spine)
@@ -45,5 +44,7 @@ def setup(ctx: PluginContext, config: Any) -> None:
     reg.register("driver", StandardDriver())
     reg.register("coalescer", LineCoalescer())
     reg.register("serializer", NdjsonSerializer())
-    reg.register("storage", RoutingFileStorage(run_dir))
+    # ADR-0186 单写者:<run_id>.spine.jsonl 归 Session / spine-sink 链拥有。
+    # 原 RoutingFileStorage(ADR-0167 遗留)会开第二条写链,已退役。
+    reg.register("storage", NullStorage())
     ctx.provide("writable_face_registry", reg)

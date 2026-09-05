@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 
 from lca.harness.profile.boot import boot_profile
+from lca.infrastructure.observability.writable_matrix import NullStorage
 from lca.infrastructure.observability.writable_matrix.registry import (
     WritableFaceRegistry,
 )
@@ -27,6 +28,9 @@ def test_boot_web_standard_exposes_event_spine_and_writable_registry() -> None:
         "(loaded by writable.matrix.default)"
     )
     assert isinstance(writable_face_registry, WritableFaceRegistry)
+    # ADR-0186 单写者:writable matrix 的 storage 面必须 Null(不落盘);
+    # spine ledger 由 Session / spine-sink 链唯一写入。
+    assert isinstance(writable_face_registry.require("storage"), NullStorage)
     assert run_ledger_factory is not None
 
 

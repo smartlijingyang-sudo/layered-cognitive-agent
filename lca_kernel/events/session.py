@@ -55,9 +55,8 @@ class SessionHeader:
     - ``is_seeded`` — 是否含 fork/重放继承的事件前缀
     - ``assistant_id`` —— ADR-0187 §3 D7 session 级助理绑定（PR-5）；
       ``None``（默认）= 继承遗留默认 agent；非空字符串 = 绑定到该助理
-      id。落盘是 :class:`lca.plugins.session.persistence_jsonl.JsonlSessionPersistence`
-      的可选 JSONL header 字段；读端对缺字段做 fail-open，向前兼容
-      PR-5 之前的 session record。
+      id。落盘经 ``Session.observe`` → ``SpineFileSink`` 写 ``<run_id>.spine.jsonl``
+      （ADR-0183 I-FW-SSOT-1）；读端对缺字段做 fail-open，向前兼容旧 record。
     """
 
     version: int
@@ -203,6 +202,10 @@ class SessionProtocol(Protocol):
 
         增量维护：新事件才触发 fold，重复读是 O(1)。
         """
+        ...
+
+    def derive_messages(self) -> list[dict[str, Any]]:
+        """从 surface fold 投影 message 序列（DSH ``deriveMessages`` 对位）。"""
         ...
 
     def observe(self, observer: SessionObserver) -> Callable[[], None]:

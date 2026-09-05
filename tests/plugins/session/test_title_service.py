@@ -122,7 +122,7 @@ def _title_events(session: Any) -> list[dict[str, Any]]:
 
 
 def _fake_ctx(bindings: dict[str, Any]) -> Any:
-    """最小 stub PluginContext:provide + soft_get(抄 test_persistence_jsonl)。"""
+    """最小 stub PluginContext:provide + soft_get。"""
 
     class _Ctx:
         def __init__(self) -> None:

@@ -618,17 +618,9 @@ class StepNarrativeWriter:
         # 详述
         lines.append("## 🔍 Steps 详述")
         lines.append("")
-        # ADR-0185 PR-3:Model saw 链接区优先指向 <run_id>.spine.jsonl
-        # (foldRequestHeader 重建 SSOT,ADR-0185 §3.7 / I-MV-2);无 spine 时
-        # 回退 <run_dir>/model_visible/(双轨期,PR-4 收口后删除)。
-        # COMPAT(delete-when: PR-4 删旁路文件,tracking: ADR-0185 §5 PR-4)
+        # ADR-0185 PR-4:Model saw 链接仅指向 spine fold SSOT;无 spine 时标注 unavailable。
         lines.append("### 🪞 Model saw (per step)")
         lines.append("")
-        # narrative.md 一定写在 <run_dir>/journal.narrative.md,output_path.parent
-        # 即 run_dir —— 与 journal_step.py / journal_replay.py PR-3 一致地走
-        # run_dir / spine_filename_for_run(run_id) 解析物理路径;非相对 CWD。
-        # 空 output_path(`StepNarrativeWriter("")`)只走 render(),无 run_dir,
-        # 跳过 spine 探测直接回退 model_visible/(无 race / 无误报)。
         spine_exists = False
         spine_path: Path | None = None
         if self._path != Path() and self._path.parent != Path("."):
@@ -642,9 +634,7 @@ class StepNarrativeWriter:
                 )
             else:
                 lines.append(
-                    f"- `{step.step_id}` → "
-                    f"`traces/runs/{document.run_id}/model_visible/{step.step_id}/` "
-                    f"(legacy sidecar;PR-3 双轨期)"
+                    f"- `{step.step_id}` → fold unavailable (no spine ledger; sidecar retired)"
                 )
         lines.append("")
         for step in document.steps:

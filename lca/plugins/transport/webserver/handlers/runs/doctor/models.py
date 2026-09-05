@@ -114,17 +114,14 @@ class StepScan:
     spine_file_exists: bool = False
     flush_errors: tuple[dict[str, Any], ...] = ()
     # SSOT 看门狗(SSOT-Doctor):H-ssot / H-mv-journal
-    # H-mv-journal 读路径:fold_model_visible 优先,sidecar tools.json 仅 fallback
-    # (ADR-0185 PR-3.1;sidecar 删除条件 = PR-4 收口)。
+    # H-mv-journal 读路径:fold_model_visible 唯一 SSOT (ADR-0185 PR-4)。
     phase_fold_payload_kinds: dict[str, set[str]] = field(default_factory=dict)
     phase_fold_objective_anomalies: tuple[dict[str, Any], ...] = ()
-    tool_schema_count: int = -1  # -1 → fold 与 sidecar 均缺失
+    tool_schema_count: int = -1  # -1 → fold 无可用 schema
     tool_schema_empty_count: int = 0
-    tool_schema_source: str = "none"  # "fold" | "sidecar" | "none"
-    # ADR-0185 PR-3.1:doctor fold 优先双轨 (fold → sidecar → journal 推导)。
+    tool_schema_source: str = "none"  # "fold" | "none"
     # ``fold_*`` 字段记录 doctor 走 :func:`fold_model_visible` 重建的命中统计;
-    # 双轨期任一步 fold 命中即视为 fold 路径优先,``fold_source`` 表
-    # "fold" / "sidecar" / "mixed" / "none" 之一。
+    # ``fold_source`` 为 "fold" | "unavailable" | "mixed" | "none"。
     fold_attempted: bool = False
     fold_hits: int = 0
     fold_misses: int = 0

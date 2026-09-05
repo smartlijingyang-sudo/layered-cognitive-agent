@@ -146,6 +146,9 @@ class Session(SessionProtocol):
         *,
         actor: str | None = None,
         visibility: str = "model",
+        ignorable: bool = False,
+        surface_op: Any | None = None,
+        source_event_seqs: tuple[int, ...] | None = None,
     ) -> SessionEvent:
         """校验 → 入日志 → fire observers（contained）→ 返回落日志的事件。
 
@@ -170,6 +173,9 @@ class Session(SessionProtocol):
             session_id=self.id,
             actor=actor,
             visibility=visibility,  # type: ignore[arg-type]
+            ignorable=ignorable,
+            surface_op=surface_op,
+            source_event_seqs=source_event_seqs,
         )
         self._appending = True
         try:
@@ -308,6 +314,12 @@ class Session(SessionProtocol):
             )
             self._header_fold_seq = len(self._log)
         return self._header_fold
+
+    def derive_messages(self) -> list[dict[str, Any]]:
+        """从 surface fold 投影 message 序列（DSH ``deriveMessages`` 对位）。"""
+        from lca.plugins.session.runtime.messages import derive_messages
+
+        return derive_messages(self.snapshot_events())
 
     def observe(self, observer: SessionObserver) -> Callable[[], None]:
         """注册 append 观察者；返回幂等取消函数。

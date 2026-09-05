@@ -70,7 +70,8 @@ class ModelVisiblePublisher:
     ``id → marker_class`` 解析 yaml publishers token;本类即为 marker。
 
     业务方不直接调用;真正 publish 走 :class:`ModelVisibleHook` 内部
-    ``bus.publish(payload, producer=ModelVisiblePublisher)``。
+    ``publish_via_session(payload, producer=ModelVisiblePublisher)`` →
+    ``Session.append``(ADR-0186 Session SSOT;不走 EventBus.publish)。
     """
 
 
@@ -87,7 +88,8 @@ class ModelVisiblePublisher:
     description=(
         "model-visible publisher（ADR-0185 §3.1 / PR-2）：spine.llm.request.header "
         "+ spine.llm.request.header.assistant 两类 spine event 唯一授权 producer; "
-        "ModelVisibleHook 内部 fold 优化 + canonicalHeader 归一 + EventBus 投递。"
+        "ModelVisibleHook 内部 fold 优化 + canonicalHeader 归一 + Session 投递"
+        "（publish_via_session,ADR-0186）。"
     ),
     test_suite="tests/plugins/events/publishers/model_visible/test_publisher.py",
     functional_group=FunctionalGroup.G7_EXECUTION,
@@ -129,8 +131,9 @@ async def setup(ctx: PluginContext, config: _Config) -> None:
 
     ctx.provide("event.bus.publisher.model_visible", ModelVisiblePublisher)
 
-    # 实例化 hook 并 provide 给 composer 装配。EventBus.default() 走进程单例;
-    # 测试可注入 EventBus mock。
+    # 实例化 hook 并 provide 给 composer 装配。publish 不经 bus:hook 内部
+    # 走 publish_via_session → Session.append(ADR-0186);bus 仅为
+    # ModelVisibleHook 构造形参(鉴权 registry 仍由 EventBus 进程单例承载)。
     bus: Any = EventBus.default()
     hook = _build_hook(bus=bus)
     ctx.provide("llm.adapter.hook.model_visible", hook)

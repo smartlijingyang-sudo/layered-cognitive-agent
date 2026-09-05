@@ -8,7 +8,7 @@
 - provider 形状(id / automatic / generate)与 plugin 装配(经 ``session.title``
   capability 注册;服务缺席时只 provide 不注册)
 
-fake ctx 抄 ``tests/plugins/session/test_persistence_jsonl.py``;``asyncio_mode=auto``。
+fake ctx 为最小 stub PluginContext(provide + soft_get);``asyncio_mode=auto``。
 """
 
 from __future__ import annotations
@@ -64,7 +64,7 @@ class _Message:
 
 
 def _fake_ctx(bindings: dict[str, Any]) -> Any:
-    """最小 stub PluginContext:provide + soft_get(抄 test_persistence_jsonl)。"""
+    """最小 stub PluginContext:provide + soft_get。"""
 
     class _Ctx:
         def __init__(self) -> None:

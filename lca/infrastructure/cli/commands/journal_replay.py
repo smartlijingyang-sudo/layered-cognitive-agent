@@ -58,14 +58,8 @@ def register(app: typer.Typer) -> None:
     ) -> None:
         """DSH Trajectory 风格 HTML —— 与 LobeHub / WebServer 解耦。"""
         run_dir = traces_root / "runs" / run_id
-        # ADR-0185 PR-3:trajectory 「model saw」链接优先指向 spine.jsonl
-        # (fold SSOT);无 spine 时回退 <run_dir>/model_visible/ (PR-3 双轨期)。
-        mv_path: Path | None = None
-        spine_path = _spine_path(run_id, traces_root)
-        if spine_path is not None:
-            mv_path = spine_path
-        elif (run_dir / "model_visible").exists():
-            mv_path = run_dir / "model_visible"
+        # ADR-0185 PR-4:trajectory 「model saw」链接仅 spine fold SSOT。
+        mv_path: Path | None = _spine_path(run_id, traces_root)
         deriver = WaterfallDeriver(run_id, model_visible_root=mv_path)
         for record in _read_events_jsonl(run_id, traces_root):
             deriver.on_event(record)

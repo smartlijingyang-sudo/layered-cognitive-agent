@@ -16,9 +16,9 @@ Hops:
   - H-xref (ADR-0176 D5): journal ⇄ spine 跨源一致性 hop
     (body.tool.execute.start 数 > 0 但 journal.steps[*].tool_call 为 0,
      llm.call.end 数 > 0 但 journal.totals.steps == 0,等)
-  - H-fold (ADR-0185 PR-3.1): doctor fold 优先双轨检查——
+  - H-fold (ADR-0185 PR-4): doctor fold-only 检查——
     诊断是否每 step 都能通过 :func:`fold_model_visible` 从 spine ledger
-    重建;fold 缺失则触发旧 sidecar / journal 推导兜底路径。
+    重建;无 fold 时 ok=None(unavailable),不再读 model_visible sidecar。
 
 不做的事:
     - 不读 evidence(由 reader 按需 fetch)。
@@ -99,7 +99,7 @@ def _mv_candidate_step_ids(
     run_dir: Path,
     spine_path: Path | None,
 ) -> tuple[str, ...]:
-    """H-mv-journal 候选 step_id:journal → sidecar 目录 → spine payload。"""
+    """H-mv-journal 候选 step_id:journal → spine payload（fold 唯一读路径）。"""
     ordered: list[str] = []
     seen: set[str] = set()
 
@@ -117,12 +117,6 @@ def _mv_candidate_step_ids(
         except Exception as exc:
             _log = _safe_logger()
             _log.debug("h_mv_journal.journal_unreadable", error=str(exc))
-
-    mv_dir = run_dir / "model_visible"
-    if mv_dir.is_dir():
-        for step_dir in sorted(mv_dir.iterdir()):
-            if step_dir.is_dir():
-                _add(step_dir.name)
 
     if spine_path is not None and spine_path.exists():
         try:
@@ -148,25 +142,6 @@ def _mv_candidate_step_ids(
     return tuple(ordered)
 
 
-def _sidecar_tools_json(run_dir: Path, step_id: str) -> list[Any] | None:
-    """读 sidecar ``model_visible/<step_id>/tools.json``;缺失或损坏 → None。
-
-    COMPAT(delete-when: PR-4 收口 fold 为唯一 model-visible 入口, tracking: ADR-0185)
-    """
-    tools_path = run_dir / "model_visible" / step_id / "tools.json"
-    if not tools_path.exists():
-        return None
-    try:
-        data = json.loads(tools_path.read_text(encoding="utf-8"))
-    except Exception as exc:
-        _log = _safe_logger()
-        _log.debug("h_mv_journal.sidecar_unreadable", path=str(tools_path), error=str(exc))
-        return None
-    if isinstance(data, list):
-        return data
-    return None
-
-
 def _scan_tool_schemas(
     run_dir: Path,
     run_id: str,
@@ -174,16 +149,13 @@ def _scan_tool_schemas(
 ) -> tuple[int, int, str]:
     """H-mv-journal 计数:(非空, 空, source);均缺失 → (-1, 0, "none")。
 
-    优先 :func:`fold_model_visible`;fold 返回 None 或 tools 空列表时回退
-    sidecar ``model_visible/<step_id>/tools.json``。
+    仅 :func:`fold_model_visible`;sidecar ``model_visible/`` 已退役(ADR-0185 PR-4)。
     """
     step_ids = _mv_candidate_step_ids(run_dir, spine_path)
     for step_id in step_ids:
         folded = fold_model_visible(run_dir=run_dir, run_id=run_id, step_id=step_id)
         if folded is None:
             continue
-        # fold_source 在 payload 缺字段时可能只 fold 出 EpochHeader.tools,
-        # tool_schemas 为空;两者任一非空即视为 fold 命中。
         schemas: Any = folded.tool_schemas
         if not schemas and folded.header is not None and folded.header.tools:
             schemas = folded.header.tools
@@ -191,12 +163,6 @@ def _scan_tool_schemas(
             continue
         nonempty, empty = _count_tool_schemas(schemas)
         return nonempty, empty, "fold"
-    # COMPAT(delete-when: PR-4 收口 fold 为唯一 model-visible 入口, tracking: ADR-0185)
-    for step_id in step_ids:
-        data = _sidecar_tools_json(run_dir, step_id)
-        if data is not None:
-            nonempty, empty = _count_tool_schemas(data)
-            return nonempty, empty, "sidecar"
     return -1, 0, "none"
 
 
@@ -323,11 +289,10 @@ def _scan_fold(
     scan: StepScan,
     doc: JournalDocument | None,
 ) -> StepScan:
-    """ADR-0185 PR-3.1:doctor fold 优先双轨扫描。
+    """ADR-0185 PR-3.1:doctor fold 扫描（spine fold 唯一 model-visible 读路径）。
 
-    与 :func:`lca.infrastructure.observability.replay.cursor.StandardCursor.at`
-    的优先级对齐:**fold 路径优先,sidecar / journal 推导兜底**。fold 命中
-    即视为 fold 路径成功;fold 缺失则退化到 sidecar 双轨。
+    与 :func:`fold_model_visible` / :func:`StandardCursor.at` 对齐:fold 命中
+    即成功;fold miss 记为 unavailable（journal 推导仍可能展示,但非 SSOT）。
 
     SSOT 解析失败(spine ledger 不存在)= fold 路径 not applicable,记录
     ``fold_attempted=True / fold_hits=0`` 让 H-fold 显式给出
@@ -356,8 +321,7 @@ def _scan_fold(
             fold_step_misses=(),
         )
 
-    # spine ledger SSOT 解析;缺失时所有 step 视作 fold miss(非故障,
-    # 走 sidecar / journal 推导兜底)。
+    # spine ledger SSOT 解析;缺失时所有 step 视作 fold miss。
     spine_path: Path | None = None
     try:
         spine_path = find_spine_file(run_dir, run_id)
@@ -365,10 +329,7 @@ def _scan_fold(
         spine_path = None
 
     if spine_path is None:
-        # 没有 spine ledger → fold 路径不可用,所有 step 视为 fold miss
-        # (非故障,走 sidecar / journal 推导兜底)。仍记录 attempted=True
-        # 让 H-fold 给出「spine 缺失,fold 路径不可用」的状态;fold_source
-        # 标 "sidecar" 表示"实际 viewer 会退化到 sidecar 兜底"。
+        # 没有 spine ledger → fold 路径不可用
         _log = _safe_logger()
         _log.debug(
             "h_fold.spine_missing",
@@ -380,7 +341,7 @@ def _scan_fold(
             fold_attempted=True,
             fold_hits=0,
             fold_misses=scan.total_steps,
-            fold_source="sidecar",
+            fold_source="unavailable",
             fold_step_hits=(),
             fold_step_misses=tuple(s.step_index for s in doc.steps),
         )
@@ -409,13 +370,11 @@ def _scan_fold(
                 step_index=step.step_index,
             )
 
-    # fold_source: "fold" 全命中;"sidecar" 全 miss 但仍试图走(实际
-    # 是否真走 sidecar 由 viewer 决定,doctor 只报"fold miss 步数");
-    # "mixed" 部分命中部分 miss;"none" 未尝试(空 doc)。
+    # fold_source: "fold" 全命中;"unavailable" 全 miss;"mixed" 部分命中。
     if fold_hits == 0 and fold_misses == 0:
         fold_source = "none"
     elif fold_hits == 0:
-        fold_source = "sidecar"
+        fold_source = "unavailable"
     elif fold_misses == 0:
         fold_source = "fold"
     else:
@@ -901,8 +860,7 @@ def _hop_h_ssot(scan: StepScan) -> HopVerdict:
 def _hop_h_mv_journal(scan: StepScan) -> HopVerdict:
     """model-visible vs journal 一致性(SSOT-Doctor, ADR-0185 PR-3.1)。
 
-    读路径:优先 ``fold_model_visible``(``FoldedModelVisible.tool_schemas``);
-    fold 返回 None 时回退 sidecar ``model_visible/tools.json``。
+    读路径:仅 ``fold_model_visible``(``FoldedModelVisible.tool_schemas``)。
 
     broken when:
       - 非空 schema 数 = 0(record_tools 接 Any,json.dumps(default=str)
@@ -917,7 +875,7 @@ def _hop_h_mv_journal(scan: StepScan) -> HopVerdict:
     if scan.tool_schema_count < 0:
         return HopVerdict(
             ok=None,
-            detail="fold 与 sidecar tools.json 均缺失",
+            detail="fold 路径无可用 tool schema",
             extra=extra,
         )
     if scan.tool_schema_count == 0:
@@ -943,11 +901,10 @@ def _hop_h_mv_journal(scan: StepScan) -> HopVerdict:
 
 
 def _hop_h_fold(scan: StepScan) -> HopVerdict:
-    """ADR-0185 PR-3.1:doctor fold 优先双轨 hop。
+    """ADR-0185 PR-3.1:doctor fold 路径 hop（spine fold 唯一 SSOT）。
 
-    与 :func:`lca.infrastructure.observability.replay.cursor.StandardCursor.at`
-    的优先级对齐:**fold 路径优先**(spine fold via :func:`fold_model_visible`),
-    sidecar / journal 推导兜底。本 hop 探测 fold 路径的可用性与一致性。
+    探测 ``fold_model_visible`` 对 journal step 的命中率;miss 不视作停机故障,
+    但标为 unavailable（部署未接 publisher / 无 spine 事件）。
 
     语义:
 
@@ -955,11 +912,8 @@ def _hop_h_fold(scan: StepScan) -> HopVerdict:
     - ``scan.fold_attempted=False`` (空 doc / 无 step) → ok=None,「no
       step to fold」
     - ``scan.fold_source="fold"`` (全部 fold 命中) → ok=True, fold 优先
-    - ``scan.fold_source="mixed"`` (部分 fold 命中) → ok=False,**部分
-      步骤走 sidecar / journal 推导兜底**,跨源一致性疑点
-    - ``scan.fold_source="sidecar"`` (全部 fold miss) → ok=None,「fold
-      路径不可用,所有步骤走兜底」;不视作故障(publisher 未接 PR-2 是
-      部署态问题,不是诊断信号)
+    - ``scan.fold_source="mixed"`` (部分 fold 命中) → ok=False,跨源一致性疑点
+    - ``scan.fold_source="unavailable"`` (全部 fold miss) → ok=None
     - ``scan.fold_source="none"`` → ok=None,「未尝试 fold」
 
     注意:H-fold 的「broken」语义**比** H-xref 轻——H-xref 探测「spine
@@ -992,16 +946,14 @@ def _hop_h_fold(scan: StepScan) -> HopVerdict:
             ok=False,
             detail=(
                 f"fold 部分命中 {scan.fold_hits}/{scan.fold_hits + scan.fold_misses}; "
-                f"miss 起始 step={miss_first}(走 sidecar / journal 推导兜底)"
+                f"miss 起始 step={miss_first}"
             ),
             extra=extra,
         )
-    if scan.fold_source == "sidecar":
+    if scan.fold_source == "unavailable":
         return HopVerdict(
             ok=None,
-            detail=(
-                f"fold 路径不可用 ({scan.fold_misses} steps 全部走 sidecar / journal 推导兜底)"
-            ),
+            detail=f"fold 路径不可用 ({scan.fold_misses} steps 全部 miss)",
             extra=extra,
         )
     # fold_source == "none" — 未尝试 fold(空 doc 或其他边界态)

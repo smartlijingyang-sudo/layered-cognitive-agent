@@ -257,3 +257,20 @@ class SessionCheckpoint:
     """
 
     status: str
+
+
+@session_event("session.end_seed.v1", visibility="audit")
+@dataclass(frozen=True)
+class SessionEndSeed:
+    """Fork/restore 继承边界标记（DSH session/end-seed 对位）。"""
+
+
+@session_event("feedback.record.v1", visibility="audit")
+@dataclass(frozen=True)
+class FeedbackRecord:
+    """用户反馈记录 —— FEEDBACK_ONLY 遥测门控释放前缀（DSH feedback/record 对位）。"""
+
+    rating: str | None = None
+    tags: tuple[str, ...] = ()
+    message_seqs: tuple[int, ...] = ()
+    text: str | None = None

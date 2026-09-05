@@ -667,22 +667,17 @@ def test_h_fold_mixed_is_fail_when_partial_hit(tmp_path: Path) -> None:
     # H-fold 是这次新引入的可见诊断信号)
 
 
-def test_h_fold_sidecar_when_no_spine_but_journal_exists(tmp_path: Path) -> None:
-    """ADR-0185 PR-3.1:journal 存在但 spine 缺失 → fold_source=sidecar,ok=None。
-
-    所有 step 都走 sidecar / journal 推导兜底;不视为故障(publisher 未
-    接 PR-2 是部署态问题,不是诊断信号),只报告「fold 路径不可用」。
-    """
+def test_h_fold_unavailable_when_no_spine_but_journal_exists(tmp_path: Path) -> None:
+    """journal 存在但 spine 缺失 → fold_source=unavailable, ok=None。"""
     doc = _build_doc()
     journal = _write_doc(tmp_path, doc)
 
     report = diagnose_step_tree(journal)
     h = report.hops["H-fold"]
     assert h.ok is None, f"all-miss 应 ok=None,got {h.detail}"
-    assert h.extra["fold_source"] == "sidecar"
+    assert h.extra["fold_source"] == "unavailable"
     assert h.extra["fold_hits"] == 0
     assert h.extra["fold_misses"] == 4
-    assert "sidecar" in h.detail or "兜底" in h.detail
 
 
 def test_h_fold_priority_prefers_spine_over_sidecar(tmp_path: Path) -> None:
@@ -825,8 +820,8 @@ def test_h_mv_journal_prefers_fold_over_sidecar(tmp_path: Path) -> None:
     assert report.consistency["tool_schema_source"] == "fold"
 
 
-def test_h_mv_journal_sidecar_fallback_when_fold_none(tmp_path: Path) -> None:
-    """fold 返回 None 时回退 sidecar tools.json。"""
+def test_h_mv_journal_no_sidecar_when_fold_none(tmp_path: Path) -> None:
+    """fold 返回 None 时 sidecar 不再读 → ok=None。"""
     doc = _build_doc()
     journal = _write_doc(tmp_path, doc)
     _write_sidecar_tools(
@@ -837,24 +832,22 @@ def test_h_mv_journal_sidecar_fallback_when_fold_none(tmp_path: Path) -> None:
 
     report = diagnose_step_tree(journal)
     h = report.hops["H-mv-journal"]
-    assert h.ok is True, h.detail
-    assert h.extra["tool_schema_count"] == 1
-    assert h.extra["tool_schema_source"] == "sidecar"
+    assert h.ok is None, h.detail
+    assert h.extra["tool_schema_count"] == -1
+    assert h.extra["tool_schema_source"] == "none"
 
 
-def test_h_mv_journal_sidecar_empty_dicts_fail(tmp_path: Path) -> None:
-    """sidecar 全是 ``{}`` 且 fold 缺失 → H-mv-journal broken。"""
+def test_h_mv_journal_sidecar_files_ignored_when_fold_none(tmp_path: Path) -> None:
+    """遗留 sidecar 文件存在但 fold 缺失 → 仍 ok=None。"""
     doc = _build_doc()
     journal = _write_doc(tmp_path, doc)
     _write_sidecar_tools(tmp_path, "step_1", [{}, {}])
 
     report = diagnose_step_tree(journal)
     h = report.hops["H-mv-journal"]
-    assert h.ok is False
-    assert h.extra["tool_schema_count"] == 0
-    assert h.extra["tool_schema_empty_count"] == 2
-    assert h.extra["tool_schema_source"] == "sidecar"
-    assert "非空 schema=0" in h.detail or "空 dict schema" in h.detail
+    assert h.ok is None
+    assert h.extra["tool_schema_count"] == -1
+    assert h.extra["tool_schema_source"] == "none"
 
 
 def test_h_mv_journal_missing_is_none(tmp_path: Path) -> None:
@@ -864,6 +857,6 @@ def test_h_mv_journal_missing_is_none(tmp_path: Path) -> None:
     report = diagnose_step_tree(journal)
     h = report.hops["H-mv-journal"]
     assert h.ok is None
-    assert "均缺失" in h.detail
+    assert "无可用" in h.detail or "缺失" in h.detail
     assert h.extra["tool_schema_count"] == -1
     assert h.extra["tool_schema_source"] == "none"

@@ -154,7 +154,7 @@ async def test_setup_provides_capability() -> None:
     ctx = _fake_ctx()
 
     # setup is wrapped by @plugin into a cordis.Plugin carrier; .setup is the
-    # original async function (mirrors tests/plugins/session/test_persistence_jsonl.py).
+    # original async function.
     await setup.setup(ctx, Config())
 
     assert "session.checkpoint.policy" in ctx.provided

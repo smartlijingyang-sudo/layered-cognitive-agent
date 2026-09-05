@@ -67,6 +67,9 @@ class SessionEvent:
     provider: str | None = None
     visibility: Literal["model", "audit", "internal"] = "model"
     scope: EventScope | None = None
+    ignorable: bool = False
+    surface_op: Any | None = None
+    source_event_seqs: tuple[int, ...] | None = None
 
     @property
     def category(self) -> str:

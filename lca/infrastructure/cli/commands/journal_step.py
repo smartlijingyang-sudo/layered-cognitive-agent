@@ -212,24 +212,22 @@ def register(app: typer.Typer) -> None:
         print(_format_step_human(step), end="")
 
         if model_visible:
-            # ADR-0185 PR-3:model-visible SSOT 优先 spine.jsonl (fold 重建);
-            # 无 spine 时回退 <run_dir>/model_visible/<step_id>/(双轨期)。
             from lca.infrastructure.observability.spine.sinks.naming import (
                 spine_filename_for_run,
             )
 
             step_id = step.get("step_id") or ""
             spine_file = run_dir / spine_filename_for_run(run_dir.name)
+            print("")
             if spine_file.exists():
-                print("")
                 print(
                     f"model_visible: spine.jsonl (fold 重建;step_id={step_id});"
                     f" 调用 lca_kernel.events.fold.foldRequestHeader"
                 )
             else:
-                mv_dir = run_dir / "model_visible" / step_id
-                print("")
-                print(f"model_visible: {mv_dir}  (legacy sidecar;PR-3 双轨期)")
+                print(
+                    f"model_visible: fold unavailable (no {spine_file.name}; sidecar retired)"
+                )
 
 
 __all__ = ["register"]
