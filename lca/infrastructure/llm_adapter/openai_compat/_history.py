@@ -41,6 +41,10 @@ def openai_messages_with_history(
                     "content": str(item.get("content") or ""),
                 }
             )
+        elif role == "user":
+            content = item.get("content")
+            if isinstance(content, str) and content.strip():
+                messages.append({"role": "user", "content": content})
     return messages
 
 
@@ -86,4 +90,8 @@ def anthropic_messages_with_history(
                     ],
                 }
             )
+        elif role == "user":
+            content = item.get("content")
+            if isinstance(content, str) and content.strip():
+                messages.append({"role": "user", "content": content})
     return messages

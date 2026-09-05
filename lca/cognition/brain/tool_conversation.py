@@ -29,6 +29,10 @@ def build_tool_history(state: AgentState) -> list[dict[str, Any]]:
     for index, turn in enumerate(state.history):
         if not isinstance(turn, Turn):
             continue
+        human_answer = _human_answer_message(turn)
+        if human_answer is not None:
+            messages.append(human_answer)
+            continue
         if turn.decision.action_type != ActionType.USE_TOOL:
             continue
         if not turn.decision.tool_calls:
@@ -65,6 +69,27 @@ def build_tool_history(state: AgentState) -> list[dict[str, Any]]:
                 }
             )
     return messages
+
+
+def _human_answer_message(turn: Turn) -> dict[str, Any] | None:
+    """Project resume answers onto the provider wire.
+
+    ``askUserQuestion`` pauses before ``remember`` commits the USE_TOOL turn, so
+    resume only folds an ``ASK_HUMAN`` turn. Without this branch the next LLM
+    call sees empty history and asks the same questions again.
+    """
+    if turn.decision.action_type != ActionType.ASK_HUMAN:
+        return None
+    observation = turn.observation
+    if observation is None or not observation.success:
+        return None
+    extra = observation.extra or {}
+    if extra.get("source") != "human_answer":
+        return None
+    content = _observation_content(observation)
+    if not content:
+        return None
+    return {"role": "user", "content": content}
 
 
 def _tool_results_for_turn(turn: Turn) -> list[Observation]:

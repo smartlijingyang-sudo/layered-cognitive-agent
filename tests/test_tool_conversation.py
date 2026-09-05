@@ -129,3 +129,37 @@ class TestToolConversation(unittest.TestCase):
         self.assertEqual(messages[1]["tool_calls"][0]["function"]["name"], "read_file")
         self.assertEqual(messages[2]["role"], "tool")
         self.assertEqual(messages[2]["tool_call_id"], "toolu_1")
+
+    def test_human_answer_resume_projects_user_message(self) -> None:
+        state = AgentState(trace_id="t", task="create assistant", budget=Budget(), step=1)
+        state.history.append(
+            Turn(
+                decision=Decision(
+                    decision_id="dec_hil",
+                    action_type="ask_human",
+                    rationale="Human-in-the-loop answer received.",
+                    confidence=1.0,
+                    tool_calls=[
+                        ToolCall(
+                            call_id="tc_hil",
+                            tool_name="askUserQuestion",
+                            arguments={},
+                        )
+                    ],
+                ),
+                observation=Observation(
+                    observation_id="obs_hil",
+                    success=True,
+                    payload="名字：小助手；角色：个人助手",
+                    extra={"source": "human_answer", "tool_name": "askUserQuestion"},
+                ),
+            )
+        )
+        history = build_tool_history(state)
+        self.assertEqual(len(history), 1)
+        self.assertEqual(history[0]["role"], "user")
+        self.assertIn("小助手", history[0]["content"])
+
+        messages = openai_messages_with_history("USER_TASK", history)
+        self.assertEqual(messages[1]["role"], "user")
+        self.assertIn("小助手", messages[1]["content"])
