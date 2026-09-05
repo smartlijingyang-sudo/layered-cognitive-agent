@@ -30,6 +30,11 @@ def test_ignorable_unknown_allowed() -> None:
     validate_event_type_for_read("totally/unknown", ignorable=True)
 
 
+def test_spine_execution_points_are_known() -> None:
+    validate_event_type_for_read("body.tool.execute.start")
+    validate_event_type_for_read("spine.body.tool.execute.end")
+
+
 def test_dirty_log_rejected_on_open(tmp_path: Path) -> None:
     path = tmp_path / "run_1.spine.jsonl"
     path.write_text(

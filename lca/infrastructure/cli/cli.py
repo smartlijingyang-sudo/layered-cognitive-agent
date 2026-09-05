@@ -37,6 +37,7 @@ from lca.infrastructure.cli.commands import (
     journal,
     journal_exceptions,
     journal_replay,
+    journal_session,
     journal_step,
     journal_steps,
     journal_trace,
@@ -93,6 +94,7 @@ journal_trace.register(_journal_group)
 journal_replay.register(_journal_group)
 journal_exceptions.register(_journal_group)
 journal_step.register(_journal_group)
+journal_session.register(_journal_group)
 kernel.register(app)
 notes.register(app)
 

@@ -287,6 +287,9 @@ def _build_category_to_ep() -> dict[str, str]:
 
 _SPINE_CATEGORY_TO_EP: dict[str, str] = _build_category_to_ep()
 
+SPINE_EVENT_CATEGORIES: frozenset[str] = frozenset(_SPINE_EP_TO_CATEGORY.values())
+"""All spine ``category`` strings registered in the EP→category map (read-path 闭集)."""
+
 
 def category_to_spine_ep(category: str) -> str | None:
     """spine category 串 → 裸 EP;未登记返回 ``None``。"""
@@ -362,4 +365,4 @@ class SpineEventPayload(EventPayload):
         return Plane.OBSERVABILITY
 
 
-__all__ = ["SPINE_EXECUTION_POINTS", "SpineEventPayload"]
+__all__ = ["SPINE_EVENT_CATEGORIES", "SPINE_EXECUTION_POINTS", "SpineEventPayload"]

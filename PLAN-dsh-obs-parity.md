@@ -1,6 +1,6 @@
 # PLAN: DSH 观察体系全面对齐 — 补齐规划
 
-> **状态**:Wave 0–6 + G1/G5 PR-4 已落地;15 项验收矩阵 13/15 绿(5/11 刻意跳过)。
+> **状态**:Wave 0–6 + G1/G5 PR-4 + Wave 5 已落地;15 项验收矩阵 13/15 绿(5/11 刻意跳过)。
 > **输入**:用户提供的 A–K 模块清单 + 15 条验收矩阵;`DSH-GAP-AUDIT.md`(G1–G15)、
 > `OBS-CONVERGENCE-NEXT.md`、ADR-0183/0184/0185/0186/0188、
 > `docs/specs/session-event-pipeline-spec.md`。
@@ -146,10 +146,10 @@ DSH `packages/llm/token-meter` 的 Python 对位,按扩展路径落:
 
 ### Wave 5 — 查询面补齐(可选增强,非「全面」的必要条件)
 
-| # | 动作 | 现状对位 |
+| # | 动作 | 落点 |
 |---|---|---|
-| 5.1 | tool call↔result 对齐查询(时长/ok/error)按 `invocation_id` | Journal 面已有(`TraceInspector`),Session 面经 `spine.body.tool.execute.*` 补一个折叠查询 |
-| 5.2 | 按 type/turn/step 过滤的 session 事件查询 | `SpineReader` + 过滤函数;`lca-ops` 已有 `journal trace`,补 session 面入口 |
+| 5.1 | tool call↔result 对齐查询(时长/ok/error)按 `invocation_id` | ✅ `query.fold_tool_invocations` + `journal session tools` |
+| 5.2 | 按 type/turn/step 过滤的 session 事件查询 | ✅ `query.filter_session_events` + `journal session events/transcript` |
 | 5.3 | (缓办)corpus 检索(DSH `session-query` 全文检索) | 产品需求未出现前不做 |
 
 ### Wave 6 — RecordingLoop 夹具(★ 验收矩阵的执行器)

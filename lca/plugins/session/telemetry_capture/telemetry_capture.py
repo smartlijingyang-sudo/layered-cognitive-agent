@@ -245,6 +245,23 @@ class SessionTelemetryCapture:
             self._count_backend_error()
             _log.warning("session.telemetry.backend_shutdown_failed", exc_info=True)
 
+    def reset_handoff_cursor(self, session_id: str, *, through_seq: int) -> None:
+        """fork/seed 后重置 on_demand 游标,避免重复外送祖先前缀(DSH 对位)。"""
+        with self._lock:
+            self._cursors[session_id] = through_seq
+
+    def diagnostics_snapshot(self) -> dict[str, Any]:
+        """披露面：共享策略 + 丢弃/脱敏/后端错误计数（Wave 3.3）。"""
+        with self._lock:
+            sharing = self.sharing.value
+            return {
+                "capture_mode": self._capture_mode,
+                "sharing": sharing,
+                "redacted_count": self._redacted_count,
+                "dropped_count": self._dropped_count,
+                "backend_error_count": self._backend_error_count,
+            }
+
     # ── 内部 ────────────────────────────────────────────────────────
 
     def _apply_redactors(self, record: TelemetryRecord) -> TelemetryRecord | None:
@@ -386,12 +403,24 @@ def _observe_contained(capture: SessionTelemetryCapture, session: Any) -> None:
     """挂入单个 Session，失败 contained（记 warning，不打断其余）。"""
     try:
         capture.observe_session(session)
+        _seed_telemetry_cursor(capture, session)
     except Exception:
         _log.warning(
             "session.telemetry.attach_failed",
             session_id=getattr(session, "id", None),
             exc_info=True,
         )
+
+
+def _seed_telemetry_cursor(capture: SessionTelemetryCapture, session: Any) -> None:
+    """fork/restore 的 seeded session 从 seed 边界后开始计量/外送。"""
+    header = getattr(session, "header", None)
+    if header is None or not getattr(header, "is_seeded", False):
+        return
+    seed_length = getattr(header, "seed_length", None)
+    if not isinstance(seed_length, int) or seed_length <= 0:
+        return
+    capture.reset_handoff_cursor(_session_id(session), through_seq=seed_length - 1)
 
 
 def _attach_to_store(store: Any, capture: SessionTelemetryCapture) -> None:

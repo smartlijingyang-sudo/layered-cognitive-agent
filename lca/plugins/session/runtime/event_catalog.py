@@ -9,6 +9,7 @@ from __future__ import annotations
 from lca.contracts.harness import memory as _memory_events  # noqa: F401 — register types
 from lca.contracts.harness.tasks.session import event_registry
 from lca_kernel.events.fold import SURFACE_EVENT_TYPES
+from lca_kernel.events.payloads_spine import SPINE_EVENT_CATEGORIES, SPINE_EXECUTION_POINTS
 
 __all__ = [
     "UnknownSessionEventTypeError",
@@ -29,9 +30,11 @@ class UnknownSessionEventTypeError(ValueError):
 
 
 def known_session_event_types() -> frozenset[str]:
-    """本构建理解的 session event type 闭集（yaml/decorator 注册 + surface 词表）。"""
+    """本构建理解的 session event type 闭集（yaml/decorator 注册 + surface + spine EP）。"""
     types = set(event_registry().keys())
     types.update(SURFACE_EVENT_TYPES)
+    types.update(SPINE_EXECUTION_POINTS)
+    types.update(SPINE_EVENT_CATEGORIES)
     return frozenset(types)
 
 
