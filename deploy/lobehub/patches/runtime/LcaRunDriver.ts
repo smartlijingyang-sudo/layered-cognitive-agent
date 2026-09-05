@@ -538,13 +538,15 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
     rec.resultMsgId = created?.id;
     lastResultMsgId = created?.id || lastResultMsgId;
     if (created?.id) {
-      get().internal_dispatchMessage(
-        {
-          id: created.id,
-          key: 'lca',
-          type: 'updatePluginState',
-          value: { run_id: runId, status: 'waiting_input' },
-        },
+      // Persist pluginState.lca to the DB so that handleLcaAskUserSubmit
+      // (customInteractionHandlers) and skipToolInteraction (conversationControl)
+      // can read run_id via getDbMessageById and POST /runs/<id>/answer to
+      // resume this run. A plain internal_dispatchMessage only updates the
+      // in-memory store; the submit handler reads from DB and would see an
+      // empty run_id, causing the answer to be lost and a fresh run created.
+      await get().optimisticUpdatePluginState(
+        created.id,
+        { lca: { run_id: runId, status: 'waiting_input' } },
         { operationId: options.operationId },
       );
     }
