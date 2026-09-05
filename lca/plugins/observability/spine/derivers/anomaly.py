@@ -1,8 +1,8 @@
 # RETAINED(test/CLI/capability; tracking: ADR-0186 PR-3g / I-SESSION-5)
 # Production step_tree uses StepTreeFoldDeriver (I-SESSION-5 fold-only builder).
-# Anomaly is invoked by ``EmitPipeline.emit`` after record seal (not via
-# EventSpine.subscribe). Kept for unit tests, CLI replay, and capability
-# provide; not the production step_tree builder path.
+# Anomaly is invoked by ``session.spine_anomaly`` Session observer when a
+# run-bound Session hook is active; ``EmitPipeline.emit`` only calls
+# ``on_event`` on the hook-less fallback path (unit tests / pre-boot).
 
 """AnomalyDetector — I15 / I16 spine deriver with 8 invariant-violation detectors.
 

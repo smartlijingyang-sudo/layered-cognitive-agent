@@ -4,30 +4,27 @@ ADR-0169 D1 / L10 定义 :class:`WritePort` 协议位;ADR-0183 PR-9 把三条
 写入路径(``EventSpine.append`` / ``SpineWritePortAdapter.append`` /
 cursor 直写)收口为本模块两个入口:
 
-- :func:`spine_port_append` —— 唯一 spine 写入实现:stamp(seq / epoch /
-  causality / hash chain)→ sinks(FD-1 fail-fast)→ subscribers(FD-2
-  容错)。``EventSpine.append`` 是转发本函数的 façade。
+- :func:`spine_port_append` —— 唯一 spine 写入实现:转发给 Session runtime
+  钩子,stamp / 落盘 / subscriber 派发均在钩子内完成。无钩子绑定时
+  fail-loud。``EventSpine.append`` 是转发本函数的 façade。
 - :func:`write_port_append` —— 唯一 WritePort 字段映射:cursor 的 6 字段
   翻译成 spine append 字段后经 façade 落盘。``SpineWritePortAdapter.append``
   是转发本函数的 façade。
 
-生产落盘行为不变:sinks = [FileSink],写 ``<run_dir>/<run_id>.spine.jsonl``。
+ADR-0186:Session 是事件 SSOT。生产落盘经 Session observer(SpineFileSink)
+写 ``<run_dir>/<run_id>.spine.jsonl``;本模块不再直接写 sink。
+
 cursor 不得直接 import EventSpine / Serializer / Storage(ADR-0169 L4
 I-PLUG1);本模块只 import spine 原语(EventRecord / EventSink /
 SpineContext),不 import EventSpine 类。
-
-ADR-0185 PR-3h:模块另持有 Session runtime 转发缝(:class:`SessionAppendHook`
-+ ContextVar 注册);未绑定时全部写入行为与缝存在前逐字节一致。
 """
 
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
 from collections.abc import Callable, Sequence
 from contextvars import ContextVar, Token
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from lca.infrastructure.observability.spine.context import SpineContext
@@ -91,15 +88,15 @@ _session_append_hook: ContextVar[SessionAppendHook | None] = ContextVar(
 
 
 def get_session_append_hook() -> SessionAppendHook | None:
-    """取当前绑定的 Session runtime 转发钩子;无则返回 ``None``(走原同步直写)。"""
+    """取当前绑定的 Session runtime 转发钩子;无则返回 ``None``。"""
     return _session_append_hook.get()
 
 
 def bind_session_append_hook(hook: SessionAppendHook) -> Token[Any]:
     """绑定 Session runtime 转发钩子;返回 reset token。
 
-    由 Session runtime 装配方调用(骨架期无生产调用方);未绑定 /
-    释放后全部 spine 写入走原同步路径,行为不变。
+    由 Session runtime 装配方调用(如 ``bind_run_event_session_from_store``)。
+    未绑定时 ``spine_port_append`` 将 RuntimeError fail-loud。
     """
     return _session_append_hook.set(hook)
 
@@ -124,138 +121,71 @@ def spine_port_append(
     ref: Any = None,
     session_hook: SessionAppendHook | None = None,
 ) -> EventRecord:
-    """唯一 spine 写入实现(ADR-0183 PR-9)。
+    """唯一 spine 写入实现(ADR-0183 PR-9, ADR-0186 Session SSOT)。
 
-    Stamp(seq / epoch / span / causality_id / hash chain,全部由
-    :class:`SpineContext` 主导分配)→ 写全部 sinks → 更新 hash chain →
-    通知 subscribers。
+    Session runtime 钩子绑定后,全部写入转发给 Session:stamp / 落盘 /
+    subscriber 派发均在钩子内完成。本函数只负责转发和 fail-loud。
 
-    Failure 语义(与原 EventSpine.append 一致):
-    - FD-1 sink 错误 fail-fast,首个错误向调用方传播;
-    - FD-2 subscriber 错误容错,仅日志 ``spine.deriver_failed``,不传播;
-      原事件仍到达 sink。
+    Failure 语义:
+    - 无钩子绑定时 RuntimeError(fail-loud,要求调用方先绑 Session)
+    - 钩子抛错时 contained(log + 返回 stub record),不传播
 
-    所有权:record 为新建 frozen 实例,sinks / subscribers 只读遍历。
-
-    ``session_hook``(ADR-0185 PR-3h 骨架):非 None 时先在本地
-    SpineContext 分配前转发给 Session runtime,钩子返回的
-    :class:`EventRecord` 直接回传;钩子抛错按 FD-2 容错(日志
-    ``spine.session_forward_failed``),落回下方原同步路径。传 ``None``
-    (默认)时行为与缝存在前逐字节一致。
-
-    COMPAT(delete-when: Session runtime 成为唯一 spine append 入口、
-    ``session_hook`` 参数与同步直写回退调用方清零;
-    tracking: ADR-0185 PR-3h 骨架)
+    ADR-0186 迁移完成后,sinks/subscribers 参数可移除(当前保留以兼容
+    EventSpine.append 签名)。
     """
-    effective_hook = session_hook or get_session_append_hook()
-    if effective_hook is not None:
-        try:
-            return effective_hook(
-                sinks,
-                subscribers,
-                execution_point=execution_point,
-                channel=channel,
-                caller_payload=caller_payload,
-                outcome=outcome,
-                span_ctx=span_ctx,
-                phase=phase,
-                reason=reason,
-                when=when,
-                ref=ref,
-            )
-        except Exception as exc:
-            log.warning(
-                "spine.session_forward_failed execution_point=%s err=%s",
-                execution_point,
-                exc,
-                exc_info=True,
-            )
-
-    now = when or datetime.now(timezone.utc)
-    seq = SpineContext.next_sequence()
-    epoch = SpineContext.next_epoch()
-    current_span = SpineContext.current_span()
-    parent_id = (
-        span_ctx.parent_span_id
-        if span_ctx is not None
-        else (current_span.span_id if current_span is not None else None)
-    )
-    span_id = span_ctx.span_id if span_ctx is not None else f"lca-seq-{seq:08x}"
-    run_id = SpineContext.get_run() or "default-run"
-    step_id = SpineContext.get_step()
-    prev_hash = SpineContext.last_hash()
-    causality_payload = json.dumps(
-        {
-            "execution_point": execution_point,
-            "channel": channel,
-            "payload": caller_payload or {},
-            "span_id": span_id,
-            "epoch": epoch,
-        },
-        sort_keys=True,
-        default=str,
-    )
-    causality_id = "sha256:" + hashlib.sha256(causality_payload.encode()).hexdigest()
-    new_hash = (
-        "sha256:" + hashlib.sha256(((prev_hash or "") + causality_id).encode("utf-8")).hexdigest()
-    )
-
-    # trace_id 解析链(ADR-0183 §3.9 PR-12):
-    # 1) EventBus.publish 显式 trace_id → 经 ref 传入(ref 优先)
-    # 2) caller_payload["trace_id"] 字段(老路径兼容)
-    # 3) SpineContext contextvars(_trace_id,EventBus 默认注入)
-    # 4) 全 None(无 trace 关联)
-    _ref_trace_id = getattr(ref, "trace_id", None) if ref is not None else None
-    _payload_trace_id = (caller_payload or {}).get("trace_id")
-    if _ref_trace_id is not None:
-        _resolved_trace_id: str | None = _ref_trace_id
-    elif _payload_trace_id is not None:
-        _resolved_trace_id = str(_payload_trace_id)
-    else:
-        _resolved_trace_id = SpineContext.get_trace_id()
-
-    record = EventRecord(
-        execution_point=execution_point,
-        channel=channel,
-        span_id=span_id,
-        parent_span_id=parent_id,
-        sequence=seq,
-        epoch=epoch,
-        causality_id=causality_id,
-        outcome=outcome,
-        when=now,
-        # trace_id 由 EventBus.publish 经 ref 注入(ADR-0183 §3.9 PR-12);
-        # 老路径走 SpineContext contextvars 兜底,保持向后兼容。
-        trace_id=_resolved_trace_id,
-        when_corrected=now,
-        prev_event_hash=prev_hash,
-        run_id=run_id,
-        step_id=step_id,
-        payload=caller_payload or {},
-        phase=phase,
-        reason=reason,
-    )
-
-    # FD-1: sinks fail-fast; first error propagates
-    for sink in sinks:
-        sink.write(record)
-
-    SpineContext.chain_hash(new_hash)
-
-    # FD-2: subscribers contained; failures logged, never propagated
-    for fn in tuple(subscribers):
-        try:
-            fn(record)
-        except Exception as exc:
-            log.warning(
-                "spine.deriver_failed execution_point=%s deriver=%s err=%s",
-                record.execution_point,
-                getattr(fn, "__qualname__", repr(fn)),
-                exc,
-                exc_info=True,
-            )
-
-    return record
+    hook = session_hook or get_session_append_hook()
+    if hook is None:
+        raise RuntimeError(
+            f"spine_port_append: no Session hook bound for execution_point={execution_point!r}. "
+            "Session runtime must bind hook via bind_session_append_hook() before append. "
+            "See ADR-0186 for Session SSOT architecture."
+        )
+    try:
+        return hook(
+            sinks,
+            subscribers,
+            execution_point=execution_point,
+            channel=channel,
+            caller_payload=caller_payload,
+            outcome=outcome,
+            span_ctx=span_ctx,
+            phase=phase,
+            reason=reason,
+            when=when,
+            ref=ref,
+        )
+    except Exception as exc:
+        if type(exc).__name__ == "I17Violation" and type(exc).__module__ in (
+            "lca.plugins.observability.spine.spine_enrich",
+            "lca.plugins.observability.spine.emit_pipeline",
+        ):
+            raise
+        log.warning(
+            "spine.session_forward_failed execution_point=%s err=%s",
+            execution_point,
+            exc,
+            exc_info=True,
+        )
+        # Return stub record on hook failure (contained, don't kill run)
+        return EventRecord(
+            execution_point=execution_point,
+            channel=channel,
+            span_id="stub",
+            parent_span_id=None,
+            sequence=0,
+            epoch=0,
+            causality_id="stub",
+            outcome=outcome,
+            when=when or datetime.now(UTC),
+            trace_id=None,
+            when_corrected=when or datetime.now(UTC),
+            prev_event_hash=None,
+            run_id=SpineContext.get_run() or "default-run",
+            step_id=SpineContext.get_step(),
+            payload=caller_payload or {},
+            phase=phase,
+            reason=reason,
+        )
 
 
 def write_port_append(

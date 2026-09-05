@@ -12,7 +12,6 @@ from lca.contracts.observability.writable_matrix import (
     Coalescer,
     EventEmitter,
     EventStorage,
-    ModelVisibleRecorder,
     ReplayCursor,
     Serializer,
     StepDriver,
@@ -24,7 +23,6 @@ _FACE_PROTOCOL: dict[str, type[Any]] = {
     "coalescer": Coalescer,
     "serializer": Serializer,
     "storage": EventStorage,
-    "model_visible_recorder": ModelVisibleRecorder,
     "replay_cursor": ReplayCursor,
 }
 

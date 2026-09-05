@@ -154,6 +154,7 @@ class BoundRunEventSession:
     bridge: RunEventSessionBridge
     publish_token: Any
     run_id: str
+    spine_hook_token: Any = None
 
 
 def bind_run_event_session_from_store(store: Any, run_id: str) -> BoundRunEventSession:
@@ -168,11 +169,15 @@ def bind_run_event_session_from_store(store: Any, run_id: str) -> BoundRunEventS
     bridge = RunEventSessionBridge(inner)
     token = set_publish_session(bridge)
     set_session(bridge)
+    from lca.plugins.session.runtime.spine_hook import bind_bridge_spine_hook
+
+    spine_hook_token = bind_bridge_spine_hook(bridge)
     return BoundRunEventSession(
         store=store,
         bridge=bridge,
         publish_token=token,
         run_id=run_id,
+        spine_hook_token=spine_hook_token,
     )
 
 
@@ -198,6 +203,11 @@ def unbind_run_event_session(bound: BoundRunEventSession | None) -> None:
     """Reset publish/observe slots and dispose the Session. Idempotent."""
     if bound is None:
         return
+    if bound.spine_hook_token is not None:
+        from lca.plugins.session.runtime.spine_hook import reset_bridge_spine_hook
+
+        with contextlib.suppress(Exception):
+            reset_bridge_spine_hook(bound.spine_hook_token)
     with contextlib.suppress(Exception):
         reset_publish_session(bound.publish_token)
     if current_session() is bound.bridge:

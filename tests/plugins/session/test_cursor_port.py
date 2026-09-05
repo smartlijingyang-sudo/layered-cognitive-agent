@@ -67,7 +67,8 @@ def test_append_accepts_run_session_bridge() -> None:
         inner = bound.bridge.inner
         event = inner.event_at(0)
         assert event is not None
-        assert event.type == "llm.request.header"
+        # bridge.append(SpineEventPayload) → Session type = spine category
+        assert event.type == "spine.llm.request.header"
         assert event.data["incarnation"] == 1
     finally:
         unbind_run_event_session(bound)

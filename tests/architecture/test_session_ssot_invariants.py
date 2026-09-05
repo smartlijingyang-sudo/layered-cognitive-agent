@@ -296,3 +296,45 @@ def test_pipeline_loader_has_no_bus_subscribe() -> None:
     text = path.read_text(encoding="utf-8")
     assert "bus.subscribe(" not in text, "ADR-0186: pipeline_loader still calls bus.subscribe("
     assert ".subscribe(" not in text, "ADR-0186: pipeline_loader still calls .subscribe("
+
+
+def test_builder_has_no_legacy_spine_write_port_fallback() -> None:
+    """ADR-0186: production builder 不得再引用 SpineWritePortAdapter 回退。"""
+    path = (
+        _REPO_ROOT
+        / "lca"
+        / "plugins"
+        / "transport"
+        / "webserver"
+        / "handlers"
+        / "runs"
+        / "session"
+        / "builder.py"
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "SpineWritePortAdapter" not in text
+
+
+def test_field_producer_merge_lives_in_spine_enrich() -> None:
+    """ADR-0186 wave-2: FieldProducer merge 只在 spine_enrich + Session hook。"""
+    emit_path = _REPO_ROOT / "lca" / "plugins" / "observability" / "spine" / "emit_pipeline.py"
+    enrich_path = _REPO_ROOT / "lca" / "plugins" / "observability" / "spine" / "spine_enrich.py"
+    hook_path = _REPO_ROOT / "lca" / "plugins" / "session" / "runtime" / "spine_hook.py"
+    assert enrich_path.exists()
+    enrich_text = enrich_path.read_text(encoding="utf-8")
+    assert "producer.produce" in enrich_text
+    emit_text = emit_path.read_text(encoding="utf-8")
+    assert "producer.produce" not in emit_text
+    hook_text = hook_path.read_text(encoding="utf-8")
+    assert "get_active_spine_enricher" in hook_text
+
+
+def test_anomaly_runs_via_session_observer_not_emit_pipeline_when_hooked() -> None:
+    """ADR-0186 wave-3: hook 路径下 EmitPipeline 不得调用 anomaly.on_event。"""
+    emit_path = _REPO_ROOT / "lca" / "plugins" / "observability" / "spine" / "emit_pipeline.py"
+    emit_text = emit_path.read_text(encoding="utf-8")
+    assert "get_session_append_hook()" in emit_text
+    assert "self._anomaly.on_event" in emit_text
+    anomaly_plugin = _REPO_ROOT / "lca" / "plugins" / "session" / "spine_anomaly" / "spine_anomaly.py"
+    assert anomaly_plugin.exists()
+    assert "session_event_to_event_record" in anomaly_plugin.read_text(encoding="utf-8")

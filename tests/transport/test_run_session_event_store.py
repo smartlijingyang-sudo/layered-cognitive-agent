@@ -1,8 +1,8 @@
 """RunSessionBuilder binds session.store onto publish/observe slots.
 
 Locks:
-- session.store present → create Session(run_id), set_publish_session + set_session
-- session.store missing → structlog warning, publishers stay on EventBus
+- session.store present → create Session(run_id), set_publish_session + set_session + spine hook
+- session.store missing → RunSessionBuilder fail-loud; bind_run_event_session warns only
 - close() resets slots and disposes the Session
 - step_tree EventSpine.subscribe stays in place (fold cut is a later PR)
 """
@@ -223,20 +223,15 @@ def test_builder_binds_session_store_to_publish_and_observe_slots(tmp_path: Path
     assert current_session() is None
 
 
-def test_builder_without_session_store_degrades_to_eventbus(tmp_path: Path) -> None:
-    ctx, spine = _build_ctx(session_store=None)
+def test_builder_without_session_store_fail_loud(tmp_path: Path) -> None:
+    """缺 session.store → RunSessionBuilder fail-loud（与 requires_session_store 同锁）。"""
+    from lca.contracts.mechanisms.capability import MissingCapabilityError
+
+    ctx, _spine = _build_ctx(session_store=None)
     registry = RunRegistry(locator=FilesystemRunLocator(root=tmp_path))
 
-    with structlog.testing.capture_logs() as logs:
-        session = create_run_session(registry, question="q", user_text="u", ctx=ctx)
-    try:
-        assert session.event_session is None
-        assert current_publish_session() is None
-        assert current_session() is None
-        assert not spine.subscribers
-        assert any(item.get("event") == "session.store.missing" for item in logs)
-    finally:
-        _teardown(session)
+    with pytest.raises(MissingCapabilityError):
+        create_run_session(registry, question="q", user_text="u", ctx=ctx)
 
 
 def test_bound_session_append_records_log_and_returns_eventref(
@@ -332,33 +327,10 @@ def test_builder_routes_cursor_writes_through_session_when_store_bound(
         events = inner.snapshot_events()
         assert inner.seq == before + 1
         new_event = events[-1]
-        assert new_event.type == "phase.perceive.fold"
+        assert new_event.type == "spine.phase.perceive.fold"
         assert new_event.data["incarnation"] == cursor.incarnation.incarnation_seq
         # legacy spine 不再收到 cursor 写入。
         assert spine.appends == []
     finally:
         _teardown(session)
 
-
-def test_builder_falls_back_to_spine_port_without_session_store(
-    tmp_path: Path,
-) -> None:
-    """缺 session.store → cursor WritePort 回退 legacy SpineWritePortAdapter。"""
-    from lca.infrastructure.observability.loop_cursor.bind import SpineWritePortAdapter
-
-    ctx, spine = _build_ctx(session_store=None)
-    registry = RunRegistry(locator=FilesystemRunLocator(root=tmp_path))
-
-    session = create_run_session(registry, question="q", user_text="u", ctx=ctx)
-    try:
-        cursor = session.loop_cursor
-        assert isinstance(cursor._spine, SpineWritePortAdapter)
-        assert session.event_session is None
-        cursor.advance("perceive")
-        # 回退路径:写入仍走 spine.append(execution_point + caller_payload.incarnation)。
-        assert len(spine.appends) == 1
-        rec = spine.appends[0]
-        assert rec["execution_point"] == "phase.perceive.fold"
-        assert rec["caller_payload"]["incarnation"] == cursor.incarnation.incarnation_seq
-    finally:
-        _teardown(session)

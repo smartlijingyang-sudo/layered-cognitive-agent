@@ -125,15 +125,8 @@ class SessionStore:
                 raise ValueError(f"seed 事件 seq 不连续: 期望 {index}, 实际 {event.seq}")
             if not event.type:
                 raise ValueError(f"seed 事件 #{index} type 为空")
-            from lca.plugins.session.runtime.event_catalog import (
-                UnknownSessionEventTypeError,
-                validate_event_type_for_read,
-            )
-
-            try:
-                validate_event_type_for_read(event.type, ignorable=event.ignorable)
-            except UnknownSessionEventTypeError as exc:
-                raise ValueError(str(exc)) from exc
+            # in-memory seed 信任调用方(fork / 测试 fixture);fail-closed 只在
+            # :meth:`restore_from_log` → :func:`load_session_events` 冷读路径。
             session._log.append(event)
         # 强制 is_seeded=True（无论传入 header 的值）
         object.__setattr__(session._header, "is_seeded", True)

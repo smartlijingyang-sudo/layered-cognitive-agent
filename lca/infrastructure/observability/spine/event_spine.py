@@ -21,7 +21,6 @@ from datetime import datetime
 from typing import Any
 
 from lca.infrastructure.observability.loop_cursor._spine_port import (
-    get_session_append_hook,
     spine_port_append,
 )
 from lca.infrastructure.observability.spine.context import SpineContext
@@ -75,11 +74,7 @@ class EventSpine:
     ) -> EventRecord:
         """Façade — forward to ``spine_port_append``, the single write impl.
 
-        Signature and failure semantics (FD-1 / FD-2) are unchanged; the
-        implementation lives in ``loop_cursor._spine_port`` (ADR-0183 PR-9).
-
-        COMPAT(delete-when: PR-3 cursor 迁完仅剩 sync 直写 fallback;
-        tracking: ADR-0184 PR-2;45 天窗口)
+        Session runtime 钩子必须已绑定(ADR-0186);未绑定时 RuntimeError。
         """
         return spine_port_append(
             self._sinks,
@@ -106,15 +101,10 @@ class EventSpine:
         reason: str | None = None,
         when: datetime | None = None,
     ) -> EventRecord:
-        """Session.append 兼容 shim(ADR-0185 PR-3h 骨架)。
+        """Session.append 兼容 shim(ADR-0185 PR-3h / ADR-0186)。
 
-        Session runtime 钩子已绑定(:func:`bind_session_append_hook`)时,
-        写入经 ``spine_port_append`` 的 ``session_hook`` 转发给 Session
-        runtime,由钩子完整拥有该次写入;未绑定或转发失败时落回
-        :meth:`append` 的原同步直写路径,失败语义不变。
-
-        COMPAT(delete-when: Session runtime 成为唯一 spine append 入口、
-        同步直写回退调用方清零;tracking: ADR-0185 PR-3h 骨架)
+        转发给 ``spine_port_append``,后者读取 ContextVar 中的 Session
+        runtime 钩子并完成写入。无钩子绑定时 RuntimeError。
         """
         return spine_port_append(
             self._sinks,
@@ -127,7 +117,6 @@ class EventSpine:
             phase=phase,
             reason=reason,
             when=when,
-            session_hook=get_session_append_hook(),
         )
 
     def flush(self) -> None:

@@ -15,8 +15,8 @@ fine.
 from __future__ import annotations
 
 from abc import abstractmethod
-from collections.abc import Iterator
-from typing import Any
+from collections.abc import Iterator, Sequence
+from typing import Any, Protocol
 
 from lca.contracts.models.core.perception import ContextItem, ItemKind
 from lca.contracts.models.core.state import AgentState
@@ -29,11 +29,17 @@ from lca.contracts.models.observability.journal import (
     JournalEvent as _JournalEvent,
 )
 from lca.contracts.protocols import Sensor
-from lca.infrastructure.observability import RunStore
 
 # Item kind identifiers (closed set, see perception.py).
 INBOX_FACTS_KIND: ItemKind = "inbox_facts"
 TEAM_INBOX_KIND: ItemKind = "team_inbox"
+
+
+class JournalBackedStore(Protocol):
+    """Minimal read surface for journal-backed sensors — no RunStore import."""
+
+    @property
+    def events(self) -> Sequence[StampedEvent]: ...
 
 
 class _JournalSensor(Sensor):
@@ -50,7 +56,7 @@ class _JournalSensor(Sensor):
     item_kind: ItemKind
     provenance: str
 
-    def __init__(self, store: RunStore, *, since_step: int = 0) -> None:
+    def __init__(self, store: JournalBackedStore, *, since_step: int = 0) -> None:
         self._store = store
         self._since_step = since_step
 
@@ -97,7 +103,7 @@ class InboxFactsSensor(_JournalSensor):
         }
 
 
-def build_inbox_facts_sensor(store: RunStore) -> Sensor:
+def build_inbox_facts_sensor(store: JournalBackedStore) -> Sensor:
     """Named factory: ``sensor.inbox-facts`` (PR8)."""
     return InboxFactsSensor(store)
 
@@ -122,6 +128,6 @@ class TeamInboxSensor(_JournalSensor):
         }
 
 
-def build_team_inbox_sensor(store: RunStore) -> Sensor:
+def build_team_inbox_sensor(store: JournalBackedStore) -> Sensor:
     """Named factory: ``sensor.team-inbox`` (PR9)."""
     return TeamInboxSensor(store)

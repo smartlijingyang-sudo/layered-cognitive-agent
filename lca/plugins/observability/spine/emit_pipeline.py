@@ -1,49 +1,18 @@
-"""``spine.emit_pipeline`` — assembly line for ``EventRecord`` payloads (Task 7.8).
+"""``spine.emit_pipeline`` — commit + anomaly seam (enrich → Session hook).
 
-The emit pipeline is the composition root for the I12 auto-source fields
-required by ADR-0165 / ADR-0165.1 §7.5.7. Every call to
-``EmitPipeline.emit(...)`` performs the same five steps:
+FieldProducer merge and I17 enforcement live in
+:mod:`lca.plugins.observability.spine.spine_enrich` and run at the
+Session append hook when a run is bound (ADR-0186 wave 2).
 
-1. Sort enabled ``FieldProducer`` plugins by ``priority`` ascending —
-   lower numbers run earlier so on a key conflict the *lower* priority
-   value wins (the documented override direction; the merge is a plain
-   ``dict.update`` from low to high so high-priority producers
-   overwrite low-priority ones, which matches ``FieldProducer``
-   Protocol semantics where high-priority is more authoritative).
-2. Call each producer's ``produce(phase="pre", ...)`` and merge the
-   returned dict into the payload. Producers whose ``produce`` raises
-   are logged and skipped — the pipeline never lets a single broken
-   producer block the rest (Layer-1 integration must be fail-open on
-   auto-source so business code always emits).
-3. ``caller_payload`` is layered on top so callers always win on
-   conflict (D11 caller-provided fields are authoritative over
-   auto-source).
-4. ``EventRecord`` is constructed through ``EventSpine.append`` which
-   enforces I12 (close-set ``execution_point`` / ``channel`` /
-   ``outcome`` / ``phase``). The pipeline additionally enforces I17
-   (ADR-0165.1 §96): every ``*.start`` event MUST carry
-   ``source_location`` or ``I17Violation`` is raised before the
-   ``EventRecord`` is appended.
-5. The bound ``AnomalyDetector.on_event`` is invoked on the sealed
-   ``EventRecord``. Its exceptions are contained (FD-2 — best-effort
-   anomaly detection must never block emission).
+Anomaly detection runs on committed Session spine events via
+``lca.plugins.session.spine_anomaly`` when a Session hook is active;
+``EmitPipeline.emit`` invokes anomaly only on the hook-less fallback path.
 
-Layer-1 integration (L1): this plugin wires every L0 ``FieldProducer``
-together so ``spine.core`` (L2) only depends on a single
-``emit_pipeline`` capability. ``L1`` is required by ADR-0165.1.
-
-Module contract
----------------
-- Public symbols: ``EmitPipeline``, ``setup``.
-- The constructor accepts ``producers`` (already-materialised
-  ``FieldProducer`` instances) and ``anomaly`` (any object with an
-  ``on_event(EventRecord) -> None`` method, typically the
-  ``AnomalyDetector`` produced by ``spine.deriver.anomaly``).
-- ``emit(...)`` accepts the ``EventSpine`` as a keyword argument so the
-  pipeline is independent of process-global state; later PRs (PR-8
-  wiring) may install a default spine via ``ctx.require``.
-- Merge direction is **lower priority overwrites higher**: see the
-  override-direction note above.
+# COMPAT(owner: ADR-0186 wave-2, from: EmitPipeline owns FieldProducer merge,
+#         to: spine_enrich + SessionAppendHook,
+#         delete_when: rg 'enrich_spine_payload' lca/plugins/observability/spine/emit_pipeline.py = 1
+#                       (import-only re-export path) AND hook-less enrich branch deleted,
+#         forbidden_new_usage: new FieldProducer.produce calls outside spine_enrich)
 """
 
 from __future__ import annotations
@@ -71,6 +40,7 @@ from lca.harness.plugin_api import (
     PluginKind,
     plugin,
 )
+from lca.infrastructure.observability.loop_cursor._spine_port import get_session_append_hook
 from lca.infrastructure.observability.spine.event_record import (
     Channel,
     EventRecord,
@@ -78,24 +48,13 @@ from lca.infrastructure.observability.spine.event_record import (
     Phase,
 )
 from lca.infrastructure.observability.spine.event_spine import EventSpine
-from lca.infrastructure.observability.spine.manifest import EXECUTION_POINTS
+from lca.plugins.observability.spine.spine_enrich import (
+    I17Violation,
+    enrich_spine_payload,
+    set_active_spine_enricher,
+)
 
 log = logging.getLogger(__name__)
-
-
-# ── exceptions ───────────────────────────────────────────────────────
-
-
-class I17Violation(Exception):  # noqa: N818 — name mandated by Task 9.2 brief
-    """Raised when a ``*.start`` event is emitted without ``source_location``.
-
-    I17 (ADR-0165.1 §96) requires every ``*.start`` execution point to
-    carry a ``source_location`` field produced by the SourceAttacher
-    plugin (Task 9.1). The check lives in ``EmitPipeline.emit`` so a
-    pipeline wired without SourceAttacher cannot silently append a
-    non-compliant record; the failure surfaces to the caller with the
-    offending execution_point for log triage.
-    """
 
 
 # ── contracts ────────────────────────────────────────────────────────
@@ -103,52 +62,11 @@ class I17Violation(Exception):  # noqa: N818 — name mandated by Task 9.2 brief
 
 @runtime_checkable
 class _AnomalyLike(Protocol):
-    """Minimum surface required of the bound anomaly detector.
-
-    The full ``AnomalyDetector`` from ``spine.deriver.anomaly`` exposes
-    the eight I15 detector methods plus this ``on_event`` hook; tests
-    use lightweight stubs that only satisfy this Protocol.
-    """
-
     def on_event(self, event: EventRecord) -> None: ...
 
 
-# ── core ─────────────────────────────────────────────────────────────
-
-
-def _noop(*args: Any, **kwargs: Any) -> Any:
-    """Sentinel callable passed as ``fn`` to producer ``produce(...)``.
-
-    ``EmitPipeline.emit`` does not wrap a live function call — that is
-    the job of ``wrap_instrument`` in a later PR (see the §7.5.6
-    assembly diagram). Producers that need a real ``fn`` therefore
-    short-circuit; we pass a no-op so the FieldProducer Protocol
-    signature is satisfied without inventing a fake frame.
-    """
-    del args, kwargs
-    return None
-
-
-_NO_OP_FN: Any = _noop
-
-
 class EmitPipeline:
-    """Compose ``FieldProducer`` plugins into one ``EventRecord`` payload.
-
-    Parameters
-    ----------
-    producers:
-        Concrete ``FieldProducer`` instances to merge on every emit.
-        They are sorted by ``priority`` ascending on construction so
-        the per-emit hot path does not re-sort; producers with
-        ``enabled=False`` are kept in the list (the merge loop skips
-        them) so profile-level toggles remain reversible.
-    anomaly:
-        Bound anomaly detector. ``on_event(record)`` is invoked after
-        the record is sealed in the spine. Exceptions raised by the
-        detector are contained — emission is the truth, anomaly is the
-        derived view.
-    """
+    """Commit spine events and run anomaly detection on sealed records."""
 
     def __init__(
         self,
@@ -162,13 +80,30 @@ class EmitPipeline:
 
     @property
     def producers(self) -> tuple[FieldProducer, ...]:
-        """Return the priority-sorted producer tuple (read-only view)."""
         return tuple(self._producers)
 
     @property
     def anomaly(self) -> _AnomalyLike:
-        """Return the bound anomaly detector (read-only view)."""
         return self._anomaly
+
+    def _resolve_payload(
+        self,
+        *,
+        execution_point: str,
+        channel: Channel,
+        caller_payload: dict[str, Any] | None,
+        span_ctx: Any | None,
+    ) -> tuple[dict[str, Any], list[tuple[Any, dict[str, Any]]]]:
+        if get_session_append_hook() is not None:
+            return dict(caller_payload or {}), []
+        result = enrich_spine_payload(
+            producers=list(self._producers),
+            execution_point=execution_point,
+            channel=channel,
+            caller_payload=caller_payload,
+            span_ctx=span_ctx,
+        )
+        return result.merged, result.producer_failures
 
     def emit(
         self,
@@ -182,109 +117,12 @@ class EmitPipeline:
         phase: Phase = "live",
         reason: str | None = None,
     ) -> EventRecord:
-        """Assemble an ``EventRecord`` from producer fields + caller payload.
-
-        Steps are exactly the five from the module docstring:
-
-        1. Merge each enabled producer's ``produce(phase="pre", ...)``
-           output into the payload dict, lower priority first.
-        2. Layer ``caller_payload`` on top so the caller wins on
-           conflict (D11).
-        3. ``EventSpine.append`` constructs the ``EventRecord``,
-           enforcing I12 close-set validation (raises ``ValueError``
-           for an unknown ``execution_point``, ``outcome``, ``channel``
-           or ``phase``).
-        4. Invoke ``self._anomaly.on_event(record)`` on the sealed
-           record. Detector exceptions are contained (FD-2).
-
-        Returns
-        -------
-        EventRecord
-            The sealed record as appended to the spine and seen by the
-            anomaly detector.
-        """
-        merged: dict[str, Any] = {}
-
-        # Step 1: merge enabled producers in ascending priority order.
-        # On key conflict the *higher* priority value wins because the
-        # lower-priority writer ran first and the higher-priority
-        # writer's ``dict.update`` overwrites it — see module docstring
-        # for the documented override direction.
-        #
-        # ``producer_failures`` rides alongside ``merged`` as a
-        # sidecar list of ``(producer, failure_entry)`` tuples. It is
-        # populated when a producer used the ``_lca_failures``
-        # protocol extension to surface sub-field failures without
-        # aborting the merge path (ADR-0165 §FieldProducer protocol
-        # extension; ADR-2026-09-02-i17-traceback §D2).
-        producer_failures: list[tuple[Any, dict[str, Any]]] = []
-        for producer in self._producers:
-            if not producer.enabled:
-                continue
-            try:
-                fields = producer.produce(
-                    fn=_NO_OP_FN,
-                    args=(),
-                    kwargs={},
-                    ctx=None,
-                    span=span_ctx,
-                    phase="pre",
-                )
-            except Exception as exc:
-                # Contained by Layer-1 design: a single broken
-                # producer MUST NOT block the rest of the pipeline.
-                # FD-2 isolation at the seam.
-                log.warning(
-                    "emit_pipeline: producer=%s raised %s; skipping",
-                    getattr(producer, "name", repr(producer)),
-                    exc,
-                    exc_info=True,
-                )
-                continue
-            if not fields:
-                continue
-            # The sidecar key never lands in the merged payload —
-            # it is a protocol-internal channel that we strip here so
-            # the spine never sees implementation details.
-            sidecar = fields.pop("_lca_failures", None)
-            if isinstance(sidecar, list):
-                for entry in sidecar:
-                    if isinstance(entry, dict):
-                        producer_failures.append((producer, entry))
-            merged.update(fields)
-
-        # Step 2: caller payload wins on conflict (D11).
-        if caller_payload:
-            merged.update(caller_payload)
-
-        # Step 3: EventSpine.append enforces I12 close-set validation
-        # by constructing ``EventRecord``, whose ``__post_init__``
-        # raises ``ValueError`` for unknown execution points / channel /
-        # outcome / phase. We pre-check ``execution_point`` here for a
-        # clearer error path (the spine would raise the same error, but
-        # checking up front yields a tighter stack).
-        if execution_point not in EXECUTION_POINTS:
-            raise ValueError(
-                f"UnknownExecutionPoint({execution_point!r}): not in EXECUTION_POINTS whitelist"
-            )
-
-        # Step 3a: I17 — every ``*.start`` event MUST carry a
-        # ``source_location`` field (ADR-0165.1 §96; ADR-2026-09-02
-        # §D4, ADR-i17-tb). Per ADR-i17-tb the I17 check is a
-        # spine-wide strong contract: a ``*.start`` event missing
-        # ``source_location`` MUST raise I17Violation unconditionally,
-        # regardless of whether the SourceAttacher producer is wired
-        # into the pipeline. The previous weak-degradation branch
-        # (publishing ``phase_graph.instrument.coverage``) was a
-        # temporary backstop while Task 9.1 was in flight; the
-        # SourceAttacher is now mandatory in ``loop_cursor.spine_default``
-        # (web-standard forces it on), so the backstop is removed.
-        if execution_point.endswith(".start") and "source_location" not in merged:
-            raise I17Violation(
-                f"I17: execution_point={execution_point!r} requires "
-                f"'source_location' in payload (ADR-0165.1 §96; "
-                f"ADR-i17-tb spine-wide strong contract)"
-            )
+        merged, producer_failures = self._resolve_payload(
+            execution_point=execution_point,
+            channel=channel,
+            caller_payload=caller_payload,
+            span_ctx=span_ctx,
+        )
 
         record = spine.append(
             execution_point=execution_point,
@@ -296,14 +134,6 @@ class EmitPipeline:
             reason=reason,
         )
 
-        # Step 3b: producer sidecar (ADR-0165 §FieldProducer protocol
-        # extension). If a producer surfaced sub-field failures via
-        # the ``_lca_failures`` key, emit one ``spine.producer.failure``
-        # journal event per entry so the failure is observable from
-        # the run directory. We never propagate these back to the
-        # caller — emission of the original record is the truth, and
-        # the sidecar entries are best-effort diagnostics that ride
-        # the same anomaly-detection seam (FD-2 containment).
         if producer_failures:
             for producer_origin, entry in producer_failures:
                 try:
@@ -330,30 +160,21 @@ class EmitPipeline:
                         exc_info=True,
                     )
 
-        # Step 4: anomaly detector runs on the sealed record. FD-2
-        # containment means we never propagate a detector exception
-        # back to the caller — emission is the truth, anomaly is
-        # best-effort.
-        try:
-            self._anomaly.on_event(record)
-        except Exception as exc:
-            # Contained by FD-2 design: emission succeeded, the
-            # detector is best-effort.
-            log.warning(
-                "emit_pipeline: anomaly=%s raised %s; record still emitted",
-                getattr(self._anomaly, "name", type(self._anomaly).__name__),
-                exc,
-                exc_info=True,
-            )
+        if get_session_append_hook() is None:
+            try:
+                self._anomaly.on_event(record)
+            except Exception as exc:
+                log.warning(
+                    "emit_pipeline: anomaly=%s raised %s; record still emitted",
+                    getattr(self._anomaly, "name", type(self._anomaly).__name__),
+                    exc,
+                    exc_info=True,
+                )
 
         return record
 
 
-# ── plugin manifest ──────────────────────────────────────────────────
-
-
 def _looks_like_field_producer(value: object) -> bool:
-    """Return True when ``value`` exposes the FieldProducer structural surface."""
     return (
         hasattr(value, "produce")
         and hasattr(value, "priority")
@@ -370,10 +191,8 @@ def _looks_like_field_producer(value: object) -> bool:
     kind=PluginKind.SEAM,
     effects="none",
     description=(
-        "Emit pipeline — composes all enabled field_producer.* plugins by "
-        "priority ascending, merges their pre-phase dicts, layers caller "
-        "payload on top, seals the EventRecord via EventSpine (I12), and "
-        "invokes the bound anomaly detector (I15) on the sealed record."
+        "Emit pipeline — FieldProducer enrich at Session hook; commit via "
+        "EventSpine.append and invoke bound anomaly detector (I15)."
     ),
     test_suite="tests.lca_plugins.observability.spine.test_emit_pipeline",
     contract=PluginContract(
@@ -396,13 +215,7 @@ def _looks_like_field_producer(value: object) -> bool:
     ),
 )
 async def setup(ctx: PluginContext, config: Any) -> None:
-    """Materialise an ``EmitPipeline`` from the wired L0 producer plugins.
-
-    Collects every ``field_producer.*`` capability plus the bound
-    ``deriver.anomaly`` detector, assembles :class:`EmitPipeline`, and
-    publishes it under ``emit_pipeline`` for ``spine.core`` (L2).
-    """
-    del config  # profile-tolerant; producers come from wired capabilities.
+    del config
 
     matched = ctx.require_matching("field_producer.")
     producers: list[FieldProducer] = [
@@ -419,6 +232,23 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     )
 
     set_active_pipeline_accessor(lambda: pipeline)
+
+    def _enricher(
+        *,
+        execution_point: str,
+        channel: Channel,
+        caller_payload: dict[str, Any] | None,
+        span_ctx: Any | None,
+    ) -> Any:
+        return enrich_spine_payload(
+            producers=list(pipeline.producers),
+            execution_point=execution_point,
+            channel=channel,
+            caller_payload=caller_payload,
+            span_ctx=span_ctx,
+        )
+
+    set_active_spine_enricher(_enricher)
 
     log.debug(
         "spine.emit_pipeline: setup complete producers=%d anomaly=%s",

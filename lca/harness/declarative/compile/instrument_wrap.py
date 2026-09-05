@@ -80,8 +80,12 @@ def _is_i17_violation(exc: BaseException) -> bool:
     """
     cls = type(exc)
     return (
-        cls.__module__ == "lca.plugins.observability.spine.emit_pipeline"
-        and cls.__name__ == "I17Violation"
+        cls.__name__ == "I17Violation"
+        and cls.__module__
+        in (
+            "lca.plugins.observability.spine.emit_pipeline",
+            "lca.plugins.observability.spine.spine_enrich",
+        )
     )
 
 

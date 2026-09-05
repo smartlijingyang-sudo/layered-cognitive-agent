@@ -166,20 +166,6 @@ from lca.infrastructure.observability.genai import (
 from lca.infrastructure.observability.genai import (
     build_default_registry as build_default_genai_registry,
 )
-from lca.infrastructure.observability.journal import (
-    OtelProjector,
-    RunState,
-    RunStatus,
-    RunStore,
-    UnregisteredJournalEventError,
-    fold_run_state,
-)
-from lca.infrastructure.observability.journal.backends import InMemoryJournalStore
-from lca.infrastructure.observability.journal.engine.journal_io import (
-    read_journal,
-    stamped_to_record,
-)
-from lca.infrastructure.observability.journal.engine.serialization import stamped_to_journal_record
 from lca.infrastructure.observability.narrative import plan_steps_joined
 from lca.infrastructure.observability.stream.trace_inspector import TraceInspector, TraceReport
 from lca.infrastructure.observability.stream.trace_tool_runner import (
@@ -327,3 +313,44 @@ __all__ = [
     "team_id_for",
     "traced",
 ]
+
+_LAZY_JOURNAL_SYMBOLS: dict[str, tuple[str, str]] = {
+    "OtelProjector": ("lca.infrastructure.observability.journal", "OtelProjector"),
+    "RunState": ("lca.infrastructure.observability.journal", "RunState"),
+    "RunStatus": ("lca.infrastructure.observability.journal", "RunStatus"),
+    "RunStore": ("lca.infrastructure.observability.journal", "RunStore"),
+    "UnregisteredJournalEventError": (
+        "lca.infrastructure.observability.journal",
+        "UnregisteredJournalEventError",
+    ),
+    "fold_run_state": ("lca.infrastructure.observability.journal", "fold_run_state"),
+    "InMemoryJournalStore": (
+        "lca.infrastructure.observability.journal.backends",
+        "InMemoryJournalStore",
+    ),
+    "read_journal": (
+        "lca.infrastructure.observability.journal.engine.journal_io",
+        "read_journal",
+    ),
+    "stamped_to_record": (
+        "lca.infrastructure.observability.journal.engine.journal_io",
+        "stamped_to_record",
+    ),
+    "stamped_to_journal_record": (
+        "lca.infrastructure.observability.journal.engine.serialization",
+        "stamped_to_journal_record",
+    ),
+}
+
+
+def __getattr__(name: str) -> object:
+    """PEP 562 lazy loader — journal 实现符号按需 import,不污染业务层 import 图。"""
+    import importlib
+
+    spec = _LAZY_JOURNAL_SYMBOLS.get(name)
+    if spec is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module = importlib.import_module(spec[0])
+    value = getattr(module, spec[1])
+    globals()[name] = value
+    return value

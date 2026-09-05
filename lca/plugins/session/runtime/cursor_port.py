@@ -28,6 +28,8 @@ from lca.plugins.session.runtime.session import Session
 
 __all__ = ["SessionWritePortAdapter"]
 
+_NO_PRODUCER = object()
+
 
 class SessionWritePortAdapter:
     """把 loop_cursor 的 WritePort append 路由到当前 run 的 ``Session.append``。
@@ -42,7 +44,7 @@ class SessionWritePortAdapter:
     runtime :class:`Session`(测试便利);解析不到 Session 时 fail-loud。
     """
 
-    __slots__ = ("_session",)
+    __slots__ = ("_bridge", "_session")
 
     def __init__(self, run_session: object) -> None:
         """precondition: ``run_session`` 是已 bind 的 run session bridge 或 Session。
@@ -50,23 +52,36 @@ class SessionWritePortAdapter:
         失败语义: ``None`` / 解析不到 runtime Session 抛 :class:`ValueError`
         (fail-loud,不在 adapter 内回退 spine)。
         """
-        session = self._resolve(run_session)
+        bridge = self._resolve_bridge(run_session)
+        session = self._resolve_session(run_session)
         if session is None:
             raise ValueError(
                 "SessionWritePortAdapter requires a bound run session "
                 "(bridge exposing `.inner` or a runtime Session); got "
                 f"{type(run_session).__name__}"
             )
+        self._bridge = bridge
         self._session = session
 
     @staticmethod
-    def _resolve(target: object) -> Session | None:
+    def _resolve_session(target: object) -> Session | None:
         """从 bridge / Session 解析出 runtime Session;解析不到返回 ``None``。"""
         if isinstance(target, Session):
             return target
         inner = getattr(target, "inner", None)
         if isinstance(inner, Session):
             return inner
+        return None
+
+    @staticmethod
+    def _resolve_bridge(target: object) -> Any | None:
+        """若 target 是 run bind bridge(``append(payload, *, producer)``),返回它。"""
+        if isinstance(target, Session):
+            return None
+        append = getattr(target, "append", None)
+        inner = getattr(target, "inner", None)
+        if callable(append) and isinstance(inner, Session):
+            return target
         return None
 
     def append(
@@ -87,5 +102,20 @@ class SessionWritePortAdapter:
         """
         del run_id, phase  # per-run Session 隐含 run_id;phase 无 Session 槽位
         data = {**payload, "incarnation": incarnation}
+        if self._bridge is not None:
+            # 经 bridge 投递 SpineEventPayload,SpineFileSink 等 observer 才能
+            # 收到 cursor EP(裸 Session.append 只入内存日志,observer 跳过非
+            # EventPayload 派发 —— 导致 writable.step.start 不进 spine.jsonl)。
+            from lca_kernel.events.payloads_spine import SpineEventPayload
+
+            self._bridge.append(
+                SpineEventPayload(
+                    execution_point=execution_point,
+                    channel="fact",
+                    payload=data,
+                ),
+                producer=_NO_PRODUCER,
+            )
+            return seq
         self._session.append(execution_point, data)
         return seq

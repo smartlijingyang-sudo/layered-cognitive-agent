@@ -14,7 +14,6 @@ Perceive 只能通过 ``StepCoordinator`` 间接触达，任一面都是可替�
 
 附加：
 
-    ModelVisibleRecorder      (Protocol)   完整模型可见正文
     ReplayCursor              (Protocol)   零 token 回放
 
 每个 Protocol 在 ``contracts/observability/writable_matrix.py`` 中独立
@@ -26,7 +25,6 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
-from lca.contracts.observability.loop_cursor_payloads import ToolSchema
 from lca.infrastructure.observability.spine.event_record import EventRecord
 
 # ── 主链五面 ──────────────────────────────────────────────────────
@@ -79,17 +77,6 @@ class EventStorage(Protocol):
 
 
 @runtime_checkable
-class ModelVisibleRecorder(Protocol):
-    """完整模型可见正文(默认 = FilesystemRecorder,目录约定见实现)。"""
-
-    def record_header(self, step_id: str, header: Any) -> None: ...
-    def record_prompt(self, step_id: str, text: str) -> None: ...
-    def record_tools(self, step_id: str, schemas: tuple[ToolSchema, ...]) -> None: ...
-    def record_manifest(self, step_id: str, manifest: Any) -> None: ...
-    def record_messages(self, step_id: str, messages: tuple[Any, ...]) -> None: ...
-
-
-@runtime_checkable
 class ReplayCursor(Protocol):
     """零 token 确定性回放（默认 = StandardCursor）。"""
 
@@ -104,7 +91,6 @@ WritableFace = (
     | Coalescer
     | Serializer
     | EventStorage
-    | ModelVisibleRecorder
     | ReplayCursor
 )
 
@@ -114,6 +100,5 @@ FACE_NAMES: tuple[str, ...] = (
     "coalescer",
     "serializer",
     "storage",
-    "model_visible_recorder",
     "replay_cursor",
 )

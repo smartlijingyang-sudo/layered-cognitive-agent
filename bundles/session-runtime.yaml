@@ -5,8 +5,8 @@
 #
 # Profile 装配：profiles/web-standard.yaml 在 event-bus-components 之前
 # 引用本 bundle，使 session.store 在 event-bus plugin boot 前可用。
-# RunSessionBuilder 按 run_id create Session，绑定 publish/observe 槽位；
-# 缺 session.store 时 publishers 降级 EventBus。
+# RunSessionBuilder 按 run_id create Session，绑定 publish/observe 槽位与
+# spine→Session 转发钩子；缺 session.store 时 fail-loud（不再回退 legacy spine）。
 #
 # 持久化经 Session.observe：SpineFileSink（event-bus-components 装载）写
 # *.spine.jsonl —— 唯一 durable 真值流（ADR-0183 I-FW-SSOT-1）。
@@ -22,6 +22,11 @@ entries:
   - id: lca.plugins.session.runtime
     name: session_runtime
     $module: lca.plugins.session.runtime.plugin
+    config: {}
+
+  - id: lca.plugins.session.spine_anomaly
+    name: session_spine_anomaly
+    $module: lca.plugins.session.spine_anomaly.spine_anomaly
     config: {}
 
   - id: lca.plugins.session.checkpoint_policy
