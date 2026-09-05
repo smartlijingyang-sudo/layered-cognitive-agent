@@ -12,6 +12,7 @@ Journal 和 Session 的持久化都应通过本模块的 ``WriteBehindBuffer`` �
 - ``dispose()`` 排空全部待写事件后关闭 sink
 """
 
+from lca.infrastructure.persistence.atomic_json_sink import AtomicJsonFileSink, AtomicJsonSnapshot
 from lca.infrastructure.persistence.jsonl_sink import JsonlFileSink
 from lca.infrastructure.persistence.run_buffer_registry import (
     RunWriteBehindRegistry,
@@ -29,6 +30,8 @@ from lca.infrastructure.persistence.write_behind import (
 )
 
 __all__ = [
+    "AtomicJsonFileSink",
+    "AtomicJsonSnapshot",
     "DropPolicy",
     "JsonlFileSink",
     "RunWriteBehindRegistry",

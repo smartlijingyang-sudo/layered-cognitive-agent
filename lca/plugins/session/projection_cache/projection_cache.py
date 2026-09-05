@@ -16,17 +16,16 @@ state}``）以 per-session 一个 JSON 文档写到
 
 与 DSH 形态的偏差：DSH 走 storage domain（``session_projcache``，
 write-behind 节流 + 创建/``turn/end``/dispose 三强制点 + 身份见证）；
-LCA 简化为每 session 一个 JSON 文档、两个强制写点、无节流配置与身份
-见证 —— LCA 冷读恒全量日志，行可用性由版本 + seq 边界双重门控。
+LCA 对齐 write-behind 批量落盘（``AtomicJsonFileSink``），强制写点：
+``turn.ended.v1``、``Session.flush()`` 与 ``close()`` 最终写。
 """
 
 from __future__ import annotations
 
 import json
-import os
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import structlog
 from pydantic import BaseModel
@@ -45,7 +44,12 @@ from lca.contracts.protocols.session.projection_unit import (
     ProjectionSnapshot,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.persistence.atomic_json_sink import AtomicJsonFileSink, AtomicJsonSnapshot
+from lca.infrastructure.persistence.write_behind import WriteBehindBuffer
 from lca_kernel.events.session import SessionEvent
+
+if TYPE_CHECKING:
+    from lca_kernel.events.session import SessionProtocol
 
 _log = structlog.get_logger(__name__)
 
@@ -68,8 +72,7 @@ class Config(BaseModel):
 class _CacheObserver:
     """把 :class:`ProjectionCache` 装成 Session observer 的适配器。
 
-    只承接 ``turn.ended.v1`` 强制写点；无 ``flush`` 面（不是
-    ``Session.flush`` 链的 durability 参与方）。
+    只承接 ``turn.ended.v1`` 强制写点；enqueue 到 write-behind buffer。
     """
 
     def __init__(self, cache: ProjectionCache) -> None:
@@ -78,6 +81,17 @@ class _CacheObserver:
     def __call__(self, session: Any, event: SessionEvent) -> None:
         if event.type == _TURN_ENDED:
             self._cache.save(session)
+
+
+class _ProjectionCacheFlushListener:
+    """``Session.flush()`` 链：排空 projection cache write-behind buffer。"""
+
+    def __init__(self, cache: ProjectionCache) -> None:
+        self._cache = cache
+
+    async def flush(self, session: SessionProtocol) -> None:
+        del session
+        self._cache.flush_sync()
 
 
 class ProjectionCache:
@@ -99,6 +113,8 @@ class ProjectionCache:
         self._tracked: dict[str, Any] = {}
         self._store_hooks: list[Callable[[], None]] = []
         self._closed = False
+        self._sink = AtomicJsonFileSink()
+        self._buffer = WriteBehindBuffer(self._sink, max_delay_ms=200)
 
     # ── 公开面 ──────────────────────────────────────────────────────
 
@@ -107,23 +123,36 @@ class ProjectionCache:
         return self._cache_root / f"{session_id}{_FILE_SUFFIX}"
 
     def register_to(self, session: Any) -> Callable[[], None]:
-        """把强制写点 observer 挂到给定 Session，并跟踪供 :meth:`close` 最终写。
+        """把强制写点 observer + flush listener 挂到给定 Session。
 
-        observer 在 ``turn.ended.v1`` 时同步写一次检查点文档（回合边界
-        低频，小文档同步写；写失败 fail-soft）。返回
-        ``Session.observe`` 的幂等取消函数。
+        ``turn.ended.v1`` enqueue 检查点；``Session.flush()`` 显式 drain。
+        返回合并的幂等取消函数。
         """
         session_id = _session_id(session)
         if session_id != "unknown":
             self._tracked[session_id] = session
-        return session.observe(_CacheObserver(self))
+        observe_cancel = session.observe(_CacheObserver(self))
+        flush_cancel: Callable[[], None] | None = None
+        register_flush = getattr(session, "register_flush_listener", None)
+        if callable(register_flush):
+            flush_cancel = register_flush(_ProjectionCacheFlushListener(self))
+
+        def cancel() -> None:
+            observe_cancel()
+            if flush_cancel is not None:
+                flush_cancel()
+
+        return cancel
+
+    def flush_sync(self) -> None:
+        """显式排空 write-behind buffer（``Session.flush`` / 测试用）。"""
+        self._buffer.flush()
 
     def save(self, session: Any) -> bool:
-        """即刻持久化一个活 session 的检查点（强制写点的落盘体）。
+        """Enqueue 一个活 session 的检查点（强制写点的落盘体）。
 
-        fail-soft：checkpoint 取切或写盘失败只记结构化日志，永不抛；
-        返回是否写成功（失败时缓存保持旧值，下次写自愈）。文档以
-        临时文件 + ``os.replace`` 原子替换，避免崩溃撕裂。
+        fail-soft：checkpoint 取切或 enqueue 失败只记结构化日志，永不抛；
+        返回是否成功入队（落盘由 write-behind 异步完成）。
         """
         session_id = _session_id(session)
         try:
@@ -141,11 +170,13 @@ class ProjectionCache:
             )
             return False
         try:
-            self._write_atomic(session_id, encoded)
+            self._buffer.enqueue(
+                AtomicJsonSnapshot(path=self.path_for(session_id), encoded=encoded)
+            )
             return True
         except Exception:
             _log.warning(
-                "session.projection_cache.write_failed",
+                "session.projection_cache.enqueue_failed",
                 session_id=session_id,
                 path=str(self.path_for(session_id)),
                 exc_info=True,
@@ -216,6 +247,7 @@ class ProjectionCache:
         self._closed = True
         for session in tuple(self._tracked.values()):
             self.save(session)
+        self._buffer.dispose()
         self._tracked.clear()
         for cancel in self._store_hooks:
             cancel()
@@ -241,14 +273,6 @@ class ProjectionCache:
         if expected is None or version != expected:
             return None
         return ProjectionCheckpoint(version=version, seq=seq, state=value["state"])
-
-    def _write_atomic(self, session_id: str, encoded: str) -> None:
-        """原子替换写：先写临时文件再 ``os.replace``，崩溃不产半写文档。"""
-        path = self.path_for(session_id)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_name(path.name + ".tmp")
-        tmp.write_text(encoded, encoding="utf-8")
-        os.replace(tmp, path)
 
 
 def _session_id(session: Any) -> str:
@@ -313,7 +337,7 @@ def _attach_to_store(store: Any, cache: ProjectionCache) -> None:
         "把 registry.checkpoint 行以 per-session 一个 JSON 文档写到 "
         "<cache_root>/<session_id>.projcache.json。缓存永不是真值：写 "
         "fail-soft，version 失配弃整行，restore 失败即全量重折。强制写点："
-        "turn.ended.v1 到达 + close() 最终写。"
+        "turn.ended.v1 到达 + Session.flush() + close() 最终写。"
     ),
     test_suite="tests/plugins/session/test_projection_cache.py",
     functional_group=FunctionalGroup.G3_FACTS,
