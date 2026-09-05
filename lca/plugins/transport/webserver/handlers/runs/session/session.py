@@ -84,6 +84,10 @@ class RunSession:
     snapshot: Any = None
     runnable: Any = None
     approval_request: dict[str, Any] | None = None
+    # Idempotency keys of answer commands already accepted for this run.
+    # A repeat POST /runs/<id>/answer with a recorded key replays the original
+    # receipt instead of resuming again.
+    accepted_answer_keys: set[str] = field(default_factory=set)
     closed_at: float | None = None
     bindings: PlaneBindings | None = None
     # ADR-0122 ambient snapshot captured at execute-prepare time; re-bound on

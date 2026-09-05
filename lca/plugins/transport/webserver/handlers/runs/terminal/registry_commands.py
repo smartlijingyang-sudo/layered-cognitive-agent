@@ -10,6 +10,8 @@ from __future__ import annotations
 import asyncio
 import contextlib
 
+import structlog
+
 from lca.contracts.protocols.runtime.infra import MachineResolver
 from lca.plugins.transport.webserver.handlers.runs.execute.execute import (
     create_run_session,
@@ -24,6 +26,8 @@ from lca.plugins.transport.webserver.handlers.runs.terminal.port import (
     RunReceipt,
     RunRequest,
 )
+
+_log = structlog.get_logger(__name__)
 
 
 class RegistryRunCommands:
@@ -78,15 +82,24 @@ class RegistryRunCommands:
     async def cancel(self, run_id: str) -> RunCommandReceipt:
         session = self._registry.get(run_id)
         if session is None:
+            _log.warning("run_cancel_rejected", run_id=run_id, reason="run_not_found")
             return RunCommandReceipt(accepted=False, error="run not found")
         if session.status in (RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELED):
+            _log.info("run_cancel_noop", run_id=run_id, status=session.status.value)
             return RunCommandReceipt(accepted=True, status=session.status.value)
+        prior_status = session.status
         session.cancel_requested = True
         session.status = RunStatus.CANCELED
         if session.task is not None and not session.task.done():
             session.task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await session.task
+        _log.info(
+            "run_canceled",
+            run_id=run_id,
+            prior_status=prior_status.value,
+            canceled_at_waiting_input=prior_status is RunStatus.WAITING_INPUT,
+        )
         return RunCommandReceipt(accepted=True, status=RunStatus.CANCELED.value)
 
     async def resume_approval(
@@ -96,8 +109,13 @@ class RegistryRunCommands:
         payload: str,
         idempotency_key: str,
     ) -> RunCommandReceipt:
-        del approval_id, idempotency_key
         if not isinstance(payload, str):
+            _log.warning(
+                "run_resume_rejected",
+                run_id=run_id,
+                reason="payload_not_string",
+                idempotency_key=idempotency_key,
+            )
             return RunCommandReceipt(
                 accepted=False,
                 error="approval payload must be a string",
@@ -105,20 +123,64 @@ class RegistryRunCommands:
             )
         session = self._registry.get(run_id)
         if session is None:
+            _log.warning(
+                "run_resume_rejected",
+                run_id=run_id,
+                reason="run_not_found",
+                idempotency_key=idempotency_key,
+            )
             return RunCommandReceipt(accepted=False, error="run not found")
+        if idempotency_key and idempotency_key in session.accepted_answer_keys:
+            _log.info(
+                "run_resume_replayed",
+                run_id=run_id,
+                idempotency_key=idempotency_key,
+            )
+            return RunCommandReceipt(accepted=True, status="resumed")
         if session.status is not RunStatus.WAITING_INPUT:
+            _log.warning(
+                "run_resume_rejected",
+                run_id=run_id,
+                reason="not_waiting_input",
+                status=session.status.value,
+                idempotency_key=idempotency_key,
+            )
             return RunCommandReceipt(
                 accepted=False,
                 error="run not waiting for input",
                 error_status=409,
             )
         if session.snapshot is None or session.runnable is None:
+            _log.warning(
+                "run_resume_rejected",
+                run_id=run_id,
+                reason="no_resume_state",
+                idempotency_key=idempotency_key,
+            )
             return RunCommandReceipt(
                 accepted=False,
                 error="no resume state available",
                 error_status=500,
             )
+        pending_approval_id = ""
+        if session.approval_request is not None:
+            raw_pending = session.approval_request.get("approval_id")
+            pending_approval_id = str(raw_pending) if raw_pending else ""
         session.status = RunStatus.RUNNING
+        if idempotency_key:
+            session.accepted_answer_keys.add(idempotency_key)
+        # The frontend still posts the tool name as approval_id; the pending
+        # approval carries the derived "<plan_ref>:<node>:<visit>" id. Record
+        # both plus the match flag so mismatches stay auditable.
+        _log.info(
+            "run_resume_accepted",
+            run_id=run_id,
+            idempotency_key=idempotency_key,
+            request_approval_id=approval_id,
+            pending_approval_id=pending_approval_id,
+            approval_id_matched=bool(pending_approval_id) and approval_id == pending_approval_id,
+            payload_chars=len(payload),
+        )
         # Resume 是新请求 = 新 context：create 时的 Session 绑定不在场。
         # create_task 拷贝当前 context，run task 继承这里的绑定；
         # 请求 context 随请求结束丢弃，无需 reset。
