@@ -501,7 +501,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
     const callId = `ask_${runId}`;
     const call: MessageToolCall = {
       function: {
-        arguments: JSON.stringify({ questions }),
+        arguments: JSON.stringify({ lca_run_id: runId, questions }),
         name: 'lobe-user-interaction____askUserQuestion',
       },
       id: callId,
@@ -516,7 +516,11 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
         parentId: assistantId,
         plugin: {
           apiName: 'askUserQuestion',
-          arguments: JSON.stringify({ questions }),
+          // lca_run_id rides along in the tool arguments so the Intervention's
+          // prepareCustomInteractionSubmit can hand it to handleLcaAskUserSubmit
+          // via context.requestArgs — the handler is a module-level function and
+          // cannot read the context-scoped conversation store.
+          arguments: JSON.stringify({ lca_run_id: runId, questions }),
           identifier: 'lobe-user-interaction',
           id: callId,
           type: 'builtin',

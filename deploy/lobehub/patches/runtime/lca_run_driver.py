@@ -142,6 +142,35 @@ def apply(ctx: PatchContext) -> bool:
         "customInteractionHandlers.ts"
     )
     handlers_text = ctx.read(handlers_path)
+
+    # Self-heal: earlier revisions read run_id via useConversationStore.getState(),
+    # which is a context hook with no getState() and crashes at submit time. Replace
+    # that read with the requestArgs-based read (lca_run_id rides in the tool args).
+    broken_read = (
+        "  // Read pluginState.lca from the conversation store to get the run_id.\n"
+        "  const msg = dataSelectors.getDbMessageById(messageId)(useConversationStore.getState());\n"
+        "  const lca = (msg?.pluginState as Record<string, unknown> | undefined)?.lca as\n"
+        "    | { run_id?: string; status?: string }\n"
+        "    | undefined;\n"
+        "  const runId = typeof lca?.run_id === 'string' ? lca.run_id : '';"
+    )
+    fixed_read = (
+        "  const reqArgs = (context?.requestArgs ?? {}) as Record<string, unknown>;\n"
+        "  const runId = typeof reqArgs.lca_run_id === 'string' ? reqArgs.lca_run_id : '';"
+    )
+    if broken_read in handlers_text:
+        handlers_text = handlers_text.replace(broken_read, fixed_read, 1)
+        # The store import only existed for the broken read; drop it so it does
+        # not linger as an unused import.
+        handlers_text = handlers_text.replace(
+            "import { dataSelectors, useConversationStore } from '@/features/Conversation/store';\n",
+            "",
+            1,
+        )
+        ctx.write(handlers_path, handlers_text)
+        changed = True
+        handlers_text = ctx.read(handlers_path)
+
     if "handleLcaAskUserSubmit" not in handlers_text:
         # Add import for conversation store + LCA token.
         import_anchor = "import { topicService } from '@/services/topic';"
@@ -207,11 +236,8 @@ const handleLcaAskUserSubmit: CustomInteractionSubmitHandler = async (payload, c
       payload,
     };
 
-  const msg = dataSelectors.getDbMessageById(messageId)(useConversationStore.getState());
-  const lca = (msg?.pluginState as Record<string, unknown> | undefined)?.lca as
-    | { run_id?: string; status?: string }
-    | undefined;
-  const runId = typeof lca?.run_id === 'string' ? lca.run_id : '';
+  const reqArgs = (context?.requestArgs ?? {}) as Record<string, unknown>;
+  const runId = typeof reqArgs.lca_run_id === 'string' ? reqArgs.lca_run_id : '';
   if (!runId)
     return {
       options: { createUserMessage: false, pluginState: { askUserAnswers: payload }, skipResume: true },
