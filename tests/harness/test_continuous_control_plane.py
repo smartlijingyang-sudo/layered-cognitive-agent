@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.harness.act.command import CommandReceipt
 from lca.contracts.harness.tasks.continuous import (
     Trigger,
     TriggerKind,
@@ -15,7 +14,6 @@ from lca.contracts.harness.tasks.continuous import (
     WorkStatus,
 )
 from lca.harness.continuous import SqliteContinuousControlPlane, SqliteWorkQueue
-from lca.harness.continuous_session import AgentRegistryWorkActivator
 
 NOW = datetime(2026, 8, 27, 0, 0, tzinfo=UTC)
 
@@ -138,53 +136,3 @@ async def test_control_plane_releases_claim_when_worker_is_cancelled(tmp_path: P
     assert queue.status_of("work-1") is WorkStatus.RETRY_WAIT
 
 
-@pytest.mark.asyncio
-async def test_agent_registry_activator_uses_stable_session_and_message_id() -> None:
-    calls: list[tuple[str, dict[str, object]]] = []
-
-    class Registry:
-        async def create_session(self, **kwargs: object) -> CommandReceipt:
-            calls.append(("create", kwargs))
-            return CommandReceipt("create", str(kwargs["session_id"]), 1, True)
-
-        async def dispatch_message(self, **kwargs: object) -> CommandReceipt:
-            calls.append(("dispatch", kwargs))
-            return CommandReceipt("dispatch", str(kwargs["session_id"]), 2, True)
-
-        async def cancel(self, **kwargs: object) -> CommandReceipt:
-            raise AssertionError("not used")
-
-        async def resume_approval(self, **kwargs: object) -> CommandReceipt:
-            raise AssertionError("not used")
-
-        async def steer(self, **kwargs: object) -> CommandReceipt:
-            raise AssertionError("not used")
-
-        async def inject(self, **kwargs: object) -> CommandReceipt:
-            raise AssertionError("not used")
-
-    receipt = await AgentRegistryWorkActivator(Registry()).activate(_item())
-
-    assert receipt == WorkActivationReceipt(True, "ses-work-work-1", "work_dispatched")
-    assert calls == [
-        (
-            "create",
-            {
-                "idempotency_key": "continuous:create:work-1",
-                "profile": "web-standard",
-                "preset": None,
-                "options": None,
-                "session_id": "ses-work-work-1",
-            },
-        ),
-        (
-            "dispatch",
-            {
-                "session_id": "ses-work-work-1",
-                "idempotency_key": "continuous:dispatch:work-1",
-                "content": "review the new commit",
-                "role": "user",
-                "message_id": "msg-work-work-1",
-            },
-        ),
-    ]

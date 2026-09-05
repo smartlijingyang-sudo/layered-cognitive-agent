@@ -1,12 +1,10 @@
-"""Harness — session spine command carrier, agent handles, sessions, skills.
+"""Harness — profile 装配、声明式阶段图、插件机制骨架、投影与技能。
 
-"command dispatcher" 新命名(ADR-0119 followup-2): 顶层 docstring 与 ``lca.harness.command.dispatcher``
-子模块路径沿用至今。语义不是 ADR-0119 决定 4 之后的 ``kernel_serve``
-LCA 后台进程,而是 session spine (0090 / 0092) 命令接收面。完整命名空间
-历史映射看 ``docs/adr/0119-followup-gateway-name-map.md``。
+Session 事件真值层（append / observer / fold / 持久化）归 ``lca.plugins.session``
+（ADR-0186）；旧 ``harness.command`` 命令面与 ``harness.agent`` live-agent
+registry 面已退役（命令入口归 runs 平面）。
 
-cordis migration complete. Submodules (lca.harness.command.dispatcher,
-lca.harness.session.inbox, lca.harness.agent.handle, lca.harness.skills)
+cordis migration complete. Submodules
 import directly from their respective submodules.
 
 Re-exports removed (deleted in cordis migration):

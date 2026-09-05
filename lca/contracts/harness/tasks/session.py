@@ -56,7 +56,7 @@ class EventScope:
 
 @dataclass(frozen=True)
 class SessionEvent:
-    """One immutable session fact."""
+    """One immutable session fact (唯一事件信封 —— kernel 层经 re-export 复用)."""
 
     type: str
     seq: int
@@ -67,6 +67,16 @@ class SessionEvent:
     provider: str | None = None
     visibility: Literal["model", "audit", "internal"] = "model"
     scope: EventScope | None = None
+
+    @property
+    def category(self) -> str:
+        """spine 事件形态投影：``foldRequestHeader`` 按 category 识别 fold 目标。"""
+        return self.type
+
+    @property
+    def payload(self) -> dict[str, Any]:
+        """spine 事件形态投影：``data`` 的只读别名。"""
+        return self.data
 
 
 def session_event(

@@ -92,22 +92,6 @@ RUNTIME_FACTORY = Capability[object]("runtime_factory", cardinality="one")
 """Profile-selected factory that constructs the concrete Agent Loop runtime."""
 LOOP_GUARD_EVALUATOR = Capability[object]("loop_guard_evaluator", cardinality="one")
 """Profile-selected pure policy that governs declarative phase-graph loop re-entry."""
-SESSION_PERSISTENCE_FACTORY = Capability[object]("session_persistence_factory", cardinality="one")
-"""Profile-selected factory that creates durable Session fact-stream backends."""
-SESSION_PROJECTION_REGISTRY_FACTORY = Capability[object](
-    "session_projection_registry_factory", cardinality="one"
-)
-"""Profile-selected factory for Session projection storage and default views."""
-SESSION_LIVE_BUILDER = Capability[object]("session_live_builder", cardinality="one")
-"""Profile-selected callable that creates one live owner agent for a durable Session."""
-SESSION_TURN_CONTROLLER_FACTORY = Capability[object](
-    "session_turn_controller_factory", cardinality="one"
-)
-"""Profile-selected factory that owns one in-flight Agent turn per durable Session."""
-SESSION_FOLLOWUP_POLICY = Capability[object]("session_followup_policy", cardinality="one")
-"""Profile-selected pure policy for concurrent user follow-up admission."""
-SESSION_COMMAND_LEDGER = Capability[object]("session_command_ledger", cardinality="one")
-"""Profile-selected event-sourced policy for durable Session command idempotency."""
 TOOL_BATCH_EXECUTION_POLICY = Capability[object]("tool_batch_execution_policy", cardinality="one")
 """Profile-selected strategy for parallel or ordered model-emitted tool batches."""
 CONTINUOUS_CONTROL_PLANE_FACTORY = Capability[object](

@@ -33,16 +33,6 @@ def build_test_catalog() -> dict[str, type]:
             "DelegationCachePlugin",
         ),
         (
-            "lca.events.subscriber.console_projector",
-            "lca.plugins.events.subscribers.console_projector.subscriber",
-            "ConsoleProjectorSubscriber",
-        ),
-        (
-            "lca.events.sink.journal",
-            "lca.plugins.events.sinks.journal.sink",
-            "JournalSink",
-        ),
-        (
             "events.spine.reflector.cognition",
             "lca.plugins.events.publishers.spine_reflector_cognition.plugin",
             "ReflectorClass",
@@ -116,16 +106,6 @@ def build_test_catalog() -> dict[str, type]:
             "events.spine.loop_cursor",
             "lca.plugins.events.publishers.spine_loop_cursor.plugin",
             "LoopCursorPlugin",
-        ),
-        (
-            "events.spine_chain_sink",
-            "lca.plugins.events.sinks.spine_chain_sink.sink",
-            "SpineChainSink",
-        ),
-        (
-            "events.spine_step_tree_accumulator",
-            "lca.plugins.events.subscribers.spine_step_tree_accumulator.subscriber",
-            "SpineStepTreeAccumulator",
         ),
         (
             "events.model_visible.publisher",

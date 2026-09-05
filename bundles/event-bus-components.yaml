@@ -114,32 +114,8 @@ entries:
     $module: lca.plugins.events.publishers.delegation_cache.plugin
     config: {}
 
-  # ── Sink: spine_chain_sink ──
-  - id: events.spine.chain_sink
-    name: events_spine_chain_sink
-    $module: lca.plugins.events.sinks.spine_chain_sink.sink
-    config: {}
-
   # ── Sink: existing spine_file_sink ──
   - id: lca.events.sink.spine_file
     name: lca_events_sink_spine_file
     $module: lca.plugins.events.sinks.spine_file_sink
-    config: {}
-
-  # ── Sink: existing journal ──
-  - id: lca.events.sink.journal
-    name: lca_events_sink_journal
-    $module: lca.plugins.events.sinks.journal
-    config: {}
-
-  # ── Subscriber: spine_step_tree_accumulator ──
-  - id: events.spine.step_tree_accumulator
-    name: events_spine_step_tree_accumulator
-    $module: lca.plugins.events.subscribers.spine_step_tree_accumulator.subscriber
-    config: {}
-
-  # ── Subscriber: existing console_projector ──
-  - id: lca.events.subscriber.console_projector
-    name: lca_events_subscriber_console_projector
-    $module: lca.plugins.events.subscribers.console_projector
     config: {}

@@ -5,10 +5,7 @@ from __future__ import annotations
 import pytest
 
 from lca.plugins.events.publishers.delegation_cache.plugin import DelegationCachePlugin
-from lca.plugins.events.sinks.journal.sink import JournalSink
-from lca.plugins.events.subscribers.console_projector.subscriber import (
-    ConsoleProjectorSubscriber,
-)
+from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink
 from lca_kernel.events import Category, EventRef, TeamDelegationCacheHit
 from lca_kernel.events.bus import EventBus, FailureSemantics
 from lca_kernel.events.errors import (
@@ -52,7 +49,7 @@ def test_unauthorized_publish_raises(bus: EventBus) -> None:
 def test_authorized_subscribe_receives_events(bus: EventBus) -> None:
     received: list = []
     bus.subscribe(
-        plugin=ConsoleProjectorSubscriber,
+        plugin=SpineFileSink,
         category=Category.TEAM_DELEGATION_CACHE_HIT,
         on_event=lambda p, r: received.append((p, r)),
     )
@@ -99,7 +96,7 @@ def test_consumer_exception_does_not_propagate(bus: EventBus) -> None:
         raise RuntimeError("boom")
 
     bus.subscribe(
-        plugin=ConsoleProjectorSubscriber,
+        plugin=SpineFileSink,
         category=Category.TEAM_DELEGATION_CACHE_HIT,
         on_event=boom,
         failure=FailureSemantics.CONTAINED,
@@ -111,9 +108,8 @@ def test_consumer_exception_does_not_propagate(bus: EventBus) -> None:
     assert isinstance(ref, EventRef)
 
 
-def test_journal_sink_in_registry(bus: EventBus) -> None:
-    """JournalSink 在 yaml subscribers 白名单 → can_subscribe 通过。"""
+def test_spine_file_sink_in_registry(bus: EventBus) -> None:
+    """SpineFileSink 在 yaml subscribers 白名单 → can_subscribe 通过。"""
     cat = Category.TEAM_DELEGATION_CACHE_HIT
-    assert bus.registry.can_subscribe(JournalSink, cat) is True
-    assert bus.registry.can_subscribe(ConsoleProjectorSubscriber, cat) is True
+    assert bus.registry.can_subscribe(SpineFileSink, cat) is True
     assert bus.registry.can_publish(DelegationCachePlugin, cat) is True

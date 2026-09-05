@@ -65,41 +65,34 @@ class SessionHeader:
     created_at: int
     is_seeded: bool = False
     assistant_id: str | None = None
+    # 业务 lineage 字段（创建时盖章；落盘为 header 可选字段，读端容缺）
+    cwd: str | None = None
+    parent_session: str | None = None
+    seed_length: int | None = None
+    origin: str | None = None
+    delegation_depth: int | None = None
+    agent_preset: str | None = None
+    profile_digest: str | None = None
 
     def __post_init__(self) -> None:
         if self.assistant_id is not None and not self.assistant_id.strip():
             raise ValueError("assistant_id must be None or non-empty string")
 
 
-@dataclass(frozen=True, slots=True)
-class SessionEvent:
-    """Session 日志的一条不可变事件（对齐 dsh ``SessionEvent`` 信封）。
+from lca.contracts.harness.tasks.session import SessionEvent  # noqa: E402
 
-    - ``type`` — 事件 category 字符串（spine category 是本仓原生词表）
-    - ``seq`` — 日志内单调连续序号，恒等于入日志时的 ``len(log)``
-    - ``time`` — append 时刻 Unix epoch 毫秒
-    - ``data`` — JSON 值域 payload；实现层入日志前做无损 JSON 快照，
-      读回的 ``data`` 是落日志的值，不是调用方可变输入的引用
+SessionEvent.__doc__ = """Session 日志的唯一不可变事件信封（DSH 对齐）。
 
-    ``category`` / ``payload`` 是只读投影，把信封适配成
-    :func:`lca_kernel.events.fold.foldRequestHeader` 的 spine 事件形态；
-    不引入第二份状态。
-    """
+- ``type`` — 事件 category 字符串（spine category 是本仓原生词表）
+- ``seq`` — 日志内单调连续序号，恒等于入日志时的 ``len(log)``
+- ``time`` — append 时刻 Unix epoch 毫秒
+- ``data`` — JSON 值域 payload；实现层入日志前做无损 JSON 快照
+- ``session_id`` — 所属 session；``actor``/``visibility`` 为审计投影
 
-    type: str
-    seq: int
-    time: int
-    data: Mapping[str, Any]
-
-    @property
-    def category(self) -> str:
-        """spine 事件形态投影：``foldRequestHeader`` 按 category 识别 fold 目标。"""
-        return self.type
-
-    @property
-    def payload(self) -> Mapping[str, Any]:
-        """spine 事件形态投影：``foldRequestHeader`` 从 payload 还原 header 字段。"""
-        return self.data
+``category`` / ``payload`` 是只读投影，适配
+:func:`lca_kernel.events.fold.foldRequestHeader` 的 spine 事件形态。
+全仓唯一信封类型：旧 ``lca_kernel.events.session.SessionEvent`` 本地定义已删除。
+"""
 
 
 @runtime_checkable
@@ -173,13 +166,21 @@ class SessionProtocol(Protocol):
         """下一条事件的序号 —— 恒等于当前日志长度。"""
         ...
 
-    def append(self, event_type: str, data: Mapping[str, Any]) -> SessionEvent:
+    def append(
+        self,
+        event_type: str,
+        data: Mapping[str, Any],
+        *,
+        actor: str | None = None,
+        visibility: str = "model",
+    ) -> SessionEvent:
         """校验 → 入日志 → fire observers（contained）→ 返回落日志的事件。
 
         precondition：``event_type`` 非空字符串；``data`` 可无损 JSON 序列化。
         失败语义：校验不过抛 ``TypeError`` / ``ValueError``，日志不变；
         observer 抛错被 contained，不影响返回值。重入抛
         :class:`SessionReentryError`，同样不改日志。
+        ``actor`` / ``visibility`` 写入事件信封元数据（审计/可见性投影）。
         """
         ...
 

@@ -25,12 +25,7 @@ from lca.contracts.capabilities import (
     RESULT_FINALIZER_FACTORY,
     RESUME_INPUT_ADAPTERS,
     RUNTIME_JOURNAL_FACTORY,
-    SESSION_LIVE_BUILDER,
-    SESSION_PERSISTENCE_FACTORY,
-    SESSION_PROJECTION_REGISTRY_FACTORY,
 )
-from lca.contracts.harness.collaboration.agent import SessionLiveBuilder
-from lca.contracts.harness.state.projection import SessionProjectionRegistryFactory
 from lca.contracts.protocols.journal.spec import AgentSpec
 from lca.contracts.protocols.runtime.runtime_composition import (
     CheckpointStateResolverFactory,
@@ -40,7 +35,6 @@ from lca.contracts.protocols.runtime.runtime_composition import (
     ResultFinalizerFactory,
     RuntimeJournalFactory,
 )
-from lca.contracts.protocols.session.session_persistence import SessionPersistenceFactory
 from lca.contracts.protocols.state.plan import CompiledRunPlan
 from lca.harness.profile.boot import boot_profile
 from lca.plugins.composer.runtime.runtime_binding import (
@@ -273,11 +267,6 @@ def test_booted_web_profile_resolves_declarative_runtime_factories() -> None:
         ctx.inject(DECLARATIVE_INTERPRETER_FACTORY.key), DeclarativeInterpreterFactory
     )
     assert isinstance(ctx.inject(RESULT_FINALIZER_FACTORY.key), ResultFinalizerFactory)
-    assert isinstance(ctx.inject(SESSION_LIVE_BUILDER.key), SessionLiveBuilder)
-    assert isinstance(ctx.inject(SESSION_PERSISTENCE_FACTORY.key), SessionPersistenceFactory)
-    assert isinstance(
-        ctx.inject(SESSION_PROJECTION_REGISTRY_FACTORY.key), SessionProjectionRegistryFactory
-    )
     assert isinstance(ctx.inject(RUNTIME_JOURNAL_FACTORY.key), RuntimeJournalFactory)
 
 

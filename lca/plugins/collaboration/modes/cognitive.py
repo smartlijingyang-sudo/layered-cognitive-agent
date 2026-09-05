@@ -12,15 +12,10 @@ from typing import cast
 import structlog
 from pydantic import BaseModel, ConfigDict
 
-from lca.contracts.capabilities import (
-    RUN_MODE_REGISTRY,
-    SESSION_FOLLOWUP_POLICY,
-    SESSION_TURN_CONTROLLER_FACTORY,
-)
+from lca.contracts.capabilities import RUN_MODE_REGISTRY
 from lca.contracts.mechanisms.capability import require_capability
 from lca.contracts.protocols.session.run_mode import RunModeRegistryProtocol
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.plugins.loop_drivers.cognitive import build_cognitive_live_agent
 from lca.plugins.transport.webserver.handlers.runs.execute.loop_drivers import CognitiveRunDriver
 from lca.plugins.transport.webserver.handlers.runs.lifecycle.runnable_assembly import (
     CognitiveRunnableAssembler,
@@ -55,10 +50,8 @@ def _cognitive_driver_factory(ctx: object) -> CognitiveRunDriver:
     requires=[
         "run_loop_driver_registry",
         RUN_MODE_REGISTRY.key,
-        SESSION_TURN_CONTROLLER_FACTORY.key,
-        SESSION_FOLLOWUP_POLICY.key,
     ],
-    provides=["agent_loop", "run_loop_driver_registry[cognitive]"],
+    provides=["run_loop_driver_registry[cognitive]"],
     implements=[],
     layer="L4",
     effects="none",
@@ -67,12 +60,11 @@ def _cognitive_driver_factory(ctx: object) -> CognitiveRunDriver:
     kind=PluginKind.PRIMITIVE,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    """Mount the cognitive live-agent factory and profile-aware run driver."""
+    """Mount the profile-aware cognitive run driver."""
 
     registry = ctx.require("run_loop_driver_registry")
     registry.register(config.target, lambda: _cognitive_driver_factory(ctx))
-    ctx.provide("agent_loop", build_cognitive_live_agent)
-    _log.debug("agent_loop_registered", target=config.target)
+    _log.debug("cognitive_run_driver_registered", target=config.target)
 
 
 __all__ = ["Config", "setup"]

@@ -244,20 +244,6 @@ from lca.contracts.protocols.session.run_mode import (
     RegisteredMode,
     RunModeRegistryProtocol,
 )
-from lca.contracts.protocols.session.session_command_ledger import (
-    ApprovalResumeDecision,
-    ApprovalResumeDisposition,
-    SessionCommandLedger,
-)
-from lca.contracts.protocols.session.session_persistence import (
-    SessionPersistence,
-    SessionPersistenceFactory,
-)
-from lca.contracts.protocols.session.session_turn import (
-    SessionTurnController,
-    SessionTurnControllerFactory,
-    TurnAlreadyRunningError,
-)
 from lca.contracts.protocols.state.plan import COMPILED_RUN_PLAN_VERSION, CompiledRunPlan
 
 # ── CommandEnvelope + RunFact (ADR-0068 §五 + ADR-0074 PR-7 V4) ─────────
@@ -314,8 +300,6 @@ __all__ = [  # noqa: RUF022 — discovery order matches tests/contracts/test_pro
     "ActionScopeAuthority",
     "AgentTransport",
     "AgentUnit",
-    "ApprovalResumeDecision",
-    "ApprovalResumeDisposition",
     "ArtifactClosure",
     "AttachmentIdentity",
     "Body",
@@ -451,11 +435,6 @@ __all__ = [  # noqa: RUF022 — discovery order matches tests/contracts/test_pro
     "SemanticPhase",
     "Sensor",
     "SensorDisabledError",
-    "SessionCommandLedger",
-    "SessionPersistence",
-    "SessionPersistenceFactory",
-    "SessionTurnController",
-    "SessionTurnControllerFactory",
     "SharedMemoryStore",
     "SkillImportError",
     "SkillImporter",
@@ -490,7 +469,6 @@ __all__ = [  # noqa: RUF022 — discovery order matches tests/contracts/test_pro
     "ToolRegistry",
     "ToolRenderer",
     "TransportRegistryProtocol",
-    "TurnAlreadyRunningError",
     "TypedRelation",
     "ValidationIssue",
     "ValidationReport",

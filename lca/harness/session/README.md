@@ -5,19 +5,22 @@
 > schema_version: 2.0.0
 
 ## 1. 职责
-LCA 框架的组成部分。具体职责参见同目录下各子包的 README 与 pyproject.toml 中的 ``[tool.lca.package_contracts]`` 块。
+跨平面共享的 Session 纯工具：`emit` —— typed session 事件对象 →
+`Session.append` 的统一发射出口。Session 事件真值层归 `lca/plugins/session`（ADR-0186）。
 
 ## 2. 不负责
-与下层契约的合规性检查（由 lint-imports 与 check_package_contracts 门禁统一处理）；任何不在本目录 schema_version 范围内的修改都不应提交。
+事件落盘、恢复、投影（归 `lca/plugins/session` 家族）；词表注册（归
+`lca/contracts/harness/memory/events.py`）。
 
 ## 3. 输入
-- 当前包内 `8` 个公开模块 + `60` 个公开符号（class / function）
+- 当前包内 `1` 个公开模块 + `1` 个公开符号（function）
 
 ## 4. 输出
-- 暴露的公共 API：2 个显式 __all__ 条目； 60 个定义符号中，39 个为公共命名
+- 暴露的公共 API：1 个显式 __all__ 条目（`emit`）
 
 ## 5. 允许依赖
-—
+- `lca.contracts`
+- `lca_kernel.events`
 
 ## 6. 禁止依赖
 **pyproject.toml `[tool.lca.package_contracts.lca.harness.session].forbidden_dependencies`**:
@@ -28,24 +31,17 @@ LCA 框架的组成部分。具体职责参见同目录下各子包的 README �
 - `lca.runtime`
 
 ## 7. 副作用
-log:emit
+无（`emit` 委托 `Session.append`，副作用归调用目标）。
 
 ## 8. 失败语义
-模块导入失败 → ImportError；类实例化失败 → TypeError / ValueError；运行时错误以 L1 protocol 中定义的异常类型抛出。
+词表未注册 / 数据不可 JSON 序列化 → 发射点抛错（`Session.append` 契约）；
+`SessionReentryError` 由实现层在嵌套 append 时抛出。
 
 ## 9. 公共入口
 **__init__.py 显式 __all__**:
 
-- `Inbox`
-- `SessionStore`
+- `emit`
 
 **模块清单**:
 
-- `lca/harness/session/event_validation.py`
-- `lca/harness/session/inbox.py`
-- `lca/harness/session/inbox_projection.py`
-- `lca/harness/session/persistence.py`
-- `lca/harness/session/recovery.py`
-- `lca/harness/session/replay.py`
-- `lca/harness/session/resume_point.py`
-- `lca/harness/session/store.py`
+- `lca/harness/session/emit.py`

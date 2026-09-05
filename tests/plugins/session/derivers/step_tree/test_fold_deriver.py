@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from lca.plugins.session.derivers.step_tree import (
@@ -43,14 +43,14 @@ def test_fold_single_step_from_writable_events() -> None:
             "payload": {"phase": "think"},
             "outcome": None,
             "phase": "live",
-            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
         },
         {
             "execution_point": "writable.step.end",
             "payload": {"outcome": "success"},
             "outcome": "success",
             "phase": "live",
-            "when": datetime(2026, 9, 1, 12, 0, 1, tzinfo=timezone.utc),
+            "when": datetime(2026, 9, 1, 12, 0, 1, tzinfo=UTC),
         },
     ]
     doc = fold_step_tree(events, run_id="r1")
@@ -68,13 +68,13 @@ def test_fold_brain_think_start_end_creates_implicit_step() -> None:
             "execution_point": "brain.think.start",
             "payload": {},
             "outcome": None,
-            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
         },
         {
             "execution_point": "brain.think.end",
             "payload": {},
             "outcome": "success",
-            "when": datetime(2026, 9, 1, 12, 0, 1, tzinfo=timezone.utc),
+            "when": datetime(2026, 9, 1, 12, 0, 1, tzinfo=UTC),
         },
     ]
     doc = fold_step_tree(events, run_id="r_implicit")
@@ -90,7 +90,7 @@ def test_fold_phase_fold_creates_phase_record() -> None:
             "execution_point": "phase.think.fold",
             "payload": {"summary": "thinking"},
             "outcome": None,
-            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
         },
     ]
     doc = fold_step_tree(events, run_id="r_phase")
@@ -112,22 +112,22 @@ def test_fold_model_only_run_keeps_totals_contract() -> None:
         {
             "execution_point": "phase.perceive.fold",
             "payload": {"summary": ""},
-            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
         },
         {
             "execution_point": "phase.think.fold",
             "payload": {"summary": "started"},
-            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
         },
         {
             "execution_point": "phase.think.fold",
             "payload": {"summary": "respond"},
-            "when": datetime(2026, 9, 1, 12, 0, 1, tzinfo=timezone.utc),
+            "when": datetime(2026, 9, 1, 12, 0, 1, tzinfo=UTC),
         },
         {
             "execution_point": "phase.stop.fold",
             "payload": {"summary": ""},
-            "when": datetime(2026, 9, 1, 12, 0, 2, tzinfo=timezone.utc),
+            "when": datetime(2026, 9, 1, 12, 0, 2, tzinfo=UTC),
         },
     ]
     doc = fold_step_tree(events, run_id="r_model_only", outcome="completed")
@@ -144,18 +144,18 @@ def test_fold_think_fold_with_open_step_counts_segment() -> None:
         {
             "execution_point": "writable.step.start",
             "payload": {"phase": "think"},
-            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
         },
         {
             "execution_point": "phase.think.fold",
             "payload": {"summary": "respond"},
-            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
         },
         {
             "execution_point": "writable.step.end",
             "payload": {},
             "outcome": "success",
-            "when": datetime(2026, 9, 1, 12, 0, 1, tzinfo=timezone.utc),
+            "when": datetime(2026, 9, 1, 12, 0, 1, tzinfo=UTC),
         },
     ]
     doc = fold_step_tree(events, run_id="r_seg")
@@ -173,7 +173,7 @@ def test_fold_terminal_outcome_from_kernel_run_stop() -> None:
             "execution_point": "kernel.run.stop",
             "payload": {},
             "outcome": "success",
-            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
         },
     ]
     doc = fold_step_tree(events, run_id="r_term")
@@ -187,7 +187,7 @@ def test_fold_explicit_outcome_overrides_spine() -> None:
             "execution_point": "kernel.run.stop",
             "payload": {},
             "outcome": "success",
-            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
         },
     ]
     doc = fold_step_tree(events, run_id="r_override", outcome="failed")
@@ -201,7 +201,7 @@ def test_fold_tool_call_record_attaches_to_step() -> None:
             "execution_point": "writable.step.start",
             "payload": {"phase": "act"},
             "outcome": None,
-            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
         },
         {
             "execution_point": "step.tool_call.record",
@@ -213,13 +213,13 @@ def test_fold_tool_call_record_attaches_to_step() -> None:
                 "step_index": 1,
             },
             "outcome": None,
-            "when": datetime(2026, 9, 1, 12, 0, 1, tzinfo=timezone.utc),
+            "when": datetime(2026, 9, 1, 12, 0, 1, tzinfo=UTC),
         },
         {
             "execution_point": "writable.step.end",
             "payload": {},
             "outcome": "success",
-            "when": datetime(2026, 9, 1, 12, 0, 2, tzinfo=timezone.utc),
+            "when": datetime(2026, 9, 1, 12, 0, 2, tzinfo=UTC),
         },
     ]
     doc = fold_step_tree(events, run_id="r_tool")
@@ -238,13 +238,13 @@ def test_fold_skips_unrecognized_events() -> None:
             "execution_point": "writable.step.start",
             "payload": {"phase": "think"},
             "outcome": None,
-            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
         },
         {
             "execution_point": "writable.step.end",
             "payload": {},
             "outcome": "success",
-            "when": datetime(2026, 9, 1, 12, 0, 1, tzinfo=timezone.utc),
+            "when": datetime(2026, 9, 1, 12, 0, 1, tzinfo=UTC),
         },
     ]
     doc = fold_step_tree(events, run_id="r_skip")
@@ -262,13 +262,13 @@ def test_deriver_writes_journal_json(tmp_path: Path) -> None:
             "execution_point": "writable.step.start",
             "payload": {"phase": "think"},
             "outcome": None,
-            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
         },
         {
             "execution_point": "writable.step.end",
             "payload": {},
             "outcome": "success",
-            "when": datetime(2026, 9, 1, 12, 0, 1, tzinfo=timezone.utc),
+            "when": datetime(2026, 9, 1, 12, 0, 1, tzinfo=UTC),
         },
     ]
     deriver = StepTreeFoldDeriver(run_id="r_derive", run_dir=tmp_path)
@@ -298,7 +298,7 @@ def test_derive_step_tree_function(tmp_path: Path) -> None:
             "execution_point": "phase.think.fold",
             "payload": {"summary": "thinking"},
             "outcome": None,
-            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+            "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
         },
     ]
     doc = derive_step_tree(events, run_id="r_fn", run_dir=tmp_path, outcome="completed")
@@ -341,8 +341,7 @@ def test_fold_iso_when_and_session_event() -> None:
             type="writable.step.end",
             seq=1,
             time=1_756_728_001_000,
-            data={"outcome": "success"},
-        ),
+            data={"outcome": "success"}, session_id="s"),
     ]
     doc = fold_step_tree(events, run_id="r_coerce")
     assert len(doc.steps) == 1
@@ -517,22 +516,19 @@ def test_deriver_flush_merges_session_snapshot_and_spine_with_dedup(tmp_path: Pa
                 type="spine.cognition.brain.think.start",
                 seq=0,
                 time=1_788_512_185_993,
-                data={"state_id": "t"},
-            ),
+                data={"state_id": "t"}, session_id="s"),
             # 与 spine 文件的 phase.think.fold 同源:镜像记录携带同一
             # event_id("{run_id}:{seq}") → 按同源标识去重
             SessionEvent(
                 type="spine.phase.think.fold",
                 seq=1,
                 time=1_788_512_186_013,
-                data={"summary": "respond", "step_index": 1},
-            ),
+                data={"summary": "respond", "step_index": 1}, session_id="s"),
             SessionEvent(
                 type="spine.runtime.event_publisher.publish",
                 seq=2,
                 time=1_788_512_188_973,
-                data={"event_type": "completed", "outcome": "success"},
-            ),
+                data={"event_type": "completed", "outcome": "success"}, session_id="s"),
         )
     )
     spine_path = tmp_path / f"{run_id}.spine.jsonl"
@@ -679,7 +675,7 @@ def test_regression_run_b2c1424d93d4_journal_not_empty(tmp_path: Path) -> None:
     run_id = "run_b2c1424d93d4"
     session = _FakeSession(
         tuple(
-            SessionEvent(type=event_type, seq=seq, time=time_ms, data=data)
+            SessionEvent(type=event_type, seq=seq, time=time_ms, data=data, session_id="s")
             for seq, (event_type, time_ms, data) in enumerate(_RUN_B2C1424D93D4_SESSION)
         )
     )

@@ -15,9 +15,7 @@ from lca.contracts.event import Category, EventPayload
 from lca.plugins.events.publishers.delegation_cache.plugin import (
     DelegationCachePlugin,
 )
-from lca.plugins.events.subscribers.console_projector.subscriber import (
-    ConsoleProjectorSubscriber,
-)
+from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink
 from lca.plugins.transport.webserver.lifespan_adapter import TraceIdMiddleware
 from lca_kernel.events import TeamDelegationCacheHit
 from lca_kernel.events.bus import (
@@ -26,8 +24,6 @@ from lca_kernel.events.bus import (
     reset_trace_id,
     set_trace_id,
 )
-from lca_kernel.events import _DEFAULT_CONFIG_DIR
-from lca_kernel.events.registry import EventRegistry
 
 
 @pytest.fixture
@@ -66,7 +62,7 @@ class TestWebserverTraceIsolation:
         barrier = asyncio.Barrier(2)
 
         bus.subscribe(
-            plugin=ConsoleProjectorSubscriber,
+            plugin=SpineFileSink,
             category=Category.TEAM_DELEGATION_CACHE_HIT,
             on_event=lambda _p, r: subscriber_seen.append(r.trace_id),
         )

@@ -7,7 +7,7 @@
 3. :func:`set_session` 把目录整表挂到新 Session（run-bind 路径）;
 4. 全部 sink/subscriber setup 只走目录登记 —— 不触碰
    ``EventBus.subscribe`` / ``mount_sink``（``spine_file_sink`` /
-   ``spine_chain_sink`` / ``journal`` / ``console_projector`` /
+   ``spine_file_sink`` /
    ``spine_step_tree_accumulator``）。
 """
 
@@ -27,33 +27,11 @@ from lca.plugins.events._session_observe import (
     register_as_session_observer,
     set_session,
 )
-from lca.plugins.events.sinks.journal.manifest import (
-    SINK_PLUGIN_CLASS as JOURNAL_PLUGIN_CLASS,
-)
-from lca.plugins.events.sinks.journal.manifest import (
-    setup as journal_setup,
-)
-from lca.plugins.events.sinks.spine_chain_sink.sink import (
-    SpineChainSink,
-)
-from lca.plugins.events.sinks.spine_chain_sink.sink import setup as chain_setup
 from lca.plugins.events.sinks.spine_file_sink.manifest import (
     SINK_PLUGIN_CLASS,
 )
 from lca.plugins.events.sinks.spine_file_sink.manifest import (
     setup as sink_setup,
-)
-from lca.plugins.events.subscribers.console_projector.manifest import (
-    SUBSCRIBER_PLUGIN_CLASS,
-)
-from lca.plugins.events.subscribers.console_projector.manifest import (
-    setup as projector_setup,
-)
-from lca.plugins.events.subscribers.spine_step_tree_accumulator.subscriber import (
-    SpineStepTreeAccumulator,
-)
-from lca.plugins.events.subscribers.spine_step_tree_accumulator.subscriber import (
-    setup as step_tree_setup,
 )
 from lca_kernel.events import EventRef
 
@@ -172,120 +150,3 @@ def test_spine_file_sink_setup_catalogues_without_session() -> None:
 
 
 # ── ConsoleProjector 样本 ──────────────────────────────────────────────
-
-
-def test_console_projector_setup_prefers_session_observe() -> None:
-    """Session 在场:on_event 经 observe 注册,不依赖 event.bus 能力。"""
-    session = _RecordingSession()
-    set_session(session)
-    ctx = _StubPluginContext()
-
-    asyncio.run(projector_setup.setup(ctx, projector_setup.Config()))
-
-    subscriber = ctx.provided["event.subscriber.console_projector"]
-    plugin, callback = session.observed[0]
-    assert plugin is SUBSCRIBER_PLUGIN_CLASS
-    assert callback == subscriber.on_event
-
-
-def test_console_projector_setup_catalogues_without_session() -> None:
-    """Session 缺席:只 provide + 入目录，不 bus.subscribe。"""
-    ctx = _StubPluginContext()
-
-    asyncio.run(projector_setup.setup(ctx, projector_setup.Config()))
-
-    subscriber = ctx.provided["event.subscriber.console_projector"]
-    assert observer_catalog()[SUBSCRIBER_PLUGIN_CLASS] == subscriber.on_event
-    session = _RecordingSession()
-    set_session(session)
-    assert session.observed == [(SUBSCRIBER_PLUGIN_CLASS, subscriber.on_event)]
-
-
-# ── JournalSink 样本 ──────────────────────────────────────────────────
-
-
-def test_journal_sink_setup_prefers_session_observe() -> None:
-    """Session 在场:on_event 经 observe 注册,不依赖 event.bus 能力。"""
-    session = _RecordingSession()
-    set_session(session)
-    ctx = _StubPluginContext()
-
-    asyncio.run(journal_setup.setup(ctx, journal_setup.Config()))
-
-    sink = ctx.provided["event.sink.journal"]
-    plugin, callback = session.observed[0]
-    assert plugin is JOURNAL_PLUGIN_CLASS
-    assert callback == sink.on_event
-
-
-def test_journal_sink_setup_catalogues_without_session() -> None:
-    """Session 缺席:只 provide + 入目录，不 bus.subscribe。"""
-    ctx = _StubPluginContext()
-
-    asyncio.run(journal_setup.setup(ctx, journal_setup.Config()))
-
-    sink = ctx.provided["event.sink.journal"]
-    assert observer_catalog()[JOURNAL_PLUGIN_CLASS] == sink.on_event
-    session = _RecordingSession()
-    set_session(session)
-    assert session.observed == [(JOURNAL_PLUGIN_CLASS, sink.on_event)]
-
-
-# ── SpineChainSink 样本 ───────────────────────────────────────────────
-
-
-def test_spine_chain_sink_setup_prefers_session_observe(tmp_path) -> None:
-    """Session 在场:sink 注册走 observe,不依赖 event.bus 能力。"""
-    del tmp_path
-    session = _RecordingSession()
-    set_session(session)
-    ctx = _StubPluginContext()
-
-    asyncio.run(chain_setup.setup(ctx, chain_setup.Config()))
-
-    sink = ctx.provided["event.bus.chain_sink"]
-    plugin, callback = session.observed[0]
-    assert plugin is SpineChainSink
-    assert callback is sink
-
-
-def test_spine_chain_sink_setup_without_session_provides_only() -> None:
-    """Session 缺席:provide + 入目录，不 mount_sink / subscribe。"""
-    ctx = _StubPluginContext()
-
-    asyncio.run(chain_setup.setup(ctx, chain_setup.Config()))
-
-    sink = ctx.provided["event.bus.chain_sink"]
-    assert isinstance(sink, SpineChainSink)
-    assert observer_catalog()[SpineChainSink] is sink
-
-
-# ── SpineStepTreeAccumulator 样本 ─────────────────────────────────────
-
-
-def test_spine_step_tree_accumulator_setup_prefers_session_observe() -> None:
-    """Session 在场:subscriber 注册走 observe,不依赖 event.bus 能力。"""
-    SpineStepTreeAccumulator.reset()
-    session = _RecordingSession()
-    set_session(session)
-    ctx = _StubPluginContext()
-
-    asyncio.run(step_tree_setup.setup(ctx, step_tree_setup.Config()))
-
-    subscriber = ctx.provided["event.bus.step_tree_accumulator"]
-    plugin, callback = session.observed[0]
-    assert plugin is SpineStepTreeAccumulator
-    assert callback is subscriber
-
-
-def test_spine_step_tree_accumulator_setup_without_session_provides_only() -> None:
-    """Session 缺席:provide + 入目录，不 bus.subscribe。"""
-    SpineStepTreeAccumulator.reset()
-    ctx = _StubPluginContext()
-
-    asyncio.run(step_tree_setup.setup(ctx, step_tree_setup.Config()))
-
-    subscriber = ctx.provided["event.bus.step_tree_accumulator"]
-    assert isinstance(subscriber, SpineStepTreeAccumulator)
-    assert subscriber._state == []
-    assert observer_catalog()[SpineStepTreeAccumulator] is subscriber

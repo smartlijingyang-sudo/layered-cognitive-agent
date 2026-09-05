@@ -120,41 +120,6 @@ entries:
       providers: [memory]
       active_provider: memory
 
-  - id: lca-session-persistence-jsonl-provider
-    name: lca_providers_session_persistence_jsonl
-    $module: lca.plugins.collaboration.session_persistence_provider
-    config: {}
-
-  - id: lca-session-projection-memory-provider
-    name: lca_providers_session_projection_memory
-    $module: lca.plugins.collaboration.session_projections_provider
-    config: {}
-
-  # The active Session owns exactly one cancellable turn task.  Alternative
-  # controllers (for example, a durable worker-backed implementation) replace
-  # this provider without coupling command routing to a concrete Agent Loop.
-  - id: lca-session-turn-controller-factory
-    name: lca_providers_session_turn_controller
-    $module: lca.plugins.collaboration.session_turn_controller_provider
-    config: {}
-
-  # Follow-up admission is distinct from task ownership. The default safely
-  # queues concurrent user messages; latency-sensitive deployments may select
-  # strict rejection without changing the LiveAgent or command router.
-  - id: lca-session-followup-policy
-    name: lca_providers_session_followup_policy
-    $module: lca.plugins.collaboration.session_followup_policy_provider
-    config:
-      mode: enqueue
-
-  # Approval resume commands derive idempotency from this Session's durable
-  # facts. A deployment may replace this pure ledger without changing router
-  # or live-agent control flow.
-  - id: lca-session-command-ledger
-    name: lca_providers_session_command_ledger
-    $module: lca.plugins.collaboration.session_command_ledger_provider
-    config: {}
-
   - id: lca-search-provider
     name: lca_providers_search
     $module: lca.plugins.memory.search_provider

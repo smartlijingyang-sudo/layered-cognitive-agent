@@ -477,8 +477,8 @@ def test_restore_seeds_log_without_firing_observers() -> None:
     store = SessionStore()
     header = SessionHeader(version=SESSION_FORMAT_VERSION, id="s-restored", created_at=1000)
     events = [
-        SessionEvent(type="a", seq=0, time=1001, data={"k": 1}),
-        SessionEvent(type="b", seq=1, time=1002, data={"k": 2}),
+        SessionEvent(type="a", seq=0, time=1001, data={"k": 1}, session_id="s"),
+        SessionEvent(type="b", seq=1, time=1002, data={"k": 2}, session_id="s"),
     ]
 
     session = store.restore("s-restored", header, events)
@@ -507,7 +507,7 @@ def test_restore_sets_is_seeded_even_when_header_says_false() -> None:
     header = SessionHeader(
         version=SESSION_FORMAT_VERSION, id="s-seeded", created_at=2000, is_seeded=False
     )
-    events = [SessionEvent(type="x", seq=0, time=2001, data={})]
+    events = [SessionEvent(type="x", seq=0, time=2001, data={}, session_id="s")]
 
     session = store.restore("s-seeded", header, events)
 
@@ -533,8 +533,7 @@ def test_restore_with_header_events_initializes_fold() -> None:
         type=REQUEST_HEADER,
         seq=0,
         time=4001,
-        data=_header_payload(system="restored-sys", model="m-restored"),
-    )
+        data=_header_payload(system="restored-sys", model="m-restored"), session_id="s")
 
     session = store.restore("s-fold", header, [header_event])
 
@@ -569,8 +568,8 @@ def test_store_restore_rejects_discontinuous_seq() -> None:
     store = SessionStore()
     header = SessionHeader(version=SESSION_FORMAT_VERSION, id="bad-seq", created_at=7000)
     events = [
-        SessionEvent(type="a", seq=0, time=1, data={}),
-        SessionEvent(type="b", seq=2, time=2, data={}),  # 跳 seq
+        SessionEvent(type="a", seq=0, time=1, data={}, session_id="s"),
+        SessionEvent(type="b", seq=2, time=2, data={}, session_id="s"),  # 跳 seq
     ]
     with pytest.raises(ValueError, match="seq 不连续"):
         store.restore("bad-seq", header, events)

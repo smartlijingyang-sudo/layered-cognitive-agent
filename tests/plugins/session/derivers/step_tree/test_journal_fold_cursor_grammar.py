@@ -23,20 +23,17 @@ def test_session_shaped_prefixed_events_fold_step_and_outcome() -> None:
             type="spine.cognition.brain.think.start",
             seq=0,
             time=1_788_512_185_993,
-            data={"state_id": "trace_x"},
-        ),
+            data={"state_id": "trace_x"}, session_id="s"),
         SessionEvent(
             type="spine.cognition.brain.think.end",
             seq=1,
             time=1_788_512_188_840,
-            data={"state_id": "trace_x", "outcome": "success"},
-        ),
+            data={"state_id": "trace_x", "outcome": "success"}, session_id="s"),
         SessionEvent(
             type="spine.runtime.event_publisher.publish",
             seq=2,
             time=1_788_512_188_973,
-            data={"event_type": "completed", "outcome": "success"},
-        ),
+            data={"event_type": "completed", "outcome": "success"}, session_id="s"),
     ]
     doc = fold_step_tree(events, run_id="r_session_shape")
     assert doc.totals is not None

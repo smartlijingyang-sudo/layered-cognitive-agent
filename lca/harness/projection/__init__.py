@@ -1,10 +1,5 @@
-"""Projection registry and first-party web projections."""
+"""Reducer state fold mirror (C12)."""
 
-from lca.harness.projection.registry import InMemoryProjectionRegistry
-from lca.harness.projection.web import ActivityProjection, ConversationProjection
+from lca.harness.projection.agent_state import AgentStateProjection
 
-__all__ = [
-    "ActivityProjection",
-    "ConversationProjection",
-    "InMemoryProjectionRegistry",
-]
+__all__ = ["AgentStateProjection"]

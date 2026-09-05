@@ -9,12 +9,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lca.plugins.collaboration.modes.cordis_creator import _CordisCreatorModeAdapter
 from lca.cognition.team.modes.default_modes import (
     _CordisCreatorModeAdapter as CompatibilityCreatorAdapter,
 )
 from lca.cognition.team.modes.default_modes import _SoloModeAdapter as CompatibilitySoloAdapter
 from lca.cognition.team.modes.default_modes import _TeamModeAdapter as CompatibilityTeamAdapter
+from lca.plugins.collaboration.modes.cordis_creator import _CordisCreatorModeAdapter
 from lca.plugins.collaboration.modes.solo import _SoloModeAdapter
 from lca.plugins.collaboration.modes.team import _TeamModeAdapter
 
@@ -23,17 +23,6 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def _source(relative_path: str) -> str:
     return (ROOT / relative_path).read_text(encoding="utf-8")
-
-
-def test_session_registry_is_a_facade_over_activation_and_command_routing() -> None:
-    """The public registry must not regain storage, recovery, or command ownership."""
-    source = _source("lca/harness/agent/registry.py")
-
-    assert "SessionActivator" in source
-    assert "AgentCommandRouter" in source
-    assert "SessionStore(" not in source
-    assert "_idempotency" not in source
-    assert "_entry_or_recover" not in source
 
 
 def test_execution_environment_only_coordinates_scope_order() -> None:

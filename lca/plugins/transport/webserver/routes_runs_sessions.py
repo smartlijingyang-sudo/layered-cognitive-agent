@@ -36,16 +36,6 @@ from lca.plugins.transport.webserver.handlers.runs.api.query_endpoints import (
     get_run_profile,
     stream_run_live,
 )
-from lca.plugins.transport.webserver.handlers.session_routes import (
-    command_answer,
-    command_cancel,
-    command_inject,
-    command_steer,
-    create_session,
-    get_snapshot,
-    send_message,
-    stream_events,
-)
 from lca.plugins.transport.webserver.route_register import register_routes
 
 ROUTE_SPECS: tuple[RouteSpec, ...] = (
@@ -57,14 +47,6 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
     RouteSpec("/runs/{run_id}/evidence/{ref:path}", get_run_evidence, ("GET",)),
     RouteSpec("/runs/{run_id}/cancel", cancel_run, ("POST", "OPTIONS")),
     RouteSpec("/runs/{run_id}/answer", answer_run, ("POST", "OPTIONS")),
-    RouteSpec("/v1/sessions", create_session, ("POST", "OPTIONS")),
-    RouteSpec("/v1/sessions/{session_id}/messages", send_message, ("POST", "OPTIONS")),
-    RouteSpec("/v1/sessions/{session_id}/snapshot", get_snapshot, ("GET", "OPTIONS")),
-    RouteSpec("/v1/sessions/{session_id}/events", stream_events, ("GET", "OPTIONS")),
-    RouteSpec("/v1/sessions/{session_id}/commands/answer", command_answer, ("POST", "OPTIONS")),
-    RouteSpec("/v1/sessions/{session_id}/commands/cancel", command_cancel, ("POST", "OPTIONS")),
-    RouteSpec("/v1/sessions/{session_id}/commands/steer", command_steer, ("POST", "OPTIONS")),
-    RouteSpec("/v1/sessions/{session_id}/commands/inject", command_inject, ("POST", "OPTIONS")),
 )
 
 

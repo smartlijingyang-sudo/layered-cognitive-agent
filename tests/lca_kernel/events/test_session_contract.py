@@ -31,7 +31,7 @@ def test_session_header_frozen() -> None:
 
 
 def test_session_event_frozen() -> None:
-    e = SessionEvent(type="test/x", seq=0, time=1, data={"a": 1})
+    e = SessionEvent(type="test/x", seq=0, time=1, data={"a": 1}, session_id="s")
     with pytest.raises(Exception):
         e.seq = 2  # type: ignore[misc]
     assert e.type == "test/x"

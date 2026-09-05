@@ -1,62 +1,27 @@
-"""Session projection SPI (spec §2.2.6)."""
+"""Session projection 契约（spec §2.2.6）。
+
+投影注册表/单元契约归 ``lca/contracts/protocols/session/projection_unit.py``
+（ADR-0186 后的 DSH 对齐形态）；本模块保留跨平面共享的快照类型。
+"""
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Protocol, runtime_checkable
-
-from lca.contracts.harness.tasks.session import SessionEvent
+from typing import Any
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ProjectionSnapshot:
+    """一个 session 上全部客户端可见单元的一次一致读切。
+
+    ``as_of_seq`` 是共享水位 —— 所有值反映的最后一条事件的 seq
+    （空日志为 ``-1``）；``values`` 是 key → 完整当前值。客户端收
+    完整值，不收 fold 中间态；调用方不得改动返回结构。
+    """
+
     as_of_seq: int
-    values: dict[str, Any]
+    values: Mapping[str, Any]
 
 
-@dataclass(frozen=True)
-class ProjectionChange:
-    session_id: str
-    key: str
-    version: int
-    seq: int
-    value: Any
-
-
-class ProjectionDefinition(Protocol):
-    """Pure reducer: init → apply(event) → view."""
-
-    key: str
-    version: int
-
-    def init(self) -> Any: ...
-
-    def apply(self, state: Any, event: Any) -> Any: ...
-
-    def view(self, state: Any) -> Any: ...
-
-
-class ProjectionRegistry(Protocol):
-    def register(self, definition: ProjectionDefinition) -> Any: ...
-
-    def snapshot(self, session_id: str) -> ProjectionSnapshot: ...
-
-    def subscribe_changes(self, listener: Callable[[ProjectionChange], None]) -> Any: ...
-
-
-class SessionProjectionRegistry(ProjectionRegistry, Protocol):
-    """Projection registry with the lifecycle operations required by Session Spine."""
-
-    def bind_session(self, session_id: str) -> None: ...
-
-    def on_event(self, event: SessionEvent) -> None: ...
-
-    def replay(self, session_id: str, events: list[SessionEvent]) -> None: ...
-
-
-@runtime_checkable
-class SessionProjectionRegistryFactory(Protocol):
-    """Create the selected projection registry and its declared default views."""
-
-    def create(self) -> SessionProjectionRegistry: ...
+__all__ = ["ProjectionSnapshot"]

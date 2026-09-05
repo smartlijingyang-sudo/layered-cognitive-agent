@@ -5,19 +5,22 @@
 > schema_version: 2.0.0
 
 ## 1. 职责
-LCA 框架的组成部分。具体职责参见同目录下各子包的 README 与 pyproject.toml 中的 ``[tool.lca.package_contracts]`` 块。
+Reducer 状态 fold 镜像（AGENTS.md C12）：`AgentStateProjection` 从 Session
+事件流纯函数重建 `AgentState`，与 reducer `apply_*` 同步。客户端投影面归
+`lca/plugins/session/projection_registry`（DSH session-projection 对齐）。
 
 ## 2. 不负责
-与下层契约的合规性检查（由 lint-imports 与 check_package_contracts 门禁统一处理）；任何不在本目录 schema_version 范围内的修改都不应提交。
+投影注册表与驱动（归 `lca/plugins/session/projection_registry`）；web 视图
+单元（已退役，被新投影家族单元取代）。
 
 ## 3. 输入
-- 当前包内 `3` 个公开模块 + `16` 个公开符号（class / function）
+- 当前包内 `1` 个公开模块 + `1` 个公开符号（class）
 
 ## 4. 输出
-- 暴露的公共 API：3 个显式 __all__ 条目； 16 个定义符号中，14 个为公共命名
+- 暴露的公共 API：1 个显式 __all__ 条目（`AgentStateProjection`）
 
 ## 5. 允许依赖
-—
+- `lca.contracts`
 
 ## 6. 禁止依赖
 **pyproject.toml `[tool.lca.package_contracts.lca.harness.projection].forbidden_dependencies`**:
@@ -28,20 +31,16 @@ LCA 框架的组成部分。具体职责参见同目录下各子包的 README �
 - `lca.runtime`
 
 ## 7. 副作用
-log:emit
+无（纯函数 fold）。
 
 ## 8. 失败语义
-模块导入失败 → ImportError；类实例化失败 → TypeError / ValueError；运行时错误以 L1 protocol 中定义的异常类型抛出。
+fold 输入必须是合法 Session 事件流；非法事件形态抛 `ValueError`。
 
 ## 9. 公共入口
 **__init__.py 显式 __all__**:
 
-- `ActivityProjection`
-- `ConversationProjection`
-- `InMemoryProjectionRegistry`
+- `AgentStateProjection`
 
 **模块清单**:
 
 - `lca/harness/projection/agent_state.py`
-- `lca/harness/projection/registry.py`
-- `lca/harness/projection/web.py`

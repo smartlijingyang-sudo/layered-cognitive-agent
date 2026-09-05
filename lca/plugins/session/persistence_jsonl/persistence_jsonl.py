@@ -7,8 +7,17 @@ in-process log 的 durable 镜像。
 
 设计要点：
 
-- **观察者形态**：append 提交后才被 fire；observer 失败 contained 由
-  :class:`Session` 实现层保证,不外抛(PR-3c 契约)。
+- **观察者形态**：append 提交后才被 fire；``on_session_event`` 只做入队
+  (无 I/O),不阻塞生产者;落盘由 write-behind 批量窗口完成。
+- **write-behind 落盘**（对齐 DSH ``SessionWriteBehind`` /
+  ``docs/specs/session-event-pipeline-spec.md`` §3.2）：
+  每 session 一个 :class:`WriteBehindBuffer` + :class:`JsonlFileSink`;
+  首条待写事件开固定窗口(默认 200ms),窗口到期批量写(单次 ``flush`` +
+  可选 ``fsync``);背景写失败事件保留、暂停自动重试,``flush()`` 显式
+  排空并重抛错误(由 :class:`Session.flush` 链记 ``FlushResult(ok=False)``);
+  ``close()`` 排空后关闭(幂等)。
+- **持久性时序**：无显式 flush 时,事件的持久性以 ``max_delay_ms`` 窗口
+  为上界;``Session.flush()`` 是下一动作前的顺序与持久性检查点。
 - **JSONL 布局**：每行 = 一个 SessionEvent JSON；header 在文件首行,
   后续行为事件,与 :class:`lca.harness.session.persistence.JsonlSessionPersistence`
   字节布局兼容(``kind`` 字段区分)。**不**复用 :class:`SpineSink`
@@ -17,9 +26,8 @@ in-process log 的 durable 镜像。
   (``type/seq/time/data/session_id/actor/provider/visibility/scope``)。
   路径后缀 ``.session.jsonl``，与 ADR-0183 I-FW-SSOT-1 spine
   (SpineFileSink / SpineEventRecord)分离，无双写风险。
-- **flush hook**：当 :class:`Session` 在 PR-3e 之后提供 ``add_flush_hook``
-  时注册幂等刷新回调；当前 PR-3c 骨架尚未提供该面,实现为 best-effort
-  接管 store 的活 Session,不阻塞契约外能力。
+- **flush 链**：:meth:`Session.flush` 经 observer-duck-type 调用
+  ``flush(session)``,本实现同步排空该 session 的待写缓冲。
 
 注册路径：``setup`` 在 boot 时把 :class:`JsonlSessionPersistence` 注册到当前
 :class:`SessionStore` 的所有活 Session;若 store 提供接管钩子,新 Session
@@ -28,16 +36,14 @@ in-process log 的 durable 镜像。
 
 from __future__ import annotations
 
-import contextlib
-import json
 import threading
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
 import structlog
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
@@ -49,6 +55,8 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.persistence.jsonl_sink import JsonlFileSink
+from lca.infrastructure.persistence.write_behind import WriteBehindBuffer
 from lca_kernel.events.session import SessionEvent, SessionHeader
 
 _log = structlog.get_logger(__name__)
@@ -59,20 +67,29 @@ _RUNS_ROOT_DEFAULT = "traces/runs"
 _HEADER_KIND = "header"
 _EVENT_KIND = "event"
 _FILE_SUFFIX = ".session.jsonl"
+_MAX_DELAY_MS_DEFAULT = 200
+"""write-behind 批量窗口缺省值(对齐 DSH ``DEFAULT_WRITE_BATCH_MAX_DELAY_MS``)。"""
 
 
 class Config(BaseModel):
-    """plugin 配置:落盘根目录与 fsync 策略;拒绝未知键。"""
+    """plugin 配置:落盘根目录、批量窗口与 fsync 策略;拒绝未知键。"""
 
     model_config = {"extra": "forbid"}
 
     runs_root: str = _RUNS_ROOT_DEFAULT
     """traces/runs 等价基址;每个 session 在其下建子目录。"""
 
-    fsync: bool = False
-    """每行 append 后是否额外 ``os.fsync`` 强制落盘。
+    max_delay_ms: int = Field(default=_MAX_DELAY_MS_DEFAULT, ge=1)
+    """write-behind 批量窗口:首条待写事件后的最大等待时间。
 
-    每行写入后必然 ``flush`` 到 OS(durable 镜像契约,与开关无关);
+    窗口到期或显式 ``flush()`` 时批量落盘;窗口只约束有意的批量等待,
+    不约束 ``flush`` 的排空语义。
+    """
+
+    fsync: bool = False
+    """每批写入后是否额外 ``os.fsync`` 强制落盘。
+
+    每批写入后必然 ``flush`` 到 OS(durable 镜像契约,与开关无关);
     ``fsync=True`` 进一步保证物理介质持久(生产强一致,测试 ``False``)。
     """
 
@@ -83,11 +100,11 @@ class JsonlSessionPersistence:
     与 :class:`lca.harness.session.persistence.JsonlSessionPersistence` 的差异：
 
     - **直接吃 SessionEvent**：不再走 ``SessionPersistence`` 工厂,
-      observer 入口 = ``on_session_event(session, event)``。
+      observer 入口 = ``on_session_event(session, event)``,只入队不写盘。
     - **提供 ``register_to`` 方法**：把 observer 挂到给定 Session,
       返回幂等取消函数。
-    - **提供 ``flush`` / ``close`` 方法**：per-session 文件句柄管理,
-      与 Session 未来的 ``add_flush_hook`` 配套。
+    - **提供 ``flush`` / ``close`` 方法**：排空/关闭 per-session
+      write-behind 缓冲;``Session.flush()`` observer-duck-type 链经此落盘。
     - **路径决定**：``traces/runs/<session_id>/<session_id>.session.jsonl``,
       session_id 取自 Session.id。
     """
@@ -97,16 +114,19 @@ class JsonlSessionPersistence:
         runs_root: Path | str | None = None,
         *,
         fsync: bool = False,
+        max_delay_ms: int = _MAX_DELAY_MS_DEFAULT,
     ) -> None:
         """构造 detached observer。
 
-        precondition：``runs_root`` 是可写目录的基址；缺省 = ``Path("traces/runs")``。
-        失败语义：实例化阶段不创建文件；目录在第一次写时按需建立。
+        precondition：``runs_root`` 是可写目录的基址；缺省 = ``Path("traces/runs")``;
+        ``max_delay_ms >= 1``(违反由 :class:`WriteBehindBuffer` 抛 ``ValueError``)。
+        失败语义：实例化阶段不创建文件；目录在首批落盘时按需建立。
         """
         self._runs_root = Path(runs_root) if runs_root is not None else Path(_RUNS_ROOT_DEFAULT)
         self._fsync = bool(fsync)
-        self._files: dict[str, _SessionFile] = {}
-        self._files_lock = threading.Lock()
+        self._max_delay_ms = max_delay_ms
+        self._buffers: dict[str, WriteBehindBuffer] = {}
+        self._lock = threading.Lock()
         self._header_written: set[str] = set()
         # SessionStore.add_observer_hook 返回的反注册闭包；全量 close 时释放。
         self._store_hooks: list[Callable[[], None]] = []
@@ -116,50 +136,62 @@ class JsonlSessionPersistence:
     def on_session_event(self, session: Any, event: SessionEvent) -> None:
         """``SessionObserver`` 协议入口。
 
-        时序：事件已入日志后被 Session 调用；失败由 Session 实现层 contained
-        (记录 + 继续),本方法仅在 ``OSError`` 时上抛,让 Session 记录。
+        时序：事件已入日志后被 Session 调用;本方法仅把序列化后的行入队
+        (无 I/O,不阻塞生产者)。落盘失败由 write-behind 保留事件并暂停
+        自动重试,不回滚已提交的 append。
         """
         session_id = _session_id(session, event)
-        with self._files_lock:
-            sfile = self._open_if_needed(session_id)
-            if sfile is None:
-                return
-            if session_id not in self._header_written:
-                header = _header_for(session, session_id)
-                if header is not None:
-                    self._write_header(sfile, header)
+        with self._lock:
+            buffer = self._buffer_for(session_id)
+            header_needed = session_id not in self._header_written
+            if header_needed:
                 self._header_written.add(session_id)
-            self._write_event(sfile, event)
+        if buffer is None:
+            return
+        if header_needed:
+            header = _header_for(session, session_id)
+            if header is not None:
+                buffer.enqueue(_header_payload(header))
+        buffer.enqueue(_session_event_to_dict(event))
 
     def register_to(self, session: Any) -> Any:
-        """把 observer 挂到给定 Session;返回 ``Session.observe`` 的取消函数。"""
-        return session.observe(self.on_session_event)
+        """把 observer 挂到给定 Session;返回 ``Session.observe`` 的取消函数。
+
+        注册的是 :class:`_ObserverAdapter` 对象(不是裸绑定方法):
+        ``__call__`` 接 append 事件,``flush`` 接 :meth:`Session.flush` 的
+        observer-duck-type 探测——否则显式 flush 链到不了本实现的排空面。
+        """
+        return session.observe(_ObserverAdapter(self))
 
     def flush(self, session_id: str | None = None) -> None:
-        """刷新文件缓冲到磁盘(per-session);``session_id`` 缺省 = 全量。
+        """排空待写缓冲到磁盘(阻塞);``session_id`` 缺省 = 全量。
 
         ``session_id`` 也接受 Session-like对象:``Session.flush()`` 的
         observer-duck-type 链以 ``observer.flush(session)`` 形态调用,
         此处经 ``.id`` 归一为 session id(ADR-0186 flush 链)。
+
+        失败语义:批写入失败时重抛(事件已保留在缓冲),由
+        :class:`Session.flush` 链记 ``FlushResult(ok=False)``。
         """
-        with self._files_lock:
+        with self._lock:
             targets = self._select(_normalize_session_key(session_id))
-            for _, sfile in targets:
-                sfile.flush()
+        for _, buffer in targets:
+            buffer.flush()
 
     def close(self, session_id: str | None = None) -> None:
-        """flush + 关闭文件;``session_id`` 缺省 = 全量(接受同 :meth:`flush` 的归一)。
+        """排空 + 关闭缓冲;``session_id`` 缺省 = 全量(接受同 :meth:`flush` 的归一)。
 
         全量 close 同时释放 ``SessionStore.add_observer_hook`` 反注册闭包；
-        per-session close 不动 store 接管。
+        per-session close 不动 store 接管。close 后同 session 再来事件时
+        按需重建缓冲(追加模式,不覆盖已落盘内容)。
         """
-        with self._files_lock:
+        with self._lock:
             targets = self._select(_normalize_session_key(session_id))
-            for sid, sfile in targets:
+            for sid, buffer in targets:
                 try:
-                    sfile.close()
+                    buffer.dispose()
                 finally:
-                    self._files.pop(sid, None)
+                    self._buffers.pop(sid, None)
                     self._header_written.discard(sid)
         if session_id is None:
             for cancel in self._store_hooks:
@@ -170,80 +202,81 @@ class JsonlSessionPersistence:
         """返回 ``session_id`` 对应的落盘路径(不创建文件)。"""
         return self._runs_root / session_id / f"{session_id}{_FILE_SUFFIX}"
 
+    def pending_count(self, session_id: str) -> int:
+        """该 session 待写事件数(诊断只读;未知 session = 0)。"""
+        with self._lock:
+            buffer = self._buffers.get(session_id)
+        if buffer is None:
+            return 0
+        return buffer.pending_count
+
     # ── 内部 ────────────────────────────────────────────────────────
 
-    def _select(self, session_id: str | None) -> list[tuple[str, _SessionFile]]:
+    def _select(self, session_id: str | None) -> list[tuple[str, WriteBehindBuffer]]:
         if session_id is None:
-            return list(self._files.items())
-        single = self._files.get(session_id)
+            return list(self._buffers.items())
+        single = self._buffers.get(session_id)
         return [(session_id, single)] if single is not None else []
 
-    def _open_if_needed(self, session_id: str) -> _SessionFile | None:
-        existing = self._files.get(session_id)
-        if existing is not None:
+    def _buffer_for(self, session_id: str) -> WriteBehindBuffer | None:
+        """取(或按需创建)session 的 write-behind 缓冲(持锁调用)。
+
+        文件句柄在首批落盘时才由 :class:`JsonlFileSink` 惰性打开;
+        打开/写入失败在批写入时经 ``on_failure`` 记录,事件保留待重试。
+        """
+        existing = self._buffers.get(session_id)
+        if existing is not None and not existing.is_closed:
             return existing
-        path = self.local_path(session_id)
-        try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            handle = path.open("a", encoding="utf-8")
-        except OSError as exc:
+        sink = JsonlFileSink(self.local_path(session_id), fsync=self._fsync)
+        buffer = WriteBehindBuffer(
+            sink,
+            max_delay_ms=self._max_delay_ms,
+            on_failure=self._make_on_failure(session_id),
+        )
+        self._buffers[session_id] = buffer
+        return buffer
+
+    def _make_on_failure(self, session_id: str) -> Callable[[Exception], None]:
+        def _on_failure(exc: Exception) -> None:
             _log.warning(
-                "session.persistence.open_failed",
+                "session.persistence.batch_write_failed",
                 session_id=session_id,
-                path=str(path),
+                path=str(self.local_path(session_id)),
                 error=str(exc),
-                exc_info=True,
+                exc_info=exc,
             )
-            return None
-        sfile = _SessionFile(path=path, handle=handle, fsync=self._fsync)
-        self._files[session_id] = sfile
-        return sfile
 
-    def _write_header(self, sfile: _SessionFile, header: SessionHeader) -> None:
-        payload: dict[str, Any] = {"kind": _HEADER_KIND, **asdict(header)}
-        # ADR-0187 §3 D7 session-level assistant binding (PR-5).
-        # ``assistant_id`` is an additive JSONL field: when present and
-        # non-empty, the header advertises the binding; ``None`` / whitespace
-        # is omitted to keep pre-PR-5 byte layout unchanged. Readers tolerate
-        # absence (forward-compatible).
-        assistant_id = payload.get("assistant_id")
-        if not (isinstance(assistant_id, str) and assistant_id.strip()):
-            payload.pop("assistant_id", None)
-        sfile.write_line(payload)
-
-    def _write_event(self, sfile: _SessionFile, event: SessionEvent) -> None:
-        payload = _session_event_to_dict(event)
-        sfile.write_line(payload)
+        return _on_failure
 
 
-class _SessionFile:
-    """per-session 文件句柄包装(append 模式 + 可选 fsync)。"""
+class _ObserverAdapter:
+    """把 :class:`JsonlSessionPersistence` 装成 Session observer 的适配器。
 
-    def __init__(self, *, path: Path, handle: Any, fsync: bool) -> None:
-        self.path = path
-        self._handle = handle
-        self._fsync = fsync
+    ``__call__`` 承接 append 事件;``flush`` 承接 :meth:`Session.flush` 的
+    duck-type 探测(同步排空,失败重抛由 flush 链记 ``FlushResult(ok=False)``)。
+    """
 
-    def write_line(self, payload: Mapping[str, Any]) -> None:
-        line = json.dumps(payload, ensure_ascii=False)
-        self._handle.write(line + "\n")
-        self.flush()
+    def __init__(self, persistence: JsonlSessionPersistence) -> None:
+        self._persistence = persistence
 
-    def flush(self) -> None:
-        # durable 镜像契约:每条 append 行立刻 flush 到 OS。依赖 buffered
-        # 写入时,长活进程会让尾部事件滞留进程缓冲,session.jsonl 在磁盘上
-        # 表现为截断(事件已入 Session 内存日志,但镜像缺尾)。
-        # ``fsync`` 只决定是否进一步强制落盘。
-        self._handle.flush()
-        if self._fsync:
-            import os
+    def __call__(self, session: Any, event: SessionEvent) -> None:
+        self._persistence.on_session_event(session, event)
 
-            os.fsync(self._handle.fileno())
+    def flush(self, session: Any) -> None:
+        self._persistence.flush(session)
 
-    def close(self) -> None:
-        with contextlib.suppress(OSError):
-            self._handle.flush()
-        self._handle.close()
+
+def _header_payload(header: SessionHeader) -> dict[str, Any]:
+    payload: dict[str, Any] = {"kind": _HEADER_KIND, **asdict(header)}
+    # ADR-0187 §3 D7 session-level assistant binding (PR-5).
+    # ``assistant_id`` is an additive JSONL field: when present and
+    # non-empty, the header advertises the binding; ``None`` / whitespace
+    # is omitted to keep pre-PR-5 byte layout unchanged. Readers tolerate
+    # absence (forward-compatible).
+    assistant_id = payload.get("assistant_id")
+    if not (isinstance(assistant_id, str) and assistant_id.strip()):
+        payload.pop("assistant_id", None)
+    return payload
 
 
 # ── helpers ────────────────────────────────────────────────────────────
@@ -383,6 +416,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     persistence = JsonlSessionPersistence(
         runs_root=config.runs_root,
         fsync=config.fsync,
+        max_delay_ms=config.max_delay_ms,
     )
     ctx.provide("session.persistence.jsonl", persistence)
     register_to_session_store(ctx, persistence)

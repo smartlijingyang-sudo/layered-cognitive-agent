@@ -10,20 +10,16 @@ ADR-0169 PR-27(L10 / D9):默认 ``DEFAULT_FILENAME`` 改为 ``$run_id.spine.json
 PR-4 收口:旧 layout 已退役;新 reader / writer 只能识别 spine 命名。
 journal store 的 bootstrap 只看新 spine 路径。
 
-特性:
-- 每次 ``append`` 走"写 staging + fsync + atomic rename"协议,崩溃时不破坏
-  既有文件。
-- ``flush()`` 把内存 buffer 强制刷到磁盘。
-- ``close()`` 重复调用安全。
-- 可选 ``fsync_each_append=True`` 保证 required 事件跨进程持久。
+写入路径（write-behind 批量写入,对齐 DSH ``SessionWriteBehind``）:
+- ``append`` 先入内存账本（即时可读）,再入 ``WriteBehindBuffer`` 待批量落盘
+- ``WriteBehindBuffer`` 按 ``max_delay_ms`` 定时窗口批量写入 ``JsonlFileSink``
+- ``JsonlFileSink`` 以追加模式写入,每批一次 ``flush`` + 可选 ``fsync``
+- ``flush()`` 强制排空缓冲区;``close()`` 排空并关闭文件句柄
 """
 
 from __future__ import annotations
 
-import contextlib
 import json
-import os
-import time
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -36,10 +32,12 @@ from lca.infrastructure.observability.journal.schema_version import (
     SCHEMA_VERSION,
     check_schema_version,
 )
+from lca.infrastructure.persistence.jsonl_sink import JsonlFileSink
+from lca.infrastructure.persistence.write_behind import WriteBehindBuffer
 
 
 class FilesystemJournalStore(JournalStoreBackend):
-    """Append-only 文件账本(L2 durable)。"""
+    """Append-only 文件账本（write-behind 批量写入）。"""
 
     DEFAULT_FILENAME = "$run_id.spine.jsonl"
 
@@ -50,6 +48,7 @@ class FilesystemJournalStore(JournalStoreBackend):
         run_id: str = "default-run",
         filename: str | None = None,
         fsync_each_append: bool = True,
+        max_delay_ms: int = 200,
     ) -> None:
         from lca.infrastructure.observability.spine.sinks.naming import (
             resolve_filename,
@@ -62,11 +61,22 @@ class FilesystemJournalStore(JournalStoreBackend):
         resolved = resolve_filename(template, run_id)
         # 写入路径总是新 spine 命名(后续 append 落此)
         self._path = self._root / resolved
-        self._fsync_each_append = fsync_each_append
         self._events: list[StampedEvent] = []
+
         # bootstrap:仅识别 spine 命名;旧 layout 已下线
         if self._path.exists():
             self._load_existing()
+
+        # write-behind:内存 → 定时批量 → JsonlFileSink 追加落盘
+        self._sink = JsonlFileSink(
+            self._path,
+            fsync=fsync_each_append,
+            serializer=self._serialize,
+        )
+        self._buffer = WriteBehindBuffer(
+            self._sink,
+            max_delay_ms=max_delay_ms,
+        )
 
     @property
     def path(self) -> Path:
@@ -143,31 +153,11 @@ class FilesystemJournalStore(JournalStoreBackend):
     # ── JournalStoreBackend 契约 ──────────────────────────────
 
     def append(self, stamped: StampedEvent) -> StampedEvent:
-        # 1. 写 staging 临时文件
-        staging = self._path.with_suffix(
-            self._path.suffix + f".staging-{os.getpid()}-{time.time_ns()}"
-        )
-        try:
-            with staging.open("w", encoding="utf-8") as f:
-                json.dump(self._serialize(stamped), f, ensure_ascii=False)
-                if self._fsync_each_append:
-                    f.flush()
-                    os.fsync(f.fileno())
-        except OSError:
-            with contextlib.suppress(OSError):
-                staging.unlink()
-            raise
-
-        # 2. 原子 rename 到正式文件
-        try:
-            os.replace(staging, self._path)
-        except OSError:
-            with contextlib.suppress(OSError):
-                staging.unlink()
-            raise
-
-        # 3. 内存记账(允许并发读 snapshot)
+        """追加事件:先入内存账本（即时可读），再入 write-behind 待批量落盘。"""
+        # 1. 内存记账(允许并发读 snapshot)
         self._events.append(stamped)
+        # 2. 入 write-behind buffer（定时批量落盘）
+        self._buffer.enqueue(stamped)
         return stamped
 
     def events(self) -> Sequence[StampedEvent]:
@@ -183,11 +173,12 @@ class FilesystemJournalStore(JournalStoreBackend):
         return tuple(self._events[start:])
 
     def flush(self) -> None:
-        # 文件已在 append 时 fsync;此处 no-op
-        return None
+        """强制排空缓冲区,确保所有待写事件落盘。"""
+        self._buffer.flush()
 
     def close(self) -> None:
-        return None
+        """排空缓冲区并关闭文件句柄;幂等。"""
+        self._buffer.dispose()
 
     # ── 序列化辅助 ──────────────────────────────────────────────
 

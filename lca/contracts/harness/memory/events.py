@@ -227,3 +227,33 @@ class AssistantResponded:
     step: int
     content: str
     tool_calls: list[dict[str, Any]] | None = None
+
+
+@session_event("session.title.v1", visibility="audit")
+@dataclass(frozen=True)
+class SessionTitle:
+    """Latest-wins session title — log-only, never model-visible (ADR-0188).
+
+    ``message_seqs`` are the session event seqs of the user messages used to
+    derive this title (empty for an explicit user rename). ``source`` is one
+    of ``"fallback"`` / ``"provider"`` / ``"user"``: the built-in
+    deterministic fallback, a registered title provider, or an explicit user
+    rename (which pins the title against automatic generation).
+    """
+
+    title: str
+    message_seqs: tuple[int, ...]
+    source: str
+
+
+@session_event("session.checkpoint.v1", visibility="audit")
+@dataclass(frozen=True)
+class SessionCheckpoint:
+    """生命周期恢复检查点——恢复面唯一权威(消费方见 ``plugins/session/runtime/recovery.py``)。
+
+    ``status`` 取 :class:`LiveAgentStatus` 的 wire 值(``waiting_input`` /
+    ``disposed`` / 历史终态 ``completed`` / ``failed`` / ``canceled``);
+    ``working`` 禁止落检查点(恢复不变量)。
+    """
+
+    status: str

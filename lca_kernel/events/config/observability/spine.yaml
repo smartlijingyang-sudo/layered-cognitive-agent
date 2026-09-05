@@ -7,14 +7,7 @@
 consumer_rules:
   - prefix: "spine."
     subscribers:
-      - events.spine_chain_sink
       - lca.plugins.events.sinks.spine_file_sink.sink.SpineFileSink
-      - lca.plugins.events.sinks.journal.sink.JournalSink
-      - lca.plugins.events.subscribers.console_projector.subscriber.ConsoleProjectorSubscriber
-  # perceive 子树：SpineStepTreeAccumulator 额外构建 step tree
-  - prefix: "spine.cognition.brain.perceive."
-    subscribers:
-      - events.spine_step_tree_accumulator
 
 events:
   # ── Cognition（试点 + PR-2 一次性全迁，删-when：cognition reflector 旧

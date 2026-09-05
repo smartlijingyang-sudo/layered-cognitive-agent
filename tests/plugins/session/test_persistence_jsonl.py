@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -86,21 +87,27 @@ def test_register_to_writes_header_then_events(tmp_path: Path) -> None:
     assert lines[2]["seq"] == 1
 
 
-def test_append_durable_without_explicit_flush(tmp_path: Path) -> None:
-    """durable 镜像契约:append 后无需显式 flush,行已在磁盘。
+def test_append_durable_within_write_behind_window(tmp_path: Path) -> None:
+    """write-behind 契约:无显式 flush 时,事件在窗口到期后落盘。
 
-    回归锁:长活进程里依赖 buffered 写入会让尾部事件滞留进程缓冲,
-    session.jsonl 在磁盘上截断(事件已入 Session 内存日志,镜像缺尾)。
+    回归锁:窗口到期后尾部事件不得滞留进程缓冲——事件已入 Session
+    内存日志而镜像缺尾即为违约。显式 ``flush()`` 之外的持久性时序以
+    ``max_delay_ms`` 为上界(docs/specs/session-event-pipeline-spec.md §3.2)。
     """
     store = SessionStore()
     session = store.create("s-durable")
-    persistence = JsonlSessionPersistence(runs_root=tmp_path)
+    persistence = JsonlSessionPersistence(runs_root=tmp_path, max_delay_ms=10)
 
     persistence.register_to(session)
     session.append("spine.turn.started", {"turn": 1})
 
-    lines = _read_jsonl(persistence.local_path("s-durable"))
-    assert _event_types(lines) == ["spine.turn.started"]
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline:
+        path = persistence.local_path("s-durable")
+        if path.exists() and _event_types(_read_jsonl(path)) == ["spine.turn.started"]:
+            return
+        time.sleep(0.01)
+    pytest.fail("事件未在 write-behind 窗口内落盘")
 
 
 def test_header_only_written_once(tmp_path: Path) -> None:
@@ -227,7 +234,12 @@ def test_close_releases_handles(tmp_path: Path) -> None:
 def test_observer_does_not_swallow_event_after_open_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """observer 写入抛错由 Session contained,日志事件不丢失。"""
+    """observer 入队不做 I/O:open 失败不反噬 append,事件保留待重试。
+
+    write-behind 形态下失败时序后移:``on_session_event`` 只入队;
+    批写入(窗口到期或显式 flush)才触碰文件。批写失败时事件保留在
+    缓冲(不丢失),显式 ``flush()`` 重抛错误。
+    """
     store = SessionStore()
     session = store.create("s-fail")
     persistence = JsonlSessionPersistence(runs_root=tmp_path)
@@ -239,11 +251,16 @@ def test_observer_does_not_swallow_event_after_open_failure(
 
     monkeypatch.setattr(Path, "open", boom)
 
-    # observer 失败由 Session 实现层 contained,append 仍返回事件,
-    # 日志不变(本 plugin 失败不应回滚已 commit 的 append)。
+    # append 只入队,不受 open 失败影响;日志不变。
     event = session.append("survive", {"k": 1})
     assert event.seq == 0
     assert session.event_at(0) is event
+
+    # 显式 flush 触发批写入 → open 失败 → 重抛;事件保留在缓冲。
+    with pytest.raises(OSError, match="disk full"):
+        persistence.flush("s-fail")
+    # header 行 + 事件行都保留待重试(失败不丢失)。
+    assert persistence.pending_count("s-fail") == 2
 
 
 def test_append_unaffected_by_persistence_failure(tmp_path: Path) -> None:
@@ -271,8 +288,7 @@ def test_session_id_authoritative(tmp_path: Path) -> None:
         type="custom",
         seq=0,
         time=0,
-        data={"k": 1},
-    )
+        data={"k": 1}, session_id="elsewhere")
     persistence = JsonlSessionPersistence(runs_root=tmp_path)
     persistence.on_session_event(session, event)
     persistence.flush()
@@ -428,20 +444,6 @@ def test_register_to_session_store_with_no_store_logs(caplog: pytest.LogCaptureF
     ctx = _fake_ctx(store=None)
     persistence = JsonlSessionPersistence()
     register_to_session_store(ctx, persistence)  # 不抛
-
-
-# ── harness/session/persistence.py 未被改动(契约护栏)──────────────
-
-
-def test_harness_session_persistence_unchanged() -> None:
-    """护栏:本 plugin 不修改 lca/harness/session/persistence.py。
-
-    通过 import 与符号存在性做软断言;真正的源码对比由 git diff 守护。
-    """
-    from lca.harness.session import persistence as harness_persistence
-
-    assert hasattr(harness_persistence, "JsonlSessionPersistence")
-    assert hasattr(harness_persistence, "JsonlSessionPersistenceFactory")
 
 
 # ── ADR-0187 §3 D7: assistant_id 持久化（PR-5）───────────────────────

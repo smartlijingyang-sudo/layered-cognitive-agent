@@ -211,16 +211,6 @@ entries:
     config:
       target: cognitive
   # Cognitive is the default loop driver; the bundle decides whether to load
-  # alternative loops alongside it.
-
-  # This bridge is deliberately co-located with the selected ``agent_loop``.
-  # The base infrastructure bundle remains useful for tooling/observability-only
-  # profiles, which must not accidentally promise a Session Spine they cannot run.
-  - id: lca-session-live-builder-provider
-    name: lca_providers_session_live_builder
-    $module: lca.plugins.runtime.session_live_builder
-    config: {}
-
   # ── Plan-driven composers (one entry per capability plane) ─────────
   # Each composer is independently replaceable through a profile patch. The
   # default profile composes all four, while a specialized profile can replace

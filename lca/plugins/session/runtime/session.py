@@ -139,7 +139,14 @@ class Session(SessionProtocol):
         """下一条事件的序号 —— 恒等于当前日志长度（``seq = len(log)`` 契约）。"""
         return len(self._log)
 
-    def append(self, event_type: str, data: Mapping[str, Any]) -> SessionEvent:
+    def append(
+        self,
+        event_type: str,
+        data: Mapping[str, Any],
+        *,
+        actor: str | None = None,
+        visibility: str = "model",
+    ) -> SessionEvent:
         """校验 → 入日志 → fire observers（contained）→ 返回落日志的事件。
 
         precondition：``event_type`` 非空字符串；``data`` 可无损 JSON 序列化。
@@ -155,7 +162,15 @@ class Session(SessionProtocol):
             raise SessionReentryError(
                 f"session {self.id!r} append 重入: 上一次 append 的 observer fire 未结束"
             )
-        event = SessionEvent(type=event_type, seq=len(self._log), time=_now_ms(), data=snapshot)
+        event = SessionEvent(
+            type=event_type,
+            seq=len(self._log),
+            time=_now_ms(),
+            data=snapshot,
+            session_id=self.id,
+            actor=actor,
+            visibility=visibility,  # type: ignore[arg-type]
+        )
         self._appending = True
         try:
             # observer 快照在入日志前取：fire 期间新注册的观察者不收本事件。

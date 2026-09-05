@@ -70,11 +70,12 @@ class SessionStore:
                     exc_info=True,
                 )
 
-    def create(self, session_id: str | None = None) -> Session:
+    def create(self, session_id: str | None = None, header: SessionHeader | None = None) -> Session:
         """创建并入仓一个 Session。
 
         precondition：``session_id`` 缺省时自动发号；显式 id 不得与活
-        session 冲突。失败语义：冲突抛 ``ValueError``。
+        session 冲突；``header`` 非空时其 ``id`` 必须等于最终 ``session_id``。
+        失败语义：冲突 / header 不一致抛 ``ValueError``。
         所有权：返回的 Session 即仓内实例（``get`` 按同一对象返回）。
         """
         if session_id is None:
@@ -86,7 +87,9 @@ class SessionStore:
                     break
         elif session_id in self._sessions:
             raise ValueError(f"session {session_id!r} 已存在")
-        session = Session(session_id)
+        if header is not None and header.id != session_id:
+            raise ValueError(f"header.id {header.id!r} 与 session_id {session_id!r} 不一致")
+        session = Session(session_id, header=header)
         self._sessions[session_id] = session
         self._fanout_creation_hooks(session)
         return session

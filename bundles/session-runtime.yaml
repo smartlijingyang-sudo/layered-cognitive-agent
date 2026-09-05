@@ -30,3 +30,47 @@ entries:
       runs_root: traces/runs
       fsync: false
 
+  - id: lca.plugins.session.checkpoint_policy
+    name: session_checkpoint_policy
+    $module: lca.plugins.session.checkpoint_policy.checkpoint_policy
+    config: {}
+
+  # ── 投影家族（DSH session-projection 对齐）────────────────────────
+  - id: lca.plugins.session.projection_registry
+    name: session_projection_registry
+    $module: lca.plugins.session.projection_registry.projection_registry
+    config: {}
+
+  - id: lca.plugins.session.projection_cache
+    name: session_projection_cache
+    $module: lca.plugins.session.projection_cache.projection_cache
+    config: {}
+
+  - id: lca.plugins.session.session_stats
+    name: session_projection_stats
+    $module: lca.plugins.session.session_stats.session_stats
+    config: {}
+
+  - id: lca.plugins.session.session_turn_outline
+    name: session_projection_turn_outline
+    $module: lca.plugins.session.session_turn_outline.session_turn_outline
+    config: {}
+
+  # ── 标题家族（DSH session-title 对齐；LLM provider 按部署选挂）────
+  - id: lca.plugins.session.title_service
+    name: session_title_service
+    $module: lca.plugins.session.title_service.title_service
+    config: {}
+
+  # ── 遥测家族（DSH session-telemetry 对齐；默认 DISABLED 不出站）──
+  - id: lca.plugins.session.telemetry_capture
+    name: session_telemetry_capture
+    $module: lca.plugins.session.telemetry_capture.telemetry_capture
+    config: {}
+
+  - id: lca.plugins.session.telemetry_otel
+    name: session_telemetry_otel
+    $module: lca.plugins.session.telemetry_otel.telemetry_otel
+    config:
+      mode: DISABLED
+

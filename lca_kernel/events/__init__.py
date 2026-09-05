@@ -14,7 +14,6 @@ PR-1 收口：EventBus 改为 EnvelopeBus 子类,保留全部现有方法。
 
 不在此暴露：
 - :class:`EventRegistry` —— SSOT 加载器，机制内部
-- :class:`JournalSink` —— 默认 sink，机制内部
 - 任何旧 ``JournalEvent`` / ``record()`` / reflector helper
 """
 
