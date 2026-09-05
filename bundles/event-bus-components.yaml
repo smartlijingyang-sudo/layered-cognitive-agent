@@ -119,3 +119,9 @@ entries:
     name: lca_events_sink_spine_file
     $module: lca.plugins.events.sinks.spine_file_sink
     config: {}
+
+  # ── Subscriber: exception index (write-behind) ──
+  - id: events.subscriber.exception_index_writer
+    name: events_subscriber_exception_index_writer
+    $module: lca.plugins.events.subscribers.exception_index_writer
+    config: {}

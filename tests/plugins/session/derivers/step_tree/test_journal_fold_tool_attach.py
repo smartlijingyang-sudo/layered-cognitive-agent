@@ -189,3 +189,48 @@ def test_tool_record_before_any_step_is_dropped() -> None:
     ]
     doc = fold_step_tree(events, run_id="r_orphan_tool")
     assert doc.totals.steps == 0
+
+
+def test_body_tool_execute_end_ok_false_from_outcome() -> None:
+    """body.tool.execute.end 缺 ok 字段时从 outcome 推导,不能 ``ok or True`` 恒真。"""
+    events = [
+        {"execution_point": "brain.think.start", "payload": {}, "when": 1.0},
+        {"execution_point": "brain.think.end", "payload": {}, "outcome": "success", "when": 2.0},
+        {
+            "execution_point": "body.tool.execute.end",
+            "payload": {"tool_name": "bash", "outcome": "failed", "ok": False},
+            "when": 3.0,
+        },
+    ]
+    doc = fold_step_tree(events, run_id="r_tool_fail", outcome="failed")
+    step = doc.steps[0]
+    assert step.tool_result is not None
+    assert step.tool_result.ok is False
+
+
+def test_exception_caught_marks_step_error_and_failed_outcome() -> None:
+    """exception.caught 写入 step.error 且 metadata.outcome=failed。"""
+    events = [
+        {"execution_point": "brain.think.start", "payload": {}, "when": 1.0},
+        {"execution_point": "brain.think.end", "payload": {}, "outcome": "success", "when": 2.0},
+        {
+            "execution_point": "body.tool.execute.end",
+            "payload": {"tool_name": "search_skill", "outcome": "success"},
+            "when": 3.0,
+        },
+        {
+            "execution_point": "exception.caught",
+            "payload": {
+                "exception_class": "ValidationError",
+                "exception_message": "category mapping missing",
+            },
+            "when": 4.0,
+        },
+    ]
+    doc = fold_step_tree(events, run_id="r_exc", outcome="failed")
+    assert doc.metadata.outcome == "failed"
+    step = doc.steps[0]
+    assert step.error == "category mapping missing"
+    assert step.outcome == "failed"
+    assert step.tool_result is not None
+    assert step.tool_result.ok is True

@@ -226,6 +226,7 @@ class _Frame:
     reflect: ReflectTrace | None = None
     segments: list[SegmentRecord] = field(default_factory=list)
     outcome: str | None = None
+    error: str | None = None
     exited_at: float | None = None
     model: str = ""
     request_reason: str = ""
@@ -254,6 +255,9 @@ class _StepTreeState:
 
 def _capture_outcome(state: _StepTreeState, ep: str, event: Mapping[str, Any]) -> None:
     """从 terminal EP 捕获 run 终态。"""
+    if ep == "exception.caught":
+        state.terminal_outcome = "failed"
+        return
     if ep in {"kernel.run.stop", "lifecycle.finally"}:
         ev_outcome = str(event.get("outcome") or "").strip().lower()
         if ev_outcome in {"success", "completed"}:
@@ -328,6 +332,31 @@ def _begin_step(state: _StepTreeState, event: Mapping[str, Any], ts: float) -> N
         opened_by="writable",
         window_signal="explicit",
     )
+
+
+def _tool_result_ok(payload: Mapping[str, Any]) -> bool:
+    """从 tool result / body.tool.execute.end payload 推导 ok。"""
+    if "ok" in payload:
+        return bool(payload.get("ok"))
+    outcome = str(payload.get("outcome") or "success").strip().lower()
+    return outcome in {"success", "completed", ""}
+
+
+def _capture_exception(state: _StepTreeState, payload: Mapping[str, Any], ts: float) -> None:
+    """``exception.caught`` → 关联 step 错误 + run 终态 failed。"""
+    state.terminal_outcome = "failed"
+    msg = str(payload.get("exception_message") or payload.get("reason") or "").strip()
+    if not msg:
+        exc_type = str(payload.get("exception_class") or payload.get("exc_type") or "Error")
+        msg = exc_type
+    target = state.open_step
+    if target is None and state.closed_frames:
+        target = state.closed_frames[-1]
+    if target is not None:
+        target.error = msg[:2000]
+        target.outcome = "failed"
+        if target.exited_at is None:
+            target.exited_at = ts
 
 
 def _close_step(state: _StepTreeState, outcome: str) -> None:
@@ -635,7 +664,7 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
                 tuple(str(f) for f in files_raw) if isinstance(files_raw, (list, tuple)) else ()
             )
             target.tool_result = ToolResult(
-                ok=bool(payload.get("ok", True)),
+                ok=_tool_result_ok(payload),
                 latency_ms=int(payload.get("latency_ms") or 0),
                 stdout_head=str(payload.get("stdout_head") or "")[:2000],
                 stdout_chars_total=int(payload.get("stdout_chars_total") or 0),
@@ -664,7 +693,7 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
                 tuple(str(f) for f in files_raw) if isinstance(files_raw, (list, tuple)) else ()
             )
             target.tool_result = ToolResult(
-                ok=bool(payload.get("ok") or True),
+                ok=_tool_result_ok(payload),
                 latency_ms=int(payload.get("latency_ms") or 0),
                 stdout_head=str(payload.get("stdout_head") or "")[:2000],
                 stdout_chars_total=int(payload.get("stdout_chars_total") or 0),
@@ -674,6 +703,8 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
                 error=payload.get("error"),
                 delta_summary=str(payload.get("delta_summary") or ""),
             )
+    elif ep == "exception.caught":
+        _capture_exception(state, payload, ts)
 
 
 def _materialize(
@@ -690,9 +721,14 @@ def _materialize(
     if outcome is not None:
         state.terminal_outcome = outcome
     if state.open_step is not None:
-        # run 已 completed 时,残留 open step 属正常收口;其余(中断 /
-        # 无终态信号)维持 cancelled。
-        residual_outcome = "success" if state.terminal_outcome == "completed" else "cancelled"
+        # run 已 completed 时,残留 open step 属正常收口;failed 标 failed;
+        # 其余(中断 / 无终态信号)维持 cancelled。
+        if state.terminal_outcome == "completed":
+            residual_outcome = "success"
+        elif state.terminal_outcome == "failed":
+            residual_outcome = "failed"
+        else:
+            residual_outcome = "cancelled"
         _close_step(state, residual_outcome)
         state.open_step = None
 
@@ -711,6 +747,7 @@ def _materialize(
             reflect=f.reflect,
             segments=tuple(f.segments),
             outcome=f.outcome,
+            error=f.error,
             extra={"window_signal": f.window_signal},
         )
         for f in sorted(state.closed_frames, key=lambda fr: fr.step_index)

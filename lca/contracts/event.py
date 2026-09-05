@@ -98,6 +98,14 @@ class Category(str, Enum):
     SPINE_WRITABLE_ITERATION_HALT = "spine.writable.iteration.halt"
     SPINE_WRITABLE_ITERATION_CLOSING = "spine.writable.iteration.closing"
     SPINE_WRITABLE_ITERATION_CLOSE = "spine.writable.iteration.close"
+    # observability/spine — loop cursor record_* + i17 self-observation
+    SPINE_STEP_THINKING_RECORD = "spine.step.thinking.record"
+    SPINE_STEP_TOOL_CALL_RECORD = "spine.step.tool_call.record"
+    SPINE_STEP_TOOL_RESULT_RECORD = "spine.step.tool_result.record"
+    SPINE_STEP_REFLECT_RECORD = "spine.step.reflect.record"
+    SPINE_STEP_SPAN_RECORD = "spine.step.span.record"
+    SPINE_I17_REJECTED = "spine.i17.rejected"
+    SPINE_PRODUCER_FAILURE = "spine.producer.failure"
     SPINE_PERCEIVE_PHASE_FOLD = "spine.perceive.phase.fold"
     SPINE_PHASE_PERCEIVE_FOLD = "spine.phase.perceive.fold"
     SPINE_PHASE_THINK_FOLD = "spine.phase.think.fold"
@@ -215,6 +223,13 @@ CATEGORY_DEFAULT_PLANE: dict[Category, Plane] = {
     Category.SPINE_WRITABLE_ITERATION_HALT: Plane.OBSERVABILITY,
     Category.SPINE_WRITABLE_ITERATION_CLOSING: Plane.OBSERVABILITY,
     Category.SPINE_WRITABLE_ITERATION_CLOSE: Plane.OBSERVABILITY,
+    Category.SPINE_STEP_THINKING_RECORD: Plane.OBSERVABILITY,
+    Category.SPINE_STEP_TOOL_CALL_RECORD: Plane.OBSERVABILITY,
+    Category.SPINE_STEP_TOOL_RESULT_RECORD: Plane.OBSERVABILITY,
+    Category.SPINE_STEP_REFLECT_RECORD: Plane.OBSERVABILITY,
+    Category.SPINE_STEP_SPAN_RECORD: Plane.OBSERVABILITY,
+    Category.SPINE_I17_REJECTED: Plane.OBSERVABILITY,
+    Category.SPINE_PRODUCER_FAILURE: Plane.OBSERVABILITY,
     Category.SPINE_PERCEIVE_PHASE_FOLD: Plane.OBSERVABILITY,
     Category.SPINE_PHASE_PERCEIVE_FOLD: Plane.OBSERVABILITY,
     Category.SPINE_PHASE_THINK_FOLD: Plane.OBSERVABILITY,

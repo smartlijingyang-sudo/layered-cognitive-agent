@@ -13,6 +13,15 @@ Journal 和 Session 的持久化都应通过本模块的 ``WriteBehindBuffer`` �
 """
 
 from lca.infrastructure.persistence.jsonl_sink import JsonlFileSink
+from lca.infrastructure.persistence.run_buffer_registry import (
+    RunWriteBehindRegistry,
+    SessionPersistenceFlushListener,
+)
+from lca.infrastructure.persistence.run_paths import (
+    exceptions_path_for_run,
+    run_id_from_event_id,
+    spine_path_for_run,
+)
 from lca.infrastructure.persistence.write_behind import (
     DropPolicy,
     WriteBehindBuffer,
@@ -22,6 +31,11 @@ from lca.infrastructure.persistence.write_behind import (
 __all__ = [
     "DropPolicy",
     "JsonlFileSink",
+    "RunWriteBehindRegistry",
+    "SessionPersistenceFlushListener",
     "WriteBehindBuffer",
     "WriteBehindSink",
+    "exceptions_path_for_run",
+    "run_id_from_event_id",
+    "spine_path_for_run",
 ]

@@ -575,7 +575,8 @@ class StepTreeAccumulatorDeriver(Deriver):
             target = self._resolve_step_target(event, p)
             if target is not None:
                 target.tool_result = ToolResult(
-                    ok=bool(p.get("ok", True)),
+                    ok=bool(p.get("ok")) if "ok" in p else str(p.get("outcome") or "success").lower()
+                    in {"success", "completed", ""},
                     latency_ms=int(p.get("latency_ms") or 0),
                     stdout_head=str(p.get("stdout_head", ""))[:2000],
                     stdout_chars_total=int(p.get("stdout_chars_total", 0) or 0),

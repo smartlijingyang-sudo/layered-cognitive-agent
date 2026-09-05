@@ -57,6 +57,8 @@ def record_terminal_materialization(session: RunSession) -> None:
                 summary=report.summary,
             )
         manifest_path = locator.manifest_path(session.run_id)
+        session_error = str(session.error or "")
+        session_status = str(getattr(session.status, "value", session.status) or "")
         manifest = RunManifest(
             run_id=session.run_id,
             # ADR-0068 §决策二:plan_ref 顶层字段(declarative: compiled_run_plan_ref
@@ -65,6 +67,8 @@ def record_terminal_materialization(session: RunSession) -> None:
             # build 阶段填好(PR 修复);此处不再 ``getattr`` 兜底,字段缺失应
             # fail-loud 而不是 silent 默认 ""(之前 diagnostics 也清理过同类兜底)。
             plan_ref=str(session.plan_ref),
+            session_error=session_error,
+            session_status=session_status,
             terminal_event_seq=terminal_event_seq_for(session),
             ledger_high_watermark=ledger_high_watermark_for(session),
             ledger_summary=ledger_summary_for(session),
@@ -73,11 +77,11 @@ def record_terminal_materialization(session: RunSession) -> None:
             extra={
                 "doctor_report": report.as_dict(),
                 "flush_errors": tuple(flush_errors),
-                # Carrier pre-journal failures live on session.error; persist
-                # them so offline debug-run can read the message after the
-                # live session is gone (ADR-0165.1 / ADR-0122 gap).
-                "session_error": str(session.error or ""),
-                "session_status": str(getattr(session.status, "value", session.status) or ""),
+                # COMPAT(owner: ADR-0165.1, from: extra.session_error,
+                # delete_when: rg 'extra\\.session_error' traces/ scripts/ tests/ = 0,
+                # forbidden_new_usage: 新 reader 读顶层 session_error/session_status)
+                "session_error": session_error,
+                "session_status": session_status,
             },
         )
         atomic_write_text(

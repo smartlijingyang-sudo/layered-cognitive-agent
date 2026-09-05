@@ -168,3 +168,39 @@ def test_json_output(tmp_path: Path) -> None:
     data = json.loads(result.stdout)
     assert data["count"] == 1
     assert data["records"][0]["payload"]["exception_class"] == "AttributeError"
+
+
+def test_spine_fallback_when_exceptions_index_missing(tmp_path: Path) -> None:
+    """ADR-0183 SpineSink 路径无 exceptions.jsonl 时,回退读 spine.jsonl。"""
+    runner = CliRunner()
+    traces_root = tmp_path / "traces"
+    run_id = "run_spine_only"
+    run_dir = traces_root / "runs" / run_id
+    run_dir.mkdir(parents=True)
+    spine_path = run_dir / f"{run_id}.spine.jsonl"
+    spine_path.write_text(
+        json.dumps(
+            {
+                "execution_point": "exception.caught",
+                "channel": "error",
+                "payload": {
+                    "exception_class": "ValidationError",
+                    "exception_message": "bad payload",
+                    "boundary": "act.main",
+                    "traceback_text": "Traceback...\nValidationError: bad payload",
+                },
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    result = runner.invoke(
+        app,
+        ["journal", "exceptions", run_id, "--traces-root", str(traces_root), "--json"],
+    )
+    assert result.exit_code == 0
+    data = json.loads(result.stdout)
+    assert data["source"] == "spine_fallback"
+    assert data["count"] == 1
+    assert data["records"][0]["payload"]["exception_class"] == "ValidationError"

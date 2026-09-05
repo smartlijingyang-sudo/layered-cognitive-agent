@@ -48,7 +48,24 @@ def test_category_mapping_for_pilot_ep() -> None:
     """试点 EP → category 映射正确。"""
     p = SpineEventPayload(execution_point="brain.perceive.start")
     assert p.category == Category("spine.cognition.brain.perceive.start")
-    assert p.category.value == "spine.cognition.brain.perceive.start"
+
+
+def test_all_spine_execution_points_have_category_mapping() -> None:
+    """SPINE_EXECUTION_POINTS 闭集内每个 EP 都必须登记 category 映射。"""
+    from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
+
+    missing = sorted(ep for ep in SPINE_EXECUTION_POINTS if ep not in _SPINE_EP_TO_CATEGORY)
+    assert missing == [], f"missing _SPINE_EP_TO_CATEGORY entries: {missing}"
+
+
+def test_loop_cursor_record_ep_passes_validation() -> None:
+    """loop cursor record_* EP 经 EventBus 路径时不应再 fail-fast。"""
+    p = SpineEventPayload(
+        execution_point="step.tool_call.record",
+        channel="fact",
+        payload={"tool_name": "search_skill"},
+    )
+    assert p.category == Category("spine.step.tool_call.record")
 
 
 def test_pilot_ep_in_whitelist() -> None:

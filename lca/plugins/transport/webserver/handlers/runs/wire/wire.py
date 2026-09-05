@@ -11,6 +11,7 @@ Computer tools split by execution context:
 from __future__ import annotations
 
 from lca.infrastructure.tools.ask_user import IDENTIFIER as _USER_INTERACTION
+from lca.infrastructure.tools.composio import IDENTIFIER as _COMPOSIO
 from lca.infrastructure.tools.lca_computer.manifest import LOCAL_SYSTEM_ID as _LOCAL_SYSTEM
 from lca.infrastructure.tools.lca_sandbox import IDENTIFIER as _CLOUD_SANDBOX
 from lca.infrastructure.tools.skills.manifest import _SKILL_STORE_IDENTIFIER as _SKILL_STORE
@@ -60,8 +61,24 @@ WIRE: dict[str, tuple[str, str]] = {
     # ── web search / user interaction ──
     "search": (_WEB_BROWSING, "search"),
     "askUserQuestion": (_USER_INTERACTION, "askUserQuestion"),
+    # ── composio (LCA-native integration) ──
+    "composioConnect": (_COMPOSIO, "composioConnect"),
+    "composioRefresh": (_COMPOSIO, "composioRefresh"),
 }
 
 
 def resolve(name: str) -> tuple[str, str] | None:
-    return WIRE.get(name)
+    direct = WIRE.get(name)
+    if direct is not None:
+        return direct
+    return _resolve_composio_action(name)
+
+
+def _resolve_composio_action(name: str) -> tuple[str, str] | None:
+    """Map a Composio action slug to (identifier, apiName) for LobeHub UI projection."""
+    from lca.infrastructure.integrations.composio.catalog import resolve_identifier_for_tool_slug
+
+    identifier = resolve_identifier_for_tool_slug(name)
+    if identifier is None:
+        return None
+    return identifier, name

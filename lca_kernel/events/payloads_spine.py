@@ -230,6 +230,15 @@ _SPINE_EP_TO_CATEGORY: dict[str, str] = {
     "phase.tool.call.start": "spine.phase.tool.call.start",
     "phase.tool.call.end": "spine.phase.tool.call.end",
     "phase.tool.denied": "spine.phase.tool.denied",
+    # Loop cursor record_* (ADR-0167 D2 / ADR-0181 PR-10)
+    "step.thinking.record": "spine.step.thinking.record",
+    "step.tool_call.record": "spine.step.tool_call.record",
+    "step.tool_result.record": "spine.step.tool_result.record",
+    "step.reflect.record": "spine.step.reflect.record",
+    "step.span.record": "spine.step.span.record",
+    # Spine self-observation (ADR-0165 i17)
+    "spine.i17.rejected": "spine.i17.rejected",
+    "spine.producer.failure": "spine.producer.failure",
     # Phase graph (PR-5)
     "phase_graph.node.start": "spine.phase_graph.node.start",
     "phase_graph.node.end": "spine.phase_graph.node.end",

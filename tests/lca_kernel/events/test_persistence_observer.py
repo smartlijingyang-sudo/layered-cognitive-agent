@@ -68,11 +68,15 @@ def _authorized_payload() -> EventPayload:
 @pytest.fixture(autouse=True)
 def _isolate_singletons() -> Any:
     """每个测试清空 EnvelopeBus + PersistenceObserver 进程级单例,避免串扰。"""
+    from lca.infrastructure.persistence.run_buffer_registry import RunWriteBehindRegistry
+
     EnvelopeBus.reset_singleton()
     PersistenceObserver.reset_singleton()
+    RunWriteBehindRegistry.reset_singleton()
     yield
     EnvelopeBus.reset_singleton()
     PersistenceObserver.reset_singleton()
+    RunWriteBehindRegistry.reset_singleton()
 
 
 # ── 1:FsyncProtocol 默认值 ──────────────────────────────────────────────
@@ -347,6 +351,7 @@ class TestExecutionPointLabeling:
             seq=8,
             time=1_788_512_186_015,
             data={"step_id": "step-001", "reason": "initial"},
+            session_id="run_ep_label",
         )
         observer(_StubSession("run_ep_label"), event)
         assert len(sink.records) == 1
@@ -365,6 +370,7 @@ class TestExecutionPointLabeling:
             seq=1,
             time=1_788_512_185_000,
             data={"execution_point": "brain.think.start", "state_id": "s"},
+            session_id="run_ep_keep",
         )
         observer(_StubSession("run_ep_keep"), event)
         assert sink.records[0].execution_point == "brain.think.start"
@@ -380,6 +386,7 @@ class TestExecutionPointLabeling:
             seq=2,
             time=1_788_512_186_000,
             data={"foo": 1},
+            session_id="run_ep_unknown",
         )
         observer(_StubSession("run_ep_unknown"), event)
         assert sink.records[0].execution_point == "unknown"

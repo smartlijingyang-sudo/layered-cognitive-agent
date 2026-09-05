@@ -187,3 +187,21 @@ def test_manifest_plan_ref_position_locked_between_run_id_and_terminal_event_seq
     assert run_id_idx < plan_ref_idx < terminal_seq_idx, (
         f"plan_ref must be between run_id and terminal_event_seq, got keys order: {keys}"
     )
+
+
+def test_manifest_session_error_top_level_field() -> None:
+    """session_error / session_status 是顶层字段,兼容 extra 镜像。"""
+    m = RunManifest(
+        run_id="r1",
+        session_error="ValidationError: boom",
+        session_status="failed",
+    )
+    payload = m.to_dict()
+    assert payload["session_error"] == "ValidationError: boom"
+    assert payload["session_status"] == "failed"
+    restored = RunManifest.from_dict({"run_id": "r1", "extra": {"session_error": "legacy"}})
+    assert restored.session_error == "legacy"
+    restored_top = RunManifest.from_dict(
+        {"run_id": "r1", "session_error": "top", "extra": {"session_error": "legacy"}}
+    )
+    assert restored_top.session_error == "top"

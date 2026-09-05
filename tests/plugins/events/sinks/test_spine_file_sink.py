@@ -13,11 +13,22 @@ from pathlib import Path
 
 import pytest
 
+from lca.infrastructure.persistence.run_buffer_registry import RunWriteBehindRegistry
 from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink, _run_id_of
 from lca.plugins.session.runtime.bus_facade import SessionBusFacade
 from lca.plugins.session.runtime.session import Session
 from lca_kernel.events import EventRef
 from lca_kernel.events.payloads import SpineEventPayload
+from lca_kernel.events.persistence import PersistenceObserver
+
+
+@pytest.fixture(autouse=True)
+def _isolate_write_behind_singletons() -> None:
+    PersistenceObserver.reset_singleton()
+    RunWriteBehindRegistry.reset_singleton()
+    yield
+    PersistenceObserver.reset_singleton()
+    RunWriteBehindRegistry.reset_singleton()
 
 _RECORD_KEYS = {
     "event_id",
@@ -56,6 +67,7 @@ def test_spine_file_sink_writes_ten_key_record(tmp_path: Path) -> None:
     """build_record 单一入口落盘：10 键 SSOT 布局（含 trace_id）+ sort_keys 序列化。"""
     sink = SpineFileSink(run_dir=tmp_path)
     sink(_payload(), _ref("run-test-1:0"))
+    sink.flush()
 
     target = tmp_path / "run-test-1.spine.jsonl"
     lines = target.read_text(encoding="utf-8").splitlines()
@@ -81,6 +93,7 @@ def test_spine_file_sink_routes_each_run_to_own_file(tmp_path: Path) -> None:
     sink(_payload(), _ref("run-a:0"))
     sink(_payload(), _ref("run-b:0"))
     sink(_payload(), _ref("run-a:1"))
+    sink.flush()
 
     run_a = (tmp_path / "run-a.spine.jsonl").read_text(encoding="utf-8").splitlines()
     run_b = (tmp_path / "run-b.spine.jsonl").read_text(encoding="utf-8").splitlines()
@@ -93,9 +106,11 @@ def test_spine_file_sink_observes_real_session_run_id(tmp_path: Path) -> None:
     """经 SessionBusFacade 全链：文件取 session.id，不产生 default-run 文件。"""
     session = Session("run-e2e-42")
     facade = SessionBusFacade(session)
-    facade.observe(SpineFileSink, SpineFileSink(run_dir=tmp_path))
+    sink = SpineFileSink(run_dir=tmp_path)
+    facade.observe(SpineFileSink, sink)
 
     facade.append(_payload(), producer=object())
+    sink.flush()
 
     target = tmp_path / "run-e2e-42.spine.jsonl"
     assert target.exists()
@@ -152,6 +167,7 @@ def test_spine_file_sink_default_path_lands_under_traces_runs(
     monkeypatch.chdir(tmp_path)
     sink = SpineFileSink()
     sink(_payload(), _ref("run-default-path:0"))
+    sink.flush()
 
     target = tmp_path / "traces" / "runs" / "run-default-path" / "run-default-path.spine.jsonl"
     assert target.exists()
@@ -166,3 +182,4 @@ def test_spine_file_sink_default_path_lands_under_traces_runs(
 def test_run_id_of_parses_session_delivery_shape(event_id: str, expected: str) -> None:
     """'{session.id}:{seq}' 反解；rpartition 容忍 run id 自带冒号。"""
     assert _run_id_of(event_id) == expected
+

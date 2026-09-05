@@ -43,10 +43,12 @@ class JsonlFileSink(WriteBehindSink):
         path: Path | str,
         *,
         fsync: bool = True,
+        sort_keys: bool = False,
         serializer: Callable[[Any], dict[str, Any]] | None = None,
     ) -> None:
         self._path = Path(path)
         self._fsync = fsync
+        self._sort_keys = sort_keys
         self._serializer = serializer or _default_serializer
         self._handle: Any = None
         self._closed = False
@@ -66,7 +68,9 @@ class JsonlFileSink(WriteBehindSink):
         lines: list[str] = []
         for event in events:
             payload = self._serializer(event)
-            lines.append(json.dumps(payload, ensure_ascii=False, default=str))
+            lines.append(
+                json.dumps(payload, ensure_ascii=False, default=str, sort_keys=self._sort_keys)
+            )
 
         handle.write("\n".join(lines) + "\n")
         handle.flush()

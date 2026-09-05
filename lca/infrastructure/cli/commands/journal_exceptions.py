@@ -18,9 +18,9 @@
     ./scripts/lca-ops journal exceptions --raw                 # 完整 payload
     ./scripts/lca-ops journal exceptions --grep AttributeError # 按 class 过滤
 
-设计上不重读 spine 主 ledger —— 主 ledger 异常行是
-``{execution_point, offloaded}`` 占位符(>4 KiB offload 到 sidecar),
-查 traceback 必须走 exceptions.jsonl 或 sidecar,前者是专用索引。
+设计上优先读 ``<run_id>.exceptions.jsonl``(旧 FileSink 双写索引)。
+ADR-0183 ``SpineSink`` 路径只写 ``<run_id>.spine.jsonl`` 时,本命令回退扫描
+spine 主 ledger 中的 ``exception.caught`` 行,避免"有异常但 CLI 报无异常"。
 """
 
 from __future__ import annotations
@@ -35,16 +35,36 @@ import typer
 _DEFAULT_TRACES_ROOT = Path("traces")
 
 
-def _find_exceptions_path(run_id: str, traces_root: Path) -> Path:
-    """定位 <run_id>/<run_id>.exceptions.jsonl。
-
-    run_id 空 → 取 traces/runs 下 mtime 最新的 run。
-    """
+def _find_run_dir(run_id: str, traces_root: Path) -> Path:
     if not run_id:
         from lca.infrastructure.cli.commands._shared import find_latest_run_id
 
         run_id = find_latest_run_id(traces_root)
-    return traces_root / "runs" / run_id / f"{run_id}.exceptions.jsonl"
+    return traces_root / "runs" / run_id
+
+
+def _iter_spine_exception_records(spine_path: Path) -> list[dict[str, Any]]:
+    if not spine_path.exists():
+        return []
+    out: list[dict[str, Any]] = []
+    for line in spine_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if rec.get("execution_point") != "exception.caught":
+            continue
+        payload = rec.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        # 兼容旧 offload 占位符:只有 offloaded digest 时跳过,交给 sidecar 路径。
+        if payload.keys() <= {"offloaded", "execution_point"} or payload.get("offloaded"):
+            continue
+        out.append(rec)
+    return out
 
 
 def _iter_records(path: Path) -> list[dict[str, Any]]:
@@ -142,15 +162,25 @@ def register(app: typer.Typer) -> None:
             _DEFAULT_TRACES_ROOT, "--traces-root", help="traces 根目录"
         ),
     ) -> None:
-        """列出 run 的所有 traceback(从 ``<run_id>.exceptions.jsonl`` 读)。"""
-        exc_path = _find_exceptions_path(run_id, traces_root)
-        if not exc_path.exists():
+        """列出 run 的所有 traceback(优先 exceptions.jsonl,回退 spine.jsonl)。"""
+        run_dir = _find_run_dir(run_id, traces_root)
+        exc_path = run_dir / f"{run_dir.name}.exceptions.jsonl"
+        spine_path = run_dir / f"{run_dir.name}.spine.jsonl"
+        source = "exceptions_index"
+        if exc_path.exists():
+            records = _iter_records(exc_path)
+        else:
+            records = _iter_spine_exception_records(spine_path)
+            source = "spine_fallback"
+        if not records and not exc_path.exists() and not spine_path.exists():
             if json_output:
                 sys.stdout.write(
                     json.dumps(
                         {
-                            "run_id": exc_path.parent.name if exc_path.parent else "",
+                            "run_id": run_dir.name,
                             "exceptions_path": str(exc_path),
+                            "spine_path": str(spine_path),
+                            "source": source,
                             "count": 0,
                             "records": [],
                         },
@@ -159,10 +189,33 @@ def register(app: typer.Typer) -> None:
                     + "\n"
                 )
             else:
-                print(f"无异常:{exc_path} 不存在 (该 run 无 exception.caught 事件)")
+                print(
+                    f"无异常:{exc_path} 不存在且 {spine_path} 不存在 "
+                    "(该 run 无 exception.caught 事件)"
+                )
             return
-
-        records = _iter_records(exc_path)
+        if not records:
+            if json_output:
+                sys.stdout.write(
+                    json.dumps(
+                        {
+                            "run_id": run_dir.name,
+                            "exceptions_path": str(exc_path),
+                            "spine_path": str(spine_path),
+                            "source": source,
+                            "count": 0,
+                            "records": [],
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
+            else:
+                print(
+                    f"无异常:{exc_path} 不存在,且 {spine_path} 中无完整 "
+                    "exception.caught 行 (该 run 无 exception.caught 事件)"
+                )
+            return
         if grep:
             records = [
                 r
@@ -172,8 +225,10 @@ def register(app: typer.Typer) -> None:
 
         if json_output:
             payload = {
-                "run_id": exc_path.parent.name,
+                "run_id": run_dir.name,
                 "exceptions_path": str(exc_path),
+                "spine_path": str(spine_path),
+                "source": source,
                 "count": len(records),
                 "records": records,
             }
@@ -184,8 +239,10 @@ def register(app: typer.Typer) -> None:
             print(f"无匹配 traceback (grep={grep!r})")
             return
 
-        print(f"run_id: {exc_path.parent.name}")
+        print(f"run_id: {run_dir.name}")
         print(f"exceptions_path: {exc_path}")
+        print(f"spine_path: {spine_path}")
+        print(f"source: {source}")
         print(f"count: {len(records)}")
         print("===")
         if raw:

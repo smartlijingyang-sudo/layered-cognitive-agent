@@ -576,6 +576,66 @@ events:
       - events.spine.reflector.writable
       - events.spine.writable_matrix
 
+  # ── Loop cursor record_*（ADR-0167 D2 / ADR-0181 PR-10）──────────
+  - category: spine.step.thinking.record
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      run_id: str
+    publishers:
+      - events.spine.loop_cursor
+
+  - category: spine.step.tool_call.record
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      run_id: str
+      tool_name: str
+    publishers:
+      - events.spine.loop_cursor
+
+  - category: spine.step.tool_result.record
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      run_id: str
+      tool_name: str
+    publishers:
+      - events.spine.loop_cursor
+
+  - category: spine.step.reflect.record
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      run_id: str
+    publishers:
+      - events.spine.loop_cursor
+
+  - category: spine.step.span.record
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      run_id: str
+    publishers:
+      - events.spine.loop_cursor
+
+  - category: spine.i17.rejected
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      attempted_ep: str
+    publishers:
+      - events.spine.reflector.runtime
+
+  - category: spine.producer.failure
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields:
+      producer_name: str
+      key: str
+    publishers:
+      - events.spine.reflector.runtime
+
   # ── Phase（PR-5）────────────────────────────────────────────────
   - category: spine.perceive.phase.fold
     plane: lca.contracts.event.Plane.OBSERVABILITY

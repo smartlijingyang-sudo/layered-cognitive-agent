@@ -270,7 +270,12 @@ def _extract_failure(
     extra = manifest.get("extra", {}) or {}
     doctor = extra.get("doctor_report", {}) or {}
     h6 = doctor.get("hops", {}).get("H6", {}) or {}
-    error_message = h6.get("error") or extra.get("session_error") or None
+    error_message = (
+        h6.get("error")
+        or manifest.get("session_error")
+        or extra.get("session_error")
+        or None
+    )
     if isinstance(error_message, str) and not error_message.strip():
         error_message = None
     error_type: str | None = None

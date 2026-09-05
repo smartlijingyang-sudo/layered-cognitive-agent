@@ -53,6 +53,8 @@ class RunManifest:
     schema: str = "lca.run_manifest/1"
     run_id: str = ""
     plan_ref: str = ""  # ADR-0068 §决策二:CompiledRunPlan.plan_ref,16-hex 稳定 ID
+    session_error: str = ""  # 终态 carrier 错误;顶层可读(ADR-0165.1 / ADR-0122)
+    session_status: str = ""  # RunSession.status.value 物化快照
     terminal_event_seq: int = 0
     ledger_high_watermark: int = 0
     ledger_summary: str = ""
@@ -65,6 +67,8 @@ class RunManifest:
             "schema": self.schema,
             "run_id": self.run_id,
             "plan_ref": self.plan_ref,
+            "session_error": self.session_error,
+            "session_status": self.session_status,
             "terminal_event_seq": self.terminal_event_seq,
             "ledger_high_watermark": self.ledger_high_watermark,
             "ledger_summary": self.ledger_summary,
@@ -75,16 +79,19 @@ class RunManifest:
 
     @classmethod
     def from_dict(cls, payload: Mapping[str, Any]) -> RunManifest:
+        extra = dict(payload.get("extra", {}) or {})
         return cls(
             schema=str(payload.get("schema", "lca.run_manifest/1")),
             run_id=str(payload.get("run_id", "")),
             plan_ref=str(payload.get("plan_ref", "")),
+            session_error=str(payload.get("session_error") or extra.get("session_error") or ""),
+            session_status=str(payload.get("session_status") or extra.get("session_status") or ""),
             terminal_event_seq=int(payload.get("terminal_event_seq", 0)),
             ledger_high_watermark=int(payload.get("ledger_high_watermark", 0)),
             ledger_summary=str(payload.get("ledger_summary", "")),
             started_at=float(payload.get("started_at", 0.0)),
             closed_at=float(payload.get("closed_at", 0.0)),
-            extra=dict(payload.get("extra", {}) or {}),
+            extra=extra,
         )
 
 
