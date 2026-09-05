@@ -29,6 +29,7 @@ meta = PatchMeta(
         f"{_UI_TRANSPORTS}/lcaPersist.ts",
         f"{_UI_TRANSPORTS}/lcaArtifacts.ts",
         f"{_UI_TRANSPORTS}/lcaWire.ts",
+        f"{_UI_TRANSPORTS}/lcaToolRender/renderers/lobe-user-interaction/askUserQuestion.tsx",
         "src/store/chat/slices/agentRun/actions/transports/client/streamingExecutor.ts",
     ),
     risk="high",
@@ -127,6 +128,16 @@ def apply(ctx: PatchContext) -> bool:
     if ctx.write_if_changed(f"{_UI_TRANSPORTS}/lcaWire.ts", render_wire_ts(WIRE)):
         changed = True
 
+    # askUserQuestion question-card renderer (human-in-the-loop resume via
+    # POST /runs/<id>/answer); reuses the shared ask-user components.
+    if ctx.write_if_changed(
+        f"{_UI_TRANSPORTS}/lcaToolRender/renderers/lobe-user-interaction/askUserQuestion.tsx",
+        (_HERE / "lcaToolRender/renderers/lobe-user-interaction/askUserQuestion.tsx").read_text(
+            encoding="utf-8"
+        ),
+    ):
+        changed = True
+
     executor = "src/store/chat/slices/agentRun/actions/transports/client/streamingExecutor.ts"
     text = ctx.read(executor)
     if "finishLcaChat" not in text:
@@ -160,6 +171,32 @@ def apply(ctx: PatchContext) -> bool:
                 raise SystemExit("[lca_run_driver] model/provider anchor not found")
             text = text.replace(anchor, anchor + "\n" + _RUN_BLOCK, 1)
         ctx.write(executor, text)
+        changed = True
+
+    # Register the LCA tool renderers (askUserQuestion question card etc.).
+    # Upstream only calls registerBuiltinToolSurfaces(); without this the LCA
+    # renderers never register and tool messages fall back to the accordion.
+    tool_surfaces = "src/spa/initialize/toolSurfaces.ts"
+    ts_text = ctx.read(tool_surfaces)
+    if "ensureLcaToolRenderRegistered" not in ts_text:
+        ts_anchor = (
+            "      .then(({ registerBuiltinToolSurfaces }) => {\n"
+            "        registerBuiltinToolSurfaces();\n"
+            "      })"
+        )
+        ts_replacement = (
+            "      .then(async ({ registerBuiltinToolSurfaces }) => {\n"
+            "        registerBuiltinToolSurfaces();\n"
+            "        /* LCA: register LCA tool renderers (question card etc.) */\n"
+            "        const { ensureLcaToolRenderRegistered } = await import(\n"
+            "          '@/store/chat/agents/transports/lcaToolRender/lca_tool_render_register'\n"
+            "        );\n"
+            "        ensureLcaToolRenderRegistered();\n"
+            "      })"
+        )
+        if ts_anchor not in ts_text:
+            raise SystemExit("[lca_run_driver] toolSurfaces anchor not found")
+        ctx.write(tool_surfaces, ts_text.replace(ts_anchor, ts_replacement, 1))
         changed = True
 
     for rel in _STALE:

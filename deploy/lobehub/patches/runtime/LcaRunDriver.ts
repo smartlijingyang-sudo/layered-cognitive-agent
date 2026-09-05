@@ -35,7 +35,6 @@ import { WIRE } from './lcaWire';
 
 const LCA_TOKEN = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
 const TERMINAL = new Set(['canceled', 'completed', 'failed']);
-const PAUSED = new Set(['waiting_input']);
 
 /** Invocation arguments only. Result fields never become plugin.arguments. */
 const ARG_KEYS = new Set([
@@ -66,6 +65,9 @@ const ARG_KEYS = new Set([
   'pattern',
   'glob',
   'scope',
+  // askUserQuestion: keep the model's questions so the renderer can show the
+  // question card (deploy/lobehub/patches/runtime/lcaToolRender/.../askUserQuestion.tsx).
+  'questions',
 ]);
 
 type WireFile = { id?: string; mime_type?: string; name: string; size?: number; url: string };
@@ -474,6 +476,78 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
     if (!handler) handler = makeHandler(assistantId);
   };
 
+  /**
+   * Present the pending askUserQuestion card when the run pauses for human
+   * input. The questions are not on the journal stream — they live on the
+   * run snapshot's `approval_request` — so fetch it, then create the
+   * `lobe-user-interaction/askUserQuestion` tool message the renderer keys on
+   * and hand it the run context for the POST /runs/<id>/answer resume.
+   */
+  const presentAskUserCard = async () => {
+    const snapRes = await fetch(`/lca-api/runs/${runId}`, {
+      headers: { Authorization: `Bearer ${LCA_TOKEN}` },
+    });
+    const snap = snapRes.ok
+      ? ((await snapRes.json()) as { approval_request?: { questions?: unknown } })
+      : {};
+    const questions = Array.isArray(snap.approval_request?.questions)
+      ? snap.approval_request.questions
+      : [];
+    if (!questions.length) return;
+
+    await ensureTurn();
+    const callId = `ask_${runId}`;
+    const call: MessageToolCall = {
+      function: {
+        arguments: JSON.stringify({ questions }),
+        name: 'lobe-user-interaction____askUserQuestion',
+      },
+      id: callId,
+      type: 'function',
+    };
+    const rec: TurnTool = { call };
+    tools.set(callId, rec);
+    currentTurnTools.push(rec);
+    const created = await get().optimisticCreateMessage(
+      {
+        content: '',
+        parentId: assistantId,
+        plugin: {
+          apiName: 'askUserQuestion',
+          arguments: JSON.stringify({ questions }),
+          identifier: 'lobe-user-interaction',
+          id: callId,
+          type: 'builtin',
+        },
+        // Mark the tool message as a pending intervention so LobeHub's native
+        // InterventionBar renders the interactive askUserQuestion card (the
+        // same surface native runs use). Its submit resumes the gateway run.
+        pluginIntervention: { status: 'pending' },
+        role: 'tool',
+        tool_call_id: callId,
+        topicId: ctx.topicId,
+        ...(ctx.agentId ? { agentId: ctx.agentId } : {}),
+        ...(ctx.threadId ? { threadId: ctx.threadId } : {}),
+      },
+      { operationId: options.operationId },
+    );
+    rec.resultMsgId = created?.id;
+    lastResultMsgId = created?.id || lastResultMsgId;
+    if (created?.id) {
+      get().internal_dispatchMessage(
+        {
+          id: created.id,
+          key: 'lca',
+          type: 'updatePluginState',
+          value: { run_id: runId, status: 'waiting_input' },
+        },
+        { operationId: options.operationId },
+      );
+    }
+    publishTurnTools(false);
+    await persistRow();
+  };
+
   const applyProjected = async (projected: Projected): Promise<void> => {
     switch (projected.kind) {
       case 'open-turn': {
@@ -695,6 +769,10 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
         return;
       }
       case 'run-finished': {
+        if (projected.status === 'input-required') {
+          await presentAskUserCard();
+          return;
+        }
         if (projected.error) noteRowError(projected.error);
         await persistRow();
         return;
@@ -772,7 +850,10 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
       if (snap.error && !rowError) {
         noteRowError(new Error(snap.error));
       }
-      if (TERMINAL.has(String(snap.status ?? '')) || PAUSED.has(String(snap.status ?? ''))) break;
+      // waiting_input does not end the loop: the run resumes on the same live
+      // stream after POST /runs/<id>/answer, so keep projecting until a terminal
+      // status (or abort).
+      if (TERMINAL.has(String(snap.status ?? ''))) break;
       await new Promise((resolve) => setTimeout(resolve, 400));
     }
   } catch (error) {

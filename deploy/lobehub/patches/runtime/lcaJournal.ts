@@ -22,7 +22,7 @@ export type Projected =
       state: Record<string, unknown>;
     }
   | { kind: 'tool-denied'; payload: Record<string, unknown>; reason: string }
-  | { kind: 'run-finished'; error?: string }
+  | { kind: 'run-finished'; error?: string; status?: string }
   | { kind: 'live-gap' };
 
 export function toolCallId(payload: Record<string, unknown>, fallback: string): string {
@@ -163,6 +163,9 @@ export function projectJournalFrame(frame: JournalFrame): Projected {
       return {
         error: payload.error ? String(payload.error) : undefined,
         kind: 'run-finished',
+        // 'input-required' marks a human-in-the-loop pause (askUserQuestion);
+        // the driver uses it to present the question card.
+        status: typeof payload.status === 'string' ? payload.status : undefined,
       };
     case 'LiveGap':
       return { kind: 'live-gap' };
