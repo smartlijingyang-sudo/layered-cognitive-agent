@@ -186,17 +186,14 @@ def apply(ctx: PatchContext) -> bool:
             "  },"
         )
         new_handler = (
-            "  {\n"
-            "    handler: handleLcaAskUserSubmit,\n"
-            "    match: isAskUserQuestionCall,\n"
-            "  },"
+            "  {\n    handler: handleLcaAskUserSubmit,\n    match: isAskUserQuestionCall,\n  },"
         )
         if old_handler not in handlers_text:
             raise SystemExit("[lca_run_driver] askUserQuestion handler anchor not found")
         handlers_text = handlers_text.replace(old_handler, new_handler, 1)
 
         # Insert the handleLcaAskUserSubmit function before customInteractionSubmitHandlers.
-        lca_handler_fn = '''
+        lca_handler_fn = """
 /**
  * LCA askUserQuestion resume: POST the answer to the LCA gateway and store
  * structured answers in pluginState. The LCA run resumes on the same live
@@ -259,13 +256,11 @@ const handleLcaAskUserSubmit: CustomInteractionSubmitHandler = async (payload, c
   };
 };
 
-'''
+"""
         handlers_anchor = "const customInteractionSubmitHandlers: Array<{"
         if handlers_anchor not in handlers_text:
             raise SystemExit("[lca_run_driver] customInteractionSubmitHandlers anchor not found")
-        handlers_text = handlers_text.replace(
-            handlers_anchor, lca_handler_fn + handlers_anchor, 1
-        )
+        handlers_text = handlers_text.replace(handlers_anchor, lca_handler_fn + handlers_anchor, 1)
 
         ctx.write(handlers_path, handlers_text)
         changed = True
@@ -331,6 +326,69 @@ const handleLcaAskUserSubmit: CustomInteractionSubmitHandler = async (payload, c
             + "    }",
             1,
         )
+        ctx.write(control_path, control_text)
+        changed = True
+
+    # conversationControl.ts: LCA askUserQuestion SKIP must not double-resume
+    # either. skipToolInteraction's default path builds a synthetic user message
+    # and calls executeClientAgent (a fresh run). For an LCA run paused at
+    # waiting_input, ship the skip as an answer to POST /runs/<id>/answer and
+    # skip the new run — the LcaRunDriver live stream keeps consuming the resume.
+    if "LCA askUserQuestion skip answer" not in control_text:
+        if "const LCA_TOKEN" not in control_text:
+            lifecycle_import_anchor = (
+                "import { buildRunLifecycle } from '../lifecycle/buildRunLifecycle';"
+            )
+            if lifecycle_import_anchor not in control_text:
+                raise SystemExit("[lca_run_driver] conversationControl token anchor not found")
+            control_text = control_text.replace(
+                lifecycle_import_anchor,
+                lifecycle_import_anchor
+                + "\n\nconst LCA_TOKEN = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';",
+                1,
+            )
+
+        skip_anchor = (
+            "    if (this.#wasInterimOpStopped(operationId)) return;\n"
+            "\n"
+            "    // 2. Create a user message indicating the skip"
+        )
+        if skip_anchor not in control_text:
+            raise SystemExit("[lca_run_driver] conversationControl skip anchor not found")
+        skip_block = (
+            "    if (this.#wasInterimOpStopped(operationId)) return;\n"
+            "\n"
+            "    // LCA askUserQuestion skip answer: the run is paused server-side at\n"
+            "    // waiting_input. Ship the skip as an answer so it resumes there; do NOT\n"
+            "    // start a fresh executeClientAgent run.\n"
+            "    const lcaSkipState = (toolMessage.pluginState as\n"
+            "      | Record<string, unknown>\n"
+            "      | undefined)?.lca as { run_id?: string } | undefined;\n"
+            "    const lcaSkipRunId = typeof lcaSkipState?.run_id === 'string' ? lcaSkipState.run_id : '';\n"
+            "    if (lcaSkipRunId) {\n"
+            "      try {\n"
+            "        await fetch(`/lca-api/runs/${lcaSkipRunId}/answer`, {\n"
+            "          body: JSON.stringify({\n"
+            "            approval_id: 'askUserQuestion',\n"
+            "            idempotency_key: `${lcaSkipRunId}:${toolMessageId}:skip`,\n"
+            "            payload: toolContent,\n"
+            "          }),\n"
+            "          headers: {\n"
+            "            Authorization: `Bearer ${LCA_TOKEN}`,\n"
+            "            'Content-Type': 'application/json',\n"
+            "          },\n"
+            "          method: 'POST',\n"
+            "        });\n"
+            "      } catch (error) {\n"
+            "        console.error('[LCA] askUserQuestion skip answer failed', error);\n"
+            "      }\n"
+            "      completeOperation(operationId);\n"
+            "      return;\n"
+            "    }\n"
+            "\n"
+            "    // 2. Create a user message indicating the skip"
+        )
+        control_text = control_text.replace(skip_anchor, skip_block, 1)
         ctx.write(control_path, control_text)
         changed = True
 
