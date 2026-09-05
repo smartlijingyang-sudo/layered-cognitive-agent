@@ -114,6 +114,17 @@ class RunSession:
         init=False,
     )
 
+    @property
+    def closed(self) -> bool:
+        """Whether the terminal close hook has already run.
+
+        ``close`` is the final step of :meth:`RunTerminalizer.terminalize`, so a
+        closed session has already materialized its derived artifacts. Callers
+        use this as an exactly-once guard before triggering terminalization from
+        a second site (e.g. the cancel command path).
+        """
+        return self._closed
+
     def close(self, reason: CloseReason) -> bool:
         """释放 run-local ContextVar token 与 per-run Session 绑定。
 

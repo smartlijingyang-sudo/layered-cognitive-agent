@@ -142,33 +142,39 @@ def test_run_session_consumes_profile_selected_journal_factory(tmp_path: Path) -
 
     first = create_run_session(registry, question="first", user_text="first", ctx=ctx)
     second = create_run_session(registry, question="second", user_text="second", ctx=ctx)
+    try:
+        # factory 拿到两条路径 + 两个独立 tail
+        assert factory.paths == [first.spine_path, second.spine_path]
+        assert first.tail is factory.tails[0]
+        assert second.tail is factory.tails[1]
+        assert factory.process_creations == 1
+        assert registry.journal is factory.process
+        assert registry.live_totals()["journal_subscribers"] == 0
 
-    # factory 拿到两条路径 + 两个独立 tail
-    assert factory.paths == [first.spine_path, second.spine_path]
-    assert first.tail is factory.tails[0]
-    assert second.tail is factory.tails[1]
-    assert factory.process_creations == 1
-    assert registry.journal is factory.process
-    assert registry.live_totals()["journal_subscribers"] == 0
+        # 每 run 独立的 StepCoordinator + 独立的 StepTreeFoldDeriver
+        assert first.coordinator is not None
+        assert second.coordinator is not None
+        assert first.coordinator is not second.coordinator
+        assert first.coordinator.run_id == first.run_id
+        assert second.coordinator.run_id == second.run_id
+        from lca.plugins.session.derivers.step_tree import StepTreeFoldDeriver
 
-    # 每 run 独立的 StepCoordinator + 独立的 StepTreeFoldDeriver
-    assert first.coordinator is not None
-    assert second.coordinator is not None
-    assert first.coordinator is not second.coordinator
-    assert first.coordinator.run_id == first.run_id
-    assert second.coordinator.run_id == second.run_id
-    from lca.plugins.session.derivers.step_tree import StepTreeFoldDeriver
-
-    assert isinstance(first.thread_tree_writer, StepTreeFoldDeriver)
-    assert isinstance(second.thread_tree_writer, StepTreeFoldDeriver)
-    assert first.thread_tree_writer is not second.thread_tree_writer
+        assert isinstance(first.thread_tree_writer, StepTreeFoldDeriver)
+        assert isinstance(second.thread_tree_writer, StepTreeFoldDeriver)
+        assert first.thread_tree_writer is not second.thread_tree_writer
+    finally:
+        # builder 的 install_run_cursor 占用 ContextVar;close 释放,
+        # 防止泄漏到后续依赖 ``get_current_cursor() is None`` 的测试。
+        # token 必须按安装逆序释放(LIFO),否则 reset 失败被 close 吞掉。
+        second.close("completed")
+        first.close("completed")
 
 
 def test_session_step_tree_bundle_is_wired_for_terminalizer_flush(tmp_path: Path) -> None:
     """Regression: ``RunSession.step_tree_bundle`` must be the bundle that owns
     ``StepTreeFoldDeriver.flush()``.
 
-    Without this, ``materialization._flush_step_tree`` early-returns on
+    Without this, ``step_tree_flush.flush_step_tree_artifacts`` early-returns on
     ``bundle is None`` and ``journal.json`` never gets written.
 
     ADR-0167 D11 / ADR-0186 PR-3g: terminalize flushes via
@@ -233,12 +239,15 @@ def test_session_step_tree_bundle_is_wired_for_terminalizer_flush(tmp_path: Path
         user_text="u",
         ctx=_Ctx(_BundleSpyFactory(), WritableFaceRegistry()),
     )
-
-    # session.step_tree_bundle 必须是 factory 给的那个 bundle —— 否则
-    # materialization._flush_step_tree 的 ``bundle = getattr(session, ...)``
-    # 拿 None 早退,deriver 永不 flush,journal.json 永不写。
-    assert session.step_tree_bundle is not None, (
-        "session.step_tree_bundle must be wired by RunSessionBuilder; "
-        "otherwise materialization._flush_step_tree early-returns and "
-        "StepTreeFoldDeriver.flush() never produces journal.json"
-    )
+    try:
+        # session.step_tree_bundle 必须是 factory 给的那个 bundle —— 否则
+        # step_tree_flush.flush_step_tree_artifacts 的 ``bundle = getattr(session, ...)``
+        # 拿 None 早退,deriver 永不 flush,journal.json 永不写。
+        assert session.step_tree_bundle is not None, (
+            "session.step_tree_bundle must be wired by RunSessionBuilder; "
+            "otherwise step_tree_flush.flush_step_tree_artifacts early-returns and "
+            "StepTreeFoldDeriver.flush() never produces journal.json"
+        )
+    finally:
+        # builder 的 install_run_cursor 占用 ContextVar;close 释放,防泄漏。
+        session.close("completed")

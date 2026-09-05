@@ -142,9 +142,19 @@ def test_approval_id_mismatch_still_accepted(monkeypatch: pytest.MonkeyPatch) ->
     asyncio.run(_scenario())
 
 
-def test_cancel_at_waiting_input_transitions_status() -> None:
+def test_cancel_at_waiting_input_transitions_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     session = _waiting_session()
     commands = _commands_for(session)
+
+    class _NoopTerminalizer:
+        def __init__(self, registry: object, **kwargs: object) -> None: ...
+
+        async def terminalize(self, *args: object, **kwargs: object) -> None:
+            session._closed = True
+
+    monkeypatch.setattr(registry_commands, "RunTerminalizer", _NoopTerminalizer)
 
     async def _scenario() -> None:
         receipt = await commands.cancel("run-idem-1")

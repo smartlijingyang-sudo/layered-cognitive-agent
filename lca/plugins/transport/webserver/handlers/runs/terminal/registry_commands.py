@@ -26,6 +26,7 @@ from lca.plugins.transport.webserver.handlers.runs.terminal.port import (
     RunReceipt,
     RunRequest,
 )
+from lca.plugins.transport.webserver.handlers.runs.terminal.terminalizer import RunTerminalizer
 
 _log = structlog.get_logger(__name__)
 
@@ -94,6 +95,19 @@ class RegistryRunCommands:
             session.task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await session.task
+            # A running loop's ``finally`` already terminalized it once the
+            # task unwound above; do not re-materialize here.
+        elif not session.closed:
+            # The loop is not executing (paused at WAITING_INPUT, or the task
+            # already finished without a terminal transition), so its
+            # ``finally`` will never fire.  Close the terminal transition here
+            # so journal.json / narrative.md / manifest.json still materialize
+            # for a canceled run.
+            await RunTerminalizer(self._registry).terminalize(
+                session,
+                workspace=None,
+                success=False,
+            )
         _log.info(
             "run_canceled",
             run_id=run_id,

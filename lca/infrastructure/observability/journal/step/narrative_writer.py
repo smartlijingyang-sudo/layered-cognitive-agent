@@ -36,7 +36,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -49,6 +49,7 @@ from lca.contracts.models.observability.journal_step import (
     ToolCallRecord,
     ToolResult,
 )
+from lca.infrastructure.atomic_write import atomic_write_text
 from lca.infrastructure.observability.spine.sinks.naming import spine_filename_for_run
 
 if TYPE_CHECKING:
@@ -103,7 +104,7 @@ def _format_duration(duration_ms: int | None) -> str:
 def _format_ts(epoch: float | None) -> str:
     if epoch is None:
         return "—"
-    return datetime.fromtimestamp(epoch, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
+    return datetime.fromtimestamp(epoch, tz=UTC).strftime("%Y-%m-%d %H:%M:%SZ")
 
 
 # ── Step 子节渲染 ── ──
@@ -588,10 +589,9 @@ class StepNarrativeWriter:
         )
 
     def write(self, document: JournalDocument) -> Path:
-        """写 narrative.md。 返回落盘路径。"""
+        """原子覆盖写 narrative.md。 返回落盘路径。"""
         text = self.render(document)
-        self._path.write_text(text, encoding="utf-8")
-        return self._path
+        return atomic_write_text(self._path, text)
 
     def render(self, document: JournalDocument) -> str:
         """纯函数 —— 给 document 返回 markdown 文本(测试 / CLI 直接 print 用)。"""
@@ -674,7 +674,7 @@ class StepNarrativeWriter:
 
 
 def _format_ts_to_now() -> str:
-    return datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
+    return datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M:%SZ")
 
 
 __all__ = ["FoldProvider", "StepNarrativeWriter"]

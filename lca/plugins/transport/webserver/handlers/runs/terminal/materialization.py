@@ -12,11 +12,15 @@ import structlog
 
 from lca.contracts.observability.run_locator import RunLocator
 from lca.contracts.observability.run_manifest import RunManifest
+from lca.infrastructure.atomic_write import atomic_write_text
 from lca.infrastructure.observability.journal.engine.journal_io import (
     load_journal_records,
     record_normalize,
 )
 from lca.plugins.transport.webserver.handlers.runs.doctor import diagnose
+from lca.plugins.transport.webserver.handlers.runs.observability.step_tree_flush import (
+    flush_step_tree_artifacts,
+)
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
 from lca.plugins.transport.webserver.handlers.runs.terminal.status import journal_store
 
@@ -39,7 +43,7 @@ def record_terminal_materialization(session: RunSession) -> None:
     flush_errors: list[dict[str, str]] = []
 
     # ADR-0164: terminalize 时 step-tree flush(写 journal.json + narrative.md)
-    flush_errors.extend(_flush_step_tree(session))
+    flush_errors.extend(flush_step_tree_artifacts(session))
 
     try:
         # Prefer step-tree journal.json (main store) over legacy jsonl.
@@ -53,7 +57,6 @@ def record_terminal_materialization(session: RunSession) -> None:
                 summary=report.summary,
             )
         manifest_path = locator.manifest_path(session.run_id)
-        manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest = RunManifest(
             run_id=session.run_id,
             # ADR-0068 §决策二:plan_ref 顶层字段(declarative: compiled_run_plan_ref
@@ -77,9 +80,9 @@ def record_terminal_materialization(session: RunSession) -> None:
                 "session_status": str(getattr(session.status, "value", session.status) or ""),
             },
         )
-        manifest_path.write_text(
+        atomic_write_text(
+            manifest_path,
             json.dumps(manifest.to_dict(), ensure_ascii=False, indent=2),
-            encoding="utf-8",
         )
     except Exception as exc:
         # manifest 自身写失败 —— 已无法写到 disk, 把异常也收进 flush_errors
@@ -98,57 +101,6 @@ def record_terminal_materialization(session: RunSession) -> None:
             run_id=session.run_id,
             exc_info=True,
         )
-
-
-def _flush_step_tree(session: RunSession) -> list[dict[str, str]]:
-    """从 session 拿 step-tree bundle 并 flush(写 journal.json + narrative.md)。
-
-    bundle 在 ``create_run_components`` 阶段构造并挂到 session 上(若有
-    step_lifecycle_store); terminalizer 这里负责落盘。
-
-    返回值: ``flush_errors`` 列表 —— 每条失败以 ``{operation, error_type,
-    error_message, traceback}`` 形态返回, 由 ``record_terminal_materialization``
-    写进 manifest.extra.flush_errors。 即便落盘失败, 下一次 debug-run 也能
-    拿到完整现场。
-    """
-    bundle = getattr(session, "step_tree_bundle", None)
-    if bundle is None:
-        return []
-    errors: list[dict[str, str]] = []
-    try:
-        outcome = _journal_outcome_from_session(session)
-        flush = getattr(bundle, "flush", None)
-        if callable(flush):
-            flush(outcome=outcome)
-    except Exception as exc:
-        errors.append(
-            {
-                "operation": "step_tree.flush",
-                "error_type": type(exc).__name__,
-                "error_message": str(exc)[:500],
-                "traceback": traceback.format_exc(limit=4),
-            }
-        )
-        _log.error(
-            "step_tree_flush_failed",
-            run_id=session.run_id,
-            exc_info=True,
-        )
-    return errors
-
-
-def _journal_outcome_from_session(session: RunSession) -> str:
-    """Map RunSession.status onto JournalMetadata.outcome vocabulary."""
-    status = str(getattr(session.status, "value", session.status) or "").lower()
-    if status == "completed":
-        return "completed"
-    if status == "failed":
-        return "failed"
-    if status in {"canceled", "cancelled"}:
-        return "stopped"
-    if status == "waiting_input":
-        return "paused"
-    return "stopped"
 
 
 def _doctor_journal_path(session: RunSession, locator: RunLocator) -> Path:

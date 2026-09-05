@@ -22,6 +22,9 @@ from lca.plugins.transport.webserver.handlers.runs.execute.execution_environment
     RunExecutionEnvironment,
 )
 from lca.plugins.transport.webserver.handlers.runs.observability.binding import ensure_session_hub
+from lca.plugins.transport.webserver.handlers.runs.observability.step_tree_flush import (
+    flush_step_tree_artifacts,
+)
 from lca.plugins.transport.webserver.handlers.runs.session.session import (
     RunRegistry,
     RunSession,
@@ -241,9 +244,23 @@ class RunLifecycleCoordinator:
         )
 
     async def _finish_or_pause(self, session: RunSession, *, workspace: Any, success: bool) -> None:
-        """Leave a pause resumable or terminalize all other lifecycle outcomes."""
+        """Leave a pause resumable or terminalize all other lifecycle outcomes.
+
+        Pause is an incremental derive point: journal.json + narrative.md are
+        flushed here (outcome ``paused``) so derived artifacts exist while the
+        run waits for input, not only after a terminal transition.  A paused
+        run that is later canceled must not depend on terminalize to have any
+        derived artifacts on disk.
+        """
 
         if session.status == RunStatus.WAITING_INPUT:
+            flush_errors = flush_step_tree_artifacts(session, outcome="paused")
+            if flush_errors:
+                _log.warning(
+                    "step_tree_flush_on_pause_failed",
+                    run_id=session.run_id,
+                    flush_errors=flush_errors,
+                )
             self._registry.mark_paused(session)
             return
         await RunTerminalizer(self._registry).terminalize(

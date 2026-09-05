@@ -12,12 +12,12 @@ ADR-0167 D11: spine ledger 是唯一 SSOT;``journal.json`` 是可重
 from __future__ import annotations
 
 import json
-import tempfile
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any
 
 from lca.contracts.models.observability.journal_doc import JournalDocument
+from lca.infrastructure.atomic_write import atomic_write_text
 
 
 def to_jsonable(obj: Any) -> Any:
@@ -39,7 +39,6 @@ class JournalDocumentWriter:
     参数:
         output_path: 落盘文件路径,默认 ``traces/runs/<run_id>/journal.json``。
         indent: pretty-print 缩进,默认 2(便于 git diff / 人读)。
-        ensure_parents: 写之前 mkdir -p 父目录。
     """
 
     def __init__(
@@ -47,11 +46,8 @@ class JournalDocumentWriter:
         output_path: str | Path,
         *,
         indent: int = 2,
-        ensure_parents: bool = True,
     ) -> None:
         self._path = Path(output_path)
-        if ensure_parents:
-            self._path.parent.mkdir(parents=True, exist_ok=True)
         self._indent = indent
 
     @property
@@ -70,22 +66,7 @@ class JournalDocumentWriter:
             indent=self._indent,
             ensure_ascii=False,
         )
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            dir=str(self._path.parent),
-            prefix=self._path.name + ".",
-            suffix=".tmp",
-            delete=False,
-        ) as fh:
-            fh.write(text)
-            tmp_path = Path(fh.name)
-        try:
-            tmp_path.replace(self._path)
-        except Exception:
-            tmp_path.unlink(missing_ok=True)
-            raise
-        return self._path
+        return atomic_write_text(self._path, text)
 
 
 __all__ = ["JournalDocumentWriter", "to_jsonable"]
