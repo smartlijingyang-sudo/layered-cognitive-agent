@@ -1,0 +1,45 @@
+# Profile: LCA-native Composio (Google Drive, Gmail, Slack, …).
+#
+# web-standard + composio-tools bundle. Requires COMPOSIO_API_KEY via env/profile patch.
+
+name: composio-enabled
+description: |
+  Web-standard deployment with LCA-native Composio OAuth + action tools.
+
+bundles:
+  - bundles/base.yaml
+  - bundles/observability-default.yaml
+  - bundles/web-app.yaml
+  - bundles/scenario-cordis-creator.yaml
+  - bundles/declarative-phase-graph.yaml
+  - bundles/loop_cursor.spine_default.yaml
+  - bundles/session-runtime.yaml
+  - bundles/event-bus-components.yaml
+  - bundles/composio-tools.yaml
+
+patch:
+  - id: lca-llm-resolver
+    config:
+      default_model: qwen3.7-plus
+      load_dotenv: true
+  - id: lca-composio-provider
+    config:
+      api_key:
+        from_env: COMPOSIO_API_KEY
+        required: true
+      callback_url:
+        from_env: LCA_COMPOSIO_CALLBACK_URL
+        required: false
+      default_user_id:
+        from_env: LCA_COMPOSIO_USER_ID
+        required: false
+      auth_config_ids:
+        from_env: COMPOSIO_AUTH_CONFIG_IDS
+        required: false
+      connections_path:
+        from_env: LCA_COMPOSIO_CONNECTIONS_PATH
+        required: false
+  - id: spine.sink.file
+    config:
+      boot_path: .lca/spine/boot-spine.jsonl
+      runs_root: traces/runs

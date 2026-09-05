@@ -123,12 +123,21 @@ class LobeHubService:
     # ── Lifecycle ─────────────────────────────────────────────────────
 
     def start(self) -> ServiceState:
-        """Start Next (the service) and the Vite sidecar if missing."""
+        """Start Vite sidecar first, then Next (Next proxies SPA HTML from Vite)."""
         current = self.state()
         if current.is_running:
             return current
 
         self.ensure_ready()
+        spa_pid = self._ensure_spa()
+        if spa_pid is None:
+            return ServiceState(status=ServiceStatus.STOPPED, detail="vite spawn failed")
+        if not self._spa_ready():
+            return ServiceState(
+                status=ServiceStatus.STOPPED,
+                pid=spa_pid,
+                detail="vite sidecar start timeout",
+            )
         pid = self._ensure_next()
         if pid is None:
             return ServiceState(status=ServiceStatus.STOPPED, detail="spawn failed")
@@ -138,7 +147,6 @@ class LobeHubService:
                 pid=pid,
                 detail="dev server start timeout",
             )
-        self._ensure_spa()
         return ServiceState(
             status=ServiceStatus.RUNNING,
             pid=pid,
@@ -579,8 +587,9 @@ class LobeHubService:
         if not env_file.exists():
             env_file.write_text(template.read_text())
 
-        # Update kernel_serve proxy URLs
-        kernel_serve_url = f"{self._kernel_serve.base_url}/v1"
+        # Update kernel_serve proxy URLs (use LAN/public URL, not bind address 0.0.0.0)
+        gateway_base = self._client_gateway_base()
+        kernel_serve_url = f"{gateway_base}/v1"
         lines = env_file.read_text().splitlines()
         updated = []
         changed = False
@@ -588,6 +597,9 @@ class LobeHubService:
         for line in lines:
             if line.startswith("OPENAI_PROXY_URL="):
                 updated.append(f"OPENAI_PROXY_URL={kernel_serve_url}")
+                changed = True
+            elif line.startswith("NEXT_PUBLIC_OPENAI_PROXY_URL="):
+                updated.append(f"NEXT_PUBLIC_OPENAI_PROXY_URL={kernel_serve_url}")
                 changed = True
             elif line.startswith("OPENAI_API_KEY="):
                 updated.append("OPENAI_API_KEY=lca-local")
@@ -605,6 +617,25 @@ class LobeHubService:
             env_file.write_text("\n".join(updated) + "\n")
 
         return changed
+
+    def _client_gateway_base(self) -> str:
+        """Browser-reachable LCA gateway base (not the bind address)."""
+        template = self._root / self._config.env_template
+        if template.exists():
+            vite_host = ""
+            for line in template.read_text().splitlines():
+                if line.startswith("LCA_GATEWAY_PUBLIC_URL="):
+                    url = line.split("=", 1)[1].strip()
+                    if url:
+                        return url.rstrip("/")
+                if line.startswith("VITE_DEV_HOST="):
+                    vite_host = line.split("=", 1)[1].strip()
+            if vite_host:
+                return f"http://{vite_host}:{self._kernel_serve.port}"
+        bind = self._kernel_serve.host
+        if bind in {"0.0.0.0", "::"}:
+            return f"http://127.0.0.1:{self._kernel_serve.port}"
+        return self._kernel_serve.base_url.rstrip("/")
 
     def _ensure_deps(self) -> bool:
         """Install dependencies if node_modules missing."""
@@ -630,6 +661,20 @@ class LobeHubService:
         for _ in range(120):
             time.sleep(0.5)
             if http_ready(f"{self._config.dev_url}/", timeout=1.0):
+                consec += 1
+                if consec >= needed:
+                    return True
+            else:
+                consec = 0
+        return False
+
+    def _spa_ready(self) -> bool:
+        spa_url = f"http://127.0.0.1:{self._config.spa_port}/"
+        needed = 2
+        consec = 0
+        for _ in range(120):
+            time.sleep(0.5)
+            if http_ready(spa_url, timeout=1.0):
                 consec += 1
                 if consec >= needed:
                     return True

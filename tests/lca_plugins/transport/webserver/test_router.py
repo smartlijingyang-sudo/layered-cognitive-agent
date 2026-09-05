@@ -86,13 +86,20 @@ class TestInstall:
         assert after - before == 3
 
     def test_install_idempotent(self) -> None:
-        """两次 install 追加两次;router 不缓存已 install 状态。"""
+        """Repeated install does not duplicate already-mounted routes."""
         router = RouteRegistry()
         router.register_http(Route("/a", _noop, methods=["GET"]))
         app = Starlette()
         router.install(app)
         router.install(app)
-        assert len(app.router.routes) == 2
+        assert len(app.router.routes) == 1
+
+    def test_register_after_install_appends_to_app(self) -> None:
+        router = RouteRegistry()
+        app = Starlette()
+        router.install(app)
+        router.register_http(Route("/late", _noop, methods=["GET"]))
+        assert any(getattr(route, "path", None) == "/late" for route in app.router.routes)
 
     def test_install_empty_router_noop(self) -> None:
         router = RouteRegistry()

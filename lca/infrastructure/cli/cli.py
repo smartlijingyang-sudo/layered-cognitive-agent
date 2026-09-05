@@ -29,6 +29,7 @@ import lca.infrastructure.cli.steps  # noqa: F401  -- step registration
 from lca.infrastructure.cli.commands import (
     assistants,
     audit,
+    composio,
     creator_plan,
     declarative,
     diagnostics,
@@ -83,6 +84,7 @@ events_delivery.register(app)
 package_organization.register(app)
 audit.register(app)
 creator_plan.register(app)
+composio.register(app)
 declarative.register(app)
 # ``journal`` owns the ``journal`` typer group; the four siblings below
 # add their subcommands to that same group rather than calling

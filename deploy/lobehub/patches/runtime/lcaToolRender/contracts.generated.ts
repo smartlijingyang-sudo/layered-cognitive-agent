@@ -579,14 +579,19 @@ export const CONTRACTS: Readonly<Record<string, ToolRenderContract>> =   {
       identifier: "lobe-skill-store",
       apiName: "searchSkill",
       args: [
-        { pythonKey: "query", wireKey: "query", kind: "string", source: "argument", required: true },
+        { pythonKey: "query", wireKey: "q", kind: "string", source: "argument", required: true },
+        { pythonKey: "page", wireKey: "page", kind: "int", source: "argument", required: false },
+        { pythonKey: "page_size", wireKey: "pageSize", kind: "int", source: "argument", required: false },
       ],
       state: [
-        { pythonKey: "content", wireKey: "content", kind: "string", source: "observation", required: true },
+        { pythonKey: "items", wireKey: "items", kind: "json", source: "observation", required: true },
+        { pythonKey: "page", wireKey: "page", kind: "int", source: "observation", required: true },
+        { pythonKey: "page_size", wireKey: "pageSize", kind: "int", source: "observation", required: true },
         { pythonKey: "total", wireKey: "total", kind: "int", source: "observation", required: true },
+        { pythonKey: "content", wireKey: "content", kind: "string", source: "observation", required: true },
       ],
       streaming: [],
-      contentField: null,
+      contentField: "content",
       waitFor: [],
     },
     "writeFile": {

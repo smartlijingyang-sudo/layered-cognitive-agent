@@ -45,6 +45,7 @@ bundles:
   - bundles/session-runtime.yaml
   - bundles/event-bus-components.yaml
   - bundles/assistant-runtime.yaml
+  - bundles/composio-tools.yaml
 
 patch:
   # 兜底:LCA_ASSISTANTS_ROOT 未设置时落到用户数据盘默认路径;
@@ -56,4 +57,24 @@ patch:
   # 空字符串 = 关闭前端注册。
   - id: lca.plugins.assistant.webserver_bridge
     config:
-      lobehub_url: "http://127.0.0.1:3010"
+      lobehub_url: "http://10.36.6.252:3010"
+  - id: lca-composio-provider
+    config:
+      api_key:
+        from_env: COMPOSIO_API_KEY
+        required: true
+      callback_url:
+        from_env: LCA_COMPOSIO_CALLBACK_URL
+        required: false
+      default_user_id:
+        from_env: LCA_COMPOSIO_USER_ID
+        required: false
+      auth_config_ids:
+        from_env: COMPOSIO_AUTH_CONFIG_IDS
+        required: false
+      connections_path:
+        from_env: LCA_COMPOSIO_CONNECTIONS_PATH
+        required: false
+  - id: lca-llm-resolver
+    config:
+      load_dotenv: true

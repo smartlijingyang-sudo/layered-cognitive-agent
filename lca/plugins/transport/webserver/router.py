@@ -101,6 +101,7 @@ class RouteRegistry(RouteRegistryProtocol):
         self._prefixes: dict[str, Route] = {}
         self._upgrades: dict[str, WebSocketRoute] = {}
         self._fallback: Callable[..., object] | None = None
+        self._app: Starlette | None = None
 
     # ── Registration (returns disposer) ─────────────────────
 
@@ -109,9 +110,17 @@ class RouteRegistry(RouteRegistryProtocol):
         if route.path in self._exact or route.path in self._prefixes:
             raise ValueError(f"webserver: duplicate http route {route.path!r}")
         self._exact[route.path] = route
+        if self._app is not None:
+            self._app.router.routes.append(route)
 
         def _dispose() -> None:
             self._exact.pop(route.path, None)
+            if self._app is not None:
+                self._app.router.routes[:] = [
+                    existing
+                    for existing in self._app.router.routes
+                    if getattr(existing, "path", None) != route.path
+                ]
 
         return _dispose
 
@@ -120,9 +129,17 @@ class RouteRegistry(RouteRegistryProtocol):
         if route.path in self._upgrades:
             raise ValueError(f"webserver: duplicate upgrade route {route.path!r}")
         self._upgrades[route.path] = route
+        if self._app is not None:
+            self._app.router.routes.append(route)
 
         def _dispose() -> None:
             self._upgrades.pop(route.path, None)
+            if self._app is not None:
+                self._app.router.routes[:] = [
+                    existing
+                    for existing in self._app.router.routes
+                    if getattr(existing, "path", None) != route.path
+                ]
 
         return _dispose
 
@@ -141,13 +158,25 @@ class RouteRegistry(RouteRegistryProtocol):
         Starlette 默认 404 行为不变;``_fallback`` 通过后续 PR 在 gateway/app.py
         内部 wired 到 ``app.add_exception_handler(404, ...)``。本阶段 router 只
         持有 fallback 引用,确保 single-owner 约束在注册期即生效。
+
+        After ``install``, late ``register_*`` calls also append to ``app`` so
+        opt-in bundles (e.g. composio-tools) can mount routes after
+        ``lca-web-server`` setup.
         """
+        self._app = app
+        mounted_paths = {getattr(route, "path", None) for route in app.router.routes}
         for route in list(self._exact.values()):
-            app.router.routes.append(route)
+            if route.path not in mounted_paths:
+                app.router.routes.append(route)
+                mounted_paths.add(route.path)
         for route in list(self._prefixes.values()):
-            app.router.routes.append(route)
+            if route.path not in mounted_paths:
+                app.router.routes.append(route)
+                mounted_paths.add(route.path)
         for upgrade in list(self._upgrades.values()):
-            app.router.routes.append(upgrade)
+            if upgrade.path not in mounted_paths:
+                app.router.routes.append(upgrade)
+                mounted_paths.add(upgrade.path)
 
 
 __all__ = ["RouteRegistry"]

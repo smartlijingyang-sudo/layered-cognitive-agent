@@ -604,48 +604,37 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     # Pull catalog providers lazily so the section plugin does not
     # require the catalog at setup time — composition root order is
     # independent of which section plugin loads first.
-    from lca.contracts.capabilities import BRAIN_PROMPT_CATALOG_FACTORY
-    from lca.contracts.mechanisms.capability import provider_current
+    from lca.contracts.capabilities import BRAIN_PROMPT_CATALOG_FACTORY, cap_key
     from lca.contracts.protocols.think.cognition import BrainPromptCatalogFactory
-
-    try:
-        catalog_factory = ctx.require(BRAIN_PROMPT_CATALOG_FACTORY.key)
-    except Exception:
-        catalog_factory = None
+    from lca.plugins.composer.composition.skill_store import active_skill_store
 
     class _EmptyStore:
         def list_installed(self) -> tuple[object, ...]:
             return ()
 
-    def _active_skill_store() -> object:
-        """渲染期取 ``skills`` capability 背后的真实 skill store。
+    def _runtime_scope() -> object:
+        inner_carrier = getattr(ctx, "_inner_carrier", None)
+        if callable(inner_carrier):
+            return inner_carrier()
+        return ctx
 
-        capability 在场时 ``render_brain_skills`` 枚举已安装技能
-        (available_skills section 的真值,与 Reasoner 的 catalog hint
-        同源);缺失 / 解析失败回退空 store —— section 渲染为空、
-        assembler 标 skipped_empty,不挡业务。
-        """
+    def _active_skill_store() -> object:
+        """渲染期取与 Brain 工厂同源的 skill store（含 assistant Home 合并）。"""
         try:
-            provider = ctx.soft_get("skills")
+            return active_skill_store(_runtime_scope())
         except Exception:
             return _EmptyStore()
-        if provider is None:
-            return _EmptyStore()
-        try:
-            store = provider_current(provider)
-        except Exception:
-            return _EmptyStore()
-        return store if store is not None else _EmptyStore()
 
     def _catalog_render(render_method: str) -> Callable[[], str]:
-        if catalog_factory is None or not isinstance(catalog_factory, BrainPromptCatalogFactory):
-            return lambda: ""
-
         sentinel = object()
+        factory_key = cap_key(BRAIN_PROMPT_CATALOG_FACTORY)
 
         def _render() -> str:
+            factory = ctx.soft_get(factory_key)
+            if factory is None or not isinstance(factory, BrainPromptCatalogFactory):
+                return ""
             try:
-                catalog = catalog_factory.create(
+                catalog = factory.create(
                     skill_store=_active_skill_store(),  # type: ignore[arg-type]
                     tools=(),
                 )

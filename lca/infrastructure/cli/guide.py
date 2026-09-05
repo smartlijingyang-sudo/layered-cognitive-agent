@@ -181,6 +181,17 @@ Audit 测量网  ADR-0074 PR-0（只读）
   ./scripts/lca-ops notes-list        枚举 docs/notes/ 现有 note（--json 给 agent）
 
 ────────────────────────────────
+Composio（LCA-native OAuth，读 .env COMPOSIO_API_KEY）
+────────────────────────────────
+  ./scripts/lca-ops composio status
+  ./scripts/lca-ops composio connect google-drive
+  ./scripts/lca-ops composio refresh google-drive
+  ./scripts/lca-ops composio migrate --database-url $DATABASE_URL
+
+  OAuth callback（自动 refresh，无需手动 composioRefresh）:
+  http://127.0.0.1:8765/composio/oauth/callback
+
+────────────────────────────────
 通用参数
 ────────────────────────────────
   --json           结构化 JSON（agent）

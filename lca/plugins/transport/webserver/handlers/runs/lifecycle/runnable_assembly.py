@@ -75,6 +75,7 @@ class CognitiveRunnableAssembler:
                 request.scope,
                 request.bindings,
                 machine_resolver=request.machine_resolver,
+                assistant_id=str(getattr(request.session, "assistant_id", "") or "").strip(),
             ),
         )
         adapter = self._mode_registry.resolve(request.mode)
@@ -86,6 +87,7 @@ def tools_from_scope(
     bindings: PlaneBindings | None,
     *,
     machine_resolver: MachineResolver | None = None,
+    assistant_id: str = "",
 ) -> tuple[Tool, ...]:
     """Materialize tools from the booted tools seam; missing seams fail loudly."""
 
@@ -98,6 +100,7 @@ def tools_from_scope(
         "search": require_capability(scope, "search"),
         "skill_store": provider_current(require_capability(scope, "skills")),
         "machine_resolver": machine_resolver,
+        "assistant_id": assistant_id,
     }
     return tuple(require_capability(scope, "tools").materialize(bind))
 

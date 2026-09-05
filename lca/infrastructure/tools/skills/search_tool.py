@@ -20,7 +20,7 @@ from lca.infrastructure.search.service import any_search_provider_available
 from lca.infrastructure.search.skill_policy import filter_skill_search_result
 from lca.infrastructure.tools.contract.render import RenderContract, contract
 from lca.infrastructure.tools.contract.schema import COMMON
-from lca.infrastructure.tools.skills._format import format_skill_index_rows
+from lca.infrastructure.tools.skills._format import format_skill_index_rows, to_market_skill_items
 
 SEARCH_SKILL_TOOL = "search_skill"
 
@@ -33,11 +33,15 @@ _SANDBOX_FALLBACK = "无匹配 skill。建议用 execute_code 直接编码实现
         tool_name="search_skill",
         identifier="lobe-skill-store",
         api_name="searchSkill",
-        args=(COMMON["query"],),
+        args=(COMMON["query"].rename("q"), COMMON["page"].optional(), COMMON["page_size"].optional()),
         state=(
-            COMMON["content"],
+            COMMON["items"],
+            COMMON["page"],
+            COMMON["page_size"],
             COMMON["total"],
+            COMMON["content"],
         ),
+        content_field="content",
     )
 )
 class SkillSearchTool(Tool):
@@ -53,6 +57,7 @@ class SkillSearchTool(Tool):
         "type": "object",
         "properties": {
             "query": {"type": "string", "description": "搜索关键词；空则列出本地已安装"},
+            "q": {"type": "string", "description": "同 query（LobeHub wire 别名）"},
             "page": {"type": "integer", "default": 1},
             "page_size": {"type": "integer", "default": 20},
         },
@@ -66,7 +71,7 @@ class SkillSearchTool(Tool):
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         start = time.monotonic()
-        query = str(args.get("query") or "")
+        query = str(args.get("query") or args.get("q") or "")
         page = int(args.get("page") or 1)
         page_size = int(args.get("page_size") or 20)
 
@@ -76,11 +81,18 @@ class SkillSearchTool(Tool):
             unified_search_available=any_search_provider_available(),
         )
         body = self._format_body(result)
+        items = to_market_skill_items(result.items)
         latency_ms = int((time.monotonic() - start) * 1000)
         return Observation(
             observation_id=new_id("obs"),
             success=True,
-            payload={"content": body, "total": result.total},
+            payload={
+                "content": body,
+                "items": items,
+                "page": result.page,
+                "page_size": result.page_size,
+                "total": result.total,
+            },
             content_type=ContentType.TEXT,
             latency_ms=latency_ms,
         )

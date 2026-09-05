@@ -42,8 +42,9 @@ class KernelServeConfig(BaseModel):
 
     @property
     def health_url(self) -> str:
-        """Full health check URL."""
-        return f"{self.base_url}{self.health_path}"
+        """Full health check URL (always loopback — bind may be 0.0.0.0)."""
+        probe_host = "127.0.0.1" if self.host in {"0.0.0.0", "::"} else self.host
+        return f"http://{probe_host}:{self.port}{self.health_path}"
 
 
 class LobeHubConfig(BaseModel):

@@ -1,0 +1,26 @@
+# Composio third-party integrations (LCA-native, Option C).
+#
+# Opt-in: add `composio-tools` to profile bundles and set COMPOSIO_API_KEY via
+# profile patch on lca-composio-provider.
+name: composio-tools
+description: |
+  LCA-native Composio integration: OAuth connections + dynamic action tools.
+requires:
+  - base
+
+entries:
+  - id: lca-composio-provider
+    name: lca_composio_provider
+    $module: lca.plugins.integrations.composio_provider
+    config: {}
+
+  - id: lca-composio-tools
+    name: lca_composio_tools
+    $module: lca.plugins.tools.composio_tools
+    config:
+      enabled: true
+
+  - id: lca-gateway-routes-composio
+    name: lca_webserver_routes_composio
+    $module: lca.plugins.transport.webserver.routes_composio
+    config: {}

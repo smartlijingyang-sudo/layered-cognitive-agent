@@ -46,6 +46,7 @@ const ARG_KEYS = new Set([
   'code',
   'skill_id',
   'query',
+  'q',
   'directoryPath',
   'directory_path',
   'timeout',
@@ -85,6 +86,9 @@ function pickArgs(state: Record<string, unknown> | undefined): Record<string, un
   const args: Record<string, unknown> = {};
   for (const key of ARG_KEYS) {
     if (state[key] !== undefined) args[key] = state[key];
+  }
+  if (args.q === undefined && args.query !== undefined) {
+    args.q = args.query;
   }
   return args;
 }

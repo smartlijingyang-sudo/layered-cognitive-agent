@@ -159,6 +159,8 @@ async def _serve_async(
     env_snapshot = load_layered_env(
         bin_name="lca_kernel", dir=os.getcwd(), allow_unknown=allow_unknown_env
     )
+    # Profile resolve reads os.environ for {from_env: ...}; apply filtered .env first.
+    os.environ.update(dict(env_snapshot.dotenv))
 
     async def main() -> int:
         async with run_kernel_lifespan(profile_path) as state:  # 步骤 2+3: K1-K6 装 plugin 树

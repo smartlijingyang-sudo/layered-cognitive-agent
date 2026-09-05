@@ -83,4 +83,6 @@ COMMON: dict[str, FieldSpec] = {
     "time_range": FieldSpec("time_range", "timeRange", "string", "argument", required=False),
     "questions": FieldSpec("questions", "questions", "json", "argument"),
     "total": FieldSpec("total", "total", "int", "observation"),
+    "items": FieldSpec("items", "items", "json", "observation"),
+    "page_size": FieldSpec("page_size", "pageSize", "int", "observation"),
 }

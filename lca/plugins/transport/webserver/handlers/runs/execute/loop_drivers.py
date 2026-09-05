@@ -115,7 +115,7 @@ class CognitiveRunDriver:
         else:
             llm = llm_resolver.resolve()
             scope = None
-        tools = _tools_from_ctx(scope, bindings)
+        tools = _tools_from_ctx(scope, bindings, session=session)
         if mode == SOLO_MODE_KEY:
             persona = _assistant_persona(scope, session)
             runnable: Agent | Team = _build_solo_agent(
@@ -161,16 +161,23 @@ class CognitiveRunDriver:
 # ── Helpers (private; nothing else in the gateway constructs an Agent/Team) ──
 
 
-def _tools_from_ctx(scope: Context | None, bindings: PlaneBindings | None) -> tuple[Tool, ...]:
+def _tools_from_ctx(
+    scope: Context | None,
+    bindings: PlaneBindings | None,
+    *,
+    session: RunSession | None = None,
+) -> tuple[Tool, ...]:
     """Materialize tools from the booted tools seam. Missing seam → fail."""
     if scope is None:
         return ()
+    assistant_id = str(getattr(session, "assistant_id", "") or "").strip() if session else ""
     bind = {
         "file_store": provider_current(require_capability(scope, "file_store")),
         "bindings": bindings,
         "sandbox": provider_current(require_capability(scope, "sandbox")),
         "search": require_capability(scope, "search"),
         "skill_store": provider_current(require_capability(scope, "skills")),
+        "assistant_id": assistant_id,
     }
     return tuple(require_capability(scope, "tools").materialize(bind))
 

@@ -12,7 +12,7 @@
 # 本段只保留 host/port/health_path 给 daemon 派生 ws_url 用。
 # ADR-0119 followup-2:原 ``gateway:`` 段改为 ``kernel_serve:``。
 kernel_serve:
-  host: "127.0.0.1"
+  host: "0.0.0.0"
   port: 8765
   health_path: /health
   # 助理域（ADR-0187）：web-assistant = web-standard + assistant-runtime bundle。

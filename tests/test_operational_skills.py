@@ -230,6 +230,9 @@ class TestSkillTools(unittest.IsolatedAsyncioTestCase):
         projected = project_tool_state("search_skill", {"query": "pdf"}, obs)
         self.assertIn("pdf-helper", projected["content"])
         self.assertEqual(projected["total"], obs.payload["total"])
+        self.assertIsInstance(projected["items"], list)
+        self.assertGreater(len(projected["items"]), 0)
+        self.assertEqual(projected["items"][0]["identifier"], "pdf-helper")
 
     async def test_tools_consume_importer_protocol_without_http_store_attribute(self) -> None:
         package = self.store.install_package(

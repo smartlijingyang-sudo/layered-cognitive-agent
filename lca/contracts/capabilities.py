@@ -101,6 +101,7 @@ CONTINUOUS_CONTROL_PLANE_FACTORY = Capability[object](
 SANDBOX = Capability[object]("sandbox", cardinality="registry")
 MEMORY = Capability[object]("memory", cardinality="registry")
 SEARCH = Capability[object]("search", cardinality="registry")
+COMPOSIO = Capability[object]("composio", cardinality="one")
 STATE_STORE = Capability[object]("state_store", cardinality="registry")
 EVENT_DESCRIPTOR_REGISTRY = Capability[object]("event_descriptor_registry", cardinality="one")
 """单一事件描述符注册中心（ADR-0063 PR-7 source inversion）。"""

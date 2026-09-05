@@ -95,6 +95,7 @@ BOOTSTRAP_PREFIXES: tuple[str, ...] = (
     "REDIS_",  # REDIS_HOST / REDIS_PORT / REDIS_DB
     "OTEL_",  # OpenTelemetry standard
     "VAULT_",  # VAULT_ADDR / VAULT_TOKEN
+    "COMPOSIO_",  # COMPOSIO_API_KEY / COMPOSIO_AUTH_CONFIG_IDS
 )
 
 BOOTSTRAP_FORBIDDEN: frozenset[str] = frozenset(
