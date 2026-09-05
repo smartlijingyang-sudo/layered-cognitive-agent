@@ -12,6 +12,8 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -581,6 +583,40 @@ def test_store_restore_appears_in_get_and_list() -> None:
     session = store.restore("listed", header, [])
     assert store.get("listed") is session
     assert session in store.list()
+
+
+def test_restore_from_log_fail_closed_then_restore(tmp_path: Path) -> None:
+    session_id = "from_log"
+    path = tmp_path / f"{session_id}.spine.jsonl"
+    path.write_text(
+        "\n".join(
+            [
+                json.dumps({"type": "turn.started.v1", "seq": 0, "time": 1, "data": {"turn": 1}}),
+                json.dumps({"type": "turn.ended.v1", "seq": 1, "time": 2, "data": {"turn": 1, "reason": "done"}}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    store = SessionStore()
+    header = SessionHeader(version=SESSION_FORMAT_VERSION, id=session_id, created_at=9000)
+    session = store.restore_from_log(session_id, header, path)
+    assert session.seq == 2
+    assert session.header.is_seeded is True
+    assert [e.type for e in session.snapshot_events()] == ["turn.started.v1", "turn.ended.v1"]
+
+
+def test_restore_from_log_rejects_dirty_type(tmp_path: Path) -> None:
+    session_id = "dirty"
+    path = tmp_path / f"{session_id}.spine.jsonl"
+    path.write_text(
+        json.dumps({"type": "unknown/bad", "seq": 0, "time": 1, "data": {}}) + "\n",
+        encoding="utf-8",
+    )
+    store = SessionStore()
+    header = SessionHeader(version=SESSION_FORMAT_VERSION, id=session_id, created_at=9001)
+    with pytest.raises(ValueError, match="unknown"):
+        store.restore_from_log(session_id, header, path)
 
 
 # ── plugin 装配 ─────────────────────────────────────────────────────

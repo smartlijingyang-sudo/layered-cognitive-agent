@@ -1,6 +1,6 @@
 # PLAN: DSH 观察体系全面对齐 — 补齐规划
 
-> **状态**:实施中,2026-09-05。Wave 0–4/6 + G1/G5 PR-4 已落地;158 项 parity 测试绿。
+> **状态**:Wave 0–6 + G1/G5 PR-4 已落地;15 项验收矩阵 13/15 绿(5/11 刻意跳过)。
 > **输入**:用户提供的 A–K 模块清单 + 15 条验收矩阵;`DSH-GAP-AUDIT.md`(G1–G15)、
 > `OBS-CONVERGENCE-NEXT.md`、ADR-0183/0184/0185/0186/0188、
 > `docs/specs/session-event-pipeline-spec.md`。
@@ -168,19 +168,19 @@ DSH `packages/llm/token-meter` 的 Python 对位,按扩展路径落:
 |---|---|---|---|
 | 1 | 只有 `append` 产生持久事件 | ✅ `tests/architecture/test_session_ssot_invariants.py`(I-SESSION-1/3)+ import-linter business-event-isolation | 保持,随 Wave 0 收口 |
 | 2 | surface 仅 3 种 | ✅ `fold.py::SURFACE_EVENT_TYPES` + `test_fold_surface.py` | 已绿 |
-| 3 | `deriveMessages()` ≡ 重放 surface | ❌ 无 derive_messages | Wave 4.3 + 测试 |
+| 3 | `deriveMessages()` ≡ 重放 surface | ✅ `messages.py` + `test_messages_and_fork.py` | Wave 4 ✅ |
 | 4 | replace 不删历史事件 | ✅ `foldSurface` 语义(events 保留、surface 变短)+ `test_fold_surface.py` | 已绿,RecordingLoop 复断 |
 | 5 | prune 紧跟影子计价 | ⏭️ LCA 无 surface 压缩词表 | Wave 2.5 预留;引入压缩词表时补(需事件闭集 ADR) |
-| 6 | 未知非 ignorable → 拒读 | ❌ `reader.py` 无已知类型校验 | Wave 1.2 + 脏 log 测试 |
-| 7 | 撕尾不暴露 | ⚠️ 规格承诺读端跳过,回归测试未在位 | Wave 6.3 补破坏性测试(先验证现状,缺则修) |
+| 6 | 未知非 ignorable → 拒读 | ✅ `log_reader` + `restore_from_log` + 脏 log 测试 | Wave 1 ✅ |
+| 7 | 撕尾不暴露 | ✅ `test_torn_tail_read.py` + `restore_from_log` | Wave 6 ✅ |
 | 8 | waterfall 不 next 即中断 | ✅ middleware/hook 族测试(`test_think_guard_consumer.py` 等) | 已绿 |
-| 9 | usage 仅信封一致时当锚 | ❌ 无计量层 | Wave 2.2 + 测试 |
-| 10 | FEEDBACK_ONLY 无 feedback 不外送 | ⚠️ 模式在、来源缺 | Wave 3 + 测试 |
+| 9 | usage 仅信封一致时当锚 | ✅ `HeuristicTokenMeter` + `test_token_usage.py` | Wave 2 ✅ |
+| 10 | FEEDBACK_ONLY 无 feedback 不外送 | ✅ `telemetry_capture` gate + 测试 | Wave 3 ✅ |
 | 11 | 上传失败不写水位 | ⏭️ 不适用(无 DeepSeek 回传) | 跳过 |
 | 12 | 插件类型可 merge 可跳过 | ✅ `ignorable` + event_catalog fail-closed | Wave 1 ✅ |
 | 13 | 模型请求内容 ⊆ 日志可重建 | ✅ request.header + RecordingLoop catalog 参数化 | Wave 6 ✅ |
 | 14 | 投影冷读 = 全量 fold | ✅ `test_token_usage.py` 冷热对比 | Wave 2 ✅ |
-| 15 | OTEL turn/step/tool 树确定性再生 | ⚠️ `otel/projector.py` 用事件 ts 还原显式起止(结构上确定),缺 live vs replay spanId 对比测试 | Wave 6 后补专项测试 |
+| 15 | OTEL turn/step/tool 树确定性再生 | ✅ `test_otel_live_replay_parity.py` | Wave 6 ✅ |
 
 ---
 

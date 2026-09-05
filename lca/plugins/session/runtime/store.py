@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import contextlib
 from collections.abc import Callable, Sequence
+from pathlib import Path
 
 import structlog
 
@@ -146,6 +147,22 @@ class SessionStore:
         # 不重放给 observer（restore 时序契约）。
         self._fanout_creation_hooks(session)
         return session
+
+    def restore_from_log(
+        self,
+        session_id: str,
+        header: SessionHeader,
+        log_path: Path,
+    ) -> Session:
+        """从 durable session JSONL 冷恢复：fail-closed 读 + :meth:`restore`。
+
+        读语义对齐 :func:`load_session_events`（撕尾截断、known-types 校验、
+        seq 连续）。``log_path`` 通常是 ``<run_dir>/<run_id>.spine.jsonl``。
+        """
+        from lca.plugins.session.runtime.log_reader import load_session_events
+
+        events = load_session_events(log_path, session_id=session_id)
+        return self.restore(session_id, header, events)
 
     def fork(
         self,
