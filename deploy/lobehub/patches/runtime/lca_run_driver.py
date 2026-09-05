@@ -29,8 +29,8 @@ meta = PatchMeta(
         f"{_UI_TRANSPORTS}/lcaPersist.ts",
         f"{_UI_TRANSPORTS}/lcaArtifacts.ts",
         f"{_UI_TRANSPORTS}/lcaWire.ts",
-        f"{_UI_TRANSPORTS}/lcaToolRender/renderers/lobe-user-interaction/askUserQuestion.tsx",
         "src/store/chat/slices/agentRun/actions/transports/client/streamingExecutor.ts",
+        "src/features/Conversation/Messages/AssistantGroup/Tool/Detail/Intervention/customInteractionHandlers.ts",
     ),
     risk="high",
     category="runtime",
@@ -38,7 +38,9 @@ meta = PatchMeta(
     why="LobeHub AgentRuntime owns a client tool loop; LCA already ran the loop on the server",
     technical_detail=(
         "executeClientAgent enters runLcaJournal then finishLcaChat. "
-        "TS sources are copied; lcaWire.ts is generated from WIRE."
+        "TS sources are copied; lcaWire.ts is generated from WIRE. "
+        "askUserQuestion reuses native lobe-user-interaction Inspector/Intervention/Render; "
+        "LCA resume is wired via customInteractionHandlers."
     ),
     verify_file="src/store/chat/slices/agentRun/actions/transports/client/streamingExecutor.ts",
     verify_marker="/* LCA: every chat is a Run */",
@@ -128,14 +130,146 @@ def apply(ctx: PatchContext) -> bool:
     if ctx.write_if_changed(f"{_UI_TRANSPORTS}/lcaWire.ts", render_wire_ts(WIRE)):
         changed = True
 
-    # askUserQuestion question-card renderer (human-in-the-loop resume via
-    # POST /runs/<id>/answer); reuses the shared ask-user components.
-    if ctx.write_if_changed(
-        f"{_UI_TRANSPORTS}/lcaToolRender/renderers/lobe-user-interaction/askUserQuestion.tsx",
-        (_HERE / "lcaToolRender/renderers/lobe-user-interaction/askUserQuestion.tsx").read_text(
-            encoding="utf-8"
-        ),
-    ):
+    # askUserQuestion: 复用原生 lobe-user-interaction 包的 Inspector + Intervention + Render。
+    # LCA resume 路径由 customInteractionHandlers 的 handleLcaAskUserSubmit 处理。
+    # 不再拷贝自定义 renderer。
+
+    # customInteractionHandlers: 注入 LCA askUserQuestion resume handler。
+    handlers_path = (
+        "src/features/Conversation/Messages/AssistantGroup/Tool/Detail/Intervention/"
+        "customInteractionHandlers.ts"
+    )
+    handlers_text = ctx.read(handlers_path)
+    if "handleLcaAskUserSubmit" not in handlers_text:
+        # Add import for conversation store + LCA token.
+        import_anchor = "import { topicService } from '@/services/topic';"
+        if import_anchor not in handlers_text:
+            raise SystemExit("[lca_run_driver] customInteractionHandlers import anchor not found")
+        handlers_text = handlers_text.replace(
+            import_anchor,
+            import_anchor
+            + "\nimport { dataSelectors, useConversationStore } from '@/features/Conversation/store';\n"
+            + "\nconst LCA_TOKEN = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';",
+            1,
+        )
+
+        # Add messageId to CustomInteractionContext.
+        ctx_anchor = "interface CustomInteractionContext {\n  apiName?: string;"
+        if ctx_anchor not in handlers_text:
+            raise SystemExit("[lca_run_driver] CustomInteractionContext anchor not found")
+        handlers_text = handlers_text.replace(
+            ctx_anchor,
+            "interface CustomInteractionContext {\n  apiName?: string;\n  messageId?: string;",
+            1,
+        )
+
+        # Replace the generic askUserQuestion handler with the LCA-aware one.
+        old_handler = (
+            "  {\n"
+            "    handler: async (payload) => ({\n"
+            "      options: { pluginState: { askUserAnswers: payload } },\n"
+            "      payload,\n"
+            "    }),\n"
+            "    match: isAskUserQuestionCall,\n"
+            "  },"
+        )
+        new_handler = (
+            "  {\n"
+            "    handler: handleLcaAskUserSubmit,\n"
+            "    match: isAskUserQuestionCall,\n"
+            "  },"
+        )
+        if old_handler not in handlers_text:
+            raise SystemExit("[lca_run_driver] askUserQuestion handler anchor not found")
+        handlers_text = handlers_text.replace(old_handler, new_handler, 1)
+
+        # Insert the handleLcaAskUserSubmit function before customInteractionSubmitHandlers.
+        lca_handler_fn = '''
+/**
+ * LCA askUserQuestion resume: POST the answer to the LCA gateway and store
+ * structured answers in pluginState. The LCA run resumes on the same live
+ * stream that LcaRunDriver keeps consuming.
+ */
+const handleLcaAskUserSubmit: CustomInteractionSubmitHandler = async (payload, context) => {
+  const messageId = context?.messageId;
+  if (!messageId) return { options: { pluginState: { askUserAnswers: payload } }, payload };
+
+  const msg = dataSelectors.getDbMessageById(messageId)(useConversationStore.getState());
+  const lca = (msg?.pluginState as Record<string, unknown> | undefined)?.lca as
+    | { run_id?: string; status?: string }
+    | undefined;
+  const runId = typeof lca?.run_id === 'string' ? lca.run_id : '';
+  if (!runId) return { options: { pluginState: { askUserAnswers: payload } }, payload };
+
+  const FREEFORM_KEY = '__freeform__';
+  const freeform = payload[FREEFORM_KEY];
+  let answerText: string;
+  if (typeof freeform === 'string' && freeform.trim()) {
+    answerText = freeform.trim();
+  } else {
+    const lines: string[] = [];
+    for (const [key, value] of Object.entries(payload)) {
+      if (key === FREEFORM_KEY || value == null) continue;
+      const text = Array.isArray(value) ? value.join(', ') : String(value);
+      if (text) lines.push(`${key} ${text}`);
+    }
+    answerText = lines.length > 0 ? lines.join('\\n') : JSON.stringify(payload);
+  }
+
+  try {
+    await fetch(`/lca-api/runs/${runId}/answer`, {
+      body: JSON.stringify({
+        approval_id: 'askUserQuestion',
+        idempotency_key: `${runId}:${messageId}`,
+        payload: answerText,
+      }),
+      headers: {
+        Authorization: `Bearer ${LCA_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      method: 'POST',
+    });
+  } catch (error) {
+    console.error('[LCA] askUserQuestion answer failed', error);
+  }
+
+  return { options: { pluginState: { askUserAnswers: payload } }, payload };
+};
+
+'''
+        handlers_anchor = "const customInteractionSubmitHandlers: Array<{"
+        if handlers_anchor not in handlers_text:
+            raise SystemExit("[lca_run_driver] customInteractionSubmitHandlers anchor not found")
+        handlers_text = handlers_text.replace(
+            handlers_anchor, lca_handler_fn + handlers_anchor, 1
+        )
+
+        ctx.write(handlers_path, handlers_text)
+        changed = True
+
+    # Intervention/index.tsx: pass messageId to prepareCustomInteractionSubmit.
+    intervention_path = (
+        "src/features/Conversation/Messages/AssistantGroup/Tool/Detail/Intervention/index.tsx"
+    )
+    intervention_text = ctx.read(intervention_path)
+    old_ctx = (
+        "              {\n"
+        "                apiName,\n"
+        "                requestArgs: parsedArgs,\n"
+        "                topicId,\n"
+        "              },"
+    )
+    new_ctx = (
+        "              {\n"
+        "                apiName,\n"
+        "                messageId: id,\n"
+        "                requestArgs: parsedArgs,\n"
+        "                topicId,\n"
+        "              },"
+    )
+    if old_ctx in intervention_text:
+        intervention_text = intervention_text.replace(old_ctx, new_ctx, 1)
+        ctx.write(intervention_path, intervention_text)
         changed = True
 
     executor = "src/store/chat/slices/agentRun/actions/transports/client/streamingExecutor.ts"

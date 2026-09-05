@@ -65,8 +65,8 @@ const ARG_KEYS = new Set([
   'pattern',
   'glob',
   'scope',
-  // askUserQuestion: keep the model's questions so the renderer can show the
-  // question card (deploy/lobehub/patches/runtime/lcaToolRender/.../askUserQuestion.tsx).
+  // askUserQuestion: keep the model's questions so the native
+  // lobe-user-interaction Inspector/Intervention can show the question card.
   'questions',
 ]);
 
@@ -480,8 +480,10 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
    * Present the pending askUserQuestion card when the run pauses for human
    * input. The questions are not on the journal stream — they live on the
    * run snapshot's `approval_request` — so fetch it, then create the
-   * `lobe-user-interaction/askUserQuestion` tool message the renderer keys on
-   * and hand it the run context for the POST /runs/<id>/answer resume.
+   * `lobe-user-interaction/askUserQuestion` tool message. The native
+   * Inspector shows the i18n label, the native Intervention renders the
+   * interactive form, and the LCA resume handler in customInteractionHandlers
+   * POSTs the answer to `/lca-api/runs/<id>/answer`.
    */
   const presentAskUserCard = async () => {
     const snapRes = await fetch(`/lca-api/runs/${runId}`, {
@@ -521,7 +523,9 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
         },
         // Mark the tool message as a pending intervention so LobeHub's native
         // InterventionBar renders the interactive askUserQuestion card (the
-        // same surface native runs use). Its submit resumes the gateway run.
+        // same surface native runs use). Submit goes through
+        // customInteractionHandlers.handleLcaAskUserSubmit which resumes
+        // the gateway run via POST /runs/<id>/answer.
         pluginIntervention: { status: 'pending' },
         role: 'tool',
         tool_call_id: callId,
