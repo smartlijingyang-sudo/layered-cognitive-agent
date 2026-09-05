@@ -68,6 +68,7 @@ const ARG_KEYS = new Set([
   // askUserQuestion: keep the model's questions so the native
   // lobe-user-interaction Inspector/Intervention can show the question card.
   'questions',
+  'lca_run_id',
 ]);
 
 type WireFile = { id?: string; mime_type?: string; name: string; size?: number; url: string };
@@ -453,6 +454,11 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
     }
     if (!id) throw new Error('lca: failed to open assistant turn');
     assistantId = id;
+    // Anchor the chain: subsequent openTurn calls should parent off this new
+    // assistant row, not off a stale tool-message id from a previous turn.
+    // If the current turn later produces a tool-result, tool-invoked will
+    // overwrite lastResultMsgId with the tool result message — that wins.
+    lastResultMsgId = id;
     journalDurationMs = undefined;
     currentTurnTools.length = 0;
     get().associateMessageWithOperation(id, options.operationId);
@@ -476,14 +482,18 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
     if (!handler) handler = makeHandler(assistantId);
   };
 
+  const findAskUserTurnTool = (): TurnTool | undefined => {
+    const pair = WIRE.askUserQuestion;
+    if (!pair) return undefined;
+    const wireName = `${pair[0]}____${pair[1]}`;
+    return currentTurnTools.find((rec) => rec.call.function.name === wireName);
+  };
+
   /**
    * Present the pending askUserQuestion card when the run pauses for human
-   * input. The questions are not on the journal stream — they live on the
-   * run snapshot's `approval_request` — so fetch it, then create the
-   * `lobe-user-interaction/askUserQuestion` tool message. The native
-   * Inspector shows the i18n label, the native Intervention renders the
-   * interactive form, and the LCA resume handler in customInteractionHandlers
-   * POSTs the answer to `/lca-api/runs/<id>/answer`.
+   * input. Journal `ToolStarted` already opens the askUserQuestion tool row;
+   * reuse it and stamp `pluginIntervention` + `pluginState.lca` instead of
+   * inserting a second question card (which looked like an endless re-ask loop).
    */
   const presentAskUserCard = async () => {
     const snapRes = await fetch(`/lca-api/runs/${runId}`, {
@@ -498,6 +508,33 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
     if (!questions.length) return;
 
     await ensureTurn();
+    const pair = WIRE.askUserQuestion;
+    const existing = findAskUserTurnTool();
+    if (existing?.resultMsgId && pair) {
+      existing.call.function.arguments = mergeInvocationArgs(existing.call.function.arguments, {
+        lca_run_id: runId,
+        questions,
+      });
+      dispatchMessage(existing.resultMsgId, {
+        plugin: {
+          apiName: pair[1],
+          arguments: existing.call.function.arguments,
+          identifier: pair[0],
+          id: existing.call.id,
+          type: 'builtin',
+        },
+        pluginIntervention: { status: 'pending' },
+      });
+      await get().optimisticUpdatePluginState(
+        existing.resultMsgId,
+        { lca: { run_id: runId, status: 'waiting_input' } },
+        { operationId: options.operationId },
+      );
+      publishTurnTools(false);
+      await persistRow();
+      return;
+    }
+
     const callId = `ask_${runId}`;
     const call: MessageToolCall = {
       function: {

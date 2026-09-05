@@ -30,3 +30,24 @@ class TestToolWireTable(unittest.TestCase):
         self.assertIn("runCommand", WIRE)
         self.assertIn("readFile", WIRE)
         self.assertIn("search_skill", WIRE)
+
+    def test_create_assistant_maps_to_agent_management(self) -> None:
+        """create_assistant must resolve to lobe-agent-management/createAgent
+        so the frontend renders the CreateAgent card instead of logging
+        'unknown tool' and breaking the assistant message parent chain
+        (regression: run_53b7414d67bb final reply invisible)."""
+        self.assertEqual(
+            resolve("create_assistant"), ("lobe-agent-management", "createAgent")
+        )
+
+
+class TestLcaWireGeneration(unittest.TestCase):
+    """The lca_run_driver patch generates lobehub-ui lcaWire.ts from WIRE."""
+
+    def test_generated_wire_includes_create_assistant(self) -> None:
+        from deploy.lobehub.patches.runtime.lca_run_driver import render_wire_ts
+
+        output = render_wire_ts(WIRE)
+        self.assertIn("'create_assistant'", output)
+        self.assertIn("'lobe-agent-management'", output)
+        self.assertIn("'createAgent'", output)

@@ -58,9 +58,12 @@ WIRE: dict[str, tuple[str, str]] = {
     "read_skill_reference": (_SKILLS, "readReference"),
     "search_skill": (_SKILL_STORE, "searchSkill"),
     "import_skill": (_SKILL_STORE, "importSkill"),
-    # ── web search / user interaction ──
+    # ── web search / user interaction / assistant management ──
     "search": (_WEB_BROWSING, "search"),
     "askUserQuestion": (_USER_INTERACTION, "askUserQuestion"),
+    # lobe-agent-management: LobeHub-native builtin plugin identifier; the
+    # frontend resolves i18n labels and the CreateAgent render from it.
+    "create_assistant": ("lobe-agent-management", "createAgent"),
     # ── composio (LCA-native integration) ──
     "composioConnect": (_COMPOSIO, "composioConnect"),
     "composioRefresh": (_COMPOSIO, "composioRefresh"),
