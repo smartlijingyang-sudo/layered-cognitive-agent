@@ -214,7 +214,7 @@ web = [
 ]
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 100
 # SKILL.md files embed Python code blocks; ruff 0.16+ misinterprets the file as
 # Python when the embedded block parses cleanly. Treat all .md as out of scope.
