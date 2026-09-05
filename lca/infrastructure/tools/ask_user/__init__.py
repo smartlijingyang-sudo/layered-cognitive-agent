@@ -77,12 +77,42 @@ class AskUserExecutor:
         return _validate(args)
 
     async def askUserQuestion(self, params: dict[str, Any]) -> Observation:  # noqa: N802
+        _auto_inject_freeform(params)
         error = _validate(params)
         if error:
             return Observation(observation_id="", success=False, payload=None, error=error)
         raise ApprovalPendingError(
             approval_request={"type": "ask_user_question", "questions": params["questions"]}
         )
+
+
+_FREEFORM_OPTION: dict[str, str] = {
+    "label": "自己输入",
+    "description": "不选上面的选项，直接在文本框输入",
+}
+
+
+def _auto_inject_freeform(params: dict[str, Any]) -> None:
+    """Ensure every question has >=2 options by injecting a freeform slot.
+
+    Models often produce a single option like "让我直接输入" for open-ended
+    questions. Without this fix the validator rejects the call (min 2 options)
+    and the run re-asks after resume, creating a visible question loop.
+    """
+    questions = params.get("questions")
+    if not isinstance(questions, list):
+        return
+    for q in questions:
+        if not isinstance(q, dict):
+            continue
+        opts = q.get("options")
+        if not isinstance(opts, list) or len(opts) == 0:
+            q["options"] = [_FREEFORM_OPTION, _FREEFORM_OPTION]
+            continue
+        if len(opts) < 2:
+            opts.append(_FREEFORM_OPTION)
+        if len(opts) > _MAX_OPTIONS:
+            q["options"] = opts[:_MAX_OPTIONS]
 
 
 def _validate(args: dict[str, Any]) -> str | None:
