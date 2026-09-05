@@ -392,6 +392,54 @@ const handleLcaAskUserSubmit: CustomInteractionSubmitHandler = async (payload, c
         ctx.write(control_path, control_text)
         changed = True
 
+    # conversationControl.ts: LCA askUserQuestion CANCEL must release the run
+    # paused server-side at waiting_input. cancelToolInteraction only stamps the
+    # rejection locally and never notifies the backend, leaving the run stuck
+    # waiting for an answer that will never arrive. POST the cancel to the LCA
+    # gateway so the run leaves waiting_input.
+    if "LCA askUserQuestion cancel" not in control_text:
+        if "const LCA_TOKEN" not in control_text:
+            lifecycle_import_anchor = (
+                "import { buildRunLifecycle } from '../lifecycle/buildRunLifecycle';"
+            )
+            if lifecycle_import_anchor not in control_text:
+                raise SystemExit("[lca_run_driver] conversationControl token anchor not found")
+            control_text = control_text.replace(
+                lifecycle_import_anchor,
+                lifecycle_import_anchor
+                + "\n\nconst LCA_TOKEN = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';",
+                1,
+            )
+
+        cancel_anchor = "    const toolContent = 'User cancelled this interaction.';\n"
+        if cancel_anchor not in control_text:
+            raise SystemExit("[lca_run_driver] conversationControl cancel anchor not found")
+        cancel_block = (
+            "    const toolContent = 'User cancelled this interaction.';\n"
+            "\n"
+            "    // LCA askUserQuestion cancel: the run is paused server-side at\n"
+            "    // waiting_input. Forward the cancel to the LCA gateway so the run\n"
+            "    // leaves waiting_input; otherwise it stays stuck waiting for an\n"
+            "    // answer that will never arrive.\n"
+            "    const lcaCancelState = (toolMessage.pluginState as\n"
+            "      | Record<string, unknown>\n"
+            "      | undefined)?.lca as { run_id?: string } | undefined;\n"
+            "    const lcaCancelRunId = typeof lcaCancelState?.run_id === 'string' ? lcaCancelState.run_id : '';\n"
+            "    if (lcaCancelRunId) {\n"
+            "      try {\n"
+            "        await fetch(`/lca-api/runs/${lcaCancelRunId}/cancel`, {\n"
+            "          headers: { Authorization: `Bearer ${LCA_TOKEN}` },\n"
+            "          method: 'POST',\n"
+            "        });\n"
+            "      } catch (error) {\n"
+            "        console.error('[LCA] askUserQuestion cancel failed', error);\n"
+            "      }\n"
+            "    }\n"
+        )
+        control_text = control_text.replace(cancel_anchor, cancel_block, 1)
+        ctx.write(control_path, control_text)
+        changed = True
+
     executor = "src/store/chat/slices/agentRun/actions/transports/client/streamingExecutor.ts"
     text = ctx.read(executor)
     if "finishLcaChat" not in text:
