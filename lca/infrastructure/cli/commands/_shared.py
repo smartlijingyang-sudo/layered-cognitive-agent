@@ -107,32 +107,15 @@ def resolve_repo_root() -> Path:
 
 
 def find_latest_run_id(traces_root: Path | None = None) -> str | None:
-    """Return the most recently completed ``run_id``, or ``None``.
+    """Return the ``run_id`` whose ``traces/runs/<run_id>`` dir has the newest mtime.
 
-    Preference order (matches :mod:`lca.infrastructure.cli.commands.journal`):
-
-    1. ``<traces_root>/latest.json`` (atomic pointer written by
-       :class:`FilesystemRunLocator.update_latest_pointer`). Authoritative
-       "what was the most recent completed run" signal; avoids mtime
-       races where an archived / restored run outranks the live one.
-    2. mtime-sorted fallback when the pointer is missing or stale.
-
-    Returns ``None`` if ``traces/runs/`` does not exist or is empty.
+    The run directory mtime is the sole signal; no pointer file is read or
+    written. Returns ``None`` if ``traces/runs/`` does not exist or is empty.
     """
     root = traces_root if traces_root is not None else Path("traces")
     runs_root = root / "runs"
     if not runs_root.exists():
         return None
-    pointer = root / "latest.json"
-    if pointer.is_file():
-        try:
-            payload = json.loads(pointer.read_text("utf-8"))
-        except (OSError, json.JSONDecodeError):
-            payload = None
-        if isinstance(payload, dict) and payload.get("kind") == "run_pointer":
-            run_id = str(payload.get("run_id", ""))
-            if run_id and (runs_root / run_id).is_dir():
-                return run_id
     candidates = [p for p in runs_root.iterdir() if p.is_dir()]
     if not candidates:
         return None

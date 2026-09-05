@@ -3,7 +3,6 @@
 布局(ADR-0169 PR-27 L10 / D9)::
 
     <root>/
-    ├── latest.json                                # 原子指针
     └── runs/
         └── <run_id>/                              # 不可猜测的目录名
             ├── <run_id>.spine.jsonl                # spine SSOT (ADR-0165.1 / 0167 D11 / PR-27)
@@ -18,12 +17,8 @@
 
 from __future__ import annotations
 
-import contextlib
-import json
-import os
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
 
 from lca.contracts.observability.run_locator import RunLocator
 from lca.infrastructure.observability.spine.sinks.naming import (
@@ -74,25 +69,6 @@ class FilesystemRunLocator(RunLocator):
 
     def manifest_path(self, run_id: str) -> Path:
         return self.run_dir(run_id) / "manifest.json"
-
-    def latest_pointer_path(self) -> Path:
-        return self._root / "latest.json"
-
-    def update_latest_pointer(self, run_id: str) -> None:
-        """原子更新 latest.json:临时文件 + os.replace(0065 §七)。"""
-        target = self.latest_pointer_path()
-        payload: dict[str, Any] = {"run_id": run_id, "kind": "run_pointer"}
-        tmp = target.with_suffix(target.suffix + f".tmp-{os.getpid()}-{os.getcwd().count('/')}")
-        try:
-            with tmp.open("w", encoding="utf-8") as f:
-                json.dump(payload, f, ensure_ascii=False)
-                f.flush()
-                os.fsync(f.fileno())
-            os.replace(tmp, target)
-        except OSError:
-            with contextlib.suppress(OSError):
-                tmp.unlink()
-            raise
 
     # ── 辅助(非 Protocol 契约)─────────────────────────────
 

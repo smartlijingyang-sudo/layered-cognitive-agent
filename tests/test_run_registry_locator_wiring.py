@@ -29,8 +29,6 @@ class _FakeLocator(RunLocator):
         self.manifest_calls: list[str] = []
         self.evidence_calls: list[str] = []
         self.material_calls: list[tuple[str, str, str]] = []
-        self.update_calls: list[str] = []
-        self.latest_called: int = 0
 
     @property
     def storage_root(self) -> Path:
@@ -56,13 +54,6 @@ class _FakeLocator(RunLocator):
     ) -> Path:
         self.material_calls.append((run_id, generator_id, generator_version))
         return self._root / "runs" / run_id / "materializations" / generator_id / generator_version
-
-    def latest_pointer_path(self) -> Path:
-        self.latest_called += 1
-        return self._root / "latest.json"
-
-    def update_latest_pointer(self, run_id: str) -> None:
-        self.update_calls.append(run_id)
 
 
 class RunRegistryLocatorWiring(unittest.TestCase):
@@ -100,14 +91,6 @@ class RunRegistryLocatorWiring(unittest.TestCase):
             self.assertEqual(m, root / "runs" / "run_x" / "manifest.json")
             self.assertEqual(e, root / "runs" / "run_x" / "evidence")
             self.assertEqual(d, root / "runs" / "run_x" / "materializations" / "cost" / "1")
-
-    def test_update_latest_pointer_delegates(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            fake = _FakeLocator(root)
-            reg = RunRegistry(locator=fake)
-            reg.update_latest_pointer("run_y")
-            self.assertEqual(fake.update_calls, ["run_y"])
 
 
 class RunSessionHoldsLocator(unittest.TestCase):

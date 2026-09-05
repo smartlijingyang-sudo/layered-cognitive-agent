@@ -4,8 +4,6 @@
 
 ```text
 traces/
-├── latest.json                         # { "run_id": ..., "kind": "run_pointer" }
-│                                       # 临时文件 + 原子 rename；非事实来源
 └── runs/<unguessable_run_id>/          # run_id 即目录名 (ULID)
     ├── events.jsonl                    # EventSpine SSOT（执行点账本）
     ├── journal.json                    # 物化视图 lca.journal/3.1（step 故事）
@@ -69,10 +67,11 @@ RunSessionBuilder.build(run_id=X)
     └── assemble_run_hub(...)
 ```
 
-## latest.json 原子更新
+## 最新 run 判定
 
-写 `latest.json.tmp-{pid}-{counter}` → `os.replace()` 到 `latest.json`；
-每次 fsync 内容。损坏则重建。**不是事实 owner**。
+"最新 run" = `traces/runs/<run_id>` 中目录 mtime 最新的一个
+（`find_latest_run_id()`，CLI 各 journal 子命令共用）。不存在也不读
+任何指针文件：终态写入时刻与目录真实活跃度不一致，指针判定会错。
 
 ## 目录命名
 

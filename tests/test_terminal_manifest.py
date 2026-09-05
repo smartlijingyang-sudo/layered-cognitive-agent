@@ -2,13 +2,11 @@
 
 ``_record_terminal_materialization`` 在 run 进入终态后写:
 - ``<run_id>/manifest.json`` —— RunManifest + doctor_report merged in extra
-- ``traces/latest.json`` —— 原子指针,指向该 run
 
 本测试不依赖 boot / plugin / LLM,只验证:
 1. manifest.json 落盘且字段合规
 2. doctor_report 合并进 extra(向后兼容 doctor.v2 schema)
-3. latest.json 原子更新(临时文件 + rename)
-4. 异常路径下不抛(只记日志)
+3. 异常路径下不抛(只记日志)
 """
 
 from __future__ import annotations
@@ -67,7 +65,7 @@ def _make_session(*, run_id: str, spine_path: Path, status: RunStatus) -> RunSes
 
 
 class TerminalManifestWritesPerRun(unittest.TestCase):
-    """终态 manifest.json + latest.json 落地。"""
+    """终态 manifest.json 落地。"""
 
     def test_manifest_written_with_run_id_and_terminal_event_seq(self) -> None:
         with self._fresh_root() as root:
@@ -108,40 +106,6 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
             self.assertEqual(payload["closed_at"], 1100.0)
             self.assertIn("doctor_report", payload["extra"])
             self.assertEqual(payload["extra"]["doctor_report"]["schema"], "doctor.v3")
-
-    def test_latest_json_atomically_written(self) -> None:
-        with self._fresh_root() as root:
-            run_id = "run_terminal02"
-            spine_path = root / "runs" / run_id / "events.jsonl"
-            _write_jsonl(
-                spine_path,
-                [
-                    _row(
-                        1,
-                        "AgentRunStarted",
-                        {"agent_role": "agt_x", "objective": "q"},
-                    ),
-                    _row(
-                        2,
-                        "AgentRunFinished",
-                        {"agent_role": "agt_x", "ok": True},
-                    ),
-                ],
-            )
-            session = _make_session(
-                run_id=run_id, spine_path=spine_path, status=RunStatus.COMPLETED
-            )
-
-            record_terminal_materialization(session)
-
-            latest = root / "latest.json"
-            self.assertTrue(latest.exists(), "latest.json must exist")
-            latest_payload = json.loads(latest.read_text(encoding="utf-8"))
-            self.assertEqual(latest_payload["kind"], "run_pointer")
-            self.assertEqual(latest_payload["run_id"], run_id)
-            # 临时文件不应残留
-            leftovers = list(root.glob("latest.json.tmp-*"))
-            self.assertEqual(leftovers, [], "tmp files must not remain after rename")
 
     def test_session_without_locator_falls_back_to_path_inferred_locator(self) -> None:
         """测试 / 直构造的 session 没 locator;从 spine_path 上溯推断 FilesystemRunLocator。"""
@@ -273,8 +237,7 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
             )
             # 不抛
             record_terminal_materialization(session)
-            # journal 不存在 → manifest.json 不写(找不到 ledger_summary / watermark),
-            # latest.json 也不更新 —— 因为 manifest_path.parent.mkdir(parents=True) + 写失败
+            # journal 不存在 → manifest.json 不写(找不到 ledger_summary / watermark)
             # 我们只要求不抛
             self.assertTrue(True)
 

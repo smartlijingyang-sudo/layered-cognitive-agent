@@ -48,11 +48,5 @@ class RunLocator(Protocol):
     def manifest_path(self, run_id: str) -> Path:
         """返回 manifest.json 路径。"""
 
-    def latest_pointer_path(self) -> Path:
-        """返回 traces/latest.json 路径(原子指针,非事实来源)。"""
-
-    def update_latest_pointer(self, run_id: str) -> None:
-        """原子更新 latest.json(临时文件 + os.replace)。"""
-
 
 __all__ = ["RunLocator"]

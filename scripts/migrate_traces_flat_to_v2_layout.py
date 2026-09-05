@@ -10,7 +10,6 @@
 
 新布局(0065 §七)::
     traces/
-    ├── latest.json
     └── runs/
         └── run_xxx/
             ├── journal.jsonl          # 来自 <id>.jsonl
@@ -112,10 +111,6 @@ def _scan_flat_artifacts(runs_dir: Path) -> list[FlatArtifact]:
             )
             break
     return out
-
-
-def _latest_pointer_payload() -> dict[str, str]:
-    return {"kind": "run_pointer"}
 
 
 def _ledger_summary_for(path: Path) -> str:
@@ -237,20 +232,13 @@ def _execute_plan(*, root: Path, plan: MigrationPlan) -> dict[str, int]:
         "journal_moved": 0,
         "manifest_written": 0,
         "diagnostic_moved": 0,
-        "latest_written": 0,
         "src_deleted": 0,
     }
-    latest_run_id: str | None = None
-    latest_mtime: float = -1.0
 
     for journal, dst in plan.journal_moves:
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(journal.src_path), str(dst))
         counts["journal_moved"] += 1
-        m = _mtime_of(dst)
-        if m > latest_mtime:
-            latest_mtime = m
-            latest_run_id = journal.run_id
 
     for _journal, doctor, dst in plan.manifest_writes:
         manifest = _compose_manifest(journal=Path(dst.parent) / "journal.jsonl", doctor=doctor)
@@ -277,14 +265,6 @@ def _execute_plan(*, root: Path, plan: MigrationPlan) -> dict[str, int]:
             ):
                 art.src_path.unlink()
                 counts["src_deleted"] += 1
-
-    # latest.json 原子更新
-    if latest_run_id is not None:
-        from lca.infrastructure.observability.backends.run_locator_fs import FilesystemRunLocator
-
-        locator = FilesystemRunLocator(root=root)
-        locator.update_latest_pointer(latest_run_id)
-        counts["latest_written"] += 1
     return counts
 
 

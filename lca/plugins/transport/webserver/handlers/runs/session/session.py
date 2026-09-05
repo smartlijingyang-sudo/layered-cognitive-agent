@@ -277,11 +277,6 @@ class RunRegistry:
             generator_version=generator_version,
         )
 
-    def update_latest_pointer(self, run_id: str) -> None:
-        """Delegate latest-run materialization to the durable locator."""
-
-        self._locator.update_latest_pointer(run_id)
-
     def summary(self, run_id: str) -> dict[str, Any] | None:
         """Return the carrier projection for one retained session."""
 

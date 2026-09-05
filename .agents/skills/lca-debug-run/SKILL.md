@@ -1,6 +1,6 @@
 ---
 name: lca-debug-run
-description: Use when the user says "latest run", "刚才那个 run", "分析一下这次", "为啥这次失败", "看看发生了什么", "最新一次 run", "DSH 风格轨迹", "traceback 呢" — runs the 5-step run-debrief flow (pointer file → debug-run → journal trace → sidecar/exceptions index → explain), hands off to `lca-code-review` when the evidence points at a real defect, and links `docs/debug/run-debug-guide.md` for the canonical command matrix (CI-locked by `scripts/check_run_debug_sync.py`). Trigger phrases: "latest run", "刚才那个 run", "debug-run", "lca-debug", "分析这次 run", "traceback".
+description: Use when the user says "latest run", "刚才那个 run", "分析一下这次", "为啥这次失败", "看看发生了什么", "最新一次 run", "DSH 风格轨迹", "traceback 呢" — runs the 5-step run-debrief flow (latest-run resolve → debug-run → journal trace → sidecar/exceptions index → explain), hands off to `lca-code-review` when the evidence points at a real defect, and links `docs/debug/run-debug-guide.md` for the canonical command matrix (CI-locked by `scripts/check_run_debug_sync.py`). Trigger phrases: "latest run", "刚才那个 run", "debug-run", "lca-debug", "分析这次 run", "traceback".
 ---
 
 # Reading an LCA Run
@@ -10,7 +10,7 @@ A run debrief is **not** a bug investigation. The 5-step flow is the routine pat
 **SSOT layout, do not duplicate:**
 
 - The canonical command SOP — including `WHY / DO / OUTPUT / NEXT / FAIL` per step, sidecar/exceptions paths, bug-report writing rules, `POST /runs` triggering rules, and the CI sync gate — lives in [`docs/debug/run-debug-guide.md`](../../../docs/debug/run-debug-guide.md). That file is locked by [`scripts/check_run_debug_sync.py`](../../../scripts/check_run_debug_sync.py): every `` `lca-ops …` `` backtick path inside it must exist in `lca-ops --help`, or CI fails. The skill links it; it does not restate it.
-- This skill owns four things the SOP does not: the trigger-phrase table, the run_id pointer rule, the 5-step flow at a glance (so the agent knows the path before opening the SOP), and the bug-vs-debrief decision + escalation handoff.
+- This skill owns four things the SOP does not: the trigger-phrase table, the run_id resolution rule, the 5-step flow at a glance (so the agent knows the path before opening the SOP), and the bug-vs-debrief decision + escalation handoff.
 - AGENTS.md §6 owns the command-matrix pointers and the "改单 run 调试" reference; the human-readable index of every `lca-ops` subcommand lives in [docs/debug/README.md](../../../docs/debug/README.md) (kept narrow, not duplicated here).
 
 If a command in the SOP changes, fix the SOP first (CI will catch you). If a trigger phrase changes or the bug-vs-debrief split shifts, fix this skill.
@@ -31,7 +31,7 @@ Do **not** enter the flow for: static code questions, ADR review, Profile topolo
 
 The full per-step `WHY / DO / OUTPUT / NEXT / FAIL` lives in `docs/debug/run-debug-guide.md` (Step 0–8). This is the agent's checklist so a step is never skipped "to save time". Each step consumes the previous step's evidence; do not skip ahead.
 
-1. **Resolve `run_id` from the pointer file.** `LATEST=$(jq -r .run_id traces/latest.json)` — the atomic pointer is SSOT. Never `ls -t traces/runs`, never `find`, never sort by mtime. The pointer file is the run the system considers latest, even when file mtimes disagree.
+1. **Resolve `run_id` from the newest-mtime run dir.** `LATEST=$(ls -1t traces/runs | head -1)` — no pointer file exists; the directory mtime under `traces/runs/` is the sole signal (same rule as `find_latest_run_id()`; CLI journal subcommands also accept an empty run_id and resolve this themselves).
 2. **8-section diagnostic.** `./scripts/lca-ops debug-run "$LATEST"` — manifest, journal summary, kernel.log tail, phase.cursor, error_ref, top stack frames, suggested_action, plan_ref + replay commands. [3/8] kernel.log is usually empty and [5/8] error_ref is a *label*, not a traceback. A clean [3/8] does not mean "no failure".
 3. **Spine event flow.** `./scripts/lca-ops journal logs -r "$LATEST" -v` (control-point table) and `./scripts/lca-ops journal trace "$LATEST"` (default `--human` tree with payload text + Δms + folded reducer/token noise). Reconstructs what the model saw.
 4. **Traceback.** Step 1.5 in user-facing vocabulary, but step 3 of the SOP: `./scripts/lca-ops journal exceptions "$LATEST"` reads the dedicated `<run_id>.exceptions.jsonl` index (every `exception.caught` EP, full payload, guaranteed durable per ADR-2026-09-03). Offloaded sidecars live at `traces/runs/<id>/<sha8>-<SafeClass>.json`. Last-resort `FALLBACK.log` only fires when both ledgers fail to write. Mandatory for any failure trigger phrase.

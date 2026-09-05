@@ -35,10 +35,11 @@ Trigger phrases (run this immediately, do not ask for clarification):
 | supplies a `run_<id>` directly | yes |
 | "刚才服务挂了" / "kernel 不响应" | no — go to AGENTS.md §6 service matrix |
 
-**Hard rule for run_id**: always read it from the atomic pointer, never ls/find/mtime:
+**Hard rule for run_id**: resolve it as the newest-mtime directory under
+`traces/runs/` (no pointer file exists):
 
 ```sh
-LATEST=$(jq -r .run_id traces/latest.json)
+LATEST=$(ls -1t traces/runs | head -1)
 ```
 
 ---
@@ -113,7 +114,7 @@ Each step has five labels you should expect to find in your own output:
 ```sh
 # Default human view (tree indent + payload text + Δms + auto-collapse
 # token/reducer noise). Pass this to the user when they ask "走了一遍啥逻辑".
-# No run_id = latest run (traces/latest.json pointer, mtime fallback).
+# No run_id = latest run (newest mtime under traces/runs).
 ./scripts/lca-ops journal trace
 ./scripts/lca-ops journal trace "$LATEST"   # explicit, equivalent here
 
@@ -303,7 +304,7 @@ facade、命令 handler 都是 kernel 进程内 import 的对象 —— **修改
 # (Run via API / scenario file / curl — whatever the user's flow is.)
 
 # Then re-enter this SOP at Step 1 with the new run_id.
-LATEST2=$(jq -r .run_id traces/latest.json)
+LATEST2=$(ls -1t traces/runs | head -1)
 ./scripts/lca-ops debug-run "$LATEST2" --json
 ```
 

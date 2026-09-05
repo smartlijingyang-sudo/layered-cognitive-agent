@@ -5,7 +5,6 @@
 
 - ``<id>.jsonl``        → ``<id>/journal.jsonl``
 - ``<id>.doctor.json``  → 合并进 ``<id>/manifest.json`` 的 ``extra.doctor_report``
-- 一次写 ``<root>/latest.json``(原子 rename,指向 mtime 最大的 run)
 
 测试只验证纯函数 + 文件系统副作用;不依赖 gateway 启动。
 """
@@ -161,7 +160,7 @@ class PlanAndExecute(unittest.TestCase):
         finally:
             tmp.cleanup()
 
-    def test_apply_moves_journal_and_writes_manifest_and_latest(self) -> None:
+    def test_apply_moves_journal_and_writes_manifest(self) -> None:
         root, tmp = _fresh_root()
         try:
             (root / "runs" / "run_aaa1.jsonl").write_text(
@@ -185,7 +184,6 @@ class PlanAndExecute(unittest.TestCase):
 
             self.assertEqual(counts["journal_moved"], 1)
             self.assertEqual(counts["manifest_written"], 1)
-            self.assertEqual(counts["latest_written"], 1)
 
             run_dir = root / "runs" / "run_aaa1"
             self.assertTrue((run_dir / "journal.jsonl").exists())
@@ -202,10 +200,6 @@ class PlanAndExecute(unittest.TestCase):
             self.assertNotIn("terminal_event_id", payload)
             self.assertEqual(payload["extra"]["doctor_report"]["summary"], "ok")
             self.assertIn("migrated_from", payload["extra"])
-
-            latest = json.loads((root / "latest.json").read_text(encoding="utf-8"))
-            self.assertEqual(latest["kind"], "run_pointer")
-            self.assertEqual(latest["run_id"], "run_aaa1")
         finally:
             tmp.cleanup()
 
@@ -234,26 +228,6 @@ class PlanAndExecute(unittest.TestCase):
             )
             self.assertEqual(len(plan.journal_moves), 0)
             self.assertEqual(len(plan.skipped_unrelated), 1)
-        finally:
-            tmp.cleanup()
-
-
-class LatestPointerPicksNewest(unittest.TestCase):
-    def test_latest_points_to_most_recent_run(self) -> None:
-        root, tmp = _fresh_root()
-        try:
-            (root / "runs" / "run_aaa1.jsonl").write_text("{}", encoding="utf-8")
-            import time
-
-            time.sleep(0.05)
-            (root / "runs" / "run_bbb2.jsonl").write_text("{}", encoding="utf-8")
-
-            arts = _scan_flat_artifacts(root / "runs")
-            plan = _build_plan(root=root, artifacts=arts)
-            _execute_plan(root=root, plan=plan)
-
-            latest = json.loads((root / "latest.json").read_text(encoding="utf-8"))
-            self.assertEqual(latest["run_id"], "run_bbb2")
         finally:
             tmp.cleanup()
 

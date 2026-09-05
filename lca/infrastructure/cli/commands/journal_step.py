@@ -169,7 +169,7 @@ def register(app: typer.Typer) -> None:
     def step_cmd(
         run_id: str = typer.Argument(
             "",
-            help="run_id (e.g. run_c38532761cfb);空 = 最新一个 run(traces/latest.json)",
+            help="run_id (e.g. run_c38532761cfb);空 = traces/runs 下 mtime 最新的 run",
         ),
         step_index: int = typer.Option(..., "--step", help="step_index (1-based) within the run"),
         json_output: bool = typer.Option(False, "--json", help="完整 step JSON 输出"),

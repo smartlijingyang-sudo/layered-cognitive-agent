@@ -508,15 +508,12 @@ def test_journal_trace_module_export() -> None:
 # ── argument-less mode (latest run) ──────────────────────────────────
 
 
-def test_no_run_id_picks_latest_via_pointer(traces_root: Path, monkeypatch) -> None:
-    """Omitting ``run_id`` reads ``traces/latest.json`` and renders that run.
+def test_no_run_id_picks_latest_run_dir(traces_root: Path) -> None:
+    """Omitting ``run_id`` picks the newest ``traces/runs/<run_id>`` directory.
 
-    The CliRunner changes cwd to a temp dir, so we monkeypatch the
-    default traces root and write the atomic pointer at that root.
+    The fixture seeds a single ``run_test`` directory, which the
+    mtime-based resolver must select without any pointer file.
     """
-    pointer = traces_root / "latest.json"
-    pointer.write_text('{"run_id": "run_test", "kind": "run_pointer"}', encoding="utf-8")
-
     result = runner.invoke(
         app,
         [
@@ -532,11 +529,11 @@ def test_no_run_id_picks_latest_via_pointer(traces_root: Path, monkeypatch) -> N
     assert "brain/perceive.py" in result.stdout
 
 
-def test_no_run_id_picks_mtime_latest_when_pointer_missing(tmp_path: Path, monkeypatch) -> None:
-    """Without ``traces/latest.json`` we fall back to mtime order.
+def test_no_run_id_picks_mtime_latest_of_two_runs(tmp_path: Path) -> None:
+    """Two run directories under ``traces/runs/``; the newer mtime wins.
 
-    Two run directories under ``traces/runs/``; the second (newer) must
-    be picked automatically when no run_id is given.
+    The second (newer) run must be picked automatically when no run_id
+    is given.
     """
     root = tmp_path / "traces"
     older = root / "runs" / "run_old"
@@ -584,7 +581,7 @@ def test_no_run_id_picks_mtime_latest_when_pointer_missing(tmp_path: Path, monke
 
 
 def test_no_run_id_with_no_runs_errors(tmp_path: Path) -> None:
-    """Empty ``traces/runs/`` and no pointer: friendly exit code 1."""
+    """Empty ``traces/runs/``: friendly exit code 1."""
     root = tmp_path / "traces"
     root.mkdir()
     result = runner.invoke(
@@ -593,25 +590,6 @@ def test_no_run_id_with_no_runs_errors(tmp_path: Path) -> None:
     )
     assert result.exit_code == 1
     assert "no runs found" in result.stderr or "no runs" in result.stderr
-
-
-def test_no_run_id_with_pointer_but_missing_run_dir(tmp_path: Path) -> None:
-    """Pointer references a missing run directory → mtime fallback (empty → error).
-
-    If the pointer is stale (run directory removed), the resolver falls
-    back to mtime order. With no runs present the user gets the same
-    friendly error as the empty case.
-    """
-    root = tmp_path / "traces"
-    root.mkdir()
-    (root / "latest.json").write_text(
-        '{"run_id": "run_missing", "kind": "run_pointer"}', encoding="utf-8"
-    )
-    result = runner.invoke(
-        app,
-        ["journal", "trace", "--traces-root", str(root)],
-    )
-    assert result.exit_code == 1
 
 
 def test_explicit_run_id_still_works(traces_root: Path) -> None:

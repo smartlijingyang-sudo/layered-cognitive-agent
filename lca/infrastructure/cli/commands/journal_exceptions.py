@@ -38,7 +38,7 @@ _DEFAULT_TRACES_ROOT = Path("traces")
 def _find_exceptions_path(run_id: str, traces_root: Path) -> Path:
     """定位 <run_id>/<run_id>.exceptions.jsonl。
 
-    run_id 空 → 走 traces/latest.json。
+    run_id 空 → 取 traces/runs 下 mtime 最新的 run。
     """
     if not run_id:
         from lca.infrastructure.cli.commands._shared import find_latest_run_id
@@ -133,7 +133,7 @@ def register(app: typer.Typer) -> None:
     def exceptions_cmd(
         run_id: str = typer.Argument(
             "",
-            help="run_id (e.g. run_c38532761cfb);空 = 最新一个 run(traces/latest.json)",
+            help="run_id (e.g. run_c38532761cfb);空 = traces/runs 下 mtime 最新的 run",
         ),
         grep: str = typer.Option("", "--grep", help="按 exception_class 过滤(子串匹配,大小写敏感)"),
         json_output: bool = typer.Option(False, "--json", help="JSON 输出给 agent"),

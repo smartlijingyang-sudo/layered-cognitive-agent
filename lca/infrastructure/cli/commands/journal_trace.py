@@ -3,8 +3,8 @@
 Task 9.3: ``./scripts/lca-ops journal trace [run_id] [--locals] [--source]``
 reads the append-only ``<run_id>.spine.jsonl`` written by the spine ``FileSink``
 and prints a human-readable table. ``run_id`` is optional: when omitted
-the command picks the latest run via ``traces/latest.json`` (pointer
-preferred, mtime-sorted fallback). The default view shows ``seq /
+the command picks the run under ``traces/runs`` with the newest directory
+mtime. The default view shows ``seq /
 execution point / channel / outcome / when``. With ``--source`` two extra
 columns appear (``source_location`` file:line and the function name).
 With ``--locals`` (which implies ``--source``) two more columns are
@@ -1041,8 +1041,8 @@ def _latest_run_id(traces_root: Path) -> str | None:
     """Resolve the latest ``run_id`` under ``traces_root`` for argument-less trace.
 
     Delegates to :func:`lca.infrastructure.cli.commands._shared.find_latest_run_id`
-    so the resolution rules (``traces/latest.json`` pointer first, then
-    mtime-sorted fallback) stay consistent across CLI commands.
+    so the resolution rule (newest ``traces/runs/<run_id>`` mtime) stays
+    consistent across CLI commands.
     """
     return find_latest_run_id(traces_root)
 
@@ -1054,7 +1054,7 @@ def register(app: typer.Typer) -> None:
     def trace_cmd(
         run_id: str = typer.Argument(
             "",
-            help="run_id (e.g. run_c38532761cfb);空 = 最新一个 run(traces/latest.json 优先)",
+            help="run_id (e.g. run_c38532761cfb);空 = traces/runs 下 mtime 最新的 run",
         ),
         human: bool = typer.Option(
             True,
@@ -1080,8 +1080,8 @@ def register(app: typer.Typer) -> None:
     ) -> None:
         """检查一个 run 的 spine ledger(只读,PR-9 I17 起生效)。
 
-        不带参数时自动选最新一个 run(``traces/latest.json`` 原子指针优先,
-        否则 mtime 最新)。其余语义同显式传参:
+        不带参数时自动选 ``traces/runs`` 下 mtime 最新的一个 run。
+        其余语义同显式传参:
 
         默认开 ``--human``:tree 缩进 + payload 原文 + Δms 时间戳 +
         自动折叠 ``llm.stream.token`` / ``runtime.reducer.apply`` /

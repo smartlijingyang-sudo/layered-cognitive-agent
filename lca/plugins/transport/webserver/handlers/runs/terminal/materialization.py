@@ -25,7 +25,7 @@ _log = structlog.get_logger(__name__)
 
 
 def record_terminal_materialization(session: RunSession) -> None:
-    """Write a terminal manifest and update its navigation pointer without owning facts.
+    """Write a terminal manifest without owning facts.
 
     ADR-0164 Phase 7: 在写 manifest 之前 flush step-tree bundle(写
     journal.json + narrative.md)。 让 step-tree 是主存储, 旧 stream 是 raw。
@@ -81,7 +81,6 @@ def record_terminal_materialization(session: RunSession) -> None:
             json.dumps(manifest.to_dict(), ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
-        locator.update_latest_pointer(session.run_id)
     except Exception as exc:
         # manifest 自身写失败 —— 已无法写到 disk, 把异常也收进 flush_errors
         # 让上游 / debug-run 通过 structlog 看得到
