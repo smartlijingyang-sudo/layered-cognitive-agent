@@ -31,6 +31,8 @@ meta = PatchMeta(
         f"{_UI_TRANSPORTS}/lcaWire.ts",
         "src/store/chat/slices/agentRun/actions/transports/client/streamingExecutor.ts",
         "src/features/Conversation/Messages/AssistantGroup/Tool/Detail/Intervention/customInteractionHandlers.ts",
+        "src/features/Conversation/Messages/AssistantGroup/Tool/Detail/Intervention/index.tsx",
+        "src/store/chat/slices/agentRun/actions/entries/conversationControl.ts",
     ),
     risk="high",
     category="runtime",
@@ -163,6 +165,16 @@ def apply(ctx: PatchContext) -> bool:
             1,
         )
 
+        # Add skipResume to SubmitToolInteractionOptions.
+        opts_anchor = "interface SubmitToolInteractionOptions {\n  createUserMessage?: boolean;"
+        if opts_anchor not in handlers_text:
+            raise SystemExit("[lca_run_driver] SubmitToolInteractionOptions anchor not found")
+        handlers_text = handlers_text.replace(
+            opts_anchor,
+            "interface SubmitToolInteractionOptions {\n  createUserMessage?: boolean;\n  skipResume?: boolean;",
+            1,
+        )
+
         # Replace the generic askUserQuestion handler with the LCA-aware one.
         old_handler = (
             "  {\n"
@@ -192,14 +204,22 @@ def apply(ctx: PatchContext) -> bool:
  */
 const handleLcaAskUserSubmit: CustomInteractionSubmitHandler = async (payload, context) => {
   const messageId = context?.messageId;
-  if (!messageId) return { options: { pluginState: { askUserAnswers: payload } }, payload };
+  if (!messageId)
+    return {
+      options: { createUserMessage: false, pluginState: { askUserAnswers: payload }, skipResume: true },
+      payload,
+    };
 
   const msg = dataSelectors.getDbMessageById(messageId)(useConversationStore.getState());
   const lca = (msg?.pluginState as Record<string, unknown> | undefined)?.lca as
     | { run_id?: string; status?: string }
     | undefined;
   const runId = typeof lca?.run_id === 'string' ? lca.run_id : '';
-  if (!runId) return { options: { pluginState: { askUserAnswers: payload } }, payload };
+  if (!runId)
+    return {
+      options: { createUserMessage: false, pluginState: { askUserAnswers: payload }, skipResume: true },
+      payload,
+    };
 
   const FREEFORM_KEY = '__freeform__';
   const freeform = payload[FREEFORM_KEY];
@@ -233,7 +253,10 @@ const handleLcaAskUserSubmit: CustomInteractionSubmitHandler = async (payload, c
     console.error('[LCA] askUserQuestion answer failed', error);
   }
 
-  return { options: { pluginState: { askUserAnswers: payload } }, payload };
+  return {
+    options: { createUserMessage: false, pluginState: { askUserAnswers: payload }, skipResume: true },
+    payload,
+  };
 };
 
 '''
@@ -270,6 +293,45 @@ const handleLcaAskUserSubmit: CustomInteractionSubmitHandler = async (payload, c
     if old_ctx in intervention_text:
         intervention_text = intervention_text.replace(old_ctx, new_ctx, 1)
         ctx.write(intervention_path, intervention_text)
+        changed = True
+
+    # conversationControl.ts: honour skipResume so LCA askUserQuestion doesn't
+    # double-resume (the LCA run is already resumed by POST /runs/<id>/answer).
+    control_path = "src/store/chat/slices/agentRun/actions/entries/conversationControl.ts"
+    control_text = ctx.read(control_path)
+    if "skipResume" not in control_text:
+        # Add skipResume to the options type.
+        type_anchor = "      toolResultContent?: string;\n    },\n  ): Promise<void> => {"
+        if type_anchor not in control_text:
+            raise SystemExit("[lca_run_driver] conversationControl type anchor not found")
+        control_text = control_text.replace(
+            type_anchor,
+            "      skipResume?: boolean;\n      toolResultContent?: string;\n    },\n  ): Promise<void> => {",
+            1,
+        )
+
+        # Skip the resume step when skipResume is set (LCA already resumed).
+        resume_anchor = (
+            "    // NOTE: intentionally do NOT bail on Stop here. `intervention: approved`\n"
+            "    // and the tool result are already persisted above; returning early would\n"
+            "    // leave the submission recorded but never resumed — a stuck conversation.\n"
+            "    // Same best-effort rationale as approveToolCalling: complete atomically and\n"
+            "    // honor the next Stop normally."
+        )
+        if resume_anchor not in control_text:
+            raise SystemExit("[lca_run_driver] conversationControl resume anchor not found")
+        control_text = control_text.replace(
+            resume_anchor,
+            resume_anchor
+            + "\n\n    // LCA: the run is already resumed by POST /runs/<id>/answer; skip the\n"
+            + "    // client/gateway resume to avoid creating a duplicate run.\n"
+            + "    if (options?.skipResume) {\n"
+            + "      completeOperation(operationId);\n"
+            + "      return;\n"
+            + "    }",
+            1,
+        )
+        ctx.write(control_path, control_text)
         changed = True
 
     executor = "src/store/chat/slices/agentRun/actions/transports/client/streamingExecutor.ts"
