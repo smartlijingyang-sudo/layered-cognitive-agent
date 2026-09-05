@@ -36,6 +36,28 @@ from lca_kernel.events.reader import SpineReader
 log = logging.getLogger(__name__)
 
 
+def _read_session_file(path: Path) -> list[Any]:
+    """从 ``<run_id>.session.jsonl`` 读取事件列表。
+
+    回落路径:无 in-process session 时,从磁盘文件读取 Session 事件。
+    每行是 JSON 对象,保留 ``type`` / ``data`` / ``seq`` / ``time`` 等字段。
+    """
+    events: list[Any] = []
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    events.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+    except OSError:
+        pass
+    return events
+
+
 def derive_step_tree(
     events: Iterable[Any],
     *,
@@ -228,7 +250,8 @@ class StepTreeFoldDeriver:
         / ``step.*.record``)只在 ``<run_id>.spine.jsonl`` —— journal 需要
         并集。合并按 epoch 秒排序,同刻 session 事件在前;精确重复
         (同 EP + 同时间戳 + 同 payload)去重,防单流收敛后双计。
-        无 session 时仅读 spine 文件;两者皆空返回空迭代器。
+        无 in-process session 时回落读 ``<run_id>.session.jsonl`` 文件;
+        两者皆空返回空迭代器。
         """
         session = self._session
         snapshot_events: list[Any] = []
@@ -237,6 +260,12 @@ class StepTreeFoldDeriver:
             raw_snapshot = snapshot()
             if isinstance(raw_snapshot, Iterable):
                 snapshot_events = list(raw_snapshot)
+
+        # 无 in-process session 时,从磁盘 session 文件回落读取
+        if not snapshot_events:
+            session_path = self._run_dir / f"{self._run_id}.session.jsonl"
+            if session_path.exists():
+                snapshot_events = _read_session_file(session_path)
 
         path = self._spine_path
         if path is None:

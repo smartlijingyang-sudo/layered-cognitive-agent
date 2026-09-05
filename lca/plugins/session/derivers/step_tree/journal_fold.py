@@ -37,6 +37,7 @@ capability provide，非 EventSpine.subscribe 生产 builder 路径。
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -178,6 +179,24 @@ def _ts(event: Mapping[str, Any]) -> float:
     return 0.0
 
 
+def _truncate_kept(text: str, *, head: int, tail: int) -> str:
+    """Truncate ``text`` to at most ``head + tail + 12`` characters.
+
+    中间折叠为 ``"\\n… [truncated N chars] …\\n"``。全文在
+    ``<run_id>.spine.jsonl``(``llm.stream.token`` 事件 SSOT;ADR-0185),
+    这里只是 viewport 投影。
+    """
+    if not text:
+        return ""
+    total = len(text)
+    if total <= head + tail + 64:
+        return text
+    head_part = text[:head]
+    tail_part = text[-tail:] if tail else ""
+    middle_dropped = total - head - tail
+    return f"{head_part}\n… [{middle_dropped} chars truncated] …\n{tail_part}"
+
+
 @dataclass
 class _Frame:
     """fold 中间态:一个 step 的累积帧。
@@ -190,6 +209,10 @@ class _Frame:
     显式边界信号(``writable.step.start`` 或 cursor ``llm.request.header``)
     开/升级帧 → ``explicit``;仅 ``brain.think.start`` 隐式兜底开窗 →
     ``implicit``。物化时写 ``JournalStep.extra.window_signal``。
+
+    ``llm_started`` / ``stream_*_chunks``:Session 形态的 ``llm.stream.token``
+    按 ``channel_kind`` 分流累积(reasoning vs output);``llm.call.end``
+    收口时拼成 ThinkingTrace。与 DSH ``StepTreeAccumulatorDeriver`` 同语义。
     """
 
     step_id: str
@@ -208,6 +231,9 @@ class _Frame:
     request_reason: str = ""
     opened_by: str = "writable"
     window_signal: str = "implicit"
+    llm_started: bool = False
+    stream_reasoning_chunks: list[str] = field(default_factory=list)
+    stream_final_chunks: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -462,6 +488,115 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
                 opened_by="header",
                 window_signal="explicit",
             )
+    elif ep == "llm.call.start":
+        # 标记 LLM 窗口开启;stream.token 据此判断是否属于当前 step。
+        # Session 形态的 payload 携带 model,同步到帧上(供 ThinkingTrace 使用)。
+        if state.open_step is not None:
+            state.open_step.llm_started = True
+            call_model = str(payload.get("model") or "")
+            if call_model and not state.open_step.model:
+                state.open_step.model = call_model
+    elif ep == "llm.stream.token":
+        # Session 形态:按 channel_kind 分流累积 reasoning / output。
+        # 与 DSH StepTreeAccumulatorDeriver 同语义;全文在 spine.jsonl,
+        # 这里只保留截断后的摘要给 journal.json。
+        target = _resolve_target(state, payload)
+        if target is not None and target.llm_started:
+            delta = str(payload.get("text_delta") or "")
+            if delta:
+                kind = payload.get("channel_kind") or "output"
+                if kind == "reasoning":
+                    target.stream_reasoning_chunks.append(delta)
+                else:
+                    target.stream_final_chunks.append(delta)
+    elif ep == "llm.call.end":
+        # 收口:把累积的 stream 缓冲拼成 ThinkingTrace。
+        target = _resolve_target(state, payload)
+        if target is not None:
+            model = str(payload.get("model") or target.model or "unknown")
+            latency_ms = int(payload.get("latency_ms") or 0)
+            prompt_tokens = payload.get("prompt_tokens")
+            completion_tokens = payload.get("completion_tokens")
+            reasoning_text = "".join(target.stream_reasoning_chunks)
+            final_text = "".join(target.stream_final_chunks)
+            reasoning_kept = _truncate_kept(reasoning_text, head=2048, tail=1024)
+            final_kept = _truncate_kept(final_text, head=4096, tail=1024)
+            target.thinking = ThinkingTrace(
+                model=model,
+                latency_ms=latency_ms,
+                reasoning=reasoning_kept,
+                decision="respond",
+                prompt_tokens=int(prompt_tokens)
+                if isinstance(prompt_tokens, (int, float))
+                else None,
+                completion_tokens=int(completion_tokens)
+                if isinstance(completion_tokens, (int, float))
+                else None,
+                raw_response_preview=final_kept[:600] if final_kept else "",
+            )
+            target.llm_started = False
+            target.stream_reasoning_chunks.clear()
+            target.stream_final_chunks.clear()
+    elif ep == "spine.llm.request.header.assistant":
+        # 模型所见即日志:assistant message 是 LLM 响应的 SSOT。
+        # 补全 ThinkingTrace.raw_response_preview;tool_calls 非空时构造 ToolCallRecord。
+        target = _resolve_target(state, payload)
+        if target is not None:
+            assistant_content = str(payload.get("assistant_content") or "")
+            tool_calls = payload.get("tool_calls")
+            usage = payload.get("usage") if isinstance(payload.get("usage"), Mapping) else {}
+            if target.thinking is not None:
+                # 补全 preview(从完整 assistant_content 截断)
+                if assistant_content:
+                    target.thinking.raw_response_preview = assistant_content[:600]
+                # 补全 token counts(若 llm.call.end 未设置)
+                if target.thinking.prompt_tokens is None:
+                    pt = usage.get("prompt_tokens")
+                    if isinstance(pt, (int, float)):
+                        target.thinking.prompt_tokens = int(pt)
+                if target.thinking.completion_tokens is None:
+                    ct = usage.get("completion_tokens")
+                    if isinstance(ct, (int, float)):
+                        target.thinking.completion_tokens = int(ct)
+            else:
+                # llm.call.end 未到达或失败 → 直接从 assistant_content 构造
+                target.thinking = ThinkingTrace(
+                    model=target.model or "unknown",
+                    latency_ms=0,
+                    reasoning="",
+                    decision="respond",
+                    prompt_tokens=int(usage["prompt_tokens"])
+                    if isinstance(usage.get("prompt_tokens"), (int, float))
+                    else None,
+                    completion_tokens=int(usage["completion_tokens"])
+                    if isinstance(usage.get("completion_tokens"), (int, float))
+                    else None,
+                    raw_response_preview=assistant_content[:600] if assistant_content else "",
+                )
+            if isinstance(tool_calls, list) and tool_calls:
+                first_call = tool_calls[0]
+                if isinstance(first_call, Mapping):
+                    call_args = first_call.get("arguments") or first_call.get("args") or {}
+                    fn = first_call.get("function")
+                    if isinstance(fn, Mapping):
+                        name = str(fn.get("name") or "")
+                        if not call_args:
+                            raw_args = fn.get("arguments") or ""
+                            if isinstance(raw_args, str) and raw_args:
+                                try:
+                                    call_args = json.loads(raw_args)
+                                except (json.JSONDecodeError, ValueError):
+                                    call_args = {}
+                    else:
+                        name = str(first_call.get("name") or "")
+                    target.tool_call = ToolCallRecord(
+                        invocation_id=str(
+                            first_call.get("id") or first_call.get("invocation_id") or ""
+                        ),
+                        name=name,
+                        arguments=dict(call_args) if isinstance(call_args, dict) else {},
+                        arguments_summary="",
+                    )
     elif ep == "step.thinking.record":
         target = _resolve_target(state, payload)
         if target is not None:
