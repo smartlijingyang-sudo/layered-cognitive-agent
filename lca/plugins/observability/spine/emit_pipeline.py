@@ -8,6 +8,10 @@ Anomaly detection runs on committed Session spine events via
 ``lca.plugins.session.spine_anomaly`` when a Session hook is active;
 ``EmitPipeline.emit`` invokes anomaly only on the hook-less fallback path.
 
+Production ``setup()`` provides ``emit_pipeline`` for ``spine.core`` and
+registers the spine enricher; it does **not** install
+``set_active_pipeline_accessor`` (wrap/runtime bypass SSOT hook directly).
+
 # COMPAT(owner: ADR-0186 wave-2, from: EmitPipeline owns FieldProducer merge,
 #         to: spine_enrich + SessionAppendHook,
 #         delete_when: rg 'enrich_spine_payload' lca/plugins/observability/spine/emit_pipeline.py = 1
@@ -40,7 +44,7 @@ from lca.harness.plugin_api import (
     PluginKind,
     plugin,
 )
-from lca.infrastructure.observability.loop_cursor._spine_port import get_session_append_hook
+from lca.infrastructure.observability.loop_cursor._spine_port import is_session_ssot_hook_active
 from lca.infrastructure.observability.spine.event_record import (
     Channel,
     EventRecord,
@@ -94,7 +98,7 @@ class EmitPipeline:
         caller_payload: dict[str, Any] | None,
         span_ctx: Any | None,
     ) -> tuple[dict[str, Any], list[tuple[Any, dict[str, Any]]]]:
-        if get_session_append_hook() is not None:
+        if is_session_ssot_hook_active():
             return dict(caller_payload or {}), []
         result = enrich_spine_payload(
             producers=list(self._producers),
@@ -160,7 +164,7 @@ class EmitPipeline:
                         exc_info=True,
                     )
 
-        if get_session_append_hook() is None:
+        if not is_session_ssot_hook_active():
             try:
                 self._anomaly.on_event(record)
             except Exception as exc:
@@ -226,12 +230,6 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     anomaly = ctx.require("deriver.anomaly")
     pipeline = EmitPipeline(producers=producers, anomaly=anomaly)
     ctx.provide("emit_pipeline", pipeline)
-
-    from lca.harness.declarative.compile.instrument_wrap import (
-        set_active_pipeline_accessor,
-    )
-
-    set_active_pipeline_accessor(lambda: pipeline)
 
     def _enricher(
         *,

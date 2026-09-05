@@ -54,9 +54,15 @@ class _CaptureSink:
 
 
 def _make_spine() -> EventSpine:
-    """Return a fresh ``EventSpine`` with a capture sink and a run id wired."""
+    """Return a fresh ``EventSpine`` with capture sink + passthrough hook."""
+    from lca.infrastructure.observability.loop_cursor._spine_port import bind_session_append_hook
+    from tests.observability.spine.conftest import SyncPassthroughHook
+
     SpineContext.set_run("emit-pipeline-test")
-    return EventSpine(sinks=[_CaptureSink()])
+    sink = _CaptureSink()
+    spine = EventSpine(sinks=[sink])
+    bind_session_append_hook(SyncPassthroughHook())
+    return spine
 
 
 def _make_span() -> SpanContext:
@@ -463,6 +469,9 @@ def test_setup_assembles_pipeline_from_producers_and_anomaly() -> None:
         assert pipeline.anomaly is anomaly
         # Sorted by priority; unrelated non-producer binding is filtered out.
         assert [p.name for p in pipeline.producers] == ["low", "high"]
+        from lca.harness.declarative.compile.instrument_wrap import resolve_active_pipeline
+
+        assert resolve_active_pipeline() is None
     finally:
         set_active_pipeline_accessor(None)
 

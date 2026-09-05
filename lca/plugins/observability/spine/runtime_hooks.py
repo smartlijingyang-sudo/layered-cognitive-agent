@@ -61,8 +61,13 @@ from collections.abc import Callable
 from typing import Any
 
 from lca.harness.declarative.compile.instrument_wrap import (
+    _emit_spine_direct,
+    _emit_via_pipeline,
     set_active_pipeline_accessor,
     set_active_spine_accessor,
+)
+from lca.infrastructure.observability.loop_cursor._spine_port import (
+    is_session_ssot_hook_active,
 )
 from lca.infrastructure.observability.spine.context import SpineContext
 from lca.infrastructure.observability.spine.event_record import Channel
@@ -175,30 +180,35 @@ def emit_through_pipeline(
     spine = resolve_active_spine()
     if spine is None:
         return
+    if is_session_ssot_hook_active():
+        _emit_spine_direct(
+            spine=spine,
+            execution_point=execution_point,
+            channel=channel,
+            payload=payload,
+            outcome=outcome,
+            span=span,
+        )
+        return
     pipeline = resolve_active_pipeline()
-    try:
-        if pipeline is not None:
-            pipeline.emit(
-                execution_point=execution_point,
-                channel=channel,
-                span_ctx=span,
-                caller_payload=payload,
-                spine=spine,
-                outcome=outcome,
-            )
-        else:
-            spine.append(
-                execution_point=execution_point,
-                channel=channel,
-                caller_payload=payload,
-                outcome=outcome,
-                span_ctx=span,
-            )
-    except Exception as exc:
-        log.warning(
-            "spine.runtime_hooks: emit failed ep=%s err=%s",
-            execution_point,
-            exc,
+    if pipeline is not None:
+        _emit_via_pipeline(
+            pipeline=pipeline,
+            spine=spine,
+            execution_point=execution_point,
+            channel=channel,
+            payload=payload,
+            outcome=outcome,
+            span=span,
+        )
+    else:
+        _emit_spine_direct(
+            spine=spine,
+            execution_point=execution_point,
+            channel=channel,
+            payload=payload,
+            outcome=outcome,
+            span=span,
         )
 
 

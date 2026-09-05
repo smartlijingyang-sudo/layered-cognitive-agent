@@ -1,19 +1,16 @@
-"""PR-3h Session.append 兼容 shim 单测(骨架)。
+"""PR-3h Session.append 兼容 shim 单测(ADR-0186 收口)。
 
-骨架期无真实 Session runtime;转发缝由桩钩子钉死:
+ADR-0186 后 ``spine_port_append`` 只转发给 Session hook;无 hook 绑定时
+RuntimeError fail-loud。同步直写路径已删除。
 
 - 钩子已绑定:``append_via_session`` / ``append`` 均转发写入,钩子返回的
-  record 原样回传,同步直写路径不触发(不触 sink、不通知 subscribers);
-- 钩子未绑定 / 转发抛错:落回原同步直写路径,落盘与 subscriber 语义与
-  :meth:`EventSpine.append` 一致。
-
-ADR-0186 PR-3h 起 ``spine_port_append`` 自动读取 ContextVar,``EventSpine.append``
-与 ``append_via_session`` 行为等价(均优先 Session)。
+  record 原样回传;
+- 钩子未绑定:RuntimeError fail-loud;
+- 钩子抛错:log + 重新抛出(不返回 stub record)。
 """
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,6 +21,7 @@ import pytest
 from lca.infrastructure.observability.loop_cursor._spine_port import (
     bind_session_append_hook,
     reset_session_append_hook,
+    _session_append_hook,
 )
 from lca.infrastructure.observability.spine.context import SpineContext
 from lca.infrastructure.observability.spine.event_record import EventRecord
@@ -71,7 +69,7 @@ class _ForwardRecorder:
 
 
 class _RaisingHook:
-    """桩故障 Session runtime:转发必抛错,验证容错落回同步路径。"""
+    """桩故障 Session runtime:转发必抛错,验证 contained 语义。"""
 
     def __call__(
         self,
@@ -85,7 +83,7 @@ class _RaisingHook:
 
 
 def test_append_via_session_forwards_to_bound_hook(tmp_path: Path) -> None:
-    """钩子绑定时写入转发给 Session runtime;同步直写路径不触发。"""
+    """钩子绑定时写入转发给 Session runtime;sink / subscribers 不触发。"""
     SpineContext.set_run("r-session-forward")
     sink = FileSink(tmp_path, run_id="r-session-forward")
     seen: list[EventRecord] = []
@@ -112,43 +110,51 @@ def test_append_via_session_forwards_to_bound_hook(tmp_path: Path) -> None:
     assert ledger.read_text(encoding="utf-8") == ""
 
 
-@pytest.mark.parametrize("hook_kind", ["none", "raising"])
-def test_append_via_session_falls_back_to_sync_path(tmp_path: Path, hook_kind: str) -> None:
-    """无钩子 / 钩子抛错:落回原同步直写路径,落盘与 subscriber 语义不变。"""
-    SpineContext.set_run("r-session-fallback")
-    sink = FileSink(tmp_path, run_id="r-session-fallback")
-    seen: list[EventRecord] = []
-    spine = EventSpine(sinks=[sink], subscribers=[seen.append])
-    token = bind_session_append_hook(_RaisingHook()) if hook_kind == "raising" else None
+def test_append_via_session_runtime_error_when_no_hook(tmp_path: Path) -> None:
+    """ADR-0186 收口:无钩子绑定时 RuntimeError fail-loud(同步直写路径已删除)。"""
+    SpineContext.set_run("r-session-no-hook")
+    sink = FileSink(tmp_path, run_id="r-session-no-hook")
+    spine = EventSpine(sinks=[sink], subscribers=[])
+    # Explicitly unbind the autouse hook from conftest to test no-hook behavior
+    unbind_token = _session_append_hook.set(None)
     try:
-        rec = spine.append_via_session(
-            execution_point="brain.think.start",
-            channel="fact",
-            caller_payload={"via": "fallback"},
-        )
+        with pytest.raises(RuntimeError, match="no Session hook bound"):
+            spine.append_via_session(
+                execution_point="brain.think.start",
+                channel="fact",
+                caller_payload={"via": "fail-loud"},
+            )
     finally:
-        if token is not None:
-            reset_session_append_hook(token)
+        _session_append_hook.reset(unbind_token)
         spine.close()
+    # sink 未写入
+    ledger = tmp_path / "r-session-no-hook.spine.jsonl"
+    assert not ledger.exists() or ledger.read_text(encoding="utf-8") == ""
 
-    assert rec.run_id == "r-session-fallback"
-    assert rec.sequence >= 1
-    assert len(seen) == 1
-    lines = (tmp_path / "r-session-fallback.spine.jsonl").read_text(encoding="utf-8").splitlines()
-    assert len(lines) == 1
-    obj = json.loads(lines[0])
-    assert obj["execution_point"] == "brain.think.start"
-    assert obj["payload"] == {"via": "fallback"}
+
+def test_append_via_session_raising_hook_propagates(tmp_path: Path) -> None:
+    """钩子抛错时 fail-loud:log + 传播,不返回 stub record。"""
+    SpineContext.set_run("r-session-raising")
+    sink = FileSink(tmp_path, run_id="r-session-raising")
+    spine = EventSpine(sinks=[sink], subscribers=[])
+    token = bind_session_append_hook(_RaisingHook())
+    try:
+        with pytest.raises(RuntimeError, match="session runtime unavailable"):
+            spine.append_via_session(
+                execution_point="brain.think.start",
+                channel="fact",
+                caller_payload={"via": "contained"},
+            )
+    finally:
+        reset_session_append_hook(token)
+        spine.close()
 
 
 # ── ADR-0186 PR-3h: EventSpine.append 自动优先 Session ────────────────────
 
 
 def test_append_prefers_session_hook_when_bound(tmp_path: Path) -> None:
-    """ADR-0186 PR-3h: ``EventSpine.append`` 在钩子绑定时自动走 Session 路径。
-
-    ``spine_port_append`` 自动读取 ContextVar,调用方无需显式传 hook。
-    """
+    """ADR-0186: ``EventSpine.append`` 在钩子绑定时自动走 Session 路径。"""
     SpineContext.set_run("r-append-prefers-session")
     sink = FileSink(tmp_path, run_id="r-append-prefers-session")
     seen: list[EventRecord] = []
@@ -168,33 +174,24 @@ def test_append_prefers_session_hook_when_bound(tmp_path: Path) -> None:
     assert len(hook.calls) == 1
     assert hook.calls[0]["execution_point"] == "brain.think.start"
     assert hook.calls[0]["caller_payload"] == {"via": "append-session"}
-    # 钩子返回值原样回传;同步路径未触 sink / subscribers
     assert rec.payload == {"via": "session-stub"}
     assert seen == []
-    ledger = tmp_path / "r-append-prefers-session.spine.jsonl"
-    assert ledger.read_text(encoding="utf-8") == ""
 
 
-def test_append_falls_back_when_no_hook(tmp_path: Path) -> None:
-    """ADR-0186 PR-3h: 无钩子绑定时 ``EventSpine.append`` 走同步直写路径(行为不变)。"""
+def test_append_runtime_error_when_no_hook(tmp_path: Path) -> None:
+    """ADR-0186 收口:无钩子绑定时 ``EventSpine.append`` RuntimeError。"""
     SpineContext.set_run("r-append-no-hook")
     sink = FileSink(tmp_path, run_id="r-append-no-hook")
-    seen: list[EventRecord] = []
-    spine = EventSpine(sinks=[sink], subscribers=[seen.append])
+    spine = EventSpine(sinks=[sink], subscribers=[])
+    # Explicitly unbind the autouse hook from conftest to test no-hook behavior
+    unbind_token = _session_append_hook.set(None)
     try:
-        rec = spine.append(
-            execution_point="brain.think.start",
-            channel="fact",
-            caller_payload={"via": "sync-path"},
-        )
+        with pytest.raises(RuntimeError, match="no Session hook bound"):
+            spine.append(
+                execution_point="brain.think.start",
+                channel="fact",
+                caller_payload={"via": "fail-loud"},
+            )
     finally:
+        _session_append_hook.reset(unbind_token)
         spine.close()
-
-    assert rec.run_id == "r-append-no-hook"
-    assert rec.sequence >= 1
-    assert len(seen) == 1
-    lines = (tmp_path / "r-append-no-hook.spine.jsonl").read_text(encoding="utf-8").splitlines()
-    assert len(lines) == 1
-    obj = json.loads(lines[0])
-    assert obj["execution_point"] == "brain.think.start"
-    assert obj["payload"] == {"via": "sync-path"}

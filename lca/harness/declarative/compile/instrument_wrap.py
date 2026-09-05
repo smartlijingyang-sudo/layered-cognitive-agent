@@ -52,6 +52,9 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Any, TypeVar, overload
 
+from lca.infrastructure.observability.loop_cursor._spine_port import (
+    is_session_ssot_hook_active,
+)
 from lca.infrastructure.observability.spine.context import (
     SpanContext,
     SpineContext,
@@ -213,85 +216,16 @@ def _exception_payload(exc: BaseException, *, boundary: str = "instrument_wrap")
     return exc_to_record(exc, boundary=boundary).asdict()
 
 
-def _safe_append(
+def _emit_spine_direct(
     *,
-    spine: EventSpine | None,
+    spine: EventSpine,
     execution_point: str,
     channel: Channel,
     payload: dict[str, Any],
     outcome: OutcomeT | None,
     span: SpanContext | None,
-    exc: BaseException | None = None,
 ) -> None:
-    """Emit a spine event without letting a broken helper block the caller.
-
-    When a process-local EmitPipeline accessor is installed (PR-7.1),
-    the emission is routed through it so enabled ``FieldProducer``
-    plugins may merge their keys into the payload before the
-    ``EventRecord`` is sealed. When no pipeline is installed this
-    function falls back to the direct ``EventSpine.append`` path so
-    PR-4 assembler contracts still hold under unit tests.
-
-    ``exc`` carries a ``BaseException`` captured by the wrap layer at
-    the call site. When provided it is merged into the payload as the
-    structured failure fields documented in :func:`_exception_payload`,
-    so a channel="error" event always carries enough information to
-    render the traceback without re-raising.
-    """
-    if exc is not None:
-        # Caller payload wins on conflict (the caller may override
-        # ``exception_message`` with a domain-specific phrasing), so we
-        # merge exc first and then apply caller payload on top.
-        payload = {**_exception_payload(exc), **payload}
-    pipeline = _resolve_pipeline()
-    if pipeline is not None and spine is not None:
-        try:
-            pipeline.emit(
-                execution_point=execution_point,
-                channel=channel,
-                span_ctx=span,
-                caller_payload=payload,
-                spine=spine,
-                outcome=outcome,
-            )
-        except ValueError as exc:
-            log.warning(
-                "wrap_instrument: drop invalid event ep=%s err=%s",
-                execution_point,
-                exc,
-                exc_info=True,
-            )
-        except Exception as exc:
-            if _is_i17_violation(exc):
-                # ADR-2026-09-02-i17-traceback §D1: I17 failures MUST
-                # surface their traceback (the original code swallowed
-                # them as a generic ``log.warning`` without
-                # ``exc_info=True``). The assembler wraps every phase,
-                # so losing the traceback here loses the entire
-                # evidence trail for any *.start rejection.
-                _publish_i17_rejection(
-                    spine=spine,
-                    span=span,
-                    attempted_ep=execution_point,
-                    exc=exc,
-                    channel=channel,
-                )
-                log.error(
-                    "wrap_instrument: I17 rejected ep=%s reason=%s",
-                    execution_point,
-                    exc,
-                    exc_info=True,
-                )
-            else:
-                log.warning(
-                    "wrap_instrument: pipeline emit failed ep=%s err=%s",
-                    execution_point,
-                    exc,
-                    exc_info=True,
-                )
-        return
-    if spine is None:
-        return
+    """Direct ``EventSpine.append`` with contained failure handling."""
     try:
         spine.append(
             execution_point=execution_point,
@@ -301,7 +235,6 @@ def _safe_append(
             span_ctx=span,
         )
     except ValueError as exc:
-        # EventRecord post-init validation failure (malformed payload).
         log.warning(
             "wrap_instrument: drop invalid event ep=%s err=%s",
             execution_point,
@@ -309,10 +242,6 @@ def _safe_append(
             exc_info=True,
         )
     except Exception as exc:
-        # FD-1 sink failures are supposed to propagate, but only to the
-        # caller that triggered the emit. The wrap site is not a
-        # business surface; contain it so a broken spine never aborts
-        # the wrapped runnable mid-execution.
         if _is_i17_violation(exc):
             _publish_i17_rejection(
                 spine=spine,
@@ -334,6 +263,124 @@ def _safe_append(
                 exc,
                 exc_info=True,
             )
+
+
+def _emit_via_pipeline(
+    *,
+    pipeline: Any,
+    spine: EventSpine,
+    execution_point: str,
+    channel: Channel,
+    payload: dict[str, Any],
+    outcome: OutcomeT | None,
+    span: SpanContext | None,
+) -> None:
+    """Route through ``EmitPipeline.emit`` with contained failure handling."""
+    try:
+        pipeline.emit(
+            execution_point=execution_point,
+            channel=channel,
+            span_ctx=span,
+            caller_payload=payload,
+            spine=spine,
+            outcome=outcome,
+        )
+    except ValueError as exc:
+        log.warning(
+            "wrap_instrument: drop invalid event ep=%s err=%s",
+            execution_point,
+            exc,
+            exc_info=True,
+        )
+    except Exception as exc:
+        if _is_i17_violation(exc):
+            _publish_i17_rejection(
+                spine=spine,
+                span=span,
+                attempted_ep=execution_point,
+                exc=exc,
+                channel=channel,
+            )
+            log.error(
+                "wrap_instrument: I17 rejected ep=%s reason=%s",
+                execution_point,
+                exc,
+                exc_info=True,
+            )
+        else:
+            log.warning(
+                "wrap_instrument: pipeline emit failed ep=%s err=%s",
+                execution_point,
+                exc,
+                exc_info=True,
+            )
+
+
+def _safe_append(
+    *,
+    spine: EventSpine | None,
+    execution_point: str,
+    channel: Channel,
+    payload: dict[str, Any],
+    outcome: OutcomeT | None,
+    span: SpanContext | None,
+    exc: BaseException | None = None,
+) -> None:
+    """Emit a spine event without letting a broken helper block the caller.
+
+    When a process-local EmitPipeline accessor is installed (PR-7.1),
+    the emission is routed through it so enabled ``FieldProducer``
+    plugins may merge their keys into the payload before the
+    ``EventRecord`` is sealed — unless a production Session SSOT hook
+    is active, in which case enrich/commit/anomaly already run at the
+    Session boundary and the wrapper calls ``EventSpine.append`` directly.
+    When no pipeline is installed this function falls back to the direct
+    ``EventSpine.append`` path so PR-4 assembler contracts still hold
+    under unit tests.
+
+    ``exc`` carries a ``BaseException`` captured by the wrap layer at
+    the call site. When provided it is merged into the payload as the
+    structured failure fields documented in :func:`_exception_payload`,
+    so a channel="error" event always carries enough information to
+    render the traceback without re-raising.
+    """
+    if exc is not None:
+        # Caller payload wins on conflict (the caller may override
+        # ``exception_message`` with a domain-specific phrasing), so we
+        # merge exc first and then apply caller payload on top.
+        payload = {**_exception_payload(exc), **payload}
+    if spine is None:
+        return
+    if is_session_ssot_hook_active():
+        _emit_spine_direct(
+            spine=spine,
+            execution_point=execution_point,
+            channel=channel,
+            payload=payload,
+            outcome=outcome,
+            span=span,
+        )
+        return
+    pipeline = _resolve_pipeline()
+    if pipeline is not None:
+        _emit_via_pipeline(
+            pipeline=pipeline,
+            spine=spine,
+            execution_point=execution_point,
+            channel=channel,
+            payload=payload,
+            outcome=outcome,
+            span=span,
+        )
+        return
+    _emit_spine_direct(
+        spine=spine,
+        execution_point=execution_point,
+        channel=channel,
+        payload=payload,
+        outcome=outcome,
+        span=span,
+    )
 
 
 def _publish_i17_rejection(

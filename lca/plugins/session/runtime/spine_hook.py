@@ -20,6 +20,7 @@ from typing import Any
 
 from lca.infrastructure.observability.loop_cursor._spine_port import (
     SessionAppendHook,
+    SESSION_SSOT_HOOK_MARKER,
     bind_session_append_hook,
     reset_session_append_hook,
 )
@@ -35,6 +36,7 @@ _log = logging.getLogger(__name__)
 _NO_PRODUCER = object()
 
 __all__ = [
+    "SESSION_SSOT_HOOK_MARKER",
     "bind_bridge_spine_hook",
     "make_session_spine_append_hook",
     "reset_bridge_spine_hook",
@@ -210,6 +212,11 @@ def make_session_spine_append_hook(bridge: RunEventSessionBridge) -> SessionAppe
             ref=ref,
         )
 
+    return _mark_session_ssot_hook(hook)
+
+
+def _mark_session_ssot_hook(hook: SessionAppendHook) -> SessionAppendHook:
+    setattr(hook, SESSION_SSOT_HOOK_MARKER, True)
     return hook
 
 

@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Sequence
 from contextvars import ContextVar, Token
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any, Protocol
 
 from lca.infrastructure.observability.spine.context import SpineContext
@@ -37,6 +37,8 @@ from lca.infrastructure.observability.spine.event_record import (
 from lca.infrastructure.observability.spine.sinks.base import EventSink
 
 log = logging.getLogger(__name__)
+
+SESSION_SSOT_HOOK_MARKER = "__lca_session_ssot_hook__"
 
 
 class WritePort(Protocol):
@@ -92,6 +94,12 @@ def get_session_append_hook() -> SessionAppendHook | None:
     return _session_append_hook.get()
 
 
+def is_session_ssot_hook_active() -> bool:
+    """True when the bound hook is a production Session SSOT forwarder."""
+    hook = get_session_append_hook()
+    return hook is not None and getattr(hook, SESSION_SSOT_HOOK_MARKER, False)
+
+
 def bind_session_append_hook(hook: SessionAppendHook) -> Token[Any]:
     """绑定 Session runtime 转发钩子;返回 reset token。
 
@@ -128,7 +136,7 @@ def spine_port_append(
 
     Failure 语义:
     - 无钩子绑定时 RuntimeError(fail-loud,要求调用方先绑 Session)
-    - 钩子抛错时 contained(log + 返回 stub record),不传播
+    - 钩子抛错时 log + 重新抛出(I17 / sink OSError 直接传播)
 
     ADR-0186 迁移完成后,sinks/subscribers 参数可移除(当前保留以兼容
     EventSpine.append 签名)。
@@ -155,10 +163,14 @@ def spine_port_append(
             ref=ref,
         )
     except Exception as exc:
+        # I17 violations always propagate
         if type(exc).__name__ == "I17Violation" and type(exc).__module__ in (
             "lca.plugins.observability.spine.spine_enrich",
             "lca.plugins.observability.spine.emit_pipeline",
         ):
+            raise
+        # FD-1: sink errors (OSError, IOError) propagate to caller
+        if isinstance(exc, (OSError, IOError)):
             raise
         log.warning(
             "spine.session_forward_failed execution_point=%s err=%s",
@@ -166,26 +178,7 @@ def spine_port_append(
             exc,
             exc_info=True,
         )
-        # Return stub record on hook failure (contained, don't kill run)
-        return EventRecord(
-            execution_point=execution_point,
-            channel=channel,
-            span_id="stub",
-            parent_span_id=None,
-            sequence=0,
-            epoch=0,
-            causality_id="stub",
-            outcome=outcome,
-            when=when or datetime.now(UTC),
-            trace_id=None,
-            when_corrected=when or datetime.now(UTC),
-            prev_event_hash=None,
-            run_id=SpineContext.get_run() or "default-run",
-            step_id=SpineContext.get_step(),
-            payload=caller_payload or {},
-            phase=phase,
-            reason=reason,
-        )
+        raise
 
 
 def write_port_append(
@@ -229,10 +222,12 @@ def write_port_append(
 
 
 __all__ = [
+    "SESSION_SSOT_HOOK_MARKER",
     "SessionAppendHook",
     "WritePort",
     "bind_session_append_hook",
     "get_session_append_hook",
+    "is_session_ssot_hook_active",
     "reset_session_append_hook",
     "spine_port_append",
     "write_port_append",

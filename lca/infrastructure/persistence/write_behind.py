@@ -1,4 +1,4 @@
-"""Write-behind 批量写入缓冲区 —— Journal / Session 共享的持久化基础设施。
+"""Write-behind 批量写入缓冲区 —— Session persistence 内部基础设施。
 
 对齐 DSH ``SessionWriteBehind`` 的核心语义：
 
@@ -6,6 +6,10 @@
 2. 定时窗口到期或显式 ``flush()`` 时，批量写入 ``WriteBehindSink``
 3. 写入失败 → 事件放回 pending（不丢失），标记暂停等待下次触发
 4. ``dispose()`` 排空全部待写事件后关闭 sink
+
+ADR-0186: 本模块是 Session persistence 的内部基础设施，由
+``FilesystemJournalStore`` 消费。不接受新的直接调用方——持久化统一
+经 Session observer 链（SpineFileSink / WriteBehindBuffer）落盘。
 
 投递保证（对齐 Manus 指南 L0/L1/L2 + ``EventDurability``）：
 

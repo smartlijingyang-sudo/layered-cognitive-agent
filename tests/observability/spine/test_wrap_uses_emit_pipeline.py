@@ -50,9 +50,10 @@ class _CaptureSink:
 
 
 def _make_spine() -> EventSpine:
-    """Return a fresh ``EventSpine`` with a capture sink and a run id wired."""
+    """Return a fresh ``EventSpine`` with capture sink (autouse passthrough hook)."""
     SpineContext.set_run("wrap-emit-pipeline-test")
-    return EventSpine(sinks=[_CaptureSink()])
+    sink = _CaptureSink()
+    return EventSpine(sinks=[sink])
 
 
 def _make_field_producer(
@@ -363,5 +364,78 @@ def test_wrap_instrument_preserves_instrumented_markers_with_pipeline() -> None:
         assert getattr(wrapped, "wrap_provenance", None) == "assembler"
         assert getattr(wrapped, "__wrapped__", None) is sample
     finally:
+        set_active_pipeline_accessor(None)
+        set_active_spine_accessor(None)
+
+
+def test_wrap_instrument_bypasses_emit_pipeline_when_session_ssot_hook() -> None:
+    """Production Session hook: enrich at hook; wrap must not call EmitPipeline.emit."""
+    from lca.infrastructure.observability.loop_cursor._spine_port import (
+        bind_session_append_hook,
+        reset_session_append_hook,
+    )
+    from lca.plugins.observability.spine.spine_enrich import (
+        enrich_spine_payload,
+        set_active_spine_enricher,
+    )
+    from lca.plugins.session.runtime.bind import (
+        bind_run_event_session_from_store,
+        unbind_run_event_session,
+    )
+    from lca.plugins.session.runtime.spine_hook import make_session_spine_append_hook
+    from lca.plugins.session.runtime.store import SessionStore
+
+    store = SessionStore()
+    bound = bind_run_event_session_from_store(store, "wrap_ssot_bypass")
+    signature_producer = _make_field_producer(
+        "spine.reflector.signature.stub",
+        priority=100,
+        fields={"signature_fingerprint": "pipeline_only"},
+    )
+    source_producer = _make_field_producer(
+        "spine.reflector.source.stub",
+        priority=8,
+        fields={"source_location": {"file": "s.py", "line": 1, "function": "f"}},
+    )
+    SpineContext.set_run("wrap_ssot_bypass")
+    sink = _CaptureSink()
+    spine = EventSpine(sinks=[sink])
+    hook_token = bind_session_append_hook(make_session_spine_append_hook(bound.bridge))
+    pipeline_emit_count = 0
+    real_pipeline = _install_pipeline_accessor(
+        spine, producers=[source_producer, signature_producer]
+    )
+    original_emit = real_pipeline.emit
+
+    def _counting_emit(**kwargs: Any) -> EventRecord:
+        nonlocal pipeline_emit_count
+        pipeline_emit_count += 1
+        return original_emit(**kwargs)
+
+    real_pipeline.emit = _counting_emit  # type: ignore[method-assign]
+    previous_enricher = set_active_spine_enricher(
+        lambda **kwargs: enrich_spine_payload(
+            producers=[source_producer, signature_producer], **kwargs
+        )
+    )
+    try:
+
+        def sample() -> int:
+            """SSOT bypass probe."""
+            return 7
+
+        wrapped = wrap_instrument(sample)
+        assert wrapped() == 7
+        assert pipeline_emit_count == 0
+        session = bound.bridge.inner
+        assert session.seq == 2
+        start_event = session.event_at(0)
+        assert start_event is not None
+        assert start_event.data["signature_fingerprint"] == "pipeline_only"
+        assert not sink.records, "SSOT hook path must not write EventSpine sinks"
+    finally:
+        set_active_spine_enricher(previous_enricher)
+        reset_session_append_hook(hook_token)
+        unbind_run_event_session(bound)
         set_active_pipeline_accessor(None)
         set_active_spine_accessor(None)

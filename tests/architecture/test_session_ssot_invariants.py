@@ -333,8 +333,31 @@ def test_anomaly_runs_via_session_observer_not_emit_pipeline_when_hooked() -> No
     """ADR-0186 wave-3: hook 路径下 EmitPipeline 不得调用 anomaly.on_event。"""
     emit_path = _REPO_ROOT / "lca" / "plugins" / "observability" / "spine" / "emit_pipeline.py"
     emit_text = emit_path.read_text(encoding="utf-8")
-    assert "get_session_append_hook()" in emit_text
+    assert "is_session_ssot_hook_active()" in emit_text
     assert "self._anomaly.on_event" in emit_text
     anomaly_plugin = _REPO_ROOT / "lca" / "plugins" / "session" / "spine_anomaly" / "spine_anomaly.py"
     assert anomaly_plugin.exists()
     assert "session_event_to_event_record" in anomaly_plugin.read_text(encoding="utf-8")
+
+
+def test_wrap_bypasses_emit_pipeline_when_session_ssot_hook() -> None:
+    """ADR-0186 wave-4: SSOT hook 活跃时 wrap/runtime 不得经 EmitPipeline。"""
+    wrap_path = _REPO_ROOT / "lca" / "harness" / "declarative" / "compile" / "instrument_wrap.py"
+    hooks_path = _REPO_ROOT / "lca" / "plugins" / "observability" / "spine" / "runtime_hooks.py"
+    wrap_text = wrap_path.read_text(encoding="utf-8")
+    hooks_text = hooks_path.read_text(encoding="utf-8")
+    assert "is_session_ssot_hook_active()" in wrap_text
+    assert "is_session_ssot_hook_active()" in hooks_text
+    safe_body = wrap_text[wrap_text.index("def _safe_append(") :]
+    ssot_idx = safe_body.index("is_session_ssot_hook_active()")
+    pipeline_idx = safe_body.index("_resolve_pipeline()")
+    assert ssot_idx < pipeline_idx
+
+
+def test_emit_pipeline_setup_does_not_install_pipeline_accessor() -> None:
+    """ADR-0186 wave-5: production setup wires enricher only, not wrap accessor."""
+    emit_path = _REPO_ROOT / "lca" / "plugins" / "observability" / "spine" / "emit_pipeline.py"
+    emit_text = emit_path.read_text(encoding="utf-8")
+    setup_body = emit_text[emit_text.index("async def setup(") :]
+    assert "set_active_spine_enricher" in setup_body
+    assert "set_active_pipeline_accessor" not in setup_body

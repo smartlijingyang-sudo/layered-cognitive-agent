@@ -1,4 +1,8 @@
-"""Tests for EventSpine (Task 1.5)."""
+"""Tests for EventSpine (Task 1.5).
+
+ADR-0186 更新:spine_port_append 现在要求 Session hook 绑定。
+conftest.py 提供 sync_passthrough_hook fixture 模拟旧同步路径行为。
+"""
 
 from __future__ import annotations
 

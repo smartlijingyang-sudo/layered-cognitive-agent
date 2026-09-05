@@ -1,5 +1,8 @@
 """JSONL 文件批量写入后端 —— ``WriteBehindSink`` 的文件系统实现。
 
+ADR-0186: Session persistence 内部基础设施。由 ``FilesystemJournalStore``
+通过 ``WriteBehindBuffer`` 消费，不接受新的直接调用方。
+
 对齐 DSH ``PersistenceBackend.appendBatch`` 的语义：
 
 - 长驻文件句柄（不逐条开关）
