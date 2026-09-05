@@ -245,7 +245,12 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     emit_pipeline = ctx.require("emit_pipeline")
     file_sink = ctx.require("file_sink")
 
-    sinks: list[EventSink] = [file_sink]
+    # ADR-0186 convergence: FileSink (System A) no longer writes to
+    # <run_id>.spine.jsonl. SpineFileSink (System B) via Session observer
+    # is now the sole writer. EventSpine is created without disk sinks
+    # to eliminate dual-write. file_sink is still required for backwards
+    # compat but not wired into the sinks list.
+    sinks: list[EventSink] = []
     console_sink = (
         getattr(ctx, "soft_get", lambda _k: None)("console_sink")
         if hasattr(ctx, "soft_get")
@@ -253,6 +258,18 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     )
     if console_sink is not None and isinstance(console_sink, EventSink):
         sinks.append(console_sink)
+
+    # EventSpine requires at least one sink; use a no-op sink when no
+    # real sinks are configured (all disk writes go through System B).
+    if not sinks:
+        class _NoOpSink:
+            def write(self, record: Any) -> None:
+                pass
+
+            def close(self) -> None:
+                pass
+
+        sinks.append(_NoOpSink())  # type: ignore[arg-type]
 
     event_spine = EventSpine(sinks=sinks)
 

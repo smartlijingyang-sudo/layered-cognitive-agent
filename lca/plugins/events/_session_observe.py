@@ -63,6 +63,9 @@ def set_session(session: object | None) -> None:
 
     时序：装载后立即把 :func:`observer_catalog` 中每条挂到新 Session；
     清空只卸当前目标，**不**清目录（下一 run bind 再挂）。
+
+    幂等：同一 session 对象重复调用不重复注册 observer（防止 resume
+    路径与 create 路径各调一次导致事件双写）。
     """
     global _current_session
     if session is None:
@@ -74,6 +77,8 @@ def set_session(session: object | None) -> None:
     if not isinstance(bound, SessionObserverTarget):
         msg = f"Session 观察目标必须提供 observe()；got {type(session).__name__}"
         raise TypeError(msg)
+    if bound is _current_session:
+        return
     _current_session = bound
     for plugin, callback in tuple(_observer_catalog.items()):
         bound.observe(plugin, callback)
