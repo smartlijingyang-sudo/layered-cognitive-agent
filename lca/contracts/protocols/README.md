@@ -92,7 +92,6 @@ log:emit
 - `EffectPolicyPlan`
 - `EnvelopeVerdict`
 - `EventBus`
-- `GateChainComposer`
 - `GraphNodeExecutionContext`
 - `GraphNodeExecutor`
 - `GraphNodeExecutorRegistryProtocol`

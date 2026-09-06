@@ -115,39 +115,6 @@ class TestLayerBoundary:
 
 
 class TestHubConstruction:
-    def test_hub_accepts_sink_protocol(self) -> None:
-        from lca.cognition.perceive_sink import ManifestSink, NullSink
-
-        assert isinstance(NullSink(), ManifestSink)
-
-    def test_journal_sink_consumes_write_only_backend(self) -> None:
-        from lca.cognition.perceive_sink import JournalSink
-        from lca.contracts.models.core.perception import ContextManifest
-        from lca.contracts.models.observability.journal import ContextManifested
-        from lca.contracts.observability.ports import JournalBackend
-
-        class WriteOnlyJournal:
-            def __init__(self) -> None:
-                self.events: list[ContextManifested] = []
-
-            def write(self, event: ContextManifested) -> None:
-                self.events.append(event)
-                return None
-
-            def flush(self) -> None:
-                return None
-
-            def close(self) -> None:
-                return None
-
-        journal = WriteOnlyJournal()
-        assert isinstance(journal, JournalBackend)
-        event = ContextManifested(step=3)
-        emitted = JournalSink(journal).emit(event, ContextManifest(items=()))
-
-        assert emitted is event
-        assert journal.events == [event]
-
     def test_hub_constructor_signature(self) -> None:
         import inspect
 

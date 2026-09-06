@@ -142,9 +142,6 @@ from lca.contracts.protocols.gate.budget_policy import BudgetPolicy
 # ── 控制面单一入口（ADR-0066 + tracker §19）─────────────────────
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 
-# ── GateChainComposer（ADR-0074 可定制决策门链组合）────────
-from lca.contracts.protocols.gate.gate_chain_composer import GateChainComposer
-
 # ── Lead 预算策略解析接缝 ─────────────────────────────────
 from lca.contracts.protocols.gate.lead_budget_policy import LeadBudgetPolicyResolver
 from lca.contracts.protocols.gate.loop_guard import LoopGuardEvaluator, LoopGuardVerdict
@@ -345,7 +342,6 @@ __all__ = [  # noqa: RUF022 — discovery order matches tests/contracts/test_pro
     "EffectPolicyPlan",
     "EnvelopeVerdict",
     "EventBus",
-    "GateChainComposer",
     "GraphNodeExecutionContext",
     "GraphNodeExecutor",
     "GraphNodeExecutorRegistryProtocol",

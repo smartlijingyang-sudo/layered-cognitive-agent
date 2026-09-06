@@ -9,7 +9,6 @@ from lca.contracts.protocols.act.effect_handler import (
     EffectHandlerRegistry,
 )
 from lca.contracts.protocols.gate.decision_classifier import DecisionClassifier
-from lca.contracts.protocols.gate.gate_chain_composer import GateChainComposer
 from lca.contracts.protocols.journal.artifact_closure import ArtifactClosure
 from lca.contracts.protocols.state.delta_handler import (
     DeltaHandler,
@@ -200,30 +199,3 @@ class TestArtifactClosureProtocol:
             pass
 
         assert not isinstance(Empty(), ArtifactClosure)
-
-
-class TestGateChainComposerProtocol:
-    """GateChainComposer Protocol tests."""
-
-    def test_protocol_is_runtime_checkable(self):
-        assert hasattr(GateChainComposer, "__protocol_attrs__")
-
-    def test_protocol_has_compose_method(self):
-        assert hasattr(GateChainComposer, "compose")
-
-    def test_runtime_check_accepts_structural_match(self):
-        """isinstance() should accept any object with compose()."""
-
-        class FakeComposer:
-            def compose(self):
-                return None
-
-        assert isinstance(FakeComposer(), GateChainComposer)
-
-    def test_runtime_check_rejects_missing_method(self):
-        """isinstance() should reject objects lacking compose()."""
-
-        class Empty:
-            pass
-
-        assert not isinstance(Empty(), GateChainComposer)
