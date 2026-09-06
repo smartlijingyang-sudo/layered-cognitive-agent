@@ -63,7 +63,7 @@ class SessionFactCommitter(FactCommitter):
             return self._commit_context_manifested_payload(payload, node_ref=node_ref)
 
         return self._commit_spine_fact(
-            execution_point=f"phase.fact.{kind}" if not kind.startswith("phase.") else kind,
+            execution_point="phase.fact",
             payload={
                 "plan_ref": plan_ref,
                 "node_ref": node_ref,

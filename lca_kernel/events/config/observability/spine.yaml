@@ -1087,3 +1087,48 @@ events:
       run_id: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
+
+  - category: spine.runtime.diagnostic
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
+    fields:
+      category: str
+      operation: str
+      plugin: str
+      status: str
+      attributes: dict
+      output: dict
+    publishers:
+      - lca.loop.fact_gateway.DefaultFactGateway
+
+  # ── Fact plane（ADR-0192）──────────────────────────────────────
+  - category: spine.phase.fact
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
+    fields:
+      plan_ref: str
+      node_ref: str
+      fact_id: str
+      kind: str
+      payload: dict
+    publishers:
+      - lca.loop.fact_gateway.DefaultFactGateway
+
+  - category: spine.phase.evidence
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
+    fields:
+      plan_ref: str
+      evidence_ref: str
+    publishers:
+      - lca.loop.fact_gateway.DefaultFactGateway
+
+  - category: spine.effect.receipt
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
+    fields:
+      plan_ref: str
+      observation_type: str
+      observation: dict
+    publishers:
+      - lca.loop.fact_gateway.DefaultFactGateway

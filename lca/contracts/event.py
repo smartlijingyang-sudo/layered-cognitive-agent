@@ -152,6 +152,11 @@ class Category(str, Enum):
     SPINE_BOOT_PLUGIN_FIBER_SPAWNED = "spine.boot.plugin.fiber.spawned"
     SPINE_BOOT_OBSERVABILITY_ASSEMBLED = "spine.boot.observability.assembled"
     SPINE_RUNTIME_OBSERVED = "spine.runtime.observed"
+    SPINE_RUNTIME_DIAGNOSTIC = "spine.runtime.diagnostic"
+    # observability/spine — ADR-0192 fact plane
+    SPINE_PHASE_FACT = "spine.phase.fact"
+    SPINE_PHASE_EVIDENCE = "spine.phase.evidence"
+    SPINE_EFFECT_RECEIPT = "spine.effect.receipt"
     # observability/spine — ADR-0187 assistant domain (12 EP)
     SPINE_ASSISTANT_CREATED = "spine.assistant.created"
     SPINE_ASSISTANT_BOOTSTRAP_COMPLETED = "spine.assistant.bootstrap.completed"
@@ -304,6 +309,10 @@ CATEGORY_DEFAULT_PLANE: dict[Category, Plane] = {
     Category.SPINE_BOOT_PLUGIN_FIBER_SPAWNED: Plane.STRUCTURAL,
     Category.SPINE_BOOT_OBSERVABILITY_ASSEMBLED: Plane.STRUCTURAL,
     Category.SPINE_RUNTIME_OBSERVED: Plane.OBSERVABILITY,
+    Category.SPINE_RUNTIME_DIAGNOSTIC: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_FACT: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_EVIDENCE: Plane.OBSERVABILITY,
+    Category.SPINE_EFFECT_RECEIPT: Plane.OBSERVABILITY,
     Category.SPINE_ASSISTANT_CREATED: Plane.STRUCTURAL,
     Category.SPINE_ASSISTANT_BOOTSTRAP_COMPLETED: Plane.STRUCTURAL,
     Category.SPINE_ASSISTANT_PROFILE_REVISED: Plane.STRUCTURAL,

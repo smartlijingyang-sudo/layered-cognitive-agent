@@ -68,6 +68,23 @@ def test_loop_cursor_record_ep_passes_validation() -> None:
     assert p.category == Category("spine.step.tool_call.record")
 
 
+def test_runtime_diagnostic_ep_passes_validation() -> None:
+    """runtime.diagnostic EP used by emit_diagnostic must pass SpineEventPayload validation."""
+    p = SpineEventPayload(
+        execution_point="runtime.diagnostic",
+        channel="fact",
+        payload={
+            "category": "hook",
+            "operation": "hook.trigger",
+            "plugin": "hook_registry.simple",
+            "status": "",
+            "attributes": {"hook_event": "on_start"},
+            "output": {},
+        },
+    )
+    assert p.category == Category("spine.runtime.diagnostic")
+
+
 def test_pilot_ep_in_whitelist() -> None:
     """SPINE_EXECUTION_POINTS 闭集含 76 EP（包括试点 + 余下 75）。"""
     assert len(SPINE_EXECUTION_POINTS) >= 1

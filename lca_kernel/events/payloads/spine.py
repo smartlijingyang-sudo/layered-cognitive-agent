@@ -148,6 +148,11 @@ SPINE_EXECUTION_POINTS: tuple[str, ...] = (
     "boot.observability.assembled",
     # Runtime observed (PR-6)
     "runtime.observed",
+    "runtime.diagnostic",
+    # Fact plane (ADR-0192)
+    "phase.fact",
+    "phase.evidence",
+    "effect.receipt",
     # Assistant domain (ADR-0187)
     "assistant.created",
     "assistant.bootstrap.completed",
@@ -305,6 +310,11 @@ _SPINE_EP_TO_CATEGORY: dict[str, str] = {
     "boot.observability.assembled": "spine.boot.observability.assembled",
     # Runtime observed (PR-6)
     "runtime.observed": "spine.runtime.observed",
+    "runtime.diagnostic": "spine.runtime.diagnostic",
+    # Fact plane (ADR-0192)
+    "phase.fact": "spine.phase.fact",
+    "phase.evidence": "spine.phase.evidence",
+    "effect.receipt": "spine.effect.receipt",
     # Assistant domain (ADR-0187)
     "assistant.created": "spine.assistant.created",
     "assistant.bootstrap.completed": "spine.assistant.bootstrap.completed",

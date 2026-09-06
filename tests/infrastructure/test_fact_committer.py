@@ -89,7 +89,7 @@ def test_commit_spine_fact_fallback_when_unbound() -> None:
 def test_runtime_journal_committer_monotonic_sequence() -> None:
     journal = RuntimeJournalCommitter()
     with patch(
-        "lca.infrastructure.session.fact_committer.publish_ep_bound",
+        "lca.infrastructure.session.commit.fact_committer.publish_ep_bound",
         return_value=None,
     ):
         first = journal.commit_evidence("evidence-1", plan_ref="plan", node_ref="think")
@@ -111,7 +111,7 @@ def test_commit_spine_fact_uses_receipt_seq_when_bound() -> None:
             time=1,
         )
         with patch(
-            "lca.infrastructure.session.fact_committer.publish_ep_bound",
+            "lca.infrastructure.session.commit.fact_committer.publish_ep_bound",
             return_value=receipt,
         ) as publish:
             ref = committer.commit_evidence("evidence-2", plan_ref="plan", node_ref="think")
@@ -138,7 +138,7 @@ def test_emit_diagnostic_routes_via_publish_ep_bound() -> None:
     session = Session("fact_committer_diag")
     token = set_publish_session(session)
     try:
-        with patch("lca.infrastructure.session.fact_committer.publish_ep_bound") as publish:
+        with patch("lca.infrastructure.session.commit.fact_committer.publish_ep_bound") as publish:
             emit_diagnostic(
                 category="plugin",
                 operation="sensor.read",
