@@ -16,11 +16,13 @@ render (table / JSON / log).  No side effects.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import cast
 
 from lca.contracts.atoms.enums import MemoryLayer
+from lca.contracts.harness.tasks.session import SessionEvent
 from lca.contracts.models.observability.journal import (
     ApprovalResolved,
     ContextManifested,
@@ -158,12 +160,13 @@ def diagnose_loop_stuck(
     *,
     window: int = 10,
     trace_id: str | None = None,
+    session_events: Sequence[SessionEvent] | None = None,
 ) -> DiagnosisReport:
     """Diagnose why the loop is stuck in repeated patterns.
 
     Spec §24.5.3: count recent tool invocations + GateDecided events.
-    A repeat-tool-call warning without a budget hint is a Brain that
-    is not reading the PolicyFact fold.
+    Session ``gate.decided.v1`` facts are consulted when journal
+    ``GateDecided`` events are absent (ADR-0191 migration).
     """
     findings: list[Finding] = []
     tool_events: list[StampedEvent] = [
@@ -185,7 +188,8 @@ def diagnose_loop_stuck(
     repeats = sum(1 for i in range(1, len(tool_names)) if tool_names[i] == tool_names[i - 1])
     if repeats >= window - 1:
         warnings = [e for e in gate_events if cast("GateDecided", e.event).verdict == "warn"]
-        if not warnings:
+        session_warn_count = _session_gate_warn_count(session_events)
+        if not warnings and session_warn_count == 0:
             findings.append(
                 Finding(
                     pattern=DiagnosePattern.LOOP_STUCK,
@@ -200,19 +204,34 @@ def diagnose_loop_stuck(
                 )
             )
         else:
+            warn_count = len(warnings) if warnings else session_warn_count
+            evidence_refs = tuple(e.seq for e in warnings) if warnings else (-1,)
             findings.append(
                 Finding(
                     pattern=DiagnosePattern.LOOP_STUCK,
                     severity="medium",
                     summary=(
-                        f"{len(warnings)} GateDecided warn events but loop still repeats; "
+                        f"{warn_count} GateDecided warn events but loop still repeats; "
                         "Brain may not be reading the PolicyFact fold."
                     ),
-                    evidence_refs=tuple(e.seq for e in warnings),
+                    evidence_refs=evidence_refs,
                 )
             )
 
     return DiagnosisReport(DiagnosePattern.LOOP_STUCK, tuple(findings))
+
+
+def _session_gate_warn_count(session_events: Sequence[SessionEvent] | None) -> int:
+    if not session_events:
+        return 0
+    count = 0
+    for event in session_events:
+        if event.type != "gate.decided.v1":
+            continue
+        data = event.data if isinstance(event.data, dict) else {}
+        if data.get("verdict") == "warn":
+            count += 1
+    return count
 
 
 def diagnose_memory_poisoned(store: RunStore) -> DiagnosisReport:
@@ -285,6 +304,7 @@ def diagnose(
             store,
             window=int(cast("str", kwargs.get("window", 10))),
             trace_id=cast("str | None", kwargs.get("trace_id")),
+            session_events=cast("Sequence[SessionEvent] | None", kwargs.get("session_events")),
         )
     if pattern == DiagnosePattern.MEMORY_POISONED:
         return diagnose_memory_poisoned(store)

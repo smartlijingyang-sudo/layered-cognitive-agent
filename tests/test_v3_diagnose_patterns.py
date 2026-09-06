@@ -80,6 +80,31 @@ class TestDiagnoseLoopStuck:
         assert not report.ok
         assert any("Brain may not be reading" in f.summary for f in report.findings)
 
+    def test_repeat_with_session_warn(self) -> None:
+        from lca.contracts.harness.tasks.session import SessionEvent
+
+        store = RunStore()
+        for i in range(10):
+            store.append(ToolInvoked(tool_name="some_tool", invocation_id=f"inv-{i}", ok=True))
+        session_events = (
+            SessionEvent(
+                type="gate.decided.v1",
+                seq=1,
+                time=0,
+                session_id="s1",
+                data={
+                    "event_id": "gate-1",
+                    "gate": "RepeatToolCallGate",
+                    "verdict": "warn",
+                    "is_rewritten": False,
+                    "step": 9,
+                },
+            ),
+        )
+        report = diagnose_loop_stuck(store, window=10, session_events=session_events)
+        assert not report.ok
+        assert any("Brain may not be reading" in f.summary for f in report.findings)
+
 
 class TestDiagnoseMemoryPoisoned:
     def test_procedural_commit_flagged(self) -> None:

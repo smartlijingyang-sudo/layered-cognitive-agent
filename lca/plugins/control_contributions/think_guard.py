@@ -48,8 +48,18 @@ def _is_known_action(decision: Decision) -> bool:
 
 
 def _latest_gate_event(state: AgentState) -> GateDecided | None:
-    """Return the latest typed gate event."""
-    # This is a simplified version - in reality we'd need to check plugin_id
+    """Return the latest typed gate event for the current think step."""
+    from lca.contracts.harness.fold.perceive import fold_gate_decisions_from_events
+    from lca.infrastructure.session.bindings import resolve_session_reader
+
+    session = resolve_session_reader()
+    if session is not None:
+        decisions = fold_gate_decisions_from_events(
+            session.snapshot_events(),
+            step=state.step,
+        )
+        if decisions:
+            return decisions[-1]
     events = PerceiveState.from_agent_state(state).gate_decided
     return events[-1] if events else None
 
