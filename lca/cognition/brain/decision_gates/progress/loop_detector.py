@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from lca.cognition.brain.decision_gates.chained.chained import record_gate_decided
 from lca.cognition.convergence.evidence import build_delivery_evidence
-from lca.cognition.convergence.producer_tools import is_producer_tool
+from lca.cognition.convergence.payload import turn_has_delivery_signal
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.execution.decision import Decision
@@ -41,6 +41,7 @@ from lca.contracts.models.core.policy.loop_policy import (
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import DecisionGate
 from lca.infrastructure.session.context.turn_control_reader import (
+    ControlTurnView,
     control_turns,
     iter_control_turns_reversed,
 )
@@ -131,19 +132,24 @@ class ProgressLoopDetector(DecisionGate):
 
     @staticmethod
     def _count_producer_stall_after_delivery(state: AgentState) -> int:
-        """Count producer successes after delivery already satisfied (ADR-0196)."""
+        """Count successful tool turns after delivery already satisfied (ADR-0196)."""
         if not build_delivery_evidence(state).satisfied:
             return 0
         count = 0
         for turn in iter_control_turns_reversed(state):
             if turn.action_type != ActionType.USE_TOOL:
                 break
-            if not is_producer_tool(turn.tool_name):
-                break
             if not turn.observation_success:
                 break
             count += 1
-        return count
+        return max(0, count - 1)
+
+    @staticmethod
+    def _turn_has_meaningful_progress(turn: ControlTurnView) -> bool:
+        return turn_has_delivery_signal(
+            turn.observation_payload,
+            files_created=turn.files_created,
+        )
 
     @staticmethod
     def _count_consecutive_no_progress(state: AgentState) -> int:
@@ -152,7 +158,7 @@ class ProgressLoopDetector(DecisionGate):
         for turn in iter_control_turns_reversed(state):
             if turn.action_type != ActionType.USE_TOOL:
                 break
-            if turn.observation_success:
+            if ProgressLoopDetector._turn_has_meaningful_progress(turn):
                 break
             count += 1
         return count

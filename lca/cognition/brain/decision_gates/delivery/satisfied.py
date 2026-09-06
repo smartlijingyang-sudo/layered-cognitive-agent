@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from lca.cognition.brain.decision_gates.chained.chained import record_gate_decided
-from lca.cognition.convergence.producer_tools import is_producer_tool
 from lca.cognition.convergence.runtime import ConvergenceRuntime
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.ids.ids import new_id
@@ -13,11 +12,11 @@ from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import DecisionGate
 from lca.contracts.protocols.think.convergence import ConvergencePolicy
 
-_RATIONALE = "交付证据已满足：禁止继续 producer 工具，必须 respond 收口。"
+_RATIONALE = "交付证据已满足：禁止继续工具调用，必须 respond 收口。"
 
 
 class DeliverySatisfiedGate(DecisionGate):
-    """Rewrite producer tool decisions to RESPOND when delivery is satisfied."""
+    """Rewrite USE_TOOL decisions to RESPOND when delivery is satisfied."""
 
     def __init__(self, runtime: ConvergenceRuntime | ConvergencePolicy | None = None) -> None:
         if isinstance(runtime, ConvergenceRuntime):
@@ -36,8 +35,6 @@ class DeliverySatisfiedGate(DecisionGate):
         if not evidence.satisfied:
             return decision
         tool_name = decision.tool_calls[0].tool_name
-        if not is_producer_tool(tool_name):
-            return decision
 
         response_text = self._runtime.synthesize(
             state,

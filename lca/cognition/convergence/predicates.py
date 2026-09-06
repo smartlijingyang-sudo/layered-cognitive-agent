@@ -13,7 +13,7 @@ def delivery_satisfied(
     has_user_visible_delivery: bool,
 ) -> tuple[bool, str]:
     if task_class == "informative_text":
-        if producer_ok >= 1 and (has_user_visible_delivery or artifact_count >= 1):
+        if has_user_visible_delivery or artifact_count >= 1:
             return True, "informative_text: substantive output or artifact ready for respond"
         return False, "informative_text: awaiting substantive output or text respond"
     if task_class in {"visual_artifact", "code_demo", "mixed"}:
@@ -22,8 +22,8 @@ def delivery_satisfied(
         return False, f"{task_class}: no harvestable artifact yet"
     if artifact_count >= 1 and producer_ok >= 1:
         return True, "unknown task class: artifact + producer success"
-    if producer_ok >= 1 and has_user_visible_delivery:
-        return True, "unknown: substantive producer output"
+    if has_user_visible_delivery:
+        return True, "unknown: substantive tool output ready for respond"
     return False, "unknown: insufficient delivery signals"
 
 

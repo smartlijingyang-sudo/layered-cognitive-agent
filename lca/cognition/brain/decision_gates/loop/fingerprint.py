@@ -9,6 +9,33 @@ from hashlib import sha256
 from lca.contracts.models.core.execution.decision import ToolCall
 from lca.infrastructure.session.context.turn_control_reader import ControlTurnView
 
+_DIRECTORY_ARG_KEYS = ("directoryPath", "directory", "path", "dir")
+_INSPECT_TOOLS = frozenset({"listFiles", "list_files", "readFile", "read_file"})
+_WORKSPACE_ROOT_ALIASES = frozenset({".", "./", "", "/mnt/data", "/mnt/data/"})
+
+
+def _normalize_directory_path(path: str) -> str:
+    stripped = path.strip()
+    if stripped.rstrip("/") in _WORKSPACE_ROOT_ALIASES or stripped == "/mnt/data":
+        return "."
+    return stripped
+
+
+def _normalize_tool_arguments(
+    tool_name: str,
+    arguments: Mapping[str, object] | None,
+) -> dict[str, object]:
+    if arguments is None:
+        return {}
+    if tool_name not in _INSPECT_TOOLS:
+        return dict(arguments)
+    normalized = dict(arguments)
+    for key in _DIRECTORY_ARG_KEYS:
+        value = normalized.get(key)
+        if isinstance(value, str):
+            normalized[key] = _normalize_directory_path(value)
+    return normalized
+
 
 def fingerprint_payload(payload: object) -> str:
     """Return a deterministic SHA-256 digest for one normalized JSON payload."""
@@ -54,7 +81,13 @@ def normalize_for_fingerprint(value: object) -> object | None:
 
 def tool_call_fingerprint(tool_call: ToolCall) -> str | None:
     payload = normalize_for_fingerprint(
-        {"tool_name": tool_call.tool_name, "arguments": tool_call.arguments}
+        {
+            "tool_name": tool_call.tool_name,
+            "arguments": _normalize_tool_arguments(
+                tool_call.tool_name,
+                tool_call.arguments,
+            ),
+        }
     )
     if payload is None:
         return None
@@ -65,7 +98,13 @@ def view_tool_fingerprint(turn: ControlTurnView) -> str | None:
     if turn.tool_name is None:
         return None
     payload = normalize_for_fingerprint(
-        {"tool_name": turn.tool_name, "arguments": turn.tool_arguments or {}}
+        {
+            "tool_name": turn.tool_name,
+            "arguments": _normalize_tool_arguments(
+                turn.tool_name,
+                turn.tool_arguments,
+            ),
+        }
     )
     if payload is None:
         return None

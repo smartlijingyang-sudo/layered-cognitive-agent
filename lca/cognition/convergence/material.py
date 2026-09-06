@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lca.cognition.convergence.payload import merge_files_created, payload_stdout
-from lca.cognition.convergence.producer_tools import is_producer_tool
+from lca.cognition.convergence.payload import (
+    merge_files_created,
+    payload_stdout,
+    turn_has_delivery_signal,
+)
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.models.core.perceive.projection import current_manifest_from_state
 from lca.contracts.models.core.state.state import AgentState
@@ -61,8 +64,6 @@ def collect_delivery_material(state: AgentState) -> DeliveryMaterial:
     for turn in reversed(control_turns(state)):
         if not _is_use_tool(turn.action_type):
             continue
-        if not is_producer_tool(turn.tool_name):
-            continue
         if not turn.observation_success:
             continue
         stdout = payload_stdout(turn.observation_payload)
@@ -70,7 +71,10 @@ def collect_delivery_material(state: AgentState) -> DeliveryMaterial:
             turn.observation_payload,
             files_created=turn.files_created,
         )
-        if stdout or files:
+        if turn_has_delivery_signal(
+            turn.observation_payload,
+            files_created=turn.files_created,
+        ):
             best_stdout = stdout
             best_files = files
             break

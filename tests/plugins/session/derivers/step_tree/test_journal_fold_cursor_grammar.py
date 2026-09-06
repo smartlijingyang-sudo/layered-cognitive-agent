@@ -113,7 +113,7 @@ def test_second_header_closes_first_step() -> None:
 
 
 def test_header_without_step_id_generates_sequential_id() -> None:
-    """payload 缺 step_id 时回落生成 step_{seq:03d}。"""
+    """payload 缺 step_id 时回落生成 step-{seq:03d}。"""
     events = [
         {
             "execution_point": "llm.request.header",
@@ -123,7 +123,7 @@ def test_header_without_step_id_generates_sequential_id() -> None:
     ]
     doc = fold_step_tree(events, run_id="r_header_seq", outcome="completed")
     assert len(doc.steps) == 1
-    assert doc.steps[0].step_id == "step_001"
+    assert doc.steps[0].step_id == "step-001"
 
 
 def test_header_upgrades_empty_think_frame_in_place() -> None:

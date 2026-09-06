@@ -107,3 +107,41 @@ async def test_delivery_not_satisfied_allows_producer() -> None:
     )
     result = await gate.enforce(state, decision)
     assert result.action_type == ActionType.USE_TOOL
+
+
+@pytest.mark.asyncio
+async def test_delivery_satisfied_rewrites_listfiles_repeat_to_respond() -> None:
+    """Inspect tools with substantive stdout count as delivery (listFiles-once scenario)."""
+    file_list = '[{"name": ".lca", "type": "directory"}, {"name": "outputs", "type": "directory"}]'
+    state = AgentState(
+        trace_id="t",
+        task="Use listFiles once on . then reply with file count only.",
+        budget=Budget(),
+    )
+    state.history.append(
+        Turn(
+            decision=Decision(
+                decision_id="d0",
+                action_type=ActionType.USE_TOOL,
+                rationale="list",
+                confidence=0.9,
+                tool_calls=[ToolCall(call_id="c0", tool_name="listFiles", arguments={"directoryPath": "."})],
+            ),
+            observation=Observation(
+                observation_id="o0",
+                success=True,
+                payload={"stdout": file_list},
+            ),
+        )
+    )
+    gate = DeliverySatisfiedGate()
+    decision = Decision(
+        decision_id="d1",
+        action_type=ActionType.USE_TOOL,
+        rationale="list again",
+        confidence=0.9,
+        tool_calls=[ToolCall(call_id="c1", tool_name="listFiles", arguments={"directoryPath": "/mnt/data"})],
+    )
+    forced = await gate.enforce(state, decision)
+    assert forced.action_type == ActionType.RESPOND
+    assert file_list.strip() in (forced.response_text or "")

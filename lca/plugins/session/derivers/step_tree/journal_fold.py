@@ -357,7 +357,7 @@ def _begin_step(state: _StepTreeState, event: Mapping[str, Any], ts: float) -> N
         _close_step(state, "fail")
     state.step_seq += 1
     state.open_step = _Frame(
-        step_id=start_step_id or f"step_{state.step_seq:03d}",
+        step_id=start_step_id or f"step-{state.step_seq:03d}",
         step_index=state.step_seq,
         phase=phase,  # type: ignore[arg-type]
         entered_at=ts,
@@ -371,7 +371,7 @@ def _tool_result_ok(payload: Mapping[str, Any]) -> bool:
     if "ok" in payload:
         return bool(payload.get("ok"))
     outcome = str(payload.get("outcome") or "success").strip().lower()
-    return outcome in {"success", "completed", ""}
+    return outcome in {"success", "completed", "ok", ""}
 
 
 def _assign_tool_call(target: _Frame, payload: Mapping[str, Any], ep: str) -> None:
@@ -525,7 +525,7 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
             # 由 think 包络开窗,window_signal 标 implicit。
             state.step_seq += 1
             state.open_step = _Frame(
-                step_id=f"step_{state.step_seq:03d}",
+                step_id=f"step-{state.step_seq:03d}",
                 step_index=state.step_seq,
                 phase="think",
                 entered_at=ts,
@@ -578,7 +578,7 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
                 _close_step(state, "success")
             state.step_seq += 1
             state.open_step = _Frame(
-                step_id=header_step_id or f"step_{state.step_seq:03d}",
+                step_id=header_step_id or f"step-{state.step_seq:03d}",
                 step_index=state.step_seq,
                 phase="think",
                 entered_at=ts,

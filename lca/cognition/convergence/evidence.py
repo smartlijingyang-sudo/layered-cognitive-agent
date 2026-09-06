@@ -35,8 +35,6 @@ def _has_user_visible_delivery(state: AgentState) -> bool:
     for turn in control_turns(state):
         if not _is_use_tool(turn.action_type):
             continue
-        if not is_producer_tool(turn.tool_name):
-            continue
         if not turn.observation_success:
             continue
         if turn_has_delivery_signal(
