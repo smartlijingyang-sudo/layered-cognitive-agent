@@ -301,6 +301,33 @@ class SessionCheckpoint:
     status: str
 
 
+@session_event("gate.decided.v1", visibility="model")
+@dataclass(frozen=True)
+class GateDecidedCommitted:
+    """Durable gate verdict for Session SSOT fold (ADR-0191 R1)."""
+
+    event_id: str
+    gate: str
+    verdict: str
+    is_rewritten: bool
+    step: int
+    policy_fact_kind: str = ""
+    policy_fact_message: str = ""
+    policy_fact_source: str = ""
+    tool_name: str | None = None
+    rationale: str | None = None
+
+
+@session_event("context.manifested.v1", visibility="model")
+@dataclass(frozen=True)
+class ContextManifestCommitted:
+    """Durable ContextManifest snapshot for Session SSOT fold (ADR-0191 R1)."""
+
+    step: int
+    digest: str
+    items: tuple[dict[str, Any], ...] = ()
+
+
 @session_event("turn.control.v1", visibility="internal")
 @dataclass(frozen=True)
 class TurnControlCommitted:

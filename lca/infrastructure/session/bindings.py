@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
 
+from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols.session.checkpoint_policy import (
     FlushableSession,
     SessionCheckpointPolicyProtocol,
@@ -58,6 +59,16 @@ def resolve_session_reader() -> SessionReader | None:
 def resolve_flushable_session() -> FlushableSession | None:
     """Bound runtime Session for checkpoint ``flush()``, or ``None``."""
     return resolve_session_reader()
+
+
+def resolve_session_for_emit(state: AgentState | None = None) -> Session | None:
+    """Bound Session writer for cognitive fact emission, or ``None``.
+
+    ``state`` is accepted for call-site symmetry (step metadata lives on
+    state; session binding is always contextvar-based today).
+    """
+    _ = state
+    return _resolve_runtime_session(current_publish_session())
 
 
 def current_model_context_assembler() -> ModelContextAssembler:
@@ -142,6 +153,7 @@ __all__ = [
     "await_tool_side_effect_checkpoint",
     "current_model_context_assembler",
     "resolve_flushable_session",
+    "resolve_session_for_emit",
     "resolve_session_reader",
     "set_checkpoint_policy",
     "set_model_context_assembler",

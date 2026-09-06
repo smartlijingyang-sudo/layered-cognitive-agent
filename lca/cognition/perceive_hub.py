@@ -79,7 +79,8 @@ class SequentialPerceiveHub(PerceiveHub):
         cursor: LoopCursor | None = _current_cursor()
 
         items = await self._fold(state)
-        manifest = build_manifest_from_items(items)
+        digest = digest_manifest(build_manifest_from_items(items))
+        manifest = ContextManifest(items=tuple(items), digest=digest)
         # Write the typed slot — the Reasoner reads this.
         view = PerceiveState.from_agent_state(state)
         view.current_manifest = manifest
@@ -90,11 +91,15 @@ class SequentialPerceiveHub(PerceiveHub):
         event = ContextManifested(
             step=state.step,
             item_kinds=tuple(item.kind for item in items),
-            digest=digest_manifest(manifest),
+            digest=digest,
             item_refs=(),
             persist_full_prompt=False,
         )
         self._sink.emit(event, manifest)
+
+        from lca.infrastructure.session.cognitive_emit import emit_context_manifested_for_state
+
+        emit_context_manifested_for_state(state, manifest)
 
         if cursor is not None:
             # 派生 phase.perceive.fold EP(ADR-0169 P2 / L3)。

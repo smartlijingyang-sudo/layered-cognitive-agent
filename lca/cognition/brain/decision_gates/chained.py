@@ -44,3 +44,6 @@ def record_gate_decided(state: AgentState, event: GateDecided) -> None:
     via direct ``state.working_memory`` access.
     """
     record_event_to_state(state, event)
+    from lca.infrastructure.session.cognitive_emit import emit_gate_decided_from_policy
+
+    emit_gate_decided_from_policy(state, event)
