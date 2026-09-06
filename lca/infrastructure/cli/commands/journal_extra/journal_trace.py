@@ -563,11 +563,22 @@ def _detail_lines(ep: str, payload: dict[str, Any], *, max_lines: int) -> _Detai
         return _DetailBlock(tuple(lines), truncated)
 
     if ep == "exception.caught":
-        msg = payload.get("message")
+        msg = payload.get("exception_message") or payload.get("message")
         if msg:
             _add("  ✗ message:")
             for chunk in str(msg).splitlines():
                 _add(f"    │ {_trim(chunk)}")
+        tb = payload.get("traceback_text")
+        if tb:
+            _add("  ✗ traceback:")
+            for chunk in str(tb).splitlines():
+                _add(f"    │ {_trim(chunk, 200)}")
+        err_kind = payload.get("err_kind")
+        if err_kind:
+            _add(f"  err_kind={err_kind}")
+        boundary = payload.get("boundary")
+        if boundary:
+            _add(f"  boundary={boundary}")
         return _DetailBlock(tuple(lines), truncated)
 
     if ep == "phase.think.fold":

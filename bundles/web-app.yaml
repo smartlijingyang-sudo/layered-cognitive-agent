@@ -88,10 +88,6 @@ entries:
   name: state_stop_policy_default
   $module: lca.plugins.loop.state.stop_policy.plugin
   config: {}
-- id: hook_registry.simple
-  name: hook_registry_simple
-  $module: lca.plugins.runtime.hook_registry
-  config: {}
 - id: resume_input.human_answer
   name: resume_input_human_answer
   $module: lca.plugins.runtime.resume_input

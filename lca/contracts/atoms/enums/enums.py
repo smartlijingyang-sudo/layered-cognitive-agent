@@ -51,17 +51,13 @@ class ActionScope(str, Enum):
 
 
 class HookEvent(str, Enum):
-    """认知循环生命周期钩子事件名。"""
+    """Cordis lifecycle hook namespace (observe-only; platform uses RuntimeLifecycle SSOT).
+
+    PRE_* / POST_* removed per cognitive constitution v3 PR10 — phase boundaries
+    are owned by PhaseGraph + RuntimeLifecycleEventType, not HookRegistry.
+    """
 
     ON_START = "on_start"
-    PRE_PERCEIVE = "pre_perceive"
-    POST_PERCEIVE = "post_perceive"
-    PRE_THINK = "pre_think"
-    POST_THINK = "post_think"
-    PRE_ACT = "pre_act"
-    POST_ACT = "post_act"
-    PRE_REFLECT = "pre_reflect"
-    POST_REFLECT = "post_reflect"
     ON_ERROR = "on_error"
     ON_PAUSE = "on_pause"
     ON_COMPLETE = "on_complete"

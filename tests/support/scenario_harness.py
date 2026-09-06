@@ -126,7 +126,6 @@ _CLOSED_SET: frozenset[str] = frozenset(
         "body.simple",
         "safe_executor.simple",
         "state.stop-policy.default",
-        "hook_registry.simple",
         "middleware_registry.memory",
         # Memory layers
         "lca-memory-four-layer",

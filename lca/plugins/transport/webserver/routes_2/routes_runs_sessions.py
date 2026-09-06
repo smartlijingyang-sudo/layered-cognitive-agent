@@ -36,6 +36,8 @@ from lca.plugins.transport.webserver.handlers.runs.api.query_endpoints import (
     get_run,
     get_run_doctor,
     get_run_evidence,
+    get_run_exceptions,
+    get_run_failure,
     get_run_profile,
     stream_run_live,
 )
@@ -46,6 +48,8 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
     RouteSpec("/runs/{run_id}", get_run, ("GET",)),
     RouteSpec("/runs/{run_id}/live", stream_run_live, ("GET", "OPTIONS")),
     RouteSpec("/runs/{run_id}/doctor", get_run_doctor, ("GET",)),
+    RouteSpec("/runs/{run_id}/failure", get_run_failure, ("GET",)),
+    RouteSpec("/runs/{run_id}/exceptions", get_run_exceptions, ("GET",)),
     RouteSpec("/runs/{run_id}/profile", get_run_profile, ("GET",)),
     RouteSpec("/runs/{run_id}/evidence/{ref:path}", get_run_evidence, ("GET",)),
     RouteSpec("/runs/{run_id}/cancel", cancel_run, ("POST", "OPTIONS")),

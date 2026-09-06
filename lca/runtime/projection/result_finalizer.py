@@ -55,7 +55,6 @@ class RuntimeResultFinalizer(ResultFinalizer):
         通道。reducer 仍是 state 唯一 writer(ADR-0070 C4)。
         """
         final_state = interpretation.state
-        await self._hooks.trigger("on_complete", final_state)
 
         outcome = interpretation.outcome
         if outcome is None:

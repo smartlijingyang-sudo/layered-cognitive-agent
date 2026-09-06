@@ -63,6 +63,11 @@ class RunTerminalizer:
         finally:
             try:
                 if session.hub is not None:
+                    from lca.plugins.transport.webserver.handlers.runs.terminal.observation import (
+                        ensure_carrier_terminal_observation,
+                    )
+
+                    ensure_carrier_terminal_observation(session)
                     session.hub.close()
             finally:
                 _derive_terminal_status(session, success)

@@ -119,14 +119,5 @@ ATTR_MEMORY_LAYER = "memory_layer"
 ATTR_MEMORY_KEY_PREVIEW = "memory_key_preview"
 ATTR_HIT = "hit"
 
-# HookEvent → loop phase span（认知生命周期）
-HOOK_TO_PHASE_SPAN: dict[str, str] = {
-    "pre_perceive": SpanName.LOOP_PHASE_PERCEIVE.value,
-    "post_perceive": SpanName.LOOP_PHASE_PERCEIVE.value,
-    "pre_think": SpanName.LOOP_PHASE_THINK.value,
-    "post_think": SpanName.LOOP_PHASE_THINK.value,
-    "pre_act": SpanName.LOOP_PHASE_ACT.value,
-    "post_act": SpanName.LOOP_PHASE_ACT.value,
-    "pre_reflect": SpanName.LOOP_PHASE_REFLECT.value,
-    "post_reflect": SpanName.LOOP_PHASE_REFLECT.value,
-}
+# HookEvent → loop phase span（legacy; phase hooks retired — spans owned by PhaseObserver）
+HOOK_TO_PHASE_SPAN: dict[str, str] = {}

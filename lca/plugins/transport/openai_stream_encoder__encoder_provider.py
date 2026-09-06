@@ -90,9 +90,21 @@ class OpenAIStreamEncoder:
                 reason = str(getattr(event, "reason", "") or "denied")
                 yield chunk_builder.append_content(f"\n\n_tool denied: {reason}_\n\n")
             elif et in {self.AGENT_RUN_FINISHED, self.TEAM_RUN_FINISHED}:
+                error_text = str(getattr(event, "error", "") or "").strip()
+                if error_text:
+                    yield chunk_builder.append_content(f"\n\n_error: {error_text}_\n\n")
                 yield chunk_builder.finish_reason("stop")
                 terminated = True
                 break
+            elif et == "RuntimeObserved":
+                operation = str(getattr(event, "operation", "") or "")
+                if operation == "run.lifecycle.failed":
+                    error_text = str(getattr(event, "error_message", "") or "").strip()
+                    if error_text:
+                        yield chunk_builder.append_content(f"\n\n_error: {error_text}_\n\n")
+                    yield chunk_builder.finish_reason("stop")
+                    terminated = True
+                    break
             # Anything else (Casting/Decision/Step/Sandbox*): journal/OTel only
         if not terminated:
             # Source stream drained without a Finished event — close cleanly.

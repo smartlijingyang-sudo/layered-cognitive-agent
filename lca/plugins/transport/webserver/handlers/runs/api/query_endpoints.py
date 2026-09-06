@@ -178,6 +178,37 @@ async def get_run_doctor(request: Request) -> JSONResponse:
     return JSONResponse(report.as_dict(), headers=cors_headers())
 
 
+async def get_run_failure(request: Request) -> JSONResponse:
+    """GET /runs/{run_id}/failure — user + operator failure projection."""
+    run_id = request.path_params["run_id"]
+    summary = await _run_port_of(request).summary(run_id)
+    if summary is None:
+        return JSONResponse({"error": "run not found"}, status_code=404, headers=cors_headers())
+    from lca.plugins.transport.webserver.read.runs.failure.failure_reader import (
+        failure_summary_for_run,
+    )
+
+    payload = failure_summary_for_run(
+        run_id,
+        user_error=str(summary.get("error") or ""),
+    )
+    return JSONResponse(payload, headers=cors_headers())
+
+
+async def get_run_exceptions(request: Request) -> JSONResponse:
+    """GET /runs/{run_id}/exceptions — exception.caught evidence (operator/debug)."""
+    run_id = request.path_params["run_id"]
+    summary = await _run_port_of(request).summary(run_id)
+    if summary is None:
+        return JSONResponse({"error": "run not found"}, status_code=404, headers=cors_headers())
+    from lca.plugins.transport.webserver.read.runs.failure.failure_reader import (
+        load_exception_records,
+    )
+
+    records = load_exception_records(run_id)
+    return JSONResponse({"run_id": run_id, "exceptions": records}, headers=cors_headers())
+
+
 async def get_run_profile(request: Request) -> JSONResponse:
     """GET /runs/{run_id}/profile — return the boot-time profile_snapshot.json."""
     run_id = request.path_params["run_id"]
@@ -339,6 +370,8 @@ __all__ = [
     "get_run",
     "get_run_doctor",
     "get_run_evidence",
+    "get_run_exceptions",
+    "get_run_failure",
     "get_run_profile",
     "health_payload",
     "stream_journal_live",

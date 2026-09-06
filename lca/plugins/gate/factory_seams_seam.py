@@ -68,9 +68,13 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config
+    from lca.runtime.support.null_hook_registry import NullHookRegistry
+
+    hooks_registry = FactoryRegistry("hooks")
+    hooks_registry.register("simple", NullHookRegistry)
     ctx.provide(BODIES.key, FactoryRegistry("bodies"))
     ctx.provide(BRAINS.key, FactoryRegistry("brains"))
-    ctx.provide(HOOKS.key, FactoryRegistry("hooks"))
+    ctx.provide(HOOKS.key, hooks_registry)
     ctx.provide(
         RESUME_INPUT_ADAPTERS.key,
         FactoryRegistry("resume_input_adapters"),

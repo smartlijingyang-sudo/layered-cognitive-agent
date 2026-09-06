@@ -31,6 +31,9 @@ from lca.plugins.transport.webserver.handlers.runs.terminal.failure.failure impo
     RunFailureFacts,
     record_run_failure,
 )
+from lca.plugins.transport.webserver.handlers.runs.terminal.observation import (
+    emit_carrier_run_failed,
+)
 from lca.plugins.transport.webserver.handlers.runs.terminal.outcome.outcome import RunOutcomeApplier
 from lca.plugins.transport.webserver.handlers.runs.terminal.terminalizer.terminalizer import (
     RunTerminalizer,
@@ -137,9 +140,14 @@ class RunLifecycleCoordinator:
                     trace_id=session.trace_id,
                 )
             )
+            emit_carrier_run_failed(
+                session,
+                hub=hub,
+                user_message=session.error,
+                exception_class=type(exc).__name__,
+            )
             emit_carrier_exception_finally(
                 boundary="lifecycle.execute",
-                run_id=session.run_id,
                 trace_id=session.trace_id,
             )
         except asyncio.CancelledError:
@@ -165,9 +173,14 @@ class RunLifecycleCoordinator:
                     trace_id=session.trace_id,
                 )
             )
+            emit_carrier_run_failed(
+                session,
+                hub=hub,
+                user_message=session.error,
+                exception_class=type(exc).__name__,
+            )
             emit_carrier_exception_finally(
                 boundary="lifecycle.execute",
-                run_id=session.run_id,
                 trace_id=session.trace_id,
             )
         finally:
@@ -219,6 +232,24 @@ class RunLifecycleCoordinator:
             )
             session.error = self._format_exception(exc, session)
             self._record_failure(session, exc, session.hub)
+            from lca.infrastructure.observability.spine.exception.emit import (
+                emit_exception_caught,
+            )
+
+            emit_exception_caught(
+                exc_to_record(
+                    exc,
+                    boundary="lifecycle.resume",
+                    run_id=session.run_id,
+                    trace_id=session.trace_id,
+                )
+            )
+            emit_carrier_run_failed(
+                session,
+                hub=session.hub,
+                user_message=session.error,
+                exception_class=type(exc).__name__,
+            )
         finally:
             await self._finish_or_pause(session, workspace=None, success=success)
 

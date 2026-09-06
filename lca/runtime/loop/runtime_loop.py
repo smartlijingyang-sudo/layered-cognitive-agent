@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from lca.infrastructure.observability.spine.event.record import Outcome
 
-from lca.contracts.atoms.enums.enums import HookEvent
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.conversation.conversation import PRIOR_CONVERSATION_WM_KEY
 from lca.contracts.models.core.execution.result import Result
@@ -183,7 +182,6 @@ class CognitiveRuntime(Runtime):
         begin_turn()
         accept_user_message(message_id=f"task:{trace_id}", content=task)
         await self._lifecycle.publish(RuntimeLifecycleEventType.STARTED, state)
-        await self.hooks.trigger(HookEvent.ON_START.value, state)
         return await self._run_driver(state, runner=lambda: self._bindings.new_driver().run(state))
 
     async def _publish_terminal_event(self, state: object, result: Result) -> None:

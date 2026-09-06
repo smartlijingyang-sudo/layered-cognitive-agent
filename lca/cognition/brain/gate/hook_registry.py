@@ -18,19 +18,15 @@ from typing import Any
 import structlog
 
 from lca.contracts.atoms.enums.enums import HookEvent
-from lca.contracts.atoms.telemetry.telemetry import ATTR_STEP, HOOK_TO_PHASE_SPAN, SpanName
+from lca.contracts.atoms.telemetry.telemetry import ATTR_STEP, SpanName
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.models.observability.diagnostic.diagnostic import DiagnosticCategory
 from lca.contracts.protocols import HookRegistry
 from lca.infrastructure.observability import detached_span, set_actor
-from lca.infrastructure.session.commit.fact_committer import emit_diagnostic
 
 _log = structlog.get_logger(__name__)
 
 
 def _span_name_for_hook(event_name: str) -> str:
-    if event_name in HOOK_TO_PHASE_SPAN:
-        return HOOK_TO_PHASE_SPAN[event_name]
     if event_name == HookEvent.ON_ERROR:
         return SpanName.ERROR.value
     return f"hook.{event_name}"
@@ -110,16 +106,6 @@ class CordisHookRegistry(HookRegistry):
         # payloads; we fold state + kwargs into a single envelope so the
         # listener signature stays uniform across all 5 dispatch modes.
         envelope = {"event_name": event_name, "state": state, **kwargs}
-        emit_diagnostic(
-            category=DiagnosticCategory.HOOK.value,
-            operation="hook.trigger",
-            plugin="hook_registry.simple",
-            attributes={
-                "hook_event": event_name,
-                "listener_namespace": _hook_event_name(event_name),
-                "state_step": state.step,
-            },
-        )
         with detached_span(_span_name_for_hook(event_name), **attrs):
             return await self._ctx.events.serial(_hook_event_name(event_name), envelope)
 
