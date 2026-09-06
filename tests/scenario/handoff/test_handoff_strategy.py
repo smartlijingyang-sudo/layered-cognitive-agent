@@ -203,7 +203,7 @@ class TestHandoffRuntimeStop(unittest.IsolatedAsyncioTestCase):
     async def test_runtime_stops_on_handoff(self) -> None:
         """handoff action 应触发 StopPolicy 返回 should_stop=True。"""
         from lca.plugins.journal.artifact.closure_provider import DefaultArtifactClosure
-        from lca.plugins.phase_graph.stop.policy import DefaultStopPolicy
+        from lca.plugins.loop.state.stop_policy.plugin import DefaultStopPolicy
 
         brain = MagicMock()
         body = MagicMock()

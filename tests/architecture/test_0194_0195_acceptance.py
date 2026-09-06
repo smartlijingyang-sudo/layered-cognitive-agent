@@ -26,7 +26,7 @@ _DECLARATIVE_BUNDLE_PATHS = (
 _ALLOWED_DECLARATIVE_PHASE_GRAPH_MODULES: frozenset[str] = frozenset()
 
 # rg-equivalent baseline; decrease intentionally → lower constant + note in PR.
-_WEB_APP_PHASE_GRAPH_MODULE_BASELINE = 1
+_WEB_APP_PHASE_GRAPH_MODULE_BASELINE = 0
 
 
 def _extract_module_path(line: str) -> str | None:

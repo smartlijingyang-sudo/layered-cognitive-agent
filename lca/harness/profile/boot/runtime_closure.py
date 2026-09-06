@@ -91,7 +91,7 @@ _RUNTIME_CLOSURE_CATALOG: tuple[RuntimeClosureRequirement, ...] = (
     ),
     RuntimeClosureRequirement(
         "stop_policy",
-        "lca.plugins.phase_graph.stop.policy",
+        "lca.plugins.loop.state.stop_policy.plugin",
     ),
     RuntimeClosureRequirement(
         "reducer",

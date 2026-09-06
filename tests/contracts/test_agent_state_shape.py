@@ -69,7 +69,7 @@ def test_harness_projection_agent_state_does_not_write_final_output() -> None:
 def test_stop_policy_does_not_read_state_final_output() -> None:
     """stop_policy.py 不含 state.final_output 读取(迁移到 StopDecision.final_output 或 TerminalOutcome)。"""
 
-    import lca.plugins.phase_graph.stop.policy as stop_policy_module
+    import lca.plugins.loop.state.stop_policy.plugin as stop_policy_module
 
     src = stop_policy_module.__file__ or ""
     with open(src, encoding="utf-8") as fh:
