@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from lca.contracts.observability.loop_cursor import PhaseName
 from lca.contracts.observability.meta_event_taxonomy import (
     DEBUG_RUN_META_FAMILIES,
     META_EVENT_PRODUCER_SEAMS,
@@ -12,6 +13,19 @@ from lca.contracts.observability.meta_event_taxonomy import (
     classify_spine_event_key,
 )
 from lca.contracts.observability.skill_meta_ep_closure import SKILL_META_EVENT_POINTS
+
+
+def test_phase_name_has_six_semantic_phases_without_gate() -> None:
+    """ADR-0194 P2-01: Gate is Think sub-chain; not a loop-cursor graph node."""
+    assert set(PhaseName.__args__) == {
+        "perceive",
+        "think",
+        "act",
+        "reflect",
+        "remember",
+        "stop",
+    }
+    assert "gate" not in PhaseName.__args__
 
 
 def test_skill_spine_closure_matches_taxonomy() -> None:

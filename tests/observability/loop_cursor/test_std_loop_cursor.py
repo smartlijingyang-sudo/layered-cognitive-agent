@@ -89,13 +89,12 @@ def test_advance_emits_phase_fold_ep() -> None:
 
 def test_full_phase_chain_emits_phase_folds() -> None:
     c, spine = _make_cursor()
-    for phase in ("perceive", "think", "gate", "act", "reflect", "stop"):
+    for phase in ("perceive", "think", "act", "reflect", "stop"):
         c.advance(phase)  # type: ignore[arg-type]
     eps = [r["execution_point"] for r in spine.records]
     assert eps == [
         "phase.perceive.fold",
         "phase.think.fold",
-        "phase.gate.fold",
         "phase.act.fold",
         "phase.reflect.fold",
         "phase.stop.fold",

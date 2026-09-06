@@ -20,7 +20,7 @@ itself (ADR-0184 D6): ``record_request_header`` / ``open_step`` open a
 step, ``advance("stop")`` / ``close`` close it. The stub spine is a plain
 recorder for those EPs. Segment boundaries (``writable.segment.*``) still
 mirror the legacy ``CoordinatorAdapter`` semantics (think window open /
-gate close) because segment emission has not moved onto the cursor.
+act close) because segment emission has not moved onto the cursor.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ class _StubSpine:
     (ADR-0169 PR-15 PersistenceCoordinator integration), because
     ``writable.segment.*`` emission has not moved onto the cursor:
         - ``phase.think.fold`` → opens a segment.
-        - ``phase.gate.fold`` (leaving THINK) → closes the open segment.
+        - ``phase.act.fold`` (leaving THINK) → closes the open segment.
 
     For ``writable.iteration.closing``: legacy ordering is
     ``segment.end → closing`` (close path first closes any open segment,
@@ -111,7 +111,7 @@ class _StubSpine:
                 }
             )
         # segment end (leaving THINK)
-        elif execution_point == "phase.gate.fold" and self._segment_open:
+        elif execution_point == "phase.act.fold" and self._segment_open:
             self._segment_open = False
             self.records.append(
                 {
@@ -162,7 +162,7 @@ def _count(spine: _StubSpine, name: str) -> int:
 def test_segment_start_emitted_when_phase_window_opens() -> None:
     """verify:writable.segment.start EP 在 phase window 开启时(think.fold)被 emit。
 
-    走 1 个 iteration:perceive → think → gate → act → reflect → stop。
+    走 1 个 iteration:perceive → think → act → reflect → stop。
     - 走到 ``phase.think.fold`` 时 spine 必出现一条 ``writable.segment.start``。
     - segment.start 必须在 records 中出现在 ``phase.think.fold`` 之后。
     """
@@ -189,26 +189,26 @@ def test_segment_start_emitted_when_phase_window_opens() -> None:
 
 
 def test_segment_end_emitted_when_phase_window_closes() -> None:
-    """verify:writable.segment.end EP 在 phase window 关闭时(gate.fold)被 emit。
+    """verify:writable.segment.end EP 在 phase window 关闭时(act.fold)被 emit。
 
-    走 1 个 iteration:perceive → think → gate → act → reflect → stop。
-    - 走到 ``phase.gate.fold`` 时 spine 必出现一条 ``writable.segment.end``。
-    - segment.end 必须在 records 中出现在 ``phase.gate.fold`` 之后。
+    走 1 个 iteration:perceive → think → act → reflect → stop。
+    - 走到 ``phase.act.fold`` 时 spine 必出现一条 ``writable.segment.end``。
+    - segment.end 必须在 records 中出现在 ``phase.act.fold`` 之后。
     """
     c, spine = _make_cursor()
-    for phase in ("perceive", "think", "gate"):
+    for phase in ("perceive", "think", "act"):
         c.advance(phase)  # type: ignore[arg-type]
     # 此时 segment.end 必已 emit
     assert _count(spine, "writable.segment.end") == 1, (
-        "writable.segment.end must be emitted on phase.gate.fold (leaving THINK)"
+        "writable.segment.end must be emitted on phase.act.fold (leaving THINK)"
     )
-    gate_idx = next(
-        i for i, r in enumerate(spine.records) if r["execution_point"] == "phase.gate.fold"
+    act_idx = next(
+        i for i, r in enumerate(spine.records) if r["execution_point"] == "phase.act.fold"
     )
     seg_end_idx = next(
         i for i, r in enumerate(spine.records) if r["execution_point"] == "writable.segment.end"
     )
-    assert seg_end_idx > gate_idx, "writable.segment.end must come after phase.gate.fold in records"
+    assert seg_end_idx > act_idx, "writable.segment.end must come after phase.act.fold in records"
 
 
 def test_count_segment_start_equals_count_segment_end_three_phases() -> None:
@@ -218,9 +218,9 @@ def test_count_segment_start_equals_count_segment_end_three_phases() -> None:
     begin/end EP 数严格相等。
     """
     c, spine = _make_cursor()
-    # 3 个完整 iteration,每轮 think → gate → act → reflect → stop
+    # 3 个完整 iteration,每轮 think → act → reflect → stop
     for _ in range(3):
-        for phase in ("perceive", "think", "gate", "act", "reflect", "stop"):
+        for phase in ("perceive", "think", "act", "reflect", "stop"):
             c.advance(phase)  # type: ignore[arg-type]
     starts = _count(spine, "writable.segment.start")
     ends = _count(spine, "writable.segment.end")
@@ -241,7 +241,7 @@ def test_segment_begin_end_pairing_with_record_request_header() -> None:
         c.advance("perceive")
         c.advance("think")
         c.record_request_header(_req_header(f"step-{i}"))
-        for phase in ("gate", "act", "reflect", "stop"):
+        for phase in ("act", "reflect", "stop"):
             c.advance(phase)  # type: ignore[arg-type]
     c.close("completed")
 
@@ -255,13 +255,13 @@ def test_segment_begin_end_pairing_with_record_request_header() -> None:
 def test_segment_close_on_cursor_close_balances_open_segments() -> None:
     """verify:cursor.close() 在中途(segment 未关)时,close EP 强制平衡 segment。
 
-    走 2 轮 iteration,最后一轮只到 think(不走到 gate),然后 close;
+    走 2 轮 iteration,最后一轮只到 think(不走到 act),然后 close;
     close 路径必须 emit 缺失的 segment.end + step.end,使最终
     count(start) == count(end)。
     """
     c, spine = _make_cursor()
     # iteration 1 走完整
-    for phase in ("perceive", "think", "gate", "act", "reflect", "stop"):
+    for phase in ("perceive", "think", "act", "reflect", "stop"):
         c.advance(phase)  # type: ignore[arg-type]
     # iteration 2 只走到 think(segment 开但未关)
     for phase in ("perceive", "think"):

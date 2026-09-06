@@ -22,6 +22,7 @@ from lca.infrastructure.session.cognitive_emit import (
     emit_context_manifested_for_state,
     emit_gate_decided_from_policy,
     run_brain_think_with_spine_facts,
+    run_reasoner_generate_thoughts_with_spine_facts,
 )
 from lca.loop.fact_gateway import publish_ep_bound, reset_fact_gateway_env
 from lca.plugins.events.publishers._session_publish import (
@@ -270,6 +271,74 @@ async def test_run_brain_think_with_spine_facts_emits_failure_on_error() -> None
         ]
         assert len(events) == 1
         assert events[0].data["payload"]["outcome"] == "failure"
+    finally:
+        reset_fact_gateway_env()
+        reset_publish_session(token)
+
+
+@pytest.mark.asyncio
+async def test_run_reasoner_generate_thoughts_emits_prompt_assembler_eps() -> None:
+    from lca.cognition.brain.reasoner import PromptReasoner
+    from lca.contracts.models.core.llm import LLMResponse
+    from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
+    from lca.contracts.protocols import LLMAdapter
+
+    class _NoopLLM(LLMAdapter):
+        async def complete(self, prompt: str, **kwargs: object) -> LLMResponse:
+            return LLMResponse(text="ok", model="test")
+
+        def stream(self, prompt: str, **kwargs: object):
+            async def _gen():
+                if False:
+                    yield None
+                return
+
+            return _gen()
+
+    session = Session("reasoner_spine")
+    token = set_publish_session(session)
+    reset_fact_gateway_env(enabled=True)
+    try:
+        state = _state()
+        reasoner = PromptReasoner(
+            llm=_NoopLLM(),
+            role_profile=RoleProfile(
+                role="r",
+                goal="g",
+                backstory="b",
+                tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
+            ),
+            tools_desc="(无)",
+            templates={"react_prompt": "task={task}"},
+        )
+        response = await run_reasoner_generate_thoughts_with_spine_facts(reasoner, state)
+        assert response.text == "ok"
+        starts = [
+            event
+            for event in session.snapshot_events()
+            if event.type == "spine.cognition.prompt_assembler.assemble.start"
+        ]
+        ends = [
+            event
+            for event in session.snapshot_events()
+            if event.type == "spine.cognition.prompt_assembler.assemble.end"
+        ]
+        reason_starts = [
+            event
+            for event in session.snapshot_events()
+            if event.type == "spine.cognition.reasoner.reason.start"
+        ]
+        reason_ends = [
+            event
+            for event in session.snapshot_events()
+            if event.type == "spine.cognition.reasoner.reason.end"
+        ]
+        assert len(starts) == 1
+        assert len(ends) == 1
+        assert len(reason_starts) == 1
+        assert len(reason_ends) == 1
+        assert ends[0].data["payload"]["outcome"] == "success"
+        assert reason_ends[0].data["payload"]["outcome"] == "success"
     finally:
         reset_fact_gateway_env()
         reset_publish_session(token)

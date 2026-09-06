@@ -82,7 +82,7 @@ class _StubSpine:
           发射(ADR-0184 D6),stub 原样记录,不注入。
         - first ``phase.think.fold`` → emit ``writable.segment.start``
           (legacy ``coord.begin_segment`` for THINK segment).
-        - ``phase.gate.fold`` (closing THINK segment) → emit
+        - ``phase.act.fold`` (leaving THINK segment) → emit
           ``writable.segment.end``.
         - ``writable.iteration.closing`` → close any open segment.
 
@@ -127,7 +127,7 @@ class _StubSpine:
                     "phase": phase,
                 }
             )
-        elif execution_point == "phase.gate.fold" and self._segment_open:
+        elif execution_point == "phase.act.fold" and self._segment_open:
             self._segment_open = False
             self.records.append(
                 {
@@ -197,8 +197,7 @@ def _req_header(step_id: str = "step-001", inc: int = 1) -> RequestHeader:
 _D2_ALLOWED_TRANSITIONS: dict[PhaseName | None, frozenset[PhaseName]] = {
     None: frozenset({"perceive"}),
     "perceive": frozenset({"think"}),
-    "think": frozenset({"gate"}),
-    "gate": frozenset({"act"}),
+    "think": frozenset({"act"}),
     "act": frozenset({"reflect"}),
     "reflect": frozenset({"stop"}),
     "stop": frozenset({"perceive"}),  # new iteration
@@ -328,13 +327,13 @@ def test_l1_step_begin_end_count_parity_across_two_iterations() -> None:
     for phase in ("perceive", "think"):
         c.advance(phase)  # type: ignore[arg-type]
     c.record_request_header(_req_header("step-001"))
-    for phase in ("gate", "act", "reflect", "stop"):
+    for phase in ("act", "reflect", "stop"):
         c.advance(phase)  # type: ignore[arg-type]
     # iteration 2
     for phase in ("perceive", "think"):
         c.advance(phase)  # type: ignore[arg-type]
     c.record_request_header(_req_header("step-002"))
-    for phase in ("gate", "act", "reflect", "stop"):
+    for phase in ("act", "reflect", "stop"):
         c.advance(phase)  # type: ignore[arg-type]
     c.close("completed")
 
@@ -353,9 +352,9 @@ def test_l1_step_begin_end_count_parity_across_two_iterations() -> None:
 def test_l2_segment_begin_end_count_parity_across_two_iterations() -> None:
     """L2:每个 ``writable.segment.start`` 必须配对一个 ``writable.segment.end``。"""
     c, spine = _make_cursor()
-    for phase in ("perceive", "think", "gate", "act", "reflect", "stop"):
+    for phase in ("perceive", "think", "act", "reflect", "stop"):
         c.advance(phase)  # type: ignore[arg-type]
-    for phase in ("perceive", "think", "gate", "act", "reflect", "stop"):
+    for phase in ("perceive", "think", "act", "reflect", "stop"):
         c.advance(phase)  # type: ignore[arg-type]
     c.close("completed")
 
@@ -372,7 +371,7 @@ def test_l2_segment_begin_end_count_parity_across_two_iterations() -> None:
 
 
 def test_l3_perceive_to_act_skip_raises_cursor_error() -> None:
-    """L3:D2 转移图不允许跨阶段跳跃;perceive → act 跳过 think / gate 必须抛。"""
+    """L3:D2 转移图不允许跨阶段跳跃;perceive → act 跳过 think 必须抛。"""
     c = _make_strict_cursor()
     c.advance("perceive")
     with pytest.raises(CursorError) as excinfo:
@@ -380,20 +379,19 @@ def test_l3_perceive_to_act_skip_raises_cursor_error() -> None:
     assert "D2 transfer violation" in str(excinfo.value)
 
 
-def test_l3_think_to_act_skip_raises_cursor_error() -> None:
-    """L3:think → act(跳过 gate)也必须抛 — D2 转移图钉死。"""
+def test_l3_think_to_act_is_valid_transition() -> None:
+    """L3:think → act 是 D2 合法转移(Gate 为 Think 子链,非 graph node)。"""
     c = _make_strict_cursor()
     c.advance("perceive")
     c.advance("think")
-    with pytest.raises(CursorError) as excinfo:
-        c.advance("act")
-    assert "D2 transfer violation" in str(excinfo.value)
+    snap = c.advance("act")
+    assert snap.phase == "act"
 
 
 def test_l3_full_transfer_sequence_succeeds() -> None:
-    """L3:D2 完整链 perceive → think → gate → act → reflect → stop 全部成功。"""
+    """L3:D2 完整链 perceive → think → act → reflect → stop 全部成功。"""
     c = _make_strict_cursor()
-    for phase in ("perceive", "think", "gate", "act", "reflect", "stop"):
+    for phase in ("perceive", "think", "act", "reflect", "stop"):
         snap = c.advance(phase)  # type: ignore[arg-type]
     assert snap.phase == "stop"
     # stop → perceive 触发新 iteration(permitted by D2)
@@ -409,12 +407,12 @@ def test_l3_phase_fold_order_is_recorded_in_order() -> None:
     c, spine = _make_cursor()
     c.advance("perceive")
     c.advance("think")
-    c.advance("gate")
+    c.advance("act")
     fold_eps = [ep for ep in _eps(spine) if ep.endswith(".fold")]
     assert fold_eps == [
         "phase.perceive.fold",
         "phase.think.fold",
-        "phase.gate.fold",
+        "phase.act.fold",
     ]
 
 
@@ -470,7 +468,7 @@ def test_l5_record_timing_combined_with_phase_advance() -> None:
     )
 
     # (3) 离开 THINK → record_thinking 必抛
-    c.advance("gate")
+    c.advance("act")
     with pytest.raises(CursorError):
         c.record_thinking(
             ThinkingRecord(
@@ -482,7 +480,6 @@ def test_l5_record_timing_combined_with_phase_advance() -> None:
         )
 
     # (2) ACT 窗口允许 record_tool_call / record_tool_result
-    c.advance("act")
     c.record_tool_call(
         ToolCallRecord(
             tool_name="t",
@@ -529,7 +526,7 @@ def test_l6_record_request_header_increments_step_index_per_call() -> None:
     c.record_request_header(_req_header("step-001"))
     assert c.snapshot.step_index == 1
     # step 2(回到 think 后再调用)
-    c.advance("gate")
+    c.advance("act")
     c.advance("act")
     c.advance("reflect")
     c.advance("stop")
@@ -539,7 +536,7 @@ def test_l6_record_request_header_increments_step_index_per_call() -> None:
     # 注意:stop → perceive 重置 step_index = 0,第二次调用后再次 +1
     assert c.snapshot.step_index == 1, "step_index resets on iteration boundary (ADR-0169 D1)"
     # step 3
-    c.advance("gate")
+    c.advance("act")
     c.advance("act")
     c.advance("reflect")
     c.advance("stop")
@@ -576,7 +573,7 @@ def test_l7_close_emits_closing_ep_last() -> None:
     由后续 PR 处理,本测试只验证 cursor.close 端的 EP 序列)。
     """
     c, spine = _make_cursor()
-    for phase in ("perceive", "think", "gate", "act", "reflect", "stop"):
+    for phase in ("perceive", "think", "act", "reflect", "stop"):
         c.advance(phase)  # type: ignore[arg-type]
     c.close("completed")
 
@@ -617,7 +614,7 @@ def test_l8_iteration_and_attempt_in_step_independent_monotonic() -> None:
         c.advance(phase)  # type: ignore[arg-type]
     c.record_request_header(_req_header("a"))
     attempts.append(c.snapshot.attempt_in_step)
-    for phase in ("gate", "act", "reflect", "stop"):
+    for phase in ("act", "reflect", "stop"):
         c.advance(phase)  # type: ignore[arg-type]
     c.advance("perceive")  # stop → perceive triggers iteration++
     iterations.append(c.snapshot.iteration)
@@ -626,7 +623,7 @@ def test_l8_iteration_and_attempt_in_step_independent_monotonic() -> None:
     c.advance("think")
     c.record_request_header(_req_header("b"))
     attempts.append(c.snapshot.attempt_in_step)
-    for phase in ("gate", "act", "reflect", "stop"):
+    for phase in ("act", "reflect", "stop"):
         c.advance(phase)  # type: ignore[arg-type]
     c.advance("perceive")
     iterations.append(c.snapshot.iteration)
@@ -842,11 +839,10 @@ def test_i_proj_5_std_loop_cursor_field_whitelist_stable() -> None:
 
 
 def test_phase_name_closed_set_is_stable() -> None:
-    """C1 不变量:PhaseName Literal 闭集 = 7 phase;不允许运行时扩展。"""
+    """C1 不变量:PhaseName Literal 闭集 = 6 phase;不允许运行时扩展。"""
     assert set(PhaseName.__args__) == {
         "perceive",
         "think",
-        "gate",
         "act",
         "reflect",
         "remember",

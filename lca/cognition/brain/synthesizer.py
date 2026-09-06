@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import contextlib
+
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import Result
 from lca.contracts.models.core.state import Budget
 from lca.contracts.protocols import Synthesizer
+from lca.infrastructure.session.cognitive_emit import emit_synthesizer_merge_for_state
 
 
 class ConcatSynthesizer(Synthesizer):
@@ -19,20 +22,17 @@ class ConcatSynthesizer(Synthesizer):
         self._separator = separator
 
     async def synthesize(self, objective: str, candidates: list[Result]) -> Result:
-        # PR-3.2: spine envelope for the synthesizer.merge execution point.
-        from lca.plugins.events.publishers.spine_reflector_cognition import (
-            emit_synthesizer_merge,
-        )
-
         state_id = candidates[0].trace_id if candidates else objective
+        candidate_count = len(candidates)
         try:
             if not candidates:
                 result = Result.failed("No candidates to synthesize")
-                emit_synthesizer_merge(
-                    state_id=state_id,
-                    candidate_count=0,
-                    outcome="success",
-                )
+                with contextlib.suppress(Exception):
+                    emit_synthesizer_merge_for_state(
+                        state_id=state_id,
+                        candidate_count=0,
+                        outcome="success",
+                    )
                 return result
 
             outputs: list[str] = []
@@ -66,15 +66,17 @@ class ConcatSynthesizer(Synthesizer):
                 extra={"synthesis_method": "concat", "candidate_count": len(candidates)},
             )
         except BaseException:
-            emit_synthesizer_merge(
-                state_id=state_id,
-                candidate_count=len(candidates),
-                outcome="failure",
-            )
+            with contextlib.suppress(Exception):
+                emit_synthesizer_merge_for_state(
+                    state_id=state_id,
+                    candidate_count=candidate_count,
+                    outcome="failure",
+                )
             raise
-        emit_synthesizer_merge(
-            state_id=state_id,
-            candidate_count=len(candidates),
-            outcome="success",
-        )
+        with contextlib.suppress(Exception):
+            emit_synthesizer_merge_for_state(
+                state_id=state_id,
+                candidate_count=candidate_count,
+                outcome="success",
+            )
         return result

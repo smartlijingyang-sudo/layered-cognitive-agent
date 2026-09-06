@@ -7,7 +7,7 @@
 本测试记录已知 offenders 为 baseline,仅对**新增**违规文件 fail-fast;
 清零后移除 ``@pytest.mark.xfail`` 的 strict 目标测试。
 
-当前 baseline(2026-09-06,P0-07 骨架,P1-13): 10 files — 见 ``_BASELINE_OFFENDERS``。
+当前 baseline(2026-09-06,P0-07 骨架,P1-11): 4 files — 见 ``_BASELINE_OFFENDERS``。
 """
 
 from __future__ import annotations
@@ -32,16 +32,10 @@ _FORBIDDEN_PATTERNS: tuple[str, ...] = (
 # 已知债:迁移至 ``lca/loop/fact_gateway`` 前不得新增。
 _BASELINE_OFFENDERS: frozenset[str] = frozenset(
     {
-        "lca/cognition/_spine_envelope.py",
         "lca/cognition/body/action_handlers.py",
         "lca/cognition/body/delegation_cache.py",
         "lca/cognition/body/safe_executor.py",
         "lca/cognition/body/team_message_tool.py",
-        "lca/cognition/body/tool_journal_emit.py",
-        "lca/cognition/brain/null_critic.py",
-        "lca/cognition/brain/reasoner.py",
-        "lca/cognition/brain/skill_router.py",
-        "lca/cognition/brain/synthesizer.py",
     }
 )
 
@@ -88,7 +82,7 @@ def test_cognition_no_new_fact_production_imports() -> None:
 
 @pytest.mark.xfail(
     strict=False,
-    reason="existing offenders: 10 files — see _BASELINE_OFFENDERS for roadmap",
+    reason="existing offenders: 4 files — see _BASELINE_OFFENDERS for roadmap",
 )
 def test_cognition_has_no_fact_production_imports_strict() -> None:
     """strict 目标:offenders 清零后 xpass,随后移除 xfail marker。"""

@@ -47,7 +47,7 @@ class CordisEventTableEntry:
 #
 # - writable.{step,segment,iteration}.{start,end,...} (L1, L2, L16)
 # - step.{thinking.record,tool_call.record,tool_result.record}
-# - phase.<name>.fold(for all 7 PhaseName)
+# - phase.<name>.fold(for all 6 PhaseName)
 # - llm.request.header
 #
 # Future PR 可向本表追加条目;**禁止**业务 / plugin 代码直接
@@ -100,7 +100,7 @@ _CORDIS_EVENT_TABLE_ENTRIES: Final[tuple[CordisEventTableEntry, ...]] = (
         execution_point="step.tool_result.record",
         cordis_name="agent.step.tool_result.record",
     ),
-    # ── phase.<name>.fold  (all 7 PhaseName,ADR-0169 D2) ──────────
+    # ── phase.<name>.fold  (all 6 PhaseName,ADR-0194 §1.3) ────────
     *[
         CordisEventTableEntry(
             execution_point=f"phase.{phase}.fold",

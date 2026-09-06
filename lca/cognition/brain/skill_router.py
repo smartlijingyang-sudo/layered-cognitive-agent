@@ -2,22 +2,31 @@
 
 from __future__ import annotations
 
+import contextlib
+
 from lca.contracts.harness.memory.events import SkillRouted
 from lca.contracts.harness.memory.skill import SkillEventSink
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import SkillRouter
+from lca.infrastructure.observability.meta_event_emit import emit_skill_routed
+from lca.infrastructure.session.cognitive_emit import emit_skill_router_route_for_state
 
 
-def _safe_spine_route(**kwargs: object) -> None:
+def _safe_spine_route(
+    *,
+    state_id: str,
+    template: str,
+    decision_path: str,
+    outcome: str,
+) -> None:
     """Best-effort spine envelope; routing must continue when publish is unauthorized."""
-    from lca.plugins.events.publishers.spine_reflector_cognition import (
-        emit_skill_router_route,
-    )
-
-    try:
-        emit_skill_router_route(**kwargs)  # type: ignore[arg-type]
-    except Exception:  # INTENTIONAL: L10 spine mirror must not block routing
-        return
+    with contextlib.suppress(Exception):
+        emit_skill_router_route_for_state(
+            state_id=state_id,
+            template=template,
+            decision_path=decision_path,
+            outcome=outcome,
+        )
 
 
 async def _emit_session_routed(
@@ -26,11 +35,9 @@ async def _emit_session_routed(
     """把一次路由决定写为 ``skill.routed.v1`` Session 事实。
 
     未注入 sink 时为 no-op（cognition 层不硬依赖 SessionStore）。
-    时序：在对应 ``emit_skill_router_route`` spine 信封之后调用。
+    时序：在对应 ``skill_router.route`` spine 信封之后调用。
     失败语义：sink append 抛错时向 ``route()`` 调用方传播。
     """
-    from lca.infrastructure.observability.meta_event_emit import emit_skill_routed
-
     emit_skill_routed(template_id=template_id, decision_path=decision_path)
     if session_events is None:
         return

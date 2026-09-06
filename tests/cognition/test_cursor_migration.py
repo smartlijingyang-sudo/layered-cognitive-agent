@@ -19,15 +19,12 @@ import inspect
 import re
 from dataclasses import dataclass, field
 
-import pytest
-
 from lca.cognition.body.safe_executor import (
     _record_tool_call_evidence,
     _record_tool_result_evidence,
 )
 from lca.contracts.observability.incarnation import Incarnation
 from lca.contracts.observability.loop_cursor import (
-    CursorError,
     CursorSnapshot,
 )
 from lca.infrastructure.observability.loop_cursor import StdLoopCursor
@@ -192,61 +189,73 @@ def _strip_docstrings_and_comments(source: str) -> str:
 
 
 def test_tool_journal_emit_routes_start_through_cursor_record_tool_call() -> None:
-    """``emit_tool_started`` 经 cursor.record_tool_call / CursorRecord 落 evidence EP。
+    """``record_tool_started_observability`` 经 CursorRecord 落 evidence EP。
 
     ADR-0169 PR-1/S1 + SSOT 收口:cursor 是 spine writer 唯一入口。ToolCallRecord
     构造在 CursorRecord 内部;helper 只透传字段。
     """
     from lca.cognition.body import tool_journal_emit
 
-    source_started = inspect.getsource(tool_journal_emit.emit_tool_started)
+    source_started = inspect.getsource(tool_journal_emit.record_tool_started_observability)
     body = _strip_docstrings_and_comments(source_started)
     assert (
         "cursor.record_tool_call" in body
         or "CursorRecord.try_record_tool_call" in body
     ), (
-        "emit_tool_started must route through cursor.record_tool_call "
+        "record_tool_started_observability must route through cursor.record_tool_call "
         "(directly or via CursorRecord wrapper; ADR-0169 SSOT)"
     )
-    assert "coord.emit" not in body, "emit_tool_started no longer calls coord.emit (ADR-0169 §D9)"
-    assert "_emit_phase_tool_call_start" in body, (
-        "emit_tool_started mirrors phase.tool.call.start for journal trace / debug-run"
+    assert "coord.emit" not in body
+    from lca.cognition.body import safe_executor
+
+    source_commit = inspect.getsource(safe_executor._commit_tool_started)
+    commit_body = _strip_docstrings_and_comments(source_commit)
+    assert "commit_tool_phase_call_start" in commit_body, (
+        "_commit_tool_started must commit phase.tool.call.start via loop seam"
     )
 
 
 def test_tool_journal_emit_routes_end_through_cursor_record_tool_result() -> None:
-    """``emit_tool_invoked`` 经 cursor.record_tool_result 落 evidence EP。"""
+    """``record_tool_invoked_observability`` 经 cursor.record_tool_result 落 evidence EP。"""
     from lca.cognition.body import tool_journal_emit
 
-    source_invoked = inspect.getsource(tool_journal_emit.emit_tool_invoked)
+    source_invoked = inspect.getsource(tool_journal_emit.record_tool_invoked_observability)
     body = _strip_docstrings_and_comments(source_invoked)
     assert (
         "cursor.record_tool_result" in body
         or "CursorRecord.try_record_tool_result" in body
     ), (
-        "emit_tool_invoked must route through cursor.record_tool_result "
+        "record_tool_invoked_observability must route through cursor.record_tool_result "
         "(directly or via CursorRecord wrapper; ADR-0169 SSOT)"
     )
     assert "coord.emit" not in body
-    assert "_emit_phase_tool_call_end" in body
+    from lca.cognition.body import safe_executor
+
+    source_commit = inspect.getsource(safe_executor._commit_tool_invoked)
+    commit_body = _strip_docstrings_and_comments(source_commit)
+    assert "commit_tool_phase_call_end" in commit_body
 
 
 def test_tool_journal_emit_routes_denied_through_cursor_record_tool_result() -> None:
-    """``emit_tool_denied`` 经 cursor.record_tool_result(outcome="denied") 落 evidence EP。"""
+    """``record_tool_denied_observability`` 经 cursor.record_tool_result(outcome="denied")。"""
     from lca.cognition.body import tool_journal_emit
 
-    source_denied = inspect.getsource(tool_journal_emit.emit_tool_denied)
+    source_denied = inspect.getsource(tool_journal_emit.record_tool_denied_observability)
     body = _strip_docstrings_and_comments(source_denied)
     assert (
         "cursor.record_tool_result" in body
         or "CursorRecord.try_record_tool_result" in body
     ), (
-        "emit_tool_denied must route through cursor.record_tool_result "
+        "record_tool_denied_observability must route through cursor.record_tool_result "
         "(directly or via CursorRecord wrapper; ADR-0169 SSOT)"
     )
     assert '"denied"' in body
     assert "coord.emit" not in body
-    assert "_emit_phase_tool_denied" in body
+    from lca.cognition.body import safe_executor
+
+    source_commit = inspect.getsource(safe_executor._commit_tool_denied)
+    commit_body = _strip_docstrings_and_comments(source_commit)
+    assert "commit_tool_phase_denied" in commit_body
 
 
 def test_tool_journal_emit_runtime_records_tool_call_ep_when_cursor_bound() -> None:

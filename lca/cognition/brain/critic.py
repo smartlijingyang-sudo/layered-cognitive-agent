@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.cognition._spine_envelope import with_spine_envelope
 from lca.contracts.atoms.enums import ReflectionVerdict
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.atoms.semantic_keys import (
@@ -16,6 +15,7 @@ from lca.contracts.atoms.semantic_keys import (
 from lca.contracts.models.core.decision import Observation, Reflection
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import Critic
+from lca.infrastructure.session.spine_envelope import with_spine_envelope
 
 _FAILURE_KIND_HINT: dict[str, str] = {
     FAILURE_KIND_VALIDATION: "参数不合法，请重复同一动作，须修正参数后重新调用",

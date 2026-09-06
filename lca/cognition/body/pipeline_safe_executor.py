@@ -114,10 +114,10 @@ class PipelineSafeExecutor(SafeExecutor):
 
     def _check_permission_and_args(self, tool: Tool, args: dict[str, Any]) -> ToolPreDecision:
         """Stage 1: 权限检查和参数校验。"""
-        from lca.cognition.body.safe_executor import emit_tool_denied
+        from lca.cognition.body.safe_executor import _commit_tool_denied
 
         if tool.name not in self.permission_manifest.allowed_tools:
-            emit_tool_denied(tool, "permission")
+            _commit_tool_denied(tool, "permission")
             return ToolPreDecision(
                 kind="deny",
                 reason=f"工具 {tool.name} 未在 ToolPermissionManifest.allowed_tools 中授权",
@@ -126,7 +126,7 @@ class PipelineSafeExecutor(SafeExecutor):
         # 参数校验
         validation_error = self._validate_args(tool, args)
         if validation_error is not None:
-            emit_tool_denied(tool, "validation")
+            _commit_tool_denied(tool, "validation")
             return ToolPreDecision(kind="deny", reason=validation_error)
 
         return ToolPreDecision(kind="allow")
@@ -431,9 +431,9 @@ class PipelineSafeExecutor(SafeExecutor):
         delegate routes through it so the boundary guard sees one
         emission site per event.
         """
-        from lca.cognition.body.safe_executor import emit_tool_invoked
+        from lca.cognition.body.safe_executor import _commit_tool_invoked
 
-        emit_tool_invoked(
+        _commit_tool_invoked(
             tool,
             args,
             obs,

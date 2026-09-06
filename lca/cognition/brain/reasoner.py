@@ -42,6 +42,7 @@ from lca.contracts.models.cognition.prompt_assembly import (
 # The sections-based pipeline replaces the inline implementation;
 # these helpers stay so characterization tests pin the exact text
 # shape. They are *not* used by PromptReasoner itself anymore.
+from lca.contracts.models.cognition.reasoner_turn import ReasonerTurnPlan, ReasonerTurnRender
 from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.models.core.perception import ContextManifest
 from lca.contracts.models.core.state import AgentState
@@ -188,66 +189,37 @@ class PromptReasoner:
     def register_template(self, name: str, template: str) -> None:
         self._legacy_templates[name] = template
 
-    async def generate_thoughts(self, state: AgentState) -> LLMResponse:
+    def build_turn_plan(self, state: AgentState) -> ReasonerTurnPlan:
+        """Pure pre-render metadata for spine ``prompt_assembler.assemble.start``."""
+        template_id, decision_path = self._select_template(state)
+        activated_skill_ids = tuple(skill.skill_id for skill in state.activated_skills)
+        sections_preview = tuple(self._template_section_names(template_id))
+        return ReasonerTurnPlan(
+            state_id=state.trace_id,
+            template_id=template_id,
+            decision_path=decision_path,
+            activated_skill_ids=activated_skill_ids,
+            tools_count=len(self.tools),
+            available_skills_count=self._available_skills_count_hint(),
+            sections_preview=sections_preview,
+            variant_preview=self._template_variant(template_id),
+        )
+
+    def render_turn(self, state: AgentState, plan: ReasonerTurnPlan) -> ReasonerTurnRender:
+        """Render the prompt and collect post-render spine metadata (no emit)."""
         from lca.contracts.models.core.perceive_projection import current_manifest_from_state
 
         manifest = current_manifest_from_state(state)
-        template_id, decision_path = self._select_template(state)
-        annotate(**{ATTR_PROMPT_TEMPLATE: template_id})
-
-        from lca.plugins.events.publishers.spine_reflector_cognition import (
-            emit_prompt_assembler_end,
-            emit_prompt_assembler_start,
-            emit_reasoner_reason_end,
-            emit_reasoner_reason_start,
+        prompt, trace, section_count = self._render_prompt(
+            state,
+            manifest=manifest,
+            template_id=plan.template_id,
+            decision_path=plan.decision_path,
         )
-
-        state_id = state.trace_id
-        # 渲染前的真实激活集（start EP 不再发空预览）；end EP 用
-        # trace.activated_skill_ids 权威覆盖。
-        activated_skill_ids: tuple[str, ...] = tuple(
-            skill.skill_id for skill in state.activated_skills
-        )
-        tools_count = len(self.tools)
-        available_skills_count = self._available_skills_count_hint()
-        # Sections preview from the template itself (available pre-render);
-        # end EP carries the authoritative section_outputs.
-        sections_preview: list[str] = self._template_section_names(template_id)
-        variant_preview = self._template_variant(template_id)
-        emit_prompt_assembler_start(
-            state_id=state_id,
-            template_id=template_id,
-            decision_path=decision_path,
-            sections=sections_preview or None,
-            activated_skills=list(activated_skill_ids) or None,
-            tools_count=tools_count,
-            available_skills_count=available_skills_count,
-            variant=variant_preview,
-        )
-        reasoner_prompt_token = None
-        try:
-            prompt, trace, section_count = self._render_prompt(
-                state,
-                manifest=manifest,
-                template_id=template_id,
-                decision_path=decision_path,
-            )
-        except BaseException:
-            emit_prompt_assembler_end(
-                state_id=state_id,
-                template_id=template_id,
-                section_count=0,
-                outcome="failure",
-                variant=variant_preview,
-            )
-            raise
         if trace is not None:
-            sections_preview = [s.name for s in trace.sections]
             activated_skill_ids = trace.activated_skill_ids
-            tools_count = trace.tools_count
-            available_skills_count = trace.available_skills_count
             total_chars = trace.total_chars
-            section_outputs = [
+            section_outputs = tuple(
                 {
                     "name": s.name,
                     "kind": s.kind,
@@ -261,58 +233,52 @@ class PromptReasoner:
                     "content_digest": _sha256_digest(s.text) if s.text else None,
                 }
                 for s in trace.sections
-            ]
-            reasoner_prompt_token = self._bind_reasoner_prompt(trace, manifest)
+            )
+            variant = trace.variant
         else:
+            activated_skill_ids = plan.activated_skill_ids
             total_chars = None
             section_outputs = None
-        emit_prompt_assembler_end(
-            state_id=state_id,
-            template_id=template_id,
+            variant = plan.variant_preview
+        return ReasonerTurnRender(
+            prompt=prompt,
+            trace=trace,
             section_count=section_count,
+            manifest=manifest,
+            activated_skill_ids=activated_skill_ids,
             section_outputs=section_outputs,
             total_chars=total_chars,
-            outcome="success",
-            variant=trace.variant if trace is not None else variant_preview,
+            variant=variant,
         )
-        if section_outputs:
-            from lca.infrastructure.observability.meta_event_emit import (
-                emit_prompt_sections_from_trace,
-            )
 
-            emit_prompt_sections_from_trace(
-                template_id=template_id,
-                sections=section_outputs,
-            )
-        if activated_skill_ids:
-            from lca.infrastructure.observability.meta_event_emit import emit_context_injected
-
-            for skill_id in activated_skill_ids:
-                emit_context_injected(
-                    source=f"skill:{skill_id}",
-                    content_ref=f"skill:{skill_id}@prompt",
-                    model_visible=True,
-                )
-
-        emit_reasoner_reason_start(state_id=state_id)
+    async def complete_turn(
+        self,
+        state: AgentState,
+        render: ReasonerTurnRender,
+    ) -> LLMResponse:
+        """Invoke the LLM for one rendered turn (ModelVisible bind stays here)."""
+        reasoner_prompt_token = None
+        if render.trace is not None:
+            reasoner_prompt_token = self._bind_reasoner_prompt(render.trace, render.manifest)
         try:
-            response = await execute_llm_turn(
+            return await execute_llm_turn(
                 self.llm,
                 self.tools,
-                prompt,
+                render.prompt,
                 step=state.step,
                 state=state,
                 task=state.task or "",
             )
-        except BaseException:
-            emit_reasoner_reason_end(state_id=state_id, outcome="failure")
+        finally:
             if reasoner_prompt_token is not None:
                 self._reset_reasoner_prompt(reasoner_prompt_token)
-            raise
-        emit_reasoner_reason_end(state_id=state_id, outcome="success")
-        if reasoner_prompt_token is not None:
-            self._reset_reasoner_prompt(reasoner_prompt_token)
-        return response
+
+    async def generate_thoughts(self, state: AgentState) -> LLMResponse:
+        """Render the prompt and call the LLM; spine EPs are emitted by the loop layer."""
+        plan = self.build_turn_plan(state)
+        annotate(**{ATTR_PROMPT_TEMPLATE: plan.template_id})
+        render = self.render_turn(state, plan)
+        return await self.complete_turn(state, render)
 
     def _select_template(self, state: AgentState) -> tuple[str, SelectorDecisionPath]:
         if self.selector is not None:
@@ -367,8 +333,8 @@ class PromptReasoner:
         """Return the names of sections a template references.
 
         Falls back to an empty list when no assembler/template_provider is
-        wired (legacy/test paths). Used by ``emit_prompt_assembler_start``
-        so the start EP carries a useful section preview before render.
+        wired (legacy/test paths). Used by ``build_turn_plan`` so the start EP
+        carries a useful section preview before render.
         """
         assembler = self.assembler
         if assembler is None:

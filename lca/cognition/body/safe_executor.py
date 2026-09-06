@@ -24,11 +24,9 @@ from lca.contracts.atoms.semantic_keys import (
 )
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.result import ApprovalPendingError, ToolExecutionError
-from lca.contracts.models.observability.journal import ApprovalRequested
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.contracts.observability.evidence import EvidenceRef
 from lca.contracts.protocols import SafeExecutor, Tool
-from lca.infrastructure.observability.journal_append import append_journal_event
 from lca.infrastructure.session.bindings import await_tool_side_effect_checkpoint
 from lca.infrastructure.tools.tool_invocation_scope import tool_invocation_scope
 
@@ -109,25 +107,101 @@ def _delta_summary_from_obs(observation: Any, *, limit: int = 200) -> str:
 
 
 from lca.cognition.body.tool_journal_emit import (  # noqa: E402
-    emit_tool_denied,
     emit_tool_invoked,
-    emit_tool_started,
+    prepare_tool_started,
+    record_tool_started_observability,
 )
-from lca.plugins.events.publishers.spine_reflector_body_llm import (
-    plugin as _body_llm_reflector,  # noqa: E402
+from lca.plugins.events.publishers.spine_reflector_body_llm import (  # noqa: E402
+    plugin as _body_llm_reflector,
 )
 
 
-def _emit_approval_requested(tool: Tool, invocation_id: str) -> None:
-    """Record a human-input request without opening a tool invocation."""
-    append_journal_event(
-        ApprovalRequested(
-            envelope_id=invocation_id,
-            tool_name=tool.name,
-            capability_grant=tool.name,
-            risk_level="human-input",
-        )
+def _commit_tool_denied(tool: Tool, reason: str) -> None:
+    from lca.cognition.body.tool_journal_emit import emit_tool_denied
+    from lca.loop.tool_journal_commit import (
+        commit_tool_journal_receipt,
+        commit_tool_phase_denied,
     )
+
+    receipt = emit_tool_denied(tool, reason)
+    commit_tool_journal_receipt(receipt)
+    commit_tool_phase_denied(tool_name=tool.name, reason=reason)
+
+
+def _commit_tool_started(
+    tool: Tool,
+    args: dict[str, Any],
+    invocation_id: str,
+    *,
+    evidence_store: Any,
+    evidence_policy: Any,
+) -> EvidenceRef | None:
+    from lca.loop.tool_journal_commit import (
+        commit_tool_journal_receipt,
+        commit_tool_phase_call_start,
+    )
+
+    receipt, arguments_ref = prepare_tool_started(
+        tool,
+        args,
+        invocation_id,
+        evidence_store=evidence_store,
+        evidence_policy=evidence_policy,
+    )
+    record_tool_started_observability(tool, args, invocation_id, receipt)
+    commit_tool_journal_receipt(receipt)
+    commit_tool_phase_call_start(
+        tool_name=tool.name,
+        invocation_id=invocation_id,
+        arguments_summary=_summarize_args_for_cursor(dict(args) if isinstance(args, dict) else {}),
+    )
+    return arguments_ref
+
+
+def _commit_tool_invoked(
+    tool: Tool,
+    args: dict[str, Any],
+    obs: Observation,
+    *,
+    latency_ms: int,
+    attempt: int,
+    invocation_id: str,
+    arguments_ref: EvidenceRef | None = None,
+) -> None:
+    from lca.loop.tool_journal_commit import (
+        commit_tool_journal_receipt,
+        commit_tool_phase_call_end,
+    )
+
+    evidence_store, evidence_policy = _resolve_evidence_pair()
+    receipt = emit_tool_invoked(
+        tool,
+        args,
+        obs,
+        latency_ms=latency_ms,
+        attempt=attempt,
+        invocation_id=invocation_id,
+        arguments_ref=arguments_ref,
+        evidence_store=evidence_store,
+        evidence_policy=evidence_policy,
+    )
+    committed = receipt.catalog_event
+    commit_tool_journal_receipt(receipt)
+    commit_tool_phase_call_end(
+        tool_name=tool.name,
+        invocation_id=committed.invocation_id,
+        outcome="ok" if obs.success else "failure",
+        ok=obs.success,
+        latency_ms=latency_ms,
+    )
+
+
+def _commit_approval_requested(tool: Tool, invocation_id: str) -> None:
+    """Record a human-input request without opening a tool invocation."""
+    from lca.contracts.models.observability.act_journal_receipt import approval_requested_receipt
+    from lca.loop.act_journal_commit import commit_act_journal_receipt
+
+    commit_act_journal_receipt(approval_requested_receipt(tool, invocation_id))
 
 
 def _resolve_evidence_pair() -> tuple[Any, Any]:
@@ -165,14 +239,14 @@ class SimpleSafeExecutor(SafeExecutor):
         invocation_id: str = "",
     ) -> Observation:
         if tool.name not in self.permission_manifest.allowed_tools:
-            emit_tool_denied(tool, "permission")
+            _commit_tool_denied(tool, "permission")
             raise ToolExecutionError(
                 f"工具 {tool.name} 未在 ToolPermissionManifest.allowed_tools 中授权"
             )
 
         validation_error = self._validate_args(tool, args)
         if validation_error is not None:
-            emit_tool_denied(tool, "validation")
+            _commit_tool_denied(tool, "validation")
             return Observation(
                 observation_id=new_id("obs"),
                 success=False,
@@ -204,9 +278,9 @@ class SimpleSafeExecutor(SafeExecutor):
                 # journal in the approval lifecycle; a ToolStarted event would
                 # require a ToolInvoked/ToolDenied terminal fact even though the
                 # question has not been executed yet.
-                _emit_approval_requested(tool, invocation_id)
+                _commit_approval_requested(tool, invocation_id)
             else:
-                self._started_refs[invocation_id] = emit_tool_started(
+                self._started_refs[invocation_id] = _commit_tool_started(
                     tool,
                     args,
                     invocation_id,
@@ -366,11 +440,7 @@ class SimpleSafeExecutor(SafeExecutor):
         invocation_id: str,
         arguments_ref: EvidenceRef | None = None,
     ) -> None:
-        # Prefer sandbox/tool-provided id; fall back to SafeExecutor-assigned id.
-        # ToolInvoked emission is delegated to tool_journal_emit so the
-        # boundary guard sees a single canonical site (this module).
-        evidence_store, evidence_policy = _resolve_evidence_pair()
-        emit_tool_invoked(
+        _commit_tool_invoked(
             tool,
             args,
             obs,
@@ -378,8 +448,6 @@ class SimpleSafeExecutor(SafeExecutor):
             attempt=attempt,
             invocation_id=invocation_id,
             arguments_ref=arguments_ref,
-            evidence_store=evidence_store,
-            evidence_policy=evidence_policy,
         )
 
     async def _execute_once(

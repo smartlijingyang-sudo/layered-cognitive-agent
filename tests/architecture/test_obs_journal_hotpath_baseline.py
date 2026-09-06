@@ -4,10 +4,10 @@
 不得高于 baseline — 新代码应经 ``FactGateway`` / loop 缝写入,不得扩散
 journal 热路径直连。
 
-当前 baseline(2026-09-06,P0-09 骨架,P1-13 memory 迁移):
-  lca/cognition: 7 occurrences
-  lca/loop:       3 occurrences
-  total:         10
+当前 baseline(2026-09-06,P0-09 骨架,P1-11 body act journal 迁移):
+  lca/cognition: 2 occurrences
+  lca/loop:       6 occurrences
+  total:          8
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ _SCAN_ROOTS: tuple[Path, ...] = (
 )
 
 # rg-equivalent count baseline; decrease intentionally → lower constant + note in PR.
-_APPEND_JOURNAL_EVENT_BASELINE = 10
+_APPEND_JOURNAL_EVENT_BASELINE = 8
 
 
 def _count_append_journal_event() -> int:

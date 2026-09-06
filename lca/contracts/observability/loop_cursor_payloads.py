@@ -225,7 +225,7 @@ class PhaseFoldPayload:
     (历史 bug:spine 同时出现 objective=模型名 与 objective=用户文本 两条同 EP)。
     """
 
-    phase: Literal["perceive", "think", "gate", "act", "reflect", "remember", "stop"]
+    phase: Literal["perceive", "think", "act", "reflect", "remember", "stop"]
     # objective 的来源显式化:不再接受裸 str,只能是用户原文 / agent role / 系统角色 / 模型名。
     objective_kind: Literal["user_text", "agent_role", "system_role", "model_name"]
     objective: str = ""

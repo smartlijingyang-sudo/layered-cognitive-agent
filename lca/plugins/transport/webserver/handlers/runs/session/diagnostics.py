@@ -112,7 +112,7 @@ class RunBootSnapshotRecorder:
                 capabilities=capabilities,
                 control_plan={
                     "version": "v3",
-                    "phases": ["perceive", "think", "gate", "act", "reflect", "remember", "stop"],
+                    "phases": ["perceive", "think", "act", "reflect", "remember", "stop"],
                 },
             )
         except Exception:

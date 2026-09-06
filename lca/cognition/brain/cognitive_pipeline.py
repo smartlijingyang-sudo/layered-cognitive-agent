@@ -24,6 +24,7 @@ from lca.contracts.protocols.think.cognitive_pipeline import (
     CognitiveReflectionPipeline,
     CognitiveThinkPipeline,
 )
+from lca.loop.reasoner_emit import run_reasoner_with_spine_facts
 
 
 class StandardCognitiveThinkPipeline(CognitiveThinkPipeline):
@@ -60,7 +61,7 @@ class StandardCognitiveThinkPipeline(CognitiveThinkPipeline):
             active_template = await skill_router.route(state)
             routed_state = reducer.apply_skill_route(state, active_template)
 
-        response = await reasoner.generate_thoughts(routed_state)
+        response = await run_reasoner_with_spine_facts(reasoner, routed_state)
         decision = classifier.classify(response)
         if decision_gate is not None:
             decision = await decision_gate.enforce(routed_state, decision)

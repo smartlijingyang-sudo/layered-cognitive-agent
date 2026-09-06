@@ -23,6 +23,7 @@ from lca.infrastructure.observability.loop_cursor import (
 from lca.infrastructure.observability.loop_cursor.bind import reset_run_cursor
 from lca.infrastructure.observability.loop_cursor.factory import LoopCursorFactory
 from lca.infrastructure.observability.loop_cursor.projection_host import StdProjectionHost
+from lca.plugins.session.runtime.store import SessionStore
 from lca.plugins.transport.webserver.handlers.runs.execute import create_run_session
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry
 
@@ -91,13 +92,21 @@ class _SpyFactory:
 class _Context:
     """cordis-style ctx —— 提供 ``inject(key)`` 给 :func:`require_capability`。"""
 
-    def __init__(self, factory: _SpyFactory, registry_obj: Any, spine: Any) -> None:
+    def __init__(
+        self,
+        factory: _SpyFactory,
+        registry_obj: Any,
+        spine: Any,
+        session_store: SessionStore | None = None,
+    ) -> None:
         self._services = {
             "run_ledger_factory": factory,
             "writable_face_registry": registry_obj,
             "event_spine": spine,
             "process_journal": object(),
         }
+        if session_store is not None:
+            self._services["session.store"] = session_store
         # PR-7:observability seam registries. Pre-populated with the
         # same factories that observability-default bundle injects in prod.
         from lca.infrastructure.observability import NamedRegistry
@@ -162,7 +171,7 @@ def _build_ctx() -> Any:
     registry_obj.register("serializer", NdjsonSerializer())
     registry_obj.register("storage", NullStorage())
 
-    return _Context(_SpyFactory(), registry_obj, _StubSpine())
+    return _Context(_SpyFactory(), registry_obj, _StubSpine(), SessionStore())
 
 
 # Tests ────────────────────────────────────────────────────

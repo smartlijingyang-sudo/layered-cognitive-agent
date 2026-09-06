@@ -19,7 +19,6 @@ from lca.contracts.observability.loop_cursor_payloads import (
 PhaseName = Literal[
     "perceive",
     "think",
-    "gate",
     "act",
     "reflect",
     "remember",

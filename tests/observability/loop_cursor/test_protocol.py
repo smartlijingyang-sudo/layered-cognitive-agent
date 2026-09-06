@@ -20,7 +20,6 @@ def test_phase_name_is_closed_set() -> None:
     assert set(PhaseName.__args__) == {
         "perceive",
         "think",
-        "gate",
         "act",
         "reflect",
         "remember",

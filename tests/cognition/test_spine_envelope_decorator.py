@@ -1,122 +1,115 @@
 """R3 tests for ``with_spine_envelope``.
 
-Drives the real shipped decorator at ``lca/cognition/_spine_envelope.py``
+Drives the shipped decorator at ``lca/infrastructure/session/spine_envelope.py``
 on real ``Critic`` / ``SkillRouter`` boundary points to assert:
 
 1. Success path emits ``start`` then ``end(outcome="success")``.
 2. Exception path emits ``start`` then ``end(outcome="failure")`` and re-raises.
-3. The decorator is a no-op when the spine reflector module is unreachable
-   (import-side failure is silently swallowed; the wrapped function still runs).
+3. The decorator is a no-op when no Session is bound (offline / tests).
 4. The decorator preserves the wrapped function's metadata (name, docstring).
 5. The decorator survives simple failure: the inner exception type is preserved.
 """
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
-from lca.cognition._spine_envelope import with_spine_envelope
+from lca.infrastructure.session.spine_envelope import with_spine_envelope
+from lca.loop.fact_gateway import publish_ep_bound, reset_fact_gateway_env
+from lca.plugins.events.publishers._session_publish import (
+    reset_publish_session,
+    set_publish_session,
+)
+from lca.plugins.session.runtime.session import Session
 
 
 def test_decorator_emits_start_then_end_on_success() -> None:
     """Success path emits both start and end(outcome='success')."""
-    calls: list[tuple[str, str]] = []
+    calls: list[tuple[str, str, dict[str, object]]] = []
 
     class _State:
         trace_id = "trace-1"
 
-    from lca.plugins.events.publishers import spine_reflector_cognition as cog_mod
-
-    original_start = getattr(cog_mod, "emit_test_point_start", None)
-    original_end = getattr(cog_mod, "emit_test_point_end", None)
-
-    def _start(*, state_id: str) -> None:
-        calls.append(("start", state_id))
-
-    def _end(*, state_id: str, outcome: str = "success") -> None:
-        calls.append(("end", f"{state_id}:{outcome}"))
-
-    cog_mod.emit_test_point_start = _start
-    cog_mod.emit_test_point_end = _end
+    session = Session("spine_env_success")
+    token = set_publish_session(session)
+    reset_fact_gateway_env(enabled=True)
     try:
 
-        @with_spine_envelope("test_point", state_id_arg="state")
-        async def _fn(state: _State) -> str:
-            return "ok"
+        def _capture(ep: str, payload: dict[str, object], **kwargs: object) -> None:
+            calls.append((ep, str(payload.get("state_id", "")), dict(payload)))
 
-        # Run the async function
-        import asyncio
+        with patch(
+            "lca.infrastructure.session.spine_envelope.publish_ep_bound",
+            side_effect=_capture,
+        ):
 
-        result = asyncio.run(_fn(_State()))
+            @with_spine_envelope("test.point", state_id_arg="state")
+            async def _fn(state: _State) -> str:
+                return "ok"
+
+            import asyncio
+
+            result = asyncio.run(_fn(_State()))
         assert result == "ok"
-        assert calls == [("start", "trace-1"), ("end", "trace-1:success")]
+        assert len(calls) == 2
+        assert calls[0][0] == "test.point.start"
+        assert calls[0][1] == "trace-1"
+        assert calls[1][0] == "test.point.end"
+        assert calls[1][2]["outcome"] == "success"
     finally:
-        if original_start is not None:
-            cog_mod.emit_test_point_start = original_start
-        else:
-            delattr(cog_mod, "emit_test_point_start")
-        if original_end is not None:
-            cog_mod.emit_test_point_end = original_end
-        else:
-            delattr(cog_mod, "emit_test_point_end")
+        reset_fact_gateway_env()
+        reset_publish_session(token)
 
 
 def test_decorator_emits_failure_on_exception() -> None:
     """Failure path emits end(outcome='failure') and re-raises."""
-    calls: list[tuple[str, str]] = []
+    calls: list[tuple[str, dict[str, object]]] = []
 
     class _State:
         trace_id = "trace-2"
 
-    from lca.plugins.events.publishers import spine_reflector_cognition as cog_mod
-
-    original_start = getattr(cog_mod, "emit_boom_start", None)
-    original_end = getattr(cog_mod, "emit_boom_end", None)
-
-    cog_mod.emit_boom_start = lambda *, state_id: calls.append(("start", state_id))
-    cog_mod.emit_boom_end = lambda *, state_id, outcome="success": calls.append(
-        ("end", f"{state_id}:{outcome}")
-    )
+    session = Session("spine_env_failure")
+    token = set_publish_session(session)
+    reset_fact_gateway_env(enabled=True)
     try:
 
-        @with_spine_envelope("boom", state_id_arg="state")
-        async def _fn(state: _State) -> str:
-            raise ValueError("kaboom")
+        def _capture(ep: str, payload: dict[str, object], **kwargs: object) -> None:
+            calls.append((ep, dict(payload)))
 
-        import asyncio
+        with patch(
+            "lca.infrastructure.session.spine_envelope.publish_ep_bound",
+            side_effect=_capture,
+        ):
 
-        with pytest.raises(ValueError, match="kaboom"):
-            asyncio.run(_fn(_State()))
-        assert calls == [("start", "trace-2"), ("end", "trace-2:failure")]
+            @with_spine_envelope("boom", state_id_arg="state")
+            async def _fn(state: _State) -> str:
+                raise ValueError("kaboom")
+
+            import asyncio
+
+            with pytest.raises(ValueError, match="kaboom"):
+                asyncio.run(_fn(_State()))
+        assert len(calls) == 2
+        assert calls[0][0] == "boom.start"
+        assert calls[1][0] == "boom.end"
+        assert calls[1][1]["outcome"] == "failure"
     finally:
-        if original_start is not None:
-            cog_mod.emit_boom_start = original_start
-        else:
-            delattr(cog_mod, "emit_boom_start")
-        if original_end is not None:
-            cog_mod.emit_boom_end = original_end
-        else:
-            delattr(cog_mod, "emit_boom_end")
+        reset_fact_gateway_env()
+        reset_publish_session(token)
 
 
-def test_decorator_noop_when_spine_emitters_missing() -> None:
-    """If the spine reflector is absent, decorator still runs the wrapped function."""
+def test_decorator_noop_when_session_unbound() -> None:
+    """If no session is bound, decorator still runs the wrapped function."""
 
     class _State:
         trace_id = "trace-3"
 
-    from lca.plugins.events.publishers import spine_reflector_cognition as cog_mod
-
-    sentinel_start = getattr(cog_mod, "emit_does_not_exist_start", None)
-    sentinel_end = getattr(cog_mod, "emit_does_not_exist_end", None)
-    if hasattr(cog_mod, "emit_does_not_exist_start"):
-        delattr(cog_mod, "emit_does_not_exist_start")
-    if hasattr(cog_mod, "emit_does_not_exist_end"):
-        delattr(cog_mod, "emit_does_not_exist_end")
-
+    reset_fact_gateway_env(enabled=True)
     try:
 
-        @with_spine_envelope("does_not_exist", state_id_arg="state")
+        @with_spine_envelope("does.not.exist", state_id_arg="state")
         async def _fn(state: _State) -> int:
             return 42
 
@@ -124,10 +117,7 @@ def test_decorator_noop_when_spine_emitters_missing() -> None:
 
         assert asyncio.run(_fn(_State())) == 42
     finally:
-        if sentinel_start is not None:
-            cog_mod.emit_does_not_exist_start = sentinel_start
-        if sentinel_end is not None:
-            cog_mod.emit_does_not_exist_end = sentinel_end
+        reset_fact_gateway_env()
 
 
 def test_decorator_preserves_function_metadata() -> None:
@@ -140,3 +130,33 @@ def test_decorator_preserves_function_metadata() -> None:
 
     assert critique.__name__ == "critique"
     assert "Critique state" in (critique.__doc__ or "")
+
+
+def test_decorator_routes_via_publish_ep_bound() -> None:
+    """Integration: bound session receives start/end spine facts."""
+    session = Session("spine_env_gateway")
+    token = set_publish_session(session)
+    reset_fact_gateway_env(enabled=True)
+    try:
+
+        class _State:
+            trace_id = "trace-gateway"
+
+        with patch(
+            "lca.infrastructure.session.spine_envelope.publish_ep_bound",
+            wraps=publish_ep_bound,
+        ) as publish:
+
+            @with_spine_envelope("critic_eval", state_id_arg="state", actor="critic")
+            async def _fn(state: _State) -> str:
+                return "ok"
+
+            import asyncio
+
+            assert asyncio.run(_fn(_State())) == "ok"
+        assert publish.call_count == 2
+        assert publish.call_args_list[0].args[0] == "critic.eval.start"
+        assert publish.call_args_list[1].args[0] == "critic.eval.end"
+    finally:
+        reset_fact_gateway_env()
+        reset_publish_session(token)

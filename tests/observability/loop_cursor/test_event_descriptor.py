@@ -3,7 +3,7 @@
 闭合扫查:
 - EventDescriptor 是 ``frozen=True``;试图改字段冻结。
 - ``derive("phase.think.fold")`` 返回 ``cordis_name == "agent.phase.think.fold"``。
-- 全部 7 个 ``PhaseName`` 值都被 cordis_event_table 覆盖。
+- 全部 6 个 ``PhaseName`` 值都被 cordis_event_table 覆盖。
 - 未登记 execution_point ⇒ ``UnknownCordisEventError``(L15 UnknownEventType 同源)。
 - ``schema_version`` 字段存在且 ``>= 1``(L15 方向感知 journal 格式拒绝)。
 - ``derive()`` 是 deterministic:同 EP 多次派生得到字面相同的 EventDescriptor。
@@ -42,8 +42,8 @@ def test_derive_phase_think_fold_yields_cordis_name() -> None:
     assert descriptor.ignorable is False
 
 
-def test_all_seven_phase_names_have_cordis_derivation() -> None:
-    """全部 7 个 PhaseName 字面值必须在 cordis_event_table 登记。"""
+def test_all_six_phase_names_have_cordis_derivation() -> None:
+    """全部 6 个 PhaseName 字面值必须在 cordis_event_table 登记。"""
     expected_ep_for_phase = {phase: f"phase.{phase}.fold" for phase in PhaseName.__args__}
     for phase, ep in expected_ep_for_phase.items():
         descriptor = EventDescriptor.derive(ep)

@@ -52,7 +52,6 @@ from lca.contracts.models.core.budget import (
 from lca.contracts.models.core.decision import Decision, DelegationSpec, Observation
 from lca.contracts.models.core.result import ToolExecutionError
 from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.observability.journal import DecisionMade, SynthesisCompleted
 from lca.contracts.models.team.consultation import SynthesisMethod, usable_outcomes
 from lca.contracts.models.team.delegation_context import delegator_scope
 from lca.contracts.protocols import (
@@ -63,7 +62,6 @@ from lca.contracts.protocols import (
 from lca.contracts.protocols.act.action import Action
 from lca.contracts.protocols.act.command_envelope import command_envelope_to_dict
 from lca.contracts.protocols.act.tool_batch_execution import ToolBatchExecutionPolicy
-from lca.infrastructure.observability.journal_append import append_journal_event
 from lca.plugins.events.publishers.spine_reflector_body_llm import (
     plugin as _body_llm_reflector,
 )
@@ -74,26 +72,10 @@ _ERR_TIMEOUT = "delegate 超时"
 
 def record_decision_made(decision: Decision, state: AgentState) -> None:
     """发射决策事实；TraceInspector 可从账本按需分析动作模式。"""
-    delegate_target = ""
-    delegate_count = 0
-    if decision.delegations:
-        first = decision.delegations[0]
-        delegate_target = first.target_role or first.target_agent_id or ""
-        delegate_count = len(decision.delegations) if len(decision.delegations) > 1 else 0
-    tool_name = decision.tool_calls[0].tool_name if decision.tool_calls else ""
-    append_journal_event(
-        DecisionMade(
-            step=state.step,
-            action_type=decision.action_type,
-            rationale_preview=decision.rationale,
-            delegate_target=delegate_target,
-            delegate_count=delegate_count,
-            tool_name=tool_name,
-            confidence=decision.confidence,
-            # 规范正文：已经过 DecisionParser 形状归一（ADR-0045）
-            response_text=decision.response_text or "",
-        )
-    )
+    from lca.contracts.models.observability.act_journal_receipt import decision_made_receipt
+    from lca.loop.act_journal_commit import commit_act_journal_receipt
+
+    commit_act_journal_receipt(decision_made_receipt(decision, state))
 
 
 def _timeout_observation(error: str, *, payload: object = None) -> Observation:
@@ -153,9 +135,14 @@ class RespondOperation(Action):
         else:
             method = SynthesisMethod.FULL
             candidate_count = len(board.required_roles)
-        append_journal_event(
-            SynthesisCompleted(
-                method=method.value,
+        from lca.contracts.models.observability.act_journal_receipt import (
+            synthesis_completed_receipt,
+        )
+        from lca.loop.act_journal_commit import commit_act_journal_receipt
+
+        commit_act_journal_receipt(
+            synthesis_completed_receipt(
+                method=method,
                 candidate_count=candidate_count,
                 output_text=decision.response_text or "",
             )

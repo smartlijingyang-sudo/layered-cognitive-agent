@@ -1,6 +1,6 @@
 """EXECUTION_POINT coverage: ``prompt_assembler.assemble.start`` / ``.end``
-must be emitted by :class:`PromptReasoner.generate_thoughts` with the
-ADR-0175 payload extensions.
+must be emitted by the reasoner spine envelope with the ADR-0175 payload
+extensions.
 
 Per ADR-0165 I8, every entry in ``EXECUTION_POINTS`` must have at least
 one emitter wired in production. This test pins the wiring for the
@@ -29,6 +29,9 @@ from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.protocols import LLMAdapter
+from lca.infrastructure.session.cognitive_emit import (
+    run_reasoner_generate_thoughts_with_spine_facts,
+)
 from lca.plugins.events.publishers.spine_reflector_cognition import (  # noqa: F401  # ADR-0181 PR-2: 旧 reflector 退役
     ReflectorClass,
 )
@@ -185,10 +188,16 @@ async def test_prompt_assembler_eps_emitted_with_payload():
     from lca.contracts.models.team.role_team import (
         ToolPermissionManifest,
     )
+    from lca.loop.fact_gateway import reset_fact_gateway_env
+    from lca.plugins.events.publishers._session_publish import (
+        reset_publish_session,
+        set_publish_session,
+    )
+    from lca.plugins.session.runtime.session import Session
 
-    # ADR-0183 PR-7: _CapturingMechanism 退役，新 EventBus 走 _CapturingBus
-    spine = _CapturingBus()
-    EventBus.set_default(spine)
+    session = Session("prompt-assembler-eps")
+    token = set_publish_session(session)
+    reset_fact_gateway_env(enabled=True)
     try:
         template = PromptTemplate(
             id="react_prompt",
@@ -210,37 +219,45 @@ async def test_prompt_assembler_eps_emitted_with_payload():
             selector=_StubStaticSelector(),
             tools=[],
         )
-        await reasoner.generate_thoughts(_build_state())
+        await run_reasoner_generate_thoughts_with_spine_facts(reasoner, _build_state())
     finally:
-        EventBus.set_default(None)
+        reset_fact_gateway_env()
+        reset_publish_session(token)
 
-    starts = [c for c in spine.calls if c["execution_point"] == "prompt_assembler.assemble.start"]
-    ends = [c for c in spine.calls if c["execution_point"] == "prompt_assembler.assemble.end"]
-    assert len(starts) == 1, f"start EP must be emitted exactly once per render (got {spine.calls})"
-    assert len(ends) == 1, f"end EP must be emitted exactly once per render (got {spine.calls})"
-    start = starts[0]
-    end = ends[0]
-    assert start["payload"]["template_id"] == "react_prompt"
-    assert start["payload"]["decision_path"] == "profile_default"
-    assert start["payload"]["sections"] == ["role"]
-    assert end["payload"]["section_count"] == 1
-    outputs = end["payload"]["section_outputs"]
+    events = session.snapshot_events()
+    starts = [e for e in events if e.type == "spine.cognition.prompt_assembler.assemble.start"]
+    ends = [e for e in events if e.type == "spine.cognition.prompt_assembler.assemble.end"]
+    assert len(starts) == 1, f"start EP must be emitted exactly once per render (got {events})"
+    assert len(ends) == 1, f"end EP must be emitted exactly once per render (got {events})"
+    start = starts[0].data["payload"]
+    end = ends[0].data["payload"]
+    assert start["template_id"] == "react_prompt"
+    assert start["decision_path"] == "profile_default"
+    assert start["sections"] == ["role"]
+    assert end["section_count"] == 1
+    outputs = end["section_outputs"]
     assert isinstance(outputs, list) and len(outputs) == 1
     assert outputs[0]["name"] == "role"
     assert outputs[0]["kind"] == "pure"
     assert outputs[0]["text_chars"] == len("hello-world")
-    assert isinstance(end["payload"]["total_chars"], int)
-    assert end["payload"]["total_chars"] > 0
+    assert isinstance(end["total_chars"], int)
+    assert end["total_chars"] > 0
 
 
 def test_skill_router_route_emits_decision_path():
     import asyncio
 
     from lca.cognition.brain.skill_router import KeywordSkillRouter
+    from lca.loop.fact_gateway import reset_fact_gateway_env
+    from lca.plugins.events.publishers._session_publish import (
+        reset_publish_session,
+        set_publish_session,
+    )
+    from lca.plugins.session.runtime.session import Session
 
-    # ADR-0183 PR-7: _CapturingMechanism 退役，新 EventBus 走 _CapturingBus
-    spine = _CapturingBus()
-    EventBus.set_default(spine)
+    session = Session("skill-router-eps")
+    token = set_publish_session(session)
+    reset_fact_gateway_env(enabled=True)
     try:
         router = KeywordSkillRouter(
             rules={"research_prompt": ["hello"]},
@@ -248,13 +265,19 @@ def test_skill_router_route_emits_decision_path():
         )
         result = asyncio.run(router.route(_build_state()))
     finally:
-        EventBus.set_default(None)
+        reset_fact_gateway_env()
+        reset_publish_session(token)
 
     assert result == "research_prompt"
-    skill_eps = [c for c in spine.calls if c["execution_point"] == "skill_router.route"]
+    skill_eps = [
+        event
+        for event in session.snapshot_events()
+        if event.type == "spine.cognition.skill_router.route"
+    ]
     assert len(skill_eps) == 1
-    assert skill_eps[0]["payload"]["template"] == "research_prompt"
-    assert skill_eps[0]["payload"]["decision_path"] == "keyword_match"
+    payload = skill_eps[0].data["payload"]
+    assert payload["template"] == "research_prompt"
+    assert payload["decision_path"] == "keyword_match"
 
 
 def test_selector_returns_decision_path_tuple():

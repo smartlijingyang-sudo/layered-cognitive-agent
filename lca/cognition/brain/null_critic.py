@@ -12,31 +12,20 @@ from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.decision import Observation, Reflection
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import Critic
+from lca.infrastructure.session.spine_envelope import with_spine_envelope
 
 
 class NullCritic(Critic):
     """Default null Critic (ADR-0068 / 宪法 §3.4)."""
 
+    @with_spine_envelope("critic_eval", state_id_arg="state", actor="critic")
     async def critique(self, state: AgentState, observation: Observation) -> Reflection:
-        # PR-3.2: spine envelope (consistent instrumentation across critics).
-        from lca.plugins.events.publishers.spine_reflector_cognition import (
-            emit_critic_eval_end,
-            emit_critic_eval_start,
+        del observation
+        return Reflection(
+            reflection_id=new_id("refl"),
+            verdict=ReflectionVerdict.ON_TRACK,
+            lesson=None,
         )
-
-        state_id = state.trace_id
-        emit_critic_eval_start(state_id=state_id)
-        try:
-            reflection = Reflection(
-                reflection_id=new_id("refl"),
-                verdict=ReflectionVerdict.ON_TRACK,
-                lesson=None,
-            )
-        except BaseException:
-            emit_critic_eval_end(state_id=state_id, outcome="failure")
-            raise
-        emit_critic_eval_end(state_id=state_id, outcome="success")
-        return reflection
 
 
 __all__ = ["NullCritic"]
