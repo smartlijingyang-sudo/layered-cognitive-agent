@@ -24,7 +24,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from functools import wraps
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar
 
 import structlog
 from opentelemetry import trace as otel_trace
@@ -60,8 +60,8 @@ _F = TypeVar("_F", bound=Callable[..., Any])
 # scope，由 runtime 边界（bind/run_scope）统一设置；facade 不感知具体 backend。
 @dataclass(frozen=True)
 class RunContext:
-    trace_id: TraceId = ""
-    run_id: RunId = ""
+    trace_id: TraceId = ""  # type: ignore[assignment]
+    run_id: RunId = ""  # type: ignore[assignment]
     parent_run_id: RunId | None = None
     agent_role: str = ""
     step: int = 0
@@ -190,8 +190,8 @@ def span(name: object, **attributes: Any) -> Iterator[Any]:
         with NullSpanHandle() as h:
             yield h
         return
-    label = name.value if hasattr(name, "value") else str(name)
-    with bound.tracer.start(label, **attributes) as h:
+    label = getattr(name, "value", name)
+    with bound.tracer.start(str(label), **attributes) as h:
         # 自动写入 session_id（如果当前 context 有）
         ctx = _current_run_context_or_empty()
         if ctx.session_id and ATTR_SESSION_ID not in h.attributes:
@@ -211,8 +211,8 @@ def detached_span(name: object, **attributes: Any) -> Iterator[Any]:
         return
     # detached 在 tracer 层通过 attach=False 表达；当前 OTelTracer 默认 attach=True
     # 简化：detached 等同普通 span；OtelTracer 后续 PR 加 attach 参数
-    label = name.value if hasattr(name, "value") else str(name)
-    with bound.tracer.start(label, **attributes) as h:
+    label = getattr(name, "value", name)
+    with bound.tracer.start(str(label), **attributes) as h:
         yield h
 
 
@@ -348,7 +348,7 @@ class OperationRecorder:
         _exc_type: type[BaseException] | None,
         exc: BaseException | None,
         _tb: Any,
-    ) -> bool:
+    ) -> Literal[False]:
         duration_ms = int((time.perf_counter() - self._started) * 1000) if self._started else 0
         output = {**self._output, "duration_ms": duration_ms}
         if exc is None:
@@ -406,7 +406,7 @@ def traced(
     name: object, *, capture: Callable[..., dict[str, Any]] | None = None
 ) -> Callable[[_F], _F]:
     """用 span 包裹同步或异步函数。"""
-    label = name.value if hasattr(name, "value") else str(name)
+    label = getattr(name, "value", name)
 
     def decorator(fn: _F) -> _F:
         import inspect

@@ -9,8 +9,6 @@ New action types = register a new handler, no core code changes required.
 
 from __future__ import annotations
 
-from typing import cast
-
 from pydantic import BaseModel
 
 from lca.contracts.atoms.control.slot import ControlSlot
@@ -216,7 +214,7 @@ class InMemoryActionHandlerRegistry(UniqueOperationRegistry[ActionHandler], Acti
 
     def registered(self) -> tuple[str, ...]:
         """返回稳定的已注册 ActionType 快照。"""
-        return cast("tuple[str, ...]", self._registered_operations())
+        return self._registered_operations()
 
 
 def register_default_action_handlers(

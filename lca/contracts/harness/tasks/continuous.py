@@ -8,10 +8,11 @@ the existing Session Spine and declarative runtime.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 
 
 class TriggerKind(StrEnum):
@@ -83,7 +84,7 @@ class WorkItem:
         if self.max_attempts <= 0:
             raise ValueError("max_attempts must be positive")
         if not isinstance(self.grant, tuple):
-            object.__setattr__(self, "grant", tuple(str(item) for item in self.grant))
+            object.__setattr__(self, "grant", tuple(str(item) for item in cast("Sequence[object]", self.grant)))
         if self.available_at is not None and self.available_at.tzinfo is None:
             raise ValueError("available_at must be timezone-aware")
 

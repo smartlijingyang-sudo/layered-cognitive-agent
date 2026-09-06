@@ -63,6 +63,7 @@ class RunLoopDriver(Protocol):
         bindings: Any,
         run_context: RunContext,
         ctx: Context,
+        machine_resolver: Any | None = None,
     ) -> DriverOutcome: ...
 
 

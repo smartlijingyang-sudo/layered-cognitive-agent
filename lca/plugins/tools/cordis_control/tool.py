@@ -97,11 +97,11 @@ MANIFEST = ToolManifest(
 class CordisControlTool(Tool):
     """Run the four Creator faces through one Composer-bound artifact lifecycle."""
 
-    name: ClassVar[str] = "cordis_control"
-    description: ClassVar[str] = MANIFEST.api[0].description
+    name = "cordis_control"
+    description = MANIFEST.api[0].description
     parameters: ClassVar[dict[str, Any]] = MANIFEST.api[0].parameters
-    is_idempotent: ClassVar[bool] = False
-    default_timeout_s: ClassVar[int] = MANIFEST.api[0].default_timeout_ms // 1000
+    is_idempotent = False
+    default_timeout_s = MANIFEST.api[0].default_timeout_ms // 1000
 
     def __init__(
         self,

@@ -124,6 +124,14 @@ class OtelProjector(JournalProjector):
     def flush(self) -> None:
         return None
 
+    def project(self, document: Any) -> None:
+        """Export a journal document by replaying stamped events through ``on_event``."""
+        stamped_events = getattr(document, "stamped_events", None)
+        if stamped_events is None:
+            return
+        for stamped in stamped_events:
+            self.on_event(stamped)
+
     def close(self) -> None:
         for span in self._index.drain_leaked():
             _log.warning("journal_otel_container_leaked")

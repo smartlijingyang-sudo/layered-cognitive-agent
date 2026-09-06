@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 import operator
 from collections.abc import Callable, Mapping
-from typing import cast
+from typing import Any, cast
 
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     DeclarativeValidationError,
@@ -87,7 +87,7 @@ def _evaluate_ast(node: ast.AST, roots: Mapping[str, object]) -> object:
 def _contains(container: object, item: object) -> bool:
     """Evaluate membership only for explicitly supported predicate containers."""
     if isinstance(container, (str, bytes, tuple, list, set, frozenset, Mapping)):
-        return item in container
+        return cast("Any", item) in container
     raise DeclarativeValidationError("PS-001", "predicate membership target is not supported")
 
 

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import ClassVar, cast
 
 from pydantic import BaseModel, ConfigDict
 
@@ -456,9 +456,8 @@ def build_static_text(config: BaseModel, name: str, default_text: str) -> Static
     """Bind a config text value to a StaticTextSection instance."""
 
     text = getattr(config, "text", None) or default_text
-    section = StaticTextSection(text=text)
-    section.name = name
-    return section
+    section_cls = type(f"StaticTextSection_{name}", (StaticTextSection,), {"name": name})
+    return cast("StaticTextSection", section_cls(text=text))
 
 
 def build_react_workflow(config: BaseModel) -> StaticTextSection:
@@ -643,7 +642,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
             except Exception:
                 return ""
             method = getattr(catalog, render_method, sentinel)
-            if method is sentinel:
+            if method is sentinel or not callable(method):
                 return ""
             try:
                 return str(method())

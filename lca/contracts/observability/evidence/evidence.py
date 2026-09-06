@@ -121,7 +121,7 @@ class EvidencePolicy(Protocol):
         media_type: str = "application/octet-stream",
     ) -> Classification:
         """根据 payload 内容 + hint 决定分类。"""
-
+        ...
     def retention(
         self,
         payload: bytes,
@@ -129,7 +129,7 @@ class EvidencePolicy(Protocol):
         hint: RetentionClass | None = None,
     ) -> RetentionClass:
         """根据 payload 大小 + hint 决定保留类。"""
-
+        ...
     def should_inline(
         self,
         payload: bytes,
@@ -143,7 +143,7 @@ class EvidencePolicy(Protocol):
         - public / internal 且 size <= 64 KiB → True
         - public / internal 且 size > 64 KiB → False
         """
-
+        ...
 
 @runtime_checkable
 class EvidenceStore(Protocol):
@@ -170,7 +170,7 @@ class EvidenceStore(Protocol):
         Raises:
             EvidenceIntegrityError: 写入失败 / 摘要计算失败
         """
-
+        ...
     def get(
         self,
         ref: EvidenceRef,
@@ -184,16 +184,16 @@ class EvidenceStore(Protocol):
             EvidenceIntegrityError: 摘要不匹配 / 字节数不一致 / 缺失
             PermissionError: requester / audience 不满足 ref.classification 策略
         """
-
+        ...
     def contains(self, ref: EvidenceRef) -> bool:
         """纯存在性检查 —— 不读内容,不验证摘要(用于 sweep 之前预筛)。"""
-
+        ...
     def sweep_orphan(
         self,
         ledger_index: Mapping[str, set[EvidenceRef]],
     ) -> int:
         """清掉不被 ledger_index 任何 run 引用的对象。返回清掉数量。幂等。"""
-
+        ...
 
 __all__ = [
     "Classification",

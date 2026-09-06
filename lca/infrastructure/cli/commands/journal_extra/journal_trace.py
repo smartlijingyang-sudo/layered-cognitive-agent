@@ -689,7 +689,7 @@ def _parent_is_lca_span(parent: str | None) -> bool:
     for any span. We only descend into a span when its name belongs to
     the ``lca-span-`` namespace.
     """
-    return bool(parent) and parent.startswith("lca-span-")
+    return parent is not None and parent.startswith("lca-span-")
 
 
 def _parse_when(event: dict[str, Any]) -> datetime | None:
@@ -737,9 +737,10 @@ def _render_human(
 
     # Anchor time = the earliest event we have so Δms is meaningful.
     anchored = [e for e in events if _parse_when(e) is not None]
-    anchor = min((_parse_when(e) for e in anchored), default=None)
-    if anchor is None:
+    anchor_times = [t for e in anchored if (t := _parse_when(e)) is not None]
+    if not anchor_times:
         return "(no timestamps)"
+    anchor = min(anchor_times)
 
     children = _build_span_tree(events)
     output: list[str] = []
@@ -754,7 +755,7 @@ def _render_human(
         ),
         "?",
     )
-    last_t = max((_parse_when(e) for e in anchored), default=anchor)
+    last_t = max(anchor_times)
     total_ms = int((last_t - anchor).total_seconds() * 1000)
     output.append(f"▶ {run_id}  trace={trace_id}  ·持续 {_format_delta_ms(total_ms).lstrip('Δ+')}")
     output.append("")
@@ -780,7 +781,7 @@ def _render_human(
             if idx in rendered:
                 i += 1
                 continue
-            ep_name = events[idx].get("execution_point", "")
+            ep_name = str(events[idx].get("execution_point", "") or "")
             if ep_name == "llm.stream.token":
                 j = i
                 while (
@@ -841,12 +842,15 @@ def _render_human(
     depth_of: dict[int, int] = {}
     span_owner: dict[str, int] = {}
     for idx, e in enumerate(events):
-        parent = e.get("parent_span_id")
-        depth_of[idx] = depth_of.get(span_owner.get(parent, -1), 0) + (
+        parent_raw = e.get("parent_span_id")
+        parent = parent_raw if isinstance(parent_raw, str) else None
+        parent_depth_key = span_owner.get(parent, -1) if parent is not None else -1
+        depth_of[idx] = depth_of.get(parent_depth_key, 0) + (
             1 if _parent_is_lca_span(parent) and parent in span_owner else 0
         )
-        if _parent_is_lca_span(e.get("span_id")):
-            span_owner[e["span_id"]] = idx
+        span_id_raw = e.get("span_id")
+        if _parent_is_lca_span(span_id_raw if isinstance(span_id_raw, str) else None):
+            span_owner[str(span_id_raw)] = idx
 
     rendered: set[int] = set()
     i = 0
@@ -855,7 +859,7 @@ def _render_human(
         if idx in rendered:
             i += 1
             continue
-        ep_name = events[idx].get("execution_point", "")
+        ep_name = str(events[idx].get("execution_point", "") or "")
         if ep_name == "llm.stream.token":
             j = i
             while (
@@ -980,9 +984,9 @@ def _build_fold_line(
     ep_name: str,
     depth: int,
     anchor: datetime,
-) -> str | None:
+) -> str:
     if not indices:
-        return None
+        return ""
     head = events[indices[0]]
     tail = events[indices[-1]]
     head_t = _parse_when(head)
@@ -1001,7 +1005,7 @@ def _build_fold_line(
             f"{indent}    runtime.reducer.apply ×{len(indices)}"
             f"  ({', '.join(methods)})  Δ+{delta_ms}ms"
         )
-    return None
+    return ""
 
 
 def _render_transport_pair(
@@ -1079,7 +1083,7 @@ def register(app: typer.Typer) -> None:
             False, "--source", help="在表格里追加 source_location 列(默认开)"
         ),
         json_output: bool = typer.Option(False, "--json", help="JSON 输出,给 agent"),
-        traces_root: Path = typer.Option(  # noqa: B008
+        traces_root: Path = typer.Option(
             _DEFAULT_TRACES_ROOT, "--traces-root", help="traces 根目录"
         ),
         limit: int = typer.Option(0, "--limit", "-n", help="只输出前 N 行(0 = 全部)"),

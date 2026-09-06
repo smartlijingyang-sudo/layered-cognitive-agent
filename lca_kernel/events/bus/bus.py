@@ -37,7 +37,7 @@ import time
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar, cast
 
 import structlog
 
@@ -118,8 +118,8 @@ class EventRef(EnvelopeRef):
     全删时机)。
     """
 
-    persisted: bool  # type: ignore[assignment]
-    subscriber_count: int  # type: ignore[assignment]
+    persisted: bool
+    subscriber_count: int
 
 
 # ── 投递策略(ADR-0184 D4)──────────────────────────────────────────────
@@ -209,7 +209,7 @@ class EnvelopeBus(Generic[P]):
     - :attr:`registry` —— 只读 SSOT 引用
     """
 
-    _default_instance: ClassVar[EnvelopeBus[P] | None] = None
+    _default_instance: ClassVar[EnvelopeBus[Any] | None] = None
 
     def __init__(
         self,
@@ -581,7 +581,12 @@ class EventBus(EnvelopeBus[P]):
             elif stage == "on_failure":
                 on_fail = getattr(inst, "on_consumer_failure", None)
                 if callable(on_fail):
-                    self._failure_hooks.append(on_fail)
+                    self._failure_hooks.append(
+                        cast(
+                            "Callable[[EventPayload, EventRef, BaseException], FailureAction]",
+                            on_fail,
+                        )
+                    )
 
     # ── 投递回执 / 计数器(ADR-0184 D2/D4)────────────────────────────────
 

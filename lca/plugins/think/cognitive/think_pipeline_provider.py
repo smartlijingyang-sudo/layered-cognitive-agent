@@ -29,7 +29,7 @@ class Config(BaseModel):
     model_config = {"extra": "forbid"}
 
 
-@plugin(  # type: ignore[arg-type]  # PluginContext currently erases Config covariance.
+@plugin(  # PluginContext currently erases Config covariance.
     id="lca-cognitive-think-pipeline-standard",
     provides=[COGNITIVE_THINK_PIPELINE.key],
     requires=[],

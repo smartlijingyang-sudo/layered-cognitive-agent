@@ -14,7 +14,7 @@ import asyncio
 import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 
 import structlog
 from pydantic import BaseModel, Field
@@ -249,7 +249,7 @@ class SessionTitleService:
             self._attach_session(session)
         cancel = hook(self._attach_session)
         if callable(cancel):
-            self._store_hooks.append(cancel)
+            self._store_hooks.append(cast("Callable[[], None]", cancel))
 
     def _attach_session(self, session: Any) -> None:
         """把 observer 挂到单个 Session;挂入失败 contained。"""

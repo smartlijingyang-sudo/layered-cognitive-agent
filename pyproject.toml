@@ -316,6 +316,10 @@ exclude = [
 ]
 reportMissingImports = true
 
+[[tool.pyright.overrides]]
+module = ["langfuse", "langfuse.*"]
+reportMissingImports = false
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 addopts = "-ra --cov=lca --cov-report=term-missing -m 'not real_llm'"

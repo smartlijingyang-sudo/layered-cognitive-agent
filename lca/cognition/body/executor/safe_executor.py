@@ -36,7 +36,7 @@ _PERF_COUNTER_SCALE = 1000
 # R1: deterministic exceptions live in ``_retry_classification`` so the two
 # SafeExecutor implementations cannot drift on what is non-retryable.
 from lca.cognition.body.internal._retry_classification import (
-    _DETERMINISTIC_EXCEPTIONS,  # noqa: E402
+    _DETERMINISTIC_EXCEPTIONS,
 )
 
 
@@ -97,9 +97,7 @@ def _delta_summary_from_obs(observation: Any, *, limit: int = 200) -> str:
     """从 Observation 生成 step.tool_result.delta_summary(< 200 字符人话)。"""
     if not getattr(observation, "success", True):
         err = getattr(observation, "error", None) or "unknown"
-        return f"❌ {type(err).__class__.__name__ if hasattr(type(err), '__class__') else 'err'}: {err}"[
-            :limit
-        ]
+        return f"❌ {type(err).__name__}: {err}"[:limit]
     files = _extract_files_created(observation)
     if files:
         names = ", ".join(files[:3])

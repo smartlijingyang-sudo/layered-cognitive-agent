@@ -13,7 +13,6 @@ from __future__ import annotations
 import asyncio
 import re
 from collections.abc import Sequence
-from typing import cast
 
 from lca.contracts.atoms.enums.enums import MemoryRecordKind
 from lca.contracts.atoms.ids.ids import new_id
@@ -103,11 +102,7 @@ class ToolBatchExecutor:
         """Select and validate contiguous dispatch segments before execution."""
 
         if isinstance(self._policy, ToolBatchSegmentPlanningPolicy):
-            segmented_policy = cast("ToolBatchSegmentPlanningPolicy", self._policy)
-            segments = cast(
-                "tuple[ToolBatchExecutionSegment, ...]",
-                segmented_policy.select_segments(entries),
-            )
+            segments = self._policy.select_segments(entries)
         else:
             segments = (
                 ToolBatchExecutionSegment(

@@ -35,12 +35,15 @@ import typer
 _DEFAULT_TRACES_ROOT = Path("traces")
 
 
-def _find_run_dir(run_id: str, traces_root: Path) -> Path:
-    if not run_id:
+def _find_run_dir(run_id: str | None, traces_root: Path) -> Path:
+    resolved_run_id = run_id
+    if not resolved_run_id:
         from lca.infrastructure.cli.commands.kernel._shared import find_latest_run_id
 
-        run_id = find_latest_run_id(traces_root)
-    return traces_root / "runs" / run_id
+        resolved_run_id = find_latest_run_id(traces_root)
+    if not resolved_run_id:
+        raise typer.BadParameter("no run_id and no latest run found under traces/runs")
+    return traces_root / "runs" / resolved_run_id
 
 
 def _iter_spine_exception_records(spine_path: Path) -> list[dict[str, Any]]:
@@ -158,7 +161,7 @@ def register(app: typer.Typer) -> None:
         grep: str = typer.Option("", "--grep", help="按 exception_class 过滤(子串匹配,大小写敏感)"),
         json_output: bool = typer.Option(False, "--json", help="JSON 输出给 agent"),
         raw: bool = typer.Option(False, "--raw", help="完整 payload,不做格式化"),
-        traces_root: Path = typer.Option(  # noqa: B008
+        traces_root: Path = typer.Option(
             _DEFAULT_TRACES_ROOT, "--traces-root", help="traces 根目录"
         ),
     ) -> None:

@@ -36,7 +36,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from lca.contracts.observability.registry.run_locator import RunLocator
 
@@ -177,10 +177,13 @@ class DebugRunToolAdapter:
 
         manifest_summary = _safe_json(manifest_path)
         spine_events = _safe_lines(spine_events_path)
-        seqs = sorted({e.get("run_seq") for e in spine_events if isinstance(e.get("run_seq"), int)})
-        missing_seqs = tuple(
-            s for s in range(1, (seqs[-1] if seqs else 0) + 1) if s not in set(seqs)
+        seqs: list[int] = sorted(
+            run_seq
+            for e in spine_events
+            if isinstance((run_seq := e.get("run_seq")), int)
         )
+        max_seq = seqs[-1] if seqs else 0
+        missing_seqs = tuple(s for s in range(1, max_seq + 1) if s not in set(seqs))
         spine_points = tuple(
             str(e.get("execution_point"))
             for e in spine_events
@@ -262,7 +265,7 @@ def _safe_json(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
     try:
-        return json.loads(path.read_text())
+        return cast("dict[str, Any]", json.loads(path.read_text()))
     except Exception:
         return {}
 

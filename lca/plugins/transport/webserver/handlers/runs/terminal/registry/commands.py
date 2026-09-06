@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+from typing import Any, cast
 
 import structlog
 
@@ -262,7 +263,7 @@ class RegistryRunCommands:
             if callable(snapshot):
                 append_approval_resolved_if_pending(
                     inner,
-                    snapshot(),
+                    cast("Any", snapshot()),
                     approval_id=pending_approval_id or approval_id,
                     payload=payload,
                     command_id=idempotency_key or f"resume:{run_id}:{approval_id}",

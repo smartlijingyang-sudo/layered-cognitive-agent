@@ -21,7 +21,6 @@ from opentelemetry.trace import StatusCode
 from lca.infrastructure.observability.adapters.policy import otel_safe_attributes
 
 if TYPE_CHECKING:
-    from opentelemetry.context import Context, Token
 
     from lca.contracts.observability.core.ports import AttributePolicyBackend
 
@@ -84,7 +83,7 @@ class SpanHandle:
         self._otel = otel_span
         self.attributes: dict[str, Any] = attributes
         self._attach = attach
-        self._ctx_token: Token[Context] | None = None
+        self._ctx_token: Any = None
 
     def __enter__(self) -> SpanHandle:
         if self._attach:

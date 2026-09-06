@@ -9,15 +9,48 @@ ADR-2026-09-02-i17-stream-align §C: spine is the SSOT
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
+from lca.contracts.atoms.ids.ids import RunId, TraceId
 from lca.contracts.models.observability.journal.journal import (
     JournalEvent,
     RunScope,
     StampedEvent,
 )
 from lca.infrastructure.observability.stream.trace_inspector import TraceInspector
+
+
+def _object_to_int(value: object, default: int = 0) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return default
+    return default
+
+
+def _object_to_float(value: object, default: float = 0.0) -> float:
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return default
+    return default
+
+
+def _mapping_value(value: object) -> dict[str, object]:
+    if isinstance(value, Mapping):
+        return dict(value)
+    return {}
 
 
 def _load_inspector_from_jsonl(jsonl_path: Path) -> TraceInspector:
@@ -70,7 +103,7 @@ def _event_from_payload(payload: dict[str, object]) -> StampedEvent | None:
         seq_field = seq_value if isinstance(seq_value, int) else 0
         when_field = payload.get("when_corrected") or payload.get("when") or 0.0
         try:
-            ts_value = float(when_field)  # type: ignore[arg-type]
+            ts_value = _object_to_float(when_field)
         except (TypeError, ValueError):
             ts_value = 0.0
         event_type = str(payload.get("execution_point", "") or "")
@@ -78,7 +111,7 @@ def _event_from_payload(payload: dict[str, object]) -> StampedEvent | None:
         # data dict so TraceInspector failure-detection (which keys off
         # ``data["channel"]`` / ``data["outcome"]``) can recognise v3
         # events without forcing every consumer to learn the new envelope.
-        inner_payload = dict(payload.get("payload", {}) or {})
+        inner_payload = _mapping_value(payload.get("payload", {}))
         channel = payload.get("channel")
         if isinstance(channel, str) and channel:
             inner_payload.setdefault("channel", channel)
@@ -96,8 +129,10 @@ def _event_from_payload(payload: dict[str, object]) -> StampedEvent | None:
             seq=seq_field,
             ts=ts_value,
             scope=RunScope(
-                trace_id=str(scope_raw.get("trace_id", "")),
-                run_id=str(scope_raw.get("run_id", "")) or str(payload.get("run_id", "") or ""),
+                trace_id=TraceId(str(scope_raw.get("trace_id", ""))),
+                run_id=RunId(
+                    str(scope_raw.get("run_id", "")) or str(payload.get("run_id", "") or "")
+                ),
             ),
             event=JournalEvent(),
             event_type=event_type,
@@ -115,19 +150,19 @@ def _event_from_payload(payload: dict[str, object]) -> StampedEvent | None:
     if not event_type:
         event_type = str(payload.get("event_type", ""))
     return StampedEvent(
-        seq=int(payload.get("run_seq", payload.get("seq", 0)) or 0),
-        ts=float(payload.get("occurred_at", payload.get("ts", 0.0)) or 0.0),
+        seq=_object_to_int(payload.get("run_seq", payload.get("seq", 0)) or 0),
+        ts=_object_to_float(payload.get("occurred_at", payload.get("ts", 0.0)) or 0.0),
         scope=RunScope(
-            trace_id=str(scope_raw.get("trace_id", "")),
-            run_id=str(scope_raw.get("run_id", "")),
+            trace_id=TraceId(str(scope_raw.get("trace_id", ""))),
+            run_id=RunId(str(scope_raw.get("run_id", ""))),
         ),
         event=JournalEvent(),
         event_type=event_type,
-        data=payload.get("data", {}) or {},
+        data=_mapping_value(payload.get("data", {})),
     )
 
 
-def _serialize_report(report) -> dict[str, object]:
+def _serialize_report(report: object) -> dict[str, object]:
     """TraceReport / TraceReport-like → JSON-serializable dict。"""
     return {
         "trace_id": getattr(report, "trace_id", ""),

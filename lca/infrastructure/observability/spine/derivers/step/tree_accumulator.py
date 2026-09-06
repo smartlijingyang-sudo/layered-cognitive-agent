@@ -27,7 +27,9 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Literal, cast
 
+from lca.contracts.atoms.ids.ids import RunId, TraceId
 from lca.contracts.models.observability.journal.doc import (
     JournalDocument,
     JournalMetadata,
@@ -36,6 +38,7 @@ from lca.contracts.models.observability.journal.step import (
     JournalStep,
     ReflectTrace,
     StepContext,
+    StepOutcome,
     StepPhase,
     ThinkingTrace,
     ToolCallRecord,
@@ -53,6 +56,31 @@ from lca.infrastructure.observability.spine.derivers.base.base import Deriver
 from lca.infrastructure.observability.spine.event.record import EventRecord
 
 log = logging.getLogger(__name__)
+
+
+def _object_to_int(value: object, default: int = 0) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return default
+    return default
+
+
+def _as_step_outcome(value: str | None) -> StepOutcome | None:
+    if value == "ok":
+        return "ok"
+    if value == "fail":
+        return "fail"
+    if value == "skip":
+        return "skip"
+    return None
 
 
 def _truncate_kept(text: str, *, head: int, tail: int) -> str:
@@ -537,7 +565,7 @@ class StepTreeAccumulatorDeriver(Deriver):
                     return default
 
                 stdout_head = str(_pick("stdout_head", "") or "")
-                stdout_chars_total = int(_pick("stdout_chars_total", 0) or 0)
+                stdout_chars_total = _object_to_int(_pick("stdout_chars_total", 0) or 0)
                 stdout_truncated = bool(_pick("stdout_truncated", False))
                 stderr = str(_pick("stderr", "") or "")
                 files_raw = _pick("files_created", ()) or ()
@@ -545,8 +573,9 @@ class StepTreeAccumulatorDeriver(Deriver):
                     tuple(str(f) for f in files_raw) if isinstance(files_raw, (list, tuple)) else ()
                 )
                 ok = bool(_pick("ok", True))
-                latency_ms = int(_pick("latency_ms", 0) or 0)
-                error = _pick("error", None)
+                latency_ms = _object_to_int(_pick("latency_ms", 0) or 0)
+                error_raw = _pick("error", None)
+                error_value = str(error_raw) if error_raw is not None else None
                 delta_summary = str(_pick("delta_summary", "") or "")
                 target.tool_result = ToolResult(
                     ok=ok,
@@ -556,7 +585,7 @@ class StepTreeAccumulatorDeriver(Deriver):
                     stdout_truncated=stdout_truncated,
                     stderr=stderr[:2000],
                     files_created=files_tuple,
-                    error=error,
+                    error=error_value,
                     delta_summary=delta_summary,
                 )
         elif ep == "body.tool.execute.start":
@@ -648,7 +677,7 @@ class StepTreeAccumulatorDeriver(Deriver):
                 open_step.step_id = start_step_id
             open_step.opened_by = "writable"
             open_step.window_signal = "explicit"
-            open_step.phase = phase  # type: ignore[assignment]
+            open_step.phase = cast("StepPhase", phase)
             return
         if open_step is not None:
             # 嵌套 begin_step 视为上一 step 收口失败 → 强制 close
@@ -658,7 +687,7 @@ class StepTreeAccumulatorDeriver(Deriver):
         self._open_step = _StepFrame(
             step_id=start_step_id or f"step_{self._step_seq:03d}",
             step_index=self._step_seq,
-            phase=phase,  # type: ignore[arg-type]
+            phase=cast("StepPhase", phase),
             entered_at=ts,
             context_before=StepContext(objective=self._objective),
             opened_by="writable",
@@ -684,7 +713,7 @@ class StepTreeAccumulatorDeriver(Deriver):
         self._open_step = _StepFrame(
             step_id=f"step_{self._step_seq:03d}",
             step_index=self._step_seq,
-            phase=phase,  # type: ignore[arg-type]
+            phase=cast("StepPhase", phase),
             entered_at=ts,
             context_before=StepContext(objective=self._objective),
             opened_by="think",
@@ -695,7 +724,7 @@ class StepTreeAccumulatorDeriver(Deriver):
         if self._open_step is None:
             return
         f = self._open_step
-        f.outcome = outcome  # type: ignore[assignment]
+        f.outcome = outcome
         f.exited_at = self._last_ts or f.entered_at
         # reflect 默认摘要
         if f.reflect is None and f.tool_result is not None:
@@ -737,7 +766,7 @@ class StepTreeAccumulatorDeriver(Deriver):
             tool_result=frame.tool_result,
             reflect=frame.reflect,
             segments=tuple(frame.segments),
-            outcome=frame.outcome,
+            outcome=_as_step_outcome(frame.outcome),
             extra={"window_signal": frame.window_signal},
         )
 
@@ -856,8 +885,8 @@ class StepTreeAccumulatorDeriver(Deriver):
         )
         return JournalDocument(
             schema="lca.journal/3.1",
-            run_id=self._run_id,
-            trace_id=self._run_id,
+            run_id=RunId(self._run_id),
+            trace_id=TraceId(self._run_id),
             started_at=self._first_ts or 0.0,
             steps=tuple(steps_list),
             metadata=meta,
@@ -866,7 +895,7 @@ class StepTreeAccumulatorDeriver(Deriver):
             phases=tuple(self._phases),
         )
 
-    def _resolve_outcome(self) -> str:
+    def _resolve_outcome(self) -> Literal["completed", "failed", "paused", "stopped", "in_progress"]:
         """决定 JournalMetadata.outcome。
 
         优先级:
@@ -877,7 +906,10 @@ class StepTreeAccumulatorDeriver(Deriver):
           3) 兜底:有 step → completed;否则 in_progress(旧启发式)。
         """
         if self._terminal_outcome:
-            return self._terminal_outcome
+            return cast(
+                "Literal['completed', 'failed', 'paused', 'stopped', 'in_progress']",
+                self._terminal_outcome,
+            )
         if self._last_ts is not None and (self._steps or self._phases):
             return "completed"
         return "completed" if self._steps else "in_progress"

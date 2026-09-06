@@ -16,6 +16,8 @@ incarnation 显式身份(ADR-0169 D6 / L14):
 
 from __future__ import annotations
 
+from typing import cast
+
 from lca.contracts.observability.core.incarnation import Incarnation
 from lca.infrastructure.observability.loop_cursor.spine._spine_port import WritePort
 from lca.infrastructure.observability.loop_cursor.std.std import StdLoopCursor
@@ -72,7 +74,7 @@ class LoopCursorFactory:
                 "Use RunSessionBuilder._compute_plan_ref to derive it before "
                 "constructing the cursor."
             )
-        plan_ref = profile.plan_ref
+        plan_ref = cast("str", getattr(profile, "plan_ref"))
         incarnation = Incarnation(
             run_id=run_id,
             plan_ref=str(plan_ref),

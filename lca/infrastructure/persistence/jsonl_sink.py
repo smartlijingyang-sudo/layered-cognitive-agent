@@ -19,9 +19,9 @@ from __future__ import annotations
 import contextlib
 import json
 import os
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from lca.infrastructure.persistence.write_behind import WriteBehindSink
 
@@ -108,9 +108,12 @@ def _default_serializer(event: Any) -> dict[str, Any]:
         pass
     if isinstance(event, dict):
         return event
-    if hasattr(event, "to_dict"):
-        return event.to_dict()
-    return dict(event)
+    to_dict = getattr(event, "to_dict", None)
+    if callable(to_dict):
+        return cast("dict[str, Any]", to_dict())
+    if isinstance(event, Mapping):
+        return dict(cast("Mapping[str, Any]", event))
+    raise TypeError(f"cannot serialize event of type {type(event).__name__}")
 
 
 __all__ = ["JsonlFileSink"]

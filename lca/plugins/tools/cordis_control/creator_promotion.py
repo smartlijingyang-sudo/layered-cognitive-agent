@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from lca.application.authoring.preset_authoring import PresetAuthoring
 from lca.contracts.atoms.artifact.state import ArtifactState
 from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.harness.composition.plugin_meta import PluginMeta
 from lca.contracts.harness.journal.artifact import (
     artifact_with_scope,
     capability_artifact_to_dict,
@@ -69,7 +70,7 @@ def promote(
     factory = PluginFactory(
         name=name,
         factory=item.factory,
-        plugin_meta=item.metadata,
+        plugin_meta=cast("PluginMeta", item.metadata),
         source_path=item.path,
     )
     try:

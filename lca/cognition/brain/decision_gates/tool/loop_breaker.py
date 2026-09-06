@@ -23,7 +23,10 @@ from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.execution.decision import Decision, ToolCall
 from lca.contracts.models.core.policy.gate_policy import GateDecided, PolicyFact
-from lca.contracts.models.core.policy.loop_policy import DEFAULT_LOOP_POLICY
+from lca.contracts.models.core.policy.loop_policy import (
+    DEFAULT_LOOP_POLICY,
+    LoopPolicyThresholds,
+)
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import DecisionGate
 from lca.infrastructure.session.context.turn_control_reader import iter_control_turns_reversed
@@ -39,7 +42,11 @@ _BLOCKED_STALLED_RATIONALE = (
 class ToolLoopBreakerGate(DecisionGate):
     """Block failed patterns and identical no-progress tool-call loops."""
 
-    def __init__(self, *, thresholds=DEFAULT_LOOP_POLICY) -> None:
+    def __init__(
+        self,
+        *,
+        thresholds: LoopPolicyThresholds = DEFAULT_LOOP_POLICY,
+    ) -> None:
         self._thresholds = thresholds
 
     async def enforce(self, state: AgentState, decision: Decision) -> Decision:

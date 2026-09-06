@@ -6,6 +6,8 @@ Imports are lazy to avoid harness ↔ infrastructure session binding cycles.
 
 from __future__ import annotations
 
+from typing import Any
+
 from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
@@ -14,7 +16,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
 )
 
 
-def _current_cursor():
+def _current_cursor() -> Any:
     from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
         current_cursor,
     )

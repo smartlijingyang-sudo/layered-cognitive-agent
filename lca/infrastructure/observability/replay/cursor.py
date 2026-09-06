@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import replace as dc_replace
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from lca.contracts.observability.evidence.replay import StepContextAt
 
@@ -103,8 +103,16 @@ class StandardCursor:
             new_act = dict(act)
             data_obj = new_act.get("data")
             tool_name = getattr(data_obj, "name", None) or getattr(data_obj, "tool_name", None)
-            if tool_name and tool_name in tool_args_overrides and hasattr(data_obj, "arguments"):
-                new_act["data"] = dc_replace(data_obj, arguments=tool_args_overrides[tool_name])
+            if (
+                tool_name
+                and tool_name in tool_args_overrides
+                and data_obj is not None
+                and hasattr(data_obj, "arguments")
+            ):
+                new_act["data"] = dc_replace(
+                    cast("Any", data_obj),
+                    arguments=tool_args_overrides[tool_name],
+                )
             new_actions.append(new_act)
         return StepContextAt(
             step_index=ctx.step_index,

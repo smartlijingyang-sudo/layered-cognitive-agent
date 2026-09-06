@@ -132,7 +132,7 @@ class SessionFactCommitter(FactCommitter):
                 payload=dict(payload),
             )
             return f"noop:context.manifested:{self._sequence}"
-        step = int(payload.get("step", 0))
+        step = int(str(payload.get("step", 0)))
         digest = str(payload.get("digest", ""))
         manifest = ContextManifest(items=(), digest=digest)
         receipt = emit_context_manifested(session, manifest, step=step, actor=node_ref)

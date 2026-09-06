@@ -41,6 +41,6 @@ def _not_implemented() -> None:
     effects="filesystem",
     description="S3 EventStorage (PR-10 TODO; not implemented in this milestone).",
 )
-def setup(ctx: PluginContext, config: Any) -> None:
+async def setup(ctx: PluginContext, config: Any) -> None:
     del ctx, config
     _not_implemented()

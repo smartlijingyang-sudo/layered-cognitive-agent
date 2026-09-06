@@ -7,8 +7,9 @@ logic for the v2 journal envelope.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
+from lca.contracts.atoms.ids.ids import RunId, TraceId
 from lca.contracts.models.observability.journal.journal import (
     Causation,
     DescriptorRef,
@@ -16,6 +17,81 @@ from lca.contracts.models.observability.journal.journal import (
     RunScope,
     StampedEvent,
 )
+
+
+def _mapping_value(value: object, *, field_name: str) -> Mapping[str, object]:
+    """Validate one JSON object before it enters the typed Journal envelope."""
+    if not isinstance(value, Mapping):
+        raise ValueError(f"JournalRecord.{field_name} must be an object")
+    return {str(key): item for key, item in value.items()}
+
+
+def _mapping_field(payload: Mapping[str, object], field_name: str) -> Mapping[str, object]:
+    value = payload.get(field_name, {})
+    if value is None:
+        return {}
+    return _mapping_value(value, field_name=field_name)
+
+
+def _sequence_field(payload: Mapping[str, object], field_name: str) -> tuple[object, ...]:
+    value = payload.get(field_name, ())
+    if value is None:
+        return ()
+    if isinstance(value, (str, bytes, bytearray)) or not isinstance(value, Sequence):
+        raise ValueError(f"JournalRecord.{field_name} must be an array")
+    return tuple(value)
+
+
+def _string_field(payload: Mapping[str, object], field_name: str, *, default: str = "") -> str:
+    value = payload.get(field_name, default)
+    if value is None:
+        return default
+    if not isinstance(value, str):
+        raise ValueError(f"JournalRecord.{field_name} must be a string")
+    return value
+
+
+def _optional_string_field(payload: Mapping[str, object], field_name: str) -> str | None:
+    value = payload.get(field_name)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"JournalRecord.{field_name} must be a string or null")
+    return value
+
+
+def _int_field(payload: Mapping[str, object], field_name: str, *, default: int = 0) -> int:
+    value = payload.get(field_name, default)
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        raise ValueError(f"JournalRecord.{field_name} must be an integer")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError as exc:
+            raise ValueError(f"JournalRecord.{field_name} must be an integer") from exc
+    raise ValueError(f"JournalRecord.{field_name} must be an integer")
+
+
+def _float_field(payload: Mapping[str, object], field_name: str, *, default: float = 0.0) -> float:
+    value = payload.get(field_name, default)
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        raise ValueError(f"JournalRecord.{field_name} must be a number")
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError as exc:
+            raise ValueError(f"JournalRecord.{field_name} must be a number") from exc
+    raise ValueError(f"JournalRecord.{field_name} must be a number")
 
 
 def causation_to_dict(causation: Causation) -> dict[str, object]:
@@ -28,12 +104,13 @@ def causation_to_dict(causation: Causation) -> dict[str, object]:
 
 def causation_from_dict(payload: Mapping[str, object]) -> Causation:
     """Deserialize Causation from a plain dict."""
-    links_raw = payload.get("links", ()) or ()
-    links: tuple[dict[str, str], ...] = tuple(
-        dict(item) for item in links_raw if isinstance(item, Mapping)
+    links = tuple(
+        {key: _string_field(link, key) for key in link}
+        for item in _sequence_field(payload, "links")
+        for link in (_mapping_value(item, field_name="causation.links[]"),)
     )
     return Causation(
-        parent_event_id=str(payload.get("parent_event_id", "")),
+        parent_event_id=_string_field(payload, "parent_event_id"),
         links=links,
     )
 
@@ -50,9 +127,9 @@ def descriptor_ref_to_dict(ref: DescriptorRef) -> dict[str, object]:
 def descriptor_ref_from_dict(payload: Mapping[str, object]) -> DescriptorRef:
     """Deserialize DescriptorRef from a plain dict."""
     return DescriptorRef(
-        type=str(payload.get("type", "")),
-        version=int(payload.get("version", 1)),
-        payload_schema_version=int(payload.get("payload_schema_version", 1)),
+        type=_string_field(payload, "type"),
+        version=_int_field(payload, "version", default=1),
+        payload_schema_version=_int_field(payload, "payload_schema_version", default=1),
     )
 
 
@@ -71,21 +148,16 @@ def scope_to_dict(scope: RunScope) -> dict[str, object]:
 
 def scope_from_dict(payload: Mapping[str, object]) -> RunScope:
     """Deserialize RunScope from a plain dict (preserves brand-typed fields)."""
-
-    def _opt_str(key: str) -> str | None:
-        value = payload.get(key)
-        if value is None:
-            return None
-        return str(value)
-
+    parent_run_id = _optional_string_field(payload, "parent_run_id")
+    parent_trace_id = _optional_string_field(payload, "parent_trace_id")
     return RunScope(
-        trace_id=str(payload.get("trace_id", "")),
-        run_id=str(payload.get("run_id", "")),
-        parent_run_id=_opt_str("parent_run_id"),
-        parent_trace_id=_opt_str("parent_trace_id"),
-        delegation_id=_opt_str("delegation_id"),
-        agent_role=str(payload.get("agent_role", "")),
-        step=int(payload.get("step", 0)),
+        trace_id=TraceId(_string_field(payload, "trace_id")),
+        run_id=RunId(_string_field(payload, "run_id")),
+        parent_run_id=RunId(parent_run_id) if parent_run_id is not None else None,
+        parent_trace_id=TraceId(parent_trace_id) if parent_trace_id is not None else None,
+        delegation_id=_optional_string_field(payload, "delegation_id"),
+        agent_role=_string_field(payload, "agent_role"),
+        step=_int_field(payload, "step"),
     )
 
 
@@ -111,27 +183,26 @@ def journal_record_from_dict(payload: Mapping[str, object]) -> JournalRecord:
     """Deserialize JournalRecord from a plain dict."""
     from lca.contracts.observability.evidence.evidence import EvidenceRef
 
-    scope_raw = payload.get("scope", {}) or {}
-    scope = scope_from_dict(scope_raw)
-    causation = causation_from_dict(payload.get("causation", {}) or {})
-    descriptor = descriptor_ref_from_dict(payload.get("descriptor", {}) or {})
-    evidence_raw = payload.get("evidence", ()) or ()
+    scope = scope_from_dict(_mapping_field(payload, "scope"))
+    causation = causation_from_dict(_mapping_field(payload, "causation"))
+    descriptor = descriptor_ref_from_dict(_mapping_field(payload, "descriptor"))
     evidence = tuple(
-        EvidenceRef.from_dict(item) for item in evidence_raw if isinstance(item, Mapping)
+        EvidenceRef.from_dict(_mapping_value(item, field_name="evidence[]"))
+        for item in _sequence_field(payload, "evidence")
     )
     return JournalRecord(
         schema="lca.journal/2",
-        event_id=str(payload.get("event_id", "")),
-        run_id=str(payload.get("run_id", "")),
-        run_seq=int(payload.get("run_seq", 0)),
-        occurred_at=float(payload.get("occurred_at", 0.0)),
-        committed_at=float(payload.get("committed_at", 0.0)),
+        event_id=_string_field(payload, "event_id"),
+        run_id=_string_field(payload, "run_id"),
+        run_seq=_int_field(payload, "run_seq"),
+        occurred_at=_float_field(payload, "occurred_at"),
+        committed_at=_float_field(payload, "committed_at"),
         scope=scope,
         causation=causation,
         descriptor=descriptor,
-        data=dict(payload.get("data", {}) or {}),
+        data=dict(_mapping_field(payload, "data")),
         evidence=evidence,
-        plan_ref=str(payload.get("plan_ref", "")),
+        plan_ref=_string_field(payload, "plan_ref"),
     )
 
 

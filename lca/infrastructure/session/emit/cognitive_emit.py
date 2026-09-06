@@ -8,7 +8,7 @@ Single production seam for ``gate.decided.v1``, ``context.manifested.v1``, and
 from __future__ import annotations
 
 import contextlib
-from typing import Any
+from typing import Any, cast
 
 from lca.contracts.harness.memory.events import (
     ContextManifestCommitted,
@@ -395,11 +395,11 @@ async def run_reasoner_generate_thoughts_with_spine_facts(
     if not callable(build_turn_plan) or not callable(render_turn) or not callable(complete_turn):
         return await reasoner.generate_thoughts(state)
 
-    plan: ReasonerTurnPlan = build_turn_plan(state)
+    plan: ReasonerTurnPlan = cast("ReasonerTurnPlan", build_turn_plan(state))
     with contextlib.suppress(Exception):
         emit_prompt_assembler_start_for_state(state, plan)
     try:
-        render: ReasonerTurnRender = render_turn(state, plan)
+        render: ReasonerTurnRender = cast("ReasonerTurnRender", render_turn(state, plan))
     except BaseException:
         with contextlib.suppress(Exception):
             emit_prompt_assembler_end_for_state(
@@ -418,7 +418,7 @@ async def run_reasoner_generate_thoughts_with_spine_facts(
     with contextlib.suppress(Exception):
         emit_reasoner_reason_start_for_state(state, state_id=plan.state_id)
     try:
-        response = await complete_turn(state, render)
+        response = await cast("Any", complete_turn(state, render))
     except BaseException:
         with contextlib.suppress(Exception):
             emit_reasoner_reason_end_for_state(
@@ -429,7 +429,7 @@ async def run_reasoner_generate_thoughts_with_spine_facts(
         raise
     with contextlib.suppress(Exception):
         emit_reasoner_reason_end_for_state(state, outcome="success", state_id=plan.state_id)
-    return response
+    return cast("LLMResponse", response)
 
 
 async def run_brain_think_with_spine_facts(brain: Brain, state: AgentState) -> Decision:

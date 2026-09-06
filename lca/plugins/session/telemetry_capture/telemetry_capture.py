@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 import structlog
 from pydantic import BaseModel, field_validator
@@ -213,12 +213,12 @@ class SessionTelemetryCapture:
                     return
                 self._contain(lambda: self.capture_session(sess, event.seq))
 
-            return session.observe(_feedback_observer)
+            return cast("Callable[[], None]", session.observe(_feedback_observer))
 
         def _observer(sess: Any, event: SessionEvent) -> None:
             self._contain(lambda: self._release(_session_id(sess), event))
 
-        return session.observe(_observer)
+        return cast("Callable[[], None]", session.observe(_observer))
 
     def register_redactor(self, hook: RedactionHook) -> Callable[[], None]:
         """注册脱敏钩子；返回幂等取消函数。
@@ -283,7 +283,7 @@ class SessionTelemetryCapture:
             current = result
         return current
 
-    def _contain(self, step: Callable[[], None]) -> None:
+    def _contain(self, step: Callable[[], object]) -> None:
         """捕获侧单步 contained：任何异常不得逃逸到 observer fire 链。"""
         try:
             step()
@@ -439,4 +439,4 @@ def _attach_to_store(store: Any, capture: SessionTelemetryCapture) -> None:
         raise TypeError(msg)
     cancel = hook(lambda session: _observe_contained(capture, session))
     if callable(cancel):
-        capture._store_hooks.append(cancel)
+        capture._store_hooks.append(cast("Callable[[], None]", cancel))

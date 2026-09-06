@@ -45,7 +45,7 @@ class RuntimeResultFinalizer(ResultFinalizer):
     async def finalize(
         self,
         *,
-        interpretation: InterpretationResult,
+        interpretation: object,
         plan_ref: str,
         journal_sequence: int,
     ) -> Result:
@@ -54,6 +54,8 @@ class RuntimeResultFinalizer(ResultFinalizer):
         ADR-0158 决策 二:closure 不再经 reducer 流,改走 transport projection
         通道。reducer 仍是 state 唯一 writer(ADR-0070 C4)。
         """
+        if not isinstance(interpretation, InterpretationResult):
+            raise TypeError("RuntimeResultFinalizer.finalize requires InterpretationResult")
         final_state = interpretation.state
 
         outcome = interpretation.outcome

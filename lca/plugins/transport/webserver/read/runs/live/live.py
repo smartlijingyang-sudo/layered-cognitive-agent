@@ -63,7 +63,8 @@ async def stream_chat_completion(
                 return
     finally:
         if hasattr(session.tail, "_subscribers"):
-            for sub in list(session.tail._subscribers):
+            subscribers = getattr(session.tail, "_subscribers", ())
+            for sub in list(subscribers):
                 with contextlib.suppress(Exception):
                     sub.queue.put_nowait(None)
 

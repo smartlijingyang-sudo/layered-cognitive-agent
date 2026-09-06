@@ -215,8 +215,10 @@ class OtelTelemetryBackend:
         with self._lock:
             if self._started or self._closed:
                 return
-            self._provider = self._build_provider()
-            self._logger = self._provider.get_logger(_SCOPE)
+            provider = self._build_provider()
+            assert provider is not None
+            self._provider = provider
+            self._logger = provider.get_logger(_SCOPE)
             self._worker = threading.Thread(target=self._run, daemon=True)
             self._started = True
             self._worker.start()
@@ -268,7 +270,9 @@ class OtelTelemetryBackend:
             return self._exporter_override
         if self._otlp_endpoint:
             try:
-                from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+                from opentelemetry.exporter.otlp.proto.http._log_exporter import (  # type: ignore[import-not-found]
+                    OTLPLogExporter,
+                )
             except ImportError:
                 _log.warning("session.telemetry.otlp_exporter_unavailable")
             else:

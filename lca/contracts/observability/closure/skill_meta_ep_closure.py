@@ -34,49 +34,46 @@ SKILL_META_EVENT_POINTS: Final[tuple[str, ...]] = (
 _EMITTER = "lca.infrastructure.tools.skills"
 
 
-def all_skill_meta_event_descriptors() -> tuple[EventDescriptor, ...]:
-    common = dict(
+def _skill_meta_descriptor(
+    type_name: str,
+    description: str,
+    *,
+    required: tuple[str, ...],
+) -> EventDescriptor:
+    return EventDescriptor(
+        type_name=type_name,
+        emitter=_EMITTER,
+        description=description,
         plane=EventPlane.STRUCTURAL,
         domain="event",
         durability=EventDurability.REQUIRED,
         audience=EventAudience.AUDITOR,
         sensitivity=EventSensitivity.INTERNAL,
-        required=("skill_id",),
+        required=required,
     )
+
+
+def all_skill_meta_event_descriptors() -> tuple[EventDescriptor, ...]:
     return (
-        EventDescriptor(
-            type_name=SKILL_PACKAGE_INSTALLED,
-            emitter=_EMITTER,
-            description="Global skill package installed to local store",
-            **common,
+        _skill_meta_descriptor(
+            SKILL_PACKAGE_INSTALLED,
+            "Global skill package installed to local store",
+            required=("skill_id",),
         ),
-        EventDescriptor(
-            type_name=SKILL_PACKAGE_INSTALL_FAILED,
-            emitter=_EMITTER,
-            description="Global skill package install rejected",
+        _skill_meta_descriptor(
+            SKILL_PACKAGE_INSTALL_FAILED,
+            "Global skill package install rejected",
             required=("reason",),
-            plane=EventPlane.STRUCTURAL,
-            domain="event",
-            durability=EventDurability.REQUIRED,
-            audience=EventAudience.AUDITOR,
-            sensitivity=EventSensitivity.INTERNAL,
         ),
-        EventDescriptor(
-            type_name=SKILL_PACKAGE_ACTIVATED,
-            emitter=_EMITTER,
-            description="Global skill activated into agent context",
-            **common,
+        _skill_meta_descriptor(
+            SKILL_PACKAGE_ACTIVATED,
+            "Global skill activated into agent context",
+            required=("skill_id",),
         ),
-        EventDescriptor(
-            type_name=SKILL_PACKAGE_SEARCHED,
-            emitter=_EMITTER,
-            description="Skill market/local search executed",
+        _skill_meta_descriptor(
+            SKILL_PACKAGE_SEARCHED,
+            "Skill market/local search executed",
             required=("query", "result_count"),
-            plane=EventPlane.STRUCTURAL,
-            domain="event",
-            durability=EventDurability.REQUIRED,
-            audience=EventAudience.AUDITOR,
-            sensitivity=EventSensitivity.INTERNAL,
         ),
     )
 
@@ -84,8 +81,8 @@ def all_skill_meta_event_descriptors() -> tuple[EventDescriptor, ...]:
 __all__ = [
     "SKILL_META_EVENT_POINTS",
     "SKILL_PACKAGE_ACTIVATED",
-    "SKILL_PACKAGE_INSTALL_FAILED",
     "SKILL_PACKAGE_INSTALLED",
+    "SKILL_PACKAGE_INSTALL_FAILED",
     "SKILL_PACKAGE_SEARCHED",
     "all_skill_meta_event_descriptors",
 ]

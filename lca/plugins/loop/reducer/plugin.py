@@ -9,7 +9,7 @@ from __future__ import annotations
 import functools
 import logging
 from collections.abc import Callable
-from typing import TYPE_CHECKING, ParamSpec, TypeVar, overload
+from typing import TYPE_CHECKING, ParamSpec, TypeVar, cast, overload
 
 from pydantic import BaseModel
 
@@ -207,8 +207,9 @@ class DefaultReducer(Reducer):
             from lca.infrastructure.session.context.turn_control_reader import (
                 append_turn_control_fact,
             )
+            from lca_kernel.events.session.session import SessionProtocol
 
-            append_turn_control_fact(writer, turn)
+            append_turn_control_fact(cast("SessionProtocol", writer), turn)
         return result
 
     @_instrument_apply

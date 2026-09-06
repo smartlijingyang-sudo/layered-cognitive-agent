@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from lca.contracts.observability.infra.coding_agent_tools import TraceInspectorTool
+from lca.infrastructure.observability.stream.trace_inspector import TraceFocus
 from lca.plugins.tools.diagnostics.helpers._helpers import (
     _load_inspector_from_jsonl,
     _serialize_report,
@@ -26,7 +27,9 @@ class TraceInspectorToolAdapter(TraceInspectorTool):
         depth: int = 24,
     ) -> dict[str, Any]:
         inspector = _load_inspector_from_jsonl(self._path)
-        report = inspector.inspect_trace(run_id=run_id, focus=focus, depth=depth)
+        report = inspector.inspect_trace(
+            run_id=run_id, focus=cast("TraceFocus", focus), depth=depth
+        )
         return _serialize_report(report)
 
 

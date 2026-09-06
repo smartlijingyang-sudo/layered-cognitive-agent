@@ -131,6 +131,7 @@ def _build_bindings(
             raise CapabilityPlanResolveError(
                 f"plugin {plugin.id}: multiple effect classes are ambiguous: {effect_classes}"
             )
+        effect_class = effect_classes[0] if effect_classes else "none"
         for capability in spec.provides:
             requirement = runtime_closure_requirement(capability.key)
             bindings.append(
@@ -138,7 +139,7 @@ def _build_bindings(
                     capability=capability.key,
                     owner_plugin=plugin.id,
                     resolution_key=capability.resolution_key or capability.key,
-                    effect_class=effect_classes[0],
+                    effect_class=effect_class,
                     revision=spec.revision,
                     required_in_production=requirement is not None,
                     fallback_policy=(

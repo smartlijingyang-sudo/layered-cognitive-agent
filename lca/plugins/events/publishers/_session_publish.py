@@ -33,14 +33,14 @@ def _authorize_producer(payload: Any, producer: Any) -> None:
     from lca_kernel.events.bus.bus import EnvelopeBus
     from lca_kernel.events.errors.errors import UnauthorizedPublishError
 
-    bus = EnvelopeBus.default()
+    bus: EnvelopeBus[Any] = EnvelopeBus.default()
     coerce = getattr(bus, "_coerce_producer", None)
     producer_cls = coerce(producer) if callable(coerce) else producer
     category = getattr(payload, "category", None)
     if category is None or producer_cls is None:
         return
     registry = bus.registry
-    if not registry.can_publish(producer_cls, category):
+    if not registry.can_publish(cast("type | str", producer_cls), category):
         identifier = getattr(producer_cls, "__name__", str(producer_cls))
         cat_value = getattr(category, "value", category)
         raise UnauthorizedPublishError(identifier, cat_value)

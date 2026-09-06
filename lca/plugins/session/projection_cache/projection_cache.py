@@ -137,7 +137,10 @@ class ProjectionCache:
         flush_cancel: Callable[[], None] | None = None
         register_flush = getattr(session, "register_flush_listener", None)
         if callable(register_flush):
-            flush_cancel = register_flush(_ProjectionCacheFlushListener(self))
+            flush_cancel = cast(
+                "Callable[[], None] | None",
+                register_flush(_ProjectionCacheFlushListener(self)),
+            )
 
         def cancel() -> None:
             observe_cancel()
@@ -324,7 +327,7 @@ def _attach_to_store(store: Any, cache: ProjectionCache) -> None:
 
     cancel = hook(_on_create)
     if callable(cancel):
-        cache._store_hooks.append(cancel)
+        cache._store_hooks.append(cast("Callable[[], None]", cancel))
 
 
 @plugin(

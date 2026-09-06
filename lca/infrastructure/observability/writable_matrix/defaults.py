@@ -180,7 +180,7 @@ class NdjsonSerializer:
 def _iso(v: Any) -> str | None:
     if isinstance(v, datetime):
         return v.isoformat()
-    return None  # type: ignore[returnNone]
+    return None
 
 
 # ── Storage ───────────────────────────────────────────────────────

@@ -216,6 +216,7 @@ class PromptReasoner:
             template_id=plan.template_id,
             decision_path=plan.decision_path,
         )
+        variant: str | None
         if trace is not None:
             activated_skill_ids = trace.activated_skill_ids
             total_chars = trace.total_chars

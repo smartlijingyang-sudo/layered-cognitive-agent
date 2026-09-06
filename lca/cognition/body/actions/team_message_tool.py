@@ -11,6 +11,8 @@ next think's ``ContextManifest``.
 
 from __future__ import annotations
 
+from typing import Any, ClassVar
+
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.observability.journal.journal import TeamMessagePublished
 
@@ -31,20 +33,20 @@ def publish_team_message(
     ``use_tool`` pipeline.
     """
     from lca.contracts.models.observability.act.journal_receipt import (
-        team_message_published_receipt,
+        ActJournalReceipt,
     )
     from lca.loop.commit.act_journal import commit_act_journal_receipt
 
-    receipt = team_message_published_receipt(
+    event = TeamMessagePublished(
         team_id=team_id,
         thread_id=thread_id,
         sender_role=sender_role,
         recipient_role=recipient_role,
-        body_preview=body,
         step=step,
+        body_preview=body,
     )
-    commit_act_journal_receipt(receipt)
-    return receipt.journal_event
+    commit_act_journal_receipt(ActJournalReceipt(journal_event=event))
+    return event
 
 
 TEAM_MESSAGE_TOOL_NAME = "team.message-publish"
@@ -60,21 +62,20 @@ def build_team_message_publish_tool() -> object:
     from lca.contracts.protocols.runtime.infra.infra import Tool
 
     class _TeamMessagePublishTool(Tool):
-        def __init__(self) -> None:
-            self.name = TEAM_MESSAGE_TOOL_NAME
-            self.description = "Publish a message on the team's topic."
-            self.parameters = {
-                "type": "object",
-                "properties": {
-                    "team_id": {"type": "string"},
-                    "thread_id": {"type": "string"},
-                    "recipient_role": {"type": "string"},
-                    "body": {"type": "string"},
-                },
-                "required": ["team_id", "thread_id", "recipient_role", "body"],
-            }
-            self.is_idempotent = True
-            self.default_timeout_s = 5
+        name = TEAM_MESSAGE_TOOL_NAME
+        description = "Publish a message on the team's topic."
+        parameters: ClassVar[dict[str, Any]] = {
+            "type": "object",
+            "properties": {
+                "team_id": {"type": "string"},
+                "thread_id": {"type": "string"},
+                "recipient_role": {"type": "string"},
+                "body": {"type": "string"},
+            },
+            "required": ["team_id", "thread_id", "recipient_role", "body"],
+        }
+        is_idempotent = True
+        default_timeout_s = 5
 
         async def execute(self, args: dict) -> Observation:
             event = publish_team_message(

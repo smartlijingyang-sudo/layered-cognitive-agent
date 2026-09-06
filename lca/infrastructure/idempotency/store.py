@@ -16,7 +16,7 @@ from dataclasses import fields, is_dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.protocols.journal.idempotency.idempotency import (
@@ -180,8 +180,10 @@ def _decode_receipt(value: object) -> object:
         raw_fields = value.get("fields")
         if not isinstance(raw_fields, dict):
             raise TypeError("Observation receipt fields must be an object")
-        decoded = {key: _decode_receipt(item) for key, item in raw_fields.items()}
-        return Observation(**decoded)
+        fields: dict[str, Any] = {
+            str(key): _decode_receipt(item) for key, item in raw_fields.items()
+        }
+        return Observation(**fields)
     if "__lca_type__" in value:
         raise TypeError(f"unsupported receipt type tag: {kind!r}")
     return {str(key): _decode_receipt(item) for key, item in value.items()}

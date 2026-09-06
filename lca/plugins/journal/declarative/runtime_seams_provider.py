@@ -31,8 +31,10 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
+from lca.contracts.protocols.gate.loop_guard import LoopGuardEvaluator
 from lca.contracts.protocols.journal.artifact.closure import ArtifactClosure
 from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
+from lca.contracts.protocols.journal.phase.observation import PhaseObserver
 from lca.contracts.protocols.runtime.infra.infra import StateStore
 from lca.contracts.protocols.runtime.runtime.composition import (
     CheckpointStateResolver,
@@ -139,8 +141,8 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
                 journal=journal,
                 effect_gateway=effect_gateway,
                 reducer=reducer,
-                phase_observer=phase_observer,
-                loop_guard_evaluator=self._loop_guard_evaluator,
+                phase_observer=cast("PhaseObserver | None", phase_observer),
+                loop_guard_evaluator=cast("LoopGuardEvaluator | None", self._loop_guard_evaluator),
                 lifecycle_publisher=lifecycle_publisher,
             ),
         )

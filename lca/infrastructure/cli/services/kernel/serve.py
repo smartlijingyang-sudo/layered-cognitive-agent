@@ -19,6 +19,7 @@ import contextlib
 import subprocess
 import time
 from pathlib import Path
+from typing import Protocol, cast
 
 from lca.infrastructure.cli.config.config import KernelServeConfig
 from lca.infrastructure.cli.service.service import (
@@ -32,6 +33,10 @@ from lca.infrastructure.cli.services.process.utils import (
     find_pid_by_argv,
     port_listening,
 )
+
+
+class _ProcessLike(Protocol):
+    def send_signal(self, sig: int) -> None: ...
 
 
 class KernelServeService:
@@ -96,7 +101,7 @@ class KernelServeService:
         existing_pid = find_pid_by_argv("lca_kernel", "serve")
         if existing_pid is not None:
             with contextlib.suppress(ProcessLookupError):
-                existing_pid.send_signal(15)  # SIGTERM → K6 dispose → exit
+                cast("_ProcessLike", existing_pid).send_signal(15)  # SIGTERM → K6 dispose → exit
             # 等端口彻底空闲(给 K6 留出 dispose 时间)
             deadline = time.monotonic() + 10.0
             while time.monotonic() < deadline:
@@ -155,6 +160,15 @@ class KernelServeService:
             "请直接 `uv run python -m lca_kernel serve ...` "
             "或跑 `./scripts/lca-ops heal` 自愈。"
         )
+
+    def stop(self) -> ServiceState:  # pragma: no cover - intentional stub
+        raise NotImplementedError(
+            "lca-ops 不提供 `lca-ops kernel_serve stop`。"
+            "SIGTERM 由 K6 ``lca_kernel.lifecycle`` 守护。"
+        )
+
+    def ensure_ready(self) -> bool:  # pragma: no cover - intentional stub
+        return False
 
 
 __all__ = ["KernelServeService"]

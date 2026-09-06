@@ -48,11 +48,11 @@ class Tool(Protocol):
     手工描述参数格式。
     """
 
-    name: str
-    description: str
+    name: ClassVar[str]
+    description: ClassVar[str]
     parameters: ClassVar[dict[str, Any]]
-    is_idempotent: bool
-    default_timeout_s: int
+    is_idempotent: ClassVar[bool]
+    default_timeout_s: ClassVar[int]
 
     async def execute(self, args: dict[str, Any]) -> Observation: ...
 

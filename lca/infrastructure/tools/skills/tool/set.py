@@ -7,7 +7,7 @@ from lca.contracts.protocols.memory.operational_skills import (
     SkillImporter,
     SkillPackageInstaller,
 )
-from lca.infrastructure.file.store import FileStore
+from lca.infrastructure.file.store import FileStore, LocalFileStore
 from lca.infrastructure.skills.factory.factory import resolve_skill_importer
 from lca.infrastructure.tools.skills.activate.tool import SkillActivateTool
 from lca.infrastructure.tools.skills.exec.tool import SkillExecTool
@@ -43,7 +43,7 @@ def build_operational_skill_tools(
             SkillExecTool(
                 sandbox=sandbox,
                 store=resolved_store,
-                file_store=file_store,
+                file_store=file_store if file_store is not None else LocalFileStore(),
             )
         )
     return tools

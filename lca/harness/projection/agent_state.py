@@ -39,7 +39,6 @@ class AgentStateProjection:
             agent_role="",
             from_role="",
             team_awareness=None,
-            history=[],
             last_error=None,
             active_template=None,
             activated_skills=[],

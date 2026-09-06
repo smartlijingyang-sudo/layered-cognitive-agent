@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import typer
 
@@ -19,7 +20,7 @@ def _spine_path(run_id: str, traces_root: Path) -> Path:
     return traces_root / "runs" / run_id / f"{run_id}.spine.jsonl"
 
 
-def _load_run_events(run_id: str, traces_root: Path):
+def _load_run_events(run_id: str, traces_root: Path) -> tuple[Any, ...]:
     path = _spine_path(run_id, traces_root)
     if not path.exists():
         typer.echo(f"spine ledger not found: {path}", err=True)
@@ -42,7 +43,7 @@ def register(app: typer.Typer) -> None:
         turn: int | None = typer.Option(None, "--turn", help="filter by turn"),
         step: int | None = typer.Option(None, "--step", help="filter by step"),
         json_output: bool = typer.Option(False, "--json", help="JSON lines output"),
-        traces_root: Path = typer.Option(  # noqa: B008
+        traces_root: Path = typer.Option(
             _DEFAULT_TRACES_ROOT,
             "--traces-root",
             help="traces root directory",
@@ -81,7 +82,7 @@ def register(app: typer.Typer) -> None:
     def tools_cmd(
         run_id: str = typer.Argument(..., help="run_id"),
         json_output: bool = typer.Option(False, "--json", help="JSON output"),
-        traces_root: Path = typer.Option(  # noqa: B008
+        traces_root: Path = typer.Option(
             _DEFAULT_TRACES_ROOT,
             "--traces-root",
             help="traces root directory",
@@ -120,7 +121,7 @@ def register(app: typer.Typer) -> None:
     def transcript_cmd(
         run_id: str = typer.Argument(..., help="run_id"),
         json_output: bool = typer.Option(False, "--json", help="JSON output"),
-        traces_root: Path = typer.Option(  # noqa: B008
+        traces_root: Path = typer.Option(
             _DEFAULT_TRACES_ROOT,
             "--traces-root",
             help="traces root directory",

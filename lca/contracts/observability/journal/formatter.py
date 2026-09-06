@@ -22,12 +22,13 @@ class JournalFormatter(Protocol):
     @property
     def name(self) -> str:
         """formatter 注册名（如 'console' / 'fact_stream' / 'jsonl'）。"""
-
+        ...
     def render_event(self, stamped: StampedEvent) -> str:
         """渲染单条事件为字符串（含末尾换行）。"""
-
+        ...
     def flush(self) -> str:
         """冲刷内部缓冲，返回未发送的字符串（空字符串表示已 flush）。"""
-
+        ...
     def close(self) -> str:
         """关闭 formatter，返回终结片段（如 SSE sentinel / JSONL 末尾空行）。"""
+        ...

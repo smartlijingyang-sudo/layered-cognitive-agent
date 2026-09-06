@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import contextlib
 import functools
-from collections.abc import Awaitable, Callable
-from typing import ParamSpec, TypeVar
+from collections.abc import Callable, Coroutine
+from typing import Any, ParamSpec, TypeVar
 
 from lca.contracts.models.core.state.state import AgentState
 from lca.loop.fact_gateway import publish_ep_bound
@@ -28,14 +28,14 @@ def with_spine_envelope(
     *,
     state_id_arg: str = "state",
     actor: str = "cognition",
-) -> Callable[[Callable[_P, Awaitable[_R]]], Callable[_P, Awaitable[_R]]]:
+) -> Callable[[Callable[_P, Coroutine[Any, Any, _R]]], Callable[_P, Coroutine[Any, Any, _R]]]:
     """Wrap ``point``'s execution in a start/end spine envelope via ``publish_ep_bound``."""
 
     start_ep, end_ep = _execution_points(point)
 
     def decorator(
-        fn: Callable[_P, Awaitable[_R]],
-    ) -> Callable[_P, Awaitable[_R]]:
+        fn: Callable[_P, Coroutine[Any, Any, _R]],
+    ) -> Callable[_P, Coroutine[Any, Any, _R]]:
         @functools.wraps(fn)
         async def wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
             state_obj = kwargs.get(state_id_arg) or (args[0] if args else None)

@@ -177,7 +177,7 @@ async def _serve_async(
                 },
             )
             # bind kernel 给 coordinator(供 SIGTERM 触发 LIFO dispose)
-            coordinator._kernel = ctx  # type: ignore[attr-defined]
+            coordinator._kernel = ctx
 
             # 步骤 7: lca-web-server plugin 已在 K3 装好 Starlette + 装 routes + 装 ASGI state;
             # 这里从 ctx 拿 web_server 句柄,await 触发 uvicorn 监听

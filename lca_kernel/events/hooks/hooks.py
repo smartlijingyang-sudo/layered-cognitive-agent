@@ -19,9 +19,8 @@ from lca.contracts.event import Category, EventPayload
 from lca_kernel.events.payloads.payloads import MechanismDispatchEventPayload
 
 if TYPE_CHECKING:
-    from lca_kernel.events.bus.bus import EventBus
+    from lca_kernel.events.bus.bus import EventBus, EventRef
     from lca_kernel.events.registry.registry import EventSpec
-    from lca_kernel.events.spine.runtime import EventRef
 
 # ── 公开枚举 / 哨兵 ──────────────────────────────────────────────────────
 

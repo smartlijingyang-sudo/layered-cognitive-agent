@@ -134,10 +134,14 @@ class _StepTreeBundle:
         """写 journal.json + narrative.md。"""
         if self.deriver is None:
             return
-        self.deriver.flush(outcome=outcome)
+        flush = getattr(self.deriver, "flush", None)
+        if callable(flush):
+            flush(outcome=outcome)
         document = getattr(self.deriver, "document", None)
-        if document is not None and hasattr(self.narrative_writer, "write"):
-            self.narrative_writer.write(document)
+        if document is not None:
+            write_fn = getattr(self.narrative_writer, "write", None)
+            if callable(write_fn):
+                write_fn(document)
 
 
 @plugin(

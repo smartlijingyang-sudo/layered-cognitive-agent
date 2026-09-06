@@ -86,7 +86,7 @@ def migrate_rows(integration: ComposioIntegration, rows: list[dict[str, Any]]) -
 def fetch_lobehub_rows(database_url: str) -> list[dict[str, Any]]:
     """Read Composio rows from LobeHub Postgres (plugins + connectors)."""
     try:
-        import psycopg
+        import psycopg  # type: ignore[import-not-found]
     except ImportError as exc:
         raise RuntimeError(
             "DB migration requires psycopg. Install with: uv add psycopg[binary]"

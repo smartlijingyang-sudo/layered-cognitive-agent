@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Any, cast
 
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols.act.command.envelope import RunDelta, RunFact
@@ -68,7 +69,7 @@ def _failure_to_dict(failure: object) -> object:
             "attempt_count": len(failure.attempts),
         }
     if dataclasses.is_dataclass(failure):
-        return dataclasses.asdict(failure)
+        return dataclasses.asdict(cast("Any", failure))
     if isinstance(failure, Mapping):
         return dict(failure)
     # Strings and other scalars serialize to a single ``message`` field

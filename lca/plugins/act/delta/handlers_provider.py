@@ -17,7 +17,8 @@ ADR-0074：把所有 Reducer 操作的可插拔 handler 注册到 registry，run
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, cast
 
 from pydantic import BaseModel
 
@@ -98,18 +99,18 @@ class TurnDeltaHandler(DeltaHandler):
         turn: Turn = _extract_turn(delta.metadata)
         commit = getattr(reducer, "commit_turn", None)
         if callable(commit):
-            return commit(state, turn)
+            return cast("AgentState", commit(state, turn))
         return reducer.apply_turn(state, turn)
 
 
-def _extract_turn(metadata: dict[str, Any]) -> Turn:
+def _extract_turn(metadata: Mapping[str, Any]) -> Turn:
     """从 metadata 提取 Turn：优先 ``metadata["turn"]``，否则从组件构造。
 
     common.py 的 StandardPhaseExecutor 将 decision / observation / reflection
     分别放入 metadata，而非预构造 Turn 对象。本函数兼容两种格式。
     """
     if "turn" in metadata:
-        return metadata["turn"]
+        return cast("Turn", metadata["turn"])
     # 从组件构造 Turn（兼容 common.py 的标准输出）
     return Turn(
         decision=metadata["decision"],

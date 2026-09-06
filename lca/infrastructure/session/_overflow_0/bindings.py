@@ -5,7 +5,7 @@ from __future__ import annotations
 import contextvars
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, cast
 
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.session.checkpoint.policy import (
@@ -20,6 +20,7 @@ from lca.infrastructure.session.context.model_context_assembler import (
     default_model_context_assembler,
 )
 from lca.plugins.events.publishers._session_publish import current_publish_session
+from lca.session.append import Session
 
 _model_context_assembler: contextvars.ContextVar[ModelContextAssembler | None] = (
     contextvars.ContextVar("lca_model_context_assembler", default=None)
@@ -30,11 +31,10 @@ _checkpoint_policy_var: contextvars.ContextVar[SessionCheckpointPolicyProtocol |
 _default_checkpoint_policy: SessionCheckpointPolicyProtocol | None = None
 
 
-def _resolve_runtime_session(target: object | None) -> object | None:
+def _resolve_runtime_session(target: object | None) -> Session | None:
     if target is None:
         return None
     from lca.plugins.session.runtime.bus.facade import SessionBusFacade
-    from lca.session.append import Session
 
     if isinstance(target, Session):
         return target
@@ -59,7 +59,7 @@ def resolve_session_reader() -> SessionReader | None:
 
 def resolve_flushable_session() -> FlushableSession | None:
     """Bound runtime Session for checkpoint ``flush()``, or ``None``."""
-    return resolve_session_reader()
+    return _resolve_runtime_session(current_publish_session())
 
 
 def resolve_session_for_emit(state: AgentState | None = None) -> object | None:
@@ -93,8 +93,13 @@ def _resolve_checkpoint_policy() -> SessionCheckpointPolicyProtocol:
             SessionCheckpointPolicy,
         )
 
-        _default_checkpoint_policy = SessionCheckpointPolicy(enabled=True)
-    return _default_checkpoint_policy
+        _default_checkpoint_policy = cast(
+            "SessionCheckpointPolicyProtocol",
+            SessionCheckpointPolicy(enabled=True),
+        )
+    policy = _default_checkpoint_policy
+    assert policy is not None
+    return policy
 
 
 def assemble_model_history(*, step: int) -> list[dict[str, Any]]:

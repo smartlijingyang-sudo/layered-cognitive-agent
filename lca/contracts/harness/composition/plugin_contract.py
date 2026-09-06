@@ -28,8 +28,9 @@ ADR-0110 PR-A：本模块新增 ``compose_plugin_contract`` / ``logic_address_to
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from lca.contracts.atoms.control.slot import ControlSlot, validate_slot_iterable
 from lca.contracts.atoms.functional.group import (
@@ -106,7 +107,8 @@ class LifecycleContract:
     def __post_init__(self) -> None:
         if not isinstance(self.allowed_scopes, tuple):
             scopes: list[Scope] = []
-            for s in self.allowed_scopes:
+            raw_scopes = cast("Sequence[Scope | str]", self.allowed_scopes)
+            for s in raw_scopes:
                 scopes.append(s if isinstance(s, Scope) else parse_scope(s))
             object.__setattr__(self, "allowed_scopes", tuple(scopes))
 

@@ -13,8 +13,9 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from lca.contracts.observability import ExceptionRecord as ExceptionRecordT
+from lca.contracts.observability.evidence.outcome import Outcome
 from lca.harness.declarative.compile.instrument.wrap import resolve_active_spine
-from lca.infrastructure.observability.spine.event.record import EventRecord
+from lca.infrastructure.observability.spine.event.record import Channel, EventRecord
 
 _EXECUTION_POINT = "exception.caught"
 _CHANNEL_ERROR: Literal["error"] = "error"
@@ -25,9 +26,9 @@ _EMIT_ACTOR = "exception.emit"
 def _safe_append(
     *,
     execution_point: str,
-    channel: str,
+    channel: Channel,
     payload: dict[str, Any] | None = None,
-    outcome: str | None = None,
+    outcome: Outcome | None = None,
 ) -> EventRecord | None:
     """Append via process-local spine accessor (tests / unwired runs)."""
     spine = resolve_active_spine()

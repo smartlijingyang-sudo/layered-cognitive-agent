@@ -28,6 +28,8 @@ class SessionCheckpointPolicyProtocol(Protocol):
 
     async def before_tool_side_effect(self, session: FlushableSession) -> None: ...
 
+    async def at_step_boundary(self, session: FlushableSession) -> None: ...
+
 
 __all__ = [
     "CheckpointFailure",

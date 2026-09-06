@@ -8,23 +8,32 @@ from __future__ import annotations
 
 import socket
 from pathlib import Path
+from typing import Protocol, cast
 
 
-def find_pid_by_argv(*needles: str) -> object | None:
+class ProcessHandle(Protocol):
+    """Minimal process interface for signal-based lifecycle helpers."""
+
+    pid: int
+
+    def send_signal(self, sig: int) -> None: ...
+
+
+def find_pid_by_argv(*needles: str) -> ProcessHandle | None:
     """Return the first PID whose ``/proc/<pid>/cmdline`` contains all needles.
 
-    Returns ``None`` when nothing matches. The return value is typed as
-    ``object`` (a ``psutil.Process``-like proxy from ``psutil`` if installed,
-    else a minimal stand-in) so callers don't import psutil directly.
+    Returns ``None`` when nothing matches. The return value is a minimal
+    process handle (``psutil.Process`` when installed, else a ``/proc`` proxy)
+    so callers can send signals without importing psutil directly.
     """
     try:
-        import psutil  # type: ignore[import-not-found]
+        import psutil  # type: ignore[import-untyped]
 
         for proc in psutil.process_iter(["pid", "cmdline"]):
             cmdline = proc.info.get("cmdline") or []
             joined = " ".join(cmdline)
             if all(needle in joined for needle in needles):
-                return proc
+                return cast("ProcessHandle", proc)
         return None
     except ImportError:
         # Fall back to /proc scan (Linux only); returns a minimal stand-in.
@@ -62,4 +71,4 @@ class _ProcfsProxy:
             os.kill(self.pid, sig)
 
 
-__all__ = ["find_pid_by_argv", "port_listening"]
+__all__ = ["ProcessHandle", "find_pid_by_argv", "port_listening"]

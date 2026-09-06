@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
+from typing import Any, cast
 
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.harness.memory.events import TurnControlCommitted
@@ -12,7 +13,7 @@ from lca.contracts.models.core.state.state import AgentState
 from lca.harness.session.emit import emit
 from lca.infrastructure.session._overflow_0.bindings import resolve_session_reader
 from lca.plugins.session.session_turn_control.session_turn_control import TurnControlUnit
-from lca_kernel.events.session.session import SessionEvent
+from lca_kernel.events.session.session import SessionEvent, SessionProtocol
 
 _TURN_CONTROL = "turn.control.v1"
 
@@ -40,7 +41,7 @@ class ControlTurnView:
     observation_error: str | None = None
 
 
-def append_turn_control_fact(session: object, turn: Turn) -> None:
+def append_turn_control_fact(session: SessionProtocol, turn: Turn) -> None:
     """Append one ``turn.control.v1`` fact for TurnControlUnit fold."""
     decision = turn.decision
     tool_name = decision.tool_calls[0].tool_name if decision.tool_calls else None
@@ -94,7 +95,7 @@ def projected_control_turns(state: AgentState) -> tuple[ControlTurnView, ...] | 
     snapshot = getattr(session, "snapshot_events", None)
     if not callable(snapshot):
         return None
-    folded = fold_control_turns_from_events(tuple(snapshot()))
+    folded = fold_control_turns_from_events(tuple(cast("Any", snapshot)()))
     return folded
 
 

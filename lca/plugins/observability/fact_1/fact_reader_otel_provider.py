@@ -72,10 +72,11 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         settings: ObservabilitySettings | None = None,
         *,
         tracer: Any = None,
-        **_: Any,
+        **unused: Any,
     ) -> JournalProjector:
         # tracer 由 assemble 阶段按 kwarg 注入；此处不主动构造
-        _ = settings
+        del unused
+        _settings = settings
         return OtelProjector(tracer, genai_mapper_registry=None)
 
     registry.register("otel", _make_otel_reader)

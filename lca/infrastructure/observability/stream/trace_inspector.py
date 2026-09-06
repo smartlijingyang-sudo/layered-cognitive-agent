@@ -241,7 +241,9 @@ class TraceInspector:
                 if "source_location" in stamped.data:
                     failure["source_location"] = stamped.data["source_location"]
                 if "call_frames" in stamped.data:
-                    failure["call_frames"] = list(stamped.data["call_frames"])
+                    call_frames = stamped.data["call_frames"]
+                    if isinstance(call_frames, (list, tuple)):
+                        failure["call_frames"] = list(call_frames)
         rendered: dict[str, Any] = {
             "seq": stamped.seq,
             "time": stamped.ts,

@@ -62,6 +62,10 @@ class RegistryEffectDispatcher(EffectDispatcher):
             raise DeclarativeValidationError(
                 "PG-003", f"undeclared effect operation: {operation}"
             ) from exc
+        if handler is None:
+            raise DeclarativeValidationError(
+                "PG-003", f"undeclared effect operation: {operation}"
+            )
 
         effect_output = await handler.handle(envelope, policy, self._capabilities)
         if not envelope.idempotency_key:
@@ -98,6 +102,10 @@ class RegistryDeltaReducer(DeltaReducer):
             raise DeclarativeValidationError(
                 "PG-003", f"undeclared delta operation: {operation}"
             ) from exc
+        if handler is None:
+            raise DeclarativeValidationError(
+                "PG-003", f"undeclared delta operation: {operation}"
+            )
         return handler.apply(state, delta, self._reducer)
 
 

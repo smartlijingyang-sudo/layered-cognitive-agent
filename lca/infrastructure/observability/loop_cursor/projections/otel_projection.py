@@ -28,7 +28,7 @@ _EP_LLM_HEADER = "llm.request.header"
 
 # OTel SDK 可选 import(ADR-0172 D5 / P1)
 try:
-    from opentelemetry import trace as _otel_trace  # type: ignore[import-not-found]
+    from opentelemetry import trace as _otel_trace
 
     _OTEL_AVAILABLE = True
 except ImportError:  # pragma: no cover - 由缺失依赖触发

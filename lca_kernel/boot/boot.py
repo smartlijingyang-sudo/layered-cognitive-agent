@@ -212,9 +212,9 @@ def _register_event_pipeline(resolved: ResolvedProfile) -> None:
         load_pipeline_for_profile,
         register_pipeline_once,
     )
-    from lca_kernel.events.bus.bus import EnvelopeBus
+    from lca_kernel.events.bus.bus import EventBus
 
-    bus = EnvelopeBus.default()
+    bus: EventBus[Any] = EventBus.default()  # type: ignore[assignment]
     catalog, emits_by_id = _collect_marker_catalog(resolved)
     if catalog:
         for plugin_id, marker in catalog.items():

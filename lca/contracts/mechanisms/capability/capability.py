@@ -84,7 +84,7 @@ def provider_current(svc: object) -> object | None:
     if svc is None:
         return None
     if hasattr(svc, "providers"):
-        providers = svc.providers
+        providers = cast("Any", svc).providers
         if not getattr(providers, "active", None):
             return None
         try:

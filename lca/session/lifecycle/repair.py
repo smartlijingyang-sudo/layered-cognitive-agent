@@ -120,17 +120,17 @@ def repair_interrupted_turn(
             continue
 
         if event_type in _TOOL_CALL:
-            call_id = _extract_tool_call_id(data)
-            if call_id is not None:
-                entry = pending_calls.get(call_id)
+            tool_call_id = _extract_tool_call_id(data)
+            if tool_call_id is not None:
+                entry = pending_calls.get(tool_call_id)
                 if entry is not None:
                     entry.call_seq = event.seq
             continue
 
         if event_type in _TOOL_RESULT:
-            call_id = _extract_tool_result_call_id(data)
-            if call_id is not None:
-                pending_calls.pop(call_id, None)
+            tool_result_call_id = _extract_tool_result_call_id(data)
+            if tool_result_call_id is not None:
+                pending_calls.pop(tool_result_call_id, None)
 
     if not events or open_turn is None:
         return []
@@ -179,7 +179,9 @@ def repair_interrupted_turn(
                 },
                 session_id=session_id,
                 surface_op="append",
-                source_event_seqs=(pending.call_seq,) if started else None,
+                source_event_seqs=(pending.call_seq,)
+                if started and pending.call_seq is not None
+                else None,
             )
         )
         seq += 1

@@ -34,5 +34,5 @@ class LabelSerializer:
     effects="none",
     description="Label-only serializer; metadata only, no payload.",
 )
-def setup(ctx: PluginContext, config: Any) -> None:
+async def setup(ctx: PluginContext, config: Any) -> None:
     ctx.provide("serializer", LabelSerializer())

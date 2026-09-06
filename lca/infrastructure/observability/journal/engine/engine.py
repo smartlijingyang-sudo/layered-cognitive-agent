@@ -351,13 +351,15 @@ class RunStore:
                 continue
             if isinstance(event, RuntimeObserved) and item.name in {"attributes", "output"}:
                 if aggressive:
-                    redacted = {k: redact_restricted(str(v)) for k, v in dict(value).items()}
-                    if redacted != dict(value):
-                        updates[item.name] = redacted
+                    redacted_map = {
+                        k: redact_restricted(str(v)) for k, v in dict(value).items()
+                    }
+                    if redacted_map != dict(value):
+                        updates[item.name] = redacted_map
                     continue
-                normalized = self._policy.prepare(dict(value))
-                if normalized != value:
-                    updates[item.name] = normalized
+                prepared_map = self._policy.prepare(dict(value))
+                if prepared_map != value:
+                    updates[item.name] = prepared_map
         return dataclasses.replace(event, **updates) if updates else event
 
 

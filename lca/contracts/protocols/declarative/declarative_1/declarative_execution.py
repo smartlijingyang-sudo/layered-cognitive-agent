@@ -174,7 +174,7 @@ class PhaseExecutionFailure:
     # {node_id} step after {n} attempt(s)"这种文学化叙述。默认从 attempts[-1]
     # 推导(timeout → "timeout",transient → "provider",其他 → "internal"),
     # 显式传入可覆盖。
-    error_kind: PhaseErrorKind = ""
+    error_kind: PhaseErrorKind | None = None
 
     def __post_init__(self) -> None:
         if not self.node_id:
@@ -185,7 +185,7 @@ class PhaseExecutionFailure:
             raise DeclarativeValidationError(
                 "PG-010", "phase execution failure requires at least one attempt"
             )
-        if not self.error_kind:
+        if self.error_kind is None:
             object.__setattr__(self, "error_kind", _derive_error_kind(self.attempts))
 
     def is_retryable(self) -> bool:

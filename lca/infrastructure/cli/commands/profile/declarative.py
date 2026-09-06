@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 import typer
 
@@ -28,7 +29,7 @@ def register(app: typer.Typer) -> None:
 
     @plugin_app.command("check")
     def plugin_check(
-        profile: Path = typer.Argument(..., help="Profile YAML"),  # noqa: B008
+        profile: Path = typer.Argument(..., help="Profile YAML"),
         strict: bool = typer.Option(False, "--strict", help="将任何声明缺失视为失败"),
         json_mode: bool = typer.Option(False, "--json", help="输出 JSON"),
     ) -> None:
@@ -90,11 +91,11 @@ def register(app: typer.Typer) -> None:
 
     @plan_app.command("compile")
     def plan_compile(
-        profile: Path = typer.Argument(..., help="Profile YAML"),  # noqa: B008
-        task_contract: Path | None = typer.Option(  # noqa: B008
+        profile: Path = typer.Argument(..., help="Profile YAML"),
+        task_contract: Path | None = typer.Option(
             None, "--task-contract", help="TaskContract 文件"
         ),
-        output: Path | None = typer.Option(None, "--output", "-o", help="写入 canonical JSON"),  # noqa: B008
+        output: Path | None = typer.Option(None, "--output", "-o", help="写入 canonical JSON"),
         json_mode: bool = typer.Option(False, "--json", help="输出 JSON"),
     ) -> None:
         """编译 Profile 为 canonical CompiledRunPlan v2。"""
@@ -111,7 +112,7 @@ def register(app: typer.Typer) -> None:
 
     @plan_app.command("validate")
     def plan_validate(
-        plan_file: Path = typer.Argument(..., help="由 plan compile 写出的 JSON"),  # noqa: B008
+        plan_file: Path = typer.Argument(..., help="由 plan compile 写出的 JSON"),
         json_mode: bool = typer.Option(False, "--json", help="输出 JSON"),
     ) -> None:
         """验证已序列化计划中记录的 schema、phase graph、effect 与 evidence 状态。"""
@@ -119,16 +120,21 @@ def register(app: typer.Typer) -> None:
             raw = json.loads(plan_file.read_text())
         except (OSError, json.JSONDecodeError) as exc:
             _fail(f"plan validate: {exc}")
-        declarative = raw.get("declarative") if isinstance(raw, dict) else None
-        validation = declarative.get("validation_report") if isinstance(declarative, dict) else None
+        if not isinstance(raw, dict):
+            _fail("plan validate: input must be a JSON object")
+        declarative = raw.get("declarative")
+        validation = (
+            declarative.get("validation_report") if isinstance(declarative, dict) else None
+        )
         if not isinstance(validation, dict):
             _fail("plan validate: input has no declarative validation report")
+        validation_report = cast("dict[str, Any]", validation)
         report = {
             "plan_ref": raw.get("plan_ref", ""),
             "schema_version": raw.get("schema_version", ""),
-            "valid": bool(validation.get("valid")),
-            "errors": validation.get("errors", []),
-            "warnings": validation.get("warnings", []),
+            "valid": bool(validation_report.get("valid")),
+            "errors": validation_report.get("errors", []),
+            "warnings": validation_report.get("warnings", []),
         }
         emit_report(report, json_mode=json_mode)
         if not report["valid"]:
@@ -137,7 +143,7 @@ def register(app: typer.Typer) -> None:
     @plan_app.command("relations")
     def plan_relations(
         plugin: str = typer.Option(..., "--plugin", "-p", help="plugin id"),
-        profile: Path = typer.Option(  # noqa: B008
+        profile: Path = typer.Option(
             Path("profiles/web-standard.yaml"),
             "--profile",
             help="Profile YAML to compile for relations lookup",

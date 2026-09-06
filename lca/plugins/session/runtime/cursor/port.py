@@ -109,10 +109,12 @@ class SessionWritePortAdapter:
             from lca_kernel.events.payloads.spine import SpineEventPayload
 
             self._bridge.append(
-                SpineEventPayload(
-                    execution_point=execution_point,
-                    channel="fact",
-                    payload=data,
+                SpineEventPayload.model_validate(
+                    {
+                        "execution_point": execution_point,
+                        "channel": "fact",
+                        "payload": data,
+                    }
                 ),
                 producer=_NO_PRODUCER,
             )

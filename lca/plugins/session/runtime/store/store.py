@@ -155,11 +155,11 @@ class SessionStore:
         from lca.plugins.session.runtime.log.reader import load_session_events
         from lca.session.lifecycle.repair import repair_interrupted_turn
 
-        events = load_session_events(log_path, session_id=session_id)
-        closers = repair_interrupted_turn(events, cold_load=True)
+        seed_events = load_session_events(log_path, session_id=session_id)
+        closers = repair_interrupted_turn(seed_events, cold_load=True)
         if closers:
-            events = [*events, *closers]
-        return self.restore(session_id, header, events)
+            seed_events = (*seed_events, *closers)
+        return self.restore(session_id, header, seed_events)
 
     def fork(
         self,

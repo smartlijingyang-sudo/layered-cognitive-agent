@@ -11,6 +11,7 @@ DELEGATE/HANDOFF 成员调用统一走 ``send_and_wait``（与 strategy 同端�
 from __future__ import annotations
 
 import asyncio
+from typing import cast
 
 from lca.cognition.body.delegation.cache import (
     cached_delegation_observation,
@@ -307,7 +308,7 @@ class DelegateOperation(Action):
         except TimeoutError:
             return _timeout_observation(_ERR_TIMEOUT)
         # transport 已 harvest 时直接透传（含 partial payload）
-        return observation
+        return cast("Observation", observation)
 
 
 class HandoffOperation(Action):

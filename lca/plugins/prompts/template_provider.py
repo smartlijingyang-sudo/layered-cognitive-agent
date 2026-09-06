@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -25,6 +26,7 @@ from lca.contracts.models.cognition.prompt_assembly import (
 from lca.contracts.models.cognition.prompt_assembly import (
     PromptTemplateConfig,
     PromptTemplateVariant,
+    SectionKind,
     SectionReference,
 )
 from lca.contracts.models.cognition.prompt_assembly import (
@@ -87,9 +89,11 @@ def _builtin_templates() -> Mapping[str, _PromptTemplate]:
     """Built-in templates — the default surface Profile YAML extends."""
 
     base = _builtin_section_refs()
-    def refs(sl):
+
+    def refs(sl: tuple[tuple[str, str, bool, str | None], ...]) -> tuple[SectionReference, ...]:
         return tuple(
-            SectionReference(name=n, kind=k, optional=o, fallback=f) for (n, k, o, f) in sl
+            SectionReference(name=n, kind=cast("SectionKind", k), optional=o, fallback=f)
+            for (n, k, o, f) in sl
         )
 
     react_section_count = 13  # through react_tool_usage_guidelines

@@ -25,11 +25,11 @@ _FIELD_MODEL = "model"
 
 # Langfuse SDK 可选 import(ADR-0172 D5)
 try:
-    from langfuse import Langfuse as _LangfuseClient  # type: ignore[import-not-found]
+    from langfuse import Langfuse as _LangfuseClient  # pyright: ignore[reportMissingImports]
 
     _LANGFUSE_AVAILABLE = True
 except ImportError:  # pragma: no cover - 由缺失依赖触发
-    _LangfuseClient = None  # type: ignore[assignment]
+    _LangfuseClient = None
     _LANGFUSE_AVAILABLE = False
 
 

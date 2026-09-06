@@ -35,7 +35,7 @@ class TypeDiagnostic:
     code: str
 
 
-_DEFAULT_PATHS = ["lca"]
+_DEFAULT_PATHS = ["lca", "lca_kernel"]
 
 
 def _run_tool(cmd: list[str], *, cwd: Path) -> tuple[int, str]:
@@ -198,7 +198,7 @@ def register(app: typer.Typer) -> None:
     def typecheck_cmd(
         paths: list[str] | None = typer.Argument(
             None,
-            help="Paths to check (default: lca). Example: lca/plugins/transport",
+            help="Paths to check (default: lca + lca_kernel). Example: lca/plugins/transport",
         ),
         json_mode: bool = typer.Option(False, "--json", help="JSON output for agents"),
         mypy_only: bool = typer.Option(False, "--mypy-only", help="Run Mypy only"),

@@ -106,11 +106,11 @@ MANIFEST = ToolManifest(
 class FileWriteTool(Tool):
     """file_write Tool 实现。"""
 
-    name: ClassVar[str] = "file_write"
-    description: ClassVar[str] = MANIFEST.api[0].description
+    name = "file_write"
+    description = MANIFEST.api[0].description
     parameters: ClassVar[dict[str, Any]] = MANIFEST.api[0].parameters
-    is_idempotent: ClassVar[bool] = True
-    default_timeout_s: ClassVar[int] = MANIFEST.api[0].default_timeout_ms // 1000
+    is_idempotent = True
+    default_timeout_s = MANIFEST.api[0].default_timeout_ms // 1000
 
     def validate(self, args: dict[str, Any]) -> str | None:
         path = args.get("path")

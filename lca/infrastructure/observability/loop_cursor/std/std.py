@@ -7,7 +7,7 @@ llm hook / model_visible recorder 实例(评审 S1 处方,AST scan 验证)。
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, get_args
 
 from lca.contracts.observability.core.incarnation import Incarnation
 from lca.contracts.observability.cursor.loop_cursor import (
@@ -28,7 +28,7 @@ from lca.contracts.observability.registry.resume import ResumeSpec
 from lca.infrastructure.observability.loop_cursor.spine._spine_port import WritePort
 from lca.infrastructure.observability.loop_cursor.state.state import _CursorState
 
-_VALID_PHASES = frozenset(PhaseName.__args__)
+_VALID_PHASES = frozenset(get_args(PhaseName))
 
 
 class StdLoopCursor:
@@ -330,23 +330,12 @@ class StdLoopCursor:
             event_payload["text_preview"] = text_preview
         self._append(execution_point="step.thinking.record", payload=event_payload)
 
-    def record_tool_call(
-        self,
-        payload: ToolCallRecord,
-        *,
-        arguments: dict[str, object] | None = None,
-        arguments_summary: str = "",
-        invocation_id: str = "",
-    ) -> None:
+    def record_tool_call(self, payload: ToolCallRecord) -> None:
         """Emit ``step.tool_call.record`` with rich arguments payload.
 
-        The dataclass :class:`ToolCallRecord` carries only ``args_digest``
-        + ``args_payload_path``. To make step-tree (and downstream
-        readers) recoverable we accept ``arguments`` / ``arguments_summary``
-        / ``invocation_id`` as keyword-only additions; when provided they
-        are forwarded into the spine event payload so derivers do not
-        have to fetch model_visible separately just to see what the
-        tool was called with.
+        :class:`ToolCallRecord` carries digest/path plus optional
+        ``arguments`` / ``arguments_summary`` / ``invocation_id`` so
+        step-tree derivers do not have to fetch model_visible separately.
         """
         self._ensure_open()
         self._ensure_not_halted()
@@ -361,34 +350,19 @@ class StdLoopCursor:
             "plan_ref": self._state.incarnation.plan_ref,
             "step_index": self._state.step_index,
         }
-        if arguments is not None:
-            event_payload["arguments"] = arguments
-        if arguments_summary:
-            event_payload["arguments_summary"] = arguments_summary
-        if invocation_id:
-            event_payload["invocation_id"] = invocation_id
+        if payload.arguments is not None:
+            event_payload["arguments"] = payload.arguments
+        if payload.arguments_summary:
+            event_payload["arguments_summary"] = payload.arguments_summary
+        if payload.invocation_id:
+            event_payload["invocation_id"] = payload.invocation_id
         self._append(execution_point="step.tool_call.record", payload=event_payload)
 
-    def record_tool_result(
-        self,
-        payload: ToolResultRecord,
-        *,
-        invocation_id: str = "",
-        ok: bool = True,
-        latency_ms: int = 0,
-        stdout_head: str = "",
-        stdout_chars_total: int = 0,
-        stdout_truncated: bool = False,
-        stderr: str = "",
-        files_created: tuple[str, ...] = (),
-        error: str | None = None,
-        delta_summary: str = "",
-    ) -> None:
+    def record_tool_result(self, payload: ToolResultRecord) -> None:
         """Emit ``step.tool_result.record`` with rich result fields.
 
-        Same forward-compat pattern as :meth:`record_tool_call` —
-        callers may attach the full result surface so step-tree readers
-        do not have to round-trip through sidecars.
+        :class:`ToolResultRecord` carries digest/path/outcome plus optional
+        result surface fields so step-tree readers do not round-trip sidecars.
         """
         self._ensure_open()
         self._ensure_not_halted()
@@ -403,26 +377,26 @@ class StdLoopCursor:
             "plan_ref": self._state.incarnation.plan_ref,
             "step_index": self._state.step_index,
         }
-        if invocation_id:
-            event_payload["invocation_id"] = invocation_id
-        if not ok:
+        if payload.invocation_id:
+            event_payload["invocation_id"] = payload.invocation_id
+        if not payload.ok:
             event_payload["ok"] = False
-        if latency_ms:
-            event_payload["latency_ms"] = latency_ms
-        if stdout_head:
-            event_payload["stdout_head"] = stdout_head
-        if stdout_chars_total:
-            event_payload["stdout_chars_total"] = stdout_chars_total
-        if stdout_truncated:
+        if payload.latency_ms:
+            event_payload["latency_ms"] = payload.latency_ms
+        if payload.stdout_head:
+            event_payload["stdout_head"] = payload.stdout_head
+        if payload.stdout_chars_total:
+            event_payload["stdout_chars_total"] = payload.stdout_chars_total
+        if payload.stdout_truncated:
             event_payload["stdout_truncated"] = True
-        if stderr:
-            event_payload["stderr"] = stderr
-        if files_created:
-            event_payload["files_created"] = list(files_created)
-        if error is not None:
-            event_payload["error"] = error
-        if delta_summary:
-            event_payload["delta_summary"] = delta_summary
+        if payload.stderr:
+            event_payload["stderr"] = payload.stderr
+        if payload.files_created:
+            event_payload["files_created"] = list(payload.files_created)
+        if payload.error is not None:
+            event_payload["error"] = payload.error
+        if payload.delta_summary:
+            event_payload["delta_summary"] = payload.delta_summary
         self._append(execution_point="step.tool_result.record", payload=event_payload)
 
     def record_request_header(self, header: RequestHeader) -> None:

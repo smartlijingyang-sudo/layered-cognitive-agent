@@ -83,10 +83,11 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     registry: NamedRegistry = ctx.require("fact_readers")
 
     def _make_langfuse_reader(
-        settings: ObservabilitySettings | None = None, **_: Any
+        settings: ObservabilitySettings | None = None, **unused: Any
     ) -> JournalProjector:
         # 真实实现待 exporters/langfuse 迁移完成后替换；当前保留 no-op 以保 boot 链通畅。
-        _ = settings
+        del unused
+        _settings = settings
         return _NoopReader()
 
     registry.register("langfuse", _make_langfuse_reader)

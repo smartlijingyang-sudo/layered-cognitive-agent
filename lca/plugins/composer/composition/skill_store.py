@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from lca.contracts.mechanisms.capability.capability import (
     MissingCapabilityError,
     provider_current,
     require_capability,
 )
+from lca.contracts.protocols.assistant.skill_overlay import AssistantSkillOverlay
+from lca.contracts.protocols.memory.operational_skills import SkillPackageStore
 from lca.infrastructure.observability.facade.run.ambit import current_assistant_id
 from lca.infrastructure.skills.assistant.merged_store import AssistantMergedSkillStore
 
@@ -34,8 +36,8 @@ def active_skill_store(scope: object) -> Any:
     if overlay is None:
         return store
     return AssistantMergedSkillStore(
-        global_store=store,
-        overlay=overlay,
+        global_store=cast("SkillPackageStore", store),
+        overlay=cast("AssistantSkillOverlay", overlay),
         assistant_id=assistant_id,
     )
 

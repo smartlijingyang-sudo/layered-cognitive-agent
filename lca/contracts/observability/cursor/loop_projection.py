@@ -43,16 +43,16 @@ class LoopProjectionDefinition(Protocol):
 
     def init(self) -> Any:
         """Seed 状态;每次 register 调一次。"""
-
+        ...
     def apply(self, state: Any, snapshot: CursorSnapshot, record: EventRecord) -> Any:
         """纯 reducer;in-place 修改禁止(返回新 state);不抛副作用。"""
-
+        ...
     def view(self, state: Any) -> Any:
         """派生 side-effect target;Host.flush_all 在此才真正写盘。"""
-
+        ...
     def restore(self, state: Any) -> Any:
         """Checkpoint replay 入口;默认 = init。"""
-
+        ...
 
 @dataclass(frozen=True)
 class ProjectionToken:

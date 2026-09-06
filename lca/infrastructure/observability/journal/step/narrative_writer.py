@@ -521,8 +521,8 @@ def _render_summary(doc: JournalDocument) -> list[str]:
     lines.append("")
     chain = doc.prior_summary_chain()
     if chain:
-        for i, s in enumerate(chain, 1):
-            lines.append(f"{i}. {_short(s, 200)}")
+        for i, summary in enumerate(chain, 1):
+            lines.append(f"{i}. {_short(summary, 200)}")
     else:
         lines.append("_(空)_")
     return lines

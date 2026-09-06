@@ -84,7 +84,7 @@ def parse_session_event_record(
         session_id=session_id,
         actor=data.get("actor") if isinstance(data.get("actor"), str) else None,
         provider=data.get("provider") if isinstance(data.get("provider"), str) else None,
-        visibility=visibility,  # type: ignore[arg-type]
+        visibility=visibility,
         ignorable=ignorable,
         surface_op=surface_op,
         source_event_seqs=source_seqs,

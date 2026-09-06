@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -233,7 +233,7 @@ def summarize_step(step: JournalStep) -> str:
     return f"ok ({step.phase})"
 
 
-def iter_steps(steps: Sequence[JournalStep]):
+def iter_steps(steps: Sequence[JournalStep]) -> Iterator[JournalStep]:
     """迭代器(测试用, 保证顺序)。"""
     yield from steps
 

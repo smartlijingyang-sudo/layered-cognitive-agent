@@ -19,7 +19,6 @@ from lca.contracts.models.core.state.plane import PlaneBindings
 from lca.contracts.models.observability.journal.journal import RunScope
 from lca.contracts.models.team.run.context import RunContext
 from lca.contracts.protocols.runtime.infra.infra import MachineResolver
-from lca.infrastructure.file.store import FileStore
 from lca.infrastructure.observability import BoundObservability, bind_backends, run_scope
 from lca.infrastructure.observability.events.event.descriptor_env import bind_descriptors
 from lca.infrastructure.observability.facade.run.ambit import (
@@ -107,10 +106,10 @@ class RunExecutionEnvironment:
                 trace_id=cast("TraceId", session.trace_id),
                 run_id=cast("RunId", session.run_id),
             ),
-            run_id=session.run_id,
-            trace_id=session.trace_id,
+            run_id=cast("RunId", session.run_id),
+            trace_id=cast("TraceId", session.trace_id),
             attachment_ids=tuple(session.attachment_ids or ()),
-            file_store=cast("FileStore | None", providers.file_store),
+            file_store=providers.file_store,
             assistant_id=(getattr(session, "assistant_id", "") or "").strip(),
         )
         # Capture the ambient snapshot on the session so a HIL resume can

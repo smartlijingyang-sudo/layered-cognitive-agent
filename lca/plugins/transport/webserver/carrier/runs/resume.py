@@ -7,6 +7,10 @@ whether a run may resume.  Process-local ``RunSession.snapshot`` /
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+from typing import Any, cast
+
+from lca.contracts.harness.tasks.session import SessionEvent
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
     RunRegistry,
     RunSession,
@@ -23,7 +27,10 @@ def validate_durable_resume(session: RunSession) -> None:
     snapshot = getattr(inner, "snapshot_events", None)
     if not callable(snapshot):
         return
-    assert_resume_allowed(session, snapshot())
+    assert_resume_allowed(
+        cast("Any", session),
+        cast("Iterable[SessionEvent]", snapshot()),
+    )
 
 
 def resume_cache_ready(session: RunSession) -> bool:

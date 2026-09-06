@@ -39,5 +39,5 @@ class OTelEmitter:
     effects="network",
     description="OTel-style emitter; defers to an attached OTLP delegate.",
 )
-def setup(ctx: PluginContext, config: Any) -> None:
+async def setup(ctx: PluginContext, config: Any) -> None:
     ctx.provide("emitter", OTelEmitter())

@@ -37,7 +37,7 @@ from lca.infrastructure.observability.spine.event.record import EventRecord
 _DEFAULT_TRACES_ROOT = Path("traces")
 
 
-def _read_doc(run_id: str, traces_root: Path):
+def _read_doc(run_id: str, traces_root: Path) -> tuple[Any, Path]:
     journal_path = traces_root / "runs" / run_id / "journal.json"
     if not journal_path.exists():
         raise FileNotFoundError(f"journal.json not found: {journal_path}")
@@ -48,10 +48,10 @@ def register(app: typer.Typer) -> None:
     @app.command(name="trajectory")
     def trajectory_cmd(
         run_id: str = typer.Argument(..., help="run_id"),
-        out: Path = typer.Option(  # noqa: B008
+        out: Path = typer.Option(
             None, "--out", help="输出 HTML 路径；默认 traces/runs/<id>/journal.trajectory.html"
         ),
-        traces_root: Path = typer.Option(  # noqa: B008
+        traces_root: Path = typer.Option(
             _DEFAULT_TRACES_ROOT,
             "--traces-root",
         ),
@@ -76,12 +76,12 @@ def register(app: typer.Typer) -> None:
         diff_only: bool = typer.Option(
             False, "--diff-only", help="只打印 messages 与 actions 的摘要"
         ),
-        tool_args: list[str] | None = typer.Option(  # noqa: B008
+        tool_args: list[str] | None = typer.Option(
             None,
             "--tool",
             help="NAME=JSON_OVERRIDE（仅算 diff，不跑 tool）",
         ),
-        traces_root: Path = typer.Option(  # noqa: B008
+        traces_root: Path = typer.Option(
             _DEFAULT_TRACES_ROOT,
             "--traces-root",
         ),
@@ -145,7 +145,7 @@ def register(app: typer.Typer) -> None:
     @app.command(name="verify-model-visible")
     def verify_cmd(
         run_id: str = typer.Argument(..., help="run_id"),
-        traces_root: Path = typer.Option(  # noqa: B008
+        traces_root: Path = typer.Option(
             _DEFAULT_TRACES_ROOT,
             "--traces-root",
         ),

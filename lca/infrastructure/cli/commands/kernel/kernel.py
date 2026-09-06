@@ -21,6 +21,7 @@ import json
 import sys
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
+from typing import cast
 
 import typer
 
@@ -30,7 +31,7 @@ def register(app: typer.Typer) -> None:
 
     @app.command()
     def kernel_boot(
-        profile_path: Path = typer.Argument(  # noqa: B008
+        profile_path: Path = typer.Argument(
             "profiles/web-standard.yaml",
             help="Profile YAML path to compile and boot",
         ),
@@ -48,7 +49,7 @@ def register(app: typer.Typer) -> None:
 
     @app.command(name="kernel_serve")
     def kernel_serve(
-        profile_path: Path = typer.Argument(  # noqa: B008
+        profile_path: Path = typer.Argument(
             "profiles/web-standard.yaml",
             help="Profile YAML path the LCA kernel should boot",
         ),
@@ -77,7 +78,7 @@ def register(app: typer.Typer) -> None:
 
     @app.command(name="kernel_compose")
     def kernel_compose(
-        profile_path: Path = typer.Argument(  # noqa: B008
+        profile_path: Path = typer.Argument(
             "profiles/web-standard.yaml",
             help="Profile YAML path to compile and dump",
         ),
@@ -136,8 +137,9 @@ def _boot_blocking(profile_path: Path) -> None:
 
 def _serialize_plan(plan: object) -> dict[str, object]:
     """Coerce a CompiledRunPlan to a JSON-friendly dict."""
+    data: dict[str, object]
     if is_dataclass(plan) and not isinstance(plan, type):
-        data = asdict(plan)
+        data = cast("dict[str, object]", asdict(plan))
     elif isinstance(plan, dict):
         data = dict(plan)
     else:

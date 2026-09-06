@@ -22,7 +22,7 @@ from __future__ import annotations
 from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from lca.infrastructure.observability.spine.event.record import (
     Channel,
@@ -143,8 +143,9 @@ class StepCoordinator:
         if self._current_step is not None:
             raise RuntimeError(f"begin_step while step {self._current_step!r} still open")
         driver = self.registry.require("driver")
-        self._current_step = driver.begin_step(phase, **ctx)
-        return self._current_step
+        step_id = driver.begin_step(phase, **ctx)
+        self._current_step = step_id
+        return cast("str", step_id)
 
     def end_step(
         self,
@@ -172,8 +173,9 @@ class StepCoordinator:
         if self._current_step is None:
             raise RuntimeError("begin_segment while no step open")
         driver = self.registry.require("driver")
-        self._current_segment = driver.begin_segment(self._current_step, kind)
-        return self._current_segment
+        segment_id = driver.begin_segment(self._current_step, kind)
+        self._current_segment = segment_id
+        return cast("str", segment_id)
 
     def end_segment(self, outcome: str = "success") -> None:
         """仅做 driver.end_segment 状态收尾,不再写 EP。"""

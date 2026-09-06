@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.atoms.control.slot import ControlSlot
@@ -49,7 +51,7 @@ class _RegistryImpl(PromptSectionRegistry):
 
     def list_sections(self) -> tuple[tuple[SectionKind, str, object], ...]:
         return tuple(
-            (kind, name, self._by_key[(kind, name)])
+            (cast("SectionKind", kind), name, self._by_key[(kind, name)])
             for (kind, name) in sorted(self._by_key)
         )
 

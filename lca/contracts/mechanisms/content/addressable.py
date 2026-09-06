@@ -20,16 +20,16 @@ class ContentAddressableStore(Protocol):
 
     def put(self, payload: bytes, *, media_type: str = "application/octet-stream") -> str:
         """存一份 payload;返回 sha256 hex digest。"""
-
+        ...
     def get(self, digest: str) -> bytes:
         """按 digest 取回;缺失抛 KeyError。"""
-
+        ...
     def contains(self, digest: str) -> bool:
         """纯存在性检查,不读内容。"""
-
+        ...
     def sweep_orphan(self, live_digests: set[str]) -> int:
         """清掉不在 live_digests 集合的 digest;返回清掉数量;幂等。"""
-
+        ...
 
 @dataclass(frozen=True)
 class InMemoryContentAddressableStore:

@@ -37,7 +37,7 @@ def derive_event_message(event: SessionEvent | Mapping[str, Any]) -> dict[str, A
     else:
         event_type = str(event.get("type") or event.get("category") or "")
         raw = event.get("data") if isinstance(event.get("data"), Mapping) else event.get("payload")
-        data = raw if isinstance(raw, Mapping) else {}
+        data = dict(raw) if isinstance(raw, Mapping) else {}
 
     if event_type == SURFACE_USER_TYPE:
         messages = data.get("messages")
@@ -87,10 +87,10 @@ def derive_messages(events: Iterable[SessionEvent | Mapping[str, Any]]) -> list[
                 by_seq[seq] = event
     messages: list[dict[str, Any]] = []
     for seq in surface.nodes:
-        event = by_seq.get(seq)
-        if event is None:
+        node_event = by_seq.get(seq)
+        if node_event is None:
             continue
-        msg = derive_event_message(event)
+        msg = derive_event_message(node_event)
         if msg is not None:
             messages.append(msg)
     return messages
@@ -112,10 +112,10 @@ def export_transcript(events: Iterable[SessionEvent | Mapping[str, Any]]) -> lis
                 by_seq[seq] = event
     transcript: list[dict[str, Any]] = []
     for seq in surface.nodes:
-        event = by_seq.get(seq)
-        if event is None or not isAppendSurfaceEvent(event):
+        node_event = by_seq.get(seq)
+        if node_event is None or not isAppendSurfaceEvent(node_event):
             continue
-        msg = derive_event_message(event)
+        msg = derive_event_message(node_event)
         if msg is not None:
             transcript.append(msg)
     return transcript

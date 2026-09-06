@@ -16,13 +16,14 @@ class TraceTool(Protocol):
     @property
     def name(self) -> str:
         """工具注册名（kebab-case，如 ``inspect-trace``）。"""
-
+        ...
     @property
     def description(self) -> str:
         """工具用途说明（传给 Coding Agent）。"""
-
+        ...
     def invoke(self, **kwargs: Any) -> dict[str, Any]:
         """执行工具；返回 JSON-serializable dict。
 
         参数语义依赖具体工具；events 不传时使用 TraceInspector.events。
         """
+        ...

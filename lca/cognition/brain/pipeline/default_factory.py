@@ -19,6 +19,7 @@ from lca.contracts.models.cognition.prompt_assembly import (
 from lca.contracts.models.team.role.team import RoleProfile
 from lca.contracts.protocols import (
     Brain,
+    BrainPromptCatalog,
     Critic,
     DecisionGate,
     LLMAdapter,
@@ -80,19 +81,18 @@ class SimpleBrainFactory:
         self,
         llm: LLMAdapter,
         role_profile: RoleProfile,
-        tools_desc: str,
+        catalog: BrainPromptCatalog,
         *,
         tools: list[Tool] | None = None,
-        available_skills: str = "",
     ) -> Brain:
         reasoner = self._reasoner_cls(
             llm,
             role_profile,
-            tools_desc,
+            catalog,
             tools=tools,
             assembler=self._assembler,
             selector=self._selector,
-            available_skills=available_skills,
+            available_skills=catalog.render_brain_skills(),
         )
         return ModularBrain(
             reasoner=reasoner,

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 from pathlib import Path
+from typing import Any
 
 import typer
 
@@ -109,7 +110,7 @@ def register(app: typer.Typer) -> None:
             "--database-url",
             help="LobeHub DATABASE_URL (default: env DATABASE_URL)",
         ),
-        input_json: Path | None = typer.Option(  # noqa: B008
+        input_json: Path | None = typer.Option(
             None,
             "--input",
             help="JSON rows export when Postgres driver unavailable",
@@ -152,7 +153,7 @@ def register(app: typer.Typer) -> None:
             typer.echo("Imported: " + ", ".join(result.identifiers))
 
 
-def _load_integration():
+def _load_integration() -> Any:
     from lca.infrastructure.integrations.composio.env.settings import (
         load_composio_settings_from_env,
     )

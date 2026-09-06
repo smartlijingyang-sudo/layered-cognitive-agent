@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, cast
 
 from lca.agent.team_handle import TeamHandle
@@ -16,7 +16,7 @@ from lca.contracts.protocols.journal.spec.spec import (
     LeadSpec,
     TeamSpec,
 )
-from lca.contracts.protocols.runtime.infra.infra import AgentTransport
+from lca.contracts.protocols.runtime.infra.infra import AgentTransport, Tool
 from lca.infrastructure.observability import BoundObservability
 from lca.plugins.composer.collaboration.team import resolve_observability, team_trace_profile
 from lca.plugins.composer.composition.agent_assembly import PlanBoundAgentAssembler, promote_lead
@@ -44,13 +44,13 @@ __all__ = [
 ]
 
 
-def _format_tools_xml(tools: Sequence[object]) -> str:
+def _format_tools_xml(tools: Iterable[Tool]) -> str:
     """Compatibility export for the stable model-visible tool catalog."""
 
     return ModelPromptCatalog.for_tools(tools).render_tools_xml()
 
 
-def _render_available_skills(scope: object) -> str:
+def _render_available_skills(scope: Context) -> str:
     """Compatibility export for the active model-visible skill catalog."""
 
     return ModelPromptCatalog.load(active_skill_store(scope)).render_skill_discovery()

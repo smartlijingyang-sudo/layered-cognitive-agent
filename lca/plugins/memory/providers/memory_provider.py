@@ -84,11 +84,19 @@ async def setup(ctx: PluginContext, config: Config) -> None:
             raise TypeError(
                 "memory policies are selected by the active profile, not create() arguments"
             )
+        from lca.contracts.protocols.collaboration.orchestration.orchestration import (
+            SharedMemoryStore,
+        )
+
+        shared_store = kwargs.pop("shared_store", None)
+        if kwargs:
+            raise TypeError(f"unexpected SimpleMemorySystem kwargs: {sorted(kwargs)}")
+        store = shared_store if isinstance(shared_store, SharedMemoryStore) else None
         return SimpleMemorySystem(
+            store,
             policy=write_policy,
             compaction=compaction_policy,
             retrieval=retrieval_policy_factory(),
-            **kwargs,
         )
 
     service = ctx.require("memory")

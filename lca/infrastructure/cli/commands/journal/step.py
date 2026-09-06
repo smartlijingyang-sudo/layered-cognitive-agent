@@ -28,14 +28,15 @@ import typer
 _DEFAULT_TRACES_ROOT = Path("traces")
 
 
-def _resolve_run_dir(run_id: str, traces_root: Path) -> Path | None:
-    if not run_id:
+def _resolve_run_dir(run_id: str | None, traces_root: Path) -> Path | None:
+    resolved_run_id = run_id
+    if not resolved_run_id:
         from lca.infrastructure.cli.commands.kernel._shared import find_latest_run_id
 
-        run_id = find_latest_run_id(traces_root)
-    if not run_id:
+        resolved_run_id = find_latest_run_id(traces_root)
+    if not resolved_run_id:
         return None
-    return traces_root / "runs" / run_id
+    return traces_root / "runs" / resolved_run_id
 
 
 def _load_journal(run_dir: Path) -> dict[str, Any] | None:
@@ -43,7 +44,8 @@ def _load_journal(run_dir: Path) -> dict[str, Any] | None:
     if not journal_path.exists():
         return None
     try:
-        return json.loads(journal_path.read_text(encoding="utf-8"))
+        data: dict[str, Any] = json.loads(journal_path.read_text(encoding="utf-8"))
+        return data
     except Exception:
         return None
 
@@ -51,7 +53,8 @@ def _load_journal(run_dir: Path) -> dict[str, Any] | None:
 def _select_step(doc: dict[str, Any], step_index: int) -> dict[str, Any] | None:
     for st in doc.get("steps", []):
         if int(st.get("step_index", 0)) == step_index:
-            return st
+            step: dict[str, Any] = st
+            return step
     return None
 
 
@@ -181,7 +184,7 @@ def register(app: typer.Typer) -> None:
                 "foldRequestHeader 重建;无 spine 时回退 model_visible/<step_id>/)"
             ),
         ),
-        traces_root: Path = typer.Option(  # noqa: B008
+        traces_root: Path = typer.Option(
             _DEFAULT_TRACES_ROOT, "--traces-root", help="traces 根目录"
         ),
     ) -> None:

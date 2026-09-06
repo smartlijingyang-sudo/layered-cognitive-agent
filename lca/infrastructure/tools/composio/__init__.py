@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
@@ -220,7 +220,9 @@ def build_tools(integration: ComposioIntegration | None) -> list[Tool]:
             build_tools_from_manifest(
                 manifest,
                 executor,
-                invoke_fn=lambda ex, api_name, args: _invoke(ex, api_name, args),
+                invoke_fn=lambda ex, api_name, args: _invoke(
+                    cast("ComposioActionExecutor", ex), api_name, args
+                ),
             )
         )
 

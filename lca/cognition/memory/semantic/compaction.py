@@ -53,7 +53,7 @@ class SemanticCompactionPolicy(CompactionPolicy):
             raise ValueError("semantic compaction mode must be 'shadow' or 'enforce'")
         if max_summary_characters < 256:
             raise ValueError("semantic compaction max_summary_characters must be at least 256")
-        self._mode = mode
+        self._mode: Literal["shadow", "enforce"] = mode
         self._max_summary_characters = max_summary_characters
         self._selection = SimpleCompactionPolicy()
 

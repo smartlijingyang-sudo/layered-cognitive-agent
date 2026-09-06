@@ -37,7 +37,7 @@ class MultiStorage:
     effects="filesystem",
     description="Fan-out storage; collects multiple EventStorage.",
 )
-def setup(ctx: PluginContext, config: Any) -> None:
+async def setup(ctx: PluginContext, config: Any) -> None:
     ms = MultiStorage()
     for child in config.get("children", []):
         ms.add(child)

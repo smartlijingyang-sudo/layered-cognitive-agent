@@ -30,9 +30,8 @@ class CursorRecord:
     ``stderr`` / ``files_created`` / ``error`` / ``delta_summary``),而非
     仅 ``tool_name`` + digest。``CursorRecord`` 作为唯一 writer 入口,
     负责把这些字段全部透传给 ``cursor.record_tool_call`` /
-    ``cursor.record_tool_result``(后者在 std.py 已支持 kwargs 透传,
-    这条路在 PR-26 task-25 之前被错误地走了一个简化的 dataclass-only
-    入口,导致 deriver 永远看不到调用内容 —— Bug #1 根因)。
+    ``cursor.record_tool_result``(经 ``ToolCallRecord`` / ``ToolResultRecord``
+    payload 表达,与 ``LoopCursor`` Protocol 对齐)。
     """
 
     @staticmethod
@@ -97,10 +96,10 @@ class CursorRecord:
                     args_digest=args_digest,
                     args_payload_path=None,
                     call_seq=hash(invocation_id) & 0x7FFFFFFF,
+                    arguments=arguments,
+                    arguments_summary=arguments_summary,
+                    invocation_id=invocation_id,
                 ),
-                arguments=arguments or {},
-                arguments_summary=arguments_summary,
-                invocation_id=invocation_id,
             )
         except CursorError as exc:
             _log.warning(
@@ -145,17 +144,17 @@ class CursorRecord:
                     result_digest=result_digest or "",
                     result_path=None,
                     outcome=outcome,
+                    invocation_id=invocation_id,
+                    ok=ok,
+                    latency_ms=latency_ms,
+                    stdout_head=stdout_head,
+                    stdout_chars_total=stdout_chars_total,
+                    stdout_truncated=stdout_truncated,
+                    stderr=stderr,
+                    files_created=files_created,
+                    error=error,
+                    delta_summary=delta_summary,
                 ),
-                invocation_id=invocation_id,
-                ok=ok,
-                latency_ms=latency_ms,
-                stdout_head=stdout_head,
-                stdout_chars_total=stdout_chars_total,
-                stdout_truncated=stdout_truncated,
-                stderr=stderr,
-                files_created=files_created,
-                error=error,
-                delta_summary=delta_summary,
             )
         except CursorError as exc:
             _log.warning(

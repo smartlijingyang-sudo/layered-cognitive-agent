@@ -320,8 +320,8 @@ def templates_from_provider(provider: PromptTemplateProvider) -> Mapping[str, st
         _prompt, _trace = render_template(
             template=_template,
             registry=None,
-            role_profile=None,  # type: ignore[arg-type]
-            state=None,  # type: ignore[arg-type]
+            role_profile=None,
+            state=None,
             awareness=None,
             manifest=None,
             tools=(),
@@ -346,14 +346,16 @@ def normalize_selector_result(
 
 def _coerce_decision_path(value: object) -> SelectorDecisionPath:
     """Map unknown decision paths to ``"legacy"`` rather than failing."""
-    if value in {
-        "active_template_override",
-        "consult_duty",
-        "team_awareness_routing",
-        "profile_default",
-        "legacy",
-    }:
-        return value  # type: ignore[return-value]
+    if value == "active_template_override":
+        return "active_template_override"
+    if value == "consult_duty":
+        return "consult_duty"
+    if value == "team_awareness_routing":
+        return "team_awareness_routing"
+    if value == "profile_default":
+        return "profile_default"
+    if value == "legacy":
+        return "legacy"
     return "legacy"
 
 

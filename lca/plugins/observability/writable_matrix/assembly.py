@@ -33,7 +33,7 @@ from lca.infrastructure.observability.writable_matrix import (
         " only override one face, not duplicate this composition."
     ),
 )
-def setup(ctx: PluginContext, config: Any) -> None:
+async def setup(ctx: PluginContext, config: Any) -> None:
     """用 spine 组装默认五面 registry;storage 面固定 Null(不落盘)。"""
     del config  # run_dir 已退役:storage 面不再写文件
     spine = ctx.require("event_spine")

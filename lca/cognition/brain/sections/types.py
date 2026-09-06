@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from lca.contracts.models.core.state.state import AgentState
     from lca.contracts.models.team.delegation.delegation import DelegationResult
     from lca.contracts.models.team.role.team import RoleProfile
+    from lca.contracts.models.team.team.awareness import TeamAwareness
 
 
 _EMPTY_TEAMMATES = "(无可用队友)"
@@ -130,7 +131,7 @@ _REPORT_EXCLUDED_KINDS: frozenset[MemoryRecordKind] = frozenset(
 )
 
 
-def context_exclusions_for(awareness) -> frozenset[MemoryRecordKind]:
+def context_exclusions_for(awareness: TeamAwareness | None) -> frozenset[MemoryRecordKind]:
     """Free-routing excludes delegation results (they appear in MEMBER_REPORTS).
 
     ``awareness`` may be a ``TeamAwareness`` (consult_duty is optional).

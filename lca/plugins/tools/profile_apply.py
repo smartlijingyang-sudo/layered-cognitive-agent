@@ -37,8 +37,8 @@ class ProfileApplyTool(Tool):
     learning loop into an unreviewed production write path.
     """
 
-    name: ClassVar[str] = "profile_apply"
-    description: ClassVar[str] = (
+    name = "profile_apply"
+    description = (
         "Preview an approved profile candidate; production application is disabled."
     )
     parameters: ClassVar[dict[str, Any]] = {
@@ -53,8 +53,8 @@ class ProfileApplyTool(Tool):
         },
         "required": ["candidate"],
     }
-    is_idempotent: ClassVar[bool] = True
-    default_timeout_s: ClassVar[int] = 5
+    is_idempotent = True
+    default_timeout_s = 5
 
     def validate(self, args: dict[str, Any]) -> str | None:
         candidate = args.get("candidate")

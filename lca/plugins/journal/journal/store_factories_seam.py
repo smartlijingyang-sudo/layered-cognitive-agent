@@ -35,7 +35,7 @@ class Config(BaseModel):
 @plugin(
     id="lca-journal-store-factory-registry",
     provides=["journal_store_factories"],
-    implements=None,  # type: ignore[arg-type]
+    implements=None,
     layer="L0",
     effects="none",
     description="Provide the JournalStoreBackend factory registry (PR-8).",

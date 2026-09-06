@@ -102,7 +102,7 @@ class PluginContext(Protocol):
 class AuditedPluginContext:
     """Wraps a Context and expose only Manifest-audited setup interactions."""
 
-    __inner: object
+    _AuditedPluginContext__inner: object
     _definition: PluginDefinition[Any]
     provided: set[str] = field(default_factory=set)
     required: set[str] = field(default_factory=set)
@@ -111,11 +111,11 @@ class AuditedPluginContext:
 
     def _runtime(self) -> _PluginRuntimeCarrier:
         """Return the narrow operational surface without exposing it to plugins."""
-        return cast("_PluginRuntimeCarrier", self.__inner)
+        return cast("_PluginRuntimeCarrier", self._AuditedPluginContext__inner)
 
     def _inner_carrier(self) -> object:
-        """Return the Cordis carrier behind the name-mangled ``__inner`` field."""
-        return object.__getattribute__(self, "_AuditedPluginContext__inner")
+        """Return the Cordis carrier behind the name-mangled inner field."""
+        return self._AuditedPluginContext__inner
 
     def _assert_declared(
         self,
@@ -222,17 +222,17 @@ class AuditedPluginContext:
     @property
     def events(self) -> PluginEventBus:
         """Expose the event bus without exposing capability mutation or injection."""
-        events = getattr(self.__inner, "events", None)
+        events = getattr(self._AuditedPluginContext__inner, "events", None)
         if events is None:
             raise AttributeError("underlying context has no events")
         return cast("PluginEventBus", events)
 
     def emit(self, event: str, *args: object, **kwargs: object) -> object:
         self.emitted.add(event)
-        events = getattr(self.__inner, "events", None)
+        events = getattr(self._AuditedPluginContext__inner, "events", None)
         if events is not None and hasattr(events, "emit"):
             return events.emit(event, *args, **kwargs)
-        emit_fn = getattr(self.__inner, "emit", None)
+        emit_fn = getattr(self._AuditedPluginContext__inner, "emit", None)
         if callable(emit_fn):
             return emit_fn(event, *args, **kwargs)
         raise AttributeError("underlying context has no emit")

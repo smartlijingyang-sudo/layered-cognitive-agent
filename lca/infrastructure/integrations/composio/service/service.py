@@ -106,7 +106,10 @@ class ComposioIntegration:
             return pinned
         configs = await self._client.list_auth_configs()
         for cfg in configs:
-            toolkit = cfg.get("toolkit") if isinstance(cfg.get("toolkit"), dict) else {}
+            if not isinstance(cfg, dict):
+                continue
+            toolkit_obj = cfg.get("toolkit")
+            toolkit = toolkit_obj if isinstance(toolkit_obj, dict) else {}
             slug = str(toolkit.get("slug") or "").upper()
             if slug == app_slug.upper() and cfg.get("id"):
                 return str(cfg["id"])

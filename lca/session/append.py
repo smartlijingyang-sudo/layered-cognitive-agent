@@ -6,6 +6,7 @@ Production fact append goes through :class:`Session` and its :meth:`~Session.app
 from __future__ import annotations
 
 import contextlib
+import inspect
 import json
 import time
 from collections.abc import Callable, Mapping
@@ -209,7 +210,7 @@ class Session(SessionProtocol):
             try:
                 maybe_coro = flush_fn(self)
                 # duck-type observer.flush 若是 async，await 它；同步则直接忽略返回值。
-                if hasattr(maybe_coro, "__await__"):
+                if inspect.isawaitable(maybe_coro):
                     await maybe_coro
                 results.append(
                     FlushResult(

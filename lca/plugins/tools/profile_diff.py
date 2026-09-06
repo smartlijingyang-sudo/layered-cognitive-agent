@@ -32,8 +32,8 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 class ProfileDiffTool(Tool):
     """Compare two declarative profile payloads without reading or writing files."""
 
-    name: ClassVar[str] = "profile_diff"
-    description: ClassVar[str] = "Compare two profile candidates without applying either one."
+    name = "profile_diff"
+    description = "Compare two profile candidates without applying either one."
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
@@ -42,8 +42,8 @@ class ProfileDiffTool(Tool):
         },
         "required": ["baseline", "candidate"],
     }
-    is_idempotent: ClassVar[bool] = True
-    default_timeout_s: ClassVar[int] = 5
+    is_idempotent = True
+    default_timeout_s = 5
 
     def validate(self, args: dict[str, Any]) -> str | None:
         if not isinstance(args.get("baseline"), dict):

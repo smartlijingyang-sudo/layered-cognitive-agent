@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel
 
 from lca.contracts.atoms.control.slot import ControlSlot
@@ -70,7 +72,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     del config
     from lca.runtime.support.null_hook_registry import NullHookRegistry
 
-    hooks_registry = FactoryRegistry("hooks")
+    hooks_registry: FactoryRegistry[Any] = FactoryRegistry("hooks")
     hooks_registry.register("simple", NullHookRegistry)
     ctx.provide(BODIES.key, FactoryRegistry("bodies"))
     ctx.provide(BRAINS.key, FactoryRegistry("brains"))

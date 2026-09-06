@@ -35,7 +35,11 @@ def _gate_decided_from_payload(payload: dict[str, Any]) -> GateDecided | None:
     event_id = payload.get("event_id")
     gate = payload.get("gate")
     verdict = payload.get("verdict")
-    if not all(isinstance(value, str) and value for value in (event_id, gate, verdict)):
+    if not isinstance(event_id, str) or not event_id:
+        return None
+    if not isinstance(gate, str) or not gate:
+        return None
+    if not isinstance(verdict, str) or not verdict:
         return None
     is_rewritten = payload.get("is_rewritten")
     if not isinstance(is_rewritten, bool):

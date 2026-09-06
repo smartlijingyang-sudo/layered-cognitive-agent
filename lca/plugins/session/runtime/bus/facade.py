@@ -30,7 +30,7 @@ import structlog
 from lca.contracts.event import EventPayload
 from lca.session.append import Session
 from lca_kernel.events.bus.bus import EventRef
-from lca_kernel.events.session.session import SessionEvent, SessionProtocol
+from lca_kernel.events.session.session import SessionEvent, SessionObserver, SessionProtocol
 
 _log = structlog.get_logger(__name__)
 
@@ -66,7 +66,7 @@ def _category_str(payload: object) -> str:
 
 def _payload_data(payload: object) -> dict[str, Any]:
     if hasattr(payload, "model_dump"):
-        dumped = payload.model_dump(mode="json")
+        dumped = cast("Any", payload).model_dump(mode="json")
         if not isinstance(dumped, dict):
             raise TypeError(f"EventPayload.model_dump 必须返回 dict；got {type(dumped).__name__}")
         dumped.pop("category", None)
@@ -162,4 +162,4 @@ class SessionBusFacade:
                     exc_info=True,
                 )
 
-        return self._session.observe(adapter)
+        return self._session.observe(cast("SessionObserver", adapter))

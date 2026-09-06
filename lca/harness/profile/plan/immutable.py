@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, NoReturn
 
 
 class _FrozenMapping(dict[str, Any]):
     """Dict-compatible container that rejects mutation after projection."""
 
     @staticmethod
-    def _immutable(*_args: Any, **_kwargs: Any) -> None:
+    def _immutable(*_args: Any, **_kwargs: Any) -> NoReturn:
         raise TypeError("profile projection values are immutable")
 
     def __deepcopy__(self, _memo: dict[int, object]) -> _FrozenMapping:
@@ -30,7 +30,7 @@ class _FrozenList(list[Any]):
     """List-compatible container that rejects mutation after projection."""
 
     @staticmethod
-    def _immutable(*_args: Any, **_kwargs: Any) -> None:
+    def _immutable(*_args: Any, **_kwargs: Any) -> NoReturn:
         raise TypeError("profile projection values are immutable")
 
     def __deepcopy__(self, _memo: dict[int, object]) -> _FrozenList:

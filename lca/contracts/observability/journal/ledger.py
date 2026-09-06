@@ -55,15 +55,15 @@ class RunLedger(Protocol):
     @property
     def is_sealed(self) -> bool:
         """L7: 终态事件提交后返回 True。"""
-
+        ...
     @property
     def run_seq(self) -> int:
         """最后一个已提交 seq;空账本为零。"""
-
+        ...
     @property
     def run_id(self) -> str:
         """所属 run 的稳定身份。"""
-
+        ...
     def append(
         self,
         event: StampedEvent | JournalRecord,
@@ -78,29 +78,29 @@ class RunLedger(Protocol):
             LedgerUnregisteredError: descriptor 未登记或 schema 版本不匹配(L4)
             LedgerDurabilityError: required 事件持久化失败(L2)
         """
-
+        ...
     def seal(self, terminal_event: StampedEvent | JournalRecord) -> StampedEvent:
         """L7: 提交终态事件并封存账本。
 
         终态事件必须是已知 terminal 类型(``AgentRunFinished`` /
         ``TeamRunFinished`` 等);封存后 ``is_sealed=True``。
         """
-
+        ...
     def events(self) -> Sequence[StampedEvent]:
         """已提交事件的稳定快照。"""
-
+        ...
     def get(self, seq: int) -> StampedEvent | None:
         """按连续序列 O(1) 读取;越界返回 None。"""
-
+        ...
     def read_from(self, after_seq: int) -> Sequence[StampedEvent]:
         """返回严格晚于 ``after_seq`` 的事件,供可恢复消费者拉取。"""
-
+        ...
     def flush(self) -> None:
         """冲刷 backend + projection。"""
-
+        ...
     def close(self) -> None:
         """关闭 backend + projection;封存后调用安全。"""
-
+        ...
 
 @runtime_checkable
 class RunLedgerFactory(Protocol):
@@ -108,7 +108,7 @@ class RunLedgerFactory(Protocol):
 
     def create(self, *, run_id: str = "") -> RunLedger:
         """创建一个尚未封存的 run-scoped ledger。"""
-
+        ...
 
 @dataclass(frozen=True)
 class LedgerStats:

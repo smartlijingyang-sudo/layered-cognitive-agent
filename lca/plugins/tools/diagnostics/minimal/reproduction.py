@@ -26,9 +26,7 @@ class MinimalReproduction(MinimalReproductionTool):
         first = rendered[0] if rendered else {}
         failure_seq = int(first.get("seq", 0))
         failure_type = str(first.get("type", ""))
-        causal_chain = tuple(
-            int(e.get("seq", 0)) for e in inspector.explain_failure(run_id=run_id).causal_chain
-        )
+        causal_chain = inspector.explain_failure(run_id=run_id).causal_chain
         return MinimalReproductionPackage(
             failure_seq=failure_seq,
             failure_event_type=failure_type,

@@ -116,14 +116,15 @@ class AssistantEvolve(Protocol):
 
     def observe(self, assistant_id: str, run_ids: tuple[str, ...]) -> ObservationDigest:
         """从 run 轨迹产观察摘要；助理不存在 / digest 不一致 ⇒ fail-closed。"""
-
+        ...
     def distill(self, assistant_id: str, digest: ObservationDigest) -> SkillAcquisitionCandidate:
         """蒸馏候选（experiment）；发 ``assistant.skill.evolved.proposed`` EP。"""
-
+        ...
     def list_pending(self, assistant_id: str) -> tuple[SkillAcquisitionCandidate, ...]:
         """列当前待提升候选（按 candidate_id 排序）。"""
-
+        ...
     def promote(
         self, assistant_id: str, candidate_id: str, approval: WriteApproval
     ) -> SkillInstallReceipt:
         """0067 闸后写 ``{home}/skills/``；发 ``assistant.skill.evolved.promoted`` EP。"""
+        ...

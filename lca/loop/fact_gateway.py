@@ -79,7 +79,9 @@ class DefaultFactGateway(FactGateway):
     def publish_ep(self, ep: str, payload: Mapping[str, Any], *, actor: str) -> AppendReceipt:
         """提交 spine EP 事实(category 鉴权 + I17 enrich + FieldProducer merge)。"""
         merged = _enrich_publish_payload(ep, payload)
-        spine = SpineEventPayload(execution_point=ep, channel="fact", payload=merged)
+        spine = SpineEventPayload.model_validate(
+            {"execution_point": ep, "channel": "fact", "payload": merged}
+        )
         data = spine.model_dump(mode="json")
         data.pop("category", None)
         record = self._session.append(spine.category.value, data, actor=actor)

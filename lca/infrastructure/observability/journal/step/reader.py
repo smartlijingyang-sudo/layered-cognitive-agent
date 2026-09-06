@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from lca.contracts.models.observability.journal.doc import (
     JournalDocument,
@@ -237,7 +237,7 @@ def read_step_document(path: str | Path) -> JournalDocument:
             f"read_step_document: expected schema in "
             f"{{'lca.journal/3', 'lca.journal/3.1'}}, got {schema!r}"
         )
-    return _from_jsonable(obj, JournalDocument)
+    return cast("JournalDocument", _from_jsonable(obj, JournalDocument))
 
 
 __all__ = ["StepGroupedReader", "read_step_document"]

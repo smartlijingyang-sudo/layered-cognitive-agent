@@ -36,7 +36,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, Protocol, cast
 from weakref import WeakKeyDictionary
 
 import yaml
@@ -173,8 +173,13 @@ def pipeline_from_mapping(
 _REGISTERED: WeakKeyDictionary[EnvelopeBus[Any], set[tuple[str, int]]] = WeakKeyDictionary()
 
 
+class _PipelineRegistrationBus(Protocol):
+    def register_pipeline(self, pipeline: object) -> None: ...
+
+
 def register_pipeline_once(bus: EnvelopeBus[Any], pipeline: Pipeline) -> bool:
     """幂等版 ``bus.register_pipeline``;同名同版重复装载跳过,返回是否装载。"""
+    registrable = cast("_PipelineRegistrationBus", bus)
     key = (pipeline.name, pipeline.version)
     seen = _REGISTERED.get(bus)
     if seen is None:
@@ -182,7 +187,7 @@ def register_pipeline_once(bus: EnvelopeBus[Any], pipeline: Pipeline) -> bool:
         _REGISTERED[bus] = seen
     if key in seen:
         return False
-    bus.register_pipeline(pipeline)
+    registrable.register_pipeline(pipeline)
     seen.add(key)
     return True
 

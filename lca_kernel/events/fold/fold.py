@@ -39,7 +39,7 @@ from __future__ import annotations
 import json
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, TypeGuard
 
 REQUEST_HEADER_CATEGORY: str = "spine.llm.request.header"
 """fold 识别的事件 category 字符串。
@@ -626,7 +626,7 @@ def _parse_event(event: Any) -> _EventView:
     )
 
 
-def _is_event_seq(value: object) -> bool:
+def _is_event_seq(value: object) -> TypeGuard[int]:
     """非负 int;拒绝 bool(``True`` 是 ``int`` 子类)。"""
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
 
@@ -816,7 +816,7 @@ def foldSurface(events: Iterable[Any]) -> SurfaceFoldResult:  # noqa: N802 (dsh 
             continue
         if not _is_event_seq(view.seq):
             raise ValueError(f"session event seq {view.seq} is not contiguous; expected {index}")
-        seq = int(view.seq)
+        seq = view.seq
         if surface_op == "append":
             _assert_provenance(view, ())
             nodes.append(seq)

@@ -101,10 +101,9 @@ class A2ATransport(AgentTransport):
     def _resolve_endpoint(self, agent_card: AgentCard | str) -> str:
         if isinstance(agent_card, str):
             return agent_card
-        if hasattr(agent_card, "url"):
-            return str(agent_card.url)
-        if hasattr(agent_card, "endpoint"):
-            return str(agent_card.endpoint)
+        endpoint = getattr(agent_card, "url", None) or agent_card.endpoint
+        if endpoint:
+            return str(endpoint)
         if self._default_endpoint:
             return self._default_endpoint
         raise ValueError(f"无法从 AgentCard 解析 A2A 端点 URL: {agent_card!r}")

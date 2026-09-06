@@ -15,10 +15,11 @@ class CliDebugCommand(Protocol):
     @property
     def name(self) -> str:
         """子命令名（如 'trace' / 'run' / 'scope'）。"""
-
+        ...
     @property
     def description(self) -> str:
         """子命令一行说明。"""
-
+        ...
     def run(self, **kwargs: Any) -> int:
         """执行子命令；返回退出码（0 成功）。"""
+        ...

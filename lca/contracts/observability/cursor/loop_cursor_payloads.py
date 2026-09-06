@@ -14,7 +14,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 if TYPE_CHECKING:
     from lca.contracts.models.core.execution.tool import ToolManifest
@@ -80,6 +80,10 @@ class ToolCallRecord:
     # COMPAT(delete-when: 下个 minor 版本,或所有 caller 迁完;
     #   tracking: ADR-0185 spec §2.5 P5)
     args_payload_path: str | None = None
+    # Rich fields — step-tree / deriver 可直接读,无需 sidecar round-trip。
+    arguments: dict[str, Any] | None = None
+    arguments_summary: str = ""
+    invocation_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -88,6 +92,17 @@ class ToolResultRecord:
     result_digest: str
     result_path: str | None
     outcome: Literal["ok", "failure", "timeout", "denied"]
+    # Rich fields — step-tree / deriver 可直接读,无需 sidecar round-trip。
+    invocation_id: str = ""
+    ok: bool = True
+    latency_ms: int = 0
+    stdout_head: str = ""
+    stdout_chars_total: int = 0
+    stdout_truncated: bool = False
+    stderr: str = ""
+    files_created: tuple[str, ...] = ()
+    error: str | None = None
+    delta_summary: str = ""
 
 
 @dataclass(frozen=True)
@@ -166,7 +181,7 @@ class ToolSchema:
         to_openai = getattr(obj, "to_openai_dict", None)
         if callable(to_openai):
             try:
-                return ToolSchema.from_openai(to_openai())
+                return ToolSchema.from_openai(cast("dict[str, Any]", to_openai()))
             except Exception:  # noqa: S110 — 兜底走下一条 transform 分支
                 pass
         if isinstance(obj, dict):

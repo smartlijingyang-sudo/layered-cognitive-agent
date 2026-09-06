@@ -200,7 +200,7 @@ class RunLifecycleCoordinator:
         finally:
             emit_kernel_run_stop(
                 run_id=session.run_id,
-                outcome=run_outcome,  # type: ignore[arg-type]
+                outcome=run_outcome,
                 trace_id=session.trace_id,
             )
             await self._finish_or_pause(session, workspace=workspace, success=success)

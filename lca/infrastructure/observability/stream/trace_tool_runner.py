@@ -108,23 +108,23 @@ class _PluginInteractionGraphTool:
 
 
 def make_inspect_trace_tool() -> TraceTool:
-    return _InspectTraceTool()  # type: ignore[return-value]
+    return _InspectTraceTool()
 
 
 def make_explain_failure_tool() -> TraceTool:
-    return _ExplainFailureTool()  # type: ignore[return-value]
+    return _ExplainFailureTool()
 
 
 def make_find_optimization_tool() -> TraceTool:
-    return _FindOptimizationTool()  # type: ignore[return-value]
+    return _FindOptimizationTool()
 
 
 def make_export_minimal_reproduction_tool() -> TraceTool:
-    return _ExportMinimalReproductionTool()  # type: ignore[return-value]
+    return _ExportMinimalReproductionTool()
 
 
 def make_plugin_interaction_graph_tool() -> TraceTool:
-    return _PluginInteractionGraphTool()  # type: ignore[return-value]
+    return _PluginInteractionGraphTool()
 
 
 __all__ = [

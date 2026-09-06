@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import contextlib
 from collections.abc import Awaitable, Callable
+from contextlib import AbstractContextManager
+from typing import Protocol
 
 from lca.contracts.mechanisms import Hook
 from lca.contracts.models.core.conversation.message import (
@@ -46,6 +48,10 @@ from lca.runtime.loop.runtime_lifecycle import record_run_resumed
 _STRATEGY_KEY_SOLO = "solo"
 
 
+class _RunEventSessionBinder(Protocol):
+    def bound(self, run_id: str) -> AbstractContextManager[object | None]: ...
+
+
 def _task_as_text(task: str | AgentMessage) -> str:
     if isinstance(task, AgentMessage):
         return agent_message_as_text(task)
@@ -63,7 +69,7 @@ class CognitiveAgent(AgentUnit):
         max_steps: int = DEFAULT_MAX_STEPS,
         max_wall_clock_seconds: int | None = None,
         plan_ref: str = "",
-        event_session_binder: object | None = None,
+        event_session_binder: _RunEventSessionBinder | None = None,
     ) -> None:
         self.runtime = runtime
         self.role_profile = role_profile
@@ -85,7 +91,7 @@ class CognitiveAgent(AgentUnit):
         return self._plan_ref
 
     @property
-    def event_session_binder(self) -> object | None:
+    def event_session_binder(self) -> _RunEventSessionBinder | None:
         """Optional run-boundary Session binder from composition root."""
         return self._event_session_binder
 
@@ -156,8 +162,8 @@ class CognitiveAgent(AgentUnit):
 
         binder = self._event_session_binder
         bound_cm = (
-            binder.bound(scope.run_id)  # type: ignore[union-attr]
-            if binder is not None and hasattr(binder, "bound")
+            binder.bound(scope.run_id)
+            if binder is not None
             else contextlib.nullcontext()
         )
 
@@ -253,7 +259,7 @@ class CognitiveAgent(AgentUnit):
                 trace_id=iteration_trace_id,
                 role=role,
                 iteration_kind=iteration_kind,
-                outcome=iteration_outcome,  # type: ignore[arg-type]
+                outcome=iteration_outcome,
             )
 
     @staticmethod

@@ -134,20 +134,20 @@ class AssistantCatalog(Protocol):
 
     def get(self, assistant_id: str) -> AssistantSpec:
         """按 assistant_id 取 resolve 视图；不存在抛 ValueError。"""
-
+        ...
     def list(self) -> tuple[AssistantSummary, ...]: ...
 
     def revise_profile(self, assistant_id: str, patch: ProfilePatch) -> PlanRevision:
         """patch 模式：digest 重算 + ``revision_seq++`` + ``revisions/`` 快照 + EP。"""
-
+        ...
     def reimport(self, assistant_id: str, reason: str) -> PlanRevision:
         """裸改恢复模式：以磁盘当前文件为输入重算全部配置面 digest。
 
         ``actor="reimport"``；``reason`` 写入 EP 元数据。"""
-
+        ...
     def retire(self, assistant_id: str, reason: str) -> None:
         """转入 retired 状态，拒收新 run（EP assistant.retired）。"""
-
+        ...
 
 __all__ = [
     "AssistantCatalog",

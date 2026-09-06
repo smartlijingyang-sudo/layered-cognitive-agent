@@ -34,6 +34,18 @@ _DEFAULT_SPINE_DELAY_MS = 50
 _DEFAULT_EXCEPTIONS_DELAY_MS = 200
 
 
+def _buffer_write_failure(kind: str, run_id: str) -> Callable[[Exception], None]:
+    def _on_failure(exc: Exception) -> None:
+        log.error(
+            "run_buffer_registry: %s batch write failed run_id=%s err=%s",
+            kind,
+            run_id,
+            exc,
+        )
+
+    return _on_failure
+
+
 @dataclass(frozen=True, slots=True)
 class _SpineQueuedRecord:
     record: SpineEventRecord
@@ -265,20 +277,12 @@ class RunWriteBehindRegistry:
             spine_buffer=WriteBehindBuffer(
                 spine_sink,
                 max_delay_ms=spine_delay,
-                on_failure=lambda exc, rid=run_id: log.error(
-                    "run_buffer_registry: spine batch write failed run_id=%s err=%s",
-                    rid,
-                    exc,
-                ),
+                on_failure=_buffer_write_failure("spine", run_id),
             ),
             exceptions_buffer=WriteBehindBuffer(
                 exceptions_sink,
                 max_delay_ms=exceptions_delay,
-                on_failure=lambda exc, rid=run_id: log.error(
-                    "run_buffer_registry: exceptions batch write failed run_id=%s err=%s",
-                    rid,
-                    exc,
-                ),
+                on_failure=_buffer_write_failure("exceptions", run_id),
             ),
             spine_fsync=spine_fsync,
             exceptions_fsync=exceptions_fsync,

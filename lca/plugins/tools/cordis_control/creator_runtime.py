@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
 from lca.contracts.atoms.artifact.state import ArtifactState
@@ -66,7 +67,7 @@ class CreatorRuntime:
             },
             status=DiagnosticStatus.SUCCEEDED,
         )
-        artifacts = self._authored.values()
+        artifacts: Iterable[AuthoredPlugin] = self._authored.values()
         if target:
             artifacts = (item for name, item in self._authored.items() if name == target)
         return {

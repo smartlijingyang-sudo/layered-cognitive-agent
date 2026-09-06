@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 from collections.abc import Sequence
+from contextvars import Token
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -106,7 +107,7 @@ class RunSession:
     thread_tree_writer: object | None = None  # ADR-0186 PR-3g: per-run StepTreeFoldDeriver
     coordinator: object | None = None  # ADR-0167 D11: StepCoordinator (Agent 唯一写入口)
     loop_cursor: object | None = None  # ADR-0169 §D11 PR-1.5: LoopCursor(写入 cursor 的入口)
-    loop_cursor_token: object | None = (
+    loop_cursor_token: Token[Any] | None = (
         None  # ADR-0169 §D11 PR-1.5: ContextVar reset token (close 时释放)
     )
     event_session: BoundRunEventSession | None = None  # ADR-0186: per-run DSH Session 绑定
@@ -185,8 +186,11 @@ class RunRegistry:
 
             locator = FilesystemRunLocator(root=_RUNS_ROOT)
         self._locator: RunLocator = locator
-        self._locator.storage_root.mkdir(parents=True, exist_ok=True)
-        (self._locator.storage_root / "runs").mkdir(parents=True, exist_ok=True)
+        storage_root = getattr(locator, "storage_root", _RUNS_ROOT)
+        if not isinstance(storage_root, Path):
+            storage_root = _RUNS_ROOT
+        storage_root.mkdir(parents=True, exist_ok=True)
+        (storage_root / "runs").mkdir(parents=True, exist_ok=True)
         self._index = RunSessionIndex(
             max_terminal=max_terminal,
             terminal_ttl_s=terminal_ttl_s,

@@ -34,5 +34,5 @@ class PassthroughCoalescer:
     effects="none",
     description="Coalescer replacement: no buffering / windowing.",
 )
-def setup(ctx: PluginContext, config: Any) -> None:
+async def setup(ctx: PluginContext, config: Any) -> None:
     ctx.provide("coalescer", PassthroughCoalescer())

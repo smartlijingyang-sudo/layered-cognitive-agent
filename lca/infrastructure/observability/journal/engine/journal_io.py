@@ -29,6 +29,7 @@ from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Any
 
+from lca.contracts.atoms.ids.ids import RunId, TraceId
 from lca.contracts.models.observability.journal.catalog import (
     JOURNAL_EVENT_CLASSES,
 )
@@ -203,7 +204,7 @@ def _v1_to_v2_record(record: Mapping[str, Any]) -> dict[str, Any]:
         "agent_role": str(scope_raw.get("agent_role", "")),
         "step": int(scope_raw.get("step", 0)),
     }
-    run_id = scope["run_id"]
+    run_id = str(scope["run_id"])
     seq = int(record.get("seq", 0))
     ts = float(record.get("ts", 0.0))
     event_type = str(record.get("event_type", "UnknownEvent"))
@@ -273,8 +274,8 @@ def record_to_stamped(
         return None
     scope_payload = normalized.get("scope", {}) or {}
     scope = RunScope(
-        trace_id=str(scope_payload.get("trace_id", "")),
-        run_id=str(scope_payload.get("run_id", "")),
+        trace_id=TraceId(str(scope_payload.get("trace_id", ""))),
+        run_id=RunId(str(scope_payload.get("run_id", ""))),
         parent_run_id=scope_payload.get("parent_run_id"),
         parent_trace_id=scope_payload.get("parent_trace_id"),
         delegation_id=scope_payload.get("delegation_id"),

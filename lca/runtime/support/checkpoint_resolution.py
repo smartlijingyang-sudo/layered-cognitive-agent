@@ -70,12 +70,16 @@ class DeclarativeCheckpointStateResolver(CheckpointStateResolver):
 
     async def resolve(
         self,
-        checkpoint: DeclarativeCheckpoint,
+        checkpoint: object,
         *,
         expected_plan_ref: str,
     ) -> AgentState:
         """Validate and materialize the state for a resumed declarative Turn."""
 
+        if not isinstance(checkpoint, DeclarativeCheckpoint):
+            raise TypeError(
+                "DeclarativeCheckpointStateResolver.resolve requires DeclarativeCheckpoint"
+            )
         self._require_matching_plan_ref(checkpoint, expected_plan_ref)
         state = await self._load_state(checkpoint)
         self._restore_legacy_cursor(state, checkpoint.cursor)

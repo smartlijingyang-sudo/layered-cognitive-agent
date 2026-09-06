@@ -56,12 +56,12 @@ class W3CTraceContextValidator(Protocol):
 
     def parse_traceparent(self, raw: str) -> TraceparentParts | None:
         """解析 + 校验 ``traceparent``;格式错误返回 None。"""
-
+        ...
     def parse_tracestate(self, raw: str) -> Mapping[str, str]:
         """解析 ``tracestate`` 键值对;非法键值跳过,合法保留。"""
-
+        ...
     def validate(self, *, traceparent: str | None, tracestate: str | None) -> W3CValidationResult:
         """综合校验;返回 W3CValidationResult。"""
-
+        ...
 
 __all__ = ["TraceparentParts", "W3CTraceContextValidator", "W3CValidationResult"]

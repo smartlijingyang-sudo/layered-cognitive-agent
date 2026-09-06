@@ -122,6 +122,7 @@ class FilesystemJournalStore(JournalStoreBackend):
 
                 raise UnknownEventType(event_type)
             # 重建 StampedEvent 的最小骨架,seq/ts/event_type/data 已够消费
+            from lca.contracts.atoms.ids.ids import RunId, TraceId
             from lca.contracts.models.observability.journal.journal import (
                 JournalEvent,
                 RunScope,
@@ -131,8 +132,8 @@ class FilesystemJournalStore(JournalStoreBackend):
                 seq = int(payload.get("seq", len(self._events) + 1))
                 ts = float(payload.get("ts", 0.0))
                 scope = RunScope(
-                    trace_id=str(payload.get("scope", {}).get("trace_id", "")),
-                    run_id=str(payload.get("scope", {}).get("run_id", "")),
+                    trace_id=TraceId(str(payload.get("scope", {}).get("trace_id", ""))),
+                    run_id=RunId(str(payload.get("scope", {}).get("run_id", ""))),
                 )
                 event = JournalEvent()  # 占位;测试/Inspector 不深入 payload
                 stamped = StampedEvent(

@@ -9,11 +9,14 @@
 from __future__ import annotations
 
 import contextlib
+from contextlib import AbstractContextManager
+from typing import Protocol
 
 from lca.contracts.models.core.conversation.message import AgentMessage, agent_message_as_text
 from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.observability.journal.journal import (
+    RunScope,
     TeamRunFinished,
     TeamRunStarted,
 )
@@ -32,6 +35,10 @@ from lca.infrastructure.observability import (
 )
 
 
+class _RunEventSessionBinder(Protocol):
+    def bound(self, run_id: str) -> AbstractContextManager[object | None]: ...
+
+
 class TeamHandle(TeamUnit):
     """Holds a closed TeamStrategy + trace profile. Zero mutation on agents."""
 
@@ -42,7 +49,7 @@ class TeamHandle(TeamUnit):
         observability: BoundObservability,
         members: tuple[AgentUnit, ...],
         lead: AgentUnit | None = None,
-        event_session_binder: object | None = None,
+        event_session_binder: _RunEventSessionBinder | None = None,
     ) -> None:
         self._strategy = strategy
         self._profile = profile
@@ -63,18 +70,13 @@ class TeamHandle(TeamUnit):
         # point on the team entry. The team is a closed strategy; one
         # ``TeamHandle.run`` is one iteration (the cognitive loop sits
         # inside each member agent).
-        from lca.loop.emit.cognitive.agent_spawn import (
-            emit_agent_loop_iteration_end,
-            emit_agent_loop_iteration_start,
-        )
-
         iteration_trace_id = scope.trace_id
         iteration_role = f"team:{self._profile.team_id}"
 
         binder = self._event_session_binder
         bound_cm = (
-            binder.bound(scope.run_id)  # type: ignore[union-attr]
-            if binder is not None and hasattr(binder, "bound")
+            binder.bound(scope.run_id)
+            if binder is not None
             else contextlib.nullcontext()
         )
 
@@ -84,20 +86,21 @@ class TeamHandle(TeamUnit):
                 scope,
                 iteration_trace_id,
                 iteration_role,
-                emit_agent_loop_iteration_start,
-                emit_agent_loop_iteration_end,
             )
 
     async def _run_body(
         self,
         text: str,
-        scope: object,
+        scope: RunScope,
         iteration_trace_id: str,
         iteration_role: str,
-        emit_agent_loop_iteration_start: object,
-        emit_agent_loop_iteration_end: object,
     ) -> Result:
-        emit_agent_loop_iteration_start(  # type: ignore[operator]
+        from lca.loop.emit.cognitive.agent_spawn import (
+            emit_agent_loop_iteration_end,
+            emit_agent_loop_iteration_start,
+        )
+
+        emit_agent_loop_iteration_start(
             trace_id=iteration_trace_id,
             role=iteration_role,
             iteration_kind="fresh",
@@ -150,5 +153,5 @@ class TeamHandle(TeamUnit):
                     trace_id=iteration_trace_id,
                     role=iteration_role,
                     iteration_kind="fresh",
-                    outcome=iteration_outcome,  # type: ignore[arg-type]
+                    outcome=iteration_outcome,
                 )

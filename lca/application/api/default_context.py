@@ -24,8 +24,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from cordis import Context
 
-    from lca.harness.plugin_api import PluginContext
-
 _DEFAULT_PROFILE = "profiles/web-standard.yaml"
 
 # Public deprecation metadata (ADR-0115 决定 7).
@@ -40,7 +38,7 @@ SET_DEFAULT_CTX_DEPRECATION_REASON = (
 class DefaultContextHolder:
     """Mutable state for one process-wide, lazily booted plugin context."""
 
-    ctx: PluginContext | None = None
+    ctx: Context | None = None
     boot_lock: threading.Lock = field(default_factory=threading.Lock)
     boot_complete: threading.Event = field(default_factory=threading.Event)
     booting: bool = False

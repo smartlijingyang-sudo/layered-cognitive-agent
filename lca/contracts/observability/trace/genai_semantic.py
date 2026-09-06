@@ -23,10 +23,11 @@ class GenAISemanticMapper(Protocol):
     @property
     def event_type(self) -> str:
         """mapper 监听的事件类型名（精确匹配 StampedEvent.event_type）。"""
-
+        ...
     @property
     def runtime_kind(self) -> str:
         """运行解释域（plugin/ll/tool/memory/transport/code/permission/retry/error）。"""
-
+        ...
     def map(self, stamped: StampedEvent) -> dict[str, str]:
         """返回 OTel 属性 dict；空 dict 表示该事件无 GenAI 属性可映射。"""
+        ...

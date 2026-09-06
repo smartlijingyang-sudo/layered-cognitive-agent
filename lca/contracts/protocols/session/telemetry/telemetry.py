@@ -99,7 +99,7 @@ class SessionTelemetrySink(Protocol):
 
     def flush(self) -> None:
         """可选的排空提示；缺省空实现（不阻塞、不应抛错）。"""
-
+        ...
     def shutdown(self) -> None:
         """排空队列至静止；返回时后端管线已静止。"""
         ...

@@ -11,7 +11,7 @@ import asyncio
 import json
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from lca.contracts.models.observability.journal.journal import StampedEvent
 from lca.contracts.observability.journal.run_journal import LiveRunProjection
@@ -105,7 +105,7 @@ class RunUiEncoder:
                 continue
 
             last_seq = max(last_seq, item.seq)
-            frames, item_terminated = self._process_item(item, state)
+            frames, item_terminated = self._process_item(cast("_SupportsEventType", item), state)
             for frame in frames:
                 yield frame
             if item_terminated:

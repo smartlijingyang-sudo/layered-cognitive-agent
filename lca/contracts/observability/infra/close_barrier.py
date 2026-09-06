@@ -70,3 +70,4 @@ class CloseBarrier(Protocol):
 
     def close(self, reason: CloseReason) -> CloseReport:
         """按 5 步顺序执行 close 协调;返回 CloseReport。"""
+        ...

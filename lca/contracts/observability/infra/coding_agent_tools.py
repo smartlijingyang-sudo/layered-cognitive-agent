@@ -69,7 +69,7 @@ class TraceInspectorTool(Protocol):
         depth: int = 24,
     ) -> dict[str, Any]:
         """返回 TraceReport 序列化(TraceInspector 现有 API)。"""
-
+        ...
 
 @runtime_checkable
 class FailureExplainerTool(Protocol):

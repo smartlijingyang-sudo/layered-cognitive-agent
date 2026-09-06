@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast, overload
 
 from cordis.plugin import Plugin as CordisPlugin
 from cordis.plugin import plugin as _cordis_plugin
@@ -48,6 +48,8 @@ if TYPE_CHECKING:
         PhaseContribution,
         PluginSpec,
     )
+
+_PluginSetupT = TypeVar("_PluginSetupT", bound="PluginSetupFn[Any]")
 
 
 def _resolve_plugin_contract(
@@ -100,6 +102,58 @@ class PluginCarrier(Protocol):
     name: str | None
     inject: Sequence[str] | None
     meta: PluginMetadata
+
+
+@overload
+def plugin(
+    setup: _PluginSetupT,
+    *,
+    id: str,
+    Config: type[BaseModel] | None = None,  # noqa: N803
+    provides: Sequence[Capability[object] | str] | None = None,
+    requires: Sequence[Capability[object] | str] | None = None,
+    implements: object = None,
+    layer: str,
+    kind: PluginKind,
+    effects: EffectClass | str | Sequence[EffectClass | str] | None = None,
+    test_suite: str | None = None,
+    description: str | None = None,
+    meta: PluginMetadata | None = None,
+    relations: Sequence[RawRelationEntry] | None = None,
+    contributes: Sequence[object] | None = None,
+    functional_group: FunctionalGroup | str | None = None,
+    logic_address: LogicAddress | None = None,
+    contract: PluginContract | None = None,
+    spec: PluginSpec | None = None,
+    ownership: OwnershipDeclaration | None = None,
+    marker_class: type | None = None,
+) -> CordisPlugin: ...
+
+
+@overload
+def plugin(
+    setup: None = None,
+    *,
+    id: str,
+    Config: type[BaseModel] | None = None,  # noqa: N803
+    provides: Sequence[Capability[object] | str] | None = None,
+    requires: Sequence[Capability[object] | str] | None = None,
+    implements: object = None,
+    layer: str,
+    kind: PluginKind,
+    effects: EffectClass | str | Sequence[EffectClass | str] | None = None,
+    test_suite: str | None = None,
+    description: str | None = None,
+    meta: PluginMetadata | None = None,
+    relations: Sequence[RawRelationEntry] | None = None,
+    contributes: Sequence[object] | None = None,
+    functional_group: FunctionalGroup | str | None = None,
+    logic_address: LogicAddress | None = None,
+    contract: PluginContract | None = None,
+    spec: PluginSpec | None = None,
+    ownership: OwnershipDeclaration | None = None,
+    marker_class: type | None = None,
+) -> Callable[[PluginSetupFn[Any]], CordisPlugin]: ...
 
 
 def plugin(

@@ -45,9 +45,11 @@ COMPOSIO_EVENT_POINTS: Final[tuple[str, ...]] = (
 _COMPOSIO_EMITTER = "lca.plugins.integrations.composio"
 
 
-def all_composio_event_descriptors() -> tuple[EventDescriptor, ...]:
-    """Return EventDescriptor metadata for boot-time registry registration."""
-    common = dict(
+def _composio_descriptor(type_name: str) -> EventDescriptor:
+    return EventDescriptor(
+        type_name=type_name,
+        emitter=_COMPOSIO_EMITTER,
+        description=f"Composio integration: {type_name}",
         plane=EventPlane.STRUCTURAL,
         domain="event",
         durability=EventDurability.REQUIRED,
@@ -55,15 +57,11 @@ def all_composio_event_descriptors() -> tuple[EventDescriptor, ...]:
         sensitivity=EventSensitivity.INTERNAL,
         required=("identifier",),
     )
-    return tuple(
-        EventDescriptor(
-            type_name=ep,
-            emitter=_COMPOSIO_EMITTER,
-            description=f"Composio integration: {ep}",
-            **common,
-        )
-        for ep in COMPOSIO_EVENT_POINTS
-    )
+
+
+def all_composio_event_descriptors() -> tuple[EventDescriptor, ...]:
+    """Return EventDescriptor metadata for boot-time registry registration."""
+    return tuple(_composio_descriptor(ep) for ep in COMPOSIO_EVENT_POINTS)
 
 
 __all__ = [

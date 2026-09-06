@@ -24,7 +24,7 @@ ADR-0119 决定 1 + 决定 3 + ADR-0119 followup-2。``lca-web-server`` 是 L1 S
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -153,7 +153,7 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     # 3c. 装 Starlette lifespan 协议(让 TestClient(app).lifespan_context(app) 工作)
     # 长期可维护:lifespan 实现放在 lca_kernel.lifespan,plugin/cli/test 三方都用它
     # 不写"app.state.ctx = inner" hack(短期凑合)
-    app.router.lifespan_context = make_lifespan(inner)
+    app.router.lifespan_context = cast("Any", make_lifespan(inner))
 
     # 4. provide web_server 句柄(cli.py:serve 会 await 它)
     handle = WebServerHandle(app=app, config=cfg, ctx=inner)

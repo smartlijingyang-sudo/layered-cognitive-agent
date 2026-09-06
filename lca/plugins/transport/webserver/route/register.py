@@ -96,7 +96,7 @@ def register_routes(
             # Requests for this path receive Starlette's default 404.
             continue
         dispose = registry.register_http(_starlette_route(spec))
-        inner: Any = ctx._runtime()  # type: ignore[attr-defined]
+        inner: Any = ctx._runtime()
         inner.effect(dispose, label=f"route:{spec.path}")
         registered.append(spec.path)
     return tuple(registered)

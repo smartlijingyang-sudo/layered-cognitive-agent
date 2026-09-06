@@ -18,6 +18,7 @@ from lca.contracts.mechanisms.capability.capability import (
     MissingCapabilityError,
     require_capability,
 )
+from lca.contracts.models.core.state.plane import PlaneBindings
 from lca.contracts.observability.registry.run_locator import RunLocator
 from lca.infrastructure.observability.journal.sse.frames import parse_last_event_id
 from lca.plugins.transport.webserver.handlers.cors.cors import cors_headers
@@ -34,7 +35,7 @@ _PROFILE_SNAPSHOT_NAME = "profile_snapshot.json"
 _DEFAULT_PROFILE_SNAPSHOT_ROOT = Path("traces") / "runs"
 
 
-def _spine_path_of(request: Request, run_id: str):
+def _spine_path_of(request: Request, run_id: str) -> Path | None:
     """Resolve one run's Journal through the owner selected by composition."""
     return _run_port_of(request).journal_path(run_id)
 
@@ -83,7 +84,7 @@ async def get_context(request: Request) -> JSONResponse:
     online = [device.as_dict() for device in devices.list_online()]
     latest = _run_port_of(request).latest_bindings()
     bindings = None
-    if latest is not None:
+    if isinstance(latest, PlaneBindings):
         bindings = {
             "primary": _plane_payload(latest.primary),
             "secondary": _plane_payload(latest.secondary),
@@ -153,8 +154,9 @@ async def stream_run_live(request: Request) -> StreamingResponse | JSONResponse:
     run_id = request.path_params["run_id"]
     if await _run_port_of(request).summary(run_id) is None:
         return JSONResponse({"error": "run not found"}, status_code=404, headers=cors_headers())
+    frames = await _run_port_of(request).stream_run_live(run_id, _parse_after(request))
     return StreamingResponse(
-        _run_port_of(request).stream_run_live(run_id, _parse_after(request)),
+        frames,
         media_type="text/event-stream",
         headers=cors_headers(
             **{

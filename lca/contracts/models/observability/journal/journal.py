@@ -1098,7 +1098,7 @@ class JournalRecord:
     run_seq: int = 0
     occurred_at: float = 0.0
     committed_at: float = 0.0
-    scope: RunScope = field(default_factory=RunScope)
+    scope: RunScope = field(default_factory=lambda: RunScope())
     causation: Causation = field(default_factory=Causation)
     descriptor: DescriptorRef = field(default_factory=DescriptorRef)
     data: Mapping[str, object] = field(default_factory=dict)

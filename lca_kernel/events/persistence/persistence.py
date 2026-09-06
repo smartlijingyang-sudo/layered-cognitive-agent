@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC
 from pathlib import Path
@@ -271,7 +272,10 @@ class PersistenceObserver:
         if cls._default_instance is None:
             instance = cls()
             registry = instance._ensure_registry()
-            registry._on_spine_batch_written = instance._on_spine_batch_written
+            def _on_batch(event_ids: Sequence[str]) -> None:
+                instance._on_spine_batch_written(tuple(event_ids))
+
+            registry._on_spine_batch_written = _on_batch
             cls._default_instance = instance
         return cls._default_instance
 

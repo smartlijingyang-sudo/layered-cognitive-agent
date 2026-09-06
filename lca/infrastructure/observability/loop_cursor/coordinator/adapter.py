@@ -40,7 +40,7 @@ from __future__ import annotations
 import hashlib
 import json
 from contextvars import ContextVar, Token
-from typing import Any
+from typing import Any, get_args
 
 from lca.contracts.models.observability.journal.step import (
     ThinkingTrace,
@@ -64,7 +64,7 @@ from lca.contracts.observability.cursor.loop_cursor_payloads import (
 )
 from lca.infrastructure.observability.writable_matrix.coordinator import StepCoordinator
 
-_VALID_CURSOR_PHASES = frozenset(PhaseName.__args__)
+_VALID_CURSOR_PHASES = frozenset(get_args(PhaseName))
 
 _DIGEST_PREFIX = "sha256:"
 
@@ -219,10 +219,10 @@ class CoordinatorAdapter:
                 args_digest=sha256_digest({"args": args_summary, "invocation_id": invocation_id}),
                 args_payload_path=None,
                 call_seq=self._cursor.snapshot.seq,
+                arguments=arguments,
+                arguments_summary=args_summary,
+                invocation_id=invocation_id,
             ),
-            arguments=arguments,
-            arguments_summary=args_summary,
-            invocation_id=invocation_id,
         )
 
     def record_tool_result(self, result: LegacyToolResult) -> None:
@@ -248,16 +248,16 @@ class CoordinatorAdapter:
                 result_digest=sha256_digest({"delta_summary": delta_summary}),
                 result_path=None,
                 outcome=outcome,  # type: ignore[arg-type]
+                ok=ok,
+                latency_ms=latency_ms,
+                stdout_head=stdout_head,
+                stdout_chars_total=stdout_chars_total,
+                stdout_truncated=stdout_truncated,
+                stderr=stderr,
+                files_created=tuple(files_created),
+                error=error,
+                delta_summary=delta_summary,
             ),
-            ok=ok,
-            latency_ms=latency_ms,
-            stdout_head=stdout_head,
-            stdout_chars_total=stdout_chars_total,
-            stdout_truncated=stdout_truncated,
-            stderr=stderr,
-            files_created=tuple(files_created),
-            error=error,
-            delta_summary=delta_summary,
         )
 
     # ── 关闭协同:close 透传到 cursor;CloseBarrier 由 runtime 持 ───

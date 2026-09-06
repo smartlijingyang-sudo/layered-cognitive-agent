@@ -269,7 +269,7 @@ async def setup(ctx: PluginContext, config: Any) -> None:
             def close(self) -> None:
                 pass
 
-        sinks.append(_NoOpSink())  # type: ignore[arg-type]
+        sinks.append(_NoOpSink())
 
     event_spine = EventSpine(sinks=sinks)
 

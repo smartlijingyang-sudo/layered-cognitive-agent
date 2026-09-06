@@ -131,17 +131,19 @@ def _publish_producer_failures(
     for producer_origin, entry in producer_failures:
         try:
             bridge.append(
-                SpineEventPayload(
-                    execution_point="spine.producer.failure",
-                    channel="error",
-                    payload={
-                        "producer": getattr(producer_origin, "name", "unknown"),
-                        "key": entry.get("key"),
-                        "exception_class": entry.get("exception_class"),
-                        "traceback_text": entry.get("traceback_text"),
-                        "span_id": getattr(span_ctx, "span_id", None),
-                        "outer_execution_point": outer_execution_point,
-                    },
+                SpineEventPayload.model_validate(
+                    {
+                        "execution_point": "spine.producer.failure",
+                        "channel": "error",
+                        "payload": {
+                            "producer": getattr(producer_origin, "name", "unknown"),
+                            "key": entry.get("key"),
+                            "exception_class": entry.get("exception_class"),
+                            "traceback_text": entry.get("traceback_text"),
+                            "span_id": getattr(span_ctx, "span_id", None),
+                            "outer_execution_point": outer_execution_point,
+                        },
+                    }
                 ),
                 producer=_NO_PRODUCER,
             )
@@ -188,10 +190,12 @@ def make_session_spine_append_hook(bridge: RunEventSessionBridge) -> SessionAppe
             producer_failures = []
 
         bridge.append(
-            SpineEventPayload(
-                execution_point=execution_point,
-                channel=channel,
-                payload=payload_data,
+            SpineEventPayload.model_validate(
+                {
+                    "execution_point": execution_point,
+                    "channel": channel,
+                    "payload": payload_data,
+                }
             ),
             producer=_NO_PRODUCER,
         )

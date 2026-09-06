@@ -25,10 +25,12 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import typer
 
+from lca.contracts.models.observability.journal.doc import JournalDocument
+from lca.contracts.models.observability.journal.step import JournalStep
 from lca.infrastructure.observability.backends.run_locator_fs import (
     FilesystemRunLocator,
 )
@@ -58,20 +60,20 @@ def _format_duration(duration_ms: int | None) -> str:
     return f"{seconds / 60:.1f}m"
 
 
-def _summarize_step_one_line(step) -> str:
+def _summarize_step_one_line(step: JournalStep) -> str:
     """一行人话摘要(用于表格)。"""
     if step.reflect is not None and step.reflect.summary:
-        return step.reflect.summary[:80]
+        return str(step.reflect.summary[:80])
     if step.tool_result is not None and step.tool_result.delta_summary:
-        return step.tool_result.delta_summary[:80]
+        return str(step.tool_result.delta_summary[:80])
     if step.thinking is not None and step.thinking.decision:
         return f"[{step.thinking.decision}]"
     if step.tool_call is not None:
-        return step.tool_call.arguments_summary[:80] or step.tool_call.name
+        return str(step.tool_call.arguments_summary[:80] or step.tool_call.name)
     return "—"
 
 
-def _print_step_table(doc) -> None:
+def _print_step_table(doc: JournalDocument) -> None:
     """打印 step 表 (跟 narrative.md 的 summary 表同款, 但更简洁)。"""
     print(f"# {doc.metadata.objective}")
     print(
@@ -91,17 +93,15 @@ def _print_step_table(doc) -> None:
         )
 
 
-def _print_step_detail(doc, step_index: int) -> None:
+def _print_step_detail(doc: JournalDocument, step_index: int) -> None:
     """打印第 N 步的完整内容(markdown 格式,复用 StepNarrativeWriter)。"""
     step = doc.step_by_index(step_index)
     if step is None:
         print(f"step index {step_index} 不存在 (1..{len(doc.steps)})", file=sys.stderr)
         raise SystemExit(1)
     # 构造单步 document
-    from lca.contracts.models.observability.journal.doc import (
-        close_document,
-        empty_document,
-    )
+    from lca.contracts.models.observability import append_step
+    from lca.contracts.models.observability.journal.doc import empty_document
 
     single_doc = empty_document(
         run_id=doc.run_id,
@@ -109,16 +109,12 @@ def _print_step_detail(doc, step_index: int) -> None:
         metadata=doc.metadata,
         started_at=doc.started_at,
     )
-    single_doc = close_document(single_doc, outcome="in_progress", closed_at=None)
-    # append_step 是 frozen → 新 object
-    from lca.contracts.models.observability import append_step
-
     single_doc = append_step(single_doc, step)
     md = StepNarrativeWriter("").render(single_doc)
     print(md)
 
 
-def _print_summary_chain(doc) -> None:
+def _print_summary_chain(doc: JournalDocument) -> None:
     """打印因果链(prior_summary_chain 链式)。"""
     chain = doc.prior_summary_chain()
     if not chain:
@@ -128,7 +124,7 @@ def _print_summary_chain(doc) -> None:
         print(f"{i:>3}. {s}")
 
 
-def _read_doc_or_exit(traces_root: Path, run_id: str):
+def _read_doc_or_exit(traces_root: Path, run_id: str) -> JournalDocument:
     """解析路径 + read document, 错误时友好提示 + typer.Exit(1)。"""
     locator = FilesystemRunLocator(traces_root)
     journal_path = locator.journal_step_path(run_id)
@@ -155,7 +151,7 @@ def register(app: typer.Typer) -> None:
         step_index: int | None = typer.Option(None, "--step", "-s", help="只看第 N步 (1-based)"),
         summary_only: bool = typer.Option(False, "--summary", help="只输出 prior_summary_chain"),
         json_output: bool = typer.Option(False, "--json", help="完整 JournalDocument JSON"),
-        traces_root: Path = typer.Option(  # noqa: B008
+        traces_root: Path = typer.Option(
             _DEFAULT_TRACES_ROOT, "--traces-root", help="traces 根目录"
         ),
     ) -> None:
@@ -176,7 +172,7 @@ def register(app: typer.Typer) -> None:
     @app.command(name="narrative")
     def narrative_cmd(
         run_id: str = typer.Argument(..., help="run_id"),
-        traces_root: Path = typer.Option(  # noqa: B008
+        traces_root: Path = typer.Option(
             _DEFAULT_TRACES_ROOT, "--traces-root", help="traces 根目录"
         ),
     ) -> None:
@@ -189,7 +185,7 @@ def register(app: typer.Typer) -> None:
         sys.stdout.write(path.read_text(encoding="utf-8"))
 
 
-def _document_to_dict(doc) -> dict[str, Any]:
+def _document_to_dict(doc: JournalDocument) -> dict[str, Any]:
     """JournalDocument → JSON-friendly dict(复用 projector 反序列化逻辑)。"""
     from dataclasses import asdict, is_dataclass
 
@@ -204,7 +200,7 @@ def _document_to_dict(doc) -> dict[str, Any]:
             return obj
         return repr(obj)
 
-    return _to_jsonable(doc)
+    return cast("dict[str, Any]", _to_jsonable(doc))
 
 
 __all__ = ["register"]

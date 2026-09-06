@@ -9,10 +9,18 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
+from lca.contracts.harness.tasks.session import SessionEvent
+
 
 @runtime_checkable
 class SessionReader(Protocol):
     """Minimal Session read face for model-context fold."""
+
+    def snapshot_events(
+        self, from_seq: int = 0, to_seq_exclusive: int | None = None
+    ) -> tuple[SessionEvent, ...]:
+        """Immutable event log slice for pure folds (gate policy, projections)."""
+        ...
 
     def derive_messages(self) -> list[dict[str, Any]]: ...
 

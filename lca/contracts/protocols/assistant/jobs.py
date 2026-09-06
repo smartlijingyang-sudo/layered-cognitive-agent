@@ -129,9 +129,10 @@ class AssistantJobs(Protocol):
 
     def register(self, assistant_id: str, job_spec: JobSpec) -> JobRegistration:
         """收 JobSpec → 注册 0093 WorkItem；发 ``assistant.job.registered`` EP。"""
-
+        ...
     def list_jobs(self, assistant_id: str) -> tuple[JobRegistration, ...]:
         """列本助理已登记 job（按 job_id 排序）。"""
-
+        ...
     def fire(self, assistant_id: str, job_id: str) -> WorkItemHandle:
         """人工投递一次 ``actor="manual"`` Trigger；发 ``assistant.job.fired`` EP。"""
+        ...

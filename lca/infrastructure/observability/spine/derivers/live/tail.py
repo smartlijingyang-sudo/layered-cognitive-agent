@@ -14,15 +14,17 @@ Production step_tree uses ``StepTreeFoldDeriver`` (I-SESSION-5).
 from __future__ import annotations
 
 import logging
-from datetime import timezone
+from collections.abc import AsyncIterator
+from datetime import UTC
 
+from lca.contracts.atoms.ids.ids import RunId, TraceId
 from lca.contracts.models.observability.journal.journal import (
     RunScope as _RunScope,
 )
 from lca.contracts.models.observability.journal.journal import (
     StampedEvent,
 )
-from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
+from lca.infrastructure.observability.journal.stream.live_tail import LiveGap, LiveTail
 from lca.infrastructure.observability.spine.derivers.base.base import Deriver
 from lca.infrastructure.observability.spine.event.record import EventRecord
 
@@ -63,13 +65,13 @@ class LiveTailDeriver(Deriver):
             )
 
     # ── SSE carrier fan-out（非 EventSpine.subscribe / 非 fold）──
-    def subscribe(self, *args: object, **kwargs: object):
+    def subscribe(self, after_seq: int = 0) -> AsyncIterator[StampedEvent | LiveGap]:
         """Pass through to ``LiveTail.subscribe`` (SSE carrier, not fold).
 
         Returns the ring buffer's register-replay-live iterator. Not the
         I-SESSION-5 derivation path; retained until a separate transport ADR.
         """
-        return self._tail.subscribe(*args, **kwargs)
+        return self._tail.subscribe(after_seq)
 
     def close(self) -> None:
         """Pass through to the wrapped tail's close."""
@@ -102,12 +104,12 @@ def _to_stamped(event: EventRecord) -> StampedEvent:
         },
     )
     scope = _RunScope(
-        trace_id=event.run_id,  # spine run_id maps to legacy trace_id
-        run_id=event.run_id,
+        trace_id=TraceId(event.run_id),  # spine run_id maps to legacy trace_id
+        run_id=RunId(event.run_id),
         agent_role="",
     )
     ts = (
-        event.when.astimezone(timezone.utc).timestamp()
+        event.when.astimezone(UTC).timestamp()
         if event.when.tzinfo
         else event.when.timestamp()
     )

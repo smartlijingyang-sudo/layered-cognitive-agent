@@ -15,7 +15,7 @@ Planes (session-event-pipeline-spec §3):
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Final, Literal
+from typing import Final, Literal, get_args
 
 from lca.contracts.observability.cursor.loop_cursor import PhaseName
 
@@ -78,7 +78,7 @@ LLM_SPINE_EPS: Final[tuple[str, ...]] = (
 
 # ADR-0194 §1.3: cursor fold EP 与 PhaseName 六步闭集对齐;不含 gate phase。
 PHASE_FOLD_SPINE_EPS: Final[tuple[str, ...]] = tuple(
-    f"phase.{phase}.fold" for phase in PhaseName.__args__
+    f"phase.{phase}.fold" for phase in get_args(PhaseName)
 )
 
 COGNITION_SPINE_EPS: Final[tuple[str, ...]] = (

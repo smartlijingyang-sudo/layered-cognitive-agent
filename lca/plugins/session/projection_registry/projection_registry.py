@@ -18,7 +18,7 @@ import contextlib
 import copy
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 from weakref import WeakKeyDictionary
 
 import structlog
@@ -151,7 +151,7 @@ class ProjectionRegistry:
         attach = getattr(session, "_attach_projection_registry", None)
         if callable(attach):
             attach(self)
-        return session.observe(_ProjectionObserver(self))
+        return cast("Callable[[], None]", session.observe(_ProjectionObserver(self)))
 
     def on_session_event(self, session: Any, event: SessionEvent) -> None:
         """observer 入口：一条已提交事件急切穿过全部单元。单个单元失败

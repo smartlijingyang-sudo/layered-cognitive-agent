@@ -131,7 +131,7 @@ class _HookAttachFinder(ast.NodeVisitor):
     # Helpers
     # ------------------------------------------------------------------
 
-    def _add_finding(self, node: ast.AST, kind: str, message: str) -> None:
+    def _add_finding(self, node: ast.expr, kind: str, message: str) -> None:
         """Add a finding for the given AST node."""
         self.findings.append(
             Finding(

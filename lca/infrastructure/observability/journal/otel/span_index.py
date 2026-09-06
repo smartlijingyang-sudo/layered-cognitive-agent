@@ -20,11 +20,10 @@ from opentelemetry import context as otel_context
 from opentelemetry import trace as otel_trace
 
 if TYPE_CHECKING:
-    from opentelemetry.context import Token
     from opentelemetry.trace import Span, Tracer
 
 
-def _safe_detach(token: Token) -> None:
+def _safe_detach(token: Any) -> None:
     """在当前 Context 有效时 unwind ambient；跨 Context 则静默跳过。
 
     不调用 ``otel_context.detach``：其在失败时会 ``logger.exception``
@@ -45,7 +44,7 @@ class SpanContainerIndex:
         self._tracer = tracer
         self._runs: dict[str, Span] = {}
         self._delegations: dict[str, Span] = {}
-        self._attach_tokens: dict[str, Token] = {}
+        self._attach_tokens: dict[str, Any] = {}
         self._own_span_ids: set[str] = set()
 
     @staticmethod

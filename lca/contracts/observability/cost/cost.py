@@ -39,13 +39,13 @@ class CostPricingTable(Protocol):
 
     def get(self, pricing_ref: str) -> Mapping[str, ModelPricing]:
         """返回该 ``pricing_ref`` 下的所有 ModelPricing。"""
-
+        ...
     def current_ref(self) -> str:
         """当前默认 pricing_ref(不应追溯改写历史)。"""
-
+        ...
     def list_refs(self) -> tuple[str, ...]:
         """所有已注册 pricing_ref;按注册顺序。"""
-
+        ...
 
 @dataclass(frozen=True)
 class CostCalculator:

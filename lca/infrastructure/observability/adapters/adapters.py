@@ -13,7 +13,7 @@ import contextlib
 import inspect
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
-from typing import Any
+from typing import Any, cast
 
 import structlog
 
@@ -127,7 +127,7 @@ class TelemetryLLMAdapter(LLMAdapter):
             return self._spine_emit
         from lca.loop.emit.cognitive import llm
 
-        return llm  # type: ignore[return-value]
+        return llm
 
     @property
     def inner(self) -> LLMAdapter:
@@ -154,9 +154,13 @@ class TelemetryLLMAdapter(LLMAdapter):
         if self._session_append is None:
             return
 
+        append = self._session_append
+        if append is None:
+            return
+
         async def _run() -> None:
             try:
-                result = self._session_append(payload)
+                result = append(payload)
                 if inspect.isawaitable(result):
                     await result
             except Exception:
@@ -261,8 +265,10 @@ class TelemetryLLMAdapter(LLMAdapter):
                     break
                 except TimeoutError:
                     end_outcome = "timeout"
-                    with contextlib.suppress(Exception):
-                        await inner_stream.aclose()
+                    aclose_fn = getattr(inner_stream, "aclose", None)
+                    if callable(aclose_fn):
+                        with contextlib.suppress(Exception):
+                            await cast("Any", aclose_fn())
                     _log.warning(
                         "llm_stream_idle_timeout",
                         adapter=type(self._inner).__name__,
@@ -463,7 +469,7 @@ class TelemetryLLMAdapter(LLMAdapter):
                 self._spine().emit_llm_call_end(
                     model=model,
                     stream=True,
-                    outcome=outcome,  # type: ignore[arg-type]
+                    outcome=outcome,
                     latency_ms=int((time.perf_counter() - started) * _PERF_COUNTER_SCALE),
                     prompt_tokens=prompt_tokens or None,
                     completion_tokens=completion_tokens or None,

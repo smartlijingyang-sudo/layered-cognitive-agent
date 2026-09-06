@@ -78,7 +78,7 @@ class PersistenceCoordinator(Protocol):
         ...
 
     def restore(self, from_seq: int) -> Iterator[EventRecord]:
-        """从 ``from_seq`` 开始回放事件(checkpoint replay)。
+        """从 ``from_seq`` 开始回放事件(checkpoint replay).
 
         Parameters
         ----------
@@ -90,7 +90,6 @@ class PersistenceCoordinator(Protocol):
         Iterator[EventRecord]
             按 seq 升序的事件迭代器;空迭代器表示无可回放事件。
         """
-        _ = from_seq
         ...
 
     def stats(self) -> PersistenceStats:

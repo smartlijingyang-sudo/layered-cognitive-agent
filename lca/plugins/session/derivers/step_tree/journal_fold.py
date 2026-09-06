@@ -39,10 +39,11 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
+from lca.contracts.atoms.ids.ids import RunId, TraceId
 from lca.contracts.models.observability.journal.doc import (
     JournalDocument,
     JournalMetadata,
@@ -51,6 +52,7 @@ from lca.contracts.models.observability.journal.step import (
     JournalStep,
     ReflectTrace,
     StepContext,
+    StepOutcome,
     ThinkingTrace,
     ToolCallRecord,
     ToolResult,
@@ -195,6 +197,20 @@ def _truncate_kept(text: str, *, head: int, tail: int) -> str:
     tail_part = text[-tail:] if tail else ""
     middle_dropped = total - head - tail
     return f"{head_part}\n… [{middle_dropped} chars truncated] …\n{tail_part}"
+
+
+def _journal_step_outcome(raw: str | None) -> StepOutcome | None:
+    """Map fold/runtime outcome strings onto journal ``StepOutcome`` literals."""
+    if raw is None:
+        return None
+    normalized = raw.strip().lower()
+    if normalized in {"success", "completed", "ok", ""}:
+        return "ok"
+    if normalized in {"fail", "failed", "error"}:
+        return "fail"
+    if normalized in {"skip", "skipped", "cancelled", "canceled", "stopped"}:
+        return "skip"
+    return cast("StepOutcome", normalized)
 
 
 @dataclass
@@ -573,32 +589,43 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
         if target is not None:
             assistant_content = str(payload.get("assistant_content") or "")
             tool_calls = payload.get("tool_calls")
-            usage = payload.get("usage") if isinstance(payload.get("usage"), Mapping) else {}
+            usage_raw = payload.get("usage")
+            usage: dict[str, Any] = dict(usage_raw) if isinstance(usage_raw, Mapping) else {}
             if target.thinking is not None:
                 # 补全 preview(从完整 assistant_content 截断)
-                if assistant_content:
-                    target.thinking.raw_response_preview = assistant_content[:600]
-                # 补全 token counts(若 llm.call.end 未设置)
-                if target.thinking.prompt_tokens is None:
+                thinking = target.thinking
+                prompt_tokens = thinking.prompt_tokens
+                if prompt_tokens is None:
                     pt = usage.get("prompt_tokens")
                     if isinstance(pt, (int, float)):
-                        target.thinking.prompt_tokens = int(pt)
-                if target.thinking.completion_tokens is None:
+                        prompt_tokens = int(pt)
+                completion_tokens = thinking.completion_tokens
+                if completion_tokens is None:
                     ct = usage.get("completion_tokens")
                     if isinstance(ct, (int, float)):
-                        target.thinking.completion_tokens = int(ct)
+                        completion_tokens = int(ct)
+                target.thinking = replace(
+                    thinking,
+                    raw_response_preview=assistant_content[:600]
+                    if assistant_content
+                    else thinking.raw_response_preview,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                )
             else:
                 # llm.call.end 未到达或失败 → 直接从 assistant_content 构造
+                prompt_tokens_raw = usage.get("prompt_tokens")
+                completion_tokens_raw = usage.get("completion_tokens")
                 target.thinking = ThinkingTrace(
                     model=target.model or "unknown",
                     latency_ms=0,
                     reasoning="",
                     decision="respond",
-                    prompt_tokens=int(usage["prompt_tokens"])
-                    if isinstance(usage.get("prompt_tokens"), (int, float))
+                    prompt_tokens=int(prompt_tokens_raw)
+                    if isinstance(prompt_tokens_raw, (int, float))
                     else None,
-                    completion_tokens=int(usage["completion_tokens"])
-                    if isinstance(usage.get("completion_tokens"), (int, float))
+                    completion_tokens=int(completion_tokens_raw)
+                    if isinstance(completion_tokens_raw, (int, float))
                     else None,
                     raw_response_preview=assistant_content[:600] if assistant_content else "",
                 )
@@ -746,7 +773,7 @@ def _materialize(
             tool_result=f.tool_result,
             reflect=f.reflect,
             segments=tuple(f.segments),
-            outcome=f.outcome,
+            outcome=_journal_step_outcome(f.outcome),
             error=f.error,
             extra={"window_signal": f.window_signal},
         )
@@ -771,8 +798,8 @@ def _materialize(
     seg_count = sum(len(f.segments) for f in state.closed_frames)
     return JournalDocument(
         schema="lca.journal/3.1",
-        run_id=run_id,
-        trace_id=run_id,
+        run_id=cast("RunId", run_id),
+        trace_id=cast("TraceId", run_id),
         started_at=state.first_ts or 0.0,
         steps=tuple(steps_list),
         metadata=meta,

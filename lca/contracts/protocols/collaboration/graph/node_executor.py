@@ -41,7 +41,7 @@ class GraphNodeExecutor(Protocol):
 
     async def execute(self, context: GraphNodeExecutionContext) -> Result | None:
         """Return a node result, or ``None`` for a no-op topology node."""
-
+        ...
 
 @runtime_checkable
 class GraphNodeExecutorRegistryProtocol(Protocol):
@@ -49,10 +49,10 @@ class GraphNodeExecutorRegistryProtocol(Protocol):
 
     def register(self, node_type: NodeType, executor: GraphNodeExecutor) -> None:
         """Register exactly one executor for a node type."""
-
+        ...
     def resolve(self, node_type: NodeType) -> GraphNodeExecutor:
         """Return the executor for a declared node type or fail closed."""
-
+        ...
 
 __all__ = [
     "GraphNodeExecutionContext",

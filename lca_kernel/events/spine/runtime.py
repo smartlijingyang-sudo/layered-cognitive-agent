@@ -34,13 +34,14 @@ import os
 import sys
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TextIO, TypeGuard
+from typing import TYPE_CHECKING, Any, TextIO, TypeGuard, cast
+
+from lca.contracts.event import EventPayload
+from lca_kernel.events.bus.bus import EnvelopeRef
 
 if TYPE_CHECKING:
-    from lca.contracts.event import EventPayload
-    from lca_kernel.events import EventRef
     from lca_kernel.events.payloads.spine import SpineEventPayload
 
 log = logging.getLogger(__name__)
@@ -92,7 +93,7 @@ class SpineClock:
     def now(cls) -> datetime:
         if cls._override is not None:
             return cls._override
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
 
     @classmethod
     def now_iso(cls) -> str:
@@ -187,7 +188,7 @@ class SpineEventRecord:
     def build(
         cls,
         payload: SpineEventPayload,
-        ref: EventRef,
+        ref: EnvelopeRef,
         *,
         chain: SpineChainContext | None = None,
     ) -> SpineEventRecord:
@@ -288,7 +289,7 @@ class SpineStream:
         if env_path and env_path != "-":
             # 写到文件而不是 stdout（生产 SSE / 容器友好）；
             # 持有文件句柄到对象生命周期,不能用 with
-            self._default = Path(env_path).open("a", encoding="utf-8")  # noqa: SIM115
+            self._default: TextIO = Path(env_path).open("a", encoding="utf-8")  # noqa: SIM115
         else:
             self._default = default or sys.stdout
 
@@ -327,7 +328,7 @@ __all__ = [
 
 def build_record(
     payload: EventPayload,
-    ref: EventRef,
+    ref: EnvelopeRef,
     *,
     chain: SpineChainContext | None = None,
 ) -> SpineEventRecord:
@@ -364,7 +365,7 @@ def build_record(
     prev_event_hash_attr: str | None = getattr(payload, "prev_event_hash", None)
 
     if hasattr(payload, "payload") and isinstance(getattr(payload, "payload", None), dict):
-        inner_payload: dict[str, Any] = dict(payload.payload)
+        inner_payload: dict[str, Any] = dict(cast("Any", payload).payload)
     else:
         # typed EventPayload subclass with typed fields (e.g. ADR-0185 §3.3
         # model-visible payloads) — dump pydantic fields into payload dict

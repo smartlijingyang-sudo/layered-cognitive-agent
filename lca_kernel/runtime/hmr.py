@@ -107,8 +107,12 @@ class PatchWatcher(Protocol):
     def start(self) -> None:
         """启动后台轮询线程;幂等(二次调用 no-op)。"""
 
+        ...
+
     def stop(self) -> None:
         """停止轮询线程;幂等。"""
+
+        ...
 
     def reload_now(self) -> PatchEvent:
         """同步触发一次 reload;不依赖后台线程。返回 :class:`PatchEvent`。
@@ -118,6 +122,8 @@ class PatchWatcher(Protocol):
         ReloadError
             文件缺失 / 解析失败 / 空文件 / IO 错误时。
         """
+
+        ...
 
 
 def validate_patch(patch: Any, *, path: Path | None = None) -> None:

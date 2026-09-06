@@ -127,7 +127,7 @@ class ModelVisibleHookAdapter(LLMAdapter):
         self._hook = hook
         # hook 自带 cursor_provider(setup 时注入 get_current_cursor);此处复用,
         # 不再独立存 provider,避免 cursor ContextVar 解析路径分叉。
-        self._cursor_provider = hook._cursor_provider  # type: ignore[attr-defined]
+        self._cursor_provider = hook._cursor_provider
 
     @property
     def inner(self) -> LLMAdapter:

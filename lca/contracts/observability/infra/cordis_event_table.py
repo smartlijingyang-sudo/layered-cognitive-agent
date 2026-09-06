@@ -13,7 +13,7 @@ cordis_name 派生不变量;ADR-0168-final §D14 EventDescriptor.cordis_name。
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Final
+from typing import Final, get_args
 
 from lca.contracts.observability.cursor.loop_cursor import PhaseName
 
@@ -106,7 +106,7 @@ _CORDIS_EVENT_TABLE_ENTRIES: Final[tuple[CordisEventTableEntry, ...]] = (
             execution_point=f"phase.{phase}.fold",
             cordis_name=f"agent.phase.{phase}.fold",
         )
-        for phase in PhaseName.__args__
+        for phase in get_args(PhaseName)
     ],
     # ── llm.request.header  (ADR-0169 D7 + L6:必在 THINK 窗口开) ──
     CordisEventTableEntry(

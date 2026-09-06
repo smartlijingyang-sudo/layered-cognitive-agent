@@ -224,11 +224,14 @@ class RunSessionBuilder:
         if bundle is not None and step_tree_deriver is not None:
             from dataclasses import replace as _dc_replace
 
+            from lca.plugins.observability.run.ledger_seam import _StepTreeBundle
+
+            typed_bundle = cast("_StepTreeBundle", bundle)
             components = components.__class__(
                 writer=components.writer,
                 tail=components.tail,
                 step_tree_writer=_dc_replace(
-                    bundle,
+                    typed_bundle,
                     deriver=step_tree_deriver,
                 ),
             )

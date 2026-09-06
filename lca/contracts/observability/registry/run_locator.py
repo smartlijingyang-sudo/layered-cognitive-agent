@@ -27,26 +27,26 @@ class RunLocator(Protocol):
 
     def run_dir(self, run_id: str) -> Path:
         """返回 run 的物理目录;若目录不存在也返回路径(写时再创建)。"""
-
+        ...
     def journal_step_path(self, run_id: str) -> Path:
         """返回该 run 的 journal.json 路径(ADR-0164 step-tree 主存储)。"""
-
+        ...
     def events_path(self, run_id: str) -> Path:
         """返回该 run 的 spine ledger 路径(``<run_id>.spine.jsonl``;ADR-0165.1 / ADR-0167 D11 / PR-4 SSOT)。"""
-
+        ...
     def journal_narrative_path(self, run_id: str) -> Path:
         """返回该 run 的 journal.narrative.md 路径(StepNarrativeWriter)。"""
-
+        ...
     def evidence_dir(self, run_id: str) -> Path:
         """返回该 run 的 evidence 子目录路径。"""
-
+        ...
     def materialization_dir(
         self, run_id: str, *, generator_id: str, generator_version: str
     ) -> Path:
         """返回 materializations/<generator-id>/<generator-version>/ 路径。"""
-
+        ...
     def manifest_path(self, run_id: str) -> Path:
         """返回 manifest.json 路径。"""
-
+        ...
 
 __all__ = ["RunLocator"]

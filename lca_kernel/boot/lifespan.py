@@ -36,7 +36,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Callable, Generator
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, cast
 
 
 def make_lifespan(
@@ -69,9 +69,9 @@ def make_lifespan(
         # app.state 上 ctx 引用被一并回收(无副作用)。测试驱动 lifespan 后
         # 仍能读 app.state.ctx(跟深 seek app.current 同款语义)。
 
-    # @asynccontextmanager 把 async function 转成 sync context manager
-    # 内部 sync generator yield 一次,符合 Starlette 期望的形式
-    return _lifespan
+    # @asynccontextmanager 把 async function 转成 sync context manager;
+    # Starlette 期望 sync generator function,运行时与 cast 标注一致。
+    return cast("Callable[[Any], Generator[Any, Any, Any]]", _lifespan)
 
 
 __all__ = ["make_lifespan"]
