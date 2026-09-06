@@ -56,7 +56,8 @@ def main() -> int:
     with httpx.stream(
         "GET",
         f"{FRONTEND_BASE}/lca-api/runs/{run_id}/live",
-        headers=_auth_headers({"Last-Event-ID": "0"}),
+        params={"after": 0},
+        headers=_auth_headers(),
         timeout=130.0,
     ) as resp:
         resp.raise_for_status()
@@ -73,7 +74,7 @@ def main() -> int:
                 )
                 if et:
                     types.append(et)
-                if et in {"AgentRunFinished", "TeamRunFinished"}:
+                if et == "done":
                     print("live events:", types)
                     return 0
     print("incomplete:", types, file=sys.stderr)

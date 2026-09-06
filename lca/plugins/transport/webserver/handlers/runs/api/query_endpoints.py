@@ -154,7 +154,7 @@ async def stream_run_live(request: Request) -> StreamingResponse | JSONResponse:
     run_id = request.path_params["run_id"]
     if await _run_port_of(request).summary(run_id) is None:
         return JSONResponse({"error": "run not found"}, status_code=404, headers=cors_headers())
-    frames = await _run_port_of(request).stream_run_live(run_id, _parse_after(request))
+    frames = _run_port_of(request).stream_run_live(run_id, _parse_after(request))
     return StreamingResponse(
         frames,
         media_type="text/event-stream",

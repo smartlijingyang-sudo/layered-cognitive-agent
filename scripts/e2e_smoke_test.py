@@ -244,7 +244,8 @@ async def main() -> int:
             async with client.stream(
                 "GET",
                 f"{frontend_base}/lca-api/runs/{run_id}/live",
-                headers={**auth, "Last-Event-ID": "0"},
+                params={"after": 0},
+                headers=auth,
                 timeout=130.0,
             ) as resp:
                 resp.raise_for_status()
@@ -265,7 +266,7 @@ async def main() -> int:
                         )
                         if et:
                             types.append(et)
-                        if et in {"AgentRunFinished", "TeamRunFinished"}:
+                        if et == "done":
                             print(f"  ✓ live events: {types}")
                             return 0
         print(f"  ✗ frontend wire incomplete: {types}", file=sys.stderr)

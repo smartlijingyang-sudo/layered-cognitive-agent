@@ -60,10 +60,138 @@ export class StreamingExecutorActionImpl {
 """
 
 
+_STUB_HANDLERS = """import { topicService } from '@/services/topic';
+
+interface SubmitToolInteractionOptions {
+  createUserMessage?: boolean;
+  pluginState?: Record<string, unknown>;
+  toolResultContent?: string;
+}
+
+interface CustomInteractionContext {
+  apiName?: string;
+  requestArgs?: Record<string, unknown>;
+  topicId?: string | null;
+}
+
+type CustomInteractionSubmitHandler = (
+  payload: Record<string, unknown>,
+  context?: CustomInteractionContext,
+) => Promise<{ options?: SubmitToolInteractionOptions; payload: Record<string, unknown> } | undefined>;
+
+const isAskUserQuestionCall = () => true;
+
+const customInteractionSubmitHandlers: Array<{
+  handler: CustomInteractionSubmitHandler;
+  match: (identifier: string, apiName?: string) => boolean;
+}> = [
+  {
+    handler: async (payload) => ({
+      options: { pluginState: { askUserAnswers: payload } },
+      payload,
+    }),
+    match: isAskUserQuestionCall,
+  },
+];
+
+export const prepareCustomInteractionSubmit = async () => ({ payload: {} });
+export const isCustomInteractionIdentifier = () => false;
+export const isHeteroInteractionIdentifier = () => false;
+export const recordCustomInteractionResolution = async () => {};
+"""
+
+_STUB_INTERVENTION = """export const x = async () => {
+  await prepareCustomInteractionSubmit(
+    identifier,
+    action.payload,
+    {
+      apiName,
+      requestArgs: parsedArgs,
+      topicId,
+    },
+  );
+};
+"""
+
+_STUB_CONVERSATION_CONTROL = """import { buildRunLifecycle } from '../lifecycle/buildRunLifecycle';
+
+export class ConversationControlStub {
+  submitToolInteraction = async (
+    toolMessageId: string,
+    response: Record<string, unknown>,
+    context?: unknown,
+    options?: {
+      createUserMessage?: boolean;
+      pluginState?: Record<string, unknown>;
+      toolResultContent?: string;
+    },
+  ): Promise<void> => {
+    void toolMessageId;
+    void response;
+    void context;
+    void options;
+    // NOTE: intentionally do NOT bail on Stop here. `intervention: approved`
+    // and the tool result are already persisted above; returning early would
+    // leave the submission recorded but never resumed — a stuck conversation.
+    // Same best-effort rationale as approveToolCalling: complete atomically and
+    // honor the next Stop normally.
+  };
+
+  skipToolInteraction = async () => {
+    if (this.#wasInterimOpStopped(operationId)) return;
+
+    // 2. Create a user message indicating the skip
+  };
+
+  cancelToolInteraction = async () => {
+    const toolContent = 'User cancelled this interaction.';
+    void toolContent;
+  };
+
+  #wasInterimOpStopped = (_operationId: string): boolean => false;
+}
+"""
+
+_STUB_TOOL_SURFACES = """let registrationPromise: Promise<void> | undefined;
+
+export const ensureBuiltinToolSurfaces = (): Promise<void> => {
+  if (!registrationPromise) {
+    registrationPromise = import('@lobechat/builtin-tools/register')
+      .then(({ registerBuiltinToolSurfaces }) => {
+        registerBuiltinToolSurfaces();
+      });
+  }
+  return registrationPromise;
+};
+"""
+
+
 def _seed_ui(tmp_path: Path) -> Path:
     executor = tmp_path / _EXECUTOR
     executor.parent.mkdir(parents=True)
     executor.write_text(_STUB_EXECUTOR, encoding="utf-8")
+
+    handlers = (
+        tmp_path
+        / "src/features/Conversation/Messages/AssistantGroup/Tool/Detail/Intervention/customInteractionHandlers.ts"
+    )
+    handlers.parent.mkdir(parents=True, exist_ok=True)
+    handlers.write_text(_STUB_HANDLERS, encoding="utf-8")
+
+    intervention = (
+        tmp_path
+        / "src/features/Conversation/Messages/AssistantGroup/Tool/Detail/Intervention/index.tsx"
+    )
+    intervention.write_text(_STUB_INTERVENTION, encoding="utf-8")
+
+    control = tmp_path / "src/store/chat/slices/agentRun/actions/entries/conversationControl.ts"
+    control.parent.mkdir(parents=True, exist_ok=True)
+    control.write_text(_STUB_CONVERSATION_CONTROL, encoding="utf-8")
+
+    tool_surfaces = tmp_path / "src/spa/initialize/toolSurfaces.ts"
+    tool_surfaces.parent.mkdir(parents=True, exist_ok=True)
+    tool_surfaces.write_text(_STUB_TOOL_SURFACES, encoding="utf-8")
+
     return tmp_path
 
 
@@ -101,8 +229,12 @@ def test_apply_injects_marker_and_writes_driver(tmp_path: Path) -> None:
     assert driver.is_file()
     source = driver.read_text(encoding="utf-8")
     assert "runLcaJournal" in source
-    assert "projectJournalFrame" in source
+    assert "observeRunLive" in source
     assert (ui / "src/store/chat/agents/transports/lcaJournal.ts").is_file()
+    assert (ui / "src/store/chat/agents/transports/lcaRunObserve.ts").is_file()
+    assert (ui / "src/store/chat/agents/transports/lcaRunCommand.ts").is_file()
+    journal = (ui / "src/store/chat/agents/transports/lcaJournal.ts").read_text(encoding="utf-8")
+    assert "projectJournalFrame" in journal
     assert (ui / "src/store/chat/agents/transports/lcaWire.ts").is_file()
 
     assert meta.verify_marker == _MARKER
@@ -117,14 +249,14 @@ def test_apply_is_idempotent_when_marker_present(tmp_path: Path) -> None:
 
 
 def test_apply_raises_when_anchor_missing(tmp_path: Path) -> None:
-    executor = tmp_path / _EXECUTOR
-    executor.parent.mkdir(parents=True)
+    ui = _seed_ui(tmp_path)
+    executor = ui / _EXECUTOR
     executor.write_text(
         "import { createClientRuntimeExecutors } from "
         "'@/store/chat/agents/transports/createClientRuntimeExecutors';\n"
         "export const x = 1;\n",
         encoding="utf-8",
     )
-    ctx = PatchContext(ui_dir=tmp_path)
+    ctx = PatchContext(ui_dir=ui)
     with pytest.raises(SystemExit, match="lca_run_driver"):
         apply(ctx)
