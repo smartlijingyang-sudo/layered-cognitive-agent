@@ -295,12 +295,10 @@ async def _boot_context(
                     status="started",
                 )
             )
-            spawn_fiber(
+            fiber = spawn_fiber(
                 ctx, entry.definition, entry.config
-            )  # ↓ K3:cordis registry 注册 fiber(返回不 await)
-            await _await_fiber_for(
-                ctx, entry.definition.spec.id
-            )  # ↓ K3:等这个 fiber 真的跑完 setup(关键:顺序保证)
+            )  # ↓ K3:cordis registry 注册 fiber(返回可 await 的句柄)
+            await fiber.await_()  # ↓ K3:等这个 fiber 跑完 setup(顺序保证)
             if entry.definition.id == "lca-file-store-service" and bootstrap_file_store is not None:
                 _bind_bootstrap_file_store(
                     ctx, bootstrap_file_store

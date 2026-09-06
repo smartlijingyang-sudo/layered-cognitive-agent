@@ -1,7 +1,7 @@
 """Run-mode registry tests — ADR-0076 §六 verification.
 
 The ``run_mode_registry`` capability seam replaces
-``gateway/modes.py:resolve_lca_mode()``'s string ``if/elif`` dispatch.
+``lca/cognition/team/modes_catalog.py:resolve_lca_mode()``'s string ``if/elif`` dispatch.
 This module enforces the contract:
 
 1. The Tier-1 seam plugin mounts an empty ``RunModeRegistry`` on the

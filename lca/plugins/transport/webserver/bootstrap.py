@@ -95,7 +95,7 @@ class DefaultWebserverBootstrapFactory:
 
 def install_bootstrap_state(
     app: Any,
-    ctx: Any,
+    carrier_ctx: Any,
     *,
     config: WebserverBootstrapConfig | None = None,
 ) -> None:
@@ -128,7 +128,7 @@ def install_bootstrap_state(
 
     file_store: FileStore = boot.file_store
     try:
-        seam_file_store = ctx.inject("file_store") if ctx is not None else None
+        seam_file_store = carrier_ctx.inject("file_store") if carrier_ctx is not None else None
     except Exception:
         seam_file_store = None
     if seam_file_store is not None:
@@ -141,14 +141,14 @@ def install_bootstrap_state(
     app.state.file_store = file_store
     app.state.device_hub = boot.device_hub
 
-    if ctx is not None:
+    if carrier_ctx is not None:
         with contextlib.suppress(Exception):
-            app.state.bound_observability = ctx.inject("observability")
+            app.state.bound_observability = carrier_ctx.inject("observability")
 
-    if ctx is not None:
+    if carrier_ctx is not None:
         journal_factory: Any = None
         with contextlib.suppress(Exception, KeyError):
-            journal_factory = ctx.inject("run_ledger_factory")
+            journal_factory = carrier_ctx.inject("run_ledger_factory")
         if journal_factory is not None and hasattr(journal_factory, "create_process_journal"):
             with contextlib.suppress(Exception):
                 run_registry.bind_process_journal(journal_factory)

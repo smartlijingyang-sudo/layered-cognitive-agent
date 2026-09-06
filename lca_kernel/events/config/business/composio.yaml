@@ -11,74 +11,74 @@ events:
     payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
     fields: {}
     publishers:
-      - events.spine.reflector.composio
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.composio.oauth.callback.failed
     plane: lca.contracts.event.Plane.STRUCTURAL
     payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
     fields: {}
     publishers:
-      - events.spine.reflector.composio
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.composio.oauth.callback.processed
     plane: lca.contracts.event.Plane.STRUCTURAL
     payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
     fields: {}
     publishers:
-      - events.spine.reflector.composio
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.composio.connection.created
     plane: lca.contracts.event.Plane.STRUCTURAL
     payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
     fields: {}
     publishers:
-      - events.spine.reflector.composio
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.composio.connection.pending
     plane: lca.contracts.event.Plane.STRUCTURAL
     payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
     fields: {}
     publishers:
-      - events.spine.reflector.composio
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.composio.connection.refreshed
     plane: lca.contracts.event.Plane.STRUCTURAL
     payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
     fields: {}
     publishers:
-      - events.spine.reflector.composio
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.composio.connection.activated
     plane: lca.contracts.event.Plane.STRUCTURAL
     payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
     fields: {}
     publishers:
-      - events.spine.reflector.composio
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.composio.connection.deleted
     plane: lca.contracts.event.Plane.STRUCTURAL
     payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
     fields: {}
     publishers:
-      - events.spine.reflector.composio
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.composio.tool.execution.started
     plane: lca.contracts.event.Plane.STRUCTURAL
     payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
     fields: {}
     publishers:
-      - events.spine.reflector.composio
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.composio.tool.executed
     plane: lca.contracts.event.Plane.STRUCTURAL
     payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
     fields: {}
     publishers:
-      - events.spine.reflector.composio
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.composio.tool.execution.failed
     plane: lca.contracts.event.Plane.STRUCTURAL
     payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
     fields: {}
     publishers:
-      - events.spine.reflector.composio
+      - lca.loop.fact_gateway.DefaultFactGateway

@@ -16,7 +16,8 @@ from lca.harness.profile.boot_products import (
     profile_boot_products_from_scope,
     resolved_profile_from_scope,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.setup import (
+from lca.plugins.observability.profile_snapshot_run_boot_provider import PluginSnapshotEntry
+from lca.plugins.transport.webserver.handlers.runs.session.diagnostics import (
     plugin_inventory_from_boot_products,
 )
 
@@ -91,12 +92,15 @@ def test_run_plugin_inventory_reads_boot_products_not_context_entries() -> None:
     )
 
     assert plugin_inventory_from_boot_products(ctx) == [
-        "|".join(
-            (
-                entry.id,
-                f"requires={','.join(entry.definition.required_capability_keys)}",
-                f"provides={','.join(entry.definition.provided_capability_keys)}",
-            )
+        PluginSnapshotEntry(
+            id=entry.id,
+            layer=entry.definition.spec.layer,
+            kind=str(
+                entry.definition.spec.kind.value
+                if hasattr(entry.definition.spec.kind, "value")
+                else entry.definition.spec.kind
+            ),
+            effects=tuple(entry.definition.spec.effects),
         )
         for entry in resolved.plugins
         if not entry.disabled

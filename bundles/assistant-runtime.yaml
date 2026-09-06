@@ -16,9 +16,9 @@
 
 entries:
   # ── PR-3: Home CRUD + manifest digest 校验 ─────────────────────
-  - id: lca.plugins.domain.assistant.catalog.plugin
+  - id: lca.plugins.assistant.catalog
     name: lca_plugins_assistant_catalog
-    $module: lca.plugins.domain.assistant.catalog.plugin
+    $module: lca.plugins.assistant.catalog
     config:
       # 根路径优先来自 env 注入(ADR-0187 §6 删除条件:不直读 os.environ);
       # 缺失时 profile patch 段应负责提供 literal 默认值
@@ -64,7 +64,7 @@ entries:
     config: {}
 
   # ── PR-7: create_assistant 工具工厂（对话创建助理执行面）────────
-  - id: lca.plugins.domain.tools.assistant_tools.plugin
+  - id: lca.plugins.assistant.tools
     name: lca_plugins_assistant_tools
-    $module: lca.plugins.domain.tools.assistant_tools.plugin
+    $module: lca.plugins.assistant.tools
     config: {}

@@ -11,25 +11,25 @@ events:
     payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
     fields: {}
     publishers:
-      - events.spine.reflector.skill
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.skill.package.install.failed
     plane: lca.contracts.event.Plane.STRUCTURAL
     payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
     fields: {}
     publishers:
-      - events.spine.reflector.skill
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.skill.package.activated
     plane: lca.contracts.event.Plane.STRUCTURAL
     payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
     fields: {}
     publishers:
-      - events.spine.reflector.skill
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.skill.package.searched
     plane: lca.contracts.event.Plane.STRUCTURAL
     payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
     fields: {}
     publishers:
-      - events.spine.reflector.skill
+      - lca.loop.fact_gateway.DefaultFactGateway

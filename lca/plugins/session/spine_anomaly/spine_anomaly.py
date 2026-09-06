@@ -7,7 +7,7 @@ Session hook is active.
 # COMPAT(owner: ADR-0186 wave-3, from: EmitPipeline.emit → anomaly.on_event,
 #         to: Session observer + hook-less EmitPipeline fallback,
 #         delete_when: rg 'self\\._anomaly\\.on_event' lca/plugins/observability/spine/emit_pipeline.py = 0,
-#         forbidden_new_usage: EventSpine.subscribe(anomaly) in production boot)
+#         forbidden_new_usage: EventSpine subscribe(anomaly) in production boot)
 """
 
 from __future__ import annotations

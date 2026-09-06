@@ -19,7 +19,7 @@ events:
     fields:
       state_id: str
     publishers:
-      - events.spine.reflector.cognition
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.cognition.brain.perceive.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -28,7 +28,7 @@ events:
       state_id: str
       outcome: str
     publishers:
-      - events.spine.reflector.cognition
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.cognition.brain.think.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -36,7 +36,7 @@ events:
     fields:
       state_id: str
     publishers:
-      - events.spine.reflector.cognition
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.cognition.brain.think.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -45,7 +45,7 @@ events:
       state_id: str
       outcome: str
     publishers:
-      - events.spine.reflector.cognition
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.cognition.think.gate.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -53,7 +53,7 @@ events:
     fields:
       state_id: str
     publishers:
-      - events.spine.reflector.cognition
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.cognition.think.gate.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -62,7 +62,7 @@ events:
       state_id: str
       outcome: str
     publishers:
-      - events.spine.reflector.cognition
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.cognition.critic.eval.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -70,7 +70,7 @@ events:
     fields:
       state_id: str
     publishers:
-      - events.spine.reflector.cognition
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.cognition.critic.eval.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -79,7 +79,7 @@ events:
       state_id: str
       outcome: str
     publishers:
-      - events.spine.reflector.cognition
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.cognition.reasoner.reason.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -87,7 +87,7 @@ events:
     fields:
       state_id: str
     publishers:
-      - events.spine.reflector.cognition
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.cognition.reasoner.reason.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -96,7 +96,7 @@ events:
       state_id: str
       outcome: str
     publishers:
-      - events.spine.reflector.cognition
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.cognition.prompt_assembler.assemble.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -106,7 +106,7 @@ events:
       template_id: str
       variant: str
     publishers:
-      - events.spine.reflector.cognition
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.cognition.prompt_assembler.assemble.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -117,7 +117,7 @@ events:
       section_count: int
       variant: str
     publishers:
-      - events.spine.reflector.cognition
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.cognition.synthesizer.merge
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -125,7 +125,7 @@ events:
     fields:
       state_id: str
     publishers:
-      - events.spine.reflector.cognition
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.cognition.skill_router.route
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -134,7 +134,7 @@ events:
       state_id: str
       decision_path: str
     publishers:
-      - events.spine.reflector.cognition
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.cognition.memory.read
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -143,7 +143,7 @@ events:
       state_id: str
       outcome: str
     publishers:
-      - events.spine.reflector.cognition
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.cognition.memory.write
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -152,7 +152,7 @@ events:
       state_id: str
       outcome: str
     publishers:
-      - events.spine.reflector.cognition
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   # ── Body（PR-3）─────────────────────────────────────────────
   - category: spine.body.tool.execute.start
@@ -163,7 +163,7 @@ events:
       invocation_id: str
       attempt: int
     publishers:
-      - events.spine.reflector.body_llm
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.body.tool.execute.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -174,7 +174,7 @@ events:
       attempt: int
       outcome: str
     publishers:
-      - events.spine.reflector.body_llm
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.body.tool.retry
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -185,7 +185,7 @@ events:
       attempt: int
       reason: str
     publishers:
-      - events.spine.reflector.body_llm
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.body.sandbox.enter
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -194,7 +194,7 @@ events:
       invocation_id: str
       tool_name: str
     publishers:
-      - events.spine.reflector.body_llm
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.body.sandbox.exit
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -204,7 +204,7 @@ events:
       tool_name: str
       outcome: str
     publishers:
-      - events.spine.reflector.body_llm
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   # ── Lifecycle normalization（PR-3，ADR-0166 S5）───────────────
   - category: spine.lifecycle.finally
@@ -214,7 +214,7 @@ events:
       boundary: str
       trace_id: str
     publishers:
-      - events.spine.reflector.runtime
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   # ── LLM（PR-3）──────────────────────────────────────────────
   - category: spine.llm.call.start
@@ -225,7 +225,7 @@ events:
       stream: bool
       prompt_preview: str
     publishers:
-      - events.spine.reflector.body_llm
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.llm.call.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -235,7 +235,7 @@ events:
       stream: bool
       outcome: str
     publishers:
-      - events.spine.reflector.body_llm
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.llm.stream.token
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -246,7 +246,7 @@ events:
       seq: int
       channel_kind: str
     publishers:
-      - events.spine.reflector.body_llm
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.llm.stream.stall
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -256,7 +256,7 @@ events:
       idle_ms: int
       seq: int
     publishers:
-      - events.spine.reflector.body_llm
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.llm.request.header
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -298,7 +298,7 @@ events:
       message: str
       trace_id: str
     publishers:
-      - events.spine.reflector.runtime
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.exception.finally
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -308,7 +308,7 @@ events:
       trace_id: str
       outcome: str
     publishers:
-      - events.spine.reflector.runtime
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   # ── Runtime observed（PR-3 与 exception 一起迁，PR-6 新加 runtime.observed 类别）──
   - category: spine.runtime.reducer.apply
@@ -319,7 +319,7 @@ events:
       phase: str
       outcome: str
     publishers:
-      - events.spine.reflector.runtime
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.runtime.checkpoint.create
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -330,7 +330,7 @@ events:
       node_id: str
       outcome: str
     publishers:
-      - events.spine.reflector.runtime
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.runtime.resume.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -340,7 +340,7 @@ events:
       state_ref: str
       node_id: str
     publishers:
-      - events.spine.reflector.runtime
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.runtime.resume.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -351,7 +351,7 @@ events:
       node_id: str
       outcome: str
     publishers:
-      - events.spine.reflector.runtime
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.runtime.event_publisher.publish
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -361,7 +361,7 @@ events:
       trace_id: str
       outcome: str
     publishers:
-      - events.spine.reflector.runtime
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   # ── Transport（PR-4）─────────────────────────────────────────────
   - category: spine.transport.route.enter
@@ -372,7 +372,7 @@ events:
       method: str
       run_id: str
     publishers:
-      - events.spine.reflector.transport
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.transport.route.exit
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -383,7 +383,7 @@ events:
       run_id: str
       outcome: str
     publishers:
-      - events.spine.reflector.transport
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.transport.sse.publish
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -392,7 +392,7 @@ events:
       path: str
       run_id: str
     publishers:
-      - events.spine.reflector.transport
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   # ── Kernel lifecycle（PR-4）─────────────────────────────────────
   - category: spine.kernel.boot.start
@@ -401,7 +401,7 @@ events:
     fields:
       profile: str
     publishers:
-      - events.spine.reflector.kernel_loop
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.kernel.boot.completed
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -410,7 +410,7 @@ events:
       profile: str
       outcome: str
     publishers:
-      - events.spine.reflector.kernel_loop
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.kernel.run.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -419,7 +419,7 @@ events:
       run_id: str
       trace_id: str
     publishers:
-      - events.spine.reflector.transport
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.kernel.run.stop
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -429,7 +429,7 @@ events:
       trace_id: str
       outcome: str
     publishers:
-      - events.spine.reflector.transport
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.kernel.run.cancelled
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -438,7 +438,7 @@ events:
       run_id: str
       trace_id: str
     publishers:
-      - events.spine.reflector.transport
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   # ── Agent loop + agent + loop fork（PR-4）─────────────────────────
   - category: spine.agent_loop.iteration.start
@@ -449,7 +449,7 @@ events:
       role: str
       iteration_kind: str
     publishers:
-      - events.spine.reflector.agent_spawn
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.agent_loop.iteration.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -460,7 +460,7 @@ events:
       iteration_kind: str
       outcome: str
     publishers:
-      - events.spine.reflector.agent_spawn
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.loop.fork
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -469,7 +469,7 @@ events:
       child_role: str
       parent_step: int
     publishers:
-      - events.spine.reflector.kernel_loop
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.agent.spawn
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -479,7 +479,7 @@ events:
       role: str
       agent_id: str
     publishers:
-      - events.spine.reflector.agent_spawn
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.agent.iteration
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -490,7 +490,7 @@ events:
       agent_id: str
       iteration: int
     publishers:
-      - events.spine.reflector.agent_spawn
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.agent.final
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -501,7 +501,7 @@ events:
       agent_id: str
       outcome: str
     publishers:
-      - events.spine.reflector.agent_spawn
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   # ── Writable matrix（PR-5）───────────────────────────────────────
   - category: spine.writable.step.start
@@ -511,7 +511,7 @@ events:
       step: int
       run_id: str
     publishers:
-      - events.spine.reflector.writable
+      - events.spine.writable_matrix
       - events.spine.writable_matrix
 
   - category: spine.writable.step.end
@@ -522,7 +522,7 @@ events:
       run_id: str
       outcome: str
     publishers:
-      - events.spine.reflector.writable
+      - events.spine.writable_matrix
       - events.spine.writable_matrix
 
   - category: spine.writable.segment.start
@@ -533,7 +533,7 @@ events:
       step: int
       run_id: str
     publishers:
-      - events.spine.reflector.writable
+      - events.spine.writable_matrix
       - events.spine.writable_matrix
 
   - category: spine.writable.segment.end
@@ -545,7 +545,7 @@ events:
       run_id: str
       outcome: str
     publishers:
-      - events.spine.reflector.writable
+      - events.spine.writable_matrix
       - events.spine.writable_matrix
 
   - category: spine.writable.iteration.halt
@@ -555,7 +555,7 @@ events:
       run_id: str
       reason: str
     publishers:
-      - events.spine.reflector.writable
+      - events.spine.writable_matrix
       - events.spine.writable_matrix
 
   - category: spine.writable.iteration.closing
@@ -564,7 +564,7 @@ events:
     fields:
       run_id: str
     publishers:
-      - events.spine.reflector.writable
+      - events.spine.writable_matrix
       - events.spine.writable_matrix
 
   - category: spine.writable.iteration.close
@@ -573,7 +573,7 @@ events:
     fields:
       run_id: str
     publishers:
-      - events.spine.reflector.writable
+      - events.spine.writable_matrix
       - events.spine.writable_matrix
 
   # ── Loop cursor record_*（ADR-0167 D2 / ADR-0181 PR-10）──────────
@@ -625,7 +625,7 @@ events:
     fields:
       attempted_ep: str
     publishers:
-      - events.spine.reflector.runtime
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.producer.failure
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -634,7 +634,7 @@ events:
       producer_name: str
       key: str
     publishers:
-      - events.spine.reflector.runtime
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   # ── Phase（PR-5）────────────────────────────────────────────────
   - category: spine.perceive.phase.fold
@@ -644,7 +644,7 @@ events:
       step: int
       run_id: str
     publishers:
-      - events.spine.reflector.phase
+      - events.spine.loop_cursor
       - events.spine.loop_cursor
 
   - category: spine.phase.perceive.fold
@@ -654,7 +654,7 @@ events:
       step: int
       run_id: str
     publishers:
-      - events.spine.reflector.phase
+      - events.spine.loop_cursor
       - events.spine.loop_cursor
 
   - category: spine.phase.think.fold
@@ -665,7 +665,7 @@ events:
       run_id: str
       decision_path: str
     publishers:
-      - events.spine.reflector.phase
+      - events.spine.loop_cursor
       - events.spine.loop_cursor
 
   - category: spine.phase.remember.fold
@@ -675,7 +675,7 @@ events:
       step: int
       run_id: str
     publishers:
-      - events.spine.reflector.phase
+      - events.spine.loop_cursor
       - events.spine.loop_cursor
 
   - category: spine.phase.stop.fold
@@ -686,7 +686,7 @@ events:
       run_id: str
       outcome: str
     publishers:
-      - events.spine.reflector.phase
+      - events.spine.loop_cursor
       - events.spine.loop_cursor
 
   - category: spine.phase.reflect.fold
@@ -697,7 +697,7 @@ events:
       run_id: str
       lessons: int
     publishers:
-      - events.spine.reflector.phase
+      - events.spine.loop_cursor
       - events.spine.loop_cursor
 
   - category: spine.phase.act.fold.start
@@ -708,7 +708,7 @@ events:
       run_id: str
       tool_name: str
     publishers:
-      - events.spine.reflector.phase
+      - events.spine.loop_cursor
       - events.spine.loop_cursor
 
   - category: spine.phase.act.fold.end
@@ -720,7 +720,7 @@ events:
       tool_name: str
       outcome: str
     publishers:
-      - events.spine.reflector.phase
+      - events.spine.loop_cursor
       - events.spine.loop_cursor
 
   - category: spine.phase.act.fold
@@ -732,7 +732,7 @@ events:
       tool_name: str
       outcome: str
     publishers:
-      - events.spine.reflector.phase
+      - events.spine.loop_cursor
       - events.spine.loop_cursor
 
   - category: spine.phase.tool.call.start
@@ -744,7 +744,7 @@ events:
       tool_name: str
       invocation_id: str
     publishers:
-      - events.spine.reflector.phase
+      - events.spine.loop_cursor
       - events.spine.loop_cursor
 
   - category: spine.phase.tool.call.end
@@ -757,7 +757,7 @@ events:
       invocation_id: str
       outcome: str
     publishers:
-      - events.spine.reflector.phase
+      - events.spine.loop_cursor
       - events.spine.loop_cursor
 
   - category: spine.phase.tool.denied
@@ -769,7 +769,7 @@ events:
       tool_name: str
       reason: str
     publishers:
-      - events.spine.reflector.phase
+      - events.spine.loop_cursor
       - events.spine.loop_cursor
 
   # ── Phase graph（PR-5）──────────────────────────────────────────
@@ -780,7 +780,7 @@ events:
       node_id: str
       run_id: str
     publishers:
-      - events.spine.reflector.phase_graph
+      - events.spine.loop_cursor
 
   - category: spine.phase_graph.node.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -790,7 +790,7 @@ events:
       run_id: str
       outcome: str
     publishers:
-      - events.spine.reflector.phase_graph
+      - events.spine.loop_cursor
 
   - category: spine.phase_graph.edge.transit
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -800,7 +800,7 @@ events:
       to_node: str
       run_id: str
     publishers:
-      - events.spine.reflector.phase_graph
+      - events.spine.loop_cursor
 
   - category: spine.phase_graph.instrument.coverage
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -810,7 +810,7 @@ events:
       total_nodes: int
       run_id: str
     publishers:
-      - events.spine.reflector.phase_graph
+      - events.spine.loop_cursor
 
   # ── Team（PR-6 新加）─────────────────────────────────────────
   - category: spine.team.casting.started
@@ -821,7 +821,7 @@ events:
       requested_roles: str
       run_id: str
     publishers:
-      - events.spine.reflector.team
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.team.casting.completed
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -831,7 +831,7 @@ events:
       selected_roles: str
       run_id: str
     publishers:
-      - events.spine.reflector.team
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.team.casting.failed
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -841,7 +841,7 @@ events:
       reason: str
       run_id: str
     publishers:
-      - events.spine.reflector.team
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.team.delegation.issued
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -852,7 +852,7 @@ events:
       subtask: str
       run_id: str
     publishers:
-      - events.spine.reflector.team
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.team.delegation.completed
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -864,7 +864,7 @@ events:
       outcome: str
       run_id: str
     publishers:
-      - events.spine.reflector.team
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.team.delegation.cache_hit
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -874,7 +874,7 @@ events:
       subtask: str
       step: int
     publishers:
-      - events.spine.reflector.team
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.team.message.published
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -885,7 +885,7 @@ events:
       recipient: str
       run_id: str
     publishers:
-      - events.spine.reflector.team
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   # ── Perception（PR-6）────────────────────────────────────────
   - category: spine.perception.observe
@@ -895,7 +895,7 @@ events:
       run_id: str
       source: str
     publishers:
-      - events.spine.reflector.perception
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.perception.attention.focus
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -904,7 +904,7 @@ events:
       run_id: str
       target: str
     publishers:
-      - events.spine.reflector.perception
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.perception.attention.blur
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -913,7 +913,7 @@ events:
       run_id: str
       target: str
     publishers:
-      - events.spine.reflector.perception
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.perception.signal.detected
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -923,7 +923,7 @@ events:
       signal_kind: str
       score: float
     publishers:
-      - events.spine.reflector.perception
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.perception.fused
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -933,7 +933,7 @@ events:
       artifact_id: str
       sources: str
     publishers:
-      - events.spine.reflector.perception
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.perception.artifact.built
     plane: lca.contracts.event.Plane.OBSERVABILITY
@@ -943,7 +943,7 @@ events:
       artifact_id: str
       size_bytes: int
     publishers:
-      - events.spine.reflector.perception
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   # ── Control（PR-6）──────────────────────────────────────────
   - category: spine.control.dispatch
@@ -954,7 +954,7 @@ events:
       target: str
       intent: str
     publishers:
-      - events.spine.reflector.control
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.control.invoke
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -963,7 +963,7 @@ events:
       run_id: str
       target: str
     publishers:
-      - events.spine.reflector.control
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.control.signal
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -972,7 +972,7 @@ events:
       run_id: str
       name: str
     publishers:
-      - events.spine.reflector.control
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.control.approve.request
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -982,7 +982,7 @@ events:
       request_id: str
       intent: str
     publishers:
-      - events.spine.reflector.control
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.control.approve.response
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -993,7 +993,7 @@ events:
       verdict: str
       actor: str
     publishers:
-      - events.spine.reflector.control
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.control.deny
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1003,7 +1003,7 @@ events:
       request_id: str
       reason: str
     publishers:
-      - events.spine.reflector.control
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.control.revoke
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1012,7 +1012,7 @@ events:
       run_id: str
       target: str
     publishers:
-      - events.spine.reflector.control
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.control.pause
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1021,7 +1021,7 @@ events:
       run_id: str
       reason: str
     publishers:
-      - events.spine.reflector.control
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.control.resume
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1029,7 +1029,7 @@ events:
     fields:
       run_id: str
     publishers:
-      - events.spine.reflector.control
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.control.stop
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1038,7 +1038,7 @@ events:
       run_id: str
       outcome: str
     publishers:
-      - events.spine.reflector.control
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.control.accept
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1047,7 +1047,7 @@ events:
       run_id: str
       request_id: str
     publishers:
-      - events.spine.reflector.control
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   # ── Boot（PR-6）─────────────────────────────────────────────
   - category: spine.boot.profile.resolved
@@ -1057,7 +1057,7 @@ events:
       profile: str
       plugins: int
     publishers:
-      - events.spine.reflector.boot
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.boot.plugin.fiber.spawned
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1066,7 +1066,7 @@ events:
       plugin_id: str
       layer: str
     publishers:
-      - events.spine.reflector.boot
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.boot.observability.assembled
     plane: lca.contracts.event.Plane.STRUCTURAL
@@ -1075,7 +1075,7 @@ events:
       sinks: int
       derivers: int
     publishers:
-      - events.spine.reflector.boot
+      - lca.loop.fact_gateway.DefaultFactGateway
 
   # ── Runtime observed（PR-6）──────────────────────────────────
   - category: spine.runtime.observed
@@ -1086,4 +1086,4 @@ events:
       detail: str
       run_id: str
     publishers:
-      - events.spine.reflector.runtime
+      - lca.loop.fact_gateway.DefaultFactGateway

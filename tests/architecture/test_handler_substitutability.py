@@ -272,8 +272,8 @@ def test_runtime_gateway_does_not_construct_handlers_by_name() -> None:
 def test_declarative_execution_uses_registry_dispatch() -> None:
     """The production Turn module must route effects and deltas through dispatch."""
 
-    runtime_path = REPO / "lca" / "runtime" / "declarative_runtime.py"
-    tree = ast.parse(runtime_path.read_text(encoding="utf-8"))
+    execution_path = REPO / "lca" / "loop" / "driver.py"
+    tree = ast.parse(execution_path.read_text(encoding="utf-8"))
     execution = next(
         node
         for node in tree.body

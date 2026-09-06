@@ -62,7 +62,8 @@ def test_each_declared_control_executor_uses_the_phase_contract() -> None:
             for name, value in vars(module).items()
             if name.endswith("Executor") and inspect.isclass(value)
         ]
-        assert len(executors) == 1
-        parameters = tuple(inspect.signature(executors[0].execute).parameters.values())
-        assert parameters[1].annotation == "PhaseContext"
-        assert parameters[2].annotation == "PhaseInput"
+        assert executors, f"{module_path} must declare at least one *Executor class"
+        for executor_cls in executors:
+            parameters = tuple(inspect.signature(executor_cls.execute).parameters.values())
+            assert parameters[1].annotation == "PhaseContext"
+            assert parameters[2].annotation == "PhaseInput"

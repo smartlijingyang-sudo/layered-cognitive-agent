@@ -45,6 +45,8 @@ REPO = Path(__file__).resolve().parent.parent
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 PLUGINS_DIR = REPO / "lca" / "plugins"
+# Kernel meta-layer plugins (e.g. lca.events.bus) live outside lca/plugins/.
+PLUGIN_SCAN_DIRS = (PLUGINS_DIR, REPO / "lca_kernel")
 DEFAULT_PROFILE = "profiles/web-standard.yaml"
 
 # ── Six-plane classification (ADR-0076 §一) ─────────────────────────
@@ -72,6 +74,7 @@ _PLANE_RULES: list[tuple[str, dict[str, object]]] = [
                 # （其本质是把「事实」与「派生证据」投递到总线的载体，与
                 # observability seam 同属 cross-cutting 平面）。
                 r"^lca/plugins/events/",
+                r"^lca_kernel/events/",
             ],
             "kind": None,
         },
@@ -227,9 +230,7 @@ def _parse_plugin_decorator(tree: ast.Module, module_path: str) -> PluginManifes
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
-        if node.name != "setup":
-            continue
-        # Look for @plugin(...) decorator
+        # Look for @plugin(...) decorator on any setup entrypoint (setup, setup_bus, …).
         for dec in node.decorator_list:
             if not isinstance(dec, ast.Call):
                 continue
@@ -327,9 +328,13 @@ def _parse_plugin_decorator(tree: ast.Module, module_path: str) -> PluginManifes
 
 
 def _scan_plugins() -> list[PluginManifest]:
-    """Scan all ``lca/plugins/**/*.py`` for ``@plugin`` decorators."""
+    """Scan plugin directories for ``@plugin`` decorators."""
     manifests: list[PluginManifest] = []
-    for py in sorted(PLUGINS_DIR.rglob("*.py")):
+    plugin_files: list[Path] = []
+    for scan_root in PLUGIN_SCAN_DIRS:
+        if scan_root.exists():
+            plugin_files.extend(scan_root.rglob("*.py"))
+    for py in sorted(plugin_files):
         if py.name == "__init__.py":
             continue
         rel = str(py.relative_to(REPO))
@@ -434,8 +439,12 @@ def _build_capability_tree(profile: str) -> CapabilityTree:
             entry.phase.value
         )
 
-    # Phase executors: plugins in phase_executors/ directory
-    phase_executors = [p.id for p in plugins if "phase_graph/" in p.module]
+    # Phase executors: standard phase plugins (legacy phase_graph/ + loop/phase/).
+    phase_executors = [
+        p.id
+        for p in plugins
+        if "phase_graph/" in p.module or "loop/phase/" in p.module.replace(".", "/")
+    ]
 
     # Effect/Delta handlers: plugins providing these capabilities
     effect_handlers = [

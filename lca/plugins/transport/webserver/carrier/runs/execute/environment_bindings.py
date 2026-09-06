@@ -12,7 +12,11 @@ from typing import Any, cast
 
 import structlog
 
-from lca.contracts.mechanisms.capability import provider_current, require_capability
+from lca.contracts.mechanisms.capability import (
+    MissingCapabilityError,
+    provider_current,
+    require_capability,
+)
 from lca.contracts.models.core.plane import PlaneBindings, PlaneKind
 from lca.contracts.protocols.runtime.infra import MachineResolver, Sandbox
 from lca.infrastructure.file_store import FileStore
@@ -88,7 +92,10 @@ def resolve_run_providers(bindings: PlaneBindings, ctx: Any) -> RunProviders:
 
 def resolve_descriptor_registry(ctx: Any) -> Any:
     """Prefer the profile-bound descriptor registry; use legacy fallback otherwise."""
-    registry = ctx.inject("event_descriptor_registry", default=None)
+    try:
+        registry = require_capability(ctx, "event_descriptor_registry")
+    except MissingCapabilityError:
+        registry = None
     if registry is not None:
         return registry
     from lca.infrastructure.observability.events.event_catalog import EVENT_DESCRIPTOR_REGISTRY

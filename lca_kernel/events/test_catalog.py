@@ -20,9 +20,10 @@ from lca_kernel.events.registry import EventRegistry
 def build_test_catalog() -> dict[str, type]:
     """构造测试用的 marker catalog（id → marker class）。
 
-    与生产路径等价：枚举 ``lca.plugins.events`` 下所有带 marker 的组件。
-    任意组件 import 失败 → 跳过该项（不影响其他项）；catalog 用于事件
-    yaml ``publishers:`` / ``subscribers:`` id-form token 解析。
+    与生产路径等价：枚举 event-bus 组件中带 ``marker_class`` 的 publisher。
+    FactGateway-routed spine categories 在 yaml 里用 class-path token
+    ``lca.loop.fact_gateway.DefaultFactGateway`` 授权；本 catalog 只覆盖
+    仍走 EventBus marker 鉴权的 plugin id。
     """
     catalog: dict[str, type] = {}
     pairs: tuple[tuple[str, str, str], ...] = (

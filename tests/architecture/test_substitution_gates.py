@@ -51,8 +51,10 @@ COMPOSER_PATHS = (
 )
 TEAM_TRANSPORT_PATH = COMPOSER_DIRECTORY / "collaboration" / "team_transport.py"
 GRAPH_STRATEGY_PATH = REPO / "lca" / "plugins" / "strategies" / "graph.py"
-GATEWAY_MODE_PATH = REPO / "gateway" / "modes.py"
-GATEWAY_LOOP_PATH = REPO / "gateway" / "runs" / "execute/loop_drivers.py"
+GATEWAY_MODE_PATH = REPO / "lca" / "cognition" / "team" / "modes_catalog.py"
+GATEWAY_LOOP_PATH = (
+    REPO / "lca" / "plugins" / "transport" / "webserver" / "carrier" / "runs" / "execute" / "loop_drivers.py"
+)
 
 
 def _read(path: Path) -> str:
@@ -333,7 +335,7 @@ def test_gateway_does_not_branch_on_mode_keys() -> None:
         return
     findings = _format(_mode_string_dispatches(tree), GATEWAY_MODE_PATH)
     assert not findings, (
-        "gateway/modes.py branches on mode name strings — substitution "
+        "modes_catalog.py branches on mode name strings — substitution "
         "test fails (ADR-0076 §六):\n  - "
         + "\n  - ".join(findings)
         + "\nRemediation: register each mode as a mode adapter plugin and "
@@ -342,7 +344,7 @@ def test_gateway_does_not_branch_on_mode_keys() -> None:
 
 
 def test_loop_driver_does_not_branch_on_mode_keys() -> None:
-    """``gateway/runs/loop_drivers.py`` must not branch on mode name strings.
+    """``carrier/runs/execute/loop_drivers.py`` must not branch on mode name strings.
 
     The legacy carrier already routes through ``CognitiveRunnableAssembler``
     with a dict-of-adapters pattern; a remaining string-compare on
@@ -379,7 +381,7 @@ def test_loop_driver_does_not_branch_on_mode_keys() -> None:
                 findings.append((node.lineno, f"mode key literal: {comparator.value!r}"))
     formatted = _format(findings, GATEWAY_LOOP_PATH)
     assert not formatted, (
-        "gateway/runs/loop_drivers.py branches on mode name strings — "
+        "carrier/runs/execute/loop_drivers.py branches on mode name strings — "
         "substitution test fails (ADR-0076 §六):\n  - " + "\n  - ".join(formatted)
     )
 
