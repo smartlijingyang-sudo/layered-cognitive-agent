@@ -1,81 +1,64 @@
-# lca
+# LCA — Layered Cognitive Agent
 
-> 状态：稳定
-> 所有者：@lca-maintainers
-> schema_version: 2.0.0
+> **平台目录宪法：** [docs/specs/platform-directory-architecture.md](../docs/specs/platform-directory-architecture.md)  
+> **架构决策：** [docs/adr/0195-platform-architecture-convergence.md](../docs/adr/0195-platform-architecture-convergence.md)
 
-## 1. 职责
-LCA 框架的组成部分。具体职责参见同目录下各子包的 README 与 pyproject.toml 中的 ``[tool.lca.package_contracts]`` 块。
+## 是什么
 
-## 2. 不负责
-与下层契约的合规性检查（由 lint-imports 与 check_package_contracts 门禁统一处理）；任何不在本目录 schema_version 范围内的修改都不应提交。
+LCA 是**插件化认知 Agent 框架**：Profile 编译成图，Graph 驱动 Loop，Loop 追加 Session 事实，Cognition 只算不写。
 
-## 3. 输入
-- 当前包内 `895` 个公开模块 + `3790` 个公开符号（class / function）
+## 顶层包地图
 
-## 4. 输出
-- 暴露的公共 API：14 个显式 __all__ 条目； 3790 个定义符号中，2828 个为公共命名
+```text
+lca/
+├── contracts/       类型与 Protocol（无行为、无 I/O）
+├── harness/         编译、MTK、plugin API
+│   ├── graph/         图内核（目标 MTK 子包）
+│   └── composition/   Profile → CompiledRunPlan
+├── loop/            Agent loop 机制 + FactGateway（人读入口）
+├── session/         事实 append / fold / repair（提升中）
+├── cognition/       纯认知原语（零 emit）
+├── runtime/         CognitiveRuntime 窄入口
+├── agent/           AgentUnit / Team
+├── application/     L4 组合根
+├── infrastructure/  适配器与端口
+└── plugins/         可替换 Manifest 贡献（见 plugins/ARCHITECTURE.md）
 
-## 5. 允许依赖
-—
+lca_kernel/          G0 启动 + 事件 yaml SSOT（与 lca 平级）
+```
 
-## 6. 禁止依赖
-—
+## 依赖方向（单向）
 
-## 7. 副作用
-log:emit
+```text
+contracts → infrastructure → cognition → runtime → agent → application
+harness → contracts
+loop / session → contracts, harness
+plugins → contracts（经 Context 注入，禁止 plugin→plugin）
+```
 
-## 8. 失败语义
-模块导入失败 → ImportError；类实例化失败 → TypeError / ValueError；运行时错误以 L1 protocol 中定义的异常类型抛出。
+## 三时态
 
-## 9. 公共入口
-**__init__.py 显式 __all__**:
+| 时态 | 问什么 | 去哪读 |
+|---|---|---|
+| Compile | 装什么？ | `bundles/` · `lca_kernel/boot.py` |
+| Run | 这一步做什么？ | `lca/loop/README.md` |
+| Observe | 发生了什么？ | `lca/session/` · `docs/observability/` |
 
-- `Agent`
-- `AgentSpec`
-- `Debate`
-- `FanOut`
-- `Governance`
-- `Graph`
-- `LeadMandate`
-- `LeadSpec`
-- `PeerRelay`
-- `PeerSwarm`
-- `Pipeline`
-- `Team`
-- `TeamLead`
-- `TeamSpec`
+## 人读入口（45 分钟全链路）
 
-**模块清单**:
+1. [lca_kernel/README.md](../lca_kernel/README.md) — 启动  
+2. [lca/loop/README.md](loop/README.md) — 认知循环  
+3. [lca/plugins/transport/README.md](plugins/transport/README.md) — HTTP  
+4. [docs/observability/platform-readme.md](../docs/observability/platform-readme.md) — 观测链  
+5. [lca/plugins/ARCHITECTURE.md](plugins/ARCHITECTURE.md) — 插件 seam 树  
 
-- `lca/_anthropic_messages.py`
-- `lca/_anthropic_stream.py`
-- `lca/_chat_completions.py`
-- `lca/_chunk.py`
-- `lca/_encoder.py`
-- `lca/_encoder.py`
-- `lca/_finalize.py`
-- `lca/_format.py`
-- `lca/_helpers.py`
-- `lca/_history.py`
-- `lca/_loader.py`
-- `lca/_responses.py`
-- `lca/_shared.py`
-- `lca/_shared.py`
-- `lca/_standard_factory.py`
-- `lca/_strategy.py`
-- `lca/a2a_transport.py`
-- `lca/act.py`
-- `lca/act_authorize.py`
-- `lca/act_budget.py`
-- `lca/act_constrain.py`
-- `lca/act_execute.py`
-- `lca/act_safe_boundary.py`
-- `lca/action.py`
-- `lca/action_authority.py`
-- `lca/action_authority.py`
-- `lca/action_catalog.py`
-- `lca/action_handler.py`
-- `lca/action_handler.py`
-- `lca/action_handlers.py`
-- ... 共 895 个
+## 验证
+
+```bash
+uv run python scripts/check_platform_directory.py
+./scripts/lca-ops audit-plugin-shape
+```
+
+## 版本
+
+schema_version: 3.0.0（目录架构 P0，2026-09-06）
