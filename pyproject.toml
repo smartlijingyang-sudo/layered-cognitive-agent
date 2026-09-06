@@ -185,6 +185,7 @@ lint = [
 ]
 typecheck = [
     "mypy>=1.13",
+    "pyright>=1.1.400",
     "pydantic>=2.9",
 ]
 test = [
@@ -257,8 +258,8 @@ ignore = [
 "lca/contracts/mechanisms.py" = ["ARG002"]
 "lca/contracts/action.py" = ["ARG002"]
 "lca/plugins/transport/**/*.py" = ["TC002"]
-"lca.infrastructure.cli/cli.py" = ["B008", "S603"]  # typer defaults + tail logs
-"lca.infrastructure.cli/commands/*.py" = ["B008", "S603"]  # typer defaults + tail logs
+"lca/infrastructure/cli/cli.py" = ["B008", "S603"]  # typer defaults + tail logs
+"lca/infrastructure/cli/commands/**/*.py" = ["B008", "S603"]  # typer + subprocess runners
 "lca.infrastructure.cli/config.py" = ["S105"]  # sudo_pass_file is a path, not a secret
 "lca.infrastructure.cli/sudo.py" = ["S603"]  # privileged subprocess wrapper
 "lca.infrastructure.cli/service.py" = ["S603", "S607", "S110", "SIM105"]  # subprocess for process management
@@ -300,6 +301,20 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = ["gateway.*", "starlette", "starlette.*", "uvicorn"]
 ignore_missing_imports = true
+
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "basic"
+include = ["lca"]
+exclude = [
+    "vendor/**",
+    "lobehub-ui/**",
+    "tests/**",
+    "lca/contracts/protocols/**",
+    "lca/infrastructure/llm_adapter/openai_compat/**",
+    "**/__pycache__",
+]
+reportMissingImports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

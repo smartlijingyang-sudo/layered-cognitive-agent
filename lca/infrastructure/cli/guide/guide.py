@@ -170,6 +170,18 @@ Audit 测量网  ADR-0074 PR-0（只读）
   ./scripts/lca-ops audit-hook-attach       hooks.trigger / middleware_bag / _emit 残留
   ./scripts/lca-ops audit-plugin-shape      lca/plugins/* 单 Manifest 范式(effects 缺失 + 双形态残留 + 同 id 镜像)
 
+────────────────────────────
+类型检查  Mypy + Pyright（IDE 爆红一键扫）
+────────────────────────────
+  VS Code 同时开 Mypy 扩展 + Pylance 会重复报；CLI 用本命令对齐两边。
+  Ruff 不管类型；lazy re-export 改完跑 ``--focus lazy-import`` 验证。
+  ./scripts/lca-ops typecheck                      全量 lca（mypy + pyright）
+  ./scripts/lca-ops typecheck --focus callable     只看 not callable / reportCallIssue
+  ./scripts/lca-ops typecheck --focus lazy-import  lazy import / object 属性类
+  ./scripts/lca-ops typecheck --json               给 agent 的结构化输出
+  ./scripts/lca-ops typecheck --mypy-only lca/agent
+  ./scripts/lca-ops typecheck --pyright-only       仅 Pylance 同款引擎
+
   ./scripts/lca-ops status-adr-supervision   一命令看 ADR-0066/0067/0068/0069/0074 监督状态
                                               = 验证 tracker.md 一致性 + 输出当前历史迁移基线
                                               (实现了 tracker 即实现 5 ADR)

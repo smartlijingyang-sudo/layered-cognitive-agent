@@ -49,6 +49,7 @@ from lca.infrastructure.cli.commands import (
     runs,
     services,
     tools,
+    typecheck,
     workflow,
 )
 from lca.infrastructure.cli.guide.guide import GUIDE
@@ -99,6 +100,7 @@ journal_step.register(_journal_group)
 journal_session.register(_journal_group)
 kernel.register(app)
 notes.register(app)
+typecheck.register(app)
 
 
 # ── legacy alias: `lca-ops logs` → `journal logs` ──────────────────

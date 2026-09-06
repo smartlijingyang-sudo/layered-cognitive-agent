@@ -12,6 +12,7 @@ from lca.infrastructure.cli.commands.ops import (
     composio,
     events_delivery,
     notes,
+    typecheck,
 )
 from lca.infrastructure.cli.commands.profile import (
     creator_plan,
@@ -50,5 +51,6 @@ __all__ = [
     "runs",
     "services",
     "tools",
+    "typecheck",
     "workflow",
 ]

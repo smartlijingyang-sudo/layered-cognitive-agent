@@ -23,7 +23,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from lca.contracts.models.observability.diagnostic.diagnostic import (
     DiagnosticCategory,
@@ -367,7 +367,7 @@ _LAZY_JOURNAL_SYMBOLS: dict[str, tuple[str, str]] = {
 }
 
 
-def __getattr__(name: str) -> object:
+def __getattr__(name: str) -> Any:
     """PEP 562 lazy loader — journal 实现符号按需 import,不污染业务层 import 图。"""
     import importlib
 
