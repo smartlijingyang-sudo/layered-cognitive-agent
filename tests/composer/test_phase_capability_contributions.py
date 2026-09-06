@@ -92,18 +92,19 @@ def test_runtime_phase_capabilities_accept_custom_contribution_keys() -> None:
 def test_standard_nodes_do_not_route_through_shared_semantic_branching() -> None:
     """Every default node owns its behavior in its selected plugin module."""
 
-    common = Path("lca/plugins/phase_graph/common.py").read_text(encoding="utf-8")
+    common = Path("lca/plugins/loop/phase/_shared/common.py").read_text(encoding="utf-8")
     assert "if self.phase" not in common
     assert "StandardPhaseExecutor" not in common
 
     expected_modules = {
-        "act.py": "StandardActExecutor",
-        "perceive.py": "StandardPerceiveExecutor",
-        "reflect.py": "StandardReflectExecutor",
-        "remember.py": "StandardRememberExecutor",
-        "stop.py": "StandardStopExecutor",
-        "think.py": "StandardThinkExecutor",
+        "act/standard/plugin.py": "StandardActExecutor",
+        "perceive/standard/plugin.py": "StandardPerceiveExecutor",
+        "reflect/standard/plugin.py": "StandardReflectExecutor",
+        "remember/standard/plugin.py": "StandardRememberExecutor",
+        "stop/standard/plugin.py": "StandardStopExecutor",
+        "think/standard/plugin.py": "StandardThinkExecutor",
     }
-    for filename, executor_name in expected_modules.items():
-        source = (Path("lca/plugins/phase_graph") / filename).read_text(encoding="utf-8")
+    phase_root = Path("lca/plugins/loop/phase")
+    for relpath, executor_name in expected_modules.items():
+        source = (phase_root / relpath).read_text(encoding="utf-8")
         assert f"class {executor_name}" in source

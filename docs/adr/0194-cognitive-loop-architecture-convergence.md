@@ -13,7 +13,7 @@
 | cognition 零 spine_reflector import；emit single entry (P-L7) | P4 插件物理重组（`plugins/` 顶层 legacy 目录，P5-10） |
 | ADR-0169 gate-as-phase 文档 Superseded 注脚（P5-05） | package-org 全绿或 ADR 豁免登记（P5-11） |
 | observability 四段链文档（P5-04 / P-L8） | Wave C COMPAT shim 清理（P5-03；delete-when grep 归零） |
-| loop/graph/nodes 协作图 SSOT；web-app phase_graph baseline 5→1 | EventBus compat 退役（G6；register_pipeline 仍依赖 shim） |
+| loop/graph/nodes + loop/state SSOT；**`plugins/phase_graph/` 已删除** | EventBus compat 退役（G6） |
 | acceptance **15/15** 通过 | `plugins/session/` 整目录删除（阻塞于 runtime 基础设施 lift） |
 
 **延伸**：ADR-0075（声明式阶段图 / MTK）、ADR-0190（极端插件化组织）、ADR-0191（四态分离 / DSH 收敛）、ADR-0192（Fact Plane）、ADR-0183/0186（Session SSOT）、认知原语宪法 v3（六步闭集 + Gate 概念群）。

@@ -5,7 +5,7 @@
 - :class:`SessionStore` —— create / get / dispose
 - :class:`SessionBusFacade` —— Session → publisher/observer bus Protocol 适配
 
-plugin 装配入口是 :mod:`lca.plugins.session.runtime.plugin`（``@plugin``
+plugin 装配入口是 :mod:`lca.plugins.session.runtime.plugin.plugin`（``@plugin``
 唯一入口，本 ``__init__`` 不声明 plugin）。
 """
 

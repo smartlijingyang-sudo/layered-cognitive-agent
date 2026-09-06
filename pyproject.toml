@@ -1794,25 +1794,6 @@ public_api = [
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.plugins.phase_graph"]
-responsibility = "lca.plugins.phase_graph: 图节点插件。本 README 由脚手架生成，待包负责人补充具体细节。"
-not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
-allowed_dependencies = [
-    "lca.contracts",
-    "lca.plugins",
-]
-forbidden_dependencies = [
-    "gateway",
-]
-side_effects = [
-    "log:emit",
-]
-public_api = [
-    "lca.plugins.phase_graph",
-]
-filename_whitelist = ["all"]
-schema_version = "1.0.0"
-
 [tool.lca.package_contracts."lca.plugins.insight"]
 responsibility = "lca.plugins.insight: 洞察插件。本 README 由脚手架生成，待包负责人补充具体细节。"
 not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"

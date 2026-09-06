@@ -21,8 +21,8 @@ _DECLARATIVE_BUNDLE_PATHS = (
     BUNDLES / "declarative-recovery.yaml",
 )
 
-# COMPAT(owner: ADR-0194, delete-when: declarative bundles have zero phase_graph $module).
-# Use nested module paths (e.g. phase_graph.stop.policy), not flat (phase_graph.stop_policy).
+# COMPAT(owner: ADR-0194, delete-when: all bundles have zero phase_graph $module).
+# Baseline tracks remaining legacy bundle debt (target: 0).
 _ALLOWED_DECLARATIVE_PHASE_GRAPH_MODULES: frozenset[str] = frozenset()
 
 # rg-equivalent baseline; decrease intentionally → lower constant + note in PR.

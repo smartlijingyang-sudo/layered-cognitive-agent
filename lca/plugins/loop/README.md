@@ -2,13 +2,13 @@
 
 Seam 树：**loop/** · phase executor、control contribution、loop driver、reducer plugin。
 
-| 子组 | Legacy 来源 |
+| 子组 | 说明 |
 |---|---|
-| `phase/<phase>/<variant>/` | `plugins/phase_graph/` executors |
-| `graph/{topology,edges,resilient,recovery}/` | `plugins/phase_graph/` declarative providers |
-| `control/<slot>/` | `plugins/control_contributions/` |
-| `driver/` | `plugins/loop_drivers/` |
-| `reducer/` | `plugins/runtime/reducer.py` |
+| `phase/<phase>/<variant>/` | 六语义 phase executor |
+| `graph/{topology,edges,resilient,recovery,nodes,state}/` | 声明式图 provider + 协作节点 + stop policy |
+| `control/<slot>/` | control contribution |
+| `driver/` | loop driver |
+| `reducer/` | state reducer plugin |
 
 机制 SSOT：`harness/graph/` + `lca/loop/`（FactGateway、transaction）。
 
