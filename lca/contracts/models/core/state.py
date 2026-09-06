@@ -11,6 +11,7 @@ from lca.contracts.atoms.ids import RunId, TraceId, new_id, utc_now
 from lca.contracts.models.core.activation import ActivatedSkill
 from lca.contracts.models.core.decision import Turn
 from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.perceive_projection import PerceiveProjection
 from lca.contracts.models.team.team_awareness import TeamAwareness
 
 if TYPE_CHECKING:
@@ -115,6 +116,7 @@ class AgentState:
     last_error: str | None = None
     active_template: str | None = None
     activated_skills: list[ActivatedSkill] = field(default_factory=list)
+    perceive: PerceiveProjection | None = None
 
     def snapshot(self, reason: SnapshotReason = SnapshotReason.PERIODIC) -> StateSnapshot:
         """Append a checkpoint and return its reference."""

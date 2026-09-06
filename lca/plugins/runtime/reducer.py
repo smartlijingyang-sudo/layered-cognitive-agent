@@ -170,10 +170,16 @@ class DefaultReducer(Reducer):
     def apply_perception(self, state: AgentState, manifest: ContextManifest) -> AgentState:
         """fold ContextManifest 到 state。
 
-        当前 Hub 已经通过 perceive_state 模块写入 current_manifest 和 gate_decided。
-        Reducer 追加 manifest_digest 到 state.extra 作为 idempotency token
-        ——用于 replay / cache 校验。
+        Reducer 是 ``AgentState.perceive`` 投影的唯一 writer(C4)。``manifest_digest``
+        仍写入 ``state.extra`` 作为 replay idempotency token，直至 COMPAT 删除。
         """
+        from lca.contracts.models.core.perceive_projection import PerceiveProjection
+
+        state.perceive = PerceiveProjection(
+            manifest=manifest,
+            digest=manifest.digest,
+            step=state.step,
+        )
         state.extra["manifest_digest"] = manifest.digest
         return state
 

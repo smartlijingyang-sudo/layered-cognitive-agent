@@ -40,6 +40,10 @@ def test_apply_perception_writes_manifest_digest() -> None:
     )
     out = DefaultReducer().apply_perception(state, manifest)
     assert out.extra["manifest_digest"] == "abc"
+    assert out.perceive is not None
+    assert out.perceive.manifest is manifest
+    assert out.perceive.digest == "abc"
+    assert out.perceive.step == 0
 
 
 def test_apply_turn_appends_history() -> None:

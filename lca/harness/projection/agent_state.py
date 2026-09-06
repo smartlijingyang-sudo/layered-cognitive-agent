@@ -43,6 +43,7 @@ class AgentStateProjection:
             last_error=None,
             active_template=None,
             activated_skills=[],
+            perceive=None,
         )
 
     def apply(self, state: AgentState, event: SessionEvent) -> AgentState:
