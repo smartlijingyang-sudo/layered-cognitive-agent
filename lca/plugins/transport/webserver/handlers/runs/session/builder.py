@@ -168,7 +168,14 @@ class RunSessionBuilder:
         # ADR-0186 convergence: per-run Session 是事件 SSOT；cursor WritePort 与
         # EventSpine.append 钩子均经 ``Session.append`` 落日志（见 spine_hook）。
         store = require_capability(self._ctx, "session.store")
-        event_session = bind_run_event_session_from_store(store, run_id)
+        profile_path = getattr(request, "profile_path", "") or "default"
+        preset = getattr(request, "preset", None)
+        event_session = bind_run_event_session_from_store(
+            store,
+            run_id,
+            profile=profile_path,
+            preset=preset if isinstance(preset, str) else None,
+        )
         spine_for_cursor = SessionWritePortAdapter(event_session.bridge)
         # ``_ProfileProxy.plan_ref`` 之前误用 ``request.mode``(transport intent
         # 而非 plan identity),导致下游 ``loop_cursor`` 的 incarnation.plan_ref

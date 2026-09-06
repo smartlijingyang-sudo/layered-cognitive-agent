@@ -82,11 +82,16 @@ class RuntimeResultFinalizer(ResultFinalizer):
             journal_seq_end=journal_sequence,
             resume_cursor=_resume_cursor(outcome, journal_sequence=journal_sequence),
         )
-        return await self._result_projection.project(
+        result = await self._result_projection.project(
             final_state,
             terminal_outcome=terminal_outcome,
             declarative_outcome=outcome,
         )
+        if outcome.kind is ExecutionOutcome.PAUSED:
+            from lca.infrastructure.session.lifecycle_emit import emit_approval_pause_from_result
+
+            emit_approval_pause_from_result(result)
+        return result
 
 
 def _resume_cursor(

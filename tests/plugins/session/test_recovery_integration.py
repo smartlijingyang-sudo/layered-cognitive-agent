@@ -65,3 +65,27 @@ def test_recover_live_agent_waiting_input_with_approval() -> None:
     assert view.status is LiveAgentStatus.WAITING_INPUT
     assert view.pending_resume is not None
     assert view.pending_resume.approval_id == "ap-1"
+
+
+def test_bind_run_emits_session_created() -> None:
+    from lca.plugins.session.runtime.bind import (
+        bind_run_event_session_from_store,
+        unbind_run_event_session,
+    )
+    from lca.plugins.session.runtime.store import SessionStore
+
+    store = SessionStore()
+    bound = bind_run_event_session_from_store(
+        store,
+        "recovery_bind",
+        profile="profiles/test.yaml",
+        preset="solo",
+    )
+    try:
+        events = bound.bridge.inner.snapshot_events()
+        assert len(events) == 1
+        assert events[0].type == "session.created.v1"
+        assert events[0].data["profile"] == "profiles/test.yaml"
+        assert events[0].data["preset"] == "solo"
+    finally:
+        unbind_run_event_session(bound)

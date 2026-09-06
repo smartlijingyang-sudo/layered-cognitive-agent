@@ -158,7 +158,13 @@ class BoundRunEventSession:
     persistence_flush_cancel: Any = None
 
 
-def bind_run_event_session_from_store(store: Any, run_id: str) -> BoundRunEventSession:
+def bind_run_event_session_from_store(
+    store: Any,
+    run_id: str,
+    *,
+    profile: str | None = None,
+    preset: str | None = None,
+) -> BoundRunEventSession:
     """Create Session for ``run_id`` and occupy publish/observe slots.
 
     precondition: ``store.create`` returns :class:`Session`.
@@ -170,9 +176,11 @@ def bind_run_event_session_from_store(store: Any, run_id: str) -> BoundRunEventS
     bridge = RunEventSessionBridge(inner)
     token = set_publish_session(bridge)
     set_session(bridge)
-    from lca.infrastructure.session.lifecycle_emit import reset_lifecycle
+    from lca.infrastructure.session.lifecycle_emit import create_session, reset_lifecycle
 
     reset_lifecycle()
+    if profile is not None:
+        create_session(profile, preset=preset)
     from lca.infrastructure.persistence.run_buffer_registry import SessionPersistenceFlushListener
     from lca.plugins.session.runtime.spine_hook import bind_bridge_spine_hook
 

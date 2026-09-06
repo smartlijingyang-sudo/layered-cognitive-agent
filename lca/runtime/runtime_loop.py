@@ -347,9 +347,20 @@ class CognitiveRuntime(Runtime):
                     outcome=outcome_holder["value"],
                 )
         await self._lifecycle.publish_terminal(state, result)
-        from lca.infrastructure.session.lifecycle_emit import end_turn
+        from lca.infrastructure.session.lifecycle_emit import (
+            checkpoint,
+            emit_approval_pause_from_result,
+            end_turn,
+            terminal_checkpoint_status,
+        )
 
-        end_turn(reason=result.status.value if hasattr(result.status, "value") else "completed")
+        if result.status is TaskStatus.INPUT_REQUIRED:
+            emit_approval_pause_from_result(result)
+        else:
+            terminal_status = terminal_checkpoint_status(result.status)
+            if terminal_status is not None:
+                checkpoint(terminal_status)
+            end_turn(reason=result.status.value if hasattr(result.status, "value") else "completed")
         return result
 
 

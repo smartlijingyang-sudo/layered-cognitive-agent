@@ -10,17 +10,25 @@ import contextvars
 from dataclasses import dataclass
 from typing import Any
 
+from lca.contracts.harness.collaboration.agent import LiveAgentStatus
 from lca.contracts.harness.memory.events import (
+    ApprovalPersisted,
     AssistantResponded,
     MessageAccepted,
     ModelCompleted,
     ModelFailed,
     ModelRequested,
+    SessionCheckpoint,
+    SessionCreated,
     StepEnded,
     StepStarted,
+    ThinkingCompleted,
+    ThinkingDelta,
     TurnEnded,
     TurnStarted,
 )
+from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.result import Result
 from lca.harness.session.emit import emit
 from lca.infrastructure.session.bindings import resolve_session_reader
 from lca.infrastructure.session.surface_emit import append_user_surface
@@ -38,6 +46,7 @@ class _LifecycleState:
     open_step: int | None = None
     turn_open: bool = False
     message_accepted: bool = False
+    approval_pause_emitted: bool = False
 
 
 def reset_lifecycle(*, turn: int = 1) -> None:
@@ -176,6 +185,97 @@ def fail_model(*, turn: int | None = None, step: int, error: str) -> None:
     emit(session, ModelFailed(turn=turn_no, step=step, error=error))
 
 
+def create_session(profile: str, preset: str | None = None) -> SessionCreated | None:
+    """``session.created.v1`` — once when a run Session is bound."""
+    session = _session()
+    if session is None:
+        return None
+    event = SessionCreated(profile=profile, preset=preset)
+    emit(session, event)
+    return event
+
+
+def checkpoint(status: str) -> SessionCheckpoint | None:
+    """``session.checkpoint.v1`` — lifecycle recovery authority (no ``working``)."""
+    if status == LiveAgentStatus.WORKING.value:
+        raise ValueError("working state must not be checkpointed")
+    session = _session()
+    if session is None:
+        return None
+    event = SessionCheckpoint(status=status)
+    emit(session, event)
+    return event
+
+
+def persist_approval(approval_id: str, resume_point: dict[str, object]) -> ApprovalPersisted | None:
+    """``approval.persisted.v1`` — durable declarative resume point."""
+    session = _session()
+    if session is None:
+        return None
+    state = _state()
+    if state.approval_pause_emitted:
+        return None
+    event = ApprovalPersisted(approval_id=approval_id, resume_point=resume_point)
+    emit(session, event)
+    state.approval_pause_emitted = True
+    return event
+
+
+def emit_approval_pause_from_result(result: Result) -> None:
+    """Emit ``approval.persisted.v1`` + ``waiting_input`` checkpoint from carrier ``extra``."""
+    if result.status is not TaskStatus.INPUT_REQUIRED:
+        return
+    state = _state()
+    if state.approval_pause_emitted:
+        return
+    extra = result.extra or {}
+    approval_request = extra.get("approval_request")
+    state_snapshot = extra.get("state_snapshot")
+    if not isinstance(approval_request, dict) or state_snapshot is None:
+        return
+    approval_id = approval_request.get("approval_id")
+    if not isinstance(approval_id, str) or not approval_id:
+        return
+    from lca.plugins.session.runtime.resume_point import (
+        resume_point_from_state_snapshot,
+        serialize_resume_point,
+    )
+
+    resume_point = serialize_resume_point(
+        resume_point_from_state_snapshot(approval_id, state_snapshot),
+    )
+    persist_approval(approval_id, resume_point)
+    checkpoint(LiveAgentStatus.WAITING_INPUT.value)
+
+
+def terminal_checkpoint_status(status: TaskStatus) -> str | None:
+    """Map a terminal carrier status to ``session.checkpoint.v1`` wire value."""
+    mapping = {
+        TaskStatus.COMPLETED: "completed",
+        TaskStatus.FAILED: "failed",
+        TaskStatus.CANCELED: "canceled",
+    }
+    return mapping.get(status)
+
+
+def session_append_for_thinking() -> Any:
+    """Return a ``SessionAppend`` hook that mirrors thinking.* via harness emit.
+
+    No-op when no Session is bound (tests / offline). Accepts
+    ``ThinkingDelta`` / ``ThinkingCompleted`` payloads from
+    :class:`TelemetryLLMAdapter`.
+    """
+
+    def _append(payload: Any) -> None:
+        session = _session()
+        if session is None:
+            return
+        if isinstance(payload, (ThinkingDelta, ThinkingCompleted)):
+            emit(session, payload)
+
+    return _append
+
+
 def end_step(*, turn: int | None = None, step: int) -> None:
     """``step.ended.v1`` — close one step after remember/act cycle."""
     session = _session()
@@ -209,10 +309,16 @@ __all__ = [
     "accept_user_message",
     "begin_step",
     "begin_turn",
+    "checkpoint",
     "complete_model",
+    "create_session",
+    "emit_approval_pause_from_result",
     "end_step",
     "end_turn",
     "fail_model",
+    "persist_approval",
     "request_model",
     "reset_lifecycle",
+    "session_append_for_thinking",
+    "terminal_checkpoint_status",
 ]

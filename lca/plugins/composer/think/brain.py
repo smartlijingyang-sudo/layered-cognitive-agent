@@ -20,6 +20,7 @@ from lca.contracts.protocols.journal.spec import AgentSpec
 from lca.infrastructure.observability.adapters import (
     TelemetryLLMAdapter,
 )
+from lca.infrastructure.session.lifecycle_emit import session_append_for_thinking
 from lca.plugins.composer.composition.skill_store import active_skill_store
 
 _MODEL_VISIBLE_HOOK_KEY = "llm.adapter.hook.model_visible"
@@ -59,16 +60,10 @@ def instrument_llm(
 
     # 已有 TelemetryLLMAdapter 时,复用之;否则用 llm 自身
     existing_telemetry = llm._inner if isinstance(llm, TelemetryLLMAdapter) else llm
-    # session_append 接线位:thinking.* Session 双写需要 per-session
-    # SessionStore(lca/harness/session/store.py),它由 SessionActivator 按
-    # session 创建、经 build_live_agent 传给 CognitiveLiveAgent,不注册在
-    # cordis scope 上;composer 入口此处只有 scope,拿不到 per-session store,
-    # 故保持 session_append=None。完整接线方式见 PR-4 同一收口:届时
-    # instrument_llm 扩签名携带 session_append,在此透传给 TelemetryLLMAdapter。
-    # COMPAT(delete-when: PR-4 收口完成,或 thinking.* Session 双写按
-    #   TelemetryLLMAdapter._append_thinking_session_event 的删除条件退役;
-    #   tracking: thinking.* Session 双写改动, 2026-09-04)
-    instrumented = TelemetryLLMAdapter(existing_telemetry)
+    instrumented = TelemetryLLMAdapter(
+        existing_telemetry,
+        session_append=session_append_for_thinking(),
+    )
 
     hook = _resolve_model_visible_hook(ctx)
     if hook is not None:

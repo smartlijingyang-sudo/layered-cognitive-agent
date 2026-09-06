@@ -102,6 +102,12 @@ def _emit_lifecycle_post(step_index: int, response: LLMResponse) -> None:
     )
 
 
+def _emit_lifecycle_fail(step_index: int, error: str) -> None:
+    from lca.infrastructure.session.lifecycle_emit import fail_model
+
+    fail_model(turn=1, step=step_index + 1, error=error)
+
+
 class ModelVisibleHookAdapter(LLMAdapter):
     """LLM adapter decorator wiring :class:`ModelVisibleHook` to the boundary.
 
@@ -148,7 +154,16 @@ class ModelVisibleHookAdapter(LLMAdapter):
                 )
             except Exception as exc:  # INTENTIONAL: L10 + D5 不挡业务
                 _log.debug("model_visible_pre_hook_failed: %s", exc)
-        response = await self._inner.complete(prompt, **kwargs)
+        try:
+            response = await self._inner.complete(prompt, **kwargs)
+        except Exception as exc:
+            if attrs is not None:
+                _, step_index, _ = attrs
+                try:
+                    _emit_lifecycle_fail(step_index, str(exc))
+                except Exception as fail_exc:  # INTENTIONAL: L10 + D5 不挡业务
+                    _log.debug("model_visible_fail_model_failed: %s", fail_exc)
+            raise
         if attrs is not None:
             run_id, step_index, incarnation = attrs
             try:
@@ -180,28 +195,37 @@ class ModelVisibleHookAdapter(LLMAdapter):
             except Exception as exc:  # INTENTIONAL: L10 + D5 不挡业务
                 _log.debug("model_visible_pre_hook_failed: %s", exc)
         post_emitted = False
-        async for event in self._inner.stream(prompt, **kwargs):
-            # COMPLETED 事件携带与 complete() 等价的最终响应;只在此记 1 次
-            # assistant payload,不按 delta 记。
-            if (
-                not post_emitted
-                and event.type == LLMStreamEventType.COMPLETED
-                and event.response is not None
-            ):
-                if attrs is not None:
-                    run_id, step_index, incarnation = attrs
-                    try:
-                        self._hook.capture_post_llm(
-                            run_id=run_id,
-                            step_index=step_index,
-                            incarnation=incarnation,
-                            response=event.response,
-                        )
-                        _emit_lifecycle_post(step_index, event.response)
-                    except Exception as exc:  # INTENTIONAL: L10 + D5 不挡业务
-                        _log.debug("model_visible_post_hook_failed: %s", exc)
-                post_emitted = True
-            yield event
+        try:
+            async for event in self._inner.stream(prompt, **kwargs):
+                # COMPLETED 事件携带与 complete() 等价的最终响应;只在此记 1 次
+                # assistant payload,不按 delta 记。
+                if (
+                    not post_emitted
+                    and event.type == LLMStreamEventType.COMPLETED
+                    and event.response is not None
+                ):
+                    if attrs is not None:
+                        run_id, step_index, incarnation = attrs
+                        try:
+                            self._hook.capture_post_llm(
+                                run_id=run_id,
+                                step_index=step_index,
+                                incarnation=incarnation,
+                                response=event.response,
+                            )
+                            _emit_lifecycle_post(step_index, event.response)
+                        except Exception as exc:  # INTENTIONAL: L10 + D5 不挡业务
+                            _log.debug("model_visible_post_hook_failed: %s", exc)
+                    post_emitted = True
+                yield event
+        except Exception as exc:
+            if attrs is not None:
+                _, step_index, _ = attrs
+                try:
+                    _emit_lifecycle_fail(step_index, str(exc))
+                except Exception as fail_exc:  # INTENTIONAL: L10 + D5 不挡业务
+                    _log.debug("model_visible_fail_model_failed: %s", fail_exc)
+            raise
 
 
 __all__ = ["ModelVisibleHookAdapter"]

@@ -104,6 +104,16 @@ def _stream_observability_kwargs(kwargs: dict[str, Any]) -> tuple[int, int, dict
     return turn, step, inner_kwargs
 
 
+def _maybe_fail_model(*, turn: int, step: int, error: str) -> None:
+    """Emit ``model.failed.v1`` when step identity is known from kwargs."""
+    if step <= 0:
+        return
+    from lca.infrastructure.session.lifecycle_emit import fail_model
+
+    turn_no = turn if turn > 0 else 1
+    fail_model(turn=turn_no, step=step, error=error)
+
+
 class TelemetryLLMAdapter(LLMAdapter):
     """装饰器：LLM 边界记录 LlmCallCompleted，不持有后端（ambient journal）。"""
 
@@ -167,7 +177,7 @@ class TelemetryLLMAdapter(LLMAdapter):
         )
         try:
             response = await self._inner.complete(prompt, **kwargs)
-        except Exception:
+        except Exception as exc:
             self._record(model, prompt, "", False, started, 0, 0, stream=False)
             _body_llm_reflector().emit_llm_call_end(
                 model=model,
@@ -175,6 +185,8 @@ class TelemetryLLMAdapter(LLMAdapter):
                 outcome="failure",
                 latency_ms=int((time.perf_counter() - started) * _PERF_COUNTER_SCALE),
             )
+            _turn, step, _ = _stream_observability_kwargs(dict(kwargs))
+            _maybe_fail_model(turn=_turn, step=step, error=str(exc))
             raise
         prompt_tokens, completion_tokens = _usage_of(response)
         self._record(
@@ -404,8 +416,9 @@ class TelemetryLLMAdapter(LLMAdapter):
                     stream=True,
                     reasoning_text=reasoning_text,
                 )
+            _maybe_fail_model(turn=turn, step=step, error="timeout")
             raise
-        except Exception:
+        except Exception as exc:
             end_outcome = "failure"
             if not recorded:
                 preview = final_response.text if final_response is not None else accumulated_text
@@ -420,6 +433,7 @@ class TelemetryLLMAdapter(LLMAdapter):
                     stream=True,
                     reasoning_text=reasoning_text,
                 )
+            _maybe_fail_model(turn=turn, step=step, error=str(exc))
             raise
         finally:
             await activity.close()
