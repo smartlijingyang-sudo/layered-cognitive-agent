@@ -8,8 +8,6 @@ import type {
 
 import { dbMessageSelectors } from '@/store/chat/slices/message/selectors/dbMessage';
 import type { ChatStore } from '@/store/chat/store';
-import { useAgentStore } from '@/store/agent';
-import { agentByIdSelectors } from '@/store/agent/selectors';
 
 import { StreamingHandler } from '../StreamingHandler';
 import {
@@ -24,6 +22,15 @@ import {
 import { persistMissed, snapshotRow, type ProjectedRow } from './lcaChatRow';
 import { toLcaChatMessageError } from './lcaError';
 import {
+  cancelLcaRun,
+  createLcaRun,
+  lcaAuthHeaders,
+  planeFieldsFromAgent,
+  toWireMessages,
+} from './lcaRunCommand';
+import {
+  LIVE_PAUSED,
+  LIVE_TERMINAL,
   observeRunLive,
   type LiveObserveCursor,
 } from './lcaRunObserve';
@@ -34,9 +41,10 @@ import {
 import { persistAssistantRow } from './lcaPersist';
 import { WIRE } from './lcaWire';
 
-const LCA_TOKEN = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
-const TERMINAL = new Set(['canceled', 'completed', 'failed']);
-const PAUSED = new Set(['waiting_input', 'awaiting_human', 'input-required']);
+export { planeFieldsFromAgent } from './lcaRunCommand';
+
+const TERMINAL = LIVE_TERMINAL;
+const PAUSED = LIVE_PAUSED;
 
 /** Invocation arguments only. Result fields never become plugin.arguments. */
 const ARG_KEYS = new Set([
@@ -132,49 +140,6 @@ function resolveCoords(
   return { identifier, apiName };
 }
 
-function collectWireFiles(message: UIChatMessage): WireFile[] {
-  const out: WireFile[] = [];
-  for (const file of message.fileList ?? []) {
-    if (!file?.url || file.inaccessible) continue;
-    out.push({
-      id: file.id,
-      mime_type: file.fileType,
-      name: file.name,
-      size: file.size,
-      url: file.url,
-    });
-  }
-  for (const image of message.imageList ?? []) {
-    if (!image?.url) continue;
-    out.push({
-      id: image.id,
-      mime_type: 'image/png',
-      name: image.alt || image.id,
-      url: image.url,
-    });
-  }
-  return out;
-}
-
-function toWireMessages(messages: UIChatMessage[]): {
-  content: string;
-  files?: WireFile[];
-  role: string;
-}[] {
-  return messages
-    .filter((message) => message.role === 'user' || message.role === 'assistant' || message.role === 'system')
-    .map((message) => {
-      const files = collectWireFiles(message);
-      return {
-        content: typeof message.content === 'string' ? message.content : '',
-        role: message.role,
-        ...(files.length ? { files } : {}),
-      };
-    });
-}
-
-type WireFile = { id?: string; mime_type?: string; name: string; size?: number; url: string };
-
 function hrefFile(name: string, url: string): ArtifactFile {
   const mimeType = mimeFromName(name);
   return {
@@ -183,32 +148,6 @@ function hrefFile(name: string, url: string): ArtifactFile {
     previewable: mimeType.startsWith('image/') || mimeType === 'application/pdf',
     url,
   };
-}
-
-export function planeFieldsFromAgent(agentId: string | undefined): {
-  assistant_id?: string;
-  device_id?: string;
-  plane?: string;
-  execution_target?: string;
-} {
-  if (!agentId) return {};
-  const config = agentByIdSelectors.getAgencyConfigById(agentId)(useAgentStore.getState());
-  // LCA assistants (ADR-0187): the create-assistant flow stores the backend
-  // assistant id in agencyConfig.lcaAssistantId; forward it so the kernel
-  // binds this run to the assistant (POST /runs assistant_id, D7).
-  const lcaAssistantId = (config as { lcaAssistantId?: string } | undefined)?.lcaAssistantId;
-  const target = config?.executionTarget;
-  const deviceId = config?.boundDeviceId;
-  const assistantFields = lcaAssistantId ? { assistant_id: lcaAssistantId } : {};
-  if (target === 'local' || target === 'device') {
-    return deviceId
-      ? { device_id: deviceId, plane: 'machine', execution_target: 'device', ...assistantFields }
-      : { plane: 'machine', execution_target: 'device', ...assistantFields };
-  }
-  if (target === 'sandbox') return { plane: 'sandbox', execution_target: 'sandbox', ...assistantFields };
-  if (target === 'auto') return { execution_target: 'auto', ...assistantFields };
-  if (target === 'none') return { execution_target: 'none', ...assistantFields };
-  return { ...assistantFields };
 }
 
 export type LcaRunOptions = {
@@ -486,7 +425,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
    */
   const presentAskUserCard = async () => {
     const snapRes = await fetch(`/lca-api/runs/${runId}`, {
-      headers: { Authorization: `Bearer ${LCA_TOKEN}` },
+      headers: lcaAuthHeaders(),
     });
     const snap = snapRes.ok
       ? ((await snapRes.json()) as { approval_request?: { questions?: unknown } })
@@ -817,27 +756,16 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
         await persistRow();
         return;
       }
-      case 'live-gap': {
-        if (typeof projected.oldestSeq === 'number' && projected.oldestSeq > 0) {
-          afterSeq = Math.max(afterSeq, projected.oldestSeq - 1);
-        }
-        console.warn('lca: live gap — ring buffer evicted events', {
-          afterSeq,
-          oldestSeq: projected.oldestSeq,
-          requestedSeq: projected.requestedSeq,
-        });
-        return;
-      }
       default:
         return;
     }
   };
 
-  const authHeaders = { Authorization: `Bearer ${LCA_TOKEN}` };
+  const authHeaders = lcaAuthHeaders();
 
   try {
-    const createRes = await fetch('/lca-api/runs', {
-      body: JSON.stringify({
+    const created = await createLcaRun(
+      {
         agent: {
           id: ctx.agentId || 'solo',
           name: ctx.agentId ? String(ctx.agentId) : '助手',
@@ -845,19 +773,9 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
         messages: toWireMessages(options.messages),
         model: options.model,
         ...planeFieldsFromAgent(ctx.agentId),
-      }),
-      headers: {
-        Authorization: `Bearer ${LCA_TOKEN}`,
-        'Content-Type': 'application/json',
       },
-      method: 'POST',
       signal,
-    });
-    if (!createRes.ok) {
-      const text = await createRes.text();
-      throw new Error(`create run HTTP ${createRes.status}: ${text.slice(0, 200)}`);
-    }
-    const created = (await createRes.json()) as { run_id: string; trace_id: string };
+    );
     runId = created.run_id;
     get().updateOperationMetadata(options.operationId, {
       lca: { run_id: created.run_id, trace_id: created.trace_id },
@@ -876,9 +794,6 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
       { authHeaders, cursor: liveCursor, runId, signal },
       {
         onProjected: async (projected) => {
-          if (projected.kind === 'live-gap' && typeof projected.oldestSeq === 'number') {
-            liveCursor.afterSeq = Math.max(liveCursor.afterSeq, projected.oldestSeq - 1);
-          }
           await applyProjected(projected);
           liveCursor.streamTerminal = streamTerminal;
         },
@@ -901,12 +816,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
     streamTerminal = liveCursor.streamTerminal;
   } catch (error) {
     if (signal.aborted) {
-      if (runId) {
-        await fetch(`/lca-api/runs/${runId}/cancel`, {
-          headers: authHeaders,
-          method: 'POST',
-        }).catch(() => undefined);
-      }
+      if (runId) await cancelLcaRun(runId);
       await finishTurn();
       publishFinalDeliverables();
       return currentRow();

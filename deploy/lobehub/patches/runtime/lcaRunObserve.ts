@@ -59,6 +59,25 @@ export type LiveObserveHandlers = {
   onSnapshot?: (snap: { error?: string; status?: string }) => Promise<void>;
 };
 
+/** Advance resume cursor when the server signals ring-buffer eviction."""
+export function advanceLiveGapCursor(
+  cursor: LiveObserveCursor,
+  projected: Projected,
+): boolean {
+  if (projected.kind !== 'live-gap' || typeof projected.oldestSeq !== 'number') {
+    return false;
+  }
+  if (projected.oldestSeq > 0) {
+    cursor.afterSeq = Math.max(cursor.afterSeq, projected.oldestSeq - 1);
+  }
+  console.warn('lca: live gap — ring buffer evicted events', {
+    afterSeq: cursor.afterSeq,
+    oldestSeq: projected.oldestSeq,
+    requestedSeq: projected.requestedSeq,
+  });
+  return true;
+}
+
 export type LiveObserveOptions = {
   authHeaders?: Record<string, string>;
   cursor: LiveObserveCursor;
@@ -94,7 +113,11 @@ export async function observeRunLive(
         cursor.afterSeq = frame.seq;
         reconnectAttempt = 0;
       }
-      await handlers.onProjected(projectJournalFrame(frame));
+      const projected = projectJournalFrame(frame);
+      if (advanceLiveGapCursor(cursor, projected)) {
+        continue;
+      }
+      await handlers.onProjected(projected);
       if (cursor.streamTerminal) break;
     }
     if (options.signal.aborted || cursor.streamTerminal) break;
