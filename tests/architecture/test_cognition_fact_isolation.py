@@ -5,16 +5,12 @@
 ``fact_gateway`` / ``plugins.events.publishers`` 等事实生产面。
 
 本测试记录已知 offenders 为 baseline,仅对**新增**违规文件 fail-fast;
-清零后移除 ``@pytest.mark.xfail`` 的 strict 目标测试。
-
-当前 baseline(2026-09-06,P0-07 骨架,P1-11): 4 files — 见 ``_BASELINE_OFFENDERS``。
+P1-16 清零后 strict 测试为常规 pass。
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-
-import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCAN_ROOT = _REPO_ROOT / "lca" / "cognition"
@@ -29,15 +25,8 @@ _FORBIDDEN_PATTERNS: tuple[str, ...] = (
     "plugins.events.publishers",
 )
 
-# 已知债:迁移至 ``lca/loop/fact_gateway`` 前不得新增。
-_BASELINE_OFFENDERS: frozenset[str] = frozenset(
-    {
-        "lca/cognition/body/action_handlers.py",
-        "lca/cognition/body/delegation_cache.py",
-        "lca/cognition/body/safe_executor.py",
-        "lca/cognition/body/team_message_tool.py",
-    }
-)
+# 迁移债清零(P1-16);保留空 baseline 供新增违规 fail-fast。
+_BASELINE_OFFENDERS: frozenset[str] = frozenset()
 
 
 def _code_line(line: str) -> str:
@@ -80,12 +69,8 @@ def test_cognition_no_new_fact_production_imports() -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason="existing offenders: 4 files — see _BASELINE_OFFENDERS for roadmap",
-)
 def test_cognition_has_no_fact_production_imports_strict() -> None:
-    """strict 目标:offenders 清零后 xpass,随后移除 xfail marker。"""
+    """strict 目标:offenders 清零(P1-16)。"""
     offenders = sorted(_find_offenders())
     assert offenders == [], (
         "ADR-0194 §7 L1 违规:lca/cognition/** 含事实生产面 import/usage:\n"

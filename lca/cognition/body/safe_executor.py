@@ -95,7 +95,9 @@ def _delta_summary_from_obs(observation: Any, *, limit: int = 200) -> str:
     """从 Observation 生成 step.tool_result.delta_summary(< 200 字符人话)。"""
     if not getattr(observation, "success", True):
         err = getattr(observation, "error", None) or "unknown"
-        return f"❌ {type(err).__class__.__name__ if hasattr(type(err), '__class__') else 'err'}: {err}"[:limit]
+        return f"❌ {type(err).__class__.__name__ if hasattr(type(err), '__class__') else 'err'}: {err}"[
+            :limit
+        ]
     files = _extract_files_created(observation)
     if files:
         names = ", ".join(files[:3])
@@ -110,9 +112,6 @@ from lca.cognition.body.tool_journal_emit import (  # noqa: E402
     emit_tool_invoked,
     prepare_tool_started,
     record_tool_started_observability,
-)
-from lca.plugins.events.publishers.spine_reflector_body_llm import (  # noqa: E402
-    plugin as _body_llm_reflector,
 )
 
 
@@ -289,11 +288,16 @@ class SimpleSafeExecutor(SafeExecutor):
                 )
                 await await_tool_side_effect_checkpoint()
 
+            from lca.loop.tool_journal_commit import (
+                commit_body_sandbox_enter,
+                commit_body_sandbox_exit,
+            )
+
             # PR-3.3: instrument the sandbox boundary. ``tool_invocation_scope``
             # binds the invocation_id that adapters/sandbox tools read to
             # correlate their output; we bracket it with body.sandbox.enter/exit
             # so traces see the exact world-effect window.
-            _body_llm_reflector.emit_body_sandbox_enter(
+            commit_body_sandbox_enter(
                 invocation_id=invocation_id,
                 tool_name=tool.name,
             )
@@ -307,7 +311,7 @@ class SimpleSafeExecutor(SafeExecutor):
                         invocation_id=invocation_id,
                     )
             finally:
-                _body_llm_reflector.emit_body_sandbox_exit(
+                commit_body_sandbox_exit(
                     invocation_id=invocation_id,
                     tool_name=tool.name,
                 )
@@ -405,7 +409,9 @@ class SimpleSafeExecutor(SafeExecutor):
                 # PR-3.3: emit body.tool.retry on the spine before sleeping so
                 # observability traces see retry decisions at the same point
                 # the executor commits to another attempt.
-                _body_llm_reflector.emit_body_tool_retry(
+                from lca.loop.tool_journal_commit import commit_body_tool_retry
+
+                commit_body_tool_retry(
                     tool_name=tool.name,
                     invocation_id=invocation_id,
                     attempt=attempts_used,
@@ -458,7 +464,12 @@ class SimpleSafeExecutor(SafeExecutor):
         # call so traces distinguish "we dispatched the call" from "the tool
         # returned"; the invocation_id here is the one bound by the parent
         # ``_execute_with_retry`` so start/end stay correlate-able.
-        _body_llm_reflector.emit_body_tool_execute_start(
+        from lca.loop.tool_journal_commit import (
+            commit_body_tool_execute_end,
+            commit_body_tool_execute_start,
+        )
+
+        commit_body_tool_execute_start(
             tool_name=tool.name,
             invocation_id=invocation_id,
             attempt=attempt + 1,
@@ -503,7 +514,7 @@ class SimpleSafeExecutor(SafeExecutor):
                 extra={FAILURE_KIND: failure_kind},
             )
         finally:
-            _body_llm_reflector.emit_body_tool_execute_end(
+            commit_body_tool_execute_end(
                 tool_name=tool.name,
                 invocation_id=invocation_id,
                 attempt=attempt + 1,

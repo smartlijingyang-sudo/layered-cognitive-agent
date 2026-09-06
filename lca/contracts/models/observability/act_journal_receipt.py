@@ -15,6 +15,7 @@ from lca.contracts.models.observability.journal import (
     DecisionMade,
     JournalEvent,
     SynthesisCompleted,
+    TeamMessagePublished,
 )
 from lca.contracts.models.team.consultation import SynthesisMethod
 from lca.contracts.protocols.runtime.infra import Tool
@@ -85,9 +86,32 @@ def approval_requested_receipt(
     )
 
 
+def team_message_published_receipt(
+    *,
+    team_id: str,
+    thread_id: str,
+    sender_role: str,
+    recipient_role: str,
+    body_preview: str,
+    step: int = 0,
+) -> ActJournalReceipt:
+    """Build a ``TeamMessagePublished`` journal receipt for team inbox fold."""
+    return ActJournalReceipt(
+        journal_event=TeamMessagePublished(
+            team_id=team_id,
+            thread_id=thread_id,
+            sender_role=sender_role,
+            recipient_role=recipient_role,
+            step=step,
+            body_preview=body_preview,
+        ),
+    )
+
+
 __all__ = [
     "ActJournalReceipt",
     "approval_requested_receipt",
     "decision_made_receipt",
     "synthesis_completed_receipt",
+    "team_message_published_receipt",
 ]

@@ -129,7 +129,184 @@ def commit_tool_phase_denied(
     )
 
 
+def commit_body_tool_execute_start(
+    *,
+    tool_name: str,
+    invocation_id: str,
+    attempt: int = 1,
+    state: AgentState | None = None,
+    session: object | None = None,
+    actor: str = "body",
+) -> AppendReceipt | None:
+    """Commit ``body.tool.execute.start`` (invocation layer) via FactGateway."""
+    return publish_ep_bound(
+        "body.tool.execute.start",
+        {
+            "tool_name": tool_name,
+            "invocation_id": invocation_id,
+            "attempt": attempt,
+        },
+        state=state,
+        session=session,
+        actor=actor,
+    )
+
+
+def commit_body_tool_execute_end(
+    *,
+    tool_name: str,
+    invocation_id: str,
+    attempt: int = 1,
+    outcome: str = "success",
+    latency_ms: int | None = None,
+    state: AgentState | None = None,
+    session: object | None = None,
+    actor: str = "body",
+) -> AppendReceipt | None:
+    """Commit ``body.tool.execute.end`` (invocation layer) via FactGateway."""
+    payload: dict[str, Any] = {
+        "tool_name": tool_name,
+        "invocation_id": invocation_id,
+        "attempt": attempt,
+        "outcome": outcome,
+    }
+    if latency_ms is not None:
+        payload["latency_ms"] = latency_ms
+    return publish_ep_bound(
+        "body.tool.execute.end",
+        payload,
+        state=state,
+        session=session,
+        actor=actor,
+    )
+
+
+def commit_body_tool_decision_start(
+    *,
+    tool_name: str,
+    invocation_id: str,
+    state: AgentState | None = None,
+    session: object | None = None,
+    actor: str = "body",
+) -> AppendReceipt | None:
+    """Commit decision-wrapper ``body.tool.execute.start`` via FactGateway."""
+    return publish_ep_bound(
+        "body.tool.execute.start",
+        {
+            "tool_name": tool_name,
+            "invocation_id": invocation_id,
+            "attempt": 1,
+            "wrapper": "decision",
+        },
+        state=state,
+        session=session,
+        actor=actor,
+    )
+
+
+def commit_body_tool_decision_end(
+    *,
+    tool_name: str,
+    invocation_id: str,
+    outcome: str = "success",
+    state: AgentState | None = None,
+    session: object | None = None,
+    actor: str = "body",
+) -> AppendReceipt | None:
+    """Commit decision-wrapper ``body.tool.execute.end`` via FactGateway."""
+    return publish_ep_bound(
+        "body.tool.execute.end",
+        {
+            "tool_name": tool_name,
+            "invocation_id": invocation_id,
+            "attempt": 1,
+            "wrapper": "decision",
+            "outcome": outcome,
+        },
+        state=state,
+        session=session,
+        actor=actor,
+    )
+
+
+def commit_body_tool_retry(
+    *,
+    tool_name: str,
+    invocation_id: str,
+    attempt: int,
+    reason: str,
+    state: AgentState | None = None,
+    session: object | None = None,
+    actor: str = "body",
+) -> AppendReceipt | None:
+    """Commit ``body.tool.retry`` spine fact via FactGateway."""
+    return publish_ep_bound(
+        "body.tool.retry",
+        {
+            "tool_name": tool_name,
+            "invocation_id": invocation_id,
+            "attempt": attempt,
+            "reason": reason,
+            "outcome": "retrying",
+        },
+        state=state,
+        session=session,
+        actor=actor,
+    )
+
+
+def commit_body_sandbox_enter(
+    *,
+    invocation_id: str,
+    tool_name: str,
+    state: AgentState | None = None,
+    session: object | None = None,
+    actor: str = "body",
+) -> AppendReceipt | None:
+    """Commit ``body.sandbox.enter`` spine fact via FactGateway."""
+    return publish_ep_bound(
+        "body.sandbox.enter",
+        {
+            "invocation_id": invocation_id,
+            "tool_name": tool_name,
+        },
+        state=state,
+        session=session,
+        actor=actor,
+    )
+
+
+def commit_body_sandbox_exit(
+    *,
+    invocation_id: str,
+    tool_name: str,
+    outcome: str = "success",
+    state: AgentState | None = None,
+    session: object | None = None,
+    actor: str = "body",
+) -> AppendReceipt | None:
+    """Commit ``body.sandbox.exit`` spine fact via FactGateway."""
+    return publish_ep_bound(
+        "body.sandbox.exit",
+        {
+            "invocation_id": invocation_id,
+            "tool_name": tool_name,
+            "outcome": outcome,
+        },
+        state=state,
+        session=session,
+        actor=actor,
+    )
+
+
 __all__ = [
+    "commit_body_sandbox_enter",
+    "commit_body_sandbox_exit",
+    "commit_body_tool_decision_end",
+    "commit_body_tool_decision_start",
+    "commit_body_tool_execute_end",
+    "commit_body_tool_execute_start",
+    "commit_body_tool_retry",
     "commit_tool_journal_receipt",
     "commit_tool_phase_call_end",
     "commit_tool_phase_call_start",

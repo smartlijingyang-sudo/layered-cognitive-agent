@@ -17,15 +17,7 @@ from pydantic import BaseModel
 
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.ids import new_id
 from lca.contracts.atoms.scope import Scope
-from lca.contracts.atoms.semantic_keys import (
-    OBS_CACHE_HIT,
-    OBS_MEMBER_RESULTS,
-    OBS_MEMBER_SUBTASKS,
-    OBS_RESULT_KIND,
-    OBS_TASK_ID,
-)
 from lca.contracts.event import Category
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -37,11 +29,14 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.models.core.decision import DelegationSpec, Observation
 from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.team.delegation import find_result
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.plugins.events.publishers._session_publish import publish_via_session
-from lca_kernel.events import TeamDelegationCacheHit
+from lca.infrastructure.delegation.cache import (
+    cached_delegation_observation as _cached_delegation_observation,
+)
+from lca.infrastructure.delegation.cache import (
+    tag_delegation_extra as _tag_delegation_extra,
+)
 
 # 业务方 plugin id（与 yaml publishers 白名单一致）。
 PUBLISHER_PLUGIN_ID = "delegation_cache"
@@ -54,53 +49,13 @@ class DelegationCachePlugin:
     """
 
     def cached_observation(self, spec: DelegationSpec, state: AgentState) -> Observation | None:
-        """幂等短路：回报记录中已有成功返回的 ``(target_role, subtask)`` 直接复用。
-
-        命中时发 ``team.delegation.cache_hit`` v2 Event；不产生 transport 往返。
-        语义保守：仅拦字面重复，改写措辞的新问题不受影响。
-        """
-        awareness = state.team_awareness
-        if awareness is None or not spec.target_role:
-            return None
-        hit = find_result(
-            awareness.results,
-            target_role=spec.target_role,
-            subtask=spec.subtask,
-        )
-        if hit is None:
-            return None
-        # 业务方一行发送入口（ADR-0183 §3.1）：构造 typed payload；publish_via_session 路由。
-        publish_via_session(
-            TeamDelegationCacheHit(
-                callee_role=hit.target_role,
-                subtask=spec.subtask,
-                step=state.step,
-            ),
-            producer=DelegationCachePlugin,
-        )
-        observation = Observation(
-            observation_id=new_id("obs"),
-            success=True,
-            payload=hit.output,
-            extra={OBS_TASK_ID: hit.task_id or "", OBS_CACHE_HIT: True},
-        )
-        return self._tag_extra(observation, spec)
+        """幂等短路：回报记录中已有成功返回的 ``(target_role, subtask)`` 直接复用。"""
+        return _cached_delegation_observation(spec, state)
 
     @staticmethod
     def _tag_extra(observation: Observation, spec: DelegationSpec) -> Observation:
-        """统一附委派归属（kind + role→result/subtask 映射）。"""
-        from lca.contracts.atoms.enums import MemoryRecordKind
-
-        extra = dict(observation.extra or {})
-        extra.setdefault(OBS_RESULT_KIND, MemoryRecordKind.DELEGATION_RESULT)
-        if OBS_MEMBER_RESULTS not in extra:
-            key = spec.target_role or spec.target_agent_id or observation.observation_id
-            extra[OBS_MEMBER_RESULTS] = {
-                str(key): observation.payload if observation.success else observation.error
-            }
-            extra[OBS_MEMBER_SUBTASKS] = {str(key): spec.subtask}
-        observation.extra = extra
-        return observation
+        """兼容壳：附委派归属（kind + role→result/subtask 映射）。"""
+        return _tag_delegation_extra(observation, spec)
 
 
 class _Config(BaseModel):

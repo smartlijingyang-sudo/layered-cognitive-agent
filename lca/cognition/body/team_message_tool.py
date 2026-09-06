@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.observability.journal import TeamMessagePublished
-from lca.infrastructure.observability.journal_append import append_journal_event
 
 
 def publish_team_message(
@@ -31,16 +30,21 @@ def publish_team_message(
     the ActionRegistry so the tool is invokable via the regular
     ``use_tool`` pipeline.
     """
-    event = TeamMessagePublished(
+    from lca.contracts.models.observability.act_journal_receipt import (
+        team_message_published_receipt,
+    )
+    from lca.loop.act_journal_commit import commit_act_journal_receipt
+
+    receipt = team_message_published_receipt(
         team_id=team_id,
         thread_id=thread_id,
         sender_role=sender_role,
         recipient_role=recipient_role,
-        step=step,
         body_preview=body,
+        step=step,
     )
-    append_journal_event(event)
-    return event
+    commit_act_journal_receipt(receipt)
+    return receipt.journal_event
 
 
 TEAM_MESSAGE_TOOL_NAME = "team.message-publish"
