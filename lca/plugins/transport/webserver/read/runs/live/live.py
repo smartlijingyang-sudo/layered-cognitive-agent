@@ -90,35 +90,10 @@ async def stream_run_live(
     after: int = 0,
 ) -> AsyncIterator[bytes]:
     """Stream a run live as four UI SSE events (reasoning|text|tool|done)."""
-    from lca.plugins.transport.run_ui_encoder__encoder_provider import RunUiEncoder
+    from lca.plugins.transport.run_live_observe__seam import stream_run_live_observe
 
-    encoder = RunUiEncoder()
-    from lca.infrastructure.observability import fold_run_state
-    from lca.plugins.transport.webserver.handlers.runs.terminal.status.status import (
-        journal_store,
-    )
-
-    terminal_status = (
-        session.status.value if hasattr(session.status, "value") else str(session.status)
-    )
-    terminal_error = session.error or ""
-    store = journal_store(session.hub) if session.hub is not None else None
-    if store is not None:
-        folded = fold_run_state(store.events)
-        if folded.status.value != "running":
-            terminal_status = folded.status.value
-        if folded.error:
-            terminal_error = folded.error
-    try:
-        async for line in encoder.encode_live_tail(
-            session.tail,
-            after_seq=after,
-            terminal_status=terminal_status,
-            terminal_error=terminal_error,
-        ):
-            yield line
-    except asyncio.CancelledError:
-        return
+    async for line in stream_run_live_observe(session, after=after):
+        yield line
 
 
 def stream_process_journal_live(tail: Any, *, last_seq: int = 0) -> AsyncIterator[bytes]:

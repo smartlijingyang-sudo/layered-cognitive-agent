@@ -7,6 +7,7 @@ import time
 from typing import Any
 
 from lca.contracts.observability.registry.status import RunLifecycleStatus
+from lca.contracts.observability.run_live import LiveTerminalHint
 from lca.infrastructure.observability import BoundObservability, fold_run_state
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
 
@@ -64,10 +65,33 @@ def fallback_terminal_status(session: RunSession, success: bool) -> None:
         session.status = RunLifecycleStatus.FAILED
 
 
+def resolve_live_terminal_hint(session: RunSession) -> tuple[str, str]:
+    """Return the terminal status/error hint for live SSE synthetic ``done``.
+
+    Journal fold is SSOT (ADR-0055). Carrier ``RunSession`` fields are the
+    fallback when fold has not yet observed a root terminal fact — typical
+    during terminalize or when the live subscriber reconnects after hub close.
+    """
+    return resolve_live_terminal_hint_dto(session).as_tuple()
+
+
+def resolve_live_terminal_hint_dto(session: RunSession) -> LiveTerminalHint:
+    """Structured terminal hint for the run live observe seam."""
+    store = journal_store(session.hub) if session.hub is not None else None
+    if store is not None:
+        folded = fold_run_state(store.events)
+        if folded.status is not RunLifecycleStatus.RUNNING:
+            return LiveTerminalHint(folded.status.value, folded.error or "")
+    status = session.status.value if hasattr(session.status, "value") else str(session.status)
+    return LiveTerminalHint(status, session.error or "")
+
+
 __all__ = [
     "current_task_cancelled",
     "derive_terminal_status",
     "fallback_terminal_status",
     "journal_store",
+    "resolve_live_terminal_hint",
+    "resolve_live_terminal_hint_dto",
     "task_cancelled",
 ]

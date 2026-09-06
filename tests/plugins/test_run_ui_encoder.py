@@ -314,6 +314,34 @@ async def test_synthetic_done_frame_uses_session_error() -> None:
 
 
 @pytest.mark.asyncio
+async def test_synthetic_done_payload_running_returns_none() -> None:
+    encoder = RunUiEncoder()
+    assert encoder._synthetic_done_payload(terminal_status="running", terminal_error="") is None
+
+
+@pytest.mark.asyncio
+async def test_synthetic_done_payload_completed_without_journal_finish() -> None:
+    encoder = RunUiEncoder()
+    assert encoder._synthetic_done_payload(terminal_status="completed", terminal_error="") == {
+        "status": "completed",
+    }
+
+
+@pytest.mark.asyncio
+async def test_synthetic_done_payload_canceled_without_journal_finish() -> None:
+    encoder = RunUiEncoder()
+    assert encoder._synthetic_done_payload(terminal_status="canceled", terminal_error="") == {
+        "status": "canceled",
+    }
+
+
+@pytest.mark.asyncio
+async def test_synthetic_done_payload_unknown_status_returns_none() -> None:
+    encoder = RunUiEncoder()
+    assert encoder._synthetic_done_payload(terminal_status="weird", terminal_error="") is None
+
+
+@pytest.mark.asyncio
 async def test_error_status_maps_to_failed() -> None:
     frames = await _encode(AgentRunFinished(status="error", error="boom", output_text=""))
     assert frames[-1]["event"] == "done"

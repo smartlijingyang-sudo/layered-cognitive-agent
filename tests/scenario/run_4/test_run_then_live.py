@@ -5,10 +5,11 @@ L706-770)的真实调用链:
 
     POST /runs                              ← 派发,响应里给 live_url
     loop:
-      GET /runs/{run_id}/live               ← SSE,断开后用 Last-Event-ID 续传
+      GET /runs/{run_id}/live?after=N     ← SSE 游标续传(ADR-0100;非 Last-Event-ID)
       GET /runs/{run_id}                    ← summary,看 status 决定退出/重连
-      if status ∈ {canceled, completed, failed} ∪ {waiting_input}: break
-      sleep 400ms
+      if status ∈ {canceled, completed, failed}: break
+      if status ∈ {waiting_input}: 保持同一 run,answer 后带 ?after= 重连
+      backoff reconnect (400ms→5s cap)
 
 本测试从纯 HTTP 视角验证三件事:
 

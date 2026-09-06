@@ -56,8 +56,14 @@ def fold_run_state(events: Sequence[StampedEvent]) -> RunState:
                 error=event.error or None,
             )
         elif isinstance(event, RuntimeObserved) and _is_carrier_terminal_observed(event):
+            raw_status = str((event.attributes or {}).get("status", "") or "")
+            status = (
+                RunLifecycleStatus.from_finish_status(raw_status)
+                if raw_status
+                else RunLifecycleStatus.FAILED
+            )
             candidate = RunState(
-                status=RunLifecycleStatus.FAILED,
+                status=status,
                 finished_at=stamped.ts,
                 error=event.error_message or None,
             )

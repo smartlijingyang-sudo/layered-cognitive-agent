@@ -308,6 +308,62 @@ async def test_stream_run_live_emits_failed_done_when_tail_closes_without_finish
 
 
 @pytest.mark.asyncio
+async def test_stream_run_live_no_done_when_tail_closes_while_running() -> None:
+    _SEQ[0] = 0
+    registry = RunRegistry()
+    adapter = RegistryRunAdapter(registry)
+    tail = LiveTail()
+    session = RunSession(
+        run_id="run-still-running",
+        trace_id="trace-still-running",
+        spine_path=Path("/var/data/lca-nonexistent.jsonl"),
+        tail=tail,
+        question="q",
+        user_text="u",
+        mode="solo",
+    )
+    from lca.contracts.observability.registry.status import RunLifecycleStatus
+
+    session.status = RunLifecycleStatus.RUNNING
+    registry.put(session)
+    tail.on_event(_stamped(StepTextDelta(text_delta="partial", channel="answer")))
+    tail.close()
+
+    raw = await _drain(adapter.stream_run_live(session.run_id, 0))
+    frames = _parse_sse(b"".join(raw))
+    assert [frame["event"] for frame in frames] == ["text"]
+    assert all(frame["event"] != "done" for frame in frames)
+
+
+@pytest.mark.asyncio
+async def test_stream_run_live_emits_completed_done_from_session_status() -> None:
+    _SEQ[0] = 0
+    registry = RunRegistry()
+    adapter = RegistryRunAdapter(registry)
+    tail = LiveTail()
+    session = RunSession(
+        run_id="run-completed-no-journal-finish",
+        trace_id="trace-completed-no-journal-finish",
+        spine_path=Path("/var/data/lca-nonexistent.jsonl"),
+        tail=tail,
+        question="q",
+        user_text="u",
+        mode="solo",
+    )
+    from lca.contracts.observability.registry.status import RunLifecycleStatus
+
+    session.status = RunLifecycleStatus.COMPLETED
+    registry.put(session)
+    tail.on_event(_stamped(StepTextDelta(text_delta="answer", channel="answer")))
+    tail.close()
+
+    raw = await _drain(adapter.stream_run_live(session.run_id, 0))
+    frames = _parse_sse(b"".join(raw))
+    assert [frame["event"] for frame in frames] == ["text", "done"]
+    assert frames[-1]["data"] == {"status": "completed"}
+
+
+@pytest.mark.asyncio
 async def test_stream_run_live_emits_nested_agent_run_finished() -> None:
     _SEQ[0] = 0
     registry = RunRegistry()

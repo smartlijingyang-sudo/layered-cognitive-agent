@@ -24,10 +24,11 @@ import {
 import { persistMissed, snapshotRow, type ProjectedRow } from './lcaChatRow';
 import { toLcaChatMessageError } from './lcaError';
 import {
-  parseSseBlock,
-  projectJournalFrame,
+  observeRunLive,
+  type LiveObserveCursor,
+} from './lcaRunObserve';
+import {
   toolCallId,
-  type JournalFrame,
   type Projected,
 } from './lcaJournal';
 import { persistAssistantRow } from './lcaPersist';
@@ -35,6 +36,7 @@ import { WIRE } from './lcaWire';
 
 const LCA_TOKEN = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
 const TERMINAL = new Set(['canceled', 'completed', 'failed']);
+const PAUSED = new Set(['waiting_input', 'awaiting_human', 'input-required']);
 
 /** Invocation arguments only. Result fields never become plugin.arguments. */
 const ARG_KEYS = new Set([
@@ -171,25 +173,7 @@ function toWireMessages(messages: UIChatMessage[]): {
     });
 }
 
-async function* readSse(response: Response): AsyncGenerator<JournalFrame> {
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error('live: empty body');
-  const decoder = new TextDecoder();
-  let buf = '';
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    while (true) {
-      const idx = buf.indexOf('\n\n');
-      if (idx < 0) break;
-      const block = buf.slice(0, idx);
-      buf = buf.slice(idx + 2);
-      const frame = parseSseBlock(block);
-      if (frame) yield frame;
-    }
-  }
-}
+type WireFile = { id?: string; mime_type?: string; name: string; size?: number; url: string };
 
 function hrefFile(name: string, url: string): ArtifactFile {
   const mimeType = mimeFromName(name);
@@ -252,6 +236,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
   let handler: StreamingHandler | null = null;
   let journalDurationMs: number | undefined;
   let lastResultMsgId: string | null = null;
+  let streamTerminal = false;
   const tools = new Map<string, TurnTool>();
   const currentTurnTools: TurnTool[] = [];
   const hrefs = new Map<string, string>();
@@ -824,13 +809,23 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
           await presentAskUserCard();
           return;
         }
+        if (projected.status && TERMINAL.has(projected.status)) {
+          streamTerminal = true;
+        }
         await ensureTurn();
-        if (projected.error) noteRowError(projected.error);
+        if (streamTerminal && projected.error) noteRowError(projected.error);
         await persistRow();
         return;
       }
       case 'live-gap': {
-        console.warn('lca: live gap', { afterSeq, lastSeq });
+        if (typeof projected.oldestSeq === 'number' && projected.oldestSeq > 0) {
+          afterSeq = Math.max(afterSeq, projected.oldestSeq - 1);
+        }
+        console.warn('lca: live gap — ring buffer evicted events', {
+          afterSeq,
+          oldestSeq: projected.oldestSeq,
+          requestedSeq: projected.requestedSeq,
+        });
         return;
       }
       default:
@@ -868,47 +863,42 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
       lca: { run_id: created.run_id, trace_id: created.trace_id },
     });
 
-    while (!signal.aborted) {
-      const streamRes = await fetch(`/lca-api/runs/${runId}/live`, {
-        headers: {
-          ...authHeaders,
-          'Last-Event-ID': String(afterSeq),
+    // Show assistant bubble before first SSE token (perceived latency).
+    await openRow(speaker, options.userMessageId || options.parentMessageId);
+
+    const liveCursor: LiveObserveCursor = {
+      afterSeq,
+      lastSeq,
+      streamTerminal: false,
+    };
+
+    await observeRunLive(
+      { authHeaders, cursor: liveCursor, runId, signal },
+      {
+        onProjected: async (projected) => {
+          if (projected.kind === 'live-gap' && typeof projected.oldestSeq === 'number') {
+            liveCursor.afterSeq = Math.max(liveCursor.afterSeq, projected.oldestSeq - 1);
+          }
+          await applyProjected(projected);
+          liveCursor.streamTerminal = streamTerminal;
         },
-        signal,
-      });
-      if (!streamRes.ok) {
-        const text = await streamRes.text();
-        throw new Error(`live HTTP ${streamRes.status}: ${text.slice(0, 200)}`);
-      }
-      for await (const frame of readSse(streamRes)) {
-        if (typeof frame.seq === 'number') {
-          lastSeq = frame.seq;
-          afterSeq = frame.seq;
-        }
-        await applyProjected(projectJournalFrame(frame));
-      }
-      if (signal.aborted) break;
-      const snapRes = await fetch(`/lca-api/runs/${runId}`, {
-        headers: authHeaders,
-      });
-      const snap = snapRes.ok
-        ? ((await snapRes.json()) as { status?: string; error?: string })
-        : {};
-      if (snap.status === 'waiting_input' && assistantId) {
-        dispatchMessage(assistantId, {
-          metadata: { lca: { run_id: runId, status: 'waiting_input' } },
-        });
-      }
-      if (snap.error && !rowError) {
-        noteRowError(new Error(snap.error));
-        await ensureTurn();
-      }
-      // waiting_input does not end the loop: the run resumes on the same live
-      // stream after POST /runs/<id>/answer, so keep projecting until a terminal
-      // status (or abort).
-      if (TERMINAL.has(String(snap.status ?? ''))) break;
-      await new Promise((resolve) => setTimeout(resolve, 400));
-    }
+        onSnapshot: async (snap) => {
+          const snapStatus = String(snap.status ?? '');
+          if (PAUSED.has(snapStatus) && assistantId) {
+            dispatchMessage(assistantId, {
+              metadata: { lca: { run_id: runId, status: 'waiting_input' } },
+            });
+          }
+          if (snap.error && !rowError && TERMINAL.has(snapStatus)) {
+            noteRowError(new Error(snap.error));
+            await ensureTurn();
+          }
+        },
+      },
+    );
+    afterSeq = liveCursor.afterSeq;
+    lastSeq = liveCursor.lastSeq;
+    streamTerminal = liveCursor.streamTerminal;
   } catch (error) {
     if (signal.aborted) {
       if (runId) {

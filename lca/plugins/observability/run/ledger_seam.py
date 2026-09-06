@@ -91,12 +91,16 @@ class FilesystemRunLedgerFactory(RunLedgerFactory, RunJournalFactory):
 
         narrative_writer = StepNarrativeWriter(spine_path.parent / "journal.narrative.md")
 
+        # One LiveTail per run: writer and tail are the same ring buffer (SSOT).
+        # assemble_run_hub registers it twice (projector + live subscribe surface).
+        live_tail = LiveTail()
+
         # step_tree_writer 是 _StepTreeBundle 的 placeholder —— deriver 与
         # narrative_writer 由 transport 在 RunSessionBuilder.build 阶段
         # 装配 fold deriver,然后 session.step_tree_bundle 持有。
         return RunJournalComponents(
-            writer=LiveTail(),
-            tail=LiveTail(),
+            writer=live_tail,
+            tail=live_tail,
             step_tree_writer=_StepTreeBundle(
                 deriver=None,
                 narrative_writer=narrative_writer,

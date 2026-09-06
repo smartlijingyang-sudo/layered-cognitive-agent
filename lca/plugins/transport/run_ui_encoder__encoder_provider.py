@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -65,14 +65,15 @@ class RunUiEncoder:
         *,
         after_seq: int = 0,
         heartbeat_s: float = 15.0,
-        terminal_status: str = "",
-        terminal_error: str = "",
+        terminal_hint: Callable[[], tuple[str, str]] | None = None,
     ) -> AsyncIterator[bytes]:
         """Subscribe to a run tail and emit four UI events plus a terminal ``done``.
 
-        When the tail closes without ``AgentRunFinished`` / ``TeamRunFinished`` /
-        carrier ``RuntimeObserved(run.lifecycle.failed)``, emits a synthetic
-        ``done`` from ``terminal_status`` / ``terminal_error`` (Wave 0 invariant).
+        Journal terminal facts (``AgentRunFinished`` / ``TeamRunFinished`` /
+        carrier ``RuntimeObserved(run.lifecycle.failed)``) end the stream via
+        ``_process_item``. When the tail closes without one, a synthetic ``done``
+        may be emitted from ``terminal_hint()`` evaluated **at close time** —
+        never inventing a failure while the carrier still reports ``running``.
         """
         from lca.infrastructure.observability.journal.stream.live_tail import (
             TEXT_CHANNEL_ANSWER,
@@ -112,11 +113,13 @@ class RunUiEncoder:
                 return
 
         if not terminated:
-            yield self.synthetic_done_frame(
-                last_seq + 1,
-                terminal_status=terminal_status,
-                terminal_error=terminal_error,
+            status, error = terminal_hint() if terminal_hint is not None else ("", "")
+            payload = self._synthetic_done_payload(
+                terminal_status=status,
+                terminal_error=error,
             )
+            if payload is not None:
+                yield self._frame(last_seq + 1, "done", payload)
 
     def synthetic_done_frame(
         self,
@@ -130,6 +133,8 @@ class RunUiEncoder:
             terminal_status=terminal_status,
             terminal_error=terminal_error,
         )
+        if payload is None:
+            raise ValueError("synthetic_done_frame requires a terminal session status")
         return self._frame(seq, "done", payload)
 
     def _process_item(
@@ -265,16 +270,25 @@ class RunUiEncoder:
         *,
         terminal_status: str,
         terminal_error: str,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         err = terminal_error.strip()
         if err:
             return {"status": "failed", "error": err}
+        key = terminal_status.strip().lower()
+        if not key or key in {RunLifecycleStatus.RUNNING.value, "running"}:
+            return None
+        if key == "error":
+            return {"status": "failed"}
+        try:
+            RunLifecycleStatus(key)
+        except ValueError:
+            return None
         mapped = self._map_status(terminal_status)
-        if mapped in {"failed", "canceled"}:
+        if mapped == "running":
+            return None
+        if mapped in {"completed", "failed", "canceled", "awaiting_human"}:
             return {"status": mapped}
-        # Tail closed without an explicit terminal journal fact — treat as failure
-        # so the UI never silently ends a run (Wave 0 live invariant).
-        return {"status": "failed", "error": "run ended without terminal event"}
+        return None
 
     @staticmethod
     def _frame(seq: int, event: str, data: dict[str, Any]) -> bytes:
@@ -296,8 +310,12 @@ class RunUiEncoder:
             return "canceled"
         if key in {RunLifecycleStatus.FAILED.value, "error"}:
             return "failed"
-        if key in {RunLifecycleStatus.COMPLETED.value, ""}:
+        if key in {RunLifecycleStatus.RUNNING.value, "running"}:
+            return "running"
+        if key in {RunLifecycleStatus.COMPLETED.value}:
             return "completed"
+        if key in {RunLifecycleStatus.TIMEOUT.value, "timeout"}:
+            return "failed"
         if "wait" in key or "human" in key or "input" in key:
             return "awaiting_human"
         return "completed"

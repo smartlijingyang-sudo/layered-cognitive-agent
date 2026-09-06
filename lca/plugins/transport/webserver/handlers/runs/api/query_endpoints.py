@@ -126,7 +126,13 @@ async def stream_journal_live(request: Request) -> StreamingResponse | JSONRespo
 
 
 def _parse_after(request: Request) -> int:
-    """Parse ``?after=`` as a non-negative int; invalid values start from 0."""
+    """Parse ``?after=`` as a non-negative int; invalid values start from 0.
+
+    ADR-0100 / run-live.md: per-run live resume uses the query param only.
+    ``Last-Event-ID`` is intentionally **not** honored here (see
+    ``test_get_live_ignores_last_event_id_header``); clients must pass
+    ``?after=<last_drawn_seq>`` on reconnect within the same run.
+    """
     raw = request.query_params.get("after", "0")
     try:
         return max(0, int(raw))

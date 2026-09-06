@@ -23,7 +23,7 @@ export type Projected =
     }
   | { kind: 'tool-denied'; payload: Record<string, unknown>; reason: string }
   | { kind: 'run-finished'; error?: string; status?: string }
-  | { kind: 'live-gap' };
+  | { kind: 'live-gap'; oldestSeq?: number; requestedSeq?: number };
 
 export function toolCallId(payload: Record<string, unknown>, fallback: string): string {
   const invocation = payload.invocation_id;
@@ -137,7 +137,17 @@ export function projectJournalFrame(frame: JournalFrame): Projected {
         status: typeof payload.status === 'string' ? payload.status : undefined,
       };
     case 'LiveGap':
-      return { kind: 'live-gap' };
+      return {
+        kind: 'live-gap',
+        oldestSeq:
+          typeof payload.oldest_seq === 'number'
+            ? payload.oldest_seq
+            : Number(payload.oldest_seq ?? 0) || undefined,
+        requestedSeq:
+          typeof payload.requested_seq === 'number'
+            ? payload.requested_seq
+            : Number(payload.requested_seq ?? 0) || undefined,
+      };
     default:
       return { kind: 'ignore' };
   }

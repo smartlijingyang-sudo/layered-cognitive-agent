@@ -55,6 +55,7 @@ def emit_carrier_run_failed(
     user_message: str,
     exception_class: str = "",
     err_kind: str = "unknown",
+    status: str = "",
 ) -> StampedEvent | None:
     """Append ``RuntimeObserved(run.lifecycle.failed)`` when no terminal journal fact exists."""
     if not user_message.strip():
@@ -63,7 +64,8 @@ def emit_carrier_run_failed(
         return None
     if hub is None or hub.journal is None:
         return None
-    stamped = hub.journal.write(
+    wire_status = status.strip() or RunLifecycleStatus.FAILED.value
+    return hub.journal.write(
         RuntimeObserved(
             kind=RuntimeKind.ERROR,
             operation=_CARRIER_TERMINAL_OPERATION,
@@ -75,13 +77,10 @@ def emit_carrier_run_failed(
                 "trace_id": session.trace_id,
                 "exception_class": exception_class,
                 "err_kind": err_kind,
-                "status": RunLifecycleStatus.FAILED.value,
+                "status": wire_status,
             },
         )
     )
-    if stamped is not None and session.tail is not None:
-        session.tail.on_event(stamped)
-    return stamped
 
 
 def ensure_carrier_terminal_observation(session: RunSession) -> StampedEvent | None:
@@ -101,11 +100,13 @@ def ensure_carrier_terminal_observation(session: RunSession) -> StampedEvent | N
     if journal_has_terminal_event(session):
         return None
     message = (folded.error if folded is not None and folded.error else None) or session.error or "run failed"
+    wire_status = session.status.value if hasattr(session.status, "value") else str(session.status)
     return emit_carrier_run_failed(
         session,
         hub=session.hub,
         user_message=message,
         exception_class=_exception_class_from_message(message),
+        status=wire_status,
     )
 
 

@@ -110,6 +110,25 @@ def test_fold_carrier_runtime_observed_failed() -> None:
     assert state.error == "bad input"
 
 
+def test_fold_carrier_runtime_observed_canceled() -> None:
+    events = [
+        _stamped(
+            1,
+            RuntimeObserved(
+                kind=RuntimeKind.ERROR,
+                operation="run.lifecycle.failed",
+                source="lifecycle.coordinator",
+                outcome=OperationOutcome.ERROR,
+                error_message="canceled",
+                attributes={"status": "canceled"},
+            ),
+        ),
+    ]
+    state = fold_run_state(events)
+    assert state.status == RunStatus.CANCELED
+    assert state.error == "canceled"
+
+
 def test_fold_canceled() -> None:
     events = [
         _stamped(1, AgentRunFinished(status="canceled")),

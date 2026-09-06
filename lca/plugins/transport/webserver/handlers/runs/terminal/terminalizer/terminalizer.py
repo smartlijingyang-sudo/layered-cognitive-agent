@@ -59,8 +59,8 @@ class RunTerminalizer:
                 ensure_carrier_terminal_observation,
             )
 
-            ensure_carrier_terminal_observation(session)
             _derive_terminal_status(session, success)
+            ensure_carrier_terminal_observation(session)
             if session.hub is not None:
                 _emit_artifact_closure_if_needed(workspace, session, session.hub)
             await self._finalizer(session.run_id)
