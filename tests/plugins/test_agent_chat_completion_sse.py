@@ -1,8 +1,4 @@
-"""LiveTail → Journal SSE on ``RegistryRunAdapter.stream_run_live``.
-
-Agent observation is ``GET /runs/{id}/live`` (event = class name), not OpenAI
-ChatCompletion chunks from ``stream_chat_completion``.
-"""
+"""LiveTail → four UI SSE events on ``RegistryRunAdapter.stream_run_live``."""
 
 from __future__ import annotations
 
@@ -112,28 +108,20 @@ async def test_stream_run_live_emits_ui_wire_with_reasoning_tool_and_finish() ->
 
     raw = await _drain(adapter.stream_run_live(session.run_id, 0))
     joined = b"".join(raw).decode("utf-8")
-    assert "event: ReasoningDelta" in joined
-    assert "event: StepTextDelta" in joined
-    assert "event: ToolStarted" in joined
-    assert "event: AgentRunFinished" in joined
-    assert "data: [DONE]" not in joined
-    assert "chat.completion" not in joined
+    assert "event: reasoning" in joined
+    assert "event: text" in joined
+    assert "event: tool" in joined
+    assert "event: done" in joined
+    assert "event: ReasoningDelta" not in joined
 
     frames = _parse_sse(raw)
-
-    def _payload(frame: dict[str, Any]) -> dict[str, Any]:
-        data = frame["data"]
-        inner = data.get("data") if isinstance(data, dict) else None
-        return inner if isinstance(inner, dict) else data
-
-    assert frames[0]["event"] == "ReasoningDelta"
-    assert _payload(frames[0]).get("text_delta") == "Let me think…"
-    tool_frames = [frame for frame in frames if frame["event"] in {"ToolStarted", "ToolInvoked"}]
-    assert [frame["event"] for frame in tool_frames] == ["ToolStarted", "ToolInvoked"]
-    assert any(_payload(frame).get("tool_name") == "read_file" for frame in tool_frames)
-    text_frames = [frame for frame in frames if frame["event"] == "StepTextDelta"]
-    assert _payload(text_frames[-1]).get("text_delta") == "Hello world"
-    assert frames[-1]["event"] == "AgentRunFinished"
+    assert frames[0]["event"] == "reasoning"
+    assert frames[0]["data"]["text"] == "Let me think…"
+    tool_frames = [frame for frame in frames if frame["event"] == "tool"]
+    assert len(tool_frames) == 2
+    text_frames = [frame for frame in frames if frame["event"] == "text"]
+    assert text_frames[-1]["data"]["text"] == "Hello world"
+    assert frames[-1]["event"] == "done"
 
 
 @pytest.mark.asyncio
@@ -162,6 +150,7 @@ async def test_stream_run_live_emits_failed_done_when_no_finish() -> None:
         question="q",
         user_text="u",
         mode="solo",
+        error="think phase exploded",
     )
     registry.put(session)
     tail.on_event(_stamped(StepTextDelta(text_delta="only this", channel="answer")))
@@ -169,7 +158,5 @@ async def test_stream_run_live_emits_failed_done_when_no_finish() -> None:
 
     raw = await _drain(adapter.stream_run_live(session.run_id, 0))
     frames = _parse_sse(raw)
-    assert [frame["event"] for frame in frames if frame["event"] != "LiveGap"] == ["StepTextDelta"]
-    joined = b"".join(raw).decode("utf-8")
-    assert "data: [DONE]" not in joined
-    assert "chat.completion" not in joined
+    assert [frame["event"] for frame in frames] == ["text", "done"]
+    assert frames[-1]["data"] == {"status": "failed", "error": "think phase exploded"}

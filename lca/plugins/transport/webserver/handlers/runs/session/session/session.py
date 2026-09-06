@@ -25,6 +25,10 @@ from lca.contracts.observability.journal.run_journal import (
 )
 from lca.contracts.observability.registry.run_locator import RunLocator
 from lca.contracts.observability.registry.status import RunLifecycleStatus
+
+# COMPAT(delete-when: rg 'RunStatus' tests/ lca/plugins/transport/ = 0 except alias,
+#         tracking: ADR-0183 PR-11 RunLifecycleStatus rename)
+RunStatus = RunLifecycleStatus
 from lca.contracts.protocols import JournalProjector
 from lca.infrastructure.observability import BoundObservability
 from lca.infrastructure.observability.facade.run.ambit import RunAmbit
@@ -308,4 +312,4 @@ class RunRegistry:
         return self._health.live_totals()
 
 
-__all__ = ["RunLifecycleStatus", "RunRegistry", "RunSession", "run_dedup_key"]
+__all__ = ["RunLifecycleStatus", "RunRegistry", "RunSession", "RunStatus", "run_dedup_key"]

@@ -129,9 +129,23 @@ class RunLifecycleCoordinator:
                     return
                 success = outcome.success
                 run_outcome = "success" if success else "failure"
+                if not success and outcome.error:
+                    from lca.plugins.transport.webserver.read.runs.error.presentation import (
+                        format_user_error,
+                    )
+
+                    emit_carrier_run_failed(
+                        session,
+                        hub=hub,
+                        user_message=format_user_error(
+                            outcome.error,
+                            run_id=session.run_id,
+                            trace_id=session.trace_id,
+                        ),
+                    )
         except (PlaneBindingError, _UnknownExecutionTargetError) as exc:
-            session.error = str(exc)
-            self._record_failure(session, exc, hub)
+            user_message = str(exc)
+            self._record_failure(session, exc, hub, error=user_message)
             emit_exception_caught(
                 exc_to_record(
                     exc,
@@ -143,7 +157,7 @@ class RunLifecycleCoordinator:
             emit_carrier_run_failed(
                 session,
                 hub=hub,
-                user_message=session.error,
+                user_message=user_message,
                 exception_class=type(exc).__name__,
             )
             emit_carrier_exception_finally(
@@ -163,8 +177,8 @@ class RunLifecycleCoordinator:
                 trace_id=session.trace_id,
                 error_type=type(exc).__name__,
             )
-            session.error = self._format_exception(exc, session)
-            self._record_failure(session, exc, hub)
+            user_message = self._format_exception(exc, session)
+            self._record_failure(session, exc, hub, error=user_message)
             emit_exception_caught(
                 exc_to_record(
                     exc,
@@ -176,7 +190,7 @@ class RunLifecycleCoordinator:
             emit_carrier_run_failed(
                 session,
                 hub=hub,
-                user_message=session.error,
+                user_message=user_message,
                 exception_class=type(exc).__name__,
             )
             emit_carrier_exception_finally(
@@ -230,8 +244,8 @@ class RunLifecycleCoordinator:
                 trace_id=session.trace_id,
                 error_type=type(exc).__name__,
             )
-            session.error = self._format_exception(exc, session)
-            self._record_failure(session, exc, session.hub)
+            user_message = self._format_exception(exc, session)
+            self._record_failure(session, exc, session.hub, error=user_message)
             from lca.infrastructure.observability.spine.exception.emit import (
                 emit_exception_caught,
             )
@@ -247,14 +261,20 @@ class RunLifecycleCoordinator:
             emit_carrier_run_failed(
                 session,
                 hub=session.hub,
-                user_message=session.error,
+                user_message=user_message,
                 exception_class=type(exc).__name__,
             )
         finally:
             await self._finish_or_pause(session, workspace=None, success=success)
 
     @staticmethod
-    def _record_failure(session: RunSession, exc: BaseException, hub: Any) -> None:
+    def _record_failure(
+        session: RunSession,
+        exc: BaseException,
+        hub: Any,
+        *,
+        error: str | None = None,
+    ) -> None:
         """Project mutable lifecycle state into the observation seam."""
 
         record_run_failure(
@@ -264,7 +284,7 @@ class RunLifecycleCoordinator:
                 agent_role=session.agent.name if session.agent else "",
                 strategy_key=session.mode,
                 objective=session.user_text,
-                error=session.error or f"{type(exc).__name__}: {exc}",
+                error=error or f"{type(exc).__name__}: {exc}",
                 hub=hub,
             )
         )

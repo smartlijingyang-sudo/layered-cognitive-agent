@@ -820,10 +820,11 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
         return;
       }
       case 'run-finished': {
-        if (projected.status === 'input-required') {
+        if (projected.status === 'input-required' || projected.status === 'awaiting_human') {
           await presentAskUserCard();
           return;
         }
+        await ensureTurn();
         if (projected.error) noteRowError(projected.error);
         await persistRow();
         return;
@@ -900,6 +901,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
       }
       if (snap.error && !rowError) {
         noteRowError(new Error(snap.error));
+        await ensureTurn();
       }
       // waiting_input does not end the loop: the run resumes on the same live
       // stream after POST /runs/<id>/answer, so keep projecting until a terminal

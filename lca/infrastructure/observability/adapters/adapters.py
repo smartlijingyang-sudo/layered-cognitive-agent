@@ -22,12 +22,12 @@ from lca.contracts.harness.memory.events import ThinkingCompleted, ThinkingDelta
 from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.observability.journal.journal import (
     LlmCallCompleted,
-    LlmCallStarted,
     ReasoningCompleted,
     ReasoningDelta,
     StepTextDelta,
 )
 from lca.contracts.protocols import LLMAdapter
+from lca.contracts.protocols.observability.llm_spine_emit import LlmSpineEmitter
 from lca.infrastructure.observability.adapters.memory_adapter import (
     TelemetryMemoryAdapter as TelemetryMemoryAdapter,
 )
@@ -38,18 +38,6 @@ from lca.infrastructure.observability.stream.llm_stream_activity import (
     LlmStreamActivityTracker,
 )
 from lca.infrastructure.observability.stream.response_text_stream import ResponseTextStreamExtractor
-
-# NOTE: spine_reflector_body_llm 走函数内 lazy import，避免 adapters →
-# lca.infrastructure.observability → lca_kernel.boot 链路触发 circular import。
-# ADR-0194 P2-13: lazy target 为 lca.loop.llm_emit。
-
-
-def _body_llm_reflector() -> Any:
-    """Lazy-import llm_emit to break circular import (ADR-0194 P2-13)."""
-    from lca.loop import llm_emit
-
-    return llm_emit
-
 
 _PERF_COUNTER_SCALE = 1000
 """perf_counter 秒 → 毫秒换算。"""
@@ -119,14 +107,12 @@ class TelemetryLLMAdapter(LLMAdapter):
         *,
         idle_timeout_s: float | None = None,
         session_append: SessionAppend | None = None,
+        spine_emit: LlmSpineEmitter | None = None,
     ) -> None:
         """装配参数。
 
         ``session_append``：可选 Session 双写注入口（见 :data:`SessionAppend`）。
-        默认 ``None`` 时行为与历史一致（只写 Journal 平面）。非 ``None`` 时,
-        流式 reasoning 在 ``record(ReasoningDelta/ReasoningCompleted)`` 之外
-        追加 ``ThinkingDelta`` / ``ThinkingCompleted`` session 事件;
-        ``turn`` / ``step`` 取自 stream kwargs（缺省 0）。
+        ``spine_emit``：LLM spine EP 生产入口，由组合根注入（ADR-0194 P2-13）。
         """
         self._inner = inner
         self.name = f"telemetry({getattr(inner, 'name', type(inner).__name__)})"
@@ -134,6 +120,14 @@ class TelemetryLLMAdapter(LLMAdapter):
             LLM_STREAM_IDLE_TIMEOUT_S if idle_timeout_s is None else idle_timeout_s
         )
         self._session_append = session_append
+        self._spine_emit = spine_emit
+
+    def _spine(self) -> LlmSpineEmitter:
+        if self._spine_emit is not None:
+            return self._spine_emit
+        from lca.loop.emit.cognitive import llm
+
+        return llm  # type: ignore[return-value]
 
     @property
     def inner(self) -> LLMAdapter:
@@ -161,10 +155,7 @@ class TelemetryLLMAdapter(LLMAdapter):
         # ADR-0164: open think step at LLM boundary (auto dual-write seam).
         _open_think_step(prompt)
         # PR-3.3: spine emits llm.call.start/end around the inner call.
-        # The journal ``record()`` pair (LlmCallStarted / LlmCallCompleted)
-        # remains for backward compatibility with the legacy projector
-        # pipeline; the spine pair is additive.
-        _body_llm_reflector().emit_llm_call_start(
+        self._spine().emit_llm_call_start(
             model=model,
             stream=False,
             prompt_preview=prompt,
@@ -173,7 +164,7 @@ class TelemetryLLMAdapter(LLMAdapter):
             response = await self._inner.complete(prompt, **kwargs)
         except Exception as exc:
             self._record(model, prompt, "", False, started, 0, 0, stream=False)
-            _body_llm_reflector().emit_llm_call_end(
+            self._spine().emit_llm_call_end(
                 model=model,
                 stream=False,
                 outcome="failure",
@@ -193,7 +184,7 @@ class TelemetryLLMAdapter(LLMAdapter):
             completion_tokens,
             stream=False,
         )
-        _body_llm_reflector().emit_llm_call_end(
+        self._spine().emit_llm_call_end(
             model=model,
             stream=False,
             outcome="success",
@@ -218,9 +209,8 @@ class TelemetryLLMAdapter(LLMAdapter):
 
         # ADR-0164: open think step at LLM stream boundary.
         _open_think_step(prompt)
-        record(LlmCallStarted(step=step, model=model))
         # PR-3.3: spine emits llm.call.start at the beginning of the stream.
-        _body_llm_reflector().emit_llm_call_start(
+        self._spine().emit_llm_call_start(
             model=model,
             stream=True,
             prompt_preview=prompt,
@@ -234,7 +224,7 @@ class TelemetryLLMAdapter(LLMAdapter):
         end_outcome: str = "success"
 
         def _on_idle(idle_s: float, idle_seq: int) -> None:
-            _body_llm_reflector().emit_llm_stream_stall(
+            self._spine().emit_llm_stream_stall(
                 model=model,
                 idle_ms=int(idle_s * _PERF_COUNTER_SCALE),
                 seq=idle_seq,
@@ -309,7 +299,7 @@ class TelemetryLLMAdapter(LLMAdapter):
                     # paths; bracketing here keeps llm.call.end durable.
                     if not spine_end_emitted:
                         pt, ct = _usage_of(final_response) if final_response is not None else (0, 0)
-                        _body_llm_reflector().emit_llm_call_end(
+                        self._spine().emit_llm_call_end(
                             model=model,
                             stream=True,
                             outcome="success",
@@ -341,7 +331,7 @@ class TelemetryLLMAdapter(LLMAdapter):
                         )
                         # ADR-0167 D4b / PR-3: 流式 delta 由 coalescer 合并后落
                         # step.thinking.reasoning，不按 token 写 EP / span —— bridge 已删。
-                        _body_llm_reflector().emit_llm_stream_token(
+                        self._spine().emit_llm_stream_token(
                             model=model,
                             text_delta=delta_text,
                             seq=reasoning_seq,
@@ -360,7 +350,7 @@ class TelemetryLLMAdapter(LLMAdapter):
                         )
                     )
                     # ADR-0167 D4b / PR-3: 流式 delta 不写 EP / span（已删 bridge_*）
-                    _body_llm_reflector().emit_llm_stream_token(
+                    self._spine().emit_llm_stream_token(
                         model=model,
                         text_delta=delta_text,
                         seq=delta_seq,
@@ -454,7 +444,7 @@ class TelemetryLLMAdapter(LLMAdapter):
                 prompt_tokens, completion_tokens = (
                     _usage_of(final_response) if final_response is not None else (0, 0)
                 )
-                _body_llm_reflector().emit_llm_call_end(
+                self._spine().emit_llm_call_end(
                     model=model,
                     stream=True,
                     outcome=outcome,  # type: ignore[arg-type]

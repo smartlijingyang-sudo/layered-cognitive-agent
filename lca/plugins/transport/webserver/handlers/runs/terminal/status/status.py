@@ -29,18 +29,19 @@ def current_task_cancelled() -> bool:
 
 
 def derive_terminal_status(session: RunSession, success: bool) -> None:
-    """Derive terminal status from Journal facts, then apply carrier fallback signals."""
+    """Derive terminal status and error from Journal facts, then carrier fallback."""
     if session.cancel_requested or task_cancelled(session.task) or current_task_cancelled():
         session.cancel_requested = True
         session.status = RunLifecycleStatus.CANCELED
-    elif session.error:
-        session.status = RunLifecycleStatus.FAILED
     elif session.hub is not None:
         store = journal_store(session.hub)
         if store is None:
             fallback_terminal_status(session, success)
         else:
-            session.status = fold_run_state(store.events).status
+            folded = fold_run_state(store.events)
+            session.status = folded.status
+            if folded.error:
+                session.error = folded.error
             if session.status is RunLifecycleStatus.RUNNING:
                 fallback_terminal_status(session, success)
     else:

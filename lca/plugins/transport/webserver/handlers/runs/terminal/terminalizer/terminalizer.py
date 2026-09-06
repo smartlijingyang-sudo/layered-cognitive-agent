@@ -55,6 +55,12 @@ class RunTerminalizer:
 
         close_reason: CloseReason = "completed" if success else "error"
         try:
+            from lca.plugins.transport.webserver.handlers.runs.terminal.observation import (
+                ensure_carrier_terminal_observation,
+            )
+
+            ensure_carrier_terminal_observation(session)
+            _derive_terminal_status(session, success)
             if session.hub is not None:
                 _emit_artifact_closure_if_needed(workspace, session, session.hub)
             await self._finalizer(session.run_id)
@@ -63,14 +69,8 @@ class RunTerminalizer:
         finally:
             try:
                 if session.hub is not None:
-                    from lca.plugins.transport.webserver.handlers.runs.terminal.observation import (
-                        ensure_carrier_terminal_observation,
-                    )
-
-                    ensure_carrier_terminal_observation(session)
                     session.hub.close()
             finally:
-                _derive_terminal_status(session, success)
                 self._registry.clear_inflight(session.run_id)
                 self._registry.prune()
                 self._materializer(session)

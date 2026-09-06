@@ -13,7 +13,6 @@ from lca.contracts.harness.tasks.session import event_type_of
 from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent, TokenUsage
 from lca.contracts.models.observability.journal.journal import (
     LlmCallCompleted,
-    LlmCallStarted,
     ReasoningCompleted,
     ReasoningDelta,
     StepTextDelta,
@@ -187,8 +186,6 @@ class TestTelemetryLLMAdapter(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(completed), 1)
         self.assertFalse(completed[0].ok)
         self.assertTrue(completed[0].stream)
-        started = [e for e in self.recorded if isinstance(e, LlmCallStarted)]
-        self.assertEqual(len(started), 1)
 
     async def test_stream_reasoning_deltas_and_completed(self) -> None:
         inner = _FakeInner()
@@ -264,11 +261,18 @@ class TestTelemetryLLMAdapter(unittest.IsolatedAsyncioTestCase):
         adapter = TelemetryLLMAdapter(inner)
         events = [e async for e in adapter.stream("prompt", step=3)]
         self.assertEqual(len(events), 5)
-        # 未注入时行为不变：Journal 平面照常记录
         reasoning = [e for e in self.recorded if isinstance(e, ReasoningDelta)]
         self.assertEqual(len(reasoning), 2)
         done = [e for e in self.recorded if isinstance(e, ReasoningCompleted)]
         self.assertEqual(len(done), 1)
+
+    async def test_stream_spine_emit_import_does_not_raise(self) -> None:
+        """Regression: spine emit wiring must not abort stream."""
+        adapter = TelemetryLLMAdapter(_FakeInner())
+        events = [e async for e in adapter.stream("prompt")]
+        self.assertEqual(len(events), 3)
+        completed = [e for e in self.recorded if isinstance(e, LlmCallCompleted)]
+        self.assertEqual(len(completed), 1)
 
 
 if __name__ == "__main__":

@@ -282,6 +282,38 @@ async def test_member_agent_run_finished_does_not_close_stream() -> None:
 
 
 @pytest.mark.asyncio
+async def test_runtime_observed_carrier_failure_emits_done() -> None:
+    from lca.contracts.models.observability.event.event import OperationOutcome, RuntimeKind
+    from lca.contracts.models.observability.journal.journal import RuntimeObserved
+
+    frames = await _encode(
+        RuntimeObserved(
+            kind=RuntimeKind.ERROR,
+            operation="run.lifecycle.failed",
+            source="lifecycle.coordinator",
+            outcome=OperationOutcome.ERROR,
+            error_message="ImportError: cannot import llm_emit",
+            attributes={"status": "failed"},
+        )
+    )
+    assert len(frames) == 1
+    assert frames[0]["event"] == "done"
+    assert frames[0]["data"] == {
+        "status": "failed",
+        "error": "ImportError: cannot import llm_emit",
+    }
+
+
+@pytest.mark.asyncio
+async def test_synthetic_done_frame_uses_session_error() -> None:
+    encoder = RunUiEncoder()
+    frame = encoder.synthetic_done_frame(99, terminal_error="boom")
+    parsed = _parse_frames([frame])
+    assert parsed[0]["event"] == "done"
+    assert parsed[0]["data"] == {"status": "failed", "error": "boom"}
+
+
+@pytest.mark.asyncio
 async def test_error_status_maps_to_failed() -> None:
     frames = await _encode(AgentRunFinished(status="error", error="boom", output_text=""))
     assert frames[-1]["event"] == "done"

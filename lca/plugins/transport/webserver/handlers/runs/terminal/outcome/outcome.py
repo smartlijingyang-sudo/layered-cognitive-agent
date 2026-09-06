@@ -14,9 +14,6 @@ from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.observability.registry.status import RunLifecycleStatus
 from lca.plugins.transport.webserver.carrier.runs.execute.loop_drivers import DriverOutcome
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
-from lca.plugins.transport.webserver.read.runs.error.presentation import (
-    format_user_error,
-)
 
 
 class RunOutcomeApplier:
@@ -32,13 +29,6 @@ class RunOutcomeApplier:
             session.runnable = outcome.resumable
             session.approval_request = outcome.approval_request
             return True
-
-        if not outcome.success and not session.error and outcome.error:
-            session.error = format_user_error(
-                outcome.error,
-                run_id=session.run_id,
-                trace_id=session.trace_id,
-            )
         return False
 
     def apply_resume(self, session: RunSession, result: Any) -> bool:
@@ -49,13 +39,6 @@ class RunOutcomeApplier:
             session.snapshot = result.extra.get("state_snapshot")
             session.approval_request = result.extra.get("approval_request")
             return True
-
-        if result.status != TaskStatus.COMPLETED and not session.error and result.error:
-            session.error = format_user_error(
-                result.error,
-                run_id=session.run_id,
-                trace_id=session.trace_id,
-            )
         return False
 
 

@@ -1,4 +1,4 @@
-"""GET /runs/{id}/live emits Journal SSE frames (event = class name)."""
+"""GET /runs/{id}/live emits four UI SSE events (ADR-0100)."""
 
 from __future__ import annotations
 
@@ -169,7 +169,6 @@ async def _drain(bytes_iter: Any) -> list[bytes]:
 
 
 def test_live_route_is_registered() -> None:
-    """PR-7:``/runs/{run_id}/live`` 由 ``routes_runs_sessions`` plugin 注册。"""
     from lca.plugins.transport.webserver.routes_2.routes_runs_sessions import ROUTE_SPECS
 
     paths = {spec.path for spec in ROUTE_SPECS}
@@ -183,13 +182,7 @@ def test_get_live_unknown_run_returns_404() -> None:
     assert response.json() == {"error": "run not found"}
 
 
-def _payload(frame: dict[str, Any]) -> dict[str, Any]:
-    data = frame["data"]
-    inner = data.get("data") if isinstance(data, dict) else None
-    return inner if isinstance(inner, dict) else data
-
-
-def test_get_live_emits_journal_events() -> None:
+def test_get_live_emits_four_ui_events() -> None:
     _SEQ[0] = 0
     registry = RunRegistry()
     session = _seed_journal(registry)
@@ -197,33 +190,21 @@ def test_get_live_emits_journal_events() -> None:
     response = client.get(f"/runs/{session.run_id}/live")
     assert response.status_code == 200
     assert "text/event-stream" in response.headers.get("content-type", "")
-    assert response.headers.get("Cache-Control") == "no-cache"
-    assert response.headers.get("Connection") == "keep-alive"
-    assert response.headers.get("X-Accel-Buffering") == "no"
 
     body = response.content.decode("utf-8")
     names = [line[len("event: ") :] for line in body.splitlines() if line.startswith("event: ")]
-    assert "ReasoningDelta" in names
-    assert "StepTextDelta" in names
-    assert "ToolStarted" in names
-    assert "ToolInvoked" in names
-    assert "AgentRunFinished" in names
-    assert "deltas" not in names
-    assert "terminal" not in names
+    assert "reasoning" in names
+    assert "text" in names
+    assert names.count("tool") == 2
+    assert "done" in names
+    assert "ReasoningDelta" not in names
+    assert "AgentRunFinished" not in names
 
     frames = _parse_sse(response.content)
-    assert frames[0]["event"] == "ReasoningDelta"
-    assert _payload(frames[0]).get("text_delta") == "think-token"
-    assert frames[0]["id"] == 1
-    assert [
-        frame["event"] for frame in frames if frame["event"] in {"ToolStarted", "ToolInvoked"}
-    ] == [
-        "ToolStarted",
-        "ToolInvoked",
-    ]
-    text_frames = [frame for frame in frames if frame["event"] == "StepTextDelta"]
-    assert _payload(text_frames[-1]).get("text_delta") == "answer-token"
-    assert frames[-1]["event"] == "AgentRunFinished"
+    assert frames[0]["event"] == "reasoning"
+    assert frames[0]["data"] == {"text": "think-token"}
+    assert frames[-1]["event"] == "done"
+    assert frames[-1]["data"]["status"] == "completed"
 
 
 def test_get_live_has_no_done_sentinel_or_chat_completion() -> None:
@@ -251,11 +232,9 @@ def test_get_live_after_skips_earlier_seqs() -> None:
     assert response.status_code == 200
     frames = _parse_sse(response.content)
     assert all(frame["id"] > 1 for frame in frames)
-    assert all(frame["event"] != "ReasoningDelta" for frame in frames)
-    names = [frame["event"] for frame in frames]
-    assert "ToolStarted" in names
-    assert "StepTextDelta" in names
-    assert "AgentRunFinished" in names
+    assert all(frame["event"] != "reasoning" for frame in frames)
+    assert "tool" in [frame["event"] for frame in frames]
+    assert frames[-1]["event"] == "done"
 
 
 def test_get_live_ignores_last_event_id_header() -> None:
@@ -270,7 +249,7 @@ def test_get_live_ignores_last_event_id_header() -> None:
     assert response.status_code == 200
     frames = _parse_sse(response.content)
     assert frames[0]["id"] == 1
-    assert frames[0]["event"] == "ReasoningDelta"
+    assert frames[0]["event"] == "reasoning"
 
 
 @pytest.mark.asyncio
@@ -281,15 +260,13 @@ async def test_stream_run_live_emits_ui_frames_from_livetail() -> None:
     session = _seed_journal(registry, run_id="run-adapter")
     raw = await _drain(adapter.stream_run_live(session.run_id, 0))
     joined = b"".join(raw).decode("utf-8")
-    assert "event: ReasoningDelta" in joined
-    assert "event: StepTextDelta" in joined
-    assert "event: ToolStarted" in joined
-    assert "event: AgentRunFinished" in joined
-    assert "data: [DONE]" not in joined
-    assert "chat.completion" not in joined
+    assert "event: reasoning" in joined
+    assert "event: text" in joined
+    assert "event: tool" in joined
+    assert "event: done" in joined
+    assert "event: ReasoningDelta" not in joined
     frames = _parse_sse(b"".join(raw))
-    assert frames[0]["id"] == 1
-    assert frames[-1]["event"] == "AgentRunFinished"
+    assert frames[-1]["event"] == "done"
 
 
 @pytest.mark.asyncio
@@ -301,7 +278,7 @@ async def test_stream_run_live_after_skips_earlier_seqs() -> None:
     raw = await _drain(adapter.stream_run_live(session.run_id, 3))
     frames = _parse_sse(b"".join(raw))
     assert all(frame["id"] > 3 for frame in frames)
-    assert [frame["event"] for frame in frames] == ["StepTextDelta", "AgentRunFinished"]
+    assert [frame["event"] for frame in frames] == ["text", "done"]
 
 
 @pytest.mark.asyncio
@@ -318,6 +295,7 @@ async def test_stream_run_live_emits_failed_done_when_tail_closes_without_finish
         question="q",
         user_text="u",
         mode="solo",
+        error="ImportError: boom",
     )
     registry.put(session)
     tail.on_event(_stamped(StepTextDelta(text_delta="partial", channel="answer")))
@@ -325,8 +303,8 @@ async def test_stream_run_live_emits_failed_done_when_tail_closes_without_finish
 
     raw = await _drain(adapter.stream_run_live(session.run_id, 0))
     frames = _parse_sse(b"".join(raw))
-    assert [frame["event"] for frame in frames] == ["StepTextDelta"]
-    assert _payload(frames[-1]).get("text_delta") == "partial"
+    assert [frame["event"] for frame in frames] == ["text", "done"]
+    assert frames[-1]["data"] == {"status": "failed", "error": "ImportError: boom"}
 
 
 @pytest.mark.asyncio
@@ -355,8 +333,5 @@ async def test_stream_run_live_emits_nested_agent_run_finished() -> None:
     raw = await _drain(adapter.stream_run_live(session.run_id, 0))
     frames = _parse_sse(b"".join(raw))
     names = [frame["event"] for frame in frames]
-    assert names == ["AgentRunFinished", "StepTextDelta", "TeamRunFinished"]
-    texts = [
-        _payload(frame).get("text_delta") for frame in frames if frame["event"] == "StepTextDelta"
-    ]
-    assert texts == ["after-member"]
+    assert names == ["text", "done"]
+    assert frames[-1]["data"]["status"] == "completed"

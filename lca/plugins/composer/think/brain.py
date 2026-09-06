@@ -21,6 +21,7 @@ from lca.infrastructure.observability.adapters import (
     TelemetryLLMAdapter,
 )
 from lca.infrastructure.session.emit.lifecycle_emit import session_append_for_thinking
+from lca.loop.emit.cognitive import llm as llm_spine_emit
 from lca.plugins.composer.composition.skill_store import active_skill_store
 
 _MODEL_VISIBLE_HOOK_KEY = "llm.adapter.hook.model_visible"
@@ -63,6 +64,7 @@ def instrument_llm(
     instrumented = TelemetryLLMAdapter(
         existing_telemetry,
         session_append=session_append_for_thinking(),
+        spine_emit=llm_spine_emit,
     )
 
     hook = _resolve_model_visible_hook(ctx)

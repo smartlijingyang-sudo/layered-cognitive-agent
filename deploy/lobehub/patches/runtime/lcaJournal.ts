@@ -1,4 +1,4 @@
-/** Journal SSE → projection values. No store I/O. */
+/** Live SSE (four events) → projection values. No store I/O. */
 
 export type JournalFrame = {
   event: string;
@@ -47,9 +47,6 @@ export function parseSseBlock(block: string): JournalFrame | null {
   if (!eventName || !dataLines.length) return null;
   try {
     const parsed = JSON.parse(dataLines.join('\n')) as Record<string, unknown>;
-    // ADR-0096 MVA-1 / 5204fd56 follow-up: v2 envelope 顶层字段从 data → payload (v2.0.0);
-    // 兼容 lca.journal/2 disk/SSE envelope（payload 在 data 下）与 Session Spine deltas
-    // 通道（SessionEvent 嵌 envelope.event）。按优先级尝试三种来源。
     const payload = (parsed.payload ?? parsed.data) as Record<string, unknown> | undefined;
     const inner =
       payload && typeof payload === 'object'
@@ -78,93 +75,65 @@ export function parseSseBlock(block: string): JournalFrame | null {
   }
 }
 
+function parseToolDetailArgs(detail: unknown): Record<string, unknown> {
+  if (typeof detail !== 'string' || !detail.startsWith('{')) return {};
+  try {
+    const parsed = JSON.parse(detail) as unknown;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Map ADR-0100 four live SSE events to LobeHub row projections. */
 export function projectJournalFrame(frame: JournalFrame): Projected {
   const payload = frame.eventPayload ?? {};
   switch (frame.event) {
-    case 'LlmCallStarted':
-      return { kind: 'open-turn', speaker: frame.speaker ?? '' };
-    case 'ReasoningDelta':
-      return { kind: 'reasoning', text: String(payload.text_delta ?? '') };
-    case 'ReasoningCompleted': {
-      const raw = payload.duration_ms;
-      const durationMs = typeof raw === 'number' && Number.isFinite(raw) ? raw : undefined;
-      return { durationMs, kind: 'reasoning-end' };
-    }
-    case 'StepTextDelta':
-      if (payload.channel && payload.channel !== 'answer') return { kind: 'ignore' };
-      return { kind: 'text', text: String(payload.text_delta ?? '') };
-    case 'ToolCallStreaming':
-    case 'ToolStarted': {
-      // ADR-0101 PR-2 + ADR-0101 followup (2026-09-01): tool events return to
-      // facts; ``arguments`` lives at payload.arguments (ToolStarted) or
-      // ``arguments_preview`` (ToolCallStreaming, best-effort partial dict
-      // emitted while LLM is still streaming tool-call arguments). Merge
-      // either into projected state so pickArgs / mergeInvocationArgs in
-      // LcaRunDriver find it; the renderer also reads args from there.
-      // ToolStarted.arguments is the source of truth; ToolCallStreaming
-      // preview is a hint and gets overwritten once ToolStarted arrives.
+    case 'reasoning':
+      return { kind: 'reasoning', text: String(payload.text ?? '') };
+    case 'text':
+      return { kind: 'text', text: String(payload.text ?? '') };
+    case 'tool': {
+      const phase = String(payload.phase ?? '');
+      const toolName = String(payload.name ?? '');
       const baseState =
-        (payload.plugin_state as Record<string, unknown> | undefined) ?? {};
-      const rawArgs = payload.arguments ?? payload.arguments_preview;
-      const merged =
-        rawArgs && typeof rawArgs === 'object' && !Array.isArray(rawArgs)
-          ? { ...baseState, ...(rawArgs as Record<string, unknown>) }
-          : baseState;
-      return {
-        idHint: toolCallId(payload, `call_${frame.seq ?? 0}`),
-        kind: 'tool-start',
-        state: merged,
-        toolName: String(payload.tool_name ?? ''),
-      };
-    }
-    case 'SandboxOutputDelta':
-      return {
-        kind: 'sandbox-delta',
-        payload,
-        stream: String(payload.stream ?? 'stdout'),
-        text: String(payload.text_delta ?? ''),
-      };
-    case 'ToolInvoked': {
-      // ADR-0101 PR-2: output_text is the top-level fact for tool output
-      // (no longer nested under plugin_state.output). Renderers read
-      // pluginState.output / .stdout / .content; expose output_text under
-      // all three keys so per-tool renders and the generic toolCardContent
-      // helper both find it. Keep the original plugin_state fields first
-      // so renderer-specific structured data (e.g. skill metadata in
-      // activate_skill) still wins on key collision.
-      const baseState =
-        (payload.plugin_state as Record<string, unknown> | undefined) ?? {};
-      const outText = payload.output_text;
-      const projState =
-        payload.projected_state &&
-        typeof payload.projected_state === 'object' &&
-        !Array.isArray(payload.projected_state)
-          ? (payload.projected_state as Record<string, unknown>)
+        payload.state && typeof payload.state === 'object' && !Array.isArray(payload.state)
+          ? (payload.state as Record<string, unknown>)
           : {};
-      const outputAliases =
-        typeof outText === 'string' && outText.length > 0
-          ? { output: outText, stdout: outText, content: outText }
-          : {};
-      return {
-        files: payload.files,
-        kind: 'tool-invoked',
-        payload,
-        state: { ...baseState, ...outputAliases, ...projState },
-      };
+      if (phase === 'started') {
+        return {
+          idHint: String(payload.id ?? `call_${frame.seq ?? 0}`),
+          kind: 'tool-start',
+          state: { ...baseState, ...parseToolDetailArgs(payload.detail) },
+          toolName,
+        };
+      }
+      if (phase === 'done') {
+        const outText = typeof payload.detail === 'string' ? payload.detail : '';
+        const outputAliases =
+          outText && outText !== 'ok' ? { output: outText, stdout: outText, content: outText } : {};
+        return {
+          files: payload.files,
+          kind: 'tool-invoked',
+          payload,
+          state: { ...baseState, ...outputAliases },
+        };
+      }
+      if (phase === 'denied') {
+        return {
+          kind: 'tool-denied',
+          payload,
+          reason: String(payload.detail ?? payload.error ?? 'denied'),
+        };
+      }
+      return { kind: 'ignore' };
     }
-    case 'ToolDenied':
-      return {
-        kind: 'tool-denied',
-        payload,
-        reason: String(payload.reason ?? payload.error ?? 'denied'),
-      };
-    case 'AgentRunFinished':
-    case 'TeamRunFinished':
+    case 'done':
       return {
         error: payload.error ? String(payload.error) : undefined,
         kind: 'run-finished',
-        // 'input-required' marks a human-in-the-loop pause (askUserQuestion);
-        // the driver uses it to present the question card.
         status: typeof payload.status === 'string' ? payload.status : undefined,
       };
     case 'LiveGap':

@@ -17,9 +17,11 @@ from lca.contracts.models.observability.event.event import (
 from lca.contracts.models.observability.journal.catalog import (
     JOURNAL_EVENT_CLASSES,
 )
+from lca.contracts.models.observability.event.event import OperationOutcome, RuntimeKind
 from lca.contracts.models.observability.journal.journal import (
     AgentRunFinished,
     AgentRunStarted,
+    RuntimeObserved,
     RunScope,
     StampedEvent,
     TeamRunFinished,
@@ -88,6 +90,24 @@ def test_fold_member_agent_finished_ignored() -> None:
     ]
     state = fold_run_state(events)
     assert state.status == RunStatus.RUNNING  # 没有根 finish 事件
+
+
+def test_fold_carrier_runtime_observed_failed() -> None:
+    events = [
+        _stamped(
+            1,
+            RuntimeObserved(
+                kind=RuntimeKind.ERROR,
+                operation="run.lifecycle.failed",
+                source="lifecycle.coordinator",
+                outcome=OperationOutcome.ERROR,
+                error_message="bad input",
+            ),
+        ),
+    ]
+    state = fold_run_state(events)
+    assert state.status == RunStatus.FAILED
+    assert state.error == "bad input"
 
 
 def test_fold_canceled() -> None:

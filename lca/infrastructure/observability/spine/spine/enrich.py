@@ -15,11 +15,26 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from contextvars import ContextVar, Token
+from contextvars import Token
 from dataclasses import dataclass, field
 from typing import Any
 
 from lca.contracts.observability.spine.producer import FieldProducer
+from lca.contracts.protocols.loop.spine_publish import (
+    SpineEnrichResult,
+)
+from lca.contracts.protocols.loop.spine_publish import (
+    get_active_field_producers as _contract_get_producers,
+)
+from lca.contracts.protocols.loop.spine_publish import (
+    get_active_spine_enricher as _contract_get_enricher,
+)
+from lca.contracts.protocols.loop.spine_publish import (
+    set_active_field_producers as _contract_set_producers,
+)
+from lca.contracts.protocols.loop.spine_publish import (
+    set_active_spine_enricher as _contract_set_enricher,
+)
 from lca.infrastructure.observability.spine.event.record import Channel
 from lca.infrastructure.observability.spine.manifest.manifest import EXECUTION_POINTS
 
@@ -49,6 +64,10 @@ class EnrichResult:
     merged: dict[str, Any]
     producer_failures: list[tuple[Any, dict[str, Any]]] = field(default_factory=list)
 
+    @classmethod
+    def from_contract(cls, result: SpineEnrichResult) -> EnrichResult:
+        return cls(merged=result.merged, producer_failures=list(result.producer_failures))
+
 
 def _noop(*args: Any, **kwargs: Any) -> Any:
     del args, kwargs
@@ -60,49 +79,56 @@ _NO_OP_FN: Any = _noop
 
 _SpineEnricher = Callable[..., EnrichResult]
 
-_active_field_producers: ContextVar[list[FieldProducer] | None] = ContextVar(
-    "lca_active_field_producers",
-    default=None,
-)
-
-_active_spine_enricher: ContextVar[_SpineEnricher | None] = ContextVar(
-    "lca_active_spine_enricher",
-    default=None,
-)
-
 
 def set_active_field_producers(
     producers: list[FieldProducer] | None,
 ) -> list[FieldProducer] | None:
     """Install process-local FieldProducer list; returns previous list."""
-    previous = _active_field_producers.get()
-    _active_field_producers.set(producers)
-    return previous
+    return _contract_set_producers(producers)
 
 
 def reset_active_field_producers(token: Token[list[FieldProducer] | None]) -> None:
-    _active_field_producers.reset(token)
+    del token  # compat: contracts layer uses replace-only set
 
 
 def get_active_field_producers() -> list[FieldProducer] | None:
-    return _active_field_producers.get()
+    return _contract_get_producers()
 
 
 def set_active_spine_enricher(
     getter: _SpineEnricher | None,
 ) -> _SpineEnricher | None:
     """Install process-local enricher callable (hook-less test compat); returns previous."""
-    previous = _active_spine_enricher.get()
-    _active_spine_enricher.set(getter)
+    previous = get_active_spine_enricher()
+    if getter is None:
+        _contract_set_enricher(None)
+        return previous
+
+    def _adapter(**kwargs: Any) -> SpineEnrichResult:
+        local = getter(**kwargs)
+        return SpineEnrichResult(
+            merged=local.merged,
+            producer_failures=list(local.producer_failures),
+        )
+
+    _contract_set_enricher(_adapter)
     return previous
 
 
 def reset_active_spine_enricher(token: Token[_SpineEnricher | None]) -> None:
-    _active_spine_enricher.reset(token)
+    del token
 
 
 def get_active_spine_enricher() -> _SpineEnricher | None:
-    return _active_spine_enricher.get()
+    enricher = _contract_get_enricher()
+    if enricher is None:
+        return None
+
+    def _proxy(**kwargs: Any) -> EnrichResult:
+        result = enricher(**kwargs)
+        return EnrichResult.from_contract(result)
+
+    return _proxy
 
 
 def enrich_spine_payload(

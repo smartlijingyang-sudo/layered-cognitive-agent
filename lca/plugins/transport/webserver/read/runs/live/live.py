@@ -9,7 +9,6 @@ from typing import Any
 
 from lca.infrastructure.observability.journal.stream.live_tail import (
     TEXT_CHANNEL_ALL,
-    TEXT_CHANNEL_ANSWER,
     LiveGap,
     iter_live_sse,
 )
@@ -79,7 +78,7 @@ async def iter_stamped_events(
     while True:
         try:
             yield await asyncio.wait_for(sub.__anext__(), timeout=15.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             continue
         except StopAsyncIteration:
             return
@@ -90,12 +89,32 @@ async def stream_run_live(
     *,
     after: int = 0,
 ) -> AsyncIterator[bytes]:
-    """Stream a run's journal as Journal SSE (event = class name)."""
+    """Stream a run live as four UI SSE events (reasoning|text|tool|done)."""
+    from lca.plugins.transport.run_ui_encoder__encoder_provider import RunUiEncoder
+
+    encoder = RunUiEncoder()
+    from lca.infrastructure.observability import fold_run_state
+    from lca.plugins.transport.webserver.handlers.runs.terminal.status.status import (
+        journal_store,
+    )
+
+    terminal_status = (
+        session.status.value if hasattr(session.status, "value") else str(session.status)
+    )
+    terminal_error = session.error or ""
+    store = journal_store(session.hub) if session.hub is not None else None
+    if store is not None:
+        folded = fold_run_state(store.events)
+        if folded.status.value != "running":
+            terminal_status = folded.status.value
+        if folded.error:
+            terminal_error = folded.error
     try:
-        async for line in iter_live_sse(
+        async for line in encoder.encode_live_tail(
             session.tail,
             after_seq=after,
-            text_channel=TEXT_CHANNEL_ANSWER,
+            terminal_status=terminal_status,
+            terminal_error=terminal_error,
         ):
             yield line
     except asyncio.CancelledError:

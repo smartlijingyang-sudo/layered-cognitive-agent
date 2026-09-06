@@ -38,7 +38,7 @@ class RegistryRunQueries:
             yield item
 
     async def stream_run_live(self, run_id: str, after: int = 0) -> AsyncIterator[bytes]:
-        """Stream a run's journal as Journal SSE (event = class name)."""
+        """Stream a run live as four UI SSE events (reasoning|text|tool|done)."""
         session = self._registry.get(run_id)
         if session is None:
             return

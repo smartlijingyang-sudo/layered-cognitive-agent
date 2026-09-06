@@ -7,19 +7,30 @@ subscription. Keepalive stays at the HTTP layer (LiveTail).
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from typing import Any, Protocol
 
+from lca.contracts.models.observability.journal.journal import StampedEvent
+from lca.contracts.observability.journal.run_journal import LiveRunProjection
 from lca.contracts.observability.registry.status import RunLifecycleStatus
 
 _OUTPUT_TRUNCATE = 2000
+_HEARTBEAT = b": keepalive\n\n"
+_CARRIER_TERMINAL_OPERATION = "run.lifecycle.failed"
 
 
 class _SupportsEventType(Protocol):
     """Anything with a string ``event_type`` plus dataclass-y fields."""
 
     event_type: str
+
+
+@dataclass
+class _EncodeState:
+    emitted_text: bool = False
 
 
 class RunUiEncoder:
@@ -33,81 +44,237 @@ class RunUiEncoder:
     DECISION_MADE = "DecisionMade"
     AGENT_RUN_FINISHED = "AgentRunFinished"
     TEAM_RUN_FINISHED = "TeamRunFinished"
+    RUNTIME_OBSERVED = "RuntimeObserved"
 
     async def encode(
         self,
         stream: AsyncIterator[_SupportsEventType],
     ) -> AsyncIterator[bytes]:
         """Yield SSE frames until root ``done``, then end the generator."""
-        emitted_text = False
+        state = _EncodeState()
         async for item in stream:
-            seq = int(getattr(item, "seq", 0) or 0)
-            event = getattr(item, "event", item)
-            et = getattr(event, "event_type", "") or type(event).__name__
+            frames, terminated = self._process_item(item, state)
+            for frame in frames:
+                yield frame
+            if terminated:
+                return
 
-            if et == self.REASONING_DELTA:
-                token = str(getattr(event, "text_delta", "") or "")
-                if not token:
-                    continue
-                yield self._frame(seq, "reasoning", {"text": token})
+    async def encode_live_tail(
+        self,
+        tail: LiveRunProjection,
+        *,
+        after_seq: int = 0,
+        heartbeat_s: float = 15.0,
+        terminal_status: str = "",
+        terminal_error: str = "",
+    ) -> AsyncIterator[bytes]:
+        """Subscribe to a run tail and emit four UI events plus a terminal ``done``.
 
-            elif et == self.STEP_TEXT_DELTA:
-                if getattr(event, "channel", "decision") != "answer":
-                    continue
-                token = str(getattr(event, "text_delta", "") or "")
-                if not token:
-                    continue
-                emitted_text = True
-                yield self._frame(seq, "text", {"text": token})
+        When the tail closes without ``AgentRunFinished`` / ``TeamRunFinished`` /
+        carrier ``RuntimeObserved(run.lifecycle.failed)``, emits a synthetic
+        ``done`` from ``terminal_status`` / ``terminal_error`` (Wave 0 invariant).
+        """
+        from lca.infrastructure.observability.journal.stream.live_tail import (
+            TEXT_CHANNEL_ANSWER,
+            LiveGap,
+            _is_visible_text_channel,
+            encode_live_gap,
+        )
 
-            elif et == self.TOOL_STARTED:
-                yield self._frame(
+        state = _EncodeState()
+        terminated = False
+        last_seq = after_seq
+        sub = tail.subscribe(after_seq=after_seq)
+
+        while True:
+            try:
+                item = await asyncio.wait_for(sub.__anext__(), timeout=heartbeat_s)
+            except TimeoutError:
+                yield _HEARTBEAT
+                continue
+            except StopAsyncIteration:
+                break
+
+            if isinstance(item, LiveGap):
+                yield encode_live_gap(item)
+                continue
+            if not isinstance(item, StampedEvent):
+                continue
+            if not _is_visible_text_channel(item, TEXT_CHANNEL_ANSWER):
+                continue
+
+            last_seq = max(last_seq, item.seq)
+            frames, item_terminated = self._process_item(item, state)
+            for frame in frames:
+                yield frame
+            if item_terminated:
+                terminated = True
+                return
+
+        if not terminated:
+            yield self.synthetic_done_frame(
+                last_seq + 1,
+                terminal_status=terminal_status,
+                terminal_error=terminal_error,
+            )
+
+    def synthetic_done_frame(
+        self,
+        seq: int,
+        *,
+        terminal_status: str = "",
+        terminal_error: str = "",
+    ) -> bytes:
+        """Emit ``done`` when the journal stream ends without a terminal fact."""
+        payload = self._synthetic_done_payload(
+            terminal_status=terminal_status,
+            terminal_error=terminal_error,
+        )
+        return self._frame(seq, "done", payload)
+
+    def _process_item(
+        self,
+        item: _SupportsEventType,
+        state: _EncodeState,
+    ) -> tuple[list[bytes], bool]:
+        seq = int(getattr(item, "seq", 0) or 0)
+        event = getattr(item, "event", item)
+        et = getattr(event, "event_type", "") or type(event).__name__
+        frames: list[bytes] = []
+
+        if et == self.REASONING_DELTA:
+            token = str(getattr(event, "text_delta", "") or "")
+            if token:
+                frames.append(self._frame(seq, "reasoning", {"text": token}))
+            return frames, False
+
+        if et == self.STEP_TEXT_DELTA:
+            if getattr(event, "channel", "decision") != "answer":
+                return frames, False
+            token = str(getattr(event, "text_delta", "") or "")
+            if token:
+                state.emitted_text = True
+                frames.append(self._frame(seq, "text", {"text": token}))
+            return frames, False
+
+        if et == self.TOOL_STARTED:
+            frames.append(
+                self._frame(
                     seq,
                     "tool",
                     self._tool_payload(
                         event, phase="started", detail=self._extract_arguments(event)
                     ),
                 )
+            )
+            return frames, False
 
-            elif et == self.TOOL_INVOKED:
-                yield self._frame(
+        if et == self.TOOL_INVOKED:
+            frames.append(
+                self._frame(
                     seq,
                     "tool",
                     self._tool_payload(event, phase="done", detail=self._tool_done_detail(event)),
                 )
+            )
+            return frames, False
 
-            elif et == self.TOOL_DENIED:
-                reason = str(getattr(event, "reason", "") or "")
-                yield self._frame(
+        if et == self.TOOL_DENIED:
+            reason = str(getattr(event, "reason", "") or "")
+            frames.append(
+                self._frame(
                     seq,
                     "tool",
                     self._tool_payload(event, phase="denied", detail=reason),
                 )
+            )
+            return frames, False
 
-            elif et == self.DECISION_MADE:
-                if emitted_text:
-                    continue
-                text = str(getattr(event, "response_text", "") or "")
-                if not text:
-                    continue
-                emitted_text = True
-                yield self._frame(seq, "text", {"text": text})
+        if et == self.DECISION_MADE:
+            if state.emitted_text:
+                return frames, False
+            text = str(getattr(event, "response_text", "") or "")
+            if text:
+                state.emitted_text = True
+                frames.append(self._frame(seq, "text", {"text": text}))
+            return frames, False
 
-            elif et == self.AGENT_RUN_FINISHED and self._parent_run_id(item) is not None:
-                continue
+        if et == self.RUNTIME_OBSERVED:
+            operation = str(getattr(event, "operation", "") or "")
+            if operation == _CARRIER_TERMINAL_OPERATION:
+                error = str(getattr(event, "error_message", "") or "").strip()
+                status = str(
+                    (getattr(event, "attributes", {}) or {}).get("status", "")
+                    or RunLifecycleStatus.FAILED.value
+                )
+                frames.append(
+                    self._frame(
+                        seq,
+                        "done",
+                        self._terminal_done_payload(
+                            status=status,
+                            error=error,
+                            emitted_text=state.emitted_text,
+                        ),
+                    )
+                )
+                return frames, True
+            return frames, False
 
-            elif et in {self.AGENT_RUN_FINISHED, self.TEAM_RUN_FINISHED}:
-                output = str(getattr(event, "output_text", "") or "")
-                error = str(getattr(event, "error", "") or "")
-                if not emitted_text and output:
-                    emitted_text = True
-                    yield self._frame(seq, "text", {"text": output})
-                status = self._map_status(str(getattr(event, "status", "") or ""))
-                done_payload: dict[str, Any] = {"status": status}
-                if not emitted_text and error:
-                    done_payload["error"] = error
-                yield self._frame(seq, "done", done_payload)
-                return
+        if et == self.AGENT_RUN_FINISHED and self._parent_run_id(item) is not None:
+            return frames, False
+
+        if et in {self.AGENT_RUN_FINISHED, self.TEAM_RUN_FINISHED}:
+            output = str(getattr(event, "output_text", "") or "")
+            error = str(getattr(event, "error", "") or "")
+            if not state.emitted_text and output:
+                state.emitted_text = True
+                frames.append(self._frame(seq, "text", {"text": output}))
+            status = str(getattr(event, "status", "") or "")
+            frames.append(
+                self._frame(
+                    seq,
+                    "done",
+                    self._terminal_done_payload(
+                        status=status,
+                        error=error,
+                        emitted_text=state.emitted_text,
+                    ),
+                )
+            )
+            return frames, True
+
+        return frames, False
+
+    def _terminal_done_payload(
+        self,
+        *,
+        status: str,
+        error: str,
+        emitted_text: bool,
+    ) -> dict[str, Any]:
+        mapped = self._map_status(status)
+        payload: dict[str, Any] = {"status": mapped}
+        err = error.strip()
+        if err and (mapped == "failed" or not emitted_text):
+            payload["error"] = err
+        return payload
+
+    def _synthetic_done_payload(
+        self,
+        *,
+        terminal_status: str,
+        terminal_error: str,
+    ) -> dict[str, Any]:
+        err = terminal_error.strip()
+        if err:
+            return {"status": "failed", "error": err}
+        mapped = self._map_status(terminal_status)
+        if mapped in {"failed", "canceled"}:
+            return {"status": mapped}
+        # Tail closed without an explicit terminal journal fact — treat as failure
+        # so the UI never silently ends a run (Wave 0 live invariant).
+        return {"status": "failed", "error": "run ended without terminal event"}
 
     @staticmethod
     def _frame(seq: int, event: str, data: dict[str, Any]) -> bytes:
@@ -116,12 +283,7 @@ class RunUiEncoder:
 
     @staticmethod
     def _map_status(status: str) -> str:
-        """归一化终态事件 status 到 LobeHub UI ``done`` 帧词表。
-
-        输入是终态事件 wire 词表(``RunLifecycleStatus`` 规范值 +
-        A2A / UI 别名);输出是 UI 词表闭集(``awaiting_human`` /
-        ``canceled`` / ``failed`` / ``completed``),不是生命周期 enum。
-        """
+        """归一化终态事件 status 到 LobeHub UI ``done`` 帧词表。"""
         key = status.strip().lower()
         if key in {
             RunLifecycleStatus.WAITING_INPUT.value,
@@ -178,11 +340,6 @@ class RunUiEncoder:
 
     @staticmethod
     def _event_state(event: Any) -> dict[str, Any]:
-        """ADR-0101 PR-3:tool 事件事实字段只有 ``arguments`` / ``files`` /
-        ``ok`` / ``error`` / ``invocation_id`` / ``tool_name``。参数完整原文
-        由 ``arguments``(inline 退路)或 ``arguments_ref``(evidence)给出;
-        UI 渲染按 ``tool_name`` 派发到 LobeHub renderer registry。
-        """
         collected: dict[str, Any] = dict(getattr(event, "arguments", {}) or {})
         files = getattr(event, "files", None)
         if files and "files" not in collected:
@@ -191,11 +348,6 @@ class RunUiEncoder:
 
     @staticmethod
     def _extract_arguments(event: Any) -> str:
-        """Serialize tool arguments as a compact JSON string.
-
-        ADR-0101 PR-3:ToolStarted.arguments 是事实字段;evidence 路径下
-        ``arguments_ref`` 由 LobeHub renderer 按 ref 单独 fetch。
-        """
         collected: dict[str, Any] = dict(getattr(event, "arguments", {}) or {})
         return json.dumps(collected, ensure_ascii=False, default=str)
 

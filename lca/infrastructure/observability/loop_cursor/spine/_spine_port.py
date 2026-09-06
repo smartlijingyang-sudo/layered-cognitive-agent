@@ -27,6 +27,12 @@ from contextvars import ContextVar, Token
 from datetime import datetime
 from typing import Any, Protocol
 
+from lca.contracts.protocols.loop.spine_publish import (
+    is_session_ssot_hook_active as _contract_hook_active,
+)
+from lca.contracts.protocols.loop.spine_publish import (
+    mark_session_ssot_hook_active,
+)
 from lca.infrastructure.observability.spine.context.context import SpineContext
 from lca.infrastructure.observability.spine.event.record import (
     Channel,
@@ -96,6 +102,8 @@ def get_session_append_hook() -> SessionAppendHook | None:
 
 def is_session_ssot_hook_active() -> bool:
     """True when the bound hook is a production Session SSOT forwarder."""
+    if _contract_hook_active():
+        return True
     hook = get_session_append_hook()
     return hook is not None and getattr(hook, SESSION_SSOT_HOOK_MARKER, False)
 
@@ -106,12 +114,15 @@ def bind_session_append_hook(hook: SessionAppendHook) -> Token[Any]:
     由 Session runtime 装配方调用(如 ``bind_run_event_session_from_store``)。
     未绑定时 ``spine_port_append`` 将 RuntimeError fail-loud。
     """
+    active = hook is not None and getattr(hook, SESSION_SSOT_HOOK_MARKER, False)
+    mark_session_ssot_hook_active(active)
     return _session_append_hook.set(hook)
 
 
 def reset_session_append_hook(token: Token[Any]) -> None:
     """释放 ``bind_session_append_hook`` 返回的 token。"""
     _session_append_hook.reset(token)
+    mark_session_ssot_hook_active(False)
 
 
 def spine_port_append(

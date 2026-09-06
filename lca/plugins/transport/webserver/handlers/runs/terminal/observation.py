@@ -86,11 +86,21 @@ def emit_carrier_run_failed(
 
 def ensure_carrier_terminal_observation(session: RunSession) -> StampedEvent | None:
     """Best-effort terminal fact before hub close when the run failed without ``AgentRunFinished``."""
-    if session.status not in {RunLifecycleStatus.FAILED, RunLifecycleStatus.CANCELED} and not session.error:
+    from lca.infrastructure.observability import fold_run_state
+
+    folded = None
+    store = journal_store(session.hub) if session.hub is not None else None
+    if store is not None:
+        folded = fold_run_state(store.events)
+    failed = (
+        session.status in {RunLifecycleStatus.FAILED, RunLifecycleStatus.CANCELED}
+        or (folded is not None and folded.status in {RunLifecycleStatus.FAILED, RunLifecycleStatus.CANCELED})
+    )
+    if not failed:
         return None
     if journal_has_terminal_event(session):
         return None
-    message = session.error or "run failed"
+    message = (folded.error if folded is not None and folded.error else None) or session.error or "run failed"
     return emit_carrier_run_failed(
         session,
         hub=session.hub,
