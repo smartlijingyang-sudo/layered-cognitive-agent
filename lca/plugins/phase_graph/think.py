@@ -49,7 +49,10 @@ class StandardThinkExecutor:
                 result_kind="decision",
                 input=input,
             )
-        return PhaseResult(result_kind="decision", payload=await brain.think(context.state))
+        from lca.infrastructure.session.cognitive_emit import run_brain_think_with_spine_facts
+
+        decision = await run_brain_think_with_spine_facts(brain, context.state)
+        return PhaseResult(result_kind="decision", payload=decision)
 
 
 @plugin(

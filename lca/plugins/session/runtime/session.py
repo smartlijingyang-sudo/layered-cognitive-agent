@@ -1,3 +1,7 @@
+# COMPAT(owner: ADR-0195, from: lca.plugins.session.runtime.session,
+# to: lca.session.append, delete_when: rg "from lca\\.plugins\\.session\\.runtime\\.session"
+#   生产引用归零(plugins/ 内 boot 装配除外),
+# forbidden_new_usage: 新代码优先 from lca.session.append import Session)
 """Session 实体 —— DSH 风格 append-only session 真值（PR-3c 骨架）。
 
 对齐 deepseek-harness ``packages/core/session/src/index.ts`` ``Session.append``

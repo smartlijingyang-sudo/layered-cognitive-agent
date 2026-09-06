@@ -1,8 +1,9 @@
-"""Session-backed FactCommitter (ADR-0192 E0/E2).
+"""Session-backed FactCommitter (ADR-0192 E0/E2, ADR-0194 P1-08).
 
 Maps declarative ``RunFact`` kinds and observations to Session catalog events
-or authorized spine structural EPs. Replaces ``RuntimeJournalCommitter``'s
-``record_runtime`` → Journal plane path for production runs.
+or authorized spine structural EPs via :mod:`lca.loop.fact_gateway`. Replaces
+``RuntimeJournalCommitter``'s ``record_runtime`` → Journal plane path for
+production runs.
 """
 
 from __future__ import annotations
@@ -15,12 +16,13 @@ import structlog
 
 from lca.contracts.harness.memory.events import ContextInjected
 from lca.contracts.protocols.act.command_envelope import RunFact
+from lca.contracts.protocols.loop.fact_gateway import AppendReceipt
 from lca.contracts.protocols.observability.fact_committer import FactCommitter
-from lca.harness.session.emit import emit
-from lca.infrastructure.observability.domain_event_publish import publish_structural_event
 from lca.infrastructure.session.bindings import resolve_session_reader
+from lca.loop.fact_gateway import append_catalog_bound, publish_ep_bound
 
 _log = structlog.get_logger(__name__)
+_DIAGNOSTIC_ACTOR = "diagnostic"
 
 
 def _json_safe(value: object) -> object:
@@ -33,6 +35,10 @@ def _json_safe(value: object) -> object:
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     return str(value)
+
+
+def _receipt_ref(receipt: AppendReceipt) -> str:
+    return f"{receipt.session_id}:{receipt.seq}"
 
 
 class SessionFactCommitter(FactCommitter):
@@ -103,12 +109,14 @@ class SessionFactCommitter(FactCommitter):
         source = str(payload.get("source", "perceive"))
         content_ref = str(payload.get("content_ref", ""))
         model_visible = bool(payload.get("model_visible", True))
-        event = emit(
-            session,
+        receipt = append_catalog_bound(
             ContextInjected(source=source, content_ref=content_ref, model_visible=model_visible),
+            session=session,
             actor=node_ref,
         )
-        return f"{session.id}:{event.seq}"
+        if receipt is None:
+            return f"noop:context.injected:{self._sequence}"
+        return _receipt_ref(receipt)
 
     def _commit_context_manifested_payload(
         self, payload: Mapping[str, object], *, node_ref: str
@@ -127,10 +135,10 @@ class SessionFactCommitter(FactCommitter):
         step = int(payload.get("step", 0))
         digest = str(payload.get("digest", ""))
         manifest = ContextManifest(items=(), digest=digest)
-        event = emit_context_manifested(session, manifest, step=step, actor=node_ref)
-        if event is None:
+        receipt = emit_context_manifested(session, manifest, step=step, actor=node_ref)
+        if receipt is None:
             return f"noop:context.manifested:{self._sequence}"
-        return f"{session.id}:{getattr(event, 'seq', self._sequence)}"
+        return _receipt_ref(receipt)
 
     def _commit_spine_fact(
         self,
@@ -140,18 +148,14 @@ class SessionFactCommitter(FactCommitter):
         node_ref: str,
         fallback_label: str,
     ) -> str:
-        from lca.plugins.events.publishers.spine_reflector_runtime.plugin import ReflectorClass
-
-        ref = publish_structural_event(
-            execution_point=execution_point,
-            channel="fact",
-            payload=payload,
-            producer=ReflectorClass,
+        receipt = publish_ep_bound(
+            execution_point,
+            payload,
+            actor=node_ref,
         )
-        if ref is None:
+        if receipt is None:
             return fallback_label
-        event_id = getattr(ref, "event_id", "") or ""
-        return event_id or fallback_label
+        return _receipt_ref(receipt) or fallback_label
 
 
 def emit_diagnostic(
@@ -185,13 +189,11 @@ def emit_diagnostic(
             output=output,
         )
         return
-    from lca.plugins.events.publishers.spine_reflector_runtime.plugin import ReflectorClass
-
-    publish_structural_event(
-        execution_point="runtime.diagnostic",
-        channel="diagnostic",
-        payload=payload,
-        producer=ReflectorClass,
+    publish_ep_bound(
+        "runtime.diagnostic",
+        payload,
+        session=session,
+        actor=plugin or _DIAGNOSTIC_ACTOR,
     )
 
 

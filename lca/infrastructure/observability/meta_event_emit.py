@@ -1,7 +1,8 @@
 """Unified meta-event emission — Session catalog + spine structural dual path.
 
-Run-bound: Session ``.v1`` facts via ``resolve_session_reader`` + ``harness.session.emit``.
-Always: spine ``skill.package.*`` / domain EPs via ``publish_structural_event``.
+Run-bound catalog facts and spine EPs both route through ``FactGateway``
+(``append_catalog_bound`` / ``publish_ep_bound``; ADR-0195 P1-17).
+``LCA_FACT_GATEWAY`` rollback is honored inside those helpers.
 Unbound session: structured ``structlog`` INFO (never silent).
 """
 
@@ -37,11 +38,13 @@ from lca.contracts.observability.skill_meta_ep_closure import (
     SKILL_PACKAGE_INSTALLED,
     SKILL_PACKAGE_SEARCHED,
 )
-from lca.harness.session.emit import emit
-from lca.infrastructure.observability.domain_event_publish import publish_structural_event
+from lca.contracts.protocols.loop.fact_gateway import AppendReceipt
 from lca.infrastructure.session.bindings import resolve_session_reader
+from lca.loop.fact_gateway import append_catalog_bound, publish_ep_bound
 
 log = structlog.get_logger(__name__)
+
+_META_ACTOR = "meta"
 
 
 def _emit_session(
@@ -49,10 +52,9 @@ def _emit_session(
     *,
     actor: str = "agent",
     session: Any | None = None,
-) -> Any | None:
-    if session is None:
-        session = resolve_session_reader()
-    if session is None:
+) -> AppendReceipt | None:
+    writer = session if session is not None else resolve_session_reader()
+    if writer is None:
         from lca.contracts.harness.tasks.session import event_type_of
 
         log.info(
@@ -61,18 +63,24 @@ def _emit_session(
             payload=asdict(event_data),
         )
         return None
-    return emit(session, event_data, actor=actor)
+    return append_catalog_bound(event_data, session=writer, actor=actor)
 
 
-def _emit_skill_spine(execution_point: str, payload: dict[str, Any]) -> Any:
-    from lca.plugins.events.publishers.spine_reflector_skill.plugin import ReflectorClass
-
-    return publish_structural_event(
-        execution_point=execution_point,
-        channel="fact",
-        payload=payload,
-        producer=ReflectorClass,
-    )
+def _emit_skill_spine(
+    execution_point: str,
+    payload: dict[str, Any],
+    *,
+    actor: str = _META_ACTOR,
+) -> AppendReceipt | None:
+    writer = resolve_session_reader()
+    if writer is None:
+        log.info(
+            "meta_event.no_session",
+            execution_point=execution_point,
+            payload=payload,
+        )
+        return None
+    return publish_ep_bound(execution_point, payload, session=writer, actor=actor)
 
 
 def tool_registry_digest(tool_names: tuple[str, ...]) -> str:

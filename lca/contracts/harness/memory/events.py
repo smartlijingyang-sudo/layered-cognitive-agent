@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from lca.contracts.harness.memory.skill import SkillCatalogEntry
@@ -326,6 +326,62 @@ class ContextManifestCommitted:
     step: int
     digest: str
     items: tuple[dict[str, Any], ...] = ()
+
+
+@session_event("tool.denied.v1", visibility="model")
+@dataclass(frozen=True)
+class ToolDeniedCommitted:
+    """Durable tool denial for Session SSOT (ADR-0194 P1-10; maps to ``ToolDenied``)."""
+
+    tool_name: str
+    reason: str
+
+
+@session_event("tool.call.resolved.v1", visibility="model")
+@dataclass(frozen=True)
+class ToolCallResolvedCommitted:
+    """Durable LLM tool-call args resolution for Session SSOT (ADR-0194 P1-12).
+
+    Maps to ``ToolCallResolved`` journal event; emitted when streaming args complete.
+    """
+
+    tool_name: str
+    tool_call_id: str
+    arguments: dict[str, Any] = field(default_factory=dict)
+    arguments_ref: dict[str, Any] | None = None
+
+
+@session_event("tool.started.v1", visibility="model")
+@dataclass(frozen=True)
+class ToolStartedCommitted:
+    """Durable tool call start for Session SSOT (ADR-0194 P1-10; maps to ``ToolStarted``)."""
+
+    tool_name: str
+    invocation_id: str
+    arguments: dict[str, Any] = field(default_factory=dict)
+    arguments_ref: dict[str, Any] | None = None
+    idempotency_key: str = ""
+
+
+@session_event("tool.invoked.v1", visibility="model")
+@dataclass(frozen=True)
+class ToolInvokedCommitted:
+    """Durable tool call completion for Session SSOT (ADR-0194 P1-10; maps to ``ToolInvoked``)."""
+
+    tool_name: str
+    invocation_id: str
+    ok: bool = True
+    latency_ms: int = 0
+    attempt: int = 1
+    error: str = ""
+    idempotency_key: str = ""
+    files: tuple[dict[str, Any], ...] = ()
+    arguments: dict[str, Any] = field(default_factory=dict)
+    arguments_ref: dict[str, Any] | None = None
+    output_ref: dict[str, Any] | None = None
+    output_text: str | None = None
+    output_truncated: bool = False
+    projected_state: dict[str, Any] = field(default_factory=dict)
 
 
 @session_event("turn.control.v1", visibility="internal")

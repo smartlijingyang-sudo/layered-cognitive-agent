@@ -29,10 +29,12 @@ from lca.contracts.harness.memory.events import (
 )
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import Result
-from lca.harness.session.emit import emit
 from lca.infrastructure.session.bindings import resolve_session_reader
 from lca.infrastructure.session.surface_emit import append_user_surface
+from lca.loop.fact_gateway import append_catalog_bound
 from lca_kernel.events.fold import SURFACE_ASSISTANT_TYPE
+
+_LIFECYCLE_ACTOR = "lifecycle"
 
 _lifecycle: contextvars.ContextVar[_LifecycleState | None] = contextvars.ContextVar(
     "lca_session_lifecycle",
@@ -66,17 +68,21 @@ def _session() -> Any | None:
     return resolve_session_reader()
 
 
+def _append_catalog(event: Any) -> bool:
+    """Append one catalog fact via FactGateway; False when session unbound."""
+    return append_catalog_bound(event, actor=_LIFECYCLE_ACTOR) is not None
+
+
 def begin_turn(*, turn: int | None = None, reason: str = "user_input") -> None:
     """``turn.started.v1`` — once per user-driven turn."""
-    session = _session()
-    if session is None:
+    if _session() is None:
         return
     state = _state()
     if turn is not None:
         state.turn = turn
     if state.turn_open:
         return
-    emit(session, TurnStarted(turn=state.turn))
+    _append_catalog(TurnStarted(turn=state.turn))
     state.turn_open = True
 
 
@@ -96,8 +102,7 @@ def accept_user_message(
     text = content.strip()
     if not text:
         return
-    emit(
-        session,
+    _append_catalog(
         MessageAccepted(message_id=message_id, role=role, content_ref=text),
     )
     append_user_surface(
@@ -109,14 +114,13 @@ def accept_user_message(
 
 def begin_step(*, turn: int | None = None, step: int) -> None:
     """``step.started.v1`` — open one model-request step."""
-    session = _session()
-    if session is None:
+    if _session() is None:
         return
     state = _state()
     turn_no = turn if turn is not None else state.turn
     if state.open_step == step:
         return
-    emit(session, StepStarted(turn=turn_no, step=step))
+    _append_catalog(StepStarted(turn=turn_no, step=step))
     state.open_step = step
 
 
@@ -128,14 +132,12 @@ def request_model(
     model: str,
 ) -> None:
     """``model.requested.v1`` — immediately before LLM dispatch."""
-    session = _session()
-    if session is None:
+    if _session() is None:
         return
     state = _state()
     turn_no = turn if turn is not None else state.turn
     begin_step(turn=turn_no, step=step)
-    emit(
-        session,
+    _append_catalog(
         ModelRequested(turn=turn_no, step=step, provider=provider, model=model),
     )
 
@@ -154,11 +156,10 @@ def complete_model(
         return
     state = _state()
     turn_no = turn if turn is not None else state.turn
-    emit(session, ModelCompleted(turn=turn_no, step=step, usage=usage))
+    _append_catalog(ModelCompleted(turn=turn_no, step=step, usage=usage))
     text = content.strip()
     if text or tool_calls:
-        emit(
-            session,
+        _append_catalog(
             AssistantResponded(
                 turn=turn_no,
                 step=step,
@@ -177,21 +178,19 @@ def complete_model(
 
 def fail_model(*, turn: int | None = None, step: int, error: str) -> None:
     """``model.failed.v1`` — terminal model error for this step."""
-    session = _session()
-    if session is None:
+    if _session() is None:
         return
     state = _state()
     turn_no = turn if turn is not None else state.turn
-    emit(session, ModelFailed(turn=turn_no, step=step, error=error))
+    _append_catalog(ModelFailed(turn=turn_no, step=step, error=error))
 
 
 def create_session(profile: str, preset: str | None = None) -> SessionCreated | None:
     """``session.created.v1`` — once when a run Session is bound."""
-    session = _session()
-    if session is None:
+    if _session() is None:
         return None
     event = SessionCreated(profile=profile, preset=preset)
-    emit(session, event)
+    _append_catalog(event)
     return event
 
 
@@ -199,24 +198,22 @@ def checkpoint(status: str) -> SessionCheckpoint | None:
     """``session.checkpoint.v1`` — lifecycle recovery authority (no ``working``)."""
     if status == LiveAgentStatus.WORKING.value:
         raise ValueError("working state must not be checkpointed")
-    session = _session()
-    if session is None:
+    if _session() is None:
         return None
     event = SessionCheckpoint(status=status)
-    emit(session, event)
+    _append_catalog(event)
     return event
 
 
 def persist_approval(approval_id: str, resume_point: dict[str, object]) -> ApprovalPersisted | None:
     """``approval.persisted.v1`` — durable declarative resume point."""
-    session = _session()
-    if session is None:
+    if _session() is None:
         return None
     state = _state()
     if state.approval_pause_emitted:
         return None
     event = ApprovalPersisted(approval_id=approval_id, resume_point=resume_point)
-    emit(session, event)
+    _append_catalog(event)
     state.approval_pause_emitted = True
     return event
 
@@ -259,7 +256,7 @@ def terminal_checkpoint_status(status: TaskStatus) -> str | None:
 
 
 def session_append_for_thinking() -> Any:
-    """Return a ``SessionAppend`` hook that mirrors thinking.* via harness emit.
+    """Return a ``SessionAppend`` hook that mirrors thinking.* via FactGateway.
 
     No-op when no Session is bound (tests / offline). Accepts
     ``ThinkingDelta`` / ``ThinkingCompleted`` payloads from
@@ -267,32 +264,27 @@ def session_append_for_thinking() -> Any:
     """
 
     def _append(payload: Any) -> None:
-        session = _session()
-        if session is None:
-            return
         if isinstance(payload, (ThinkingDelta, ThinkingCompleted)):
-            emit(session, payload)
+            _append_catalog(payload)
 
     return _append
 
 
 def end_step(*, turn: int | None = None, step: int) -> None:
     """``step.ended.v1`` — close one step after remember/act cycle."""
-    session = _session()
-    if session is None:
+    if _session() is None:
         return
     state = _state()
     turn_no = turn if turn is not None else state.turn
     if state.open_step != step:
         return
-    emit(session, StepEnded(turn=turn_no, step=step))
+    _append_catalog(StepEnded(turn=turn_no, step=step))
     state.open_step = None
 
 
 def end_turn(*, turn: int | None = None, reason: str = "completed") -> None:
     """``turn.ended.v1`` — close the user turn at run terminal."""
-    session = _session()
-    if session is None:
+    if _session() is None:
         return
     state = _state()
     turn_no = turn if turn is not None else state.turn
@@ -300,7 +292,7 @@ def end_turn(*, turn: int | None = None, reason: str = "completed") -> None:
         end_step(turn=turn_no, step=state.open_step)
     if not state.turn_open:
         return
-    emit(session, TurnEnded(turn=turn_no, reason=reason))
+    _append_catalog(TurnEnded(turn=turn_no, reason=reason))
     state.turn_open = False
     state.message_accepted = False
 

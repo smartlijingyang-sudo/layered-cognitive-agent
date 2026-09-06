@@ -1,12 +1,12 @@
-"""Fact plane package (ADR-0195).
+"""Run-bound Session bind public API (ADR-0195 P1-05).
 
-Public production APIs for Session append, event catalog, and run bind.
+Occupies publish/observe ContextVar slots at run boundaries. Implementation
+remains in ``lca.plugins.session.runtime.bind`` until Wave P4 lift.
 """
 
 from __future__ import annotations
 
-from lca.session.append import Session
-from lca.session.bind import (
+from lca.plugins.session.runtime.bind import (
     BoundRunEventSession,
     EventSessionBinder,
     RunEventSessionBridge,
@@ -15,22 +15,13 @@ from lca.session.bind import (
     event_session_binder_from_scope,
     unbind_run_event_session,
 )
-from lca.session.catalog import (
-    UnknownSessionEventTypeError,
-    known_session_event_types,
-    validate_event_type_for_read,
-)
 
 __all__ = [
     "BoundRunEventSession",
     "EventSessionBinder",
     "RunEventSessionBridge",
-    "Session",
-    "UnknownSessionEventTypeError",
     "bind_run_event_session",
     "bind_run_event_session_from_store",
     "event_session_binder_from_scope",
-    "known_session_event_types",
     "unbind_run_event_session",
-    "validate_event_type_for_read",
 ]

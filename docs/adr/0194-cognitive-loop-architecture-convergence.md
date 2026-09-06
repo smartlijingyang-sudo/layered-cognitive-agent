@@ -2,7 +2,7 @@
 
 ## 状态
 
-**Proposed**（2026-09-06）
+**Accepted**（2026-09-06）
 
 **延伸**：ADR-0075（声明式阶段图 / MTK）、ADR-0190（极端插件化组织）、ADR-0191（四态分离 / DSH 收敛）、ADR-0192（Fact Plane）、ADR-0183/0186（Session SSOT）、认知原语宪法 v3（六步闭集 + Gate 概念群）。
 
@@ -303,7 +303,7 @@ class FactGateway(Protocol):
 | 大规模 import 搬迁破坏 profile | COMPAT shim 保留 1 release；bundle `$module` 渐进改 |
 | FactGateway 单点性能 | append 仍 async write-behind（0191 Wave A3 已有） |
 | 第三方依赖 reflector plugin id | yaml producer 白名单兼容旧 category |
-| 回滚 | Wave A 仅 additive；Wave B 前 feature flag `LCA_FACT_GATEWAY=0` 回退旧 emit（delete-when Wave B 完成） |
+| 回滚 | Wave A 仅 additive；Wave B 前 env `LCA_FACT_GATEWAY`：未设/`1`/`true` → `DefaultFactGateway`；`0`/`false`/`no`/`off` → catalog 走 `harness.session.emit`、spine 走 `publish_via_session`（delete-when P5-01 / Wave B 完成） |
 
 ---
 

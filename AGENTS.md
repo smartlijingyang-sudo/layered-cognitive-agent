@@ -13,6 +13,7 @@ LCA 是基于 vendored Cordis 的 Python 插件化认知 Agent 框架。
 | 结构化认知模型 | [docs/specs/lca-structured-cognition-guide.md](docs/specs/lca-structured-cognition-guide.md) |
 | Agent Notes 决策 | [docs/notes/README.md](docs/notes/README.md) |
 | ADR 索引 | [docs/adr/README.md](docs/adr/README.md) |
+| SSOT 矩阵 | [ADR-0195 §4](docs/adr/0195-platform-architecture-convergence.md) · [platform-directory-architecture.md](docs/specs/platform-directory-architecture.md) |
 | 调试 runbook | [docs/debug/README.md](docs/debug/README.md) |
 
 **迁移态 disclaimer:** Journal / EventSpine / Session 的 SSOT 关系正在迁移中(ADR-0186 Proposed)。in-process 真值走 `Session.append`;durable SSOT 为 `<run_id>.spine.jsonl`;fold 纯函数派生 projection。兼容入口和删除条件跟踪于 ADR-0186 §5。
@@ -87,7 +88,7 @@ contracts → infrastructure → cognition → runtime → agent
 | C11 | 事件闭集 | `EXECUTION_POINTS` 是白名单;新事件必须同时加入白名单 + 注册 SpineHandler + 有测试 + ADR;双事件系统迁移中新事件只走 `Session.append` |
 | C12 | Reducer 合约 | `apply_*` 必须 `@_instrument_apply` 装饰;`apply_stop` 先于 `apply_terminal_outcome`;新方法同步更新 `AgentStateProjection` fold |
 
-**闭集:** `perceive → think → gate → act → reflect → remember → stop`。插件可替换实现,不能无 ADR 增加步骤或核心事件词表。
+**闭集(六语义 phase):** `perceive → think → act → reflect → remember → stop`;Gate 是 Think 原语子链(`DecisionGate`,非 graph node)。插件可替换实现,不能无 ADR 增加步骤或核心事件词表。
 
 **扩展路径:** `Protocol → Seam → Provider / Adapter → Registry → Plugin → Profile / Bundle`。密钥只能经 Profile `{from_env: ...}` 进入;插件不得自行读取 `os.environ`。
 

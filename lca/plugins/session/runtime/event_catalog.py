@@ -1,3 +1,7 @@
+# COMPAT(owner: ADR-0195, from: lca.plugins.session.runtime.event_catalog,
+# to: lca.session.catalog, delete_when: rg "from lca\\.plugins\\.session\\.runtime\\.event_catalog"
+#   生产引用归零(plugins/ 内 boot 装配除外),
+# forbidden_new_usage: 新代码优先 from lca.session.catalog import *)
 """Session 事件词表与读路径 fail-closed 校验（DSH known-event-types 对位）。
 
 本构建的「已知 type」= ``@session_event`` 注册表 + spine surface 闭集。
@@ -23,8 +27,7 @@ class UnknownSessionEventTypeError(ValueError):
 
     def __init__(self, event_type: str) -> None:
         super().__init__(
-            f"unknown session event type={event_type!r} and not ignorable; "
-            "refusing to open log"
+            f"unknown session event type={event_type!r} and not ignorable; refusing to open log"
         )
         self.event_type = event_type
 

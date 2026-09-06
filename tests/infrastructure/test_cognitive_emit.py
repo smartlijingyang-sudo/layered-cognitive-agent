@@ -1,6 +1,8 @@
-"""Session cognitive emit tests (gate.decided.v1 / context.manifested.v1)."""
+"""Session cognitive emit tests (gate.decided.v1 / context.manifested.v1 / brain.think)."""
 
 from __future__ import annotations
+
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -10,13 +12,18 @@ from lca.contracts.harness.fold.perceive import (
     fold_gate_decisions_from_events,
 )
 from lca.contracts.models.core.budget import create_budget
+from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.perception import ContextItem, ContextManifest
 from lca.contracts.models.core.state import AgentState
 from lca.infrastructure.session.cognitive_emit import (
+    emit_brain_think_end_for_state,
+    emit_brain_think_start_for_state,
     emit_context_manifested_for_state,
     emit_gate_decided_from_policy,
+    run_brain_think_with_spine_facts,
 )
+from lca.loop.fact_gateway import publish_ep_bound, reset_fact_gateway_env
 from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
     set_publish_session,
@@ -168,4 +175,101 @@ def test_emit_context_manifested_for_state_serializes_items() -> None:
         assert folded.items[0].kind == "policy_fact"
         assert folded.items[0].provenance == "repeat_tool_call"
     finally:
+        reset_publish_session(token)
+
+
+def test_emit_brain_think_start_routes_via_publish_ep_bound() -> None:
+    session = Session("brain_think_start")
+    token = set_publish_session(session)
+    reset_fact_gateway_env(enabled=True)
+    try:
+        state = _state()
+        with patch(
+            "lca.infrastructure.session.cognitive_emit.publish_ep_bound",
+            wraps=publish_ep_bound,
+        ) as publish:
+            emit_brain_think_start_for_state(state)
+        publish.assert_called_once()
+        args, kwargs = publish.call_args
+        assert args[0] == "brain.think.start"
+        assert args[1]["state_id"] == state.trace_id
+        assert kwargs["state"] is state
+        assert kwargs["actor"] == "brain"
+    finally:
+        reset_fact_gateway_env()
+        reset_publish_session(token)
+
+
+def test_emit_brain_think_end_appends_spine_fact() -> None:
+    session = Session("brain_think_end")
+    token = set_publish_session(session)
+    reset_fact_gateway_env(enabled=True)
+    try:
+        state = _state()
+        emit_brain_think_start_for_state(state)
+        emit_brain_think_end_for_state(state, outcome="failure")
+        events = [
+            event
+            for event in session.snapshot_events()
+            if event.type.startswith("spine.cognition.brain.think.")
+        ]
+        assert len(events) == 2
+        assert events[0].type == "spine.cognition.brain.think.start"
+        assert events[1].type == "spine.cognition.brain.think.end"
+        assert events[1].data["payload"]["outcome"] == "failure"
+    finally:
+        reset_fact_gateway_env()
+        reset_publish_session(token)
+
+
+@pytest.mark.asyncio
+async def test_run_brain_think_with_spine_facts_envelopes_decision() -> None:
+    session = Session("brain_think_envelope")
+    token = set_publish_session(session)
+    reset_fact_gateway_env(enabled=True)
+    try:
+        state = _state()
+        decision = Decision(
+            decision_id="d-brain-think",
+            action_type="respond",
+            rationale="ok",
+            confidence=1.0,
+        )
+        brain = AsyncMock()
+        brain.think = AsyncMock(return_value=decision)
+        result = await run_brain_think_with_spine_facts(brain, state)
+        assert result is decision
+        brain.think.assert_awaited_once_with(state)
+        events = [
+            event
+            for event in session.snapshot_events()
+            if event.type.startswith("spine.cognition.brain.think.")
+        ]
+        assert len(events) == 2
+        assert events[1].data["payload"]["outcome"] == "success"
+    finally:
+        reset_fact_gateway_env()
+        reset_publish_session(token)
+
+
+@pytest.mark.asyncio
+async def test_run_brain_think_with_spine_facts_emits_failure_on_error() -> None:
+    session = Session("brain_think_failure")
+    token = set_publish_session(session)
+    reset_fact_gateway_env(enabled=True)
+    try:
+        state = _state()
+        brain = AsyncMock()
+        brain.think = AsyncMock(side_effect=RuntimeError("boom"))
+        with pytest.raises(RuntimeError, match="boom"):
+            await run_brain_think_with_spine_facts(brain, state)
+        events = [
+            event
+            for event in session.snapshot_events()
+            if event.type == "spine.cognition.brain.think.end"
+        ]
+        assert len(events) == 1
+        assert events[0].data["payload"]["outcome"] == "failure"
+    finally:
+        reset_fact_gateway_env()
         reset_publish_session(token)

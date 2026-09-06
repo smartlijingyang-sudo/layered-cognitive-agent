@@ -33,6 +33,23 @@ from lca.plugins.session.runtime.recovery import recover_live_agent
 from lca.plugins.session.runtime.session import Session
 
 
+def test_lifecycle_emit_noop_when_session_unbound() -> None:
+    reset_lifecycle()
+    begin_turn()
+    accept_user_message(message_id="m0", content="ignored")
+    request_model(step=1, provider="test", model="m")
+    complete_model(step=1, content="ignored")
+    end_step(step=1)
+    end_turn()
+    assert create_session("profiles/test.yaml") is None
+    assert checkpoint("completed") is None
+    assert persist_approval("ap-0", {"approval_id": "ap-0"}) is None
+
+    append = session_append_for_thinking()
+    append(ThinkingDelta(turn=1, step=1, text_delta="x", seq=0))
+    append(ThinkingCompleted(turn=1, step=1, duration_ms=1, content_preview="x"))
+
+
 def test_lifecycle_emit_full_turn_sequence() -> None:
     session = Session("lifecycle_1")
     token = set_publish_session(session)

@@ -1,3 +1,7 @@
+# COMPAT(owner: ADR-0195, from: lca.plugins.session.runtime.bind,
+# to: lca.session.bind, delete_when: rg "from lca\\.plugins\\.session\\.runtime\\.bind"
+#   生产引用归零(plugins/ 内 boot 装配除外),
+# forbidden_new_usage: 新代码优先 from lca.session.bind import *)
 """Bind a per-run Session onto publisher/observer ContextVar slots.
 
 ADR-0186：Session 是事件 SSOT。本模块是 **run 边界** 装/卸槽的唯一实现

@@ -190,7 +190,7 @@ def test_runtime_journal_committer_exposes_monotonic_turn_sequence() -> None:
     journal = RuntimeJournalCommitter()
 
     with patch(
-        "lca.infrastructure.session.fact_committer.publish_structural_event",
+        "lca.infrastructure.session.fact_committer.publish_ep_bound",
         return_value=None,
     ):
         first = journal.commit_evidence("evidence-1", plan_ref="plan", node_ref="think")

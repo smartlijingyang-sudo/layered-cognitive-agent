@@ -22,10 +22,9 @@ from lca.cognition.brain.tool_call_stream import (
 from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.observability.journal import ToolCallResolved
+from lca.contracts.models.observability.tool_journal_receipt import tool_call_resolved_receipt
 from lca.contracts.models.team.partial_buffer import append_run_partial
 from lca.contracts.protocols import LLMAdapter, Tool
-from lca.infrastructure.observability.journal_append import append_journal_event
 from lca.infrastructure.session.bindings import (
     assemble_model_history,
     await_model_request_checkpoint,
@@ -53,7 +52,7 @@ async def execute_llm_turn(
     await await_model_request_checkpoint()
     if mode == LlmTurnMode.SUMMARIZE:
         return await _summarize_after_search(llm, tools, prompt, step=step, llm_kwargs=llm_kwargs)
-    return await _stream_turn(llm, tools, prompt, step=step, llm_kwargs=llm_kwargs)
+    return await _stream_turn(llm, tools, prompt, step=step, llm_kwargs=llm_kwargs, state=state)
 
 
 async def _summarize_after_search(
@@ -98,6 +97,7 @@ async def _stream_turn(
     *,
     step: int,
     llm_kwargs: dict[str, object],
+    state: AgentState | None = None,
 ) -> LLMResponse:
     accumulated = ""
     stream_response: LLMResponse | None = None
@@ -121,16 +121,18 @@ async def _stream_turn(
             stream_response = event.response
             break
 
-    # args 收齐才 emit 一次 ToolCallResolved;旧"每 delta 一次 ToolCallStreaming"
+    # args 收齐才 commit 一次 tool.call.resolved.v1;旧"每 delta 一次 ToolCallStreaming"
     # 是 UI 信号误入事实账本,本批废 (前置步骤 ToolCallStreaming 已被删除)。
-    for slot in pop_completed_slots(tool_slots):
-        append_journal_event(
-            ToolCallResolved(
+    if tool_slots:
+        from lca.loop.tool_journal_commit import commit_tool_journal_receipt
+
+        for slot in pop_completed_slots(tool_slots):
+            receipt = tool_call_resolved_receipt(
                 tool_name=str(slot["tool_name"]),
                 tool_call_id=str(slot["tool_call_id"]),
                 arguments=parse_completed_slot_args(str(slot["raw"])),
             )
-        )
+            commit_tool_journal_receipt(receipt, state=state)
 
     if stream_response is not None:
         return _merge_stream_response(stream_response, accumulated)

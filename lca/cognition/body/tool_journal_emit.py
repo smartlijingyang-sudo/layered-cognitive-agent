@@ -25,10 +25,11 @@ from lca.cognition.body.cursor_record import CursorRecord
 from lca.cognition.body.tool_result_preview import tool_files
 from lca.contracts.models.core.decision import Observation, ToolCall  # noqa: F401
 from lca.contracts.models.observability.diagnostic import DiagnosticCategory
-from lca.contracts.models.observability.journal import (
-    ToolDenied,
-    ToolInvoked,
-    ToolStarted,
+from lca.contracts.models.observability.tool_journal_receipt import (
+    ToolJournalReceipt,
+    tool_denied_receipt,
+    tool_invoked_receipt,
+    tool_started_receipt,
 )
 from lca.contracts.observability.evidence import (
     EvidencePolicy,
@@ -36,7 +37,6 @@ from lca.contracts.observability.evidence import (
     EvidenceStore,
 )
 from lca.contracts.protocols.runtime.infra import Tool
-from lca.infrastructure.observability.journal_append import append_journal_event
 from lca.infrastructure.session.fact_committer import emit_diagnostic
 from lca.infrastructure.tools.contract.project import project_tool_state
 
@@ -185,6 +185,33 @@ def prepare_state_evidence(
     return receipt.ref
 
 
+def prepare_tool_started(
+    tool: Tool,
+    args: dict[str, Any],
+    invocation_id: str,
+    *,
+    evidence_store: EvidenceStore | None = None,
+    evidence_policy: EvidencePolicy | None = None,
+    idempotency_key: str = "",
+) -> tuple[ToolJournalReceipt, EvidenceRef | None]:
+    """Prepare ``ToolStarted`` catalog fact; commit via loop ``FactGateway``."""
+    args_dict = dict(args)
+    arguments_ref = prepare_state_evidence(
+        args_dict,
+        evidence_store=evidence_store,
+        evidence_policy=evidence_policy,
+    )
+    inline_args: dict[str, Any] = {} if arguments_ref is not None else args_dict
+    receipt = tool_started_receipt(
+        tool_name=tool.name,
+        invocation_id=invocation_id,
+        arguments=inline_args,
+        arguments_ref=arguments_ref,
+        idempotency_key=idempotency_key,
+    )
+    return receipt, arguments_ref
+
+
 def emit_tool_started(
     tool: Tool,
     args: dict[str, Any],
@@ -207,14 +234,16 @@ def emit_tool_started(
     二选一(非空互斥, V2 / V4);evidence_store 不可用时强制 inline。
     返回 ref 供后续 ``emit_tool_invoked`` 携带同一 ref 关联。
     """
-    args_dict = dict(args)
-    arguments_ref = prepare_state_evidence(
-        args_dict,
+    receipt, arguments_ref = prepare_tool_started(
+        tool,
+        args,
+        invocation_id,
         evidence_store=evidence_store,
         evidence_policy=evidence_policy,
+        idempotency_key=idempotency_key,
     )
-    # V4:至少一个非空;evidence 不可用 → inline 退路
-    inline_args: dict[str, Any] = {} if arguments_ref is not None else args_dict
+    args_dict = dict(args)
+    inline_args = dict(receipt.catalog_event.arguments)
     emit_diagnostic(
         category=DiagnosticCategory.TOOL.value,
         operation="tool.start",
@@ -224,15 +253,9 @@ def emit_tool_started(
             "invocation_id": invocation_id,
         },
     )
-    append_journal_event(
-        ToolStarted(
-            tool_name=tool.name,
-            invocation_id=invocation_id,
-            arguments=inline_args,
-            arguments_ref=arguments_ref,
-            idempotency_key=idempotency_key,
-        )
-    )
+    from lca.loop.tool_journal_commit import commit_tool_journal_receipt
+
+    commit_tool_journal_receipt(receipt)
     # ADR-0169 PR-1/S1: route through LoopCursor.record_tool_call — cursor
     # is the SSOT for step/tool evidence (ADR-0169 D1); legacy
     # ``phase.tool.call.start`` EP is dropped here, the canonical ToolStarted
@@ -271,25 +294,85 @@ def _summarize_args(args: dict[str, Any], limit: int = 200) -> str:
     return head
 
 
+def prepare_tool_denied(tool: Tool, reason: str) -> ToolJournalReceipt:
+    """Prepare ``ToolDenied`` catalog fact; commit via loop ``FactGateway``."""
+    return tool_denied_receipt(tool_name=tool.name, reason=reason)
+
+
 def emit_tool_denied(tool: Tool, reason: str) -> None:
     """Emit ``ToolDenied`` from the canonical safe_executor module."""
+    receipt = prepare_tool_denied(tool, reason)
     emit_diagnostic(
         category=DiagnosticCategory.TOOL.value,
         operation="tool.denied",
         plugin=type(tool).__name__,
         attributes={"tool_name": tool.name, "reason": reason},
     )
-    append_journal_event(ToolDenied(tool_name=tool.name, reason=reason))
+    from lca.loop.tool_journal_commit import commit_tool_journal_receipt
+
+    commit_tool_journal_receipt(receipt)
     _emit_phase_tool_denied(tool_name=tool.name, reason=reason)
     # ADR-0169 PR-1/S1: route through LoopCursor.record_tool_result with
-    # outcome="denied". Canonical ToolDenied JournalEvent above remains
-    # (ADR-0063 SSOT).
+    # outcome="denied". Canonical ToolDenied catalog fact above remains
+    # (ADR-0063 SSOT via FactGateway when Session bound).
     #
     # R2: best-effort write goes through :class:`CursorRecord` SSOT helper.
     CursorRecord.try_record_tool_result(
         tool_name=tool.name,
         result_digest=reason,
         outcome="denied",
+    )
+
+
+def prepare_tool_invoked(
+    tool: Tool,
+    args: dict[str, Any],
+    obs: Observation,
+    *,
+    latency_ms: int,
+    attempt: int,
+    invocation_id: str,
+    arguments_ref: EvidenceRef | None = None,
+    evidence_store: EvidenceStore | None = None,
+    evidence_policy: EvidencePolicy | None = None,
+) -> ToolJournalReceipt:
+    """Prepare ``ToolInvoked`` catalog fact; commit via loop ``FactGateway``."""
+    resolved_id = str((obs.extra or {}).get("invocation_id", "") or "") or invocation_id
+    output_dict: dict[str, Any] = dict(obs.payload) if isinstance(obs.payload, dict) else {}
+    output_ref = prepare_state_evidence(
+        output_dict,
+        evidence_store=evidence_store,
+        evidence_policy=evidence_policy,
+    )
+    if not obs.success:
+        output_ref = None
+    args_dict = dict(args)
+    inline_args: dict[str, Any] = {} if arguments_ref is not None or not obs.success else args_dict
+    inline_output_text: str | None = None
+    if output_ref is None and obs.success:
+        for key in ("output", "stdout", "content"):
+            value = output_dict.get(key)
+            if isinstance(value, str):
+                inline_output_text = value
+                break
+    projected_state_dict: dict[str, Any] = {}
+    try:
+        projected_state_dict = project_tool_state(tool.name, args_dict, obs)
+    except Exception:
+        _log.debug("project_tool_state failed for %s", tool.name, exc_info=True)
+    return tool_invoked_receipt(
+        tool_name=tool.name,
+        invocation_id=resolved_id,
+        ok=obs.success,
+        latency_ms=latency_ms,
+        attempt=attempt,
+        error="" if obs.success else (obs.error or ""),
+        files=tool_files(obs),
+        arguments=inline_args,
+        arguments_ref=arguments_ref,
+        output_ref=output_ref,
+        output_text=inline_output_text,
+        projected_state=projected_state_dict,
     )
 
 
@@ -312,34 +395,20 @@ def emit_tool_invoked(
     返回并显式传入(便于 join ToolStarted↔ToolInvoked);失败时
     ``output_ref=None``,错误字符串承载在 ``error`` 字段。
     """
-    resolved_id = str((obs.extra or {}).get("invocation_id", "") or "") or invocation_id
-    output_dict: dict[str, Any] = dict(obs.payload) if isinstance(obs.payload, dict) else {}
-    output_ref = prepare_state_evidence(
-        output_dict,
+    receipt = prepare_tool_invoked(
+        tool,
+        args,
+        obs,
+        latency_ms=latency_ms,
+        attempt=attempt,
+        invocation_id=invocation_id,
+        arguments_ref=arguments_ref,
         evidence_store=evidence_store,
         evidence_policy=evidence_policy,
     )
-    if not obs.success:
-        output_ref = None
-    # V4:inline arguments 非空退路(若 arguments_ref 已空);output_ref 已 ok 才非空
-    args_dict = dict(args)
-    inline_args: dict[str, Any] = {} if arguments_ref is not None or not obs.success else args_dict
-    # Inline text result: take the common stdout keys from obs.payload when
-    # the evidence store didn't materialize a ref. Empty string if absent
-    # (frontend distinguishes empty-result from error via the `ok` flag).
-    inline_output_text: str | None = None
-    if output_ref is None and obs.success:
-        for key in ("output", "stdout", "content"):
-            value = output_dict.get(key)
-            if isinstance(value, str):
-                inline_output_text = value
-                break
-    # Renderer-facing state projection (SSE-only; stripped before jsonl).
-    projected_state_dict: dict[str, Any] = {}
-    try:
-        projected_state_dict = project_tool_state(tool.name, args_dict, obs)
-    except Exception:
-        _log.debug("project_tool_state failed for %s", tool.name, exc_info=True)
+    committed = receipt.catalog_event
+    resolved_id = committed.invocation_id
+    inline_output_text = committed.output_text
     emit_diagnostic(
         category=DiagnosticCategory.TOOL.value,
         operation="tool.complete",
@@ -355,34 +424,23 @@ def emit_tool_invoked(
             "error": "" if obs.success else (obs.error or ""),
         },
     )
-    append_journal_event(
-        ToolInvoked(
-            tool_name=tool.name,
-            invocation_id=resolved_id,
-            ok=obs.success,
-            latency_ms=latency_ms,
-            attempt=attempt,
-            error="" if obs.success else (obs.error or ""),
-            idempotency_key="",
-            files=tool_files(obs),
-            arguments=inline_args,
-            arguments_ref=arguments_ref,
-            output_ref=output_ref,
-            output_text=inline_output_text,
-            output_truncated=False,
-            projected_state=projected_state_dict,
-        )
-    )
+    from lca.loop.tool_journal_commit import commit_tool_journal_receipt
+
+    commit_tool_journal_receipt(receipt)
     # ADR-0169 PR-1/S1: route through LoopCursor.record_tool_result — cursor
     # is the SSOT for step/tool evidence (ADR-0169 D1); legacy
     # ``phase.tool.call.end`` EP is dropped here, the canonical ToolInvoked
-    # JournalEvent above remains (ADR-0063 SSOT).
+    # catalog fact above remains (ADR-0063 SSOT via FactGateway when Session bound).
     #
     # R2: best-effort write goes through :class:`CursorRecord` SSOT helper.
     # 2026-09-03 观测面 SSOT 收口:把 stdout / files / latency / error /
     # delta_summary 全部透传给 cursor,deriver 在没做 sidecar round-trip
     # 时也能拿到完整 result 字段。
-    delta = _delta_summary_from_obs(obs, inline_output_text, output_ref)
+    delta = _delta_summary_from_obs(
+        obs,
+        inline_output_text,
+        committed.output_ref,
+    )
     CursorRecord.try_record_tool_result(
         tool_name=tool.name,
         result_digest=delta,
@@ -392,7 +450,7 @@ def emit_tool_invoked(
         latency_ms=latency_ms,
         stdout_head=(inline_output_text or "")[:2000],
         stderr="" if obs.success else (obs.error or ""),
-        files_created=tuple(str(f.get("name") or "") for f in tool_files(obs)),
+        files_created=tuple(str(f.get("name") or "") for f in committed.files),
         error=obs.error or None,
         delta_summary=delta,
     )
@@ -425,5 +483,10 @@ def _delta_summary_from_obs(
         head = inline_output_text[:80].replace("\n", "⏎")
         return f"✅ stdout[:80] = {head}"
     if output_ref is not None:
-        return f"✅ 已落 evidence (ref={getattr(output_ref, 'algorithm', '?')})"
+        algo = (
+            output_ref.get("algorithm", "?")
+            if isinstance(output_ref, dict)
+            else getattr(output_ref, "algorithm", "?")
+        )
+        return f"✅ 已落 evidence (ref={algo})"
     return "✅ ok"
