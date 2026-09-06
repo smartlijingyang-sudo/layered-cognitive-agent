@@ -2,7 +2,7 @@
 
 ``OfficeWorksSealer`` moved to ``SimpleBody.finalize`` (v3 section 9.2).
 Gate chains assemble via ``GateService`` + ``gates.chain.sequential`` bundle.
-Tests may use :func:`build_default_workspace_gate_chain` for the standard 5-gate chain.
+Tests may use :func:`build_default_workspace_gate_chain` for the standard 6-gate chain.
 """
 
 from lca.cognition.brain.decision_gates.artifact.respond_injector import (
@@ -18,21 +18,25 @@ from lca.cognition.brain.decision_gates.must.consult_all import (
 from lca.cognition.brain.decision_gates.office.works_sealer import (
     OfficeWorksSealer,  # deprecated: kept for backwards compat imports
 )
+from lca.cognition.brain.decision_gates.delivery.satisfied import DeliverySatisfiedGate
 from lca.cognition.brain.decision_gates.progress.loop_detector import (
     ProgressLoopDetector,
 )
 from lca.cognition.brain.decision_gates.repeat.tool_call import RepeatToolCallGate
 from lca.cognition.brain.decision_gates.terminal.respond import TerminalRespondGate
 from lca.cognition.brain.decision_gates.tool.loop_breaker import ToolLoopBreakerGate
+from lca.cognition.convergence.runtime import ConvergenceRuntime
 from lca.contracts.protocols.think.cognition import DecisionGate
 
 
 def build_default_workspace_gate_chain() -> DecisionGate:
-    """Standard 5-gate workspace chain (GateService / gates.chain.sequential SSOT)."""
+    """Standard 6-gate workspace chain (GateService / gates.chain.sequential SSOT)."""
+    runtime = ConvergenceRuntime.default()
     return ChainedDecisionGate(
         RepeatToolCallGate(),
         ToolLoopBreakerGate(),
         ProgressLoopDetector(),
+        DeliverySatisfiedGate(runtime),
         TerminalRespondGate(),
         ArtifactRespondInjector(),
     )
@@ -50,6 +54,7 @@ __all__ = [
     "ArtifactRespondInjector",
     "ChainedDecisionGate",
     "DecisionGate",
+    "DeliverySatisfiedGate",
     "MustConsultAllMembers",
     "OfficeWorksSealer",  # deprecated: see module docstring
     "ProgressLoopDetector",

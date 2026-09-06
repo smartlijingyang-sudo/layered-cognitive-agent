@@ -34,7 +34,10 @@ from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.execution.decision import Decision
 from lca.contracts.models.core.policy.gate_policy import GateDecided, PolicyFact
-from lca.contracts.models.core.policy.loop_policy import DEFAULT_LOOP_POLICY
+from lca.contracts.models.core.policy.loop_policy import (
+    DEFAULT_LOOP_POLICY,
+    LoopPolicyThresholds,
+)
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import DecisionGate
 from lca.infrastructure.session.context.turn_control_reader import (
@@ -47,11 +50,18 @@ class ProgressLoopDetector(DecisionGate):
     """Detect cross-tool loops with zero progress.
 
     Operates in two phases:
-    1. Warning (at _PROGRESS_WARNING_THRESHOLD steps): emit a PolicyFact
+    1. Warning (at progress_warn steps): emit a PolicyFact
        that the next ContextManifest will fold into the LLM prompt.
-    2. Break (at _PROGRESS_BREAK_THRESHOLD steps): force RESPOND with
+    2. Break (at progress_break steps): force RESPOND with
        diagnostic message including recent tool history.
     """
+
+    def __init__(
+        self,
+        *,
+        thresholds: LoopPolicyThresholds = DEFAULT_LOOP_POLICY,
+    ) -> None:
+        self._thresholds = thresholds
 
     async def enforce(self, state: AgentState, decision: Decision) -> Decision:
         if decision.action_type != ActionType.USE_TOOL or not decision.tool_calls:
@@ -61,13 +71,13 @@ class ProgressLoopDetector(DecisionGate):
             self._count_consecutive_no_progress(state),
             self._count_producer_stall_after_delivery(state),
         )
-        if count < DEFAULT_LOOP_POLICY.progress_warn:
+        if count < self._thresholds.progress_warn:
             return decision
 
         tools = self._recent_tool_history(state, n=count)
         tool_summary = ", ".join(tools)
 
-        if count < DEFAULT_LOOP_POLICY.progress_break:
+        if count < self._thresholds.progress_break:
             # Phase 1: emit PolicyFact for next think phase.
             message = (
                 f"⚠️ 你已连续 {count} 步没有产生有效输出。"

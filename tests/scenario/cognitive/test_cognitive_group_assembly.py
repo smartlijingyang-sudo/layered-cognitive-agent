@@ -139,9 +139,9 @@ class TestCognitiveGroupPluginWiring:
     def test_group_services_do_not_name_standard_implementations(self) -> None:
         from pathlib import Path
 
-        root = Path(__file__).resolve().parent.parent
-        perceive_source = (root / "lca/cognition/perceive_service.py").read_text(encoding="utf-8")
-        gate_source = (root / "lca/cognition/gate_service.py").read_text(encoding="utf-8")
+        root = Path(__file__).resolve().parents[3]
+        perceive_source = (root / "lca/cognition/perceive/service.py").read_text(encoding="utf-8")
+        gate_source = (root / "lca/cognition/brain/gate/service.py").read_text(encoding="utf-8")
 
         assert "SequentialPerceiveHub" not in perceive_source
         assert "ChainedDecisionGate" not in gate_source
@@ -150,8 +150,21 @@ class TestCognitiveGroupPluginWiring:
     def test_standard_bundles_declare_group_assembly_plugins(self) -> None:
         from pathlib import Path
 
-        root = Path(__file__).resolve().parent.parent
+        root = Path(__file__).resolve().parents[3]
         for name in ("web-app.yaml", "scenario-standard.yaml"):
             content = (root / "bundles" / name).read_text(encoding="utf-8")
             assert "lca.plugins.perceive.sequential.hub" in content
             assert "lca.plugins.cognitive.gate.chained.plugin" in content
+            assert "loop.policy.default" in content
+
+    def test_web_app_bundle_declares_guard_stack(self) -> None:
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[3]
+        content = (root / "bundles" / "web-app.yaml").read_text(encoding="utf-8")
+        for plugin_id in (
+            "tool.guards.service",
+            "guard.tool-timeout",
+            "guard.tool-result-spill",
+        ):
+            assert plugin_id in content

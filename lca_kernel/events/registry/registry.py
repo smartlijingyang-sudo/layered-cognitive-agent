@@ -301,6 +301,9 @@ class EventRegistry:
             data: Any = yaml.safe_load(fh)
         if not isinstance(data, dict) or "events" not in data:
             return [], []
+        schema = data.get("schema")
+        if isinstance(schema, str) and schema.startswith("lca.observability."):
+            return [], []
         ctx = f"yaml={yaml_file.name}"
 
         def parse_rule_entry(entry: Any, *, rule_ctx: str) -> _ConsumerRuleTokens:

@@ -1,12 +1,14 @@
-"""RepeatToolCallGate contribution — posts onto GateService (ADR-0074 PR-2)."""
+"""Tool guard service plugin — act-plane guard registry (ADR-0197)."""
 
 from __future__ import annotations
 
 from pydantic import BaseModel
 
+from lca.cognition.body.guard.service import ToolGuardService
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.capabilities import TOOL_GUARDS
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     AuthorityContract,
@@ -15,7 +17,6 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols import DecisionGate
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
@@ -27,23 +28,24 @@ class Config(BaseModel):
 
 
 @plugin(
-    id="gate.repeat-tool-call",
-    requires=["gates", "loop_guard_policy"],
-    implements=[DecisionGate],
+    id="tool.guards.service",
+    provides=[TOOL_GUARDS.key],
+    requires=[],
     layer="L1",
     effects="none",
-    description="Block runaway repeat-tool-call loops.",
-    test_suite="tests/test_plugin_alignment.py",
+    description="Registry for act-plane tool guard contributions (timeout, spill, …).",
+    test_suite="tests/cognition/test_tool_guard_plugins.py",
     kind=PluginKind.PRIMITIVE,
-    functional_group=FunctionalGroup.G6_DECISION,
+    functional_group=FunctionalGroup.G7_EXECUTION,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(
-            group=FunctionalGroup.G6_DECISION, control_slots=(ControlSlot.THINK_GUARD,)
+            group=FunctionalGroup.G7_EXECUTION,
+            control_slots=(ControlSlot.ACT_SAFE_BOUNDARY,),
         ),
-        lifecycle=LifecycleContract(allowed_scopes=(Scope.TURN,)),
-        authority=AuthorityContract(grants=("gates.read",)),
-        observability=EvidenceContract(descriptors=("policy.gate.repeat-tool-call.denied",)),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.AGENT, Scope.RUN)),
+        authority=AuthorityContract(grants=("tool_guards.register",)),
+        observability=EvidenceContract(descriptors=("tool.guards.service.provided",)),
     ),
     ownership=OwnershipDeclaration(
         reads=("plugin.serve",),
@@ -52,13 +54,5 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.cognition.brain.decision_gates.repeat.tool_call import RepeatToolCallGate
-    from lca.plugins.cognitive.gate._loop_policy import resolve_loop_policy
-
-    policy = resolve_loop_policy(ctx)
-    ctx.require("gates").add(
-        lambda: RepeatToolCallGate(policy=policy),
-        id="repeat-tool-call",
-        slot="loop",
-        order=10,
-    )
+    del config
+    ctx.provide(TOOL_GUARDS.key, ToolGuardService())

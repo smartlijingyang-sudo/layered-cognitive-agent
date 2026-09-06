@@ -117,6 +117,7 @@ _CLOSED_SET: frozenset[str] = frozenset(
         "sensor.workspace-instructions",
         "sensor.skill-catalog",
         # Gates (named factories)
+        "loop.policy.default",
         "gate.repeat-tool-call",
         "gate.tool-loop-breaker",
         "gate.progress-loop-detector",
@@ -127,6 +128,9 @@ _CLOSED_SET: frozenset[str] = frozenset(
         "gate.must-consult-all",
         # Act / runtime
         "body.simple",
+        "tool.guards.service",
+        "guard.tool-timeout",
+        "guard.tool-result-spill",
         "safe_executor.simple",
         "state.stop-policy.default",
         "middleware_registry.memory",

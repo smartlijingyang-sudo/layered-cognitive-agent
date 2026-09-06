@@ -344,6 +344,10 @@ BRAIN_PROMPT_CATALOG_FACTORY = Capability[object](
 
 CONVERGENCE_POLICY = Capability[object]("convergence_policy", cardinality="one")
 """Profile-selected convergence policy for delivery gates and stop grace (ADR-0196)."""
+LOOP_GUARD_POLICY = Capability[object]("loop_guard_policy", cardinality="one")
+"""Profile-selected loop hygiene thresholds for think-plane DecisionGates (ADR-0197)."""
+TOOL_GUARDS = Capability[object]("tool_guards", cardinality="one")
+"""Act-plane tool guard contribution registry (ADR-0197)."""
 CRITIC_SIMPLE = Capability[object]("critic.simple", cardinality="factory")
 JOURNAL_STORE = Capability[object]("journal_store", cardinality="factory")
 TOOLS_COMPOSE_SERVICE = Capability[object]("tools.compose_service", cardinality="factory")

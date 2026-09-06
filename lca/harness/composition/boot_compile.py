@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from lca.harness.composition.observability_compile import compile_observability_boot_plan
 from lca.harness.composition.plan_compiler import CompileOptions, compile_plan
 from lca.harness.profile.boot.products import ProfileBootProducts
 from lca.harness.profile.resolve.resolve import ResolvedProfile
@@ -11,6 +10,8 @@ from lca.harness.profile.validate.runtime_binding_validator import profile_allow
 
 def compile_profile_boot_products(resolved: ResolvedProfile) -> ProfileBootProducts:
     """Compile the immutable boot product pair from a resolved profile."""
+    from lca.harness.composition.observability_compile import compile_observability_boot_plan
+
     return ProfileBootProducts(
         resolved_profile=resolved,
         compiled_run_plan=compile_plan(

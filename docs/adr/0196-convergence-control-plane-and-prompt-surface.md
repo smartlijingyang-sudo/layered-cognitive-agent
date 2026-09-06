@@ -34,6 +34,7 @@ Gate 仍 ⊂ Think；不增第七 phase。Stop grace path 留 P3。
 - ``turn.control.v1`` 携带 ``files_created`` 供 gate fold（P2 已落地）
 - Stop grace respond 经 ``ConvergenceRuntime.evaluate_budget_and_emit`` + ``synthesize``（P3 已落地）
 - Profile 可选自定义 ``ConvergencePolicy`` 插件替换 default（注册 ``convergence_policy`` capability）
+- Guard Stack 见 [ADR-0197](0197-guard-stack-hermes-dsh-convergence.md)（loop/act guard 插件化）
 
 ## 3. 关联
 

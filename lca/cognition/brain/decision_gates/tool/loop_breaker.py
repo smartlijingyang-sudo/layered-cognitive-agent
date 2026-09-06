@@ -165,16 +165,15 @@ class ToolLoopBreakerGate(DecisionGate):
                 return error
         return ""
 
-    @staticmethod
-    def _failure_response(tool_name: str, last_error: str) -> str:
+    def _failure_response(self, tool_name: str, last_error: str) -> str:
         """Create a useful terminal response for the established failure condition."""
-
+        limit = self._thresholds.break_failures
         if last_error:
             return (
-                f"{tool_name} 连续失败 {DEFAULT_LOOP_POLICY.break_failures} 次，已停止重试。\n"
+                f"{tool_name} 连续失败 {limit} 次，已停止重试。\n"
                 f"最后错误：{last_error}"
             )
-        return f"{tool_name} 连续失败 {DEFAULT_LOOP_POLICY.break_failures} 次，已停止重试。"
+        return f"{tool_name} 连续失败 {limit} 次，已停止重试。"
 
     @staticmethod
     def _force_respond(decision: Decision, *, rationale: str, response: str) -> Decision:

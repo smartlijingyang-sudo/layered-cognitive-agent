@@ -28,7 +28,7 @@ class Config(BaseModel):
 
 @plugin(
     id="gate.tool-loop-breaker",
-    requires=["gates"],
+    requires=["gates", "loop_guard_policy"],
     implements=[DecisionGate],
     layer="L1",
     effects="none",
@@ -53,5 +53,12 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.cognition.brain.decision_gates.tool.loop_breaker import ToolLoopBreakerGate
+    from lca.plugins.cognitive.gate._loop_policy import resolve_loop_thresholds
 
-    ctx.require("gates").add(ToolLoopBreakerGate, id="tool-loop-breaker", slot="loop", order=20)
+    thresholds = resolve_loop_thresholds(ctx)
+    ctx.require("gates").add(
+        lambda: ToolLoopBreakerGate(thresholds=thresholds),
+        id="tool-loop-breaker",
+        slot="loop",
+        order=20,
+    )

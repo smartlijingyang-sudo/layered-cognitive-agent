@@ -1,13 +1,13 @@
-"""SimpleSafeExecutor plugin — named factory ``safe_executor.simple``."""
+"""Tool timeout guard plugin — DSH timeout-policy (ADR-0197)."""
 
 from __future__ import annotations
 
 from pydantic import BaseModel
 
+from lca.cognition.body.guard.timeout import ToolTimeoutGuard
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
-from lca.contracts.capabilities import SAFE_EXECUTOR_SIMPLE
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     AuthorityContract,
@@ -19,33 +19,33 @@ from lca.contracts.harness.composition.plugin_contract import (
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
-from lca.contracts.protocols.runtime.infra.infra import SafeExecutor
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
     model_config = {"extra": "forbid"}
 
+    enabled: bool = True
+
 
 @plugin(
-    id="safe_executor.simple",
-    provides=[SAFE_EXECUTOR_SIMPLE.key],
+    id="guard.tool-timeout",
     requires=["tool_guards"],
-    implements=[SafeExecutor],
     layer="L1",
-    effects="tools",
-    description="Provide the SafeExecutor factory used by the Composer.",
-    test_suite="tests/test_plugin_alignment.py",
+    effects="none",
+    description="Cooperative per-tool timeout from Tool.default_timeout_s (DSH timeout-policy).",
+    test_suite="tests/cognition/test_tool_guard_plugins.py",
     kind=PluginKind.PRIMITIVE,
     functional_group=FunctionalGroup.G7_EXECUTION,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(
-            group=FunctionalGroup.G7_EXECUTION, control_slots=(ControlSlot.ACT_SAFE_BOUNDARY,)
+            group=FunctionalGroup.G7_EXECUTION,
+            control_slots=(ControlSlot.ACT_SAFE_BOUNDARY,),
         ),
         lifecycle=LifecycleContract(allowed_scopes=(Scope.INVOCATION,)),
-        authority=AuthorityContract(grants=(SAFE_EXECUTOR_SIMPLE.key,)),
-        observability=EvidenceContract(descriptors=("execution.safe-boundary.completed",)),
+        authority=AuthorityContract(grants=("tool.execute.wrap",)),
+        observability=EvidenceContract(descriptors=("guard.tool-timeout.applied",)),
     ),
     ownership=OwnershipDeclaration(
         reads=("plugin.serve",),
@@ -54,14 +54,9 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    """Provide the named SafeExecutor factory ``safe_executor.simple``."""
-    from lca.cognition.body.executor.safe_executor import SimpleSafeExecutor
     from lca.cognition.body.guard.service import ToolGuardService
-    from lca.cognition.body.guard.wrapped_executor import guarded_executor_factory
 
-    del config
-    guards = ctx.require("tool_guards")
-    if not isinstance(guards, ToolGuardService):
-        raise TypeError(f"tool_guards must be ToolGuardService, got {type(guards).__name__}")
-    factory = guarded_executor_factory(SimpleSafeExecutor, guards)
-    ctx.provide(SAFE_EXECUTOR_SIMPLE.key, factory)
+    service = ctx.require("tool_guards")
+    if not isinstance(service, ToolGuardService):
+        raise TypeError(f"tool_guards must be ToolGuardService, got {type(service).__name__}")
+    service.add(ToolTimeoutGuard(enabled=config.enabled), id="tool-timeout", order=10)

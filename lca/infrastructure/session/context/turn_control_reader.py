@@ -164,9 +164,26 @@ def consecutive_same_tool(state: AgentState, tool_name: str) -> int:
     return count
 
 
+def consecutive_identical_tool_calls(state: AgentState, fingerprint: str | None) -> int:
+    """Count consecutive USE_TOOL turns with the same tool+args fingerprint."""
+    if not fingerprint:
+        return 0
+    from lca.cognition.brain.decision_gates.loop.fingerprint import view_tool_fingerprint
+
+    count = 0
+    for turn in iter_control_turns_reversed(state):
+        if turn.action_type != ActionType.USE_TOOL.value and turn.action_type != ActionType.USE_TOOL:
+            break
+        if view_tool_fingerprint(turn) != fingerprint:
+            break
+        count += 1
+    return count
+
+
 __all__ = [
     "ControlTurnView",
     "append_turn_control_fact",
+    "consecutive_identical_tool_calls",
     "consecutive_same_tool",
     "control_turns",
     "fold_control_turns_from_events",

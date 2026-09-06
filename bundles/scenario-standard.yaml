@@ -27,6 +27,17 @@ entries:
   name: gates_chain_sequential
   $module: lca.plugins.cognitive.gate.chained.plugin
   config: {}
+- id: loop.policy.default
+  name: loop_policy_default
+  $module: lca.plugins.cognitive.loop.policy.plugin
+  config:
+    repeat_warn: 3
+    break_failures: 3
+    break_stalled: 3
+    progress_warn: 3
+    progress_break: 6
+    repeat_thresholds: [3, 5, 8]
+    arguments_preview_chars: 500
 - id: sensor.clock
   name: sensor_clock
   $module: lca.plugins.sensors.clock.clock

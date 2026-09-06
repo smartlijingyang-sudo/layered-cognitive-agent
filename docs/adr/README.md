@@ -139,6 +139,7 @@
 | [0194](0194-cognitive-loop-architecture-convergence.md) | 认知 Loop 架构收敛 — 图内核 / FactGateway 单轨 / 六 phase 正名 / 极端插件化目录 | Implemented (P0–P5 core) |
 | [0195](0195-platform-architecture-convergence.md) | 全栈平台架构收敛 — Kernel · Transport · Observability 四段链 · 插件 seam 树 · SSOT 矩阵 | Implemented (P0–P5 core) |
 | [0196](0196-convergence-control-plane-and-prompt-surface.md) | Convergence 控制面与 PromptSurface — 交付谓词、调试事件、工具/Prompt SSOT | Implemented (P1–P3) |
+| [0197](0197-guard-stack-hermes-dsh-convergence.md) | Guard Stack — Hermes 分层收敛 + DSH guard 插件化融合 | Accepted (P1–P2) |
 | [0198](0198-observability-compile-graph.md) | Observability Compile Graph — yaml SSOT、ObservabilityCompiler、fold merge | Accepted (P0) |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。

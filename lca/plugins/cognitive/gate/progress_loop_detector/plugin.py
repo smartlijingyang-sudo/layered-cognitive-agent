@@ -28,7 +28,7 @@ class Config(BaseModel):
 
 @plugin(
     id="gate.progress-loop-detector",
-    requires=["gates"],
+    requires=["gates", "loop_guard_policy"],
     implements=[DecisionGate],
     layer="L1",
     effects="none",
@@ -57,7 +57,12 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.cognition.brain.decision_gates.progress.loop_detector import (
         ProgressLoopDetector,
     )
+    from lca.plugins.cognitive.gate._loop_policy import resolve_loop_thresholds
 
+    thresholds = resolve_loop_thresholds(ctx)
     ctx.require("gates").add(
-        ProgressLoopDetector, id="progress-loop-detector", slot="loop", order=30
+        lambda: ProgressLoopDetector(thresholds=thresholds),
+        id="progress-loop-detector",
+        slot="loop",
+        order=30,
     )
