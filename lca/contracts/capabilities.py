@@ -341,6 +341,9 @@ BRAIN_PROMPT_CATALOG_FACTORY = Capability[object](
     "brain_prompt_catalog_factory", cardinality="factory"
 )
 """Profile-selected factory for the frozen tools and skills view consumed by a Brain."""
+
+CONVERGENCE_POLICY = Capability[object]("convergence_policy", cardinality="one")
+"""Profile-selected convergence policy for delivery gates and stop grace (ADR-0196)."""
 CRITIC_SIMPLE = Capability[object]("critic.simple", cardinality="factory")
 JOURNAL_STORE = Capability[object]("journal_store", cardinality="factory")
 TOOLS_COMPOSE_SERVICE = Capability[object]("tools.compose_service", cardinality="factory")

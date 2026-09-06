@@ -328,6 +328,44 @@ class ContextManifestCommitted:
     items: tuple[dict[str, Any], ...] = ()
 
 
+@session_event("delivery.evidence.v1", visibility="audit")
+@dataclass(frozen=True)
+class DeliveryEvidenceCommitted:
+    """Folded delivery evidence snapshot for convergence debug (ADR-0196)."""
+
+    step: int
+    task_class: str
+    artifact_count: int
+    producer_success_count: int
+    satisfied: bool
+    detail: str = ""
+
+
+@session_event("convergence.evaluated.v1", visibility="audit")
+@dataclass(frozen=True)
+class ConvergenceEvaluatedCommitted:
+    """Convergence policy verdict for debug-run (ADR-0196)."""
+
+    step: int
+    kind: str
+    rationale: str
+    task_class: str
+    satisfied: bool
+    detail: str = ""
+
+
+@session_event("prompt.surface.rendered.v1", visibility="audit")
+@dataclass(frozen=True)
+class PromptSurfaceRenderedCommitted:
+    """PromptSurface render audit — tools/sandbox SSOT (ADR-0196)."""
+
+    step: int
+    task_class: str
+    tool_count: int
+    include_full_sandbox: bool
+    digest: str
+
+
 @session_event("tool.denied.v1", visibility="model")
 @dataclass(frozen=True)
 class ToolDeniedCommitted:
@@ -475,6 +513,7 @@ class TurnControlCommitted:
     tool_arguments: dict[str, Any] | None = None
     observation_payload: Any | None = None
     observation_error: str | None = None
+    files_created: tuple[str, ...] = ()
 
 
 @session_event("session.end_seed.v1", visibility="audit")

@@ -208,6 +208,60 @@ def test_body_tool_execute_end_ok_false_from_outcome() -> None:
     assert step.tool_result.ok is False
 
 
+def test_body_tool_execute_does_not_clobber_step_tool_evidence() -> None:
+    """ADR-0198: L5 span events must not overwrite L3 evidence (run_574216d84621)."""
+    events = [
+        {
+            "execution_point": "writable.step.start",
+            "payload": {"step_id": "step_001", "phase": "think"},
+            "when": 1.0,
+        },
+        {
+            "execution_point": "step.tool_call.record",
+            "payload": {
+                "tool_name": "executeCode",
+                "invocation_id": "toolu_x",
+                "arguments": {"code": "print(1)"},
+                "arguments_summary": "code=...",
+            },
+            "when": 2.0,
+        },
+        {
+            "execution_point": "body.tool.execute.start",
+            "payload": {},
+            "when": 3.0,
+        },
+        {
+            "execution_point": "step.tool_result.record",
+            "payload": {
+                "tool_name": "executeCode",
+                "stdout_head": "joke output",
+                "stdout_chars_total": 11,
+                "ok": True,
+            },
+            "when": 4.0,
+        },
+        {
+            "execution_point": "body.tool.execute.end",
+            "payload": {},
+            "when": 5.0,
+        },
+        {
+            "execution_point": "writable.step.end",
+            "payload": {"outcome": "success"},
+            "when": 6.0,
+        },
+    ]
+    doc = fold_step_tree(events, run_id="r_merge", outcome="completed")
+    step = doc.steps[0]
+    assert step.tool_call is not None
+    assert step.tool_call.name == "executeCode"
+    assert step.tool_call.arguments == {"code": "print(1)"}
+    assert step.tool_result is not None
+    assert step.tool_result.stdout_head == "joke output"
+    assert step.tool_result.stdout_chars_total == 11
+
+
 def test_exception_caught_marks_step_error_and_failed_outcome() -> None:
     """exception.caught 写入 step.error 且 metadata.outcome=failed。"""
     events = [
@@ -231,6 +285,6 @@ def test_exception_caught_marks_step_error_and_failed_outcome() -> None:
     assert doc.metadata.outcome == "failed"
     step = doc.steps[0]
     assert step.error == "category mapping missing"
-    assert step.outcome == "failed"
+    assert step.outcome == "fail"
     assert step.tool_result is not None
     assert step.tool_result.ok is True

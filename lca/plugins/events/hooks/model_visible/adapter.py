@@ -65,6 +65,37 @@ def _model_identity(kwargs: dict[str, Any]) -> tuple[str, str]:
     return "unknown", "unknown"
 
 
+def _resolve_model_config(inner: LLMAdapter) -> dict[str, Any] | None:
+    cur: Any = inner
+    for _ in range(8):
+        model = getattr(cur, "model", None) or getattr(cur, "model_name", None)
+        provider = getattr(cur, "provider", None) or getattr(cur, "provider_id", None)
+        if model:
+            cfg: dict[str, Any] = {"model": str(model)}
+            if provider:
+                cfg["provider"] = str(provider)
+            return cfg
+        nxt = getattr(cur, "inner", None) or getattr(cur, "_inner", None)
+        if nxt is None or nxt is cur:
+            break
+        cur = nxt
+    return None
+
+
+def _kwargs_for_hook(kwargs: dict[str, Any], *, inner: LLMAdapter) -> dict[str, Any]:
+    out = dict(kwargs)
+    if "messages" not in out and "history" in out:
+        out["messages"] = out["history"]
+    cfg = _resolve_model_config(inner)
+    if cfg is not None:
+        existing = out.get("config")
+        if isinstance(existing, dict):
+            out["config"] = {**cfg, **existing}
+        else:
+            out["config"] = cfg
+    return out
+
+
 def _tool_calls_payload(response: LLMResponse) -> list[dict[str, Any]] | None:
     if not response.tool_calls:
         return None
@@ -150,7 +181,7 @@ class ModelVisibleHookAdapter(LLMAdapter):
                     run_id=run_id,
                     step_index=step_index,
                     incarnation=incarnation,
-                    kwargs=kwargs,
+                    kwargs=_kwargs_for_hook(kwargs, inner=self._inner),
                 )
             except Exception as exc:  # INTENTIONAL: L10 + D5 不挡业务
                 _log.debug("model_visible_pre_hook_failed: %s", exc)
@@ -190,7 +221,7 @@ class ModelVisibleHookAdapter(LLMAdapter):
                     run_id=run_id,
                     step_index=step_index,
                     incarnation=incarnation,
-                    kwargs=kwargs,
+                    kwargs=_kwargs_for_hook(kwargs, inner=self._inner),
                 )
             except Exception as exc:  # INTENTIONAL: L10 + D5 不挡业务
                 _log.debug("model_visible_pre_hook_failed: %s", exc)

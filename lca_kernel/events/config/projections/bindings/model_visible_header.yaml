@@ -1,0 +1,16 @@
+# Model-visible header fold bindings (ADR-0198) — placeholder for foldRequestHeader parity
+schema: lca.observability.bindings/1
+projection_id: model_visible.header
+
+rules:
+  - id: request_header
+    match:
+      execution_point: llm.request.header
+    target_field: header
+    extract:
+      step_id: payload.step_id
+      model: payload.model|payload.config.model|payload.config.model_id
+      tools_digest: payload.tools_digest
+      messages_digest: payload.messages_digest
+    merge: replace
+    precedence: 100

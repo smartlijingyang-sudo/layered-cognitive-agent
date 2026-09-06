@@ -28,6 +28,8 @@ ADR reference: zero-delivery root-cause #2 (multi-tool loop detection).
 from __future__ import annotations
 
 from lca.cognition.brain.decision_gates.chained.chained import record_gate_decided
+from lca.cognition.convergence.evidence import build_delivery_evidence
+from lca.cognition.convergence.producer_tools import is_producer_tool
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.execution.decision import Decision
@@ -55,7 +57,10 @@ class ProgressLoopDetector(DecisionGate):
         if decision.action_type != ActionType.USE_TOOL or not decision.tool_calls:
             return decision
 
-        count = self._count_consecutive_no_progress(state)
+        count = max(
+            self._count_consecutive_no_progress(state),
+            self._count_producer_stall_after_delivery(state),
+        )
         if count < DEFAULT_LOOP_POLICY.progress_warn:
             return decision
 
@@ -113,6 +118,22 @@ class ProgressLoopDetector(DecisionGate):
             ),
         )
         return forced
+
+    @staticmethod
+    def _count_producer_stall_after_delivery(state: AgentState) -> int:
+        """Count producer successes after delivery already satisfied (ADR-0196)."""
+        if not build_delivery_evidence(state).satisfied:
+            return 0
+        count = 0
+        for turn in iter_control_turns_reversed(state):
+            if turn.action_type != ActionType.USE_TOOL:
+                break
+            if not is_producer_tool(turn.tool_name):
+                break
+            if not turn.observation_success:
+                break
+            count += 1
+        return count
 
     @staticmethod
     def _count_consecutive_no_progress(state: AgentState) -> int:

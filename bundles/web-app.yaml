@@ -11,6 +11,10 @@ entries:
   name: sensor_clock
   $module: lca.plugins.sensors.clock.clock
   config: {}
+- id: sensor.convergence-task
+  name: sensor_convergence_task
+  $module: lca.plugins.sensors.convergence.task
+  config: {}
 - id: sensor.workspace-artifacts
   name: sensor_workspace_artifacts
   $module: lca.plugins.sensors.workspace.artifacts
@@ -50,6 +54,14 @@ entries:
 - id: gate.progress-loop-detector
   name: gate_progress_loop_detector
   $module: lca.plugins.cognitive.gate.progress_loop_detector.plugin
+  config: {}
+- id: convergence.policy.default
+  name: convergence_policy_default
+  $module: lca.plugins.cognitive.convergence.policy.plugin
+  config: {}
+- id: gate.delivery-satisfied
+  name: gate_delivery_satisfied
+  $module: lca.plugins.cognitive.gate.delivery_satisfied.plugin
   config: {}
 - id: gate.terminal-respond
   name: gate_terminal_respond

@@ -51,6 +51,7 @@ class TurnControlUnit:
                     "tool_arguments": payload.get("tool_arguments"),
                     "observation_payload": payload.get("observation_payload"),
                     "observation_error": payload.get("observation_error"),
+                    "files_created": payload.get("files_created") or (),
                 },
             ]
             return {

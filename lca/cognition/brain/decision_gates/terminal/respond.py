@@ -12,60 +12,18 @@ Sensor-owned surface.
 from __future__ import annotations
 
 from lca.cognition.brain.decision_gates.chained.chained import record_gate_decided
+from lca.cognition.convergence.delivery_synth import synthesize_delivery_response
+from lca.cognition.convergence.evidence import build_delivery_evidence
+from lca.cognition.convergence.producer_tools import is_producer_tool
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.execution.decision import Decision
-from lca.contracts.models.core.perceive.projection import current_manifest_from_state
 from lca.contracts.models.core.policy.budget import TERMINAL_RESERVE_STEPS
 from lca.contracts.models.core.policy.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import DecisionGate
 
 _TERMINAL_RATIONALE = "终态步：必须向用户收口；产物已从工作区账本合成摘要。"
-
-# Last-step writes still run. Forcing respond here would ship a stale ledger
-# and discard the tool that was about to produce the deliverable.
-_PRODUCER_TOOLS = frozenset(
-    {
-        "editFile",
-        "executeCode",
-        "exportFile",
-        "runCommand",
-        "sandbox_execute",
-        "writeFile",
-        "write_file_local",
-        "local_runCommand",
-        "local_writeFile",
-        "local_editFile",
-        "local_executeCode",
-        "local_readFile",
-    }
-)
-
-
-def _closure_from_manifest(state: AgentState) -> str:
-    """Read the workspace-artifacts manifest item as the closure source (PR6).
-
-    Pre-PR6 this called ``get_run_workspace().artifacts.closure_text()``
-    directly.  v3 §5.1 forbids live workspace reads in Gates — the
-    Hub's ``WorkspaceArtifactsSensor`` is the only legitimate source.
-    """
-    manifest = current_manifest_from_state(state)
-    if manifest is None:
-        return ""
-    for item in manifest.items:
-        if item.kind != "workspace_artifacts":
-            continue
-        if not isinstance(item.payload, list) or not item.payload:
-            continue
-        lines: list[str] = []
-        for art in item.payload:
-            if isinstance(art, dict):
-                path = art.get("path", "")
-                url = art.get("url", "")
-                lines.append(f"- {path} {url}")
-        return "\n".join(lines)
-    return ""
 
 
 class TerminalRespondGate(DecisionGate):
@@ -78,11 +36,15 @@ class TerminalRespondGate(DecisionGate):
             return decision
         if decision.action_type in {ActionType.RESPOND, ActionType.STOP, ActionType.ASK_HUMAN}:
             return decision
-        if _is_producer(decision):
+        evidence = build_delivery_evidence(state)
+        if _is_producer(decision) and not evidence.satisfied:
             return decision
 
-        closure = _closure_from_manifest(state)
-        response = closure or decision.response_text or "任务已完成。"
+        response = synthesize_delivery_response(
+            state,
+            evidence,
+            existing_text=decision.response_text or "",
+        ) or "任务已完成。"
         forced = Decision(
             decision_id=decision.decision_id,
             action_type=ActionType.RESPOND,
@@ -110,4 +72,7 @@ class TerminalRespondGate(DecisionGate):
 def _is_producer(decision: Decision) -> bool:
     if decision.action_type != ActionType.USE_TOOL or not decision.tool_calls:
         return False
-    return decision.tool_calls[0].tool_name in _PRODUCER_TOOLS
+    return is_producer_tool(decision.tool_calls[0].tool_name)
+
+
+__all__ = ["TerminalRespondGate"]

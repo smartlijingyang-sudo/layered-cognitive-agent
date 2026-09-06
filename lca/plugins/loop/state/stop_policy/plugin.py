@@ -49,8 +49,16 @@ class DefaultStopPolicy(StopPolicy):
     remains the sole writer of terminal state.
     """
 
-    def __init__(self, artifact_closure: ArtifactClosure) -> None:
+    def __init__(
+        self,
+        artifact_closure: ArtifactClosure,
+        *,
+        runtime: object | None = None,
+    ) -> None:
         self._artifact_closure = artifact_closure
+        from lca.cognition.convergence.runtime import ConvergenceRuntime
+
+        self._runtime = runtime if isinstance(runtime, ConvergenceRuntime) else ConvergenceRuntime.default()
 
     def decide(
         self,
@@ -110,10 +118,10 @@ class DefaultStopPolicy(StopPolicy):
         observation: Observation | None,
         state: AgentState,
     ) -> StopDecision:
+        evidence, verdict = self._runtime.evaluate_budget_and_emit(state)
+
         last_ok = observation is not None and observation.success
         final_output = self._artifact_closure.synthesize()
-        # ADR-0158 决策 四:AgentState.final_output 字段已删除;
-        # fallback 链改为 Stop决策.last_output_ref(预留)或 observation.payload。
         if (
             final_output is None
             and last_ok
@@ -121,7 +129,10 @@ class DefaultStopPolicy(StopPolicy):
             and isinstance(observation.payload, str)
         ):
             final_output = observation.payload
-        status = TaskStatus.COMPLETED if (last_ok or final_output) else TaskStatus.FAILED
+        if verdict.kind == "grace_respond" and not final_output:
+            final_output = self._runtime.synthesize(state, evidence)
+        completed = last_ok or final_output or verdict.kind == "grace_respond"
+        status = TaskStatus.COMPLETED if completed else TaskStatus.FAILED
         return StopDecision(
             should_stop=True,
             reason=StopReason.BUDGET_EXCEEDED,
@@ -143,7 +154,7 @@ class DefaultStopPolicy(StopPolicy):
 @plugin(
     id="state.stop-policy.default",
     provides=["stop_policy"],
-    requires=["artifact_closure"],
+    requires=["artifact_closure", "convergence_runtime"],
     implements=[StopPolicy],
     layer="L2",
     effects="none",
@@ -171,7 +182,8 @@ async def setup(ctx: PluginContext, config: Config) -> None:
 
     del config
     artifact_closure: ArtifactClosure = ctx.require("artifact_closure")
-    ctx.provide("stop_policy", DefaultStopPolicy(artifact_closure))
+    runtime = ctx.require("convergence_runtime")
+    ctx.provide("stop_policy", DefaultStopPolicy(artifact_closure, runtime=runtime))
 
 
 __all__ = ["Config", "DefaultStopPolicy", "setup"]

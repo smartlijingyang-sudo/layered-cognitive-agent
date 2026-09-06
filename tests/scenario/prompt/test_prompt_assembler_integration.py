@@ -100,7 +100,7 @@ def _registry_with_builtins() -> _RegistryImpl:
     registry.register(BackstorySection(), kind="pure", name="backstory")
     registry.register(
         ToolsSection(catalog_tools_xml_provider=lambda: '<tool name="x">x</tool>'),
-        kind="pure",
+        kind="stateful",
         name="tools",
     )
     registry.register(
@@ -140,9 +140,20 @@ def _registry_with_builtins() -> _RegistryImpl:
 class _FakePublishSession:
     """最小测试 Session:只收 append,不投递。"""
 
-    def append(self, payload: Any, *, producer: Any = None) -> Any:
-        del payload, producer
-        return None
+    def append(
+        self,
+        event_type: Any,
+        data: Any,
+        *,
+        producer: Any = None,
+        actor: Any = None,
+        visibility: Any = None,
+        **kwargs: Any,
+    ) -> Any:
+        del event_type, data, producer, actor, visibility, kwargs
+        from types import SimpleNamespace
+
+        return SimpleNamespace(type="test", seq=1, session_id="s", time=0.0)
 
 
 @pytest.fixture(autouse=True)

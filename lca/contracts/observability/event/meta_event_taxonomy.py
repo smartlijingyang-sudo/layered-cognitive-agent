@@ -97,6 +97,9 @@ COGNITION_SESSION_EVENTS: Final[tuple[str, ...]] = (
     "context.injected.v1",
     "skill.routed.v1",
     "gate.decided.v1",
+    "delivery.evidence.v1",
+    "convergence.evaluated.v1",
+    "prompt.surface.rendered.v1",
 )
 
 # ── Skill / Tool / Sandbox ──────────────────────────────────────────────────
@@ -154,7 +157,20 @@ ASSISTANT_SESSION_EVENTS: Final[tuple[str, ...]] = (
 DEBUG_RUN_META_FAMILIES: Final[tuple[tuple[str, tuple[str, ...]], ...]] = (
     ("session", ("turn.", "step.started", "step.ended", "message.accepted", "session.created")),
     ("llm", ("llm.", "model.", "thinking.", "brain.think", "step.thinking")),
-    ("prompt", ("prompt_assembler", "prompt.section", "reasoner.reason", "skill_router", "think.gate", "gate.decided")),
+    (
+        "prompt",
+        (
+            "prompt_assembler",
+            "prompt.section",
+            "prompt.surface",
+            "reasoner.reason",
+            "skill_router",
+            "think.gate",
+            "gate.decided",
+            "convergence.evaluated",
+            "delivery.evidence",
+        ),
+    ),
     ("tool", ("body.tool.", "phase.tool.", "step.tool_", "tool.schema")),
     ("sandbox", ("body.sandbox.",)),
     ("skill", ("skill.", "assistant.skill.", "skill.package")),

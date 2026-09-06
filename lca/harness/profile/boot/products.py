@@ -15,6 +15,7 @@ from lca.contracts.mechanisms.capability.capability import MissingCapabilityErro
 if TYPE_CHECKING:
     from cordis import Context
 
+    from lca.contracts.observability.compile.plan import CompiledObservabilityPlan
     from lca.contracts.protocols.state.plan import CompiledRunPlan
     from lca.harness.profile.resolve.resolve import ResolvedProfile
 
@@ -28,6 +29,7 @@ class ProfileBootProducts:
 
     resolved_profile: ResolvedProfile | None = None
     compiled_run_plan: CompiledRunPlan | None = None
+    compiled_observability_plan: CompiledObservabilityPlan | None = None
 
 
 def attach_profile_boot_products(
@@ -65,6 +67,13 @@ def compiled_plan_from_scope(scope: Context) -> CompiledRunPlan:
     return products.compiled_run_plan
 
 
+def observability_plan_from_scope(scope: Context) -> CompiledObservabilityPlan:
+    products = profile_boot_products_from_scope(scope)
+    if products is None or products.compiled_observability_plan is None:
+        raise MissingCapabilityError("compiled_observability_plan")
+    return products.compiled_observability_plan
+
+
 def compile_profile_boot_products(resolved: ResolvedProfile) -> ProfileBootProducts:
     from lca.harness.composition.boot_compile import (
         compile_profile_boot_products as _compile,
@@ -78,6 +87,7 @@ __all__ = [
     "attach_profile_boot_products",
     "compile_profile_boot_products",
     "compiled_plan_from_scope",
+    "observability_plan_from_scope",
     "profile_boot_products_from_scope",
     "resolved_profile_from_scope",
 ]

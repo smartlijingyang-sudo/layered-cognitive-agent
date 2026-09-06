@@ -20,7 +20,7 @@ from typing import ClassVar, cast
 
 from pydantic import BaseModel, ConfigDict
 
-from lca.cognition.brain.prompt.sandbox_prompt import build_cloud_sandbox_prompt
+from lca.cognition.brain.prompt.surface import PromptSurface
 from lca.cognition.brain.sections.types import (
     block,
     clock_from_state,
@@ -60,6 +60,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.runtime.infra.infra import Tool
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.session.emit.convergence_emit import emit_prompt_surface_rendered
 
 # ── Per-section Pydantic Config ────────────────────────────────────
 
@@ -110,21 +111,33 @@ class BackstorySection:
 
 @dataclass
 class ToolsSection:
-    """Renders the model's <tools> block plus the cloud-sandbox <tool> entries.
-
-    Pulled together so the assembler only has one slot to fill and so
-    the cloud_sandbox block stays embedded in its natural wrapper
-    instead of being emitted as a separate label-less chunk.
-    """
+    """Renders the model's <tools> block via PromptSurface (ADR-0196)."""
 
     catalog_tools_xml_provider: Callable[[], str]
     name: ClassVar[str] = "tools"
 
-    def render(self, *, role_profile: RoleProfile, tools: Sequence[Tool]) -> SectionOutput:
-        catalog_xml = self.catalog_tools_xml_provider() or ""
-        cloud_sandbox = build_cloud_sandbox_prompt(list(tools)) if tools else ""
-        body = "\n".join(part for part in (catalog_xml, cloud_sandbox) if part)
-        return SectionOutput(text=block("tools", body))
+    def render(
+        self,
+        *,
+        role_profile: RoleProfile,
+        state: AgentState,
+        awareness: TeamAwareness | None,
+        manifest: ContextManifest | None,
+        tools: Sequence[Tool],
+        activated_skills: tuple[ActivatedSkill, ...],
+    ) -> SectionOutput:
+        del role_profile, awareness, manifest, activated_skills
+        surface = PromptSurface.default()
+        rendered = surface.render_tools_block(tools, task=state.task or "", state=state)
+        emit_prompt_surface_rendered(
+            state,
+            step=state.step,
+            task_class=rendered.task_class,
+            tool_count=rendered.tool_count,
+            include_full_sandbox=rendered.include_full_sandbox,
+            digest=rendered.digest,
+        )
+        return SectionOutput(text=block("tools", rendered.body))
 
 
 @dataclass
@@ -657,11 +670,6 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         ("goal", build_goal_section(Config()), "static"),
         ("backstory", build_backstory_section(Config()), "static"),
         (
-            "tools",
-            build_tools_section(_ToolsConfig(), catalog=_catalog_render("render_tools_xml")),
-            "catalog_xml",
-        ),
-        (
             "available_skills",
             build_available_skills_section(
                 _ToolsConfig(), catalog=_catalog_render("render_brain_skills")
@@ -676,7 +684,11 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     for name, section, _kind in pure_sections:
         registry.register(section, kind="pure", name=name)
 
-    # Stateful sections
+    registry.register(
+        build_tools_section(_ToolsConfig(), catalog=_catalog_render("render_tools_xml")),
+        kind="stateful",
+        name="tools",
+    )
     stateful_sections: list[tuple[str, object]] = [
         ("current_date", build_current_date(Config())),
         ("task", build_task(Config())),

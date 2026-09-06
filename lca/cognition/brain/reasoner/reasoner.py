@@ -80,7 +80,7 @@ def _role_prompt_vars(
     ``_role_prompt_vars`` keep passing.
     """
 
-    from lca.cognition.brain.prompt.sandbox_prompt import build_cloud_sandbox_prompt
+    from lca.cognition.brain.prompt.surface import PromptSurface
     from lca.cognition.brain.sections.types import (
         clock_from_state,
         render_artifacts_block,
@@ -93,14 +93,17 @@ def _role_prompt_vars(
     )
 
     tool_list = list(tools or [])
-    cloud_sandbox = build_cloud_sandbox_prompt(tool_list) if tool_list else ""
+    surface = PromptSurface.default()
+    rendered = surface.render_tools_block(tool_list, task=state.task or "")
+    cloud_sandbox = rendered.sandbox_block
+    tools_text = rendered.tools_xml if tool_list else tools_desc
     clock = clock_from_state(state)
     current_date = clock.text if clock else ""
     variables: dict[str, str] = {
         "role": role_profile.role,
         "goal": role_profile.goal,
         "backstory": role_profile.backstory,
-        "tools": tools_desc,
+        "tools": tools_text,
         "task": state.task,
         "prior_conversation": render_prior_conversation_from_state(state),
         "context": context_lines,
@@ -433,7 +436,7 @@ class PromptReasoner:
         return "routing_prompt"
 
     def _legacy_variables(self, state: AgentState, *, manifest: object | None) -> dict[str, str]:
-        from lca.cognition.brain.prompt.sandbox_prompt import build_cloud_sandbox_prompt
+        from lca.cognition.brain.prompt.surface import PromptSurface
         from lca.cognition.brain.sections.types import (
             clock_from_state,
             context_exclusions_for,
@@ -454,14 +457,17 @@ class PromptReasoner:
             context_lines = context_lines + "\n\n" + subtasks_block
         if artifacts_block:
             context_lines = context_lines + "\n\n" + artifacts_block
-        cloud_sandbox = build_cloud_sandbox_prompt(self.tools) if self.tools else ""
+        surface = PromptSurface.default()
+        rendered = surface.render_tools_block(self.tools, task=state.task or "")
+        tools_text = rendered.tools_xml if self.tools else self.tools_desc
+        cloud_sandbox = rendered.sandbox_block
         clock = clock_from_state(state)
         current_date = clock.text if clock else ""
         variables: dict[str, str] = {
             "role": self.role_profile.role,
             "goal": self.role_profile.goal,
             "backstory": self.role_profile.backstory,
-            "tools": self.tools_desc,
+            "tools": tools_text,
             "task": state.task,
             "prior_conversation": render_prior_conversation_from_state(state),
             "context": context_lines,

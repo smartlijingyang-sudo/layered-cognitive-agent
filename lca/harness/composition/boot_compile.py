@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from lca.harness.composition.observability_compile import compile_observability_boot_plan
 from lca.harness.composition.plan_compiler import CompileOptions, compile_plan
 from lca.harness.profile.boot.products import ProfileBootProducts
 from lca.harness.profile.resolve.resolve import ResolvedProfile
@@ -18,6 +19,7 @@ def compile_profile_boot_products(resolved: ResolvedProfile) -> ProfileBootProdu
                 require_executable_phase_graph=not profile_allows_test_defaults(resolved)
             ),
         ),
+        compiled_observability_plan=compile_observability_boot_plan(),
     )
 
 

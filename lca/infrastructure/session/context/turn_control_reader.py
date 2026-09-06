@@ -6,6 +6,7 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any, cast
 
+from lca.cognition.convergence.payload import observation_files_created
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.harness.memory.events import TurnControlCommitted
 from lca.contracts.models.core.execution.decision import Turn
@@ -29,6 +30,12 @@ def _action_type_text(value: object) -> str:
     return str(value)
 
 
+def _files_created_tuple(value: object) -> tuple[str, ...]:
+    if isinstance(value, (list, tuple)):
+        return tuple(str(item) for item in value if str(item))
+    return ()
+
+
 @dataclass(frozen=True, slots=True)
 class ControlTurnView:
     """Gate-facing turn summary folded from durable Session facts."""
@@ -39,6 +46,7 @@ class ControlTurnView:
     tool_arguments: dict[str, object] | None = None
     observation_payload: object | None = None
     observation_error: str | None = None
+    files_created: tuple[str, ...] = ()
 
 
 def append_turn_control_fact(session: SessionProtocol, turn: Turn) -> None:
@@ -56,6 +64,7 @@ def append_turn_control_fact(session: SessionProtocol, turn: Turn) -> None:
             tool_arguments=tool_arguments,
             observation_payload=observation.payload if observation is not None else None,
             observation_error=observation.error if observation is not None else None,
+            files_created=observation_files_created(observation),
         ),
     )
 
@@ -81,6 +90,7 @@ def fold_control_turns_from_events(events: Sequence[SessionEvent]) -> tuple[Cont
                 if item.get("observation_error") is not None
                 else None
             ),
+            files_created=_files_created_tuple(item.get("files_created")),
         )
         for item in raw_turns
         if isinstance(item, dict)
@@ -115,6 +125,7 @@ def _history_control_turns(state: AgentState) -> tuple[ControlTurnView, ...]:
                 tool_arguments=decision.tool_calls[0].arguments if decision.tool_calls else None,
                 observation_payload=observation.payload if observation is not None else None,
                 observation_error=observation.error if observation is not None else None,
+                files_created=observation_files_created(observation),
             )
         )
     return tuple(views)
@@ -145,7 +156,7 @@ def consecutive_same_tool(state: AgentState, tool_name: str) -> int:
     """Count consecutive USE_TOOL turns targeting ``tool_name`` (newest first)."""
     count = 0
     for turn in iter_control_turns_reversed(state):
-        if turn.action_type != ActionType.USE_TOOL:
+        if turn.action_type != ActionType.USE_TOOL.value and turn.action_type != ActionType.USE_TOOL:
             break
         if turn.tool_name != tool_name:
             break

@@ -1,0 +1,36 @@
+# Projection registry (ADR-0198)
+schema: lca.observability.projection/1
+
+projections:
+  - id: journal.step_tree
+    kind: fold_reducer
+    plugin_id: observability.deriver.journal_step_tree
+    state_schema: lca.journal/3.1
+    bindings_ref: projections/bindings/journal_step_tree.yaml
+    input_include:
+      - writable.step.*
+      - llm.*
+      - step.tool_*
+      - step.thinking.record
+      - body.tool.execute.*
+      - brain.think.*
+      - phase.*.fold
+
+  - id: model_visible.header
+    kind: incremental_fold
+    plugin_id: observability.deriver.model_visible
+    state_schema: lca.model_visible.header/1
+    bindings_ref: projections/bindings/model_visible_header.yaml
+    input_include:
+      - llm.request.header
+      - llm.request.header.assistant
+      - llm.stream.token
+
+  - id: narrative.markdown
+    kind: render_template
+    plugin_id: observability.exporter.narrative
+    state_schema: text/markdown
+    bindings_ref: projections/bindings/narrative_sections.yaml
+    input_include:
+      - projection:journal.step_tree
+      - projection:model_visible.header

@@ -180,8 +180,11 @@ async def boot_entries(
     测试 fixture 不会演化出第二套解析语义。
     """
     resolved = resolve_entries(entries)  # ↓ K1b:程序化 entries 走 K1 域校验
+    from lca.harness.composition.observability_compile import compile_observability_boot_plan
+
     products = ProfileBootProducts(
-        resolved_profile=resolved
+        resolved_profile=resolved,
+        compiled_observability_plan=compile_observability_boot_plan(),
     )  # ↑ K2:包成 boot products(K2 编译产物)
     return await _boot_context(
         products, bootstrap_file_store=bootstrap_file_store

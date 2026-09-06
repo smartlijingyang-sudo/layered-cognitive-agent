@@ -1,0 +1,5 @@
+# Narrative section bindings (ADR-0198) — render-only, no event fold
+schema: lca.observability.bindings/1
+projection_id: narrative.markdown
+
+rules: []

@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, ConfigDict
 
+from lca.cognition.brain.prompt.surface import PromptSurface
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
@@ -78,12 +79,8 @@ class ModelPromptCatalog:
         return "\n".join(lines) or _EMPTY_BRAIN_SKILLS
 
     def render_tools_xml(self) -> str:
-        """渲染稳定的 XML-like 工具目录。"""
-        lines = tuple(
-            f'<tool name="{tool.name}">{tool.description or tool.name}</tool>'
-            for tool in self.tools
-        )
-        return "\n".join(lines) or _EMPTY_TOOLS
+        """Render stable XML-like tool catalog via PromptSurface SSOT (ADR-0196)."""
+        return PromptSurface.default().render_tools_xml(self.tools)
 
 
 class DefaultBrainPromptCatalogFactory(BrainPromptCatalogFactory):

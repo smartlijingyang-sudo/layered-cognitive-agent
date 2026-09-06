@@ -63,6 +63,7 @@ from lca.contracts.models.observability.journal.totals import (
     StepPhase,
     Totals,
 )
+from lca_kernel.events.fold.binding_engine import JournalBindingEngine, header_model_from_payload
 from lca_kernel.events.payloads.spine import category_to_spine_ep
 
 # 闭集 phase EP 表 —— 与 StepTreeAccumulatorDeriver 对齐(ADR-0166 D4 闭集)。
@@ -75,6 +76,21 @@ PHASE_FOLD_EPS: dict[str, StepPhase] = {
     "phase.reflect.fold": "reflect",
     "phase.stop.fold": "stop",
 }
+
+_BINDING_ENGINE: JournalBindingEngine | None = None
+
+
+def _binding_engine() -> JournalBindingEngine:
+    global _BINDING_ENGINE
+    if _BINDING_ENGINE is None:
+        _BINDING_ENGINE = JournalBindingEngine()
+    return _BINDING_ENGINE
+
+
+def reset_journal_binding_engine() -> None:
+    """Test seam: drop cached binding engine (after plan cache reset)."""
+    global _BINDING_ENGINE
+    _BINDING_ENGINE = None
 
 
 def _resolve_execution_point(name: str) -> str:
@@ -358,6 +374,19 @@ def _tool_result_ok(payload: Mapping[str, Any]) -> bool:
     return outcome in {"success", "completed", ""}
 
 
+def _assign_tool_call(target: _Frame, payload: Mapping[str, Any], ep: str) -> None:
+    target.tool_call = _binding_engine().apply_tool_call(target.tool_call, payload, ep)
+
+
+def _assign_tool_result(target: _Frame, payload: Mapping[str, Any], ep: str) -> None:
+    target.tool_result = _binding_engine().apply_tool_result(
+        target.tool_result,
+        payload,
+        ep,
+        ok_default=_tool_result_ok(payload),
+    )
+
+
 def _capture_exception(state: _StepTreeState, payload: Mapping[str, Any], ts: float) -> None:
     """``exception.caught`` → 关联 step 错误 + run 终态 failed。"""
     state.terminal_outcome = "failed"
@@ -470,6 +499,24 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
         _close_step(state, str(event.get("outcome") or payload.get("outcome") or "success"))
     elif ep in PHASE_FOLD_EPS:
         _record_phase(state, PHASE_FOLD_EPS[ep], ts, event)
+        if ep == "phase.think.fold":
+            target = state.open_step
+            if target is None and state.closed_frames:
+                target = state.closed_frames[-1]
+            if target is not None:
+                target.thinking = _binding_engine().apply_thinking_patch(
+                    target.thinking,
+                    payload,
+                    ep,
+                    frame_model=target.model or "",
+                )
+                model = str(payload.get("objective") or "")
+                if (
+                    str(payload.get("objective_kind") or "") == "model_name"
+                    and model
+                    and not target.model
+                ):
+                    target.model = model
     elif ep == "phase.act.fold.start":
         _record_phase(state, "act", ts, event)
     elif ep == "brain.think.start":
@@ -499,6 +546,7 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
         # 前一步已有内容时按正常收口关闭并开新步。
         open_frame = state.open_step
         header_step_id = str(payload.get("step_id") or "")
+        header_model = header_model_from_payload(payload) or str(payload.get("model") or "")
         can_upgrade = (
             open_frame is not None
             and _frame_is_empty(open_frame)
@@ -514,11 +562,17 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
         if can_upgrade and open_frame is not None:
             if header_step_id:
                 open_frame.step_id = header_step_id
-            open_frame.model = str(payload.get("model") or "")
+            open_frame.model = header_model
             open_frame.request_reason = str(payload.get("reason") or "")
             if open_frame.opened_by == "think":
                 open_frame.opened_by = "header"
             open_frame.window_signal = "explicit"
+            open_frame.thinking = _binding_engine().apply_thinking_patch(
+                open_frame.thinking,
+                payload,
+                ep,
+                frame_model=header_model,
+            )
         else:
             if open_frame is not None:
                 _close_step(state, "success")
@@ -528,10 +582,16 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
                 step_index=state.step_seq,
                 phase="think",
                 entered_at=ts,
-                model=str(payload.get("model") or ""),
+                model=header_model,
                 request_reason=str(payload.get("reason") or ""),
                 opened_by="header",
                 window_signal="explicit",
+            )
+            state.open_step.thinking = _binding_engine().apply_thinking_patch(
+                state.open_step.thinking,
+                payload,
+                ep,
+                frame_model=header_model,
             )
     elif ep == "llm.call.start":
         # 标记 LLM 窗口开启;stream.token 据此判断是否属于当前 step。
@@ -675,61 +735,19 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
     elif ep == "step.tool_call.record":
         target = _resolve_target(state, payload)
         if target is not None:
-            target.tool_call = ToolCallRecord(
-                invocation_id=str(payload.get("invocation_id") or ""),
-                name=str(payload.get("tool_name") or payload.get("name") or ""),
-                arguments=dict(payload["arguments"])
-                if isinstance(payload.get("arguments"), dict)
-                else {},
-                arguments_summary=str(payload.get("arguments_summary") or ""),
-            )
+            _assign_tool_call(target, payload, ep)
     elif ep == "step.tool_result.record":
         target = _resolve_target(state, payload)
         if target is not None:
-            files_raw = payload.get("files_created") or ()
-            files_tuple = (
-                tuple(str(f) for f in files_raw) if isinstance(files_raw, (list, tuple)) else ()
-            )
-            target.tool_result = ToolResult(
-                ok=_tool_result_ok(payload),
-                latency_ms=int(payload.get("latency_ms") or 0),
-                stdout_head=str(payload.get("stdout_head") or "")[:2000],
-                stdout_chars_total=int(payload.get("stdout_chars_total") or 0),
-                stdout_truncated=bool(payload.get("stdout_truncated") or False),
-                stderr=str(payload.get("stderr") or "")[:2000],
-                files_created=files_tuple,
-                error=payload.get("error"),
-                delta_summary=str(payload.get("delta_summary") or ""),
-            )
+            _assign_tool_result(target, payload, ep)
     elif ep == "body.tool.execute.start":
         target = _resolve_target(state, payload)
         if target is not None:
-            target.tool_call = ToolCallRecord(
-                invocation_id=str(payload.get("invocation_id") or ""),
-                name=str(payload.get("tool_name") or payload.get("name") or ""),
-                arguments=dict(payload["arguments"])
-                if isinstance(payload.get("arguments"), dict)
-                else {},
-                arguments_summary=str(payload.get("arguments_summary") or ""),
-            )
+            _assign_tool_call(target, payload, ep)
     elif ep == "body.tool.execute.end":
         target = _resolve_target(state, payload)
         if target is not None:
-            files_raw = payload.get("files_created") or ()
-            files_tuple = (
-                tuple(str(f) for f in files_raw) if isinstance(files_raw, (list, tuple)) else ()
-            )
-            target.tool_result = ToolResult(
-                ok=_tool_result_ok(payload),
-                latency_ms=int(payload.get("latency_ms") or 0),
-                stdout_head=str(payload.get("stdout_head") or "")[:2000],
-                stdout_chars_total=int(payload.get("stdout_chars_total") or 0),
-                stdout_truncated=bool(payload.get("stdout_truncated") or False),
-                stderr=str(payload.get("stderr") or "")[:2000],
-                files_created=files_tuple,
-                error=payload.get("error"),
-                delta_summary=str(payload.get("delta_summary") or ""),
-            )
+            _assign_tool_result(target, payload, ep)
     elif ep == "exception.caught":
         _capture_exception(state, payload, ts)
 

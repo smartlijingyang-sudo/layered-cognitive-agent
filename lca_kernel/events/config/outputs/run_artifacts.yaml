@@ -1,0 +1,31 @@
+# Run artifact manifest (ADR-0198)
+schema: lca.observability.outputs/1
+
+artifacts:
+  - id: spine
+    path_pattern: "{run_dir}/{run_id}.spine.jsonl"
+    format: ndjson
+    schema: lca.spine.record/1
+    source_projection: persistence.spine
+    durable_ssot: true
+
+  - id: journal
+    path_pattern: "{run_dir}/journal.json"
+    format: json
+    schema: lca.journal/3.1
+    source_projection: journal.step_tree
+    durable_ssot: false
+
+  - id: narrative
+    path_pattern: "{run_dir}/journal.narrative.md"
+    format: markdown
+    schema: text/markdown
+    source_projection: narrative.markdown
+    durable_ssot: false
+
+  - id: manifest
+    path_pattern: "{run_dir}/manifest.json"
+    format: json
+    schema: lca.run_manifest/1
+    source_projection: doctor.run_manifest
+    durable_ssot: false

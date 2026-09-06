@@ -52,7 +52,7 @@ def _builtin_section_refs() -> tuple[tuple[str, str, bool, str | None], ...]:
         ("goal", "pure", False, None),
         ("backstory", "pure", False, None),
         ("current_date", "stateful", True, None),
-        ("tools", "pure", False, None),
+        ("tools", "stateful", False, None),
         ("available_skills", "pure", False, None),
         ("activated_skills", "stateful", False, None),
         ("task", "stateful", False, None),

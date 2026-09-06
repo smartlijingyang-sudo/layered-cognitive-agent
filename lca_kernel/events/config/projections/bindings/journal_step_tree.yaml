@@ -1,0 +1,90 @@
+# Journal step_tree field bindings (ADR-0198)
+schema: lca.observability.bindings/1
+projection_id: journal.step_tree
+
+rules:
+  - id: thinking_from_llm_call_end
+    match:
+      execution_point: llm.call.end
+    target_field: thinking
+    extract:
+      model: payload.model
+      latency_ms: payload.latency_ms
+      prompt_tokens: payload.prompt_tokens
+      completion_tokens: payload.completion_tokens
+    merge: replace_richer
+    precedence: 90
+
+  - id: thinking_model_from_header
+    match:
+      execution_point: llm.request.header
+    target_field: thinking.model
+    extract:
+      model: payload.model|payload.config.model|payload.config.model_id
+    merge: replace_richer
+    precedence: 100
+
+  - id: thinking_model_from_phase_fold
+    match:
+      execution_point: phase.think.fold
+      when_objective_kind: model_name
+    target_field: thinking.model
+    extract:
+      model: payload.objective
+    merge: fill_empty_only
+    precedence: 20
+
+  - id: tool_call_evidence
+    match:
+      execution_point: step.tool_call.record
+    target_field: tool_call
+    extract:
+      invocation_id: payload.invocation_id
+      name: payload.tool_name|payload.name
+      arguments: payload.arguments
+      arguments_summary: payload.arguments_summary
+    merge: replace_richer
+    precedence: 100
+
+  - id: tool_call_span_start
+    match:
+      execution_point: body.tool.execute.start
+    target_field: tool_call
+    extract:
+      invocation_id: payload.invocation_id
+      name: payload.tool_name|payload.name
+      arguments: payload.arguments
+      arguments_summary: payload.arguments_summary
+    merge: fill_empty_only
+    precedence: 10
+
+  - id: tool_result_evidence
+    match:
+      execution_point: step.tool_result.record
+    target_field: tool_result
+    extract:
+      ok: payload.ok
+      latency_ms: payload.latency_ms
+      stdout_head: payload.stdout_head
+      stdout_chars_total: payload.stdout_chars_total
+      stdout_truncated: payload.stdout_truncated
+      stderr: payload.stderr
+      files_created: payload.files_created
+      error: payload.error
+      delta_summary: payload.delta_summary
+    merge: replace_richer
+    precedence: 100
+
+  - id: tool_result_span_end
+    match:
+      execution_point: body.tool.execute.end
+    target_field: tool_result
+    extract:
+      ok: payload.ok
+      latency_ms: payload.latency_ms
+      stdout_head: payload.stdout_head
+      stderr: payload.stderr
+      error: payload.error
+      delta_summary: payload.delta_summary
+    merge: fill_empty_only
+    precedence: 10

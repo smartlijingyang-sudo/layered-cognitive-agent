@@ -1,0 +1,95 @@
+# Event closure catalog — journal / model-visible critical path (ADR-0198)
+# Extends spine.yaml with layer, durability, producer seam, consumer graph.
+schema: lca.observability.closure/1
+
+events:
+  - execution_point: writable.step.start
+    layer: L1_step_boundary
+    durable: true
+    producer_seam: loop.cursor
+    consumers: [persistence.spine, projection.journal.step_tree]
+    required_fields: [step_id, phase]
+
+  - execution_point: writable.step.end
+    layer: L1_step_boundary
+    durable: true
+    producer_seam: loop.cursor
+    consumers: [persistence.spine, projection.journal.step_tree]
+    required_fields: [step_id, outcome]
+
+  - execution_point: llm.request.header
+    layer: L2_model_visible
+    durable: true
+    producer_seam: llm.adapter.hook
+    consumers: [persistence.spine, projection.journal.step_tree, projection.model_visible.header]
+    required_fields: [step_id, model]
+
+  - execution_point: llm.request.header.assistant
+    layer: L2_model_visible
+    durable: true
+    producer_seam: llm.adapter.hook
+    consumers: [persistence.spine, projection.journal.step_tree, projection.model_visible.header]
+    required_fields: []
+
+  - execution_point: llm.call.end
+    layer: L2_model_visible
+    durable: true
+    producer_seam: llm.adapter
+    consumers: [persistence.spine, projection.journal.step_tree]
+    required_fields: [model]
+
+  - execution_point: llm.stream.token
+    layer: L2_model_visible
+    durable: true
+    producer_seam: llm.adapter
+    consumers: [persistence.spine, projection.journal.step_tree]
+    required_fields: [text_delta]
+
+  - execution_point: step.tool_call.record
+    layer: L3_evidence
+    durable: true
+    producer_seam: loop.cursor
+    consumers: [persistence.spine, projection.journal.step_tree, exporter.otel]
+    required_fields: [tool_name, invocation_id]
+
+  - execution_point: step.tool_result.record
+    layer: L3_evidence
+    durable: true
+    producer_seam: loop.cursor
+    consumers: [persistence.spine, projection.journal.step_tree, exporter.otel]
+    required_fields: [tool_name, outcome]
+
+  - execution_point: body.tool.execute.start
+    layer: L5_invocation_span
+    durable: true
+    producer_seam: body.executor
+    consumers: [persistence.spine, projection.journal.step_tree]
+    required_fields: [tool_name, invocation_id]
+
+  - execution_point: body.tool.execute.end
+    layer: L5_invocation_span
+    durable: true
+    producer_seam: body.executor
+    consumers: [persistence.spine, projection.journal.step_tree]
+    required_fields: [tool_name, outcome]
+
+  - execution_point: phase.think.fold
+    layer: L4_phase_summary
+    durable: true
+    producer_seam: loop.cursor
+    consumers: [persistence.spine, projection.journal.step_tree]
+    required_fields: [phase, summary, objective_kind]
+
+  - execution_point: brain.think.start
+    layer: L1_step_boundary
+    durable: true
+    producer_seam: cognition.emit
+    consumers: [persistence.spine, projection.journal.step_tree]
+    required_fields: [state_id]
+
+  - execution_point: brain.think.end
+    layer: L1_step_boundary
+    durable: true
+    producer_seam: cognition.emit
+    consumers: [persistence.spine, projection.journal.step_tree]
+    required_fields: [outcome]

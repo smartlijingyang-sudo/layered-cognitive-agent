@@ -1,0 +1,13 @@
+# Global observability compile policies (ADR-0198)
+schema: lca.observability.compile/1
+
+layer_merge_policies:
+  # L5 invocation spans must not clobber L3 evidence fields in journal fold.
+  - source_layer: L5_invocation_span
+    target_layer: L3_evidence
+    strategy: fill_empty_only
+
+  # Phase summaries never replace model-visible header content.
+  - source_layer: L4_phase_summary
+    target_layer: L2_model_visible
+    strategy: deny_overwrite

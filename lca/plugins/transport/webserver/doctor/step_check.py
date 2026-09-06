@@ -51,6 +51,7 @@ from lca.plugins.transport.webserver.doctor.models import (
     HopVerdict,
     StepScan,
 )
+from lca_kernel.events.compile.compiler import compiled_observability_plan
 
 
 def _safe_logger() -> Any:
@@ -70,6 +71,26 @@ def _safe_logger() -> Any:
                 return None
 
         return _Stub()
+
+
+def _journal_closure_execution_points() -> frozenset[str]:
+    """Journal-critical EPs from compiled observability plan (ADR-0198 P2)."""
+    plan = compiled_observability_plan()
+    if not plan.ok:
+        return frozenset()
+    return frozenset(
+        spec.execution_point
+        for spec in plan.closure_events
+        if "projection.journal.step_tree" in spec.consumers
+    )
+
+
+def _phase_fold_execution_points() -> tuple[str, ...]:
+    return tuple(
+        ep
+        for ep in sorted(_journal_closure_execution_points())
+        if ep.startswith("phase.") and ep.endswith(".fold")
+    )
 
 
 def _is_empty_tool_schema(item: Any) -> bool:
@@ -231,17 +252,7 @@ def _scan_xref(run_dir: Path, run_id: str, scan: StepScan) -> StepScan:
     spine_event_total = sum(spine_counts.values())
     spine_body_tool_start = spine_counts.get("body.tool.execute.start", 0)
     spine_llm_call_end = spine_counts.get("llm.call.end", 0)
-    spine_phase_fold_total = sum(
-        spine_counts.get(k, 0)
-        for k in (
-            "phase.perceive.fold",
-            "phase.think.fold",
-            "phase.act.fold",
-            "phase.remember.fold",
-            "phase.reflect.fold",
-            "phase.stop.fold",
-        )
-    )
+    spine_phase_fold_total = sum(spine_counts.get(k, 0) for k in _phase_fold_execution_points())
     spine_kernel_run_start = spine_counts.get("kernel.run.start", 0)
 
     # manifest.extra.flush_errors(StepTreeAccumulator.flush 空写 fail-loud)
