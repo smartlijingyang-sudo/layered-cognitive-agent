@@ -167,7 +167,7 @@ def _safe_emit(execution_point: str, **emit_kwargs: Any) -> None:
     MissingPublishSessionError / 等），其他异常上抛。
     失败时 ``log.warning`` + 递增 ``_trace_emit_failures`` 计数。
     """
-    from lca.plugins.events.publishers.spine_reflector_transport import (
+    from lca.loop.transport_emit import (
         emit_transport_route_enter,
         emit_transport_route_exit,
     )

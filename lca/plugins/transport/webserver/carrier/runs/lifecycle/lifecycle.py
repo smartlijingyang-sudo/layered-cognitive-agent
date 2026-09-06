@@ -84,7 +84,7 @@ class RunLifecycleCoordinator:
         from lca.infrastructure.session.runtime_emit import (
             emit_exception_finally as emit_carrier_exception_finally,
         )
-        from lca.plugins.events.publishers.spine_reflector_transport import (
+        from lca.loop.transport_emit import (
             emit_kernel_run_cancelled,
             emit_kernel_run_start,
             emit_kernel_run_stop,

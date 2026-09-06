@@ -136,7 +136,6 @@ _PENDING_DEBT_FILES: frozenset[str] = frozenset(
     {
         "lca/contracts/protocols/runtime/envelope_emitter.py",
         "lca/runtime/envelope_emitter.py",
-        "lca/plugins/events/publishers/spine_reflector_runtime/plugin.py",
     }
 )
 

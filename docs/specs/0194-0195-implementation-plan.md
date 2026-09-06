@@ -1,7 +1,8 @@
 # ADR-0194 / ADR-0195 完整 PR 实施计划
 
-> **状态：** Proposed（执行 SSOT）  
-> **权威：** [ADR-0194](../adr/0194-cognitive-loop-architecture-convergence.md) · [ADR-0195](../adr/0195-platform-architecture-convergence.md) · [platform-directory-architecture.md](platform-directory-architecture.md)  
+> **状态：** Implemented（2026-09-06）
+> **完成说明：** P0–P5 全轨合并。FactGateway 生产单轨、`LCA_FACT_GATEWAY` 回退开关与 bundle 内 `spine_reflector_*` 插件条目已退役;遗留 COMPAT shim 与 package-org 豁免见各 PR delete-when。
+> **权威：** [ADR-0194](../adr/0194-cognitive-loop-architecture-convergence.md) · [ADR-0195](../adr/0195-platform-architecture-convergence.md) · [platform-directory-architecture.md](platform-directory-architecture.md)
 > **用法：** 每个 PR 标题格式 `feat(scope): subject` 或 `refactor(scope): subject`；正文必须引用 PR-ID 与 ADR 条目。
 
 ---

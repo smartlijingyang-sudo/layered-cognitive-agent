@@ -543,11 +543,16 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         )
 
     def _emit(event: str, payload: Mapping[str, Any]) -> Any:
-        from lca.plugins.events.publishers.spine_reflector_assistant.plugin import (
-            emit_assistant_domain_event,
+        from lca.infrastructure.observability.domain_event_publish import (
+            publish_structural_event,
         )
 
-        return emit_assistant_domain_event(execution_point=event, payload=payload)
+        return publish_structural_event(
+            execution_point=event,
+            channel="fact",
+            payload=dict(payload),
+            producer=type(None),
+        )
 
     impl = _AssistantEvolveImpl(
         catalog=catalog,

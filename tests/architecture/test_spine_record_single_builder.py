@@ -109,16 +109,18 @@ class TestIFwRec1:
         )
 
     def test_spine_sinks_use_build_record_single_entry(self) -> None:
-        """正向锁定:两个 spine sink 的 record 构造均走 build_record()。"""
-        sinks_root = _REPO_ROOT / "lca" / "plugins" / "events" / "sinks"
-        if not sinks_root.exists():
-            pytest.skip("lca/plugins/events/sinks/ not found")
-        matches = _rg(r"build_record\(", sinks_root)
-        expected_sinks = (
-            "spine_file_sink/sink.py",
-            "spine_chain_sink/sink.py",
+        """正向锁定: spine 落盘 dispatch 路径的 record 构造均走 build_record()。"""
+        # ADR-0186 write-behind: plugin sink shim 委托 PersistenceObserver;
+        # build_record 收口在 kernel dispatch 层(bus / persistence)。
+        kernel_paths = (
+            _REPO_ROOT / "lca_kernel" / "events" / "bus.py",
+            _REPO_ROOT / "lca_kernel" / "events" / "persistence.py",
         )
-        for sink_path in expected_sinks:
-            assert any(sink_path in m for m in matches), (
-                f"I-FW-REC-1 反向断言:{sink_path} 缺少 build_record( 调用;record 构造必须走单一入口"
+        for path in kernel_paths:
+            if not path.exists():
+                pytest.skip(f"{path} not found")
+            text = path.read_text(encoding="utf-8")
+            assert "build_record(" in text, (
+                f"I-FW-REC-1 反向断言:{path.relative_to(_REPO_ROOT)} 缺少 build_record( 调用;"
+                "record 构造必须走单一入口"
             )

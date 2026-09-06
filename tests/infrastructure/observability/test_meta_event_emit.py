@@ -11,7 +11,7 @@ from lca.infrastructure.observability.meta_event_emit import (
     emit_tool_schema_published,
     tool_registry_digest,
 )
-from lca.loop.fact_gateway import publish_ep_bound, reset_fact_gateway_env
+from lca.loop.fact_gateway import publish_ep_bound
 from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
     set_publish_session,
@@ -68,43 +68,19 @@ def test_emit_without_session_logs() -> None:
     assert ref is None
 
 
-def test_meta_emit_catalog_uses_gateway_when_enabled() -> None:
-    reset_fact_gateway_env(enabled=True)
+def test_meta_emit_catalog_uses_gateway() -> None:
     session = Session("t-meta-gateway")
     token = set_publish_session(session)
     try:
-        with (
-            patch("lca.loop.fact_gateway.DefaultFactGateway.append_catalog") as gateway_append,
-            patch("lca.loop.fact_gateway._legacy_append_catalog") as legacy_append,
-        ):
+        with patch("lca.loop.fact_gateway.DefaultFactGateway.append_catalog") as gateway_append:
             emit_tool_schema_published(("search_skill",))
         gateway_append.assert_called_once()
-        legacy_append.assert_not_called()
     finally:
         reset_publish_session(token)
-        reset_fact_gateway_env()
 
 
-def test_meta_emit_catalog_honors_legacy_flag() -> None:
-    reset_fact_gateway_env(enabled=False)
-    session = Session("t-meta-legacy")
-    token = set_publish_session(session)
-    try:
-        with (
-            patch("lca.loop.fact_gateway.DefaultFactGateway.append_catalog") as gateway_append,
-            patch("lca.loop.fact_gateway._legacy_append_catalog") as legacy_append,
-        ):
-            emit_tool_schema_published(("import_skill",))
-        legacy_append.assert_called_once()
-        gateway_append.assert_not_called()
-    finally:
-        reset_publish_session(token)
-        reset_fact_gateway_env()
-
-
-def test_meta_emit_catalog_legacy_path_writes_session() -> None:
-    reset_fact_gateway_env(enabled=False)
-    session = Session("t-meta-legacy-write")
+def test_meta_emit_catalog_writes_session() -> None:
+    session = Session("t-meta-write")
     token = set_publish_session(session)
     try:
         emit_tool_schema_published(("import_skill",))
@@ -114,11 +90,9 @@ def test_meta_emit_catalog_legacy_path_writes_session() -> None:
         assert len(events) == 1
     finally:
         reset_publish_session(token)
-        reset_fact_gateway_env()
 
 
 def test_meta_emit_skill_spine_uses_publish_ep_bound() -> None:
-    reset_fact_gateway_env(enabled=True)
     session = Session("t-meta-spine")
     token = set_publish_session(session)
     try:
@@ -132,22 +106,3 @@ def test_meta_emit_skill_spine_uses_publish_ep_bound() -> None:
         assert len(catalog) == 1
     finally:
         reset_publish_session(token)
-        reset_fact_gateway_env()
-
-
-def test_meta_emit_skill_spine_honors_legacy_flag() -> None:
-    reset_fact_gateway_env(enabled=False)
-    session = Session("t-meta-spine-legacy")
-    token = set_publish_session(session)
-    try:
-        with (
-            patch("lca.loop.fact_gateway.DefaultFactGateway.publish_ep") as gateway_publish,
-            patch("lca.loop.fact_gateway._legacy_publish_ep") as legacy_publish,
-        ):
-            emit_skill_loaded(skill_id="skill-b", content_hash="hash-b")
-        legacy_publish.assert_called_once()
-        gateway_publish.assert_not_called()
-        assert session.event_count >= 1
-    finally:
-        reset_publish_session(token)
-        reset_fact_gateway_env()

@@ -20,9 +20,7 @@ __all__ = [
     "commit_tool_phase_call_start",
     "commit_tool_phase_denied",
     "fact_gateway_for_emit",
-    "is_fact_gateway_enabled",
     "publish_ep_bound",
-    "reset_fact_gateway_env",
 ]
 
 
@@ -31,9 +29,7 @@ def __getattr__(name: str) -> Any:
         "DefaultFactGateway",
         "append_catalog_bound",
         "fact_gateway_for_emit",
-        "is_fact_gateway_enabled",
         "publish_ep_bound",
-        "reset_fact_gateway_env",
     }:
         from lca.loop import fact_gateway as _fact_gateway
 

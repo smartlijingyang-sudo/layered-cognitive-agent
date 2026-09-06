@@ -56,7 +56,7 @@ def _publish_apply_marker(
     AgentState C4 单写边界,每次 fold 经 ``runtime_emit.publish_ep_bound`` 发一条
     ``runtime.reducer.apply`` marker。
     """
-    from lca.plugins.events.publishers.spine_reflector_runtime.plugin import (
+    from lca.infrastructure.session.runtime_emit import (
         emit_runtime_reducer_apply_end,
         emit_runtime_reducer_apply_start,
     )

@@ -221,3 +221,73 @@ def test_cognitive_emit_context_manifested_for_state_uses_bound_session() -> Non
         assert session.event_count == 1
     finally:
         reset_publish_session(token)
+
+
+# --- transport_emit / agent_spawn_emit → FactGateway (ADR-0194 P5-01) ---
+
+
+def test_transport_emit_all_categories_via_gateway() -> None:
+    from lca.loop.transport_emit import (
+        emit_kernel_run_cancelled,
+        emit_kernel_run_start,
+        emit_kernel_run_stop,
+        emit_transport_route_enter,
+        emit_transport_route_exit,
+        emit_transport_sse_publish,
+    )
+
+    session = Session("t-transport-emit")
+    token = set_publish_session(session)
+    try:
+        ref = emit_transport_route_enter(path="/runs", method="POST", run_id="r1", session=session)
+        assert ref is not None
+        assert ref.category == "spine.transport.route.enter"
+        ref = emit_transport_route_exit(path="/runs", method="POST", run_id="r1", session=session)
+        assert ref is not None
+        assert ref.category == "spine.transport.route.exit"
+        ref = emit_transport_sse_publish(path="/events", run_id="r1", session=session)
+        assert ref is not None
+        assert ref.category == "spine.transport.sse.publish"
+        ref = emit_kernel_run_start(run_id="r1", trace_id="t1", session=session)
+        assert ref is not None
+        assert ref.category == "spine.kernel.run.start"
+        ref = emit_kernel_run_stop(run_id="r1", outcome="success", session=session)
+        assert ref is not None
+        assert ref.category == "spine.kernel.run.stop"
+        ref = emit_kernel_run_cancelled(run_id="r1", session=session)
+        assert ref is not None
+        assert ref.category == "spine.kernel.run.cancelled"
+        assert session.event_count == 6
+    finally:
+        reset_publish_session(token)
+
+
+def test_agent_spawn_emit_iteration_via_gateway() -> None:
+    from lca.loop.agent_spawn_emit import (
+        emit_agent_loop_iteration_end,
+        emit_agent_loop_iteration_start,
+    )
+
+    session = Session("t-agent-spawn-emit")
+    token = set_publish_session(session)
+    try:
+        start = emit_agent_loop_iteration_start(
+            trace_id="trace-1",
+            role="solo",
+            iteration_kind="fresh",
+            session=session,
+        )
+        assert start is not None
+        assert start.category == "spine.agent_loop.iteration.start"
+        end = emit_agent_loop_iteration_end(
+            trace_id="trace-1",
+            role="solo",
+            iteration_kind="fresh",
+            outcome="success",
+            session=session,
+        )
+        assert end is not None
+        assert end.category == "spine.agent_loop.iteration.end"
+        assert session.event_count == 2
+    finally:
+        reset_publish_session(token)

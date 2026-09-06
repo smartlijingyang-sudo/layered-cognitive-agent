@@ -26,11 +26,16 @@ from lca.infrastructure.integrations.composio.settings import ComposioSettings
 
 
 def _emit_composio(execution_point: str, payload: dict[str, Any]) -> None:
-    from lca.plugins.events.publishers.spine_reflector_composio.plugin import (
-        emit_composio_domain_event,
+    from lca.infrastructure.observability.domain_event_publish import (
+        publish_structural_event,
     )
 
-    emit_composio_domain_event(execution_point=execution_point, payload=payload)
+    publish_structural_event(
+        execution_point=execution_point,
+        channel="fact",
+        payload=payload,
+        producer=type(None),
+    )
 
 
 def _connection_payload(conn: ComposioConnection, **extra: Any) -> dict[str, Any]:

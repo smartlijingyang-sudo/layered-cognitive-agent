@@ -2,7 +2,7 @@
 
 ## 状态
 
-**Accepted**（2026-09-06）
+**Implemented**（2026-09-06）。P0–P5 按 [0194-0195-implementation-plan](../specs/0194-0195-implementation-plan.md) 落地;验收见 `tests/architecture/test_0194_0195_acceptance.py`。
 
 **延伸并统摄**：[ADR-0194](0194-cognitive-loop-architecture-convergence.md)（Loop）、[ADR-0115](0115-kernel-transport-boundary.md)（Kernel/Transport）、[ADR-0183](0183-event-bus-framework-ssot.md) / [0186](0186-session-as-event-ssot.md)（事件 SSOT）、[ADR-0190](adr-0190-extreme-plugin-organization.md)（插件物理组织）、[ADR-0191](0191-runtime-loop-dsh-convergence-and-control-plane.md)（四态分离）、[ADR-0075](0075-declarative-phase-graph-and-minimal-trusted-kernel.md)（图内核）。
 

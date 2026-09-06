@@ -62,6 +62,8 @@ _PLANE_RULES: list[tuple[str, dict[str, object]]] = [
                 r"^lca/plugins/providers/observability/",
                 r"^lca/plugins/providers/journal/fact_store_memory",
                 r"^lca/plugins/providers/memory/journal_memory",
+                r"^lca/plugins/observability/",
+                r"^lca/plugins/journal/",
                 # Learning plugins consume completed-run evidence and produce
                 # candidates/decisions; they remain cross-cutting rather than
                 # introducing an ungoverned seventh runtime plane.
@@ -87,6 +89,7 @@ _PLANE_RULES: list[tuple[str, dict[str, object]]] = [
                 r"^lca/plugins/phase_edges/",
                 r"^lca/plugins/phase_policies/",
                 r"^lca/plugins/phase_topology/",
+                r"^lca/plugins/loop/",
             ],
             "kind": None,
         },
@@ -104,9 +107,10 @@ _PLANE_RULES: list[tuple[str, dict[str, object]]] = [
     (
         "cognitive",
         {
-            "layers": {"L0", "L1", "L2"},
+            "layers": {"L0", "L1", "L2", "L3", "L4"},
             "module_patterns": [
-                r"^lca/plugins/(brain|reasoner|critic|synthesizer|perceive|sensors|memory|think|gates|collaboration|state)/",
+                r"^lca/plugins/cognitive/",
+                r"^lca/plugins/(brain|reasoner|critic|synthesizer|perceive|sensors|memory|think|gates|gate|collaboration|state|prompts)/",
                 r"^lca/cognition/",
             ],
             "kind": None,
@@ -116,8 +120,9 @@ _PLANE_RULES: list[tuple[str, dict[str, object]]] = [
     (
         "execution",
         {
-            "layers": {"L1", "L2"},
+            "layers": {"L0", "L1", "L2"},
             "module_patterns": [
+                r"^lca/plugins/act/",
                 r"^lca/plugins/body/",
                 r"^lca/plugins/tools/",
             ],
@@ -131,6 +136,10 @@ _PLANE_RULES: list[tuple[str, dict[str, object]]] = [
             "layers": {"L0", "L1", "L2", "L3", "L4"},
             "module_patterns": [
                 r"^lca/plugins/(strategies|roles|loop_drivers|composer|team_lead|modes|phase_graph|assistant)/",
+                r"^lca/plugins/composition/",
+                r"^lca/plugins/domain/",
+                r"^lca/plugins/session/",
+                r"^lca/plugins/transport/",
                 r"^lca/agent/",
                 r"^lca/application/",
                 r"^gateway/",
@@ -146,6 +155,7 @@ _PLANE_RULES: list[tuple[str, dict[str, object]]] = [
             "module_patterns": [
                 r"^lca/plugins/seams/",
                 r"^lca/plugins/providers/",
+                r"^lca/plugins/integrations/",
                 r"^lca.plugins.factories/",
                 r"^lca/plugins/bundles/",
             ],

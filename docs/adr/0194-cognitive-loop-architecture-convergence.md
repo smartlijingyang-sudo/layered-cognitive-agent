@@ -2,7 +2,7 @@
 
 ## 状态
 
-**Accepted**（2026-09-06）
+**Implemented**（2026-09-06）。P0–P5 按 [0194-0195-implementation-plan](../specs/0194-0195-implementation-plan.md) 落地;验收见 `tests/architecture/test_0194_0195_acceptance.py`。
 
 **延伸**：ADR-0075（声明式阶段图 / MTK）、ADR-0190（极端插件化组织）、ADR-0191（四态分离 / DSH 收敛）、ADR-0192（Fact Plane）、ADR-0183/0186（Session SSOT）、认知原语宪法 v3（六步闭集 + Gate 概念群）。
 

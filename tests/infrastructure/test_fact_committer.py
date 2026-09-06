@@ -8,7 +8,6 @@ from lca.contracts.harness.fold.perceive import fold_context_manifest_from_event
 from lca.contracts.protocols.act.command_envelope import RunFact
 from lca.contracts.protocols.loop.fact_gateway import AppendReceipt
 from lca.infrastructure.session.fact_committer import SessionFactCommitter, emit_diagnostic
-from lca.loop.fact_gateway import reset_fact_gateway_env
 from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
     set_publish_session,
@@ -124,76 +123,6 @@ def test_commit_spine_fact_uses_receipt_seq_when_bound() -> None:
         assert ref == f"{session.id}:7"
     finally:
         reset_publish_session(token)
-
-
-def test_commit_context_injected_dual_path_flag() -> None:
-    session = Session("fact_committer_flag")
-    token = set_publish_session(session)
-    try:
-        reset_fact_gateway_env(enabled=True)
-        committer = SessionFactCommitter()
-        with (
-            patch("lca.loop.fact_gateway.DefaultFactGateway.append_catalog") as gateway_append,
-            patch("lca.loop.fact_gateway._legacy_append_catalog") as legacy_append,
-        ):
-            committer.commit_fact(
-                RunFact(
-                    fact_id="inj-3",
-                    kind="context.injected",
-                    payload={"source": "perceive", "content_ref": "ctx-3"},
-                ),
-                plan_ref="plan",
-                node_ref="perceive",
-            )
-        gateway_append.assert_called_once()
-        legacy_append.assert_not_called()
-
-        reset_fact_gateway_env(enabled=False)
-        with (
-            patch("lca.loop.fact_gateway.DefaultFactGateway.append_catalog") as gateway_append,
-            patch("lca.loop.fact_gateway._legacy_append_catalog") as legacy_append,
-        ):
-            committer.commit_fact(
-                RunFact(
-                    fact_id="inj-4",
-                    kind="context.injected",
-                    payload={"source": "perceive", "content_ref": "ctx-4"},
-                ),
-                plan_ref="plan",
-                node_ref="perceive",
-            )
-        legacy_append.assert_called_once()
-        gateway_append.assert_not_called()
-    finally:
-        reset_publish_session(token)
-        reset_fact_gateway_env()
-
-
-def test_commit_spine_fact_dual_path_flag() -> None:
-    session = Session("fact_committer_ep_flag")
-    token = set_publish_session(session)
-    try:
-        committer = SessionFactCommitter()
-        reset_fact_gateway_env(enabled=True)
-        with (
-            patch("lca.loop.fact_gateway.DefaultFactGateway.publish_ep") as gateway_publish,
-            patch("lca.loop.fact_gateway._legacy_publish_ep") as legacy_publish,
-        ):
-            committer.commit_evidence("evidence-3", plan_ref="plan", node_ref="think")
-        gateway_publish.assert_called_once()
-        legacy_publish.assert_not_called()
-
-        reset_fact_gateway_env(enabled=False)
-        with (
-            patch("lca.loop.fact_gateway.DefaultFactGateway.publish_ep") as gateway_publish,
-            patch("lca.loop.fact_gateway._legacy_publish_ep") as legacy_publish,
-        ):
-            committer.commit_evidence("evidence-4", plan_ref="plan", node_ref="think")
-        legacy_publish.assert_called_once()
-        gateway_publish.assert_not_called()
-    finally:
-        reset_publish_session(token)
-        reset_fact_gateway_env()
 
 
 def test_emit_diagnostic_noop_when_unbound() -> None:

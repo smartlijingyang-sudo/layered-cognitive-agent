@@ -10,7 +10,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 PLUGINS = ROOT / "lca" / "plugins"
-BUNDLE = ROOT / "bundles" / "declarative-phase-graph.yaml"
+BUNDLES = ROOT / "bundles"
+BUNDLE = BUNDLES / "declarative-phase-graph.yaml"
 
 
 class TestADR0194Acceptance:
@@ -54,6 +55,30 @@ class TestADR0194Acceptance:
             check=False,
         )
         assert proc.returncode == 1, f"cognition imports reflector: {proc.stdout}"
+
+    def test_no_lca_fact_gateway_in_production(self) -> None:
+        """P5-01: rollback env flag removed from production paths."""
+        proc = subprocess.run(
+            ["rg", "-l", "LCA_FACT_GATEWAY", "lca/"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert proc.returncode == 1, f"LCA_FACT_GATEWAY still in production: {proc.stdout}"
+
+    def test_no_spine_reflector_plugins_in_bundles(self) -> None:
+        """P2-16 / P5: bundle entries must not load spine_reflector_* publisher modules."""
+        offenders: list[str] = []
+        for bundle_path in sorted(BUNDLES.glob("*.yaml")):
+            for lineno, line in enumerate(bundle_path.read_text(encoding="utf-8").splitlines(), start=1):
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#"):
+                    continue
+                if "$module:" in stripped and "spine_reflector" in stripped:
+                    rel = bundle_path.relative_to(ROOT).as_posix()
+                    offenders.append(f"{rel}:{lineno}: {stripped}")
+        assert not offenders, "spine_reflector bundle entries remain:\n" + "\n".join(offenders)
 
 
 class TestADR0195Acceptance:

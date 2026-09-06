@@ -2,7 +2,6 @@
 
 Run-bound catalog facts and spine EPs both route through ``FactGateway``
 (``append_catalog_bound`` / ``publish_ep_bound``; ADR-0195 P1-17).
-``LCA_FACT_GATEWAY`` rollback is honored inside those helpers.
 Unbound session: structured ``structlog`` INFO (never silent).
 """
 

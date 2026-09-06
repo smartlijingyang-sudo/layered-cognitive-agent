@@ -5,8 +5,8 @@ default impl wraps the existing spine reflectors.  This test drives
 both ends to prove:
 
 1. Protocol signatures match what runtime/agent callers will use.
-2. SpineEnvelopeEmitter emits via the spine reflector module.
-3. SpineEnvelopeEmitter is a no-op when the spine reflector raises
+2. SpineEnvelopeEmitter emits via ``runtime_emit`` / ``agent_spawn_emit``.
+3. SpineEnvelopeEmitter is a no-op when the emit helper raises
    (preserves the existing ``_safe_append`` swallow behaviour).
 """
 
@@ -71,48 +71,38 @@ def test_envelope_emitter_does_not_own_exception_caught() -> None:
     assert not hasattr(SpineEnvelopeEmitter, "emit_exception_caught")
 
 
-def test_spine_envelope_emitter_dispatches_to_agent_spawn_reflector() -> None:
-    """Agent-loop iteration emits flow through ``emit_agent_loop_iteration_*``."""
+def test_spine_envelope_emitter_dispatches_to_agent_spawn_emit() -> None:
+    """Agent-loop iteration emits flow through ``agent_spawn_emit`` helpers."""
     calls: list[tuple[str, dict[str, str]]] = []
 
-    class _FakeAgentSpawn:
-        def emit_agent_loop_iteration_start(
-            self,
-            *,
-            trace_id: str,
-            role: str,
-            iteration_kind: str,
-        ) -> None:
-            calls.append(("start", {"trace_id": trace_id, "role": role, "kind": iteration_kind}))
+    def _start(*, trace_id: str, role: str, iteration_kind: str) -> None:
+        calls.append(("start", {"trace_id": trace_id, "role": role, "kind": iteration_kind}))
 
-        def emit_agent_loop_iteration_end(
-            self,
-            *,
-            trace_id: str,
-            role: str,
-            iteration_kind: str,
-            outcome: str,
-        ) -> None:
-            calls.append(
-                (
-                    "end",
-                    {
-                        "trace_id": trace_id,
-                        "role": role,
-                        "kind": iteration_kind,
-                        "outcome": outcome,
-                    },
-                )
+    def _end(*, trace_id: str, role: str, iteration_kind: str, outcome: str) -> None:
+        calls.append(
+            (
+                "end",
+                {
+                    "trace_id": trace_id,
+                    "role": role,
+                    "kind": iteration_kind,
+                    "outcome": outcome,
+                },
             )
+        )
 
-    fake = _FakeAgentSpawn()
     emitter = SpineEnvelopeEmitter()
-    emitter._agent_spawn = lambda: fake  # type: ignore[assignment]
-
-    emitter.emit_agent_loop_iteration_start(trace_id="t-1", role="coder", kind="fresh")
-    emitter.emit_agent_loop_iteration_end(
-        trace_id="t-1", role="coder", kind="fresh", outcome="success"
-    )
+    with patch(
+        "lca.runtime.envelope_emitter.emit_agent_loop_iteration_start",
+        side_effect=_start,
+    ), patch(
+        "lca.runtime.envelope_emitter.emit_agent_loop_iteration_end",
+        side_effect=_end,
+    ):
+        emitter.emit_agent_loop_iteration_start(trace_id="t-1", role="coder", kind="fresh")
+        emitter.emit_agent_loop_iteration_end(
+            trace_id="t-1", role="coder", kind="fresh", outcome="success"
+        )
 
     assert calls == [
         ("start", {"trace_id": "t-1", "role": "coder", "kind": "fresh"}),

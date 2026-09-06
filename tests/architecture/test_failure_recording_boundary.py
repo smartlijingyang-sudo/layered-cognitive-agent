@@ -9,7 +9,17 @@ from pathlib import Path
 from lca.plugins.transport.webserver.handlers.runs.terminal.failure import RunFailureFacts
 
 ROOT = Path(__file__).parents[2]
-FAILURE_RECORDING = ROOT / "gateway" / "runs" / "terminal/failure.py"
+FAILURE_RECORDING = (
+    ROOT
+    / "lca"
+    / "plugins"
+    / "transport"
+    / "webserver"
+    / "handlers"
+    / "runs"
+    / "terminal"
+    / "failure.py"
+)
 
 
 def test_failure_recording_does_not_import_mutable_run_carrier() -> None:

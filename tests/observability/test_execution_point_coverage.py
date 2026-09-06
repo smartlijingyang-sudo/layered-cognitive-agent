@@ -185,7 +185,6 @@ async def test_prompt_assembler_eps_emitted_with_payload():
     from lca.contracts.models.team.role_team import (
         ToolPermissionManifest,
     )
-    from lca.loop.fact_gateway import reset_fact_gateway_env
     from lca.plugins.events.publishers._session_publish import (
         reset_publish_session,
         set_publish_session,
@@ -194,7 +193,6 @@ async def test_prompt_assembler_eps_emitted_with_payload():
 
     session = Session("prompt-assembler-eps")
     token = set_publish_session(session)
-    reset_fact_gateway_env(enabled=True)
     try:
         template = PromptTemplate(
             id="react_prompt",
@@ -218,7 +216,6 @@ async def test_prompt_assembler_eps_emitted_with_payload():
         )
         await run_reasoner_generate_thoughts_with_spine_facts(reasoner, _build_state())
     finally:
-        reset_fact_gateway_env()
         reset_publish_session(token)
 
     events = session.snapshot_events()
@@ -245,7 +242,6 @@ def test_skill_router_route_emits_decision_path():
     import asyncio
 
     from lca.cognition.brain.skill_router import KeywordSkillRouter
-    from lca.loop.fact_gateway import reset_fact_gateway_env
     from lca.plugins.events.publishers._session_publish import (
         reset_publish_session,
         set_publish_session,
@@ -254,7 +250,6 @@ def test_skill_router_route_emits_decision_path():
 
     session = Session("skill-router-eps")
     token = set_publish_session(session)
-    reset_fact_gateway_env(enabled=True)
     try:
         router = KeywordSkillRouter(
             rules={"research_prompt": ["hello"]},
@@ -262,7 +257,6 @@ def test_skill_router_route_emits_decision_path():
         )
         result = asyncio.run(router.route(_build_state()))
     finally:
-        reset_fact_gateway_env()
         reset_publish_session(token)
 
     assert result == "research_prompt"

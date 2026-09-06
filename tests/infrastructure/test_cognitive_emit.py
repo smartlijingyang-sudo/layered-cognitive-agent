@@ -24,7 +24,7 @@ from lca.infrastructure.session.cognitive_emit import (
     run_brain_think_with_spine_facts,
     run_reasoner_generate_thoughts_with_spine_facts,
 )
-from lca.loop.fact_gateway import publish_ep_bound, reset_fact_gateway_env
+from lca.loop.fact_gateway import publish_ep_bound
 from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
     set_publish_session,
@@ -182,7 +182,6 @@ def test_emit_context_manifested_for_state_serializes_items() -> None:
 def test_emit_brain_think_start_routes_via_publish_ep_bound() -> None:
     session = Session("brain_think_start")
     token = set_publish_session(session)
-    reset_fact_gateway_env(enabled=True)
     try:
         state = _state()
         with patch(
@@ -197,14 +196,12 @@ def test_emit_brain_think_start_routes_via_publish_ep_bound() -> None:
         assert kwargs["state"] is state
         assert kwargs["actor"] == "brain"
     finally:
-        reset_fact_gateway_env()
         reset_publish_session(token)
 
 
 def test_emit_brain_think_end_appends_spine_fact() -> None:
     session = Session("brain_think_end")
     token = set_publish_session(session)
-    reset_fact_gateway_env(enabled=True)
     try:
         state = _state()
         emit_brain_think_start_for_state(state)
@@ -219,7 +216,6 @@ def test_emit_brain_think_end_appends_spine_fact() -> None:
         assert events[1].type == "spine.cognition.brain.think.end"
         assert events[1].data["payload"]["outcome"] == "failure"
     finally:
-        reset_fact_gateway_env()
         reset_publish_session(token)
 
 
@@ -227,7 +223,6 @@ def test_emit_brain_think_end_appends_spine_fact() -> None:
 async def test_run_brain_think_with_spine_facts_envelopes_decision() -> None:
     session = Session("brain_think_envelope")
     token = set_publish_session(session)
-    reset_fact_gateway_env(enabled=True)
     try:
         state = _state()
         decision = Decision(
@@ -249,7 +244,6 @@ async def test_run_brain_think_with_spine_facts_envelopes_decision() -> None:
         assert len(events) == 2
         assert events[1].data["payload"]["outcome"] == "success"
     finally:
-        reset_fact_gateway_env()
         reset_publish_session(token)
 
 
@@ -257,7 +251,6 @@ async def test_run_brain_think_with_spine_facts_envelopes_decision() -> None:
 async def test_run_brain_think_with_spine_facts_emits_failure_on_error() -> None:
     session = Session("brain_think_failure")
     token = set_publish_session(session)
-    reset_fact_gateway_env(enabled=True)
     try:
         state = _state()
         brain = AsyncMock()
@@ -272,7 +265,6 @@ async def test_run_brain_think_with_spine_facts_emits_failure_on_error() -> None
         assert len(events) == 1
         assert events[0].data["payload"]["outcome"] == "failure"
     finally:
-        reset_fact_gateway_env()
         reset_publish_session(token)
 
 
@@ -297,7 +289,6 @@ async def test_run_reasoner_generate_thoughts_emits_prompt_assembler_eps() -> No
 
     session = Session("reasoner_spine")
     token = set_publish_session(session)
-    reset_fact_gateway_env(enabled=True)
     try:
         state = _state()
         reasoner = PromptReasoner(
@@ -340,5 +331,4 @@ async def test_run_reasoner_generate_thoughts_emits_prompt_assembler_eps() -> No
         assert ends[0].data["payload"]["outcome"] == "success"
         assert reason_ends[0].data["payload"]["outcome"] == "success"
     finally:
-        reset_fact_gateway_env()
         reset_publish_session(token)

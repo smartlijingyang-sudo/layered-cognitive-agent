@@ -1,20 +1,14 @@
 """G0 单一事实生产门面(ADR-0194 §3.1)。
 
-所有 durable 事实经本门面统一走 ``Session.append``;P2-10..16 后续将 20 个
-``spine_reflector_*`` publisher 迁移至此。catalog 事实委托
-``harness.session.emit``;spine EP 在 hook 未激活时经本模块内聚的
-``enrich_spine_payload`` 合并 FieldProducer 字段(与 Session hook 同轨)。
-
-回滚开关(ADR-0194 §8,P1-09):``LCA_FACT_GATEWAY`` 未设或为真时走本模块;
-显式 ``0``/``false``/``no``/``off`` 时 catalog 回退 ``harness.session.emit``,
-spine EP 回退 ``publish_via_session``(delete-when:P5-01 Wave B 完成)。
+所有 durable 事实经本门面统一走 ``Session.append``;spine EP 在 hook 未激活时经本模块内聚的
+``enrich_spine_payload`` 合并 FieldProducer 字段(与 Session hook 同轨)。catalog 事实委托
+``harness.session.emit``。
 """
 
 from __future__ import annotations
 
-import os
 from collections.abc import Mapping
-from typing import Any, Final
+from typing import Any
 
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols.loop.fact_gateway import AppendReceipt, FactGateway
@@ -28,27 +22,6 @@ from lca.infrastructure.observability.spine.spine_enrich import (
 from lca.infrastructure.session.bindings import resolve_session_for_emit
 from lca_kernel.events.payloads import SpineEventPayload
 from lca_kernel.events.session import SessionEvent, SessionProtocol
-
-_ENV_FACT_GATEWAY: Final[str] = "LCA_FACT_GATEWAY"
-_FACT_GATEWAY_DISABLED = frozenset({"0", "false", "no", "off"})
-
-
-def is_fact_gateway_enabled() -> bool:
-    """Return False only when ``LCA_FACT_GATEWAY`` is explicitly disabled."""
-    raw = os.environ.get(_ENV_FACT_GATEWAY)
-    if raw is None or not raw.strip():
-        return True
-    return raw.strip().lower() not in _FACT_GATEWAY_DISABLED
-
-
-def reset_fact_gateway_env(*, enabled: bool | None = None) -> None:
-    """Test-only: set, clear, or default ``LCA_FACT_GATEWAY``."""
-    if enabled is None:
-        os.environ.pop(_ENV_FACT_GATEWAY, None)
-    elif enabled:
-        os.environ[_ENV_FACT_GATEWAY] = "1"
-    else:
-        os.environ[_ENV_FACT_GATEWAY] = "0"
 
 
 def _record_to_receipt(record: SessionEvent) -> AppendReceipt:
@@ -81,28 +54,6 @@ def _enrich_publish_payload(
         span_ctx=None,
     )
     return enrich_result.merged
-
-
-def _legacy_append_catalog(writer: object, event: Any, *, actor: str) -> AppendReceipt:
-    """Catalog rollback: direct ``harness.session.emit`` (pre-P1-06 path)."""
-    record = emit(writer, event, actor=actor)  # type: ignore[arg-type]
-    return _record_to_receipt(record)
-
-
-def _legacy_publish_ep(
-    writer: object,
-    ep: str,
-    payload: Mapping[str, Any],
-    *,
-    actor: str,
-) -> AppendReceipt:
-    """Spine rollback: direct ``Session.append`` (pre-P1-02 reflector path)."""
-    merged = _enrich_publish_payload(ep, payload)
-    spine = SpineEventPayload(execution_point=ep, channel="fact", payload=merged)
-    data = spine.model_dump(mode="json")
-    data.pop("category", None)
-    record = writer.append(spine.category.value, data, actor=actor)  # type: ignore[attr-defined,union-attr]
-    return _record_to_receipt(record)
 
 
 class DefaultFactGateway(FactGateway):
@@ -154,9 +105,7 @@ def append_catalog_bound(
     writer = session if session is not None else resolve_session_for_emit(state)
     if writer is None:
         return None
-    if is_fact_gateway_enabled():
-        return DefaultFactGateway(writer).append_catalog(event, actor=actor)  # type: ignore[arg-type]
-    return _legacy_append_catalog(writer, event, actor=actor)
+    return DefaultFactGateway(writer).append_catalog(event, actor=actor)  # type: ignore[arg-type]
 
 
 def publish_ep_bound(
@@ -171,16 +120,12 @@ def publish_ep_bound(
     writer = session if session is not None else resolve_session_for_emit(state)
     if writer is None:
         return None
-    if is_fact_gateway_enabled():
-        return DefaultFactGateway(writer).publish_ep(ep, payload, actor=actor)  # type: ignore[arg-type]
-    return _legacy_publish_ep(writer, ep, payload, actor=actor)
+    return DefaultFactGateway(writer).publish_ep(ep, payload, actor=actor)  # type: ignore[arg-type]
 
 
 __all__ = [
     "DefaultFactGateway",
     "append_catalog_bound",
     "fact_gateway_for_emit",
-    "is_fact_gateway_enabled",
     "publish_ep_bound",
-    "reset_fact_gateway_env",
 ]

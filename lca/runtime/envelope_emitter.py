@@ -1,8 +1,7 @@
 """SpineEnvelopeEmitter — default EnvelopeEmitter impl via FactGateway (ADR-0194 P2-10).
 
-Runtime envelope EPs route through ``lca.infrastructure.session.runtime_emit``
-(``publish_ep_bound``). Agent-loop iteration EPs still delegate to
-``spine_reflector_agent_spawn`` until P2-14.
+Runtime envelope EPs route through ``lca.infrastructure.session.runtime_emit``;
+agent-loop iteration EPs through ``lca.loop.agent_spawn_emit``.
 """
 
 from __future__ import annotations
@@ -21,20 +20,16 @@ from lca.infrastructure.session.runtime_emit import (
     emit_runtime_resume_end,
     emit_runtime_resume_start,
 )
+from lca.loop.agent_spawn_emit import (
+    emit_agent_loop_iteration_end,
+    emit_agent_loop_iteration_start,
+)
 
 _F = TypeVar("_F", bound=Callable[..., Any])
 
 
 class SpineEnvelopeEmitter:
     """Default :class:`EnvelopeEmitter` that delegates runtime EPs to FactGateway."""
-
-    @staticmethod
-    def _agent_spawn() -> Any:
-        from lca.plugins.events.publishers.spine_reflector_agent_spawn import (
-            plugin as _a,
-        )
-
-        return _a
 
     def _safe_emit(self, fn: _F, /, **kwargs: Any) -> None:
         with contextlib.suppress(BaseException):
@@ -86,7 +81,7 @@ class SpineEnvelopeEmitter:
 
     def emit_agent_loop_iteration_start(self, *, trace_id: str, role: str, kind: str) -> None:
         self._safe_emit(
-            self._agent_spawn().emit_agent_loop_iteration_start,
+            emit_agent_loop_iteration_start,
             trace_id=trace_id,
             role=role,
             iteration_kind=kind,
@@ -96,7 +91,7 @@ class SpineEnvelopeEmitter:
         self, *, trace_id: str, role: str, kind: str, outcome: str
     ) -> None:
         self._safe_emit(
-            self._agent_spawn().emit_agent_loop_iteration_end,
+            emit_agent_loop_iteration_end,
             trace_id=trace_id,
             role=role,
             iteration_kind=kind,

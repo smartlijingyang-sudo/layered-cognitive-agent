@@ -52,20 +52,17 @@ class TestPlatformDirectory:
         assert (LCA / "harness" / "graph" / "README.md").is_file()
         assert (LCA / "harness" / "composition" / "README.md").is_file()
 
-    def test_no_new_plugin_py_under_spine_reflector(self) -> None:
-        """P2 will delete reflectors; block accidental new plugin.py there."""
+    def test_no_spine_reflector_plugin_dirs_remain(self) -> None:
+        """P5-01: spine_reflector_* publisher dirs deleted."""
         publishers = PLUGINS / "events" / "publishers"
         if not publishers.is_dir():
             pytest.skip("no events/publishers")
-        offenders: list[str] = []
-        for d in publishers.iterdir():
-            if not d.is_dir() or not d.name.startswith("spine_reflector"):
-                continue
-            plugin_py = d / "plugin.py"
-            if plugin_py.is_file():
-                # Existing reflectors allowed until P2; test documents inventory
-                continue
-        assert not offenders
+        reflectors = [
+            d.name
+            for d in publishers.iterdir()
+            if d.is_dir() and d.name.startswith("spine_reflector")
+        ]
+        assert reflectors == []
 
     def test_check_platform_directory_script_passes_hard_gates(self) -> None:
         import subprocess

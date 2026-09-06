@@ -17,7 +17,7 @@ from unittest.mock import patch
 import pytest
 
 from lca.infrastructure.session.spine_envelope import with_spine_envelope
-from lca.loop.fact_gateway import publish_ep_bound, reset_fact_gateway_env
+from lca.loop.fact_gateway import publish_ep_bound
 from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
     set_publish_session,
@@ -34,7 +34,6 @@ def test_decorator_emits_start_then_end_on_success() -> None:
 
     session = Session("spine_env_success")
     token = set_publish_session(session)
-    reset_fact_gateway_env(enabled=True)
     try:
 
         def _capture(ep: str, payload: dict[str, object], **kwargs: object) -> None:
@@ -59,7 +58,6 @@ def test_decorator_emits_start_then_end_on_success() -> None:
         assert calls[1][0] == "test.point.end"
         assert calls[1][2]["outcome"] == "success"
     finally:
-        reset_fact_gateway_env()
         reset_publish_session(token)
 
 
@@ -72,7 +70,6 @@ def test_decorator_emits_failure_on_exception() -> None:
 
     session = Session("spine_env_failure")
     token = set_publish_session(session)
-    reset_fact_gateway_env(enabled=True)
     try:
 
         def _capture(ep: str, payload: dict[str, object], **kwargs: object) -> None:
@@ -96,7 +93,6 @@ def test_decorator_emits_failure_on_exception() -> None:
         assert calls[1][0] == "boom.end"
         assert calls[1][1]["outcome"] == "failure"
     finally:
-        reset_fact_gateway_env()
         reset_publish_session(token)
 
 
@@ -106,7 +102,6 @@ def test_decorator_noop_when_session_unbound() -> None:
     class _State:
         trace_id = "trace-3"
 
-    reset_fact_gateway_env(enabled=True)
     try:
 
         @with_spine_envelope("does.not.exist", state_id_arg="state")
@@ -117,8 +112,6 @@ def test_decorator_noop_when_session_unbound() -> None:
 
         assert asyncio.run(_fn(_State())) == 42
     finally:
-        reset_fact_gateway_env()
-
 
 def test_decorator_preserves_function_metadata() -> None:
     """The decorator must preserve name and docstring via functools.wraps."""
@@ -136,7 +129,6 @@ def test_decorator_routes_via_publish_ep_bound() -> None:
     """Integration: bound session receives start/end spine facts."""
     session = Session("spine_env_gateway")
     token = set_publish_session(session)
-    reset_fact_gateway_env(enabled=True)
     try:
 
         class _State:
@@ -158,5 +150,4 @@ def test_decorator_routes_via_publish_ep_bound() -> None:
         assert publish.call_args_list[0].args[0] == "critic.eval.start"
         assert publish.call_args_list[1].args[0] == "critic.eval.end"
     finally:
-        reset_fact_gateway_env()
         reset_publish_session(token)
