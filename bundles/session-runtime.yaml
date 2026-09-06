@@ -21,7 +21,7 @@ description: |
 entries:
   - id: lca.plugins.session.runtime
     name: session_runtime
-    $module: lca.plugins.session.runtime.plugin.plugin.plugin
+    $module: lca.plugins.session.runtime.plugin.plugin
     config: {}
 
   - id: lca.plugins.session.spine_anomaly
