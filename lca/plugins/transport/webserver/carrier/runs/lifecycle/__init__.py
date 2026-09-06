@@ -7,8 +7,18 @@ during its own ``__init__.py`` execution).
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
 
-def __getattr__(name: str):
+if TYPE_CHECKING:
+    from lca.plugins.transport.webserver.carrier.runs.binding import ensure_session_hub
+    from lca.plugins.transport.webserver.carrier.runs.lifecycle.lifecycle import (
+        RunLifecycleCoordinator,
+    )
+
+__all__ = ["RunLifecycleCoordinator", "ensure_session_hub"]
+
+
+def __getattr__(name: str) -> Any:
     if name in ("RunLifecycleCoordinator", "ensure_session_hub"):
         from lca.plugins.transport.webserver.carrier.runs.lifecycle.lifecycle import (
             RunLifecycleCoordinator,
@@ -20,6 +30,3 @@ def __getattr__(name: str):
         globals()["ensure_session_hub"] = ensure_session_hub
         return globals()[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
-__all__ = ["RunLifecycleCoordinator", "ensure_session_hub"]

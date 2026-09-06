@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Protocol, cast, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
 
 class CapabilityKey(str, Enum):
@@ -22,6 +22,11 @@ class CapabilityKey(str, Enum):
 
 
 REQUIRED_CAPABILITY_KEYS: tuple[CapabilityKey, ...] = tuple(CapabilityKey)
+
+
+if TYPE_CHECKING:
+    SeamKey = CapabilityKey
+    REQUIRED_SEAM_KEYS: tuple[CapabilityKey, ...]
 
 
 def __getattr__(name: str) -> object:

@@ -86,6 +86,8 @@ __all__ = [
 if TYPE_CHECKING:
     from cordis import Context
 
+    _cached_default_ctx: Context | None
+
 
 def __getattr__(name: str) -> object:
     """Preserve the historical cache alias while lifecycle ownership lives elsewhere."""

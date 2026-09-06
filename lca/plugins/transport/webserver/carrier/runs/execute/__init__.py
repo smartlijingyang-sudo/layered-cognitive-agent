@@ -9,12 +9,19 @@ Legacy import path ``handlers/runs/execute`` removed (ADR-0195 P3-02); use this 
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 from lca.plugins.transport.webserver.carrier.runs.execute.execute import (
     create_run_session,
     execute_run,
     resume_run,
     schedule_run,
 )
+
+if TYPE_CHECKING:
+    from lca.plugins.transport.webserver.carrier.runs.lifecycle.lifecycle import (
+        RunLifecycleCoordinator,
+    )
 
 __all__ = [
     "RunLifecycleCoordinator",
@@ -25,7 +32,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     if name == "RunLifecycleCoordinator":
         from lca.plugins.transport.webserver.carrier.runs.lifecycle.lifecycle import (
             RunLifecycleCoordinator,

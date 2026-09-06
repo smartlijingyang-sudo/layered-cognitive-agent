@@ -9,7 +9,7 @@ not create a static dependency on ``application``.
 from __future__ import annotations
 
 from importlib import import_module
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from lca.contracts.models.team.team.coordination import (
     Debate,
@@ -38,6 +38,9 @@ __all__ = [
     "TeamLead",
     "TeamSpec",
 ]
+
+if TYPE_CHECKING:
+    from lca.application.api.api import Agent, Team, TeamLead
 
 _LAZY_COMPOSITION_SYMBOLS = frozenset({"Agent", "Team", "TeamLead"})
 

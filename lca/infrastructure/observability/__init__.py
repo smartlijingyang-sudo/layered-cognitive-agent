@@ -21,6 +21,10 @@
 包外禁止 import 任何子模块（守卫测试强制）；本 ``__init__`` 是唯一表面。
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from lca.contracts.models.observability.diagnostic.diagnostic import (
     DiagnosticCategory,
     DiagnosticEvent,
@@ -313,6 +317,26 @@ __all__ = [
     "team_id_for",
     "traced",
 ]
+
+if TYPE_CHECKING:
+    from lca.infrastructure.observability.journal.backends.memory import InMemoryJournalStore
+    from lca.infrastructure.observability.journal.engine.engine import (
+        RunStore,
+        UnregisteredJournalEventError,
+    )
+    from lca.infrastructure.observability.journal.engine.journal_io import (
+        read_journal,
+        stamped_to_record,
+    )
+    from lca.infrastructure.observability.journal.engine.reducer import (
+        RunState,
+        RunStatus,
+        fold_run_state,
+    )
+    from lca.infrastructure.observability.journal.engine.serialization import (
+        stamped_to_journal_record,
+    )
+    from lca.infrastructure.observability.journal.otel.projector import OtelProjector
 
 _LAZY_JOURNAL_SYMBOLS: dict[str, tuple[str, str]] = {
     "OtelProjector": ("lca.infrastructure.observability.journal", "OtelProjector"),

@@ -6,7 +6,10 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from lca.infrastructure.llm_adapter.openai_compat import OpenAICompatAdapter
 
 from lca.infrastructure.llm_adapter.api.style import LLMApiStyle
 from lca.infrastructure.llm_adapter.factory.factory import (

@@ -30,6 +30,8 @@ from lca.infrastructure.observability.events.event.descriptors_data import build
 if TYPE_CHECKING:
     from lca.contracts.observability.event.descriptor_registry import EventDescriptorRegistry
 
+    EVENT_DESCRIPTOR_REGISTRY: EventDescriptorRegistry
+
 # 懒加载 fallback：第一次读 EVENT_DESCRIPTOR_REGISTRY 时构造，后续复用同一对象。
 # 与 ambient registry 完全独立——是兜底，不是替代品。
 _fallback_cache: EventDescriptorRegistry | None = None
@@ -76,4 +78,4 @@ def __getattr__(name: str) -> Any:
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-__all__ = ["EVENT_DESCRIPTOR_REGISTRY", "descriptor_for", "may_export_externally"]  # noqa: F822  (PEP 562 lazy export via __getattr__)
+__all__ = ["EVENT_DESCRIPTOR_REGISTRY", "descriptor_for", "may_export_externally"]

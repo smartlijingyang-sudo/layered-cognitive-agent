@@ -5,7 +5,35 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from lca.harness.declarative.compile.assembler.assembler import (
+        ExecutableNode,
+        ExecutablePlan,
+        GraphAssembler,
+        MappingRestrictedScope,
+        RestrictedScope,
+    )
+    from lca.harness.declarative.compile.compiler.compiler import (
+        DeclarativePlanProjection,
+        compile_declarative_projection,
+    )
+    from lca.harness.declarative.controls.approval import (
+        ApprovalState,
+        ApprovalStateMachine,
+        ApprovalTransition,
+    )
+    from lca.harness.declarative.controls.validation import validate_control_binding_closure
+    from lca.harness.declarative.execute.outcome_projection import (
+        InterpretationResult,
+        PhaseVisit,
+    )
+    from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
+    from lca.harness.graph.execute.interpreter import (
+        GenericPlanInterpreter,
+        InMemoryJournalCommitter,
+    )
 
 __all__ = [
     "ApprovalState",

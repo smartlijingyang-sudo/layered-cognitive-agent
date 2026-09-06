@@ -5,7 +5,26 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from lca.loop.commit.act_journal import commit_act_journal_receipt
+    from lca.loop.commit.memory_journal import (
+        commit_memory_journal_receipt,
+        commit_memory_spine_receipt,
+    )
+    from lca.loop.commit.tool_journal import (
+        commit_tool_journal_receipt,
+        commit_tool_phase_call_end,
+        commit_tool_phase_call_start,
+        commit_tool_phase_denied,
+    )
+    from lca.loop.fact_gateway import (
+        DefaultFactGateway,
+        append_catalog_bound,
+        fact_gateway_for_emit,
+        publish_ep_bound,
+    )
 
 __all__ = [
     "DefaultFactGateway",

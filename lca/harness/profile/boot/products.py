@@ -81,11 +81,3 @@ __all__ = [
     "profile_boot_products_from_scope",
     "resolved_profile_from_scope",
 ]
-
-
-def __getattr__(name: str) -> object:
-    if name == "compile_profile_boot_products":
-        from lca.harness.composition.boot_compile import compile_profile_boot_products
-
-        return compile_profile_boot_products
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
