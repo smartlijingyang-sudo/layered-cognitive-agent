@@ -1,8 +1,12 @@
-"""ContextManifest journal sink adapters (COMPAT — ADR-0192 E4 delete-when).
+"""ContextManifest journal sink adapters (COMPAT — ADR-0192 delete-when).
 
-PerceiveHub no longer emits facts; production uses ``PhaseFactEmitter`` +
-``emit_context_manifested_for_state``. ``JournalSink`` remains for tests that
-assert legacy ``ContextManifested`` journal records until delete-when clears.
+# COMPAT(owner: ADR-0192, from: PerceiveHub ManifestSink journal dual-write,
+# to: PhaseFactEmitter + emit_context_manifested_for_state,
+# delete_when: rg 'ManifestSink|JournalSink|NullSink' tests/ lca/ = 0 except this module,
+# forbidden_new_usage: new perceive paths writing ContextManifested via JournalSink)
+
+Production manifest facts use Session ``context.manifested.v1``. These adapters
+remain for focused journal-backend unit tests only.
 """
 
 from __future__ import annotations
@@ -104,15 +108,9 @@ class JournalSink:
         return cast("ContextManifested", stamped.event)
 
 
-def default_sink() -> ManifestSink:
-    """返回生产账本适配器。"""
-    return JournalSink()
-
-
 __all__ = [
     "JournalEventAppender",
     "JournalSink",
     "ManifestSink",
     "NullSink",
-    "default_sink",
 ]

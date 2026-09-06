@@ -28,7 +28,6 @@ from lca.cognition.brain.decision_gates import (
     record_gate_decided,
 )
 from lca.cognition.perceive_hub import SequentialPerceiveHub
-from lca.cognition.perceive_sink import JournalSink, NullSink
 from lca.cognition.sensors import (
     InboxFactsSensor,
     TeamInboxSensor,
@@ -111,12 +110,10 @@ class TestSensorsPrimitive:
         # The Hub path catches the exception and produces an empty
         # contribution.
         from lca.cognition.perceive_hub import SequentialPerceiveHub
-        from lca.cognition.perceive_sink import NullSink
 
         hub = SequentialPerceiveHub(
             sensors=[_Disabled()],
             memory=None,
-            sink=NullSink(),
         )
         manifest = await hub.perceive(_state())
         assert manifest.has_kind("clock") is False
@@ -204,11 +201,9 @@ class TestHubPrimitive:
 
     @pytest.mark.asyncio
     async def test_hub_folds_session_gate_decisions(self) -> None:
-        store = RunStore()
         hub = SequentialPerceiveHub(
             sensors=[],
             memory=None,
-            sink=JournalSink.for_store(store),
         )
         with bound_session():
             state = _state()
@@ -229,12 +224,11 @@ class TestHubPrimitive:
             assert manifest.has_kind("policy_fact")
 
     @pytest.mark.asyncio
-    async def test_hub_with_null_sink_does_not_record(self) -> None:
-        """NullSink is the offline-test sink."""
+    async def test_hub_perceive_without_journal_sink(self) -> None:
+        """Hub fold works offline; manifest facts emit via PhaseFactEmitter in production."""
         hub = SequentialPerceiveHub(
             sensors=[build_clock_sensor()],
             memory=None,
-            sink=NullSink(),
         )
         manifest = await hub.perceive(_state())
         assert manifest.has_kind("clock")
@@ -285,11 +279,9 @@ class TestCompositionLarge:
     @pytest.mark.asyncio
     async def test_idempotent_perceive(self) -> None:
         """The Hub is idempotent for replay: same sensors → same manifest."""
-        store = RunStore()
         hub = SequentialPerceiveHub(
             sensors=[build_clock_sensor()],
             memory=None,
-            sink=JournalSink.for_store(store),
         )
         state = _state()
         m1 = await hub.perceive(state)
@@ -350,7 +342,6 @@ class TestTeamMessageE2E:
         hub = SequentialPerceiveHub(
             sensors=[TeamInboxSensor(store)],
             memory=None,
-            sink=JournalSink.for_store(store),
         )
         manifest = await hub.perceive(_state())
         assert manifest.has_kind("team_inbox")

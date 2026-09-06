@@ -24,7 +24,6 @@ from lca.cognition.brain.decision_gates import (
     ToolLoopBreakerGate,
 )
 from lca.cognition.perceive_hub import SequentialPerceiveHub
-from lca.cognition.perceive_sink import JournalSink
 from lca.cognition.sensors import (
     InboxFactsSensor,
     TeamInboxSensor,
@@ -148,11 +147,9 @@ class TestFullV3Integration:
     @pytest.mark.asyncio
     async def test_hub_digest_stable_across_runs(self) -> None:
         """Perception is deterministic for the same sensor set + state."""
-        store = RunStore()
         hub = SequentialPerceiveHub(
             sensors=[build_clock_sensor()],
             memory=None,
-            sink=JournalSink.for_store(store),
         )
         # Two runs of the same state produce the same digest.
         state = _state()

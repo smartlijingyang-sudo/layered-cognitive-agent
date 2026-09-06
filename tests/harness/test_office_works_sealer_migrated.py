@@ -25,12 +25,12 @@ from lca.cognition.body.action_registry import ActionRegistry
 from lca.cognition.body.safe_executor import SimpleSafeExecutor
 from lca.cognition.body.simple_body import SimpleBody
 from lca.cognition.body.tool_registry import SimpleToolRegistry
+from lca.cognition.brain.decision_gates import build_default_workspace_gate_chain
 from lca.cognition.transport_registry_factory import build_transport_registry
 from lca.contracts.models.core.budget import Budget
 from lca.contracts.models.core.decision import Decision, Observation, Turn
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.team.role_team import ToolPermissionManifest
-from lca.plugins.gate.gate_chain_composer_provider import DefaultGateChainComposer
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SEALER_PATH = (
@@ -56,12 +56,9 @@ def _build_body_for_finalize(seal_office_works_fn: Callable[[], Awaitable[None]]
 
 class TestOfficeWorksSealerMigration:
     def test_sealer_no_longer_in_composed_gate_chain(self) -> None:
-        """The composer-owned default chain MUST NOT include the sealer."""
-        from lca.cognition.brain.decision_gates import (
-            build_workspace_agent_gate_with_composer,
-        )
+        """The default workspace gate chain MUST NOT include the sealer."""
 
-        gate = build_workspace_agent_gate_with_composer(DefaultGateChainComposer())
+        gate = build_default_workspace_gate_chain()
         underlying = getattr(gate, "_gates", None)
         assert underlying is not None, "expected ChainedDecisionGate to expose _gates"
         gate_names = [type(g).__name__ for g in underlying]

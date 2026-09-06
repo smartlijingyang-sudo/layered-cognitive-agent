@@ -37,10 +37,8 @@ def build_manifested_event(
 ) -> tuple[ContextManifested, ContextManifest]:
     """Build the (event, manifest) pair for emission.
 
-    The PerceiveHub is the only caller; the pair is passed to the
-    injected ``ManifestSink``. Returns a tuple so the sink can both
-    record the manifest content and stay decoupled from the manifest
-    builder.
+    The PerceiveHub returns the manifest; PhaseFactEmitter records
+    ``context.manifested.v1`` Session facts in production.
     """
     manifest = ContextManifest(items=tuple(items))
     digest = digest_manifest(manifest)

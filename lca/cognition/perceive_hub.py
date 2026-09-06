@@ -33,9 +33,7 @@ class SequentialPerceiveHub(PerceiveHub):
         memory: MemorySystem | None,
         *,
         max_context_chars: int = DEFAULT_CONTEXT_BUDGET_CHARS,
-        sink: object | None = None,
     ) -> None:
-        del sink  # COMPAT(ADR-0192 E4): legacy JournalSink kwarg ignored
         self._sensors = list(sensors)
         self._memory = memory
         self._budgeter = ContextBudgeter(max_context_chars)

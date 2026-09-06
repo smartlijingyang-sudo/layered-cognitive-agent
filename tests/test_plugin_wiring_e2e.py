@@ -120,11 +120,6 @@ class TestHubConstruction:
 
         assert isinstance(NullSink(), ManifestSink)
 
-    def test_hub_default_sink_is_journal(self) -> None:
-        from lca.cognition.perceive_sink import JournalSink, default_sink
-
-        assert isinstance(default_sink(), JournalSink)
-
     def test_journal_sink_consumes_write_only_backend(self) -> None:
         from lca.cognition.perceive_sink import JournalSink
         from lca.contracts.models.core.perception import ContextManifest
@@ -162,7 +157,8 @@ class TestHubConstruction:
         params = list(sig.parameters.keys())
         assert "sensors" in params
         assert "memory" in params
-        assert "sink" in params
+        assert "max_context_chars" in params
+        assert "sink" not in params
 
 
 class TestSensorBaseClass:

@@ -18,7 +18,6 @@ from lca.cognition.body.team_message_tool import (
     publish_team_message,
 )
 from lca.cognition.perceive_hub import SequentialPerceiveHub
-from lca.cognition.perceive_sink import JournalSink
 from lca.cognition.sensors import TeamInboxSensor
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.state import AgentState, Budget
@@ -91,7 +90,6 @@ class TestTeamMessageTool:
         hub = SequentialPerceiveHub(
             sensors=[TeamInboxSensor(store)],
             memory=None,
-            sink=JournalSink.for_store(store),
         )
         state = AgentState(trace_id=new_id("trace"), task="t", budget=Budget())
         manifest = await hub.perceive(state)

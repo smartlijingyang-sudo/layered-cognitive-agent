@@ -30,7 +30,6 @@ from lca.plugins.act.effect_handlers_provider import (
     register_default_effect_handlers,
 )
 from lca.plugins.gate.decision_classifier_provider import DefaultDecisionClassifier
-from lca.plugins.gate.gate_chain_composer_provider import DefaultGateChainComposer
 from lca.plugins.journal.artifact_closure_provider import DefaultArtifactClosure
 
 
@@ -359,18 +358,17 @@ class TestDefaultArtifactClosure:
         assert callable(closure.synthesize)
 
 
-class TestDefaultGateChainComposer:
-    """DefaultGateChainComposer tests."""
+class TestDefaultWorkspaceGateChain:
+    """Default workspace gate chain helper tests."""
 
-    def test_implements_protocol(self):
-        """Should implement GateChainComposer Protocol."""
-        from lca.contracts.protocols.gate.gate_chain_composer import GateChainComposer
+    def test_builds_chained_gate(self) -> None:
+        from lca.cognition.brain.decision_gates import (
+            ChainedDecisionGate,
+            build_default_workspace_gate_chain,
+        )
 
-        composer = DefaultGateChainComposer()
-        assert isinstance(composer, GateChainComposer)
-
-    def test_has_compose_method(self):
-        """Should have compose method."""
-        composer = DefaultGateChainComposer()
-        assert hasattr(composer, "compose")
-        assert callable(composer.compose)
+        gate = build_default_workspace_gate_chain()
+        assert isinstance(gate, ChainedDecisionGate)
+        underlying = getattr(gate, "_gates", None)
+        assert underlying is not None
+        assert len(underlying) == 5

@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from lca.cognition.perceive_hub import SequentialPerceiveHub
-from lca.cognition.perceive_sink import NullSink
 from lca.contracts.models.core.budget import create_budget
 from lca.contracts.models.core.perception import ContextItem
 from lca.contracts.models.core.state import AgentState
@@ -30,7 +29,6 @@ async def test_perceive_hub_trims_items_to_context_budget() -> None:
     hub = SequentialPerceiveHub(
         sensors=[_LargePayloadSensor()],
         memory=None,
-        sink=NullSink(),
         max_context_chars=150,
     )
     manifest = await hub.perceive(state)
