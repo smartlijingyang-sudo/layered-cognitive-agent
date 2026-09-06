@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.observability.journal import TeamMessagePublished
-from lca.infrastructure.observability import record as _journal_record
+from lca.infrastructure.observability.journal_append import append_journal_event
 
 
 def publish_team_message(
@@ -39,7 +39,7 @@ def publish_team_message(
         step=step,
         body_preview=body,
     )
-    _journal_record(event)
+    append_journal_event(event)
     return event
 
 

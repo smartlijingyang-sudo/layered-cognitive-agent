@@ -22,7 +22,8 @@ from lca.contracts.atoms.telemetry import ATTR_STEP, HOOK_TO_PHASE_SPAN, SpanNam
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.diagnostic import DiagnosticCategory
 from lca.contracts.protocols import HookRegistry
-from lca.infrastructure.observability import detached_span, record_runtime, set_actor
+from lca.infrastructure.observability import detached_span, set_actor
+from lca.infrastructure.session.fact_committer import emit_diagnostic
 
 _log = structlog.get_logger(__name__)
 
@@ -109,9 +110,9 @@ class CordisHookRegistry(HookRegistry):
         # payloads; we fold state + kwargs into a single envelope so the
         # listener signature stays uniform across all 5 dispatch modes.
         envelope = {"event_name": event_name, "state": state, **kwargs}
-        record_runtime(
-            DiagnosticCategory.HOOK,
-            "hook.trigger",
+        emit_diagnostic(
+            category=DiagnosticCategory.HOOK.value,
+            operation="hook.trigger",
             plugin="hook_registry.simple",
             attributes={
                 "hook_event": event_name,

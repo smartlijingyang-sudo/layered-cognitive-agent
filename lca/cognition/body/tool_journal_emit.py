@@ -36,7 +36,8 @@ from lca.contracts.observability.evidence import (
     EvidenceStore,
 )
 from lca.contracts.protocols.runtime.infra import Tool
-from lca.infrastructure.observability import record, record_runtime
+from lca.infrastructure.observability.journal_append import append_journal_event
+from lca.infrastructure.session.fact_committer import emit_diagnostic
 from lca.infrastructure.tools.contract.project import project_tool_state
 
 _log = structlog.get_logger(__name__)
@@ -214,16 +215,16 @@ def emit_tool_started(
     )
     # V4:至少一个非空;evidence 不可用 → inline 退路
     inline_args: dict[str, Any] = {} if arguments_ref is not None else args_dict
-    record_runtime(
-        DiagnosticCategory.TOOL,
-        "tool.start",
+    emit_diagnostic(
+        category=DiagnosticCategory.TOOL.value,
+        operation="tool.start",
         plugin=type(tool).__name__,
         attributes={
             "tool_name": tool.name,
             "invocation_id": invocation_id,
         },
     )
-    record(
+    append_journal_event(
         ToolStarted(
             tool_name=tool.name,
             invocation_id=invocation_id,
@@ -272,13 +273,13 @@ def _summarize_args(args: dict[str, Any], limit: int = 200) -> str:
 
 def emit_tool_denied(tool: Tool, reason: str) -> None:
     """Emit ``ToolDenied`` from the canonical safe_executor module."""
-    record_runtime(
-        DiagnosticCategory.TOOL,
-        "tool.denied",
+    emit_diagnostic(
+        category=DiagnosticCategory.TOOL.value,
+        operation="tool.denied",
         plugin=type(tool).__name__,
         attributes={"tool_name": tool.name, "reason": reason},
     )
-    record(ToolDenied(tool_name=tool.name, reason=reason))
+    append_journal_event(ToolDenied(tool_name=tool.name, reason=reason))
     _emit_phase_tool_denied(tool_name=tool.name, reason=reason)
     # ADR-0169 PR-1/S1: route through LoopCursor.record_tool_result with
     # outcome="denied". Canonical ToolDenied JournalEvent above remains
@@ -339,9 +340,9 @@ def emit_tool_invoked(
         projected_state_dict = project_tool_state(tool.name, args_dict, obs)
     except Exception:
         _log.debug("project_tool_state failed for %s", tool.name, exc_info=True)
-    record_runtime(
-        DiagnosticCategory.TOOL,
-        "tool.complete",
+    emit_diagnostic(
+        category=DiagnosticCategory.TOOL.value,
+        operation="tool.complete",
         plugin=type(tool).__name__,
         attributes={
             "tool_name": tool.name,
@@ -354,7 +355,7 @@ def emit_tool_invoked(
             "error": "" if obs.success else (obs.error or ""),
         },
     )
-    record(
+    append_journal_event(
         ToolInvoked(
             tool_name=tool.name,
             invocation_id=resolved_id,

@@ -63,7 +63,7 @@ from lca.contracts.protocols import (
 from lca.contracts.protocols.act.action import Action
 from lca.contracts.protocols.act.command_envelope import command_envelope_to_dict
 from lca.contracts.protocols.act.tool_batch_execution import ToolBatchExecutionPolicy
-from lca.infrastructure.observability import record
+from lca.infrastructure.observability.journal_append import append_journal_event
 from lca.plugins.events.publishers.spine_reflector_body_llm import (
     plugin as _body_llm_reflector,
 )
@@ -81,7 +81,7 @@ def record_decision_made(decision: Decision, state: AgentState) -> None:
         delegate_target = first.target_role or first.target_agent_id or ""
         delegate_count = len(decision.delegations) if len(decision.delegations) > 1 else 0
     tool_name = decision.tool_calls[0].tool_name if decision.tool_calls else ""
-    record(
+    append_journal_event(
         DecisionMade(
             step=state.step,
             action_type=decision.action_type,
@@ -153,7 +153,7 @@ class RespondOperation(Action):
         else:
             method = SynthesisMethod.FULL
             candidate_count = len(board.required_roles)
-        record(
+        append_journal_event(
             SynthesisCompleted(
                 method=method.value,
                 candidate_count=candidate_count,

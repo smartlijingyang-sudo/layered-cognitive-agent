@@ -7,14 +7,12 @@ from collections.abc import Sequence
 import structlog
 
 from lca.cognition.brain.context_manifest import build_manifest_from_items, digest_manifest
-from lca.cognition.perceive_sink import ManifestSink
 from lca.contracts.harness.fold.perceive import fold_gate_decisions_from_events
 from lca.contracts.harness.state.context_budget import (
     DEFAULT_CONTEXT_BUDGET_CHARS,
     ContextBudgeter,
 )
 from lca.contracts.models.core.gate_policy import GateDecided
-from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.perception import ContextItem, ContextManifest
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.diagnostic import DiagnosticCategory, DiagnosticStatus
@@ -34,10 +32,10 @@ class SequentialPerceiveHub(PerceiveHub):
         sensors: Sequence[Sensor],
         memory: MemorySystem | None,
         *,
-        sink: ManifestSink | None = None,
         max_context_chars: int = DEFAULT_CONTEXT_BUDGET_CHARS,
+        sink: object | None = None,
     ) -> None:
-        del sink  # COMPAT(ADR-0192 E4): JournalSink ignored; facts via PhaseFactEmitter
+        del sink  # COMPAT(ADR-0192 E4): legacy JournalSink kwarg ignored
         self._sensors = list(sensors)
         self._memory = memory
         self._budgeter = ContextBudgeter(max_context_chars)
@@ -104,41 +102,16 @@ def _memory_items(state: AgentState) -> list[ContextItem]:
 
 def _policy_fact_items(state: AgentState) -> list[ContextItem]:
     session = resolve_session_reader()
-    if session is not None:
-        prior_step = state.step - 1
-        if prior_step >= 0:
-            decisions = fold_gate_decisions_from_events(
-                session.snapshot_events(),
-                step=prior_step,
-            )
-            if decisions:
-                _drain_gate_decided_bucket(state)
-                return [_policy_fact_item(event) for event in decisions if event.policy_fact]
-    return _policy_fact_items_from_bucket(state)
-
-
-def _policy_fact_items_from_bucket(state: AgentState) -> list[ContextItem]:
-    view = PerceiveState.from_agent_state(state)
-    if not view.gate_decided:
+    if session is None:
         return []
-    items: list[ContextItem] = []
-    for event in view.gate_decided:
-        if not isinstance(event, GateDecided):
-            continue
-        if event.policy_fact is None:
-            continue
-        items.append(_policy_fact_item(event))
-    view.gate_decided = []
-    view.commit(state)
-    return items
-
-
-def _drain_gate_decided_bucket(state: AgentState) -> None:
-    view = PerceiveState.from_agent_state(state)
-    if not view.gate_decided:
-        return
-    view.gate_decided = []
-    view.commit(state)
+    prior_step = state.step - 1
+    if prior_step < 0:
+        return []
+    decisions = fold_gate_decisions_from_events(
+        session.snapshot_events(),
+        step=prior_step,
+    )
+    return [_policy_fact_item(event) for event in decisions if event.policy_fact]
 
 
 def _policy_fact_item(event: GateDecided) -> ContextItem:

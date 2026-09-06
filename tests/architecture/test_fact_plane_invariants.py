@@ -58,7 +58,7 @@ class TestIFact1:
 
 
 class TestIFact2:
-    """I-FACT-2: Perceive path must not use Journal production APIs."""
+    """I-FACT-2: Cognition must not use Journal production APIs directly."""
 
     def test_i_fact_2_perceive_hub_and_sink_clean(self) -> None:
         path = _COGNITION / "perceive_hub.py"
@@ -80,6 +80,24 @@ class TestIFact2:
                 if token in line:
                     matches.append(f"{path.relative_to(_REPO_ROOT)}:{lineno}:{line}")
         assert not matches, "I-FACT-2 perceive_hub violations\n" + "\n".join(matches)
+
+    def test_i_fact_2_cognition_no_direct_facade_record(self) -> None:
+        """Cognition must route journal writes through append_journal_event seam."""
+        forbidden_patterns = (
+            "from lca.infrastructure.observability import record",
+            "from lca.infrastructure.observability.facade.facade import record",
+            "record_runtime(",
+        )
+        matches: list[str] = []
+        for path in _COGNITION.rglob("*.py"):
+            for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+                stripped = line.strip()
+                if stripped.startswith("#"):
+                    continue
+                for token in forbidden_patterns:
+                    if token in line:
+                        matches.append(f"{path.relative_to(_REPO_ROOT)}:{lineno}:{line}")
+        assert not matches, "I-FACT-2 cognition facade violations\n" + "\n".join(matches)
 
     def test_i_fact_2_perceive_hub_pure(self) -> None:
         from lca.cognition import perceive_hub

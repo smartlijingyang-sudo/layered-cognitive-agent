@@ -63,12 +63,10 @@ def _make_manifest(payload: list[dict] | None) -> ContextManifest:
 
 
 def _seed_manifest(state: AgentState, payload: list[dict]) -> None:
-    """Write a synthetic ContextManifest into PerceiveState slots."""
-    from lca.contracts.models.core.perceive_state import PerceiveState
+    """Write a synthetic ContextManifest onto ``state.perceive``."""
+    from tests.support.session_gate_helpers import seed_manifest_projection
 
-    view = PerceiveState.from_agent_state(state)
-    view.current_manifest = _make_manifest(payload)
-    view.commit(state)
+    seed_manifest_projection(state, _make_manifest(payload))
 
 
 class TestArtifactRespondInjectorManifest:

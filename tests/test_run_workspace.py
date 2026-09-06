@@ -313,7 +313,7 @@ class TestArtifactClosure:
 class TestArtifactRespondInjector:
     async def test_rewrites_relative_images_and_appends_links(self) -> None:
         from lca.cognition.brain.context_manifest import build_manifest_from_items
-        from lca.contracts.models.core.perceive_state import PerceiveState
+        from tests.support.session_gate_helpers import seed_manifest_projection
 
         gate = ArtifactRespondInjector()
         with run_workspace_scope("run_inj", wall_clock_seconds=60) as workspace:
@@ -346,9 +346,9 @@ class TestArtifactRespondInjector:
                     )
                 ]
             )
-            view = PerceiveState.from_agent_state(state)
-            view.current_manifest = manifest
-            view.commit(state)
+            from tests.support.session_gate_helpers import seed_manifest_projection
+
+            seed_manifest_projection(state, manifest)
             out = await gate.enforce(
                 state,
                 Decision(
@@ -365,7 +365,7 @@ class TestArtifactRespondInjector:
 
     async def test_keeps_ledger_urls_and_drops_unknown_ones(self) -> None:
         from lca.cognition.brain.context_manifest import build_manifest_from_items
-        from lca.contracts.models.core.perceive_state import PerceiveState
+        from tests.support.session_gate_helpers import seed_manifest_projection
 
         gate = ArtifactRespondInjector()
         with run_workspace_scope("run_inj2", wall_clock_seconds=60) as workspace:
@@ -395,9 +395,7 @@ class TestArtifactRespondInjector:
                     )
                 ]
             )
-            view = PerceiveState.from_agent_state(state)
-            view.current_manifest = manifest
-            view.commit(state)
+            seed_manifest_projection(state, manifest)
             out = await gate.enforce(
                 state,
                 Decision(

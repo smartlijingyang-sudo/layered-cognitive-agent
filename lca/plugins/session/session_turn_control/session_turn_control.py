@@ -85,6 +85,7 @@ class Config(BaseModel):
     id="lca.plugins.session.turn_control",
     Config=Config,
     provides=("session.projection.turn_control",),
+    requires=("session.projections",),
     layer="L2",
     kind=PluginKind.PROVIDER,
     effects="none",
@@ -109,5 +110,10 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    registry = ctx.require("session.projection_registry")
-    registry.register(TurnControlUnit())
+    del config
+    unit = TurnControlUnit()
+    ctx.provide("session.projection.turn_control", unit)
+    registry = ctx.soft_get("session.projections")
+    if registry is None:
+        return
+    registry.register(unit)

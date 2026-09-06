@@ -25,7 +25,7 @@ from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.journal import ToolCallResolved
 from lca.contracts.models.team.partial_buffer import append_run_partial
 from lca.contracts.protocols import LLMAdapter, Tool
-from lca.infrastructure.observability import record
+from lca.infrastructure.observability.journal_append import append_journal_event
 from lca.infrastructure.session.bindings import (
     assemble_model_history,
     await_model_request_checkpoint,
@@ -124,7 +124,7 @@ async def _stream_turn(
     # args 收齐才 emit 一次 ToolCallResolved;旧"每 delta 一次 ToolCallStreaming"
     # 是 UI 信号误入事实账本,本批废 (前置步骤 ToolCallStreaming 已被删除)。
     for slot in pop_completed_slots(tool_slots):
-        record(
+        append_journal_event(
             ToolCallResolved(
                 tool_name=str(slot["tool_name"]),
                 tool_call_id=str(slot["tool_call_id"]),

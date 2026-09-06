@@ -126,5 +126,9 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config
-    registry = ctx.require("session.projections")
-    registry.register(ModelVisibleUnit())
+    unit = ModelVisibleUnit()
+    ctx.provide("session.projection.model_visible", unit)
+    registry = ctx.soft_get("session.projections")
+    if registry is None:
+        return
+    registry.register(unit)

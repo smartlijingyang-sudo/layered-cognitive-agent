@@ -31,7 +31,7 @@ from lca.contracts.models.core.memory import MemoryRecord
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.journal import ContextCompacted, MemoryCommitted
 from lca.contracts.protocols import MemorySystem, RetrievalPolicy, SharedMemoryStore
-from lca.infrastructure.observability import record
+from lca.infrastructure.observability.journal_append import append_journal_event
 
 _DEFAULT_MAX_WORKING = 20
 _DEFAULT_MAX_EPISODIC = 50
@@ -121,7 +121,7 @@ class SimpleMemorySystem(MemorySystem):
             record.kind.value if hasattr(record.kind, "value") else str(record.kind)
             for record in compacted
         )
-        record(
+        append_journal_event(
             ContextCompacted(
                 step=state.step,
                 original_kinds=kinds,
@@ -150,7 +150,7 @@ class SimpleMemorySystem(MemorySystem):
 
         Returns ``MemoryCommitResult(accepted, rejected)``.  ``accepted``
         records are appended to their target layers; ``rejected`` writes
-        are not stored.  Both sides journal via ``record()``.
+        are not stored.  Both sides journal via ``append_journal_event()``.
         """
         # PR-3.2: spine envelope for the memory.write execution point
         # (one event per accepted write — the close-set intent of
@@ -166,9 +166,9 @@ class SimpleMemorySystem(MemorySystem):
         for rec in result.accepted:
             self._append_record(rec.memory_type, rec)
         # Emit journal events.  Best-effort: outside a bind() context the
-        # record() facade is a no-op (per ADR-0055 / facade.py:140).
+        # append seam is a no-op (per ADR-0055 / facade.py:140).
         for rec in result.accepted:
-            record(
+            append_journal_event(
                 MemoryCommitted(
                     layer=rec.memory_type.value,
                     record_id=rec.record_id,
@@ -181,7 +181,7 @@ class SimpleMemorySystem(MemorySystem):
                 outcome="success",
             )
         for rej in result.rejected:
-            record(
+            append_journal_event(
                 MemoryCommitted(
                     layer=rej.write.layer.value,
                     record_id=rej.write.record_id,

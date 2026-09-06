@@ -28,7 +28,7 @@ from lca.contracts.models.observability.journal import ApprovalRequested
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.contracts.observability.evidence import EvidenceRef
 from lca.contracts.protocols import SafeExecutor, Tool
-from lca.infrastructure.observability import record
+from lca.infrastructure.observability.journal_append import append_journal_event
 from lca.infrastructure.session.bindings import await_tool_side_effect_checkpoint
 from lca.infrastructure.tools.tool_invocation_scope import tool_invocation_scope
 
@@ -120,7 +120,7 @@ from lca.plugins.events.publishers.spine_reflector_body_llm import (
 
 def _emit_approval_requested(tool: Tool, invocation_id: str) -> None:
     """Record a human-input request without opening a tool invocation."""
-    record(
+    append_journal_event(
         ApprovalRequested(
             envelope_id=invocation_id,
             tool_name=tool.name,

@@ -8,6 +8,8 @@ from contextlib import contextmanager
 from lca.contracts.harness.fold.perceive import fold_gate_decisions_from_events
 from lca.contracts.models.core.decision import Turn
 from lca.contracts.models.core.gate_policy import GateDecided
+from lca.contracts.models.core.perceive_projection import PerceiveProjection
+from lca.contracts.models.core.perception import ContextManifest
 from lca.contracts.models.core.state import AgentState
 from lca.infrastructure.session.bindings import resolve_session_reader
 from lca.infrastructure.session.turn_control_reader import append_turn_control_fact
@@ -51,9 +53,25 @@ def gate_decisions_for_step(state: AgentState, *, step: int | None = None) -> li
     return fold_gate_decisions_from_events(session.snapshot_events(), step=target)
 
 
+def seed_manifest_projection(
+    state: AgentState,
+    manifest: ContextManifest,
+    *,
+    step: int | None = None,
+) -> None:
+    """Write a synthetic manifest onto ``state.perceive`` for gate/harness tests."""
+    target_step = state.step if step is None else step
+    state.perceive = PerceiveProjection(
+        manifest=manifest,
+        digest=manifest.digest,
+        step=target_step,
+    )
+
+
 __all__ = [
     "append_control_turn",
     "bound_session",
     "extend_control_turns",
     "gate_decisions_for_step",
+    "seed_manifest_projection",
 ]
