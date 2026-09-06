@@ -36,7 +36,7 @@ from lca.infrastructure.observability.writable_matrix.registry import (
     WritableFaceRegistry,
 )
 from lca.plugins.session.derivers.step_tree import StepTreeFoldDeriver
-from lca.session.bind import bind_run_event_session_from_store
+from lca.session.lifecycle.bind import bind_run_event_session_from_store
 from lca.plugins.session.runtime.cursor_port import SessionWritePortAdapter
 from lca.plugins.transport.webserver.carrier.runs.binding import assemble_run_hub
 from lca.plugins.transport.webserver.read.runs.identity import default_agent_ref

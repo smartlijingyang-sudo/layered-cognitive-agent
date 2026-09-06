@@ -11,7 +11,9 @@
 | `brain/` | Think + **Gate** | Reasoner、Pipeline、`decision_gates/`（Gate ⊂ Think） |
 | `body/` | Act | SafeExecutor、tool dispatch |
 | `memory/` | Memory | propose/commit 实现 |
-| `perceive_hub.py` 等 | Perceive | Hub、Sensor 逻辑 |
+| `perceive/` | Perceive | hub、service |
+| `wire/` | 认知 transport 适配 | envelope、registry_factory |
+| `brain/gate_service.py` | Think 内 Gate 服务 | Gate ⊂ Think |
 | `sensors/` | Perceive | 传感器实现 |
 | `collaboration/` | Collaboration | Team 认知辅助 |
 

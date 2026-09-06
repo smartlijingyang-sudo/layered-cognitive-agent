@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import pytest
 
 from lca.contracts.harness.tasks.session import SessionEvent
-from lca.session.recovery import SessionRecoveryError, assert_resume_allowed
+from lca.session.lifecycle.recovery import SessionRecoveryError, assert_resume_allowed
 from lca.contracts.observability.status import RunLifecycleStatus
 
 
@@ -66,7 +66,7 @@ def test_assert_resume_allowed_rejects_idle_recovery() -> None:
 
 def test_append_approval_resolved_if_pending() -> None:
     from lca.session.append import Session
-    from lca.session.recovery import append_approval_resolved_if_pending
+    from lca.session.lifecycle.recovery import append_approval_resolved_if_pending
 
     session = Session("run_2")
     events = [

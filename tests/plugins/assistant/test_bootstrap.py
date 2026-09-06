@@ -27,7 +27,7 @@ from lca.contracts.capabilities import ASSISTANT_BOOTSTRAP, ASSISTANT_CATALOG
 from lca.contracts.models.core.perception import ContextManifest
 from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
 from lca.harness.plugin_api import definition_from_plugin
-from lca.harness.plugin_manifest import EffectClass
+from lca.harness.plugin.manifest import EffectClass
 from lca.plugins.assistant.bootstrap import (
     BootstrapProjection,
     BootstrapProjectionService,

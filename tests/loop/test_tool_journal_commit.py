@@ -14,7 +14,7 @@ from lca.contracts.models.observability.tool_journal_receipt import (
     tool_invoked_receipt,
     tool_started_receipt,
 )
-from lca.loop.tool_journal_commit import commit_tool_journal_receipt
+from lca.loop.commit.tool_journal import commit_tool_journal_receipt
 from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
     set_publish_session,

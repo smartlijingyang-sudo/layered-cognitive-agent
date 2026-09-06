@@ -27,7 +27,7 @@ from lca.cognition.brain.decision_gates import (
     ToolLoopBreakerGate,
     record_gate_decided,
 )
-from lca.cognition.perceive_hub import SequentialPerceiveHub
+from lca.cognition.perceive.hub import SequentialPerceiveHub
 from lca.cognition.sensors import (
     InboxFactsSensor,
     TeamInboxSensor,
@@ -109,7 +109,7 @@ class TestSensorsPrimitive:
             await _Disabled().read(_state())
         # The Hub path catches the exception and produces an empty
         # contribution.
-        from lca.cognition.perceive_hub import SequentialPerceiveHub
+        from lca.cognition.perceive.hub import SequentialPerceiveHub
 
         hub = SequentialPerceiveHub(
             sensors=[_Disabled()],

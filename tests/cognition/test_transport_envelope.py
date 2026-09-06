@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from lca.cognition.transport_envelope import mint_transport_envelope
+from lca.cognition.wire.envelope import mint_transport_envelope
 from lca.contracts.models.observability.plan_ref import plan_ref_scope
 
 

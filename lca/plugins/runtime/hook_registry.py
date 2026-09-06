@@ -34,7 +34,7 @@ def build_simple_hook_registry(ctx: PluginContext) -> HookRegistry:
     路径走 ``cursor.advance(phase)`` + ``cursor.record_*(...)`` 直接写 spine。
     本函数保留只为兼容现有 plugin manifest 装配,返回空注册实例。
     """
-    from lca.cognition.hook_registry import CordisHookRegistry
+    from lca.cognition.brain.hook_registry import CordisHookRegistry
 
     return CordisHookRegistry(ctx)
 

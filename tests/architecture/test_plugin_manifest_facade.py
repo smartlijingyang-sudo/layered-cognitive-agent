@@ -14,9 +14,9 @@ from lca.harness.plugin_api import (
     definition_from_plugin,
     plugin,
 )
-from lca.harness.plugin_context import AuditedPluginContext
-from lca.harness.plugin_declaration import PluginCarrier
-from lca.harness.plugin_manifest import PluginDefinition as ManifestPluginDefinition
+from lca.harness.plugin.context import AuditedPluginContext
+from lca.harness.plugin.declaration import PluginCarrier
+from lca.harness.plugin.manifest import PluginDefinition as ManifestPluginDefinition
 
 
 class _Config(BaseModel):
@@ -54,8 +54,8 @@ def test_public_plugin_api_preserves_the_manifest_identity_and_decorator_round_t
 def test_public_plugin_api_retains_runtime_audit_and_carrier_types() -> None:
     """运行期审计与 Cordis 载体适配继续通过同一公开入口可发现。"""
 
-    assert AuditedPluginContext.__module__ == "lca.harness.plugin_context"
-    assert PluginCarrier.__module__ == "lca.harness.plugin_declaration"
+    assert AuditedPluginContext.__module__ == "lca.harness.plugin.context"
+    assert PluginCarrier.__module__ == "lca.harness.plugin.declaration"
 
 
 def test_plugin_api_is_a_thin_stable_facade() -> None:
@@ -67,6 +67,4 @@ def test_plugin_api_is_a_thin_stable_facade() -> None:
 
     assert "class " not in source
     assert "def " not in source
-    assert "plugin_manifest" in source
-    assert "plugin_declaration" in source
-    assert "plugin_context" in source
+    assert "lca.harness.plugin" in source

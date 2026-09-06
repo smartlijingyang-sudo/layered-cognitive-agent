@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.capabilities import TOOLS
-from lca.harness.plugin_manifest import EffectClass, PluginKind
+from lca.harness.plugin.manifest import EffectClass, PluginKind
 
 if TYPE_CHECKING:
     from pydantic import BaseModel

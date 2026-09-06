@@ -1,0 +1,56 @@
+# Anchor packages enforced by check_cognitive_directory.py (strict mode).
+# Each anchor must satisfy max_direct_py at merge time (root + strict_children only).
+
+[defaults]
+max_direct_py = 5
+max_direct_py_warn = 6
+max_file_loc = 300
+max_file_loc_legacy = 400
+plugin_py_max_loc = 500
+
+[[anchors]]
+path = "lca/harness"
+note = "Root ≤3 .py; plugin/ and continuous/ subpackages"
+strict_children = ["plugin", "continuous"]
+
+[[anchors]]
+path = "lca/cognition"
+note = "Root __init__ only; perceive/, wire/"
+strict_children = ["perceive", "wire"]
+
+[[anchors]]
+path = "lca/loop"
+note = "Core 4 + emit/* + commit/"
+strict_children = ["emit/spine", "emit/cognitive", "commit"]
+
+[[anchors]]
+path = "lca/session"
+note = "Core 3 + lifecycle/"
+strict_children = ["lifecycle"]
+
+# Legacy overflow — report-only until migrated (owner: ADR-0195 P5)
+[[legacy_allow]]
+path = "lca/contracts/observability"
+max_direct_py = 41
+delete_when = "split into observability/{journal,evidence,cost,event,taxonomy}/ each ≤5"
+
+[[legacy_allow]]
+path = "lca/infrastructure/cli/commands"
+max_direct_py = 26
+delete_when = "cli/commands/{run,profile,journal,diagnose,plugin}/"
+
+[[legacy_allow]]
+path = "lca/plugins/memory"
+max_direct_py = 22
+delete_when = "plugins/cognitive/memory/<id>/ one plugin per dir"
+
+# File-level loc legacy (strict_children only)
+[[legacy_loc_allow]]
+path = "lca/harness/plugin/declaration.py"
+max_loc = 538
+delete_when = "split declaration adapter from @plugin decorator core"
+
+[[legacy_loc_allow]]
+path = "lca/loop/commit/tool_journal.py"
+max_loc = 314
+delete_when = "extract tool phase helpers to commit/tool_phase.py"

@@ -54,7 +54,7 @@ def test_append_translates_to_session_event_with_ep_type_and_incarnation() -> No
 
 def test_append_accepts_run_session_bridge() -> None:
     """构造接受 run bind 产出的 bridge(读 ``.inner``),与裸 Session 等价。"""
-    from lca.session.bind import (
+    from lca.session.lifecycle.bind import (
         bind_run_event_session_from_store,
         unbind_run_event_session,
     )

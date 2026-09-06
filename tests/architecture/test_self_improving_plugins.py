@@ -15,7 +15,7 @@ from lca.contracts.atoms.scope import Scope
 from lca.contracts.harness.think.eval_comparison import EvalComparison
 from lca.contracts.protocols.composition.logic_address import score_logic_address
 from lca.contracts.protocols.think.learning import SkillAcquirer
-from lca.harness.plugin_declaration import definition_from_plugin
+from lca.harness.plugin.declaration import definition_from_plugin
 from lca.harness.composition.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
 from lca.plugins.insight.failure_analyzer import FailureAnalyzerService

@@ -126,7 +126,7 @@ class SimpleMemorySystem(MemorySystem):
 
     async def perceive(self, state: AgentState) -> AgentState:
         """Return a context-enriched state value without mutating the input instance."""
-        from lca.loop.memory_journal_commit import (
+        from lca.loop.commit.memory_journal import (
             commit_memory_journal_receipt,
             commit_memory_spine_receipt,
         )
@@ -185,7 +185,7 @@ class SimpleMemorySystem(MemorySystem):
         records are appended to their target layers; ``rejected`` writes
         are not stored.  Both sides journal via loop ``memory_journal_commit``.
         """
-        from lca.loop.memory_journal_commit import (
+        from lca.loop.commit.memory_journal import (
             commit_memory_journal_receipt,
             commit_memory_spine_receipt,
         )

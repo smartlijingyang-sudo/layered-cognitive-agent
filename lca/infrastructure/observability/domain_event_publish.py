@@ -12,7 +12,7 @@ from typing import Any
 import structlog
 
 from lca.infrastructure.session.bindings import resolve_session_reader
-from lca.loop.spine_ep_emit import SpineEmitRef, publish_spine_ep
+from lca.loop.emit.spine.ep import SpineEmitRef, publish_spine_ep
 
 log = structlog.get_logger(__name__)
 

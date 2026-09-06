@@ -189,7 +189,7 @@ class CognitiveAgent(AgentUnit):
     ) -> Result:
         """Emit + execute inside an already-bound (or intentionally unbound) Session."""
         # PR-3.1: spine envelope for the agent_loop.iteration execution point.
-        from lca.loop.agent_spawn_emit import (
+        from lca.loop.emit.cognitive.agent_spawn import (
             emit_agent_loop_iteration_end,
             emit_agent_loop_iteration_start,
         )

@@ -227,7 +227,7 @@ def test_cognitive_emit_context_manifested_for_state_uses_bound_session() -> Non
 
 
 def test_transport_emit_all_categories_via_gateway() -> None:
-    from lca.loop.transport_emit import (
+    from lca.loop.transport import (
         emit_kernel_run_cancelled,
         emit_kernel_run_start,
         emit_kernel_run_stop,
@@ -263,7 +263,7 @@ def test_transport_emit_all_categories_via_gateway() -> None:
 
 
 def test_agent_spawn_emit_iteration_via_gateway() -> None:
-    from lca.loop.agent_spawn_emit import (
+    from lca.loop.emit.cognitive.agent_spawn import (
         emit_agent_loop_iteration_end,
         emit_agent_loop_iteration_start,
     )

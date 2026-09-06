@@ -644,7 +644,7 @@ async def test_setup_provides_session_store() -> None:
 
 
 def test_plugin_manifest_metadata() -> None:
-    from lca.harness.plugin_declaration import definition_from_plugin
+    from lca.harness.plugin.declaration import definition_from_plugin
     from lca.plugins.session.runtime import plugin as plugin_module
 
     definition = definition_from_plugin(plugin_module.setup, module=__name__)

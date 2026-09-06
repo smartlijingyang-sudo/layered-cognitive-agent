@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 from pydantic import BaseModel
 
-from lca.cognition.perceive_hub import SequentialPerceiveHub
+from lca.cognition.perceive.hub import SequentialPerceiveHub
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope

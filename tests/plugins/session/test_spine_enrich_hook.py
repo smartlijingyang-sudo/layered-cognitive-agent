@@ -19,7 +19,7 @@ from lca.infrastructure.observability.spine.spine_enrich import (
     set_active_field_producers,
     set_active_spine_enricher,
 )
-from lca.session.bind import (
+from lca.session.lifecycle.bind import (
     bind_run_event_session_from_store,
     unbind_run_event_session,
 )

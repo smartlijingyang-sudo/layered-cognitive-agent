@@ -327,7 +327,7 @@ def test_on_event_does_not_raise_for_unknown_event() -> None:
 
 def test_module_declares_plugin_with_expected_id() -> None:
     """The ``@plugin`` decorator on ``setup`` must bind ``spine.deriver.anomaly``."""
-    from lca.harness.plugin_declaration import definition_from_plugin
+    from lca.harness.plugin.declaration import definition_from_plugin
     from lca.plugins.observability.spine.derivers import anomaly
 
     # Touching the module forces the @plugin decorator to attach

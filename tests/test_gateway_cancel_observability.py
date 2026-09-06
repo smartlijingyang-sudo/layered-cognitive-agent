@@ -11,7 +11,7 @@ import pytest
 
 from lca.agent.cognitive_agent import CognitiveAgent
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
-from lca.session.bind import EventSessionBinder
+from lca.session.lifecycle.bind import EventSessionBinder
 from lca.plugins.session.runtime.store import SessionStore
 from lca.plugins.transport.webserver.carrier.runs.execute import create_run_session, schedule_run
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunStatus

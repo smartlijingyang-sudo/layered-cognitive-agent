@@ -12,7 +12,7 @@ from lca.contracts.models.observability.act_journal_receipt import (
     synthesis_completed_receipt,
 )
 from lca.contracts.models.observability.journal import ApprovalRequested, DecisionMade
-from lca.loop.act_journal_commit import commit_act_journal_receipt
+from lca.loop.commit.act_journal import commit_act_journal_receipt
 
 
 class _StubTool:

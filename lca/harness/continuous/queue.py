@@ -16,7 +16,7 @@ from lca.contracts.harness.tasks.continuous import (
     WorkQueue,
     WorkStatus,
 )
-from lca.harness.continuous_serialization import (
+from lca.harness.continuous.serialization import (
     max_attempts_from_payload,
     require_aware,
     timestamp,

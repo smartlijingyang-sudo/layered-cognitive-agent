@@ -13,8 +13,8 @@ from lca.harness.plugin_api import (
     PluginKind,
     UndeclaredInteractionError,
 )
-from lca.harness.plugin_context import collect_context_bindings, requirement_covers_key
-from lca.harness.plugin_spec_projection import native_spec_from_declaration
+from lca.harness.plugin.context import collect_context_bindings, requirement_covers_key
+from lca.harness.plugin.spec_projection import native_spec_from_declaration
 
 
 class _FakeCarrier:

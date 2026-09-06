@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from lca.contracts.harness.collaboration.agent import LiveAgentStatus
 from lca.contracts.harness.tasks.session import SessionEvent
-from lca.session.recovery import recover_live_agent
-from lca.session.repair import repair_interrupted_turn
+from lca.session.lifecycle.recovery import recover_live_agent
+from lca.session.lifecycle.repair import repair_interrupted_turn
 
 _SESSION = "recovery-run"
 
@@ -68,7 +68,7 @@ def test_recover_live_agent_waiting_input_with_approval() -> None:
 
 
 def test_bind_run_emits_session_created() -> None:
-    from lca.session.bind import (
+    from lca.session.lifecycle.bind import (
         bind_run_event_session_from_store,
         unbind_run_event_session,
     )

@@ -4,7 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TypeAlias
 
-from lca.cognition.group_assembly import (
+from lca.cognition.collaboration.group_assembly import (
     AssemblyStrategy,
     OrderedContributionCatalog,
     SingleAssemblyStrategy,

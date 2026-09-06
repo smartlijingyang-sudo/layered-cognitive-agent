@@ -19,7 +19,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.harness.tasks.continuous import ContinuousControlPlaneFactory
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.harness.continuous import SqliteContinuousControlPlaneFactory
+from lca.harness.continuous.session import SqliteContinuousControlPlaneFactory
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

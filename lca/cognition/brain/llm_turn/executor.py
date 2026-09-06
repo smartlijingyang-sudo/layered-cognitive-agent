@@ -124,7 +124,7 @@ async def _stream_turn(
     # args 收齐才 commit 一次 tool.call.resolved.v1;旧"每 delta 一次 ToolCallStreaming"
     # 是 UI 信号误入事实账本,本批废 (前置步骤 ToolCallStreaming 已被删除)。
     if tool_slots:
-        from lca.loop.tool_journal_commit import commit_tool_journal_receipt
+        from lca.loop.commit.tool_journal import commit_tool_journal_receipt
 
         for slot in pop_completed_slots(tool_slots):
             receipt = tool_call_resolved_receipt(

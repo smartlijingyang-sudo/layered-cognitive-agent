@@ -53,8 +53,12 @@ class TestSessionRepairModule:
     """I-RESUME-1: cold-load repair module exists."""
 
     def test_repair_module_exists(self) -> None:
-        repair = ROOT / "lca" / "session" / "repair.py"
+        repair = ROOT / "lca" / "session" / "lifecycle" / "repair.py"
         assert repair.is_file()
+
+    def test_recovery_module_exists(self) -> None:
+        recovery = ROOT / "lca" / "session" / "lifecycle" / "recovery.py"
+        assert recovery.is_file()
 
 
 class TestControlPlaneProtocols:
@@ -94,7 +98,7 @@ class TestTransportRecoveryAuthority:
         assert "carrier.runs.resume" in src
 
     def test_recovery_public_api_exists(self) -> None:
-        assert (ROOT / "lca" / "session" / "recovery.py").is_file()
+        assert (ROOT / "lca" / "session" / "lifecycle" / "recovery.py").is_file()
 
     def test_runtime_loop_awaits_step_boundary(self) -> None:
         src = (ROOT / "lca/runtime/runtime_loop.py").read_text(encoding="utf-8")

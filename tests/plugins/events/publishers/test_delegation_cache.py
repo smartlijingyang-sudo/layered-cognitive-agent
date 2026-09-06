@@ -56,7 +56,7 @@ def test_manifest_provides_match_setup_keys() -> None:
     曾声明未 provide 的 ``delegation.cache_observation``，CompiledRunPlan
     把它编进 ProviderBinding 后 spawn 全挂。
     """
-    from lca.harness.plugin_declaration import definition_from_plugin
+    from lca.harness.plugin.declaration import definition_from_plugin
     from lca.plugins.events.publishers.delegation_cache import plugin as mod
 
     definition = definition_from_plugin(mod.setup, module=__name__)

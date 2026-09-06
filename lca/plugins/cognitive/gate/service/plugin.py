@@ -49,6 +49,6 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.cognition.gate_service import GateService
+    from lca.cognition.brain.gate_service import GateService
 
     ctx.provide("gates", GateService())

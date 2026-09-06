@@ -24,7 +24,7 @@ from lca.contracts.protocols.think.cognitive_pipeline import (
     CognitiveReflectionPipeline,
     CognitiveThinkPipeline,
 )
-from lca.loop.reasoner_emit import run_reasoner_with_spine_facts
+from lca.loop.emit.cognitive.reasoner import run_reasoner_with_spine_facts
 
 
 class StandardCognitiveThinkPipeline(CognitiveThinkPipeline):

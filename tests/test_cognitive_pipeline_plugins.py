@@ -20,7 +20,7 @@ from lca.contracts.protocols import (
     CognitiveReflectionPipeline,
     CognitiveThinkPipeline,
 )
-from lca.harness.plugin_declaration import definition_from_plugin
+from lca.harness.plugin.declaration import definition_from_plugin
 from lca.harness.profile.resolve import resolve_profile
 from lca.plugins.cognitive.brain._standard_factory import STANDARD_COGNITIVE_BRAIN_FACTORY_REQUIREMENTS
 

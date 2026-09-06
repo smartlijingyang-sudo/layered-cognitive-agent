@@ -26,7 +26,7 @@ from lca.cognition.body.safe_executor import SimpleSafeExecutor
 from lca.cognition.body.simple_body import SimpleBody
 from lca.cognition.body.tool_registry import SimpleToolRegistry
 from lca.cognition.brain.decision_gates import build_default_workspace_gate_chain
-from lca.cognition.transport_registry_factory import build_transport_registry
+from lca.cognition.wire.registry_factory import build_transport_registry
 from lca.contracts.models.core.budget import Budget
 from lca.contracts.models.core.decision import Decision, Observation, Turn
 from lca.contracts.models.core.state import AgentState

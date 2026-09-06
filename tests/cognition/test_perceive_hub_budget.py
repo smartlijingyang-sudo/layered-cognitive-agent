@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.cognition.perceive_hub import SequentialPerceiveHub
+from lca.cognition.perceive.hub import SequentialPerceiveHub
 from lca.contracts.models.core.budget import create_budget
 from lca.contracts.models.core.perception import ContextItem
 from lca.contracts.models.core.state import AgentState

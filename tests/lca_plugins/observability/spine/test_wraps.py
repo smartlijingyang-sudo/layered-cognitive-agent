@@ -9,7 +9,7 @@ provides / requires.
 from __future__ import annotations
 
 from lca.harness.plugin_api import PluginKind
-from lca.harness.plugin_declaration import definition_from_plugin
+from lca.harness.plugin.declaration import definition_from_plugin
 from lca.plugins.observability.spine.wraps import assembler, ctx_effect, ctx_intercept
 
 

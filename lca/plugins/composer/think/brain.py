@@ -98,7 +98,7 @@ def _resolve_model_visible_hook(ctx: object | None) -> Any:
             return None
     own_bindings = getattr(ctx, "own_bindings", None)
     if own_bindings is not None:
-        from lca.harness.plugin_context import collect_context_bindings
+        from lca.harness.plugin.context import collect_context_bindings
 
         return collect_context_bindings(ctx).get(_MODEL_VISIBLE_HOOK_KEY)
     return None

@@ -31,7 +31,7 @@ from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseConte
 from lca.harness.declarative.lifecycle.phase_observation import PhaseObserver, phase_state_snapshot
 from lca.harness.graph.governance.phase_governance import GovernanceResult, PhaseGovernance
 from lca.harness.graph.traversal import PhaseTraversal
-from lca.loop.phase_fact_emitter import emit_phase_catalog_facts
+from lca.loop.emit.spine.phase_fact import emit_phase_catalog_facts
 
 
 @dataclass(frozen=True, slots=True)

@@ -37,7 +37,7 @@ def cached_delegation_observation(spec: DelegationSpec, state: AgentState) -> Ob
     )
     if hit is None:
         return None
-    from lca.loop.delegation_journal_commit import commit_delegation_cache_hit
+    from lca.loop.commit.delegation_journal import commit_delegation_cache_hit
 
     commit_delegation_cache_hit(
         callee_role=hit.target_role,

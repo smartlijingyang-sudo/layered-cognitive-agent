@@ -8,7 +8,7 @@ from typing import Any, cast
 import pytest
 
 from lca.harness.plugin_api import EffectClass, PluginDefinition, PluginKind
-from lca.harness.plugin_spec_projection import native_spec_from_declaration
+from lca.harness.plugin.spec_projection import native_spec_from_declaration
 from lca.harness.profile.projection import ResolvedProfileProjection
 from lca.harness.profile.resolve import ResolvedPlugin, ResolvedProfile
 

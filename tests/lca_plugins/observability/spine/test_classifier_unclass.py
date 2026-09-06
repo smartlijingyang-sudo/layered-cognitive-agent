@@ -259,7 +259,7 @@ def test_missing_exception_returns_empty_dict(fresh_producer: Any) -> None:
 
 def test_plugin_manifest_declares_expected_metadata() -> None:
     """The wrapped plugin exposes the canonical id / layer / kind / provides."""
-    from lca.harness.plugin_declaration import definition_from_plugin
+    from lca.harness.plugin.declaration import definition_from_plugin
     from lca.plugins.observability.spine import classifiers
 
     # Touching the module forces the @plugin decorator to attach

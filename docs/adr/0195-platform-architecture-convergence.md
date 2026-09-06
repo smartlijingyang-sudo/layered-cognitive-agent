@@ -345,7 +345,7 @@ P5 文档与遗留删除（2 周）
 | P-L2 | `plugins/transport/` 零 `Session.append`/Reducer/PhaseExecutor | transport-isolation |
 | P-L3 | `plugins/transport/carrier/` 零 deriver/fold 实现 | 读写分离 |
 | P-L4 | 生产 EP 仅 yaml 登记 category | registry drift test |
-| P-L5 | 每 plugin 包 ≤8 .py（10 预警，15 阻断） | package-org |
+| P-L5 | 每 plugin 包 ≤5 .py（8 legacy 预警，12 阻断） | package-org + [cognitive-directory-discipline](../specs/cognitive-directory-discipline.md) |
 | P-L6 | 无 `plugins/events/publishers/spine_reflector` 新文件 | O2 |
 | P-L7 | Loop 热路径事实经 FactGateway | emit single entry |
 | P-L8 | `docs/observability/*` 写入路径描述与 P-L7 一致 | doc test |

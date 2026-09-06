@@ -33,7 +33,7 @@ from lca.contracts.protocols.assistant.catalog import (
 )
 from lca.contracts.protocols.declarative.declarative_common import PluginSpecKind
 from lca.harness.plugin_api import definition_from_plugin
-from lca.harness.plugin_manifest import EffectClass
+from lca.harness.plugin.manifest import EffectClass
 from lca.plugins.assistant._events import AssistantCreatedEventPayload
 from lca.plugins.assistant._home_layout import CONFIG_FACE_FILES, SCHEMA_VERSION
 from lca.plugins.assistant.catalog import (

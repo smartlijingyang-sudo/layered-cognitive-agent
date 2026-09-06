@@ -16,9 +16,9 @@ Loop 热路径 durable 事实应经 ``FactGateway`` (``append_catalog_bound`` /
 
 Loop 热路径已知债(P2-21 baseline,迁移至 FactGateway):
 
-- ``lca/loop/act_journal_commit.py`` — ``append_journal_event``
-- ``lca/loop/memory_journal_commit.py`` — ``append_journal_event``
-- ``lca/loop/delegation_journal_commit.py`` — ``publish_via_session``
+- ``lca/loop/commit/act_journal.py`` — ``append_journal_event``
+- ``lca/loop/commit/memory_journal.py`` — ``append_journal_event``
+- ``lca/loop/commit/delegation_journal.py`` — ``publish_via_session``
 """
 
 from __future__ import annotations
@@ -42,9 +42,9 @@ _LOOP_FACT_SSOT_FILES: frozenset[str] = frozenset(
 )
 _LOOP_FACT_BASELINE_DEBT: frozenset[str] = frozenset(
     {
-        "lca/loop/act_journal_commit.py",
-        "lca/loop/memory_journal_commit.py",
-        "lca/loop/delegation_journal_commit.py",
+        "lca/loop/commit/act_journal.py",
+        "lca/loop/commit/memory_journal.py",
+        "lca/loop/commit/delegation_journal.py",
     }
 )
 _LOOP_FORBIDDEN_PATTERNS: tuple[str, ...] = (

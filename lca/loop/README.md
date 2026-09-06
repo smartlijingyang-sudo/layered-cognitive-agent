@@ -26,7 +26,7 @@ HTTP/CLI → CognitiveAgent → CognitiveRuntime → DeclarativeRuntimeDriver
 | 3 | `lca/loop/transaction.py` | 一次 visit 的生命周期 |
 | 4 | `lca/plugins/phase_graph/*.py` | 各 phase 如何调认知原语（迁移目标：`plugins/phase/*`） |
 | 5 | `lca/runtime/runtime_loop.py` | Run 入口与 lifecycle |
-| 6 | `lca/infrastructure/session/cognitive_emit.py` | Gate/perceive catalog 事实（迁移目标：`lca/loop/fact_gateway.py`） |
+| 6 | `lca/loop/fact_gateway.py` + `emit/` + `commit/` | Gate/perceive catalog 事实 |
 
 ## 四类状态（勿混）
 
@@ -37,7 +37,16 @@ HTTP/CLI → CognitiveAgent → CognitiveRuntime → DeclarativeRuntimeDriver
 | Control | RunCommitter / Reducer | — |
 | Ephemeral | stream accumulators | — |
 
-## 相关 ADR
+## 子目录
+
+| 路径 | 职责 |
+|---|---|
+| `emit/spine/` | spine EP 投递（ep、phase_fact、kernel_loop） |
+| `emit/cognitive/` | 认知面 EP（llm、reasoner、agent_spawn） |
+| `commit/` | journal/spine 提交收据 |
+| `transport.py` | transport 面 EP |
+
+旧模块名经 ``lca.loop`` 包 ``sys.modules`` 兼容；新代码用上表路径。
 
 - [0075 声明式阶段图](../../docs/adr/0075-declarative-phase-graph-and-minimal-trusted-kernel.md)
 - [0191 Runtime DSH 收敛](../../docs/adr/0191-runtime-loop-dsh-convergence-and-control-plane.md)

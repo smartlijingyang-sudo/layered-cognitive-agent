@@ -336,6 +336,7 @@ checks = [
     "scripts/check_patch_integrity.py",
     # Package organization (2026-08-30 cleanup batch):
     "scripts/check_package_size.py",
+    "scripts/check_cognitive_directory.py",
     "scripts/check_package_contracts.py",
     "scripts/check_package_noun.py",
     "scripts/check_filename_boundaries.py",

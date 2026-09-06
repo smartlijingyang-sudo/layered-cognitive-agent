@@ -4,8 +4,8 @@ from dataclasses import dataclass
 
 import pytest
 
-from lca.cognition.gate_service import GateService
-from lca.cognition.perceive_service import PerceiveService
+from lca.cognition.brain.gate_service import GateService
+from lca.cognition.perceive.service import PerceiveService
 from lca.contracts.mechanisms.capability import MissingCapabilityError
 from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.perception import ContextManifest

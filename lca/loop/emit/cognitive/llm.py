@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from lca.contracts.models.core.state import AgentState
-from lca.loop.spine_ep_emit import SpineEmitRef, publish_spine_ep
+from lca.loop.emit.spine.ep import SpineEmitRef, publish_spine_ep
 
 _LLM_ACTOR = "llm"
 

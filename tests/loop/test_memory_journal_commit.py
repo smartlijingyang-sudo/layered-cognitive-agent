@@ -10,7 +10,7 @@ from lca.contracts.models.observability.memory_journal_receipt import (
     memory_committed_receipt,
     memory_read_spine_receipt,
 )
-from lca.loop.memory_journal_commit import (
+from lca.loop.commit.memory_journal import (
     commit_memory_journal_receipt,
     commit_memory_spine_receipt,
 )

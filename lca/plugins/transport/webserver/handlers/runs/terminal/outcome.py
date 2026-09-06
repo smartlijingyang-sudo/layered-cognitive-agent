@@ -27,7 +27,7 @@ class RunOutcomeApplier:
 
         if outcome.waiting_input:
             session.status = RunLifecycleStatus.WAITING_INPUT
-            # COMPAT(P3-06): cache live handles for hot resume; not durable authority.
+            # P3-06: cache live handles for hot resume; not durable authority.
             session.snapshot = outcome.snapshot
             session.runnable = outcome.resumable
             session.approval_request = outcome.approval_request

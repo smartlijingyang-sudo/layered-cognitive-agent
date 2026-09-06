@@ -31,7 +31,7 @@ from lca.infrastructure.observability.spine.spine_enrich import (
     enrich_spine_payload,
     get_active_field_producers,
 )
-from lca.session.bind import RunEventSessionBridge
+from lca.session.lifecycle.bind import RunEventSessionBridge
 from lca_kernel.events.payloads_spine import SpineEventPayload
 
 _log = logging.getLogger(__name__)

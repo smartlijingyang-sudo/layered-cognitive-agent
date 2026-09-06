@@ -29,7 +29,7 @@ from lca.cognition.member_status.tracking import (
     duty_consult,
     record_delegation_return,
 )
-from lca.cognition.transport_envelope import delegate_via_envelope, handoff_via_envelope
+from lca.cognition.wire.envelope import delegate_via_envelope, handoff_via_envelope
 from lca.contracts.atoms.enums import MemoryRecordKind
 from lca.contracts.atoms.ids import new_id, remaining_seconds
 from lca.contracts.atoms.semantic_keys import (
@@ -70,7 +70,7 @@ _ERR_TIMEOUT = "delegate 超时"
 def record_decision_made(decision: Decision, state: AgentState) -> None:
     """发射决策事实；TraceInspector 可从账本按需分析动作模式。"""
     from lca.contracts.models.observability.act_journal_receipt import decision_made_receipt
-    from lca.loop.act_journal_commit import commit_act_journal_receipt
+    from lca.loop.commit.act_journal import commit_act_journal_receipt
 
     commit_act_journal_receipt(decision_made_receipt(decision, state))
 
@@ -135,7 +135,7 @@ class RespondOperation(Action):
         from lca.contracts.models.observability.act_journal_receipt import (
             synthesis_completed_receipt,
         )
-        from lca.loop.act_journal_commit import commit_act_journal_receipt
+        from lca.loop.commit.act_journal import commit_act_journal_receipt
 
         commit_act_journal_receipt(
             synthesis_completed_receipt(
@@ -197,7 +197,7 @@ class UseToolOperation(Action):
         # tool-name list in the payload so consumers can join them by
         # ``decision_id`` and parent_span_id.
         tool_names = [tc.tool_name for tc in decision.tool_calls]
-        from lca.loop.tool_journal_commit import (
+        from lca.loop.commit.tool_journal import (
             commit_body_tool_decision_end,
             commit_body_tool_decision_start,
         )

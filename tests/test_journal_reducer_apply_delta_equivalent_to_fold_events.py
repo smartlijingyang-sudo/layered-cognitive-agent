@@ -15,7 +15,7 @@ from __future__ import annotations
 import pytest
 
 from lca.cognition.brain.decision_gates import record_gate_decided
-from lca.cognition.perceive_hub import SequentialPerceiveHub
+from lca.cognition.perceive.hub import SequentialPerceiveHub
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.perception import ContextItem

@@ -266,7 +266,7 @@ def test_builtin_map_has_at_least_60_entries() -> None:
 
 def test_plugin_manifest_declares_expected_metadata() -> None:
     """The wrapped plugin exposes the canonical id / layer / kind / provides."""
-    from lca.harness.plugin_declaration import definition_from_plugin
+    from lca.harness.plugin.declaration import definition_from_plugin
     from lca.plugins.observability.spine import classifiers
 
     # Touching the module forces the @plugin decorator to attach

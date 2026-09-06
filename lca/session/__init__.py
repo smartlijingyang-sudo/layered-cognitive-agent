@@ -7,25 +7,10 @@ repair, checkpoint, and recovery.
 from __future__ import annotations
 
 from lca.session.append import Session
-from lca.session.bind import (
-    BoundRunEventSession,
-    EventSessionBinder,
-    RunEventSessionBridge,
-    bind_run_event_session,
-    bind_run_event_session_from_store,
-    event_session_binder_from_scope,
-    unbind_run_event_session,
-)
 from lca.session.catalog import (
     UnknownSessionEventTypeError,
     known_session_event_types,
     validate_event_type_for_read,
-)
-from lca.session.checkpoint import (
-    CheckpointFailure,
-    FlushableSession,
-    SessionCheckpointPolicy,
-    SessionCheckpointPolicyProtocol,
 )
 from lca.session.fold import (
     REQUEST_HEADER_CATEGORY,
@@ -36,7 +21,22 @@ from lca.session.fold import (
     foldSurface,
     headerEquals,
 )
-from lca.session.recovery import (
+from lca.session.lifecycle.bind import (
+    BoundRunEventSession,
+    EventSessionBinder,
+    RunEventSessionBridge,
+    bind_run_event_session,
+    bind_run_event_session_from_store,
+    event_session_binder_from_scope,
+    unbind_run_event_session,
+)
+from lca.session.lifecycle.checkpoint import (
+    CheckpointFailure,
+    FlushableSession,
+    SessionCheckpointPolicy,
+    SessionCheckpointPolicyProtocol,
+)
+from lca.session.lifecycle.recovery import (
     SessionRecoveryError,
     append_approval_resolved_if_pending,
     assert_resume_allowed,
@@ -44,7 +44,7 @@ from lca.session.recovery import (
     recovery_from_events,
     sync_run_status_from_recovery,
 )
-from lca.session.repair import (
+from lca.session.lifecycle.repair import (
     TOOL_NOT_STARTED,
     TOOL_OUTCOME_UNKNOWN,
     SessionRepairError,
@@ -52,21 +52,21 @@ from lca.session.repair import (
 )
 
 __all__ = [
+    "REQUEST_HEADER_CATEGORY",
+    "SURFACE_ASSISTANT_TYPE",
+    "SURFACE_TOOL_RESULT_TYPE",
+    "TOOL_NOT_STARTED",
+    "TOOL_OUTCOME_UNKNOWN",
     "BoundRunEventSession",
     "CheckpointFailure",
     "EventSessionBinder",
     "FlushableSession",
-    "REQUEST_HEADER_CATEGORY",
     "RunEventSessionBridge",
-    "SURFACE_ASSISTANT_TYPE",
-    "SURFACE_TOOL_RESULT_TYPE",
     "Session",
     "SessionCheckpointPolicy",
     "SessionCheckpointPolicyProtocol",
     "SessionRecoveryError",
     "SessionRepairError",
-    "TOOL_NOT_STARTED",
-    "TOOL_OUTCOME_UNKNOWN",
     "UnknownSessionEventTypeError",
     "append_approval_resolved_if_pending",
     "assert_resume_allowed",

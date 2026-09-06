@@ -7,7 +7,7 @@ whether a run may resume.  Process-local ``RunSession.snapshot`` /
 
 from __future__ import annotations
 
-from lca.session.recovery import assert_resume_allowed
+from lca.session.lifecycle.recovery import assert_resume_allowed
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunSession
 
 

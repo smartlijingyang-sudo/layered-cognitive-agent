@@ -250,7 +250,7 @@ def test_config_rejects_unknown_keys() -> None:
 
 
 def test_plugin_manifest_metadata() -> None:
-    from lca.harness.plugin_declaration import definition_from_plugin
+    from lca.harness.plugin.declaration import definition_from_plugin
     from lca.plugins.session.telemetry_otel import telemetry_otel as plugin_module
 
     definition = definition_from_plugin(plugin_module.setup, module=__name__)

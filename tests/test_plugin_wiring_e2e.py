@@ -118,7 +118,7 @@ class TestHubConstruction:
     def test_hub_constructor_signature(self) -> None:
         import inspect
 
-        from lca.cognition.perceive_hub import SequentialPerceiveHub
+        from lca.cognition.perceive.hub import SequentialPerceiveHub
 
         sig = inspect.signature(SequentialPerceiveHub.__init__)
         params = list(sig.parameters.keys())

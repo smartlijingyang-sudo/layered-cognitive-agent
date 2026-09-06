@@ -33,7 +33,7 @@ def publish_team_message(
     from lca.contracts.models.observability.act_journal_receipt import (
         team_message_published_receipt,
     )
-    from lca.loop.act_journal_commit import commit_act_journal_receipt
+    from lca.loop.commit.act_journal import commit_act_journal_receipt
 
     receipt = team_message_published_receipt(
         team_id=team_id,

@@ -29,7 +29,7 @@ from lca.plugins.events.publishers._session_publish import (
     set_publish_session,
 )
 from lca.plugins.session.runtime.messages import derive_messages
-from lca.session.recovery import recover_live_agent
+from lca.session.lifecycle.recovery import recover_live_agent
 from lca.session.append import Session
 
 

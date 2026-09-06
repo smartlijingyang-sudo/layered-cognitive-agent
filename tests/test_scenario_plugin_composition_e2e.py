@@ -36,7 +36,7 @@ from lca.cognition.brain.decision_gates import (
     RepeatToolCallGate,
     record_gate_decided,
 )
-from lca.cognition.perceive_hub import SequentialPerceiveHub
+from lca.cognition.perceive.hub import SequentialPerceiveHub
 from lca.cognition.sensors import (
     ClockSensor,
     InboxFactsSensor,

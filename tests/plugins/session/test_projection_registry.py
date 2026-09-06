@@ -418,7 +418,7 @@ async def test_setup_attaches_restored_session_via_hook() -> None:
 
 
 def test_plugin_manifest_metadata() -> None:
-    from lca.harness.plugin_declaration import definition_from_plugin
+    from lca.harness.plugin.declaration import definition_from_plugin
 
     definition = definition_from_plugin(plugin_module.setup, module=__name__)
     assert definition.id == "lca.plugins.session.projection_registry"

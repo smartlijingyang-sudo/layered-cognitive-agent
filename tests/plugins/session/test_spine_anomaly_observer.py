@@ -11,7 +11,7 @@ from lca.infrastructure.observability.loop_cursor._spine_port import (
 from lca.infrastructure.observability.spine.event_record import EventRecord
 from lca.plugins.observability.spine.emit_pipeline import EmitPipeline
 from lca.infrastructure.observability.spine.spine_enrich import enrich_spine_payload, set_active_spine_enricher
-from lca.session.bind import (
+from lca.session.lifecycle.bind import (
     bind_run_event_session_from_store,
     unbind_run_event_session,
 )

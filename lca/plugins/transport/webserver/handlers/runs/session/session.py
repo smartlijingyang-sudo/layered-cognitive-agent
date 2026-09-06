@@ -76,7 +76,7 @@ class RunSession:
     error: str = ""
     task: asyncio.Task[Any] | None = None
     cancel_requested: bool = False
-    # COMPAT(P3-06): snapshot/runnable are process-local resume cache, not SSOT.
+    # P3-06: snapshot/runnable are process-local resume cache, not SSOT.
     # Authority: recover_live_agent + Session facts (carrier/runs/resume.py).
     snapshot: Any = None
     runnable: Any = None

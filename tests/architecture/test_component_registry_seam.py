@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from lca.application.policies import LEAD_BUDGET_POLICY_KEY, LeadBudgetPolicy
-from lca.cognition.gate_service import GateService
+from lca.cognition.brain.gate_service import GateService
 from lca.cognition.memory.simple_memory import SimpleMemorySystem
 from lca.cognition.memory.temporal_memory import TemporalMemorySystem
 from lca.contracts.atoms.enums import ComponentKind, DecisionGateName

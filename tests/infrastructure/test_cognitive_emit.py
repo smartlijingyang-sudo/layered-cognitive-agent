@@ -120,7 +120,7 @@ async def test_phase_fact_emitter_appends_context_manifested() -> None:
         PhaseResult,
         SemanticPhase,
     )
-    from lca.loop.phase_fact_emitter import emit_phase_catalog_facts
+    from lca.loop.emit.spine.phase_fact import emit_phase_catalog_facts
     from lca.plugins.events.publishers._session_publish import (
         reset_publish_session,
         set_publish_session,

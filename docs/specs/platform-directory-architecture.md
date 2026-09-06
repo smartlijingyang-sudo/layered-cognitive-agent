@@ -15,7 +15,8 @@
 | **机制 vs 原语 vs 插件** | G0 机制不可插件化；认知原语可替换；插件 = Manifest 声明的贡献 |
 | **三时态分离** | compile（harness/kernel）· run（loop/cognition）· observe（session/fold/export） |
 | **读写分离** | transport `carrier/` 写触发；`read/` 只 fold；session 只 append |
-| **8/10/15** | 每目录直接 `.py` ≤8 正常，9–10 预警，>10 必拆，>15 阻断或 ADR 豁免 |
+| **5 / 6 / 8** | 每目录直接 `.py` ≤5 正常，6–7 预警，≥8 必拆（详见 cognitive-directory-discipline） |
+| **8 / 10 / 15** | legacy 宽限，逐步收敛到 5/6/8（详见 package-organization-discipline） |
 
 ---
 

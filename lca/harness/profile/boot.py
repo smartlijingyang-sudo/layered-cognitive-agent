@@ -300,7 +300,7 @@ def _validate_audited_interactions(
 ) -> None:
     """Defend the declaration-to-interaction subset invariant after Fiber boot."""
 
-    from lca.harness.plugin_context import requirement_covers_key
+    from lca.harness.plugin.context import requirement_covers_key
 
     declared_provide = set(definition.provided_capability_keys)
     declared_require = set(definition.required_capability_keys)

@@ -373,7 +373,7 @@ def test_unknown_execution_point_is_rejected_at_emit() -> None:
 
 def test_plugin_manifest_declares_expected_metadata() -> None:
     """The wrapped plugin exposes the canonical id / layer / kind / provides."""
-    from lca.harness.plugin_declaration import definition_from_plugin
+    from lca.harness.plugin.declaration import definition_from_plugin
     from lca.plugins.observability.spine import emit_pipeline
 
     # Touching the module forces the @plugin decorator to attach

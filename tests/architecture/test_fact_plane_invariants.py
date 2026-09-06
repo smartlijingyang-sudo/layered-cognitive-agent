@@ -13,8 +13,9 @@ import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _COGNITION = _REPO_ROOT / "lca" / "cognition"
+_PERCEIVE_HUB = _COGNITION / "perceive" / "hub.py"
 _PHASE_LOOP = _REPO_ROOT / "lca" / "plugins" / "loop" / "phase"
-_PHASE_EMITTER = _REPO_ROOT / "lca" / "loop" / "phase_fact_emitter.py"
+_PHASE_EMITTER = _REPO_ROOT / "lca" / "loop" / "emit" / "spine" / "phase_fact.py"
 _TRANSACTION = _REPO_ROOT / "lca" / "loop" / "transaction.py"
 
 
@@ -59,7 +60,7 @@ class TestIFact2:
     """I-FACT-2: Cognition must not use Journal production APIs directly."""
 
     def test_i_fact_2_perceive_hub_and_sink_clean(self) -> None:
-        path = _COGNITION / "perceive_hub.py"
+        path = _PERCEIVE_HUB
         forbidden = (
             "bound.journal",
             "record_runtime(",
@@ -98,7 +99,7 @@ class TestIFact2:
         assert not matches, "I-FACT-2 cognition facade violations\n" + "\n".join(matches)
 
     def test_i_fact_2_perceive_hub_pure(self) -> None:
-        from lca.cognition import perceive_hub
+        from lca.cognition.perceive import hub as perceive_hub
 
         source = textwrap.dedent(inspect.getsource(perceive_hub.SequentialPerceiveHub.perceive))
         body_text = ast.unparse(ast.parse(source))

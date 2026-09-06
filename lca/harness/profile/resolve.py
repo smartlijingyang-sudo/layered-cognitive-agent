@@ -21,7 +21,7 @@ from typing import Any, cast
 from pydantic import BaseModel, SecretStr
 
 from lca.harness.plugin_api import PluginDefinition, PluginSetupFn, definition_from_plugin
-from lca.harness.plugin_spec_projection import native_spec_from_declaration
+from lca.harness.plugin.spec_projection import native_spec_from_declaration
 from lca.harness.profile.errors import ProfileResolveError
 from lca.harness.profile.source import (
     ProfileSource,

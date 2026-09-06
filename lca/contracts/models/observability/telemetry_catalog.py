@@ -100,25 +100,25 @@ TELEMETRY_CATALOG: dict[str, VocabDef] = {
     # ── 认知域：hook 边界自动发射 ──
     SpanName.LOOP_PHASE_PERCEIVE.value: _span(
         VocabDomain.COGNITIVE,
-        "lca.cognition.hook_registry",
+        "lca.cognition.brain.hook_registry",
         required=(ATTR_AGENT_ROLE, ATTR_STEP),
         desc="感知相位",
     ),
     SpanName.LOOP_PHASE_THINK.value: _span(
         VocabDomain.COGNITIVE,
-        "lca.cognition.hook_registry",
+        "lca.cognition.brain.hook_registry",
         required=(ATTR_AGENT_ROLE, ATTR_STEP),
         desc="思考相位",
     ),
     SpanName.LOOP_PHASE_ACT.value: _span(
         VocabDomain.COGNITIVE,
-        "lca.cognition.hook_registry",
+        "lca.cognition.brain.hook_registry",
         required=(ATTR_AGENT_ROLE, ATTR_STEP),
         desc="行动相位",
     ),
     SpanName.LOOP_PHASE_REFLECT.value: _span(
         VocabDomain.COGNITIVE,
-        "lca.cognition.hook_registry",
+        "lca.cognition.brain.hook_registry",
         required=(ATTR_AGENT_ROLE, ATTR_STEP),
         desc="反思相位",
     ),
@@ -163,7 +163,7 @@ TELEMETRY_CATALOG: dict[str, VocabDef] = {
     ),
     SpanName.ERROR.value: _span(
         VocabDomain.RESOURCE,
-        "lca.cognition.hook_registry",
+        "lca.cognition.brain.hook_registry",
         desc="hook on_error 错误 span",
     ),
     # ── 事件域 ──

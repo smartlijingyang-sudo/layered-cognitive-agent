@@ -20,7 +20,7 @@ from lca.infrastructure.session.runtime_emit import (
     emit_runtime_resume_end,
     emit_runtime_resume_start,
 )
-from lca.loop.agent_spawn_emit import (
+from lca.loop.emit.cognitive.agent_spawn import (
     emit_agent_loop_iteration_end,
     emit_agent_loop_iteration_start,
 )

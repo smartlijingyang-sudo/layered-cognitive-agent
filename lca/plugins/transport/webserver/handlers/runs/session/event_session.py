@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from lca.session.bind import (
+from lca.session.lifecycle.bind import (
     BoundRunEventSession,
     RunEventSessionBridge,
     bind_run_event_session,

@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol, cast, runtime_checkable
 
 from lca.contracts.capabilities import Capability, cap_key
-from lca.harness.plugin_manifest import PluginDefinition
+from lca.harness.plugin.manifest import PluginDefinition
 
 __all__ = [
     "AuditedPluginContext",

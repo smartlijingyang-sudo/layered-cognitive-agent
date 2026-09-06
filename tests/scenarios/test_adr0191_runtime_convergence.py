@@ -12,8 +12,8 @@ from lca.infrastructure.session.bindings import (
 )
 from lca.infrastructure.session.model_context_assembler import default_model_context_assembler
 from lca.infrastructure.session.surface_emit import append_human_answer_surface
-from lca.session.recovery import recover_live_agent
-from lca.session.repair import repair_interrupted_turn
+from lca.session.lifecycle.recovery import recover_live_agent
+from lca.session.lifecycle.repair import repair_interrupted_turn
 from lca.session.append import Session
 from lca_kernel.events.fold import SURFACE_ASSISTANT_TYPE, SURFACE_USER_TYPE
 

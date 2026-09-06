@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from lca.harness.plugin_declaration import definition_from_plugin
+from lca.harness.plugin.declaration import definition_from_plugin
 from lca.infrastructure.observability.spine.derivers.graph import GraphDeriver
 from lca.infrastructure.observability.spine.event_record import EventRecord
 from lca.plugins.observability.spine.derivers import (

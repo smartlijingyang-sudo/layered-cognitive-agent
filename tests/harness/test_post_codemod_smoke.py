@@ -28,8 +28,8 @@ from pydantic import BaseModel
 
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.harness.plugin_api import plugin
-from lca.harness.plugin_declaration import definition_from_plugin
-from lca.harness.plugin_manifest import PluginKind
+from lca.harness.plugin.declaration import definition_from_plugin
+from lca.harness.plugin.manifest import PluginKind
 
 
 class _Cfg(BaseModel):

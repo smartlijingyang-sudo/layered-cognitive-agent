@@ -63,7 +63,7 @@ class TeamHandle(TeamUnit):
         # point on the team entry. The team is a closed strategy; one
         # ``TeamHandle.run`` is one iteration (the cognitive loop sits
         # inside each member agent).
-        from lca.loop.agent_spawn_emit import (
+        from lca.loop.emit.cognitive.agent_spawn import (
             emit_agent_loop_iteration_end,
             emit_agent_loop_iteration_start,
         )

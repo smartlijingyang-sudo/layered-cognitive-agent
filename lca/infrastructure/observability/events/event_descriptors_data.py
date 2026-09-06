@@ -528,7 +528,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             PerceptionMerged,
             domain=VocabDomain.EVENT,
-            emitter="lca.cognition.perceive_hub",
+            emitter="lca.cognition.perceive.hub",
             required=("delta_ref",),
             description="Hub fold 终态",
             durability="required",

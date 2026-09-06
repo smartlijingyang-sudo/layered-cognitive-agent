@@ -5,7 +5,7 @@ from __future__ import annotations
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.protocols.composition.logic_address import score_logic_address
-from lca.harness.plugin_declaration import definition_from_plugin
+from lca.harness.plugin.declaration import definition_from_plugin
 from lca.plugins.loop.control.act_authorize.plugin import setup as authorize_setup
 from lca.plugins.loop.control.act_budget.plugin import setup as budget_setup
 from lca.plugins.loop.control.act_constrain.plugin import setup as constrain_setup

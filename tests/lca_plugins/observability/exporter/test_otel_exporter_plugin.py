@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.harness.plugin_declaration import definition_from_plugin
+from lca.harness.plugin.declaration import definition_from_plugin
 from lca.plugins.observability.exporter.otel import plugin as otel_plugin
 
 

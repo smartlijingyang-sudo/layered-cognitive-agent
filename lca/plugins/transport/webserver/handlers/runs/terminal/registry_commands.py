@@ -184,7 +184,7 @@ class RegistryRunCommands:
                 error="run not waiting for input",
                 error_status=409,
             )
-        from lca.session.recovery import SessionRecoveryError
+        from lca.session.lifecycle.recovery import SessionRecoveryError
         from lca.plugins.transport.webserver.carrier.runs.resume import (
             resume_cache_ready,
             validate_durable_resume,
@@ -251,7 +251,7 @@ class RegistryRunCommands:
             from lca.plugins.events.publishers._session_publish import (
                 set_publish_session,
             )
-            from lca.session.recovery import (
+            from lca.session.lifecycle.recovery import (
                 append_approval_resolved_if_pending,
             )
 

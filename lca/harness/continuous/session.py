@@ -22,8 +22,8 @@ from lca.contracts.harness.tasks.continuous import (
     WorkQueue,
     WorkStatus,
 )
-from lca.harness.continuous_queue import LeaseNotOwnedError, SqliteWorkQueue
-from lca.harness.continuous_serialization import require_aware
+from lca.harness.continuous.queue import LeaseNotOwnedError, SqliteWorkQueue
+from lca.harness.continuous.serialization import require_aware
 
 
 @dataclass(frozen=True, slots=True)

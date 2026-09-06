@@ -18,7 +18,7 @@ def test_normalize_helpers_importable_from_plugin_declaration() -> None:
     for ``@plugin`` / ``definition_from_plugin`` — public callers go through
     ``lca.harness.plugin_api``.
     """
-    import lca.harness.plugin_declaration as pd
+    import lca.harness.plugin.declaration as pd
 
     for name in (
         "_normalize_keys",
@@ -42,13 +42,13 @@ def test_normalize_helpers_callable_and_stable() -> None:
 
     Guards against accidental signature drift during the move.
     """
-    from lca.harness.plugin_declaration import (
+    from lca.harness.plugin.declaration import (
         _normalize_effects,
         _normalize_implements,
         _normalize_keys,
         _normalize_relations,
     )
-    from lca.harness.plugin_manifest import EffectClass, PluginKind
+    from lca.harness.plugin.manifest import EffectClass, PluginKind
 
     assert _normalize_keys(None) == ()
     assert _normalize_keys(("a.b", "c.d")) == ("a.b", "c.d")

@@ -39,7 +39,7 @@ from lca.contracts.protocols.memory.operational_skills import (
     SkillPackage,
 )
 from lca.harness.plugin_api import definition_from_plugin
-from lca.harness.plugin_manifest import EffectClass
+from lca.harness.plugin.manifest import EffectClass
 from lca.infrastructure.skills.disk_store import DiskSkillPackageStore
 from lca.infrastructure.skills.settings import SkillSettings
 from lca.plugins.assistant.catalog import (

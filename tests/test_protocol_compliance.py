@@ -22,7 +22,7 @@ from lca.cognition.body.tool_registry import SimpleToolRegistry
 from lca.cognition.brain.critic import SimpleCritic
 from lca.cognition.brain.modular_brain import ModularBrain
 from lca.cognition.brain.reasoner import PromptReasoner
-from lca.cognition.hook_registry import CordisHookRegistry
+from lca.cognition.brain.hook_registry import CordisHookRegistry
 from lca.cognition.memory.simple_memory import SimpleMemorySystem
 from lca.contracts.protocols import (
     AgentTransport,

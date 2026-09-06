@@ -84,7 +84,7 @@ class RunLifecycleCoordinator:
         from lca.infrastructure.session.runtime_emit import (
             emit_exception_finally as emit_carrier_exception_finally,
         )
-        from lca.loop.transport_emit import (
+        from lca.loop.transport import (
             emit_kernel_run_cancelled,
             emit_kernel_run_start,
             emit_kernel_run_stop,
@@ -193,7 +193,7 @@ class RunLifecycleCoordinator:
         try:
             bindings = session.bindings
             ambit = session.ambit
-            # COMPAT(P3-06): snapshot/runnable are hot-path cache; authority is Session facts.
+            # P3-06: snapshot/runnable are hot-path cache; authority is Session facts.
             with (
                 bind_run_ambit(ambit) if ambit is not None else nullcontext(),
                 run_workspace_scope(session.run_id),

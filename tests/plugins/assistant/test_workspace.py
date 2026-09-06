@@ -32,7 +32,7 @@ from lca.contracts.models.act.execution_space import (
 )
 from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
 from lca.harness.plugin_api import definition_from_plugin
-from lca.harness.plugin_manifest import EffectClass
+from lca.harness.plugin.manifest import EffectClass
 from lca.plugins.assistant.catalog import (
     AssistantCatalogError,
     AssistantCatalogImpl,

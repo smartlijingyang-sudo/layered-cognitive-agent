@@ -30,7 +30,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.harness.plugin_manifest import (
+from lca.harness.plugin.manifest import (
     _LAYER_VALUES,
     EffectClass,
     PluginDefinition,
@@ -39,7 +39,7 @@ from lca.harness.plugin_manifest import (
     PluginSetupFn,
     RawRelationEntry,
 )
-from lca.harness.plugin_spec_projection import native_spec_from_declaration
+from lca.harness.plugin.spec_projection import native_spec_from_declaration
 
 if TYPE_CHECKING:
     from lca.contracts.protocols.declarative.declarative_phase_graph import (

@@ -15,7 +15,7 @@ from lca.cognition.brain.modular_brain import ModularBrain
 from lca.cognition.brain.prompts import load_builtin_prompt
 from lca.cognition.brain.reasoner import PromptReasoner
 from lca.cognition.brain.skill_router import StaticSkillRouter
-from lca.cognition.hook_registry import CordisHookRegistry
+from lca.cognition.brain.hook_registry import CordisHookRegistry
 from lca.contracts.atoms.enums import ActionType, LLMStreamEventType, ReflectionVerdict
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.decision import Decision, Observation, Reflection

@@ -23,7 +23,7 @@ from lca.cognition.brain.decision_gates import (
     RepeatToolCallGate,
     ToolLoopBreakerGate,
 )
-from lca.cognition.perceive_hub import SequentialPerceiveHub
+from lca.cognition.perceive.hub import SequentialPerceiveHub
 from lca.cognition.sensors import (
     InboxFactsSensor,
     TeamInboxSensor,

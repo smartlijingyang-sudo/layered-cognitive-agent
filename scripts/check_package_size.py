@@ -1,4 +1,4 @@
-"""Phase D: enforce the §11 rule that no package exceeds 8 .py files.
+"""Phase D: enforce the §11 rule that no package exceeds 5 .py files (cognitive-directory-discipline).
 
 The cap (excluding __init__.py) keeps each subdirectory focused on one
 domain. Per ADR-0105 §11.x, exempt files live in
@@ -65,7 +65,7 @@ def _rel_package(absolute_dir: Path, root: Path) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT / "lca")
-    parser.add_argument("--max", type=int, default=8)
+    parser.add_argument("--max", type=int, default=5)
     args = parser.parse_args(argv)
 
     whitelist = _load_whitelist()

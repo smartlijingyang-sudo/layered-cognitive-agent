@@ -117,7 +117,7 @@ from lca.cognition.body.tool_journal_emit import (  # noqa: E402
 
 def _commit_tool_denied(tool: Tool, reason: str) -> None:
     from lca.cognition.body.tool_journal_emit import emit_tool_denied
-    from lca.loop.tool_journal_commit import (
+    from lca.loop.commit.tool_journal import (
         commit_tool_journal_receipt,
         commit_tool_phase_denied,
     )
@@ -135,7 +135,7 @@ def _commit_tool_started(
     evidence_store: Any,
     evidence_policy: Any,
 ) -> EvidenceRef | None:
-    from lca.loop.tool_journal_commit import (
+    from lca.loop.commit.tool_journal import (
         commit_tool_journal_receipt,
         commit_tool_phase_call_start,
     )
@@ -167,7 +167,7 @@ def _commit_tool_invoked(
     invocation_id: str,
     arguments_ref: EvidenceRef | None = None,
 ) -> None:
-    from lca.loop.tool_journal_commit import (
+    from lca.loop.commit.tool_journal import (
         commit_tool_journal_receipt,
         commit_tool_phase_call_end,
     )
@@ -198,7 +198,7 @@ def _commit_tool_invoked(
 def _commit_approval_requested(tool: Tool, invocation_id: str) -> None:
     """Record a human-input request without opening a tool invocation."""
     from lca.contracts.models.observability.act_journal_receipt import approval_requested_receipt
-    from lca.loop.act_journal_commit import commit_act_journal_receipt
+    from lca.loop.commit.act_journal import commit_act_journal_receipt
 
     commit_act_journal_receipt(approval_requested_receipt(tool, invocation_id))
 
@@ -288,7 +288,7 @@ class SimpleSafeExecutor(SafeExecutor):
                 )
                 await await_tool_side_effect_checkpoint()
 
-            from lca.loop.tool_journal_commit import (
+            from lca.loop.commit.tool_journal import (
                 commit_body_sandbox_enter,
                 commit_body_sandbox_exit,
             )
@@ -409,7 +409,7 @@ class SimpleSafeExecutor(SafeExecutor):
                 # PR-3.3: emit body.tool.retry on the spine before sleeping so
                 # observability traces see retry decisions at the same point
                 # the executor commits to another attempt.
-                from lca.loop.tool_journal_commit import commit_body_tool_retry
+                from lca.loop.commit.tool_journal import commit_body_tool_retry
 
                 commit_body_tool_retry(
                     tool_name=tool.name,
@@ -464,7 +464,7 @@ class SimpleSafeExecutor(SafeExecutor):
         # call so traces distinguish "we dispatched the call" from "the tool
         # returned"; the invocation_id here is the one bound by the parent
         # ``_execute_with_retry`` so start/end stay correlate-able.
-        from lca.loop.tool_journal_commit import (
+        from lca.loop.commit.tool_journal import (
             commit_body_tool_execute_end,
             commit_body_tool_execute_start,
         )

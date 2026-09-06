@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
-from lca.cognition.gate_service import GateService
+from lca.cognition.brain.gate_service import GateService
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.functional_group import FunctionalGroup

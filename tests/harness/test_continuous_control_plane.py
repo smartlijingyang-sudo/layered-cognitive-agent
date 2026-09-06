@@ -13,7 +13,7 @@ from lca.contracts.harness.tasks.continuous import (
     WorkItem,
     WorkStatus,
 )
-from lca.harness.continuous import SqliteContinuousControlPlane, SqliteWorkQueue
+from lca.harness.continuous.session import SqliteContinuousControlPlane, SqliteWorkQueue
 
 NOW = datetime(2026, 8, 27, 0, 0, tzinfo=UTC)
 
