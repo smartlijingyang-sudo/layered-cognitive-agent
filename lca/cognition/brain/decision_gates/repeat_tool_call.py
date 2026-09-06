@@ -19,6 +19,7 @@ from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
+from lca.contracts.models.core.loop_policy import DEFAULT_LOOP_POLICY
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import DecisionGate
 from lca.infrastructure.session.turn_control_reader import (
@@ -26,8 +27,6 @@ from lca.infrastructure.session.turn_control_reader import (
     last_observation_success,
 )
 
-_THRESHOLD = 3
-_FACT_KIND = "repeat_tool_call"
 _WARNING_TEMPLATE = (
     "⚠️ 你已连续 {count} 次调用工具 {tool}{failed}。请换一种方法或工具，不要继续重复相同的调用。"
 )
@@ -48,7 +47,7 @@ class RepeatToolCallGate(DecisionGate):
 
         tool_name = decision.tool_calls[0].tool_name
         consecutive = consecutive_same_tool(state, tool_name)
-        if consecutive < _THRESHOLD:
+        if consecutive < DEFAULT_LOOP_POLICY.repeat_warn:
             return decision
 
         # Build the warning payload.  is_rewritten=False: this is a warning,

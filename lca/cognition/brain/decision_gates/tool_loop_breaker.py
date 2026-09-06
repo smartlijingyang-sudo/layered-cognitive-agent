@@ -13,22 +13,20 @@ It deliberately does not block polling-like calls whose observations change.
 
 from __future__ import annotations
 
-import json
-from collections.abc import Mapping, Sequence
-from hashlib import sha256
-
 from lca.cognition.brain.decision_gates.chained import record_gate_decided
+from lca.cognition.brain.decision_gates.loop_fingerprint import (
+    tool_call_fingerprint,
+    view_observation_fingerprint,
+    view_tool_fingerprint,
+)
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.ids import new_id
-from lca.contracts.models.core.budget import TOOL_LOOP_BREAK_THRESHOLD
 from lca.contracts.models.core.decision import Decision, ToolCall
 from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
+from lca.contracts.models.core.loop_policy import DEFAULT_LOOP_POLICY
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import DecisionGate
-from lca.infrastructure.session.turn_control_reader import (
-    ControlTurnView,
-    iter_control_turns_reversed,
-)
+from lca.infrastructure.session.turn_control_reader import iter_control_turns_reversed
 
 _BLOCKED_FAILURE_RATIONALE = (
     "同一工具已连续失败多次，禁止再次调用。请换用其他工具、修正代码，或直接 respond 收口。"
@@ -41,13 +39,16 @@ _BLOCKED_STALLED_RATIONALE = (
 class ToolLoopBreakerGate(DecisionGate):
     """Block failed patterns and identical no-progress tool-call loops."""
 
+    def __init__(self, *, thresholds=DEFAULT_LOOP_POLICY) -> None:
+        self._thresholds = thresholds
+
     async def enforce(self, state: AgentState, decision: Decision) -> Decision:
         if decision.action_type != ActionType.USE_TOOL or not decision.tool_calls:
             return decision
 
         tool_call = decision.tool_calls[0]
         failure_count = self._consecutive_failures(state, tool_call.tool_name)
-        if failure_count >= TOOL_LOOP_BREAK_THRESHOLD:
+        if failure_count >= self._thresholds.break_failures:
             return self._block(
                 state,
                 decision,
@@ -60,7 +61,7 @@ class ToolLoopBreakerGate(DecisionGate):
             )
 
         stalled_count = self._consecutive_identical_observations(state, tool_call)
-        if stalled_count >= TOOL_LOOP_BREAK_THRESHOLD:
+        if stalled_count >= self._thresholds.break_stalled:
             return self._block(
                 state,
                 decision,
@@ -68,7 +69,7 @@ class ToolLoopBreakerGate(DecisionGate):
                 rationale=_BLOCKED_STALLED_RATIONALE,
                 response=(
                     f"{tool_call.tool_name} 以相同参数连续返回相同结果 "
-                    f"{TOOL_LOOP_BREAK_THRESHOLD} 次，已停止重复调用。"
+                    f"{self._thresholds.break_stalled} 次，已停止重复调用。"
                 ),
             )
         return decision
@@ -124,7 +125,7 @@ class ToolLoopBreakerGate(DecisionGate):
         hard stop; the independent failure breaker remains active.
         """
 
-        candidate_fingerprint = _tool_call_fingerprint(candidate)
+        candidate_fingerprint = tool_call_fingerprint(candidate)
         if candidate_fingerprint is None:
             return 0
 
@@ -133,9 +134,9 @@ class ToolLoopBreakerGate(DecisionGate):
         for turn in iter_control_turns_reversed(state):
             if turn.tool_name != candidate.tool_name:
                 break
-            if _view_tool_fingerprint(turn) != candidate_fingerprint:
+            if view_tool_fingerprint(turn) != candidate_fingerprint:
                 break
-            observation_fingerprint = _view_observation_fingerprint(turn)
+            observation_fingerprint = view_observation_fingerprint(turn)
             if observation_fingerprint is None:
                 return 0
             if expected_observation is None:
@@ -163,10 +164,10 @@ class ToolLoopBreakerGate(DecisionGate):
 
         if last_error:
             return (
-                f"{tool_name} 连续失败 {TOOL_LOOP_BREAK_THRESHOLD} 次，已停止重试。\n"
+                f"{tool_name} 连续失败 {DEFAULT_LOOP_POLICY.break_failures} 次，已停止重试。\n"
                 f"最后错误：{last_error}"
             )
-        return f"{tool_name} 连续失败 {TOOL_LOOP_BREAK_THRESHOLD} 次，已停止重试。"
+        return f"{tool_name} 连续失败 {DEFAULT_LOOP_POLICY.break_failures} 次，已停止重试。"
 
     @staticmethod
     def _force_respond(decision: Decision, *, rationale: str, response: str) -> Decision:
@@ -179,89 +180,6 @@ class ToolLoopBreakerGate(DecisionGate):
             confidence=0.9,
             response_text=response,
         )
-
-
-def _tool_call_fingerprint(tool_call: ToolCall) -> str | None:
-    payload = _normalize_for_fingerprint(
-        {"tool_name": tool_call.tool_name, "arguments": tool_call.arguments}
-    )
-    if payload is None:
-        return None
-    return _fingerprint(payload)
-
-
-def _view_tool_fingerprint(turn: ControlTurnView) -> str | None:
-    if turn.tool_name is None:
-        return None
-    payload = _normalize_for_fingerprint(
-        {"tool_name": turn.tool_name, "arguments": turn.tool_arguments or {}}
-    )
-    if payload is None:
-        return None
-    return _fingerprint(payload)
-
-
-def _view_observation_fingerprint(turn: ControlTurnView) -> str | None:
-    payload = _normalize_for_fingerprint(
-        {
-            "success": turn.observation_success,
-            "payload": turn.observation_payload,
-            "error": turn.observation_error,
-        }
-    )
-    if payload is None:
-        return None
-    return _fingerprint(payload)
-
-
-def _fingerprint(payload: object) -> str:
-    """Return a deterministic SHA-256 digest for one normalized JSON payload."""
-
-    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    return sha256(encoded.encode("utf-8")).hexdigest()
-
-
-def _normalize_for_fingerprint(value: object) -> object | None:
-    """Return a conservative JSON-safe canonical value or ``None`` when unknown.
-
-    Tool arguments and observations may contain arbitrary Python objects in tests
-    or third-party adapters.  The policy only compares stable primitives,
-    mappings, sequences and sets; it never falls back to ``str(value)`` because
-    object representations can embed memory addresses and create false progress.
-    """
-
-    if value is None or isinstance(value, (bool, int, float, str)):
-        return value
-    if isinstance(value, Mapping):
-        normalized_mapping: dict[str, object] = {}
-        for key in sorted(value, key=lambda item: str(item)):
-            if not isinstance(key, str):
-                return None
-            normalized_value = _normalize_for_fingerprint(value[key])
-            if normalized_value is None and value[key] is not None:
-                return None
-            normalized_mapping[key] = normalized_value
-        return normalized_mapping
-    if isinstance(value, Sequence) and not isinstance(value, (bytes, bytearray, str)):
-        normalized_sequence: list[object] = []
-        for item in value:
-            normalized_value = _normalize_for_fingerprint(item)
-            if normalized_value is None and item is not None:
-                return None
-            normalized_sequence.append(normalized_value)
-        return normalized_sequence
-    if isinstance(value, (set, frozenset)):
-        normalized_set: list[object] = []
-        for item in value:
-            normalized_value = _normalize_for_fingerprint(item)
-            if normalized_value is None and item is not None:
-                return None
-            normalized_set.append(normalized_value)
-        return sorted(
-            normalized_set,
-            key=lambda item: json.dumps(item, ensure_ascii=False, sort_keys=True),
-        )
-    return None
 
 
 __all__ = ["ToolLoopBreakerGate"]

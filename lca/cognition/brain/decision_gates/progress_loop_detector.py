@@ -32,16 +32,13 @@ from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
+from lca.contracts.models.core.loop_policy import DEFAULT_LOOP_POLICY
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import DecisionGate
 from lca.infrastructure.session.turn_control_reader import (
     control_turns,
     iter_control_turns_reversed,
 )
-
-_PROGRESS_WARNING_THRESHOLD = 3
-_PROGRESS_BREAK_THRESHOLD = 6
-
 
 class ProgressLoopDetector(DecisionGate):
     """Detect cross-tool loops with zero progress.
@@ -58,13 +55,13 @@ class ProgressLoopDetector(DecisionGate):
             return decision
 
         count = self._count_consecutive_no_progress(state)
-        if count < _PROGRESS_WARNING_THRESHOLD:
+        if count < DEFAULT_LOOP_POLICY.progress_warn:
             return decision
 
         tools = self._recent_tool_history(state, n=count)
         tool_summary = ", ".join(tools)
 
-        if count < _PROGRESS_BREAK_THRESHOLD:
+        if count < DEFAULT_LOOP_POLICY.progress_break:
             # Phase 1: emit PolicyFact for next think phase.
             message = (
                 f"⚠️ 你已连续 {count} 步没有产生有效输出。"
