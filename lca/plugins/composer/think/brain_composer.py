@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from lca.contracts.capabilities import GATES
 from lca.contracts.harness.composition.composer import (
     AgentCompositionRequest,
     AgentGraphContribution,
 )
+from lca.contracts.mechanisms.capability import require_capability
 from lca.plugins.composer.think.brain import (
     apply_lead_brain,
     instrument_llm,
@@ -46,7 +48,7 @@ class BrainComposer:
             hooks=None,
             observability=None,
             llm=llm,
-            phase_capabilities={},
+            phase_capabilities={"gates": require_capability(scope, GATES.key)},
             metadata={"composer": self.key},
         )
 

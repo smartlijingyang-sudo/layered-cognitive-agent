@@ -16,7 +16,10 @@ from lca.plugins.control_contributions.perceive_context import PerceiveContextEx
 from lca.plugins.control_contributions.remember_admit import RememberAdmitExecutor
 from lca.plugins.control_contributions.stop_decide import StopDecideExecutor
 from lca.plugins.control_contributions.stop_focus import FocusStopExecutor
-from lca.plugins.control_contributions.think_guard import ThinkGuardExecutor
+from lca.plugins.control_contributions.think_guard import (
+    ThinkGuardEnforceExecutor,
+    ThinkGuardExecutor,
+)
 
 __all__ = [
     "ActAuthorizeExecutor",
@@ -30,5 +33,6 @@ __all__ = [
     "PerceiveContextExecutor",
     "RememberAdmitExecutor",
     "StopDecideExecutor",
+    "ThinkGuardEnforceExecutor",
     "ThinkGuardExecutor",
 ]

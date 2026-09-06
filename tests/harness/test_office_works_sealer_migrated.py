@@ -86,26 +86,23 @@ class TestOfficeWorksSealerMigration:
         # malformed calls whose runtime errors the architecture test pins down.
         unchecked_factory = cast("Any", SimpleBrainFactory)
 
-        with pytest.raises(TypeError, match="agent_gate_factory"):
+        with pytest.raises(TypeError, match="classifier"):
             unchecked_factory()
 
         with pytest.raises(TypeError, match="critic_factory"):
             unchecked_factory(
-                agent_gate_factory=lambda: None,
                 classifier=None,
                 reasoner_cls=PromptReasoner,
             )
 
         with pytest.raises(TypeError, match="reasoner_cls"):
             unchecked_factory(
-                agent_gate_factory=lambda: None,
                 classifier=None,
                 critic_factory=lambda: None,
             )
 
         with pytest.raises(TypeError, match="unexpected keyword argument 'synthesizer_factory'"):
             unchecked_factory(
-                agent_gate_factory=lambda: None,
                 classifier=None,
                 critic_factory=lambda: None,
                 reasoner_cls=PromptReasoner,

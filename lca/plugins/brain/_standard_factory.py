@@ -49,9 +49,7 @@ def build_standard_cognitive_brain_factory(ctx: PluginContext) -> BrainFactory:
 
     from lca.cognition.brain.default_factory import SimpleBrainFactory
 
-    gates = ctx.require("gates")
     return SimpleBrainFactory(
-        agent_gate_factory=gates.assemble,
         classifier=ctx.require("decision_classifier"),
         critic_factory=ctx.require("critic.simple"),
         reasoner_cls=ctx.require("reasoner.prompt"),

@@ -1,9 +1,10 @@
-"""Think-guard control executor."""
+"""Think-guard control executors — gate enforcement via declarative phase graph."""
 
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
+from lca.cognition.gate_service import GateService
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.functional_group import FunctionalGroup
@@ -19,6 +20,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.gate_policy import GateDecided
 from lca.contracts.models.core.state import AgentState
+from lca.contracts.protocols.declarative.declarative_execution import StandardPhaseCapability
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ContributionRole,
     PhaseContext,
@@ -31,11 +33,6 @@ from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDecl
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
-_GATE_CONTRIBUTIONS = {
-    "gate.repeat-tool-call": "RepeatToolCallGate",
-    "gate.tool-loop-breaker": "ToolLoopBreakerGate",
-}
-
 
 def _is_known_action(decision: Decision) -> bool:
     """Return whether a decision uses the closed ActionType vocabulary."""
@@ -44,6 +41,19 @@ def _is_known_action(decision: Decision) -> bool:
         return True
     except (ValueError, AttributeError):
         return False
+
+
+def _resolve_gate_service(context: PhaseContext) -> GateService | None:
+    """Return the profile-selected gate registry when declared to the phase."""
+    gates = context.capabilities.get(StandardPhaseCapability.GATES.value)
+    if gates is None:
+        return None
+    if not isinstance(gates, GateService):
+        raise TypeError(
+            "phase capability 'gates' must be GateService, "
+            f"got {type(gates).__name__}"
+        )
+    return gates
 
 
 def _latest_gate_event(state: AgentState) -> GateDecided | None:
@@ -70,11 +80,24 @@ def _gate_verdict_kind(event: GateDecided) -> ControlVerdictKind:
     return ControlVerdictKind.ALLOW
 
 
-class ThinkGuardExecutor:
-    """Execute think-guard control policy."""
+class ThinkGuardEnforceExecutor:
+    """Run profile-selected decision gates and return the enforced Decision."""
 
     async def execute(self, context: PhaseContext, input: PhaseInput) -> PhaseResult:
-        """Evaluate think-guard control."""
+        decision = context.decision
+        if decision is None:
+            return PhaseResult(result_kind="decision", payload=None)
+        gate_service = _resolve_gate_service(context)
+        if gate_service is None:
+            return PhaseResult(result_kind="decision", payload=decision)
+        enforced = await gate_service.assemble().enforce(context.state, decision)
+        return PhaseResult(result_kind="decision", payload=enforced)
+
+
+class ThinkGuardExecutor:
+    """Map durable gate facts to the closed ControlVerdict vocabulary."""
+
+    async def execute(self, context: PhaseContext, input: PhaseInput) -> PhaseResult:
         decision = context.decision
         if decision is None:
             return PhaseResult(
@@ -125,7 +148,7 @@ class Config(BaseModel):
 @plugin(
     id="control.think.guard",
     Config=Config,
-    provides=["control.think.guard"],
+    provides=["control.think.guard", "control.think.guard.enforce"],
     layer="L2",
     kind=PluginKind.PROVIDER,
     effects="none",
@@ -133,12 +156,19 @@ class Config(BaseModel):
     contributes=[
         PhaseContribution(
             phase=SemanticPhase.THINK,
+            role=ContributionRole.TRANSFORM,
+            executor="control.think.guard.enforce",
+            output="think.guard.enforce",
+            order=0,
+        ),
+        PhaseContribution(
+            phase=SemanticPhase.THINK,
             role=ContributionRole.GOVERN,
             executor="control.think.guard",
             output="think.guard",
-            order=0,
+            order=1,
             aggregation="deny-on-any-deny",
-        )
+        ),
     ],
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
@@ -146,19 +176,25 @@ class Config(BaseModel):
             group=FunctionalGroup.G6_DECISION, control_slots=(ControlSlot.THINK_GUARD,)
         ),
         lifecycle=LifecycleContract(allowed_scopes=(Scope.TURN,)),
-        authority=AuthorityContract(grants=("decision.read",)),
+        authority=AuthorityContract(grants=("decision.read", "gates.assemble")),
         observability=EvidenceContract(descriptors=("control.think.guard.checked",)),
     ),
     relations=(),
     ownership=OwnershipDeclaration(
-        reads=("control.think.guard",),
+        reads=("control.think.guard", "gates"),
         emits=("control.think.guard.checked",),
         state_mutation="forbidden",
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config
+    ctx.provide("control.think.guard.enforce", ThinkGuardEnforceExecutor())
     ctx.provide("control.think.guard", ThinkGuardExecutor())
 
 
-__all__ = ["Config", "ThinkGuardExecutor", "setup"]
+__all__ = [
+    "Config",
+    "ThinkGuardEnforceExecutor",
+    "ThinkGuardExecutor",
+    "setup",
+]

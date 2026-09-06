@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import cast
 
+from lca.cognition.gate_service import GateService
 from lca.contracts.protocols.act.embodiment import Body
 from lca.contracts.protocols.declarative.declarative_execution import (
     PhaseCapabilityReader,
@@ -37,6 +38,10 @@ class StandardPhaseCapabilities:
     @property
     def memory(self) -> MemorySystem | None:
         return cast("MemorySystem | None", self.reader.get(StandardPhaseCapability.MEMORY))
+
+    @property
+    def gates(self) -> GateService | None:
+        return cast("GateService | None", self.reader.get(StandardPhaseCapability.GATES))
 
     @property
     def perceive_hub(self) -> PerceiveHub | None:

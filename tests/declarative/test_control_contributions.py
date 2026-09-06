@@ -10,6 +10,7 @@ from lca.contracts.models.core.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseInput
 from lca.contracts.protocols.gate.control_verdict import ControlVerdictKind
+from lca.harness.declarative.compile.phase_capabilities import MappingPhaseCapabilities
 from lca.plugins.control_contributions import (
     ActAuthorizeExecutor,
     ActBudgetExecutor,
@@ -32,6 +33,7 @@ class MockContext:
         self.observation = observation
         self.reflection = reflection
         self.checkpoint_reason = checkpoint_reason
+        self.capabilities = MappingPhaseCapabilities({})
 
 
 def _make_working_state() -> AgentState:
@@ -270,5 +272,41 @@ async def test_observe_checkpoint_allows_valid_step():
     executor = ObserveCheckpointExecutor()
     state = _make_working_state()
     context = MockContext(state)
+    result = await executor.execute(context, PhaseInput())
+    assert result.payload.kind == ControlVerdictKind.ALLOW
+
+
+@pytest.mark.asyncio
+async def test_think_guard_enforce_passthrough_without_gate_service():
+    """Without gates capability the transform contribution keeps the candidate."""
+    from lca.plugins.control_contributions.think_guard import ThinkGuardEnforceExecutor
+
+    executor = ThinkGuardEnforceExecutor()
+    state = _make_working_state()
+    decision = Decision(
+        decision_id="d1",
+        action_type=ActionType.RESPOND,
+        rationale="test",
+        confidence=1.0,
+    )
+    context = MockContext(state, decision=decision)
+    result = await executor.execute(context, PhaseInput())
+    assert result.payload is decision
+
+
+@pytest.mark.asyncio
+async def test_think_guard_govern_allows_without_gate_facts():
+    """GOVERN contribution allows when no durable gate facts exist yet."""
+    from lca.plugins.control_contributions.think_guard import ThinkGuardExecutor
+
+    executor = ThinkGuardExecutor()
+    state = _make_working_state()
+    decision = Decision(
+        decision_id="d1",
+        action_type=ActionType.RESPOND,
+        rationale="test",
+        confidence=1.0,
+    )
+    context = MockContext(state, decision=decision)
     result = await executor.execute(context, PhaseInput())
     assert result.payload.kind == ControlVerdictKind.ALLOW

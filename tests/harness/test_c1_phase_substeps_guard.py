@@ -211,10 +211,11 @@ class TestCV4AllControlSlot11:
         中被实际调用（PR-1/4）。其余槽位 PR-7 / PR-8 / PR-9 落地。
         """
         stop_executor_src = Path("lca/plugins/phase_graph/stop.py").read_text(encoding="utf-8")
-        brain_src = (BRAIN_DIR / "modular_brain.py").read_text(encoding="utf-8")
-        # think.guard must be referenced in ModularBrain (agent_gates)
-        assert "agent_gates" in brain_src, (
-            "ModularBrain must reference agent_gates (think.guard 投稿)"
-        )
+        think_guard_src = Path(
+            "lca/plugins/control_contributions/think_guard.py"
+        ).read_text(encoding="utf-8")
+        # think.guard runs through declarative TRANSFORM + GOVERN contributions.
+        assert "ThinkGuardEnforceExecutor" in think_guard_src
+        assert "ContributionRole.TRANSFORM" in think_guard_src
         # stop.decide must be referenced through the stop phase's local policy.
         assert "stop_policy.decide" in stop_executor_src

@@ -34,6 +34,7 @@ class StandardPhaseCapability(str, Enum):
 
     BRAIN = "brain"
     BODY = "body"
+    GATES = "gates"
     MEMORY = "memory"
     PERCEIVE_HUB = "perceive_hub"
     STOP_POLICY = "stop_policy"

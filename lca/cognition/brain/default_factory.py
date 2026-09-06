@@ -48,7 +48,7 @@ class SimpleBrainFactory:
     def __init__(
         self,
         *,
-        agent_gate_factory: Callable[[], DecisionGate],
+        agent_gate_factory: Callable[[], DecisionGate] | None = None,
         classifier: DecisionClassifier,
         critic_factory: Callable[[], Critic],
         reasoner_cls: type[PromptReasoner],
@@ -97,7 +97,7 @@ class SimpleBrainFactory:
         return ModularBrain(
             reasoner=reasoner,
             critic=self._critic_factory(),
-            agent_gates=self._agent_gate_factory(),
+            agent_gates=self._agent_gate_factory() if self._agent_gate_factory is not None else None,
             classifier=self._classifier,
             think_pipeline=self._think_pipeline,
             reflection_pipeline=self._reflection_pipeline,
