@@ -24,6 +24,7 @@ import { toLcaChatMessageError } from './lcaError';
 import {
   cancelLcaRun,
   createLcaRun,
+  fetchRunSnapshot,
   lcaAuthHeaders,
   planeFieldsFromAgent,
   toWireMessages,
@@ -81,8 +82,6 @@ const ARG_KEYS = new Set([
   'questions',
   'lca_run_id',
 ]);
-
-type WireFile = { id?: string; mime_type?: string; name: string; size?: number; url: string };
 
 type TurnTool = {
   call: MessageToolCall;
@@ -424,14 +423,9 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
    * inserting a second question card (which looked like an endless re-ask loop).
    */
   const presentAskUserCard = async () => {
-    const snapRes = await fetch(`/lca-api/runs/${runId}`, {
-      headers: lcaAuthHeaders(),
-    });
-    const snap = snapRes.ok
-      ? ((await snapRes.json()) as { approval_request?: { questions?: unknown } })
-      : {};
-    const questions = Array.isArray(snap.approval_request?.questions)
-      ? snap.approval_request.questions
+    const snapRes = await fetchRunSnapshot(runId);
+    const questions = Array.isArray(snapRes.approval_request?.questions)
+      ? snapRes.approval_request.questions
       : [];
     if (!questions.length) return;
 

@@ -11,6 +11,7 @@ import {
   type JournalFrame,
   type Projected,
 } from './lcaJournal';
+import { fetchRunSnapshot, lcaAuthHeaders } from './lcaRunCommand';
 
 const LCA_TOKEN = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
 
@@ -122,12 +123,7 @@ export async function observeRunLive(
     }
     if (options.signal.aborted || cursor.streamTerminal) break;
 
-    const snapRes = await fetch(`/lca-api/runs/${options.runId}`, {
-      headers: authHeaders,
-    });
-    const snap = snapRes.ok
-      ? ((await snapRes.json()) as { status?: string; error?: string })
-      : {};
+    const snap = await fetchRunSnapshot(options.runId);
     const snapStatus = String(snap.status ?? '');
     if (handlers.onSnapshot) {
       await handlers.onSnapshot({ error: snap.error, status: snapStatus });

@@ -31,6 +31,12 @@ export type CreateRunResult = {
   trace_id: string;
 };
 
+export type RunSnapshot = {
+  approval_request?: { questions?: unknown };
+  error?: string;
+  status?: string;
+};
+
 export type CreateRunBody = {
   agent: { id: string; name: string };
   assistant_id?: string;
@@ -127,6 +133,14 @@ export async function createLcaRun(
     throw new Error(`create run HTTP ${response.status}: ${text.slice(0, 200)}`);
   }
   return (await response.json()) as CreateRunResult;
+}
+
+export async function fetchRunSnapshot(runId: string): Promise<RunSnapshot> {
+  const response = await fetch(`/lca-api/runs/${runId}`, {
+    headers: lcaAuthHeaders(),
+  });
+  if (!response.ok) return {};
+  return (await response.json()) as RunSnapshot;
 }
 
 export async function cancelLcaRun(
