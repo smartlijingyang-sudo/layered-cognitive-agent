@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from lca.contracts.atoms.enums.enums import ContentType
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.atoms.semantic.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
+from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
 from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.protocols import Tool
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from lca.contracts.protocols.assistant.catalog import (
         AssistantCatalog,
     )
-    from lca.plugins.assistant.webserver.webserver_bridge import AssistantFrontendBridge
+    from lca.plugins.assistant.webserver.bridge import AssistantFrontendBridge
 
 CREATE_ASSISTANT_TOOL = "create_assistant"
 

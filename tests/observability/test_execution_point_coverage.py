@@ -27,13 +27,13 @@ from lca.contracts.models.cognition.prompt_assembly import (
 )
 from lca.contracts.models.core.conversation.llm import LLMResponse
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.models.team.role.role_team import RoleProfile
+from lca.contracts.models.team.role.team import RoleProfile
 from lca.contracts.protocols import LLMAdapter
 from lca.infrastructure.session.emit.cognitive_emit import (
     run_reasoner_generate_thoughts_with_spine_facts,
 )
 from lca_kernel.events.bus.bus import EventBus
-from lca_kernel.events.test.test_catalog import build_test_bus
+from lca_kernel.events.test.catalog import build_test_bus
 
 
 @pytest.fixture(autouse=True)
@@ -182,7 +182,7 @@ def _make_assembler(template: PromptTemplate, registry):
 
 
 async def test_prompt_assembler_eps_emitted_with_payload():
-    from lca.contracts.models.team.role.role_team import (
+    from lca.contracts.models.team.role.team import (
         ToolPermissionManifest,
     )
     from lca.plugins.events.publishers._session_publish import (

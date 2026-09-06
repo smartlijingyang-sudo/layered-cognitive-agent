@@ -24,14 +24,14 @@ from lca.contracts.models.core.execution.sandbox import (
     SessionInfo,
 )
 from lca.contracts.protocols import Sandbox, SandboxRuntime
-from lca.infrastructure.file.file_store import FileStore
-from lca.infrastructure.sandbox.artifact.artifact_scanner import GUEST_ARTIFACT_SCANNER
+from lca.infrastructure.file.store import FileStore
+from lca.infrastructure.sandbox.artifact.scanner import GUEST_ARTIFACT_SCANNER
 from lca.infrastructure.sandbox.bootstrap.bootstrap import SANDBOX_INIT_TIMEOUT_S
-from lca.infrastructure.sandbox.error.error_parse import classify_execution_error
-from lca.infrastructure.sandbox.exec.exec_result import sandbox_exec_result_from
-from lca.infrastructure.sandbox.inspect.inspect_prelude import INSPECT_SCRIPT, parse_inspect_stdout
+from lca.infrastructure.sandbox.error.parse import classify_execution_error
+from lca.infrastructure.sandbox.exec.result import sandbox_exec_result_from
+from lca.infrastructure.sandbox.inspect.prelude import INSPECT_SCRIPT, parse_inspect_stdout
 from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
-from lca.infrastructure.sandbox.runtime.runtime_mount import (
+from lca.infrastructure.sandbox.runtime.mount import (
     build_mount_manifest,
     load_mount_files,
     verify_mount_or_error,
@@ -411,7 +411,7 @@ class RunBoundSandboxRuntime(SandboxRuntime):
                     environment_ready=False,
                 )
             profile = {"files": [], "profiles": {}}
-        from lca.infrastructure.skills.format.format_routing import enrich_inspect_profile
+        from lca.infrastructure.skills.format.routing import enrich_inspect_profile
         from lca.infrastructure.workspace import get_run_workspace
 
         profile = enrich_inspect_profile(profile)

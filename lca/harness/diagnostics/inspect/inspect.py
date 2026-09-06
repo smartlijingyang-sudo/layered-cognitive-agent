@@ -7,16 +7,16 @@ from typing import Any
 
 from cordis import Context
 
-from lca.harness.profile.boot.boot_products import resolved_profile_from_scope
+from lca.harness.profile.boot.products import resolved_profile_from_scope
 from lca.harness.profile.resolve.resolve import dump_resolved
 
 
 async def inspect_profile_tree(profile_path: Path | str) -> Context:
     """Boot a profile and return the resolved cordis.Context."""
 
-    from lca.harness.profile.boot.boot import boot_profile
+    from lca_kernel import run_kernel
 
-    return await boot_profile(profile_path)
+    return await run_kernel(profile_path)
 
 
 def format_plugin_tree(ctx: Context, *, profile: str) -> str:

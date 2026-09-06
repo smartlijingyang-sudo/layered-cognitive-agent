@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lca.plugins.session.runtime.log.log_reader import iter_session_log_lines, load_session_events
+from lca.plugins.session.runtime.log.reader import iter_session_log_lines, load_session_events
 
 
 def test_torn_tail_line_ignored(tmp_path: Path) -> None:

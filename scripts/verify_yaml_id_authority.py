@@ -40,7 +40,7 @@ if str(ROOT) not in sys.path:
 import yaml  # noqa: E402
 
 from lca_kernel.events.registry.registry import EventRegistry  # noqa: E402
-from lca_kernel.events.test.test_catalog import build_test_catalog  # noqa: E402
+from lca_kernel.events.test.catalog import build_test_catalog  # noqa: E402
 
 CONFIG_FILES = (
     "lca_kernel/events/config/observability/spine.yaml",

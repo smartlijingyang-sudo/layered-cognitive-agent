@@ -30,7 +30,7 @@ IMPORT_REWRITES: dict[str, str] = {
     "lca.cognition.perceive.hub": "lca.cognition.perceive.hub",
     "lca.cognition.collaboration.group_assembly": "lca.cognition.collaboration.group_assembly",
     "lca.cognition.brain.gate.hook_registry": "lca.cognition.brain.gate.hook_registry",
-    "lca.cognition.brain.gate.gate_service": "lca.cognition.brain.gate.gate_service",
+    "lca.cognition.brain.gate.service": "lca.cognition.brain.gate.service",
     "lca.loop.commit.delegation_journal": "lca.loop.commit.delegation_journal",
     "lca.loop.commit.phase_spine": "lca.loop.commit.phase_spine",
     "lca.loop.commit.memory_journal": "lca.loop.commit.memory_journal",

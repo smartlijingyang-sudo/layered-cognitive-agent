@@ -19,8 +19,8 @@ from collections.abc import Sequence
 
 from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
 from lca.contracts.protocols import Tool
-from lca.infrastructure.attachment.system.system_role_renderer import render_system_role
-from lca.infrastructure.file.file_store import FileStore
+from lca.infrastructure.attachment.system.role_renderer import render_system_role
+from lca.infrastructure.file.store import FileStore
 from lca.infrastructure.observability import current_file_store as get_current_run_file_store
 from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
 from lca.infrastructure.sandbox.surface.surface import plane_system_role

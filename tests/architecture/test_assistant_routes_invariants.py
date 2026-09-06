@@ -103,7 +103,7 @@ class TestIAssistantRoutesProfileIsolation:
         assert "lca.plugins.assistant.catalog.catalog" not in ids
         assert "lca.plugins.assistant.bootstrap.bootstrap" not in ids
         assert "lca.plugins.assistant.workspace.workspace" not in ids
-        assert "lca.plugins.assistant.skill.skill_overlay" not in ids
+        assert "lca.plugins.assistant.skill.overlay" not in ids
         assert "lca.plugins.assistant.jobs.jobs" not in ids
         assert "lca.plugins.assistant.evolve.evolve" not in ids
 

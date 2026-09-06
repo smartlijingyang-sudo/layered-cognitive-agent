@@ -9,11 +9,11 @@ from typing import Any
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from lca.infrastructure.integrations.composio.env.env_settings import (
+from lca.infrastructure.integrations.composio.env.settings import (
     connection_to_lobehub_plugin,
     connection_to_public_dict,
 )
-from lca.infrastructure.integrations.composio.oauth.oauth_callback import oauth_callback_html
+from lca.infrastructure.integrations.composio.oauth.callback import oauth_callback_html
 from lca.infrastructure.integrations.composio.service.service import ComposioIntegration
 from lca.plugins.transport.webserver.handlers.cors.cors import cors_headers
 

@@ -197,7 +197,7 @@ class TestStrictPlanBinding:
         """Production Agent binding must not accept a second plan interpretation."""
 
         from lca.contracts.protocols.state.plan import CapabilityBinding
-        from lca.harness.profile.boot.boot_products import (
+        from lca.harness.profile.boot.products import (
             ProfileBootProducts,
             attach_profile_boot_products,
         )
@@ -338,7 +338,7 @@ class TestStrictTeamBinding:
                 ),
             ),
         )
-        from lca.harness.profile.boot.boot_products import (
+        from lca.harness.profile.boot.products import (
             ProfileBootProducts,
             attach_profile_boot_products,
         )
@@ -357,7 +357,7 @@ class TestDefaultProfilePlanBinding:
     async def test_default_profile_binds_plan_to_solo_agent(self) -> None:
         from lca.application.api.api import ensure_default_ctx
         from lca.application.api.spawn import spawn_agent
-        from lca.infrastructure.llm_adapter.mock.mock_llm import MockLLMAdapter
+        from lca.infrastructure.llm_adapter.mock.llm import MockLLMAdapter
         from tests.support.agent_specs import make_spec
 
         scope = await ensure_default_ctx()

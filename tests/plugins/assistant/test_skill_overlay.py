@@ -40,13 +40,13 @@ from lca.contracts.protocols.memory.operational_skills import (
 )
 from lca.harness.plugin_api import definition_from_plugin
 from lca.harness.plugin.manifest import EffectClass
-from lca.infrastructure.skills.disk.disk_store import DiskSkillPackageStore
+from lca.infrastructure.skills.disk.store import DiskSkillPackageStore
 from lca.infrastructure.skills.settings.settings import SkillSettings
 from lca.plugins.assistant.catalog.catalog import (
     AssistantCatalogError,
     AssistantCatalogImpl,
 )
-from lca.plugins.assistant.skill.skill_overlay import (
+from lca.plugins.assistant.skill.overlay import (
     AssistantSkillOverlayImpl,
     Config,
     setup,
@@ -500,7 +500,7 @@ class TestCrossAssistantIsolation:
 class TestPluginManifest:
     def test_definition_id_namespace(self) -> None:
         definition = definition_from_plugin(setup)
-        assert definition.spec.id == "lca.plugins.assistant.skill.skill_overlay"
+        assert definition.spec.id == "lca.plugins.assistant.skill.overlay"
 
     def test_provides_assistant_skill_overlay(self) -> None:
         definition = definition_from_plugin(setup)

@@ -1,7 +1,5 @@
-"""Public exports for ``export`` (auto-fixed)."""
+"""Public exports for ``export``."""
 
-from lca.infrastructure.tools.lca_computer.apis.export.export_file import (
-    parameters,
-)
+from . import file as export_file
 
-__all__ = ['parameters']
+__all__ = ["export_file"]

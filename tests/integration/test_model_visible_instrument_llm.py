@@ -131,7 +131,7 @@ def test_full_pipeline_publishes_spine_event(booted_ctx: Any) -> None:
         reset_publish_session,
         set_publish_session,
     )
-    from lca_kernel.events.test.test_catalog import build_test_bus
+    from lca_kernel.events.test.catalog import build_test_bus
 
     bus = build_test_bus()
     EventBus.set_default(bus)
@@ -148,7 +148,7 @@ def test_full_pipeline_publishes_spine_event(booted_ctx: Any) -> None:
     session_token = set_publish_session(session)
 
     try:
-        from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
+        from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
             bind_current_cursor,
             get_current_cursor,
             reset_current_cursor,

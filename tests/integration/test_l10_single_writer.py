@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lca.infrastructure.observability.spine.event.event_spine import EventSpine
+from lca.infrastructure.observability.spine.event.spine import EventSpine
 from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
 
 

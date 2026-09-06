@@ -17,7 +17,7 @@ from typing import Any
 
 from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.protocols import LLMAdapter
-from lca.infrastructure.llm.llm_errors import LLMUnavailableError
+from lca.infrastructure.llm.errors import LLMUnavailableError
 
 
 @dataclass(frozen=True)

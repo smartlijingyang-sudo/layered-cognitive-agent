@@ -22,7 +22,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import ASSISTANT_CATALOG, ASSISTANT_WORKSPACE
 from lca.contracts.harness.composition.plugin_contract import (

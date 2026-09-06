@@ -37,7 +37,7 @@ def _seed_run_with_exception(
     """
     from datetime import datetime, timezone
 
-    from lca.infrastructure.observability.spine.event.event_record import EventRecord
+    from lca.infrastructure.observability.spine.event.record import EventRecord
 
     runs_root = traces_root / "runs"
     run_dir = runs_root / run_id

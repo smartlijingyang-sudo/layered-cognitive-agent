@@ -18,7 +18,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from lca.contracts.protocols.session.persistence.persistence_service import CheckpointFailure
+from lca.contracts.protocols.session.persistence.service import CheckpointFailure
 from lca.plugins.session.checkpoint_policy.checkpoint_policy import (
     Config,
     FlushableSession,

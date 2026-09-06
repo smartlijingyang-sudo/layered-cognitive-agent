@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from lca.infrastructure.llm.config import LLMFace, resolve_endpoint
-from lca.infrastructure.llm.llm_errors import LLMUnavailableError
+from lca.infrastructure.llm.errors import LLMUnavailableError
 
 _cached_async_client: Any = None
 _cached_client_key: tuple[str | None, str | None] | None = None

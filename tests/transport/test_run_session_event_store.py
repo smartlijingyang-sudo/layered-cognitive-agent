@@ -32,7 +32,7 @@ from lca.plugins.session.runtime.store.store import SessionStore
 from lca.plugins.transport.webserver.carrier.runs.execute import create_run_session
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunRegistry
 from lca_kernel.events.bus.bus import EventBus
-from lca_kernel.events.test.test_catalog import build_test_bus
+from lca_kernel.events.test.catalog import build_test_bus
 
 
 class _StubSpine:
@@ -103,14 +103,14 @@ class _Context:
         if session_store is not None:
             self._services["session.store"] = session_store
         from lca.infrastructure.observability import NamedRegistry
-        from lca.infrastructure.observability.loop_cursor.close.close_barrier_impl import (
+        from lca.infrastructure.observability.loop_cursor.close.barrier_impl import (
             StdCloseBarrier,
         )
         from lca.infrastructure.observability.loop_cursor.factory.factory import LoopCursorFactory
-        from lca.infrastructure.observability.loop_cursor.persistence.persistence_coordinator import (
+        from lca.infrastructure.observability.loop_cursor.persistence.coordinator import (
             NullPersistenceCoordinator,
         )
-        from lca.infrastructure.observability.loop_cursor.projection.projection_host import (
+        from lca.infrastructure.observability.loop_cursor.projection.host import (
             StdProjectionHost,
         )
 
@@ -305,7 +305,7 @@ def test_builder_routes_cursor_writes_through_session_when_store_bound(
     cursor EP 事件经单一生产入口 ``Session.append`` 落 Session,不再写 legacy
     spine 链(``SpineWritePortAdapter`` → ``EventSpine.append`` → FileSink)。
     """
-    from lca.plugins.session.runtime.cursor.cursor_port import SessionWritePortAdapter
+    from lca.plugins.session.runtime.cursor.port import SessionWritePortAdapter
 
     store = SessionStore()
     ctx, spine = _build_ctx(session_store=store)

@@ -2,7 +2,18 @@
 
 ## 状态
 
-**Implemented**（2026-09-06）。P0–P5 按 [0194-0195-implementation-plan](../specs/0194-0195-implementation-plan.md) 落地;验收见 `tests/architecture/test_0194_0195_acceptance.py`。
+**Implemented (P0–P5 core)**（2026-09-06）。P0–P5 按 [0194-0195-implementation-plan](../specs/0194-0195-implementation-plan.md) 落地;验收见 `tests/architecture/test_0194_0195_acceptance.py`。
+
+**Completion note（2026-09-06）**：
+
+| 已完成 | 待办 / 已知债务 |
+|---|---|
+| 四段链生产路径（FactGateway → Session → spine → deriver） | Transport carrier/read 终态拆分（P4 部分 PR） |
+| platform-readme + architecture-overview 写入路径对齐（P5-04 / P-L8） | `plugins/` legacy 顶层目录删除（P5-10） |
+| bundle 无 `spine_reflector_*`；`LCA_FACT_GATEWAY` 已删 | package-org CI 全绿（P5-11） |
+| 平台 README 锚点（kernel / loop / transport / plugins） | acceptance **15/15** 通过 |
+| loop/graph/nodes 协作图 plugin 迁移；session-runtime canonical `$module` | `plugins/` legacy 顶层目录删除（P5-10） |
+| harness pipeline_loader EnvelopeBus-primary 类型 | EventBus compat 退役（O4；delete-when 未达） |
 
 **延伸并统摄**：[ADR-0194](0194-cognitive-loop-architecture-convergence.md)（Loop）、[ADR-0115](0115-kernel-transport-boundary.md)（Kernel/Transport）、[ADR-0183](0183-event-bus-framework-ssot.md) / [0186](0186-session-as-event-ssot.md)（事件 SSOT）、[ADR-0190](adr-0190-extreme-plugin-organization.md)（插件物理组织）、[ADR-0191](0191-runtime-loop-dsh-convergence-and-control-plane.md)（四态分离）、[ADR-0075](0075-declarative-phase-graph-and-minimal-trusted-kernel.md)（图内核）。
 

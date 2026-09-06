@@ -37,7 +37,7 @@ from typing import Any
 import yaml
 
 from lca.contracts.event import Category, EventPayload, Plane
-from lca_kernel.events.config.config_parser import (
+from lca_kernel.events.config.parser import (
     SubscriberRule,
     subscribers_from_rules,
 )

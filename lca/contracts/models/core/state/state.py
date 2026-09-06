@@ -11,8 +11,8 @@ from lca.contracts.atoms.ids.ids import RunId, TraceId, new_id, utc_now
 from lca.contracts.models.core.workspace.activation import ActivatedSkill
 from lca.contracts.models.core.execution.decision import Turn
 from lca.contracts.models.core.state.lifecycle import TaskStatus
-from lca.contracts.models.core.perceive.perceive_projection import PerceiveProjection
-from lca.contracts.models.team.team.team_awareness import TeamAwareness
+from lca.contracts.models.core.perceive.projection import PerceiveProjection
+from lca.contracts.models.team.team.awareness import TeamAwareness
 
 if TYPE_CHECKING:
     from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseRunCursor

@@ -14,7 +14,7 @@ from typing import IO, TYPE_CHECKING, Any
 from lca_kernel.events.sinks import SinkBackend
 
 if TYPE_CHECKING:
-    from lca_kernel.events.spine.spine_runtime import SpineEventRecord
+    from lca_kernel.events.spine.runtime import SpineEventRecord
 
 log = logging.getLogger(__name__)
 

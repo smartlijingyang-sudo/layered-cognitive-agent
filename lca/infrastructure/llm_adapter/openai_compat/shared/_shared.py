@@ -11,7 +11,7 @@ from lca.infrastructure.llm_adapter.settings.settings import (
     DEFAULT_TEMPERATURE,
     build_generation_kwargs,
 )
-from lca.infrastructure.llm_adapter.tool.tool_arguments import (
+from lca.infrastructure.llm_adapter.tool.arguments import (
     finish_reason_value,
 )
 

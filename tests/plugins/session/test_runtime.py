@@ -665,7 +665,7 @@ def _hit(*, role: str = "worker") -> Any:
 
 
 def test_bus_facade_append_maps_payload_into_session_log() -> None:
-    from lca.plugins.session.runtime.bus.bus_facade import SessionBusFacade
+    from lca.plugins.session.runtime.bus.facade import SessionBusFacade
     from lca_kernel.events.payloads.payloads import SpineEventPayload
 
     session = SessionStore().create("s-bus")
@@ -696,7 +696,7 @@ def test_bus_facade_append_maps_payload_into_session_log() -> None:
 
 
 def test_bus_facade_observe_projects_original_payload_and_ref() -> None:
-    from lca.plugins.session.runtime.bus.bus_facade import SessionBusFacade
+    from lca.plugins.session.runtime.bus.facade import SessionBusFacade
 
     session = SessionStore().create("s-obs")
     publish = SessionBusFacade(session)
@@ -714,7 +714,7 @@ def test_bus_facade_observe_projects_original_payload_and_ref() -> None:
 
 
 def test_bus_facade_observe_contains_callback_failure() -> None:
-    from lca.plugins.session.runtime.bus.bus_facade import SessionBusFacade
+    from lca.plugins.session.runtime.bus.facade import SessionBusFacade
 
     session = SessionStore().create("s-contain")
     facade = SessionBusFacade(session)
@@ -736,7 +736,7 @@ def test_bus_facade_observe_contains_callback_failure() -> None:
 
 
 def test_as_bus_facade_wraps_session_only() -> None:
-    from lca.plugins.session.runtime.bus.bus_facade import SessionBusFacade, as_bus_facade
+    from lca.plugins.session.runtime.bus.facade import SessionBusFacade, as_bus_facade
 
     session = SessionStore().create("s-coerce")
     wrapped = as_bus_facade(session)

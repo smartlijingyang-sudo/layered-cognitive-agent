@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from lca.cognition.body.actions.action_registry import ActionRegistry
 from lca.contracts.mechanisms.capability.capability import MissingCapabilityError
-from lca.contracts.protocols.act.action.action_handler import ActionHandlerRegistry
+from lca.contracts.protocols.act.action.handler import ActionHandlerRegistry
 from lca.contracts.protocols.runtime.infra.infra import (
     SafeExecutor,
     ToolRegistry,

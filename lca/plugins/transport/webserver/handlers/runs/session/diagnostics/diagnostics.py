@@ -24,8 +24,8 @@ import structlog
 
 from lca.contracts.mechanisms.capability.capability import MissingCapabilityError, require_capability
 from lca.contracts.observability.registry.run_locator import RunLocator
-from lca.harness.profile.boot.boot_products import resolved_profile_from_scope
-from lca.plugins.observability.profile.profile_snapshot_run_boot_provider import (
+from lca.harness.profile.boot.products import resolved_profile_from_scope
+from lca.plugins.observability.profile.snapshot_run_boot_provider import (
     PluginSnapshotEntry,
     RunBootSnapshot,
 )

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from lca.contracts.models.observability.journal.journal import ContextCompacted, MemoryCommitted
-from lca.contracts.models.observability.memory.memory_journal_receipt import (
+from lca.contracts.models.observability.memory.journal_receipt import (
     MemoryJournalReceipt,
     MemorySpineReceipt,
     context_compacted_receipt,

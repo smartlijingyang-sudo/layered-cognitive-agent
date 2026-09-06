@@ -43,11 +43,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from lca.contracts.models.observability.journal.journal_doc import (
+from lca.contracts.models.observability.journal.doc import (
     JournalDocument,
     JournalMetadata,
 )
-from lca.contracts.models.observability.journal.journal_step import (
+from lca.contracts.models.observability.journal.step import (
     JournalStep,
     ReflectTrace,
     StepContext,
@@ -55,13 +55,13 @@ from lca.contracts.models.observability.journal.journal_step import (
     ToolCallRecord,
     ToolResult,
 )
-from lca.contracts.models.observability.journal.journal_totals import (
+from lca.contracts.models.observability.journal.totals import (
     PhaseRecord,
     SegmentRecord,
     StepPhase,
     Totals,
 )
-from lca_kernel.events.payloads.payloads_spine import category_to_spine_ep
+from lca_kernel.events.payloads.spine import category_to_spine_ep
 
 # 闭集 phase EP 表 —— 与 StepTreeAccumulatorDeriver 对齐(ADR-0166 D4 闭集)。
 PHASE_FOLD_EPS: dict[str, StepPhase] = {

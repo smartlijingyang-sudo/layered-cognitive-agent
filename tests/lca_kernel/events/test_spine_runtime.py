@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from lca_kernel.events import EventRef
 from lca_kernel.events.payloads.payloads import Category, SpineEventPayload
-from lca_kernel.events.spine.spine_runtime import (
+from lca_kernel.events.spine.runtime import (
     SpineChain,
     SpineChainContext,
     SpineClock,

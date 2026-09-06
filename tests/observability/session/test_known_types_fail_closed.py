@@ -12,7 +12,7 @@ from lca.session.catalog import (
     known_session_event_types,
     validate_event_type_for_read,
 )
-from lca.plugins.session.runtime.log.log_reader import SessionLogReadError, load_session_events
+from lca.plugins.session.runtime.log.reader import SessionLogReadError, load_session_events
 
 
 def test_known_types_includes_registered_session_events() -> None:

@@ -233,7 +233,7 @@ def emit_approval_pause_from_result(result: Result) -> None:
     approval_id = approval_request.get("approval_id")
     if not isinstance(approval_id, str) or not approval_id:
         return
-    from lca.plugins.session.runtime.resume.resume_point import (
+    from lca.plugins.session.runtime.resume.point import (
         resume_point_from_state_snapshot,
         serialize_resume_point,
     )

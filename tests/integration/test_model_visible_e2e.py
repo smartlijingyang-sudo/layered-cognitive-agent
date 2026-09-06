@@ -33,7 +33,7 @@ from lca.infrastructure.observability.spine.sinks.naming import (
     spine_filename_for_run,
 )
 from lca_kernel.events.fold.fold import canonicalHeader, headerEquals
-from lca_kernel.events.payloads.payloads_model_visible import (
+from lca_kernel.events.payloads.model_visible import (
     SpineLlmRequestHeaderAssistantPayload,
 )
 

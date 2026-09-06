@@ -16,7 +16,7 @@ import structlog
 
 from lca.application.api.api import Agent, Team, TeamLead
 from lca.application.authoring.role_suggest import suggest_for_auto_repair, suggest_from_paths
-from lca.contracts.models.team.team.team_coordination import (
+from lca.contracts.models.team.team.coordination import (
     STRATEGY_KEY_DEBATE,
     STRATEGY_KEY_FAN_OUT,
     STRATEGY_KEY_PEER_RELAY,

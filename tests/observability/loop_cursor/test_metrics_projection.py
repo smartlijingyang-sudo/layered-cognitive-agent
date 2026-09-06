@@ -18,7 +18,7 @@ from lca.infrastructure.observability.loop_cursor.projections.metrics_projection
     MetricsProjection,
     MetricsState,
 )
-from lca.infrastructure.observability.spine.event.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.record import EventRecord
 
 
 def _snap(seq: int = 0, step_id: str | None = "s1") -> CursorSnapshot:

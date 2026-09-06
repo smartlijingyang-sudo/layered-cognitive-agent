@@ -1,6 +1,6 @@
 """Public exports for ``exec`` (auto-fixed)."""
 
-from lca.infrastructure.sandbox.exec.exec_result import (
+from lca.infrastructure.sandbox.exec.result import (
     sandbox_exec_result_from,
 )
 

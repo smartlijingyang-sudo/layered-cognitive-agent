@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.harness.diagnostics.audit.audit_state_writers import (
+from lca.harness.diagnostics.audit.state_writers import (
     Finding,
     format_report,
     scan_state_writers,

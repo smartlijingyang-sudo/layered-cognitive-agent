@@ -290,7 +290,7 @@ def test_team_composer_assembles_each_member_once() -> None:
 def test_team_composer_passes_resolved_store_to_one_member_assembly_pass() -> None:
     """A Team member receives the seam-resolved store during its only assembly pass."""
 
-    from lca.contracts.models.team.team.team_coordination import Pipeline
+    from lca.contracts.models.team.team.coordination import Pipeline
     from lca.contracts.protocols.journal.spec.spec import TeamSpec
     from lca.plugins.composer.collaboration.team_composer import TeamComposer
     from tests.support.agent_specs import make_spec
@@ -400,7 +400,7 @@ def test_team_seam_plugin_consumes_shared_memory_resolver_from_scope() -> None:
 def test_team_seam_factory_produces_complete_seam() -> None:
     """The default ``TeamSeamFactory.build`` must return a fully populated seam."""
 
-    from lca.contracts.models.team.team.team_coordination import Pipeline
+    from lca.contracts.models.team.team.coordination import Pipeline
     from lca.contracts.protocols.journal.spec.spec import TeamSpec
     from lca.infrastructure.transport.agent_transport import InternalTransport
 
@@ -424,7 +424,7 @@ def test_team_seam_factory_produces_complete_seam() -> None:
 def test_team_seam_factory_returns_no_shared_memory_when_layers_empty() -> None:
     """When no shared layers are declared, ``shared_memory`` is ``None``."""
 
-    from lca.contracts.models.team.team.team_coordination import Pipeline
+    from lca.contracts.models.team.team.coordination import Pipeline
     from lca.contracts.protocols.journal.spec.spec import TeamSpec
 
     factory = _default_team_seam_factory()
@@ -486,7 +486,7 @@ def test_default_composers_expose_only_the_graph_operation_they_own() -> None:
         AgentAssemblyPort,
         PlanBoundAgentAssembler,
     )
-    from lca.plugins.composer.perceive.perceive_composer import PerceiveComposer
+    from lca.plugins.composer.perceive.composer import PerceiveComposer
     from lca.plugins.composer.think.brain_composer import BrainComposer
 
     for composer in (BrainComposer(), BodyComposer(), PerceiveComposer()):
@@ -527,7 +527,7 @@ def test_default_team_seam_factory_keeps_backend_decisions_independent() -> None
     but each stage has its own narrow test surface.
     """
 
-    from lca.contracts.models.team.team.team_coordination import Pipeline
+    from lca.contracts.models.team.team.coordination import Pipeline
     from lca.contracts.protocols.journal.spec.spec import TeamSpec
 
     class _SharedMemoryResolver:

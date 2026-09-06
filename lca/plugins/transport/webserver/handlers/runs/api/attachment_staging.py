@@ -21,7 +21,7 @@ from lca.contracts.models.observability.journal.journal import (
 )
 from lca.contracts.protocols.runtime.infra.infra import MachineResolver
 from lca.infrastructure.attachment import FileStoreAttachmentIdentity
-from lca.infrastructure.file.file_store import FileStore
+from lca.infrastructure.file.store import FileStore
 from lca.infrastructure.observability import record
 from lca.infrastructure.runtime_plane.resolve.resolve import ref_of
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession

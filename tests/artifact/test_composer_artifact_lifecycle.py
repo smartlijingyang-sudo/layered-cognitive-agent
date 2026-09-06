@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from cordis import Context
 
-from lca.contracts.atoms.artifact.artifact_state import ArtifactState
+from lca.contracts.atoms.artifact.state import ArtifactState
 from lca.contracts.mechanisms.composition.composition import PluginFactory
-from lca.plugins.think.composition.composition_composer_provider import (
+from lca.plugins.think.composition.composer_provider import (
     CordisComposer,
     build_default_invariant_checker,
 )

@@ -17,7 +17,7 @@ import logging
 from pathlib import Path
 
 from lca.infrastructure.observability.spine.derivers.base.base import Deriver
-from lca.infrastructure.observability.spine.event.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.record import EventRecord
 
 log = logging.getLogger(__name__)
 

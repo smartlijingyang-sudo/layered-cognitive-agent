@@ -6,7 +6,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from lca.infrastructure.observability.spine.event.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.record import EventRecord
 from lca.infrastructure.observability.spine.sinks.routing_file_sink import (
     RunRoutingFileSink,
 )

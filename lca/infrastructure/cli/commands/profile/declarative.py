@@ -195,7 +195,7 @@ def register(app: typer.Typer) -> None:
 
 
 def _emit_plan_templates(*, json_mode: bool) -> None:
-    from lca.contracts.atoms.plan.plan_template import (
+    from lca.contracts.atoms.plan.template import (
         all_plan_template_ids,
         plan_template_to_dict,
         standard_plan_templates,

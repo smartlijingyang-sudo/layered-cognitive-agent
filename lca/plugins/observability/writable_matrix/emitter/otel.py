@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.infrastructure.observability.spine.event.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.record import EventRecord
 
 
 @dataclass

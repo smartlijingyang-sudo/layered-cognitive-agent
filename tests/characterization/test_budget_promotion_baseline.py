@@ -17,7 +17,7 @@ from lca.contracts.models.core.policy.budget import (
     DEFAULT_MAX_WALL_CLOCK_SECONDS,
     LEAD_MIN_MAX_STEPS,
 )
-from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
 
 _policy = LeadBudgetPolicy()
 
@@ -122,8 +122,8 @@ class TestNoPersistencePath:
     """
 
     def test_memory_record_is_in_memory_only(self) -> None:
-        from lca.cognition.memory.simple.simple_memory import SimpleMemorySystem
-        from lca.cognition.memory.team.team_shared_memory import TeamSharedMemoryStore
+        from lca.cognition.memory.simple.memory import SimpleMemorySystem
+        from lca.cognition.memory.team.shared_memory import TeamSharedMemoryStore
         from lca.contracts.atoms.enums.enums import MemoryLayer
         from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
 

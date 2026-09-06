@@ -13,7 +13,7 @@ Reader 边界使用以下常量判断格式兼容性:
 
 from __future__ import annotations
 
-from lca.contracts.observability.journal.journal_format_errors import (
+from lca.contracts.observability.journal.format_errors import (
     VersionTooNew,
     VersionTooOld,
 )

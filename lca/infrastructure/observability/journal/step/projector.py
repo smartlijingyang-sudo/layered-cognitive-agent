@@ -16,8 +16,8 @@ from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any
 
-from lca.contracts.models.observability.journal.journal_doc import JournalDocument
-from lca.infrastructure.atomic.atomic_write import atomic_write_text
+from lca.contracts.models.observability.journal.doc import JournalDocument
+from lca.infrastructure.atomic.write import atomic_write_text
 
 
 def to_jsonable(obj: Any) -> Any:

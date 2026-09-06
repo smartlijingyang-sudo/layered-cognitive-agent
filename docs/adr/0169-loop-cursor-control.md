@@ -2,9 +2,11 @@
 
 > **§D7 I-MV1 "model_visible 5 件套 SSOT" 已被 [ADR-0185](0185-model-visible-event-bus-alignment.md) 取代**;`ModelVisibleCapture` 缝、`StdModelVisibleCapture` / `StdReasonerPromptCapture` 默认实现、`<run_dir>/model_visible/` 旁路文件目录由 ADR-0185 收口。本文件保留全文作历史。
 
+> **Gate 作为独立 phase（`PhaseName` 含 `"gate"`、D2 转移图 GATE 窗口、`advance('gate')` / `phase.gate.fold` 等）已被 [ADR-0194](0194-cognitive-loop-architecture-convergence.md) 修订**;六语义 phase 闭集，Gate 为 Think 原语子链（`think.gate.*` catalog 事实）；正文保留作历史。
+
 ## 状态
 
-**Accepted — 2026-09-02**(§D7 I-MV1 段已被 ADR-0185 Superseded)
+**Accepted — 2026-09-02**(§D7 I-MV1 段已被 ADR-0185 Superseded；gate-as-phase 段已被 ADR-0194 修订)
 
 > **实施状态(2026-09-02)**: 五缝文件全部落地(`StdLoopCursor` /
 > `StdProjectionHost` / `PersistenceCoordinator` / `ModelVisibleCapture` /

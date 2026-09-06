@@ -505,7 +505,7 @@ class TelemetryLLMAdapter(LLMAdapter):
         # 历史 bug:此路径曾用 coord.emit_phase 把 ``model=`` 误传成 ``objective=``,
         # 导致 spine 同 EP 出现 objective=模型名 与 objective=用户文本两条。
         # 修复:直接走 cursor.advance,objective_kind 显式 ``model_name``。
-        from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
+        from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
             get_current_cursor,
         )
 
@@ -525,7 +525,7 @@ def _open_think_step(prompt: str) -> None:
     ADR-0169 P2:phase.<x>.fold 由 cursor.advance 派生,禁止 coord 双写。
     objective 必须是用户原文,显式标 ``user_text``。
     """
-    from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
+    from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
         get_current_cursor,
     )
 

@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from lca.contracts.atoms.artifact.artifact_state import ArtifactState
+from lca.contracts.atoms.artifact.state import ArtifactState
 
 
 class CreatorFace(str, Enum):

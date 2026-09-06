@@ -13,7 +13,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
     SemanticPhase,
 )
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
-from lca.contracts.protocols.runtime.runtime.runtime_lifecycle import (
+from lca.contracts.protocols.runtime.runtime.lifecycle import (
     RuntimeLifecycleEvent,
     RuntimeLifecycleEventType,
 )

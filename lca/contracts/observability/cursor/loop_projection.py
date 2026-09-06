@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
 from lca.contracts.observability.cursor.loop_cursor import CursorSnapshot
-from lca.infrastructure.observability.spine.event.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.record import EventRecord
 
 
 @dataclass(frozen=True)

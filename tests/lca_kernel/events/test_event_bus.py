@@ -56,7 +56,7 @@ from lca_kernel.events.registry.registry import EventRegistry
 
 def _make_bus() -> EventBus[EventPayload]:
     """独立 EventBus 实例(从默认 yaml 加载 registry),避免单例串扰。"""
-    from lca_kernel.events.test.test_catalog import build_test_bus
+    from lca_kernel.events.test.catalog import build_test_bus
     return build_test_bus()
 
 

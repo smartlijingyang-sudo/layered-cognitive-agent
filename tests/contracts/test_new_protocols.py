@@ -1,15 +1,15 @@
 """Tests for new ADR-0074 Protocol definitions."""
 
-from lca.contracts.protocols.act.action.action_handler import (
+from lca.contracts.protocols.act.action.handler import (
     ActionHandler,
     ActionHandlerRegistry,
 )
-from lca.contracts.protocols.act.effect.effect_handler import (
+from lca.contracts.protocols.act.effect.handler import (
     EffectHandler,
     EffectHandlerRegistry,
 )
 from lca.contracts.protocols.gate.decision_classifier import DecisionClassifier
-from lca.contracts.protocols.journal.artifact.artifact_closure import ArtifactClosure
+from lca.contracts.protocols.journal.artifact.closure import ArtifactClosure
 from lca.contracts.protocols.state.delta_handler import (
     DeltaHandler,
     DeltaHandlerRegistry,

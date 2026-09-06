@@ -10,7 +10,7 @@ from lca.contracts.protocols.collaboration.agent.agent import AgentUnit
 from lca.infrastructure.transport.a2a_transport import A2ATransport
 from lca.infrastructure.transport.agent_transport import InternalTransport
 from lca.infrastructure.transport.mcp_transport import MCPTransport
-from lca.infrastructure.transport.transport_registry import TransportRegistry
+from lca.infrastructure.transport.registry import TransportRegistry
 
 
 def build_default_transport_registry() -> TransportRegistry:
@@ -25,8 +25,8 @@ def build_default_transport_registry() -> TransportRegistry:
 async def call_member_for_channel(member: AgentUnit, subtask: str) -> Observation:
     """Invoke a team member while preserving the delegator role."""
 
-    from lca.contracts.models.team.delegation.delegation_context import get_current_delegator
-    from lca.contracts.models.team.run.run_context import RunContext
+    from lca.contracts.models.team.delegation.context import get_current_delegator
+    from lca.contracts.models.team.run.context import RunContext
 
     result = await member.run(subtask, RunContext(from_role=get_current_delegator()))
     return Observation.from_result(result)

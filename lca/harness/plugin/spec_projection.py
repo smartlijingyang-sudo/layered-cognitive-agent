@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.capabilities import TOOLS
 from lca.harness.plugin.manifest import EffectClass, PluginKind
 

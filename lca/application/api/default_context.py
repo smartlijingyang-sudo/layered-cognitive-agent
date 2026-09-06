@@ -103,9 +103,9 @@ async def ensure_default_ctx() -> Context:
             await asyncio.to_thread(complete.wait)
             continue
         try:
-            from lca.harness.profile.boot.boot import boot_profile
+            from lca_kernel import run_kernel
 
-            ctx = await boot_profile(_DEFAULT_PROFILE)
+            ctx = await run_kernel(_DEFAULT_PROFILE)
         except BaseException:
             _publish(None)
             raise
@@ -133,9 +133,9 @@ def get_or_create_default_ctx() -> Context:
                 return holder.ctx
             return get_or_create_default_ctx()
         try:
-            from lca.harness.profile.boot.boot import boot_profile
+            from lca_kernel import run_kernel
 
-            ctx = asyncio.run(boot_profile(_DEFAULT_PROFILE))
+            ctx = asyncio.run(run_kernel(_DEFAULT_PROFILE))
         except BaseException:
             _publish(None)
             raise

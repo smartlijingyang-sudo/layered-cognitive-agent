@@ -29,7 +29,7 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_execution imp
 from lca.contracts.protocols.declarative.declarative_1.declarative_fault_tolerance import (
     PhaseExecutionPolicy,
 )
-from lca.harness.declarative.compile.phase.phase_execution_policy import (
+from lca.harness.declarative.compile.phase.execution_policy import (
     PhaseExecutionExhaustedError,
     PhaseExecutionRunner,
 )

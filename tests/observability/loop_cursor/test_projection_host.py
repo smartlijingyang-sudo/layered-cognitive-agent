@@ -20,14 +20,14 @@ from lca.contracts.observability.cursor.loop_projection import (
     LoopProjectionDefinition,
     ProjectionToken,
 )
-from lca.infrastructure.observability.loop_cursor.projection.projection_host import (
+from lca.infrastructure.observability.loop_cursor.projection.host import (
     FlushReport,
     StdProjectionHost,
 )
 from lca.infrastructure.observability.loop_cursor.projections.defaults import (
     default_projection_keys,
 )
-from lca.infrastructure.observability.spine.event.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.record import EventRecord
 
 
 # ── helpers ────────────────────────────────────────────────────────────

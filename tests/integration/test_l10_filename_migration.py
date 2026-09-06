@@ -15,7 +15,7 @@ from pathlib import Path
 from lca.infrastructure.observability.journal.backends.filesystem import (
     FilesystemJournalStore,
 )
-from lca.infrastructure.observability.spine.event.event_spine import EventSpine
+from lca.infrastructure.observability.spine.event.spine import EventSpine
 from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
 from lca.infrastructure.observability.spine.sinks.routing_file_sink import (
     RunRoutingFileSink,

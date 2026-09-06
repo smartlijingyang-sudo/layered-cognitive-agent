@@ -28,7 +28,7 @@ CONSUMERS_END = "event.bus.dispatch.consumers.end"
 
 
 def _make_bus() -> EventBus[EventPayload]:
-    from lca_kernel.events.test.test_catalog import build_test_bus
+    from lca_kernel.events.test.catalog import build_test_bus
     return build_test_bus()
 
 

@@ -1,7 +1,5 @@
-"""Public exports for ``kill`` (auto-fixed)."""
+"""Public exports for ``kill``."""
 
-from lca.infrastructure.tools.lca_computer.apis.kill.kill_command import (
-    parameters,
-)
+from . import command as kill_command
 
-__all__ = ['parameters']
+__all__ = ["kill_command"]

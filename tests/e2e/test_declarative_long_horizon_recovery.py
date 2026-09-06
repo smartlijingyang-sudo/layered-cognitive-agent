@@ -12,9 +12,9 @@ from typing import Any
 
 import pytest
 
-from lca.contracts.protocols.act.command.command_envelope import CommandEnvelope
+from lca.contracts.protocols.act.command.envelope import CommandEnvelope
 from lca.harness.declarative.execute.dispatch import RegistryEffectDispatcher
-from lca.plugins.act.effect.effect_handlers_provider import (
+from lca.plugins.act.effect.handlers_provider import (
     InMemoryEffectHandlerRegistry,
     register_default_effect_handlers,
 )
@@ -109,7 +109,7 @@ class TestEffectIdempotency:
             capabilities, _default_effect_handlers(), idempotency_store=store
         )
 
-        from lca.contracts.protocols.act.command.command_envelope import CapabilityGrant
+        from lca.contracts.protocols.act.command.envelope import CapabilityGrant
         from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import EffectPolicyPlan
 
         # Create envelope with idempotency key
@@ -149,7 +149,7 @@ class TestEffectIdempotency:
             capabilities, _default_effect_handlers(), idempotency_store=store
         )
 
-        from lca.contracts.protocols.act.command.command_envelope import CapabilityGrant
+        from lca.contracts.protocols.act.command.envelope import CapabilityGrant
         from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import EffectPolicyPlan
 
         # Create envelope
@@ -203,7 +203,7 @@ class TestEffectIdempotency:
             capabilities, _default_effect_handlers(), idempotency_store=store
         )
 
-        from lca.contracts.protocols.act.command.command_envelope import CapabilityGrant
+        from lca.contracts.protocols.act.command.envelope import CapabilityGrant
         from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import EffectPolicyPlan
 
         envelope = CommandEnvelope(
@@ -236,7 +236,7 @@ class TestEffectIdempotency:
             capabilities, _default_effect_handlers(), idempotency_store=store
         )
 
-        from lca.contracts.protocols.act.command.command_envelope import CapabilityGrant
+        from lca.contracts.protocols.act.command.envelope import CapabilityGrant
         from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
             DeclarativeValidationError,
             EffectPolicyPlan,

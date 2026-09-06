@@ -29,7 +29,7 @@ from lca_kernel.events.errors.errors import (  # noqa: E402
     UnknownPluginIdError,
 )
 from lca_kernel.events.registry.registry import EventRegistry  # noqa: E402
-from lca_kernel.events.test.test_catalog import build_test_catalog  # noqa: E402
+from lca_kernel.events.test.catalog import build_test_catalog  # noqa: E402
 
 _CONFIG_DIR = _ROOT / "lca_kernel" / "events" / "config"
 

@@ -35,13 +35,13 @@ from lca.contracts.models.observability.journal.journal import (
     RunScope,
     StampedEvent,
 )
-from lca.contracts.models.observability.journal.journal_catalog import (
+from lca.contracts.models.observability.journal.catalog import (
     JOURNAL_EVENT_CLASSES,
 )
 from lca.infrastructure.observability.journal.engine.serialization import (
     stamped_to_journal_record,
 )
-from lca.plugins.journal.journal.journal_schema_v2_provider import EnvelopeV2Schema
+from lca.plugins.journal.journal.schema_v2_provider import EnvelopeV2Schema
 
 _DEFAULT_SCHEMA = EnvelopeV2Schema()
 

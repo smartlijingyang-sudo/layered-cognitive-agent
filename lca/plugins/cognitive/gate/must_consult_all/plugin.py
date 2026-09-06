@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import DecisionGateName
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -51,7 +51,7 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.cognition.brain.decision_gates.must.must_consult_all import MustConsultAllMembers
+    from lca.cognition.brain.decision_gates.must.consult_all import MustConsultAllMembers
 
     ctx.require("gates").add(
         MustConsultAllMembers,

@@ -16,7 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from lca.contracts.event import Category, Plane, default_plane
-from lca_kernel.events.payloads.payloads_model_visible import (
+from lca_kernel.events.payloads.model_visible import (
     SpineLlmRequestHeaderAssistantPayload,
     SpineLlmRequestHeaderPayload,
 )

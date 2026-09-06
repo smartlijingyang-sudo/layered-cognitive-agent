@@ -23,7 +23,7 @@ from lca.plugins.events.publishers._session_publish import (
     set_publish_session,
 )
 from lca.session.append import Session
-from lca.plugins.transport.webserver.handlers.runs.session.event.event_session import (
+from lca.plugins.transport.webserver.handlers.runs.session.event.session import (
     BoundRunEventSession,
     RunEventSessionBridge,
 )

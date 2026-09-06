@@ -5,7 +5,7 @@ import pytest
 from lca.application.api.api import ensure_default_ctx
 from lca.application.api.spawn import spawn_agent
 from lca.contracts.models.core.state.lifecycle import TaskStatus
-from lca.infrastructure.llm_adapter.mock.mock_llm import MockLLMAdapter
+from lca.infrastructure.llm_adapter.mock.llm import MockLLMAdapter
 from tests.support.agent_specs import make_spec
 
 

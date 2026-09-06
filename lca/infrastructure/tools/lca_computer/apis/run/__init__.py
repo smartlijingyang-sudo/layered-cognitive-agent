@@ -1,7 +1,5 @@
-"""Public exports for ``run`` (auto-fixed)."""
+"""Public exports for ``run``."""
 
-from lca.infrastructure.tools.lca_computer.apis.run.run_command import (
-    parameters,
-)
+from . import command as run_command
 
-__all__ = ['parameters']
+__all__ = ["run_command"]

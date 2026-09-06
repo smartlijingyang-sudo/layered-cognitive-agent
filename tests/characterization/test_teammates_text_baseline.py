@@ -9,9 +9,9 @@ from __future__ import annotations
 from lca.cognition.brain.reasoner.reasoner import build_teammates_text
 from lca.cognition.member_status import InMemoryMemberStatus
 from lca.contracts.models.core.state.state import AgentState, Budget
-from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.models.team.run.run_context import RunContext
-from lca.contracts.models.team.team.team_awareness import ConsultDuty, TeamAwareness
+from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.run.context import RunContext
+from lca.contracts.models.team.team.awareness import ConsultDuty, TeamAwareness
 from lca.contracts.protocols.journal.spec.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
 
 

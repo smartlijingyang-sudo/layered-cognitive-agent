@@ -22,7 +22,7 @@ from lca.infrastructure.observability.loop_cursor import (
 from lca.infrastructure.observability.loop_cursor.bind.bind import (
     SpineWritePortAdapter,
 )
-from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
+from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
     get_current_cursor,
 )
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession

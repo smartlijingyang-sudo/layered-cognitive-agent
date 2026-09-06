@@ -24,7 +24,7 @@ from weakref import WeakKeyDictionary
 import structlog
 from pydantic import BaseModel
 
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -33,7 +33,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
-from lca.contracts.protocols.session.projection.projection_unit import (
+from lca.contracts.protocols.session.projection.unit import (
     ProjectionCheckpoint,
     ProjectionSnapshot,
     ProjectionUnit,

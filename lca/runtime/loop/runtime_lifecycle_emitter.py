@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.execution.result import Result
-from lca.contracts.protocols.runtime.runtime.runtime_lifecycle import (
+from lca.contracts.protocols.runtime.runtime.lifecycle import (
     RuntimeBudgetSnapshot,
     RuntimeLifecycleEvent,
     RuntimeLifecycleEventType,
@@ -19,7 +19,7 @@ from lca.contracts.protocols.runtime.runtime.runtime_lifecycle import (
 from lca.runtime.support.runtime_bindings import DeclarativeRuntimeBindings
 
 if TYPE_CHECKING:
-    from lca.infrastructure.observability.spine.event.event_record import Outcome
+    from lca.infrastructure.observability.spine.event.record import Outcome
 
 
 class RuntimeLifecycleEmitter:

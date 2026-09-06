@@ -1,7 +1,5 @@
-"""Public exports for ``execute`` (auto-fixed)."""
+"""Public exports for ``execute``."""
 
-from lca.infrastructure.tools.lca_computer.apis.execute.execute_code import (
-    parameters,
-)
+from . import code as execute_code
 
-__all__ = ['parameters']
+__all__ = ["execute_code"]

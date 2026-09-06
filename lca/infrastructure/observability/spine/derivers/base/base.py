@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from lca.infrastructure.observability.spine.event.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.record import EventRecord
 
 
 @runtime_checkable

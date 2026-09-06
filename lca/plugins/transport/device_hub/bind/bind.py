@@ -5,7 +5,7 @@ from __future__ import annotations
 from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
 from lca.contracts.protocols.runtime.infra.infra import MachineResolver, MachineTransport
 from lca.infrastructure.runtime_plane.paths.paths import outputs_under
-from lca.infrastructure.sandbox.host.host_settings import load_host_settings
+from lca.infrastructure.sandbox.host.settings import load_host_settings
 from lca.plugins.transport.device_hub.hub.hub import DeviceHub
 from lca.plugins.transport.device_hub.models.models import Device
 from lca.plugins.transport.device_hub.registry.registry import DeviceRegistry

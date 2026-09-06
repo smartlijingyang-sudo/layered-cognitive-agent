@@ -11,10 +11,10 @@ import pytest
 from lca.cognition.body.actions.action_registry import ActionRegistry
 from lca.cognition.body.executor.safe_executor import SimpleSafeExecutor
 from lca.cognition.body.tools.tool_registry import SimpleToolRegistry
-from lca.contracts.models.team.role.role_team import ToolPermissionManifest
-from lca.infrastructure.component.component_registry import RegistryKeyError
+from lca.contracts.models.team.role.team import ToolPermissionManifest
+from lca.infrastructure.component.registry import RegistryKeyError
 from lca.infrastructure.transport.agent_transport import InternalTransport
-from lca.infrastructure.transport.transport_registry import TransportRegistry
+from lca.infrastructure.transport.registry import TransportRegistry
 from tests.support.action_authority import build_test_action_registry
 
 

@@ -1,6 +1,6 @@
 """Public exports for ``preinstall`` (auto-fixed)."""
 
-from lca.infrastructure.runtime_plane.preinstall.preinstall_prompt import (
+from lca.infrastructure.runtime_plane.preinstall.prompt import (
     render_preinstalled_block,
 )
 

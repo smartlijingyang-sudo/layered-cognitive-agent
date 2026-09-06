@@ -17,7 +17,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
     PhaseRunCursor,
 )
 from lca.contracts.protocols.runtime.infra.infra import StateStore
-from lca.contracts.protocols.runtime.runtime.runtime_composition import CheckpointStateResolver
+from lca.contracts.protocols.runtime.runtime.composition import CheckpointStateResolver
 
 
 @dataclass(frozen=True, slots=True)

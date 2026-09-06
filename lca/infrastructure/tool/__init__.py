@@ -1,6 +1,6 @@
 """Public exports for ``tool`` (auto-fixed)."""
 
-from lca.infrastructure.tool.tool_pipeline import (
+from lca.infrastructure.tool.pipeline import (
     DefaultToolExecutionPipeline,
 )
 

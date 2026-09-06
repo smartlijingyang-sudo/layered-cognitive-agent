@@ -8,7 +8,7 @@ from typing import Any
 from lca.application.api.api import Agent, Team, TeamLead
 from lca.contracts.models.core.conversation.llm import LLMResponse
 from lca.contracts.models.core.execution.result import Result
-from lca.contracts.models.team.team.team_coordination import (
+from lca.contracts.models.team.team.coordination import (
     Debate,
     FanOut,
     LeadMandate,

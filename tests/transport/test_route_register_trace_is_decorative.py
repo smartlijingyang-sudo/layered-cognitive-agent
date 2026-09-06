@@ -16,7 +16,7 @@ from typing import Any
 
 import pytest
 
-from lca.plugins.transport.webserver.route.route_register import (
+from lca.plugins.transport.webserver.route.register import (
     _instrument_route_handler,
     _trace_emit_failures,
     trace_emit_failures,

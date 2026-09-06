@@ -45,16 +45,16 @@ from lca.contracts.models.team.graph.graph import (
     GraphNode,
     GraphValidationError,
 )
-from lca.contracts.models.team.member.member_status import MemberStatus
-from lca.contracts.models.team.role.role_team import (
+from lca.contracts.models.team.member.status import MemberStatus
+from lca.contracts.models.team.role.team import (
     CacheConfig,
     RetryPolicy,
     RoleProfile,
     ToolPermissionManifest,
 )
-from lca.contracts.models.team.run.run_context import RunContext
-from lca.contracts.models.team.team.team_awareness import ConsultDuty, TeamAwareness
-from lca.contracts.models.team.team.team_coordination import (
+from lca.contracts.models.team.run.context import RunContext
+from lca.contracts.models.team.team.awareness import ConsultDuty, TeamAwareness
+from lca.contracts.models.team.team.coordination import (
     Debate,
     FanOut,
     Graph,

@@ -47,51 +47,51 @@ class RuntimeClosureRequirement:
 _RUNTIME_CLOSURE_CATALOG: tuple[RuntimeClosureRequirement, ...] = (
     RuntimeClosureRequirement(
         "idempotency_store",
-        "lca.plugins.journal.idempotency.idempotency_store_seam",
+        "lca.plugins.journal.idempotency.store_seam",
     ),
     RuntimeClosureRequirement(
         "effect_handler_registry",
-        "lca.plugins.act.effect.effect_handler_seam",
+        "lca.plugins.act.effect.handler_seam",
     ),
     RuntimeClosureRequirement(
         "effect_dispatcher_factory",
-        "lca.plugins.journal.declarative.declarative_runtime_seams_provider",
+        "lca.plugins.journal.declarative.runtime_seams_provider",
     ),
     RuntimeClosureRequirement(
         "checkpoint_state_resolver_factory",
-        "lca.plugins.journal.declarative.declarative_runtime_seams_provider",
+        "lca.plugins.journal.declarative.runtime_seams_provider",
     ),
     RuntimeClosureRequirement(
         "result_finalizer_factory",
-        "lca.plugins.journal.declarative.declarative_runtime_seams_provider",
+        "lca.plugins.journal.declarative.runtime_seams_provider",
     ),
     RuntimeClosureRequirement(
         "delta_handler_registry",
-        "lca.plugins.act.delta.delta_handler_seam",
+        "lca.plugins.act.delta.handler_seam",
     ),
     RuntimeClosureRequirement(
         "delta_reducer_factory",
-        "lca.plugins.journal.declarative.declarative_runtime_seams_provider",
+        "lca.plugins.journal.declarative.runtime_seams_provider",
     ),
     RuntimeClosureRequirement(
         "declarative_interpreter_factory",
-        "lca.plugins.journal.declarative.declarative_runtime_seams_provider",
+        "lca.plugins.journal.declarative.runtime_seams_provider",
     ),
     RuntimeClosureRequirement(
         "runtime_journal_factory",
-        "lca.plugins.journal.declarative.declarative_runtime_seams_provider",
+        "lca.plugins.journal.declarative.runtime_seams_provider",
     ),
     RuntimeClosureRequirement(
         "loop_guard_evaluator",
-        "lca.plugins.think.loop.loop_guard_provider",
+        "lca.plugins.think.loop.guard_provider",
     ),
     RuntimeClosureRequirement(
         "evidence_store",
-        "lca.plugins.observability.evidence.evidence_store_seam",
+        "lca.plugins.observability.evidence.store_seam",
     ),
     RuntimeClosureRequirement(
         "stop_policy",
-        "lca.plugins.phase_graph.stop.stop_policy",
+        "lca.plugins.phase_graph.stop.policy",
     ),
     RuntimeClosureRequirement(
         "reducer",
@@ -99,11 +99,11 @@ _RUNTIME_CLOSURE_CATALOG: tuple[RuntimeClosureRequirement, ...] = (
     ),
     RuntimeClosureRequirement(
         "artifact_closure",
-        "lca.plugins.journal.artifact.artifact_closure_provider",
+        "lca.plugins.journal.artifact.closure_provider",
     ),
     RuntimeClosureRequirement(
         "phase_observer",
-        "lca.plugins.perceive.phase.phase_observer_provider",
+        "lca.plugins.perceive.phase.observer_provider",
     ),
     RuntimeClosureRequirement(
         "resume_input_adapters",

@@ -56,7 +56,7 @@ MANIFEST = ToolManifest(
 
 def _sandbox_obs_builder(store: Any) -> Any:
     """Return an observation builder bound to a FileStore."""
-    from lca.infrastructure.computer.op.op_result import ComputerOpResult
+    from lca.infrastructure.computer.op.result import ComputerOpResult
     from lca.infrastructure.tools.lca_computer.observations import build_computer_observation
 
     def _build(raw: Any, tool_name: str, start: float) -> Any:
@@ -76,7 +76,7 @@ def build_sandbox_tools(**kwargs: Any) -> list:
     if sandbox is None or store is None:
         return []
 
-    from lca.infrastructure.computer.sandbox.sandbox_computer import SandboxComputer
+    from lca.infrastructure.computer.sandbox.computer import SandboxComputer
     from lca.infrastructure.runtime_plane.resolve.resolve import sandbox_ref_from
     from lca.infrastructure.tools.lca_computer import _invoke_via_executor
 

@@ -82,7 +82,7 @@ ASSISTANT_CORDIS_NAMES: Final[dict[str, str]] = {ep: f"agent.{ep}" for ep in ASS
 
 # ── EventDescriptor 元数据（PR-3 注入 ``InMemoryEventDescriptorRegistry``）──
 #
-# 本元数据与 ``infrastructure/observability/events/event_descriptors_data.py``
+# 本元数据与 ``infrastructure/observability/events/descriptors_data.py``
 # 的 ``build_default_registry()`` 同源；此处先在 contracts 层冻结，避免 PR-3
 # 重复填写。emitter 全部走 ``"lca.plugins.assistant.*"`` 命名空间，PR-3 插件
 # 上线后由架构测试守住（emitter 与 module id 字面前缀一致）。

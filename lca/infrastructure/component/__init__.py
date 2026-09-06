@@ -1,6 +1,6 @@
 """Public exports for ``component`` (auto-fixed)."""
 
-from lca.infrastructure.component.component_registry import (
+from lca.infrastructure.component.registry import (
     RegistryKeyError,
     NamedRegistry,
     ComponentRegistry,

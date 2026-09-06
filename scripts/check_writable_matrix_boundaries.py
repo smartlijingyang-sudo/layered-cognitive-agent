@@ -24,7 +24,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 BANNED_IMPORTS = (
-    "lca.infrastructure.observability.spine.event.event_spine",
+    "lca.infrastructure.observability.spine.event.spine",
     "lca.infrastructure.observability.spine.sinks.file_sink",
     "lca.infrastructure.observability.spine.sinks.routing_file_sink",
     "lca.runtime.step_emitter",

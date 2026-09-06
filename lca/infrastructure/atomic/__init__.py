@@ -1,6 +1,6 @@
 """Public exports for ``atomic`` (auto-fixed)."""
 
-from lca.infrastructure.atomic.atomic_write import (
+from lca.infrastructure.atomic.write import (
     atomic_write_text,
     atomic_write_text,
 )

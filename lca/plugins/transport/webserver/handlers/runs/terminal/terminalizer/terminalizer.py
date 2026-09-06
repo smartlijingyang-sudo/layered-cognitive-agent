@@ -12,11 +12,11 @@ from typing import Any
 
 import structlog
 
-from lca.infrastructure.tools.run.run_finalizer import finalize_run
+from lca.infrastructure.tools.run.finalizer import finalize_run
 from lca.plugins.transport.webserver.carrier.runs.lifecycle.export_disposal import (
     dispose_export as _dispose_export,
 )
-from lca.plugins.transport.webserver.read.runs.artifact.artifact_closure import (
+from lca.plugins.transport.webserver.read.runs.artifact.closure import (
     emit_artifact_closure_if_needed as _emit_artifact_closure_if_needed,
 )
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunRegistry, RunSession

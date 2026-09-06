@@ -6,10 +6,10 @@ import inspect
 
 import pytest
 
-from lca.contracts.protocols.runtime.runtime.runtime_composition import RuntimeFactory
+from lca.contracts.protocols.runtime.runtime.composition import RuntimeFactory
 from lca.harness.profile.resolve.resolve import resolve_profile
 from lca.plugins.composer.runtime import runtime_assembly
-from lca.plugins.journal.runtime.runtime_factory_provider import CognitiveRuntimeFactory
+from lca.plugins.journal.runtime.factory_provider import CognitiveRuntimeFactory
 
 
 def test_cognitive_runtime_factory_implements_declared_protocol() -> None:

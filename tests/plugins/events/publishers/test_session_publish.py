@@ -29,7 +29,7 @@ from lca_kernel.events.errors.errors import MissingPublishSessionError
 @pytest.fixture
 def bus() -> EventBus:
     config_dir = Path(__file__).resolve().parents[4] / "lca_kernel" / "events" / "config"
-    from lca_kernel.events.test.test_catalog import build_test_bus
+    from lca_kernel.events.test.catalog import build_test_bus
 
     return build_test_bus(config_dir)
 
@@ -186,7 +186,7 @@ def test_set_publish_session_wraps_runtime_session(bus: EventBus) -> None:
     from lca.plugins.events.publishers.delegation_cache.plugin import (
         DelegationCachePlugin,
     )
-    from lca.plugins.session.runtime.bus.bus_facade import SessionBusFacade
+    from lca.plugins.session.runtime.bus.facade import SessionBusFacade
     from lca.session.append import Session
 
     session = Session("pub-wrap")
@@ -212,7 +212,7 @@ def test_set_publish_session_wraps_runtime_session(bus: EventBus) -> None:
 
 
 def test_set_publish_session_does_not_rewrap_facade() -> None:
-    from lca.plugins.session.runtime.bus.bus_facade import SessionBusFacade
+    from lca.plugins.session.runtime.bus.facade import SessionBusFacade
     from lca.session.append import Session
 
     facade = SessionBusFacade(Session("pub-once"))

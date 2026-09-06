@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import (
     BODIES,
@@ -22,7 +22,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.mechanisms.factory.factory_registry import FactoryRegistry
+from lca.contracts.mechanisms.factory.registry import FactoryRegistry
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 

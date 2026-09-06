@@ -16,7 +16,7 @@ from lca.contracts.mechanisms.capability.capability import provider_current, req
 from lca.contracts.models.core.state.plane import PlaneBindings
 from lca.contracts.protocols import LLMAdapter
 from lca.contracts.protocols.runtime.infra.infra import MachineResolver, Tool
-from lca.contracts.protocols.session.run.run_mode import RunModeRegistryProtocol
+from lca.contracts.protocols.session.run.mode import RunModeRegistryProtocol
 from lca.infrastructure.observability import BoundObservability
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
 

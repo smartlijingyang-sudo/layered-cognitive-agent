@@ -40,8 +40,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from lca.contracts.models.observability.journal.journal_doc import JournalDocument
-from lca.contracts.models.observability.journal.journal_step import (
+from lca.contracts.models.observability.journal.doc import JournalDocument
+from lca.contracts.models.observability.journal.step import (
     JournalStep,
     ReflectTrace,
     SpanRecord,
@@ -49,7 +49,7 @@ from lca.contracts.models.observability.journal.journal_step import (
     ToolCallRecord,
     ToolResult,
 )
-from lca.infrastructure.atomic.atomic_write import atomic_write_text
+from lca.infrastructure.atomic.write import atomic_write_text
 from lca.infrastructure.observability.spine.sinks.naming import spine_filename_for_run
 
 if TYPE_CHECKING:

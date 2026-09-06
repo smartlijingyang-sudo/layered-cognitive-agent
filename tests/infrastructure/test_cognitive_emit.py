@@ -272,7 +272,7 @@ async def test_run_brain_think_with_spine_facts_emits_failure_on_error() -> None
 async def test_run_reasoner_generate_thoughts_emits_prompt_assembler_eps() -> None:
     from lca.cognition.brain.reasoner.reasoner import PromptReasoner
     from lca.contracts.models.core.conversation.llm import LLMResponse
-    from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
+    from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
     from lca.contracts.protocols import LLMAdapter
 
     class _NoopLLM(LLMAdapter):

@@ -17,7 +17,7 @@
   把 Pipeline 声明接到已有公开面。生产 boot 走 ``register_pipeline_once``
   (只装 hooks)。``apply_pipeline`` 另实例化 sinks 写入回执 map(不
   ``bus.mount_sink``);``consumer_rules`` 仅作可检视元数据,不调用
-  :meth:`~lca_kernel.events.bus.EventBus.subscribe`。Session SSOT 路径下
+  :meth:`~lca_kernel.events.bus.EnvelopeBus.subscribe`。Session SSOT 路径下
   投递 / 持久化由 Session.observe / JsonlSessionPersistence 负责
   (ADR-0186 PR-3f)。
 
@@ -42,7 +42,7 @@ from weakref import WeakKeyDictionary
 import yaml
 
 from lca.harness.profile.resolve.resolve import ResolvedProfile
-from lca_kernel.events.bus.bus import ConsumerHandle, EventBus
+from lca_kernel.events.bus.bus import ConsumerHandle, EnvelopeBus
 from lca_kernel.events.pipeline.pipeline import (
     Pipeline,
     _parse_hooks,
@@ -82,7 +82,7 @@ class AppliedPipeline:
 
     ``sinks`` 已按 ``spec.backend(**spec.config)`` 实例化并放入 map,供调用方
     检视;**不** ``bus.mount_sink``。``consumer_handles`` 恒为空元组:
-    consumer_rules 只作声明式元数据,本函数不订阅 EventBus。
+    consumer_rules 只作声明式元数据,本函数不订阅 EnvelopeBus。
     Session SSOT 路径下投递 / 持久化由 Session.observe /
     JsonlSessionPersistence 负责(ADR-0186 PR-3f)。
     """
@@ -166,14 +166,14 @@ def pipeline_from_mapping(
     )
 
 
-# ── EventBus 装配 ────────────────────────────────────────────────────────
+# ── EnvelopeBus 装配（EventBus compat 子类仍用于 register_pipeline）────────
 
 # 同一 bus 实例上 (name, version) 只装载一次。key 挂在 bus 实例上:
-# 测试重置 EventBus 单例后新实例自动恢复可装载,无需手工清状态。
-_REGISTERED: WeakKeyDictionary[EventBus[Any], set[tuple[str, int]]] = WeakKeyDictionary()
+# 测试重置 EnvelopeBus 单例后新实例自动恢复可装载,无需手工清状态。
+_REGISTERED: WeakKeyDictionary[EnvelopeBus[Any], set[tuple[str, int]]] = WeakKeyDictionary()
 
 
-def register_pipeline_once(bus: EventBus[Any], pipeline: Pipeline) -> bool:
+def register_pipeline_once(bus: EnvelopeBus[Any], pipeline: Pipeline) -> bool:
     """幂等版 ``bus.register_pipeline``;同名同版重复装载跳过,返回是否装载。"""
     key = (pipeline.name, pipeline.version)
     seen = _REGISTERED.get(bus)
@@ -187,7 +187,7 @@ def register_pipeline_once(bus: EventBus[Any], pipeline: Pipeline) -> bool:
     return True
 
 
-def apply_pipeline(bus: EventBus[Any], pipeline: Pipeline) -> AppliedPipeline:
+def apply_pipeline(bus: EnvelopeBus[Any], pipeline: Pipeline) -> AppliedPipeline:
     """装配 Pipeline:hooks 注册 + sinks 实例化(不 mount)。
 
     - hooks: 经 ``register_pipeline_once`` → ``bus.register_pipeline``;
@@ -195,8 +195,8 @@ def apply_pipeline(bus: EventBus[Any], pipeline: Pipeline) -> AppliedPipeline:
       **不** ``bus.mount_sink``。持久化由 Session.observe /
       JsonlSessionPersistence 在 Session SSOT 路径负责(ADR-0186 PR-3f);
     - consumer_rules: 声明式元数据,供 inspect / CLI 解析与展示;
-      本函数不订阅 EventBus。投递由 Session.observe 负责;需要总线
-      订阅时由调用方显式调用 :meth:`EventBus.subscribe`。
+      本函数不订阅 EnvelopeBus。投递由 Session.observe 负责;需要总线
+      订阅时由调用方显式调用 :meth:`EnvelopeBus.subscribe`（compat 子类）。
       ``consumer_handles`` 恒为空。
 
     生产 boot 仍只用 ``register_pipeline_once``(hooks);本函数供检视

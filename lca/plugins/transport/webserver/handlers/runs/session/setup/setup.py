@@ -19,7 +19,7 @@ from lca.plugins.transport.webserver.handlers.runs.session.diagnostics.diagnosti
     plugin_inventory_from_boot_products,
 )
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunRegistry, RunSession
-from lca.plugins.transport.webserver.handlers.runs.session.setup.setup_types import RunSessionRequest
+from lca.plugins.transport.webserver.handlers.runs.session.setup.types import RunSessionRequest
 
 
 class RunSessionFactory:

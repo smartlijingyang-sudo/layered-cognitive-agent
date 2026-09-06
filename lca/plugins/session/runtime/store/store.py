@@ -152,7 +152,7 @@ class SessionStore:
         读语义对齐 :func:`load_session_events`（撕尾截断、known-types 校验、
         seq 连续）。``log_path`` 通常是 ``<run_dir>/<run_id>.spine.jsonl``。
         """
-        from lca.plugins.session.runtime.log.log_reader import load_session_events
+        from lca.plugins.session.runtime.log.reader import load_session_events
         from lca.session.lifecycle.repair import repair_interrupted_turn
 
         events = load_session_events(log_path, session_id=session_id)

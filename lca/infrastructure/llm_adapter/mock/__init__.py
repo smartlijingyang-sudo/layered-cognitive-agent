@@ -1,6 +1,6 @@
 """Public exports for ``mock`` (auto-fixed)."""
 
-from lca.infrastructure.llm_adapter.mock.mock_llm import (
+from lca.infrastructure.llm_adapter.mock.llm import (
     MockLLMAdapter,
 )
 

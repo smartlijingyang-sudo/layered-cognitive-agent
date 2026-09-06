@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from lca.contracts.protocols import AgentTransport
-from lca.infrastructure.transport.transport_registry import TransportRegistry
+from lca.infrastructure.transport.registry import TransportRegistry
 
 
 class TransportService(TransportRegistry):

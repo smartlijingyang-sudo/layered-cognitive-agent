@@ -23,12 +23,12 @@ from lca.contracts.protocols.runtime.attachment.attachment import (
     AttachmentStager,
     ResolvedAttachment,
 )
-from lca.contracts.protocols.runtime.attachment.attachment_errors import (
+from lca.contracts.protocols.runtime.attachment.errors import (
     AmbiguousFileRefError,
     AttachmentErrorCode,
     UnresolvedFileRefError,
 )
-from lca.contracts.protocols.runtime.sandbox.sandbox_backend import SandboxBackend
+from lca.contracts.protocols.runtime.sandbox.backend import SandboxBackend
 
 
 def _plane(kind: PlaneKind, root: str) -> PlaneRef:

@@ -26,7 +26,7 @@ from lca.infrastructure.persistence.write_behind import WriteBehindBuffer
 
 if TYPE_CHECKING:
     from lca_kernel.events.session.session import SessionProtocol
-    from lca_kernel.events.spine.spine_runtime import SpineEventRecord
+    from lca_kernel.events.spine.runtime import SpineEventRecord
 
 log = logging.getLogger(__name__)
 

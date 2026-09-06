@@ -5,7 +5,7 @@ import asyncio
 import pytest
 
 from lca.contracts.models.core.execution.decision import Observation
-from lca.infrastructure.idempotency.idempotency_store import SqliteIdempotencyStore
+from lca.infrastructure.idempotency.store import SqliteIdempotencyStore
 
 
 @pytest.mark.asyncio
@@ -61,10 +61,10 @@ async def test_in_progress_claim_survives_restart_and_fails_closed(tmp_path) -> 
 async def test_gateway_reuses_receipt_after_runtime_reconstruction(tmp_path) -> None:
     from types import SimpleNamespace
 
-    from lca.contracts.protocols.act.command.command_envelope import CapabilityGrant, CommandEnvelope
+    from lca.contracts.protocols.act.command.envelope import CapabilityGrant, CommandEnvelope
     from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import EffectPolicyPlan
     from lca.harness.declarative.execute.dispatch import RegistryEffectDispatcher
-    from lca.plugins.act.effect.effect_handlers_provider import (
+    from lca.plugins.act.effect.handlers_provider import (
         InMemoryEffectHandlerRegistry,
         register_default_effect_handlers,
     )

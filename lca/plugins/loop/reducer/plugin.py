@@ -173,7 +173,7 @@ class DefaultReducer(Reducer):
 
         Reducer 是 ``AgentState.perceive`` 投影的唯一 writer(C4)。
         """
-        from lca.contracts.models.core.perceive.perceive_projection import PerceiveProjection
+        from lca.contracts.models.core.perceive.projection import PerceiveProjection
 
         state.perceive = PerceiveProjection(
             manifest=manifest,

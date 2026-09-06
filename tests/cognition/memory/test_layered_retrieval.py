@@ -2,7 +2,7 @@
 
 import pytest
 
-from lca.cognition.memory.layered.layered_retrieval_policy import (
+from lca.cognition.memory.layered.retrieval_policy import (
     LayeredRetrievalPolicy,
 )
 from lca.contracts.atoms.enums.enums import MemoryLayer

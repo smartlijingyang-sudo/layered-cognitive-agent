@@ -18,7 +18,7 @@ from unittest.mock import MagicMock
 # app's order and avoids the lifecycle<->execute circular import that occurs
 # when lifecycle.lifecycle is the first module loaded.
 from lca.plugins.transport.webserver.handlers.runs.terminal import registry_commands  # noqa: F401
-from lca.infrastructure.observability.facade.run.run_ambit import RunAmbit, current_file_store
+from lca.infrastructure.observability.facade.run.ambit import RunAmbit, current_file_store
 from lca.plugins.transport.webserver.carrier.runs.lifecycle.lifecycle import RunLifecycleCoordinator
 from lca.contracts.observability.registry.status import RunLifecycleStatus
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession

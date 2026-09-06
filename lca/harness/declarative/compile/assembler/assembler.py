@@ -21,7 +21,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
     SemanticPhase,
 )
 from lca.contracts.protocols.state.plan import CompiledRunPlan
-from lca.harness.declarative.compile.instrument.instrument_wrap import (
+from lca.harness.declarative.compile.instrument.wrap import (
     ASSEMBLER_PROVENANCE,
     WRAP_INSTRUMENTED_ATTR,
     wrap_executor,

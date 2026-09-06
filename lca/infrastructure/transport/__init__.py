@@ -1,7 +1,7 @@
 """L0 互操作协议适配器 —— MCP / A2A。"""
 
 from lca.infrastructure.transport.agent_transport import InternalTransport
-from lca.infrastructure.transport.transport_registry import (
+from lca.infrastructure.transport.registry import (
     TransportNotFoundError,
     TransportRegistry,
 )

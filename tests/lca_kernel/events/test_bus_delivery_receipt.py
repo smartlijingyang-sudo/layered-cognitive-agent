@@ -20,9 +20,9 @@ from lca.contracts.event import Category, EventPayload, Plane, TeamDelegationCac
 from lca_kernel.events import _DEFAULT_CONFIG_DIR
 from lca_kernel.events.bus.bus import DeliveryPolicy, EventBus, EventRef
 from lca_kernel.events.errors.errors import EventNoSinkError
-from lca_kernel.events.payloads.payloads_spine import SpineEventPayload
+from lca_kernel.events.payloads.spine import SpineEventPayload
 from lca_kernel.events.registry.registry import EventRegistry, EventSpec
-from lca_kernel.events.spine.spine_runtime import SpineEventRecord
+from lca_kernel.events.spine.runtime import SpineEventRecord
 
 # ── helpers ──────────────────────────────────────────────────────────────
 

@@ -16,8 +16,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from lca.contracts.models.observability.journal.journal_doc import JournalMetadata
-from lca.contracts.models.observability.journal.journal_step import AttachmentRef
+from lca.contracts.models.observability.journal.doc import JournalMetadata
+from lca.contracts.models.observability.journal.step import AttachmentRef
 from lca.infrastructure.observability.writable_matrix.coordinator import (
     StepCoordinator,
 )

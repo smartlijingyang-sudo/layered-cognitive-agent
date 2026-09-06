@@ -51,7 +51,7 @@ from typing import Any, Protocol, runtime_checkable
 # 丢失之前归一化成 ExceptionRecord,再 emit_exception_caught → spine。
 # 公开名直接 import(供测试 monkeypatch + lint-imports whitelist)。
 from lca.contracts.observability.trace.exception_capture import exc_to_record
-from lca.infrastructure.observability.spine.exception.exception_emit import emit_exception_caught
+from lca.infrastructure.observability.spine.exception.emit import emit_exception_caught
 from lca_kernel.cli.errors import KernelError
 
 log = logging.getLogger(__name__)

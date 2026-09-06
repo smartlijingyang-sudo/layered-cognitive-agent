@@ -21,10 +21,10 @@ from lca.infrastructure.observability.loop_cursor.bind.bind import (
 from lca.infrastructure.observability.loop_cursor.factory.factory import LoopCursorFactory
 
 _in_memory_mod = importlib.import_module(
-    "lca.infrastructure.observability.loop_cursor.in.in_memory"
+    "lca.infrastructure.observability.loop_cursor.in.memory"
 )
 InMemoryLoopCursor = _in_memory_mod.InMemoryLoopCursor
-from lca.infrastructure.observability.loop_cursor.persistence.persistence_coordinator import (
+from lca.infrastructure.observability.loop_cursor.persistence.coordinator import (
     FilePersistenceCoordinator,
     NullPersistenceCoordinator,
     PersistenceCoordinator,

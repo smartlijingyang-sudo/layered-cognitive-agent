@@ -10,7 +10,7 @@ This test verifies the complete agent run replay capability:
 from __future__ import annotations
 
 from lca.contracts.atoms.scope.scope import Scope
-from lca.contracts.models.observability.plan.plan_ref import get_current_plan_ref, plan_ref_scope
+from lca.contracts.models.observability.plan.ref import get_current_plan_ref, plan_ref_scope
 from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan, ProviderBinding
 from lca.contracts.protocols.state.plan import CompiledRunPlan
 from lca.contracts.protocols.state.scope_plan import BudgetCeiling, ScopePlan

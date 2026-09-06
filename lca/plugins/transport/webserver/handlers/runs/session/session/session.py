@@ -27,7 +27,7 @@ from lca.contracts.observability.registry.run_locator import RunLocator
 from lca.contracts.observability.registry.status import RunLifecycleStatus
 from lca.contracts.protocols import JournalProjector
 from lca.infrastructure.observability import BoundObservability
-from lca.infrastructure.observability.facade.run.run_ambit import RunAmbit
+from lca.infrastructure.observability.facade.run.ambit import RunAmbit
 from lca.infrastructure.observability.loop_cursor import (
     reset_run_cursor,
 )
@@ -35,10 +35,10 @@ from lca.plugins.transport.webserver.read.runs.identity.identity import (
     AgentRef,
     default_agent_ref,
 )
-from lca.plugins.transport.webserver.read.runs.journal.journal_projection_binding import (
+from lca.plugins.transport.webserver.read.runs.journal.projection_binding import (
     ProcessJournalBinding,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.event.event_session import (
+from lca.plugins.transport.webserver.handlers.runs.session.event.session import (
     BoundRunEventSession,
     unbind_run_event_session,
 )

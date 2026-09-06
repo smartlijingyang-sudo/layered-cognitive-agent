@@ -1,6 +1,6 @@
 """Public exports for ``openai`` (auto-fixed)."""
 
-from lca.infrastructure.openai.openai_compat import (
+from lca.infrastructure.openai.compat import (
     StructuredLLMError,
     normalize_chat_role,
     normalize_chat_messages,

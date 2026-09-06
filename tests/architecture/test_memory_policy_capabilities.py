@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from lca.cognition.memory.layered.layered_retrieval_policy import LayeredRetrievalPolicy
-from lca.cognition.memory.simple.simple_memory import SimpleMemorySystem
+from lca.cognition.memory.layered.retrieval_policy import LayeredRetrievalPolicy
+from lca.cognition.memory.simple.memory import SimpleMemorySystem
 from lca.contracts.capabilities import (
     MEMORY_COMPACTION_POLICY,
     MEMORY_RETRIEVAL_POLICY,

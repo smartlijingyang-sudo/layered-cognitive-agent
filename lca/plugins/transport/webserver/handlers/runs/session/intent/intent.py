@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from lca.infrastructure.runtime_plane.execution.execution_target import parse_execution_target
+from lca.infrastructure.runtime_plane.execution.target import parse_execution_target
 from lca.infrastructure.runtime_plane.resolve.resolve import PlaneRequest
 from lca.plugins.loop.driver.plugin import (
     RunLoopDriverRegistry,

@@ -7,7 +7,7 @@ from urllib.parse import quote
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from lca.infrastructure.file.file_store import LocalFileStore
+from lca.infrastructure.file.store import LocalFileStore
 from lca.plugins.transport.webserver.handlers.cors.cors import CORS_HEADERS
 
 

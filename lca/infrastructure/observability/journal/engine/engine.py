@@ -32,10 +32,10 @@ from lca.contracts.models.observability.journal.journal import (
     RuntimeObserved,
     StampedEvent,
 )
-from lca.contracts.models.observability.journal.journal_catalog import JOURNAL_EVENT_CLASSES
-from lca.contracts.observability.event.event_descriptor_registry import EventDescriptorRegistry
-from lca.contracts.observability.event.event_identity import EventIdentityProvider
-from lca.contracts.observability.journal.journal_store import JournalStoreBackend
+from lca.contracts.models.observability.journal.catalog import JOURNAL_EVENT_CLASSES
+from lca.contracts.observability.event.descriptor_registry import EventDescriptorRegistry
+from lca.contracts.observability.event.identity import EventIdentityProvider
+from lca.contracts.observability.journal.store import JournalStoreBackend
 from lca.contracts.observability.journal.ledger import (
     LedgerDurabilityError,
     LedgerSealedError,
@@ -45,14 +45,14 @@ from lca.contracts.observability.journal.ledger import (
 )
 from lca.contracts.observability.core.ports import AttributePolicyBackend
 from lca.infrastructure.observability.adapters.policy import AttributePolicy, redact_restricted
-from lca.infrastructure.observability.events.event.event_catalog import descriptor_for
-from lca.infrastructure.observability.facade.projection.projection_registry import (
+from lca.infrastructure.observability.events.event.catalog import descriptor_for
+from lca.infrastructure.observability.facade.projection.registry import (
     EventProjection,
     ProjectionRegistry,
 )
-from lca.infrastructure.observability.facade.run.run_context import get_current_run_scope
+from lca.infrastructure.observability.facade.run.context import get_current_run_scope
 from lca.infrastructure.observability.journal.backends.memory import InMemoryJournalStore
-from lca.plugins.observability.event.event_identity_stable_ulid_provider import StableUlidIdentity
+from lca.plugins.observability.event.identity_stable_ulid_provider import StableUlidIdentity
 
 
 class UnregisteredJournalEventError(LedgerUnregisteredError):
@@ -264,7 +264,7 @@ class RunStore:
         event_type = type(sanitized)
         causation = sanitized.causation_refs if isinstance(sanitized, RuntimeObserved) else ()
         # ── PR-6: 读取 plan_ref from ContextVar ─────────────
-        from lca.contracts.models.observability.plan.plan_ref import (
+        from lca.contracts.models.observability.plan.ref import (
             get_current_plan_ref,
         )
 

@@ -9,8 +9,8 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.think.eval_comparison import EvalComparison
 from lca.contracts.protocols.composition.logic_address import score_logic_address

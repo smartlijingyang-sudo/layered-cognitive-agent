@@ -29,8 +29,8 @@ import warnings
 from dataclasses import dataclass
 from typing import Any
 
-from lca.contracts.atoms.control.control_slot import ControlSlot, parse_slot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup, parse_functional_group
+from lca.contracts.atoms.control.slot import ControlSlot, parse_slot
+from lca.contracts.atoms.functional.group import FunctionalGroup, parse_functional_group
 from lca.contracts.atoms.scope.scope import Scope, canonical_scope, parse_scope
 
 _DEPRECATION_MSG = (

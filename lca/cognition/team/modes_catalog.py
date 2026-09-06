@@ -24,7 +24,7 @@ from lca.contracts.capabilities import RUN_MODE_REGISTRY
 from lca.contracts.mechanisms.capability.capability import require_capability
 
 if TYPE_CHECKING:
-    from lca.plugins.state.run.run_mode_registry_seam import RunModeRegistry
+    from lca.plugins.state.run.mode_registry_seam import RunModeRegistry
 
 
 @dataclass(frozen=True)

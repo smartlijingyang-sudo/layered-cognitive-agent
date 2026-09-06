@@ -8,16 +8,16 @@ from lca.infrastructure.observability.loop_cursor.spine._spine_port import (
     bind_session_append_hook,
     reset_session_append_hook,
 )
-from lca.infrastructure.observability.spine.event.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.record import EventRecord
 from lca.plugins.observability.spine.emit_pipeline import EmitPipeline
-from lca.infrastructure.observability.spine.spine.spine_enrich import enrich_spine_payload, set_active_spine_enricher
+from lca.infrastructure.observability.spine.spine.enrich import enrich_spine_payload, set_active_spine_enricher
 from lca.session.lifecycle.bind import (
     bind_run_event_session_from_store,
     unbind_run_event_session,
 )
 from lca.plugins.session.spine_anomaly.spine_anomaly import register_spine_anomaly_to_store
-from lca.plugins.session.runtime.spine.spine_event_projection import session_event_to_event_record
-from lca.plugins.session.runtime.spine.spine_hook import make_session_spine_append_hook
+from lca.plugins.session.runtime.spine.event_projection import session_event_to_event_record
+from lca.plugins.session.runtime.spine.hook import make_session_spine_append_hook
 from lca.plugins.session.runtime.store.store import SessionStore
 
 
@@ -70,7 +70,7 @@ def test_spine_anomaly_observer_runs_on_session_append() -> None:
 
 def test_emit_pipeline_skips_anomaly_when_session_hook_bound() -> None:
     from lca.infrastructure.observability.spine.context.context import SpineContext
-    from lca.infrastructure.observability.spine.event.event_spine import EventSpine
+    from lca.infrastructure.observability.spine.event.spine import EventSpine
     from lca.infrastructure.observability.spine.sinks.base import EventSink
 
     class _Sink(EventSink):

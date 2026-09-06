@@ -40,7 +40,7 @@ def test_spine_publisher_resolved() -> None:
     解析为空。本测试改用 :func:`build_test_bus` 注入 catalog，与生产路径
     同形态。
     """
-    from lca_kernel.events.test.test_catalog import build_test_bus
+    from lca_kernel.events.test.catalog import build_test_bus
 
     bus = build_test_bus()
     cat = Category("spine.cognition.brain.perceive.start")
@@ -55,7 +55,7 @@ def test_spine_subscribers_resolved() -> None:
 
     PR-5：catalog 注入后才解析；用 :func:`build_test_bus`。
     """
-    from lca_kernel.events.test.test_catalog import build_test_bus
+    from lca_kernel.events.test.catalog import build_test_bus
 
     bus = build_test_bus()
     from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink
@@ -74,7 +74,7 @@ def test_spine_consumer_rules_cover_all_categories() -> None:
 
     PR-5：catalog 注入后才解析；用 :func:`build_test_bus`。
     """
-    from lca_kernel.events.test.test_catalog import build_test_bus
+    from lca_kernel.events.test.catalog import build_test_bus
 
     bus = build_test_bus()
     registry = bus.registry

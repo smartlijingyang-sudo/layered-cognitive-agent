@@ -9,8 +9,8 @@ import pytest
 from lca.cognition.body.executor.pipeline_safe_executor import PipelineSafeExecutor
 from lca.contracts.atoms.enums.enums import ContentType
 from lca.contracts.models.core.execution.decision import Observation
-from lca.contracts.models.team.role.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
-from lca.contracts.protocols.act.tool.tool_pipeline import (
+from lca.contracts.models.team.role.team import CacheConfig, RetryPolicy, ToolPermissionManifest
+from lca.contracts.protocols.act.tool.pipeline import (
     ExecuteNextFn,
     ToolDefinition,
     ToolExecutionContext,
@@ -18,7 +18,7 @@ from lca.contracts.protocols.act.tool.tool_pipeline import (
     ToolPostDecision,
     ToolPreDecision,
 )
-from lca.infrastructure.tool.tool_pipeline import DefaultToolExecutionPipeline
+from lca.infrastructure.tool.pipeline import DefaultToolExecutionPipeline
 
 
 class _EchoProvider:
@@ -160,7 +160,7 @@ async def test_denied_policy_prevents_provider_execution() -> None:
 async def test_legacy_safe_executor_uses_provider_pipeline_contract() -> None:
     # PR-7: mint_envelope requires plan_ref (V5 acceptance). Tests must wrap
     # the call in plan_ref_scope to inject a non-empty plan_ref.
-    from lca.contracts.models.observability.plan.plan_ref import plan_ref_scope
+    from lca.contracts.models.observability.plan.ref import plan_ref_scope
 
     executor = PipelineSafeExecutor(ToolPermissionManifest(allowed_tools=["legacy_echo"]))
 
@@ -205,7 +205,7 @@ async def test_legacy_safe_executor_requires_active_compiled_plan_ref() -> None:
 @pytest.mark.asyncio
 async def test_legacy_safe_executor_denies_before_provider_execution() -> None:
     from lca.contracts.models.core.execution.result import ToolExecutionError
-    from lca.contracts.models.observability.plan.plan_ref import plan_ref_scope
+    from lca.contracts.models.observability.plan.ref import plan_ref_scope
 
     executor = PipelineSafeExecutor(ToolPermissionManifest(allowed_tools=[]))
 

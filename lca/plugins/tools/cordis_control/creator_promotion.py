@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from lca.application.authoring.preset_authoring import PresetAuthoring
-from lca.contracts.atoms.artifact.artifact_state import ArtifactState
+from lca.contracts.atoms.artifact.state import ArtifactState
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.journal.artifact import (
     artifact_with_scope,

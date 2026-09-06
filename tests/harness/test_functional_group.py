@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.atoms.functional.functional_group import (
+from lca.contracts.atoms.functional.group import (
     V3_TO_0069_MAPPING,
     FunctionalGroup,
     all_group_ids,

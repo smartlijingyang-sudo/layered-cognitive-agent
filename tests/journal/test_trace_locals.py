@@ -26,7 +26,7 @@ import pytest
 from typer.testing import CliRunner
 
 from lca.infrastructure.cli.cli.cli import app
-from lca.infrastructure.observability.spine.event.event_record import (
+from lca.infrastructure.observability.spine.event.record import (
     EventRecord,
     Outcome,
 )

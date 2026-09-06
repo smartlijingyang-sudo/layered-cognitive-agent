@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from lca.harness.composition.plan_compiler import CompileOptions, compile_plan
-from lca.harness.profile.boot.boot_products import ProfileBootProducts
+from lca.harness.profile.boot.products import ProfileBootProducts
 from lca.harness.profile.resolve.resolve import ResolvedProfile
 from lca.harness.profile.validate.runtime_binding_validator import profile_allows_test_defaults
 

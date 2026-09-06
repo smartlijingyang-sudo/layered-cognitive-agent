@@ -8,7 +8,7 @@ from lca.contracts.harness.memory.events import (
     ToolInvokedCommitted,
 )
 from lca.contracts.models.core.execution.decision import Observation
-from lca.contracts.models.observability.tool.tool_journal_receipt import (
+from lca.contracts.models.observability.tool.journal_receipt import (
     ToolJournalReceipt,
     tool_call_resolved_receipt,
     tool_invoked_receipt,
@@ -128,7 +128,7 @@ def test_commit_tool_invoked_receipt() -> None:
 
 
 def test_prepare_tool_invoked_from_observation() -> None:
-    from lca.cognition.body.internal.tool_journal_emit import prepare_tool_invoked
+    from lca.cognition.body.emit.tool_journal import prepare_tool_invoked
 
     class _Tool:
         name = "demo"

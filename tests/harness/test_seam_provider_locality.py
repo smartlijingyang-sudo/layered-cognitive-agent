@@ -30,7 +30,7 @@ from pathlib import Path
 import pytest
 
 from lca.harness.diagnostics.inspect.inspect import inspect_profile_tree
-from lca.harness.profile.boot.boot_products import resolved_profile_from_scope
+from lca.harness.profile.boot.products import resolved_profile_from_scope
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 

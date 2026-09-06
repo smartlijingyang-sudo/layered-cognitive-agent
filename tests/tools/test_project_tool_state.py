@@ -325,8 +325,8 @@ def test_computer_observation_payload_is_flattened() -> None:
     from pathlib import Path
 
     from lca.contracts.models.core.execution.sandbox import SandboxExecResult
-    from lca.infrastructure.computer.op.op_result import ComputerOpResult
-    from lca.infrastructure.file.file_store import LocalFileStore
+    from lca.infrastructure.computer.op.result import ComputerOpResult
+    from lca.infrastructure.file.store import LocalFileStore
     from lca.infrastructure.tools.lca_computer.observations import build_computer_observation
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -357,9 +357,9 @@ def test_skill_activate_observation_payload_is_flattened() -> None:
     import tempfile
     from pathlib import Path
 
-    from lca.infrastructure.skills.disk.disk_store import DiskSkillPackageStore
+    from lca.infrastructure.skills.disk.store import DiskSkillPackageStore
     from lca.infrastructure.skills.settings.settings import SkillSettings
-    from lca.infrastructure.tools.skills.activate.activate_tool import SkillActivateTool
+    from lca.infrastructure.tools.skills.activate.tool import SkillActivateTool
 
     with tempfile.TemporaryDirectory() as tmp:
         settings = SkillSettings(cache_dir=Path(tmp))
@@ -610,7 +610,7 @@ def test_legacy_camelcase_payload_gets_normalised() -> None:
     that forgets to call it would leak camelCase into observation.payload
     and the projection would lose fields; this test pins the rename table.
     """
-    from lca.infrastructure.computer.runtime.runtime_exec import _normalize_guest_state
+    from lca.infrastructure.computer.runtime.exec import _normalize_guest_state
 
     state = {
         "success": True,

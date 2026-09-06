@@ -32,8 +32,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from lca.contracts.models.observability.journal.journal_doc import JournalDocument
-from lca.contracts.models.observability.journal.journal_step import (
+from lca.contracts.models.observability.journal.doc import JournalDocument
+from lca.contracts.models.observability.journal.step import (
     summarize_step,
 )
 from lca.contracts.observability.core.ssot import (

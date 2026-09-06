@@ -2,7 +2,7 @@
 
 import pytest
 
-from lca.cognition.memory.null.null_retrieval_policy import NullRetrievalPolicy
+from lca.cognition.memory.null.retrieval_policy import NullRetrievalPolicy
 from lca.contracts.atoms.enums.enums import MemoryLayer
 from lca.contracts.models.core.conversation.memory import MemoryRecord
 

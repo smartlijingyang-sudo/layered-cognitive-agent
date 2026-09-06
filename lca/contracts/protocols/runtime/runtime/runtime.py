@@ -9,7 +9,7 @@ from lca.contracts.models.core.execution.decision import Decision, Observation, 
 from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.state.state import AgentState, StateSnapshot
 from lca.contracts.models.core.policy.stop import StopDecision
-from lca.contracts.models.team.run.run_context import RunContext
+from lca.contracts.models.team.run.context import RunContext
 
 
 @runtime_checkable

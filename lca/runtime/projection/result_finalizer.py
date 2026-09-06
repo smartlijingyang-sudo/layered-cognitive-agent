@@ -8,9 +8,9 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
     DeclarativeValidationError,
     ExecutionOutcome,
 )
-from lca.contracts.protocols.journal.artifact.artifact_closure import ArtifactClosure
+from lca.contracts.protocols.journal.artifact.closure import ArtifactClosure
 from lca.contracts.protocols.runtime.infra.infra import StateStore
-from lca.contracts.protocols.runtime.runtime.runtime_composition import ResultFinalizer
+from lca.contracts.protocols.runtime.runtime.composition import ResultFinalizer
 from lca.contracts.protocols.state.reducer import Reducer
 from lca.harness.graph.execute.interpreter import InterpretationResult
 from lca.runtime.projection.result_projection import TerminalResultProjection

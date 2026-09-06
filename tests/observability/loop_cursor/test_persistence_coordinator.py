@@ -10,7 +10,7 @@ FilePersistenceCoordinator / CloseBarrier 协同行为在各自模块的 test_*.
 
 from __future__ import annotations
 
-from lca.infrastructure.observability.loop_cursor.persistence.persistence_coordinator import (
+from lca.infrastructure.observability.loop_cursor.persistence.coordinator import (
     NullPersistenceCoordinator,
     PersistenceCoordinator,
     PersistenceStats,

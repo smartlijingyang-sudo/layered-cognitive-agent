@@ -9,8 +9,8 @@ from lca.contracts.mechanisms.capability.capability import (
     provider_current,
     require_capability,
 )
-from lca.infrastructure.observability.facade.run.run_ambit import current_assistant_id
-from lca.infrastructure.skills.assistant.assistant_merged_store import AssistantMergedSkillStore
+from lca.infrastructure.observability.facade.run.ambit import current_assistant_id
+from lca.infrastructure.skills.assistant.merged_store import AssistantMergedSkillStore
 
 
 def active_skill_store(scope: object) -> Any:

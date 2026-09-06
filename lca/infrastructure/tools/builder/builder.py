@@ -13,7 +13,7 @@ from typing import Any, cast
 
 from lca.contracts.atoms.enums.enums import ContentType
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.atoms.semantic.semantic_keys import FAILURE_KIND, FAILURE_KIND_EXECUTION
+from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_EXECUTION
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.execution.tool import ToolApi, ToolManifest
 from lca.contracts.protocols import Tool

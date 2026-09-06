@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -37,7 +37,7 @@ from lca.plugins.transport.webserver.handlers.runs.api.query_endpoints import (
     get_run_profile,
     stream_run_live,
 )
-from lca.plugins.transport.webserver.route.route_register import register_routes
+from lca.plugins.transport.webserver.route.register import register_routes
 
 ROUTE_SPECS: tuple[RouteSpec, ...] = (
     RouteSpec("/runs", create_run, ("POST", "OPTIONS")),

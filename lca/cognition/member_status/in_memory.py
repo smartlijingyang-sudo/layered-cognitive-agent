@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from lca.contracts.atoms.enums.enums import RoleStatus
-from lca.contracts.models.team.role.role_status_rules import is_success_status, is_terminal_status
+from lca.contracts.models.team.role.status_rules import is_success_status, is_terminal_status
 
 
 @dataclass(frozen=True)

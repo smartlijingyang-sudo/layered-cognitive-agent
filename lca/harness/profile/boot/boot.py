@@ -1,56 +1,48 @@
-"""Boot a harness plugin tree from a profile YAML (ADR-0061 / ADR-0062).
+"""COMPAT shim — kernel boot is the single production entry (ADR-0195 P4-K02).
 
-Public API:
-  - ``resolve_profile`` / ``boot_resolved_profile`` — two-phase model
-  - ``boot_profile`` — compat façade (resolve then boot)
-  - ``load_profile_entries`` / ``boot_entries`` — retained for tests that
-    assemble entry dicts without a profile file; ``boot_entries`` still
-    goes through Manifest validation when modules declare ``@plugin``.
+Public boot APIs forward to :mod:`lca_kernel.boot`. Resolve helpers
+(``resolve_profile``, ``load_profile_entries``) remain here for harness
+composition; new callers should prefer ``lca_kernel.run_kernel``.
 
-Lifecycle is owned by vendored Cordis: ``ctx.registry.plugin(...)`` returns
-a :class:`cordis.fiber.Fiber` per plugin, and ``await ctx.dispose()``
-runs all fiber effects in reverse-registration order. This module only
-bridges LCA's "shared parent ctx + Manifest-audited plugin" model into
-that lifecycle; it does NOT maintain its own ``started[]`` / disposer
-list (ADR-0062 §4).
+# COMPAT(owner: ADR-0195 P4-K02, from: lca.harness.profile.boot.boot,
+# to: lca_kernel.run_kernel / run_resolved_kernel / boot_entries,
+# delete_when: rg "from lca\\.harness\\.profile\\.boot" lca/ scripts/ = 0
+#   (tests/ excluded — migration tracked in P4-K03),
+# forbidden_new_usage: 禁止在本模块新增 boot 逻辑; 新代码 import lca_kernel)
 """
 
 from __future__ import annotations
 
-import contextlib
-
-# === Deprecation (ADR-0115) ===
 import warnings
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-import structlog
 from cordis import Context
 
 from lca.harness.plugin_api import AuditedPluginContext, PluginDefinition
-from lca.harness.profile.boot.boot_products import (
-    ProfileBootProducts,
-    attach_profile_boot_products,
-)
-from lca.harness.profile.boot.boot_projection import BootEntry
 from lca.harness.profile.resolve.resolve import (
     ProfileResolveError,
     ResolvedProfile,
     dump_resolved,
-    resolve_entries,
     resolve_profile,
 )
 from lca.harness.profile.resolve.source import load_profile_entries
-from lca.infrastructure.file.file_store import FileStore
+from lca.infrastructure.file.store import FileStore
 
-_log = structlog.get_logger(__name__)
-
-warnings.warn(
-    "lca.harness.profile.boot is deprecated, use lca_kernel.boot (ADR-0115)",
-    DeprecationWarning,
-    stacklevel=2,
+_DEPRECATION = (
+    "lca.harness.profile.boot.{fn} is deprecated; "
+    "use lca_kernel.{kernel_fn} (ADR-0195 P4-K02)"
 )
+
+
+def _warn(fn: str, kernel_fn: str) -> None:
+    warnings.warn(
+        _DEPRECATION.format(fn=fn, kernel_fn=kernel_fn),
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
 
 __all__ = [
     "ProfileResolveError",
@@ -70,6 +62,7 @@ async def boot_resolved_profile(
     bootstrap_file_store: FileStore | None = None,
 ) -> Context:
     """Preflight and boot one resolved plugin graph through the kernel boot seam."""
+    _warn("boot_resolved_profile", "run_resolved_kernel")
     from lca_kernel.boot.boot import run_resolved_kernel
 
     return await run_resolved_kernel(resolved, bootstrap_file_store=bootstrap_file_store)
@@ -81,111 +74,10 @@ async def boot_entries(
     bootstrap_file_store: FileStore | None = None,
 ) -> Context:
     """Boot programmatic declarations through the production Resolve semantics."""
+    _warn("boot_entries", "boot_entries")
     from lca_kernel.boot.boot import boot_entries as kernel_boot_entries
 
     return await kernel_boot_entries(entries, bootstrap_file_store=bootstrap_file_store)
-
-
-def _install_observability(ctx: Context) -> None:
-    """Boot 末尾唯一挂点：把各 seam registry 装配成 BoundObservability。
-
-    Assemble 必须 boot 期发生一次；run 期业务代码通过
-    ``ctx.inject("observability")`` 拿到 Bound，再按需为 run 边追加
-    jsonl/tail 等 writer projection。Facade（record/span/annotate/score）
-    经 ContextVar ``lca_observability_bound`` 取当前激活的 Bound，与
-    boot ctx 解耦。
-    """
-    from lca.harness.observability import assemble_observability
-    from lca.infrastructure.observability import ObservabilitySettings
-
-    assemble_observability(ctx, ObservabilitySettings())
-
-
-def _register_event_pipeline(resolved: ResolvedProfile) -> None:
-    """Profile 声明事件编排时装载到进程级 EventBus（ADR-0183 §3.3）。
-
-    机制装载（observability 组装）之后执行。未声明且约定文件不存在时
-    直接跳过——Pipeline 是可选装配。同名同版 Pipeline 每进程只装载一次；
-    sink 的 run_id 绑定由运行时在 run 开始时完成，此处只装配。
-
-    PR-5：从 ``ResolvedProfile.plugins`` 收集声明了 ``marker_class=`` 的
-    插件的 ``id → marker class`` 注入到 ``EventRegistry._plugins`` catalog，
-    并触发 :meth:`EventRegistry.refresh` 重解析 yaml token。然后把 catalog
-    传给 :func:`load_pipeline_for_profile` 让 hooks / sinks 段 ``plugin:``
-    字段按 id 解析。
-    """
-    from lca.harness.profile.resolve.pipeline_loader import (
-        load_pipeline_for_profile,
-        register_pipeline_once,
-    )
-    from lca_kernel.events.bus.bus import EventBus
-
-    bus = EventBus.default()
-    catalog, emits_by_id = _collect_marker_catalog(resolved)
-    if catalog:
-        for plugin_id, marker in catalog.items():
-            bus.registry.register_marker(plugin_id, marker)
-        bus.registry.refresh()
-        # Post-refresh hard gate:yaml publishers token 必须全部解析得到
-        # type。失败 = boot fail-fast,事件不进入 lifespan,避免首次请求
-        # 撞 UnauthorizedPublishError → 500(本 PR 修复的根因)。
-        try:
-            bus.registry.validate_publisher_authorization()
-        except Exception:
-            _log.exception("event_bus_publisher_authorization_drift")
-            raise
-        # 反向校验:plugin manifest 声明的 emits 必须被 yaml 授权,否则
-        # OwnershipDeclaration.emits 只是装饰,而不是契约。
-        for plugin_id, emits in emits_by_id.items():
-            try:
-                bus.registry.check_manifest_emits_aligned(plugin_id, emits)
-            except Exception:
-                _log.exception(
-                    "event_bus_manifest_emits_aligned_failed",
-                    plugin_id=plugin_id,
-                )
-                raise
-        _log.info(
-            "event registry catalog populated",
-            entries=len(catalog),
-        )
-
-    pipeline = load_pipeline_for_profile(resolved, catalog=catalog)
-    if pipeline is None:
-        return
-    if register_pipeline_once(bus, pipeline):
-        _log.info(
-            "event pipeline registered",
-            pipeline=pipeline.name,
-            version=pipeline.version,
-        )
-
-
-def _collect_marker_catalog(
-    resolved: ResolvedProfile,
-) -> tuple[dict[str, type], dict[str, tuple[str, ...]]]:
-    """PR-5：从 ResolvedProfile.plugins 收集 ``id → marker_class`` 与 emits。
-
-    仅收集 ``PluginDefinition.marker_class`` 非 None 的插件；其余插件无
-    marker（不参与事件 yaml id 鉴权）。重复 id → 后者覆盖前者（按
-    ResolvedProfile 已校验的拓扑序，结果唯一）。
-
-    Returns:
-        ``(catalog, emits_by_id)``：catalog 是 ``id → marker class`` 注入
-        ``EventRegistry._plugins``；emits_by_id 是 ``id → OwnershipDeclaration.emits``，
-        供 boot 期 ``check_manifest_emits_aligned`` 反向校验使用。
-    """
-    catalog: dict[str, type] = {}
-    emits: dict[str, tuple[str, ...]] = {}
-    for plugin in resolved.plugins:
-        marker = plugin.definition.marker_class
-        if marker is None:
-            continue
-        catalog[plugin.id] = marker
-        ownership = plugin.definition.ownership
-        if ownership is not None and ownership.emits:
-            emits[plugin.id] = tuple(ownership.emits)
-    return catalog, emits
 
 
 async def boot_profile(
@@ -194,75 +86,17 @@ async def boot_profile(
     bootstrap_file_store: FileStore | None = None,
 ) -> Context:
     """Resolve then boot, optionally binding a Gateway-owned FileStore."""
-    resolved = resolve_profile(profile_path)
-    return await boot_resolved_profile(resolved, bootstrap_file_store=bootstrap_file_store)
+    _warn("boot_profile", "run_kernel")
+    from lca_kernel import run_kernel
+
+    return await run_kernel(profile_path, bootstrap_file_store=bootstrap_file_store)
 
 
-# ── Helpers ─────────────────────────────────────────────────────────
-
-
-async def _boot_context(
-    products: ProfileBootProducts,
-    *,
-    bootstrap_file_store: FileStore | None = None,
-) -> Context:
-    """Boot one prepared plugin sequence with a single audited lifecycle seam.
-
-    Both public entrances converge here after their input adapters have done
-    their work. The sequence owns only common mechanics: Fiber-backed setup,
-    boot-product attachment, partial-context cleanup, and observability
-    assembly. Inspection and composition then read the attached products
-    instead of guessing Context attribute names.
-    """
-    resolved = products.resolved_profile
-    if resolved is None:
-        raise RuntimeError("Profile boot requires a resolved profile")
-    ctx = Context()
-    try:
-        for entry in BootEntry.from_resolved(resolved):
-            await _boot_plugin(ctx, entry.definition, entry.config)
-            if entry.definition.id == "lca-file-store-service" and bootstrap_file_store is not None:
-                _bind_bootstrap_file_store(ctx, bootstrap_file_store)
-        attach_profile_boot_products(ctx, products)
-        _install_observability(ctx)
-        _register_event_pipeline(resolved)
-    except BaseException:
-        await _dispose_context(ctx)
-        raise
-    return ctx
-
-
-def _bind_bootstrap_file_store(ctx: Context, store: FileStore | None) -> None:
-    """Register the app-owned store before ordinary FileStore providers boot.
-
-    The kernel/transport boundary is profile-agnostic: if the active
-    profile does not wire the ``file_store`` seam (``lca-file-store-service``
-    plugin), the argument is silently ignored. This lets the lifespan
-    accept a bootstrap store without coupling to a specific capability
-    plugin being present.
-    """
-    if store is None:
-        return
-    from lca.infrastructure.capability.files.files import FileStoreService
-
-    try:
-        service = ctx.inject("file_store")
-    except KeyError:
-        return
-    if not isinstance(service, FileStoreService):
-        return
-    service.register("webserver_bootstrap", store, activate=True)
+# ── Fiber lifecycle helpers (tests + boot-time interaction audit) ─────
 
 
 async def _boot_plugin(ctx: Context, definition: PluginDefinition, config: Any) -> None:
-    """Run one manifest plugin once through its Cordis Fiber.
-
-    ``ResolvedProfile`` already supplies a validated topological order. The
-    callback therefore runs against the shared composition context, not the
-    Fiber's child context: sibling plugins retain the existing one-scope
-    lookup semantics, while Fiber remains the sole owner of execution,
-    returned disposers, and reverse-order cleanup.
-    """
+    """Run one manifest plugin once through its Cordis Fiber (test helper)."""
 
     audits: list[AuditedPluginContext] = []
 
@@ -275,18 +109,11 @@ async def _boot_plugin(ctx: Context, definition: PluginDefinition, config: Any) 
         {
             "name": definition.spec.id,
             "apply": setup,
-            # Dependency order was validated during Resolve. Cordis child
-            # contexts scope provides locally, whereas the harness composes
-            # capabilities on the shared parent scope; do not apply a second,
-            # incompatible DI gate here.
             "inject": [],
             "Config": definition.Config,
         },
         config=config,
     )
-    # Cordis registers the Fiber under the root Fiber, while harness callers
-    # own the root Context. Bridge those lifecycles so ctx.dispose() unloads
-    # every plugin in reverse boot order and runs each returned disposer.
     ctx.effect(fiber.dispose, label=f"plugin:{definition.spec.id}")
     await fiber.await_()
 
@@ -305,11 +132,6 @@ def _validate_audited_interactions(
     declared_provide = set(definition.provided_capability_keys)
     declared_require = set(definition.required_capability_keys)
     undeclared_provide = audited.provided - declared_provide
-    # provides ⊆ setup 实际 ctx.provide / ctx.register / seam.register。
-    # selector 形态（registry[name]）与 tool 形态（register 到 seam）通过
-    # register() 兑现，audited.registered 含 (seam_key, entry) 元组。
-    # Tool 插件常走 ctx.require("tools").register(tool) 路径，audited
-    # 只记 required 不记 register — 以 `<required>.` 前缀视为已兑现。
     registered_seams = {seam for seam, _ in audited.registered}
     missing_provide = {
         key
@@ -319,9 +141,6 @@ def _validate_audited_interactions(
         and not any(key.startswith(seam + ".") for seam in registered_seams)
         and not any(key.startswith(req + ".") for req in audited.required)
     }
-    # Concrete keys collected via require_matching("field_producer.") are
-    # covered by a declared ``field_producer.*`` wildcard — same rule as
-    # AuditedPluginContext.require(allow_wildcard=True).
     undeclared_require = {
         key
         for key in audited.required
@@ -343,16 +162,3 @@ async def _run_setup(setup_fn: Callable[..., Any], ctx: Any, config: Any) -> Any
     if hasattr(result, "__await__"):
         return await result
     return result
-
-
-async def _dispose_context(ctx: Context) -> None:
-    """Run ctx.dispose() and swallow its errors so the caller can re-raise
-    the original startup exception.
-
-    Cordis's :meth:`Context.dispose` already logs individual disposer
-    failures and continues. Any remaining error is non-fatal here; the
-    caller (boot_resolved_profile / boot_entries) is about to re-raise
-    the original startup error anyway.
-    """
-    with contextlib.suppress(BaseException):
-        await ctx.dispose()

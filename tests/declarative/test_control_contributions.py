@@ -10,7 +10,7 @@ from lca.contracts.models.core.execution.decision import Decision, Observation, 
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseInput
 from lca.contracts.protocols.gate.control_verdict import ControlVerdictKind
-from lca.harness.declarative.compile.phase.phase_capabilities import MappingPhaseCapabilities
+from lca.harness.declarative.compile.phase.capabilities import MappingPhaseCapabilities
 from lca.plugins.control_contributions import (
     ActAuthorizeExecutor,
     ActBudgetExecutor,

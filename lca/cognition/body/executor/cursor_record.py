@@ -38,7 +38,7 @@ class CursorRecord:
     @staticmethod
     def get() -> LoopCursor | None:
         """Return the currently bound cursor, or ``None`` when no spine is wired."""
-        from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
+        from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
             get_current_cursor,
         )
 

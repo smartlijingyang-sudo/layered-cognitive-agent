@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.protocols.act.command.command_envelope import CapabilityGrant
+from lca.contracts.protocols.act.command.envelope import CapabilityGrant
 
 
 def derive_child_grant(parent: CapabilityGrant, requested: CapabilityGrant) -> CapabilityGrant:

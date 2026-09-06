@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from lca.contracts.models.core.conversation.conversation import PRIOR_CONVERSATION_WM_KEY
-from lca.contracts.models.team.run.run_context import RunContext
+from lca.contracts.models.team.run.context import RunContext
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
 
 

@@ -31,8 +31,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -45,7 +45,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.runtime.infra.infra import MachineResolver
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.infrastructure.file.file_store import FileStore, LocalFileStore
+from lca.infrastructure.file.store import FileStore, LocalFileStore
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,7 +119,7 @@ def install_bootstrap_state(
     boot = factory.create(cfg)
 
     from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunRegistry
-    from lca.plugins.transport.webserver.handlers.runs.terminal.legacy.legacy_adapter import (
+    from lca.plugins.transport.webserver.handlers.runs.terminal.legacy.adapter import (
         RegistryRunAdapter,
     )
 

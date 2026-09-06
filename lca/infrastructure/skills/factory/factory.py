@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from lca.contracts.protocols.memory.operational_skills import SkillPackageInstaller
 from lca.infrastructure.skills.bundled.bundled import ensure_bundled_skills
-from lca.infrastructure.skills.disk.disk_store import DiskSkillPackageStore
-from lca.infrastructure.skills.http.http_importer import HttpSkillImporter
+from lca.infrastructure.skills.disk.store import DiskSkillPackageStore
+from lca.infrastructure.skills.http.importer import HttpSkillImporter
 from lca.infrastructure.skills.settings.settings import get_skill_settings
 
 

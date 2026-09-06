@@ -12,8 +12,8 @@ from typing import Any
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -27,13 +27,13 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 from lca.contracts.routing import RouteSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.transport.webserver.handlers.files.files import download_file, get_file_meta
-from lca.plugins.transport.webserver.handlers.openai.openai_shim import (
+from lca.plugins.transport.webserver.handlers.openai.shim import (
     chat_completions,
     embeddings_create,
     list_models,
     responses_create,
 )
-from lca.plugins.transport.webserver.route.route_register import register_routes
+from lca.plugins.transport.webserver.route.register import register_routes
 
 _LLM_REQUIRES: tuple[str, ...] = ("llm_resolver",)
 

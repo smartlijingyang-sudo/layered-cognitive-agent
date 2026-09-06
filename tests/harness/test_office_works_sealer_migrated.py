@@ -30,7 +30,7 @@ from lca.cognition.wire.registry_factory import build_transport_registry
 from lca.contracts.models.core.policy.budget import Budget
 from lca.contracts.models.core.execution.decision import Decision, Observation, Turn
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.models.team.role.role_team import ToolPermissionManifest
+from lca.contracts.models.team.role.team import ToolPermissionManifest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SEALER_PATH = (
@@ -114,7 +114,7 @@ class TestOfficeWorksSealerMigration:
         if not SEALER_PATH.exists():
             return  # acceptable: file removed outright
         spec = importlib.util.spec_from_file_location(
-            "lca.cognition.brain.decision_gates.office.office_works_sealer",
+            "lca.cognition.brain.decision_gates.office.works_sealer",
             SEALER_PATH,
         )
         assert spec is not None and spec.loader is not None

@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
-from lca.contracts.models.team.team.team_coordination import (
+from lca.contracts.models.team.team.coordination import (
     STRATEGY_KEY_DEBATE,
     STRATEGY_KEY_FAN_OUT,
     STRATEGY_KEY_PEER_RELAY,

@@ -17,7 +17,7 @@ _MANIFEST_PATH = _REPO_ROOT / "lca/infrastructure/observability/spine/manifest.p
 
 def test_execution_points_reexports_yaml_ssot() -> None:
     """COMPAT shim mirrors ``SPINE_EXECUTION_POINTS`` — no parallel tuple."""
-    from lca_kernel.events.payloads.payloads_spine import SPINE_EXECUTION_POINTS
+    from lca_kernel.events.payloads.spine import SPINE_EXECUTION_POINTS
 
     assert tuple(EXECUTION_POINTS) == SPINE_EXECUTION_POINTS
 

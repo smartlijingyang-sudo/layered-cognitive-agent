@@ -72,7 +72,7 @@ from lca.contracts.models.observability.journal.journal import (
     ToolInvoked,
     ToolStarted,
 )
-from lca.contracts.models.observability.journal.journal_catalog import (
+from lca.contracts.models.observability.journal.catalog import (
     JOURNAL_EVENT_CLASSES,
     JournalSchemaMeta,
 )
@@ -96,21 +96,21 @@ from lca.infrastructure.observability.backends.langfuse_conventions import (
     langfuse_span_visible,
 )
 from lca.infrastructure.observability.backends.tracer_backend import OtelTracer
-from lca.infrastructure.observability.events.event.event_catalog import (
+from lca.infrastructure.observability.events.event.catalog import (
     EVENT_DESCRIPTOR_REGISTRY,
     descriptor_for,
     may_export_externally,
 )
-from lca.infrastructure.observability.events.event.event_descriptor_env import (
+from lca.infrastructure.observability.events.event.descriptor_env import (
     bind_descriptors,
     current_descriptors,
 )
-from lca.infrastructure.observability.events.event.event_descriptor_registry import (
+from lca.infrastructure.observability.events.event.descriptor_registry import (
     DuplicateEventDescriptorError,
     InMemoryEventDescriptorRegistry,
     UnknownEventDescriptorError,
 )
-from lca.infrastructure.observability.events.event.event_descriptors_data import build_default_registry
+from lca.infrastructure.observability.events.event.descriptors_data import build_default_registry
 from lca.infrastructure.observability.facade.facade.facade import (  # noqa: F401
     BoundObservability,
     EvidenceBinding,
@@ -133,11 +133,11 @@ from lca.infrastructure.observability.facade.facade.facade import (  # noqa: F40
     span,
     traced,
 )
-from lca.infrastructure.observability.facade.projection.projection_registry import (
+from lca.infrastructure.observability.facade.projection.registry import (
     EventProjection,
     ProjectionRegistry,
 )
-from lca.infrastructure.observability.facade.run.run_ambit import (
+from lca.infrastructure.observability.facade.run.ambit import (
     RunAmbit,
     bind_run_ambit,
     current_attachment_ids,
@@ -147,14 +147,14 @@ from lca.infrastructure.observability.facade.run.run_ambit import (
     current_run_ambit,
     current_workspace,
 )
-from lca.infrastructure.observability.facade.run.run_context import (
+from lca.infrastructure.observability.facade.run.context import (
     TEAM_CONTAINER_ROLE,
     adopt_run_scope,
     get_current_run_scope,
     run_scope,
 )
 from lca.infrastructure.observability.facade.settings.settings import ObservabilitySettings
-from lca.infrastructure.observability.facade.team.team_profile import (
+from lca.infrastructure.observability.facade.team.profile import (
     TeamTraceProfile,
     objective_preview,
     team_id_for,

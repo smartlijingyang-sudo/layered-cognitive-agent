@@ -1,6 +1,6 @@
 """Public exports for ``cognitive`` (auto-fixed)."""
 
-from lca.infrastructure.cognitive.cognitive_loop_settings import (
+from lca.infrastructure.cognitive.loop_settings import (
     Setting,
     CognitiveLoopSettings,
     get_cognitive_loop_settings,

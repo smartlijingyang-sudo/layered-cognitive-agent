@@ -31,7 +31,7 @@ from lca.harness.declarative.compile.assembler.assembler import (
     GraphAssembler,
     MappingRestrictedScope,
 )
-from lca.harness.declarative.compile.instrument.instrument_wrap import (
+from lca.harness.declarative.compile.instrument.wrap import (
     ASSEMBLER_PROVENANCE,
     WRAP_INSTRUMENTED_ATTR,
     wrap_instrument,

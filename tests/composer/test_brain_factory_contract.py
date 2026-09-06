@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from lca.contracts.capabilities import BRAIN_PROMPT_CATALOG_FACTORY, BRAINS
-from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
 from lca.contracts.protocols.journal.spec.spec import AgentSpec
 from lca.plugins.composer.composition.prompt_catalog import DefaultBrainPromptCatalogFactory
 from lca.plugins.composer.think import brain

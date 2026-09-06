@@ -8,11 +8,11 @@ from contextlib import contextmanager
 from typing import Any
 
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.protocols.session.checkpoint.checkpoint_policy import (
+from lca.contracts.protocols.session.checkpoint.policy import (
     FlushableSession,
     SessionCheckpointPolicyProtocol,
 )
-from lca.contracts.protocols.session.model.model_context import (
+from lca.contracts.protocols.session.model.context import (
     ModelContextAssembler,
     SessionReader,
 )
@@ -33,7 +33,7 @@ _default_checkpoint_policy: SessionCheckpointPolicyProtocol | None = None
 def _resolve_runtime_session(target: object | None) -> object | None:
     if target is None:
         return None
-    from lca.plugins.session.runtime.bus.bus_facade import SessionBusFacade
+    from lca.plugins.session.runtime.bus.facade import SessionBusFacade
     from lca.session.append import Session
 
     if isinstance(target, Session):

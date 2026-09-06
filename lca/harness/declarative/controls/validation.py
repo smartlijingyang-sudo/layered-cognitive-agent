@@ -25,7 +25,7 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_graph import 
     ValidationSeverity,
 )
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import PluginSpec
-from lca.harness.graph.graph_validation import PhaseGraphValidator
+from lca.harness.graph.validation import PhaseGraphValidator
 
 
 def validation_errors(report: ValidationReport) -> tuple[ValidationIssue, ...]:

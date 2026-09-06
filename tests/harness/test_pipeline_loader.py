@@ -29,7 +29,7 @@ from lca_kernel.events.bus.bus import EventBus, FailureSemantics
 from lca_kernel.events.hooks.hooks import DefaultFailureHook, PayloadSchemaHook
 from lca_kernel.events.pipeline.pipeline import HookSpec, Pipeline, Stage
 from lca_kernel.events.sinks.spine_sink import SpineSink, SpineSinkClosedError
-from lca_kernel.events.spine.spine_runtime import SpineEventRecord
+from lca_kernel.events.spine.runtime import SpineEventRecord
 
 REPO_ROOT_PROFILE = Path("profiles/web-standard.yaml")
 
@@ -78,7 +78,7 @@ def _write_yaml(path: Path, data: object) -> Path:
 
 def _make_bus() -> EventBus:
     """独立 EventBus(默认鉴权矩阵),避免单例串扰。"""
-    from lca_kernel.events.test.test_catalog import build_test_bus
+    from lca_kernel.events.test.catalog import build_test_bus
 
     return build_test_bus()
 

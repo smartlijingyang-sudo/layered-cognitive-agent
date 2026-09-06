@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import MEMORY_RETRIEVAL_POLICY
 from lca.contracts.harness.composition.plugin_contract import (
@@ -57,7 +57,7 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Provide NullRetrievalPolicy as ``retrieval.null``."""
-    from lca.cognition.memory.null.null_retrieval_policy import NullRetrievalPolicy
+    from lca.cognition.memory.null.retrieval_policy import NullRetrievalPolicy
 
     ctx.provide("retrieval.null", NullRetrievalPolicy)
     ctx.provide(MEMORY_RETRIEVAL_POLICY.key, NullRetrievalPolicy)

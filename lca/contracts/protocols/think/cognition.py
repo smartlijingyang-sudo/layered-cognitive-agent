@@ -13,7 +13,7 @@ from lca.contracts.models.core.execution.decision import Decision, Observation, 
 from lca.contracts.models.core.conversation.llm import LLMResponse
 from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.models.team.role.role_team import RoleProfile
+from lca.contracts.models.team.role.team import RoleProfile
 from lca.contracts.protocols.memory.memory import MemorySystem
 from lca.contracts.protocols.memory.operational_skills import SkillPackageStore
 from lca.contracts.protocols.runtime.infra.infra import LLMAdapter, Tool

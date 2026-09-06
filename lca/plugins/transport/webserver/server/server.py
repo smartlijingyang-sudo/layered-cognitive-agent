@@ -26,8 +26,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -114,7 +114,7 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     """
     from starlette.applications import Starlette
 
-    from lca.plugins.transport.webserver.lifespan.lifespan_adapter import install_trace_middleware
+    from lca.plugins.transport.webserver.lifespan.adapter import install_trace_middleware
 
     # 1. 解析 config(支持 dict 或 LcaWebServerConfig)
     if isinstance(config, LcaWebServerConfig):

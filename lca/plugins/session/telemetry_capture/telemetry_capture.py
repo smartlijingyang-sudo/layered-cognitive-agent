@@ -28,7 +28,7 @@ from typing import Any
 import structlog
 from pydantic import BaseModel, field_validator
 
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,

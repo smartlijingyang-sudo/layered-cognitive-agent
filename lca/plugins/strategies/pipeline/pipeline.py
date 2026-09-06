@@ -11,8 +11,8 @@ from typing import Any
 from pydantic import BaseModel
 
 from lca.agent.member_invoke import invoke_members_sequential
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import STRATEGIES
 from lca.contracts.harness.composition.plugin_contract import (
@@ -24,7 +24,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.models.core.execution.result import Result
-from lca.contracts.models.team.team.team_coordination import STRATEGY_KEY_PIPELINE
+from lca.contracts.models.team.team.coordination import STRATEGY_KEY_PIPELINE
 from lca.contracts.protocols import TeamAssembly, TeamStage, TeamStrategy
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin

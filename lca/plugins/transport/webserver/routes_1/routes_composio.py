@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -19,7 +19,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 from lca.contracts.routing import RouteSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.transport.webserver.handlers.composio import endpoints as composio_handlers
-from lca.plugins.transport.webserver.route.route_register import register_routes
+from lca.plugins.transport.webserver.route.register import register_routes
 
 ROUTE_SPECS: tuple[RouteSpec, ...] = (
     RouteSpec("/composio/oauth/callback", composio_handlers.oauth_callback, ("GET",)),

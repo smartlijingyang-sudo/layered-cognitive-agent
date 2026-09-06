@@ -54,7 +54,7 @@ from lca.infrastructure.observability.backends.langfuse_conventions import (
     LANGFUSE_OBSERVATION_TYPE,
     OBSERVATION_TYPE_EVENT,
 )
-from lca.infrastructure.observability.events.event.event_catalog import may_export_externally
+from lca.infrastructure.observability.events.event.catalog import may_export_externally
 from lca.infrastructure.observability.journal.otel import genai_mapping as genai
 from lca.infrastructure.observability.journal.otel import mapping as mapping
 from lca.infrastructure.observability.journal.otel.mapping import EVENT_PROJECTIONS

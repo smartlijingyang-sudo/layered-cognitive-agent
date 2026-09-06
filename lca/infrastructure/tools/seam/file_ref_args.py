@@ -27,14 +27,14 @@ from dataclasses import dataclass
 from typing import Final
 
 from lca.contracts.models.core.workspace.file_ref import FileRef
-from lca.contracts.protocols.runtime.attachment.attachment_errors import (
+from lca.contracts.protocols.runtime.attachment.errors import (
     AmbiguousFileRefError,
     AttachmentError,
     AttachmentErrorCode,
     UnresolvedFileRefError,
 )
-from lca.infrastructure.attachment.default.default_provider import DefaultAttachmentResolver
-from lca.infrastructure.file.file_store import FileStore
+from lca.infrastructure.attachment.default.provider import DefaultAttachmentResolver
+from lca.infrastructure.file.store import FileStore
 from lca.infrastructure.observability import current_file_store as get_current_run_file_store
 
 _LCA_FILE_URL: Final = re.compile(r"^/files/([A-Za-z0-9_-]+)/?$")

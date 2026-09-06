@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from lca.infrastructure.observability.spine.manifest.manifest import EXECUTION_POINTS
-from lca_kernel.events.payloads.payloads_spine import (
+from lca_kernel.events.payloads.spine import (
     SPINE_EXECUTION_POINTS,
     category_to_spine_ep,
 )
@@ -50,7 +50,7 @@ def _spine_eps_from_yaml_registry() -> frozenset[str]:
 
 
 def test_manifest_aliases_spine_execution_points() -> None:
-    from lca_kernel.events.payloads.payloads_spine import SPINE_EXECUTION_POINTS
+    from lca_kernel.events.payloads.spine import SPINE_EXECUTION_POINTS
 
     assert tuple(EXECUTION_POINTS) == SPINE_EXECUTION_POINTS
 

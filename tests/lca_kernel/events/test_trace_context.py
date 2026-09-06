@@ -23,7 +23,7 @@ from lca_kernel.events.hooks.hooks import PublishContext, TraceContextHook
 
 
 def _make_bus() -> EventBus[EventPayload]:
-    from lca_kernel.events.test.test_catalog import build_test_bus
+    from lca_kernel.events.test.catalog import build_test_bus
     return build_test_bus()
 
 

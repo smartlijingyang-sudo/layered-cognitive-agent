@@ -1,7 +1,5 @@
-"""Public exports for ``glob`` (auto-fixed)."""
+"""Public exports for ``glob``."""
 
-from lca.infrastructure.tools.lca_computer.apis.glob.glob_files import (
-    parameters,
-)
+from . import files as glob_files
 
-__all__ = ['parameters']
+__all__ = ["glob_files"]

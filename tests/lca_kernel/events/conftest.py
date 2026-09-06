@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from lca_kernel.events.bus.bus import EventBus
-from lca_kernel.events.test.test_catalog import build_test_bus
+from lca_kernel.events.test.catalog import build_test_bus
 
 
 @pytest.fixture

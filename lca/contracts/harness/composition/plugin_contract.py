@@ -31,8 +31,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from lca.contracts.atoms.control.control_slot import ControlSlot, validate_slot_iterable
-from lca.contracts.atoms.functional.functional_group import (
+from lca.contracts.atoms.control.slot import ControlSlot, validate_slot_iterable
+from lca.contracts.atoms.functional.group import (
     FunctionalGroup,
     parse_functional_group,
 )

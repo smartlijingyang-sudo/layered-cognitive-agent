@@ -1,6 +1,6 @@
-"""Event delivery diagnostics — EventBus delivery counters (ADR-0184 D2).
+"""Event delivery diagnostics — EnvelopeBus delivery counters (ADR-0184 D2).
 
-Reads ``EventBus.default().delivery_snapshot()`` of the invoking process:
+Reads ``EnvelopeBus.default().delivery_snapshot()`` of the invoking process:
 per-category ``published / persisted / delivered / dropped``. Counters are
 process-local memory, not persisted; a standalone CLI process reports its
 own bus snapshot (empty until that process publishes).
@@ -28,7 +28,7 @@ def register(app: typer.Typer) -> None:
             help="读 PersistenceObserver.fsync_policy（queue_depth n/a=0）",
         ),
     ) -> None:
-        """打印本进程 EventBus 的投递计数器快照（published/persisted/delivered/dropped）。
+        """打印本进程 EnvelopeBus 的投递计数器快照（published/persisted/delivered/dropped）。
 
         计数器是进程内内存（ADR-0184 D2），不落盘；独立 CLI 进程显示
         自己总线的快照，空 = 本进程未 publish 过。``--category`` 只

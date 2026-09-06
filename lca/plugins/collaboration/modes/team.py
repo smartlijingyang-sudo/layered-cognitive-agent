@@ -21,7 +21,7 @@ from lca.contracts.models.observability.journal.journal import (
 from lca.contracts.protocols import LLMAdapter
 from lca.contracts.protocols.collaboration.casting.casting import CastingError, RoleLibrary, TeamCaster
 from lca.contracts.protocols.runtime.infra.infra import Tool
-from lca.contracts.protocols.session.run.run_mode import ModeAdapter
+from lca.contracts.protocols.session.run.mode import ModeAdapter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.observability import (
     BoundObservability,
@@ -30,7 +30,7 @@ from lca.infrastructure.observability import (
     record,
     run_scope,
 )
-from lca.plugins.state.run.run_mode_registry_seam import RunModeRegistry
+from lca.plugins.state.run.mode_registry_seam import RunModeRegistry
 from lca.plugins.transport.webserver.carrier.runs.lifecycle.runnable_assembly import (
     RunnableBuildRequest,
 )

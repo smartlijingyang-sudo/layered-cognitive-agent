@@ -16,7 +16,7 @@ from lca.contracts.models.cognition.prompt_assembly import (
     PromptAssembler,
     PromptTemplateSelector,
 )
-from lca.contracts.models.team.role.role_team import RoleProfile
+from lca.contracts.models.team.role.team import RoleProfile
 from lca.contracts.protocols import (
     Brain,
     Critic,

@@ -24,13 +24,13 @@ from lca.contracts.models.team.consultation.consultation import (
     latest_outcome_for_role,
     usable_outcomes,
 )
-from lca.contracts.models.team.member.member_status import MemberStatus
-from lca.contracts.models.team.role.role_status_rules import (
+from lca.contracts.models.team.member.status import MemberStatus
+from lca.contracts.models.team.role.status_rules import (
     is_full_success_status,
     is_success_status,
     is_terminal_status,
 )
-from lca.contracts.models.team.team.team_awareness import ConsultDuty
+from lca.contracts.models.team.team.awareness import ConsultDuty
 
 
 @dataclass(frozen=True)

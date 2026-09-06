@@ -10,7 +10,7 @@ from __future__ import annotations
 from lca.contracts.models.core.policy.budget import DEFAULT_DELEGATION_TIMEOUT_S
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.execution.result import Result
-from lca.contracts.models.team.delegation.delegation_context import member_invoke_scope
+from lca.contracts.models.team.delegation.context import member_invoke_scope
 from lca.contracts.protocols import AgentUnit, MemberInvoker, TeamStage
 from lca.contracts.protocols.runtime.infra.infra import AgentTransport
 from lca.infrastructure.transport.invocation import send_and_wait

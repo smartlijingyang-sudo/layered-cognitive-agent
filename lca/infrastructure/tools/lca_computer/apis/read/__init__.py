@@ -1,7 +1,5 @@
-"""Public exports for ``read`` (auto-fixed)."""
+"""Public exports for ``read``."""
 
-from lca.infrastructure.tools.lca_computer.apis.read.read_file import (
-    parameters,
-)
+from . import file as read_file
 
-__all__ = ['parameters']
+__all__ = ["read_file"]

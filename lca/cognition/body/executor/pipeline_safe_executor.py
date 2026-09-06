@@ -30,24 +30,24 @@ import structlog
 
 from lca.cognition.body.executor.cursor_record import CursorRecord
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.atoms.semantic.semantic_keys import (
+from lca.contracts.atoms.semantic.keys import (
     FAILURE_KIND,
     FAILURE_KIND_EXECUTION,
     FAILURE_KIND_TRANSIENT,
 )
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.execution.result import ApprovalPendingError, ToolExecutionError
-from lca.contracts.models.team.role.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
+from lca.contracts.models.team.role.team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.contracts.protocols import SafeExecutor, Tool
-from lca.contracts.protocols.act.tool.tool_pipeline import (
+from lca.contracts.protocols.act.tool.pipeline import (
     ToolDefinition,
     ToolExecutionContext,
     ToolExecutionResult,
     ToolPreDecision,
     ToolProvider,
 )
-from lca.infrastructure.tool.tool_pipeline import DefaultToolExecutionPipeline
-from lca.infrastructure.tools.tool.tool_invocation_scope import tool_invocation_scope
+from lca.infrastructure.tool.pipeline import DefaultToolExecutionPipeline
+from lca.infrastructure.tools.tool.invocation_scope import tool_invocation_scope
 
 _log = structlog.get_logger("lca.safe_executor")
 
@@ -246,8 +246,8 @@ class PipelineSafeExecutor(SafeExecutor):
         """
         invocation_id = invocation_id.strip() or new_id("inv")
 
-        from lca.contracts.models.observability.plan.plan_ref import get_current_plan_ref
-        from lca.contracts.protocols.act.command.command_envelope import (
+        from lca.contracts.models.observability.plan.ref import get_current_plan_ref
+        from lca.contracts.protocols.act.command.envelope import (
             BudgetReservation,
             CapabilityGrant,
             command_envelope_to_dict,

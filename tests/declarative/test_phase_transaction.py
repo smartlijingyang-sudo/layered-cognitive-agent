@@ -7,16 +7,16 @@ from dataclasses import dataclass, field
 import pytest
 
 from lca.contracts.models.core.state.state import AgentState, Budget
-from lca.contracts.protocols.act.command.command_envelope import RunDelta, RunFact
+from lca.contracts.protocols.act.command.envelope import RunDelta, RunFact
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     DeclarativeValidationError,
     PhaseInput,
     PhaseResult,
     SemanticPhase,
 )
-from lca.contracts.protocols.journal.phase.phase_observation import PhaseStateSnapshot
+from lca.contracts.protocols.journal.phase.observation import PhaseStateSnapshot
 from lca.harness.declarative.compile.assembler.assembler import ExecutableNode
-from lca.harness.declarative.compile.phase.phase_capabilities import normalize_phase_capabilities
+from lca.harness.declarative.compile.phase.capabilities import normalize_phase_capabilities
 from lca.harness.graph.traversal import PhaseTraversal
 from lca.harness.declarative.lifecycle.phase_observation import NullPhaseObserver
 from lca.loop.transaction import PhaseExecutionTransaction

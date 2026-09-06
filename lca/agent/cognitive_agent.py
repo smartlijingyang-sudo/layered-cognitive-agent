@@ -21,14 +21,14 @@ from lca.contracts.models.observability.journal.journal import (
     AgentRunStarted,
     RunScope,
 )
-from lca.contracts.models.observability.plan.plan_ref import plan_ref_scope
-from lca.contracts.models.team.partial.partial_buffer import (
+from lca.contracts.models.observability.plan.ref import plan_ref_scope
+from lca.contracts.models.team.partial.buffer import (
     begin_partial_buffer,
     drain_run_partial,
     reset_partial_buffer,
 )
-from lca.contracts.models.team.role.role_team import RoleProfile
-from lca.contracts.models.team.run.run_context import RunContext
+from lca.contracts.models.team.role.team import RoleProfile
+from lca.contracts.models.team.run.context import RunContext
 from lca.contracts.protocols import AgentUnit, Runtime
 from lca.contracts.protocols.perceive.capabilities import HasHooks
 from lca.infrastructure.observability import (

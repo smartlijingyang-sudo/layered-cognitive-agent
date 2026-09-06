@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.models.observability.plan.plan_ref import get_current_plan_ref
-from lca.contracts.protocols.act.command.command_envelope import (
+from lca.contracts.models.observability.plan.ref import get_current_plan_ref
+from lca.contracts.protocols.act.command.envelope import (
     CapabilityGrant,
     CommandEnvelope,
     mint_envelope,

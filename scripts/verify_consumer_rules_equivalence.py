@@ -26,7 +26,7 @@ if str(ROOT) not in sys.path:
 
 import yaml  # noqa: E402
 
-from lca_kernel.events.config.config_parser import (  # noqa: E402
+from lca_kernel.events.config.parser import (  # noqa: E402
     SubscriberRule,
     subscribers_from_rules,
 )

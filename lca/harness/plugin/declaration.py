@@ -21,7 +21,7 @@ from cordis.plugin import Plugin as CordisPlugin
 from cordis.plugin import plugin as _cordis_plugin
 from pydantic import BaseModel
 
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.capabilities import Capability, cap_key
 from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
@@ -381,7 +381,7 @@ def _resolve_functional_group(value: FunctionalGroup | str | None) -> Functional
     """Resolve FunctionalGroup from str / enum / None; returns enum or None."""
     if value is None:
         return None
-    from lca.contracts.atoms.functional.functional_group import parse_functional_group
+    from lca.contracts.atoms.functional.group import parse_functional_group
 
     if isinstance(value, FunctionalGroup):
         return value

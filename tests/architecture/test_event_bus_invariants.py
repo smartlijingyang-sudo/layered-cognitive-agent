@@ -387,7 +387,7 @@ _SPINE_YAML = _REPO_ROOT / "lca_kernel" / "events" / "config" / "observability" 
 
 # model-visible 类别集合从 spine.yaml 的 payload_class 归属推导,不硬编码
 # 类别名;_EXPECTED 反向断言防推导退化为空集。
-_MV_PAYLOAD_MODULE = "lca_kernel.events.payloads.payloads_model_visible"
+_MV_PAYLOAD_MODULE = "lca_kernel.events.payloads.model_visible"
 _EXPECTED_MV_CATEGORIES = frozenset(
     {"spine.llm.request.header", "spine.llm.request.header.assistant"}
 )

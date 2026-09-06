@@ -15,7 +15,7 @@ from lca.contracts.protocols import (
 )
 from lca.contracts.protocols.journal.spec.spec import STATE_STORE_CHOICE_PROFILE_DEFAULT
 from lca.infrastructure.capability.memory.memory import MemoryService
-from lca.infrastructure.capability.state.state_store import StateStoreService
+from lca.infrastructure.capability.state.store import StateStoreService
 from lca.infrastructure.observability.adapters import TelemetryMemoryAdapter
 from lca.plugins.composer.composition.skill_store import active_skill_store
 

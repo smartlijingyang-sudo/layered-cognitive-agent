@@ -14,8 +14,8 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -29,7 +29,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.events.publishers._session_publish import publish_via_session
 from lca_kernel.events.payloads.payloads import Category, SpineEventPayload
-from lca_kernel.events.payloads.payloads_spine import _SPINE_EP_TO_CATEGORY
+from lca_kernel.events.payloads.spine import _SPINE_EP_TO_CATEGORY
 
 if TYPE_CHECKING:
     from lca_kernel.events.bus.bus import EventRef

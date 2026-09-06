@@ -23,12 +23,12 @@ from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.models.observability.journal.journal import RunScope
-from lca.contracts.protocols.runtime.runtime.runtime_lifecycle import (
+from lca.contracts.protocols.runtime.runtime.lifecycle import (
     RuntimeLifecycleEvent,
     RuntimeLifecycleEventType,
 )
-from lca.harness.declarative.compile.instrument.instrument_wrap import set_active_spine_accessor
-from lca.infrastructure.observability.facade.run.run_context import run_scope
+from lca.harness.declarative.compile.instrument.wrap import set_active_spine_accessor
+from lca.infrastructure.observability.facade.run.context import run_scope
 from lca.runtime.loop.runtime_loop import CognitiveRuntime
 from lca_kernel.events.bus.bus import EventBus
 

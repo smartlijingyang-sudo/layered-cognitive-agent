@@ -44,16 +44,16 @@ def seam_ctx() -> Any:
     from cordis import Context
 
     from lca.infrastructure.observability import NamedRegistry
-    from lca.infrastructure.observability.loop_cursor.close.close_barrier_impl import (
+    from lca.infrastructure.observability.loop_cursor.close.barrier_impl import (
         StdCloseBarrier,
     )
     from lca.infrastructure.observability.loop_cursor.factory.factory import (
         LoopCursorFactory,
     )
-    from lca.infrastructure.observability.loop_cursor.persistence.persistence_coordinator import (
+    from lca.infrastructure.observability.loop_cursor.persistence.coordinator import (
         NullPersistenceCoordinator,
     )
-    from lca.infrastructure.observability.loop_cursor.projection.projection_host import (
+    from lca.infrastructure.observability.loop_cursor.projection.host import (
         StdProjectionHost,
     )
 

@@ -82,7 +82,7 @@ class TestWritePathConstrainedToHomeSkills:
         from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
         from lca.contracts.protocols.assistant.skill_overlay import SkillSource
         from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
-        from lca.plugins.assistant.skill.skill_overlay import AssistantSkillOverlayImpl
+        from lca.plugins.assistant.skill.overlay import AssistantSkillOverlayImpl
 
         fake_home = tmp_path / "fake-home"
         fake_home.mkdir()
@@ -116,7 +116,7 @@ class TestUnverifiedPackageCannotActivate:
         from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
         from lca.contracts.protocols.assistant.skill_overlay import SkillNotVerified
         from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
-        from lca.plugins.assistant.skill.skill_overlay import AssistantSkillOverlayImpl
+        from lca.plugins.assistant.skill.overlay import AssistantSkillOverlayImpl
 
         catalog = AssistantCatalogImpl(root=tmp_path / "assistants")
         overlay = AssistantSkillOverlayImpl(catalog=catalog)
@@ -129,7 +129,7 @@ class TestUnverifiedPackageCannotActivate:
             overlay.activate(handle.assistant_id, "rogue")
 
     def test_activate_state_allowlist_is_closed(self) -> None:
-        from lca.plugins.assistant.skill.skill_overlay import _ACTIVATABLE_STATES
+        from lca.plugins.assistant.skill.overlay import _ACTIVATABLE_STATES
 
         assert frozenset({"verified", "active"}) == _ACTIVATABLE_STATES
 
@@ -148,7 +148,7 @@ class TestEPClosureForInstallAndActivate:
         from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
         from lca.contracts.protocols.assistant.skill_overlay import SkillSource
         from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
-        from lca.plugins.assistant.skill.skill_overlay import AssistantSkillOverlayImpl
+        from lca.plugins.assistant.skill.overlay import AssistantSkillOverlayImpl
 
         emitted: list[tuple[str, dict[str, Any]]] = []
 
@@ -180,7 +180,7 @@ class TestEPClosureForInstallAndActivate:
             ASSISTANT_SKILL_INSTALLED,
         )
         from lca.harness.plugin_api import definition_from_plugin
-        from lca.plugins.assistant.skill.skill_overlay import setup
+        from lca.plugins.assistant.skill.overlay import setup
 
         definition = definition_from_plugin(setup)
         assert definition.ownership is not None
@@ -190,7 +190,7 @@ class TestEPClosureForInstallAndActivate:
     def test_ep_emission_limited_to_two_skill_eps(self) -> None:
         """PR-6 只允许发 ``assistant.skill.installed`` + ``assistant.skill.activated``。"""
         from lca.harness.plugin_api import definition_from_plugin
-        from lca.plugins.assistant.skill.skill_overlay import setup
+        from lca.plugins.assistant.skill.overlay import setup
 
         definition = definition_from_plugin(setup)
         assert definition.ownership is not None

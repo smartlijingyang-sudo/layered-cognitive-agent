@@ -5,7 +5,7 @@ from lca.infrastructure.tools.contract.builtin.builtin import (
     skill_args,
     skill_state,
 )
-from lca.infrastructure.tools.contract.codegen.codegen_ts import render_registry_to_ts
+from lca.infrastructure.tools.contract.codegen.ts import render_registry_to_ts
 from lca.infrastructure.tools.contract.project.project import (
     project_args,
     project_content,
@@ -19,7 +19,7 @@ from lca.infrastructure.tools.contract.render.render import (
     contract,
     get_contract,
 )
-from lca.infrastructure.tools.contract.sandbox.sandbox_contracts import (  # noqa: F401  — registers dynamic tools
+from lca.infrastructure.tools.contract.sandbox.contracts import (  # noqa: F401  — registers dynamic tools
     _ALL as _SANDBOX_ALL,
 )
 from lca.infrastructure.tools.contract.schema.schema import COMMON

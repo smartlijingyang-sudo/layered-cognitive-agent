@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.cognition.memory.temporal.temporal_memory import TemporalMemorySystem
+from lca.cognition.memory.temporal.memory import TemporalMemorySystem
 from lca.contracts.atoms.enums.enums import ContentType, MemoryLayer, ReflectionVerdict
 from lca.contracts.models.core.execution.decision import Observation, Reflection
 from lca.contracts.models.core.conversation.memory import MemoryRecord, MemoryRelationKind, MemoryTrust

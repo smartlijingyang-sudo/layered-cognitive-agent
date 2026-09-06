@@ -13,7 +13,7 @@ from __future__ import annotations
 import pytest
 
 from lca.contracts.observability.infra.close_barrier import CloseReport
-from lca.infrastructure.observability.loop_cursor.close.close_barrier_impl import (
+from lca.infrastructure.observability.loop_cursor.close.barrier_impl import (
     StdCloseBarrier,
 )
 

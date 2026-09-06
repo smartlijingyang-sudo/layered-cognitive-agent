@@ -27,7 +27,7 @@ from lca.contracts.observability.cursor.loop_cursor_payloads import (
 )
 from lca.infrastructure.observability.loop_cursor.bind.bind import SpineWritePortAdapter
 from lca.infrastructure.observability.loop_cursor.std.std import StdLoopCursor
-from lca.infrastructure.observability.spine.event.event_spine import EventSpine
+from lca.infrastructure.observability.spine.event.spine import EventSpine
 from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
 
 

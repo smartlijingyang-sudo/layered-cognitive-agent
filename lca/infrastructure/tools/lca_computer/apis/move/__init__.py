@@ -1,7 +1,5 @@
-"""Public exports for ``move`` (auto-fixed)."""
+"""Public exports for ``move``."""
 
-from lca.infrastructure.tools.lca_computer.apis.move.move_files import (
-    parameters,
-)
+from . import files as move_files
 
-__all__ = ['parameters']
+__all__ = ["move_files"]

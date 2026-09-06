@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from lca.contracts.models.core.state.plane import PlaneRef
 from lca.contracts.protocols import Sandbox
-from lca.infrastructure.computer.op.op_result import ComputerOpResult, TerminalCapableSandbox
-from lca.infrastructure.computer.sandbox.sandbox_computer import SandboxComputer, normalize_sandbox_path
-from lca.infrastructure.file.file_store import FileStore
+from lca.infrastructure.computer.op.result import ComputerOpResult, TerminalCapableSandbox
+from lca.infrastructure.computer.sandbox.computer import SandboxComputer, normalize_sandbox_path
+from lca.infrastructure.file.store import FileStore
 from lca.infrastructure.runtime_plane.resolve.resolve import sandbox_ref_from
 
 __all__ = [

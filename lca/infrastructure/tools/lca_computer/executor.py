@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from lca.infrastructure.computer.op.op_result import ComputerOpResult
+from lca.infrastructure.computer.op.result import ComputerOpResult
 from lca.infrastructure.computer.ops.ops import ComputerOps, SandboxExecOps
 from lca.infrastructure.tools.lca_computer.types import ApiName
 

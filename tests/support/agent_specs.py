@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
 from lca.contracts.protocols import LLMAdapter
 from lca.contracts.protocols.journal.spec.spec import AgentSpec
 

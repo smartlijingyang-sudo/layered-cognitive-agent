@@ -5,9 +5,9 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from lca.cognition.brain.prompt.leaked_tool_call import recover_leaked_tool_calls
-from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import ActionType
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (

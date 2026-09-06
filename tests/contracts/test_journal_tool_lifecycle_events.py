@@ -18,7 +18,7 @@ from lca.contracts.models.observability.journal.journal import (
     ToolLifecycleEnded,
     ToolRetryProgress,
 )
-from lca.contracts.models.observability.journal.journal_catalog import JOURNAL_EVENT_CLASSES
+from lca.contracts.models.observability.journal.catalog import JOURNAL_EVENT_CLASSES
 
 
 def test_tool_lifecycle_ended_is_registered_in_catalog() -> None:

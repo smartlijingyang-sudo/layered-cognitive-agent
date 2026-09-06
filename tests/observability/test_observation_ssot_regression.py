@@ -32,10 +32,10 @@ from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.harness.declarative.execute.outcome_projection import RunOutcomeProjector
 from lca.infrastructure.observability.journal.step.reader import read_step_document
 from lca.infrastructure.observability.spine.context.context import SpineContext
-from lca.infrastructure.observability.spine.derivers.step.step_tree_accumulator import (
+from lca.infrastructure.observability.spine.derivers.step.tree_accumulator import (
     StepTreeAccumulatorDeriver,
 )
-from lca.infrastructure.observability.spine.event.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.record import EventRecord
 
 # ── 1. find_spine_file (ssot.py) ────────────────────────────────────────
 

@@ -6,8 +6,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -55,7 +55,7 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.infrastructure.file.file_store import LocalFileStore
+    from lca.infrastructure.file.store import LocalFileStore
 
     service = ctx.require("file_store")
     if "local" in config.providers and not service.providers.names():

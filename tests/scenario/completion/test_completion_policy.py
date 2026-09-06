@@ -1,0 +1,608 @@
+"""InMemoryMemberStatus + DecisionGate + tracking 单元测试。"""
+
+from __future__ import annotations
+
+from datetime import timedelta
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from lca.cognition.brain.reasoner.critic import SimpleCritic
+from lca.cognition.brain.decision_gates.must.consult_all import (
+    MustConsultAllMembers,
+)
+from lca.cognition.brain.pipeline.modular_brain import ModularBrain
+from lca.cognition.member_status import (
+    InMemoryMemberStatus,
+    compute_required_action,
+    record_delegation_return,
+)
+from lca.cognition.member_status.tracking import _next_role_status
+from lca.contracts.atoms.enums.enums import RoleStatus
+from lca.contracts.atoms.ids.ids import elapsed_seconds, remaining_seconds, utc_now
+from lca.contracts.atoms.semantic.keys import (
+    FAILURE_KIND,
+    FAILURE_KIND_VALIDATION,
+)
+from lca.contracts.models.core.execution.decision import Decision, DelegationSpec, Observation
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.team.consultation.consultation import ConsultationDisposition
+from lca.contracts.models.team.role.status_rules import is_success_status, is_terminal_status
+from lca.contracts.models.team.team.awareness import ConsultDuty, TeamAwareness
+from lca.contracts.protocols import SupportsShortcut
+from lca.contracts.protocols.journal.spec.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
+from lca.plugins.gate.decision_classifier_provider import DefaultDecisionClassifier
+from lca.plugins.loop.reducer.plugin import DefaultReducer
+
+# ── helpers ──
+
+
+def _state(task: str = "test task", **kw) -> AgentState:
+    if "member_status" in kw and "team_awareness" not in kw:
+        board = kw.pop("member_status")
+        if board is not None:
+            kw["team_awareness"] = TeamAwareness(
+                consult_duty=ConsultDuty(
+                    member_status=board, max_attempts=DEFAULT_DELEGATE_MAX_ATTEMPTS
+                )
+            )
+    return AgentState(trace_id="t", task=task, budget=Budget(), **kw)
+
+
+def _duty(state: AgentState) -> ConsultDuty | None:
+    return state.team_awareness.consult_duty if state.team_awareness else None
+
+
+def _decision(action_type: str = "respond", **kw) -> Decision:
+    return Decision(
+        decision_id="d1",
+        action_type=action_type,
+        rationale="test",
+        confidence=0.9,
+        **kw,
+    )
+
+
+def _board(roles: set[str], status: dict[str, str] | None = None) -> InMemoryMemberStatus:
+    return InMemoryMemberStatus(
+        role_order=tuple(roles),
+        status=status or dict.fromkeys(roles, "pending"),
+    )
+
+
+def _obs(success: bool = True, error: str = "", *, failure_kind: str | None = None) -> Observation:
+    extra: dict[str, str] = {}
+    if failure_kind is not None:
+        extra[FAILURE_KIND] = failure_kind
+    return Observation(
+        observation_id="o1",
+        success=success,
+        payload=None if not success else "ok",
+        error=error or None,
+        extra=extra,
+    )
+
+
+# ── InMemoryMemberStatus ──
+
+
+class TestInMemoryMemberStatus:
+    def test_auto_init_pending(self) -> None:
+        board = _board({"a", "b"})
+        assert board.status["a"] == "pending"
+        assert board.status["b"] == "pending"
+
+    def test_all_done_false_when_pending(self) -> None:
+        board = _board({"a", "b"})
+        assert board.all_done() is False
+
+    def test_all_done_true_when_all_done(self) -> None:
+        board = _board({"a", "b"}, {"a": "done", "b": "done"})
+        assert board.all_done() is True
+
+    def test_all_done_partial(self) -> None:
+        board = _board({"a", "b", "c"}, {"a": "done", "b": "done", "c": "pending"})
+        assert board.all_done() is False
+
+    def test_all_terminal_false_when_pending(self) -> None:
+        board = _board({"a", "b"})
+        assert board.all_terminal() is False
+
+    def test_all_terminal_true_when_all_terminal(self) -> None:
+        board = _board({"a", "b"}, {"a": "done", "b": "failed"})
+        assert board.all_terminal() is True
+
+    def test_all_terminal_false_when_in_progress(self) -> None:
+        board = _board({"a", "b"}, {"a": "done", "b": "in_progress"})
+        assert board.all_terminal() is False
+
+    def test_waiting_roles_excludes_terminal(self) -> None:
+        """FAILED roles no longer appear in waiting_roles (Fix A)."""
+        board = _board(
+            {"a", "b", "c"},
+            {"a": "done", "b": "pending", "c": "failed"},
+        )
+        waiting = board.waiting_roles()
+        assert set(waiting) == {"b"}
+
+    def test_waiting_roles_order_deterministic(self) -> None:
+        """Same role_order → same iteration order (Fix D)."""
+        order = ("x", "y", "z")
+        for _ in range(10):
+            board = InMemoryMemberStatus(role_order=order)
+            assert board.waiting_roles() == ["x", "y", "z"]
+
+    def test_mark_returns_new_instance(self) -> None:
+        board = _board({"a", "b"})
+        new_board = board.mark("a", "done")
+        assert new_board is not board
+        assert new_board.status["a"] == "done"
+        assert board.status["a"] == "pending"  # original unchanged
+
+    def test_mark_chain(self) -> None:
+        board = _board({"a", "b"})
+        board = board.mark("a", "done").mark("b", "done")
+        assert board.all_done() is True
+
+    def test_duplicate_role_order_raises(self) -> None:
+        with pytest.raises(ValueError, match="重复"):
+            InMemoryMemberStatus(role_order=("a", "a"))
+
+
+# ── as_prompt_text ──
+
+
+class TestMemberStatusPromptText:
+    def test_waiting_roles_text(self) -> None:
+        board = _board({"a", "b"}, {"a": "done", "b": "pending"})
+        text = board.as_prompt_text()
+        assert "b" in text
+
+    def test_all_done_text(self) -> None:
+        board = _board({"a"}, {"a": "done"})
+        text = board.as_prompt_text()
+        assert "完毕" in text
+
+    def test_failed_roles_disclosed(self) -> None:
+        """Fix 5: honest disclosure of permanently failed roles."""
+        board = _board({"a", "b"}, {"a": "done", "b": "failed"})
+        text = board.as_prompt_text()
+        assert "b" in text
+        assert "不可用" in text
+
+    def test_reasoner_uses_as_prompt_text_not_state_field(self) -> None:
+        """Prompt text is derived; AgentState has no cached progress field."""
+        state = _state()
+        assert not hasattr(state, "team_progress_text")
+        assert not hasattr(state, "MEMBER_STATUS_PROMPT_REMOVED")
+
+
+# ── MustConsultAllMembers ──
+
+
+class TestMustConsultAllMembers:
+    @pytest.mark.asyncio
+    async def test_respond_blocked_when_not_terminal(self) -> None:
+        board = _board({"analyst", "reviewer"})
+        state = _state(member_status=board)
+        policy = MustConsultAllMembers()
+
+        decision = _decision("respond")
+        result = await policy.enforce(state, decision)
+
+        assert result.action_type == "delegate"
+        assert result.delegations
+        assert result.delegations[0].target_role in {"analyst", "reviewer"}
+        assert "[框架强制]" in result.rationale
+        assert result.confidence == 1.0
+
+    @pytest.mark.asyncio
+    async def test_respond_allowed_when_terminal_with_failures(self) -> None:
+        """Degradation by design: may respond when all terminal even if some failed."""
+        board = _board({"a", "b"}, {"a": "done", "b": "failed"})
+        state = _state(member_status=board)
+        policy = MustConsultAllMembers()
+
+        decision = _decision("respond")
+        result = await policy.enforce(state, decision)
+
+        assert result.action_type == "respond"
+
+    @pytest.mark.asyncio
+    async def test_respond_allowed_when_all_done(self) -> None:
+        board = _board({"a"}, {"a": "done"})
+        state = _state(member_status=board)
+        policy = MustConsultAllMembers()
+
+        decision = _decision("respond")
+        result = await policy.enforce(state, decision)
+
+        assert result.action_type == "respond"
+
+    @pytest.mark.asyncio
+    async def test_delegate_to_waiting_role_passes_through(self) -> None:
+        board = _board({"a", "b"})
+        state = _state(member_status=board)
+        policy = MustConsultAllMembers()
+
+        decision = _decision(
+            "delegate",
+            delegations=[DelegationSpec(target_role="a", subtask="do stuff")],
+        )
+        result = await policy.enforce(state, decision)
+
+        assert result.action_type == "delegate"
+        assert result.delegations[0].target_role == "a"
+
+    @pytest.mark.asyncio
+    async def test_delegate_to_terminal_role_redirected(self) -> None:
+        """Fix C: gate intercepts DELEGATE to already-terminal role."""
+        board = _board({"a", "b"}, {"a": "done", "b": "pending"})
+        state = _state(member_status=board)
+        policy = MustConsultAllMembers()
+
+        decision = _decision(
+            "delegate",
+            delegations=[DelegationSpec(target_role="a", subtask="re-do")],
+        )
+        result = await policy.enforce(state, decision)
+
+        assert result.action_type == "delegate"
+        assert result.delegations[0].target_role == "b"
+
+    @pytest.mark.asyncio
+    async def test_delegate_to_failed_role_redirected(self) -> None:
+        """FAILED role is terminal; gate redirects to remaining waiting role."""
+        board = _board({"a", "b", "c"}, {"a": "done", "b": "failed", "c": "pending"})
+        state = _state(member_status=board)
+        policy = MustConsultAllMembers()
+
+        decision = _decision(
+            "delegate",
+            delegations=[DelegationSpec(target_role="b", subtask="retry")],
+        )
+        result = await policy.enforce(state, decision)
+
+        assert result.action_type == "delegate"
+        assert result.delegations[0].target_role == "c"
+
+    @pytest.mark.asyncio
+    async def test_delegate_when_all_terminal_rewritten_to_respond(self) -> None:
+        """All terminal → gate rewrites DELEGATE to RESPOND."""
+        board = _board({"a", "b"}, {"a": "done", "b": "failed"})
+        state = _state(member_status=board)
+        policy = MustConsultAllMembers()
+
+        decision = _decision(
+            "delegate",
+            delegations=[DelegationSpec(target_role="a", subtask="redo")],
+        )
+        result = await policy.enforce(state, decision)
+
+        assert result.action_type == "respond"
+
+    @pytest.mark.asyncio
+    async def test_no_board_passes_through(self) -> None:
+        state = _state()  # member_status=None
+        policy = MustConsultAllMembers()
+
+        decision = _decision("respond")
+        result = await policy.enforce(state, decision)
+
+        assert result.action_type == "respond"
+
+    @pytest.mark.asyncio
+    async def test_handoff_passes_through(self) -> None:
+        """HANDOFF is out-of-scope; gate does not intercept."""
+        board = _board({"a", "b"})
+        state = _state(member_status=board)
+        policy = MustConsultAllMembers()
+
+        decision = _decision(
+            "handoff",
+            delegations=[DelegationSpec(target_role="a", subtask="handoff")],
+        )
+        result = await policy.enforce(state, decision)
+
+        assert result.action_type == "handoff"
+
+    @pytest.mark.asyncio
+    async def test_subtask_includes_role_and_task(self) -> None:
+        board = _board({"analyst"})
+        state = _state(task="launch product", member_status=board)
+        policy = MustConsultAllMembers()
+
+        result = await policy.enforce(state, _decision("respond"))
+
+        assert result.delegations
+        assert "analyst" in result.delegations[0].subtask
+        assert "launch product" in result.delegations[0].subtask
+
+
+# ── MustConsultAllMembers.try_shortcut ──
+
+
+class TestMustConsultAllMembersTryShortcut:
+    @pytest.mark.asyncio
+    async def test_short_circuits_when_exactly_one_waiting(self) -> None:
+        board = _board({"analyst"})
+        state = _state(member_status=board)
+        result = await MustConsultAllMembers().try_shortcut(state)
+
+        assert result is not None
+        assert result.action_type == "delegate"
+        assert result.delegations
+        assert result.delegations[0].target_role == "analyst"
+        assert "[框架短路]" in result.rationale
+
+    @pytest.mark.asyncio
+    async def test_fans_out_when_multiple_waiting(self) -> None:
+        """Multi-waiting shortcut fans out all waiting roles in parallel."""
+
+        state = _state(member_status=_board({"analyst", "reviewer"}))
+        result = await MustConsultAllMembers().try_shortcut(state)
+        assert result is not None
+        assert result.action_type == "delegate"
+        roles = {s.target_role for s in list(result.delegations)}
+        assert roles == {"analyst", "reviewer"}
+
+    @pytest.mark.asyncio
+    async def test_defers_when_all_terminal(self) -> None:
+        """may_respond 仍需要 LLM 生成 response_text，try_shortcut 不代劳。"""
+        state = _state(member_status=_board({"a"}, {"a": "done"}))
+        assert await MustConsultAllMembers().try_shortcut(state) is None
+
+    @pytest.mark.asyncio
+    async def test_defers_when_no_board(self) -> None:
+        state = _state()  # member_status=None
+        assert await MustConsultAllMembers().try_shortcut(state) is None
+
+
+def test_gate_without_shortcut_is_not_supports_shortcut() -> None:
+    """结构化实现 DecisionGate 但没有 try_shortcut 的 gate 不会被误判为支持快速路径。"""
+
+    class _EnforceOnlyGate:
+        async def enforce(self, state: AgentState, decision: Decision) -> Decision:
+            return decision
+
+    assert not isinstance(_EnforceOnlyGate(), SupportsShortcut)
+
+
+class TestModularBrainTryShortcutShortCircuit:
+    @pytest.mark.asyncio
+    async def test_think_skips_reasoner_when_try_shortcut_fires(self) -> None:
+        reasoner = MagicMock()
+        reasoner.generate_thoughts = AsyncMock(
+            side_effect=AssertionError("must not be called"),
+        )
+        brain = ModularBrain(
+            reasoner=reasoner,
+            reducer=DefaultReducer(),
+            classifier=DefaultDecisionClassifier(),
+            critic=SimpleCritic(),
+            decision_gate=MustConsultAllMembers(),
+        )
+
+        state = _state(member_status=_board({"analyst"}))
+        decision = await brain.think(state)
+
+        assert decision.action_type == "delegate"
+        reasoner.generate_thoughts.assert_not_called()
+
+
+# ── record_delegation_return + retry ──
+
+
+class TestRecordDelegationReturn:
+    @pytest.mark.asyncio
+    async def test_marks_done_on_success(self) -> None:
+        board = _board({"analyst"})
+        state = _state(member_status=board)
+
+        decision = _decision(
+            "delegate",
+            delegations=[DelegationSpec(target_role="analyst", subtask="analyze")],
+        )
+        obs = _obs(success=True)
+
+        record_delegation_return(state, decision.delegations[0], obs)
+
+        assert _duty(state) is not None
+        assert _duty(state).member_status.status["analyst"] == "done"
+
+    @pytest.mark.asyncio
+    async def test_marks_pending_on_first_execution_failure(self) -> None:
+        """First execution failure stays PENDING (retry, not terminal)."""
+        board = _board({"analyst"})
+        state = _state(member_status=board)
+
+        decision = _decision(
+            "delegate",
+            delegations=[DelegationSpec(target_role="analyst", subtask="analyze")],
+        )
+        obs = _obs(success=False, error="boom")
+
+        record_delegation_return(state, decision.delegations[0], obs)
+
+        assert _duty(state) is not None
+        assert _duty(state).member_status.status["analyst"] == "pending"
+        assert _duty(state).attempts["analyst"] == 1
+
+    @pytest.mark.asyncio
+    async def test_marks_failed_after_max_attempts(self) -> None:
+        """Exceeding max_attempts → FAILED (terminal)."""
+        board = _board({"analyst"})
+        state = _state(member_status=board)
+        assert _duty(state) is not None
+        _duty(state).max_attempts = 2
+
+        decision = _decision(
+            "delegate",
+            delegations=[DelegationSpec(target_role="analyst", subtask="analyze")],
+        )
+        obs = _obs(success=False, error="boom")
+
+        record_delegation_return(state, decision.delegations[0], obs)  # attempt 1 → pending
+        assert _duty(state).member_status.status["analyst"] == "pending"
+
+        record_delegation_return(state, decision.delegations[0], obs)  # attempt 2 → failed
+        assert _duty(state).member_status.status["analyst"] == "failed"
+        assert _duty(state).attempts["analyst"] == 2
+        assert _duty(state).member_status.all_terminal() is True
+
+    @pytest.mark.asyncio
+    async def test_validation_failure_immediately_failed(self) -> None:
+        """Validation-type failure → immediate FAILED (no retry)."""
+        board = _board({"analyst"})
+        state = _state(member_status=board)
+
+        decision = _decision(
+            "delegate",
+            delegations=[DelegationSpec(target_role="analyst", subtask="analyze")],
+        )
+        obs = _obs(success=False, error="not found", failure_kind=FAILURE_KIND_VALIDATION)
+
+        record_delegation_return(state, decision.delegations[0], obs)
+
+        assert _duty(state).member_status.status["analyst"] == "failed"
+        assert _duty(state).member_status.all_terminal() is True
+        assert _duty(state).attempts["analyst"] == 1
+
+    @pytest.mark.asyncio
+    async def test_noop_without_team_awareness(self) -> None:
+        state = _state()  # no team awareness at all
+        spec = DelegationSpec(target_role="analyst", subtask="analyze")
+        record_delegation_return(state, spec, _obs(success=True))
+
+    @pytest.mark.asyncio
+    async def test_noop_for_non_required_role(self) -> None:
+        board = _board({"analyst"})
+        state = _state(member_status=board)
+        spec = DelegationSpec(target_role="someone_else", subtask="chore")
+        record_delegation_return(state, spec, _obs(success=True))
+        assert _duty(state).member_status.status["analyst"] == "pending"
+
+
+# ── _next_role_status pure function ──
+
+
+class TestNextRoleStatus:
+    """Table-driven exhaustive test for the retry classification pure function."""
+
+    @pytest.mark.parametrize(
+        "disposition,usable,attempts_after,max_attempts,expected",
+        [
+            # completed + usable → DONE
+            (ConsultationDisposition.COMPLETED, True, 0, 3, "done"),
+            (ConsultationDisposition.COMPLETED, True, 2, 3, "done"),
+            # partial + usable → DONE_PARTIAL
+            (ConsultationDisposition.PARTIAL, True, 0, 3, "done_partial"),
+            # validation → FAILED immediately
+            (ConsultationDisposition.VALIDATION_FAILED, False, 0, 3, "failed"),
+            (ConsultationDisposition.VALIDATION_FAILED, False, 2, 3, "failed"),
+            # error/timeout → PENDING until max, then FAILED
+            (ConsultationDisposition.ERROR, False, 1, 3, "pending"),
+            (ConsultationDisposition.ERROR, False, 2, 3, "pending"),
+            (ConsultationDisposition.ERROR, False, 3, 3, "failed"),
+            (ConsultationDisposition.TIMEOUT, False, 1, 3, "pending"),
+            (ConsultationDisposition.TIMEOUT, False, 3, 3, "failed"),
+            # max_attempts = 1 → first failure is terminal
+            (ConsultationDisposition.ERROR, False, 1, 1, "failed"),
+            (ConsultationDisposition.TIMEOUT, False, 1, 1, "failed"),
+            # completed but not usable → retry path
+            (ConsultationDisposition.COMPLETED, False, 1, 3, "pending"),
+            (ConsultationDisposition.COMPLETED, False, 3, 3, "failed"),
+        ],
+    )
+    def test_classification(
+        self,
+        disposition: ConsultationDisposition,
+        usable: bool,
+        attempts_after: int,
+        max_attempts: int,
+        expected: str,
+    ) -> None:
+        result = _next_role_status(
+            disposition=disposition,
+            usable=usable,
+            attempts_after=attempts_after,
+            max_attempts=max_attempts,
+        )
+        assert result == RoleStatus(expected)
+
+
+# ── role_status_rules ──
+
+
+class TestRoleStatusRules:
+    @pytest.mark.parametrize(
+        "status,terminal,success",
+        [
+            (RoleStatus.PENDING, False, False),
+            (RoleStatus.IN_PROGRESS, False, False),
+            (RoleStatus.DONE, True, True),
+            (RoleStatus.FAILED, True, False),
+        ],
+    )
+    def test_classification(self, status: RoleStatus, terminal: bool, success: bool) -> None:
+        assert is_terminal_status(status) is terminal
+        assert is_success_status(status) is success
+
+
+# ── compute_required_action ──
+
+
+class TestComputeRequiredAction:
+    def test_must_delegate_when_waiting(self) -> None:
+        board = InMemoryMemberStatus(role_order=("a", "b"), status={"a": "pending", "b": "pending"})
+        action = compute_required_action(board)
+        assert action.kind == "must_delegate"
+        assert action.target_role == "a"  # first in role_order
+
+    def test_must_delegate_when_partial(self) -> None:
+        board = _board({"a", "b"}, {"a": "done", "b": "pending"})
+        action = compute_required_action(board)
+        assert action.kind == "must_delegate"
+        assert action.target_role == "b"
+
+    def test_may_respond_when_all_done(self) -> None:
+        board = _board({"a", "b"}, {"a": "done", "b": "done"})
+        action = compute_required_action(board)
+        assert action.kind == "may_respond"
+        assert action.target_role is None
+
+    def test_may_respond_when_all_terminal_with_failures(self) -> None:
+        board = _board({"a", "b"}, {"a": "done", "b": "failed"})
+        action = compute_required_action(board)
+        assert action.kind == "may_respond"
+        assert action.target_role is None
+
+
+# ── remaining_seconds / elapsed_seconds ──
+
+
+class TestTimeUtilities:
+    def test_remaining_seconds_future(self) -> None:
+        now = utc_now()
+        deadline = now + timedelta(seconds=30)
+        assert abs(remaining_seconds(deadline, now=now) - 30.0) < 0.01
+
+    def test_remaining_seconds_past(self) -> None:
+        now = utc_now()
+        deadline = now - timedelta(seconds=10)
+        result = remaining_seconds(deadline, now=now)
+        assert result < 0  # negative = already expired
+
+    def test_remaining_seconds_zero(self) -> None:
+        now = utc_now()
+        assert abs(remaining_seconds(now, now=now)) < 0.001
+
+    def test_elapsed_seconds(self) -> None:
+        now = utc_now()
+        started = now - timedelta(seconds=60)
+        assert abs(elapsed_seconds(started, now=now) - 60.0) < 0.01
+
+    def test_remaining_seconds_uses_utc_now_by_default(self) -> None:
+        deadline = utc_now() + timedelta(seconds=5)
+        result = remaining_seconds(deadline)
+        assert 0 < result < 10  # roughly 5 seconds, with some tolerance

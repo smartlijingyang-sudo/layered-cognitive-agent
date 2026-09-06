@@ -12,7 +12,7 @@ import pytest
 
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.policy.stop import StopDecision, StopReason
-from lca.contracts.protocols.act.command.command_envelope import RunDelta
+from lca.contracts.protocols.act.command.envelope import RunDelta
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     DeclarativeRunOutcome,
     ExecutionOutcome,

@@ -29,7 +29,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from lca.contracts.mechanisms.content.content_addressable import ContentAddressableStore
+from lca.contracts.mechanisms.content.addressable import ContentAddressableStore
 from lca.contracts.observability.evidence.evidence import (
     Classification,
     EvidenceIntegrityError,

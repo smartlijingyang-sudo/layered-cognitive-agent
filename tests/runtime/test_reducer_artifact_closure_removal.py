@@ -63,7 +63,7 @@ def test_artifact_closure_delta_handler_class_deleted() -> None:
     """ArtifactClosureDeltaHandler 类删除(走 transport 投影通道)。"""
 
     try:
-        from lca.plugins.act.delta.delta_handlers_provider import (
+        from lca.plugins.act.delta.handlers_provider import (
             ArtifactClosureDeltaHandler,  # type: ignore[attr-defined]
         )
 

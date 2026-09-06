@@ -1,7 +1,5 @@
-"""Public exports for ``get`` (auto-fixed)."""
+"""Public exports for ``get``."""
 
-from lca.infrastructure.tools.lca_computer.apis.get.get_command_output import (
-    parameters,
-)
+from . import command_output as get_command_output
 
-__all__ = ['parameters']
+__all__ = ["get_command_output"]

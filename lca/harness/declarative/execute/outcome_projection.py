@@ -10,7 +10,7 @@ from lca.contracts.models.core.execution.result import ApprovalPendingError
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.core.policy.stop import StopDecision, StopReason
 from lca.contracts.observability import exc_to_record
-from lca.contracts.protocols.act.command.command_envelope import RunFact
+from lca.contracts.protocols.act.command.envelope import RunFact
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
     DeclarativeValidationError,
     SemanticPhase,
@@ -346,7 +346,7 @@ class RunOutcomeProjector:
         兜住,所以运行时行为不变。
         """
         try:
-            from lca.infrastructure.observability.spine.exception.exception_emit import (
+            from lca.infrastructure.observability.spine.exception.emit import (
                 emit_exception_caught,
             )
         except Exception:  # pragma: no cover — 观测面拆装失败兜底

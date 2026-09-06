@@ -12,8 +12,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -33,7 +33,7 @@ class Config(BaseModel):
 
 def _make_projection_host(initial: list[Any] | None = None, **_: Any) -> Any:
     """Build a :class:`StdProjectionHost` with the profile-supplied initial deriver list."""
-    from lca.infrastructure.observability.loop_cursor.projection.projection_host import StdProjectionHost
+    from lca.infrastructure.observability.loop_cursor.projection.host import StdProjectionHost
 
     return StdProjectionHost(initial=initial)
 

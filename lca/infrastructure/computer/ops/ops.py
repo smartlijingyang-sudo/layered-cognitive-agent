@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from lca.contracts.models.core.state.plane import PlaneRef
-from lca.infrastructure.computer.op.op_result import ComputerOpResult
+from lca.infrastructure.computer.op.result import ComputerOpResult
 
 
 class ComputerOps(Protocol):

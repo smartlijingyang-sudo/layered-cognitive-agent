@@ -7,7 +7,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from lca.contracts.atoms.artifact.artifact_state import LEGAL_TRANSITIONS, ArtifactState, is_legal_transition
+from lca.contracts.atoms.artifact.state import LEGAL_TRANSITIONS, ArtifactState, is_legal_transition
 from lca.contracts.atoms.scope.scope import Scope, parse_scope
 
 

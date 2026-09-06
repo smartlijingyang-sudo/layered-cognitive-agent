@@ -71,7 +71,7 @@ def set_session(session: object | None) -> None:
     if session is None:
         _current_session = None
         return
-    from lca.plugins.session.runtime.bus.bus_facade import as_bus_facade
+    from lca.plugins.session.runtime.bus.facade import as_bus_facade
 
     bound = as_bus_facade(session)
     if not isinstance(bound, SessionObserverTarget):

@@ -8,14 +8,14 @@ from typing import Any
 from lca.cognition.body.actions.action_handlers import record_decision_made
 from lca.cognition.body.executor.cursor_record import CursorRecord
 from lca.contracts.atoms.enums.enums import ActionType
-from lca.contracts.atoms.semantic.semantic_keys import OBS_DEGRADED_FROM
+from lca.contracts.atoms.semantic.keys import OBS_DEGRADED_FROM
 from lca.contracts.models.core.execution.decision import Decision, Observation
 from lca.contracts.models.core.execution.result import UnregisteredActionError
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.observability.cursor.loop_cursor import PhaseName
 from lca.contracts.protocols import Body, SafeExecutor, ToolRegistry, TransportRegistryProtocol
 from lca.contracts.protocols.act.action.action import ActionRegistryProtocol
-from lca.infrastructure.component.component_registry import RegistryKeyError
+from lca.infrastructure.component.registry import RegistryKeyError
 
 # Body 是 phase=act 执行平面;advance(phase) 是把 cursor 推到对应窗口的 SSOT。
 # ADR-0169 §D1 + PR-26 task-25:phase 推进责任钉死在 SimpleBody,

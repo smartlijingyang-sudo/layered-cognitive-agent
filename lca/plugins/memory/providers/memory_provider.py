@@ -6,8 +6,8 @@ from functools import partial
 
 from pydantic import BaseModel, Field
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import (
     MEMORY_COMPACTION_POLICY,
@@ -71,7 +71,7 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Register memory factories through the active profile's governance policies."""
-    from lca.cognition.memory.simple.simple_memory import SimpleMemorySystem
+    from lca.cognition.memory.simple.memory import SimpleMemorySystem
 
     write_policy = ctx.require(MEMORY_WRITE_POLICY.key)
     compaction_policy = ctx.require(MEMORY_COMPACTION_POLICY.key)
@@ -93,7 +93,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     if "simple" in config.providers:
         service.register("simple", build_simple_memory)
     if "temporal" in config.providers:
-        from lca.cognition.memory.temporal.temporal_memory import TemporalMemorySystem
+        from lca.cognition.memory.temporal.memory import TemporalMemorySystem
 
         service.register(
             "temporal",

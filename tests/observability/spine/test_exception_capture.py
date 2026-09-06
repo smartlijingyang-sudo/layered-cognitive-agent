@@ -27,9 +27,9 @@ from lca.contracts.observability import (
     ExceptionRecord,
     exc_to_record,
 )
-from lca.infrastructure.observability.spine.event.event_record import EventRecord
-from lca.infrastructure.observability.spine.event.event_spine import EventSpine
-from lca.infrastructure.observability.spine.exception.exception_emit import (
+from lca.infrastructure.observability.spine.event.record import EventRecord
+from lca.infrastructure.observability.spine.event.spine import EventSpine
+from lca.infrastructure.observability.spine.exception.emit import (
     emit_exception_caught,
 )
 from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
@@ -202,7 +202,7 @@ def test_emit_exception_caught_has_single_definition() -> None:
 
 def test_emit_exception_caught_writes_sidecar_for_any_exception(tmp_path: Path) -> None:
     """任何异常事件 payload size > 4 KiB → FileSink 自动 offload → sidecar 必有。"""
-    from lca.harness.declarative.compile.instrument.instrument_wrap import (
+    from lca.harness.declarative.compile.instrument.wrap import (
         set_active_spine_accessor,
     )
 
@@ -276,7 +276,7 @@ def test_emit_exception_caught_small_message_still_offloads_due_to_call_frames(
     tmp_path: Path,
 ) -> None:
     """即使 exception_message 短,call_frames + traceback_text 也让 payload 超 4 KiB。"""
-    from lca.harness.declarative.compile.instrument.instrument_wrap import (
+    from lca.harness.declarative.compile.instrument.wrap import (
         set_active_spine_accessor,
     )
 
@@ -309,7 +309,7 @@ def test_emit_exception_caught_small_message_still_offloads_due_to_call_frames(
 
 def test_instrument_wrap_exception_payload_uses_ssot() -> None:
     """装饰器 ``_exception_payload`` 必须返回 ``exc_to_record(...).asdict()``。"""
-    from lca.harness.declarative.compile.instrument.instrument_wrap import _exception_payload
+    from lca.harness.declarative.compile.instrument.wrap import _exception_payload
 
     try:
         raise KeyError("wrap path")
@@ -444,7 +444,7 @@ def test_lifecycle_path_emit_includes_err_kind(tmp_path: Path) -> None:
     err_kind 仍以 JSON 行(主 ledger 或 offload)记录。本测试用 call_stack
     触发一个 frame 充足的 ValueError,这样 file_sink 必然 offload 到 sidecar。
     """
-    from lca.harness.declarative.compile.instrument.instrument_wrap import (
+    from lca.harness.declarative.compile.instrument.wrap import (
         set_active_spine_accessor,
     )
 

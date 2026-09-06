@@ -13,7 +13,7 @@ from typing import Any
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.observability.registry.status import RunLifecycleStatus
 from lca.plugins.transport.webserver.carrier.runs.execute.loop_drivers import DriverOutcome
-from lca.plugins.transport.webserver.read.runs.error.error_presentation import (
+from lca.plugins.transport.webserver.read.runs.error.presentation import (
     format_user_error,
 )
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession

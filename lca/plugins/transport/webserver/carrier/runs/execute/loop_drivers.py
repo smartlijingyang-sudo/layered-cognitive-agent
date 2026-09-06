@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 from lca.application.api.api import Agent
 from lca.contracts.mechanisms.capability.capability import require_capability
 from lca.contracts.models.core.state.lifecycle import TaskStatus
-from lca.contracts.models.team.run.run_context import RunContext
+from lca.contracts.models.team.run.context import RunContext
 from lca.infrastructure.observability import BoundObservability
 from lca.plugins.loop.driver.plugin import (
     RunLoopDriverRegistry as RunLoopDriverRegistry,

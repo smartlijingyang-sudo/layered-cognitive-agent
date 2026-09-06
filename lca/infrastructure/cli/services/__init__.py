@@ -12,7 +12,7 @@ from lca.infrastructure.cli.config.config import OpsConfig
 from lca.infrastructure.cli.registry.registry import ServiceRegistry
 from lca.infrastructure.cli.services.daemon.daemon import DaemonService
 from lca.infrastructure.cli.services.infra.infra import InfraService
-from lca.infrastructure.cli.services.kernel.kernel_serve import KernelServeService
+from lca.infrastructure.cli.services.kernel.serve import KernelServeService
 from lca.infrastructure.cli.services.lobehub.lobehub import LobeHubService
 from lca.infrastructure.cli.services.onlyboxes.onlyboxes import OnlyboxesService
 from lca.infrastructure.cli.sudo.sudo import Sudo

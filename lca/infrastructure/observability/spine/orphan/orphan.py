@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import dataclasses
 
-from lca.infrastructure.observability.spine.event.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.record import EventRecord
 
 # Close enum (ADR-0165.1 §19, design §4.3). Extend via ADR only.
 CANCEL_PRE_BOOT: str = "cancel_pre_boot"

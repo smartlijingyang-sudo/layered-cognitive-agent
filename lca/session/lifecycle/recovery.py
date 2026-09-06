@@ -11,7 +11,7 @@ from lca.contracts.harness.collaboration.agent import (
     LiveAgentStatus,
 )
 from lca.contracts.harness.tasks.session import SessionEvent
-from lca.plugins.session.runtime.resume.resume_point import deserialize_resume_point
+from lca.plugins.session.runtime.resume.point import deserialize_resume_point
 
 
 class SessionRecoveryError(ValueError):

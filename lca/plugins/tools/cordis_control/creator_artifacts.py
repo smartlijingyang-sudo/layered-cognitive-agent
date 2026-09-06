@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from lca.contracts.atoms.artifact.artifact_state import ArtifactState
+from lca.contracts.atoms.artifact.state import ArtifactState
 from lca.contracts.harness.journal.artifact import CapabilityArtifact
 
 

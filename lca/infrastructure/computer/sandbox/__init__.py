@@ -1,6 +1,6 @@
 """Public exports for ``sandbox`` (auto-fixed)."""
 
-from lca.infrastructure.computer.sandbox.sandbox_computer import (
+from lca.infrastructure.computer.sandbox.computer import (
     normalize_sandbox_path,
     SandboxComputer,
     SandboxComputer,

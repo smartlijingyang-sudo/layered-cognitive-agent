@@ -12,6 +12,44 @@ ROOT = Path(__file__).resolve().parents[2]
 PLUGINS = ROOT / "lca" / "plugins"
 BUNDLES = ROOT / "bundles"
 BUNDLE = BUNDLES / "declarative-phase-graph.yaml"
+WEB_APP_BUNDLE = BUNDLES / "web-app.yaml"
+SESSION_RUNTIME_BUNDLE = BUNDLES / "session-runtime.yaml"
+
+_STANDARD_PHASES = ("perceive", "think", "act", "reflect", "remember", "stop")
+_DECLARATIVE_BUNDLE_PATHS = (
+    BUNDLE,
+    BUNDLES / "declarative-recovery.yaml",
+)
+
+# COMPAT(owner: ADR-0194, delete-when: declarative bundles have zero phase_graph $module).
+# Use nested module paths (e.g. phase_graph.stop.policy), not flat (phase_graph.stop_policy).
+_ALLOWED_DECLARATIVE_PHASE_GRAPH_MODULES: frozenset[str] = frozenset()
+
+# rg-equivalent baseline; decrease intentionally → lower constant + note in PR.
+_WEB_APP_PHASE_GRAPH_MODULE_BASELINE = 1
+
+
+def _extract_module_path(line: str) -> str | None:
+    stripped = line.strip()
+    if not stripped or stripped.startswith("#"):
+        return None
+    if "$module:" not in stripped:
+        return None
+    _, _, value = stripped.partition("$module:")
+    return value.strip()
+
+
+def _phase_graph_module_lines(bundle_path: Path) -> list[tuple[int, str]]:
+    hits: list[tuple[int, str]] = []
+    for lineno, line in enumerate(bundle_path.read_text(encoding="utf-8").splitlines(), start=1):
+        module = _extract_module_path(line)
+        if module is not None and "phase_graph" in module:
+            hits.append((lineno, module))
+    return hits
+
+
+def _count_phase_graph_module_lines(bundle_path: Path) -> int:
+    return len(_phase_graph_module_lines(bundle_path))
 
 
 class TestADR0194Acceptance:
@@ -30,11 +68,46 @@ class TestADR0194Acceptance:
             assert "@plugin(" in source
             assert "PhaseExecutor" in source or "execute" in source
 
-    def test_bundle_points_at_loop_phase_not_phase_graph(self) -> None:
+    def test_no_flat_phase_graph_in_declarative_bundle(self) -> None:
+        """Six standard executors must bind loop.phase.*, not legacy phase_graph paths."""
         text = BUNDLE.read_text(encoding="utf-8")
-        for phase in ("perceive", "think", "act", "reflect", "remember", "stop"):
+        for phase in _STANDARD_PHASES:
             assert f"lca.plugins.loop.phase.{phase}.standard.plugin" in text
             assert f"lca.plugins.phase_graph.{phase}" not in text
+            assert f"lca.plugins.phase_graph.standard.{phase}" not in text
+
+    def test_declarative_bundle_no_legacy_phase_graph_modules(self) -> None:
+        """declarative-phase-graph + declarative-recovery: zero phase_graph $module (or COMPAT allowlist)."""
+        offenders: list[str] = []
+        for bundle_path in _DECLARATIVE_BUNDLE_PATHS:
+            rel = bundle_path.relative_to(ROOT).as_posix()
+            for lineno, module in _phase_graph_module_lines(bundle_path):
+                if module in _ALLOWED_DECLARATIVE_PHASE_GRAPH_MODULES:
+                    continue
+                offenders.append(f"{rel}:{lineno}: {module}")
+        assert not offenders, (
+            "declarative bundles must not load legacy phase_graph modules:\n"
+            + "\n".join(offenders)
+            + "\nIf migration-compat, add nested path to _ALLOWED_DECLARATIVE_PHASE_GRAPH_MODULES."
+        )
+
+    def test_web_app_phase_graph_module_count_does_not_increase(self) -> None:
+        """web-app.yaml phase_graph $module debt must not grow during loop seam migration."""
+        current = _count_phase_graph_module_lines(WEB_APP_BUNDLE)
+        assert current <= _WEB_APP_PHASE_GRAPH_MODULE_BASELINE, (
+            f"web-app.yaml phase_graph $module count increased: {current} > "
+            f"baseline {_WEB_APP_PHASE_GRAPH_MODULE_BASELINE}. "
+            "Migrate to loop seam nested paths; if count dropped, lower the baseline."
+        )
+
+    def test_web_app_phase_graph_module_baseline_is_current(self) -> None:
+        """Prevent baseline drift without intentional migration progress."""
+        current = _count_phase_graph_module_lines(WEB_APP_BUNDLE)
+        assert current == _WEB_APP_PHASE_GRAPH_MODULE_BASELINE, (
+            f"web-app.yaml phase_graph $module count is {current}; "
+            f"update _WEB_APP_PHASE_GRAPH_MODULE_BASELINE from "
+            f"{_WEB_APP_PHASE_GRAPH_MODULE_BASELINE} when migration reduces debt."
+        )
 
     def test_control_slots_in_loop_seam(self) -> None:
         text = BUNDLE.read_text(encoding="utf-8")
@@ -113,3 +186,15 @@ class TestADR0195Acceptance:
     def test_domain_assistant_catalog_loadable(self) -> None:
         mod = importlib.import_module("lca.plugins.domain.assistant.catalog.plugin")
         assert hasattr(mod, "setup")
+
+    def test_session_runtime_bundle_modules_loadable(self) -> None:
+        """P5-02: session-runtime.yaml $module paths import and expose setup."""
+        modules: list[str] = []
+        for line in SESSION_RUNTIME_BUNDLE.read_text(encoding="utf-8").splitlines():
+            module = _extract_module_path(line)
+            if module is not None and module.startswith("lca.plugins.session."):
+                modules.append(module)
+        assert len(modules) >= 11, f"expected session bundle entries, got {modules!r}"
+        for module_path in modules:
+            mod = importlib.import_module(module_path)
+            assert hasattr(mod, "setup"), f"{module_path} missing setup"

@@ -1,6 +1,6 @@
 """Public exports for ``tool`` (auto-fixed)."""
 
-from lca.infrastructure.llm_adapter.tool.tool_arguments import (
+from lca.infrastructure.llm_adapter.tool.arguments import (
     ToolArgumentsOk,
     ToolArgumentsIncomplete,
     ToolArgumentsInvalid,

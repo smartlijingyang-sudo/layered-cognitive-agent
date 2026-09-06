@@ -15,7 +15,7 @@ from lca.contracts.capabilities import (
     RUNTIME_LIFECYCLE_SUBSCRIBER_REGISTRY,
 )
 from lca.contracts.models.core.state.lifecycle import TaskStatus
-from lca.contracts.protocols.runtime.runtime.runtime_lifecycle import (
+from lca.contracts.protocols.runtime.runtime.lifecycle import (
     RuntimeBudgetSnapshot,
     RuntimeLifecycleEvent,
     RuntimeLifecycleEventType,

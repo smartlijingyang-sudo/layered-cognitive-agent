@@ -1,5 +1,7 @@
 # Architecture Overview — ADR-0065 三平面
 
+> **Loop 热路径写入（现行）**：见 [ADR-0195 §2.3](../adr/0195-platform-architecture-convergence.md) 四段链 — Producer → `FactGateway` → `Session.append` → `*.spine.jsonl` → Deriver → Exporter。细节导读：[platform-readme.md](platform-readme.md)。下文 ADR-0065 RunLedger 段落保留作证据平面历史；**loop / tool / LLM 事实不再走 `journal.write` 热路径**（ADR-0194 G1 / ADR-0195 O6，已退役）。
+
 ## 全景图
 
 ```
@@ -23,7 +25,38 @@
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## 写入路径(L1-L4)
+## 写入路径
+
+### Loop / tool / LLM 事实（现行 — ADR-0194/0195 四段链）
+
+```text
+Producer (Loop driver / PhaseExecutor / LLM adapter / Boot)
+  → FactGateway.append / publish_ep          (lca/loop/fact_gateway.py, G0)
+    → Session.append                         (in-process SSOT, lca/session/)
+      → PersistenceObserver                  (write-behind)
+        → <run_id>.spine.jsonl               (durable SSOT)
+          → Deriver plugins (pure fold)      (plugins/observability/deriver/*)
+            → Exporter plugins               (OTel / Langfuse / SSE / Console)
+```
+
+| 段 | owner | 业务路径可见？ |
+|---|---|---|
+| Registry | `lca_kernel/events/config/` | 否（yaml SSOT） |
+| Gateway | `FactGateway` | 否（Loop 机制层门面） |
+| Session | `Session.append` | 否（经 gateway 间接） |
+| Deriver / Exporter | plugin seam | 否（观察面） |
+
+**退役（勿在新代码复用）**：
+
+| 路径 | 状态 | 替代 |
+|---|---|---|
+| `journal.write` / `append_journal_event` on loop / tool / LLM 热路径 | **已退役** | FactGateway → Session catalog |
+| `spine_reflector_*` publisher 插件 | **已退役** | FactGateway + yaml producer 矩阵 |
+| cognition / loop 直写 RunStore / EventSpine | **禁止** | FactGateway 单入口（P-L7） |
+
+Boot / audit 可选 backend 仍可使用 journal 平面；run 热路径 durable 事实以 Session → spine 为准。
+
+### RunLedger 证据平面（ADR-0065 — L1-L4，非 loop 热路径）
 
 1. 业务层调 `record(AgentRunStarted(...))` (facade)
 2. facade 调 `RunStore.append(event)`

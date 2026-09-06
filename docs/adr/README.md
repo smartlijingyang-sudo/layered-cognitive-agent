@@ -116,7 +116,7 @@
 | [0168](0168-loop-step-control-and-model-visible.md) | Loop Step Control 与 Model-Visible 真实化（被 0168-final 收敛;保留问题陈述） | Superseded |
 | [0168.1](0168.1-loop-cursor-state-machine.md) | LoopCursor — 单一 Loop 状态机收敛 step / segment / phase / iteration（被 0168-final 收敛;supersedes 0168 决策段） | Superseded |
 | [0168-final](0168-loop-cursor-final.md) | LoopCursor — 单状态机收敛 Spine / Step / Segment / Phase / Iteration / Journal / Projection（supersedes 0168 + 0168.1 决策段） | Proposed |
-| [0169](0169-loop-cursor-control.md) | LoopCursor 控制面收敛 — 五缝架构 + 与观测装配分离（supersedes 0168-final 全文） | Proposed |
+| [0169](0169-loop-cursor-control.md) | LoopCursor 控制面收敛 — 五缝架构 + 与观测装配分离（gate-as-phase 由 0194 修订；supersedes 0168-final 全文） | Proposed |
 | [0170](0170-projection-host.md) | ProjectionHost — Loop 维度可插拔投影宿主（ADR-0169 §D8 投影缝） | Proposed |
 | [0171](0171-fork-shared-host.md) | fork 共享 Host 协议 — child cursor 不持独立 Host | Proposed |
 | [0172](0172-observability-exporters.md) | Observability Exporters 实现层（metrics / OTel / Langfuse） | Proposed |
@@ -136,8 +136,8 @@
 | [0191](0191-runtime-loop-dsh-convergence-and-control-plane.md) | Runtime Loop DSH 收敛与 LCA 控制面保留 — 事实/模型/控制/Ephemeral 四态分离 + Reducer 演进 | Accepted |
 | [0192](0192-fact-plane-convergence.md) | Fact Plane 收敛 — FactCommitter + PhaseFactEmitter；Journal 平面从 cognition 退役 | Proposed |
 | [0193](0193-session-projection-fabric-model-visible.md) | Session Projection Fabric — ModelVisibleUnit 增量投影；统一 model-visible 读面 | Accepted |
-| [0194](0194-cognitive-loop-architecture-convergence.md) | 认知 Loop 架构收敛 — 图内核 / FactGateway 单轨 / 六 phase 正名 / 极端插件化目录 | Implemented |
-| [0195](0195-platform-architecture-convergence.md) | 全栈平台架构收敛 — Kernel · Transport · Observability 四段链 · 插件 seam 树 · SSOT 矩阵 | Implemented |
+| [0194](0194-cognitive-loop-architecture-convergence.md) | 认知 Loop 架构收敛 — 图内核 / FactGateway 单轨 / 六 phase 正名 / 极端插件化目录 | Implemented (P0–P5 core) |
+| [0195](0195-platform-architecture-convergence.md) | 全栈平台架构收敛 — Kernel · Transport · Observability 四段链 · 插件 seam 树 · SSOT 矩阵 | Implemented (P0–P5 core) |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
 

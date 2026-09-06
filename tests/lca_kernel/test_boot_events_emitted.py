@@ -39,8 +39,8 @@ from lca.contracts.models.observability.journal.journal import (
     BootPluginFiberSpawned,
     BootProfileResolved,
 )
-from lca.contracts.models.observability.journal.journal_catalog import JOURNAL_EVENT_CLASSES
-from lca.contracts.observability.journal.journal_store import JournalStoreBackend
+from lca.contracts.models.observability.journal.catalog import JOURNAL_EVENT_CLASSES
+from lca.contracts.observability.journal.store import JournalStoreBackend
 from lca.harness.observability.assemble import make_minimal_bound
 from lca.infrastructure.observability import AttributePolicy
 from lca.infrastructure.observability.journal.backends.memory import InMemoryJournalStore

@@ -1,7 +1,5 @@
-"""Public exports for ``edit`` (auto-fixed)."""
+"""Public exports for ``edit``."""
 
-from lca.infrastructure.tools.lca_computer.apis.edit.edit_file import (
-    parameters,
-)
+from . import file as edit_file
 
-__all__ = ['parameters']
+__all__ = ["edit_file"]

@@ -18,8 +18,8 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import (
     TEAM_COMMUNICATION,
@@ -37,7 +37,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 from lca.contracts.mechanisms.capability.capability import require_capability
 from lca.contracts.models.core.conversation.memory import MemoryLayer
 from lca.contracts.protocols.collaboration.agent.agent import AgentUnit
-from lca.contracts.protocols.collaboration.team.team_seam import (
+from lca.contracts.protocols.collaboration.team.seam import (
     TeamCommunicationAssemblerProtocol,
     TeamSeamFactoryProtocol,
     TeamSharedMemoryResolverProtocol,

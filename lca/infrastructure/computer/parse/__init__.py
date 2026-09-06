@@ -1,6 +1,6 @@
 """Public exports for ``parse`` (auto-fixed)."""
 
-from lca.infrastructure.computer.parse.parse_result import (
+from lca.infrastructure.computer.parse.result import (
     parse_computer_stdout,
 )
 

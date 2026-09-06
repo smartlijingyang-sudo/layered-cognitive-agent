@@ -22,10 +22,10 @@ from lca.contracts.mechanisms import (
 )
 
 # ── ActionHandler（ADR-0074 插件化行动处理器）────────
-from lca.contracts.protocols.act.action.action_handler import ActionHandler, ActionHandlerRegistry
+from lca.contracts.protocols.act.action.handler import ActionHandler, ActionHandlerRegistry
 
 # ── CommandEnvelope + RunFact (ADR-0068 §五 + ADR-0074 PR-7 V4) ─────────
-from lca.contracts.protocols.act.command.command_envelope import (
+from lca.contracts.protocols.act.command.envelope import (
     BudgetReservation,
     CapabilityGrant,
     CommandEnvelope,
@@ -42,7 +42,7 @@ from lca.contracts.protocols.act.command.command_envelope import (
 )
 
 # ── EffectHandler 与 EffectHandlerRegistry（ADR-0074 / ADR-0068）──────
-from lca.contracts.protocols.act.effect.effect_handler import (
+from lca.contracts.protocols.act.effect.handler import (
     EffectCapabilities,
     EffectHandler,
     EffectHandlerRegistry,
@@ -52,7 +52,7 @@ from lca.contracts.protocols.act.effect.effect_handler import (
 from lca.contracts.protocols.act.embodiment.embodiment import Body
 
 # ── 工具执行管线（五阶段可拦截管线）────────────
-from lca.contracts.protocols.act.tool.tool_pipeline import (
+from lca.contracts.protocols.act.tool.pipeline import (
     ToolDefinition,
     ToolExecutionContext,
     ToolExecutionPipeline,
@@ -70,7 +70,7 @@ from lca.contracts.protocols.collaboration.agent.agent import AgentUnit
 from lca.contracts.protocols.collaboration.casting.casting import RoleLibrary, TeamCaster
 
 # ── L3 团队编排协议 ──────────────────────────────────────
-from lca.contracts.protocols.collaboration.graph.graph_node_executor import (
+from lca.contracts.protocols.collaboration.graph.node_executor import (
     GraphNodeExecutionContext,
     GraphNodeExecutor,
     GraphNodeExecutorRegistryProtocol,
@@ -83,8 +83,8 @@ from lca.contracts.protocols.collaboration.orchestration.orchestration import (
     TeamStage,
     TeamStrategy,
 )
-from lca.contracts.protocols.collaboration.team.team_seam import TeamSeamFactoryProtocol
-from lca.contracts.protocols.collaboration.team.team_unit import TeamUnit
+from lca.contracts.protocols.collaboration.team.seam import TeamSeamFactoryProtocol
+from lca.contracts.protocols.collaboration.team.unit import TeamUnit
 
 # ── LogicAddress 6 维（ADR-0069 §二 + ADR-0074 V9）────────────────
 from lca.contracts.protocols.composition.logic_address import (
@@ -147,7 +147,7 @@ from lca.contracts.protocols.gate.lead_budget_policy import LeadBudgetPolicyReso
 from lca.contracts.protocols.gate.loop_guard import LoopGuardEvaluator, LoopGuardVerdict
 
 # ── ArtifactClosure（ADR-0074 可定制 loop exit 闭合文本）────────
-from lca.contracts.protocols.journal.artifact.artifact_closure import ArtifactClosure
+from lca.contracts.protocols.journal.artifact.closure import ArtifactClosure
 
 # ── Durable effect idempotency（ADR-0075 / full-plugin-remediation §5）────
 from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyClaim, IdempotencyStore
@@ -162,7 +162,7 @@ from lca.contracts.protocols.journal.observability.observability import (
 )
 
 # ── ScopePlan + CompiledRunPlan（ADR-0068 §一 + ADR-0074 PR-3）──────
-from lca.contracts.protocols.journal.phase.phase_observation import (
+from lca.contracts.protocols.journal.phase.observation import (
     PhaseBudgetSnapshot,
     PhaseObserver,
     PhaseObserverContribution,
@@ -214,7 +214,7 @@ from lca.contracts.protocols.runtime.infra.infra import (
     TransportRegistryProtocol,
 )
 from lca.contracts.protocols.runtime.runtime.runtime import Runtime, StopPolicy
-from lca.contracts.protocols.runtime.runtime.runtime_composition import (
+from lca.contracts.protocols.runtime.runtime.composition import (
     CheckpointStateResolver,
     CheckpointStateResolverFactory,
     DeclarativeInterpreter,
@@ -227,7 +227,7 @@ from lca.contracts.protocols.runtime.runtime.runtime_composition import (
     RuntimeJournal,
     RuntimeJournalFactory,
 )
-from lca.contracts.protocols.runtime.runtime.runtime_lifecycle import (
+from lca.contracts.protocols.runtime.runtime.lifecycle import (
     RuntimeBudgetSnapshot,
     RuntimeLifecycleEvent,
     RuntimeLifecycleEventType,
@@ -236,7 +236,7 @@ from lca.contracts.protocols.runtime.runtime.runtime_lifecycle import (
     RuntimeLifecycleSubscriberContribution,
     RuntimeLifecycleSubscriberRegistry,
 )
-from lca.contracts.protocols.session.run.run_mode import (
+from lca.contracts.protocols.session.run.mode import (
     ModeAdapter,
     RegisteredMode,
     RunModeRegistryProtocol,

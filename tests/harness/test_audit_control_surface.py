@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.harness.diagnostics.audit.audit_control_surface import (
+from lca.harness.diagnostics.audit.control_surface import (
     format_report,
     scan_control_surface,
 )

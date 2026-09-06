@@ -38,7 +38,7 @@ from lca.infrastructure.observability.loop_cursor.bind.bind import (
     install_run_cursor,
     reset_run_cursor,
 )
-from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
+from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
     CoordinatorAdapter,
     bind_current_cursor,
     current_cursor,

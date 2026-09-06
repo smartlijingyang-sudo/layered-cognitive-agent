@@ -12,7 +12,7 @@ import logging
 from pathlib import Path
 
 from lca.contracts.protocols import LLMAdapter
-from lca.infrastructure.llm_adapter.api.api_style import LLMApiStyle
+from lca.infrastructure.llm_adapter.api.style import LLMApiStyle
 
 logger = logging.getLogger(__name__)
 

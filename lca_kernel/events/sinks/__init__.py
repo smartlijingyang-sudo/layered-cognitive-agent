@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from lca_kernel.events.spine.spine_runtime import SpineEventRecord
+    from lca_kernel.events.spine.runtime import SpineEventRecord
 
 
 class SinkBackend(Protocol):

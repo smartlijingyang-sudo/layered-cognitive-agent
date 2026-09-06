@@ -13,7 +13,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
     PhaseResult,
     SemanticPhase,
 )
-from lca.contracts.protocols.journal.phase.phase_observation import PhaseStateSnapshot
+from lca.contracts.protocols.journal.phase.observation import PhaseStateSnapshot
 from lca.harness.declarative.compile.assembler.assembler import ExecutableNode
 from lca.harness.graph.traversal import PhaseTraversal
 from lca.harness.declarative.lifecycle.phase_observation import PhaseObserver, phase_state_snapshot

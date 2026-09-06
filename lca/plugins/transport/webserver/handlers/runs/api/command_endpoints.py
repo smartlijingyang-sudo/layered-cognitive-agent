@@ -26,7 +26,7 @@ from starlette.responses import JSONResponse
 
 from lca.cognition.team.modes_catalog import resolve_profile_mode
 from lca.contracts.models.core.conversation.conversation import ConversationTurn
-from lca.infrastructure.file.file_store import LocalFileStore
+from lca.infrastructure.file.store import LocalFileStore
 from lca.plugins.transport.webserver.handlers.cors.cors import cors_headers
 from lca.plugins.transport.webserver.handlers.runs.ingest.ingress.ingress import (
     LobeHubRunInput,

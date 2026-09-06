@@ -1,6 +1,6 @@
 """Public exports for ``file`` (auto-fixed)."""
 
-from lca.infrastructure.file.file_store import (
+from lca.infrastructure.file.store import (
     StoredFile,
     FileStore,
     file_part_from_stored,

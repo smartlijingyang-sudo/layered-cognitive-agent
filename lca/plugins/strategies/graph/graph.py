@@ -21,8 +21,8 @@ from typing import cast
 
 from pydantic import BaseModel
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import GRAPH_NODE_EXECUTORS, STRATEGIES
 from lca.contracts.harness.composition.plugin_contract import (
@@ -38,7 +38,7 @@ from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.team.graph.graph import EdgeType, ExecutionGraph, GraphNode, NodeType
-from lca.contracts.models.team.team.team_coordination import STRATEGY_KEY_GRAPH, Graph
+from lca.contracts.models.team.team.coordination import STRATEGY_KEY_GRAPH, Graph
 from lca.contracts.protocols import (
     GraphNodeExecutionContext,
     GraphNodeExecutorRegistryProtocol,

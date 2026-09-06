@@ -117,7 +117,7 @@ def register(app: typer.Typer) -> None:
         json_mode: bool = typer.Option(False, "--json", help="JSON output"),
     ) -> None:
         """One-time import of Composio connections from LobeHub DB or JSON."""
-        from lca.infrastructure.integrations.composio.migrate.migrate_lobehub import (
+        from lca.infrastructure.integrations.composio.migrate.lobehub import (
             fetch_lobehub_rows,
             load_rows_from_json,
             migrate_rows,
@@ -153,7 +153,7 @@ def register(app: typer.Typer) -> None:
 
 
 def _load_integration():
-    from lca.infrastructure.integrations.composio.env.env_settings import (
+    from lca.infrastructure.integrations.composio.env.settings import (
         load_composio_settings_from_env,
     )
     from lca.infrastructure.integrations.composio.service.service import ComposioIntegration
@@ -163,6 +163,6 @@ def _load_integration():
 
 
 def _public_row(conn: object) -> dict[str, object]:
-    from lca.infrastructure.integrations.composio.env.env_settings import connection_to_public_dict
+    from lca.infrastructure.integrations.composio.env.settings import connection_to_public_dict
 
     return connection_to_public_dict(conn)

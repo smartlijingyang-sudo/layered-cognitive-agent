@@ -1,6 +1,6 @@
 """Public exports for ``host`` (auto-fixed)."""
 
-from lca.infrastructure.sandbox.host.host_settings import (
+from lca.infrastructure.sandbox.host.settings import (
     HostRuntimeSettings,
     load_host_settings,
 )

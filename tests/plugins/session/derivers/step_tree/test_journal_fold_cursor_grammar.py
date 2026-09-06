@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.models.observability.journal.journal_step import ThinkingTrace
+from lca.contracts.models.observability.journal.step import ThinkingTrace
 from lca.plugins.session.derivers.step_tree.journal_fold import fold_step_tree
 from lca_kernel.events.session.session import SessionEvent
 

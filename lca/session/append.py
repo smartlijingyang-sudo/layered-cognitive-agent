@@ -311,7 +311,7 @@ class Session(SessionProtocol):
 
     def derive_messages(self) -> list[dict[str, Any]]:
         """Model-visible messages via projection fabric, else pure fold replay."""
-        from lca.plugins.session.runtime.projection.projection_reader import model_visible_messages
+        from lca.plugins.session.runtime.projection.reader import model_visible_messages
 
         return model_visible_messages(self, registry=self._projections)
 

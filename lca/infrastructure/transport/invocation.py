@@ -14,7 +14,7 @@ import time
 from typing import cast
 
 from lca.contracts.atoms.ids.ids import RunId, TraceId, new_id
-from lca.contracts.atoms.semantic.semantic_keys import (
+from lca.contracts.atoms.semantic.keys import (
     COMPLETION_EMPTY,
     COMPLETION_FULL,
     COMPLETION_PARTIAL,
@@ -35,7 +35,7 @@ from lca.contracts.models.observability.journal.journal import (
     DelegationMechanism,
     RunScope,
 )
-from lca.contracts.models.team.delegation.delegation_context import (
+from lca.contracts.models.team.delegation.context import (
     delegation_scope,
     get_delegator_context,
     in_member_invoke,

@@ -8,7 +8,7 @@ from pathlib import Path
 from lca.harness.profile.boot.boot import boot_profile
 from lca.plugins.composer.act.body_composer import BodyComposer
 from lca.plugins.composer.collaboration.team_composer import TeamComposer
-from lca.plugins.composer.perceive.perceive_composer import PerceiveComposer
+from lca.plugins.composer.perceive.composer import PerceiveComposer
 from lca.plugins.composer.think.brain_composer import BrainComposer
 
 REPO = Path(__file__).resolve().parents[2]
@@ -24,7 +24,7 @@ def test_web_bundle_registers_one_entry_per_plan_composer() -> None:
     for plugin_id, module in (
         ("lca-plan-brain-composer", "lca.plugins.composer.think.brain_provider"),
         ("lca-plan-body-composer", "lca.plugins.composer.act.body_provider"),
-        ("lca-plan-perceive-composer", "lca.plugins.composer.perceive.perceive_provider"),
+        ("lca-plan-perceive-composer", "lca.plugins.composer.perceive.provider"),
         ("lca-plan-team-composer", "lca.plugins.composer.collaboration.team_provider"),
     ):
         assert f"id: {plugin_id}" in bundle

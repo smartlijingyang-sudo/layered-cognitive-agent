@@ -19,7 +19,7 @@ def register(app: typer.Typer) -> None:
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
     ) -> None:
         """Scan plugins / bundles / profiles for Control Slot references."""
-        from lca.harness.diagnostics.audit.audit_control_surface import (
+        from lca.harness.diagnostics.audit.control_surface import (
             format_report,
             scan_control_surface,
         )
@@ -36,7 +36,7 @@ def register(app: typer.Typer) -> None:
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
     ) -> None:
         """Scan layer1-3 for direct ``state.<attr> = ...`` writes outside reducer."""
-        from lca.harness.diagnostics.audit.audit_state_writers import (
+        from lca.harness.diagnostics.audit.state_writers import (
             format_report,
             scan_state_writers,
         )
@@ -56,7 +56,7 @@ def register(app: typer.Typer) -> None:
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
     ) -> None:
         """Scan Body code for direct sandbox/transport calls bypassing seams."""
-        from lca.harness.diagnostics.audit.audit_direct_commands import (
+        from lca.harness.diagnostics.audit.direct_commands import (
             format_report,
             scan_direct_commands,
         )
@@ -72,7 +72,7 @@ def register(app: typer.Typer) -> None:
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
     ) -> None:
         """Scan layers for residual hook-mounting patterns."""
-        from lca.harness.diagnostics.audit.audit_hook_attach import (
+        from lca.harness.diagnostics.audit.hook_attach import (
             format_report,
             scan_hook_attach,
         )

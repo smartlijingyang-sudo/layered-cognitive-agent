@@ -27,7 +27,7 @@ from lca.contracts.capabilities import (
     RUNTIME_JOURNAL_FACTORY,
 )
 from lca.contracts.protocols.journal.spec.spec import AgentSpec
-from lca.contracts.protocols.runtime.runtime.runtime_composition import (
+from lca.contracts.protocols.runtime.runtime.composition import (
     CheckpointStateResolverFactory,
     DeclarativeInterpreterFactory,
     DeltaReducerFactory,
@@ -37,11 +37,11 @@ from lca.contracts.protocols.runtime.runtime.runtime_composition import (
 )
 from lca.contracts.protocols.state.plan import CompiledRunPlan
 from lca.harness.profile.boot.boot import boot_profile
-from lca.plugins.composer.runtime.runtime.runtime_binding import (
+from lca.plugins.composer.runtime.runtime.binding import (
     ProductionRuntimeDeps,
     bind_runtime_graph,
 )
-from lca.plugins.composer.runtime.runtime.runtime_capabilities import RuntimeCapabilityClosure
+from lca.plugins.composer.runtime.runtime.capabilities import RuntimeCapabilityClosure
 
 REPO = Path(__file__).resolve().parents[2]
 AGENT_ASSEMBLY_PATH = REPO / "lca" / "plugins" / "composer" / "composition" / "agent_assembly.py"

@@ -84,7 +84,7 @@ def create_run_session(
     from lca.plugins.transport.webserver.handlers.runs.session.setup.setup import (
         RunSessionFactory,
     )
-    from lca.plugins.transport.webserver.handlers.runs.session.setup.setup_types import (
+    from lca.plugins.transport.webserver.handlers.runs.session.setup.types import (
         RunSessionRequest,
     )
 

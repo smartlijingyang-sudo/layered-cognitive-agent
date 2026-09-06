@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.cognition.brain.decision_gates.loop.loop_fingerprint import (
+from lca.cognition.brain.decision_gates.loop.fingerprint import (
     normalize_for_fingerprint,
     tool_call_fingerprint,
 )

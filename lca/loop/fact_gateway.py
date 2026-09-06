@@ -14,8 +14,8 @@ from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.loop.fact_gateway import AppendReceipt, FactGateway
 from lca.harness.session.emit import emit
 from lca.infrastructure.observability.loop_cursor.spine._spine_port import is_session_ssot_hook_active
-from lca.infrastructure.observability.spine.event.event_record import Channel
-from lca.infrastructure.observability.spine.spine.spine_enrich import (
+from lca.infrastructure.observability.spine.event.record import Channel
+from lca.infrastructure.observability.spine.spine.enrich import (
     enrich_spine_payload,
     get_active_field_producers,
 )

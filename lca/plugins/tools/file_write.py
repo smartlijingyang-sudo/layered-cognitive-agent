@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.atoms.semantic.semantic_keys import (
+from lca.contracts.atoms.semantic.keys import (
     FAILURE_KIND,
     FAILURE_KIND_EXECUTION,
     FAILURE_KIND_VALIDATION,
@@ -41,7 +41,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.execution.tool import ParameterSpec, ToolApi, ToolManifest, ToolMeta
 from lca.contracts.protocols import Tool
-from lca.infrastructure.path.path_policy import validate_writable_file
+from lca.infrastructure.path.policy import validate_writable_file
 
 IDENTIFIER = "file-write"
 
@@ -205,8 +205,8 @@ __all__ = ["IDENTIFIER", "MANIFEST", "FileWriteTool", "build_file_write_tool"]
 
 from pydantic import BaseModel, ConfigDict  # noqa: E402,I001
 
-from lca.contracts.atoms.control.control_slot import ControlSlot  # noqa: E402
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup  # noqa: E402
+from lca.contracts.atoms.control.slot import ControlSlot  # noqa: E402
+from lca.contracts.atoms.functional.group import FunctionalGroup  # noqa: E402
 from lca.contracts.atoms.scope.scope import Scope  # noqa: E402
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration  # noqa: E402
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin  # noqa: E402

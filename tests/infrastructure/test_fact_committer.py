@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from lca.contracts.harness.fold.perceive import fold_context_manifest_from_events
-from lca.contracts.protocols.act.command.command_envelope import RunFact
+from lca.contracts.protocols.act.command.envelope import RunFact
 from lca.contracts.protocols.loop.fact_gateway import AppendReceipt
 from lca.infrastructure.session.commit.fact_committer import SessionFactCommitter, emit_diagnostic
 from lca.plugins.events.publishers._session_publish import (

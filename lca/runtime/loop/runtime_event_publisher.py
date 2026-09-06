@@ -14,7 +14,7 @@ from enum import StrEnum
 
 import structlog
 
-from lca.contracts.protocols.runtime.runtime.runtime_lifecycle import (
+from lca.contracts.protocols.runtime.runtime.lifecycle import (
     RuntimeLifecycleEvent,
     RuntimeLifecyclePublisher,
     RuntimeLifecycleSubscriber,

@@ -7,9 +7,9 @@ from typing import Any
 
 from lca.contracts.models.core.state.plane import PlaneRef
 from lca.contracts.protocols.runtime.infra.infra import MachineTransport
-from lca.infrastructure.computer.machine.machine_exec import MachineExecMixin
-from lca.infrastructure.computer.op.op_result import ComputerOpResult
-from lca.infrastructure.file.file_store import FileStore
+from lca.infrastructure.computer.machine.exec import MachineExecMixin
+from lca.infrastructure.computer.op.result import ComputerOpResult
+from lca.infrastructure.file.store import FileStore
 from lca.infrastructure.runtime_plane.scope.scope import raise_if_out_of_scope
 
 
@@ -176,7 +176,7 @@ class MachineComputer(MachineExecMixin):
         tool_name: str = "",
         command: str = "",
     ) -> ComputerOpResult:
-        from lca.infrastructure.computer.machine.machine_harvest import attach_harvested_outputs
+        from lca.infrastructure.computer.machine.harvest import attach_harvested_outputs
 
         return await attach_harvested_outputs(
             result,
@@ -217,7 +217,7 @@ class MachineComputer(MachineExecMixin):
         body.setdefault("plane", _plane_state(self.plane))
         # ADR-0102: normalise the on-guest camelCase renderer keys to the
         # snake_case python keys the RenderContracts declare.
-        from lca.infrastructure.computer.runtime.runtime_exec import _normalize_guest_state
+        from lca.infrastructure.computer.runtime.exec import _normalize_guest_state
 
         _normalize_guest_state(body, tool_name=op)
         return ComputerOpResult(success=ok, content=content, state=body, error=err)

@@ -15,7 +15,7 @@ from lca.contracts.models.core.perceive.perception import ContextItem, ContextMa
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.core.policy.stop import StopDecision
 from lca.plugins.loop.reducer.plugin import DefaultReducer
-from lca_kernel.events.payloads.payloads_spine import SpineEventPayload
+from lca_kernel.events.payloads.spine import SpineEventPayload
 
 
 def _state() -> AgentState:
@@ -300,7 +300,7 @@ def _bind_collecting_session() -> tuple[_CollectingPublishSession, object, objec
         set_publish_session,
     )
     from lca_kernel.events.bus.bus import EventBus
-    from lca_kernel.events.test.test_catalog import build_test_bus
+    from lca_kernel.events.test.catalog import build_test_bus
 
     bus = build_test_bus()
     session = _CollectingPublishSession(bus)

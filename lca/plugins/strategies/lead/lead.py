@@ -13,8 +13,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import STRATEGIES
 from lca.contracts.harness.composition.plugin_contract import (
@@ -27,11 +27,11 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.models.core.policy.budget import DEFAULT_MIN_USABLE_PARTIAL_CHARS
 from lca.contracts.models.core.execution.result import Result
-from lca.contracts.models.team.member.member_status import MemberStatus
-from lca.contracts.models.team.role.role_team import RoleProfile
-from lca.contracts.models.team.run.run_context import RunContext
-from lca.contracts.models.team.team.team_awareness import ConsultDuty, TeamAwareness
-from lca.contracts.models.team.team.team_coordination import STRATEGY_KEY_LEAD, LeadMandate
+from lca.contracts.models.team.member.status import MemberStatus
+from lca.contracts.models.team.role.team import RoleProfile
+from lca.contracts.models.team.run.context import RunContext
+from lca.contracts.models.team.team.awareness import ConsultDuty, TeamAwareness
+from lca.contracts.models.team.team.coordination import STRATEGY_KEY_LEAD, LeadMandate
 from lca.contracts.protocols import AgentUnit, TeamAssembly, TeamStrategy
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.journal.spec.spec import LeadSpec

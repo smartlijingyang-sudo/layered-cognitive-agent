@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lca.plugins.tools.diagnostics.debug.debug_run import _extract_failure
+from lca.plugins.tools.diagnostics.debug.run import _extract_failure
 
 
 def test_debug_run_extract_failure_reads_session_error() -> None:

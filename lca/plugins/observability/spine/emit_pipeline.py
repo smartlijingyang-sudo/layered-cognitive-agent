@@ -24,8 +24,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Protocol, cast, runtime_checkable
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -45,14 +45,14 @@ from lca.harness.plugin_api import (
     plugin,
 )
 from lca.infrastructure.observability.loop_cursor.spine._spine_port import is_session_ssot_hook_active
-from lca.infrastructure.observability.spine.event.event_record import (
+from lca.infrastructure.observability.spine.event.record import (
     Channel,
     EventRecord,
     Outcome,
     Phase,
 )
-from lca.infrastructure.observability.spine.event.event_spine import EventSpine
-from lca.infrastructure.observability.spine.spine.spine_enrich import (
+from lca.infrastructure.observability.spine.event.spine import EventSpine
+from lca.infrastructure.observability.spine.spine.enrich import (
     I17Violation,
     enrich_spine_payload,
     set_active_field_producers,

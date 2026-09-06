@@ -1,7 +1,5 @@
-"""Public exports for ``search`` (auto-fixed)."""
+"""Public exports for ``search``."""
 
-from lca.infrastructure.tools.lca_computer.apis.search.search_files import (
-    parameters,
-)
+from . import files as search_files
 
-__all__ = ['parameters']
+__all__ = ["search_files"]

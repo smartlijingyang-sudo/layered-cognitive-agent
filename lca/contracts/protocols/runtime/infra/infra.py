@@ -21,7 +21,7 @@ from lca.contracts.models.core.execution.sandbox import (
     SessionInfo,
 )
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.models.team.role.role_team import CacheConfig, RetryPolicy
+from lca.contracts.models.team.role.team import CacheConfig, RetryPolicy
 
 
 @runtime_checkable

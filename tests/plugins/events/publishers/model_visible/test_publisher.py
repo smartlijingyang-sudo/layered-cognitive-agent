@@ -111,7 +111,7 @@ def test_i_mv_1_unauthorized_producer_rejected(bus: EventBus[Any]) -> None:
     """非授权 class publish → ``UnauthorizedPublishError``(鉴权矩阵生效)。"""
     from lca.contracts.event import Category
     from lca_kernel.events.errors.errors import UnauthorizedPublishError
-    from lca_kernel.events.payloads.payloads_model_visible import (
+    from lca_kernel.events.payloads.model_visible import (
         SpineLlmRequestHeaderPayload,
     )
 
@@ -183,7 +183,7 @@ def test_capture_pre_llm_advances_cursor_step(hook: Any) -> None:
     journal.tool_total=0(H-xref)。
     """
     from lca.contracts.observability.core.incarnation import Incarnation
-    from lca.infrastructure.observability.loop_cursor.in.in_memory import InMemoryLoopCursor
+    from lca.infrastructure.observability.loop_cursor.in.memory import InMemoryLoopCursor
 
     cursor = InMemoryLoopCursor(
         run_id="run-adv",
@@ -259,7 +259,7 @@ def test_capture_pre_llm_narrows_tool_objects(hook: Any, bound_session: Any) -> 
         reset_publish_session,
         set_publish_session,
     )
-    from lca_kernel.events.payloads.payloads_model_visible import (
+    from lca_kernel.events.payloads.model_visible import (
         SpineLlmRequestHeaderPayload,
     )
 
@@ -433,7 +433,7 @@ def test_adapter_pre_post_share_step_identity_after_open_step(bound_session: Any
 
     from lca.contracts.models.core.conversation.llm import LLMResponse
     from lca.contracts.observability.core.incarnation import Incarnation
-    from lca.infrastructure.observability.loop_cursor.in.in_memory import InMemoryLoopCursor
+    from lca.infrastructure.observability.loop_cursor.in.memory import InMemoryLoopCursor
     from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
         CurrentReasonerPrompt,
     )

@@ -7,10 +7,10 @@ from collections.abc import Sequence
 
 from lca.contracts.models.core.conversation.attachment import AttachmentRecord
 from lca.contracts.protocols.runtime.infra.infra import AttachmentIdentity
-from lca.infrastructure.attachment.files.files_info import AttachmentManifest
+from lca.infrastructure.attachment.files.info import AttachmentManifest
 from lca.infrastructure.attachment.layout.layout import AttachmentLayout
 from lca.infrastructure.attachment.settings.settings import AttachmentPolicyDocument, get_attachment_policy
-from lca.infrastructure.file.file_store import FileStore
+from lca.infrastructure.file.store import FileStore
 
 _HTML_DOCTYPE = re.compile(rb"^\s*<!doctype\s+html", re.IGNORECASE)
 _HTML_TAG = re.compile(rb"<html[\s>]", re.IGNORECASE)

@@ -28,7 +28,7 @@ from datetime import datetime
 from typing import Any, Protocol
 
 from lca.infrastructure.observability.spine.context.context import SpineContext
-from lca.infrastructure.observability.spine.event.event_record import (
+from lca.infrastructure.observability.spine.event.record import (
     Channel,
     EventRecord,
     Outcome,
@@ -165,7 +165,7 @@ def spine_port_append(
     except Exception as exc:
         # I17 violations always propagate
         if type(exc).__name__ == "I17Violation" and type(exc).__module__ in (
-            "lca.infrastructure.observability.spine.spine.spine_enrich",
+            "lca.infrastructure.observability.spine.spine.enrich",
             "lca.plugins.observability.spine.emit_pipeline",
         ):
             raise

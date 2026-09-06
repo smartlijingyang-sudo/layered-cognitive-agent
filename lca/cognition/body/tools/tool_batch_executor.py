@@ -17,12 +17,12 @@ from typing import cast
 
 from lca.contracts.atoms.enums.enums import MemoryRecordKind
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.atoms.semantic.semantic_keys import OBS_RESULT_KIND, OBS_TOOL_RESULTS
+from lca.contracts.atoms.semantic.keys import OBS_RESULT_KIND, OBS_TOOL_RESULTS
 from lca.contracts.models.core.execution.decision import Observation, ToolCall
 from lca.contracts.models.core.execution.result import ToolExecutionError
-from lca.contracts.models.team.role.role_team import CacheConfig, RetryPolicy
+from lca.contracts.models.team.role.team import CacheConfig, RetryPolicy
 from lca.contracts.protocols import SafeExecutor, Tool, ToolRegistry
-from lca.contracts.protocols.act.tool.tool_batch_execution import (
+from lca.contracts.protocols.act.tool.batch_execution import (
     ToolBatchEntry,
     ToolBatchExecutionMode,
     ToolBatchExecutionPolicy,

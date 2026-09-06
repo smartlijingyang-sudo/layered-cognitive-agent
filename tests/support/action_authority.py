@@ -13,7 +13,7 @@ from lca.cognition.wire.registry_factory import build_transport_registry
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.protocols import SafeExecutor, ToolRegistry, TransportRegistryProtocol
 from lca.plugins.composer.act.action_authority import build_action_registry_from_authority
-from lca.plugins.act.action.action_handlers_provider import DefaultActionHandlerRegistry
+from lca.plugins.act.action.handlers_provider import DefaultActionHandlerRegistry
 
 DEFAULT_EXECUTABLE_ACTIONS = frozenset(
     {

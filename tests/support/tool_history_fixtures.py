@@ -6,7 +6,7 @@ import json
 from typing import Any
 
 from lca.contracts.atoms.enums.enums import ActionType
-from lca.contracts.atoms.semantic.semantic_keys import OBS_TOOL_RESULTS
+from lca.contracts.atoms.semantic.keys import OBS_TOOL_RESULTS
 from lca.contracts.models.core.execution.decision import Observation, Turn
 from lca.contracts.models.core.state.state import AgentState
 

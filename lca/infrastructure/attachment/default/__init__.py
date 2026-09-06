@@ -1,6 +1,6 @@
 """Public exports for ``default`` (auto-fixed)."""
 
-from lca.infrastructure.attachment.default.default_provider import (
+from lca.infrastructure.attachment.default.provider import (
     DefaultAttachmentResolver,
     DefaultAttachmentStager,
     DefaultAttachmentPromptRenderer,

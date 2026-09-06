@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from lca.infrastructure.observability.spine.event.event_record import (
+from lca.infrastructure.observability.spine.event.record import (
     Channel,
     EventRecord,
     Outcome,

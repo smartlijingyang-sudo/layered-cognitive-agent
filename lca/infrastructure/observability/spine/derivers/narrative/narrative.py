@@ -18,12 +18,12 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from lca.contracts.models.observability.journal.journal_doc import JournalDocument
+from lca.contracts.models.observability.journal.doc import JournalDocument
 from lca.infrastructure.observability.journal.step.narrative_writer import (
     StepNarrativeWriter,
 )
 from lca.infrastructure.observability.spine.derivers.base.base import Deriver
-from lca.infrastructure.observability.spine.event.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.record import EventRecord
 
 log = logging.getLogger(__name__)
 

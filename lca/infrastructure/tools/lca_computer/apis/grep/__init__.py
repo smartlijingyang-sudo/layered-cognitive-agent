@@ -1,7 +1,5 @@
-"""Public exports for ``grep`` (auto-fixed)."""
+"""Public exports for ``grep``."""
 
-from lca.infrastructure.tools.lca_computer.apis.grep.grep_content import (
-    parameters,
-)
+from . import content as grep_content
 
-__all__ = ['parameters']
+__all__ = ["grep_content"]

@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import ComponentKind
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import COMPONENT_REGISTRY
 from lca.contracts.harness.composition.plugin_contract import (
@@ -62,8 +62,8 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config
-    from lca.cognition.memory.simple.simple_memory import SimpleMemorySystem
-    from lca.cognition.memory.temporal.temporal_memory import TemporalMemorySystem
+    from lca.cognition.memory.simple.memory import SimpleMemorySystem
+    from lca.cognition.memory.temporal.memory import TemporalMemorySystem
 
     registry = ctx.require(COMPONENT_REGISTRY.key)
     registry.register(ComponentKind.MEMORY, MEMORY_CHOICE_SIMPLE, SimpleMemorySystem)

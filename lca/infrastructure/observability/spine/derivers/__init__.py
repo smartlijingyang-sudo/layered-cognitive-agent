@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from lca.infrastructure.observability.spine.derivers.base.base import Deriver
 from lca.infrastructure.observability.spine.derivers.graph.graph import GraphDeriver
-from lca.infrastructure.observability.spine.derivers.otel.otel_trace import (
+from lca.infrastructure.observability.spine.derivers.otel.trace import (
     OtelSpan,
     OtelTraceDeriver,
 )

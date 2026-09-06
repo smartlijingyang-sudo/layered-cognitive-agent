@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Generic, TypeAlias, TypeVar
 
 from pydantic import BaseModel
 
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import PluginSpec
 
 if TYPE_CHECKING:

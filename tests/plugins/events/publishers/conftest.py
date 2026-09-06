@@ -19,7 +19,7 @@ from lca.session.append import Session
 @pytest.fixture
 def bus():
     """注入测试 catalog 的 EventBus;与生产 boot 路径等价。"""
-    from lca_kernel.events.test.test_catalog import build_test_bus
+    from lca_kernel.events.test.catalog import build_test_bus
 
     return build_test_bus()
 

@@ -34,7 +34,7 @@ from lca_kernel.events.errors.errors import (
     UnauthorizedSubscribeError,
 )
 from lca_kernel.events.hooks.hooks import PublishContext, SkipDispatch
-from lca_kernel.events.payloads.payloads_spine import SpineEventPayload
+from lca_kernel.events.payloads.spine import SpineEventPayload
 from lca_kernel.events.pipeline.pipeline import (
     ConsumerRule,
     HookSpec,

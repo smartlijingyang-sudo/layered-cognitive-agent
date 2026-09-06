@@ -30,7 +30,7 @@ def publish_team_message(
     the ActionRegistry so the tool is invokable via the regular
     ``use_tool`` pipeline.
     """
-    from lca.contracts.models.observability.act.act_journal_receipt import (
+    from lca.contracts.models.observability.act.journal_receipt import (
         team_message_published_receipt,
     )
     from lca.loop.commit.act_journal import commit_act_journal_receipt

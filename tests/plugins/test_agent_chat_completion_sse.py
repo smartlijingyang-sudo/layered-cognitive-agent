@@ -23,7 +23,7 @@ from lca.contracts.models.observability.journal.journal import (
 )
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunRegistry, RunSession
-from lca.plugins.transport.webserver.handlers.runs.terminal.legacy.legacy_adapter import RegistryRunAdapter
+from lca.plugins.transport.webserver.handlers.runs.terminal.legacy.adapter import RegistryRunAdapter
 
 _seq_counter = [0]
 

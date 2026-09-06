@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState, Budget
-from lca.contracts.protocols.act.command.command_envelope import RunDelta, RunFact
+from lca.contracts.protocols.act.command.envelope import RunDelta, RunFact
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     DeclarativeValidationError,
     DeltaReducer,
@@ -25,7 +25,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
     PhaseRunCursor,
 )
 from lca.contracts.protocols.gate.loop_guard import LoopGuardEvaluator
-from lca.contracts.protocols.runtime.runtime.runtime_lifecycle import (
+from lca.contracts.protocols.runtime.runtime.lifecycle import (
     RuntimeBudgetSnapshot,
     RuntimeLifecycleEvent,
     RuntimeLifecycleEventType,

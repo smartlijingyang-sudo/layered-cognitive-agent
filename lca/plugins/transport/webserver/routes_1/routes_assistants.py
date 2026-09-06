@@ -43,8 +43,8 @@ from typing import Any
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import (
     ASSISTANT_CATALOG,
@@ -69,7 +69,7 @@ from lca.plugins.assistant.catalog.catalog import (
     AssistantDigestMismatch,
 )
 from lca.plugins.transport.webserver.handlers.cors.cors import CORS_HEADERS
-from lca.plugins.transport.webserver.route.route_register import register_routes
+from lca.plugins.transport.webserver.route.register import register_routes
 
 _ASSISTANT_NOT_IMPLEMENTED_MARKER = (
     "COMPAT(delete-when: assistant.catalog plugin present in resolved profile; "

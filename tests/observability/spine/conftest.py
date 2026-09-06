@@ -20,7 +20,7 @@ from lca.infrastructure.observability.loop_cursor.spine._spine_port import (
     reset_session_append_hook,
 )
 from lca.infrastructure.observability.spine.context.context import SpineContext
-from lca.infrastructure.observability.spine.event.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.record import EventRecord
 from lca.infrastructure.observability.spine.sinks.base import EventSink
 
 log = logging.getLogger(__name__)

@@ -47,10 +47,10 @@ from lca.contracts.models.core.conversation.llm import LLMResponse
 from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.team.delegation.delegation import DelegationResult
-from lca.contracts.models.team.role.role_team import RoleProfile
+from lca.contracts.models.team.role.team import RoleProfile
 from lca.contracts.protocols import LLMAdapter, Tool
 from lca.infrastructure.observability import annotate
-from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
+from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
     sha256_digest as _sha256_digest,
 )
 
@@ -207,7 +207,7 @@ class PromptReasoner:
 
     def render_turn(self, state: AgentState, plan: ReasonerTurnPlan) -> ReasonerTurnRender:
         """Render the prompt and collect post-render spine metadata (no emit)."""
-        from lca.contracts.models.core.perceive.perceive_projection import current_manifest_from_state
+        from lca.contracts.models.core.perceive.projection import current_manifest_from_state
 
         manifest = current_manifest_from_state(state)
         prompt, trace, section_count = self._render_prompt(
@@ -400,7 +400,7 @@ class PromptReasoner:
 
     @staticmethod
     def _step_id_for_trace(trace: PromptTrace) -> str:
-        from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
+        from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
             get_current_cursor,
         )
 

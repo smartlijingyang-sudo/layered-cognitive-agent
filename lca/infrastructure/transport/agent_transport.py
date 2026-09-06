@@ -10,7 +10,7 @@ import asyncio
 from collections.abc import Awaitable, Callable
 
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.atoms.semantic.semantic_keys import (
+from lca.contracts.atoms.semantic.keys import (
     COMPLETION_EMPTY,
     COMPLETION_FULL,
     COMPLETION_PARTIAL,

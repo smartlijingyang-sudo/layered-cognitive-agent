@@ -19,7 +19,7 @@ from lca.contracts.event import (
     TeamDelegationCacheHit,
     default_plane,
 )
-from lca_kernel.events.payloads.payloads_spine import (
+from lca_kernel.events.payloads.spine import (
     SPINE_EXECUTION_POINTS,
     SpineEventPayload,
 )

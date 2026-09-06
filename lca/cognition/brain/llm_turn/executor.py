@@ -22,8 +22,8 @@ from lca.cognition.brain.prompt.tool_call_stream import (
 from lca.contracts.atoms.enums.enums import LLMStreamEventType
 from lca.contracts.models.core.conversation.llm import LLMResponse
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.models.observability.tool.tool_journal_receipt import tool_call_resolved_receipt
-from lca.contracts.models.team.partial.partial_buffer import append_run_partial
+from lca.contracts.models.observability.tool.journal_receipt import tool_call_resolved_receipt
+from lca.contracts.models.team.partial.buffer import append_run_partial
 from lca.contracts.protocols import LLMAdapter, Tool
 from lca.infrastructure.session._overflow_0.bindings import (
     assemble_model_history,

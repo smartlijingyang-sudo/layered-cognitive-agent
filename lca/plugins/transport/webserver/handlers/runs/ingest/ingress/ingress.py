@@ -12,7 +12,7 @@ from typing import Any
 
 from lca.contracts.models.core.conversation.conversation import ConversationTurn
 from lca.infrastructure.attachment import FileStoreAttachmentIdentity
-from lca.infrastructure.file.file_store import FileStore
+from lca.infrastructure.file.store import FileStore
 from lca.plugins.transport.webserver.handlers.runs.api.file_reference_parsing import (
     collect_file_refs as _collect_file_refs,
 )
@@ -21,13 +21,13 @@ from lca.plugins.transport.webserver.handlers.runs.ingest import (
     FileRef,
     ingest_file_refs,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.message.message_history import (
+from lca.plugins.transport.webserver.handlers.runs.session.message.history import (
     extract_prior_turns,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.message.message_text import (
+from lca.plugins.transport.webserver.handlers.runs.session.message.text import (
     history_plain_text as _history_plain_text,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.message.message_text import (
+from lca.plugins.transport.webserver.handlers.runs.session.message.text import (
     visible_user_text as _visible_user_text,
 )
 

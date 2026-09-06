@@ -1,6 +1,6 @@
 """Public exports for ``system`` (auto-fixed)."""
 
-from lca.infrastructure.attachment.system.system_role_renderer import (
+from lca.infrastructure.attachment.system.role_renderer import (
     SystemRoleResult,
     render_system_role,
     SystemRoleResult,

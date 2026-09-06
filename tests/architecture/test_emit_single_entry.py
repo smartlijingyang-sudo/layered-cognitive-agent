@@ -20,7 +20,7 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCAN_ROOT = _REPO_ROOT / "lca"
 _LOOP_SCAN_ROOT = _REPO_ROOT / "lca" / "loop"
-_SSOT_POSIX = "lca/infrastructure/observability/spine/exception/exception_emit.py"
+_SSOT_POSIX = "lca/infrastructure/observability/spine/exception/emit.py"
 
 # L2 / P-L7: loop 层允许的事实生产面(其余文件不得新增下列 pattern)。
 _LOOP_FACT_SSOT_FILES: frozenset[str] = frozenset(

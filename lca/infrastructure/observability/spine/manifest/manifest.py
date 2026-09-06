@@ -33,13 +33,13 @@ def _repo_root() -> Path:
 
 
 _REPO_ROOT = _repo_root()
-_PAYLOADS_SPINE_PATH = _REPO_ROOT / "lca_kernel" / "events" / "payloads" / "payloads_spine.py"
+_PAYLOADS_SPINE_PATH = _REPO_ROOT / "lca_kernel" / "events" / "payloads" / "spine.py"
 _CACHED_EXECUTION_POINTS: tuple[str, ...] | None = None
 
 
 def _load_spine_execution_points() -> tuple[str, ...]:
     spec = importlib.util.spec_from_file_location(
-        "lca_kernel.events.payloads.payloads_spine",
+        "lca_kernel.events.payloads.spine",
         _PAYLOADS_SPINE_PATH,
     )
     if spec is None or spec.loader is None:

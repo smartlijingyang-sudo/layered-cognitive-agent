@@ -43,7 +43,7 @@ class InlineSandbox:
     ) -> SandboxResult:
         del timeout_s
         self.write_files_calls.append(files)
-        from lca.infrastructure.sandbox.onlyboxes.onlyboxes_bootstrap import safe_rel_name
+        from lca.infrastructure.sandbox.onlyboxes.bootstrap import safe_rel_name
 
         vfs = self._sessions[session_id] if session_id and session_id in self._sessions else {}
         for name, source in files.items():

@@ -34,7 +34,7 @@ from lca.contracts.models.observability.journal.journal import (
     RuntimeObserved,
     StampedEvent,
 )
-from lca.contracts.models.observability.plan.plan_ref import (
+from lca.contracts.models.observability.plan.ref import (
     plan_ref_scope,
 )
 from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan, ProviderBinding

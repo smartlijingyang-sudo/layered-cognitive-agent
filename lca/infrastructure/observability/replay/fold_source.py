@@ -31,12 +31,12 @@ from lca_kernel.events.fold.fold import (
     EpochHeader,
     foldRequestHeader,
 )
-from lca_kernel.events.payloads.payloads_model_visible import (
+from lca_kernel.events.payloads.model_visible import (
     SpineLlmRequestHeaderAssistantPayload,
     SpineLlmRequestHeaderPayload,
 )
 from lca_kernel.events.reader.reader import SpineReader
-from lca_kernel.events.spine.spine_runtime import SpineEventRecord
+from lca_kernel.events.spine.runtime import SpineEventRecord
 
 _log = logging.getLogger(__name__)
 

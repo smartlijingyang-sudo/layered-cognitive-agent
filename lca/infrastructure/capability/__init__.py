@@ -10,7 +10,7 @@ from lca.infrastructure.capability.observability.observability import Observabil
 from lca.infrastructure.capability.sandbox.sandbox import SandboxService
 from lca.infrastructure.capability.search.search import SearchService
 from lca.infrastructure.capability.skills.skills import SkillsService
-from lca.infrastructure.capability.state.state_store import StateStoreService
+from lca.infrastructure.capability.state.store import StateStoreService
 from lca.infrastructure.capability.tools.tools import ToolsService
 from lca.infrastructure.capability.transport.transport import TransportService
 

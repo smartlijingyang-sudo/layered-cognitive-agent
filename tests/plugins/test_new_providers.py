@@ -3,14 +3,14 @@
 import pytest
 
 from lca.cognition.body.tools.tool_batch_execution import SafeToolBatchExecutionPolicy
-from lca.plugins.act.action.action_handlers_provider import (
+from lca.plugins.act.action.handlers_provider import (
     DefaultActionHandlerRegistry,
     DelegateActionHandler,
     HandoffActionHandler,
     RespondActionHandler,
     UseToolActionHandler,
 )
-from lca.plugins.act.delta.delta_handlers_provider import (
+from lca.plugins.act.delta.handlers_provider import (
     ActivationDeltaHandler,
     DefaultDeltaHandlerRegistry,
     ErrorDeltaHandler,
@@ -23,14 +23,14 @@ from lca.plugins.act.delta.delta_handlers_provider import (
     StopDeltaHandler,
     TurnDeltaHandler,
 )
-from lca.plugins.act.effect.effect_handlers_provider import (
+from lca.plugins.act.effect.handlers_provider import (
     BodyActEffectHandler,
     InMemoryEffectHandlerRegistry,
     MemoryUpdateEffectHandler,
     register_default_effect_handlers,
 )
 from lca.plugins.gate.decision_classifier_provider import DefaultDecisionClassifier
-from lca.plugins.journal.artifact.artifact_closure_provider import DefaultArtifactClosure
+from lca.plugins.journal.artifact.closure_provider import DefaultArtifactClosure
 
 
 class TestDefaultDecisionClassifier:
@@ -55,21 +55,21 @@ class TestEffectHandlers:
 
     def test_body_act_handler_implements_protocol(self):
         """BodyActEffectHandler should implement EffectHandler Protocol."""
-        from lca.contracts.protocols.act.effect.effect_handler import EffectHandler
+        from lca.contracts.protocols.act.effect.handler import EffectHandler
 
         handler = BodyActEffectHandler()
         assert isinstance(handler, EffectHandler)
 
     def test_memory_update_handler_implements_protocol(self):
         """MemoryUpdateEffectHandler should implement EffectHandler Protocol."""
-        from lca.contracts.protocols.act.effect.effect_handler import EffectHandler
+        from lca.contracts.protocols.act.effect.handler import EffectHandler
 
         handler = MemoryUpdateEffectHandler()
         assert isinstance(handler, EffectHandler)
 
     def test_empty_registry_implements_protocol(self):
         """The seam-provided registry is a neutral EffectHandlerRegistry container."""
-        from lca.contracts.protocols.act.effect.effect_handler import EffectHandlerRegistry
+        from lca.contracts.protocols.act.effect.handler import EffectHandlerRegistry
 
         registry = InMemoryEffectHandlerRegistry()
         assert isinstance(registry, EffectHandlerRegistry)
@@ -193,7 +193,7 @@ class TestDeltaHandlers:
         应配套 transport projection 通道,不可走 reducer.apply_artifact_closure。
         """
         try:
-            from lca.plugins.act.delta.delta_handlers_provider import (
+            from lca.plugins.act.delta.handlers_provider import (
                 ArtifactClosureDeltaHandler,  # type: ignore[attr-defined]
             )
         except ImportError:
@@ -269,14 +269,14 @@ class TestActionHandlers:
 
     def test_respond_handler_implements_protocol(self):
         """RespondActionHandler should implement ActionHandler Protocol."""
-        from lca.contracts.protocols.act.action.action_handler import ActionHandler
+        from lca.contracts.protocols.act.action.handler import ActionHandler
 
         handler = RespondActionHandler()
         assert isinstance(handler, ActionHandler)
 
     def test_use_tool_handler_implements_protocol(self):
         """UseToolActionHandler should implement ActionHandler Protocol."""
-        from lca.contracts.protocols.act.action.action_handler import ActionHandler
+        from lca.contracts.protocols.act.action.handler import ActionHandler
 
         handler = UseToolActionHandler(SafeToolBatchExecutionPolicy())
         assert isinstance(handler, ActionHandler)
@@ -289,21 +289,21 @@ class TestActionHandlers:
 
     def test_delegate_handler_implements_protocol(self):
         """DelegateActionHandler should implement ActionHandler Protocol."""
-        from lca.contracts.protocols.act.action.action_handler import ActionHandler
+        from lca.contracts.protocols.act.action.handler import ActionHandler
 
         handler = DelegateActionHandler()
         assert isinstance(handler, ActionHandler)
 
     def test_handoff_handler_implements_protocol(self):
         """HandoffActionHandler should implement ActionHandler Protocol."""
-        from lca.contracts.protocols.act.action.action_handler import ActionHandler
+        from lca.contracts.protocols.act.action.handler import ActionHandler
 
         handler = HandoffActionHandler()
         assert isinstance(handler, ActionHandler)
 
     def test_default_registry_implements_protocol(self):
         """DefaultActionHandlerRegistry should implement ActionHandlerRegistry Protocol."""
-        from lca.contracts.protocols.act.action.action_handler import ActionHandlerRegistry
+        from lca.contracts.protocols.act.action.handler import ActionHandlerRegistry
 
         registry = DefaultActionHandlerRegistry()
         assert isinstance(registry, ActionHandlerRegistry)
@@ -346,7 +346,7 @@ class TestDefaultArtifactClosure:
 
     def test_implements_protocol(self):
         """Should implement ArtifactClosure Protocol."""
-        from lca.contracts.protocols.journal.artifact.artifact_closure import ArtifactClosure
+        from lca.contracts.protocols.journal.artifact.closure import ArtifactClosure
 
         closure = DefaultArtifactClosure()
         assert isinstance(closure, ArtifactClosure)

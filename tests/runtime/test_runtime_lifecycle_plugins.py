@@ -14,7 +14,7 @@ from lca.contracts.capabilities import (
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.state.state import AgentState, Budget
-from lca.contracts.protocols.runtime.runtime.runtime_lifecycle import (
+from lca.contracts.protocols.runtime.runtime.lifecycle import (
     RuntimeBudgetSnapshot,
     RuntimeLifecycleEvent,
     RuntimeLifecycleEventType,

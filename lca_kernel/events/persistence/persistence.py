@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from lca_kernel.events.bus.bus import EnvelopeRef
     from lca_kernel.events.session.session import SessionEvent, SessionObserver, SessionProtocol
     from lca_kernel.events.sinks import SinkBackend
-    from lca_kernel.events.spine.spine_runtime import SpineEventRecord
+    from lca_kernel.events.spine.runtime import SpineEventRecord
 
 log = logging.getLogger(__name__)
 
@@ -106,7 +106,7 @@ def _map_session_event(
     trace_id = str(raw_trace) if raw_trace not in (None, "") else session.id
     execution_point = data.get("execution_point")
     if not isinstance(execution_point, str) or not execution_point:
-        from lca_kernel.events.payloads.payloads_spine import category_to_spine_ep
+        from lca_kernel.events.payloads.spine import category_to_spine_ep
 
         execution_point = category_to_spine_ep(event.type) or "unknown"
     channel = data.get("channel")
@@ -141,7 +141,7 @@ def _spine_record_from_mapped(
     """Session 路径:把映射后的 payload/ref 写成 SpineEventRecord,保留 trace_id。"""
     from datetime import datetime
 
-    from lca_kernel.events.spine.spine_runtime import SpineEventRecord
+    from lca_kernel.events.spine.runtime import SpineEventRecord
 
     ts = datetime.fromtimestamp(ref.ts, tz=UTC).isoformat()
     return SpineEventRecord(
@@ -454,7 +454,7 @@ class PersistenceObserver:
 
     @staticmethod
     def _build_persistable_record(payload: EventPayload, ref: EnvelopeRef) -> SpineEventRecord:
-        from lca_kernel.events.spine.spine_runtime import build_record
+        from lca_kernel.events.spine.runtime import build_record
 
         return build_record(payload, ref)
 

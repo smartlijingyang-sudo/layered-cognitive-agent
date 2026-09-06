@@ -1,7 +1,5 @@
-"""Public exports for ``write`` (auto-fixed)."""
+"""Public exports for ``write``."""
 
-from lca.infrastructure.tools.lca_computer.apis.write.write_file import (
-    parameters,
-)
+from . import file as write_file
 
-__all__ = ['parameters']
+__all__ = ["write_file"]

@@ -12,11 +12,11 @@ from __future__ import annotations
 
 import asyncio
 
-from lca.cognition.body.delegation.delegation_cache import (
+from lca.cognition.body.delegation.cache import (
     cached_delegation_observation,
     tag_delegation_extra,
 )
-from lca.cognition.body.delegation.delegation_target import resolve_delegation_target
+from lca.cognition.body.delegation.target import resolve_delegation_target
 from lca.cognition.body.tools.tool_batch_executor import ToolBatchExecutor
 from lca.cognition.body.tools.tool_wire_gate import tool_wire_block_observation
 from lca.cognition.member_status.consult_policy import (
@@ -32,7 +32,7 @@ from lca.cognition.member_status.tracking import (
 from lca.cognition.wire.envelope import delegate_via_envelope, handoff_via_envelope
 from lca.contracts.atoms.enums.enums import MemoryRecordKind
 from lca.contracts.atoms.ids.ids import new_id, remaining_seconds
-from lca.contracts.atoms.semantic.semantic_keys import (
+from lca.contracts.atoms.semantic.keys import (
     COMPLETION_EMPTY,
     COMPLETION_PARTIAL,
     FAILURE_KIND,
@@ -53,15 +53,15 @@ from lca.contracts.models.core.execution.decision import Decision, DelegationSpe
 from lca.contracts.models.core.execution.result import ToolExecutionError
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.team.consultation.consultation import SynthesisMethod, usable_outcomes
-from lca.contracts.models.team.delegation.delegation_context import delegator_scope
+from lca.contracts.models.team.delegation.context import delegator_scope
 from lca.contracts.protocols import (
     SafeExecutor,
     ToolRegistry,
     TransportRegistryProtocol,
 )
 from lca.contracts.protocols.act.action.action import Action
-from lca.contracts.protocols.act.command.command_envelope import command_envelope_to_dict
-from lca.contracts.protocols.act.tool.tool_batch_execution import ToolBatchExecutionPolicy
+from lca.contracts.protocols.act.command.envelope import command_envelope_to_dict
+from lca.contracts.protocols.act.tool.batch_execution import ToolBatchExecutionPolicy
 
 _ERR_DEADLINE_EXPIRED = "delegate 超时(deadline 已过期)"
 _ERR_TIMEOUT = "delegate 超时"
@@ -69,7 +69,7 @@ _ERR_TIMEOUT = "delegate 超时"
 
 def record_decision_made(decision: Decision, state: AgentState) -> None:
     """发射决策事实；TraceInspector 可从账本按需分析动作模式。"""
-    from lca.contracts.models.observability.act.act_journal_receipt import decision_made_receipt
+    from lca.contracts.models.observability.act.journal_receipt import decision_made_receipt
     from lca.loop.commit.act_journal import commit_act_journal_receipt
 
     commit_act_journal_receipt(decision_made_receipt(decision, state))
@@ -132,7 +132,7 @@ class RespondOperation(Action):
         else:
             method = SynthesisMethod.FULL
             candidate_count = len(board.required_roles)
-        from lca.contracts.models.observability.act.act_journal_receipt import (
+        from lca.contracts.models.observability.act.journal_receipt import (
             synthesis_completed_receipt,
         )
         from lca.loop.commit.act_journal import commit_act_journal_receipt

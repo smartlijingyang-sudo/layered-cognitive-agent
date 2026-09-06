@@ -11,9 +11,9 @@ from lca.infrastructure.observability.loop_cursor.spine._spine_port import (
     reset_session_append_hook,
 )
 from lca.infrastructure.observability.spine.context.context import SpineContext
-from lca.infrastructure.observability.spine.event.event_spine import EventSpine
+from lca.infrastructure.observability.spine.event.spine import EventSpine
 from lca.infrastructure.observability.spine.sinks.base import EventSink
-from lca.infrastructure.observability.spine.spine.spine_enrich import (
+from lca.infrastructure.observability.spine.spine.enrich import (
     I17Violation,
     enrich_spine_payload,
     set_active_field_producers,
@@ -23,7 +23,7 @@ from lca.session.lifecycle.bind import (
     bind_run_event_session_from_store,
     unbind_run_event_session,
 )
-from lca.plugins.session.runtime.spine.spine_hook import make_session_spine_append_hook
+from lca.plugins.session.runtime.spine.hook import make_session_spine_append_hook
 from lca.plugins.session.runtime.store.store import SessionStore
 
 

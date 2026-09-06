@@ -30,7 +30,7 @@ from lca.infrastructure.observability.loop_cursor.projections.defaults import (
     _GraphProjection,
     _GraphState,
 )
-from lca.infrastructure.observability.spine.event.event_record import (
+from lca.infrastructure.observability.spine.event.record import (
     EventRecord,
 )
 

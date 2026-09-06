@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import TEAM_SHARED_MEMORY_RESOLVER
 from lca.contracts.harness.composition.plugin_contract import (
@@ -24,7 +24,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.models.core.conversation.memory import MemoryLayer
 from lca.contracts.protocols.collaboration.orchestration.orchestration import SharedMemoryStore
-from lca.contracts.protocols.collaboration.team.team_seam import TeamSharedMemoryResolverProtocol
+from lca.contracts.protocols.collaboration.team.seam import TeamSharedMemoryResolverProtocol
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.journal.spec.spec import TeamSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
@@ -47,7 +47,7 @@ class DefaultTeamSharedMemoryResolver(TeamSharedMemoryResolverProtocol):
     ) -> SharedMemoryStore | None:
         """Return no store when the Team did not declare shared memory layers."""
 
-        from lca.cognition.memory.team.team_shared_memory import TeamSharedMemoryStore
+        from lca.cognition.memory.team.shared_memory import TeamSharedMemoryStore
 
         layers = shared_layers or tuple(spec.shared_memory_layers)
         return TeamSharedMemoryStore(list(layers)) if layers else None

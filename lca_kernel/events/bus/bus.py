@@ -5,8 +5,8 @@ LCA 事件总线唯一入口（SSOT）。:class:`EnvelopeBus` 是 canonical 名�
 6 字段 wire 行为 — harness 与迁移窗口专用。
 
 # COMPAT(delete-when: rg '\\bEventBus\\b' lca/ lca_kernel/
-#           --glob '!**/harness/**' --glob '!**/tests/**' = 0,
-#           tracking: ADR-0194 P2-08 / ADR-0184 PR-1)
+#           --glob '!**/harness/**' --glob '!**/tests/**' --glob '!**/bus/**' = 0,
+#           tracking: ADR-0194 G6 / ADR-0195 O4)
 # 新代码 MUST import EnvelopeBus; EventBus 名保留给 harness 与 legacy 测试。
 
 不变量:
@@ -678,7 +678,7 @@ class EventBus(EnvelopeBus[P]):
                 )
             return False
         # 延迟导入避免环:spine_runtime 依赖 mechanism,不与 bus 互引。
-        from lca_kernel.events.spine.spine_runtime import build_record
+        from lca_kernel.events.spine.runtime import build_record
 
         record = build_record(payload, ref)
         persisted = False

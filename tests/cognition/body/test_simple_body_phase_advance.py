@@ -26,7 +26,7 @@ from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.observability.core.incarnation import Incarnation
 from lca.contracts.observability.cursor.loop_cursor import CursorError
 from lca.infrastructure.observability.loop_cursor import StdLoopCursor
-from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
+from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
     bind_current_cursor,
     reset_current_cursor,
 )

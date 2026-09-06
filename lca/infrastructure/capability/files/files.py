@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from lca.infrastructure.capability.dispatch.dispatch import ProviderDispatch
-from lca.infrastructure.file.file_store import FileStore, StoredFile
+from lca.infrastructure.file.store import FileStore, StoredFile
 
 
 class FileStoreService:

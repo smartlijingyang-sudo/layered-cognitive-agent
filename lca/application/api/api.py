@@ -32,9 +32,9 @@ from lca.contracts.models.core.conversation.message import AgentMessage
 from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.state.state import StateSnapshot
 from lca.contracts.models.team.graph.graph import ExecutionGraph
-from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.models.team.run.run_context import RunContext
-from lca.contracts.models.team.team.team_coordination import (
+from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.run.context import RunContext
+from lca.contracts.models.team.team.coordination import (
     DEFAULT_COORDINATION_MAX_ROUNDS,
     Coordination,
     Debate,

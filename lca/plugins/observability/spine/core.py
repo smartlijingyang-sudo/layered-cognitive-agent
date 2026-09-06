@@ -35,8 +35,8 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -55,7 +55,7 @@ from lca.harness.plugin_api import (
     plugin,
 )
 from lca.infrastructure.observability.spine.context.context import SpineContext
-from lca.infrastructure.observability.spine.event.event_spine import EventSpine
+from lca.infrastructure.observability.spine.event.spine import EventSpine
 from lca.infrastructure.observability.spine.sinks.base import EventSink
 
 log = logging.getLogger(__name__)
@@ -150,7 +150,7 @@ def _activate_process_local_spine(ctx: PluginContext, event_spine: EventSpine) -
     Registers a disposer via ``ctx.effect`` when available so profile
     unload clears the process-local accessors (mirrors file_sink close).
     """
-    from lca.harness.declarative.compile.instrument.instrument_wrap import (
+    from lca.harness.declarative.compile.instrument.wrap import (
         set_active_spine_accessor,
     )
 

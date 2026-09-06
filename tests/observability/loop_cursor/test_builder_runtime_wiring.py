@@ -22,7 +22,7 @@ from lca.infrastructure.observability.loop_cursor import (
 )
 from lca.infrastructure.observability.loop_cursor.bind.bind import reset_run_cursor
 from lca.infrastructure.observability.loop_cursor.factory.factory import LoopCursorFactory
-from lca.infrastructure.observability.loop_cursor.projection.projection_host import StdProjectionHost
+from lca.infrastructure.observability.loop_cursor.projection.host import StdProjectionHost
 from lca.plugins.session.runtime.store.store import SessionStore
 from lca.plugins.transport.webserver.carrier.runs.execute import create_run_session
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunRegistry
@@ -110,16 +110,16 @@ class _Context:
         # PR-7:observability seam registries. Pre-populated with the
         # same factories that observability-default bundle injects in prod.
         from lca.infrastructure.observability import NamedRegistry
-        from lca.infrastructure.observability.loop_cursor.close.close_barrier_impl import (
+        from lca.infrastructure.observability.loop_cursor.close.barrier_impl import (
             StdCloseBarrier,
         )
         from lca.infrastructure.observability.loop_cursor.factory.factory import (
             LoopCursorFactory,
         )
-        from lca.infrastructure.observability.loop_cursor.persistence.persistence_coordinator import (
+        from lca.infrastructure.observability.loop_cursor.persistence.coordinator import (
             NullPersistenceCoordinator,
         )
-        from lca.infrastructure.observability.loop_cursor.projection.projection_host import (
+        from lca.infrastructure.observability.loop_cursor.projection.host import (
             StdProjectionHost,
         )
 

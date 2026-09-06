@@ -13,17 +13,17 @@ from lca.cognition.body.tools.tool_batch_execution import (
     SequentialToolBatchExecutionPolicy,
 )
 from lca.contracts.atoms.enums.enums import ActionType, MemoryRecordKind
-from lca.contracts.atoms.semantic.semantic_keys import OBS_RESULT_KIND
+from lca.contracts.atoms.semantic.keys import OBS_RESULT_KIND
 from lca.contracts.models.core.policy.budget import create_budget
 from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall
 from lca.contracts.models.core.execution.result import ToolExecutionError
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.protocols.act.tool.tool_batch_execution import (
+from lca.contracts.protocols.act.tool.batch_execution import (
     ToolBatchEntry,
     ToolBatchExecutionMode,
     ToolBatchExecutionSegment,
 )
-from lca.plugins.act.tool.tool_batch_execution_policy_provider import build_tool_batch_execution_policy
+from lca.plugins.act.tool.batch_execution_policy_provider import build_tool_batch_execution_policy
 
 
 class _Tool:

@@ -11,12 +11,12 @@ import pytest
 from lca.contracts.mechanisms.capability.capability import MissingCapabilityError
 from lca.harness.diagnostics.inspect.inspect import format_capability_graph, format_plugin_tree
 from lca.harness.profile.boot.boot import boot_entries, boot_profile, load_profile_entries
-from lca.harness.profile.boot.boot_products import (
+from lca.harness.profile.boot.products import (
     compiled_plan_from_scope,
     profile_boot_products_from_scope,
     resolved_profile_from_scope,
 )
-from lca.plugins.observability.profile.profile_snapshot_run_boot_provider import PluginSnapshotEntry
+from lca.plugins.observability.profile.snapshot_run_boot_provider import PluginSnapshotEntry
 from lca.plugins.transport.webserver.handlers.runs.session.diagnostics.diagnostics import (
     plugin_inventory_from_boot_products,
 )

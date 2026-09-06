@@ -22,7 +22,7 @@ from lca.contracts.observability.infra.cordis_event_table import (
     all_execution_points,
     lookup_cordis_name,
 )
-from lca.contracts.observability.event.event_descriptor import EventDescriptor
+from lca.contracts.observability.event.descriptor import EventDescriptor
 from lca.contracts.observability.cursor.loop_cursor import PhaseName
 
 

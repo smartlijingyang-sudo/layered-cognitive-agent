@@ -88,7 +88,7 @@ def install_run_cursor(cursor: LoopCursor) -> Token[Any]:
     ... finally:
     ...     reset_run_cursor(token)
     """
-    from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
+    from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
         bind_current_cursor,
     )
 
@@ -97,7 +97,7 @@ def install_run_cursor(cursor: LoopCursor) -> Token[Any]:
 
 def reset_run_cursor(token: Token[Any]) -> None:
     """释放 ``install_run_cursor`` 返回的 token。"""
-    from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
+    from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
         reset_current_cursor,
     )
 

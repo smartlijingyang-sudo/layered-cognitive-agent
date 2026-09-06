@@ -96,7 +96,7 @@ class Observation:
     @classmethod
     def from_result(cls, result: Result) -> Observation:
         """Bridge a Result back into an Observation for channel return path."""
-        from lca.contracts.atoms.semantic.semantic_keys import (
+        from lca.contracts.atoms.semantic.keys import (
             COMPLETION_EMPTY,
             COMPLETION_FULL,
             COMPLETION_PARTIAL,

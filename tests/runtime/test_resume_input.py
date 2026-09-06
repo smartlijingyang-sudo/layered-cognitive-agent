@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from lca.contracts.atoms.enums.enums import ActionType
-from lca.contracts.protocols.session.resume.resume_input import ResumeInput
+from lca.contracts.protocols.session.resume.input import ResumeInput
 from lca.runtime.support.resume_input import HumanAnswerResumeInputAdapter
 
 

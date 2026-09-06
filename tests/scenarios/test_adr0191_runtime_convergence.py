@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from lca.contracts.harness.collaboration.agent import LiveAgentStatus
-from lca.contracts.protocols.session.persistence.persistence_service import CheckpointFailure
+from lca.contracts.protocols.session.persistence.service import CheckpointFailure
 from lca.infrastructure.session._overflow_0.bindings import (
     assemble_model_history,
     await_model_request_checkpoint,

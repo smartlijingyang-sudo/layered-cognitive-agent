@@ -11,7 +11,7 @@ from dataclasses import asdict
 from lca.contracts.harness.memory.events import ContextCompactedCommitted, MemoryCommittedCommitted
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.observability.journal.journal import ContextCompacted, JournalEvent, MemoryCommitted
-from lca.contracts.models.observability.memory.memory_journal_receipt import (
+from lca.contracts.models.observability.memory.journal_receipt import (
     MemoryJournalReceipt,
     MemorySpineReceipt,
 )

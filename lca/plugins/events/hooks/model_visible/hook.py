@@ -45,7 +45,7 @@ from typing import TYPE_CHECKING, Any
 
 from lca.contracts.observability.cursor.loop_cursor_payloads import ToolSchema
 from lca_kernel.events.fold.fold import EpochHeader, canonicalHeader, headerEquals
-from lca_kernel.events.payloads.payloads_model_visible import (
+from lca_kernel.events.payloads.model_visible import (
     ReasonType,
     SpineLlmRequestHeaderAssistantPayload,
     SpineLlmRequestHeaderPayload,

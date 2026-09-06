@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from lca.contracts.protocols.session.model.model_context import (
+from lca.contracts.protocols.session.model.context import (
     ModelContextAssembler,
     ModelVisibleRequest,
     SessionReader,

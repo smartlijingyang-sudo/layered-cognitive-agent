@@ -15,7 +15,7 @@ from lca.contracts.protocols.memory.operational_skills import (
     SkillIndexEntry,
     SkillSearchResult,
 )
-from lca.infrastructure.skills.market.market_auth import (
+from lca.infrastructure.skills.market.auth import (
     clear_market_token_cache,
     market_auth_setup_hint,
     resolve_market_access_token,

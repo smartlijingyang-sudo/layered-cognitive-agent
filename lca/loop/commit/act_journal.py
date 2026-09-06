@@ -15,7 +15,7 @@ from lca.contracts.harness.memory.events import (
     TeamMessagePublishedCommitted,
 )
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.models.observability.act.act_journal_receipt import ActJournalReceipt
+from lca.contracts.models.observability.act.journal_receipt import ActJournalReceipt
 from lca.contracts.models.observability.journal.journal import (
     ApprovalRequested,
     DecisionMade,

@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -38,7 +38,8 @@ class _BusConfig(BaseModel):
     kind=PluginKind.PROVIDER,
     effects="none",
     description=(
-        "事件总线本体（ADR-0183）：kernel 元层；提供 publish/subscribe 入口；"
+        "事件总线本体（ADR-0183 / ADR-0194 G6 / ADR-0195 O4）：kernel 元层；"
+        "EnvelopeBus 为 canonical 入口，EventBus 为 compat shim；"
         "按 lca_kernel/events/config/**/*.yaml 鉴权矩阵路由。"
     ),
     test_suite="tests/lca_kernel/events/test_event_bus.py",
@@ -60,7 +61,7 @@ class _BusConfig(BaseModel):
     ),
 )
 async def setup_bus(ctx: PluginContext, config: _BusConfig) -> None:
-    """机制 boot：构造 EventBus + 设为全局默认 + provide 给 ctx。"""
+    """机制 boot：构造 EnvelopeBus 默认实例（EventBus compat shim）+ 设为全局默认 + provide。"""
     from pathlib import Path
 
     config_dir = Path(__file__).parent / "config"

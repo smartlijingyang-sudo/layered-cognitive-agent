@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, cast
 
 from lca.agent.team_handle import TeamHandle
 from lca.contracts.atoms.enums.enums import ActionScope, MemoryLayer
-from lca.contracts.models.team.team.team_coordination import Coordination, LeadMandate
+from lca.contracts.models.team.team.coordination import Coordination, LeadMandate
 from lca.contracts.protocols import SharedMemoryStore, TeamUnit
 from lca.contracts.protocols.journal.spec.spec import (
     DEFAULT_DELEGATE_MAX_ATTEMPTS,

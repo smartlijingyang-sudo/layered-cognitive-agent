@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from lca.contracts.atoms.enums.enums import MemoryRecordKind
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.atoms.semantic.semantic_keys import (
+from lca.contracts.atoms.semantic.keys import (
     FAILURE_KIND,
     FAILURE_KIND_TOOL_WIRE,
     OBS_RESULT_KIND,

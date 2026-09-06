@@ -18,7 +18,7 @@ from lca.contracts.models.core.conversation.memory import MemoryRecord, MemoryTr
 if TYPE_CHECKING:
     from lca.contracts.models.core.state.state import AgentState
     from lca.contracts.models.team.delegation.delegation import DelegationResult
-    from lca.contracts.models.team.role.role_team import RoleProfile
+    from lca.contracts.models.team.role.team import RoleProfile
 
 
 _EMPTY_TEAMMATES = "(无可用队友)"
@@ -200,7 +200,7 @@ def render_context_lines(
 
 
 def clock_from_state(state: AgentState) -> ManifestClock | None:
-    from lca.contracts.models.core.perceive.perceive_projection import current_manifest_from_state
+    from lca.contracts.models.core.perceive.projection import current_manifest_from_state
 
     manifest = current_manifest_from_state(state)
     if manifest is None:
@@ -212,7 +212,7 @@ def clock_from_state(state: AgentState) -> ManifestClock | None:
 
 
 def subtasks_from_state(state: AgentState) -> ManifestSubtasks:
-    from lca.contracts.models.core.perceive.perceive_projection import current_manifest_from_state
+    from lca.contracts.models.core.perceive.projection import current_manifest_from_state
 
     manifest = current_manifest_from_state(state)
     if manifest is None:
@@ -224,7 +224,7 @@ def subtasks_from_state(state: AgentState) -> ManifestSubtasks:
 
 
 def artifacts_from_state(state: AgentState) -> ManifestArtifacts:
-    from lca.contracts.models.core.perceive.perceive_projection import current_manifest_from_state
+    from lca.contracts.models.core.perceive.projection import current_manifest_from_state
 
     manifest = current_manifest_from_state(state)
     if manifest is None:

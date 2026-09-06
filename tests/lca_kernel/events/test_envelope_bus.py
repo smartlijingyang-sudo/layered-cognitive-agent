@@ -16,7 +16,7 @@ from lca_kernel.events import (
     EventRef,
     TeamDelegationCacheHit,
 )
-from lca_kernel.events.test.test_catalog import build_test_bus
+from lca_kernel.events.test.catalog import build_test_bus
 
 # ── 公共 helpers ─────────────────────────────────────────────────────────
 

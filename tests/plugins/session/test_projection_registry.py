@@ -19,7 +19,7 @@ from typing import Any
 
 import pytest
 
-from lca.contracts.protocols.session.projection.projection_unit import ProjectionCheckpoint
+from lca.contracts.protocols.session.projection.unit import ProjectionCheckpoint
 from lca.plugins.session.projection_registry import projection_registry as plugin_module
 from lca.plugins.session.projection_registry.projection_registry import (
     Config,

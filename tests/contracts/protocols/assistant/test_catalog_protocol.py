@@ -12,7 +12,7 @@ from dataclasses import FrozenInstanceError, dataclass
 import pytest
 
 from lca.contracts.models.assistant.spec import AssistantBootstrapRefs, AssistantSpec
-from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
 from lca.contracts.protocols.assistant.catalog import (
     AssistantCatalog,
     AssistantHandle,

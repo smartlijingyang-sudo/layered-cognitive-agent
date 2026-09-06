@@ -85,7 +85,7 @@ def set_publish_session(
     bus Protocol facade；已是 ``append(payload, *, producer)`` 形态的对象
     原样装载。
     """
-    from lca.plugins.session.runtime.bus.bus_facade import as_bus_facade
+    from lca.plugins.session.runtime.bus.facade import as_bus_facade
 
     return _current_session.set(cast("_PublishSession | None", as_bus_facade(session)))
 

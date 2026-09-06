@@ -94,7 +94,7 @@ def resolve_sandbox() -> Sandbox | None:
         )
         return None
 
-    from lca.infrastructure.sandbox.onlyboxes.onlyboxes_adapter import OnlyboxesSandboxAdapter
+    from lca.infrastructure.sandbox.onlyboxes.adapter import OnlyboxesSandboxAdapter
 
     _log.info("Using OnlyboxesSandboxAdapter base_url=%s", base)
     return OnlyboxesSandboxAdapter(base_url=base, access_token=token)

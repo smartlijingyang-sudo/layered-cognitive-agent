@@ -21,7 +21,7 @@ def _state_with_hit_result(
     from datetime import datetime, timezone
 
     from lca.contracts.models.team.delegation.delegation import DelegationResult
-    from lca.contracts.models.team.team.team_awareness import TeamAwareness
+    from lca.contracts.models.team.team.awareness import TeamAwareness
 
     awareness = TeamAwareness(
         results=(
@@ -72,7 +72,7 @@ def test_delegation_cache_plugin_emits_via_session() -> None:
         reset_publish_session,
         set_publish_session,
     )
-    from lca_kernel.events.test.test_catalog import build_test_bus
+    from lca_kernel.events.test.catalog import build_test_bus
 
     bus = build_test_bus()
     EventBus.set_default(bus)
@@ -112,12 +112,12 @@ def test_compatibility_shell_delegates_to_plugin() -> None:
     from typing import Any
     from unittest.mock import MagicMock
 
-    from lca.cognition.body.delegation.delegation_cache import cached_delegation_observation
+    from lca.cognition.body.delegation.cache import cached_delegation_observation
     from lca.plugins.events.publishers._session_publish import (
         reset_publish_session,
         set_publish_session,
     )
-    from lca_kernel.events.test.test_catalog import build_test_bus
+    from lca_kernel.events.test.catalog import build_test_bus
 
     bus = build_test_bus()
     EventBus.set_default(bus)
@@ -149,7 +149,7 @@ def test_unauthorized_plugin_class_cannot_publish() -> None:
     class _RoguePlugin:
         pass
 
-    from lca_kernel.events.test.test_catalog import build_test_bus
+    from lca_kernel.events.test.catalog import build_test_bus
 
     bus = build_test_bus()
     EventBus.set_default(bus)

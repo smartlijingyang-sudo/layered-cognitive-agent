@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from lca.contracts.atoms.enums.enums import RoleStatus
 from lca.contracts.atoms.ids.ids import new_id, utc_now
-from lca.contracts.atoms.semantic.semantic_keys import (
+from lca.contracts.atoms.semantic.keys import (
     COMPLETION_EMPTY,
     COMPLETION_FULL,
     COMPLETION_PARTIAL,
@@ -27,8 +27,8 @@ from lca.contracts.models.team.consultation.consultation import (
     ConsultationOutcome,
 )
 from lca.contracts.models.team.delegation.delegation import DelegationResult
-from lca.contracts.models.team.member.member_status import MemberStatus
-from lca.contracts.models.team.team.team_awareness import ConsultDuty, TeamAwareness
+from lca.contracts.models.team.member.status import MemberStatus
+from lca.contracts.models.team.team.awareness import ConsultDuty, TeamAwareness
 
 
 def duty_board(state: AgentState) -> MemberStatus | None:

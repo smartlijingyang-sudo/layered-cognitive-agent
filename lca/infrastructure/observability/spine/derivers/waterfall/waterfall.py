@@ -22,7 +22,7 @@ from __future__ import annotations
 from html import escape
 from pathlib import Path
 
-from lca.infrastructure.observability.spine.event.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.record import EventRecord
 
 _EP_GLYPH: dict[str, str] = {
     "writable.step.start": "▶",

@@ -26,9 +26,9 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
-from lca.contracts.atoms.plan.plan_template import (
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
+from lca.contracts.atoms.plan.template import (
     PlanTemplateId,
     all_plan_template_ids,
     parse_plan_template_id,

@@ -4,7 +4,8 @@ Seam 树：**loop/** · phase executor、control contribution、loop driver、re
 
 | 子组 | Legacy 来源 |
 |---|---|
-| `phase/<phase>/<variant>/` | `plugins/phase_graph/` |
+| `phase/<phase>/<variant>/` | `plugins/phase_graph/` executors |
+| `graph/{topology,edges,resilient,recovery}/` | `plugins/phase_graph/` declarative providers |
 | `control/<slot>/` | `plugins/control_contributions/` |
 | `driver/` | `plugins/loop_drivers/` |
 | `reducer/` | `plugins/runtime/reducer.py` |

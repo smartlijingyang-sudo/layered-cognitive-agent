@@ -5,7 +5,7 @@
 导入路径，避免把纯模块边界重构变成调用方的行为性迁移。
 """
 
-from lca.contracts.protocols.act.command.command_envelope import CommandEnvelope, RunDelta, RunFact
+from lca.contracts.protocols.act.command.envelope import CommandEnvelope, RunDelta, RunFact
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
     AGGREGATIONS,
     ALLOWED_EFFECTS,

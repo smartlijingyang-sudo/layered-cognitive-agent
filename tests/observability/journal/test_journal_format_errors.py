@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.observability.journal.journal_format_errors import (
+from lca.contracts.observability.journal.format_errors import (
     JournalFormatError,
     UnknownEventType,
     VersionTooNew,

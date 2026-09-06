@@ -15,8 +15,8 @@ import pytest
 from lca.infrastructure.observability.spine.context.context import (
     SpineContext,
 )
-from lca.infrastructure.observability.spine.event.event_record import EventRecord
-from lca.infrastructure.observability.spine.event.event_spine import EventSpine
+from lca.infrastructure.observability.spine.event.record import EventRecord
+from lca.infrastructure.observability.spine.event.spine import EventSpine
 from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
 
 

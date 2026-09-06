@@ -9,8 +9,8 @@ from lca.cognition.body.actions.action_registry import ActionRegistry
 from lca.cognition.body.executor.safe_executor import SimpleSafeExecutor
 from lca.cognition.body.executor.simple_body import SimpleBody
 from lca.cognition.body.tools.tool_registry import SimpleToolRegistry
-from lca.contracts.models.team.role.role_team import ToolPermissionManifest
-from lca.infrastructure.transport.transport_registry import TransportRegistry
+from lca.contracts.models.team.role.team import ToolPermissionManifest
+from lca.infrastructure.transport.registry import TransportRegistry
 
 
 def test_action_catalog_does_not_reintroduce_assembly_paths() -> None:

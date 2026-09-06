@@ -15,7 +15,7 @@ from lca.infrastructure.integrations.composio.models.models import ComposioConne
 from lca.infrastructure.integrations.composio.service.service import ComposioIntegration
 from lca.infrastructure.integrations.composio.settings.settings import ComposioSettings
 from lca.plugins.transport.webserver.handlers.composio import endpoints as composio_handlers
-from lca.plugins.transport.webserver.route.route_register import _instrument_route_handler
+from lca.plugins.transport.webserver.route.register import _instrument_route_handler
 
 
 def _settings(tmp: Path) -> ComposioSettings:

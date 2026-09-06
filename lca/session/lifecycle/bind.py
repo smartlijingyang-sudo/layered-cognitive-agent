@@ -177,7 +177,7 @@ def bind_run_event_session_from_store(
     if profile is not None:
         create_session(profile, preset=preset)
     from lca.infrastructure.persistence.run_buffer_registry import SessionPersistenceFlushListener
-    from lca.plugins.session.runtime.spine.spine_hook import bind_bridge_spine_hook
+    from lca.plugins.session.runtime.spine.hook import bind_bridge_spine_hook
 
     spine_hook_token = bind_bridge_spine_hook(bridge)
     persistence_flush_cancel = inner.register_flush_listener(SessionPersistenceFlushListener())
@@ -217,7 +217,7 @@ def unbind_run_event_session(bound: BoundRunEventSession | None) -> None:
         with contextlib.suppress(Exception):
             bound.persistence_flush_cancel()
     if bound.spine_hook_token is not None:
-        from lca.plugins.session.runtime.spine.spine_hook import reset_bridge_spine_hook
+        from lca.plugins.session.runtime.spine.hook import reset_bridge_spine_hook
 
         with contextlib.suppress(Exception):
             reset_bridge_spine_hook(bound.spine_hook_token)

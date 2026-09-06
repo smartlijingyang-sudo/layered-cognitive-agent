@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from lca.plugins.assistant.webserver.webserver_bridge import (
+from lca.plugins.assistant.webserver.bridge import (
     AssistantFrontendBridge,
     _extract_agent_id,
 )
@@ -166,7 +166,7 @@ class _FakeApp:
 
 class TestMountAssistantRoutes:
     def test_mount_adds_all_route_paths(self) -> None:
-        from lca.plugins.assistant.webserver.webserver_bridge import _mount_assistant_routes
+        from lca.plugins.assistant.webserver.bridge import _mount_assistant_routes
         from lca.plugins.transport.webserver.routes_1.routes_assistants import ROUTE_SPECS
 
         app = _FakeApp()
@@ -175,7 +175,7 @@ class TestMountAssistantRoutes:
         assert mounted == {spec.path for spec in ROUTE_SPECS}
 
     def test_mount_is_idempotent(self) -> None:
-        from lca.plugins.assistant.webserver.webserver_bridge import _mount_assistant_routes
+        from lca.plugins.assistant.webserver.bridge import _mount_assistant_routes
 
         app = _FakeApp()
         ctx = _FakeMountCtx()

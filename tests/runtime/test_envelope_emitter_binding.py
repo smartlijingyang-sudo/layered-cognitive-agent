@@ -65,7 +65,7 @@ def test_spine_envelope_emitter_dispatches_to_runtime_emit() -> None:
 
 def test_envelope_emitter_does_not_own_exception_caught() -> None:
     """``exception.caught`` is observability SSOT, not an envelope method."""
-    from lca.contracts.protocols.runtime.envelope.envelope_emitter import EnvelopeEmitter
+    from lca.contracts.protocols.runtime.envelope.emitter import EnvelopeEmitter
 
     assert "emit_exception_caught" not in EnvelopeEmitter.__dict__
     assert not hasattr(SpineEnvelopeEmitter, "emit_exception_caught")

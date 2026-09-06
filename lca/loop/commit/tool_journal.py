@@ -10,14 +10,14 @@ from __future__ import annotations
 from typing import Any
 
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.models.observability.tool.tool_journal_receipt import ToolJournalReceipt
+from lca.contracts.models.observability.tool.journal_receipt import ToolJournalReceipt
 from lca.contracts.protocols.loop.fact_gateway import AppendReceipt
 from lca.loop.fact_gateway import append_catalog_bound, publish_ep_bound
 
 
 def _phase_tool_context() -> tuple[int, str]:
-    from lca.infrastructure.observability.facade.run.run_ambit import current_run_ambit
-    from lca.infrastructure.observability.facade.run.run_context import get_current_run_scope
+    from lca.infrastructure.observability.facade.run.ambit import current_run_ambit
+    from lca.infrastructure.observability.facade.run.context import get_current_run_scope
 
     scope = get_current_run_scope()
     step = scope.step if scope is not None else 0

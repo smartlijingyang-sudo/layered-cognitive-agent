@@ -12,7 +12,7 @@ from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.observability import exc_to_record
 from lca.contracts.observability.registry.status import RunLifecycleStatus
 from lca.contracts.protocols.runtime.infra.infra import MachineResolver
-from lca.infrastructure.observability.facade.run.run_ambit import bind_run_ambit
+from lca.infrastructure.observability.facade.run.ambit import bind_run_ambit
 from lca.infrastructure.runtime_plane.resolve.resolve import PlaneBindingError
 from lca.infrastructure.runtime_plane.scope.scope import plane_bindings_scope
 from lca.infrastructure.workspace import run_workspace_scope
@@ -23,7 +23,7 @@ from lca.plugins.transport.webserver.carrier.runs.execute.execution_environment 
     RunExecutionEnvironment,
 )
 from lca.plugins.transport.webserver.carrier.runs.binding import ensure_session_hub
-from lca.plugins.transport.webserver.read.runs.step.step_tree_flush import (
+from lca.plugins.transport.webserver.read.runs.step.tree_flush import (
     flush_step_tree_artifacts,
 )
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
@@ -78,7 +78,7 @@ class RunLifecycleCoordinator:
         success = False
         run_outcome: str = "failure"
         from lca.infrastructure.observability.spine.context.context import SpineContext
-        from lca.infrastructure.observability.spine.exception.exception_emit import (
+        from lca.infrastructure.observability.spine.exception.emit import (
             emit_exception_caught,
         )
         from lca.infrastructure.session.emit.runtime_emit import (
@@ -240,7 +240,7 @@ class RunLifecycleCoordinator:
     def _format_exception(exc: Exception, session: RunSession) -> str:
         """Keep exception presentation at the lifecycle error seam."""
 
-        from lca.plugins.transport.webserver.read.runs.error.error_presentation import (
+        from lca.plugins.transport.webserver.read.runs.error.presentation import (
             format_user_error,
         )
 

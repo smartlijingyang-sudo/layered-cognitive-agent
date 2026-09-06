@@ -21,7 +21,7 @@ class TestEnvelopeGateOrder:
 
     def test_body_execute_calls_mint_envelope(self) -> None:
         """Verify Body.execute calls mint_envelope."""
-        from lca.harness.diagnostics.audit.audit_direct_commands import scan_direct_commands
+        from lca.harness.diagnostics.audit.direct_commands import scan_direct_commands
 
         # Scan body/ directory for direct execute calls
         body_dir = Path("lca/cognition/body")
@@ -35,7 +35,7 @@ class TestEnvelopeGateOrder:
 
     def test_envelope_gate_order_enforced(self) -> None:
         """Verify 5-gate order is enforced in envelope construction."""
-        from lca.contracts.protocols.act.command.command_envelope import (
+        from lca.contracts.protocols.act.command.envelope import (
             CommandEnvelope,
             mint_envelope,
         )

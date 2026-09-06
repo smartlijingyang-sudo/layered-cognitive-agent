@@ -9,7 +9,7 @@ plugin 装配入口是 :mod:`lca.plugins.session.runtime.plugin`（``@plugin``
 唯一入口，本 ``__init__`` 不声明 plugin）。
 """
 
-from lca.plugins.session.runtime.bus.bus_facade import SessionBusFacade
+from lca.plugins.session.runtime.bus.facade import SessionBusFacade
 from lca.session.append import Session
 from lca.plugins.session.runtime.store.store import SessionStore
 

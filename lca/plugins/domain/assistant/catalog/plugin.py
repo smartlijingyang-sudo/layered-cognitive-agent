@@ -32,7 +32,7 @@ from typing import Any
 import structlog
 from pydantic import BaseModel, ConfigDict, Field
 
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import ASSISTANT_CATALOG
 from lca.contracts.harness.composition.plugin_contract import (
@@ -47,7 +47,7 @@ from lca.contracts.models.assistant.spec import (
     AssistantBootstrapRefs,
     AssistantSpec,
 )
-from lca.contracts.models.team.role.role_team import (
+from lca.contracts.models.team.role.team import (
     RoleProfile,
     ToolPermissionManifest,
 )

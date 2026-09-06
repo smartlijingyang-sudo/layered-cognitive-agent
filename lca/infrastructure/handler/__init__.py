@@ -1,6 +1,6 @@
 """Public exports for ``handler`` (auto-fixed)."""
 
-from lca.infrastructure.handler.handler_registry import (
+from lca.infrastructure.handler.registry import (
     UniqueOperationRegistry,
     UniqueOperationRegistry,
 )

@@ -1,6 +1,6 @@
 """Public exports for ``op`` (auto-fixed)."""
 
-from lca.infrastructure.computer.op.op_result import (
+from lca.infrastructure.computer.op.result import (
     TerminalCapableSandbox,
     ComputerOpResult,
 )

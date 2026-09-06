@@ -1,0 +1,74 @@
+"""Default provider for the composable Think cognitive primitive."""
+
+from __future__ import annotations
+
+from pydantic import BaseModel
+
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.capabilities import COGNITIVE_THINK_PIPELINE
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.think.cognitive_pipeline import CognitiveThinkPipeline
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+
+
+class Config(BaseModel):
+    """Strict empty configuration for the standard stateless pipeline."""
+
+    model_config = {"extra": "forbid"}
+
+
+@plugin(  # type: ignore[arg-type]  # PluginContext currently erases Config covariance.
+    id="lca-cognitive-think-pipeline-standard",
+    provides=[COGNITIVE_THINK_PIPELINE.key],
+    requires=[],
+    implements=[CognitiveThinkPipeline],
+    layer="L1",
+    kind=PluginKind.PROVIDER,
+    effects="none",
+    functional_group=FunctionalGroup.G5_COGNITION,
+    description=(
+        "Provide the standard Think primitive pipeline; profiles may replace only this "
+        "subflow without replacing the Brain or Agent Loop."
+    ),
+    test_suite="tests/test_cognitive_pipeline_plugins.py",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G10_COMPOSITION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=(
+                "lca-cognitive-think-pipeline-standard.checked",
+                "lca-cognitive-think-pipeline-standard.served",
+            )
+        ),
+    ),
+    relations=(),
+    ownership=OwnershipDeclaration(
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
+        state_mutation="forbidden",
+    ),
+)
+async def setup(ctx: PluginContext, config: Config) -> None:
+    """Bind the standard, stateless Think pipeline to the capability graph."""
+
+    del config
+    from lca.cognition.brain.pipeline.cognitive_pipeline import StandardCognitiveThinkPipeline
+
+    ctx.provide(COGNITIVE_THINK_PIPELINE.key, StandardCognitiveThinkPipeline())
+
+
+__all__ = ["COGNITIVE_THINK_PIPELINE", "Config", "setup"]

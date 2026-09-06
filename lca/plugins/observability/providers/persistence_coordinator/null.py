@@ -13,8 +13,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -34,7 +34,7 @@ class Config(BaseModel):
 
 def _make_null_persistence(**_: Any) -> Any:
     """Build a :class:`NullPersistenceCoordinator` (no-op)."""
-    from lca.infrastructure.observability.loop_cursor.persistence.persistence_coordinator import (
+    from lca.infrastructure.observability.loop_cursor.persistence.coordinator import (
         NullPersistenceCoordinator,
     )
 

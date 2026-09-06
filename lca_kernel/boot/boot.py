@@ -71,16 +71,16 @@ from lca.harness.plugin_api import PluginDefinition
 # boot_products is the seam's source-of-truth (compat-only in PR-2 sense);
 # the kernel still imports the data classes from the legacy module path.
 from lca.harness.composition.boot_compile import compile_profile_boot_products
-from lca.harness.profile.boot.boot_products import (
+from lca.harness.profile.boot.products import (
     ProfileBootProducts,
     attach_profile_boot_products,
     compiled_plan_from_scope,
     profile_boot_products_from_scope,
     resolved_profile_from_scope,
 )
-from lca.harness.profile.boot.boot_projection import BootEntry
+from lca.harness.profile.boot.projection import BootEntry
 from lca.harness.profile.resolve.resolve import ResolvedProfile, resolve_entries
-from lca.infrastructure.file.file_store import FileStore
+from lca.infrastructure.file.store import FileStore
 from lca_kernel.cli.errors import KernelError, StageError
 from lca_kernel.runtime.observability import install_observability
 from lca_kernel.boot.stages import Stage
@@ -212,9 +212,9 @@ def _register_event_pipeline(resolved: ResolvedProfile) -> None:
         load_pipeline_for_profile,
         register_pipeline_once,
     )
-    from lca_kernel.events.bus.bus import EventBus
+    from lca_kernel.events.bus.bus import EnvelopeBus
 
-    bus = EventBus.default()
+    bus = EnvelopeBus.default()
     catalog, emits_by_id = _collect_marker_catalog(resolved)
     if catalog:
         for plugin_id, marker in catalog.items():

@@ -13,7 +13,7 @@ from typing import Any
 
 from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.protocols import LLMAdapter
-from lca.infrastructure.llm_adapter.api.api_style import LLMApiStyle
+from lca.infrastructure.llm_adapter.api.style import LLMApiStyle
 from lca.infrastructure.llm_adapter.openai_compat.anthropic._anthropic_messages import (
     _AnthropicMessagesStrategy,
     looks_like_anthropic_base_url,

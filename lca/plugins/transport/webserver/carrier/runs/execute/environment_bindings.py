@@ -19,7 +19,7 @@ from lca.contracts.mechanisms.capability.capability import (
 )
 from lca.contracts.models.core.state.plane import PlaneBindings, PlaneKind
 from lca.contracts.protocols.runtime.infra.infra import MachineResolver, Sandbox
-from lca.infrastructure.file.file_store import FileStore
+from lca.infrastructure.file.store import FileStore
 from lca.infrastructure.runtime_plane.resolve.resolve import (
     PlaneRequest,
     ref_of,
@@ -98,7 +98,7 @@ def resolve_descriptor_registry(ctx: Any) -> Any:
         registry = None
     if registry is not None:
         return registry
-    from lca.infrastructure.observability.events.event.event_catalog import EVENT_DESCRIPTOR_REGISTRY
+    from lca.infrastructure.observability.events.event.catalog import EVENT_DESCRIPTOR_REGISTRY
 
     return EVENT_DESCRIPTOR_REGISTRY
 

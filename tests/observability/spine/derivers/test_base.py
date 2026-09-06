@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from lca.infrastructure.observability.spine.context.context import SpineContext
-from lca.infrastructure.observability.spine.event.event_spine import EventSpine
+from lca.infrastructure.observability.spine.event.spine import EventSpine
 from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
 
 if TYPE_CHECKING:
@@ -36,7 +36,7 @@ def test_deriver_failing_one_does_not_block_business(
     try:
         with caplog.at_level(
             logging.WARNING,
-            logger="lca.infrastructure.observability.spine.event.event_spine",
+            logger="lca.infrastructure.observability.spine.event.spine",
         ):
             rec = spine.append(
                 execution_point="brain.think.start",

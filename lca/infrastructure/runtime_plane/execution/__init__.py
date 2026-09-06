@@ -1,6 +1,6 @@
 """Public exports for ``execution`` (auto-fixed)."""
 
-from lca.infrastructure.runtime_plane.execution.execution_target import (
+from lca.infrastructure.runtime_plane.execution.target import (
     ExecutionTarget,
     ExecutionPlan,
     parse_execution_target,

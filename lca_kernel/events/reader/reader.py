@@ -11,7 +11,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from lca_kernel.events.spine.spine_runtime import SpineEventRecord
+from lca_kernel.events.spine.runtime import SpineEventRecord
 
 log = logging.getLogger(__name__)
 

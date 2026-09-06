@@ -14,8 +14,8 @@ from typing import TYPE_CHECKING, cast
 
 from lca.contracts.mechanisms import HookRegistry
 from lca.contracts.models.core.state.state import AgentState, Budget
-from lca.contracts.models.team.team.team_awareness import TeamAwareness
-from lca.contracts.protocols.act.effect.effect_handler import EffectHandlerRegistry
+from lca.contracts.models.team.team.awareness import TeamAwareness
+from lca.contracts.protocols.act.effect.handler import EffectHandlerRegistry
 from lca.contracts.protocols.act.embodiment.embodiment import Body
 from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     DeltaReducer,
@@ -23,11 +23,11 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_execution imp
     PhaseCapabilityReader,
 )
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseExecutor
-from lca.contracts.protocols.journal.artifact.artifact_closure import ArtifactClosure
+from lca.contracts.protocols.journal.artifact.closure import ArtifactClosure
 from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
 from lca.contracts.protocols.memory.memory import MemorySystem
 from lca.contracts.protocols.runtime.infra.infra import StateStore
-from lca.contracts.protocols.runtime.runtime.runtime_composition import (
+from lca.contracts.protocols.runtime.runtime.composition import (
     CheckpointStateResolver,
     CheckpointStateResolverFactory,
     DeclarativeInterpreter,
@@ -39,8 +39,8 @@ from lca.contracts.protocols.runtime.runtime.runtime_composition import (
     RuntimeJournal,
     RuntimeJournalFactory,
 )
-from lca.contracts.protocols.runtime.runtime.runtime_lifecycle import RuntimeLifecyclePublisher
-from lca.contracts.protocols.session.resume.resume_input import ResumeInputAdapter
+from lca.contracts.protocols.runtime.runtime.lifecycle import RuntimeLifecyclePublisher
+from lca.contracts.protocols.session.resume.input import ResumeInputAdapter
 from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.state.plan import CompiledRunPlan
 from lca.contracts.protocols.state.reducer import Reducer

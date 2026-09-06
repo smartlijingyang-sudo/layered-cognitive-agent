@@ -35,8 +35,8 @@ from lca.cognition.brain.sections.types import (
     render_subtasks_block,
     render_teammates,
 )
-from lca.contracts.atoms.control.control_slot import ControlSlot
-from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import PROMPT_SECTION_REGISTRY
 from lca.contracts.harness.composition.plugin_contract import (
@@ -53,8 +53,8 @@ from lca.contracts.models.cognition.prompt_assembly import (
 from lca.contracts.models.core.workspace.activation import ActivatedSkill
 from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.models.team.role.role_team import RoleProfile
-from lca.contracts.models.team.team.team_awareness import TeamAwareness
+from lca.contracts.models.team.role.team import RoleProfile
+from lca.contracts.models.team.team.awareness import TeamAwareness
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.runtime.infra.infra import Tool
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin

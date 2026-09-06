@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import cast
 
-from lca.cognition.brain.gate.gate_service import GateService
+from lca.cognition.brain.gate.service import GateService
 from lca.contracts.protocols.act.embodiment.embodiment import Body
 from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     PhaseCapabilityReader,

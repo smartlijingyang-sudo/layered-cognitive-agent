@@ -15,7 +15,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
 
 
 def _current_cursor():
-    from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
+    from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
         current_cursor,
     )
 

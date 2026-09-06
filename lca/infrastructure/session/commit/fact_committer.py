@@ -15,7 +15,7 @@ from typing import Any
 import structlog
 
 from lca.contracts.harness.memory.events import ContextInjected
-from lca.contracts.protocols.act.command.command_envelope import RunFact
+from lca.contracts.protocols.act.command.envelope import RunFact
 from lca.contracts.protocols.loop.fact_gateway import AppendReceipt
 from lca.contracts.protocols.observability.fact_committer import FactCommitter
 from lca.infrastructure.session._overflow_0.bindings import resolve_session_reader

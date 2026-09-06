@@ -6,7 +6,7 @@ from typing import Any
 
 from lca.contracts.atoms.enums.enums import ReflectionVerdict
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.atoms.semantic.semantic_keys import (
+from lca.contracts.atoms.semantic.keys import (
     FAILURE_KIND,
     FAILURE_KIND_EXECUTION,
     FAILURE_KIND_TRANSIENT,

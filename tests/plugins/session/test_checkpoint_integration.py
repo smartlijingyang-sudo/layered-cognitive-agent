@@ -10,7 +10,7 @@ import pytest
 from lca.cognition.brain.llm_turn import execute_llm_turn
 from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.core.state.state import AgentState, Budget
-from lca.contracts.protocols.session.persistence.persistence_service import CheckpointFailure
+from lca.contracts.protocols.session.persistence.service import CheckpointFailure
 from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
     set_publish_session,

@@ -98,7 +98,7 @@ def _print_step_detail(doc, step_index: int) -> None:
         print(f"step index {step_index} 不存在 (1..{len(doc.steps)})", file=sys.stderr)
         raise SystemExit(1)
     # 构造单步 document
-    from lca.contracts.models.observability.journal.journal_doc import (
+    from lca.contracts.models.observability.journal.doc import (
         close_document,
         empty_document,
     )

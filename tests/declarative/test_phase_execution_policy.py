@@ -12,7 +12,7 @@ from lca.contracts.atoms.ids.ids import utc_now
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.models.core.policy.stop import StopReason
-from lca.contracts.protocols.act.command.command_envelope import RunFact
+from lca.contracts.protocols.act.command.envelope import RunFact
 from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     ExecutionOutcome,
     PhaseExecutionFailure,
@@ -23,7 +23,7 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_fault_toleran
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import SemanticPhase
 from lca.harness.declarative import GenericPlanInterpreter, GraphAssembler, MappingRestrictedScope
 from lca.harness.declarative.compile.assembler.assembler import ExecutableNode
-from lca.harness.declarative.compile.phase.phase_execution_policy import (
+from lca.harness.declarative.compile.phase.execution_policy import (
     PhaseExecutionExhaustedError,
     RunDeadlineExceededError,
     _phase_error_message,

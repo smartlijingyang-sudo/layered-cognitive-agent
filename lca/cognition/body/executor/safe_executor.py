@@ -16,7 +16,7 @@ import structlog
 
 from lca.cognition.body.executor.cursor_record import CursorRecord
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.atoms.semantic.semantic_keys import (
+from lca.contracts.atoms.semantic.keys import (
     FAILURE_KIND,
     FAILURE_KIND_EXECUTION,
     FAILURE_KIND_TRANSIENT,
@@ -24,11 +24,11 @@ from lca.contracts.atoms.semantic.semantic_keys import (
 )
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.execution.result import ApprovalPendingError, ToolExecutionError
-from lca.contracts.models.team.role.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
+from lca.contracts.models.team.role.team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.contracts.observability.evidence.evidence import EvidenceRef
 from lca.contracts.protocols import SafeExecutor, Tool
 from lca.infrastructure.session._overflow_0.bindings import await_tool_side_effect_checkpoint
-from lca.infrastructure.tools.tool.tool_invocation_scope import tool_invocation_scope
+from lca.infrastructure.tools.tool.invocation_scope import tool_invocation_scope
 
 _log = structlog.get_logger("lca.safe_executor")
 
@@ -108,7 +108,7 @@ def _delta_summary_from_obs(observation: Any, *, limit: int = 200) -> str:
     return "✅ ok"
 
 
-from lca.cognition.body.internal.tool_journal_emit import (  # noqa: E402
+from lca.cognition.body.emit.tool_journal import (  # noqa: E402
     emit_tool_invoked,
     prepare_tool_started,
     record_tool_started_observability,
@@ -116,7 +116,7 @@ from lca.cognition.body.internal.tool_journal_emit import (  # noqa: E402
 
 
 def _commit_tool_denied(tool: Tool, reason: str) -> None:
-    from lca.cognition.body.internal.tool_journal_emit import emit_tool_denied
+    from lca.cognition.body.emit.tool_journal import emit_tool_denied
     from lca.loop.commit.tool_journal import (
         commit_tool_journal_receipt,
         commit_tool_phase_denied,
@@ -197,7 +197,7 @@ def _commit_tool_invoked(
 
 def _commit_approval_requested(tool: Tool, invocation_id: str) -> None:
     """Record a human-input request without opening a tool invocation."""
-    from lca.contracts.models.observability.act.act_journal_receipt import approval_requested_receipt
+    from lca.contracts.models.observability.act.journal_receipt import approval_requested_receipt
     from lca.loop.commit.act_journal import commit_act_journal_receipt
 
     commit_act_journal_receipt(approval_requested_receipt(tool, invocation_id))

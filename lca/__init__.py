@@ -11,7 +11,7 @@ from __future__ import annotations
 from importlib import import_module
 from typing import Any
 
-from lca.contracts.models.team.team.team_coordination import (
+from lca.contracts.models.team.team.coordination import (
     Debate,
     FanOut,
     Graph,
