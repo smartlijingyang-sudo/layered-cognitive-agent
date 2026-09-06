@@ -3,10 +3,10 @@
 PR4: rewrite verdicts MUST record a GateDecided event.  When the gate
 forces a respond, a GateDecided event with verdict=rewrite is recorded.
 
-PR6: the gate reads workspace artifacts **exclusively** from the typed
-``PerceiveState.current_manifest`` artifact items.  Live
-``get_run_workspace()`` reads from the Reasoner / Gates are forbidden
-(v3 §5.1) — the workspace is a Sensor-owned surface.
+PR6: the gate reads workspace artifacts **exclusively** from
+``AgentState.perceive`` manifest items.  Live ``get_run_workspace()`` reads
+from the Reasoner / Gates are forbidden (v3 §5.1) — the workspace is a
+Sensor-owned surface.
 """
 
 from __future__ import annotations

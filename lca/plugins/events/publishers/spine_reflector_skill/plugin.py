@@ -22,6 +22,11 @@ from lca.contracts.observability.skill_meta_ep_closure import SKILL_META_EVENT_P
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.observability.domain_event_publish import publish_structural_event
+from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
+
+_SKILL_SPINE_CATEGORIES: tuple[str, ...] = tuple(
+    _SPINE_EP_TO_CATEGORY[ep] for ep in SKILL_META_EVENT_POINTS
+)
 
 
 class ReflectorClass:
@@ -78,7 +83,7 @@ __all__ = [
     ),
     ownership=OwnershipDeclaration(
         reads=("event.bus",),
-        emits=SKILL_META_EVENT_POINTS,
+        emits=_SKILL_SPINE_CATEGORIES,
         state_mutation="forbidden",
     ),
     marker_class=ReflectorClass,

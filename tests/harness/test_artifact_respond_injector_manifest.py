@@ -1,8 +1,8 @@
 """ArtifactRespondInjector v3 — manifest-driven reads + DecisionGate inheritance.
 
 PR6.D.4: gate no longer performs live workspace reads via ``get_run_workspace()``;
-it pulls the authoritative artifact list from the typed
-``PerceiveState.current_manifest`` (workspace_artifacts kind).
+it pulls the authoritative artifact list from ``AgentState.perceive.manifest``
+(workspace_artifacts kind).
 
 PR4.C.3: every workspace gate MUST explicitly inherit ``DecisionGate`` —
 structural isinstance check enforced by ``check_protocol_impl.py``.
@@ -99,7 +99,7 @@ class TestArtifactRespondInjectorManifest:
     async def test_falls_back_to_passthrough_when_no_manifest_item(self) -> None:
         gate = ArtifactRespondInjector()
         state = _make_state()
-        # No manifest written — PerceiveState.current_manifest is None.
+        # No manifest written — state.perceive is None.
         decision = _make_decision(response_text="plain text")
         out = await gate.enforce(state, decision)
         # Pass-through: decision unchanged.

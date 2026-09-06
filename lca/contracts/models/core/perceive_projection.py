@@ -17,18 +17,14 @@ class PerceiveProjection:
 
 
 def current_manifest_from_state(state: object) -> ContextManifest | None:
-    """Return the reducer projection manifest, with legacy extra fallback."""
+    """Return the reducer-owned manifest projection for ``state``."""
     projection = getattr(state, "perceive", None)
-    if projection is not None:
-        manifest = getattr(projection, "manifest", None)
-        if isinstance(manifest, ContextManifest):
-            return manifest
-    from lca.contracts.models.core.perceive_state import PerceiveState
-
-    if isinstance(state, PerceiveState):
-        return state.current_manifest
-    legacy = PerceiveState.from_agent_state(state)  # type: ignore[arg-type]
-    return legacy.current_manifest
+    if projection is None:
+        return None
+    manifest = getattr(projection, "manifest", None)
+    if isinstance(manifest, ContextManifest):
+        return manifest
+    return None
 
 
 __all__ = ["PerceiveProjection", "current_manifest_from_state"]

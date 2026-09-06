@@ -64,7 +64,6 @@ _GRANDFATHERED_METHODS: dict[str, frozenset[str]] = {
             "with_cwd",
         }
     ),
-    "PerceiveState": frozenset({"from_agent_state", "commit"}),
     "WorkflowProgress": frozenset({"done"}),
     # TerminalOutcome 的判别器只读取自身 immutable 字段，不产生副作用；
     # 作为 ADR-0077 契约便利访问器显式列出，避免放宽其它 dataclass 方法。

@@ -10,11 +10,8 @@ this gate:
 2. Strips ``/files/file_<hex>`` references that are *not* on the ledger
 3. Appends the authoritative ``closure_text()`` if it is not already present
 
-v3 §5.1 / PR6.D.4: the artifact snapshot is read from the typed manifest
-slot (``PerceiveState.current_manifest`` → ``workspace_artifacts`` item)
-as the primary source.  Falls back to the live workspace when the manifest
-has no artifact item — keeps the pre-v3 test path working while the new
-v3 path is canonical.
+v3 §5.1 / PR6.D.4: the artifact snapshot is read from ``AgentState.perceive``
+manifest (``workspace_artifacts`` item) as the primary source.
 """
 
 from __future__ import annotations

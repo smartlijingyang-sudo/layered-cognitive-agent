@@ -270,33 +270,20 @@ class TestWorkingMemoryKeys:
         )
 
     def test_no_state_extra_magic_strings_outside_typed_module(self) -> None:
-        """The v3 spec forbids ad-hoc ``state.extra[key]`` magic strings.
-
-        The only sanctioned magic keys live in ``perceive_state.py``:
-        ``gate_decided`` and ``current_manifest``.  Every other writes
-        to ``state.extra`` must be flagged.
-        """
-        typed_module = (L1 / "contracts" / "models" / "core" / "perceive_state.py").resolve()
+        """The v3 spec forbids ad-hoc ``state.extra[key]`` magic strings for perceive/gate."""
         offenders: list[str] = []
         for path in _py_files(LCA):
-            if path.resolve() == typed_module:
-                continue
             src = _read_source(path)
             for match in re.finditer(r'state\.extra\[[\'"]([a-z_]+)[\'"]\]', src):
                 line_no = src[: match.start()].count("\n") + 1
-                # Allow reading extra fields documented in state.py itself.
                 offenders.append(
                     f"{path.relative_to(ROOT)}:{line_no}: "
-                    f"state.extra[{match.group(1)!r}] — must use the typed PerceiveState"
+                    f"state.extra[{match.group(1)!r}] — use Session facts or typed projections"
                 )
-        # We tolerate a small set of legacy keys during the rollout.
-        # The forward-looking assertion: the gate_decided / current_manifest
-        # strings are read & written in the typed module only.
         offenders = [o for o in offenders if "gate_decided" in o or "current_manifest" in o]
         assert not offenders, (
-            "Ad-hoc state.extra magic strings are forbidden outside the typed "
-            "PerceiveState module. offenders: "
-            f"{offenders}"
+            "gate_decided / current_manifest magic strings are forbidden in state.extra. "
+            f"offenders: {offenders}"
         )
 
 
