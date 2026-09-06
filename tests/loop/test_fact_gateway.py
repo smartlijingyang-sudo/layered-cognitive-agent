@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import pytest
 
@@ -11,6 +12,7 @@ from lca.loop.fact_gateway import (
     DefaultFactGateway,
     append_catalog_bound,
     fact_gateway_for_emit,
+    publish_ep_bound,
 )
 from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
@@ -87,6 +89,56 @@ def test_publish_ep_unknown_raises() -> None:
         gateway.publish_ep("not.a.real.ep", {}, actor="gate")
 
     assert session.event_count == 0
+
+
+def test_publish_ep_bound_reaches_spine_file_sink_through_bridge(tmp_path: Path) -> None:
+    """Spine EP via bridge must reach SpineFileSink (typed payload on observer path)."""
+    import json
+
+    from lca.infrastructure.persistence.run_buffer_registry import RunWriteBehindRegistry
+    from lca.plugins.events._session_observe import clear_observer_catalog, set_session
+    from lca.plugins.events.publishers._session_publish import (
+        reset_publish_session,
+        set_publish_session,
+    )
+    from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink
+    from lca.session.lifecycle.bind import RunEventSessionBridge
+    from lca_kernel.events.persistence.persistence import PersistenceObserver
+
+    PersistenceObserver.reset_singleton()
+    RunWriteBehindRegistry.reset_singleton()
+    clear_observer_catalog()
+
+    session = Session("run-fg-bridge")
+    bridge = RunEventSessionBridge(session)
+    sink = SpineFileSink(run_dir=tmp_path)
+    from lca.plugins.events._session_observe import register_as_session_observer
+
+    register_as_session_observer(SpineFileSink, sink)
+    set_session(bridge)
+    token = set_publish_session(bridge)
+    try:
+        receipt = publish_ep_bound(
+            "llm.call.start",
+            {"model": "qwen", "stream": True, "prompt_preview": "hi"},
+            actor="telemetry",
+        )
+        assert receipt is not None
+        assert receipt.event_type == "spine.llm.call.start"
+        sink.flush()
+    finally:
+        reset_publish_session(token)
+        set_session(None)
+        PersistenceObserver.reset_singleton()
+        RunWriteBehindRegistry.reset_singleton()
+        clear_observer_catalog()
+
+    lines = (tmp_path / "run-fg-bridge.spine.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    record = json.loads(lines[0])
+    assert record["execution_point"] == "llm.call.start"
+    assert record["category"] == "spine.llm.call.start"
+    assert record["payload"]["model"] == "qwen"
 
 
 def test_append_diagnostic_noop() -> None:

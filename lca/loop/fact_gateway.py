@@ -7,6 +7,7 @@ enrich seam 合并 FieldProducer 字段(与 Session hook 同轨)。catalog 事�
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Mapping
 from typing import Any
 
@@ -19,6 +20,7 @@ from lca.contracts.protocols.loop.spine_publish import (
 )
 from lca.harness.session.emit import emit
 from lca.infrastructure.session._overflow_0.bindings import resolve_session_for_emit
+from lca.plugins.events.publishers._session_publish import current_publish_session
 from lca_kernel.events.payloads.payloads import SpineEventPayload
 from lca_kernel.events.session.session import SessionEvent, SessionProtocol
 
@@ -65,6 +67,33 @@ def _enrich_publish_payload(
     return enrich_result.merged
 
 
+def _supports_payload_append(writer: object) -> bool:
+    """True when ``append(payload, *, producer=...)`` (bridge / bus facade)."""
+    append = getattr(writer, "append", None)
+    if not callable(append):
+        return False
+    try:
+        sig = inspect.signature(append)
+    except (TypeError, ValueError):
+        return False
+    return "producer" in sig.parameters
+
+
+def _receipt_from_bus_ref(ref: Any, *, event_type: str) -> AppendReceipt:
+    """Map synthetic :class:`EventRef` from bridge/facade append → :class:`AppendReceipt`."""
+    event_id = getattr(ref, "event_id", "")
+    ts = getattr(ref, "ts", 0.0)
+    if not isinstance(event_id, str) or ":" not in event_id:
+        raise ValueError(f"invalid EventRef.event_id: {event_id!r}")
+    session_id, seq_s = event_id.rsplit(":", 1)
+    return AppendReceipt(
+        event_type=event_type,
+        seq=int(seq_s),
+        session_id=session_id,
+        time=int(float(ts) * 1000),
+    )
+
+
 class DefaultFactGateway(FactGateway):
     """把 ``Session.append`` 收口为唯一事实生产门面。"""
 
@@ -82,6 +111,11 @@ class DefaultFactGateway(FactGateway):
         spine = SpineEventPayload.model_validate(
             {"execution_point": ep, "channel": "fact", "payload": merged}
         )
+        if _supports_payload_append(self._session):
+            # RunEventSessionBridge / SessionBusFacade: keep typed payload on the
+            # observer path so SpineFileSink can build_record (ADR-0186).
+            ref = self._session.append(spine, producer=DefaultFactGateway)
+            return _receipt_from_bus_ref(ref, event_type=spine.category.value)
         data = spine.model_dump(mode="json")
         data.pop("category", None)
         record = self._session.append(spine.category.value, data, actor=actor)
@@ -99,7 +133,11 @@ def fact_gateway_for_emit(
     session: object | None = None,
 ) -> DefaultFactGateway | None:
     """Resolve bound Session writer; ``None`` when unbound (tests / offline)."""
-    writer = session if session is not None else resolve_session_for_emit(state)
+    del state
+    if session is not None:
+        writer = session
+    else:
+        writer = current_publish_session() or resolve_session_for_emit()
     if writer is None:
         return None
     return DefaultFactGateway(writer)  # type: ignore[arg-type]
@@ -127,8 +165,9 @@ def publish_ep_bound(
     session: object | None = None,
     actor: str,
 ) -> AppendReceipt | None:
-    """``publish_ep`` with ``resolve_session_for_emit``; no-op if unbound."""
-    writer = session if session is not None else resolve_session_for_emit(state)
+    """``publish_ep`` with bound publish session; no-op if unbound."""
+    del state
+    writer = session if session is not None else current_publish_session()
     if writer is None:
         return None
     return DefaultFactGateway(writer).publish_ep(ep, payload, actor=actor)  # type: ignore[arg-type]

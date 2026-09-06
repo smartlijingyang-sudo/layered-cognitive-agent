@@ -221,3 +221,42 @@ def test_set_publish_session_does_not_rewrap_facade() -> None:
         assert current_publish_session() is facade
     finally:
         reset_publish_session(token)
+
+
+def test_model_visible_publish_authorized_after_boot_catalog() -> None:
+    """Boot catalog on EventBus must authorize publish_via_session (not EnvelopeBus twin)."""
+    from lca.contracts.event import Category
+    from lca.contracts.models.core.perceive.perception import ContextManifest
+    from lca.harness.profile.resolve.resolve import resolve_profile
+    from lca.plugins.events.publishers.model_visible.publisher import ModelVisiblePublisher
+    from lca.session.append import Session
+    from lca.session.lifecycle.bind import RunEventSessionBridge
+    from lca_kernel.boot.boot import _register_event_pipeline
+    from lca_kernel.events.payloads.model_visible import SpineLlmRequestHeaderPayload
+
+    EventBus.reset_singleton()
+    _register_event_pipeline(resolve_profile("profiles/web-standard.yaml"))
+    bus = EventBus.default()
+    cat = Category("spine.llm.request.header")
+    assert bus.registry.can_publish(ModelVisiblePublisher, cat)
+
+    session = Session("mv-auth")
+    bridge = RunEventSessionBridge(session)
+    token = set_publish_session(bridge)
+    try:
+        payload = SpineLlmRequestHeaderPayload(
+            step_id="step-001",
+            incarnation=1,
+            config={},
+            system="sys",
+            tools=(),
+            messages=(),
+            manifest=ContextManifest(items=(), digest="test"),
+            reason="initial",
+            previous_header_digest="",
+        )
+        ref = publish_via_session(payload, producer=ModelVisiblePublisher)
+        assert ref.category == "spine.llm.request.header"
+    finally:
+        reset_publish_session(token)
+        EventBus.set_default(None)

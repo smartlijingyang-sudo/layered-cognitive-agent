@@ -26,14 +26,14 @@ if TYPE_CHECKING:
 def _authorize_producer(payload: Any, producer: Any) -> None:
     """Run EventBus S1 authorization before Session.append.
 
-    Uses the same ``EnvelopeBus.default().registry.can_publish`` matrix as
-    ``EnvelopeBus.publish``. Raises ``UnauthorizedPublishError`` on deny.
+    Uses the same ``EventBus.default().registry.can_publish`` matrix as
+    ``EventBus.publish``. Raises ``UnauthorizedPublishError`` on deny.
     Missing plugin identity / category defers to EnvelopeBus / schema checks.
     """
-    from lca_kernel.events.bus.bus import EnvelopeBus
+    from lca_kernel.events.bus.bus import EventBus
     from lca_kernel.events.errors.errors import UnauthorizedPublishError
 
-    bus: EnvelopeBus[Any] = EnvelopeBus.default()
+    bus: EventBus[Any] = EventBus.default()  # type: ignore[assignment]
     coerce = getattr(bus, "_coerce_producer", None)
     producer_cls = coerce(producer) if callable(coerce) else producer
     category = getattr(payload, "category", None)

@@ -183,7 +183,7 @@ def test_capture_pre_llm_advances_cursor_step(hook: Any) -> None:
     journal.tool_total=0(H-xref)。
     """
     from lca.contracts.observability.core.incarnation import Incarnation
-    from lca.infrastructure.observability.loop_cursor.in.memory import InMemoryLoopCursor
+    from lca.infrastructure.observability.loop_cursor import InMemoryLoopCursor
 
     cursor = InMemoryLoopCursor(
         run_id="run-adv",
@@ -433,12 +433,12 @@ def test_adapter_pre_post_share_step_identity_after_open_step(bound_session: Any
 
     from lca.contracts.models.core.conversation.llm import LLMResponse
     from lca.contracts.observability.core.incarnation import Incarnation
-    from lca.infrastructure.observability.loop_cursor.in.memory import InMemoryLoopCursor
+    from lca.infrastructure.observability.loop_cursor import InMemoryLoopCursor
+    from lca.plugins.events.hooks.model_visible.adapter import ModelVisibleHookAdapter
+    from lca.plugins.events.hooks.model_visible.hook import ModelVisibleHook
     from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
         CurrentReasonerPrompt,
     )
-    from lca.plugins.events.hooks.model_visible.adapter import ModelVisibleHookAdapter
-    from lca.plugins.events.hooks.model_visible.hook import ModelVisibleHook
     from lca.plugins.events.publishers._session_publish import (
         reset_publish_session,
         set_publish_session,
