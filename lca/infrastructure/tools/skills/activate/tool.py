@@ -8,8 +8,8 @@ from typing import Any, ClassVar
 from lca.contracts.atoms.enums.enums import ContentType
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
-from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.protocols import Tool
 from lca.contracts.protocols.memory.operational_skills import (
     SkillNotFoundError,

@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall, Turn
 from lca.contracts.models.core.conversation.message import AgentMessage, agent_message_as_text
+from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall, Turn
 from lca.contracts.protocols.session.resume.input import ResumeInput, ResumeInputAdapter
 
 

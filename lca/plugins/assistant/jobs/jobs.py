@@ -66,7 +66,9 @@ from lca.contracts.protocols.assistant.jobs import (
     JobSpec,
     WorkItemHandle,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 from lca.plugins.assistant.events._events import (
     AssistantJobFiredEventPayload,

@@ -8,10 +8,12 @@ from enum import Enum
 from typing import Literal, Protocol, runtime_checkable
 
 from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
-from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.models.core.policy.stop import StopDecision
+from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols.act.command.envelope import CommandEnvelope, RunDelta, RunFact
-from lca.contracts.protocols.declarative.declarative_1.declarative_common import DeclarativeValidationError
+from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
+    DeclarativeValidationError,
+)
 from lca.contracts.protocols.declarative.declarative_1.declarative_graph import EffectPolicyPlan
 
 

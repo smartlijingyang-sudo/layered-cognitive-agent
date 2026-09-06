@@ -27,8 +27,8 @@ from lca.contracts.harness.memory.events import (
     TurnEnded,
     TurnStarted,
 )
-from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.infrastructure.session._overflow_0.bindings import resolve_session_reader
 from lca.infrastructure.session.emit.surface_emit import append_user_surface
 from lca.loop.fact_gateway import append_catalog_bound

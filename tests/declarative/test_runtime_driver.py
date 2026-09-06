@@ -6,10 +6,13 @@ import pytest
 
 from lca.contracts.atoms.enums.enums import ActionType, ReflectionVerdict
 from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
-from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.models.core.policy.stop import StopDecision, StopReason
-from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseInput, PhaseResult
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
+    PhaseInput,
+    PhaseResult,
+)
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.harness.composition.plan_compiler import compile_plan
 from lca.harness.profile.resolve.resolve import resolve_profile

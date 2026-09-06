@@ -30,7 +30,9 @@ from lca.contracts.models.cognition.prompt_assembly import (
 from lca.contracts.models.cognition.prompt_assembly import (
     PromptTemplateProvider as Protocol_,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 # ── Built-in templates (DSH-style declarative defaults) ──────────────

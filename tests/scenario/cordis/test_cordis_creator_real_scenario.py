@@ -53,11 +53,11 @@ from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEve
 from lca.contracts.protocols import LLMAdapter
 from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
 from lca.infrastructure.observability.facade import BoundObservability, bind_backends
+from lca.plugins.roles.cordis_creator import build_cordis_creator_role_profile
 from lca.plugins.think.composition.composer_provider import (
     CordisComposer,
     build_default_invariant_checker,
 )
-from lca.plugins.roles.cordis_creator import build_cordis_creator_role_profile
 from lca.plugins.tools.bash import build_bash_tool
 from lca.plugins.tools.cordis_control import build_cordis_control_tool
 from lca.plugins.tools.file_write import build_file_write_tool
@@ -291,7 +291,6 @@ def _build_creator_toolkit(preset_root: Path):
     这样 agent 的下一次 ``use_tool("csv_stats", ...)`` 能命中。
     """
     from cordis import Context
-
     from lca.infrastructure.capability.tools.tools import ToolsService
 
     ctx = Context()
@@ -349,7 +348,6 @@ def _build_creator_toolkit_with_preset(preset_id: str, preset_root: Path):
     的工具集直接含 csv_stats（无需 cordis_control）。
     """
     from cordis import Context
-
     from lca.contracts.mechanisms.composition.composition import PluginFactory
     from lca.infrastructure.capability.tools.tools import ToolsService
 

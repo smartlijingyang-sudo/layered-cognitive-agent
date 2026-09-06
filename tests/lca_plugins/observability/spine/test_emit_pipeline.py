@@ -55,7 +55,9 @@ class _CaptureSink:
 
 def _make_spine() -> EventSpine:
     """Return a fresh ``EventSpine`` with capture sink + passthrough hook."""
-    from lca.infrastructure.observability.loop_cursor.spine._spine_port import bind_session_append_hook
+    from lca.infrastructure.observability.loop_cursor.spine._spine_port import (
+        bind_session_append_hook,
+    )
     from tests.observability.spine.conftest import SyncPassthroughHook
 
     SpineContext.set_run("emit-pipeline-test")

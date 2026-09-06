@@ -14,8 +14,12 @@ from lca.cognition.memory.policy.policy import (
 )
 from lca.contracts.atoms.enums.enums import MemoryLayer, MemoryRecordKind
 from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.models.core.conversation.memory import (
+    MemoryRecord,
+    MemoryRelationKind,
+    MemoryTrust,
+)
 from lca.contracts.models.core.execution.decision import Observation, Reflection
-from lca.contracts.models.core.conversation.memory import MemoryRecord, MemoryRelationKind, MemoryTrust
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import MemorySystem, TemporalMemoryStore
 from lca.infrastructure.state_store.sqlite_temporal_memory import SqliteTemporalMemoryStore

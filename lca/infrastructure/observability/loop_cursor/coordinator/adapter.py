@@ -51,7 +51,12 @@ from lca.contracts.models.observability.journal.step import (
 from lca.contracts.models.observability.journal.step import (
     ToolResult as LegacyToolResult,
 )
-from lca.contracts.observability.cursor.loop_cursor import CloseReason, CursorError, LoopCursor, PhaseName
+from lca.contracts.observability.cursor.loop_cursor import (
+    CloseReason,
+    CursorError,
+    LoopCursor,
+    PhaseName,
+)
 from lca.contracts.observability.cursor.loop_cursor_payloads import (
     ThinkingRecord,
     ToolCallRecord,

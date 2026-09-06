@@ -7,7 +7,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from lca.infrastructure.computer.constants.constants import COMPUTER_RESULT_BEGIN, COMPUTER_RESULT_END
+from lca.infrastructure.computer.constants.constants import (
+    COMPUTER_RESULT_BEGIN,
+    COMPUTER_RESULT_END,
+)
 from lca.infrastructure.computer.parse.result import parse_computer_stdout
 from lca.infrastructure.file.store import LocalFileStore
 from lca.infrastructure.tools.default.set import build_default_tools

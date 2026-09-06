@@ -7,13 +7,13 @@ import time
 from typing import Any
 
 from lca.contracts.atoms.ids.ids import new_id
-from lca.infrastructure.llm_adapter.settings.settings import is_qwen_model
 from lca.infrastructure.llm.resolver import (
     LLMUnavailableError,
     get_async_openai_client,
     get_model_registry,
     llm_openai_credentials,
 )
+from lca.infrastructure.llm_adapter.settings.settings import is_qwen_model
 
 
 class StructuredLLMError(RuntimeError):

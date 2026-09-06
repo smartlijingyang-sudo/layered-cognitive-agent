@@ -11,7 +11,10 @@ from starlette.applications import Starlette
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from lca.infrastructure.integrations.composio.models.models import ComposioConnection, ComposioToolDef
+from lca.infrastructure.integrations.composio.models.models import (
+    ComposioConnection,
+    ComposioToolDef,
+)
 from lca.infrastructure.integrations.composio.service.service import ComposioIntegration
 from lca.infrastructure.integrations.composio.settings.settings import ComposioSettings
 from lca.plugins.transport.webserver.handlers.composio import endpoints as composio_handlers

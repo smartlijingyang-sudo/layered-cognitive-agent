@@ -1,47 +1,29 @@
-# bundles/event-bus-components.yaml — Event-bus component plugins (plugin-universe PR-4).
-#
-# ADR-0194 P2-16: spine_reflector_* entries removed once EPs route through
-# FactGateway (lca/loop/spine_ep_emit, llm_emit, kernel_loop_emit, …).
-# COMPAT shims remain under lca/plugins/events/publishers/spine_reflector_*/
-# for test_catalog + lazy import paths (delete-when: rg 生产引用归零).
-
 entries:
-  # ── Kernel event bus（ADR-0183）：providers 依赖 event.bus ──
-  - id: lca.events.bus
-    name: events_bus
-    $module: lca_kernel.events.manifest
-    config: {}
-
-  # ── Publishers: cursor + writable matrix ──
-  - id: events.spine.loop_cursor
-    name: events_spine_loop_cursor
-    $module: lca.plugins.events.publishers.spine_loop_cursor.plugin
-    config: {}
-
-  - id: events.spine.writable_matrix
-    name: events_spine_writable_matrix
-    $module: lca.plugins.events.publishers.spine_writable_matrix.plugin
-    config: {}
-
-  - id: events.model_visible.publisher
-    name: events_model_visible_publisher
-    $module: lca.plugins.events.publishers.model_visible.publisher
-    config: {}
-
-  # ── Publisher: existing delegation_cache ──
-  - id: delegation_cache
-    name: delegation_cache_publisher
-    $module: lca.plugins.events.publishers.delegation_cache.plugin
-    config: {}
-
-  # ── Sink: existing spine_file_sink ──
-  - id: lca.events.sink.spine_file
-    name: lca_events_sink_spine_file
-    $module: lca.plugins.events.sinks.spine_file_sink
-    config: {}
-
-  # ── Subscriber: exception index (write-behind) ──
-  - id: events.subscriber.exception_index_writer
-    name: events_subscriber_exception_index_writer
-    $module: lca.plugins.events.subscribers.exception_index_writer
-    config: {}
+- id: lca.events.bus
+  name: events_bus
+  $module: lca_kernel.events.manifest.manifest
+  config: {}
+- id: events.spine.loop_cursor
+  name: events_spine_loop_cursor
+  $module: lca.plugins.events.publishers.spine_loop_cursor.plugin
+  config: {}
+- id: events.spine.writable_matrix
+  name: events_spine_writable_matrix
+  $module: lca.plugins.events.publishers.spine_writable_matrix.plugin
+  config: {}
+- id: events.model_visible.publisher
+  name: events_model_visible_publisher
+  $module: lca.plugins.events.publishers.model_visible.publisher
+  config: {}
+- id: delegation_cache
+  name: delegation_cache_publisher
+  $module: lca.plugins.events.publishers.delegation_cache.plugin
+  config: {}
+- id: lca.events.sink.spine_file
+  name: lca_events_sink_spine_file
+  $module: lca.plugins.events.sinks.spine_file_sink.manifest
+  config: {}
+- id: events.subscriber.exception_index_writer
+  name: events_subscriber_exception_index_writer
+  $module: lca.plugins.events.subscribers.exception_index_writer
+  config: {}

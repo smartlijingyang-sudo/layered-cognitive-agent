@@ -14,7 +14,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from lca.contracts.observability.evidence.evidence import Classification, EvidencePolicy, RetentionClass
+from lca.contracts.observability.evidence.evidence import (
+    Classification,
+    EvidencePolicy,
+    RetentionClass,
+)
 
 _DEFAULT_INLINE_THRESHOLD_BYTES = 64 * 1024
 

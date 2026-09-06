@@ -19,8 +19,8 @@ from typing import Any, cast
 
 import pytest
 
-from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.models.observability.journal.journal import RunScope
 from lca.contracts.protocols.runtime.runtime.lifecycle import (

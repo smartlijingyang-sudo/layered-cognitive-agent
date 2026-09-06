@@ -5,7 +5,10 @@ from __future__ import annotations
 from typing import cast
 
 from lca.contracts.atoms.enums.enums import ActionScope
-from lca.contracts.mechanisms.capability.capability import MissingCapabilityError, require_capability
+from lca.contracts.mechanisms.capability.capability import (
+    MissingCapabilityError,
+    require_capability,
+)
 from lca.contracts.protocols import (
     MemorySystem,
     PerceiveHub,

@@ -260,10 +260,11 @@ class TestRegisterAndApply:
 
     def test_apply_pipeline_wires_consumer_rules(self, capsys: pytest.CaptureFixture[str]) -> None:
         """consumer_rules 只作元数据:apply 不 subscribe;显式 subscribe 后 publish 才命中。"""
-        from lca.contracts.event import Category
         from lca.plugins.events.subscribers.console_projector.subscriber import (
             ConsoleProjectorSubscriber,
         )
+
+        from lca.contracts.event import Category
         from lca_kernel.events.pipeline.pipeline import ConsumerRule
 
         pipeline = Pipeline(

@@ -15,10 +15,10 @@ from types import SimpleNamespace
 import pytest
 
 from lca.application.authoring.casting import build_from_casting_plan
-from lca.plugins.collaboration.modes.cordis_creator import build_cordis_creator_agent
 from lca.contracts.capabilities import CORDIS_CONTROL_TOOL_FACTORY, CORDIS_CREATOR_ROLE
 from lca.contracts.mechanisms.capability.capability import MissingCapabilityError
 from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
+from lca.plugins.collaboration.modes.cordis_creator import build_cordis_creator_agent
 
 REPO = Path(__file__).resolve().parents[2]
 

@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.policy.stop import StopDecision, StopReason
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.protocols.act.command.envelope import RunDelta
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     DeclarativeRunOutcome,
@@ -21,10 +21,10 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
     PhaseRunCursor,
 )
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
+from lca.harness.composition.plan_compiler import compile_plan
 from lca.harness.declarative import GenericPlanInterpreter, GraphAssembler, MappingRestrictedScope
 from lca.harness.graph.governance.phase_governance import classify_control_verdict
 from lca.harness.plan import compiled_run_plan_ref
-from lca.harness.composition.plan_compiler import compile_plan
 from lca.harness.profile.resolve.resolve import resolve_profile
 from tests.phase_executors import standard_phase_executors
 

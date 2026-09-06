@@ -17,12 +17,12 @@ from lca.cognition.body.actions.action_registry import ActionRegistry
 from lca.cognition.body.executor.safe_executor import SimpleSafeExecutor
 from lca.cognition.body.executor.simple_body import SimpleBody
 from lca.cognition.body.tools.tool_registry import SimpleToolRegistry
+from lca.cognition.brain.gate.hook_registry import CordisHookRegistry
+from lca.cognition.brain.pipeline.modular_brain import ModularBrain
 
 # L1
 from lca.cognition.brain.reasoner.critic import SimpleCritic
-from lca.cognition.brain.pipeline.modular_brain import ModularBrain
 from lca.cognition.brain.reasoner.reasoner import PromptReasoner
-from lca.cognition.brain.gate.hook_registry import CordisHookRegistry
 from lca.cognition.memory.simple.memory import SimpleMemorySystem
 from lca.contracts.protocols import (
     AgentTransport,
@@ -53,12 +53,12 @@ from lca.plugins.composer.runtime.runtime.factory import (
     RuntimeDeps,
     build_fixture_cognitive_runtime,
 )
-from lca.plugins.loop.state.stop_policy.plugin import DefaultStopPolicy
 from lca.plugins.gate.decision_classifier_provider import DefaultDecisionClassifier
 from lca.plugins.journal.artifact.closure_provider import DefaultArtifactClosure
 
 # L2
 from lca.plugins.loop.reducer.plugin import DefaultReducer
+from lca.plugins.loop.state.stop_policy.plugin import DefaultStopPolicy
 from tests.support.unimplemented_transport import UnimplementedTransport
 
 

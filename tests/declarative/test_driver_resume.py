@@ -9,11 +9,11 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
     DeclarativeValidationError,
     PhaseRunCursor,
 )
+from lca.loop.driver import DeclarativeRuntimeDriver
 from lca.runtime.support.checkpoint_resolution import (
     DeclarativeCheckpoint,
     DeclarativeCheckpointStateResolver,
 )
-from lca.loop.driver import DeclarativeRuntimeDriver
 
 EXPECTED_PLAN_REF = "expected-plan-ref"
 

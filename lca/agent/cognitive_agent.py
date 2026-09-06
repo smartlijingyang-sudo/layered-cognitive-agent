@@ -7,14 +7,14 @@ import contextlib
 from collections.abc import Awaitable, Callable
 
 from lca.contracts.mechanisms import Hook
-from lca.contracts.models.core.policy.budget import DEFAULT_MAX_STEPS
-from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.conversation.message import (
     AgentMessage,
     agent_message_as_text,
     agent_message_text,
 )
 from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.policy.budget import DEFAULT_MAX_STEPS
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import StateSnapshot
 from lca.contracts.models.observability.journal.journal import (
     AgentRunFinished,

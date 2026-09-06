@@ -32,10 +32,8 @@ from lca.contracts.protocols.assistant.catalog import (
     ProfilePatch,
 )
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import PluginSpecKind
-from lca.harness.plugin_api import definition_from_plugin
 from lca.harness.plugin.manifest import EffectClass
-from lca.plugins.assistant.events._events import AssistantCreatedEventPayload
-from lca.plugins.assistant.home._home_layout import CONFIG_FACE_FILES, SCHEMA_VERSION
+from lca.harness.plugin_api import definition_from_plugin
 from lca.plugins.assistant.catalog.catalog import (
     AssistantCatalogError,
     AssistantCatalogImpl,
@@ -43,6 +41,8 @@ from lca.plugins.assistant.catalog.catalog import (
     Config,
     setup,
 )
+from lca.plugins.assistant.events._events import AssistantCreatedEventPayload
+from lca.plugins.assistant.home._home_layout import CONFIG_FACE_FILES, SCHEMA_VERSION
 
 # ── helpers ─────────────────────────────────────────────────────────
 

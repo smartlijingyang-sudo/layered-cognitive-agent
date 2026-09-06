@@ -17,8 +17,8 @@ import pytest
 from lca.cognition.brain.decision_gates import record_gate_decided
 from lca.cognition.perceive.hub import SequentialPerceiveHub
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.models.core.policy.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.perceive.perception import ContextItem
+from lca.contracts.models.core.policy.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols import PerceiveHub, Sensor
 from lca.contracts.protocols.think.cognition import SensorDisabledError

@@ -7,13 +7,13 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.models.core.workspace.activation import ActivatedSkill
-from lca.contracts.models.core.policy.budget import create_budget
 from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection, Turn
-from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
-from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.core.policy.budget import create_budget
 from lca.contracts.models.core.policy.stop import StopDecision
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.core.workspace.activation import ActivatedSkill
 from lca.plugins.loop.reducer.plugin import DefaultReducer
 from lca_kernel.events.payloads.spine import SpineEventPayload
 

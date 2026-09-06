@@ -29,8 +29,8 @@ from lca.cognition.memory.policy.policy import (
 from lca.cognition.memory.semantic.compaction import SemanticCompactionPolicy
 from lca.contracts.atoms.enums.enums import MemoryLayer
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.models.core.execution.decision import Observation, Reflection
 from lca.contracts.models.core.conversation.memory import MemoryRecord, MemoryTrust
+from lca.contracts.models.core.execution.decision import Observation, Reflection
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.models.observability.journal.journal import (
     ContextCompacted,

@@ -18,7 +18,10 @@ from pathlib import Path
 from lca.infrastructure.observability.journal.engine.journal_io import JOURNAL_SCHEMA_VERSION
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 from lca.plugins.transport.webserver.doctor import diagnose
-from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession, RunStatus
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
+    RunSession,
+    RunStatus,
+)
 
 
 def _write_jsonl(path: Path, rows: list[dict]) -> None:

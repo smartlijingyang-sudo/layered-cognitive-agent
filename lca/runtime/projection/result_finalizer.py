@@ -88,7 +88,9 @@ class RuntimeResultFinalizer(ResultFinalizer):
             declarative_outcome=outcome,
         )
         if outcome.kind is ExecutionOutcome.PAUSED:
-            from lca.infrastructure.session.emit.lifecycle_emit import emit_approval_pause_from_result
+            from lca.infrastructure.session.emit.lifecycle_emit import (
+                emit_approval_pause_from_result,
+            )
 
             emit_approval_pause_from_result(result)
         return result

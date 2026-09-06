@@ -4,17 +4,17 @@ from __future__ import annotations
 
 import pytest
 
+from lca.contracts.models.core.policy.stop import StopDecision, StopReason
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState, Budget
-from lca.contracts.models.core.policy.stop import StopDecision, StopReason
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     ExecutionOutcome,
     PhaseResult,
 )
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
+from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
 from lca.harness.graph.governance.phase_governance import interpret_control_verdict
 from lca.harness.graph.traversal import PhaseTraversal
-from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
 
 
 @pytest.mark.parametrize(
@@ -217,10 +217,13 @@ async def test_phase_governance_keeps_rewrite_nonblocking_and_stops_explicitly(
         PhaseContribution,
         SemanticPhase,
     )
-    from lca.harness.declarative.compile.assembler.assembler import ExecutableContribution, ExecutableNode
+    from lca.harness.declarative.compile.assembler.assembler import (
+        ExecutableContribution,
+        ExecutableNode,
+    )
     from lca.harness.declarative.compile.phase.capabilities import MappingPhaseCapabilities
-    from lca.harness.graph.governance.phase_governance import PhaseGovernance
     from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
+    from lca.harness.graph.governance.phase_governance import PhaseGovernance
 
     journal = _Journal()
     state = AgentState(trace_id="trace:test", task="test", budget=Budget())
@@ -300,10 +303,13 @@ async def test_phase_governance_uses_semantic_phase_when_node_name_is_custom() -
         PhaseContribution,
         SemanticPhase,
     )
-    from lca.harness.declarative.compile.assembler.assembler import ExecutableContribution, ExecutableNode
+    from lca.harness.declarative.compile.assembler.assembler import (
+        ExecutableContribution,
+        ExecutableNode,
+    )
     from lca.harness.declarative.compile.phase.capabilities import MappingPhaseCapabilities
-    from lca.harness.graph.governance.phase_governance import PhaseGovernance
     from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
+    from lca.harness.graph.governance.phase_governance import PhaseGovernance
 
     journal = _Journal()
     state = AgentState(trace_id="trace:test", task="test", budget=Budget())

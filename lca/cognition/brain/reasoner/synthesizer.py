@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import contextlib
 
-from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import Budget
 from lca.contracts.protocols import Synthesizer
 from lca.infrastructure.session.emit.cognitive_emit import emit_synthesizer_merge_for_state

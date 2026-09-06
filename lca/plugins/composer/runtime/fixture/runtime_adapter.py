@@ -32,7 +32,6 @@ from lca.harness.declarative.execute.loop_guard import DeclarativeLoopGuardEvalu
 from lca.plugins.composer.runtime import fixture_runtime_defaults
 from lca.plugins.composer.runtime.fixture.runtime_input import RuntimeDeps
 from lca.plugins.composer.runtime.runtime.deps import ProductionRuntimeDeps
-from lca.plugins.loop.state.stop_policy.plugin import DefaultStopPolicy
 from lca.plugins.journal.declarative.runtime_seams_provider import (
     DefaultCheckpointStateResolverFactory,
     DefaultDeclarativeInterpreterFactory,
@@ -42,6 +41,7 @@ from lca.plugins.journal.declarative.runtime_seams_provider import (
     RegistryEffectDispatcherFactory,
 )
 from lca.plugins.loop.reducer.plugin import DefaultReducer
+from lca.plugins.loop.state.stop_policy.plugin import DefaultStopPolicy
 
 
 class FixtureRuntimeAdapter:

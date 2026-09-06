@@ -66,11 +66,11 @@ from lca.contracts.models.observability.journal.journal import (
     BootPluginFiberSpawned,
     BootProfileResolved,
 )
-from lca.harness.plugin_api import PluginDefinition
 
 # boot_products is the seam's source-of-truth (compat-only in PR-2 sense);
 # the kernel still imports the data classes from the legacy module path.
 from lca.harness.composition.boot_compile import compile_profile_boot_products
+from lca.harness.plugin_api import PluginDefinition
 from lca.harness.profile.boot.products import (
     ProfileBootProducts,
     attach_profile_boot_products,
@@ -81,9 +81,9 @@ from lca.harness.profile.boot.products import (
 from lca.harness.profile.boot.projection import BootEntry
 from lca.harness.profile.resolve.resolve import ResolvedProfile, resolve_entries
 from lca.infrastructure.file.store import FileStore
+from lca_kernel.boot.stages import Stage
 from lca_kernel.cli.errors import KernelError, StageError
 from lca_kernel.runtime.observability import install_observability
-from lca_kernel.boot.stages import Stage
 
 _log = structlog.get_logger(__name__)
 

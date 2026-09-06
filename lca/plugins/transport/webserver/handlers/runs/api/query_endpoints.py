@@ -14,18 +14,21 @@ from typing import Any
 from starlette.requests import Request
 from starlette.responses import JSONResponse, StreamingResponse
 
-from lca.contracts.mechanisms.capability.capability import MissingCapabilityError, require_capability
+from lca.contracts.mechanisms.capability.capability import (
+    MissingCapabilityError,
+    require_capability,
+)
 from lca.contracts.observability.registry.run_locator import RunLocator
 from lca.infrastructure.observability.journal.sse.frames import parse_last_event_id
 from lca.plugins.transport.webserver.handlers.cors.cors import cors_headers
 from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import _run_port_of
+from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import RunPort
 from lca.plugins.transport.webserver.read.runs.evidence.evidence import (
     EvidencePayloadDecodeError,
     InvalidEvidenceDigestError,
     RunEvidenceNotFoundError,
     RunEvidenceReader,
 )
-from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import RunPort
 
 _PROFILE_SNAPSHOT_NAME = "profile_snapshot.json"
 _DEFAULT_PROFILE_SNAPSHOT_ROOT = Path("traces") / "runs"

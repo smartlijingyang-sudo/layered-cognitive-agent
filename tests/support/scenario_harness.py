@@ -269,8 +269,8 @@ def run_stub_agent(task: str = "hello world") -> Any:
     to assert the contract without exercising the full cognitive loop.
     """
     from lca.contracts.atoms.ids.ids import new_id
-    from lca.contracts.models.core.state.lifecycle import TaskStatus
     from lca.contracts.models.core.execution.result import Result
+    from lca.contracts.models.core.state.lifecycle import TaskStatus
     from lca.contracts.models.core.state.state import Budget
 
     return Result(

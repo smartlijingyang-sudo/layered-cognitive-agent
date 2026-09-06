@@ -14,7 +14,11 @@ from pydantic import BaseModel
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
-from lca.contracts.atoms.telemetry.telemetry import ATTR_CANDIDATE_COUNT, ATTR_SYNTHESIS_METHOD, SpanName
+from lca.contracts.atoms.telemetry.telemetry import (
+    ATTR_CANDIDATE_COUNT,
+    ATTR_SYNTHESIS_METHOD,
+    SpanName,
+)
 from lca.contracts.capabilities import STRATEGIES
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -24,12 +28,14 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.policy.budget import create_budget
 from lca.contracts.models.core.state.lifecycle import TaskStatus
-from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.team.team.coordination import STRATEGY_KEY_FAN_OUT
 from lca.contracts.protocols import Synthesizer, TeamAssembly, TeamStage, TeamStrategy
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.observability import span
 

@@ -10,7 +10,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from lca.contracts.protocols.declarative.declarative_1.declarative_capability import CapabilityDeclaration
+from lca.contracts.protocols.declarative.declarative_1.declarative_capability import (
+    CapabilityDeclaration,
+)
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
     AGGREGATIONS,
     ALLOWED_EFFECTS,

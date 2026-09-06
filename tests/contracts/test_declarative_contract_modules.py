@@ -23,7 +23,9 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
     PluginSpec,
     ValidationReport,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import PluginSpec as SplitPluginSpec
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    PluginSpec as SplitPluginSpec,
+)
 
 
 def test_legacy_declarative_module_reexports_specialized_contracts() -> None:

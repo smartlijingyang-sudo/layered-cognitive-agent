@@ -19,8 +19,8 @@ from typing import Any
 
 import pytest
 
-from lca.contracts.observability.evidence.fsync import FsyncProtocol
 from lca.contracts.observability.core.ssot import FsyncProtocol as SsotFsyncProtocol
+from lca.contracts.observability.evidence.fsync import FsyncProtocol
 from lca.infrastructure.observability.spine.event.record import EventRecord
 from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
 from lca.infrastructure.observability.spine.sinks.tracing_file_sink import (

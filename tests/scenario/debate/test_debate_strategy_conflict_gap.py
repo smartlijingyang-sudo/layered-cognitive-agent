@@ -9,8 +9,8 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lca.application.api.api import Agent, Team
 from lca.contracts.atoms.enums.enums import LLMStreamEventType
-from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.team.team.coordination import Debate
 from lca.contracts.protocols import LLMAdapter
 

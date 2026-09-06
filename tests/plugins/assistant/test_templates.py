@@ -24,6 +24,7 @@ from lca.contracts.observability.closure.assistant_ep_closure import (
     ASSISTANT_CREATED,
 )
 from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
+from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
 from lca.plugins.assistant.home._home_layout import (
     CONFIG_FACE_FILES,
     TEMPLATE_REGISTRY,
@@ -31,7 +32,6 @@ from lca.plugins.assistant.home._home_layout import (
     known_template_ids,
     render_template,
 )
-from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
 
 ROLE_TEMPLATES: tuple[str, ...] = (
     "assistant.research",

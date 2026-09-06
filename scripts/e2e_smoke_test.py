@@ -63,12 +63,12 @@ async def main() -> int:
     # ── Step 2: Compile plan ──────────────────────────────────────
     print("\n[2/6] compile_plan (declarative projection) ...")
     try:
+        from lca.harness.composition.plan_compiler import compile_plan
         from lca.harness.declarative.controls.validation import (
             is_validation_valid,
             validation_errors,
         )
         from lca.harness.plan import compiled_run_plan_ref
-        from lca.harness.composition.plan_compiler import compile_plan
 
         plan = compile_plan(resolved)
         print(f"  ✓ CompiledRunPlan: plan_ref={compiled_run_plan_ref(plan)}")

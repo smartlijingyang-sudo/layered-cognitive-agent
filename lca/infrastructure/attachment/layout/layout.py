@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from lca.contracts.models.core.state.guest_layout import join_under
-from lca.infrastructure.attachment.settings.settings import AttachmentPolicyDocument, get_attachment_policy
+from lca.infrastructure.attachment.settings.settings import (
+    AttachmentPolicyDocument,
+    get_attachment_policy,
+)
 
 
 def sanitize_attachment_name(name: str) -> str:

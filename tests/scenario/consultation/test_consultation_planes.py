@@ -23,11 +23,11 @@ from lca.contracts.atoms.semantic.keys import (
     FAILURE_KIND_TRANSIENT,
     OBS_COMPLETION_QUALITY,
 )
+from lca.contracts.models.core.execution.decision import Decision, DelegationSpec, Observation
 from lca.contracts.models.core.policy.budget import (
     DEFAULT_DELEGATION_TIMEOUT_S,
     resolve_delegation_timeout_s,
 )
-from lca.contracts.models.core.execution.decision import Decision, DelegationSpec, Observation
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.models.team.consultation.consultation import (
     ConsultationDisposition,

@@ -26,8 +26,8 @@ from lca.contracts.atoms.semantic.keys import (
     OBS_MEMBER_SUBTASKS,
     OBS_RESULT_KIND,
 )
-from lca.contracts.models.core.execution.decision import Observation, Reflection
 from lca.contracts.models.core.conversation.memory import MemoryRecord
+from lca.contracts.models.core.execution.decision import Observation, Reflection
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.observability.memory.journal_receipt import (
     MemoryJournalReceipt,

@@ -13,11 +13,11 @@ from lca.cognition.team.modes.default_modes import (
     build_solo_agent,
     resolve_team_casting_dependencies,
 )
-from lca.plugins.collaboration.modes.solo import filter_solo_tools
 from lca.cognition.team.modes_catalog import ALL_MODES
 from lca.contracts.capabilities import TEAM_CASTER, TEAM_ROLE_LIBRARY
 from lca.contracts.mechanisms.capability.capability import MissingCapabilityError
 from lca.contracts.models.core.conversation.llm import LLMResponse
+from lca.plugins.collaboration.modes.solo import filter_solo_tools
 from lca.plugins.collaboration.team_1.team_casting_prompt_renderer_seam import (
     BuiltinCastingPromptRenderer,
 )

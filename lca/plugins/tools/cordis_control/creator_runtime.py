@@ -11,7 +11,10 @@ from lca.contracts.harness.journal.artifact import (
     make_capability_artifact,
     migrate_to_verified,
 )
-from lca.contracts.models.observability.diagnostic.diagnostic import DiagnosticCategory, DiagnosticStatus
+from lca.contracts.models.observability.diagnostic.diagnostic import (
+    DiagnosticCategory,
+    DiagnosticStatus,
+)
 from lca.contracts.models.observability.journal.journal import PluginAuthored, PluginInspected
 from lca.infrastructure.observability import record, record_runtime
 from lca.plugins.tools.cordis_control.creator_artifacts import (

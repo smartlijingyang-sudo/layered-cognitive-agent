@@ -13,18 +13,18 @@ from pathlib import Path
 
 import pytest
 
-from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.composition.plan_compiler import CompileOptions, compile_plan
+from lca.harness.plan import compiled_run_plan_ref
+from lca.harness.profile.boot.runtime_closure import (
+    FallbackPolicy,
+    runtime_closure_requirements,
+)
 from lca.harness.profile.resolve.resolve import resolve_profile
 from lca.harness.profile.validate.runtime_binding_validator import (
     MissingBindingError,
     RuntimeBindingValidator,
     profile_allows_test_defaults,
     validate_runtime_closure,
-)
-from lca.harness.profile.boot.runtime_closure import (
-    FallbackPolicy,
-    runtime_closure_requirements,
 )
 
 # W1 §144 验收：每份 golden profile 都必须能生成完整 compiled plan。

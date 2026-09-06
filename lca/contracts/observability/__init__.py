@@ -21,6 +21,11 @@ from lca.contracts.observability.evidence.evidence import (
 from lca.contracts.observability.evidence.evidence import (
     RetentionClass as RetentionClass,
 )
+from lca.contracts.observability.evidence.outcome import Outcome as Outcome
+from lca.contracts.observability.journal.ledger import RunLedgerFactory as RunLedgerFactory
+from lca.contracts.observability.registry.status import (
+    RunLifecycleStatus as RunLifecycleStatus,
+)
 from lca.contracts.observability.trace.exception_capture import (
     ErrKind as ErrKind,
 )
@@ -35,11 +40,6 @@ from lca.contracts.observability.trace.exception_capture import (
 )
 from lca.contracts.observability.trace.exception_capture import (
     exc_to_record as exc_to_record,
-)
-from lca.contracts.observability.journal.ledger import RunLedgerFactory as RunLedgerFactory
-from lca.contracts.observability.evidence.outcome import Outcome as Outcome
-from lca.contracts.observability.registry.status import (
-    RunLifecycleStatus as RunLifecycleStatus,
 )
 
 __all__ = [

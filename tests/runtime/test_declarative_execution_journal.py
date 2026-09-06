@@ -12,8 +12,8 @@ from lca.loop.driver import (
     DeclarativeRuntimeDriver,
     RuntimePhaseCapabilities,
 )
-from lca.runtime.support.runtime_bindings import DeclarativeRuntimeBindings
 from lca.runtime.loop.runtime_journal import RuntimeJournalCommitter
+from lca.runtime.support.runtime_bindings import DeclarativeRuntimeBindings
 
 
 class _Journal:

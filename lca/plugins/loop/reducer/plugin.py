@@ -13,12 +13,11 @@ from typing import TYPE_CHECKING, ParamSpec, TypeVar, overload
 
 from pydantic import BaseModel
 
-from lca.contracts.models.core.workspace.activation import ActivatedSkill
 from lca.contracts.models.core.execution.decision import Turn
-from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.perceive.perception import ContextManifest
-from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.core.policy.stop import StopDecision
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.core.state.terminal_outcome import (
     ErrorRef,
     ResumeCursor,
@@ -26,7 +25,10 @@ from lca.contracts.models.core.state.terminal_outcome import (
     TerminalOutcomeKind,
     TextRef,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import DeclarativeValidationError
+from lca.contracts.models.core.workspace.activation import ActivatedSkill
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
+    DeclarativeValidationError,
+)
 from lca.contracts.protocols.state.reducer import Reducer
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
@@ -202,7 +204,9 @@ class DefaultReducer(Reducer):
 
             writer = resolve_flushable_session()
         if writer is not None:
-            from lca.infrastructure.session.context.turn_control_reader import append_turn_control_fact
+            from lca.infrastructure.session.context.turn_control_reader import (
+                append_turn_control_fact,
+            )
 
             append_turn_control_fact(writer, turn)
         return result

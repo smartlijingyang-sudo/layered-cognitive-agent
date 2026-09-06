@@ -24,7 +24,9 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.models.observability.journal.journal import StampedEvent
 from lca.contracts.protocols import JournalProjector
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

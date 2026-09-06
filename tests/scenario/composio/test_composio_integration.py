@@ -13,7 +13,10 @@ from lca.infrastructure.integrations.composio.catalog.catalog import (
     resolve_identifier_for_tool_slug,
 )
 from lca.infrastructure.integrations.composio.connection.store import ComposioConnectionStore
-from lca.infrastructure.integrations.composio.models.models import ComposioConnection, ComposioToolDef
+from lca.infrastructure.integrations.composio.models.models import (
+    ComposioConnection,
+    ComposioToolDef,
+)
 from lca.infrastructure.integrations.composio.settings.settings import ComposioSettings
 from lca.infrastructure.tools.composio import build_tools
 from lca.plugins.transport.webserver.handlers.runs.wire.wire import resolve

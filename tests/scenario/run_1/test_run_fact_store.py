@@ -14,6 +14,9 @@ from lca.contracts.models.observability.event.event import (
     EventAudience,
     EventDurability,
 )
+from lca.contracts.models.observability.journal.catalog import (
+    JOURNAL_EVENT_CLASSES,
+)
 from lca.contracts.models.observability.journal.journal import (
     AgentRunFinished,
     AgentRunStarted,
@@ -21,9 +24,6 @@ from lca.contracts.models.observability.journal.journal import (
     StampedEvent,
     TeamRunFinished,
     TeamRunStarted,
-)
-from lca.contracts.models.observability.journal.catalog import (
-    JOURNAL_EVENT_CLASSES,
 )
 from lca.infrastructure.observability.events.event.catalog import EVENT_DESCRIPTOR_REGISTRY
 from lca.infrastructure.observability.journal.engine.reducer import (

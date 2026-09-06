@@ -11,10 +11,10 @@ from lca.contracts.harness.fold.perceive import (
     fold_context_manifest_from_events,
     fold_gate_decisions_from_events,
 )
-from lca.contracts.models.core.policy.budget import create_budget
 from lca.contracts.models.core.execution.decision import Decision
-from lca.contracts.models.core.policy.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
+from lca.contracts.models.core.policy.budget import create_budget
+from lca.contracts.models.core.policy.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.state.state import AgentState
 from lca.infrastructure.session.emit.cognitive_emit import (
     emit_brain_think_end_for_state,
@@ -114,8 +114,8 @@ def test_emit_gate_decided_noop_when_session_unbound() -> None:
 
 @pytest.mark.asyncio
 async def test_phase_fact_emitter_appends_context_manifested() -> None:
-    from lca.contracts.models.core.policy.budget import create_budget
     from lca.contracts.models.core.perceive.perception import ContextManifest
+    from lca.contracts.models.core.policy.budget import create_budget
     from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
         PhaseResult,
         SemanticPhase,

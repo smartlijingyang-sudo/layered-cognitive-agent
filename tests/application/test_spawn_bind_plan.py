@@ -247,7 +247,9 @@ class TestStrictPlanBinding:
         )
 
     def test_plan_ref_is_propagated(self) -> None:
-        from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import CapabilityBinding
+        from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
+            CapabilityBinding,
+        )
         from lca.harness.plan import compiled_run_plan_ref
 
         plan = _plan(

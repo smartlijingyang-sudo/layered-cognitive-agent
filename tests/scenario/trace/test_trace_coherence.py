@@ -13,7 +13,12 @@ from __future__ import annotations
 
 import unittest
 
-from lca.contracts.atoms.telemetry.telemetry import ATTR_AGENT_ROLE, ATTR_MODEL, ATTR_PROMPT_PREVIEW, SpanName
+from lca.contracts.atoms.telemetry.telemetry import (
+    ATTR_AGENT_ROLE,
+    ATTR_MODEL,
+    ATTR_PROMPT_PREVIEW,
+    SpanName,
+)
 from tests.harness.collector import TraceBundle
 from tests.harness.runner import run_team_scripted
 from tests.harness.scripted_llm import ScriptedLLMAdapter, respond

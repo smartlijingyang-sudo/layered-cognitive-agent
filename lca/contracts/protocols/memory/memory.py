@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import Protocol, runtime_checkable
 
 from lca.contracts.atoms.enums.enums import MemoryLayer
-from lca.contracts.models.core.execution.decision import Observation, Reflection
 from lca.contracts.models.core.conversation.memory import MemoryRecord, MemoryRelationKind
+from lca.contracts.models.core.execution.decision import Observation, Reflection
 from lca.contracts.models.core.state.state import AgentState
 
 

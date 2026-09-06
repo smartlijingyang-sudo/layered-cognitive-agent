@@ -27,7 +27,9 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_execution imp
     PhaseExecutionFailure,
     PhaseResult,
 )
-from lca.contracts.protocols.declarative.declarative_1.declarative_fault_tolerance import PhaseExecutionPolicy
+from lca.contracts.protocols.declarative.declarative_1.declarative_fault_tolerance import (
+    PhaseExecutionPolicy,
+)
 from lca.infrastructure.observability import record
 
 

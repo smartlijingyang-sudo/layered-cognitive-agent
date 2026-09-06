@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import pytest
 
-from lca.cognition.brain.pipeline.context_manifest import digest_manifest
 from lca.cognition.brain.decision_gates import (
     ChainedDecisionGate,
     ProgressLoopDetector,
@@ -27,6 +26,7 @@ from lca.cognition.brain.decision_gates import (
     ToolLoopBreakerGate,
     record_gate_decided,
 )
+from lca.cognition.brain.pipeline.context_manifest import digest_manifest
 from lca.cognition.perceive.hub import SequentialPerceiveHub
 from lca.cognition.sensors import (
     InboxFactsSensor,

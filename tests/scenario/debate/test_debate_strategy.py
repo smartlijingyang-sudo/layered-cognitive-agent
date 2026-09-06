@@ -9,8 +9,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import Budget
 from lca.contracts.protocols import Synthesizer
 from lca.plugins.strategies.debate.debate import DebateStrategy

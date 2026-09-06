@@ -16,20 +16,20 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from lca.contracts.observability.registry.status import RunLifecycleStatus
 from lca.plugins.events._session_observe import current_session, set_session
 from lca.plugins.events.publishers._session_publish import (
     current_publish_session,
     reset_publish_session,
     set_publish_session,
 )
-from lca.session.append import Session
 from lca.plugins.transport.webserver.handlers.runs.session.event.session import (
     BoundRunEventSession,
     RunEventSessionBridge,
 )
-from lca.contracts.observability.registry.status import RunLifecycleStatus
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
 from lca.plugins.transport.webserver.handlers.runs.terminal import registry_commands
+from lca.session.append import Session
 
 
 def _waiting_session(bound: BoundRunEventSession | None) -> RunSession:

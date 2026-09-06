@@ -20,6 +20,7 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from lca.contracts.observability.registry.status import RunLifecycleStatus
 from lca.infrastructure.observability.backends.run_locator_fs import (
     FilesystemRunLocator,
 )
@@ -29,16 +30,15 @@ from lca.infrastructure.observability.journal.step.narrative_writer import (
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 from lca.plugins.observability.run.ledger_seam import _StepTreeBundle
 from lca.plugins.session.derivers.step_tree import StepTreeFoldDeriver
-from lca.plugins.transport.webserver.read.runs.identity.identity import (
-    parse_agent_ref,
-)
-from lca.contracts.observability.registry.status import RunLifecycleStatus
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
 
 # registry_commands 必须先于 lifecycle 子模块被进程导入:它拉动 execute 包链,
 # lifecycle 包的懒加载 __getattr__ 依赖该顺序打破循环。因此
 # ``RunLifecycleCoordinator`` 在用例内局部导入(此时 execute 链已加载)。
 from lca.plugins.transport.webserver.handlers.runs.terminal import registry_commands
+from lca.plugins.transport.webserver.read.runs.identity.identity import (
+    parse_agent_ref,
+)
 
 if TYPE_CHECKING:
     import pytest

@@ -11,8 +11,8 @@ from lca.contracts.capabilities import (
     RUNTIME_LIFECYCLE_PUBLISHER,
     RUNTIME_LIFECYCLE_SUBSCRIBER_REGISTRY,
 )
-from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols.runtime.runtime.lifecycle import (
     RuntimeBudgetSnapshot,
@@ -20,7 +20,7 @@ from lca.contracts.protocols.runtime.runtime.lifecycle import (
     RuntimeLifecycleEventType,
     RuntimeLifecycleSubscriberContribution,
 )
-from lca.plugins.state import runtime_lifecycle_provider, runtime_lifecycle_logging_provider
+from lca.plugins.state import runtime_lifecycle_logging_provider, runtime_lifecycle_provider
 from lca.runtime.loop.runtime_event_publisher import (
     CompositeRuntimeLifecyclePublisher,
     InMemoryRuntimeLifecycleSubscriberRegistry,

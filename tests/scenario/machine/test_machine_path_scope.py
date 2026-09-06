@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
 from lca.contracts.models.core.execution.result import ApprovalPendingError
+from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
 from lca.infrastructure.runtime_plane.scope.scope import (
     path_needs_approval,
     raise_if_out_of_scope,

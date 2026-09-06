@@ -9,7 +9,10 @@ from lca.contracts.protocols.journal.spec.spec import TeamSpec
 from lca.contracts.protocols.runtime.infra.infra import AgentTransport
 
 if TYPE_CHECKING:
-    from lca.contracts.protocols.collaboration.orchestration.orchestration import MemberInvoker, SharedMemoryStore
+    from lca.contracts.protocols.collaboration.orchestration.orchestration import (
+        MemberInvoker,
+        SharedMemoryStore,
+    )
 
 
 @dataclass(frozen=True, slots=True)

@@ -51,7 +51,9 @@ class SkillCatalogSensor(Sensor):
         )
         digest = _catalog_digest(entries)
         if digest != self._last_digest:
-            from lca.infrastructure.observability.meta_event_emit import emit_skill_catalog_published
+            from lca.infrastructure.observability.meta_event_emit import (
+                emit_skill_catalog_published,
+            )
 
             emit_skill_catalog_published(entries=entries, digest=digest, source="perceive")
             self._last_digest = digest

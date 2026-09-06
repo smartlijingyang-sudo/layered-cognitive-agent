@@ -29,14 +29,14 @@ from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Any
 
+from lca.contracts.models.observability.journal.catalog import (
+    JOURNAL_EVENT_CLASSES,
+)
 from lca.contracts.models.observability.journal.journal import (
     JournalEvent,
     JournalRecord,
     RunScope,
     StampedEvent,
-)
-from lca.contracts.models.observability.journal.catalog import (
-    JOURNAL_EVENT_CLASSES,
 )
 from lca.infrastructure.observability.journal.engine.serialization import (
     stamped_to_journal_record,

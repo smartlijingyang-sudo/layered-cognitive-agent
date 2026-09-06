@@ -10,8 +10,8 @@ from __future__ import annotations
 from typing import Any
 
 from lca.contracts.atoms.ids.ids import TraceId, new_id
-from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState, Budget, StateSnapshot
 from lca.contracts.models.core.state.terminal_outcome import (
     ArtifactRef,

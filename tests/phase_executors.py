@@ -6,9 +6,15 @@ from collections.abc import Mapping
 
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseExecutor
 from lca.plugins.loop.phase.act.standard.plugin import create_executor as create_act_executor
-from lca.plugins.loop.phase.perceive.standard.plugin import create_executor as create_perceive_executor
-from lca.plugins.loop.phase.reflect.standard.plugin import create_executor as create_reflect_executor
-from lca.plugins.loop.phase.remember.standard.plugin import create_executor as create_remember_executor
+from lca.plugins.loop.phase.perceive.standard.plugin import (
+    create_executor as create_perceive_executor,
+)
+from lca.plugins.loop.phase.reflect.standard.plugin import (
+    create_executor as create_reflect_executor,
+)
+from lca.plugins.loop.phase.remember.standard.plugin import (
+    create_executor as create_remember_executor,
+)
 from lca.plugins.loop.phase.stop.standard.plugin import create_executor as create_stop_executor
 from lca.plugins.loop.phase.think.standard.plugin import create_executor as create_think_executor
 

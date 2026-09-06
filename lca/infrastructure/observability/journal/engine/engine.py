@@ -26,16 +26,16 @@ from enum import Enum
 from typing import Any
 
 from lca.contracts.models.observability.event.event import EventAudience, EventSensitivity
+from lca.contracts.models.observability.journal.catalog import JOURNAL_EVENT_CLASSES
 from lca.contracts.models.observability.journal.journal import (
     JournalEvent,
     RunScope,
     RuntimeObserved,
     StampedEvent,
 )
-from lca.contracts.models.observability.journal.catalog import JOURNAL_EVENT_CLASSES
+from lca.contracts.observability.core.ports import AttributePolicyBackend
 from lca.contracts.observability.event.descriptor_registry import EventDescriptorRegistry
 from lca.contracts.observability.event.identity import EventIdentityProvider
-from lca.contracts.observability.journal.store import JournalStoreBackend
 from lca.contracts.observability.journal.ledger import (
     LedgerDurabilityError,
     LedgerSealedError,
@@ -43,7 +43,7 @@ from lca.contracts.observability.journal.ledger import (
     LedgerStats,
     LedgerUnregisteredError,
 )
-from lca.contracts.observability.core.ports import AttributePolicyBackend
+from lca.contracts.observability.journal.store import JournalStoreBackend
 from lca.infrastructure.observability.adapters.policy import AttributePolicy, redact_restricted
 from lca.infrastructure.observability.events.event.catalog import descriptor_for
 from lca.infrastructure.observability.facade.projection.registry import (

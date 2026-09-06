@@ -6,9 +6,9 @@ from dataclasses import dataclass, replace
 from typing import Literal
 
 from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
+from lca.contracts.models.core.policy.stop import StopDecision, StopReason
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.models.core.policy.stop import StopDecision, StopReason
 from lca.contracts.protocols.act.command.envelope import RunFact
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     ContributionRole,

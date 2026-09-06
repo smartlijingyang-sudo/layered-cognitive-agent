@@ -14,9 +14,8 @@ from __future__ import annotations
 
 import argparse
 import sys
-from pathlib import Path
-
 import tomllib
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SKIP_DIRS = {"__pycache__", ".git", ".venv", "node_modules", "traces"}

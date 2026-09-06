@@ -425,8 +425,8 @@ def _build_capability_tree(profile: str) -> CapabilityTree:
         for capability in plugin.definition.provided_capability_keys
     }
 
-    from lca.harness.plan import compiled_run_plan_ref
     from lca.harness.composition.plan_compiler import compile_plan
+    from lca.harness.plan import compiled_run_plan_ref
 
     compiled_plan = compile_plan(resolved)
     declarative_control_contributions: dict[str, list[str]] = {}

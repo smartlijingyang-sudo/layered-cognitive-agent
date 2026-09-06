@@ -26,8 +26,8 @@ from lca.contracts.harness.composition.plugin_contract import (
     logic_address_to_plugin_contract,
 )
 from lca.contracts.protocols.composition.logic_address import LogicAddress
-from lca.harness.plugin_api import plugin
 from lca.harness.plugin.manifest import PluginDefinition, PluginKind
+from lca.harness.plugin_api import plugin
 
 
 class _Cfg(BaseModel):

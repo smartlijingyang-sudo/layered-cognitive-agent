@@ -26,7 +26,9 @@ from lca.contracts.harness.composition.plugin_contract import (
 from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.team.team.coordination import STRATEGY_KEY_PIPELINE
 from lca.contracts.protocols import TeamAssembly, TeamStage, TeamStrategy
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

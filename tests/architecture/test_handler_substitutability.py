@@ -24,6 +24,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
 )
 from lca.contracts.protocols.state.delta_handler import DeltaHandler, DeltaHandlerRegistry
 from lca.harness.declarative.execute.dispatch import RegistryEffectDispatcher
+from lca.loop.driver import RuntimePhaseCapabilities
 from lca.plugins.act.action.handlers_provider import (
     DefaultActionHandlerRegistry,
     InMemoryActionHandlerRegistry,
@@ -37,7 +38,6 @@ from lca.plugins.act.delta.handlers_provider import (
 from lca.plugins.act.effect.handlers_provider import (
     InMemoryEffectHandlerRegistry,
 )
-from lca.loop.driver import RuntimePhaseCapabilities
 from lca.runtime._overflow_0.idempotency_fixtures import InMemoryFixtureIdempotencyStore
 
 REPO = Path(__file__).resolve().parents[2]

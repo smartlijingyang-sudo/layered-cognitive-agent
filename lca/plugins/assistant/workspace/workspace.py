@@ -38,7 +38,9 @@ from lca.contracts.models.act.execution_space import (
     materialize_assistant_workspace,
 )
 from lca.contracts.protocols.assistant.catalog import AssistantCatalog
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 
 __all__ = [

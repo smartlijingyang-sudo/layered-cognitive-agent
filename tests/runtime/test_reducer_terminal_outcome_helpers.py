@@ -18,9 +18,9 @@ import pytest
 
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.models.core.execution.decision import Decision, Observation, Turn
+from lca.contracts.models.core.policy.stop import StopDecision, StopReason
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState, Budget
-from lca.contracts.models.core.policy.stop import StopDecision, StopReason
 from lca.contracts.models.core.state.terminal_outcome import (
     ErrorRef,
     ResumeCursor,
@@ -28,7 +28,9 @@ from lca.contracts.models.core.state.terminal_outcome import (
     TerminalOutcomeKind,
     TextRef,
 )
-from lca.contracts.protocols.declarative.declarative_1.declarative_common import DeclarativeValidationError
+from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
+    DeclarativeValidationError,
+)
 from lca.plugins.loop.reducer.plugin import DefaultReducer
 
 

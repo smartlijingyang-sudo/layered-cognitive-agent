@@ -17,13 +17,13 @@ from typing import Any
 
 import yaml
 
+from lca.harness.profile.boot.runtime_closure import FallbackPolicy
 from lca.harness.profile.plan.declarations import (
     apply_patches,
     deep_copy_value,
     expand_entry_environment,
 )
 from lca.harness.profile.validate.errors import ProfileResolveError
-from lca.harness.profile.boot.runtime_closure import FallbackPolicy
 
 
 @dataclass(frozen=True, slots=True)

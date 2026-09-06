@@ -125,7 +125,9 @@ def register(app: typer.Typer) -> None:
             if not profile.exists():
                 print(f"Profile not found: {profile}", file=sys.stderr)
                 raise typer.Exit(2)
-            from lca.contracts.protocols.declarative.declarative_1.declarative_common import SemanticPhase
+            from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
+                SemanticPhase,
+            )
             from lca.harness.composition.plan_compiler import compile_plan
             from lca.harness.profile.resolve.resolve import resolve_profile
 

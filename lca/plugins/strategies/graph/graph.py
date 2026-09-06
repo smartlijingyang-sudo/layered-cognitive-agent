@@ -33,9 +33,9 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.policy.budget import create_budget
 from lca.contracts.models.core.state.lifecycle import TaskStatus
-from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.team.graph.graph import EdgeType, ExecutionGraph, GraphNode, NodeType
 from lca.contracts.models.team.team.coordination import STRATEGY_KEY_GRAPH, Graph
@@ -48,7 +48,9 @@ from lca.contracts.protocols import (
     TeamStage,
     TeamStrategy,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

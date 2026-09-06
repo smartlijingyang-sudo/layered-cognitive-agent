@@ -99,8 +99,8 @@ class TestLeadWallClockPropagation(unittest.TestCase):
         from unittest.mock import MagicMock
 
         from lca.agent.cognitive_agent import CognitiveAgent
-        from lca.application.authoring.policies import LeadBudgetPolicy
         from lca.application.api.spawn import promote_lead
+        from lca.application.authoring.policies import LeadBudgetPolicy
         from lca.harness.observability.assemble import make_minimal_bound
 
         runtime = MagicMock()

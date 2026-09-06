@@ -32,6 +32,16 @@ from lca_kernel.boot.boot import (
     run_resolved_kernel,
     stop_kernel,
 )
+from lca_kernel.boot.lifecycle import (
+    FAIL_LOUD_RELEASE_TIMEOUT_MS,
+    DefaultShutdownCoordinator,
+    ShutdownCoordinator,
+    create_shutdown_coordinator,
+    install_fail_loud,
+    install_signal_handlers,
+    run_kernel_lifespan,
+)
+from lca_kernel.boot.stages import Stage
 from lca_kernel.cli.errors import (
     FailLoudError,
     KernelError,
@@ -50,17 +60,7 @@ from lca_kernel.runtime.hmr import (
     summarize_patch,
     validate_patch,
 )
-from lca_kernel.boot.lifecycle import (
-    FAIL_LOUD_RELEASE_TIMEOUT_MS,
-    DefaultShutdownCoordinator,
-    ShutdownCoordinator,
-    create_shutdown_coordinator,
-    install_fail_loud,
-    install_signal_handlers,
-    run_kernel_lifespan,
-)
 from lca_kernel.runtime.observability import ObservabilityRuntime
-from lca_kernel.boot.stages import Stage
 
 if TYPE_CHECKING:
     from lca.harness.profile.resolve.resolve import ResolvedProfile

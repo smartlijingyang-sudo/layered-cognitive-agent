@@ -9,7 +9,10 @@ from typing import Any
 from urllib.parse import urlparse
 
 from lca.infrastructure.integrations.composio.catalog.catalog import get_app_by_identifier
-from lca.infrastructure.integrations.composio.models.models import ComposioConnection, ComposioToolDef
+from lca.infrastructure.integrations.composio.models.models import (
+    ComposioConnection,
+    ComposioToolDef,
+)
 from lca.infrastructure.integrations.composio.service.service import ComposioIntegration
 
 

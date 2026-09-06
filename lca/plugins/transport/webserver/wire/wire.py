@@ -14,7 +14,9 @@ from lca.infrastructure.tools.ask_user import IDENTIFIER as _USER_INTERACTION
 from lca.infrastructure.tools.composio import IDENTIFIER as _COMPOSIO
 from lca.infrastructure.tools.lca_computer.manifest import LOCAL_SYSTEM_ID as _LOCAL_SYSTEM
 from lca.infrastructure.tools.lca_sandbox import IDENTIFIER as _CLOUD_SANDBOX
-from lca.infrastructure.tools.skills.manifest.manifest import _SKILL_STORE_IDENTIFIER as _SKILL_STORE
+from lca.infrastructure.tools.skills.manifest.manifest import (
+    _SKILL_STORE_IDENTIFIER as _SKILL_STORE,
+)
 from lca.infrastructure.tools.skills.manifest.manifest import IDENTIFIER as _SKILLS
 from lca.infrastructure.tools.web_search import IDENTIFIER as _WEB_BROWSING
 
@@ -79,7 +81,9 @@ def resolve(name: str) -> tuple[str, str] | None:
 
 def _resolve_composio_action(name: str) -> tuple[str, str] | None:
     """Map a Composio action slug to (identifier, apiName) for LobeHub UI projection."""
-    from lca.infrastructure.integrations.composio.catalog.catalog import resolve_identifier_for_tool_slug
+    from lca.infrastructure.integrations.composio.catalog.catalog import (
+        resolve_identifier_for_tool_slug,
+    )
 
     identifier = resolve_identifier_for_tool_slug(name)
     if identifier is None:

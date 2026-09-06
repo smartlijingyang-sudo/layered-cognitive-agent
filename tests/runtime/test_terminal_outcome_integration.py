@@ -9,17 +9,19 @@ from __future__ import annotations
 import pytest
 
 from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.models.core.policy.stop import StopDecision, StopReason
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState, Budget
-from lca.contracts.models.core.policy.stop import StopDecision, StopReason
 from lca.contracts.models.core.state.terminal_outcome import (
     TerminalOutcome,
     TerminalOutcomeKind,
     TextRef,
 )
-from lca.contracts.protocols.declarative.declarative_1.declarative_common import DeclarativeValidationError
-from lca.plugins.loop.state.stop_policy.plugin import DefaultStopPolicy
+from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
+    DeclarativeValidationError,
+)
 from lca.plugins.loop.reducer.plugin import DefaultReducer
+from lca.plugins.loop.state.stop_policy.plugin import DefaultStopPolicy
 
 
 class _FixedArtifactClosure:

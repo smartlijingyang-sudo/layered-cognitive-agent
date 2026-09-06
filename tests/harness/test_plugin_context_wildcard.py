@@ -6,6 +6,8 @@ from typing import Any
 
 import pytest
 
+from lca.harness.plugin.context import collect_context_bindings, requirement_covers_key
+from lca.harness.plugin.spec_projection import native_spec_from_declaration
 from lca.harness.plugin_api import (
     AuditedPluginContext,
     EffectClass,
@@ -13,8 +15,6 @@ from lca.harness.plugin_api import (
     PluginKind,
     UndeclaredInteractionError,
 )
-from lca.harness.plugin.context import collect_context_bindings, requirement_covers_key
-from lca.harness.plugin.spec_projection import native_spec_from_declaration
 
 
 class _FakeCarrier:

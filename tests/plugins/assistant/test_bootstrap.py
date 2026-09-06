@@ -26,8 +26,8 @@ import pytest
 from lca.contracts.capabilities import ASSISTANT_BOOTSTRAP, ASSISTANT_CATALOG
 from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
-from lca.harness.plugin_api import definition_from_plugin
 from lca.harness.plugin.manifest import EffectClass
+from lca.harness.plugin_api import definition_from_plugin
 from lca.plugins.assistant.bootstrap.bootstrap import (
     BootstrapProjection,
     BootstrapProjectionService,
@@ -95,7 +95,9 @@ class TestPluginManifest:
         assert definition.spec.layer == "L4"
 
     def test_kind_is_seam(self) -> None:
-        from lca.contracts.protocols.declarative.declarative_1.declarative_common import PluginSpecKind
+        from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
+            PluginSpecKind,
+        )
 
         definition = definition_from_plugin(setup)
         assert definition.spec.kind is PluginSpecKind.SEAM

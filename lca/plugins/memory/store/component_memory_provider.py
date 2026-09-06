@@ -21,7 +21,9 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.contracts.protocols.journal.spec.spec import MEMORY_CHOICE_SIMPLE, MEMORY_CHOICE_TEMPORAL
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 

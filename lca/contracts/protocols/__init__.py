@@ -150,7 +150,10 @@ from lca.contracts.protocols.gate.loop_guard import LoopGuardEvaluator, LoopGuar
 from lca.contracts.protocols.journal.artifact.closure import ArtifactClosure
 
 # ── Durable effect idempotency（ADR-0075 / full-plugin-remediation §5）────
-from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyClaim, IdempotencyStore
+from lca.contracts.protocols.journal.idempotency.idempotency import (
+    IdempotencyClaim,
+    IdempotencyStore,
+)
 
 # ── 执行日志投影协议（ADR-0037 Journal-as-Truth）────────
 from lca.contracts.protocols.journal.journal.journal import JournalProjector
@@ -213,7 +216,6 @@ from lca.contracts.protocols.runtime.infra.infra import (
     ToolRegistry,
     TransportRegistryProtocol,
 )
-from lca.contracts.protocols.runtime.runtime.runtime import Runtime, StopPolicy
 from lca.contracts.protocols.runtime.runtime.composition import (
     CheckpointStateResolver,
     CheckpointStateResolverFactory,
@@ -236,6 +238,7 @@ from lca.contracts.protocols.runtime.runtime.lifecycle import (
     RuntimeLifecycleSubscriberContribution,
     RuntimeLifecycleSubscriberRegistry,
 )
+from lca.contracts.protocols.runtime.runtime.runtime import Runtime, StopPolicy
 from lca.contracts.protocols.session.run.mode import (
     ModeAdapter,
     RegisteredMode,

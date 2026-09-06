@@ -200,8 +200,8 @@ def test_cognitive_emit_context_manifested_via_gateway() -> None:
 
 
 def test_cognitive_emit_context_manifested_for_state_uses_bound_session() -> None:
-    from lca.contracts.models.core.policy.budget import create_budget
     from lca.contracts.models.core.perceive.perception import ContextManifest
+    from lca.contracts.models.core.policy.budget import create_budget
     from lca.contracts.models.core.state.state import AgentState
     from lca.infrastructure.session.emit.cognitive_emit import emit_context_manifested_for_state
 

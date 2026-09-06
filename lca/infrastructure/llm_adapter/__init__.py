@@ -9,7 +9,10 @@ from __future__ import annotations
 from typing import Any
 
 from lca.infrastructure.llm_adapter.api.style import LLMApiStyle
-from lca.infrastructure.llm_adapter.factory.factory import load_dotenv_if_present, resolve_llm_adapter
+from lca.infrastructure.llm_adapter.factory.factory import (
+    load_dotenv_if_present,
+    resolve_llm_adapter,
+)
 from lca.infrastructure.llm_adapter.failover.failover import (
     FailoverLLMAdapter,
     LLMFailoverCandidate,

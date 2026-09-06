@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lca.contracts.protocols.declarative.declarative_1.declarative_common import DeclarativeValidationError
+from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
+    DeclarativeValidationError,
+)
 
 
 @dataclass(frozen=True, slots=True)

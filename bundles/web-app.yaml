@@ -1,376 +1,265 @@
-# bundles/web-app.yaml — Web app behavior plugins (Tier-3).
-# Extends bundles/base.yaml with cognitive primitives: group services,
-# sensor/gate contributions, body, runtime, think internals, loop drivers.
-# Boot order is derived from Manifest requires→provides (ADR-0061), not YAML line order.
-
 entries:
-  # ── Perceive group + sensor contributions (ADR-0056) ──
-  - id: perceive
-    name: perceive
-    $module: lca.plugins.perceive.service
-    config: {}
-
-  - id: perceive.hub.sequential
-    name: perceive_hub_sequential
-    $module: lca.plugins.perceive.sequential_hub
-    config: {}
-
-  - id: sensor.clock
-    name: sensor_clock
-    $module: lca.plugins.sensors.clock
-    config: {}
-
-  - id: sensor.workspace-artifacts
-    name: sensor_workspace_artifacts
-    $module: lca.plugins.sensors.workspace_artifacts
-    config: {}
-
-  - id: sensor.inbox-facts
-    name: sensor_inbox_facts
-    $module: lca.plugins.sensors.inbox_facts
-    config: {}
-
-  - id: sensor.team-inbox
-    name: sensor_team_inbox
-    $module: lca.plugins.sensors.team_inbox
-    config: {}
-
-  - id: sensor.workspace-instructions
-    name: sensor_workspace_instructions
-    $module: lca.plugins.sensors.workspace_instructions
-    config: {}
-
-  - id: sensor.skill-catalog
-    name: sensor_skill_catalog
-    $module: lca.plugins.sensors.skill_catalog
-    config: {}
-
-  # ── Gate group + DecisionGate contributions (ADR-0056) ──
-  - id: gates
-    name: gates
-    $module: lca.plugins.cognitive.gate.service.plugin
-    config: {}
-
-  - id: gates.chain.sequential
-    name: gates_chain_sequential
-    $module: lca.plugins.cognitive.gate.chained.plugin
-    config: {}
-
-  - id: gate.repeat-tool-call
-    name: gate_repeat_tool_call
-    $module: lca.plugins.cognitive.gate.repeat_tool_call.plugin
-    config: {}
-
-  - id: gate.tool-loop-breaker
-    name: gate_tool_loop_breaker
-    $module: lca.plugins.cognitive.gate.tool_loop_breaker.plugin
-    config: {}
-
-  - id: gate.progress-loop-detector
-    name: gate_progress_loop_detector
-    $module: lca.plugins.cognitive.gate.progress_loop_detector.plugin
-    config: {}
-
-  - id: gate.terminal-respond
-    name: gate_terminal_respond
-    $module: lca.plugins.cognitive.gate.terminal_respond.plugin
-    config: {}
-
-  - id: gate.artifact-respond-injector
-    name: gate_artifact_respond_injector
-    $module: lca.plugins.cognitive.gate.artifact_respond_injector.plugin
-    config: {}
-
-  - id: gate.must-consult-all
-    name: gate_must_consult_all
-    $module: lca.plugins.cognitive.gate.must_consult_all.plugin
-    config: {}
-
-
-  # ── Tool batch execution policy ──
-  # The segmented-safe default keeps each side-effecting call as an ordered
-  # barrier while allowing adjacent idempotent/read-only calls to overlap.
-  - id: lca-tool-batch-execution-policy
-    name: lca_tool_batch_execution_policy
-    $module: lca.plugins.act.tool_batch_execution_policy_provider
-    config:
-      mode: segmented_safe
-
-  # ── ADR-0074: Action handler registry + provider ──
-  # Tier-1 seam declares the action_handler_registry capability;
-  # Tier-2 provider supplies DefaultActionHandlerRegistry with 4 built-in handlers.
-  - id: lca-action-handler-registry-seam
-    name: lca_seam_action_handler_registry
-    $module: lca.plugins.act.action_handler_seam
-    config: {}
-
-  - id: lca-action-handler-provider
-    name: lca_action_handler_provider
-    $module: lca.plugins.act.action_handlers_provider
-    config: {}
-
-  # ── Act / world plane ──
-  - id: body.simple
-    name: body_simple
-    $module: lca.plugins.cognitive.body.simple
-    config: {}
-
-  - id: safe_executor.simple
-    name: safe_executor_simple
-    $module: lca.plugins.cognitive.body.safe_executor
-    config: {}
-
-  # ── State-cluster stop policy ──
-  - id: state.stop-policy.default
-    name: state_stop_policy_default
-    $module: lca.plugins.loop.state.stop_policy.plugin
-    config: {}
-
-  - id: hook_registry.simple
-    name: hook_registry_simple
-    $module: lca.plugins.runtime.hook_registry
-    config: {}
-
-  - id: resume_input.human_answer
-    name: resume_input_human_answer
-    $module: lca.plugins.runtime.resume_input
-    config: {}
-
-  # ── Think internals (named factories consumed by brain factory) ──
-  - id: lca-brain-prompt-catalog-default
-    name: lca_brain_prompt_catalog_default
-    $module: lca.plugins.composer.composition.prompt_catalog
-    config: {}
-
-  - id: lca-prompt-section-registry
-    name: lca_prompt_section_registry
-    $module: lca.plugins.prompts.registry
-    config: {}
-
-  - id: lca-prompt-template-provider-builtin
-    name: lca_prompt_template_provider_builtin
-    $module: lca.plugins.prompts.template_provider
-    config: {}
-
-  - id: lca-brain-prompt-sections
-    name: lca_brain_prompt_sections
-    $module: lca.plugins.prompts.sections
-    config: {}
-
-  - id: lca-prompt-assembler-section-manifest
-    name: lca_prompt_assembler_section_manifest
-    $module: lca.plugins.prompts.assembler
-    config:
-      strip_empty_fields: true
-
-  - id: lca-prompt-template-selector-team-awareness
-    name: lca_prompt_template_selector_team_awareness
-    $module: lca.plugins.prompts.selector
-    config:
-      default_template: react_prompt
-
-  - id: lca-reasoner-prompt
-    name: lca_reasoner_prompt
-    $module: lca.plugins.reasoner.prompt
-    config: {}
-
-  - id: lca-critic-simple
-    name: lca_critic_simple
-    $module: lca.plugins.critic.simple
-    config: {}
-
-  # ── Brain strategy (requires gates + critic + reasoner) ──
-  - id: lca-brain-simple
-    name: lca_brain_simple
-    $module: lca.plugins.cognitive.brain.simple
-    config: {}
-
-  # ── Journal store (named factory; spawn instantiates per-run) ──
-  - id: lca-journal-store
-    name: lca_journal_store
-    $module: lca.plugins.journal.journal_store_seam
-    config: {}
-
-  # ── Run-loop driver registry (Tier-3) ─────────────
-  # Empty registry; loop plugins below register their drivers into it.
-  # ``default`` is the fallback target when ``/runs`` omits
-  # ``execution_target``.
-  - id: lca-run-loop-driver-registry
-    name: lca_run_loop_driver_registry
-    $module: lca.plugins.loop.driver.plugin
-    config:
-      default: cognitive
-
-  # ── Loop drivers (Tier-3) ───────────────────────────
-  # Each loop plugin declares its requires/provides and registers its
-  # driver into ``run_loop_driver_registry``. Bundle controls which loops
-  # are loaded; nothing in gateway hard-codes drivers.
-  - id: lca-loop-cognitive
-    name: lca_loop_cognitive
-    $module: lca.plugins.collaboration.modes.cognitive
-    config:
-      target: cognitive
-  # Cognitive is the default loop driver; the bundle decides whether to load
-  # ── Plan-driven composers (one entry per capability plane) ─────────
-  # Each composer is independently replaceable through a profile patch. The
-  # default profile composes all four, while a specialized profile can replace
-  # one entry without taking ownership of neighboring graph contributions.
-  - id: lca-plan-brain-composer
-    name: lca_plan_brain_composer
-    $module: lca.plugins.composer.think.brain_provider
-    config: {}
-
-  - id: lca-plan-body-composer
-    name: lca_plan_body_composer
-    $module: lca.plugins.composer.act.body_provider
-    config: {}
-
-  - id: lca-plan-perceive-composer
-    name: lca_plan_perceive_composer
-    $module: lca.plugins.composer.perceive.perceive_provider
-    config: {}
-
-  - id: lca-plan-team-composer
-    name: lca_plan_team_composer
-    $module: lca.plugins.composer.collaboration.team_provider
-    config: {}
-
-  # ── Compose-time named factories ──────────
-  # Provide fresh capability service instances at compose time
-  # so the composition root never instantiates concrete classes inline.
-  - id: tools.compose_service
-    name: tools_compose_service
-    $module: lca.plugins.factories.tools
-    config: {}
-
-  - id: transport.compose_service
-    name: transport_compose_service
-    $module: lca.plugins.factories.transport
-    config: {}
-
-  # ── Component discovery registry (ADR-0062 §7 / ADR-0074 Phase 3) ──
-  # Tier-1 seam provides empty ComponentRegistry;
-  # Tier-2 contributors register one component each for independent substitution.
-  - id: lca-component-registry-seam
-    name: lca_component_registry_seam
-    $module: lca.plugins.state.component_registry_seam
-    config: {}
-
-  - id: lca-component-state-store-contributor
-    name: lca_component_state_store_contributor
-    $module: lca.plugins.state.component_state_store_provider
-    config: {}
-
-  - id: lca-component-memory-contributor
-    name: lca_component_memory_contributor
-    $module: lca.plugins.memory.component_memory_provider
-    config: {}
-
-  - id: lca-component-budget-policy-contributor
-    name: lca_component_budget_policy_contributor
-    $module: lca.plugins.state.component_budget_policy_provider
-    config: {}
-
-  # ── Team strategy factories (ADR-0062 §7 / PR-4) ──
-  - id: strategy.lead
-    name: strategy_lead
-    $module: lca.plugins.strategies.lead
-    config: {}
-
-  - id: strategy.pipeline
-    name: strategy_pipeline
-    $module: lca.plugins.strategies.pipeline
-    config: {}
-
-  - id: strategy.fan_out
-    name: strategy_fan_out
-    $module: lca.plugins.strategies.fan_out
-    config: {}
-
-  - id: strategy.peer_relay
-    name: strategy_peer_relay
-    $module: lca.plugins.strategies.peer_relay
-    config: {}
-
-  - id: strategy.peer_swarm
-    name: strategy_peer_swarm
-    $module: lca.plugins.strategies.peer_swarm
-    config: {}
-
-  - id: strategy.debate
-    name: strategy_debate
-    $module: lca.plugins.strategies.debate
-    config: {}
-
-  # ── Graph collaboration node primitives ──────────────────
-  # Traversal remains a closed DAG kernel; each concrete NodeType behavior is
-  # resolved through this Profile-selected registry before GraphStrategy runs.
-  - id: lca.graph-node-executor-registry
-    name: lca_graph_node_executor_registry
-    $module: lca.plugins.loop.graph.nodes.registry.plugin
-    config: {}
-
-  - id: graph-node.agent.default
-    name: graph_node_agent_default
-    $module: lca.plugins.loop.graph.nodes.agent.plugin
-    config: {}
-
-  - id: graph-node.aggregator.default
-    name: graph_node_aggregator_default
-    $module: lca.plugins.loop.graph.nodes.aggregator.plugin
-    config: {}
-
-  - id: graph-node.topology.default
-    name: graph_node_topology_default
-    $module: lca.plugins.loop.graph.nodes.topology.plugin
-    config: {}
-
-  - id: strategy.graph
-    name: strategy_graph
-    $module: lca.plugins.strategies.graph
-    config: {}
-
-  # ── Transport (PR-4): Starlette webserver as 5 plugins (ADR-0112 + ADR-0115 + ADR-0119 followup-2) ──
-  # L0 seam provides route_registry; 4 L3 providers register route groups.
-  # Order matters: webserver-router must boot before routes_* providers.
-  - id: lca-webserver-router
-    name: lca_webserver_router
-    $module: lca.plugins.transport.webserver.router
-    config: {}
-
-  - id: lca-gateway-routes-health-options
-    name: lca_webserver_routes_health_options
-    $module: lca.plugins.transport.webserver.routes_health_options
-    config: {}
-
-  - id: lca-gateway-routes-runs-sessions
-    name: lca_webserver_routes_runs_sessions
-    $module: lca.plugins.transport.webserver.routes_runs_sessions
-    config: {}
-
-  - id: lca-gateway-routes-openai-compat-files
-    name: lca_webserver_routes_openai_compat_files
-    $module: lca.plugins.transport.webserver.routes_openai_compat_files
-    config: {}
-
-  - id: lca-gateway-routes-device
-    name: lca_webserver_routes_device
-    $module: lca.plugins.transport.webserver.routes_device
-    config: {}
-
-  # ADR-0119 + ADR-0119 followup-2: lca-webserver-bootstrap (L0 PROVIDER) 替代 gateway/bootstrap.py
-  # 游离函数;提供 install_bootstrap_state 给 lca-web-server 在 K3 后调
-  - id: lca-webserver-bootstrap
-    name: lca_webserver_bootstrap
-    $module: lca.plugins.transport.webserver.bootstrap
-    config: {}
-
-  # ADR-0119: lca-web-server (L1 SEAM) 替代 gateway/app.py 的 thin factory
-  # 装 Starlette + 装 routes + 装 ASGI state + 装 lifespan;cli.py:serve await web_server.serve() 监听
-  - id: lca-web-server
-    name: lca_web_server
-    $module: lca.plugins.transport.webserver.server
-    config:
-      host: "0.0.0.0"
-      port: 8765
-      log_level: "info"
+- id: perceive
+  name: perceive
+  $module: lca.plugins.perceive.service.service
+  config: {}
+- id: perceive.hub.sequential
+  name: perceive_hub_sequential
+  $module: lca.plugins.perceive.sequential.hub
+  config: {}
+- id: sensor.clock
+  name: sensor_clock
+  $module: lca.plugins.sensors.clock.clock
+  config: {}
+- id: sensor.workspace-artifacts
+  name: sensor_workspace_artifacts
+  $module: lca.plugins.sensors.workspace.artifacts
+  config: {}
+- id: sensor.inbox-facts
+  name: sensor_inbox_facts
+  $module: lca.plugins.sensors.inbox.facts
+  config: {}
+- id: sensor.team-inbox
+  name: sensor_team_inbox
+  $module: lca.plugins.sensors.team.inbox
+  config: {}
+- id: sensor.workspace-instructions
+  name: sensor_workspace_instructions
+  $module: lca.plugins.sensors.workspace.instructions
+  config: {}
+- id: sensor.skill-catalog
+  name: sensor_skill_catalog
+  $module: lca.plugins.sensors.skill.catalog
+  config: {}
+- id: gates
+  name: gates
+  $module: lca.plugins.cognitive.gate.service.plugin
+  config: {}
+- id: gates.chain.sequential
+  name: gates_chain_sequential
+  $module: lca.plugins.cognitive.gate.chained.plugin
+  config: {}
+- id: gate.repeat-tool-call
+  name: gate_repeat_tool_call
+  $module: lca.plugins.cognitive.gate.repeat_tool_call.plugin
+  config: {}
+- id: gate.tool-loop-breaker
+  name: gate_tool_loop_breaker
+  $module: lca.plugins.cognitive.gate.tool_loop_breaker.plugin
+  config: {}
+- id: gate.progress-loop-detector
+  name: gate_progress_loop_detector
+  $module: lca.plugins.cognitive.gate.progress_loop_detector.plugin
+  config: {}
+- id: gate.terminal-respond
+  name: gate_terminal_respond
+  $module: lca.plugins.cognitive.gate.terminal_respond.plugin
+  config: {}
+- id: gate.artifact-respond-injector
+  name: gate_artifact_respond_injector
+  $module: lca.plugins.cognitive.gate.artifact_respond_injector.plugin
+  config: {}
+- id: gate.must-consult-all
+  name: gate_must_consult_all
+  $module: lca.plugins.cognitive.gate.must_consult_all.plugin
+  config: {}
+- id: lca-tool-batch-execution-policy
+  name: lca_tool_batch_execution_policy
+  $module: lca.plugins.act.tool.batch_execution_policy_provider
+  config:
+    mode: segmented_safe
+- id: lca-action-handler-registry-seam
+  name: lca_seam_action_handler_registry
+  $module: lca.plugins.act.action.handler_seam
+  config: {}
+- id: lca-action-handler-provider
+  name: lca_action_handler_provider
+  $module: lca.plugins.act.action.handlers_provider
+  config: {}
+- id: body.simple
+  name: body_simple
+  $module: lca.plugins.cognitive.body.simple
+  config: {}
+- id: safe_executor.simple
+  name: safe_executor_simple
+  $module: lca.plugins.cognitive.body.safe_executor
+  config: {}
+- id: state.stop-policy.default
+  name: state_stop_policy_default
+  $module: lca.plugins.loop.state.stop_policy.plugin
+  config: {}
+- id: hook_registry.simple
+  name: hook_registry_simple
+  $module: lca.plugins.runtime.hook_registry
+  config: {}
+- id: resume_input.human_answer
+  name: resume_input_human_answer
+  $module: lca.plugins.runtime.resume_input
+  config: {}
+- id: lca-brain-prompt-catalog-default
+  name: lca_brain_prompt_catalog_default
+  $module: lca.plugins.composer.composition.prompt_catalog
+  config: {}
+- id: lca-prompt-section-registry
+  name: lca_prompt_section_registry
+  $module: lca.plugins.prompts.registry
+  config: {}
+- id: lca-prompt-template-provider-builtin
+  name: lca_prompt_template_provider_builtin
+  $module: lca.plugins.prompts.template_provider
+  config: {}
+- id: lca-brain-prompt-sections
+  name: lca_brain_prompt_sections
+  $module: lca.plugins.prompts.sections
+  config: {}
+- id: lca-prompt-assembler-section-manifest
+  name: lca_prompt_assembler_section_manifest
+  $module: lca.plugins.prompts.assembler
+  config:
+    strip_empty_fields: true
+- id: lca-prompt-template-selector-team-awareness
+  name: lca_prompt_template_selector_team_awareness
+  $module: lca.plugins.prompts.selector
+  config:
+    default_template: react_prompt
+- id: lca-reasoner-prompt
+  name: lca_reasoner_prompt
+  $module: lca.plugins.reasoner.prompt
+  config: {}
+- id: lca-critic-simple
+  name: lca_critic_simple
+  $module: lca.plugins.critic.simple
+  config: {}
+- id: lca-brain-simple
+  name: lca_brain_simple
+  $module: lca.plugins.cognitive.brain.simple
+  config: {}
+- id: lca-journal-store
+  name: lca_journal_store
+  $module: lca.plugins.journal.journal.store_seam
+  config: {}
+- id: lca-run-loop-driver-registry
+  name: lca_run_loop_driver_registry
+  $module: lca.plugins.loop.driver.plugin
+  config:
+    default: cognitive
+- id: lca-loop-cognitive
+  name: lca_loop_cognitive
+  $module: lca.plugins.collaboration.modes.cognitive
+  config:
+    target: cognitive
+- id: lca-plan-brain-composer
+  name: lca_plan_brain_composer
+  $module: lca.plugins.composer.think.brain_provider
+  config: {}
+- id: lca-plan-body-composer
+  name: lca_plan_body_composer
+  $module: lca.plugins.composer.act.body_provider
+  config: {}
+- id: lca-plan-perceive-composer
+  name: lca_plan_perceive_composer
+  $module: lca.plugins.composer.perceive.provider
+  config: {}
+- id: lca-plan-team-composer
+  name: lca_plan_team_composer
+  $module: lca.plugins.composer.collaboration.team_provider
+  config: {}
+- id: tools.compose_service
+  name: tools_compose_service
+  $module: lca.plugins.factories.tools
+  config: {}
+- id: transport.compose_service
+  name: transport_compose_service
+  $module: lca.plugins.factories.transport
+  config: {}
+- id: lca-component-registry-seam
+  name: lca_component_registry_seam
+  $module: lca.plugins.state.component.registry_seam
+  config: {}
+- id: lca-component-state-store-contributor
+  name: lca_component_state_store_contributor
+  $module: lca.plugins.state.component.state_store_provider
+  config: {}
+- id: lca-component-memory-contributor
+  name: lca_component_memory_contributor
+  $module: lca.plugins.memory.store.component_memory_provider
+  config: {}
+- id: lca-component-budget-policy-contributor
+  name: lca_component_budget_policy_contributor
+  $module: lca.plugins.state.component.budget_policy_provider
+  config: {}
+- id: strategy.lead
+  name: strategy_lead
+  $module: lca.plugins.strategies.lead.lead
+  config: {}
+- id: strategy.pipeline
+  name: strategy_pipeline
+  $module: lca.plugins.strategies.pipeline.pipeline
+  config: {}
+- id: strategy.fan_out
+  name: strategy_fan_out
+  $module: lca.plugins.strategies.fan.out
+  config: {}
+- id: strategy.peer_relay
+  name: strategy_peer_relay
+  $module: lca.plugins.strategies.peer.relay
+  config: {}
+- id: strategy.peer_swarm
+  name: strategy_peer_swarm
+  $module: lca.plugins.strategies.peer.swarm
+  config: {}
+- id: strategy.debate
+  name: strategy_debate
+  $module: lca.plugins.strategies.debate.debate
+  config: {}
+- id: lca.graph-node-executor-registry
+  name: lca_graph_node_executor_registry
+  $module: lca.plugins.loop.graph.nodes.registry.plugin
+  config: {}
+- id: graph-node.agent.default
+  name: graph_node_agent_default
+  $module: lca.plugins.loop.graph.nodes.agent.plugin
+  config: {}
+- id: graph-node.aggregator.default
+  name: graph_node_aggregator_default
+  $module: lca.plugins.loop.graph.nodes.aggregator.plugin
+  config: {}
+- id: graph-node.topology.default
+  name: graph_node_topology_default
+  $module: lca.plugins.loop.graph.nodes.topology.plugin
+  config: {}
+- id: strategy.graph
+  name: strategy_graph
+  $module: lca.plugins.strategies.graph.graph
+  config: {}
+- id: lca-webserver-router
+  name: lca_webserver_router
+  $module: lca.plugins.transport.webserver.router.router
+  config: {}
+- id: lca-gateway-routes-health-options
+  name: lca_webserver_routes_health_options
+  $module: lca.plugins.transport.webserver.routes_1.routes_health_options
+  config: {}
+- id: lca-gateway-routes-runs-sessions
+  name: lca_webserver_routes_runs_sessions
+  $module: lca.plugins.transport.webserver.routes_2.routes_runs_sessions
+  config: {}
+- id: lca-gateway-routes-openai-compat-files
+  name: lca_webserver_routes_openai_compat_files
+  $module: lca.plugins.transport.webserver.routes_1.routes_openai_compat_files
+  config: {}
+- id: lca-gateway-routes-device
+  name: lca_webserver_routes_device
+  $module: lca.plugins.transport.webserver.routes_1.routes_device
+  config: {}
+- id: lca-webserver-bootstrap
+  name: lca_webserver_bootstrap
+  $module: lca.plugins.transport.webserver.bootstrap.bootstrap
+  config: {}
+- id: lca-web-server
+  name: lca_web_server
+  $module: lca.plugins.transport.webserver.server.server
+  config:
+    host: 0.0.0.0
+    port: 8765
+    log_level: info

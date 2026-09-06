@@ -5,7 +5,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lca.infrastructure.integrations.composio.models.models import ComposioConnection, ComposioToolDef
+from lca.infrastructure.integrations.composio.models.models import (
+    ComposioConnection,
+    ComposioToolDef,
+)
 
 
 class ComposioConnectionStore:

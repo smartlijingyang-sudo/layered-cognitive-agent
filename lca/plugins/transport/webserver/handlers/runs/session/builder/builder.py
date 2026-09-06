@@ -24,7 +24,10 @@ from pathlib import Path
 from typing import Any, cast
 
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.mechanisms.capability.capability import MissingCapabilityError, require_capability
+from lca.contracts.mechanisms.capability.capability import (
+    MissingCapabilityError,
+    require_capability,
+)
 from lca.contracts.observability.journal.run_journal import RunJournalFactory
 from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.profile.boot.products import compiled_plan_from_scope
@@ -36,16 +39,19 @@ from lca.infrastructure.observability.writable_matrix.registry import (
     WritableFaceRegistry,
 )
 from lca.plugins.session.derivers.step_tree import StepTreeFoldDeriver
-from lca.session.lifecycle.bind import bind_run_event_session_from_store
 from lca.plugins.session.runtime.cursor.port import SessionWritePortAdapter
 from lca.plugins.transport.webserver.carrier.runs.binding import assemble_run_hub
-from lca.plugins.transport.webserver.read.runs.identity.identity import default_agent_ref
 from lca.plugins.transport.webserver.handlers.runs.session.event.session import (
     unbind_run_event_session,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunRegistry, RunSession
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
+    RunRegistry,
+    RunSession,
+)
 from lca.plugins.transport.webserver.handlers.runs.session.setup.types import RunSessionRequest
+from lca.plugins.transport.webserver.read.runs.identity.identity import default_agent_ref
 from lca.runtime.support.journal_setup import BuildJournalMetadata, build_step_coordinator
+from lca.session.lifecycle.bind import bind_run_event_session_from_store
 from lca_kernel.runtime.observability import ObservabilityRuntime
 
 log = logging.getLogger(__name__)

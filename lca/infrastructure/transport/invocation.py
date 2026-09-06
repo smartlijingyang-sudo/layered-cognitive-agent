@@ -24,9 +24,14 @@ from lca.contracts.atoms.semantic.keys import (
     OBS_DELEGATION_ID,
     OBS_TASK_ID,
 )
-from lca.contracts.atoms.telemetry.telemetry import ATTR_CALLEE_ROLE, ATTR_OK, ATTR_PROTOCOL, SpanName
-from lca.contracts.models.core.policy.budget import DEFAULT_DELEGATION_TIMEOUT_S
+from lca.contracts.atoms.telemetry.telemetry import (
+    ATTR_CALLEE_ROLE,
+    ATTR_OK,
+    ATTR_PROTOCOL,
+    SpanName,
+)
 from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.models.core.policy.budget import DEFAULT_DELEGATION_TIMEOUT_S
 from lca.contracts.models.core.state.lifecycle import AgentCard, TaskStatus
 from lca.contracts.models.observability.diagnostic.diagnostic import DiagnosticCategory
 from lca.contracts.models.observability.journal.journal import (

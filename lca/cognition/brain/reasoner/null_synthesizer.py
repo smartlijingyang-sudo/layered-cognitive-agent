@@ -6,8 +6,8 @@
 
 from __future__ import annotations
 
-from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.protocols import Synthesizer
 
 

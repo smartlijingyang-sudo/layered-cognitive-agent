@@ -22,8 +22,8 @@ from lca.contracts.models.observability.journal.journal import (
     ToolInvoked,
     ToolStarted,
 )
-from lca.plugins.transport.openai_stream_encoder__encoder_provider import OpenAIStreamEncoder
 from lca.plugins.transport.openai_stream_encoder__chunk_provider import OpenAIChatChunkBuilder
+from lca.plugins.transport.openai_stream_encoder__encoder_provider import OpenAIStreamEncoder
 
 
 async def _to_list(stream: AsyncIterator[bytes]) -> list[dict[str, Any]]:

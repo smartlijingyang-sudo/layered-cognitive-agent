@@ -31,8 +31,8 @@ from lca.contracts.models.act.execution_space import (
     materialize_assistant_workspace,
 )
 from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
-from lca.harness.plugin_api import definition_from_plugin
 from lca.harness.plugin.manifest import EffectClass
+from lca.harness.plugin_api import definition_from_plugin
 from lca.plugins.assistant.catalog.catalog import (
     AssistantCatalogError,
     AssistantCatalogImpl,
@@ -100,7 +100,9 @@ class TestPluginManifest:
         列表含非 ``"none"`` 项会降级为 PROVIDER;workspace effect 含
         FILESYSTEM ⇒ 归 PROVIDER。
         """
-        from lca.contracts.protocols.declarative.declarative_1.declarative_common import PluginSpecKind
+        from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
+            PluginSpecKind,
+        )
 
         definition = definition_from_plugin(setup)
         assert definition.spec.kind is PluginSpecKind.PROVIDER

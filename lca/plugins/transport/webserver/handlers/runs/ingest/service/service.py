@@ -7,7 +7,10 @@ import re
 import structlog
 
 from lca.infrastructure.file.store import FileStore
-from lca.plugins.transport.webserver.handlers.runs.ingest.cache.cache import IngestCache, get_ingest_cache
+from lca.plugins.transport.webserver.handlers.runs.ingest.cache.cache import (
+    IngestCache,
+    get_ingest_cache,
+)
 from lca.plugins.transport.webserver.handlers.runs.ingest.fetcher.fetcher import (
     FileFetcher,
     HttpxFileFetcher,

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from lca.contracts.models.core.policy.budget import Budget
 from lca.contracts.models.core.execution.decision import Decision
+from lca.contracts.models.core.policy.budget import Budget
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.observability.act.journal_receipt import (
     ActJournalReceipt,

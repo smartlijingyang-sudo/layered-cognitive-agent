@@ -12,8 +12,8 @@ from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
     set_publish_session,
 )
-from lca.session.append import Session
 from lca.runtime.loop.runtime_journal import RuntimeJournalCommitter
+from lca.session.append import Session
 
 
 def test_commit_context_injected_returns_receipt_seq() -> None:

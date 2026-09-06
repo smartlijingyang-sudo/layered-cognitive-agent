@@ -10,8 +10,8 @@ from lca.cognition.brain.decision_gates.artifact.respond_injector import (
 from lca.cognition.brain.decision_gates.office.works_sealer import OfficeWorksSealer
 from lca.cognition.brain.decision_gates.terminal.respond import TerminalRespondGate
 from lca.cognition.brain.decision_gates.tool.loop_breaker import ToolLoopBreakerGate
-from lca.contracts.models.core.policy.budget import TOOL_LOOP_BREAK_THRESHOLD
 from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall, Turn
+from lca.contracts.models.core.policy.budget import TOOL_LOOP_BREAK_THRESHOLD
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.infrastructure.text.safe_boundary import sanitize_stream_text
 from lca.infrastructure.workspace.artifact_ledger import (

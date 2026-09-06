@@ -20,14 +20,14 @@ from typing import Any, cast
 
 from pydantic import BaseModel, SecretStr
 
-from lca.harness.plugin_api import PluginDefinition, PluginSetupFn, definition_from_plugin
 from lca.harness.plugin.spec_projection import native_spec_from_declaration
-from lca.harness.profile.validate.errors import ProfileResolveError
+from lca.harness.plugin_api import PluginDefinition, PluginSetupFn, definition_from_plugin
 from lca.harness.profile.resolve.source import (
     ProfileSource,
     load_profile_source,
     programmatic_profile_source,
 )
+from lca.harness.profile.validate.errors import ProfileResolveError
 
 _LAYER_RANK = {"L0": 0, "L1": 1, "L2": 2, "L3": 3, "L4": 4}
 _REDACTED = "***"

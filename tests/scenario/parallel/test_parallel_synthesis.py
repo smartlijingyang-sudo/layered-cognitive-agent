@@ -9,8 +9,8 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.cognition.brain.reasoner.synthesizer import ConcatSynthesizer
-from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import Budget
 from lca.contracts.protocols import Synthesizer
 from lca.plugins.strategies.fan.out import ParallelStrategy

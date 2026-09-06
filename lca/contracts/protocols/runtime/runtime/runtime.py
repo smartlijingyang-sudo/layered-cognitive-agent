@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.models.core.policy.budget import DEFAULT_MAX_STEPS
 from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.execution.result import Result
-from lca.contracts.models.core.state.state import AgentState, StateSnapshot
+from lca.contracts.models.core.policy.budget import DEFAULT_MAX_STEPS
 from lca.contracts.models.core.policy.stop import StopDecision
+from lca.contracts.models.core.state.state import AgentState, StateSnapshot
 from lca.contracts.models.team.run.context import RunContext
 
 

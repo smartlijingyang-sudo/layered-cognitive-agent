@@ -13,7 +13,6 @@ from typing import Any
 
 import structlog
 
-from lca.contracts.models.core.state.guest_layout import GuestLayout
 from lca.contracts.models.core.execution.sandbox import (
     DEFAULT_SANDBOX_TIMEOUT_S,
     MountManifest,
@@ -23,6 +22,7 @@ from lca.contracts.models.core.execution.sandbox import (
     SandboxResult,
     SessionInfo,
 )
+from lca.contracts.models.core.state.guest_layout import GuestLayout
 from lca.contracts.protocols import Sandbox, SandboxRuntime
 from lca.infrastructure.file.store import FileStore
 from lca.infrastructure.sandbox.artifact.scanner import GUEST_ARTIFACT_SCANNER

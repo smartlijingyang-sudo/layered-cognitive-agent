@@ -7,8 +7,8 @@ from typing import Any, ClassVar
 
 from lca.contracts.atoms.enums.enums import ContentType
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.protocols import Tool
 from lca.contracts.protocols.memory.operational_skills import (
     SkillImporter,
@@ -20,7 +20,10 @@ from lca.infrastructure.search.service.service import any_search_provider_availa
 from lca.infrastructure.search.skill.policy import filter_skill_search_result
 from lca.infrastructure.tools.contract.render.render import RenderContract, contract
 from lca.infrastructure.tools.contract.schema.schema import COMMON
-from lca.infrastructure.tools.skills.format._format import format_skill_index_rows, to_market_skill_items
+from lca.infrastructure.tools.skills.format._format import (
+    format_skill_index_rows,
+    to_market_skill_items,
+)
 
 SEARCH_SKILL_TOOL = "search_skill"
 

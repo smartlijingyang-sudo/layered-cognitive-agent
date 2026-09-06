@@ -21,7 +21,9 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.contracts.protocols.runtime.runtime.lifecycle import RuntimeLifecycleSubscriberRegistry
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.runtime.loop.runtime_event_publisher import InMemoryRuntimeLifecycleSubscriberRegistry

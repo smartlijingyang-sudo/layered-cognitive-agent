@@ -12,10 +12,13 @@ from lca.contracts.harness.state.context_budget import (
     DEFAULT_CONTEXT_BUDGET_CHARS,
     ContextBudgeter,
 )
-from lca.contracts.models.core.policy.gate_policy import GateDecided
 from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
+from lca.contracts.models.core.policy.gate_policy import GateDecided
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.models.observability.diagnostic.diagnostic import DiagnosticCategory, DiagnosticStatus
+from lca.contracts.models.observability.diagnostic.diagnostic import (
+    DiagnosticCategory,
+    DiagnosticStatus,
+)
 from lca.contracts.protocols import MemorySystem, PerceiveHub, Sensor
 from lca.contracts.protocols.think.cognition import SensorDisabledError
 from lca.infrastructure.session._overflow_0.bindings import resolve_session_reader

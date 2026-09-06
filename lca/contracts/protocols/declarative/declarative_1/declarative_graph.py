@@ -10,7 +10,9 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_common import
     DeclarativeValidationError,
     SemanticPhase,
 )
-from lca.contracts.protocols.declarative.declarative_1.declarative_fault_tolerance import PhaseExecutionPolicy
+from lca.contracts.protocols.declarative.declarative_1.declarative_fault_tolerance import (
+    PhaseExecutionPolicy,
+)
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import PhaseContribution
 
 

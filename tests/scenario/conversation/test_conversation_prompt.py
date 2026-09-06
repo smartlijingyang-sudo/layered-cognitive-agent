@@ -6,8 +6,11 @@ import unittest
 
 from lca.cognition.brain.prompt.conversation_prompt import format_prior_conversation
 from lca.cognition.brain.reasoner.reasoner import _prior_conversation_text
+from lca.contracts.models.core.conversation.conversation import (
+    PRIOR_CONVERSATION_WM_KEY,
+    ConversationTurn,
+)
 from lca.contracts.models.core.policy.budget import create_budget
-from lca.contracts.models.core.conversation.conversation import PRIOR_CONVERSATION_WM_KEY, ConversationTurn
 from lca.contracts.models.core.state.state import AgentState
 
 

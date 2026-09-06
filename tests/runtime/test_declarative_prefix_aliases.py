@@ -9,16 +9,16 @@ surface; the file-level rename is a follow-up PR.
 
 from __future__ import annotations
 
-from lca.runtime.support.checkpoint_resolution import (
-    DeclarativeCheckpoint,
-    DeclarativeCheckpointStateResolver,
-    RuntimeCheckpoint,
-)
 from lca.loop.driver import (
     DeclarativeExecution,
     DeclarativeRuntimeDriver,
     RuntimeDriver,
     TurnExecutor,
+)
+from lca.runtime.support.checkpoint_resolution import (
+    DeclarativeCheckpoint,
+    DeclarativeCheckpointStateResolver,
+    RuntimeCheckpoint,
 )
 from lca.runtime.support.runtime_bindings import (
     DeclarativeRuntimeBindings,

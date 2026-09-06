@@ -14,13 +14,13 @@ import pytest
 
 from lca.agent.cognitive_agent import CognitiveAgent
 from lca.agent.team_handle import TeamHandle
-from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.observability.journal.journal import AgentRunFinished, TeamRunFinished
 from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
 from lca.infrastructure.observability.facade.team.profile import TeamTraceProfile
-from lca.session.lifecycle.bind import EventSessionBinder
 from lca.plugins.session.runtime.store.store import SessionStore
+from lca.session.lifecycle.bind import EventSessionBinder
 from lca_kernel.events.bus.bus import EventBus
 from lca_kernel.events.test.catalog import build_test_bus
 from tests.support.observability_helpers import make_test_bound

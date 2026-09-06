@@ -12,7 +12,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from lca.contracts.protocols.declarative.declarative_1.declarative_common import DECLARATIVE_PLAN_VERSION
+from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
+    DECLARATIVE_PLAN_VERSION,
+)
 from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
     ActionAuthorityPlan,
     CapabilityBinding,

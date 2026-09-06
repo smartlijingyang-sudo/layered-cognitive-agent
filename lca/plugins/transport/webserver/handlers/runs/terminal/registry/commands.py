@@ -27,7 +27,9 @@ from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import (
     RunReceipt,
     RunRequest,
 )
-from lca.plugins.transport.webserver.handlers.runs.terminal.terminalizer.terminalizer import RunTerminalizer
+from lca.plugins.transport.webserver.handlers.runs.terminal.terminalizer.terminalizer import (
+    RunTerminalizer,
+)
 
 _log = structlog.get_logger(__name__)
 
@@ -184,11 +186,11 @@ class RegistryRunCommands:
                 error="run not waiting for input",
                 error_status=409,
             )
-        from lca.session.lifecycle.recovery import SessionRecoveryError
         from lca.plugins.transport.webserver.carrier.runs.resume import (
             resume_cache_ready,
             validate_durable_resume,
         )
+        from lca.session.lifecycle.recovery import SessionRecoveryError
 
         try:
             validate_durable_resume(session)

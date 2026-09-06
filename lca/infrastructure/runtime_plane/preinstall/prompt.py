@@ -11,11 +11,11 @@ from typing import Any
 
 import yaml
 
-from lca.contracts.models.core.state.plane import PlaneKind
 from lca.contracts.models.core.execution.sandbox import (
     SANDBOX_PREINSTALLED_CLI_TOOLS,
     SANDBOX_PREINSTALLED_PYTHON_PACKAGES,
 )
+from lca.contracts.models.core.state.plane import PlaneKind
 from lca.infrastructure.runtime_plane.prompts import load_plane_data
 
 _PLANE_KEY = {

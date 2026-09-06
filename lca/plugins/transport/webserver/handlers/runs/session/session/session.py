@@ -31,13 +31,6 @@ from lca.infrastructure.observability.facade.run.ambit import RunAmbit
 from lca.infrastructure.observability.loop_cursor import (
     reset_run_cursor,
 )
-from lca.plugins.transport.webserver.read.runs.identity.identity import (
-    AgentRef,
-    default_agent_ref,
-)
-from lca.plugins.transport.webserver.read.runs.journal.projection_binding import (
-    ProcessJournalBinding,
-)
 from lca.plugins.transport.webserver.handlers.runs.session.event.session import (
     BoundRunEventSession,
     unbind_run_event_session,
@@ -49,7 +42,16 @@ from lca.plugins.transport.webserver.handlers.runs.session.index.index import (
     RunSessionIndex,
     run_dedup_key,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.projection.projection import summary_for_session
+from lca.plugins.transport.webserver.handlers.runs.session.projection.projection import (
+    summary_for_session,
+)
+from lca.plugins.transport.webserver.read.runs.identity.identity import (
+    AgentRef,
+    default_agent_ref,
+)
+from lca.plugins.transport.webserver.read.runs.journal.projection_binding import (
+    ProcessJournalBinding,
+)
 
 _RUNS_ROOT = Path("traces")  # ADR-0065 §七: locator root, runs/ 是其子目录
 

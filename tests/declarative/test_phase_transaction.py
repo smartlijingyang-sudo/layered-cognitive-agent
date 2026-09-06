@@ -17,8 +17,8 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
 from lca.contracts.protocols.journal.phase.observation import PhaseStateSnapshot
 from lca.harness.declarative.compile.assembler.assembler import ExecutableNode
 from lca.harness.declarative.compile.phase.capabilities import normalize_phase_capabilities
-from lca.harness.graph.traversal import PhaseTraversal
 from lca.harness.declarative.lifecycle.phase_observation import NullPhaseObserver
+from lca.harness.graph.traversal import PhaseTraversal
 from lca.loop.transaction import PhaseExecutionTransaction
 
 

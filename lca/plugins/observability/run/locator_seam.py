@@ -21,7 +21,9 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.observability.registry.run_locator import RunLocator
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

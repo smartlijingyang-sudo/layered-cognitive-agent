@@ -45,12 +45,12 @@ from lca.contracts.atoms.semantic.keys import (
     OBS_TASK_ID,
     OBS_TASK_IDS,
 )
+from lca.contracts.models.core.execution.decision import Decision, DelegationSpec, Observation
+from lca.contracts.models.core.execution.result import ToolExecutionError
 from lca.contracts.models.core.policy.budget import (
     DEFAULT_DELEGATION_TIMEOUT_S,
     resolve_delegation_timeout_s,
 )
-from lca.contracts.models.core.execution.decision import Decision, DelegationSpec, Observation
-from lca.contracts.models.core.execution.result import ToolExecutionError
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.team.consultation.consultation import SynthesisMethod, usable_outcomes
 from lca.contracts.models.team.delegation.context import delegator_scope

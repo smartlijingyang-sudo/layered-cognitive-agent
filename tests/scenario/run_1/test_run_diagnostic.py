@@ -20,8 +20,8 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
 
-from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.policy.stop import StopDecision, StopReason
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     PhaseAttemptFailure,
     PhaseExecutionFailure,

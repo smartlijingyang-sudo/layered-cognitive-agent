@@ -15,14 +15,20 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.session.runtime.messages.messages import derive_event_message
 from lca.plugins.session.token_meter.token_meter import (
     HeuristicTokenMeter,
     estimate_text_tokens,
 )
-from lca.plugins.session.runtime.messages.messages import derive_event_message
-from lca_kernel.events.fold.fold import SURFACE_ASSISTANT_TYPE, SURFACE_TOOL_RESULT_TYPE, SURFACE_USER_TYPE
+from lca_kernel.events.fold.fold import (
+    SURFACE_ASSISTANT_TYPE,
+    SURFACE_TOOL_RESULT_TYPE,
+    SURFACE_USER_TYPE,
+)
 from lca_kernel.events.session.session import SessionEvent
 
 _log = structlog.get_logger(__name__)

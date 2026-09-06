@@ -10,8 +10,8 @@ from typing import Any
 import pytest
 
 from lca.cognition.body.tools.tool_result_preview import tool_files
-from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
 from lca.contracts.models.core.execution.result import ApprovalPendingError
+from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
 from lca.infrastructure.computer.machine.machine import MachineComputer
 from lca.infrastructure.file.store import LocalFileStore
 from lca.infrastructure.tools.lca_computer.observations import build_computer_observation

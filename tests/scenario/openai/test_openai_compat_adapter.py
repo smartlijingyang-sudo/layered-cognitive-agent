@@ -13,8 +13,12 @@ from lca.contracts.atoms.enums.enums import LLMStreamEventType
 from lca.contracts.models.core.conversation.llm import TokenUsage
 from lca.infrastructure.llm_adapter.api.style import LLMApiStyle
 from lca.infrastructure.llm_adapter.openai_compat import OpenAICompatAdapter
-from lca.infrastructure.llm_adapter.openai_compat.chat._chat_completions import to_openai_chat_tool_spec
-from lca.infrastructure.llm_adapter.openai_compat.responses._responses import to_openai_responses_tool_spec
+from lca.infrastructure.llm_adapter.openai_compat.chat._chat_completions import (
+    to_openai_chat_tool_spec,
+)
+from lca.infrastructure.llm_adapter.openai_compat.responses._responses import (
+    to_openai_responses_tool_spec,
+)
 from lca.infrastructure.llm_adapter.settings.settings import clear_llm_settings_cache
 
 _HAS_OPENAI = importlib.util.find_spec("openai") is not None

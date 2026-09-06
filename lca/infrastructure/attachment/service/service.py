@@ -9,7 +9,10 @@ from lca.contracts.models.core.conversation.attachment import AttachmentRecord
 from lca.contracts.protocols.runtime.infra.infra import AttachmentIdentity
 from lca.infrastructure.attachment.files.info import AttachmentManifest
 from lca.infrastructure.attachment.layout.layout import AttachmentLayout
-from lca.infrastructure.attachment.settings.settings import AttachmentPolicyDocument, get_attachment_policy
+from lca.infrastructure.attachment.settings.settings import (
+    AttachmentPolicyDocument,
+    get_attachment_policy,
+)
 from lca.infrastructure.file.store import FileStore
 
 _HTML_DOCTYPE = re.compile(rb"^\s*<!doctype\s+html", re.IGNORECASE)

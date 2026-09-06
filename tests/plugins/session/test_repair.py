@@ -12,13 +12,13 @@ from pathlib import Path
 import pytest
 
 from lca.contracts.harness.tasks.session import SessionEvent
+from lca.plugins.session.runtime.store.store import SessionStore
 from lca.session.lifecycle.repair import (
     TOOL_NOT_STARTED,
     TOOL_OUTCOME_UNKNOWN,
     SessionRepairError,
     repair_interrupted_turn,
 )
-from lca.plugins.session.runtime.store.store import SessionStore
 from lca_kernel.events.fold.fold import SURFACE_ASSISTANT_TYPE, SURFACE_TOOL_RESULT_TYPE
 from lca_kernel.events.session.session import SESSION_FORMAT_VERSION, SessionHeader
 

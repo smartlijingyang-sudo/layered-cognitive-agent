@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from lca.contracts.protocols.declarative.declarative_1.declarative_execution import StandardPhaseCapability
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
+    StandardPhaseCapability,
+)
 from lca.plugins.loop.phase._shared.capabilities import StandardPhaseCapabilities
 
 

@@ -60,7 +60,9 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.protocols.assistant.skill_overlay import SkillSource
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.contracts.protocols.memory.operational_skills import SkillImportError
 from lca.contracts.routing import RouteSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin

@@ -12,7 +12,9 @@ from collections.abc import Mapping
 
 import pytest
 
-from lca.contracts.protocols.declarative.declarative_1.declarative_fault_tolerance import PhaseExecutionPolicy
+from lca.contracts.protocols.declarative.declarative_1.declarative_fault_tolerance import (
+    PhaseExecutionPolicy,
+)
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     PhaseInput,
     PhaseResult,

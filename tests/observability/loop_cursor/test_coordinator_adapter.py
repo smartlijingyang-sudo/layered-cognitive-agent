@@ -31,11 +31,11 @@ from lca.contracts.models.observability.journal.step import (
 from lca.contracts.observability.core.incarnation import Incarnation
 from lca.contracts.observability.cursor.loop_cursor import CursorError, CursorSnapshot
 from lca.infrastructure.observability.loop_cursor import StdLoopCursor
-from lca.infrastructure.observability.loop_cursor.spine._spine_port import WritePort
 from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
     CoordinatorAdapter,
     sha256_digest,
 )
+from lca.infrastructure.observability.loop_cursor.spine._spine_port import WritePort
 from lca.infrastructure.observability.writable_matrix.coordinator import StepCoordinator
 from lca.infrastructure.observability.writable_matrix.registry import (
     WritableFaceRegistry,

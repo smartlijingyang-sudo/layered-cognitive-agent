@@ -19,7 +19,10 @@ from lca.contracts.mechanisms.composition.composition import (
     InvariantViolation,
     PluginFactory,
 )
-from lca.contracts.models.observability.diagnostic.diagnostic import DiagnosticCategory, DiagnosticStatus
+from lca.contracts.models.observability.diagnostic.diagnostic import (
+    DiagnosticCategory,
+    DiagnosticStatus,
+)
 from lca.contracts.models.observability.journal.journal import (
     PluginMounted,
     PluginMountRejected,

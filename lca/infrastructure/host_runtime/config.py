@@ -15,8 +15,8 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field
 
-from lca.contracts.models.core.workspace.preinstall import KEY_PYTHON_IMPORTS
 from lca.contracts.models.core.execution.sandbox import SANDBOX_OUTPUT_SUBDIR
+from lca.contracts.models.core.workspace.preinstall import KEY_PYTHON_IMPORTS
 from lca.infrastructure.runtime_plane.paths.paths import join_under
 
 # ── leaf models ──────────────────────────────────────────────────────

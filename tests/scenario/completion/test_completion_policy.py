@@ -7,11 +7,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from lca.cognition.brain.reasoner.critic import SimpleCritic
 from lca.cognition.brain.decision_gates.must.consult_all import (
     MustConsultAllMembers,
 )
 from lca.cognition.brain.pipeline.modular_brain import ModularBrain
+from lca.cognition.brain.reasoner.critic import SimpleCritic
 from lca.cognition.member_status import (
     InMemoryMemberStatus,
     compute_required_action,

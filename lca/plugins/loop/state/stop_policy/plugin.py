@@ -23,11 +23,13 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
+from lca.contracts.models.core.policy.stop import StopDecision, StopReason
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.models.core.policy.stop import StopDecision, StopReason
 from lca.contracts.protocols import ArtifactClosure, StopPolicy
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 _FALSE_COMPLETION_WINDOW = 3

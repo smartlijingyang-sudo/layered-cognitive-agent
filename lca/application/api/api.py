@@ -27,9 +27,12 @@ from lca.application.api.default_context import (
 from lca.application.api.default_context import holder as _default_ctx_holder
 from lca.application.api.spawn import spawn_agent, spawn_team
 from lca.contracts.atoms.enums.enums import MemoryLayer
-from lca.contracts.models.core.policy.budget import DEFAULT_MAX_STEPS, DEFAULT_MAX_WALL_CLOCK_SECONDS
 from lca.contracts.models.core.conversation.message import AgentMessage
 from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.policy.budget import (
+    DEFAULT_MAX_STEPS,
+    DEFAULT_MAX_WALL_CLOCK_SECONDS,
+)
 from lca.contracts.models.core.state.state import StateSnapshot
 from lca.contracts.models.team.graph.graph import ExecutionGraph
 from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest

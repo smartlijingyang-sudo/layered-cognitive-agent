@@ -9,16 +9,19 @@ from lca.infrastructure.observability.loop_cursor.spine._spine_port import (
     reset_session_append_hook,
 )
 from lca.infrastructure.observability.spine.event.record import EventRecord
+from lca.infrastructure.observability.spine.spine.enrich import (
+    enrich_spine_payload,
+    set_active_spine_enricher,
+)
 from lca.plugins.observability.spine.emit_pipeline import EmitPipeline
-from lca.infrastructure.observability.spine.spine.enrich import enrich_spine_payload, set_active_spine_enricher
+from lca.plugins.session.runtime.spine.event_projection import session_event_to_event_record
+from lca.plugins.session.runtime.spine.hook import make_session_spine_append_hook
+from lca.plugins.session.runtime.store.store import SessionStore
+from lca.plugins.session.spine_anomaly.spine_anomaly import register_spine_anomaly_to_store
 from lca.session.lifecycle.bind import (
     bind_run_event_session_from_store,
     unbind_run_event_session,
 )
-from lca.plugins.session.spine_anomaly.spine_anomaly import register_spine_anomaly_to_store
-from lca.plugins.session.runtime.spine.event_projection import session_event_to_event_record
-from lca.plugins.session.runtime.spine.hook import make_session_spine_append_hook
-from lca.plugins.session.runtime.store.store import SessionStore
 
 
 class _StubProducer:

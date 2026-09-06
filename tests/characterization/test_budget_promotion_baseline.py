@@ -10,8 +10,8 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from lca.agent.cognitive_agent import CognitiveAgent
-from lca.application.authoring.policies import LeadBudgetPolicy
 from lca.application.api.spawn import promote_lead
+from lca.application.authoring.policies import LeadBudgetPolicy
 from lca.contracts.models.core.policy.budget import (
     DEFAULT_MAX_STEPS,
     DEFAULT_MAX_WALL_CLOCK_SECONDS,

@@ -1,463 +1,331 @@
-# bundles/base.yaml — LCA core capability services (cordis YAML format).
-# Replaces the legacy bundles/base-spine.yaml.
-#
-# YAML format: top-level `entries:` list. Each entry has id, name, $module, config.
-#   $module is the importable Python module path; boot.py resolves it via
-#   importlib.import_module() and invokes module.setup.setup(ctx, config)
-#   (the cordis @plugin decorator wraps the function in a Plugin dataclass
-#   whose `setup` field holds the original async function).
-
 entries:
-  # ── Tier-1: Service Definitions (13 base capabilities) ───────────
-  - id: lca-llm-service
-    name: lca_llm_service
-    $module: lca.plugins.think.llm_seam
-    config: {}
-
-  # Brain uses this explicit seam to map model responses into Decisions.
-  - id: lca-decision-classifier-seam
-    name: lca_decision_classifier_seam
-    $module: lca.plugins.gate.decision_classifier_seam
-    config: {}
-
-  # Factory registry seams for BODIES / BRAINS / HOOKS / RESUME_INPUT_ADAPTERS /
-  # STRATEGIES. Each is an empty registry that the real providers register into.
-  - id: lca-factory-seams-default
-    name: lca_factory_seams_default
-    $module: lca.plugins.gate.factory_seams_seam
-    config: {}
-
-  # Think and Reflect stay distinct cognitive primitives.  A profile can
-  # replace either provider without changing the Brain facade or Agent Loop.
-  - id: lca-cognitive-think-pipeline-standard
-    name: lca_cognitive_think_pipeline_standard
-    $module: lca.plugins.think.cognitive_think_pipeline_provider
-    config: {}
-
-  - id: lca-cognitive-reflection-pipeline-standard
-    name: lca_cognitive_reflection_pipeline_standard
-    $module: lca.plugins.think.cognitive_reflection_pipeline_provider
-    config: {}
-
-  - id: lca-tools-service
-    name: lca_tools_service
-    $module: lca.plugins.act.tools_seam
-    config: {}
-
-  - id: lca-transport-service
-    name: lca_transport_service
-    $module: lca.plugins.act.transport_seam
-    config: {}
-
-  - id: lca-skills-service
-    name: lca_skills_service
-    $module: lca.plugins.memory.skills_seam
-    config: {}
-
-  - id: lca-file-store-service
-    name: lca_file_store_service
-    $module: lca.plugins.memory.file_store_seam
-    config: {}
-
-  - id: lca-observability-service
-    name: lca_observability_service
-    $module: lca.plugins.perceive.observability_service_seam
-    config: {}
-
-  - id: lca-sandbox-service
-    name: lca_sandbox_service
-    $module: lca.plugins.act.sandbox_seam
-    config: {}
-
-  - id: lca-memory-service
-    name: lca_memory_service
-    $module: lca.plugins.memory.memory_seam
-    config: {}
-
-  - id: lca-search-service
-    name: lca_search_service
-    $module: lca.plugins.memory.search_seam
-    config: {}
-
-  - id: lca-state-store-service
-    name: lca_state_store_service
-    $module: lca.plugins.state.state_store_seam
-    config: {}
-
-  # Sole owner of LLM credentials (.env + aliases) and the chat adapter.
-  - id: lca-llm-resolver
-    name: lca_llm_resolver
-    $module: lca.plugins.think.llm_resolver_seam
-    config:
-      default_model: qwen3.7-plus
-
-  - id: lca-memory-write-policy-simple
-    name: lca_memory_write_policy_simple
-    $module: lca.plugins.memory.write_policy
-    config:
-      min_confidence: 0.5
-
-  - id: lca-memory-compaction-policy-simple
-    name: lca_memory_compaction_policy_simple
-    $module: lca.plugins.memory.compaction_policy
-    config: {}
-
-  - id: lca-retrieval-layered
-    name: lca_retrieval_layered
-    $module: lca.plugins.memory.layered_retrieval
-    config: {}
-
-  - id: lca-memory-provider
-    name: lca_providers_memory
-    $module: lca.plugins.memory.memory_provider
-    config:
-      providers: [simple, temporal]
-
-  - id: lca-state-store-provider
-    name: lca_providers_state_store
-    $module: lca.plugins.state.state_store_provider
-    config:
-      providers: [memory]
-      active_provider: memory
-
-  - id: lca-search-provider
-    name: lca_providers_search
-    $module: lca.plugins.memory.search_provider
-    config:
-      providers: [tavily]
-
-  - id: lca-tools-provider
-    name: lca_providers_tools
-    $module: lca.plugins.act.tools_provider
-    config:
-      factories: [g2a]
-
-  - id: lca-transport-provider
-    name: lca_providers_transport
-    $module: lca.plugins.act.transport_provider
-    config:
-      providers: [internal, a2a, mcp]
-
-  - id: lca-skills-provider
-    name: lca_providers_skills
-    $module: lca.plugins.memory.skills_provider
-    config:
-      providers: [disk]
-
-  - id: lca-file-store-provider
-    name: lca_providers_file_store
-    $module: lca.plugins.memory.file_store_provider
-    config:
-      providers: [local]
-
-  - id: lca-sandbox-provider
-    name: lca_providers_sandbox
-    $module: lca.plugins.act.sandbox_provider
-    config:
-      providers: [local]
-
-  # ── ADR-0063 PR-7: EventDescriptor 单一源 + Registry ──
-  - id: lca-event-descriptor-registry
-    name: lca_seam_event_descriptor
-    $module: lca.plugins.observability.event_descriptor_seam
-    config: {}
-
-  - id: lca-event-descriptor-bootstrap
-    name: lca_providers_event_descriptor
-    $module: lca.plugins.observability.event_descriptor_provider
-    config: {}
-
-  # ── ADR-0063 PR-8: JournalStoreBackend factory registry ──
-  - id: lca-journal-store-factory-registry
-    name: lca_seam_journal_store
-    $module: lca.plugins.journal.journal_store_factories_seam
-    config: {}
-
-  - id: lca-fact-store-memory-factory
-    name: lca_providers_fact_store_memory
-    $module: lca.plugins.journal.fact_store_memory_provider
-    config: {}
-
-  # ── Facade plugin-ification: 4 backend seams + providers ──
-  - id: lca-journal-seam
-    name: lca_seam_journal
-    $module: lca.plugins.observability.journal_seam
-    config: {}
-
-  - id: lca-tracer-seam
-    name: lca_seam_tracer
-    $module: lca.plugins.observability.tracer_seam
-    config: {}
-
-  - id: lca-attribute-policy-seam
-    name: lca_seam_attribute_policy
-    $module: lca.plugins.observability.attribute_policy_seam
-    config: {}
-
-  - id: lca-fact-reader-seam
-    name: lca_seam_fact_reader
-    $module: lca.plugins.observability.fact_reader_seam
-    config: {}
-
-  - id: lca-fact-scorer-seam
-    name: lca_seam_fact_scorer
-    $module: lca.plugins.observability.fact_scorer_seam
-    config: {}
-
-  - id: lca-journal-memory-factory
-    name: lca_providers_journal_memory
-    $module: lca.plugins.memory.journal_memory_provider
-    config: {}
-
-  - id: lca-tracer-otel-factory
-    name: lca_providers_tracer_otel
-    $module: lca.plugins.observability.tracer_otel_provider
-    config: {}
-
-  - id: lca-attribute-policy-default-factory
-    name: lca_providers_attribute_policy
-    $module: lca.plugins.observability.attribute_policy_provider
-    config: {}
-
-  - id: lca-fact-reader-console-factory
-    name: lca_providers_fact_reader_console
-    $module: lca.plugins.observability.fact_reader_console_provider
-    config: {}
-
-  - id: lca-fact-reader-otel-factory
-    name: lca_providers_fact_reader_otel
-    $module: lca.plugins.observability.fact_reader_otel_provider
-    config: {}
-
-  - id: lca-fact-reader-langfuse-factory
-    name: lca_providers_fact_reader_langfuse
-    $module: lca.plugins.observability.fact_reader_langfuse_provider
-    config: {}
-
-  - id: lca-langfuse-eval-scorer
-    name: lca_providers_fact_scorer_langfuse
-    $module: lca.plugins.observability.fact_scorer_langfuse_provider
-    config: {}
-
-  # ── ADR-0063 PR-9: TraceInspector tools + CLI debug commands ──
-  - id: lca-trace-tool-seam
-    name: lca_seam_trace_tool
-    $module: lca.plugins.observability.trace_tool_seam
-    config: {}
-
-  - id: lca-trace-tool-provider
-    name: lca_providers_trace_tool
-    $module: lca.plugins.observability.trace_tool_provider
-    config: {}
-
-  - id: lca-cli-debug-command-seam
-    name: lca_seam_cli_debug
-    $module: lca.plugins.observability.cli_debug_seam
-    config: {}
-
-  - id: lca-cli-debug-trace
-    name: lca_providers_cli_debug_trace
-    $module: lca.plugins.observability.cli_debug_trace_provider
-    config: {}
-
-  # ── ADR-0063 PR-10: GenAI semantic mappers ──
-  - id: lca-genai-semantic-mapper-seam
-    name: lca_seam_genai
-    $module: lca.plugins.observability.genai_seam
-    config: {}
-
-  - id: lca-genai-llm-mapper
-    name: lca_providers_genai_llm
-    $module: lca.plugins.observability.genai_llm_provider
-    config: {}
-
-  - id: lca-genai-tool-mapper
-    name: lca_providers_genai_tool
-    $module: lca.plugins.observability.genai_tool_provider
-    config: {}
-
-  # ── ADR-0075 / full-plugin-remediation §5: durable effect receipts ──
-  # The production runtime must claim and replay effects through a filesystem-backed
-  # store; an interrupted claim remains in_progress and is never silently retried.
-  - id: lca-idempotency-store-seam
-    name: lca_seam_idempotency_store
-    $module: lca.plugins.journal.idempotency_store_seam
-    config: {}
-
-  # ── ADR-0074: Effect handler registry + provider ──
-  # Tier-1 seam declares the effect_handler_registry capability;
-  # Tier-2 provider supplies DefaultEffectHandlerRegistry with body.act/memory.update handlers.
-  - id: lca-effect-handler-registry-seam
-    name: lca_seam_effect_handler_registry
-    $module: lca.plugins.act.effect_handler_seam
-    config: {}
-
-  - id: lca-effect-handler-provider
-    name: lca_effect_handler_provider
-    $module: lca.plugins.act.effect_handlers_provider
-    config: {}
-
-  # ── ADR-0074: Delta handler registry + provider ──
-  # Tier-1 seam declares the delta_handler_registry capability;
-  # Tier-2 provider registers 11 default delta handlers for all Reducer operations.
-  - id: lca-delta-handler-registry-seam
-    name: lca_seam_delta_handler_registry
-    $module: lca.plugins.act.delta_handler_seam
-    config: {}
-
-  - id: lca-delta-handler-provider
-    name: lca_delta_handler_provider
-    $module: lca.plugins.act.delta_handlers_provider
-    config: {}
-
-  # ── Declarative runtime mechanism factories ──
-  # The runtime kernel retains its authorization/journal/reducer order, while a
-  # Profile selects the concrete gateway, delta adapter, and per-turn journal.
-  - id: lca-declarative-runtime-seams-provider
-    name: lca_declarative_runtime_seams_provider
-    $module: lca.plugins.journal.declarative_runtime_seams_provider
-    config: {}
-
-  # LoopGuard policy is separate from phase topology. Profiles can replace the
-  # evaluator while retaining the same declarative graph and phase executors.
-  - id: lca-declarative-loop-guard
-    name: lca_declarative_loop_guard
-    $module: lca.plugins.think.loop_guard_provider
-    config: {}
-
-  # The complete Agent Loop is selected through this Provider. Alternative
-  # runtime implementations replace this entry without changing L3/L4 assembly.
-  - id: lca-cognitive-runtime-factory
-    name: lca_cognitive_runtime_factory
-    $module: lca.plugins.journal.runtime_factory_provider
-    config: {}
-
-  # ── ADR-0074: Artifact closure seam/provider ──
-  # Loop exit consumes this typed seam instead of the legacy free function.
-  - id: lca-artifact-closure-provider
-    name: lca_artifact_closure_provider
-    $module: lca.plugins.journal.artifact_closure_provider
-    config: {}
-
-  # ── Declarative phase observation ──
-  # Independent observer providers contribute to a neutral seam. The composite
-  # provider freezes their ordered, read-only view into every runtime binding.
-  - id: lca-phase-observer-registry-seam
-    name: lca_phase_observer_registry_seam
-    $module: lca.plugins.perceive.phase_observer_registry_seam
-    config: {}
-
-  - id: lca-phase-observer-tracing-provider
-    name: lca_phase_observer_tracing_provider
-    $module: lca.plugins.perceive.phase_observer_tracing_provider
-    config: {}
-
-  - id: lca-phase-observer-provider
-    name: lca_phase_observer_provider
-    $module: lca.plugins.perceive.phase_observer_provider
-    config:
-      failure_mode: fail_open
-
-  # ── Composable Agent Loop lifecycle publication ──
-  # The neutral registry gathers passive progress subscribers during boot. The
-  # sole composite publisher freezes them into each runtime binding; subscribers
-  # receive immutable metadata only and cannot control state, effects, or Journal.
-  - id: lca-runtime-lifecycle-subscriber-registry-seam
-    name: lca_runtime_lifecycle_subscriber_registry_seam
-    $module: lca.plugins.state.runtime_lifecycle_registry_seam
-    config: {}
-
-  - id: lca-runtime-lifecycle-logging-provider
-    name: lca_runtime_lifecycle_logging_provider
-    $module: lca.plugins.state.runtime_lifecycle_logging_provider
-    config:
-      priority: 100
-
-  - id: lca-runtime-lifecycle-publisher
-    name: lca_runtime_lifecycle_publisher
-    $module: lca.plugins.state.runtime_lifecycle_provider
-    config:
-      failure_mode: fail_open
-
-  # ── ADR-0076 §五: Team seam (TeamSharedMemoryStore / Transport / Invoker) ──
-  # Shared memory and communication are independent providers. Profiles can
-  # replace either backend without changing TeamComposer or the Team seam factory.
-  - id: lca-team-shared-memory-default
-    name: lca_team_shared_memory_default
-    $module: lca.plugins.collaboration.team_shared_memory_seam
-    config: {}
-
-  - id: lca-team-communication-default
-    name: lca_team_communication_default
-    $module: lca.plugins.collaboration.team_communication_seam
-    config: {}
-
-  # Team mode owns two further independent choices: the role catalog and the
-  # policy that turns an objective into a validated casting plan.  Both are
-  # profile-selected before the run-mode adapter is registered.
-  - id: lca-team-role-library-default
-    name: lca_team_role_library_default
-    $module: lca.plugins.collaboration.team_role_library_seam
-    config: {}
-
-  - id: lca-team-casting-prompt-renderer-builtin
-    name: lca_team_casting_prompt_renderer_builtin
-    $module: lca.plugins.collaboration.team_casting_prompt_renderer_seam
-    config:
-      template_name: casting_prompt
-
-  - id: lca-team-caster-default
-    name: lca_team_caster_default
-    $module: lca.plugins.collaboration.team_caster_seam
-    config: {}
-
-  # Tier-1 seam consumes both profile-selected Team backends; TeamComposer
-  # consumes only this completed Team seam, never a concrete backend.
-  - id: lca-team-seam-seam
-    name: lca_seam_team_seam
-    $module: lca.plugins.collaboration.team_seam_seam
-    config: {}
-
-  # ── ADR-0076 §六: run_mode_registry seam (replaces gateway if/elif) ──
-  # Each built-in mode is its own plugin entry. Replacing one mode therefore
-  # changes only that entry (or adds a replacement) and never couples Solo,
-  # Team, and Creator adapter selection inside one aggregate defaults plugin.
-  - id: lca-run-mode-registry-seam
-    name: lca_seam_run_mode_registry
-    $module: lca.plugins.state.run_mode_registry_seam
-    config: {}
-
-  - id: lca-mode-solo-default
-    name: lca_mode_solo_default
-    $module: lca.plugins.collaboration.modes.solo
-    config: {}
-
-  - id: lca-mode-team-default
-    name: lca_mode_team_default
-    $module: lca.plugins.collaboration.modes.team
-    config: {}
-
-  # ── ADR-0065 / W1: Evidence store seam ──
-  # Tier-1 seam declares evidence_store + evidence_policy capabilities (ADR-0065 L5 / L8).
-  # Provider (FilesystemEvidenceStore) included; plugins can override via ctx.provide.
-  - id: lca-evidence-store-seam
-    name: lca_seam_evidence_store
-    $module: lca.plugins.observability.evidence_store_seam
-    config: {}
-
-  # ── ADR-0065 / L9: run-scoped ledger factory ──
-  # The factory owns the durable backend and run directory layout; gateway
-  # consumers resolve it from the booted capability graph.
-  - id: lca-run-ledger-factory-seam
-    name: lca_seam_run_ledger_factory
-    $module: lca.plugins.observability.run_ledger_seam
-    config: {}
-
-  # ── W1 / ADR-0076 §四: Reducer (C4 single-writer) ──
-  # Provider is the @plugin()-decorated module itself (no separate seam/provider split
-  # because DefaultReducer is a singleton with no registry); closure declares
-  # requires this plugin to be in the bundle so production boot is fail-closed.
-  - id: lca-default-reducer
-    name: lca_default_reducer
-    $module: lca.plugins.loop.reducer.plugin
-    config: {}
+- id: lca-llm-service
+  name: lca_llm_service
+  $module: lca.plugins.think.llm.seam
+  config: {}
+- id: lca-decision-classifier-seam
+  name: lca_decision_classifier_seam
+  $module: lca.plugins.gate.decision_classifier_seam
+  config: {}
+- id: lca-factory-seams-default
+  name: lca_factory_seams_default
+  $module: lca.plugins.gate.factory_seams_seam
+  config: {}
+- id: lca-cognitive-think-pipeline-standard
+  name: lca_cognitive_think_pipeline_standard
+  $module: lca.plugins.think.cognitive.think_pipeline_provider
+  config: {}
+- id: lca-cognitive-reflection-pipeline-standard
+  name: lca_cognitive_reflection_pipeline_standard
+  $module: lca.plugins.think.cognitive.reflection_pipeline_provider
+  config: {}
+- id: lca-tools-service
+  name: lca_tools_service
+  $module: lca.plugins.act.tools.seam
+  config: {}
+- id: lca-transport-service
+  name: lca_transport_service
+  $module: lca.plugins.act.transport.seam
+  config: {}
+- id: lca-skills-service
+  name: lca_skills_service
+  $module: lca.plugins.memory.seams.skills_seam
+  config: {}
+- id: lca-file-store-service
+  name: lca_file_store_service
+  $module: lca.plugins.memory.seams.file_store_seam
+  config: {}
+- id: lca-observability-service
+  name: lca_observability_service
+  $module: lca.plugins.perceive.observability.service_seam
+  config: {}
+- id: lca-sandbox-service
+  name: lca_sandbox_service
+  $module: lca.plugins.act.sandbox.seam
+  config: {}
+- id: lca-memory-service
+  name: lca_memory_service
+  $module: lca.plugins.memory.seams.memory_seam
+  config: {}
+- id: lca-search-service
+  name: lca_search_service
+  $module: lca.plugins.memory.seams.search_seam
+  config: {}
+- id: lca-state-store-service
+  name: lca_state_store_service
+  $module: lca.plugins.state.state.store_seam
+  config: {}
+- id: lca-llm-resolver
+  name: lca_llm_resolver
+  $module: lca.plugins.think.llm.resolver_seam
+  config:
+    default_model: qwen3.7-plus
+- id: lca-memory-write-policy-simple
+  name: lca_memory_write_policy_simple
+  $module: lca.plugins.memory.policy.write_policy
+  config:
+    min_confidence: 0.5
+- id: lca-memory-compaction-policy-simple
+  name: lca_memory_compaction_policy_simple
+  $module: lca.plugins.memory.policy.compaction_policy
+  config: {}
+- id: lca-retrieval-layered
+  name: lca_retrieval_layered
+  $module: lca.plugins.memory.policy.layered_retrieval
+  config: {}
+- id: lca-memory-provider
+  name: lca_providers_memory
+  $module: lca.plugins.memory.providers.memory_provider
+  config:
+    providers:
+    - simple
+    - temporal
+- id: lca-state-store-provider
+  name: lca_providers_state_store
+  $module: lca.plugins.state.state.store_provider
+  config:
+    providers:
+    - memory
+    active_provider: memory
+- id: lca-search-provider
+  name: lca_providers_search
+  $module: lca.plugins.memory.providers.search_provider
+  config:
+    providers:
+    - tavily
+- id: lca-tools-provider
+  name: lca_providers_tools
+  $module: lca.plugins.act.tools.provider
+  config:
+    factories:
+    - g2a
+- id: lca-transport-provider
+  name: lca_providers_transport
+  $module: lca.plugins.act.transport.provider
+  config:
+    providers:
+    - internal
+    - a2a
+    - mcp
+- id: lca-skills-provider
+  name: lca_providers_skills
+  $module: lca.plugins.memory.providers.skills_provider
+  config:
+    providers:
+    - disk
+- id: lca-file-store-provider
+  name: lca_providers_file_store
+  $module: lca.plugins.memory.providers.file_store_provider
+  config:
+    providers:
+    - local
+- id: lca-sandbox-provider
+  name: lca_providers_sandbox
+  $module: lca.plugins.act.sandbox.provider
+  config:
+    providers:
+    - local
+- id: lca-event-descriptor-registry
+  name: lca_seam_event_descriptor
+  $module: lca.plugins.observability.event.descriptor_seam
+  config: {}
+- id: lca-event-descriptor-bootstrap
+  name: lca_providers_event_descriptor
+  $module: lca.plugins.observability.event.descriptor_provider
+  config: {}
+- id: lca-journal-store-factory-registry
+  name: lca_seam_journal_store
+  $module: lca.plugins.journal.journal.store_factories_seam
+  config: {}
+- id: lca-fact-store-memory-factory
+  name: lca_providers_fact_store_memory
+  $module: lca.plugins.journal.fact.store_memory_provider
+  config: {}
+- id: lca-journal-seam
+  name: lca_seam_journal
+  $module: lca.plugins.observability.journal.seam
+  config: {}
+- id: lca-tracer-seam
+  name: lca_seam_tracer
+  $module: lca.plugins.observability.tracer.seam
+  config: {}
+- id: lca-attribute-policy-seam
+  name: lca_seam_attribute_policy
+  $module: lca.plugins.observability.attribute.policy_seam
+  config: {}
+- id: lca-fact-reader-seam
+  name: lca_seam_fact_reader
+  $module: lca.plugins.observability.fact_1.fact_reader_seam
+  config: {}
+- id: lca-fact-scorer-seam
+  name: lca_seam_fact_scorer
+  $module: lca.plugins.observability.fact_2.fact_scorer_seam
+  config: {}
+- id: lca-journal-memory-factory
+  name: lca_providers_journal_memory
+  $module: lca.plugins.memory.store.journal_memory_provider
+  config: {}
+- id: lca-tracer-otel-factory
+  name: lca_providers_tracer_otel
+  $module: lca.plugins.observability.tracer.otel_provider
+  config: {}
+- id: lca-attribute-policy-default-factory
+  name: lca_providers_attribute_policy
+  $module: lca.plugins.observability.attribute.policy_provider
+  config: {}
+- id: lca-fact-reader-console-factory
+  name: lca_providers_fact_reader_console
+  $module: lca.plugins.observability.fact_1.fact_reader_console_provider
+  config: {}
+- id: lca-fact-reader-otel-factory
+  name: lca_providers_fact_reader_otel
+  $module: lca.plugins.observability.fact_1.fact_reader_otel_provider
+  config: {}
+- id: lca-fact-reader-langfuse-factory
+  name: lca_providers_fact_reader_langfuse
+  $module: lca.plugins.observability.fact_1.fact_reader_langfuse_provider
+  config: {}
+- id: lca-langfuse-eval-scorer
+  name: lca_providers_fact_scorer_langfuse
+  $module: lca.plugins.observability.fact_1.fact_scorer_langfuse_provider
+  config: {}
+- id: lca-trace-tool-seam
+  name: lca_seam_trace_tool
+  $module: lca.plugins.observability.trace.tool_seam
+  config: {}
+- id: lca-trace-tool-provider
+  name: lca_providers_trace_tool
+  $module: lca.plugins.observability.trace.tool_provider
+  config: {}
+- id: lca-cli-debug-command-seam
+  name: lca_seam_cli_debug
+  $module: lca.plugins.observability.cli.debug_seam
+  config: {}
+- id: lca-cli-debug-trace
+  name: lca_providers_cli_debug_trace
+  $module: lca.plugins.observability.cli.debug_trace_provider
+  config: {}
+- id: lca-genai-semantic-mapper-seam
+  name: lca_seam_genai
+  $module: lca.plugins.observability.genai.seam
+  config: {}
+- id: lca-genai-llm-mapper
+  name: lca_providers_genai_llm
+  $module: lca.plugins.observability.genai.llm_provider
+  config: {}
+- id: lca-genai-tool-mapper
+  name: lca_providers_genai_tool
+  $module: lca.plugins.observability.genai.tool_provider
+  config: {}
+- id: lca-idempotency-store-seam
+  name: lca_seam_idempotency_store
+  $module: lca.plugins.journal.idempotency.store_seam
+  config: {}
+- id: lca-effect-handler-registry-seam
+  name: lca_seam_effect_handler_registry
+  $module: lca.plugins.act.effect.handler_seam
+  config: {}
+- id: lca-effect-handler-provider
+  name: lca_effect_handler_provider
+  $module: lca.plugins.act.effect.handlers_provider
+  config: {}
+- id: lca-delta-handler-registry-seam
+  name: lca_seam_delta_handler_registry
+  $module: lca.plugins.act.delta.handler_seam
+  config: {}
+- id: lca-delta-handler-provider
+  name: lca_delta_handler_provider
+  $module: lca.plugins.act.delta.handlers_provider
+  config: {}
+- id: lca-declarative-runtime-seams-provider
+  name: lca_declarative_runtime_seams_provider
+  $module: lca.plugins.journal.declarative.runtime_seams_provider
+  config: {}
+- id: lca-declarative-loop-guard
+  name: lca_declarative_loop_guard
+  $module: lca.plugins.think.loop.guard_provider
+  config: {}
+- id: lca-cognitive-runtime-factory
+  name: lca_cognitive_runtime_factory
+  $module: lca.plugins.journal.runtime.factory_provider
+  config: {}
+- id: lca-artifact-closure-provider
+  name: lca_artifact_closure_provider
+  $module: lca.plugins.journal.artifact.closure_provider
+  config: {}
+- id: lca-phase-observer-registry-seam
+  name: lca_phase_observer_registry_seam
+  $module: lca.plugins.perceive.phase.observer_registry_seam
+  config: {}
+- id: lca-phase-observer-tracing-provider
+  name: lca_phase_observer_tracing_provider
+  $module: lca.plugins.perceive.phase.observer_tracing_provider
+  config: {}
+- id: lca-phase-observer-provider
+  name: lca_phase_observer_provider
+  $module: lca.plugins.perceive.phase.observer_provider
+  config:
+    failure_mode: fail_open
+- id: lca-runtime-lifecycle-subscriber-registry-seam
+  name: lca_runtime_lifecycle_subscriber_registry_seam
+  $module: lca.plugins.state.runtime.lifecycle_registry_seam
+  config: {}
+- id: lca-runtime-lifecycle-logging-provider
+  name: lca_runtime_lifecycle_logging_provider
+  $module: lca.plugins.state.runtime.lifecycle_logging_provider
+  config:
+    priority: 100
+- id: lca-runtime-lifecycle-publisher
+  name: lca_runtime_lifecycle_publisher
+  $module: lca.plugins.state.runtime.lifecycle_provider
+  config:
+    failure_mode: fail_open
+- id: lca-team-shared-memory-default
+  name: lca_team_shared_memory_default
+  $module: lca.plugins.collaboration.team_2.team_shared_memory_seam
+  config: {}
+- id: lca-team-communication-default
+  name: lca_team_communication_default
+  $module: lca.plugins.collaboration.team_1.team_communication_seam
+  config: {}
+- id: lca-team-role-library-default
+  name: lca_team_role_library_default
+  $module: lca.plugins.collaboration.team_1.team_role_library_seam
+  config: {}
+- id: lca-team-casting-prompt-renderer-builtin
+  name: lca_team_casting_prompt_renderer_builtin
+  $module: lca.plugins.collaboration.team_1.team_casting_prompt_renderer_seam
+  config:
+    template_name: casting_prompt
+- id: lca-team-caster-default
+  name: lca_team_caster_default
+  $module: lca.plugins.collaboration.team_1.team_caster_seam
+  config: {}
+- id: lca-team-seam-seam
+  name: lca_seam_team_seam
+  $module: lca.plugins.collaboration.team_1.team_seam_seam
+  config: {}
+- id: lca-run-mode-registry-seam
+  name: lca_seam_run_mode_registry
+  $module: lca.plugins.state.run.mode_registry_seam
+  config: {}
+- id: lca-mode-solo-default
+  name: lca_mode_solo_default
+  $module: lca.plugins.collaboration.modes.solo
+  config: {}
+- id: lca-mode-team-default
+  name: lca_mode_team_default
+  $module: lca.plugins.collaboration.modes.team
+  config: {}
+- id: lca-evidence-store-seam
+  name: lca_seam_evidence_store
+  $module: lca.plugins.observability.evidence.store_seam
+  config: {}
+- id: lca-run-ledger-factory-seam
+  name: lca_seam_run_ledger_factory
+  $module: lca.plugins.observability.run.ledger_seam
+  config: {}
+- id: lca-default-reducer
+  name: lca_default_reducer
+  $module: lca.plugins.loop.reducer.plugin
+  config: {}

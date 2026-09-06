@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from lca.plugins.session.runtime.fork.fork import SESSION_END_SEED_TYPE, SessionForkError, fork_session
+from lca.plugins.session.runtime.fork.fork import (
+    SESSION_END_SEED_TYPE,
+    SessionForkError,
+    fork_session,
+)
 from lca.plugins.session.runtime.messages.messages import derive_messages, export_transcript
-from lca.session.append import Session
 from lca.plugins.session.runtime.store.store import SessionStore
+from lca.session.append import Session
 from lca_kernel.events.fold.fold import SURFACE_ASSISTANT_TYPE, SURFACE_USER_TYPE
 
 

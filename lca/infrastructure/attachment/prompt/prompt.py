@@ -8,11 +8,11 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from lca.contracts.models.core.state.plane import PlaneKind
 from lca.contracts.models.core.execution.sandbox import (
     SANDBOX_INIT_MAX_FILE_BYTES,
     SANDBOX_INIT_MAX_FILES,
 )
+from lca.contracts.models.core.state.plane import PlaneKind
 from lca.infrastructure.attachment.layout.layout import AttachmentLayout, sanitize_attachment_name
 from lca.infrastructure.attachment.settings.settings import get_attachment_policy
 from lca.infrastructure.file.store import FileStore, LocalFileStore

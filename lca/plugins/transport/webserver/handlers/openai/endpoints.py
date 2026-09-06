@@ -13,7 +13,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from openai import APIError
 from starlette.requests import Request
 from starlette.responses import JSONResponse, StreamingResponse
 
@@ -36,6 +35,7 @@ from lca.plugins.transport.webserver.handlers.openai.protocol import (
     error_response,
     lca_models_payload,
 )
+from openai import APIError
 
 
 async def list_models(request: Request) -> JSONResponse:

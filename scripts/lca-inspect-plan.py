@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import sys
 
-from lca.harness.graph.execute.interpreter import compiled_run_plan_ref
 from lca.harness.composition.plan_compiler import CompileOptions, compile_plan
+from lca.harness.graph.execute.interpreter import compiled_run_plan_ref
 from lca.harness.profile.resolve.resolve import resolve_profile
 
 # ---------- 0. 编译计划 --------------------------------------------------------

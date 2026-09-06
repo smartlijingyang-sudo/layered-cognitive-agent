@@ -35,7 +35,9 @@ _log = structlog.get_logger("lca.safe_executor")
 _PERF_COUNTER_SCALE = 1000
 # R1: deterministic exceptions live in ``_retry_classification`` so the two
 # SafeExecutor implementations cannot drift on what is non-retryable.
-from lca.cognition.body.internal._retry_classification import _DETERMINISTIC_EXCEPTIONS  # noqa: E402
+from lca.cognition.body.internal._retry_classification import (
+    _DETERMINISTIC_EXCEPTIONS,  # noqa: E402
+)
 
 
 def _elapsed_ms(started: float) -> int:

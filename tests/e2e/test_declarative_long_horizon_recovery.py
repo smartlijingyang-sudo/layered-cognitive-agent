@@ -14,11 +14,11 @@ import pytest
 
 from lca.contracts.protocols.act.command.envelope import CommandEnvelope
 from lca.harness.declarative.execute.dispatch import RegistryEffectDispatcher
+from lca.loop.driver import RuntimePhaseCapabilities
 from lca.plugins.act.effect.handlers_provider import (
     InMemoryEffectHandlerRegistry,
     register_default_effect_handlers,
 )
-from lca.loop.driver import RuntimePhaseCapabilities
 from lca.runtime._overflow_0.idempotency_fixtures import InMemoryFixtureIdempotencyStore
 
 
@@ -110,7 +110,9 @@ class TestEffectIdempotency:
         )
 
         from lca.contracts.protocols.act.command.envelope import CapabilityGrant
-        from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import EffectPolicyPlan
+        from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
+            EffectPolicyPlan,
+        )
 
         # Create envelope with idempotency key
         envelope = CommandEnvelope(
@@ -150,7 +152,9 @@ class TestEffectIdempotency:
         )
 
         from lca.contracts.protocols.act.command.envelope import CapabilityGrant
-        from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import EffectPolicyPlan
+        from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
+            EffectPolicyPlan,
+        )
 
         # Create envelope
         envelope = CommandEnvelope(
@@ -204,7 +208,9 @@ class TestEffectIdempotency:
         )
 
         from lca.contracts.protocols.act.command.envelope import CapabilityGrant
-        from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import EffectPolicyPlan
+        from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
+            EffectPolicyPlan,
+        )
 
         envelope = CommandEnvelope(
             plan_ref="plan_v1",

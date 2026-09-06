@@ -25,7 +25,9 @@ from lca.contracts.harness.composition.plugin_contract import (
 from lca.contracts.models.core.conversation.memory import MemoryLayer
 from lca.contracts.protocols.collaboration.orchestration.orchestration import SharedMemoryStore
 from lca.contracts.protocols.collaboration.team.seam import TeamSharedMemoryResolverProtocol
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.contracts.protocols.journal.spec.spec import TeamSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 

@@ -8,8 +8,8 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import PurePosixPath, PureWindowsPath
 
-from lca.contracts.models.core.state.plane import PlaneBindings, PlaneKind, PlaneRef
 from lca.contracts.models.core.execution.result import ApprovalPendingError
+from lca.contracts.models.core.state.plane import PlaneBindings, PlaneKind, PlaneRef
 
 _bindings: ContextVar[PlaneBindings | None] = ContextVar("plane_bindings", default=None)
 

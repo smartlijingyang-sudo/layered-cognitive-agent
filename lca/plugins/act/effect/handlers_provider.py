@@ -34,7 +34,9 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
     CommandEnvelope,
     EffectPolicyPlan,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.handler.registry import UniqueOperationRegistry
 

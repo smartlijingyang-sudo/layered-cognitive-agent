@@ -35,6 +35,10 @@ from lca.contracts.models.observability.event.event import (
     OperationOutcome,
     RuntimeKind,
 )
+from lca.contracts.models.observability.journal.catalog import (
+    JOURNAL_EVENT_CLASSES,
+    JournalSchemaMeta,
+)
 from lca.contracts.models.observability.journal.journal import (
     ActionDegraded,
     AgentRunFinished,
@@ -71,10 +75,6 @@ from lca.contracts.models.observability.journal.journal import (
     ToolDenied,
     ToolInvoked,
     ToolStarted,
-)
-from lca.contracts.models.observability.journal.catalog import (
-    JOURNAL_EVENT_CLASSES,
-    JournalSchemaMeta,
 )
 from lca.contracts.observability.registry.named_registry import NamedRegistry
 from lca.contracts.protocols import JournalProjector

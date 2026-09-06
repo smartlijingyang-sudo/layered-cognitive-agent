@@ -25,7 +25,9 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
@@ -46,8 +48,8 @@ def _null_factory() -> type:
         "lca.infrastructure.observability.loop_cursor.in.memory"
     )
     InMemoryLoopCursor = _in_memory_mod.InMemoryLoopCursor
-    from lca.infrastructure.observability.loop_cursor.state.state import _CursorState
     from lca.contracts.observability.core.incarnation import Incarnation
+    from lca.infrastructure.observability.loop_cursor.state.state import _CursorState
 
     class _NullLoopCursorFactory:
         """In-memory only LoopCursorFactory(ADR-0169 L13)."""

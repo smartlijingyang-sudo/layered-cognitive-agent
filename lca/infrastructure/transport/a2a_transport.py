@@ -18,8 +18,8 @@ from typing import Any
 import httpx
 
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.models.core.policy.budget import DEFAULT_A2A_TIMEOUT_S
 from lca.contracts.models.core.execution.decision import AgentCard, Observation
+from lca.contracts.models.core.policy.budget import DEFAULT_A2A_TIMEOUT_S
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.protocols import AgentTransport
 

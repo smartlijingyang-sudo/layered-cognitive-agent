@@ -68,11 +68,11 @@ def test_recover_live_agent_waiting_input_with_approval() -> None:
 
 
 def test_bind_run_emits_session_created() -> None:
+    from lca.plugins.session.runtime.store.store import SessionStore
     from lca.session.lifecycle.bind import (
         bind_run_event_session_from_store,
         unbind_run_event_session,
     )
-    from lca.plugins.session.runtime.store.store import SessionStore
 
     store = SessionStore()
     bound = bind_run_event_session_from_store(

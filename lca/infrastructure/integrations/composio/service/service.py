@@ -21,7 +21,10 @@ from lca.contracts.observability.closure.composio_ep_closure import (
 from lca.infrastructure.integrations.composio.catalog.catalog import get_app_by_identifier
 from lca.infrastructure.integrations.composio.client.client import ComposioHttpClient
 from lca.infrastructure.integrations.composio.connection.store import ComposioConnectionStore
-from lca.infrastructure.integrations.composio.models.models import ComposioConnection, ComposioToolDef
+from lca.infrastructure.integrations.composio.models.models import (
+    ComposioConnection,
+    ComposioToolDef,
+)
 from lca.infrastructure.integrations.composio.settings.settings import ComposioSettings
 
 

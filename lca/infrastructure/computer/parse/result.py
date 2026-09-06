@@ -5,7 +5,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from lca.infrastructure.computer.constants.constants import COMPUTER_RESULT_BEGIN, COMPUTER_RESULT_END
+from lca.infrastructure.computer.constants.constants import (
+    COMPUTER_RESULT_BEGIN,
+    COMPUTER_RESULT_END,
+)
 
 
 def parse_computer_stdout(stdout: str) -> dict[str, Any] | None:

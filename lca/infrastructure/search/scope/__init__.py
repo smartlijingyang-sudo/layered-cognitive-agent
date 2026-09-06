@@ -2,9 +2,9 @@
 
 from lca.infrastructure.search.scope.scope import (
     get_search_run_state,
+    mark_web_search_attempt,
     reset_search_run_state,
     search_run_scope,
-    mark_web_search_attempt,
     should_prefer_llm_search,
 )
 

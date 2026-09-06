@@ -60,7 +60,9 @@ from lca.contracts.protocols.assistant.skill_overlay import (
     SkillNotVerified,
     SkillSource,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.contracts.protocols.memory.operational_skills import (
     SKILL_MAX_CONTENT_CHARS,
     SKILL_MAX_RESOURCES,

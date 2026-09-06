@@ -17,8 +17,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lca.contracts.models.core.workspace.file_ref import FileRef
 from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
+from lca.contracts.models.core.workspace.file_ref import FileRef
 from lca.infrastructure.attachment.system.role_renderer import render_system_role
 from lca.infrastructure.file.store import LocalFileStore
 from lca.infrastructure.observability.facade.run.ambit import RunAmbit, bind_run_ambit

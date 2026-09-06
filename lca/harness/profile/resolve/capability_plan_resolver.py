@@ -40,12 +40,12 @@ from lca.contracts.protocols.composition.relation import (
     typed_relations_from_iter,
 )
 from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan, ProviderBinding
-from lca.harness.profile.plan.projection import ResolvedProfileProjection
-from lca.harness.profile.resolve.resolve import ResolvedPlugin, ResolvedProfile
 from lca.harness.profile.boot.runtime_closure import (
     FallbackPolicy,
     runtime_closure_requirement,
 )
+from lca.harness.profile.plan.projection import ResolvedProfileProjection
+from lca.harness.profile.resolve.resolve import ResolvedPlugin, ResolvedProfile
 
 
 class CapabilityPlanResolveError(ValueError):

@@ -313,7 +313,11 @@ class TestLiveTailKeepsEveryChannel(unittest.TestCase):
     """LiveTail does not filter. Decision vs answer is Transport's ignore table."""
 
     def test_both_channels_stay_on_the_tail(self) -> None:
-        from lca.contracts.models.observability.journal.journal import RunScope, StampedEvent, StepTextDelta
+        from lca.contracts.models.observability.journal.journal import (
+            RunScope,
+            StampedEvent,
+            StepTextDelta,
+        )
         from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 
         tail = LiveTail()

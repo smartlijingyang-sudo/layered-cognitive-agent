@@ -11,7 +11,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import DeclarativeValidationError
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
+    DeclarativeValidationError,
+)
 
 _RECEIPT_FIELDS = frozenset({"receipt", "result", "plan_ref", "idempotency_key", "operation"})
 

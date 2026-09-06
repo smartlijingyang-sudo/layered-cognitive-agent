@@ -110,7 +110,12 @@ class TestRalphLoop:
         Three consecutive test-run calls produce a PolicyFact warning.
         """
         chain = ChainedDecisionGate(RepeatToolCallGate(), ToolLoopBreakerGate())
-        from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall, Turn
+        from lca.contracts.models.core.execution.decision import (
+            Decision,
+            Observation,
+            ToolCall,
+            Turn,
+        )
 
         def _failed_test_run() -> Turn:
             return Turn(
@@ -169,7 +174,12 @@ class TestRalphLoop:
             sensors=[build_clock_sensor()],
             memory=None,
         )
-        from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall, Turn
+        from lca.contracts.models.core.execution.decision import (
+            Decision,
+            Observation,
+            ToolCall,
+            Turn,
+        )
 
         def _failed_test_run() -> Turn:
             return Turn(
@@ -280,7 +290,12 @@ class TestComplexScenarios:
             ProgressLoopDetector(),
             TerminalRespondGate(),
         )
-        from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall, Turn
+        from lca.contracts.models.core.execution.decision import (
+            Decision,
+            Observation,
+            ToolCall,
+            Turn,
+        )
 
         def _failed_test_run() -> Turn:
             return Turn(

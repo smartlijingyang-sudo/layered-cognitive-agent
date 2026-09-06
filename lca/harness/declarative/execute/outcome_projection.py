@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from lca.contracts.models.core.execution.result import ApprovalPendingError
-from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.core.policy.stop import StopDecision, StopReason
+from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.observability import exc_to_record
 from lca.contracts.protocols.act.command.envelope import RunFact
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import (

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from lca.contracts.observability.journal.run_journal import ProcessJournalProjection, RunJournalFactory
+from lca.contracts.observability.journal.run_journal import (
+    ProcessJournalProjection,
+    RunJournalFactory,
+)
 from lca.contracts.protocols import JournalProjector
 
 

@@ -9,14 +9,13 @@ from collections.abc import Iterator
 
 import pytest
 
-from lca_kernel.events.bus.bus import EventBus
-
 # ADR-0186: spine_port_append 要求 Session hook 绑定。
 # integration tests 直接使用 EventSpine 的需此 fixture。
 from lca.infrastructure.observability.loop_cursor.spine._spine_port import (
     bind_session_append_hook,
     reset_session_append_hook,
 )
+from lca_kernel.events.bus.bus import EventBus
 from tests.observability.spine.conftest import SyncPassthroughHook
 
 

@@ -18,8 +18,8 @@ import pytest
 
 from lca.contracts.observability.core.incarnation import Incarnation
 from lca.infrastructure.observability.loop_cursor import StdLoopCursor
-from lca.infrastructure.observability.loop_cursor.spine._spine_port import WritePort
 from lca.infrastructure.observability.loop_cursor.factory.factory import LoopCursorFactory
+from lca.infrastructure.observability.loop_cursor.spine._spine_port import WritePort
 
 # ── Stubs ───────────────────────────────────────────────────
 

@@ -17,8 +17,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.models.core.workspace.file_ref import FileRef
 from lca.contracts.models.core.execution.sandbox import MountManifest
+from lca.contracts.models.core.workspace.file_ref import FileRef
 
 
 @runtime_checkable

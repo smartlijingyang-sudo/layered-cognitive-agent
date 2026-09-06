@@ -27,7 +27,9 @@ independent of the boot wiring.
 from __future__ import annotations
 
 from lca.plugins.transport.webserver.handlers.runs.ingest import FileRef
-from lca.plugins.transport.webserver.handlers.runs.ingest.service.service import try_resolve_local_file
+from lca.plugins.transport.webserver.handlers.runs.ingest.service.service import (
+    try_resolve_local_file,
+)
 
 
 def _make_ref(*, url: str, lobehub_id: str = "") -> FileRef:

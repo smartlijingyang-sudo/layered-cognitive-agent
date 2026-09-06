@@ -23,6 +23,11 @@ from lca.contracts.protocols.state.scope_plan import (
     ScopePlan,
     scope_plan_hash,
 )
+from lca.harness.composition.plan_compiler import (
+    CompileOptions,
+    compile_plan,
+    explain_compile_plan,
+)
 from lca.harness.plan import (
     build_input_provenance,
     capability_sub_plan_hash,
@@ -31,11 +36,6 @@ from lca.harness.plan import (
     control_entries_sub_plan_hash,
     declarative_plan_hash,
     scope_sub_plan_hash,
-)
-from lca.harness.composition.plan_compiler import (
-    CompileOptions,
-    compile_plan,
-    explain_compile_plan,
 )
 from lca.harness.profile.resolve.resolve import ResolvedProfile, resolve_profile
 from lca.infrastructure.cli.commands.profile.declarative import render_declarative_graph
@@ -352,8 +352,8 @@ class TestCompilePlan:
         assert builds == 1
 
     def test_projection_reuse_rejects_a_different_resolved_profile(self) -> None:
-        from lca.harness.profile.resolve.capability_plan_resolver import project_capability_plan
         from lca.harness.profile.plan.projection import ResolvedProfileProjection
+        from lca.harness.profile.resolve.capability_plan_resolver import project_capability_plan
 
         projection = ResolvedProfileProjection.build(resolve_profile("profiles/web-standard.yaml"))
         other_resolved = resolve_profile("profiles/web-standard.yaml")

@@ -19,12 +19,12 @@ from lca.infrastructure.observability.spine.spine.enrich import (
     set_active_field_producers,
     set_active_spine_enricher,
 )
+from lca.plugins.session.runtime.spine.hook import make_session_spine_append_hook
+from lca.plugins.session.runtime.store.store import SessionStore
 from lca.session.lifecycle.bind import (
     bind_run_event_session_from_store,
     unbind_run_event_session,
 )
-from lca.plugins.session.runtime.spine.hook import make_session_spine_append_hook
-from lca.plugins.session.runtime.store.store import SessionStore
 
 
 class _StubProducer:

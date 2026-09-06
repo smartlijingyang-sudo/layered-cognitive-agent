@@ -17,6 +17,7 @@ from pathlib import Path
 
 import typer
 
+
 def _repo_root() -> Path:
     for parent in Path(__file__).resolve().parents:
         if (parent / "pyproject.toml").is_file():

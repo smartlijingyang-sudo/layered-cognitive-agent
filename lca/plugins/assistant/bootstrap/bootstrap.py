@@ -41,7 +41,9 @@ from lca.contracts.models.core.perceive.perception import (
     ItemKind,
 )
 from lca.contracts.protocols.assistant.catalog import AssistantCatalog
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 from lca.plugins.assistant.home._home_layout import HomePaths, load_manifest
 

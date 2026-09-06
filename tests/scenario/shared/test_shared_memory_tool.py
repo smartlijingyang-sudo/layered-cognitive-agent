@@ -11,8 +11,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lca.cognition.memory.simple.memory import SimpleMemorySystem
 from lca.cognition.memory.team.shared_memory import TeamSharedMemoryStore
 from lca.contracts.atoms.enums.enums import MemoryLayer
-from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection, Turn
 from lca.contracts.models.core.conversation.memory import MemoryRecord
+from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection, Turn
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.models.team.team.coordination import TeamAssignment
 

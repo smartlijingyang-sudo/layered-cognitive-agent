@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from lca.contracts.observability.closure.skill_meta_ep_closure import SKILL_META_EVENT_POINTS
 from lca.contracts.observability.cursor.loop_cursor import PhaseName
 from lca.contracts.observability.event.meta_event_taxonomy import (
     COGNITION_SPINE_EPS,
@@ -15,7 +16,6 @@ from lca.contracts.observability.event.meta_event_taxonomy import (
     all_session_meta_event_types,
     classify_spine_event_key,
 )
-from lca.contracts.observability.closure.skill_meta_ep_closure import SKILL_META_EVENT_POINTS
 
 
 def test_phase_name_has_six_semantic_phases_without_gate() -> None:

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from lca.contracts.atoms.enums.enums import MemoryLayer
 from lca.contracts.atoms.telemetry.telemetry import ATTR_HIT, ATTR_MEMORY_LAYER, SpanName
-from lca.contracts.models.core.execution.decision import Observation, Reflection
 from lca.contracts.models.core.conversation.memory import MemoryRecord
+from lca.contracts.models.core.execution.decision import Observation, Reflection
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import MemorySystem
 from lca.infrastructure.observability.diagnostics.diagnostic_emitters import record_memory_operation

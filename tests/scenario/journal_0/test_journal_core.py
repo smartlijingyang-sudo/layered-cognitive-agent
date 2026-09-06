@@ -11,6 +11,7 @@ import asyncio
 
 import pytest
 
+from lca.contracts.models.observability.journal.catalog import JOURNAL_EVENT_CLASSES
 from lca.contracts.models.observability.journal.journal import (
     DelegationIssued,
     DelegationMechanism,
@@ -20,7 +21,6 @@ from lca.contracts.models.observability.journal.journal import (
     StampedEvent,
     TeamRunStarted,
 )
-from lca.contracts.models.observability.journal.catalog import JOURNAL_EVENT_CLASSES
 from lca.infrastructure.observability import (
     RunStore,
     UnregisteredJournalEventError,

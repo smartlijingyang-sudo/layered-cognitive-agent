@@ -9,8 +9,8 @@ HandoffOperation 共享同一套目标选择语义，动作模块只保留各自
 from __future__ import annotations
 
 from lca.contracts.models.core.execution.decision import DelegationSpec
-from lca.contracts.models.core.state.lifecycle import AgentCard
 from lca.contracts.models.core.execution.result import ToolExecutionError
+from lca.contracts.models.core.state.lifecycle import AgentCard
 from lca.contracts.protocols import AgentTransport, TransportRegistryProtocol
 
 

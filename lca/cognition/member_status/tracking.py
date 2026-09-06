@@ -19,8 +19,8 @@ from lca.contracts.atoms.semantic.keys import (
     OBS_DELEGATION_ID,
     OBS_TASK_ID,
 )
-from lca.contracts.models.core.policy.budget import DEFAULT_MIN_USABLE_PARTIAL_CHARS
 from lca.contracts.models.core.execution.decision import DelegationSpec, Observation
+from lca.contracts.models.core.policy.budget import DEFAULT_MIN_USABLE_PARTIAL_CHARS
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.team.consultation.consultation import (
     ConsultationDisposition,

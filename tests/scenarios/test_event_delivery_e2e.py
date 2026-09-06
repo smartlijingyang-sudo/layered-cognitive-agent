@@ -33,12 +33,12 @@ from typing import Any
 import pytest
 
 from lca.contracts.protocols import LLMAdapter
-from lca.plugins.transport.webserver.doctor.step_check import (
-    diagnose_step_tree,
-)
 from lca.plugins.transport.webserver.carrier.runs.execute import (
     create_run_session,
     execute_run,
+)
+from lca.plugins.transport.webserver.doctor.step_check import (
+    diagnose_step_tree,
 )
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
     RunRegistry,

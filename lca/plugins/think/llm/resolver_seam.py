@@ -25,7 +25,9 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.protocols import LLMAdapter
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.llm.config import DEFAULT_CHAT_MODEL
 
@@ -127,6 +129,7 @@ async def setup(ctx: PluginContext, config: BaseModel) -> None:
         normalize_llm_environ,
         prepare_llm_environ,
     )
+    from lca.infrastructure.llm.resolver import ProductionLLMResolver, live_credential
     from lca.infrastructure.llm_adapter.failover.failover import (
         FailoverLLMAdapter,
         LLMFailoverCandidate,
@@ -134,7 +137,6 @@ async def setup(ctx: PluginContext, config: BaseModel) -> None:
         RetryingLLMAdapter,
     )
     from lca.infrastructure.llm_adapter.openai_compat import OpenAICompatAdapter
-    from lca.infrastructure.llm.resolver import ProductionLLMResolver, live_credential
 
     if not isinstance(config, Config):
         raise TypeError("LLM resolver config must be Config")

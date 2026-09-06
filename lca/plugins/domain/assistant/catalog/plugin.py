@@ -63,7 +63,9 @@ from lca.contracts.protocols.assistant.catalog import (
     PlanRevision,
     ProfilePatch,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.contracts.protocols.journal.spec.spec import AgentSpec
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 from lca.plugins.assistant.events._events import (

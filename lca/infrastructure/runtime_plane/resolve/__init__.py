@@ -3,10 +3,10 @@
 from lca.infrastructure.runtime_plane.resolve.resolve import (
     PlaneBindingError,
     PlaneRequest,
-    ref_of,
     make_sandbox_ref,
-    sandbox_ref_from,
+    ref_of,
     resolve_plane_bindings,
+    sandbox_ref_from,
 )
 
 __all__ = ['PlaneBindingError', 'PlaneRequest', 'ref_of', 'make_sandbox_ref', 'sandbox_ref_from', 'resolve_plane_bindings']

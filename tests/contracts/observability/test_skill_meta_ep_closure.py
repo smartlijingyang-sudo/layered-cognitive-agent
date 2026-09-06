@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from lca.contracts.observability.infra.cordis_event_table import lookup_cordis_name
 from lca.contracts.observability.closure.skill_meta_ep_closure import (
     SKILL_META_EVENT_POINTS,
     all_skill_meta_event_descriptors,
 )
+from lca.contracts.observability.infra.cordis_event_table import lookup_cordis_name
 
 
 def test_skill_meta_closure_count() -> None:

@@ -14,10 +14,10 @@ from __future__ import annotations
 from lca.cognition.brain.decision_gates.chained.chained import record_gate_decided
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.models.core.policy.budget import TERMINAL_RESERVE_STEPS
 from lca.contracts.models.core.execution.decision import Decision
-from lca.contracts.models.core.policy.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.perceive.projection import current_manifest_from_state
+from lca.contracts.models.core.policy.budget import TERMINAL_RESERVE_STEPS
+from lca.contracts.models.core.policy.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import DecisionGate
 

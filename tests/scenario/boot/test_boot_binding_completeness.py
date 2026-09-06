@@ -20,14 +20,8 @@ from pathlib import Path
 
 import pytest
 
-from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.composition.plan_compiler import CompileOptions, compile_plan
-from lca.harness.profile.resolve.resolve import resolve_profile
-from lca.harness.profile.validate.runtime_binding_validator import (
-    MissingBindingError,
-    RuntimeBindingValidator,
-    validate_runtime_closure,
-)
+from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.profile.boot.runtime_closure import (
     RUNTIME_CLOSURE_FALLBACK_POLICIES,
     RUNTIME_CLOSURE_REQUIREMENTS,
@@ -36,6 +30,12 @@ from lca.harness.profile.boot.runtime_closure import (
     closure_requirements,
     default_fallback_policy,
     runtime_closure_requirements,
+)
+from lca.harness.profile.resolve.resolve import resolve_profile
+from lca.harness.profile.validate.runtime_binding_validator import (
+    MissingBindingError,
+    RuntimeBindingValidator,
+    validate_runtime_closure,
 )
 
 _GOLDEN_PROFILES: tuple[str, ...] = (

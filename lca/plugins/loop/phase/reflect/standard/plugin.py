@@ -28,7 +28,9 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
     PhaseResult,
     SemanticPhase,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.loop.phase._shared.capabilities import StandardPhaseCapabilities
 from lca.plugins.loop.phase._shared.common import (

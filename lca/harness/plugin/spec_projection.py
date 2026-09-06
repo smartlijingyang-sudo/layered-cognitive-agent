@@ -15,7 +15,9 @@ if TYPE_CHECKING:
         PhaseContribution,
         PluginSpec,
     )
-    from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+    from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+        OwnershipDeclaration,
+    )
 
 
 def native_spec_from_declaration(

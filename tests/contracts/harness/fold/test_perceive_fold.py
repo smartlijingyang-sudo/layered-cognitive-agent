@@ -9,8 +9,8 @@ from lca.contracts.harness.fold.perceive import (
 )
 from lca.contracts.harness.memory.events import ContextManifestCommitted, GateDecidedCommitted
 from lca.contracts.harness.tasks.session import SessionEvent, event_type_of
-from lca.contracts.models.core.policy.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
+from lca.contracts.models.core.policy.gate_policy import GateDecided, PolicyFact
 
 
 def _event(seq: int, event_type: str, data: dict) -> SessionEvent:

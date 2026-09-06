@@ -6,10 +6,10 @@ from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.protocols.composition.logic_address import score_logic_address
 from lca.harness.plugin.declaration import definition_from_plugin
-from lca.plugins.cognitive.body.safe_executor import setup as safe_executor_setup
-from lca.plugins.cognitive.body.simple import setup as simple_body_setup
 from lca.plugins.act.action.handlers_provider import setup as action_handler_setup
 from lca.plugins.act.tool.batch_execution_policy_provider import setup as tool_batch_policy_setup
+from lca.plugins.cognitive.body.safe_executor import setup as safe_executor_setup
+from lca.plugins.cognitive.body.simple import setup as simple_body_setup
 
 
 def test_execution_primitives_publish_complete_g7_logic_addresses() -> None:

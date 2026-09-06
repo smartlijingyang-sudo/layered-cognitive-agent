@@ -29,7 +29,9 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.models.core.execution.decision import DelegationSpec, Observation
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.delegation.cache import (
     cached_delegation_observation as _cached_delegation_observation,

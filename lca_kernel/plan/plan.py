@@ -9,15 +9,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from lca.harness.profile.resolve.capability_plan_resolver import (
-    CapabilityPlanOptions,
-    CapabilityPlanResolveError,
-    project_capability_plan,
-)
 from lca.harness.composition.plan_compiler import (
     CompileOptions,
     PlanCompilerError,
     compile_plan,
+)
+from lca.harness.profile.resolve.capability_plan_resolver import (
+    CapabilityPlanOptions,
+    CapabilityPlanResolveError,
+    project_capability_plan,
 )
 
 if TYPE_CHECKING:

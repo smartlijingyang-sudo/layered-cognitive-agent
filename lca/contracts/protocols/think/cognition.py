@@ -9,8 +9,8 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.conversation.llm import LLMResponse
+from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.team.role.team import RoleProfile

@@ -8,12 +8,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from lca.harness.profile.validate.runtime_binding_validator import (
-    MissingBindingError,
-    RuntimeBindingValidator,
-    profile_allows_test_defaults,
-    validate_runtime_closure,
-)
 from lca.harness.profile.boot.runtime_closure import (
     RUNTIME_CLOSURE_FALLBACK_POLICIES,
     RUNTIME_CLOSURE_REQUIREMENTS,
@@ -24,6 +18,12 @@ from lca.harness.profile.boot.runtime_closure import (
     default_fallback_policy,
     runtime_closure_requirement,
     runtime_closure_requirements,
+)
+from lca.harness.profile.validate.runtime_binding_validator import (
+    MissingBindingError,
+    RuntimeBindingValidator,
+    profile_allows_test_defaults,
+    validate_runtime_closure,
 )
 
 if TYPE_CHECKING:

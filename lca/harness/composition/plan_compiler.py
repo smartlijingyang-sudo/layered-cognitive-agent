@@ -17,12 +17,12 @@ from lca.harness.declarative.compile.compiler.compiler import (
 )
 from lca.harness.declarative.controls.validation import require_valid
 from lca.harness.plan import build_input_provenance
+from lca.harness.profile.plan.explain import explain_compile_plan
+from lca.harness.profile.plan.projection import ProfileCompilationProjections
 from lca.harness.profile.resolve.capability_plan_resolver import (
     CapabilityPlanOptions,
     project_capability_plan,
 )
-from lca.harness.profile.plan.explain import explain_compile_plan
-from lca.harness.profile.plan.projection import ProfileCompilationProjections
 from lca.harness.profile.resolve.resolve import ResolvedProfile
 from lca.harness.profile.validate.runtime_binding_validator import validate_runtime_closure
 

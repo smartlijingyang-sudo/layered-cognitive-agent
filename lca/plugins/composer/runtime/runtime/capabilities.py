@@ -41,7 +41,9 @@ if TYPE_CHECKING:
     from lca.contracts.harness.composition.composer import AgentGraph
     from lca.contracts.protocols import ArtifactClosure, Reducer
     from lca.contracts.protocols.act.effect.handler import EffectHandlerRegistry
-    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseExecutor
+    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
+        PhaseExecutor,
+    )
     from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
     from lca.contracts.protocols.runtime.runtime.composition import (
         CheckpointStateResolverFactory,

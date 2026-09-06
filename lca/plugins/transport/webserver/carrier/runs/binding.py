@@ -14,7 +14,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from lca.contracts.mechanisms.capability.capability import MissingCapabilityError, require_capability
+from lca.contracts.mechanisms.capability.capability import (
+    MissingCapabilityError,
+    require_capability,
+)
 from lca.contracts.observability.journal.run_journal import LiveRunProjection
 from lca.contracts.protocols import JournalProjector
 from lca.infrastructure.observability import BoundObservability

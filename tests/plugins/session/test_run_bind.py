@@ -10,12 +10,12 @@ from lca.plugins.events.publishers._session_publish import (
     current_publish_session,
     publish_via_session,
 )
+from lca.plugins.session.runtime.store.store import SessionStore
 from lca.session.lifecycle.bind import (
     EventSessionBinder,
     bind_run_event_session_from_store,
     unbind_run_event_session,
 )
-from lca.plugins.session.runtime.store.store import SessionStore
 from lca_kernel.events.bus.bus import EventBus
 from lca_kernel.events.errors.errors import MissingPublishSessionError
 from lca_kernel.events.test.catalog import build_test_bus

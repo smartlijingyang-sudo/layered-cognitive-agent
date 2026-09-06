@@ -29,7 +29,9 @@ from lca.contracts.protocols import SafeExecutor, ToolRegistry, TransportRegistr
 from lca.contracts.protocols.act.action.action import Action
 from lca.contracts.protocols.act.action.handler import ActionHandler, ActionHandlerRegistry
 from lca.contracts.protocols.act.tool.batch_execution import ToolBatchExecutionPolicy
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.handler.registry import UniqueOperationRegistry
 

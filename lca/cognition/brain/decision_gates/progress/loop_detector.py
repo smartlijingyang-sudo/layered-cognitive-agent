@@ -40,6 +40,7 @@ from lca.infrastructure.session.context.turn_control_reader import (
     iter_control_turns_reversed,
 )
 
+
 class ProgressLoopDetector(DecisionGate):
     """Detect cross-tool loops with zero progress.
 

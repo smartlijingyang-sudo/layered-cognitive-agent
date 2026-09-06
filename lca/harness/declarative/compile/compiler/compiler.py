@@ -26,7 +26,10 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_graph import 
     ReplacementDecision,
     ValidationReport,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import CapabilityDeclaration, PluginSpec
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    CapabilityDeclaration,
+    PluginSpec,
+)
 from lca.harness.declarative.compile.action.authority import compile_action_authority
 from lca.harness.declarative.compile.effect.policy import compile_effect_policy
 from lca.harness.declarative.controls.validation import (

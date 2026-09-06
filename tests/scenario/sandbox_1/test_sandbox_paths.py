@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import shlex
 
-from lca.contracts.models.core.state.guest_layout import GuestLayout, join_under, outputs_under
 from lca.contracts.models.core.execution.sandbox import SANDBOX_MOUNT_ROOT, SANDBOX_OUTPUT_SUBDIR
+from lca.contracts.models.core.state.guest_layout import GuestLayout, join_under, outputs_under
 from lca.infrastructure.runtime_plane.resolve.resolve import make_sandbox_ref
 from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
 

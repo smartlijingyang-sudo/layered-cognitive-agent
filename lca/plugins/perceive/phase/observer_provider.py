@@ -24,7 +24,9 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.contracts.protocols.journal.phase.observation import PhaseObserver, PhaseObserverRegistry
 from lca.harness.declarative.lifecycle.phase_observation import (
     CompositePhaseObserver,

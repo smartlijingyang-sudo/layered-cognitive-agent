@@ -20,8 +20,8 @@ from lca.contracts.atoms.semantic.keys import (
     FAILURE_KIND_VALIDATION,
     OBS_COMPLETION_QUALITY,
 )
-from lca.contracts.models.core.policy.budget import DEFAULT_TIMEOUT_HARVEST_GRACE_S
 from lca.contracts.models.core.execution.decision import AgentCard, Observation
+from lca.contracts.models.core.policy.budget import DEFAULT_TIMEOUT_HARVEST_GRACE_S
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.protocols import AgentTransport
 

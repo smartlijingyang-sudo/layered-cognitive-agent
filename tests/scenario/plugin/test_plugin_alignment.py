@@ -222,7 +222,10 @@ def test_require_capability_has_no_seam_path() -> None:
     """``seam:`` Path-2 is gone — missing plain key fails immediately."""
     import asyncio
 
-    from lca.contracts.mechanisms.capability.capability import MissingCapabilityError, require_capability
+    from lca.contracts.mechanisms.capability.capability import (
+        MissingCapabilityError,
+        require_capability,
+    )
 
     ctx = asyncio.run(boot_profile(DEFAULT_PROFILE))
     with pytest.raises(MissingCapabilityError, match="no_such_capability"):
@@ -257,7 +260,10 @@ def test_boot_fails_when_seam_provider_missing() -> None:
     # Programmatic entries retain their fixture role: after the Manifest graph
     # resolves, an omitted runtime provider remains observable as a missing
     # capability instead of being replaced by a module-level fallback.
-    from lca.contracts.mechanisms.capability.capability import MissingCapabilityError, require_capability
+    from lca.contracts.mechanisms.capability.capability import (
+        MissingCapabilityError,
+        require_capability,
+    )
 
     entries = load_profile_entries(DEFAULT_PROFILE)
     dropped = {"lca-memory-service", "lca-memory-provider"}

@@ -34,12 +34,12 @@ from typing import Any
 
 from cordis import Context
 
+from lca.contracts.models.observability.journal.catalog import JOURNAL_EVENT_CLASSES
 from lca.contracts.models.observability.journal.journal import (
     BootObservabilityAssembled,
     BootPluginFiberSpawned,
     BootProfileResolved,
 )
-from lca.contracts.models.observability.journal.catalog import JOURNAL_EVENT_CLASSES
 from lca.contracts.observability.journal.store import JournalStoreBackend
 from lca.harness.observability.assemble import make_minimal_bound
 from lca.infrastructure.observability import AttributePolicy

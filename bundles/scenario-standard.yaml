@@ -1,80 +1,57 @@
-# bundles/scenario-standard.yaml — standard scenario bundle.
-# Per spec §13.2.1 (scenario 2): all primitives enabled, default Brain,
-# all Sensors, four-layer Memory.
-
 entries:
-  # Brain (Tier-3)
-  - id: lca-brain-modular
-    name: lca_brain_modular
-    $module: lca.plugins.cognitive.brain.modular
-    config: {}
-
-  # Memory (Tier-1)
-  - id: lca-memory-four-layer
-    name: lca_memory_four_layer
-    $module: lca.plugins.memory.four_layer
-    config: {}
-
-  # Skills (Tier-1)
-  - id: lca-skills-service
-    name: lca_skills_service
-    $module: lca.plugins.memory.skills_seam
-    config: {}
-
-  # Perceive / Gate groups (ADR-0056) — idempotent if web-app already loaded them
-  - id: perceive
-    name: perceive
-    $module: lca.plugins.perceive.service
-    config: {}
-
-  - id: perceive.hub.sequential
-    name: perceive_hub_sequential
-    $module: lca.plugins.perceive.sequential_hub
-    config: {}
-
-  - id: gates
-    name: gates
-    $module: lca.plugins.cognitive.gate.service.plugin
-    config: {}
-
-  - id: gates.chain.sequential
-    name: gates_chain_sequential
-    $module: lca.plugins.cognitive.gate.chained.plugin
-    config: {}
-
-  # Sensors (Tier-3)
-  - id: lca-sensor-clock
-    name: sensor_clock
-    $module: lca.plugins.sensors.clock
-    config: {}
-
-  - id: lca-sensor-workspace-artifacts
-    name: sensor_workspace_artifacts
-    $module: lca.plugins.sensors.workspace_artifacts
-    config: {}
-
-  - id: lca-sensor-inbox-facts
-    name: sensor_inbox_facts
-    $module: lca.plugins.sensors.inbox_facts
-    config: {}
-
-  - id: lca-sensor-skill-catalog
-    name: sensor_skill_catalog
-    $module: lca.plugins.sensors.skill_catalog
-    config: {}
-
-  # Decision gates (Tier-3)
-  - id: lca-gate-repeat-tool-call
-    name: lca_gate_repeat_tool_call
-    $module: lca.plugins.cognitive.gate.repeat_tool_call.plugin
-    config: {}
-
-  - id: lca-gate-loop-breaker
-    name: lca_gate_loop_breaker
-    $module: lca.plugins.cognitive.gate.tool_loop_breaker.plugin
-    config: {}
-
-  - id: lca-gate-progress-detector
-    name: lca_gate_progress_detector
-    $module: lca.plugins.cognitive.gate.progress_loop_detector.plugin
-    config: {}
+- id: lca-brain-modular
+  name: lca_brain_modular
+  $module: lca.plugins.cognitive.brain.modular
+  config: {}
+- id: lca-memory-four-layer
+  name: lca_memory_four_layer
+  $module: lca.plugins.memory.store.four_layer
+  config: {}
+- id: lca-skills-service
+  name: lca_skills_service
+  $module: lca.plugins.memory.seams.skills_seam
+  config: {}
+- id: perceive
+  name: perceive
+  $module: lca.plugins.perceive.service.service
+  config: {}
+- id: perceive.hub.sequential
+  name: perceive_hub_sequential
+  $module: lca.plugins.perceive.sequential.hub
+  config: {}
+- id: gates
+  name: gates
+  $module: lca.plugins.cognitive.gate.service.plugin
+  config: {}
+- id: gates.chain.sequential
+  name: gates_chain_sequential
+  $module: lca.plugins.cognitive.gate.chained.plugin
+  config: {}
+- id: lca-sensor-clock
+  name: sensor_clock
+  $module: lca.plugins.sensors.clock
+  config: {}
+- id: lca-sensor-workspace-artifacts
+  name: sensor_workspace_artifacts
+  $module: lca.plugins.sensors.workspace_artifacts
+  config: {}
+- id: lca-sensor-inbox-facts
+  name: sensor_inbox_facts
+  $module: lca.plugins.sensors.inbox_facts
+  config: {}
+- id: lca-sensor-skill-catalog
+  name: sensor_skill_catalog
+  $module: lca.plugins.sensors.skill_catalog
+  config: {}
+- id: lca-gate-repeat-tool-call
+  name: lca_gate_repeat_tool_call
+  $module: lca.plugins.cognitive.gate.repeat_tool_call.plugin
+  config: {}
+- id: lca-gate-loop-breaker
+  name: lca_gate_loop_breaker
+  $module: lca.plugins.cognitive.gate.tool_loop_breaker.plugin
+  config: {}
+- id: lca-gate-progress-detector
+  name: lca_gate_progress_detector
+  $module: lca.plugins.cognitive.gate.progress_loop_detector.plugin
+  config: {}

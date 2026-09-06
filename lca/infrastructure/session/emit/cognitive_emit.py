@@ -15,10 +15,10 @@ from lca.contracts.harness.memory.events import (
     GateDecidedCommitted,
 )
 from lca.contracts.models.cognition.reasoner_turn import ReasonerTurnPlan, ReasonerTurnRender
-from lca.contracts.models.core.execution.decision import Decision
-from lca.contracts.models.core.policy.gate_policy import GateDecided
 from lca.contracts.models.core.conversation.llm import LLMResponse
+from lca.contracts.models.core.execution.decision import Decision
 from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
+from lca.contracts.models.core.policy.gate_policy import GateDecided
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import Brain, Reasoner
 from lca.contracts.protocols.loop.fact_gateway import AppendReceipt

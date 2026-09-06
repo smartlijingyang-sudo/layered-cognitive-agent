@@ -18,7 +18,9 @@ from lca.infrastructure.llm_adapter.openai_compat.anthropic._anthropic_messages 
     _AnthropicMessagesStrategy,
     looks_like_anthropic_base_url,
 )
-from lca.infrastructure.llm_adapter.openai_compat.chat._chat_completions import _ChatCompletionsStrategy
+from lca.infrastructure.llm_adapter.openai_compat.chat._chat_completions import (
+    _ChatCompletionsStrategy,
+)
 from lca.infrastructure.llm_adapter.openai_compat.responses._responses import _ResponsesStrategy
 from lca.infrastructure.llm_adapter.openai_compat.strategy._strategy import _ApiStrategy
 

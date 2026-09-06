@@ -13,11 +13,14 @@ from lca.contracts.mechanisms.capability.capability import MissingCapabilityErro
 from lca.harness.profile.boot.boot import boot_entries, boot_profile, load_profile_entries
 from lca.harness.profile.boot.products import resolved_profile_from_scope
 from lca.harness.profile.resolve.resolve import ProfileResolveError
-from lca.infrastructure.llm_adapter.mock.llm import MockLLMAdapter
 from lca.infrastructure.llm.resolver import live_credential
+from lca.infrastructure.llm_adapter.mock.llm import MockLLMAdapter
 from lca.plugins.composer.perceive.perceive import build_perceive_hub
 from lca.plugins.transport.webserver.carrier.runs.execute import create_run_session, execute_run
-from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunRegistry, RunStatus
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
+    RunRegistry,
+    RunStatus,
+)
 
 DEFAULT_PROFILE = "profiles/web-standard.yaml"
 

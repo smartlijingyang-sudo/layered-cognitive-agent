@@ -62,7 +62,9 @@ from lca.contracts.protocols.assistant.evolve import (
     SkillInstallReceipt,
     WriteApproval,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.contracts.protocols.think.learning import (
     SkillAcquirer,
     SkillAcquisitionCandidate,

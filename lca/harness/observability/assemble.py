@@ -14,13 +14,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.observability.registry.named_registry import NamedRegistry
 from lca.contracts.observability.core.ports import (
     AttributePolicyBackend,
     JournalBackend,
     ScorerFn,
     TracerBackend,
 )
+from lca.contracts.observability.registry.named_registry import NamedRegistry
 from lca.infrastructure.observability import (
     AttributePolicy,
     ObservabilitySettings,

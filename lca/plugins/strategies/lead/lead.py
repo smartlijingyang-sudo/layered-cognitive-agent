@@ -25,15 +25,17 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.models.core.policy.budget import DEFAULT_MIN_USABLE_PARTIAL_CHARS
 from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.policy.budget import DEFAULT_MIN_USABLE_PARTIAL_CHARS
 from lca.contracts.models.team.member.status import MemberStatus
 from lca.contracts.models.team.role.team import RoleProfile
 from lca.contracts.models.team.run.context import RunContext
 from lca.contracts.models.team.team.awareness import ConsultDuty, TeamAwareness
 from lca.contracts.models.team.team.coordination import STRATEGY_KEY_LEAD, LeadMandate
 from lca.contracts.protocols import AgentUnit, TeamAssembly, TeamStrategy
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.contracts.protocols.journal.spec.spec import LeadSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 

@@ -21,7 +21,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from lca.contracts.atoms.enums.enums import MemoryLayer
-from lca.contracts.models.core.policy.budget import DEFAULT_MAX_STEPS, DEFAULT_MAX_WALL_CLOCK_SECONDS
+from lca.contracts.models.core.policy.budget import (
+    DEFAULT_MAX_STEPS,
+    DEFAULT_MAX_WALL_CLOCK_SECONDS,
+)
 from lca.contracts.models.team.role.team import RoleProfile
 from lca.contracts.models.team.team.coordination import (
     STRATEGY_KEY_LEAD,

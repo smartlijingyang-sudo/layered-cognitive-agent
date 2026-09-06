@@ -22,8 +22,8 @@ from dataclasses import dataclass
 from importlib import resources
 from typing import Protocol
 
-from lca.contracts.models.core.workspace.file_ref import FileRef
 from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
+from lca.contracts.models.core.workspace.file_ref import FileRef
 from lca.infrastructure.attachment.default.provider import (
     DefaultAttachmentPromptRenderer,
     DefaultAttachmentResolver,

@@ -12,13 +12,13 @@ import asyncio
 import sys
 from unittest.mock import patch
 
-from lca_kernel.cli.errors import KernelError
 from lca_kernel.boot.lifecycle import (
     FAIL_LOUD_RELEASE_TIMEOUT_MS,
     DefaultShutdownCoordinator,
     ShutdownCoordinator,
     create_shutdown_coordinator,
 )
+from lca_kernel.cli.errors import KernelError
 
 
 class _FakeKernel:

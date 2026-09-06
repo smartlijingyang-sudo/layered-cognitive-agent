@@ -17,25 +17,25 @@ if TYPE_CHECKING:
 
 from lca.contracts.atoms.enums.enums import HookEvent
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.models.core.policy.budget import DEFAULT_MAX_STEPS, create_budget
 from lca.contracts.models.core.conversation.conversation import PRIOR_CONVERSATION_WM_KEY
-from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.policy.budget import DEFAULT_MAX_STEPS, create_budget
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import StateSnapshot
 from lca.contracts.models.team.run.context import RunContext
 from lca.contracts.observability import exc_to_record
-from lca.contracts.protocols.runtime.runtime.runtime import Runtime
 from lca.contracts.protocols.runtime.runtime.lifecycle import RuntimeLifecycleEventType
+from lca.contracts.protocols.runtime.runtime.runtime import Runtime
 from lca.infrastructure.observability import get_current_run_scope, get_span_context
 from lca.infrastructure.observability.spine.exception.emit import emit_exception_caught
-from lca.runtime.support.checkpoint_resolution import DeclarativeCheckpoint
-from lca.runtime.support.runtime_bindings import DeclarativeRuntimeBindings
 from lca.runtime.loop.runtime_lifecycle_emitter import (
     RuntimeLifecycleEmitter,
     _event_type_for_result,
     _journal_sequence_from_result,
     _phase_cursor_from_result,
 )
+from lca.runtime.support.checkpoint_resolution import DeclarativeCheckpoint
+from lca.runtime.support.runtime_bindings import DeclarativeRuntimeBindings
 
 if TYPE_CHECKING:
     from lca.contracts.mechanisms import HookRegistry
@@ -49,7 +49,9 @@ if TYPE_CHECKING:
         StateStore,
     )
     from lca.contracts.protocols.act.effect.handler import EffectHandlerRegistry
-    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseExecutor
+    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
+        PhaseExecutor,
+    )
     from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
     from lca.contracts.protocols.session.resume.input import ResumeInputAdapter
     from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry

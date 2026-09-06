@@ -6,7 +6,6 @@ import json
 from collections.abc import AsyncIterator
 from typing import Any
 
-from openai import APIError
 from starlette.responses import JSONResponse, StreamingResponse
 
 from lca.cognition.team.modes_catalog import DEFAULT_MODE
@@ -24,6 +23,7 @@ from lca.plugins.transport.webserver.handlers.openai.protocol import (
     new_chat_id,
     streaming_chat_response,
 )
+from openai import APIError
 
 
 async def chat_completions_from_body(body: dict[str, Any]) -> JSONResponse | StreamingResponse:

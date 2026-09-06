@@ -478,7 +478,9 @@ class PromptReasoner:
                 variables["member_status_text"] = (
                     awareness.consult_duty.member_status.as_prompt_text()
                 )
-                from lca.contracts.models.team.consultation.consultation import build_evidence_pack_text
+                from lca.contracts.models.team.consultation.consultation import (
+                    build_evidence_pack_text,
+                )
 
                 variables["evidence_pack_text"] = build_evidence_pack_text(
                     awareness.consult_duty.outcomes

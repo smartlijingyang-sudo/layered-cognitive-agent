@@ -15,7 +15,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from lca.contracts.models.core.conversation.attachment import AttachmentRecord
 from lca.infrastructure.attachment.normalizer.normalizer import normalize_for_injection
-from lca.infrastructure.attachment.settings.settings import AttachmentPolicyDocument, get_attachment_policy
+from lca.infrastructure.attachment.settings.settings import (
+    AttachmentPolicyDocument,
+    get_attachment_policy,
+)
 
 
 class AttachmentFileMetadata(BaseModel):

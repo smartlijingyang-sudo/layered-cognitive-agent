@@ -27,9 +27,9 @@ import json
 from pydantic import BaseModel
 
 from lca.contracts.atoms.functional.group import FunctionalGroup
-from lca.harness.plugin_api import plugin
 from lca.harness.plugin.declaration import definition_from_plugin
 from lca.harness.plugin.manifest import PluginKind
+from lca.harness.plugin_api import plugin
 
 
 class _Cfg(BaseModel):

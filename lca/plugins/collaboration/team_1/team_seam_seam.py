@@ -42,7 +42,9 @@ from lca.contracts.protocols.collaboration.team.seam import (
     TeamSeamFactoryProtocol,
     TeamSharedMemoryResolverProtocol,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.contracts.protocols.journal.spec.spec import TeamSpec
 from lca.contracts.protocols.runtime.infra.infra import AgentTransport
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin

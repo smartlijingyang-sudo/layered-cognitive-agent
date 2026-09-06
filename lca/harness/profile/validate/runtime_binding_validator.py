@@ -22,11 +22,11 @@ import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from lca.harness.profile.plan.projection import ResolvedProfileProjection
 from lca.harness.profile.boot.runtime_closure import (
     FallbackPolicy,
     runtime_closure_requirements,
 )
+from lca.harness.profile.plan.projection import ResolvedProfileProjection
 
 if TYPE_CHECKING:
     from lca.harness.profile.resolve.resolve import ResolvedProfile

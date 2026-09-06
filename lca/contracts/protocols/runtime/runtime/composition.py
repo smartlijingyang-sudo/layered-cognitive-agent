@@ -22,8 +22,8 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
 from lca.contracts.protocols.journal.artifact.closure import ArtifactClosure
 from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
 from lca.contracts.protocols.runtime.infra.infra import StateStore
-from lca.contracts.protocols.runtime.runtime.runtime import Runtime
 from lca.contracts.protocols.runtime.runtime.lifecycle import RuntimeLifecyclePublisher
+from lca.contracts.protocols.runtime.runtime.runtime import Runtime
 from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.state.reducer import Reducer
 

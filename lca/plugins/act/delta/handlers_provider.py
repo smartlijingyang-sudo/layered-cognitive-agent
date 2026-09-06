@@ -32,13 +32,15 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.models.core.workspace.activation import ActivatedSkill
 from lca.contracts.models.core.execution.decision import Turn
 from lca.contracts.models.core.perceive.perception import ContextManifest
-from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.core.policy.stop import StopDecision
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.core.workspace.activation import ActivatedSkill
 from lca.contracts.protocols.act.command.envelope import RunDelta
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.contracts.protocols.state.delta_handler import DeltaHandler, DeltaHandlerRegistry
 from lca.contracts.protocols.state.reducer import Reducer
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin

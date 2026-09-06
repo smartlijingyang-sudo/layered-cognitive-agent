@@ -19,7 +19,11 @@ from lca.contracts.models.observability.journal.journal import (
     RunScope,
 )
 from lca.contracts.protocols import LLMAdapter
-from lca.contracts.protocols.collaboration.casting.casting import CastingError, RoleLibrary, TeamCaster
+from lca.contracts.protocols.collaboration.casting.casting import (
+    CastingError,
+    RoleLibrary,
+    TeamCaster,
+)
 from lca.contracts.protocols.runtime.infra.infra import Tool
 from lca.contracts.protocols.session.run.mode import ModeAdapter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin

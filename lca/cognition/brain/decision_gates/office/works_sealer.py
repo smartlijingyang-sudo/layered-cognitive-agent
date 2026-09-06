@@ -14,8 +14,8 @@ from __future__ import annotations
 __deprecated__ = True
 
 from lca.contracts.atoms.enums.enums import ActionType
-from lca.contracts.models.core.policy.budget import TERMINAL_RESERVE_STEPS
 from lca.contracts.models.core.execution.decision import Decision
+from lca.contracts.models.core.policy.budget import TERMINAL_RESERVE_STEPS
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import DecisionGate
 from lca.infrastructure.workspace.office_works import seal_office_works

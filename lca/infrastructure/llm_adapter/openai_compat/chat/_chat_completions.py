@@ -8,7 +8,9 @@ from typing import Any
 from lca.contracts.atoms.enums.enums import LLMStreamEventType
 from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent, TokenUsage
 from lca.contracts.protocols import Tool
-from lca.infrastructure.llm_adapter.openai_compat.history._history import openai_messages_with_history
+from lca.infrastructure.llm_adapter.openai_compat.history._history import (
+    openai_messages_with_history,
+)
 from lca.infrastructure.llm_adapter.openai_compat.shared._shared import (
     ThinkTagStreamSplitter,
     _RawToolCall,

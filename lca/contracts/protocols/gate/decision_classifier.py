@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.models.core.execution.decision import Decision
 from lca.contracts.models.core.conversation.llm import LLMResponse
+from lca.contracts.models.core.execution.decision import Decision
 
 
 @runtime_checkable

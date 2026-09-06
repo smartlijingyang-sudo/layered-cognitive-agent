@@ -21,13 +21,13 @@ import httpx
 import structlog
 
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.models.core.state.guest_layout import GuestLayout
 from lca.contracts.models.core.execution.sandbox import (
     DEFAULT_SANDBOX_TIMEOUT_S,
     SandboxResult,
     SessionConfig,
     SessionInfo,
 )
+from lca.contracts.models.core.state.guest_layout import GuestLayout
 from lca.contracts.protocols import Sandbox
 from lca.infrastructure.sandbox.bootstrap.bootstrap import SANDBOX_FILES_INIT_MARKER
 from lca.infrastructure.sandbox.onlyboxes.bootstrap import (

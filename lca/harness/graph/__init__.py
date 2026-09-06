@@ -4,13 +4,13 @@ Compile, validate, interpret, and govern declarative phase graphs without
 embedding business plugin identities.
 """
 
-from lca.harness.graph.validation import PhaseGraphValidator
 from lca.harness.graph.phase_graph_compiler import (
     PhaseGraphProjection,
     compile_phase_graph_projection,
 )
 from lca.harness.graph.predicate import evaluate_restricted_predicate
 from lca.harness.graph.traversal import PhaseTraversal
+from lca.harness.graph.validation import PhaseGraphValidator
 
 __all__ = [
     "PhaseGraphProjection",

@@ -36,7 +36,9 @@ from lca.contracts.observability.journal.run_journal import (
     RunJournalComponents,
     RunJournalFactory,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

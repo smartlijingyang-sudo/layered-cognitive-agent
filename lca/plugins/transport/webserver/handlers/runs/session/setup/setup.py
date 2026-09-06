@@ -18,7 +18,10 @@ from lca.plugins.transport.webserver.handlers.runs.session.diagnostics.diagnosti
     RunBootSnapshotRecorder,
     plugin_inventory_from_boot_products,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunRegistry, RunSession
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
+    RunRegistry,
+    RunSession,
+)
 from lca.plugins.transport.webserver.handlers.runs.session.setup.types import RunSessionRequest
 
 

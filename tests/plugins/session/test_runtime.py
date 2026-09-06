@@ -18,8 +18,8 @@ from typing import Any
 
 import pytest
 
-from lca.session.append import Session
 from lca.plugins.session.runtime.store.store import SessionStore
+from lca.session.append import Session
 from lca_kernel.events.fold.fold import EpochHeader, foldRequestHeader, headerEquals
 from lca_kernel.events.session.session import (
     SESSION_FORMAT_VERSION,

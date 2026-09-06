@@ -5,10 +5,13 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock
 
 from lca.contracts.models.core.execution.decision import Decision, DelegationSpec
-from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import Budget
-from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseInput, PhaseResult
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
+    PhaseInput,
+    PhaseResult,
+)
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.harness.composition.plan_compiler import compile_plan
 from lca.harness.profile.resolve.resolve import resolve_profile

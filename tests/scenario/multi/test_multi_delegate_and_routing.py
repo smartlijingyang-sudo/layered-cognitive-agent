@@ -11,8 +11,8 @@ from lca.cognition.brain.decision_gates.must.consult_all import MustConsultAllMe
 from lca.cognition.member_status import InMemoryMemberStatus
 from lca.contracts.atoms.enums.enums import DecisionGateName, RoleStatus
 from lca.contracts.models.core.execution.decision import Decision, DelegationSpec, Observation
-from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
 from lca.contracts.models.team.team.awareness import ConsultDuty, TeamAwareness

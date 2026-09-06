@@ -16,15 +16,17 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import Budget
 from lca.contracts.models.team.graph.graph import NodeType
 from lca.contracts.protocols.collaboration.graph.node_executor import (
     GraphNodeExecutionContext,
     GraphNodeExecutor,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 _AGGREGATOR_TRACE_PREFIX = "graph-agg"

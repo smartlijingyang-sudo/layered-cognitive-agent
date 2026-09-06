@@ -10,13 +10,13 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from lca.contracts.models.core.execution.sandbox import MountEntry, MountManifest
+from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
 from lca.contracts.models.core.workspace.file_ref import (
     FileRef,
     FileRefKind,
     FileRefSource,
 )
-from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
-from lca.contracts.models.core.execution.sandbox import MountEntry, MountManifest
 from lca.contracts.protocols.runtime.attachment.attachment import (
     AttachmentPromptRenderer,
     AttachmentResolver,

@@ -44,7 +44,9 @@ from lca.harness.plugin_api import (
     PluginKind,
     plugin,
 )
-from lca.infrastructure.observability.loop_cursor.spine._spine_port import is_session_ssot_hook_active
+from lca.infrastructure.observability.loop_cursor.spine._spine_port import (
+    is_session_ssot_hook_active,
+)
 from lca.infrastructure.observability.spine.event.record import (
     Channel,
     EventRecord,

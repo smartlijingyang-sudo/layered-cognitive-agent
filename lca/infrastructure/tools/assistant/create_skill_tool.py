@@ -10,8 +10,8 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from lca.contracts.atoms.enums.enums import ContentType
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
-from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.protocols import Tool
 from lca.contracts.protocols.assistant.skill_overlay import SkillSource
 from lca.infrastructure.observability.facade.run.ambit import current_assistant_id

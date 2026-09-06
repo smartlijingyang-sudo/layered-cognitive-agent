@@ -16,7 +16,10 @@ from lca.contracts.harness.composition.composer import (
     AgentCompositionRequest,
     AgentGraphContribution,
 )
-from lca.contracts.mechanisms.capability.capability import MissingCapabilityError, require_capability
+from lca.contracts.mechanisms.capability.capability import (
+    MissingCapabilityError,
+    require_capability,
+)
 from lca.plugins.composer.act.action_authority import build_action_registry_from_authority
 from lca.plugins.composer.collaboration.team import fork_transport
 

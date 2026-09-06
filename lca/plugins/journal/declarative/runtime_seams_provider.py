@@ -28,7 +28,9 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
     DeltaReducer,
     EffectDispatcher,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.contracts.protocols.journal.artifact.closure import ArtifactClosure
 from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
 from lca.contracts.protocols.runtime.infra.infra import StateStore
@@ -50,9 +52,9 @@ from lca.contracts.protocols.state.reducer import Reducer
 from lca.harness.declarative import GenericPlanInterpreter
 from lca.harness.declarative.execute.dispatch import RegistryDeltaReducer, RegistryEffectDispatcher
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.runtime.support.checkpoint_resolution import DeclarativeCheckpointStateResolver
-from lca.runtime.projection.result_finalizer import RuntimeResultFinalizer
 from lca.runtime.loop.runtime_journal import RuntimeJournalCommitter
+from lca.runtime.projection.result_finalizer import RuntimeResultFinalizer
+from lca.runtime.support.checkpoint_resolution import DeclarativeCheckpointStateResolver
 
 
 class Config(BaseModel):

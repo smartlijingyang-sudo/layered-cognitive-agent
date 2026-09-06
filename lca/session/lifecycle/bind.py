@@ -13,7 +13,10 @@ from typing import Any, Protocol
 import structlog
 
 from lca.contracts.event import EventPayload
-from lca.contracts.mechanisms.capability.capability import MissingCapabilityError, require_capability
+from lca.contracts.mechanisms.capability.capability import (
+    MissingCapabilityError,
+    require_capability,
+)
 from lca.plugins.events._session_observe import (
     EventObserverCallback,
     current_session,

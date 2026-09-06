@@ -34,8 +34,8 @@ from lca.contracts.protocols.assistant.evolve import (
     WriteApproval,
 )
 from lca.contracts.protocols.think.learning import SkillAcquirer
-from lca.harness.plugin_api import definition_from_plugin
 from lca.harness.plugin.manifest import EffectClass
+from lca.harness.plugin_api import definition_from_plugin
 from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
 from lca.plugins.assistant.evolve.evolve import (
     AssistantEvolveImpl,

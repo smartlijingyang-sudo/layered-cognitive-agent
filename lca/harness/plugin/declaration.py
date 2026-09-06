@@ -29,7 +29,9 @@ from lca.contracts.harness.composition.plugin_contract import (
     contract_snapshot_for_meta,
 )
 from lca.contracts.protocols.composition.logic_address import LogicAddress
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
 from lca.harness.plugin.manifest import (
     _LAYER_VALUES,
     EffectClass,

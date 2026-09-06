@@ -1,60 +1,40 @@
-# bundles/scenario-cordis-creator.yaml — cordis-creator scenario bundle.
-# Per spec §13.3: standard + Composer.mount/unmount + cordis_control tool.
-
 entries:
-  # Mount governance is selected independently from the Composer factory.
-  - id: lca-composition-invariant-default
-    name: lca_composition_invariant_default
-    $module: lca.plugins.journal.composition_invariant_seam
-    config: {}
-
-  # CordisComposer provider (Tier-2) — 把 CordisComposer 工厂挂到
-  # ``composition.compose_factory`` 命名 seam，供 cordis_control 工具运行时
-  # 拿到 composer 实例。single-port 模式下 web-standard 绑此 bundle 即可。
-  - id: lca-composer-provider
-    name: lca_composer_provider
-    $module: lca.plugins.think.composition_provider_provider
-    config: {}
-
-  # Creator persona is a profile capability rather than an adapter-local
-  # builder. Custom Creator personas replace only this entry.
-  - id: lca-role-cordis-creator
-    name: lca_role_cordis_creator
-    $module: lca.plugins.roles.cordis_creator
-    config: {}
-
-  # The Composer-bound control tool is created by a profile-owned factory. Its
-  # caller grant is declared here, never embedded in a Gateway mode adapter.
-  - id: lca-tool-cordis-control
-    name: lca_tool_cordis_control
-    $module: lca.plugins.tools.cordis_control
-    config:
-      caller_grant:
-        - cordis_control.inspect
-        - cordis_control.author
-        - cordis_control.validate
-        - cordis_control.promote
-        - tool_fs.read
-        - tool_fs.write
-        - tool_bash
-        - file_write
-
-  # Register this mode independently from Solo and Team adapters. Profiles can
-  # replace or remove it without editing the base Gateway mode configuration.
-  - id: lca-mode-cordis-creator-default
-    name: lca_mode_cordis_creator_default
-    $module: lca.plugins.collaboration.modes.cordis_creator
-    config: {}
-
-  # File + bash — creator needs to author bundles on disk.
-  - id: lca-tool-bash
-    name: lca_tool_bash
-    $module: lca.plugins.tools.bash
-    config:
-      allowed: true
-
-  - id: lca-tool-file-write
-    name: lca_tool_file_write
-    $module: lca.plugins.tools.file_write
-    config:
-      allowed: true
+- id: lca-composition-invariant-default
+  name: lca_composition_invariant_default
+  $module: lca.plugins.journal.composition.invariant_seam
+  config: {}
+- id: lca-composer-provider
+  name: lca_composer_provider
+  $module: lca.plugins.think.composition.provider_provider
+  config: {}
+- id: lca-role-cordis-creator
+  name: lca_role_cordis_creator
+  $module: lca.plugins.roles.cordis_creator
+  config: {}
+- id: lca-tool-cordis-control
+  name: lca_tool_cordis_control
+  $module: lca.plugins.tools.cordis_control
+  config:
+    caller_grant:
+    - cordis_control.inspect
+    - cordis_control.author
+    - cordis_control.validate
+    - cordis_control.promote
+    - tool_fs.read
+    - tool_fs.write
+    - tool_bash
+    - file_write
+- id: lca-mode-cordis-creator-default
+  name: lca_mode_cordis_creator_default
+  $module: lca.plugins.collaboration.modes.cordis_creator
+  config: {}
+- id: lca-tool-bash
+  name: lca_tool_bash
+  $module: lca.plugins.tools.bash
+  config:
+    allowed: true
+- id: lca-tool-file-write
+  name: lca_tool_file_write
+  $module: lca.plugins.tools.file_write
+  config:
+    allowed: true

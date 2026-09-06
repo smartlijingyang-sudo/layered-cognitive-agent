@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from lca.contracts.models.observability.journal.journal import TaskCreated
 from lca.contracts.models.observability.journal.catalog import JOURNAL_EVENT_CLASSES
+from lca.contracts.models.observability.journal.journal import TaskCreated
 from lca.infrastructure.observability.events.event.descriptors_data import build_default_registry
 
 

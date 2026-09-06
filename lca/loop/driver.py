@@ -7,12 +7,12 @@ from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseRunCursor
 from lca.contracts.protocols.runtime.runtime.composition import ResultFinalizer
 from lca.harness.declarative import GraphAssembler
+from lca.runtime.loop.runtime_journal import RuntimeJournal, RuntimeJournalCommitter
 from lca.runtime.support.checkpoint_resolution import DeclarativeCheckpoint
 from lca.runtime.support.runtime_bindings import (
     DeclarativeRuntimeBindings,
     RuntimePhaseCapabilities,
 )
-from lca.runtime.loop.runtime_journal import RuntimeJournal, RuntimeJournalCommitter
 
 
 class DeclarativeExecution:
