@@ -1,113 +1,59 @@
-"""Close-set of execution points that must emit a spine event.
+"""Execution-point whitelist — COMPAT re-export (ADR-0195 O1 / P2-17).
 
-Adding/removing a point requires a Layer-1 build-time check pass and an
-EXECUTION_POINT_TEST matching it (I8 of ADR-0165.1). The set is intentional:
-do not edit casually.
+SSOT for production EP registration:
+``lca_kernel/events/config/observability/spine.yaml`` (+ business yaml)
+→ ``lca_kernel.events.payloads_spine.SPINE_EXECUTION_POINTS``.
 
-# COMPAT(delete-when: PR-9, tracking: ADR-0181)
-# 旧 EXECUTION_POINTS 仍被旧 spine (lca.infrastructure.observability.spine)
-# 的 _spine_safety.safe_append 与 spine.core._REFLECTOR_SET_ACTIVE_MODULES
-# 兜底使用。PR-3~PR-6 已迁 spine.yaml + payloads_spine.py + 各
-# spine_reflector_*，旧 spine 仅剩顶层 stubs（event_spine / event_record /
-# orphan / registry / *_emit / compile_spine_registry）以及本 manifest。
-# PR-9 全退役时一并删除（rg EXECUTION_POINTS lca/ = 0 触发）。
+Loads ``payloads_spine`` via ``importlib`` (not ``lca_kernel.events`` package
+``__init__``) to avoid import cycle:
+``event_record`` → ``manifest`` → ``payloads_spine`` → ``events.persistence``
+→ ``infrastructure.observability`` → ``event_record``.
+
+# COMPAT(owner: ADR-0195 O1 / P1-18, from: manifest.py inline EXECUTION_POINTS tuple,
+# to: spine.yaml + SPINE_EXECUTION_POINTS,
+# delete_when: rg "from lca.infrastructure.observability.spine.manifest import EXECUTION_POINTS" lca/ = 0,
+# forbidden_new_usage: 禁止在本模块新增裸 EP 字符串或 inline tuple; 新 EP 只许改 yaml + payloads_spine)
 """
 
-EXECUTION_POINTS: tuple[str, ...] = (
-    # Transport (ADR-0112)
-    "transport.route.enter",
-    "transport.route.exit",
-    "transport.sse.publish",
-    # Kernel lifecycle
-    "kernel.boot.start",
-    "kernel.boot.completed",
-    "kernel.run.start",
-    "kernel.run.stop",
-    "kernel.run.cancelled",
-    # Agent loop
-    "agent_loop.iteration.start",
-    "agent_loop.iteration.end",
-    # Cognition
-    "brain.perceive.start",
-    "brain.perceive.end",
-    "brain.think.start",
-    "brain.think.end",
-    "brain.gate.start",
-    "brain.gate.end",
-    "critic.eval.start",
-    "critic.eval.end",
-    "reasoner.reason.start",
-    "reasoner.reason.end",
-    "prompt_assembler.assemble.start",
-    "prompt_assembler.assemble.end",
-    "synthesizer.merge",
-    "skill_router.route",
-    "memory.read",
-    "memory.write",
-    # Body
-    "body.tool.execute.start",
-    "body.tool.execute.end",
-    "body.tool.retry",
-    # Writable matrix (ADR-0167 D11) —— coordinator-only step / segment 边
-    "writable.step.start",
-    "writable.step.end",
-    "writable.segment.start",
-    "writable.segment.end",
-    # Loop cursor control (ADR-0169):halt / closing / fork —— 投影宿主与
-    # PersistenceCoordinator 跨域订阅,在 ADR-0170 §D6 §L16 处制度化,
-    # 此处仅为白名单登记(不引入新控制面)。
-    "writable.iteration.halt",
-    "writable.iteration.closing",
-    "writable.iteration.close",
-    "loop.fork",
-    # Writable matrix phase events (perceive / think / act / reflect / remember / stop)
-    "perceive.phase.fold",
-    "phase.perceive.fold",
-    "phase.think.fold",
-    "phase.gate.fold",
-    "phase.remember.fold",
-    "phase.stop.fold",
-    "phase.reflect.fold",
-    "phase.act.fold.start",
-    "phase.act.fold.end",
-    "phase.act.fold",  # loop cursor single phase EP(ADR-0169 D11)
-    "phase.tool.call.start",
-    "phase.tool.call.end",
-    "phase.tool.denied",
-    # Lifecycle normalization (ADR-0166 S5) —— 正常路径用 lifecycle.finally
-    "lifecycle.finally",
-    "body.sandbox.enter",
-    "body.sandbox.exit",
-    # LLM
-    "llm.call.start",
-    "llm.call.end",
-    "llm.stream.token",
-    "llm.stream.stall",
-    "llm.request.header",  # ADR-0169 D7 + L6:必在 THINK 窗口开,model-visible SSOT
-    # Runtime
-    "runtime.reducer.apply",
-    "runtime.checkpoint.create",
-    "runtime.resume.start",
-    "runtime.resume.end",
-    "runtime.event_publisher.publish",
-    # Phase graph
-    "phase_graph.node.start",
-    "phase_graph.node.end",
-    "phase_graph.edge.transit",
-    # Exception/finally
-    "exception.caught",
-    "exception.finally",
-    # Coordinator record_* EP(ADR-0167 D2: Agent 不直接 import EventSpine,
-    # 唯一写路径 = Coordinator.record_* → 这些 EP)
-    "step.thinking.record",
-    "step.tool_call.record",
-    "step.tool_result.record",
-    "step.reflect.record",
-    "step.span.record",
-    # Spine self-observation (ADR-2026-09-02-i17-traceback):
-    # the spine itself publishes these via EmitPipeline so they ride
-    # the same seal/anomaly path as producer-supplied events.
-    "spine.i17.rejected",  # *.start rejected for missing source_location
-    "spine.producer.failure",  # a FieldProducer raised on a sub-field
-    "phase_graph.instrument.coverage",  # once-per-run I17 provider presence
-)
+from __future__ import annotations
+
+import importlib.util
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    EXECUTION_POINTS: tuple[str, ...]
+
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+_PAYLOADS_SPINE_PATH = _REPO_ROOT / "lca_kernel" / "events" / "payloads_spine.py"
+_CACHED_EXECUTION_POINTS: tuple[str, ...] | None = None
+
+
+def _load_spine_execution_points() -> tuple[str, ...]:
+    spec = importlib.util.spec_from_file_location(
+        "lca_kernel.events.payloads_spine",
+        _PAYLOADS_SPINE_PATH,
+    )
+    if spec is None or spec.loader is None:
+        msg = f"cannot load spine EP SSOT from {_PAYLOADS_SPINE_PATH}"
+        raise ImportError(msg)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    eps = module.SPINE_EXECUTION_POINTS
+    if not isinstance(eps, tuple):
+        msg = "SPINE_EXECUTION_POINTS must be a tuple"
+        raise TypeError(msg)
+    return eps
+
+
+def __getattr__(name: str) -> tuple[str, ...]:
+    if name == "EXECUTION_POINTS":
+        global _CACHED_EXECUTION_POINTS
+        if _CACHED_EXECUTION_POINTS is None:
+            _CACHED_EXECUTION_POINTS = _load_spine_execution_points()
+        return _CACHED_EXECUTION_POINTS
+    msg = f"module {__name__!r} has no attribute {name!r}"
+    raise AttributeError(msg)
+
+
+__all__ = ["EXECUTION_POINTS"]

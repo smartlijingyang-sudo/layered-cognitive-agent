@@ -79,6 +79,14 @@ def _req_header(step_id: str = "step-001") -> RequestHeader:
     )
 
 
+def test_advance_rejects_gate_phase() -> None:
+    """ADR-0194 P2-03: gate is Think sub-chain, not a cursor phase."""
+    c, spine = _make_cursor()
+    with pytest.raises(CursorError, match="invalid phase 'gate'"):
+        c.advance("gate")  # type: ignore[arg-type]
+    assert spine.records == []
+
+
 def test_advance_emits_phase_fold_ep() -> None:
     c, spine = _make_cursor()
     c.advance("perceive")

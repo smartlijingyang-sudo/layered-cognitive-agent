@@ -1,17 +1,13 @@
 """spine_reflector_cognition plugin（ADR-0181 试点 + PR-2 cognition 全迁 / ADR-0183 PR-7）。
 
-试点（已合并）：emit_brain_perceive_start
-PR-2（本）：cognition 余 15 emit 全迁；signature 严格对齐旧
-lca/plugins/observability/spine/reflectors/cognition.py，确保
-lca/cognition/brain/reasoner.py 等调用方零改动。旧 _safe_append
-的 outcome 字段映射到 payload.outcome（ShellEventPayload 用 payload
-承载，不另开字段，保留旧 API 兼容）。
+# COMPAT(owner: ADR-0194 P2-11, from: spine_reflector_cognition emit_*,
+# to: lca.infrastructure.session.cognitive_emit + publish_ep_bound,
+# delete_when: P2-16 plugin dir removed + rg "spine_reflector_cognition" lca/
+# --glob '!**/spine_reflector_cognition/**' = 0,
+# forbidden_new_usage: production import of emit_* from this package)
 
-业务方一行调：
-    publish_via_session(
-        SpineEventPayload(execution_point="...", channel="...", payload={...}),
-        producer=ReflectorClass,
-    )
+Thin adapter: emit helpers delegate to ``FactGateway.publish_ep_bound``.
+Production callers must use ``cognitive_emit`` / ``memory_journal_commit``.
 """
 
 from __future__ import annotations
@@ -35,9 +31,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.plugins.events.publishers._session_publish import publish_via_session
-from lca_kernel.events.payloads import Category, SpineEventPayload
-from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
+from lca.loop.fact_gateway import publish_ep_bound
 
 log = logging.getLogger(__name__)
 
@@ -50,105 +44,73 @@ class ReflectorClass:
     """publisher plugin 类（空标记类）。机制按 class 全路径鉴权。"""
 
 
-def _send(
-    *,
-    execution_point: str,
-    channel: str,
-    payload: dict[str, Any],
-) -> Any:
-    """内部 helper：构造 SpineEventPayload + 走 publish_via_session（PR-3d）。
-
-    category 由 execution_point 通过 _SPINE_EP_TO_CATEGORY 派生。
-    无绑定 Session 时 fail-loud（RuntimeError）——调用方必须先经
-    ``set_publish_session`` / run bind 绑定（ADR-0186）。
-    """
-    cat_str = _SPINE_EP_TO_CATEGORY[execution_point]
-    sp = SpineEventPayload(
-        category=Category(cat_str),
-        execution_point=execution_point,
-        channel=channel,
-        payload=payload,
-    )
-    return publish_via_session(sp, producer=ReflectorClass)
-
-
 def emit_brain_perceive_start(*, state_id: str) -> Any:
-    return _send(
-        execution_point="brain.perceive.start",
-        channel="fact",
-        payload={"state_id": state_id},
-    )
+    return publish_ep_bound("brain.perceive.start", {"state_id": state_id}, actor="brain")
 
 
 def emit_brain_perceive_end(*, state_id: str, outcome: str = "success") -> Any:
-    return _send(
-        execution_point="brain.perceive.end",
-        channel="fact",
-        payload={"state_id": state_id, "outcome": outcome},
+    return publish_ep_bound(
+        "brain.perceive.end",
+        {"state_id": state_id, "outcome": outcome},
+        actor="brain",
     )
 
 
 def emit_brain_think_start(*, state_id: str) -> Any:
-    return _send(
-        execution_point="brain.think.start",
-        channel="fact",
-        payload={"state_id": state_id},
-    )
+    return publish_ep_bound("brain.think.start", {"state_id": state_id}, actor="brain")
 
 
 def emit_brain_think_end(*, state_id: str, outcome: str = "success") -> Any:
-    return _send(
-        execution_point="brain.think.end",
-        channel="fact",
-        payload={"state_id": state_id, "outcome": outcome},
+    return publish_ep_bound(
+        "brain.think.end",
+        {"state_id": state_id, "outcome": outcome},
+        actor="brain",
+    )
+
+
+def emit_think_gate_start(*, state_id: str) -> Any:
+    return publish_ep_bound("think.gate.start", {"state_id": state_id}, actor="gate")
+
+
+def emit_think_gate_end(*, state_id: str, outcome: str = "success") -> Any:
+    return publish_ep_bound(
+        "think.gate.end",
+        {"state_id": state_id, "outcome": outcome},
+        actor="gate",
     )
 
 
 def emit_brain_gate_start(*, state_id: str) -> Any:
-    return _send(
-        execution_point="brain.gate.start",
-        channel="control",
-        payload={"state_id": state_id},
-    )
+    """COMPAT(delete-when: rg emit_brain_gate lca/ = 0, tracking: ADR-0194 P2-05)."""
+    return emit_think_gate_start(state_id=state_id)
 
 
 def emit_brain_gate_end(*, state_id: str, outcome: str = "success") -> Any:
-    return _send(
-        execution_point="brain.gate.end",
-        channel="control",
-        payload={"state_id": state_id, "outcome": outcome},
-    )
+    """COMPAT(delete-when: rg emit_brain_gate lca/ = 0, tracking: ADR-0194 P2-05)."""
+    return emit_think_gate_end(state_id=state_id, outcome=outcome)
 
 
 def emit_critic_eval_start(*, state_id: str) -> Any:
-    return _send(
-        execution_point="critic.eval.start",
-        channel="fact",
-        payload={"state_id": state_id},
-    )
+    return publish_ep_bound("critic.eval.start", {"state_id": state_id}, actor="critic")
 
 
 def emit_critic_eval_end(*, state_id: str, outcome: str = "success") -> Any:
-    return _send(
-        execution_point="critic.eval.end",
-        channel="fact",
-        payload={"state_id": state_id, "outcome": outcome},
+    return publish_ep_bound(
+        "critic.eval.end",
+        {"state_id": state_id, "outcome": outcome},
+        actor="critic",
     )
 
 
 def emit_reasoner_reason_start(*, state_id: str) -> Any:
-    return _send(
-        execution_point="reasoner.reason.start",
-        channel="fact",
-        payload={"state_id": state_id},
-    )
+    return publish_ep_bound("reasoner.reason.start", {"state_id": state_id}, actor="reasoner")
 
 
 def emit_reasoner_reason_end(*, state_id: str, outcome: str = "success") -> Any:
-    return _send(
-        execution_point="reasoner.reason.end",
-        channel="fact",
-        payload={"state_id": state_id, "outcome": outcome},
+    return publish_ep_bound(
+        "reasoner.reason.end",
+        {"state_id": state_id, "outcome": outcome},
+        actor="reasoner",
     )
 
 
@@ -176,11 +138,7 @@ def emit_prompt_assembler_start(
         payload["available_skills_count"] = available_skills_count
     if variant is not None:
         payload["variant"] = variant
-    return _send(
-        execution_point="prompt_assembler.assemble.start",
-        channel="fact",
-        payload=payload,
-    )
+    return publish_ep_bound("prompt_assembler.assemble.start", payload, actor="reasoner")
 
 
 def emit_prompt_assembler_end(
@@ -207,18 +165,14 @@ def emit_prompt_assembler_end(
         payload["total_chars"] = total_chars
     if variant is not None:
         payload["variant"] = variant
-    return _send(
-        execution_point="prompt_assembler.assemble.end",
-        channel="fact",
-        payload=payload,
-    )
+    return publish_ep_bound("prompt_assembler.assemble.end", payload, actor="reasoner")
 
 
 def emit_synthesizer_merge(*, state_id: str, candidate_count: int, outcome: str = "success") -> Any:
-    return _send(
-        execution_point="synthesizer.merge",
-        channel="fact",
-        payload={"state_id": state_id, "candidate_count": candidate_count, "outcome": outcome},
+    return publish_ep_bound(
+        "synthesizer.merge",
+        {"state_id": state_id, "candidate_count": candidate_count, "outcome": outcome},
+        actor="synthesizer",
     )
 
 
@@ -236,18 +190,14 @@ def emit_skill_router_route(
     }
     if decision_path is not None:
         payload["decision_path"] = decision_path
-    return _send(
-        execution_point="skill_router.route",
-        channel="control",
-        payload=payload,
-    )
+    return publish_ep_bound("skill_router.route", payload, actor="skill_router")
 
 
 def emit_memory_read(*, state_id: str, outcome: str = "success") -> Any:
-    return _send(
-        execution_point="memory.read",
-        channel="fact",
-        payload={"state_id": state_id, "outcome": outcome},
+    return publish_ep_bound(
+        "memory.read",
+        {"state_id": state_id, "outcome": outcome},
+        actor="memory",
     )
 
 
@@ -265,11 +215,7 @@ def emit_memory_write(
     }
     if record_id is not None:
         payload["record_id"] = record_id
-    return _send(
-        execution_point="memory.write",
-        channel="fact",
-        payload=payload,
-    )
+    return publish_ep_bound("memory.write", payload, actor="memory")
 
 
 __all__ = [
@@ -290,6 +236,8 @@ __all__ = [
     "emit_reasoner_reason_start",
     "emit_skill_router_route",
     "emit_synthesizer_merge",
+    "emit_think_gate_end",
+    "emit_think_gate_start",
     "setup",
 ]
 
@@ -326,8 +274,8 @@ __all__ = [
             "spine.cognition.brain.perceive.end",
             "spine.cognition.brain.think.start",
             "spine.cognition.brain.think.end",
-            "spine.cognition.brain.gate.start",
-            "spine.cognition.brain.gate.end",
+            "spine.cognition.think.gate.start",
+            "spine.cognition.think.gate.end",
             "spine.cognition.critic.eval.start",
             "spine.cognition.critic.eval.end",
             "spine.cognition.reasoner.reason.start",

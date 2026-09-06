@@ -107,7 +107,7 @@ class AgentState:
     agent_role: str = ""
     from_role: str = ""
     team_awareness: TeamAwareness | None = None
-    history: list[Turn] = field(default_factory=list)
+    control_turns: list[Turn] = field(default_factory=list)
     # ADR-0158 决策 四:final_output 字段已删除(原 line 110)。事实答案
     # 改走 TerminalOutcome.final_output_ref(ADR-0077 sole terminal truth)。
     # 旧字段名引用统计:reducer.py 4 处 + agent_state.py 2 处 +
@@ -129,3 +129,12 @@ class AgentState:
         )
         self.checkpoints.append(snap)
         return snap
+
+    @property
+    def history(self) -> list[Turn]:
+        """COMPAT(owner: ADR-0194 P4-R02): use ``control_turns``."""
+        return self.control_turns
+
+    @history.setter
+    def history(self, value: list[Turn]) -> None:
+        self.control_turns = value

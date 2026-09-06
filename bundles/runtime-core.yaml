@@ -16,7 +16,7 @@ entries:
   # profiles can replace the driver without changing runtime-core consumers.
   - id: lca-run-loop-driver-registry
     name: lca_run_loop_driver_registry
-    $module: lca.plugins.loop_drivers.registry
+    $module: lca.plugins.loop.driver.plugin
     config:
       default: cognitive
 

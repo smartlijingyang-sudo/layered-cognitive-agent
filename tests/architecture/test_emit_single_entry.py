@@ -1,26 +1,24 @@
-"""I-FW-EMIT-1: ``emit_exception_caught`` 单入口守门。
-
-ADR-0169 + note ``2026-09-03-3-seam-emit-single-entry.md`` PR-3:
+"""I-FW-EMIT-1 + ADR-0194 §7 L2 / ADR-0195 P-L7: 事实生产单入口守门。
 
 ``exception.caught`` EP 只允许一个 emitter —
 ``lca.infrastructure.observability.spine.exception_emit.emit_exception_caught``。
-任何其它 ``def emit_exception_caught`` 都是平行实现,必须删除。
 
-守护范围:
+Loop 热路径 durable 事实应经 ``FactGateway`` (``append_catalog_bound`` /
+``publish_ep_bound``) 或 ``harness.session.emit``(catalog rollback in
+``fact_gateway.py``),不得新增平行 ``publish_via_session`` /
+``append_journal_event`` / 直接 ``Session.append`` 调用。
 
-- ``lca/`` 下所有 ``.py`` 文件,排除 SSOT 模块本身
-- 检测 module-level function 和 class method
-- Protocol stub(``EnvelopeEmitter.emit_exception_caught``)也在守护范围:
-  note 要求其删除(keyword 参数面无法承载 ``ExceptionRecord``)
-
-当前债:
+当前债(exception.caught 平行 emitter):
 
 - ``lca/contracts/protocols/runtime/envelope_emitter.py`` Protocol stub
 - ``lca/runtime/envelope_emitter.py`` SpineEnvelopeEmitter 实现
 - ``lca/plugins/events/publishers/spine_reflector_runtime/plugin.py`` 函数
 
-这三处由 note-3 PR-1/PR-2 负责删除(另一个 agent 的 WIP)。本测试以
-xfail 跟踪,一旦清理完成 xfail 自动变 xpasse → 移除 xfail 标记。
+Loop 热路径已知债(P2-21 baseline,迁移至 FactGateway):
+
+- ``lca/loop/act_journal_commit.py`` — ``append_journal_event``
+- ``lca/loop/memory_journal_commit.py`` — ``append_journal_event``
+- ``lca/loop/delegation_journal_commit.py`` — ``publish_via_session``
 """
 
 from __future__ import annotations
@@ -33,7 +31,28 @@ import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCAN_ROOT = _REPO_ROOT / "lca"
+_LOOP_SCAN_ROOT = _REPO_ROOT / "lca" / "loop"
 _SSOT_POSIX = "lca/infrastructure/observability/spine/exception_emit.py"
+
+# L2 / P-L7: loop 层允许的事实生产面(其余文件不得新增下列 pattern)。
+_LOOP_FACT_SSOT_FILES: frozenset[str] = frozenset(
+    {
+        "lca/loop/fact_gateway.py",
+    }
+)
+_LOOP_FACT_BASELINE_DEBT: frozenset[str] = frozenset(
+    {
+        "lca/loop/act_journal_commit.py",
+        "lca/loop/memory_journal_commit.py",
+        "lca/loop/delegation_journal_commit.py",
+    }
+)
+_LOOP_FORBIDDEN_PATTERNS: tuple[str, ...] = (
+    "publish_via_session",
+    "append_journal_event",
+    "Session.append",
+    "spine_reflector",
+)
 
 
 def _have_ripgrep() -> bool:
@@ -78,6 +97,36 @@ def _find_emit_defs() -> list[tuple[str, int, str, str]]:
                     ):
                         results.append((rel, item.lineno, "method", node.name))
     return results
+
+
+def _code_line(line: str) -> str:
+    stripped = line.strip()
+    if stripped.startswith("#"):
+        return ""
+    return line.split("#", 1)[0]
+
+
+def _find_loop_fact_violations() -> frozenset[str]:
+    """Return loop/*.py paths using forbidden fact-production patterns."""
+    offenders: set[str] = set()
+    if not _LOOP_SCAN_ROOT.exists():
+        return frozenset()
+    allowed = _LOOP_FACT_SSOT_FILES | _LOOP_FACT_BASELINE_DEBT
+    for py in sorted(_LOOP_SCAN_ROOT.rglob("*.py")):
+        if "__pycache__" in py.parts:
+            continue
+        rel = py.relative_to(_REPO_ROOT).as_posix()
+        if rel in allowed:
+            continue
+        try:
+            lines = py.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError):
+            continue
+        if any(
+            pattern in _code_line(line) for line in lines for pattern in _LOOP_FORBIDDEN_PATTERNS
+        ):
+            offenders.add(rel)
+    return frozenset(offenders)
 
 
 # COMPAT(delete-when: note-3 PR-1 + PR-2 落地, _find_emit_defs() 返回空列表;
@@ -166,3 +215,21 @@ class TestIFwEmit1:
             pytest.xfail(
                 f"I-FW-EMIT-1: 预期 0 个非 SSOT emitter,实际 {non_ssot}。 per_file={per_file}"
             )
+
+
+class TestL2LoopFactSingleEntry:
+    """ADR-0194 §7 L2 / ADR-0195 P-L7: loop 热路径事实经 FactGateway 缝。"""
+
+    def test_loop_no_new_fact_production_bypass(self) -> None:
+        """除 SSOT + 已知债外,loop 不得新增平行事实生产 import/usage。"""
+        offenders = sorted(_find_loop_fact_violations())
+        assert offenders == [], (
+            "L2/P-L7 新增违规:lca/loop/** 出现 FactGateway 之外的 fact 生产面:\n"
+            + "\n".join(f"  - {p}" for p in offenders)
+            + "\n使用 append_catalog_bound / publish_ep_bound;已知债见 _LOOP_FACT_BASELINE_DEBT。"
+        )
+
+    def test_loop_fact_baseline_debt_unchanged(self) -> None:
+        """已知债文件集合稳定;清债后删对应 commit 模块并更新 baseline。"""
+        current_debt = {rel for rel in _LOOP_FACT_BASELINE_DEBT if (_REPO_ROOT / rel).exists()}
+        assert current_debt == _LOOP_FACT_BASELINE_DEBT

@@ -40,8 +40,8 @@ class Category(str, Enum):
     SPINE_COGNITION_BRAIN_PERCEIVE_END = "spine.cognition.brain.perceive.end"
     SPINE_COGNITION_BRAIN_THINK_START = "spine.cognition.brain.think.start"
     SPINE_COGNITION_BRAIN_THINK_END = "spine.cognition.brain.think.end"
-    SPINE_COGNITION_BRAIN_GATE_START = "spine.cognition.brain.gate.start"
-    SPINE_COGNITION_BRAIN_GATE_END = "spine.cognition.brain.gate.end"
+    SPINE_COGNITION_THINK_GATE_START = "spine.cognition.think.gate.start"
+    SPINE_COGNITION_THINK_GATE_END = "spine.cognition.think.gate.end"
     SPINE_COGNITION_CRITIC_EVAL_START = "spine.cognition.critic.eval.start"
     SPINE_COGNITION_CRITIC_EVAL_END = "spine.cognition.critic.eval.end"
     SPINE_COGNITION_REASONER_REASON_START = "spine.cognition.reasoner.reason.start"
@@ -109,7 +109,6 @@ class Category(str, Enum):
     SPINE_PERCEIVE_PHASE_FOLD = "spine.perceive.phase.fold"
     SPINE_PHASE_PERCEIVE_FOLD = "spine.phase.perceive.fold"
     SPINE_PHASE_THINK_FOLD = "spine.phase.think.fold"
-    SPINE_PHASE_GATE_FOLD = "spine.phase.gate.fold"
     SPINE_PHASE_REMEMBER_FOLD = "spine.phase.remember.fold"
     SPINE_PHASE_STOP_FOLD = "spine.phase.stop.fold"
     SPINE_PHASE_REFLECT_FOLD = "spine.phase.reflect.fold"
@@ -200,8 +199,8 @@ CATEGORY_DEFAULT_PLANE: dict[Category, Plane] = {
     Category.SPINE_COGNITION_BRAIN_PERCEIVE_END: Plane.OBSERVABILITY,
     Category.SPINE_COGNITION_BRAIN_THINK_START: Plane.OBSERVABILITY,
     Category.SPINE_COGNITION_BRAIN_THINK_END: Plane.OBSERVABILITY,
-    Category.SPINE_COGNITION_BRAIN_GATE_START: Plane.OBSERVABILITY,
-    Category.SPINE_COGNITION_BRAIN_GATE_END: Plane.OBSERVABILITY,
+    Category.SPINE_COGNITION_THINK_GATE_START: Plane.OBSERVABILITY,
+    Category.SPINE_COGNITION_THINK_GATE_END: Plane.OBSERVABILITY,
     Category.SPINE_COGNITION_CRITIC_EVAL_START: Plane.OBSERVABILITY,
     Category.SPINE_COGNITION_CRITIC_EVAL_END: Plane.OBSERVABILITY,
     Category.SPINE_COGNITION_REASONER_REASON_START: Plane.OBSERVABILITY,
@@ -263,7 +262,6 @@ CATEGORY_DEFAULT_PLANE: dict[Category, Plane] = {
     Category.SPINE_PERCEIVE_PHASE_FOLD: Plane.OBSERVABILITY,
     Category.SPINE_PHASE_PERCEIVE_FOLD: Plane.OBSERVABILITY,
     Category.SPINE_PHASE_THINK_FOLD: Plane.OBSERVABILITY,
-    Category.SPINE_PHASE_GATE_FOLD: Plane.OBSERVABILITY,
     Category.SPINE_PHASE_REMEMBER_FOLD: Plane.OBSERVABILITY,
     Category.SPINE_PHASE_STOP_FOLD: Plane.OBSERVABILITY,
     Category.SPINE_PHASE_REFLECT_FOLD: Plane.OBSERVABILITY,

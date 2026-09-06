@@ -179,6 +179,7 @@ class ToolLoopBreakerGate(DecisionGate):
             rationale=rationale,
             confidence=0.9,
             response_text=response,
+            degraded_from=decision.action_type,
         )
 
 

@@ -43,8 +43,6 @@ from contextvars import ContextVar, Token
 from typing import Any
 
 from lca.contracts.models.observability.journal_step import (
-    ReflectTrace,
-    SpanRecord,
     ThinkingTrace,
 )
 from lca.contracts.models.observability.journal_step import (
@@ -53,13 +51,15 @@ from lca.contracts.models.observability.journal_step import (
 from lca.contracts.models.observability.journal_step import (
     ToolResult as LegacyToolResult,
 )
-from lca.contracts.observability.loop_cursor import CloseReason, LoopCursor
+from lca.contracts.observability.loop_cursor import CloseReason, CursorError, LoopCursor, PhaseName
 from lca.contracts.observability.loop_cursor_payloads import (
     ThinkingRecord,
     ToolCallRecord,
     ToolResultRecord,
 )
 from lca.infrastructure.observability.writable_matrix.coordinator import StepCoordinator
+
+_VALID_CURSOR_PHASES = frozenset(PhaseName.__args__)
 
 _DIGEST_PREFIX = "sha256:"
 
@@ -116,18 +116,12 @@ class CoordinatorAdapter:
         coord  —— 旧 StepCoordinator(只读 begin/end 状态机派生 cursor)
 
     行为:
-        ``record_thinking(trace)`` →
-            cursor.record_thinking(ThinkingRecord(...)) + coord.record_thinking(trace)
-        ``record_tool_call(call)`` →
-            cursor.record_tool_call(ToolCallRecord(...)) + coord.record_tool_call(call)
         ``record_tool_result(result)`` →
-            cursor.record_tool_result(ToolResultRecord(...)) + coord.record_tool_result(result)
+            cursor.record_tool_result(ToolResultRecord(...))
         ``begin_step(phase, **ctx)`` →
             coord.begin_step(phase, **ctx) → cursor.advance(phase)
         ``end_step(...)`` →
             coord.end_step(...) + cursor.advance('stop')(当 phase == 'act')
-        ``emit(...)`` →
-            coord.emit(...) 只走(不翻译,cursor 不暴露任意 EP 入口)
 
     业务代码在 PR-25 阶段仍直接用 ``StepCoordinator``;本适配器是为
     PR-21~24 业务迁移准备的过渡壳(由 wiring 层在切换时把 ``StepCoordinator``
@@ -152,6 +146,10 @@ class CoordinatorAdapter:
 
     def begin_step(self, phase: str, **ctx: Any) -> str:
         """Step 开始 —— coord 派生 step_id, cursor 派生 phase 窗口。"""
+        if phase not in _VALID_CURSOR_PHASES:
+            raise CursorError(
+                f"invalid phase {phase!r}; gate is Think sub-chain, not a cursor phase (ADR-0194)"
+            )
         step_id = self._coord.begin_step(phase, **ctx)
         # 仅当 cursor 当前 phase != phase 时 advance(避免重复 EP)
         snap = self._cursor.snapshot
@@ -168,7 +166,7 @@ class CoordinatorAdapter:
         """Step 结束 —— coord 切走,cursor 转到 stop 候选(由调用方决定是否 advance)。"""
         self._coord.end_step(outcome, error=error)
 
-    # ── record_*: 同时调 cursor + coord(双写) ──────────────────
+    # ── record_*: cursor 唯一 writer ─────────────────────────────
 
     def record_thinking(self, trace: ThinkingTrace) -> None:
         """``record_thinking`` —— cursor 唯一 writer(SSOT 收口)。
@@ -255,35 +253,6 @@ class CoordinatorAdapter:
             files_created=tuple(files_created),
             error=error,
             delta_summary=delta_summary,
-        )
-
-    def record_reflect(self, reflect: ReflectTrace) -> None:
-        """``record_reflect`` —— cursor 无 record_reflect,仅 coord 写。"""
-        # ADR-0169 D1:cursor 不暴露 record_reflect;reflect EP 由 spine subscribers 派生。
-        self._coord.record_reflect(reflect)
-
-    def record_span(self, span: SpanRecord) -> None:
-        """``record_span`` —— cursor 无 record_span,仅 coord 写。"""
-        self._coord.record_span(span)
-
-    # ── 通用 emit —— cursor 不暴露,仅 coord 走 ──────────────────
-
-    def emit(
-        self,
-        *,
-        execution_point: str,
-        channel: Any = "fact",
-        payload: dict[str, Any] | None = None,
-        outcome: Any = None,
-        reason: str | None = None,
-    ) -> None:
-        """``coord.emit`` —— cursor 协议面**不**暴露任意 EP 入口;只走 coord。"""
-        self._coord.emit(
-            execution_point=execution_point,
-            channel=channel,
-            payload=payload,
-            outcome=outcome,
-            reason=reason,
         )
 
     # ── 关闭协同:close 透传到 cursor;CloseBarrier 由 runtime 持 ───

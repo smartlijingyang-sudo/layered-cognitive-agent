@@ -8,10 +8,7 @@ from typing import Any
 
 from lca.contracts.observability.status import RunLifecycleStatus
 from lca.infrastructure.observability import BoundObservability, fold_run_state
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession, RunStatus
-
-# COMPAT(delete-when: rg "JournalRunStatus" 生产引用归零, tracking: ADR-0183 PR-11)
-JournalRunStatus = RunLifecycleStatus
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
 
 
 def journal_store(hub: BoundObservability | None) -> Any:
@@ -35,35 +32,38 @@ def derive_terminal_status(session: RunSession, success: bool) -> None:
     """Derive terminal status from Journal facts, then apply carrier fallback signals."""
     if session.cancel_requested or task_cancelled(session.task) or current_task_cancelled():
         session.cancel_requested = True
-        session.status = RunStatus.CANCELED
+        session.status = RunLifecycleStatus.CANCELED
     elif session.error:
-        session.status = RunStatus.FAILED
+        session.status = RunLifecycleStatus.FAILED
     elif session.hub is not None:
         store = journal_store(session.hub)
         if store is None:
             fallback_terminal_status(session, success)
         else:
             session.status = fold_run_state(store.events).status
-            if session.status is RunStatus.RUNNING:
+            if session.status is RunLifecycleStatus.RUNNING:
                 fallback_terminal_status(session, success)
     else:
         fallback_terminal_status(session, success)
-    if session.status in {RunStatus.CANCELED, RunStatus.FAILED, RunStatus.COMPLETED}:
+    if session.status in {
+        RunLifecycleStatus.CANCELED,
+        RunLifecycleStatus.FAILED,
+        RunLifecycleStatus.COMPLETED,
+    }:
         session.closed_at = time.time()
 
 
 def fallback_terminal_status(session: RunSession, success: bool) -> None:
     """Retain the carrier fallback when the Journal cannot derive a terminal state."""
     if session.error:
-        session.status = RunStatus.FAILED
+        session.status = RunLifecycleStatus.FAILED
     elif success:
-        session.status = RunStatus.COMPLETED
+        session.status = RunLifecycleStatus.COMPLETED
     else:
-        session.status = RunStatus.FAILED
+        session.status = RunLifecycleStatus.FAILED
 
 
 __all__ = [
-    "JournalRunStatus",
     "current_task_cancelled",
     "derive_terminal_status",
     "fallback_terminal_status",

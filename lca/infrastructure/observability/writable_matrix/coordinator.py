@@ -12,22 +12,18 @@ Agent / Brain / Body / Perceive 只与 ``StepCoordinator`` 交互。
 - 缓存默认值 / 未配置就抛错的伪防御
 - 重复 emit 同一事实（D9 I-PLUG3）；上游 deriver 仅订阅一次
 - 「过渡期两边同时写」层——全部在 PR-3 一次性切
+
+ADR-0194 P2-09: ``record_*`` / ``emit_phase`` / ``emit`` stub 已删除;
+spine EP 唯一走 ``LoopCursor`` WritePort (``cursor.advance`` / ``record_*``)。
 """
 
 from __future__ import annotations
 
 from contextvars import ContextVar
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
-from lca.contracts.models.observability.journal_step import (
-    ReflectTrace,
-    SpanRecord,
-    ThinkingTrace,
-    ToolCallRecord,
-    ToolResult,
-)
 from lca.infrastructure.observability.spine.event_record import (
     Channel,
     EventRecord,
@@ -63,10 +59,10 @@ def reset_current_coordinator(token: Any) -> None:
 
 @dataclass
 class StepCoordinator:
-    """唯一写入口。Agent 调 ``emit_*``，由 Coordinator 走五面矩阵。
+    """唯一写入口。Agent 调 driver/segment 状态; spine EP 由 cursor 派生。
 
     ADR-0167 D11: ``bind_run`` 设置 run 身份 + 元数据; 业务侧只在
-    bind 之后才能 begin_step / record_*。
+    bind 之后才能 begin_step / begin_segment。
     """
 
     registry: WritableFaceRegistry
@@ -103,7 +99,7 @@ class StepCoordinator:
         reason: str | None = None,
     ) -> EventRecord:
         self._seq += 1
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         return EventRecord(
             execution_point=execution_point,
             channel=channel,
@@ -127,7 +123,6 @@ class StepCoordinator:
         # SSOT 收口:StepCoordinator 不再是 spine writer。cursor 是唯一写入者
         # (ADR-0169 P2 / D1);此方法保留仅供内部 state 派生(driver.begin_step
         # 仍要走 StepDriver registry 派生 step_id,见 begin_step 注释)。
-        # 业务路径(record_* / emit_* / emit_phase)必须改走 cursor。
         emitter = self.registry.require("emitter")
         coalescer = self.registry.require("coalescer")
         serializer = self.registry.require("serializer")
@@ -135,18 +130,6 @@ class StepCoordinator:
         emitter.emit(record)
         coalescer.feed(record.execution_point, record.payload)
         storage.write(serializer.serialize(record))
-
-    def _block_ep_write(self, ep: str) -> None:
-        r"""业务路径 EP 写入 SSOT 守护 —— cursor 才是唯一 writer。
-
-        COMPAT(delete-when: ``rg "step\.thinking\.record\|step\.tool_call\.record\|step\.tool_result\.record\|step\.reflect\.record\|step\.span\.record\|phase\..*\.fold\|writable\.step\|writable\.segment" lca/infrastructure/observability/writable_matrix/coordinator.py``
-        命中全部为 SSOT 守护 docstring(``_write(`` 调用清零 ——
-        ``writable.step.*`` 显式边界由 cursor 发射,ADR-0184 D6),
-        tracking: ADR-0169-task-25)。
-        """
-        raise NotImplementedError(
-            f"StepCoordinator.{ep} 已废弃:spine EP 写入唯一走 cursor.advance / cursor.record_*(SSOT)。"
-        )
 
     # ── 切步 / 切段 ────────────────────────────────────────────────
 
@@ -200,70 +183,6 @@ class StepCoordinator:
         seg_id = self._current_segment
         driver.end_segment(seg_id, outcome)
         self._current_segment = None
-
-    # ── 通用 emit ─────────────────────────────────────────────────
-
-    def emit(
-        self,
-        *,
-        execution_point: str,
-        channel: Channel = "fact",
-        payload: dict[str, Any] | None = None,
-        outcome: Outcome | None = None,
-        reason: str | None = None,
-    ) -> None:
-        """SSOT 守护:任意 EP 入口已废弃 —— 由 cursor 派生。
-
-        COMPAT(见 _block_ep_write 注释)。保留空实现仅供 fixture 旧 wiring
-        不破;业务代码必须改用 cursor.advance / cursor.record_*。
-        """
-        del execution_point, channel, payload, outcome, reason
-        self._block_ep_write("emit")
-
-    # ── phase 边（perceive / remember / stop 不开 step）──────────
-
-    def emit_phase(
-        self,
-        *,
-        phase: str,
-        objective: str,
-        summary: str,
-        outcome: str = "ok",
-    ) -> None:
-        """SSOT 守护:phase.<x>.fold 必须由 cursor.advance 派生。
-
-        COMPAT(见 _block_ep_write 注释)。本方法保留以保旧 wiring 不破,但
-        一旦调用即 raise,迫使调用方迁移到 cursor。
-        """
-        del phase, objective, summary, outcome
-        self._block_ep_write("emit_phase")
-
-    # ── record_*(Agent 写原语) ─────────────────────────────────
-
-    def record_thinking(self, trace: ThinkingTrace) -> None:
-        """SSOT 守护:step.thinking.record 由 cursor.record_thinking 派生。"""
-        del trace
-        self._block_ep_write("record_thinking")
-
-    def record_tool_call(self, call: ToolCallRecord) -> None:
-        """SSOT 守护:step.tool_call.record 由 cursor.record_tool_call 派生。"""
-        del call
-        self._block_ep_write("record_tool_call")
-
-    def record_tool_result(self, result: ToolResult) -> None:
-        """SSOT 守护:step.tool_result.record 由 cursor.record_tool_result 派生。"""
-        del result
-        self._block_ep_write("record_tool_result")
-
-    def record_reflect(self, reflect: ReflectTrace) -> None:
-        """SSOT 守护:step.reflect.record 由 cursor 派生。"""
-        del reflect
-        self._block_ep_write("record_reflect")
-
-    def record_span(self, span: SpanRecord) -> None:
-        """SSOT 守护:step.span.record 由 cursor 派生。"""
-        del span
-        self._block_ep_write("record_span")
 
     # ── context manager 便利 ─────────────────────────────────────
 

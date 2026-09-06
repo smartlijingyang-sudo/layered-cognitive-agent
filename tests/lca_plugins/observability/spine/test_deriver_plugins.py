@@ -76,7 +76,7 @@ def test_graph_deriver_on_event_and_flush_writes_digraph(tmp_path: Path) -> None
     deriver = GraphDeriver(output_path=out)
     deriver.on_event(_make_event(execution_point="brain.think.start", sequence=1))
     deriver.on_event(_make_event(execution_point="brain.think.end", sequence=2))
-    deriver.on_event(_make_event(execution_point="brain.gate.start", sequence=3))
+    deriver.on_event(_make_event(execution_point="think.gate.start", sequence=3))
     written = deriver.flush()
     assert written == out
     text = out.read_text(encoding="utf-8")

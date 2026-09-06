@@ -16,6 +16,7 @@ from lca.infrastructure.observability.spine.sinks.base import EventSink
 from lca.plugins.observability.spine.spine_enrich import (
     I17Violation,
     enrich_spine_payload,
+    set_active_field_producers,
     set_active_spine_enricher,
 )
 from lca.plugins.session.runtime.bind import (
@@ -51,7 +52,8 @@ def test_session_hook_enriches_before_append() -> None:
     store = SessionStore()
     bound = bind_run_event_session_from_store(store, "run_enrich_1")
     token = bind_session_append_hook(make_session_spine_append_hook(bound.bridge))
-    previous = set_active_spine_enricher(
+    previous_producers = set_active_field_producers([_StubProducer()])
+    previous_enricher = set_active_spine_enricher(
         lambda **kwargs: enrich_spine_payload(producers=[_StubProducer()], **kwargs)
     )
     SpineContext.set_run("run_enrich_1")
@@ -71,7 +73,8 @@ def test_session_hook_enriches_before_append() -> None:
         assert event.data["k"] == "v"
         assert not sink.records, "Session hook path must not write EventSpine sinks"
     finally:
-        set_active_spine_enricher(previous)
+        set_active_field_producers(previous_producers)
+        set_active_spine_enricher(previous_enricher)
         reset_session_append_hook(token)
         unbind_run_event_session(bound)
 
@@ -80,7 +83,8 @@ def test_session_hook_i17_propagates_without_sink_fallback() -> None:
     store = SessionStore()
     bound = bind_run_event_session_from_store(store, "run_enrich_2")
     token = bind_session_append_hook(make_session_spine_append_hook(bound.bridge))
-    previous = set_active_spine_enricher(
+    previous_producers = set_active_field_producers([])
+    previous_enricher = set_active_spine_enricher(
         lambda **kwargs: enrich_spine_payload(producers=[], **kwargs)
     )
     SpineContext.set_run("run_enrich_2")
@@ -96,6 +100,7 @@ def test_session_hook_i17_propagates_without_sink_fallback() -> None:
         assert bound.bridge.inner.seq == 0
         assert not sink.records
     finally:
-        set_active_spine_enricher(previous)
+        set_active_field_producers(previous_producers)
+        set_active_spine_enricher(previous_enricher)
         reset_session_append_hook(token)
         unbind_run_event_session(bound)

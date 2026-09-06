@@ -95,7 +95,6 @@ class LoopCursorPlugin:
             "spine.perceive.phase.fold",
             "spine.phase.perceive.fold",
             "spine.phase.think.fold",
-            "spine.phase.gate.fold",
             "spine.phase.remember.fold",
             "spine.phase.stop.fold",
             "spine.phase.reflect.fold",

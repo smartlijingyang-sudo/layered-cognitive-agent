@@ -52,26 +52,9 @@ def _publish_apply_marker(
 ) -> None:
     """Publish one ``runtime.reducer.apply`` marker through the Session chain.
 
-    Contract (ADR-0183 PR-8 / ADR-0186 PR-3d): reducer fold 是 AgentState C4
-    单写边界,每次 fold 经 spine_reflector_runtime 的 emit helpers(内部
-    ``publish_via_session`` → ``Session.append``)发一条
-    ``runtime.reducer.apply`` marker,category 为
-    ``spine.runtime.reducer.apply``(与 execution_point 一一绑定,由 plugin
-    的 ``_SPINE_EP_TO_CATEGORY`` 派生)。
-
-    producer 用 ``spine_reflector_runtime.plugin.ReflectorClass``:yaml SSOT
-    (``lca_kernel/events/config/observability/spine.yaml``) 对该 category 只
-    授权这一个 publish 身份;换独立身份需同步改 yaml 白名单。
-
-    payload 字段 method/phase/outcome/run_id 与 ``journal_trace`` reader 的
-    字段集对齐。``run_id`` 由 helper 按 thread active run
-    (``set_active_run_id`` 注入)补齐,未注入时为空串。
-
-    Failure:鉴权或 payload 校验失败抛 ``UnauthorizedPublishError`` /
-    ``PayloadSchemaError``,不静默吞错。``MissingPublishSessionError``
-    (run context 之外——boot / 测试未 bind Session)按装饰性 marker no-op:
-    与 :class:`~lca.runtime.envelope_emitter.SpineEnvelopeEmitter` 及
-    transport ``_safe_emit`` 的装饰性 emit 语义一致;fold 本体异常不受影响。
+    Contract (ADR-0183 PR-8 / ADR-0186 PR-3d / ADR-0194 P2-10): reducer fold 是
+    AgentState C4 单写边界,每次 fold 经 ``runtime_emit.publish_ep_bound`` 发一条
+    ``runtime.reducer.apply`` marker。
     """
     from lca.plugins.events.publishers.spine_reflector_runtime.plugin import (
         emit_runtime_reducer_apply_end,
@@ -170,8 +153,7 @@ class DefaultReducer(Reducer):
     def apply_perception(self, state: AgentState, manifest: ContextManifest) -> AgentState:
         """fold ContextManifest 到 state。
 
-        Reducer 是 ``AgentState.perceive`` 投影的唯一 writer(C4)。``manifest_digest``
-        仍写入 ``state.extra`` 作为 replay idempotency token，直至 COMPAT 删除。
+        Reducer 是 ``AgentState.perceive`` 投影的唯一 writer(C4)。
         """
         from lca.contracts.models.core.perceive_projection import PerceiveProjection
 
@@ -180,12 +162,11 @@ class DefaultReducer(Reducer):
             digest=manifest.digest,
             step=state.step,
         )
-        state.extra["manifest_digest"] = manifest.digest
         return state
 
     @_instrument_apply
     def apply_turn(self, state: AgentState, turn: Turn) -> AgentState:
-        state.history.append(turn)
+        state.control_turns.append(turn)
         return state
 
     def commit_turn(
@@ -453,9 +434,9 @@ class DefaultReducer(Reducer):
         """
         if stop.final_output:
             return stop.final_output
-        if not state.history:
+        if not state.control_turns:
             return None
-        last = state.history[-1]
+        last = state.control_turns[-1]
         decision = getattr(last, "decision", None)
         if decision is None:
             return None
@@ -479,7 +460,7 @@ class DefaultReducer(Reducer):
         if input_value is not None:
             state.working_memory["resume_input"] = input_value
         if turn is not None:
-            state.history.append(turn)
+            state.control_turns.append(turn)
             state.step += 1
         return state
 

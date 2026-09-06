@@ -8,7 +8,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 BUNDLE_PATH = REPO / "bundles" / "declarative-phase-graph.yaml"
-CONTROL_MODULE_PREFIX = "lca.plugins.control_contributions."
+CONTROL_MODULE_PREFIX = "lca.plugins.loop.control."
 
 
 def _declared_control_modules() -> tuple[str, ...]:
@@ -20,7 +20,7 @@ def _declared_control_modules() -> tuple[str, ...]:
         if not stripped.startswith("$module: "):
             continue
         module = stripped.removeprefix("$module: ")
-        if module.startswith(CONTROL_MODULE_PREFIX):
+        if module.startswith(CONTROL_MODULE_PREFIX) and module.endswith(".plugin"):
             modules.append(module)
     return tuple(modules)
 

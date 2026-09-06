@@ -35,7 +35,7 @@ def register(app: typer.Typer) -> None:
         保留该 category 的行（未出现过 = 空输出）。``--policy`` 切到
         PersistenceObserver 观测（不可用时优雅降级）。
         """
-        from lca_kernel.events.bus import EventBus
+        from lca_kernel.events.bus import EnvelopeBus
 
         if policy:
             try:
@@ -48,7 +48,7 @@ def register(app: typer.Typer) -> None:
                 print("PersistenceObserver not available")
             return
 
-        snapshot = EventBus.default().delivery_snapshot()
+        snapshot = EnvelopeBus.default().delivery_snapshot()
         if category is not None:
             snapshot = {category: snapshot[category]} if category in snapshot else {}
 

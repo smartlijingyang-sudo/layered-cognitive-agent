@@ -16,7 +16,7 @@ LCA 是基于 vendored Cordis 的 Python 插件化认知 Agent 框架。
 | SSOT 矩阵 | [ADR-0195 §4](docs/adr/0195-platform-architecture-convergence.md) · [platform-directory-architecture.md](docs/specs/platform-directory-architecture.md) |
 | 调试 runbook | [docs/debug/README.md](docs/debug/README.md) |
 
-**迁移态 disclaimer:** Journal / EventSpine / Session 的 SSOT 关系正在迁移中(ADR-0186 Proposed)。in-process 真值走 `Session.append`;durable SSOT 为 `<run_id>.spine.jsonl`;fold 纯函数派生 projection。兼容入口和删除条件跟踪于 ADR-0186 §5。
+**迁移态 disclaimer:** Journal / EventSpine / Session SSOT 收敛见 ADR-0186 / ADR-0191。插件物理重组(phase/control → `plugins/loop/`, gates/brain/body → `plugins/cognitive/`, assistant → `plugins/domain/`)进行中(ADR-0194/0195); bundle `$module` 已切新 seam,legacy 目录保留 COMPAT shim。`LCA_FACT_GATEWAY` 回退开关保留至 spine reflector 全量退役(P5-01)。delete-when 见 [0194-0195-implementation-plan.md](docs/specs/0194-0195-implementation-plan.md)。
 
 ## 1. 接任务前 7 问(必答,不答不写)
 

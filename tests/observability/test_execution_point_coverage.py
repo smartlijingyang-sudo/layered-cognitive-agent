@@ -32,9 +32,6 @@ from lca.contracts.protocols import LLMAdapter
 from lca.infrastructure.session.cognitive_emit import (
     run_reasoner_generate_thoughts_with_spine_facts,
 )
-from lca.plugins.events.publishers.spine_reflector_cognition import (  # noqa: F401  # ADR-0181 PR-2: 旧 reflector 退役
-    ReflectorClass,
-)
 from lca_kernel.events.bus import EventBus
 from lca_kernel.events.test_catalog import build_test_bus
 

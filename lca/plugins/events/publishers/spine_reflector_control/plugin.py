@@ -32,7 +32,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.plugins.events.publishers._session_publish import publish_via_session
+from lca.loop.spine_ep_emit import publish_spine_ep
 
 log = logging.getLogger(__name__)
 
@@ -48,13 +48,8 @@ def _send(
     channel: str,
     payload: dict[str, Any],
 ) -> EventRef:
-    sp = SpineEventPayload(
-        category=Category(category),
-        execution_point=execution_point,
-        channel=channel,
-        payload=payload,
-    )
-    return publish_via_session(sp, producer=ReflectorClass)
+    del category
+    return publish_spine_ep(execution_point, payload, channel=channel, actor="control")  # type: ignore[return-value]
 
 
 # ── dispatch / invoke / signal ────────────────────────────────────────

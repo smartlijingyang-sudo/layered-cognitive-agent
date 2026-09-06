@@ -1,18 +1,17 @@
-"""execute subpackage of lca.plugins.transport.webserver.handlers.runs — split per ADR-0105 §11.2.
+# COMPAT(owner: ADR-0195 P3-02, from: handlers/runs/execute,
+#         to: carrier/runs/execute,
+#         delete_when: rg handlers/runs/execute 生产 import = 0,
+#         forbidden_new_usage: 新 carrier 代码不得 import 本路径)
+"""Shim — re-exports ``carrier/runs/execute``."""
 
-Re-exports the carrier surface from the facade module so handlers can keep
-their existing import paths. The legacy ``_record_terminal_materialization``
-shim is gone in ADR-0122 — the real implementation lives in
-``lca.plugins.transport.webserver.handlers.runs.terminal.materialization``.
-"""
-
-from lca.plugins.transport.webserver.handlers.runs.execute.execute import (
+from lca.plugins.transport.webserver.carrier.runs.execute import *  # noqa: F403
+from lca.plugins.transport.webserver.carrier.runs.execute import (
+    RunLifecycleCoordinator,
     create_run_session,
     execute_run,
     resume_run,
     schedule_run,
 )
-from lca.plugins.transport.webserver.handlers.runs.lifecycle import RunLifecycleCoordinator
 
 __all__ = [
     "RunLifecycleCoordinator",

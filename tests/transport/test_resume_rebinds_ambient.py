@@ -20,7 +20,8 @@ from unittest.mock import MagicMock
 from lca.plugins.transport.webserver.handlers.runs.terminal import registry_commands  # noqa: F401
 from lca.infrastructure.observability.facade.run_ambit import RunAmbit, current_file_store
 from lca.plugins.transport.webserver.handlers.runs.lifecycle.lifecycle import RunLifecycleCoordinator
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession, RunStatus
+from lca.contracts.observability.status import RunLifecycleStatus
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
 # isort: on
 
 
@@ -34,7 +35,7 @@ def _waiting_session() -> RunSession:
         user_text="q",
         mode="solo",
     )
-    session.status = RunStatus.WAITING_INPUT
+    session.status = RunLifecycleStatus.WAITING_INPUT
     session.snapshot = object()
     return session
 

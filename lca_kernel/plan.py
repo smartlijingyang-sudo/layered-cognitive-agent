@@ -14,7 +14,7 @@ from lca.harness.profile.capability_plan_resolver import (
     CapabilityPlanResolveError,
     project_capability_plan,
 )
-from lca.harness.profile.plan_compiler import (
+from lca.harness.composition.plan_compiler import (
     CompileOptions,
     PlanCompilerError,
     compile_plan,

@@ -22,8 +22,8 @@ HTTP/CLI → CognitiveAgent → CognitiveRuntime → DeclarativeRuntimeDriver
 | 顺序 | 文件 | 看什么 |
 |---|---|---|
 | 1 | `bundles/declarative-phase-graph.yaml` | 节点、边、控制 plugin 列表 |
-| 2 | `lca/harness/declarative/execute/interpreter.py` | 图遍历与 loop 回边 |
-| 3 | `lca/harness/declarative/lifecycle/phase_transaction.py` | 一次 visit 的生命周期 |
+| 2 | `lca/harness/graph/execute/interpreter.py` | 图遍历与 loop 回边 |
+| 3 | `lca/loop/transaction.py` | 一次 visit 的生命周期 |
 | 4 | `lca/plugins/phase_graph/*.py` | 各 phase 如何调认知原语（迁移目标：`plugins/phase/*`） |
 | 5 | `lca/runtime/runtime_loop.py` | Run 入口与 lifecycle |
 | 6 | `lca/infrastructure/session/cognitive_emit.py` | Gate/perceive catalog 事实（迁移目标：`lca/loop/fact_gateway.py`） |

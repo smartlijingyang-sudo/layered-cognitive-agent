@@ -7,9 +7,8 @@ from dataclasses import dataclass
 import pytest
 
 from lca.contracts.harness.tasks.session import SessionEvent
-from lca.plugins.session.runtime.recovery import SessionRecoveryError
-from lca.plugins.session.runtime.transport_recovery import assert_resume_allowed
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunStatus
+from lca.session.recovery import SessionRecoveryError, assert_resume_allowed
+from lca.contracts.observability.status import RunLifecycleStatus
 
 
 def _event(seq: int, event_type: str, data: dict) -> SessionEvent:
@@ -26,11 +25,11 @@ def _event(seq: int, event_type: str, data: dict) -> SessionEvent:
 
 @dataclass
 class _RunStub:
-    status: RunStatus
+    status: RunLifecycleStatus
 
 
 def test_assert_resume_allowed_syncs_status() -> None:
-    session = _RunStub(status=RunStatus.WAITING_INPUT)
+    session = _RunStub(status=RunLifecycleStatus.WAITING_INPUT)
     events = [
         _event(
             0,
@@ -55,11 +54,11 @@ def test_assert_resume_allowed_syncs_status() -> None:
         _event(1, "session.checkpoint.v1", {"status": "waiting_input"}),
     ]
     assert_resume_allowed(session, events)
-    assert session.status is RunStatus.WAITING_INPUT
+    assert session.status is RunLifecycleStatus.WAITING_INPUT
 
 
 def test_assert_resume_allowed_rejects_idle_recovery() -> None:
-    session = _RunStub(status=RunStatus.WAITING_INPUT)
+    session = _RunStub(status=RunLifecycleStatus.WAITING_INPUT)
     events = [_event(0, "turn.ended.v1", {"turn": 1, "reason": "completed"})]
     with pytest.raises(SessionRecoveryError):
         assert_resume_allowed(session, events)

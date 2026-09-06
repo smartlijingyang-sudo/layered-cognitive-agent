@@ -6,7 +6,7 @@ import ast
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-TRANSACTION = REPO / "lca" / "harness" / "declarative" / "lifecycle" / "phase_transaction.py"
+TRANSACTION = REPO / "lca" / "loop" / "transaction.py"
 
 
 def _imported_modules(path: Path) -> set[str]:

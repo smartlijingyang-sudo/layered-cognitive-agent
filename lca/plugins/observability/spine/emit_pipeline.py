@@ -52,9 +52,10 @@ from lca.infrastructure.observability.spine.event_record import (
     Phase,
 )
 from lca.infrastructure.observability.spine.event_spine import EventSpine
-from lca.plugins.observability.spine.spine_enrich import (
+from lca.infrastructure.observability.spine.spine_enrich import (
     I17Violation,
     enrich_spine_payload,
+    set_active_field_producers,
     set_active_spine_enricher,
 )
 
@@ -246,6 +247,7 @@ async def setup(ctx: PluginContext, config: Any) -> None:
             span_ctx=span_ctx,
         )
 
+    set_active_field_producers(producers)
     set_active_spine_enricher(_enricher)
 
     log.debug(

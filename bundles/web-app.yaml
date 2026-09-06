@@ -48,42 +48,42 @@ entries:
   # ── Gate group + DecisionGate contributions (ADR-0056) ──
   - id: gates
     name: gates
-    $module: lca.plugins.gates.service
+    $module: lca.plugins.cognitive.gate.service.plugin
     config: {}
 
   - id: gates.chain.sequential
     name: gates_chain_sequential
-    $module: lca.plugins.gates.chained
+    $module: lca.plugins.cognitive.gate.chained.plugin
     config: {}
 
   - id: gate.repeat-tool-call
     name: gate_repeat_tool_call
-    $module: lca.plugins.gates.repeat_tool_call
+    $module: lca.plugins.cognitive.gate.repeat_tool_call.plugin
     config: {}
 
   - id: gate.tool-loop-breaker
     name: gate_tool_loop_breaker
-    $module: lca.plugins.gates.tool_loop_breaker
+    $module: lca.plugins.cognitive.gate.tool_loop_breaker.plugin
     config: {}
 
   - id: gate.progress-loop-detector
     name: gate_progress_loop_detector
-    $module: lca.plugins.gates.progress_loop_detector
+    $module: lca.plugins.cognitive.gate.progress_loop_detector.plugin
     config: {}
 
   - id: gate.terminal-respond
     name: gate_terminal_respond
-    $module: lca.plugins.gates.terminal_respond
+    $module: lca.plugins.cognitive.gate.terminal_respond.plugin
     config: {}
 
   - id: gate.artifact-respond-injector
     name: gate_artifact_respond_injector
-    $module: lca.plugins.gates.artifact_respond_injector
+    $module: lca.plugins.cognitive.gate.artifact_respond_injector.plugin
     config: {}
 
   - id: gate.must-consult-all
     name: gate_must_consult_all
-    $module: lca.plugins.gates.must_consult_all
+    $module: lca.plugins.cognitive.gate.must_consult_all.plugin
     config: {}
 
 
@@ -112,12 +112,12 @@ entries:
   # ── Act / world plane ──
   - id: body.simple
     name: body_simple
-    $module: lca.plugins.body.simple
+    $module: lca.plugins.cognitive.body.simple
     config: {}
 
   - id: safe_executor.simple
     name: safe_executor_simple
-    $module: lca.plugins.body.safe_executor
+    $module: lca.plugins.cognitive.body.safe_executor
     config: {}
 
   # ── State-cluster stop policy ──
@@ -182,7 +182,7 @@ entries:
   # ── Brain strategy (requires gates + critic + reasoner) ──
   - id: lca-brain-simple
     name: lca_brain_simple
-    $module: lca.plugins.brain.simple
+    $module: lca.plugins.cognitive.brain.simple
     config: {}
 
   # ── Journal store (named factory; spawn instantiates per-run) ──
@@ -197,7 +197,7 @@ entries:
   # ``execution_target``.
   - id: lca-run-loop-driver-registry
     name: lca_run_loop_driver_registry
-    $module: lca.plugins.loop_drivers.registry
+    $module: lca.plugins.loop.driver.plugin
     config:
       default: cognitive
 

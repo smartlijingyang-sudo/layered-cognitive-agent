@@ -14,10 +14,8 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _COGNITION = _REPO_ROOT / "lca" / "cognition"
 _PHASE_GRAPH = _REPO_ROOT / "lca" / "plugins" / "phase_graph"
-_PHASE_EMITTER = (
-    _REPO_ROOT / "lca" / "harness" / "declarative" / "lifecycle" / "phase_fact_emitter.py"
-)
-_TRANSACTION = _REPO_ROOT / "lca" / "harness" / "declarative" / "lifecycle" / "phase_transaction.py"
+_PHASE_EMITTER = _REPO_ROOT / "lca" / "loop" / "phase_fact_emitter.py"
+_TRANSACTION = _REPO_ROOT / "lca" / "loop" / "transaction.py"
 
 
 def _have_ripgrep() -> bool:

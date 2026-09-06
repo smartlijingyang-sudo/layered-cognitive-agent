@@ -12,6 +12,7 @@ import contextlib
 
 import structlog
 
+from lca.contracts.observability.status import RunLifecycleStatus
 from lca.contracts.protocols.runtime.infra import MachineResolver
 from lca.plugins.transport.webserver.handlers.runs.execute.execute import (
     create_run_session,
@@ -20,7 +21,7 @@ from lca.plugins.transport.webserver.handlers.runs.execute.execute import (
 from lca.plugins.transport.webserver.handlers.runs.execute.scheduling import (
     schedule_run,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunStatus
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry
 from lca.plugins.transport.webserver.handlers.runs.terminal.port import (
     RunCommandReceipt,
     RunReceipt,
@@ -100,12 +101,12 @@ class RegistryRunCommands:
         if session is None:
             _log.warning("run_cancel_rejected", run_id=run_id, reason="run_not_found")
             return RunCommandReceipt(accepted=False, error="run not found")
-        if session.status in (RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELED):
+        if session.status in (RunLifecycleStatus.COMPLETED, RunLifecycleStatus.FAILED, RunLifecycleStatus.CANCELED):
             _log.info("run_cancel_noop", run_id=run_id, status=session.status.value)
             return RunCommandReceipt(accepted=True, status=session.status.value)
         prior_status = session.status
         session.cancel_requested = True
-        session.status = RunStatus.CANCELED
+        session.status = RunLifecycleStatus.CANCELED
         if session.task is not None and not session.task.done():
             session.task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -127,9 +128,9 @@ class RegistryRunCommands:
             "run_canceled",
             run_id=run_id,
             prior_status=prior_status.value,
-            canceled_at_waiting_input=prior_status is RunStatus.WAITING_INPUT,
+            canceled_at_waiting_input=prior_status is RunLifecycleStatus.WAITING_INPUT,
         )
-        return RunCommandReceipt(accepted=True, status=RunStatus.CANCELED.value)
+        return RunCommandReceipt(accepted=True, status=RunLifecycleStatus.CANCELED.value)
 
     async def resume_approval(
         self,
@@ -169,7 +170,7 @@ class RegistryRunCommands:
                 idempotency_key=idempotency_key,
             )
             return RunCommandReceipt(accepted=True, status="resumed")
-        if session.status is not RunStatus.WAITING_INPUT:
+        if session.status is not RunLifecycleStatus.WAITING_INPUT:
             _log.warning(
                 "run_resume_rejected",
                 run_id=run_id,
@@ -183,36 +184,33 @@ class RegistryRunCommands:
                 error="run not waiting for input",
                 error_status=409,
             )
-        bound = session.event_session
-        if bound is not None:
-            inner = getattr(bound, "inner", None) or getattr(bound, "session", None)
-            snapshot = getattr(inner, "snapshot_events", None)
-            if callable(snapshot):
-                from lca.plugins.session.runtime.transport_recovery import (
-                    assert_resume_allowed,
-                )
+        from lca.plugins.session.runtime.recovery import SessionRecoveryError
+        from lca.plugins.transport.webserver.carrier.runs.resume import (
+            resume_cache_ready,
+            validate_durable_resume,
+        )
 
-                try:
-                    assert_resume_allowed(session, snapshot())
-                except Exception as exc:
-                    _log.warning(
-                        "run_resume_rejected",
-                        run_id=run_id,
-                        reason="session_recovery_mismatch",
-                        error=str(exc),
-                        idempotency_key=idempotency_key,
-                    )
-                    _emit_command_rejected(
-                        session,
-                        command_type="resume_approval",
-                        reason="session_recovery_mismatch",
-                    )
-                    return RunCommandReceipt(
-                        accepted=False,
-                        error="session recovery facts disagree with resume",
-                        error_status=409,
-                    )
-        if session.snapshot is None or session.runnable is None:
+        try:
+            validate_durable_resume(session)
+        except SessionRecoveryError as exc:
+            _log.warning(
+                "run_resume_rejected",
+                run_id=run_id,
+                reason="session_recovery_mismatch",
+                error=str(exc),
+                idempotency_key=idempotency_key,
+            )
+            _emit_command_rejected(
+                session,
+                command_type="resume_approval",
+                reason="session_recovery_mismatch",
+            )
+            return RunCommandReceipt(
+                accepted=False,
+                error="session recovery facts disagree with resume",
+                error_status=409,
+            )
+        if not resume_cache_ready(session):
             _log.warning(
                 "run_resume_rejected",
                 run_id=run_id,
@@ -229,7 +227,7 @@ class RegistryRunCommands:
         if session.approval_request is not None:
             raw_pending = session.approval_request.get("approval_id")
             pending_approval_id = str(raw_pending) if raw_pending else ""
-        session.status = RunStatus.RUNNING
+        session.status = RunLifecycleStatus.RUNNING
         if idempotency_key:
             session.accepted_answer_keys.add(idempotency_key)
         # The frontend still posts the tool name as approval_id; the pending
@@ -253,7 +251,7 @@ class RegistryRunCommands:
             from lca.plugins.events.publishers._session_publish import (
                 set_publish_session,
             )
-            from lca.plugins.session.runtime.transport_recovery import (
+            from lca.session.recovery import (
                 append_approval_resolved_if_pending,
             )
 

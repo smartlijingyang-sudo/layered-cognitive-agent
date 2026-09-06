@@ -56,7 +56,7 @@ if TYPE_CHECKING:
     from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
         CurrentReasonerPrompt,
     )
-    from lca_kernel.events.bus import EventBus, EventRef
+    from lca_kernel.events.bus import EnvelopeBus, EventRef
 
 _log = logging.getLogger(__name__)
 
@@ -156,7 +156,7 @@ class ModelVisibleHook:
     def __init__(
         self,
         *,
-        bus: EventBus[Any],
+        bus: EnvelopeBus[Any],
         cursor_provider: Callable[[], LoopCursor | None],
         prompt_ctx_getter: Callable[[], CurrentReasonerPrompt | None],
     ) -> None:

@@ -17,6 +17,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final, Literal
 
+from lca.contracts.observability.loop_cursor import PhaseName
+
 MetaEventDomain = Literal[
     "session",  # turn/step/model/thinking lifecycle
     "cognition",  # prompt assemble, reasoner, skill_router
@@ -71,9 +73,12 @@ LLM_SPINE_EPS: Final[tuple[str, ...]] = (
     "brain.think.end",
     "brain.perceive.start",
     "brain.perceive.end",
-    "brain.gate.start",
-    "brain.gate.end",
     "step.thinking.record",
+)
+
+# ADR-0194 §1.3: cursor fold EP 与 PhaseName 六步闭集对齐;不含 gate phase。
+PHASE_FOLD_SPINE_EPS: Final[tuple[str, ...]] = tuple(
+    f"phase.{phase}.fold" for phase in PhaseName.__args__
 )
 
 COGNITION_SPINE_EPS: Final[tuple[str, ...]] = (
@@ -82,12 +87,16 @@ COGNITION_SPINE_EPS: Final[tuple[str, ...]] = (
     "reasoner.reason.start",
     "reasoner.reason.end",
     "skill_router.route",
+    # Gate 是 Think 子链观测 span,非 loop-cursor phase(ADR-0194 G3)。
+    "think.gate.start",
+    "think.gate.end",
 )
 
 COGNITION_SESSION_EVENTS: Final[tuple[str, ...]] = (
     "prompt.section.published.v1",
     "context.injected.v1",
     "skill.routed.v1",
+    "gate.decided.v1",
 )
 
 # ── Skill / Tool / Sandbox ──────────────────────────────────────────────────
@@ -145,7 +154,7 @@ ASSISTANT_SESSION_EVENTS: Final[tuple[str, ...]] = (
 DEBUG_RUN_META_FAMILIES: Final[tuple[tuple[str, tuple[str, ...]], ...]] = (
     ("session", ("turn.", "step.started", "step.ended", "message.accepted", "session.created")),
     ("llm", ("llm.", "model.", "thinking.", "brain.think", "step.thinking")),
-    ("prompt", ("prompt_assembler", "prompt.section", "reasoner.reason", "skill_router")),
+    ("prompt", ("prompt_assembler", "prompt.section", "reasoner.reason", "skill_router", "think.gate", "gate.decided")),
     ("tool", ("body.tool.", "phase.tool.", "step.tool_", "tool.schema")),
     ("sandbox", ("body.sandbox.",)),
     ("skill", ("skill.", "assistant.skill.", "skill.package")),
@@ -257,6 +266,7 @@ __all__ = [
     "DEBUG_RUN_META_FAMILIES",
     "LLM_SPINE_EPS",
     "META_EVENT_PRODUCER_SEAMS",
+    "PHASE_FOLD_SPINE_EPS",
     "SANDBOX_SPINE_EPS",
     "SESSION_LIFECYCLE_EVENTS",
     "SKILL_SESSION_EVENTS",

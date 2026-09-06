@@ -6,7 +6,7 @@ entries:
   # Brain (Tier-3)
   - id: lca-brain-modular
     name: lca_brain_modular
-    $module: lca.plugins.brain.modular
+    $module: lca.plugins.cognitive.brain.modular
     config: {}
 
   # Memory (Tier-1)
@@ -34,12 +34,12 @@ entries:
 
   - id: gates
     name: gates
-    $module: lca.plugins.gates.service
+    $module: lca.plugins.cognitive.gate.service.plugin
     config: {}
 
   - id: gates.chain.sequential
     name: gates_chain_sequential
-    $module: lca.plugins.gates.chained
+    $module: lca.plugins.cognitive.gate.chained.plugin
     config: {}
 
   # Sensors (Tier-3)
@@ -66,15 +66,15 @@ entries:
   # Decision gates (Tier-3)
   - id: lca-gate-repeat-tool-call
     name: lca_gate_repeat_tool_call
-    $module: lca.plugins.gates.repeat_tool_call
+    $module: lca.plugins.cognitive.gate.repeat_tool_call.plugin
     config: {}
 
   - id: lca-gate-loop-breaker
     name: lca_gate_loop_breaker
-    $module: lca.plugins.gates.tool_loop_breaker
+    $module: lca.plugins.cognitive.gate.tool_loop_breaker.plugin
     config: {}
 
   - id: lca-gate-progress-detector
     name: lca_gate_progress_detector
-    $module: lca.plugins.gates.progress_loop_detector
+    $module: lca.plugins.cognitive.gate.progress_loop_detector.plugin
     config: {}

@@ -17,9 +17,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import pytest
+
 from lca.contracts.models.observability.journal_step import (
-    ReflectTrace,
-    SpanRecord,
     ThinkingTrace,
 )
 from lca.contracts.models.observability.journal_step import (
@@ -29,7 +29,7 @@ from lca.contracts.models.observability.journal_step import (
     ToolResult as LegacyToolResult,
 )
 from lca.contracts.observability.incarnation import Incarnation
-from lca.contracts.observability.loop_cursor import CursorSnapshot
+from lca.contracts.observability.loop_cursor import CursorError, CursorSnapshot
 from lca.infrastructure.observability.loop_cursor import StdLoopCursor
 from lca.infrastructure.observability.loop_cursor._spine_port import WritePort
 from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
@@ -169,7 +169,7 @@ def test_adapter_begin_step_triggers_cursor_advance() -> None:
 
 
 def test_adapter_record_thinking_emits_cursor_thinking_ep() -> None:
-    """``adapter.record_thinking(trace)`` → cursor.record_thinking 派生 EP + 旧 coord.record_thinking。"""
+    """``adapter.record_thinking(trace)`` → cursor.record_thinking 派生 EP。"""
     adapter, spine, _ = _build_adapter()
     # 先开 think window
     adapter.begin_step("think")
@@ -258,32 +258,12 @@ def test_adapter_record_tool_result_emits_cursor_tool_result_ep() -> None:
 
 
 def test_adapter_emit_phase_is_removed() -> None:
-    """ADR-0183 PR-9:``CoordinatorAdapter`` 不再定义 ``emit_phase``。
-
-    phase.<x>.fold EP 由 ``cursor.advance`` 唯一派生;adapter 自己的
-    ``emit_phase`` 兼容壳已删(残留调用经 ``__getattr__`` 透传到
-    ``StepCoordinator.emit_phase``,被 SSOT 守护拦下抛
-    NotImplementedError,行为与删除前一致)。
-    """
+    """ADR-0183 PR-9 / ADR-0194 P2-09: coordinator stub API deleted."""
     adapter, _, _ = _build_adapter()
 
-    assert "emit_phase" not in vars(CoordinatorAdapter), (
-        "CoordinatorAdapter.emit_phase must be removed (ADR-0183 PR-9)"
-    )
+    assert "emit_phase" not in vars(CoordinatorAdapter)
+    assert not hasattr(adapter.coord, "emit_phase")
 
-    raised = False
-    try:
-        adapter.emit_phase(
-            phase="perceive",
-            objective="collect context",
-            summary="perceived 3 items",
-            outcome="ok",
-        )
-    except NotImplementedError:
-        raised = True
-    assert raised, "adapter.emit_phase passthrough must hit coord SSOT guard"
-
-    # cursor.advance 仍然派生 phase.<x>.fold EP,SSOT 唯一 writer。
     adapter.cursor.advance(
         "perceive",
         objective_kind="system_role",
@@ -291,6 +271,22 @@ def test_adapter_emit_phase_is_removed() -> None:
         summary="perceived 3 items",
     )
     assert adapter.cursor.snapshot.phase == "perceive"
+
+
+def test_adapter_legacy_emit_apis_removed_from_coordinator() -> None:
+    """ADR-0194 P2-09: StepCoordinator record_*/emit stub 已删除。"""
+    adapter, _, _ = _build_adapter()
+    coord = adapter.coord
+    for name in (
+        "emit",
+        "emit_phase",
+        "record_thinking",
+        "record_tool_call",
+        "record_tool_result",
+        "record_reflect",
+        "record_span",
+    ):
+        assert not hasattr(coord, name), f"StepCoordinator must not expose {name}"
 
 
 def test_adapter_close_triggers_cursor_close_ep() -> None:
@@ -305,57 +301,6 @@ def test_adapter_close_triggers_cursor_close_ep() -> None:
         r for r in spine.records if r["execution_point"] == "writable.iteration.closing"
     )
     assert closing_ep["payload"]["reason"] == "completed"
-
-
-def test_adapter_record_reflect_is_deprecated() -> None:
-    """SSOT 收口后 ``record_reflect`` raise(SSOT-Compat)—— reflect EP 由 cursor 派生。
-
-    删除条件:``rg "CoordinatorAdapter.record_reflect" lca/`` = 0 时本测试与对应方法整体删除。
-    """
-    adapter, _, _ = _build_adapter()
-    adapter.begin_step("think")
-
-    reflect = ReflectTrace(summary="ok", verdict="ok")
-    raised = False
-    try:
-        adapter.record_reflect(reflect)
-    except NotImplementedError:
-        raised = True
-    assert raised, "adapter.record_reflect must raise NotImplementedError"
-
-
-def test_adapter_record_span_is_deprecated() -> None:
-    """SSOT 收口后 ``record_span`` raise(SSOT-Compat)—— span EP 由 cursor 派生。
-
-    删除条件:``rg "CoordinatorAdapter.record_span" lca/`` = 0 时本测试与对应方法整体删除。
-    """
-    adapter, _, _ = _build_adapter()
-    adapter.begin_step("think")
-
-    span = SpanRecord(kind="runtime_observed", started_at=0.0)
-    raised = False
-    try:
-        adapter.record_span(span)
-    except NotImplementedError:
-        raised = True
-    assert raised, "adapter.record_span must raise NotImplementedError"
-
-
-def test_adapter_emit_is_deprecated() -> None:
-    """SSOT 收口后 ``emit`` raise(SSOT-Compat)—— 任意 EP 不再由 Adapter 翻译。
-
-    删除条件:``rg "CoordinatorAdapter.emit(" lca/`` = 0 时本测试与对应方法整体删除。
-    """
-    adapter, _, _ = _build_adapter()
-    raised = False
-    try:
-        adapter.emit(
-            execution_point="writable.step.start",
-            payload={"phase": "think"},
-        )
-    except NotImplementedError:
-        raised = True
-    assert raised, "adapter.emit must raise NotImplementedError"
 
 
 def test_adapter_exposes_cursor_and_coord() -> None:
@@ -383,3 +328,11 @@ def test_adapter_context_manager_propagates_to_coord() -> None:
     adapter, _, _ = _build_adapter()
     with adapter as inner:
         assert inner is adapter
+
+
+def test_adapter_begin_step_rejects_gate_phase() -> None:
+    """ADR-0194 P2-03: gate is Think sub-chain, not a cursor phase."""
+    adapter, spine, _ = _build_adapter()
+    with pytest.raises(CursorError, match="invalid phase 'gate'"):
+        adapter.begin_step("gate")
+    assert spine.records == []

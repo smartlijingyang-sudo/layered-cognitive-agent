@@ -58,13 +58,5 @@ class TestIFwSsot2:
         """遗留名字与 RunLifecycleStatus 是同一对象(别名,非平行 enum)。"""
         from lca.contracts.observability.status import RunLifecycleStatus
         from lca.infrastructure.observability.journal.engine.reducer import RunStatus
-        from lca.plugins.transport.webserver.handlers.runs.session.session import (
-            RunStatus as SessionRunStatus,
-        )
-        from lca.plugins.transport.webserver.handlers.runs.terminal.status import (
-            JournalRunStatus,
-        )
 
         assert RunStatus is RunLifecycleStatus
-        assert SessionRunStatus is RunLifecycleStatus
-        assert JournalRunStatus is RunLifecycleStatus

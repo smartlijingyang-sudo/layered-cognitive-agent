@@ -21,7 +21,7 @@ from lca.contracts.models.observability.journal import StepTextDelta
 from lca.plugins.transport.webserver.handlers.runs.observability.artifact_closure import (
     emit_artifact_closure_if_needed,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunStatus
+from lca.contracts.observability.status import RunLifecycleStatus
 
 
 class _FakeStore:
@@ -68,7 +68,7 @@ class _FakeWorkspace:
         self.artifacts = _FakeArtifacts()
 
 
-def _make_session(*, status: RunStatus, error: str = "") -> Any:
+def _make_session(*, status: RunLifecycleStatus, error: str = "") -> Any:
     return SimpleNamespace(
         run_id="run_test",
         status=status,
@@ -86,7 +86,7 @@ def _run_emit(session: Any) -> list[Any]:
 
 def test_failed_run_does_not_emit_answer_channel() -> None:
     """决策 二:FAILED run 即使 workspace 有产物,也不向 channel=answer 推文本。"""
-    session = _make_session(status=RunStatus.FAILED)
+    session = _make_session(status=RunLifecycleStatus.FAILED)
     events = _run_emit(session)
     answer_events = [
         e
@@ -100,7 +100,7 @@ def test_failed_run_does_not_emit_answer_channel() -> None:
 
 def test_canceled_run_does_not_emit_answer_channel() -> None:
     """决策 二:CANCELED run 同上。"""
-    session = _make_session(status=RunStatus.CANCELED)
+    session = _make_session(status=RunLifecycleStatus.CANCELED)
     events = _run_emit(session)
     answer_events = [
         e
@@ -112,7 +112,7 @@ def test_canceled_run_does_not_emit_answer_channel() -> None:
 
 def test_running_run_with_session_error_does_not_emit_answer_channel() -> None:
     """决策 二:即使 status 还在 RUNNING,只要 session.error 非空就 suppress。"""
-    session = _make_session(status=RunStatus.RUNNING, error="something blew up")
+    session = _make_session(status=RunLifecycleStatus.RUNNING, error="something blew up")
     events = _run_emit(session)
     answer_events = [
         e
@@ -124,7 +124,7 @@ def test_running_run_with_session_error_does_not_emit_answer_channel() -> None:
 
 def test_completed_run_still_emits_answer_channel() -> None:
     """回归保护:COMPLETED run 仍正常向 channel=answer 推产物闭合文本。"""
-    session = _make_session(status=RunStatus.COMPLETED)
+    session = _make_session(status=RunLifecycleStatus.COMPLETED)
     events = _run_emit(session)
     answer_events = [
         e
@@ -139,6 +139,6 @@ def test_completed_run_still_emits_answer_channel() -> None:
 def test_status_value_lowercase_matches_run_status_enum(status_value: str) -> None:
     """回归保护:RunStatus enum 字面量是小写("failed" / "canceled"),实现已对齐。"""
     if status_value == "failed":
-        assert RunStatus.FAILED.value == "failed"
+        assert RunLifecycleStatus.FAILED.value == "failed"
     else:
-        assert RunStatus.CANCELED.value == "canceled"
+        assert RunLifecycleStatus.CANCELED.value == "canceled"

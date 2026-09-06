@@ -32,7 +32,6 @@ from lca.harness.plugin_api import AuditedPluginContext, PluginDefinition
 from lca.harness.profile.boot_products import (
     ProfileBootProducts,
     attach_profile_boot_products,
-    compile_profile_boot_products,
 )
 from lca.harness.profile.boot_projection import BootEntry
 from lca.harness.profile.resolve import (
@@ -70,18 +69,10 @@ async def boot_resolved_profile(
     *,
     bootstrap_file_store: FileStore | None = None,
 ) -> Context:
-    """Preflight and boot one resolved plugin graph through the shared sequence.
+    """Preflight and boot one resolved plugin graph through the kernel boot seam."""
+    from lca_kernel.boot import run_resolved_kernel
 
-    The immutable Profile boot products are compiled before a ``Context`` or
-    Fiber lifecycle exists. A malformed runtime closure therefore fails closed
-    without invoking any plugin setup; after the preflight succeeds, the shared
-    lifecycle module is the only place that turns a manifest definition into a
-    Cordis Fiber, attaches the boot products, handles failed boot, and installs
-    observability. Keeping this interface small prevents the two supported
-    inputs from drifting into different audit semantics.
-    """
-    products = compile_profile_boot_products(resolved)
-    return await _boot_context(products, bootstrap_file_store=bootstrap_file_store)
+    return await run_resolved_kernel(resolved, bootstrap_file_store=bootstrap_file_store)
 
 
 async def boot_entries(
@@ -89,21 +80,10 @@ async def boot_entries(
     *,
     bootstrap_file_store: FileStore | None = None,
 ) -> Context:
-    """Boot programmatic declarations through the production Resolve semantics.
+    """Boot programmatic declarations through the production Resolve semantics."""
+    from lca_kernel.boot import boot_entries as kernel_boot_entries
 
-    This compatibility adapter only supplies in-memory input. Manifest identity,
-    configuration validation, provider ownership, layer ordering, and DAG
-    construction are all resolved before the shared Fiber lifecycle executes, so
-    a test fixture cannot develop a second plugin-loading dialect. The resolved
-    graph is attached through the same boot-products seam used by production
-    boot; runtime closure remains the responsibility of explicit capability-read
-    fixtures and is not compiled here.
-    """
-    resolved = resolve_entries(entries)
-    return await _boot_context(
-        ProfileBootProducts(resolved_profile=resolved),
-        bootstrap_file_store=bootstrap_file_store,
-    )
+    return await kernel_boot_entries(entries, bootstrap_file_store=bootstrap_file_store)
 
 
 def _install_observability(ctx: Context) -> None:

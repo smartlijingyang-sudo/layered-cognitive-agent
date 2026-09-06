@@ -58,6 +58,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+import structlog
 from cordis import Context
 
 from lca.contracts.models.observability.journal import (
@@ -69,10 +70,10 @@ from lca.harness.plugin_api import PluginDefinition
 
 # boot_products is the seam's source-of-truth (compat-only in PR-2 sense);
 # the kernel still imports the data classes from the legacy module path.
+from lca.harness.composition.boot_compile import compile_profile_boot_products
 from lca.harness.profile.boot_products import (
     ProfileBootProducts,
     attach_profile_boot_products,
-    compile_profile_boot_products,
     compiled_plan_from_scope,
     profile_boot_products_from_scope,
     resolved_profile_from_scope,
@@ -83,6 +84,8 @@ from lca.infrastructure.file_store import FileStore
 from lca_kernel.errors import KernelError, StageError
 from lca_kernel.observability import install_observability
 from lca_kernel.stages import Stage
+
+_log = structlog.get_logger(__name__)
 
 
 def spawn_fiber(ctx: Context, definition: PluginDefinition, config: Any) -> Any:
@@ -126,23 +129,13 @@ async def run_kernel(
     *,
     bootstrap_file_store: FileStore | None = None,
 ) -> Context:
-    """K3 主入口: 从 profile path 启动 cordis Context.
+    """K3 主入口: 从 profile path 启动 cordis Context."""
+    from lca.harness.profile.resolve import resolve_profile
 
-    Delegates to :func:`lca.harness.profile.boot.boot_profile`, which is
-    the production boot implementation. The kernel is the single seam
-    that compiles a profile into a running Context; it does NOT maintain
-    a parallel boot implementation (the local ``_boot_context`` helper
-    exists only to satisfy unit tests of :func:`_emit_boot_events`).
-
-    完整 K 链路地图见模块 docstring 的"K3 在启动全景中的位置"段。
-    """
-    from lca.harness.profile.boot import (
-        boot_profile,  # ↓ K3:跳到生产 boot 实现(同模块 _boot_context 主循环)
+    return await run_resolved_kernel(
+        resolve_profile(profile_path),
+        bootstrap_file_store=bootstrap_file_store,
     )
-
-    return await boot_profile(
-        profile_path, bootstrap_file_store=bootstrap_file_store
-    )  # ↑ K3:返回 booted cordis.Context
 
 
 async def run_resolved_kernel(
@@ -150,14 +143,9 @@ async def run_resolved_kernel(
     *,
     bootstrap_file_store: FileStore | None = None,
 ) -> Context:
-    """K3 入口(已知 ``ResolvedProfile``):Boot an already-resolved profile.
-
-    与 :func:`run_kernel` 的差别是省去 K1 阶段(直接拿 ``ResolvedProfile``);
-    K2 计划编译会由 ``compile_profile_boot_products`` 内部完成。
-    """
-    from lca.harness.profile.boot import boot_resolved_profile
-
-    return await boot_resolved_profile(resolved, bootstrap_file_store=bootstrap_file_store)
+    """K3 入口(已知 ``ResolvedProfile``):Boot an already-resolved profile."""
+    products = compile_profile_boot_products(resolved)
+    return await _boot_context(products, bootstrap_file_store=bootstrap_file_store)
 
 
 async def stop_kernel(ctx: Context) -> None:
@@ -201,6 +189,58 @@ async def boot_entries(
 
 
 # ── Internals ─────────────────────────────────────────────────────────
+
+
+def _collect_marker_catalog(
+    resolved: ResolvedProfile,
+) -> tuple[dict[str, type], dict[str, tuple[str, ...]]]:
+    catalog: dict[str, type] = {}
+    emits: dict[str, tuple[str, ...]] = {}
+    for plugin in resolved.plugins:
+        marker = plugin.definition.marker_class
+        if marker is None:
+            continue
+        catalog[plugin.id] = marker
+        ownership = plugin.definition.ownership
+        if ownership is not None and ownership.emits:
+            emits[plugin.id] = tuple(ownership.emits)
+    return catalog, emits
+
+
+def _register_event_pipeline(resolved: ResolvedProfile) -> None:
+    from lca.harness.profile.pipeline_loader import (
+        load_pipeline_for_profile,
+        register_pipeline_once,
+    )
+    from lca_kernel.events.bus import EventBus
+
+    bus = EventBus.default()
+    catalog, emits_by_id = _collect_marker_catalog(resolved)
+    if catalog:
+        for plugin_id, marker in catalog.items():
+            bus.registry.register_marker(plugin_id, marker)
+        bus.registry.refresh()
+        try:
+            bus.registry.validate_publisher_authorization()
+        except Exception:
+            _log.exception("event_bus_publisher_authorization_drift")
+            raise
+        for plugin_id, emits in emits_by_id.items():
+            try:
+                bus.registry.check_manifest_emits_aligned(plugin_id, emits)
+            except Exception:
+                _log.exception(
+                    "event_bus_manifest_emits_aligned_failed",
+                    plugin_id=plugin_id,
+                )
+                raise
+        _log.info("event registry catalog populated", entries=len(catalog))
+
+    pipeline = load_pipeline_for_profile(resolved, catalog=catalog)
+    if pipeline is None:
+        return
+    if register_pipeline_once(bus, pipeline):
+        _log.info("event pipeline registered", pipeline=pipeline.name, version=pipeline.version)
 
 
 async def _boot_context(
@@ -283,6 +323,7 @@ async def _boot_context(
         attach_profile_boot_products(ctx, products)  # ↑ K2:K2 编译产物挂到 ctx,transport / 诊断可读
         # Step 3: re-install observability with populated registries.
         install_observability(ctx)  # ↓ K5:第 2 次,plugin 已灌好 backend,BoundObservability 真正可写
+        _register_event_pipeline(resolved)
         # Step 4: flush buffered events + emit final boot events.
         _emit_boot_events(  # ↓ K3:flush 3 个 boot 事件到 journal
             ctx,

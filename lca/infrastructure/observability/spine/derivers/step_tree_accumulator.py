@@ -1,8 +1,9 @@
-# RETAINED(test/CLI/capability; tracking: ADR-0186 PR-3g / I-SESSION-5)
-# Production step_tree uses StepTreeFoldDeriver (RunSessionBuilder fold-only;
-# I-SESSION-5). This in-memory on_event accumulator is not on the
-# EventSpine.subscribe production builder path; kept for unit tests,
-# CLI replay, and capability provide.
+# RETAINED(test/CLI/capability; tracking: ADR-0186 PR-3g / I-SESSION-5 / ADR-0195 O7)
+# Production step_tree fold: ``observability.deriver.step_tree`` plugin →
+# :class:`StepTreeFoldDeriver` (RunSessionBuilder fold-only; I-SESSION-5).
+# This in-memory on_event accumulator is not on the EventSpine.subscribe
+# production builder path; kept for unit tests, CLI replay, and capability
+# provide. Fold facade re-export: ``spine.derivers.step_tree`` (P2-20 thin).
 
 """spine-deriver step_tree_accumulator —— in-memory callback 路径（ADR-0167 D11）。
 

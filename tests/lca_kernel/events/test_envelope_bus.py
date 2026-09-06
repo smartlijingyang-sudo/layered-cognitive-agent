@@ -93,12 +93,10 @@ class TestEventBusCompatShim:
     def test_event_bus_compat_shim_subscriber_count_after_subscribe(self) -> None:
         """EventBus.publish 在订阅后,EventRef.subscriber_count > 0(persisted=False)。"""
         bus = build_test_bus()
-        from lca.plugins.events.subscribers.console_projector.subscriber import (
-            ConsoleProjectorSubscriber,
-        )
+        from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink
 
         bus.subscribe(
-            plugin=ConsoleProjectorSubscriber,
+            plugin=SpineFileSink,
             category=Category.TEAM_DELEGATION_CACHE_HIT,
             on_event=lambda _p, _r: None,
         )

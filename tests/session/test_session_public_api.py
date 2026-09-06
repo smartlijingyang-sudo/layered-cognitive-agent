@@ -50,6 +50,20 @@ def test_bind_reexports_match_plugin_module() -> None:
     )
 
 
+def test_repair_reexport_matches_public_module() -> None:
+    import lca.plugins.session.runtime.repair as plugin_repair
+    import lca.session.repair as session_repair
+
+    assert session_repair.repair_interrupted_turn is plugin_repair.repair_interrupted_turn
+
+
+def test_recovery_reexport_matches_public_module() -> None:
+    import lca.plugins.session.runtime.recovery as plugin_recovery
+    import lca.session.recovery as session_recovery
+
+    assert session_recovery.recover_live_agent is plugin_recovery.recover_live_agent
+
+
 def test_session_append_roundtrip() -> None:
     session = Session("public-api-test")
     event = session.append("turn.started.v1", {"turn": 1})

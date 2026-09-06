@@ -2,32 +2,32 @@
 entries:
   - id: phase.perceive.standard
     name: phase_perceive_standard
-    $module: lca.plugins.phase_graph.perceive
+    $module: lca.plugins.loop.phase.perceive.standard.plugin
     config: {}
 
   - id: phase.think.standard
     name: phase_think_standard
-    $module: lca.plugins.phase_graph.think
+    $module: lca.plugins.loop.phase.think.standard.plugin
     config: {}
 
   - id: phase.act.standard
     name: phase_act_standard
-    $module: lca.plugins.phase_graph.act
+    $module: lca.plugins.loop.phase.act.standard.plugin
     config: {}
 
   - id: phase.reflect.standard
     name: phase_reflect_standard
-    $module: lca.plugins.phase_graph.reflect
+    $module: lca.plugins.loop.phase.reflect.standard.plugin
     config: {}
 
   - id: phase.remember.standard
     name: phase_remember_standard
-    $module: lca.plugins.phase_graph.remember
+    $module: lca.plugins.loop.phase.remember.standard.plugin
     config: {}
 
   - id: phase.stop.standard
     name: phase_stop_standard
-    $module: lca.plugins.phase_graph.stop
+    $module: lca.plugins.loop.phase.stop.standard.plugin
     config: {}
 
   # 节点身份、入口、终止标记和访问上限同样由 Profile/Bundle 声明；编译器
@@ -146,62 +146,62 @@ entries:
   # ADR-0074: 所有控制贡献均由独立插件提供，支持按槽替换（Phase 3b）。
   - id: control.perceive.context
     name: control_perceive_context
-    $module: lca.plugins.control_contributions.perceive_context
+    $module: lca.plugins.loop.control.perceive_context.plugin
     config: {}
 
   - id: control.think.guard
     name: control_think_guard
-    $module: lca.plugins.control_contributions.think_guard
+    $module: lca.plugins.loop.control.think_guard.plugin
     config: {}
 
   - id: control.act.authorize
     name: control_act_authorize
-    $module: lca.plugins.control_contributions.act_authorize
+    $module: lca.plugins.loop.control.act_authorize.plugin
     config: {}
 
   - id: control.act.budget
     name: control_act_budget
-    $module: lca.plugins.control_contributions.act_budget
+    $module: lca.plugins.loop.control.act_budget.plugin
     config: {}
 
   - id: control.act.constrain
     name: control_act_constrain
-    $module: lca.plugins.control_contributions.act_constrain
+    $module: lca.plugins.loop.control.act_constrain.plugin
     config: {}
 
   - id: control.act.execute
     name: control_act_execute
-    $module: lca.plugins.control_contributions.act_execute
+    $module: lca.plugins.loop.control.act_execute.plugin
     config: {}
 
   - id: control.act.safe-boundary
     name: control_act_safe_boundary
-    $module: lca.plugins.control_contributions.act_safe_boundary
+    $module: lca.plugins.loop.control.act_safe_boundary.plugin
     config: {}
 
   - id: control.remember.admit
     name: control_remember_admit
-    $module: lca.plugins.control_contributions.remember_admit
+    $module: lca.plugins.loop.control.remember_admit.plugin
     config: {}
 
   - id: control.stop.decide
     name: control_stop_decide
-    $module: lca.plugins.control_contributions.stop_decide
+    $module: lca.plugins.loop.control.stop_decide.plugin
     config: {}
 
   # 防止跨工具或无工具路径在同一失败意图上做浅层反复认知；只在 STOP 治理槽收口。
   - id: control.stop.focus
     name: control_stop_focus
-    $module: lca.plugins.control_contributions.stop_focus
+    $module: lca.plugins.loop.control.stop_focus.plugin
     config:
       max_consecutive_stagnant_turns: 3
 
   - id: control.observe.checkpoint
     name: control_observe_checkpoint
-    $module: lca.plugins.control_contributions.observe_checkpoint
+    $module: lca.plugins.loop.control.observe_checkpoint.plugin
     config: {}
 
   - id: control.observe.wildcard
     name: control_observe_wildcard
-    $module: lca.plugins.control_contributions.observe_wildcard
+    $module: lca.plugins.loop.control.observe_wildcard.plugin
     config: {}

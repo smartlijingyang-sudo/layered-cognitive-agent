@@ -35,7 +35,7 @@ class Reducer(Protocol):
         ...
 
     def apply_turn(self, state: AgentState, turn: Turn) -> AgentState:
-        """追加 ``Turn`` 到 ``state.history``。"""
+        """追加 ``Turn`` 到 ``state.control_turns``。"""
         ...
 
     def apply_skill_route(self, state: AgentState, active_template: str | None) -> AgentState:

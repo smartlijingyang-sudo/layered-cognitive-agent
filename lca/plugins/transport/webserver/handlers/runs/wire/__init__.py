@@ -1,8 +1,5 @@
-"""wire subpackage of lca.plugins.transport.webserver.handlers.runs — split per ADR-0105 §11.2.
-
-Re-exports WIRE for callers using ``from lca.plugins.transport.webserver.handlers.runs.wire import WIRE``.
+"""COMPAT(owner: ADR-0195 P3-11, from: handlers/runs/wire, to: webserver/wire,
+delete_when: rg 'handlers\\.runs\\.wire' lca/ tests/ = 0, forbidden_new_usage: yes)
 """
 
-from lca.plugins.transport.webserver.handlers.runs.wire.wire import WIRE
-
-__all__ = ["WIRE"]
+from lca.plugins.transport.webserver.wire import *  # noqa: F403

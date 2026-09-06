@@ -127,14 +127,14 @@ async def setup(ctx: PluginContext, config: _Config) -> None:
        composer ``instrument_llm(llm, ctx=...)`` 软查该键,把
        :class:`ModelVisibleHookAdapter` 挂到 LLM adapter 装饰器链最外层。
     """
-    from lca_kernel.events.bus import EventBus
+    from lca_kernel.events.bus import EnvelopeBus
 
     ctx.provide("event.bus.publisher.model_visible", ModelVisiblePublisher)
 
     # 实例化 hook 并 provide 给 composer 装配。publish 不经 bus:hook 内部
     # 走 publish_via_session → Session.append(ADR-0186);bus 仅为
-    # ModelVisibleHook 构造形参(鉴权 registry 仍由 EventBus 进程单例承载)。
-    bus: Any = EventBus.default()
+    # ModelVisibleHook 构造形参(鉴权 registry 仍由 EnvelopeBus 进程单例承载)。
+    bus: Any = EnvelopeBus.default()
     hook = _build_hook(bus=bus)
     ctx.provide("llm.adapter.hook.model_visible", hook)
 

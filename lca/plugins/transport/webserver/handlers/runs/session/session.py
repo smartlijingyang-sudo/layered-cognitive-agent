@@ -53,11 +53,6 @@ from lca.plugins.transport.webserver.handlers.runs.session.projection import sum
 
 _RUNS_ROOT = Path("traces")  # ADR-0065 §七: locator root, runs/ 是其子目录
 
-# COMPAT(delete-when: rg "\bRunStatus\." 生产引用归零、全部改走 RunLifecycleStatus,
-# tracking: ADR-0183 PR-11)
-RunStatus = RunLifecycleStatus
-
-
 @dataclass
 class RunSession:
     """Carrier-facing mutable state for one legacy run."""
@@ -77,10 +72,12 @@ class RunSession:
     prior_turns: tuple[ConversationTurn, ...] = field(default_factory=tuple)
     attachment_ids: tuple[str, ...] = field(default_factory=tuple)
     agent: AgentRef = field(default_factory=default_agent_ref)
-    status: RunStatus = RunStatus.PENDING
+    status: RunLifecycleStatus = RunLifecycleStatus.PENDING
     error: str = ""
     task: asyncio.Task[Any] | None = None
     cancel_requested: bool = False
+    # COMPAT(P3-06): snapshot/runnable are process-local resume cache, not SSOT.
+    # Authority: recover_live_agent + Session facts (carrier/runs/resume.py).
     snapshot: Any = None
     runnable: Any = None
     approval_request: dict[str, Any] | None = None
@@ -309,4 +306,4 @@ class RunRegistry:
         return self._health.live_totals()
 
 
-__all__ = ["RunRegistry", "RunSession", "RunStatus", "run_dedup_key"]
+__all__ = ["RunLifecycleStatus", "RunRegistry", "RunSession", "run_dedup_key"]

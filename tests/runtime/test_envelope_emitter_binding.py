@@ -12,6 +12,8 @@ both ends to prove:
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from lca.runtime.envelope_emitter import SpineEnvelopeEmitter
 
 
@@ -34,23 +36,26 @@ def test_spine_envelope_emitter_satisfies_protocol() -> None:
         assert callable(getattr(emitter, name)), f"{name} not callable"
 
 
-def test_spine_envelope_emitter_dispatches_to_runtime_reflector() -> None:
-    """Reducer apply emits flow through ``emit_runtime_reducer_apply_*``."""
+def test_spine_envelope_emitter_dispatches_to_runtime_emit() -> None:
+    """Reducer apply emits flow through ``runtime_emit`` FactGateway helpers."""
     calls: list[tuple[str, dict[str, str]]] = []
 
-    class _FakeRuntime:
-        def emit_runtime_reducer_apply_start(self, *, method: str) -> None:
-            calls.append(("start", {"method": method}))
+    def _start(*, method: str) -> None:
+        calls.append(("start", {"method": method}))
 
-        def emit_runtime_reducer_apply_end(self, *, method: str, outcome: str) -> None:
-            calls.append(("end", {"method": method, "outcome": outcome}))
+    def _end(*, method: str, outcome: str) -> None:
+        calls.append(("end", {"method": method, "outcome": outcome}))
 
-    fake = _FakeRuntime()
     emitter = SpineEnvelopeEmitter()
-    emitter._runtime = lambda: fake  # type: ignore[assignment]
-
-    emitter.emit_reducer_apply_start(method="apply_step_advanced")
-    emitter.emit_reducer_apply_end(method="apply_step_advanced", outcome="success")
+    with patch(
+        "lca.runtime.envelope_emitter.emit_runtime_reducer_apply_start",
+        side_effect=_start,
+    ), patch(
+        "lca.runtime.envelope_emitter.emit_runtime_reducer_apply_end",
+        side_effect=_end,
+    ):
+        emitter.emit_reducer_apply_start(method="apply_step_advanced")
+        emitter.emit_reducer_apply_end(method="apply_step_advanced", outcome="success")
 
     assert calls == [
         ("start", {"method": "apply_step_advanced"}),
@@ -133,11 +138,11 @@ def test_spine_envelope_emitter_swallows_reflector_exceptions() -> None:
     """
 
     class _Boom:
-        def emit_runtime_reducer_apply_start(self, *, method: str) -> None:
-            raise RuntimeError("spine unavailable")
+        pass
 
     emitter = SpineEnvelopeEmitter()
-    emitter._runtime = lambda: _Boom()  # type: ignore[assignment]
-
-    # Must not raise.
-    emitter.emit_reducer_apply_start(method="x")
+    with patch(
+        "lca.runtime.envelope_emitter.emit_runtime_reducer_apply_start",
+        side_effect=RuntimeError("spine unavailable"),
+    ):
+        emitter.emit_reducer_apply_start(method="x")

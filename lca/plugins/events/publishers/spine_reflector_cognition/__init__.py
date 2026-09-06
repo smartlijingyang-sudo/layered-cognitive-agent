@@ -23,6 +23,8 @@ from lca.plugins.events.publishers.spine_reflector_cognition.plugin import (
     emit_reasoner_reason_start,
     emit_skill_router_route,
     emit_synthesizer_merge,
+    emit_think_gate_end,
+    emit_think_gate_start,
 )
 
 __all__ = [
@@ -43,4 +45,6 @@ __all__ = [
     "emit_reasoner_reason_start",
     "emit_skill_router_route",
     "emit_synthesizer_merge",
+    "emit_think_gate_end",
+    "emit_think_gate_start",
 ]

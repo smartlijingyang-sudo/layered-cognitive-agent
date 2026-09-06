@@ -195,7 +195,7 @@ class TestCV4StopPolicyFlow:
         """Default stop PhaseExecutor consumes only its ``stop_policy`` capability."""
         from pathlib import Path
 
-        stop_executor = Path("lca/plugins/phase_graph/stop.py").read_text(encoding="utf-8")
+        stop_executor = Path("lca/plugins/loop/phase/stop/standard/plugin.py").read_text(encoding="utf-8")
         assert "stop_policy.decide(" in stop_executor
         assert "stop_rule" not in stop_executor
 
@@ -210,9 +210,9 @@ class TestCV4AllControlSlot11:
         中至少 stop.decide 与 think.guard 已在 Stop PhaseExecutor / ModularBrain
         中被实际调用（PR-1/4）。其余槽位 PR-7 / PR-8 / PR-9 落地。
         """
-        stop_executor_src = Path("lca/plugins/phase_graph/stop.py").read_text(encoding="utf-8")
+        stop_executor_src = Path("lca/plugins/loop/phase/stop/standard/plugin.py").read_text(encoding="utf-8")
         think_guard_src = Path(
-            "lca/plugins/control_contributions/think_guard.py"
+            "lca/plugins/loop/control/think_guard/plugin.py"
         ).read_text(encoding="utf-8")
         # think.guard runs through declarative TRANSFORM + GOVERN contributions.
         assert "ThinkGuardEnforceExecutor" in think_guard_src

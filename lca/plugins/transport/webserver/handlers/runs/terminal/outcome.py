@@ -11,11 +11,12 @@ from __future__ import annotations
 from typing import Any
 
 from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.observability.status import RunLifecycleStatus
 from lca.plugins.transport.webserver.handlers.runs.execute.loop_drivers import DriverOutcome
 from lca.plugins.transport.webserver.handlers.runs.observability.error_presentation import (
     format_user_error,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession, RunStatus
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
 
 
 class RunOutcomeApplier:
@@ -25,7 +26,8 @@ class RunOutcomeApplier:
         """Apply a driver outcome and return whether the run is paused."""
 
         if outcome.waiting_input:
-            session.status = RunStatus.WAITING_INPUT
+            session.status = RunLifecycleStatus.WAITING_INPUT
+            # COMPAT(P3-06): cache live handles for hot resume; not durable authority.
             session.snapshot = outcome.snapshot
             session.runnable = outcome.resumable
             session.approval_request = outcome.approval_request
@@ -43,7 +45,7 @@ class RunOutcomeApplier:
         """Apply a resumable task result and return whether it needs input again."""
 
         if result.status == TaskStatus.INPUT_REQUIRED:
-            session.status = RunStatus.WAITING_INPUT
+            session.status = RunLifecycleStatus.WAITING_INPUT
             session.snapshot = result.extra.get("state_snapshot")
             session.approval_request = result.extra.get("approval_request")
             return True

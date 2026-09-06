@@ -19,15 +19,18 @@ from datetime import UTC, datetime
 from typing import Any
 
 from lca.infrastructure.observability.loop_cursor._spine_port import (
-    SessionAppendHook,
     SESSION_SSOT_HOOK_MARKER,
+    SessionAppendHook,
     bind_session_append_hook,
     reset_session_append_hook,
 )
 from lca.infrastructure.observability.spine.context import SpineContext
 from lca.infrastructure.observability.spine.event_record import Channel, EventRecord, Outcome, Phase
 from lca.infrastructure.observability.spine.sinks.base import EventSink
-from lca.plugins.observability.spine.spine_enrich import get_active_spine_enricher
+from lca.infrastructure.observability.spine.spine_enrich import (
+    enrich_spine_payload,
+    get_active_field_producers,
+)
 from lca.plugins.session.runtime.bind import RunEventSessionBridge
 from lca_kernel.events.payloads_spine import SpineEventPayload
 
@@ -169,9 +172,10 @@ def make_session_spine_append_hook(bridge: RunEventSessionBridge) -> SessionAppe
     ) -> EventRecord:
         del sinks, subscribers
 
-        enricher = get_active_spine_enricher()
-        if enricher is not None:
-            enrich_result = enricher(
+        producers = get_active_field_producers()
+        if producers is not None:
+            enrich_result = enrich_spine_payload(
+                producers=producers,
                 execution_point=execution_point,
                 channel=channel,
                 caller_payload=caller_payload,

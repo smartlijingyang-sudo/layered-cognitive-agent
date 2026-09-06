@@ -107,11 +107,11 @@ async def test_step_boundary_checkpoint_called_before_driver(monkeypatch) -> Non
         _fake_checkpoint,
     )
     monkeypatch.setattr(
-        "lca.plugins.events.publishers.spine_reflector_runtime.emit_lifecycle_finally",
+        "lca.infrastructure.session.runtime_emit.emit_lifecycle_finally",
         lambda **_kwargs: None,
     )
     monkeypatch.setattr(
-        "lca.plugins.events.publishers.spine_reflector_runtime.emit_exception_finally",
+        "lca.infrastructure.session.runtime_emit.emit_exception_finally",
         lambda **_kwargs: None,
     )
     monkeypatch.setattr(

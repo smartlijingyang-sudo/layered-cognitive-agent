@@ -24,16 +24,10 @@ Plugin Manifests for all three wrap kinds live under
 
 Single emission seam
 --------------------
-Every kind resolves the *same* process-local accessor pair installed by
-:func:`~lca.harness.declarative.compile.instrument_wrap.set_active_pipeline_accessor`,
-so one install covers all three and no wrap kind can drift onto a
-private emission path. Because ``instrument_wrap`` exposes setters but
-keeps its resolvers private, this module reads the accessors back through
-the setters' documented "returns the previous accessor" contract instead
-of duplicating the accessor state. When no pipeline is installed the
-hooks fall back to a direct ``EventSpine.append``, matching
-``wrap_instrument``'s documented degradation (pre-boot and unit-test
-paths must stay silent rather than fail).
+Every kind resolves the process-local spine accessor installed by
+:func:`~lca.harness.declarative.compile.instrument_wrap.set_active_spine_accessor`.
+Production runs with a Session SSOT hook active; ``EmitPipeline`` is
+hook-less test surface only (ADR-0194 P2-07).
 
 Why ``ctx.intercept`` is a monkeypatch and not a cordis primitive
 ----------------------------------------------------------------
@@ -62,12 +56,7 @@ from typing import Any
 
 from lca.harness.declarative.compile.instrument_wrap import (
     _emit_spine_direct,
-    _emit_via_pipeline,
-    set_active_pipeline_accessor,
     set_active_spine_accessor,
-)
-from lca.infrastructure.observability.loop_cursor._spine_port import (
-    is_session_ssot_hook_active,
 )
 from lca.infrastructure.observability.spine.context import SpineContext
 from lca.infrastructure.observability.spine.event_record import Channel
@@ -85,24 +74,6 @@ WRAP_INSTRUMENTED_ATTR = "__lca_instrumented__"
 
 
 # ── accessor readback ────────────────────────────────────────────────
-#
-# ``instrument_wrap`` exposes only *setters* for its two process-local
-# accessors, and its resolvers are private. Rather than reach into those
-# privates (they are the assembler's implementation detail and have
-# churned), we read the current accessor back through the setter's
-# documented return value: ``set_*_accessor(x)`` returns the accessor it
-# replaced. Setting the same value back is a no-op, so the pair is a
-# read that leaves the seam exactly as it was.
-#
-# This keeps all three wrap kinds on one seam without duplicating the
-# accessor state, which is the Task 7.1.2 invariant.
-
-
-def _read_pipeline_accessor() -> Callable[[], Any] | None:
-    """Return the installed ``emit_pipeline`` accessor without changing it."""
-    current = set_active_pipeline_accessor(None)
-    set_active_pipeline_accessor(current)
-    return current
 
 
 def _read_spine_accessor() -> Callable[[], EventSpine | None] | None:
@@ -110,23 +81,6 @@ def _read_spine_accessor() -> Callable[[], EventSpine | None] | None:
     current = set_active_spine_accessor(None)
     set_active_spine_accessor(current)
     return current
-
-
-def resolve_active_pipeline() -> Any:
-    """Return the active ``EmitPipeline``, or ``None`` when unwired.
-
-    Duck-typed on purpose: the object only has to expose ``emit(...)``.
-    A raising accessor degrades to ``None`` (legacy direct-append path)
-    instead of failing the instrumented call.
-    """
-    getter = _read_pipeline_accessor()
-    if getter is None:
-        return None
-    try:
-        return getter()
-    except Exception as exc:
-        log.warning("spine.runtime_hooks: pipeline accessor raised %r", exc)
-        return None
 
 
 def resolve_active_spine() -> EventSpine | None:
@@ -153,21 +107,11 @@ def emit_through_pipeline(
     span: Any = None,
     exc: BaseException | None = None,
 ) -> None:
-    """Emit one spine event through ``emit_pipeline``, falling back to the spine.
+    """Emit one spine event via direct ``EventSpine.append`` (production path).
 
-    This is the single funnel shared by both wrap kinds in this module.
-    It mirrors ``wrap_instrument._safe_append``: prefer the pipeline so
-    every enabled ``FieldProducer`` contributes its keys, and degrade to
-    a direct ``EventSpine.append`` when the pipeline is not installed.
-
-    ``exc`` carries a captured ``BaseException`` so channel="error"
-    events always carry the structured traceback fields documented in
-    ``wrap_instrument._exception_payload`` (ADR-2026-09-02-i17-stream-align
-    §B). Both funnels share the same payload-merge convention: exc
-    fields are written first, caller payload wins on conflict.
-
-    All emission failures are logged and swallowed — an observability
-    fault must never break the instrumented call.
+    ``EmitPipeline`` is hook-less test surface only (ADR-0194 P2-07).
+    When a Session SSOT hook is active, enrichment runs at the Session
+    boundary; this funnel only stamps in-process records.
     """
     if exc is not None:
         # Reuse the wrap-side helper so the two emission paths emit
@@ -180,36 +124,14 @@ def emit_through_pipeline(
     spine = resolve_active_spine()
     if spine is None:
         return
-    if is_session_ssot_hook_active():
-        _emit_spine_direct(
-            spine=spine,
-            execution_point=execution_point,
-            channel=channel,
-            payload=payload,
-            outcome=outcome,
-            span=span,
-        )
-        return
-    pipeline = resolve_active_pipeline()
-    if pipeline is not None:
-        _emit_via_pipeline(
-            pipeline=pipeline,
-            spine=spine,
-            execution_point=execution_point,
-            channel=channel,
-            payload=payload,
-            outcome=outcome,
-            span=span,
-        )
-    else:
-        _emit_spine_direct(
-            spine=spine,
-            execution_point=execution_point,
-            channel=channel,
-            payload=payload,
-            outcome=outcome,
-            span=span,
-        )
+    _emit_spine_direct(
+        spine=spine,
+        execution_point=execution_point,
+        channel=channel,
+        payload=payload,
+        outcome=outcome,
+        span=span,
+    )
 
 
 # ── ctx_effect ───────────────────────────────────────────────────────
@@ -397,7 +319,6 @@ __all__ = [
     "emit_through_pipeline",
     "install_ctx_effect_hook",
     "install_ctx_intercept_hook",
-    "resolve_active_pipeline",
     "resolve_active_spine",
     "wrap_ctx_intercept",
 ]

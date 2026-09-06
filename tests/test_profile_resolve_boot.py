@@ -287,10 +287,10 @@ def test_boot_resolved_preflights_products_before_plugin_lifecycle(
         raise AssertionError("plugin lifecycle must not start after preflight failure")
 
     monkeypatch.setattr(
-        "lca.harness.profile.boot.compile_profile_boot_products",
+        "lca_kernel.boot.compile_profile_boot_products",
         reject_preflight,
     )
-    monkeypatch.setattr("lca.harness.profile.boot._boot_context", unexpected_boot)
+    monkeypatch.setattr("lca_kernel.boot._boot_context", unexpected_boot)
 
     with pytest.raises(ProfileResolveError, match="preflight rejected"):
         asyncio.run(boot_resolved_profile(resolve_profile(DEFAULT)))
@@ -299,11 +299,10 @@ def test_boot_resolved_preflights_products_before_plugin_lifecycle(
 
 
 def test_boot_entrances_converge_on_one_audited_sequence() -> None:
-    """Resolved and programmatic input adapters must not duplicate Fiber boot semantics."""
-
+    """Resolved and programmatic input adapters delegate to kernel boot."""
     source = Path("lca/harness/profile/boot.py").read_text(encoding="utf-8")
-
-    assert source.count("return await _boot_context(") == 2
+    assert "run_resolved_kernel" in source
+    assert "kernel_boot_entries" in source
     assert source.count("await _boot_plugin(") == 1
 
 

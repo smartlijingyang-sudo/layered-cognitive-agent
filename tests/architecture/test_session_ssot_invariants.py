@@ -316,17 +316,23 @@ def test_builder_has_no_legacy_spine_write_port_fallback() -> None:
 
 
 def test_field_producer_merge_lives_in_spine_enrich() -> None:
-    """ADR-0186 wave-2: FieldProducer merge 只在 spine_enrich + Session hook。"""
-    emit_path = _REPO_ROOT / "lca" / "plugins" / "observability" / "spine" / "emit_pipeline.py"
-    enrich_path = _REPO_ROOT / "lca" / "plugins" / "observability" / "spine" / "spine_enrich.py"
+    """ADR-0186 wave-2 / ADR-0194 P2-06: FieldProducer merge in spine_enrich + gateway."""
+    gateway_path = _REPO_ROOT / "lca" / "loop" / "fact_gateway.py"
+    enrich_path = (
+        _REPO_ROOT / "lca" / "infrastructure" / "observability" / "spine" / "spine_enrich.py"
+    )
     hook_path = _REPO_ROOT / "lca" / "plugins" / "session" / "runtime" / "spine_hook.py"
     assert enrich_path.exists()
     enrich_text = enrich_path.read_text(encoding="utf-8")
     assert "producer.produce" in enrich_text
+    gateway_text = gateway_path.read_text(encoding="utf-8")
+    assert "enrich_spine_payload" in gateway_text
+    assert "get_active_field_producers" in gateway_text
+    emit_path = _REPO_ROOT / "lca" / "plugins" / "observability" / "spine" / "emit_pipeline.py"
     emit_text = emit_path.read_text(encoding="utf-8")
     assert "producer.produce" not in emit_text
     hook_text = hook_path.read_text(encoding="utf-8")
-    assert "get_active_spine_enricher" in hook_text
+    assert "enrich_spine_payload" in hook_text
 
 
 def test_anomaly_runs_via_session_observer_not_emit_pipeline_when_hooked() -> None:
@@ -341,13 +347,14 @@ def test_anomaly_runs_via_session_observer_not_emit_pipeline_when_hooked() -> No
 
 
 def test_wrap_bypasses_emit_pipeline_when_session_ssot_hook() -> None:
-    """ADR-0186 wave-4: SSOT hook 活跃时 wrap/runtime 不得经 EmitPipeline。"""
+    """ADR-0186 wave-4 / ADR-0194 P2-07: SSOT hook 活跃时 wrap 不得经 EmitPipeline。"""
     wrap_path = _REPO_ROOT / "lca" / "harness" / "declarative" / "compile" / "instrument_wrap.py"
     hooks_path = _REPO_ROOT / "lca" / "plugins" / "observability" / "spine" / "runtime_hooks.py"
     wrap_text = wrap_path.read_text(encoding="utf-8")
     hooks_text = hooks_path.read_text(encoding="utf-8")
     assert "is_session_ssot_hook_active()" in wrap_text
-    assert "is_session_ssot_hook_active()" in hooks_text
+    assert "_emit_via_pipeline" not in hooks_text
+    assert "resolve_active_pipeline" not in hooks_text
     safe_body = wrap_text[wrap_text.index("def _safe_append(") :]
     ssot_idx = safe_body.index("is_session_ssot_hook_active()")
     pipeline_idx = safe_body.index("_resolve_pipeline()")
@@ -360,4 +367,5 @@ def test_emit_pipeline_setup_does_not_install_pipeline_accessor() -> None:
     emit_text = emit_path.read_text(encoding="utf-8")
     setup_body = emit_text[emit_text.index("async def setup(") :]
     assert "set_active_spine_enricher" in setup_body
+    assert "set_active_field_producers" in setup_body
     assert "set_active_pipeline_accessor" not in setup_body

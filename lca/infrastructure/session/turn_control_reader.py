@@ -100,7 +100,7 @@ def projected_control_turns(state: AgentState) -> tuple[ControlTurnView, ...] | 
 
 def _history_control_turns(state: AgentState) -> tuple[ControlTurnView, ...]:
     views: list[ControlTurnView] = []
-    for turn in state.history:
+    for turn in state.control_turns:
         if not isinstance(turn, Turn):
             continue
         decision = turn.decision

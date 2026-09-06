@@ -76,7 +76,7 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/infrastructure/cli/services/lobehub.py": (
         "LobeHub streaming adapter 集中 SSE + ChunkBuilder + Encoder 装配（Phase C #5 合并 ops 后）"
     ),
-    "lca/harness/declarative/graph/phase_graph_compiler.py": (
+    "lca/harness/graph/phase_graph_compiler.py": (
         "ADR-0075：声明式阶段图编译器集中校验 profile 选定的节点、边、策略与投稿，"
         "避免由运行时解释器重新引入隐藏流程默认值"
     ),
@@ -119,13 +119,13 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
         "L4 组合根 capability 注册中心 — STOP_RULES 由 C6 port 引入（C4 后向兼容 alias），"
         "无法拆到子模块"
     ),
-    "lca/harness/declarative/graph/graph_validation.py": (
+    "lca/harness/graph/graph_validation.py": (
         "ADR-0075 声明式阶段图校验集中文件；运行时由 phase_graph_compiler 调用"
     ),
     "lca/harness/declarative/execute/outcome_projection.py": (
         "ADR-0075 outcome projection 中心化（plan_ref × Journal 绑定）"
     ),
-    "lca/harness/declarative/compile/phase_governance.py": ("ADR-0075 phase governance 中心化"),
+    "lca/harness/graph/governance/phase_governance.py": ("ADR-0075 phase governance 中心化"),
     "lca/infrastructure/observability/event_doc.py": (
         "Observability event_doc 词表 — ADR-0065 L1~L9 不变量清单"
     ),
@@ -175,10 +175,10 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/harness/declarative/compile/compiler.py": (
         "ADR-0075 PlanCompiler 单一编译入口与原生声明式控制投影"
     ),
-    "lca/harness/declarative/execute/interpreter.py": (
+    "lca/harness/graph/execute/interpreter.py": (
         "ADR-0075 GenericPlanInterpreter 统一 phase/result/delta 解释边界"
     ),
-    "lca/runtime/declarative_runtime.py": (
+    "lca/loop/driver.py": (
         "ADR-0075 DeclarativeRuntimeDriver 统一 pause/resume/result 出口"
     ),
     "lca/infrastructure/observability/journal/engine.py": (

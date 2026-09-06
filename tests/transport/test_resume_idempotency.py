@@ -13,10 +13,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
-from lca.plugins.transport.webserver.handlers.runs.session.session import (
-    RunSession,
-    RunStatus,
-)
+from lca.contracts.observability.status import RunLifecycleStatus
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
 from lca.plugins.transport.webserver.handlers.runs.terminal import registry_commands
 
 if TYPE_CHECKING:
@@ -33,7 +31,7 @@ def _waiting_session() -> RunSession:
         user_text="q",
         mode="solo",
     )
-    session.status = RunStatus.WAITING_INPUT
+    session.status = RunLifecycleStatus.WAITING_INPUT
     session.snapshot = object()
     session.runnable = object()
     session.approval_request = {
@@ -71,10 +69,10 @@ def test_duplicate_idempotency_key_replays_without_second_resume(
             idempotency_key="run-idem-1:msg-1:submit",
         )
         assert first.accepted
-        assert session.status is RunStatus.RUNNING
+        assert session.status is RunLifecycleStatus.RUNNING
 
         # 模型再次提问后第二次暂停；同一 key 重放不得再次 resume。
-        session.status = RunStatus.WAITING_INPUT
+        session.status = RunLifecycleStatus.WAITING_INPUT
         replay = await commands.resume_approval(
             run_id="run-idem-1",
             approval_id="askUserQuestion",
@@ -83,7 +81,7 @@ def test_duplicate_idempotency_key_replays_without_second_resume(
         )
         assert replay.accepted
         assert replay.status == "resumed"
-        assert session.status is RunStatus.WAITING_INPUT
+        assert session.status is RunLifecycleStatus.WAITING_INPUT
 
     asyncio.run(_scenario())
     assert calls == ["answer-1"]
@@ -108,7 +106,7 @@ def test_distinct_keys_resume_each_pause(monkeypatch: pytest.MonkeyPatch) -> Non
             idempotency_key="k-1",
         )
         assert first.accepted
-        session.status = RunStatus.WAITING_INPUT
+        session.status = RunLifecycleStatus.WAITING_INPUT
         second = await commands.resume_approval(
             run_id="run-idem-1",
             approval_id="askUserQuestion",
@@ -159,8 +157,8 @@ def test_cancel_at_waiting_input_transitions_status(
     async def _scenario() -> None:
         receipt = await commands.cancel("run-idem-1")
         assert receipt.accepted
-        assert receipt.status == RunStatus.CANCELED.value
-        assert session.status is RunStatus.CANCELED
+        assert receipt.status == RunLifecycleStatus.CANCELED.value
+        assert session.status is RunLifecycleStatus.CANCELED
         assert session.cancel_requested
 
     asyncio.run(_scenario())

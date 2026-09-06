@@ -35,7 +35,9 @@ class TestCheckpointWiring:
         )
 
     def test_perceive_awaits_step_boundary_checkpoint(self) -> None:
-        src = (ROOT / "lca/plugins/phase_graph/perceive.py").read_text(encoding="utf-8")
+        src = (
+            ROOT / "lca/plugins/loop/phase/perceive/standard/plugin.py"
+        ).read_text(encoding="utf-8")
         assert "await_step_boundary_checkpoint" in src
 
     def test_safe_executor_awaits_checkpoint_before_tool(self) -> None:
@@ -51,7 +53,7 @@ class TestSessionRepairModule:
     """I-RESUME-1: cold-load repair module exists."""
 
     def test_repair_module_exists(self) -> None:
-        repair = ROOT / "lca" / "plugins" / "session" / "runtime" / "repair.py"
+        repair = ROOT / "lca" / "session" / "repair.py"
         assert repair.is_file()
 
 
@@ -88,10 +90,11 @@ class TestTransportRecoveryAuthority:
             ROOT
             / "lca/plugins/transport/webserver/handlers/runs/terminal/registry_commands.py"
         ).read_text(encoding="utf-8")
-        assert "assert_resume_allowed" in src
-        assert "transport_recovery" in src
+        assert "validate_durable_resume" in src
+        assert "carrier.runs.resume" in src
 
-    def test_transport_recovery_module_exists(self) -> None:
+    def test_recovery_public_api_exists(self) -> None:
+        assert (ROOT / "lca" / "session" / "recovery.py").is_file()
         assert (ROOT / "lca/plugins/session/runtime/transport_recovery.py").is_file()
 
     def test_runtime_loop_awaits_step_boundary(self) -> None:

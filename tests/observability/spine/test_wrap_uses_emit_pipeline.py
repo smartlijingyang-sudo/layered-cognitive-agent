@@ -376,6 +376,7 @@ def test_wrap_instrument_bypasses_emit_pipeline_when_session_ssot_hook() -> None
     )
     from lca.plugins.observability.spine.spine_enrich import (
         enrich_spine_payload,
+        set_active_field_producers,
         set_active_spine_enricher,
     )
     from lca.plugins.session.runtime.bind import (
@@ -413,6 +414,7 @@ def test_wrap_instrument_bypasses_emit_pipeline_when_session_ssot_hook() -> None
         return original_emit(**kwargs)
 
     real_pipeline.emit = _counting_emit  # type: ignore[method-assign]
+    previous_producers = set_active_field_producers([source_producer, signature_producer])
     previous_enricher = set_active_spine_enricher(
         lambda **kwargs: enrich_spine_payload(
             producers=[source_producer, signature_producer], **kwargs
@@ -434,6 +436,7 @@ def test_wrap_instrument_bypasses_emit_pipeline_when_session_ssot_hook() -> None
         assert start_event.data["signature_fingerprint"] == "pipeline_only"
         assert not sink.records, "SSOT hook path must not write EventSpine sinks"
     finally:
+        set_active_field_producers(previous_producers)
         set_active_spine_enricher(previous_enricher)
         reset_session_append_hook(hook_token)
         unbind_run_event_session(bound)

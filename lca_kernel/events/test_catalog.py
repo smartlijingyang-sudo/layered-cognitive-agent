@@ -13,7 +13,7 @@ from __future__ import annotations
 from importlib import import_module
 from pathlib import Path
 
-from lca_kernel.events.bus import EventBus
+from lca_kernel.events.bus import EnvelopeBus, EventBus
 from lca_kernel.events.registry import EventRegistry
 
 
@@ -140,13 +140,13 @@ def build_test_catalog() -> dict[str, type]:
     return catalog
 
 
-def build_test_bus(config_dir: Path | None = None) -> EventBus:
-    """PR-5：测试路径下构造 catalog 已注入的 EventBus。
+def build_test_bus(config_dir: Path | None = None) -> EnvelopeBus:
+    """PR-5：测试路径下构造 catalog 已注入的 EnvelopeBus。
 
     1. 构造 :data:`build_test_catalog`（id → marker class）；
     2. :class:`EventRegistry.load` 装载 yaml，注入 catalog（让 id 与
        class-path 双形态 token 都能解析）；
-    3. 返回 :class:`EventBus`。
+    3. 返回 :class:`EnvelopeBus`（实例为 EventBus compat 子类）。
 
     与生产路径（profile resolve → setup_bus → catalog 注入）等价。
     """

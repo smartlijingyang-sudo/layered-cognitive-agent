@@ -1,14 +1,13 @@
-"""EventBus —— ADR-0183 §3.1 / ADR-0183 PR-7 收口 / ADR-0184 PR-1 收口。
+"""EventBus —— ADR-0183 §3.1 / ADR-0183 PR-7 收口 / ADR-0184 PR-1 收口 / ADR-0194 P2-08。
 
-LCA 事件总线唯一入口（SSOT）。原 EventMechanism（ADR-0180）在 PR-7 收口
-删除,EventBus.publish 是 producer 唯一入口,EventBus.subscribe(*, failure=...)
-是 consumer 唯一入口。
+LCA 事件总线唯一入口（SSOT）。:class:`EnvelopeBus` 是 canonical 名称;
+:class:`EventBus` 是 compat 子类,保留 subscribe / mount_sink / EventRef
+6 字段 wire 行为 — harness 与迁移窗口专用。
 
-ADR-0184 PR-1:本模块引入 :class:`EnvelopeBus` 作为统一入口,继承该入口
-并保留现有 :class:`EventBus` 全部方法 — :class:`EventBus` 自此是
-:class:`EnvelopeBus` 的兼容 shim(EventRef 6 字段 / _dispatch_sinks /
-_fanout / delivery_snapshot / configure_delivery_policy 等所有现有 wire
-行为原样保留)。
+# COMPAT(delete-when: rg '\\bEventBus\\b' lca/ lca_kernel/
+#           --glob '!**/harness/**' --glob '!**/tests/**' = 0,
+#           tracking: ADR-0194 P2-08 / ADR-0184 PR-1)
+# 新代码 MUST import EnvelopeBus; EventBus 名保留给 harness 与 legacy 测试。
 
 不变量:
 - I-FW-BUS-1: publish 是 producer 唯一入口;subscribers 是 consumer 唯一入口

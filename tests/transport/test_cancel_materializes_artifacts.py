@@ -32,10 +32,8 @@ from lca.plugins.session.derivers.step_tree import StepTreeFoldDeriver
 from lca.plugins.transport.webserver.handlers.runs.observability.identity import (
     parse_agent_ref,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.session import (
-    RunSession,
-    RunStatus,
-)
+from lca.contracts.observability.status import RunLifecycleStatus
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
 
 # registry_commands 必须先于 lifecycle 子模块被进程导入:它拉动 execute 包链,
 # lifecycle 包的懒加载 __getattr__ 依赖该顺序打破循环。因此
@@ -85,7 +83,7 @@ def _paused_session(tmp_path: Path, run_id: str) -> tuple[RunSession, Path]:
         user_text="q",
         mode="solo",
         agent=parse_agent_ref({"id": "solo", "name": "助手"}),
-        status=RunStatus.WAITING_INPUT,
+        status=RunLifecycleStatus.WAITING_INPUT,
         started_at=1000.0,
         locator=locator,
     )
@@ -113,7 +111,7 @@ def test_cancel_paused_run_materializes_derived_artifacts(tmp_path: Path) -> Non
     receipt = asyncio.run(commands.cancel(session.run_id))
 
     assert receipt.accepted
-    assert session.status is RunStatus.CANCELED
+    assert session.status is RunLifecycleStatus.CANCELED
     assert session.closed, "cancel 必须走 terminalize 的 close 钩子"
     assert (run_dir / "journal.json").exists()
     assert (run_dir / "journal.narrative.md").exists()
@@ -148,7 +146,7 @@ def test_cancel_running_task_leaves_terminalize_to_lifecycle(
 ) -> None:
     """运行中取消 → 命令路径不物化;生命周期 finally 是唯一终态收口。"""
     session, _ = _paused_session(tmp_path, "run_cancel_running")
-    session.status = RunStatus.RUNNING
+    session.status = RunLifecycleStatus.RUNNING
 
     async def _long_running() -> None:
         await asyncio.sleep(30)
@@ -210,7 +208,7 @@ def test_second_cancel_is_noop(tmp_path: Path) -> None:
 
     assert first.accepted
     assert second.accepted
-    assert second.status == RunStatus.CANCELED.value
+    assert second.status == RunLifecycleStatus.CANCELED.value
 
 
 def test_pause_flushes_journal_incrementally(tmp_path: Path) -> None:

@@ -28,6 +28,8 @@ from lca.contracts.observability.resume import ResumeSpec
 from lca.infrastructure.observability.loop_cursor._spine_port import WritePort
 from lca.infrastructure.observability.loop_cursor.state import _CursorState
 
+_VALID_PHASES = frozenset(PhaseName.__args__)
+
 
 class StdLoopCursor:
     """默认 LoopCursor 实现 — 薄控制状态机(ADR-0169 P1 / D1)。
@@ -200,6 +202,10 @@ class StdLoopCursor:
         """
         self._ensure_open()
         self._ensure_not_halted()
+        if phase not in _VALID_PHASES:
+            raise CursorError(
+                f"invalid phase {phase!r}; gate is Think sub-chain (ADR-0194 §1.3)"
+            )
         s = self._state
         # stop → perceive 触发新 iteration
         if s.phase == "stop" and phase == "perceive":

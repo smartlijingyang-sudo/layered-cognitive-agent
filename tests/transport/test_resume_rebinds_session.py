@@ -27,10 +27,8 @@ from lca.plugins.transport.webserver.handlers.runs.session.event_session import 
     BoundRunEventSession,
     RunEventSessionBridge,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.session import (
-    RunSession,
-    RunStatus,
-)
+from lca.contracts.observability.status import RunLifecycleStatus
+from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
 from lca.plugins.transport.webserver.handlers.runs.terminal import registry_commands
 
 
@@ -44,7 +42,7 @@ def _waiting_session(bound: BoundRunEventSession | None) -> RunSession:
         user_text="q",
         mode="solo",
     )
-    session.status = RunStatus.WAITING_INPUT
+    session.status = RunLifecycleStatus.WAITING_INPUT
     session.snapshot = object()
     session.runnable = object()
     session.event_session = bound

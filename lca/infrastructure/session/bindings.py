@@ -69,7 +69,11 @@ def resolve_session_for_emit(state: AgentState | None = None) -> object | None:
     state; session binding is always contextvar-based today).
     """
     _ = state
-    return _resolve_runtime_session(current_publish_session())
+    writer = current_publish_session()
+    resolved = _resolve_runtime_session(writer)
+    if resolved is not None:
+        return resolved
+    return writer
 
 
 def current_model_context_assembler() -> ModelContextAssembler:

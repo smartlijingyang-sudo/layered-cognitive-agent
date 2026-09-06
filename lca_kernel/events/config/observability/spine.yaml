@@ -47,7 +47,7 @@ events:
     publishers:
       - events.spine.reflector.cognition
 
-  - category: spine.cognition.brain.gate.start
+  - category: spine.cognition.think.gate.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
     payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
     fields:
@@ -55,7 +55,7 @@ events:
     publishers:
       - events.spine.reflector.cognition
 
-  - category: spine.cognition.brain.gate.end
+  - category: spine.cognition.think.gate.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
     payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
     fields:
@@ -664,17 +664,6 @@ events:
       step: int
       run_id: str
       decision_path: str
-    publishers:
-      - events.spine.reflector.phase
-      - events.spine.loop_cursor
-
-  - category: spine.phase.gate.fold
-    plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
-    fields:
-      step: int
-      run_id: str
-      verdict: str
     publishers:
       - events.spine.reflector.phase
       - events.spine.loop_cursor

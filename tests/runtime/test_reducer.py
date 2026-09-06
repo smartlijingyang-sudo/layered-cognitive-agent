@@ -33,20 +33,20 @@ def test_apply_step_advanced_updates_step_and_budget() -> None:
     assert out.budget.used_steps == 3
 
 
-def test_apply_perception_writes_manifest_digest() -> None:
+def test_apply_perception_writes_perceive_projection() -> None:
     state = _state()
     manifest = ContextManifest(
         items=(ContextItem(kind="clock", payload="12:00", provenance="clock"),), digest="abc"
     )
     out = DefaultReducer().apply_perception(state, manifest)
-    assert out.extra["manifest_digest"] == "abc"
+    assert "manifest_digest" not in out.extra
     assert out.perceive is not None
     assert out.perceive.manifest is manifest
     assert out.perceive.digest == "abc"
     assert out.perceive.step == 0
 
 
-def test_apply_turn_appends_history() -> None:
+def test_apply_turn_appends_control_turns() -> None:
     state = _state()
     decision = Decision(
         decision_id="d1",
@@ -58,8 +58,9 @@ def test_apply_turn_appends_history() -> None:
     reflection = Reflection(reflection_id="r1", verdict="on_track")  # type: ignore[arg-type]
     turn = Turn(decision=decision, observation=observation, reflection=reflection)
     out = DefaultReducer().apply_turn(state, turn)
+    assert len(out.control_turns) == 1
+    assert out.control_turns[0] is turn
     assert len(out.history) == 1
-    assert out.history[0] is turn
 
 
 def test_apply_activation_no_op_on_empty() -> None:
@@ -262,9 +263,35 @@ class _CollectingPublishSession:
         self._bus = bus
         self.payloads: list[object] = []
 
-    def append(self, payload: object, *, producer: object = None) -> object:
-        self.payloads.append(payload)
-        return self._bus.publish(payload, producer=producer)  # type: ignore[attr-defined]
+    def append(
+        self,
+        event_type_or_payload: object,
+        data: object | None = None,
+        *,
+        actor: str | None = None,
+        producer: object = None,
+    ) -> object:
+        if isinstance(event_type_or_payload, str) and data is not None:
+            from types import SimpleNamespace
+
+            from lca_kernel.events.payloads import Category, SpineEventPayload
+
+            payload_dict = dict(data)  # type: ignore[arg-type]
+            sp = SpineEventPayload(
+                category=Category(event_type_or_payload),
+                execution_point=str(payload_dict.get("execution_point", "")),
+                channel=str(payload_dict.get("channel", "fact")),
+                payload=dict(payload_dict.get("payload", {})),
+            )
+            self.payloads.append(sp)
+            return SimpleNamespace(
+                type=event_type_or_payload,
+                seq=len(self.payloads),
+                session_id="collecting-session",
+                time=float(len(self.payloads)),
+            )
+        self.payloads.append(event_type_or_payload)
+        return self._bus.publish(event_type_or_payload, producer=producer)  # type: ignore[attr-defined]
 
 
 def _bind_collecting_session() -> tuple[_CollectingPublishSession, object, object]:
@@ -284,9 +311,7 @@ def _bind_collecting_session() -> tuple[_CollectingPublishSession, object, objec
 
 def _reset_active_run_id() -> None:
     """marker payload 的 run_id 取 thread active run;测试钉为空串(C8)。"""
-    from lca.plugins.events.publishers.spine_reflector_runtime.plugin import (
-        set_active_run_id,
-    )
+    from lca.infrastructure.session.runtime_emit import set_active_run_id
 
     set_active_run_id(None)
 

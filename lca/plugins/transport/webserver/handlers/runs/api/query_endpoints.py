@@ -304,9 +304,9 @@ def _read_event_bus_health() -> dict[str, Any] | None:
     ``queue_depth`` is 0 when the observer is available (sync path; no queue).
     """
     try:
-        from lca_kernel.events import EventBus
+        from lca_kernel.events import EnvelopeBus
 
-        snapshot = EventBus.default().delivery_snapshot()
+        snapshot = EnvelopeBus.default().delivery_snapshot()
         published_total = sum(c.get("published", 0) for c in snapshot.values())
         persisted_total = sum(c.get("persisted", 0) for c in snapshot.values())
         delivered_total = sum(c.get("delivered", 0) for c in snapshot.values())

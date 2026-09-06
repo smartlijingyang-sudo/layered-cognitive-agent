@@ -1,24 +1,5 @@
-"""Gateway live-tail compatibility facade.
-
-Runtime journal projection belongs to L0 observability. This module preserves
-the historical Gateway import path for HTTP handlers and external callers while
-keeping live-tail behavior in the infrastructure implementation.
+"""COMPAT(owner: ADR-0195 P3-09, from: handlers/runs/terminal/live_compat, to: read/runs/terminal,
+delete_when: rg 'handlers\\.runs\\.terminal\\.live_compat' lca/ tests/ = 0, forbidden_new_usage: yes)
 """
 
-from lca.infrastructure.observability.journal.stream.live_tail import (
-    TEXT_CHANNEL_ALL,
-    TEXT_CHANNEL_ANSWER,
-    LiveGap,
-    LiveTail,
-    encode_live_gap,
-    iter_live_sse,
-)
-
-__all__ = [
-    "TEXT_CHANNEL_ALL",
-    "TEXT_CHANNEL_ANSWER",
-    "LiveGap",
-    "LiveTail",
-    "encode_live_gap",
-    "iter_live_sse",
-]
+from lca.plugins.transport.webserver.read.runs.terminal.live_compat import *  # noqa: F403

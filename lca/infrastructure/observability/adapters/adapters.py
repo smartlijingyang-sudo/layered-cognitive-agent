@@ -41,20 +41,14 @@ from lca.infrastructure.observability.stream.response_text_stream import Respons
 
 # NOTE: spine_reflector_body_llm 走函数内 lazy import，避免 adapters →
 # lca.infrastructure.observability → lca_kernel.boot 链路触发 circular import。
+# ADR-0194 P2-13: lazy target 为 lca.loop.llm_emit。
 
 
 def _body_llm_reflector() -> Any:
-    """Lazy-import spine_reflector_body_llm to break circular import.
+    """Lazy-import llm_emit to break circular import (ADR-0194 P2-13)."""
+    from lca.loop import llm_emit
 
-    adapters.adapters 被 lca.infrastructure.observability.__init__ 优先
-    导入；如顶层 import spine_reflector_body_llm 会触发
-    lca_kernel.events.payloads → lca_kernel.boot → lca.harness.observability
-    → lca.infrastructure.observability 回灌，模块未初始化导致
-    ``ImportError: cannot import name 'X' from partially initialized module``。
-    """
-    from lca.plugins.events.publishers.spine_reflector_body_llm import plugin
-
-    return plugin
+    return llm_emit
 
 
 _PERF_COUNTER_SCALE = 1000

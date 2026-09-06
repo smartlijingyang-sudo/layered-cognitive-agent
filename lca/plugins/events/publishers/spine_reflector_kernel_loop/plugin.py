@@ -1,20 +1,10 @@
-"""spine_reflector_kernel_loop plugin（ADR-0181 PR-4 / ADR-0183 PR-7）。
-
-PR-4：kernel.boot / loop.fork 全部 3 emit 下沉到 EventBus.publish：
-- kernel.boot.start / .completed
-- loop.fork
-"""
+# COMPAT(owner: ADR-0194 P2-14, from: spine_reflector_kernel_loop plugin emit,
+# to: lca.loop.kernel_loop_emit,
+# delete_when: rg "spine_reflector_kernel_loop" 生产引用归零(P2-16 bundle 已删),
+# forbidden_new_usage: 新 emit 走 lca.loop.kernel_loop_emit)
+"""spine_reflector_kernel_loop COMPAT shim (ADR-0194 P2-14)."""
 
 from __future__ import annotations
-
-import logging
-from typing import TYPE_CHECKING, Any
-
-from lca_kernel.events.payloads import Category, SpineEventPayload
-from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
-
-if TYPE_CHECKING:
-    from lca_kernel.events.bus import EventRef
 
 from pydantic import BaseModel
 
@@ -31,64 +21,11 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.plugins.events.publishers._session_publish import publish_via_session
-
-log = logging.getLogger(__name__)
-
-
-class ReflectorClass:
-    """publisher plugin 类（空标记类）。机制按 class 全路径鉴权。"""
-
-
-def _send(
-    *,
-    execution_point: str,
-    channel: str,
-    payload: dict[str, Any],
-) -> EventRef:
-    """内部 helper：构造 SpineEventPayload + publish_via_session（PR-3d）。"""
-    cat_str = _SPINE_EP_TO_CATEGORY[execution_point]
-    sp = SpineEventPayload(
-        category=Category(cat_str),
-        execution_point=execution_point,
-        channel=channel,
-        payload=payload,
-    )
-    return publish_via_session(sp, producer=ReflectorClass)
-
-
-# ── kernel.boot.start / .completed ────────────────────────────────────
-
-
-def emit_kernel_boot_start(*, profile: str) -> EventRef:
-    """Emit at kernel boot start; ``profile`` is the resolved profile name."""
-    return _send(
-        execution_point="kernel.boot.start",
-        channel="control",
-        payload={"profile": profile},
-    )
-
-
-def emit_kernel_boot_completed(*, profile: str, outcome: str = "success") -> EventRef:
-    """Emit at kernel boot completion; default outcome ``success``."""
-    return _send(
-        execution_point="kernel.boot.completed",
-        channel="control",
-        payload={"profile": profile, "outcome": outcome},
-    )
-
-
-# ── loop.fork ─────────────────────────────────────────────────────────
-
-
-def emit_loop_fork(*, child_role: str, parent_step: int) -> EventRef:
-    """Emit when a loop cursor forks into a child agent; ADR-0169."""
-    return _send(
-        execution_point="loop.fork",
-        channel="control",
-        payload={"child_role": child_role, "parent_step": parent_step},
-    )
-
+from lca.loop.kernel_loop_emit import (
+    emit_kernel_boot_completed,
+    emit_kernel_boot_start,
+    emit_loop_fork,
+)
 
 __all__ = [
     "ReflectorClass",
@@ -99,10 +36,12 @@ __all__ = [
 ]
 
 
-
-
 class _Config(BaseModel):
     model_config = {"extra": "forbid"}
+
+
+class ReflectorClass:
+    """Publisher marker for yaml auth matrix (legacy)."""
 
 
 @plugin(
@@ -112,9 +51,7 @@ class _Config(BaseModel):
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
-    description=(
-        "kernel_loop publisher（ADR-0181）：event.bus.reflector.kernel_loop 由本 plugin 发出。"
-    ),
+    description="COMPAT: kernel_loop spine EPs migrated to lca.loop (ADR-0194 P2-14).",
     test_suite="tests/plugins/events/publishers/test_events_spine_reflector_kernel_loop.py",
     functional_group=FunctionalGroup.G0_CON_KERNEL,
     contract=PluginContract(
@@ -141,6 +78,5 @@ class _Config(BaseModel):
     marker_class=ReflectorClass,
 )
 async def setup(ctx: PluginContext, config: _Config) -> None:
-    """events.spine.reflector.kernel_loop boot：注册 publisher marker 给 ctx。"""
+    del config
     ctx.provide("event.bus.reflector.kernel_loop", ReflectorClass)
-
