@@ -7,10 +7,10 @@ from pathlib import Path
 import pytest
 
 from lca.contracts.protocols.assistant.skill_overlay import SkillInstallReceipt, SkillSource
-from lca.infrastructure.skills.assistant_merged_store import AssistantMergedSkillStore
-from lca.infrastructure.skills.disk_store import DiskSkillPackageStore
-from lca.infrastructure.skills.settings import SkillSettings
-from lca.plugins.assistant.skill_overlay import AssistantSkillOverlayImpl
+from lca.infrastructure.skills.assistant.assistant_merged_store import AssistantMergedSkillStore
+from lca.infrastructure.skills.disk.disk_store import DiskSkillPackageStore
+from lca.infrastructure.skills.settings.settings import SkillSettings
+from lca.plugins.assistant.skill.skill_overlay import AssistantSkillOverlayImpl
 
 
 class _StubCatalog:

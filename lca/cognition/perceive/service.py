@@ -9,7 +9,7 @@ from lca.cognition.collaboration.group_assembly import (
     OrderedContributionCatalog,
     SingleAssemblyStrategy,
 )
-from lca.contracts.mechanisms.capability import MissingCapabilityError
+from lca.contracts.mechanisms.capability.capability import MissingCapabilityError
 from lca.contracts.protocols import MemorySystem, PerceiveHub, Sensor
 from lca.contracts.protocols.think.cognition import PerceiveHubAssembler
 

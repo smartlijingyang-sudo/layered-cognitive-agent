@@ -18,11 +18,11 @@ import pytest
 
 from lca.contracts.event import Category, EventPayload, Plane, TeamDelegationCacheHit
 from lca_kernel.events import _DEFAULT_CONFIG_DIR
-from lca_kernel.events.bus import DeliveryPolicy, EventBus, EventRef
-from lca_kernel.events.errors import EventNoSinkError
-from lca_kernel.events.payloads_spine import SpineEventPayload
-from lca_kernel.events.registry import EventRegistry, EventSpec
-from lca_kernel.events.spine_runtime import SpineEventRecord
+from lca_kernel.events.bus.bus import DeliveryPolicy, EventBus, EventRef
+from lca_kernel.events.errors.errors import EventNoSinkError
+from lca_kernel.events.payloads.payloads_spine import SpineEventPayload
+from lca_kernel.events.registry.registry import EventRegistry, EventSpec
+from lca_kernel.events.spine.spine_runtime import SpineEventRecord
 
 # ── helpers ──────────────────────────────────────────────────────────────
 
@@ -339,7 +339,7 @@ class TestEventsDeliveryCommand:
     def test_json_output(self, seeded_default_bus) -> None:
         from typer.testing import CliRunner
 
-        from lca.infrastructure.cli.cli import app
+        from lca.infrastructure.cli.cli.cli import app
 
         result = CliRunner().invoke(app, ["events-delivery", "--json"])
         assert result.exit_code == 0
@@ -354,7 +354,7 @@ class TestEventsDeliveryCommand:
     def test_category_filter(self, seeded_default_bus) -> None:
         from typer.testing import CliRunner
 
-        from lca.infrastructure.cli.cli import app
+        from lca.infrastructure.cli.cli.cli import app
 
         runner = CliRunner()
         hit = runner.invoke(
@@ -369,7 +369,7 @@ class TestEventsDeliveryCommand:
     def test_human_output_renders_table(self, seeded_default_bus) -> None:
         from typer.testing import CliRunner
 
-        from lca.infrastructure.cli.cli import app
+        from lca.infrastructure.cli.cli.cli import app
 
         result = CliRunner().invoke(app, ["events-delivery"])
         assert result.exit_code == 0

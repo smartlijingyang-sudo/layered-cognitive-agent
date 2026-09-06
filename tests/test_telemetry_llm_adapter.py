@@ -7,11 +7,11 @@ from collections.abc import AsyncIterator
 from typing import Any
 from unittest import mock
 
-from lca.contracts.atoms.enums import LLMStreamEventType
+from lca.contracts.atoms.enums.enums import LLMStreamEventType
 from lca.contracts.harness.memory.events import ThinkingCompleted, ThinkingDelta
 from lca.contracts.harness.tasks.session import event_type_of
-from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent, TokenUsage
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent, TokenUsage
+from lca.contracts.models.observability.journal.journal import (
     LlmCallCompleted,
     LlmCallStarted,
     ReasoningCompleted,
@@ -25,8 +25,8 @@ from lca.plugins.events.publishers._session_publish import (
     set_publish_session,
 )
 from lca.session.append import Session
-from lca_kernel.events.bus import EventBus
-from lca_kernel.events.test_catalog import build_test_bus
+from lca_kernel.events.bus.bus import EventBus
+from lca_kernel.events.test.test_catalog import build_test_bus
 
 
 class _FakeInner(LLMAdapter):

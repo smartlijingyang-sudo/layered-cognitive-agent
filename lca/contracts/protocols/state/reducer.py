@@ -9,12 +9,12 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.models.core.activation import ActivatedSkill
-from lca.contracts.models.core.decision import Turn
-from lca.contracts.models.core.perception import ContextManifest
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.core.stop import StopDecision
-from lca.contracts.models.core.terminal_outcome import ResumeCursor, TerminalOutcome
+from lca.contracts.models.core.workspace.activation import ActivatedSkill
+from lca.contracts.models.core.execution.decision import Turn
+from lca.contracts.models.core.perceive.perception import ContextManifest
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.core.policy.stop import StopDecision
+from lca.contracts.models.core.state.terminal_outcome import ResumeCursor, TerminalOutcome
 
 
 @runtime_checkable

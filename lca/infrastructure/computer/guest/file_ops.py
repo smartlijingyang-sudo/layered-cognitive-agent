@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.infrastructure.computer.constants import READ_FILE_DEFAULT_MAX_LINES
+from lca.infrastructure.computer.constants.constants import READ_FILE_DEFAULT_MAX_LINES
 from lca.infrastructure.computer.guest.json_script import compose_json_script
 from lca.infrastructure.computer.guest.preamble import SCRIPT_PRELUDE
 

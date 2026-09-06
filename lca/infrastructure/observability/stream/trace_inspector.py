@@ -11,7 +11,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from typing import Any, Literal
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     AgentRunFinished,
     LlmCallCompleted,
     RuntimeObserved,

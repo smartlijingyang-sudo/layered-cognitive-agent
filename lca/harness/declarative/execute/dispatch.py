@@ -5,19 +5,19 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import cast
 
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.protocols.act.command_envelope import CommandEnvelope, RunDelta
-from lca.contracts.protocols.act.effect_handler import EffectCapabilities, EffectHandlerRegistry
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.protocols.act.command.command_envelope import CommandEnvelope, RunDelta
+from lca.contracts.protocols.act.effect.effect_handler import EffectCapabilities, EffectHandlerRegistry
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     DeclarativeValidationError,
     DeltaReducer,
     EffectDispatcher,
     EffectPolicyPlan,
 )
-from lca.contracts.protocols.journal.idempotency import IdempotencyStore
+from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
 from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.state.reducer import Reducer
-from lca.infrastructure.component_registry import RegistryKeyError
+from lca.infrastructure.component.component_registry import RegistryKeyError
 
 
 class RegistryEffectDispatcher(EffectDispatcher):

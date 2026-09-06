@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from lca.contracts.protocols import AgentTransport, TransportRegistryProtocol
-from lca.infrastructure.component_registry import NamedRegistry, RegistryKeyError
+from lca.infrastructure.component.component_registry import NamedRegistry, RegistryKeyError
 
 
 class TransportNotFoundError(RegistryKeyError):

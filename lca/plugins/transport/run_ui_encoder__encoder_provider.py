@@ -11,7 +11,7 @@ import json
 from collections.abc import AsyncIterator
 from typing import Any, Protocol
 
-from lca.contracts.observability.status import RunLifecycleStatus
+from lca.contracts.observability.registry.status import RunLifecycleStatus
 
 _OUTPUT_TRUNCATE = 2000
 

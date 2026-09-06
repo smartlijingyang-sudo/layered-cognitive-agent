@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import unittest
 
-from lca.cognition.brain.tool_call_stream import (
+from lca.cognition.brain.prompt.tool_call_stream import (
     parse_partial_tool_args,
     push_tool_call_stream,
 )
@@ -102,7 +102,7 @@ class TestPushToolCallStream(unittest.TestCase):
         assert len(slots["c2"]["raw"]) >= 160
 
         # raw 可以被 parse_partial_tool_args 还原 partial dict
-        from lca.cognition.brain.tool_call_stream import parse_partial_tool_args
+        from lca.cognition.brain.prompt.tool_call_stream import parse_partial_tool_args
 
         partial = parse_partial_tool_args(slots["c2"]["raw"])
         assert isinstance(partial, dict)

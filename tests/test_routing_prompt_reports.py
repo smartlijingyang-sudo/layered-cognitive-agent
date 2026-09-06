@@ -6,18 +6,18 @@ import unittest
 from datetime import datetime, timezone
 
 from lca.cognition.brain.prompts import load_builtin_prompt
-from lca.cognition.brain.reasoner import (
+from lca.cognition.brain.reasoner.reasoner import (
     PromptReasoner,
     build_member_reports_text,
 )
-from lca.contracts.atoms.enums import LLMStreamEventType, MemoryLayer, MemoryRecordKind
-from lca.contracts.atoms.semantic_keys import META_ROLE, META_STEP
-from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
-from lca.contracts.models.core.memory import MemoryRecord
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.team.delegation import DelegationResult
-from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.models.team.team_awareness import TeamAwareness
+from lca.contracts.atoms.enums.enums import LLMStreamEventType, MemoryLayer, MemoryRecordKind
+from lca.contracts.atoms.semantic.semantic_keys import META_ROLE, META_STEP
+from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
+from lca.contracts.models.core.conversation.memory import MemoryRecord
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.team.delegation.delegation import DelegationResult
+from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.team.team_awareness import TeamAwareness
 
 
 def _profile(role: str) -> RoleProfile:

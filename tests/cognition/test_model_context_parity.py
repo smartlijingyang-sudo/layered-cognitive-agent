@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from lca.infrastructure.session.model_context_assembler import DefaultModelContextAssembler
-from lca.plugins.session.runtime.messages import derive_messages
+from lca.infrastructure.session.context.model_context_assembler import DefaultModelContextAssembler
+from lca.plugins.session.runtime.messages.messages import derive_messages
 from lca.session.append import Session
-from lca_kernel.events.fold import (
+from lca_kernel.events.fold.fold import (
     REQUEST_HEADER_CATEGORY,
     SURFACE_ASSISTANT_TYPE,
     SURFACE_USER_TYPE,

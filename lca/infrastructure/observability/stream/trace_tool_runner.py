@@ -10,8 +10,8 @@ from collections.abc import Sequence
 from dataclasses import asdict
 from typing import Any
 
-from lca.contracts.models.observability.journal import StampedEvent
-from lca.contracts.observability.trace_tool import TraceTool
+from lca.contracts.models.observability.journal.journal import StampedEvent
+from lca.contracts.observability.trace.trace_tool import TraceTool
 from lca.infrastructure.observability.stream.trace_inspector import TraceFocus, TraceInspector
 
 

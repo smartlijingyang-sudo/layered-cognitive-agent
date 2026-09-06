@@ -24,10 +24,10 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from lca.contracts.models.observability.journal import StampedEvent
-from lca.contracts.models.observability.journal_catalog import JOURNAL_EVENT_CLASSES
-from lca.contracts.observability.journal_format_errors import JournalFormatError
-from lca.contracts.observability.journal_store import JournalStoreBackend
+from lca.contracts.models.observability.journal.journal import StampedEvent
+from lca.contracts.models.observability.journal.journal_catalog import JOURNAL_EVENT_CLASSES
+from lca.contracts.observability.journal.journal_format_errors import JournalFormatError
+from lca.contracts.observability.journal.journal_store import JournalStoreBackend
 from lca.infrastructure.observability.journal.schema_version import (
     SCHEMA_VERSION,
     check_schema_version,
@@ -116,13 +116,13 @@ class FilesystemJournalStore(JournalStoreBackend):
             data = payload.get("data", {}) or {}
             ignorable = bool(data.get("ignorable", False))
             if event_type not in JOURNAL_EVENT_CLASSES and not ignorable:
-                from lca.contracts.observability.journal_format_errors import (
+                from lca.contracts.observability.journal.journal_format_errors import (
                     UnknownEventType,
                 )
 
                 raise UnknownEventType(event_type)
             # 重建 StampedEvent 的最小骨架,seq/ts/event_type/data 已够消费
-            from lca.contracts.models.observability.journal import (
+            from lca.contracts.models.observability.journal.journal import (
                 JournalEvent,
                 RunScope,
             )

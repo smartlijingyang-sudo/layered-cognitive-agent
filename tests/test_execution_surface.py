@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from lca.contracts.models.core.plane import PlaneKind, PlaneRef
-from lca.infrastructure.runtime_plane.resolve import PlaneBindings
-from lca.infrastructure.runtime_plane.scope import plane_bindings_scope
-from lca.infrastructure.sandbox.factory import set_sandbox_resolver
-from lca.infrastructure.sandbox.surface import environment_note, skill_preamble
+from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
+from lca.infrastructure.runtime_plane.resolve.resolve import PlaneBindings
+from lca.infrastructure.runtime_plane.scope.scope import plane_bindings_scope
+from lca.infrastructure.sandbox.factory.factory import set_sandbox_resolver
+from lca.infrastructure.sandbox.surface.surface import environment_note, skill_preamble
 
 
 def test_machine_prompt_uses_real_root() -> None:

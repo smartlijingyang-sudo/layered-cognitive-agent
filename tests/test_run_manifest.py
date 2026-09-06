@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.observability.run_manifest import (
+from lca.contracts.observability.registry.run_manifest import (
     IntegrityState,
     ManifestEvidence,
     RunManifest,
@@ -141,7 +141,7 @@ def test_manifest_plan_ref_round_trip_with_real_compiled_run_plan_ref() -> None:
     """
     from lca.harness.plan import compiled_run_plan_ref
     from lca.harness.composition.plan_compiler import compile_plan
-    from lca.harness.profile.resolve import resolve_profile
+    from lca.harness.profile.resolve.resolve import resolve_profile
 
     profile = resolve_profile("profiles/web-standard.yaml")
     plan = compile_plan(profile)

@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.atoms.artifact_state import ArtifactState
+from lca.contracts.atoms.artifact.artifact_state import ArtifactState
 from lca.plugins.creator.personas import (
     CreatorFace,
     CreatorResult,

@@ -12,16 +12,16 @@ import asyncio
 
 import pytest
 
-from lca.cognition.body.team_message_tool import (
+from lca.cognition.body.actions.team_message_tool import (
     TEAM_MESSAGE_TOOL_NAME,
     build_team_message_publish_tool,
     publish_team_message,
 )
 from lca.cognition.perceive.hub import SequentialPerceiveHub
 from lca.cognition.sensors import TeamInboxSensor
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.observability.journal import TeamMessagePublished
+from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.observability.journal.journal import TeamMessagePublished
 from lca.infrastructure.observability.journal.engine.engine import RunStore
 
 

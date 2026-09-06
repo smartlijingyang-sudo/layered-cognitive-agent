@@ -20,12 +20,12 @@ from typing import Any
 from lca.infrastructure.observability.loop_cursor import (
     StdLoopCursor,
 )
-from lca.infrastructure.observability.loop_cursor.bind import reset_run_cursor
-from lca.infrastructure.observability.loop_cursor.factory import LoopCursorFactory
-from lca.infrastructure.observability.loop_cursor.projection_host import StdProjectionHost
-from lca.plugins.session.runtime.store import SessionStore
+from lca.infrastructure.observability.loop_cursor.bind.bind import reset_run_cursor
+from lca.infrastructure.observability.loop_cursor.factory.factory import LoopCursorFactory
+from lca.infrastructure.observability.loop_cursor.projection.projection_host import StdProjectionHost
+from lca.plugins.session.runtime.store.store import SessionStore
 from lca.plugins.transport.webserver.carrier.runs.execute import create_run_session
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunRegistry
 
 
 def _reset_session_contextvars(session: Any) -> None:
@@ -66,7 +66,7 @@ class _SpyFactory:
     def create_run_components(self, *, spine_path: Path) -> Any:
         from dataclasses import dataclass as _dc
 
-        from lca.contracts.observability.run_journal import RunJournalComponents
+        from lca.contracts.observability.journal.run_journal import RunJournalComponents
         from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 
         @_dc(frozen=True)
@@ -110,16 +110,16 @@ class _Context:
         # PR-7:observability seam registries. Pre-populated with the
         # same factories that observability-default bundle injects in prod.
         from lca.infrastructure.observability import NamedRegistry
-        from lca.infrastructure.observability.loop_cursor.close_barrier_impl import (
+        from lca.infrastructure.observability.loop_cursor.close.close_barrier_impl import (
             StdCloseBarrier,
         )
-        from lca.infrastructure.observability.loop_cursor.factory import (
+        from lca.infrastructure.observability.loop_cursor.factory.factory import (
             LoopCursorFactory,
         )
-        from lca.infrastructure.observability.loop_cursor.persistence_coordinator import (
+        from lca.infrastructure.observability.loop_cursor.persistence.persistence_coordinator import (
             NullPersistenceCoordinator,
         )
-        from lca.infrastructure.observability.loop_cursor.projection_host import (
+        from lca.infrastructure.observability.loop_cursor.projection.projection_host import (
             StdProjectionHost,
         )
 

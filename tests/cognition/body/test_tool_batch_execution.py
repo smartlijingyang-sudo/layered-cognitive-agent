@@ -5,25 +5,25 @@ from typing import Any, ClassVar
 
 import pytest
 
-from lca.cognition.body.action_handlers import UseToolOperation
-from lca.cognition.body.tool_batch_execution import (
+from lca.cognition.body.actions.action_handlers import UseToolOperation
+from lca.cognition.body.tools.tool_batch_execution import (
     ParallelToolBatchExecutionPolicy,
     SafeToolBatchExecutionPolicy,
     SegmentedSafeToolBatchExecutionPolicy,
     SequentialToolBatchExecutionPolicy,
 )
-from lca.contracts.atoms.enums import ActionType, MemoryRecordKind
-from lca.contracts.atoms.semantic_keys import OBS_RESULT_KIND
-from lca.contracts.models.core.budget import create_budget
-from lca.contracts.models.core.decision import Decision, Observation, ToolCall
-from lca.contracts.models.core.result import ToolExecutionError
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.protocols.act.tool_batch_execution import (
+from lca.contracts.atoms.enums.enums import ActionType, MemoryRecordKind
+from lca.contracts.atoms.semantic.semantic_keys import OBS_RESULT_KIND
+from lca.contracts.models.core.policy.budget import create_budget
+from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall
+from lca.contracts.models.core.execution.result import ToolExecutionError
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.protocols.act.tool.tool_batch_execution import (
     ToolBatchEntry,
     ToolBatchExecutionMode,
     ToolBatchExecutionSegment,
 )
-from lca.plugins.act.tool_batch_execution_policy_provider import build_tool_batch_execution_policy
+from lca.plugins.act.tool.tool_batch_execution_policy_provider import build_tool_batch_execution_policy
 
 
 class _Tool:
@@ -281,7 +281,7 @@ def test_provider_rejects_unknown_policy_mode() -> None:
 async def test_batch_executor_resolves_every_tool_before_dispatch() -> None:
     """缺少任一工具时，批次接缝不得启动部分世界副作用。"""
 
-    from lca.cognition.body.tool_batch_executor import ToolBatchExecutor
+    from lca.cognition.body.tools.tool_batch_executor import ToolBatchExecutor
 
     available = _Tool("available", is_idempotent=True)
     executor = _RecordingSafeExecutor()
@@ -309,7 +309,7 @@ async def test_batch_executor_falls_back_to_canonicalised_name() -> None:
     snake_case 进 journal),只在 dispatch 前 normalize 解析。
     """
 
-    from lca.cognition.body.tool_batch_executor import ToolBatchExecutor
+    from lca.cognition.body.tools.tool_batch_executor import ToolBatchExecutor
 
     camel_tool = _Tool("exportFile", is_idempotent=True)
     safe_executor = _RecordingSafeExecutor()
@@ -331,7 +331,7 @@ async def test_batch_executor_falls_back_to_canonicalised_name() -> None:
 async def test_batch_executor_marks_single_result_as_tool_result() -> None:
     """单工具路径与批次路径共享工具结果类别这一测试表面。"""
 
-    from lca.cognition.body.tool_batch_executor import ToolBatchExecutor
+    from lca.cognition.body.tools.tool_batch_executor import ToolBatchExecutor
 
     read = _Tool("read", is_idempotent=True)
     executor = _RecordingSafeExecutor()

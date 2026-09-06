@@ -18,9 +18,9 @@ from lca.cognition.member_status.consult_policy import (
     compute_consult_next,
     compute_required_action_from_duty,
 )
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.team.member_status import MemberStatus
-from lca.contracts.models.team.team_awareness import ConsultDuty
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.team.member.member_status import MemberStatus
+from lca.contracts.models.team.team.team_awareness import ConsultDuty
 
 
 @dataclass(frozen=True)

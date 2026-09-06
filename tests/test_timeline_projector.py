@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.models.observability.journal import ReasoningDelta, RunScope, StampedEvent
+from lca.contracts.models.observability.journal.journal import ReasoningDelta, RunScope, StampedEvent
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 
 

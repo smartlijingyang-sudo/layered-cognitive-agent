@@ -56,7 +56,7 @@ PROFILES_AND_BASELINES: list[tuple[str, str]] = [
 
 def _capture(profile: str) -> dict:
     """Boot ``profile`` and capture its capability graph (id/manifest/edges)."""
-    from lca.harness.diagnostics.inspect import (
+    from lca.harness.diagnostics.inspect.inspect import (
         format_capability_graph,
         inspect_profile_tree,
     )

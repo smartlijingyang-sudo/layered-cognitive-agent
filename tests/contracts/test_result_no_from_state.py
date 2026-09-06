@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import inspect
 
-from lca.contracts.models.core.result import Result
+from lca.contracts.models.core.execution.result import Result
 
 
 def test_result_has_no_from_state_classmethod() -> None:

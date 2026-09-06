@@ -13,7 +13,7 @@ from __future__ import annotations
 def test_agent_state_has_no_final_output_field() -> None:
     """ADR-0158 决策 四:AgentState.final_output 字段必须删除。"""
 
-    from lca.contracts.models.core.state import AgentState
+    from lca.contracts.models.core.state.state import AgentState
 
     assert "final_output" not in AgentState.__annotations__, (
         "AgentState.final_output 字段必须删除(ADR-0158 决策 四);"

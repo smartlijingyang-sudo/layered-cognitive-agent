@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 
-from lca.harness.profile.boot import boot_profile
+from lca.harness.profile.boot.boot import boot_profile
 from lca.infrastructure.observability.writable_matrix import NullStorage
 from lca.infrastructure.observability.writable_matrix.registry import (
     WritableFaceRegistry,

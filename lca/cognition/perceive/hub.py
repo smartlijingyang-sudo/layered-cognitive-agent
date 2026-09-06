@@ -6,20 +6,20 @@ from collections.abc import Sequence
 
 import structlog
 
-from lca.cognition.brain.context_manifest import build_manifest_from_items, digest_manifest
+from lca.cognition.brain.pipeline.context_manifest import build_manifest_from_items, digest_manifest
 from lca.contracts.harness.fold.perceive import fold_gate_decisions_from_events
 from lca.contracts.harness.state.context_budget import (
     DEFAULT_CONTEXT_BUDGET_CHARS,
     ContextBudgeter,
 )
-from lca.contracts.models.core.gate_policy import GateDecided
-from lca.contracts.models.core.perception import ContextItem, ContextManifest
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.observability.diagnostic import DiagnosticCategory, DiagnosticStatus
+from lca.contracts.models.core.policy.gate_policy import GateDecided
+from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.observability.diagnostic.diagnostic import DiagnosticCategory, DiagnosticStatus
 from lca.contracts.protocols import MemorySystem, PerceiveHub, Sensor
 from lca.contracts.protocols.think.cognition import SensorDisabledError
-from lca.infrastructure.session.bindings import resolve_session_reader
-from lca.infrastructure.session.fact_committer import emit_diagnostic
+from lca.infrastructure.session._overflow_0.bindings import resolve_session_reader
+from lca.infrastructure.session.commit.fact_committer import emit_diagnostic
 
 _log = structlog.get_logger("lca.perceive_hub")
 

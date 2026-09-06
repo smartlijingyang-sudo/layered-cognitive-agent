@@ -11,19 +11,25 @@ ADR-0185 PR-4:``CurrentReasonerPrompt`` 已迁出至
 一并删除(viewer / replay / explain 改走 spine.jsonl + foldRequestHeader)。
 """
 
-from lca.infrastructure.observability.loop_cursor.bind import (
+import importlib
+
+from lca.infrastructure.observability.loop_cursor.bind.bind import (
     SpineWritePortAdapter,
     install_run_cursor,
     reset_run_cursor,
 )
-from lca.infrastructure.observability.loop_cursor.factory import LoopCursorFactory
-from lca.infrastructure.observability.loop_cursor.in_memory import InMemoryLoopCursor
-from lca.infrastructure.observability.loop_cursor.persistence_coordinator import (
+from lca.infrastructure.observability.loop_cursor.factory.factory import LoopCursorFactory
+
+_in_memory_mod = importlib.import_module(
+    "lca.infrastructure.observability.loop_cursor.in.in_memory"
+)
+InMemoryLoopCursor = _in_memory_mod.InMemoryLoopCursor
+from lca.infrastructure.observability.loop_cursor.persistence.persistence_coordinator import (
     FilePersistenceCoordinator,
     NullPersistenceCoordinator,
     PersistenceCoordinator,
 )
-from lca.infrastructure.observability.loop_cursor.std import StdLoopCursor
+from lca.infrastructure.observability.loop_cursor.std.std import StdLoopCursor
 
 __all__ = [
     "FilePersistenceCoordinator",

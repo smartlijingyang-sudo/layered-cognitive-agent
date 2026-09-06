@@ -13,14 +13,14 @@ from collections.abc import Sequence
 
 import pytest
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     AgentRunFinished,
     AgentRunStarted,
     LlmCallCompleted,
     StampedEvent,
     TeamRunFinished,
 )
-from lca.contracts.observability.ledger import LedgerSealedError, RunLedger
+from lca.contracts.observability.journal.ledger import LedgerSealedError, RunLedger
 from lca.infrastructure.observability.journal.engine.engine import RunStore
 
 

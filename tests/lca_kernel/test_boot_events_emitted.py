@@ -34,19 +34,19 @@ from typing import Any
 
 from cordis import Context
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     BootObservabilityAssembled,
     BootPluginFiberSpawned,
     BootProfileResolved,
 )
-from lca.contracts.models.observability.journal_catalog import JOURNAL_EVENT_CLASSES
-from lca.contracts.observability.journal_store import JournalStoreBackend
+from lca.contracts.models.observability.journal.journal_catalog import JOURNAL_EVENT_CLASSES
+from lca.contracts.observability.journal.journal_store import JournalStoreBackend
 from lca.harness.observability.assemble import make_minimal_bound
 from lca.infrastructure.observability import AttributePolicy
 from lca.infrastructure.observability.journal.backends.memory import InMemoryJournalStore
 from lca.infrastructure.observability.journal.engine.engine import RunStore
-from lca_kernel.boot import _emit_boot_events  # pyright: ignore[reportPrivateUsage]
-from lca_kernel.stages import Stage
+from lca_kernel.boot.boot import _emit_boot_events  # pyright: ignore[reportPrivateUsage]
+from lca_kernel.boot.stages import Stage
 
 
 class _CaptureStore(JournalStoreBackend):

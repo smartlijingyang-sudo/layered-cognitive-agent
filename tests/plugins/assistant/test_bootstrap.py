@@ -24,17 +24,17 @@ from typing import Any
 import pytest
 
 from lca.contracts.capabilities import ASSISTANT_BOOTSTRAP, ASSISTANT_CATALOG
-from lca.contracts.models.core.perception import ContextManifest
+from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
 from lca.harness.plugin_api import definition_from_plugin
 from lca.harness.plugin.manifest import EffectClass
-from lca.plugins.assistant.bootstrap import (
+from lca.plugins.assistant.bootstrap.bootstrap import (
     BootstrapProjection,
     BootstrapProjectionService,
     project_home_to_context_manifest,
     setup,
 )
-from lca.plugins.assistant.catalog import (
+from lca.plugins.assistant.catalog.catalog import (
     AssistantCatalogError,
     AssistantCatalogImpl,
     AssistantDigestMismatch,
@@ -80,7 +80,7 @@ def bootstrap_service(catalog: AssistantCatalogImpl) -> BootstrapProjectionServi
 class TestPluginManifest:
     def test_definition_id_namespace(self) -> None:
         definition = definition_from_plugin(setup)
-        assert definition.spec.id == "lca.plugins.assistant.bootstrap"
+        assert definition.spec.id == "lca.plugins.assistant.bootstrap.bootstrap"
 
     def test_provides_assistant_bootstrap(self) -> None:
         definition = definition_from_plugin(setup)
@@ -95,7 +95,7 @@ class TestPluginManifest:
         assert definition.spec.layer == "L4"
 
     def test_kind_is_seam(self) -> None:
-        from lca.contracts.protocols.declarative.declarative_common import PluginSpecKind
+        from lca.contracts.protocols.declarative.declarative_1.declarative_common import PluginSpecKind
 
         definition = definition_from_plugin(setup)
         assert definition.spec.kind is PluginSpecKind.SEAM
@@ -199,7 +199,7 @@ class TestProjectHomeToContextManifest:
         self,
         assistant_a: Any,
     ) -> None:
-        from lca.contracts.models.core.perception import ContextClass
+        from lca.contracts.models.core.perceive.perception import ContextClass
 
         manifest = project_home_to_context_manifest(
             spec_home=Path(assistant_a.home_path),
@@ -284,7 +284,7 @@ class TestBootstrapProjectionService:
         soul_path.write_text("new SOUL content", encoding="utf-8")
         manifest_path = Path(assistant_a.home_path) / "manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        from lca.plugins.assistant._home_layout import sha256_digest
+        from lca.plugins.assistant.home._home_layout import sha256_digest
 
         manifest["digests"]["SOUL.md"] = sha256_digest(soul_path)
         manifest_path.write_text(
@@ -311,7 +311,7 @@ class TestCrossAssistantProjectionIsolation:
         # 同步更新 A 的 manifest.digests 以便通过 catalog digest 校验
         manifest_path = Path(assistant_a.home_path) / "manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        from lca.plugins.assistant._home_layout import sha256_digest
+        from lca.plugins.assistant.home._home_layout import sha256_digest
 
         manifest["digests"]["SOUL.md"] = sha256_digest(Path(assistant_a.home_path) / "SOUL.md")
         manifest_path.write_text(
@@ -340,7 +340,7 @@ class TestCrossAssistantProjectionIsolation:
         # 同步更新 A 的 manifest.digests
         manifest_path = Path(assistant_a.home_path) / "manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        from lca.plugins.assistant._home_layout import sha256_digest
+        from lca.plugins.assistant.home._home_layout import sha256_digest
 
         manifest["digests"]["goals.yaml"] = sha256_digest(goals_path_a)
         manifest_path.write_text(

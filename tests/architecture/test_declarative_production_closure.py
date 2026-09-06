@@ -79,8 +79,8 @@ def test_plan_binding_rejects_v1_fallback_candidates():
 
 async def test_incomplete_runnable_profile_is_rejected_during_boot_before_binding():
     """Plan validation belongs to boot, before a composer can consume a scope."""
-    from lca.harness.profile.boot import boot_resolved_profile
-    from lca.harness.profile.resolve import resolve_profile
+    from lca.harness.profile.boot.boot import boot_resolved_profile
+    from lca.harness.profile.resolve.resolve import resolve_profile
 
     resolved = resolve_profile("profiles/web-standard.yaml")
     missing_stop = tuple(
@@ -97,8 +97,8 @@ async def test_incomplete_runnable_profile_is_rejected_during_boot_before_bindin
 
 def test_plan_binding_rejects_a_scope_without_the_boot_frozen_plan():
     """Composition must not silently create a second plan from profile data."""
-    from lca.contracts.mechanisms.capability import MissingCapabilityError
-    from lca.harness.profile.resolve import resolve_profile
+    from lca.contracts.mechanisms.capability.capability import MissingCapabilityError
+    from lca.harness.profile.resolve.resolve import resolve_profile
     from lca.plugins.composer.composition.plan_binding import compiled_plan_from_scope
 
     resolved = resolve_profile("profiles/web-standard.yaml")

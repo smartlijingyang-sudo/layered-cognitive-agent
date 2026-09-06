@@ -11,12 +11,12 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from lca.contracts.observability.ledger import RunLedgerFactory
-from lca.contracts.observability.run_journal import (
+from lca.contracts.observability.journal.ledger import RunLedgerFactory
+from lca.contracts.observability.journal.run_journal import (
     RunJournalComponents,
     RunJournalFactory,
 )
-from lca.harness.profile.boot import boot_profile
+from lca.harness.profile.boot.boot import boot_profile
 from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
 from lca.infrastructure.observability.backends.run_locator_fs import (
     FilesystemRunLocator,
@@ -30,20 +30,20 @@ from lca.infrastructure.observability.writable_matrix.registry import (
 from lca.plugins.transport.webserver.carrier.runs.execute import (
     create_run_session,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunRegistry
 
 
 def _install_observability_seams(services: dict[str, object]) -> None:
     """Bind ObservabilityRuntime seam registries for stub ctx."""
     from lca.infrastructure.observability import NamedRegistry
-    from lca.infrastructure.observability.loop_cursor.close_barrier_impl import (
+    from lca.infrastructure.observability.loop_cursor.close.close_barrier_impl import (
         StdCloseBarrier,
     )
-    from lca.infrastructure.observability.loop_cursor.factory import LoopCursorFactory
-    from lca.infrastructure.observability.loop_cursor.persistence_coordinator import (
+    from lca.infrastructure.observability.loop_cursor.factory.factory import LoopCursorFactory
+    from lca.infrastructure.observability.loop_cursor.persistence.persistence_coordinator import (
         NullPersistenceCoordinator,
     )
-    from lca.infrastructure.observability.loop_cursor.projection_host import (
+    from lca.infrastructure.observability.loop_cursor.projection.projection_host import (
         StdProjectionHost,
     )
 

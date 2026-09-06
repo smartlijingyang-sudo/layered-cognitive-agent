@@ -18,15 +18,15 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from lca.contracts.protocols.session.persistence_service import CheckpointFailure
+from lca.contracts.protocols.session.persistence.persistence_service import CheckpointFailure
 from lca.plugins.session.checkpoint_policy.checkpoint_policy import (
     Config,
     FlushableSession,
     SessionCheckpointPolicy,
     setup,
 )
-from lca.plugins.session.runtime.store import SessionStore
-from lca_kernel.events.session import FlushResult
+from lca.plugins.session.runtime.store.store import SessionStore
+from lca_kernel.events.session.session import FlushResult
 
 _ENTRY_POINTS = ("before_model_request", "before_tool_side_effect", "at_step_boundary")
 """三个 fail-closed 边界(DSH llm/stream、tools/execute、agent/pre-step)。"""

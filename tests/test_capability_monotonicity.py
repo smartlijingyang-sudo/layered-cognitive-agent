@@ -11,7 +11,7 @@ child grants must be a subset of parent grants.
 
 from __future__ import annotations
 
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.scope.scope import Scope
 
 
 class TestCapabilityMonotonicity:
@@ -19,7 +19,7 @@ class TestCapabilityMonotonicity:
 
     def test_child_grants_subset_of_parent(self) -> None:
         """Verify child grants ⊆ parent grants."""
-        from lca.contracts.protocols.act.command_envelope import CapabilityGrant
+        from lca.contracts.protocols.act.command.command_envelope import CapabilityGrant
 
         # Parent grants
         parent_grants = (
@@ -50,7 +50,7 @@ class TestCapabilityMonotonicity:
 
     def test_artifact_grants_monotonic(self) -> None:
         """Verify artifact grants are monotonic."""
-        from lca.contracts.protocols.act.command_envelope import CapabilityGrant
+        from lca.contracts.protocols.act.command.command_envelope import CapabilityGrant
 
         # Parent grants
         parent_grants = (

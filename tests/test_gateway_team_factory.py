@@ -6,8 +6,8 @@ import json
 import unittest
 
 from lca.agent.role_library import FileRoleLibrary
-from lca.application.api import Agent, Team
-from lca.application.casting import LLMTeamCaster
+from lca.application.api.api import Agent, Team
+from lca.application.authoring.casting import LLMTeamCaster
 from lca.cognition.team.modes.default_modes import (
     build_runnable_team,
     build_solo_agent,
@@ -16,9 +16,9 @@ from lca.cognition.team.modes.default_modes import (
 from lca.plugins.collaboration.modes.solo import filter_solo_tools
 from lca.cognition.team.modes_catalog import ALL_MODES
 from lca.contracts.capabilities import TEAM_CASTER, TEAM_ROLE_LIBRARY
-from lca.contracts.mechanisms.capability import MissingCapabilityError
-from lca.contracts.models.core.llm import LLMResponse
-from lca.plugins.collaboration.team_casting_prompt_renderer_seam import (
+from lca.contracts.mechanisms.capability.capability import MissingCapabilityError
+from lca.contracts.models.core.conversation.llm import LLMResponse
+from lca.plugins.collaboration.team_1.team_casting_prompt_renderer_seam import (
     BuiltinCastingPromptRenderer,
 )
 from tests.harness.collector import InMemoryObservability

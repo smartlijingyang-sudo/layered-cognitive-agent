@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     AgentRunFinished,
     ReasoningDelta,
     RunScope,
@@ -22,8 +22,8 @@ from lca.contracts.models.observability.journal import (
     ToolStarted,
 )
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunSession
-from lca.plugins.transport.webserver.handlers.runs.terminal.legacy_adapter import RegistryRunAdapter
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunRegistry, RunSession
+from lca.plugins.transport.webserver.handlers.runs.terminal.legacy.legacy_adapter import RegistryRunAdapter
 
 _seq_counter = [0]
 

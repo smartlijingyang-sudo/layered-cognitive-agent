@@ -6,13 +6,13 @@ from collections.abc import Awaitable, Callable
 from typing import Any, cast
 
 from lca.contracts.protocols import Sandbox, Tool
-from lca.contracts.protocols.runtime.infra import MachineTransport
-from lca.infrastructure.computer.machine import MachineComputer
-from lca.infrastructure.computer.ops import ComputerOps
+from lca.contracts.protocols.runtime.infra.infra import MachineTransport
+from lca.infrastructure.computer.machine.machine import MachineComputer
+from lca.infrastructure.computer.ops.ops import ComputerOps
 
 # Lazy import SandboxComputer below to break circular: computer ↔ tools.
-from lca.infrastructure.file_store import FileStore
-from lca.infrastructure.tools.builder import build_tools_from_manifest
+from lca.infrastructure.file.file_store import FileStore
+from lca.infrastructure.tools.builder.builder import build_tools_from_manifest
 from lca.infrastructure.tools.lca_computer.executor import LcaComputerExecutor, LcaSandboxExecutor
 from lca.infrastructure.tools.lca_computer.manifest import (
     CLOUD_SANDBOX_MANIFEST,
@@ -38,7 +38,7 @@ def _computer_obs_builder(store: FileStore) -> Callable[..., Any]:
     """Return an observation builder bound to a FileStore."""
 
     def _build(raw: Any, tool_name: str, start: float) -> Any:
-        from lca.infrastructure.computer.op_result import ComputerOpResult
+        from lca.infrastructure.computer.op.op_result import ComputerOpResult
 
         if isinstance(raw, ComputerOpResult):
             return build_computer_observation(raw, tool_name=tool_name, start=start, store=store)
@@ -68,8 +68,8 @@ def build_computer_tools(
     if ops is not None:
         runtime = ops
     elif sandbox is not None:
-        from lca.infrastructure.computer.sandbox_computer import SandboxComputer
-        from lca.infrastructure.runtime_plane.resolve import sandbox_ref_from
+        from lca.infrastructure.computer.sandbox.sandbox_computer import SandboxComputer
+        from lca.infrastructure.runtime_plane.resolve.resolve import sandbox_ref_from
 
         runtime = SandboxComputer(
             plane=plane or sandbox_ref_from(sandbox),

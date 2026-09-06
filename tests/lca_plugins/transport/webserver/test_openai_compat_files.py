@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from lca.plugins.transport.webserver.router import RouteRegistry
+from lca.plugins.transport.webserver.router.router import RouteRegistry
 
 
 class _FakeRuntime:
@@ -41,7 +41,7 @@ class _FakeCtx:
 
 @pytest.mark.asyncio
 async def test_routes_openai_compat_files_register_six_routes() -> None:
-    from lca.plugins.transport.webserver.routes_openai_compat_files import setup as plugin
+    from lca.plugins.transport.webserver.routes_1.routes_openai_compat_files import setup as plugin
 
     router = RouteRegistry()
     ctx = _FakeCtx(router)
@@ -53,7 +53,7 @@ async def test_routes_openai_compat_files_register_six_routes() -> None:
 
 @pytest.mark.asyncio
 async def test_routes_openai_compat_files_paths_match_baseline() -> None:
-    from lca.plugins.transport.webserver.routes_openai_compat_files import setup as plugin
+    from lca.plugins.transport.webserver.routes_1.routes_openai_compat_files import setup as plugin
 
     router = RouteRegistry()
     ctx = _FakeCtx(router)
@@ -72,7 +72,7 @@ async def test_routes_openai_compat_files_paths_match_baseline() -> None:
 
 @pytest.mark.asyncio
 async def test_routes_openai_compat_files_effects_tracked() -> None:
-    from lca.plugins.transport.webserver.routes_openai_compat_files import setup as plugin
+    from lca.plugins.transport.webserver.routes_1.routes_openai_compat_files import setup as plugin
 
     router = RouteRegistry()
     ctx = _FakeCtx(router)

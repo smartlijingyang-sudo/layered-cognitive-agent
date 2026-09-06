@@ -15,7 +15,7 @@ from pathlib import Path
 from lca.infrastructure.observability.journal.backends.filesystem import (
     FilesystemJournalStore,
 )
-from lca.infrastructure.observability.spine.event_spine import EventSpine
+from lca.infrastructure.observability.spine.event.event_spine import EventSpine
 from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
 from lca.infrastructure.observability.spine.sinks.routing_file_sink import (
     RunRoutingFileSink,
@@ -118,7 +118,7 @@ def test_legacy_events_jsonl_no_longer_loaded(tmp_path: Path) -> None:
     assert len(store.events()) == 0
 
     # 后续 append 写到 <run_id>.spine.jsonl(新默认)
-    from lca.contracts.models.observability.journal import (
+    from lca.contracts.models.observability.journal.journal import (
         JournalEvent,
         RunScope,
         StampedEvent,

@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from lca.contracts.atoms.telemetry import (
+from lca.contracts.atoms.telemetry.telemetry import (
     ATTR_COMPLETION_TOKENS,
     ATTR_LATENCY_MS,
     ATTR_MODEL,
@@ -18,7 +18,7 @@ from lca.contracts.atoms.telemetry import (
     ATTR_PROMPT_TOKENS,
     ATTR_RESPONSE_PREVIEW,
 )
-from lca.contracts.models.observability.journal import LlmCallCompleted
+from lca.contracts.models.observability.journal.journal import LlmCallCompleted
 from lca.infrastructure.observability.backends.langfuse_conventions import (
     GEN_AI_INPUT,
     GEN_AI_OPERATION,

@@ -18,7 +18,7 @@ from typing import Any, ClassVar
 
 import pytest
 
-from lca_kernel.events.bus import EventBus
+from lca_kernel.events.bus.bus import EventBus
 
 # ── fixtures ────────────────────────────────────────────────────────────
 # bus / bound_session 来自上层 conftest:publish 走绑定 Session 路径
@@ -110,8 +110,8 @@ def test_i_mv_1_model_visible_publisher_authorized(bus: EventBus[Any]) -> None:
 def test_i_mv_1_unauthorized_producer_rejected(bus: EventBus[Any]) -> None:
     """非授权 class publish → ``UnauthorizedPublishError``(鉴权矩阵生效)。"""
     from lca.contracts.event import Category
-    from lca_kernel.events.errors import UnauthorizedPublishError
-    from lca_kernel.events.payloads_model_visible import (
+    from lca_kernel.events.errors.errors import UnauthorizedPublishError
+    from lca_kernel.events.payloads.payloads_model_visible import (
         SpineLlmRequestHeaderPayload,
     )
 
@@ -182,8 +182,8 @@ def test_capture_pre_llm_advances_cursor_step(hook: Any) -> None:
     ``step.*.record`` payload.step_index=0 挂不上 fold 帧 →
     journal.tool_total=0(H-xref)。
     """
-    from lca.contracts.observability.incarnation import Incarnation
-    from lca.infrastructure.observability.loop_cursor.in_memory import InMemoryLoopCursor
+    from lca.contracts.observability.core.incarnation import Incarnation
+    from lca.infrastructure.observability.loop_cursor.in.in_memory import InMemoryLoopCursor
 
     cursor = InMemoryLoopCursor(
         run_id="run-adv",
@@ -254,12 +254,12 @@ def test_capture_pre_llm_narrows_tool_objects(hook: Any, bound_session: Any) -> 
     ``list[Tool]``);修复前 payload 构造命中 pydantic ValidationError 并
     穿透 capture_pre_llm,``spine.llm.request.header`` 完全不落盘。
     """
-    from lca.contracts.observability.loop_cursor_payloads import ToolSchema
+    from lca.contracts.observability.cursor.loop_cursor_payloads import ToolSchema
     from lca.plugins.events.publishers._session_publish import (
         reset_publish_session,
         set_publish_session,
     )
-    from lca_kernel.events.payloads_model_visible import (
+    from lca_kernel.events.payloads.payloads_model_visible import (
         SpineLlmRequestHeaderPayload,
     )
 
@@ -379,7 +379,7 @@ def test_capture_post_llm_reads_llmresponse_text_field(hook: Any, monkeypatch: A
     本测试用真实 :class:`LLMResponse`(``.text`` 有值)断言 assistant_content
     捕获到文本,防字段名回归。
     """
-    from lca.contracts.models.core.llm import LLMResponse
+    from lca.contracts.models.core.conversation.llm import LLMResponse
 
     captured: dict[str, Any] = {}
 
@@ -431,9 +431,9 @@ def test_adapter_pre_post_share_step_identity_after_open_step(bound_session: Any
     """
     import asyncio
 
-    from lca.contracts.models.core.llm import LLMResponse
-    from lca.contracts.observability.incarnation import Incarnation
-    from lca.infrastructure.observability.loop_cursor.in_memory import InMemoryLoopCursor
+    from lca.contracts.models.core.conversation.llm import LLMResponse
+    from lca.contracts.observability.core.incarnation import Incarnation
+    from lca.infrastructure.observability.loop_cursor.in.in_memory import InMemoryLoopCursor
     from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
         CurrentReasonerPrompt,
     )

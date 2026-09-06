@@ -16,7 +16,7 @@ v3 §5.5 splits memory updates into a two-phase pipeline:
 from __future__ import annotations
 
 from lca.cognition.memory import SimpleMemorySystem
-from lca.cognition.memory.policy import (
+from lca.cognition.memory.policy.policy import (
     CompactionPolicy,
     MemoryAuthority,
     MemoryCommitResult,
@@ -26,13 +26,13 @@ from lca.cognition.memory.policy import (
     SimpleCompactionPolicy,
     SimpleMemoryPolicy,
 )
-from lca.cognition.memory.semantic_compaction import SemanticCompactionPolicy
-from lca.contracts.atoms.enums import MemoryLayer
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.models.core.decision import Observation, Reflection
-from lca.contracts.models.core.memory import MemoryRecord, MemoryTrust
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.observability.journal import (
+from lca.cognition.memory.semantic.semantic_compaction import SemanticCompactionPolicy
+from lca.contracts.atoms.enums.enums import MemoryLayer
+from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.models.core.execution.decision import Observation, Reflection
+from lca.contracts.models.core.conversation.memory import MemoryRecord, MemoryTrust
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.observability.journal.journal import (
     ContextCompacted,
     MemoryCommitted,
 )
@@ -128,7 +128,7 @@ class TestSimpleMemoryPolicy:
 
 class TestSimpleCompactionPolicy:
     def test_compact_truncates_by_recency(self) -> None:
-        from lca.contracts.models.core.memory import MemoryRecord
+        from lca.contracts.models.core.conversation.memory import MemoryRecord
 
         records = tuple(
             MemoryRecord(
@@ -148,7 +148,7 @@ class TestSimpleCompactionPolicy:
         assert kept[-2].record_id == "r3"
 
     def test_compact_returns_all_when_under_budget(self) -> None:
-        from lca.contracts.models.core.memory import MemoryRecord
+        from lca.contracts.models.core.conversation.memory import MemoryRecord
 
         records = tuple(
             MemoryRecord(
@@ -165,7 +165,7 @@ class TestSimpleCompactionPolicy:
         assert len(kept) == 3
 
     def test_compact_handles_missing_recency(self) -> None:
-        from lca.contracts.models.core.memory import MemoryRecord
+        from lca.contracts.models.core.conversation.memory import MemoryRecord
 
         records = (
             MemoryRecord(
@@ -318,7 +318,7 @@ class TestSimpleMemorySystemCommit:
 
     async def test_perceive_emits_context_compacted_event(self) -> None:
         """``perceive`` MUST emit a ``ContextCompacted`` via shadow compaction."""
-        from lca.contracts.models.core.memory import MemoryRecord
+        from lca.contracts.models.core.conversation.memory import MemoryRecord
 
         system = SimpleMemorySystem()
         # Seed enough records to exceed the default budget.
@@ -362,7 +362,7 @@ class TestSimpleMemorySystemCommit:
 
     async def test_memory_committed_event_emitted_for_accepted_writes(self) -> None:
         """Direct test: MemoryCommitted is appended to the journal."""
-        from lca.contracts.models.observability.journal import RunScope
+        from lca.contracts.models.observability.journal.journal import RunScope
         from lca.infrastructure.observability import bind_backends, run_scope
         from tests.support.observability_helpers import make_test_bound
 
@@ -383,7 +383,7 @@ class TestSimpleMemorySystemCommit:
         )
 
     async def test_semantic_compaction_event_exposes_metrics_without_summary_content(self) -> None:
-        from lca.contracts.models.observability.journal import RunScope
+        from lca.contracts.models.observability.journal.journal import RunScope
         from lca.infrastructure.observability import bind_backends, run_scope
         from tests.support.observability_helpers import make_test_bound
 
@@ -426,8 +426,8 @@ class TestSimpleMemorySystemCommit:
 
     async def test_context_compacted_event_emitted_on_perceive(self) -> None:
         """Direct test: ContextCompacted is appended on perceive."""
-        from lca.contracts.models.core.memory import MemoryRecord
-        from lca.contracts.models.observability.journal import RunScope
+        from lca.contracts.models.core.conversation.memory import MemoryRecord
+        from lca.contracts.models.observability.journal.journal import RunScope
         from lca.infrastructure.observability import bind_backends, run_scope
         from tests.support.observability_helpers import make_test_bound
 

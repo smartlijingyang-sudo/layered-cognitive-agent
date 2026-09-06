@@ -44,16 +44,16 @@ def seam_ctx() -> Any:
     from cordis import Context
 
     from lca.infrastructure.observability import NamedRegistry
-    from lca.infrastructure.observability.loop_cursor.close_barrier_impl import (
+    from lca.infrastructure.observability.loop_cursor.close.close_barrier_impl import (
         StdCloseBarrier,
     )
-    from lca.infrastructure.observability.loop_cursor.factory import (
+    from lca.infrastructure.observability.loop_cursor.factory.factory import (
         LoopCursorFactory,
     )
-    from lca.infrastructure.observability.loop_cursor.persistence_coordinator import (
+    from lca.infrastructure.observability.loop_cursor.persistence.persistence_coordinator import (
         NullPersistenceCoordinator,
     )
-    from lca.infrastructure.observability.loop_cursor.projection_host import (
+    from lca.infrastructure.observability.loop_cursor.projection.projection_host import (
         StdProjectionHost,
     )
 
@@ -152,7 +152,7 @@ def test_loop_cursor_standard_provider_registers() -> None:
     from cordis import Context
 
     from lca.infrastructure.observability import NamedRegistry
-    from lca.infrastructure.observability.loop_cursor.factory import LoopCursorFactory
+    from lca.infrastructure.observability.loop_cursor.factory.factory import LoopCursorFactory
 
     ctx = Context()
     ctx.provide("observability.loop_cursor", NamedRegistry())
@@ -257,7 +257,7 @@ def test_from_profile_replaces_loop_cursor_with_stub(tmp_path: Path, seam_ctx: A
     Runtime.from_profile 仍能完成缝族装配,而 ``LoopCursorFactory.from_profile``
     不再被调,取而代之的是 stub factory。
     """
-    from lca_kernel.observability import ObservabilityRuntime
+    from lca_kernel.runtime.observability import ObservabilityRuntime
 
     marker = tmp_path / "loop_cursor_marker"
     _register_marker_factory(seam_ctx, seam="observability.loop_cursor", marker_path=marker)
@@ -287,7 +287,7 @@ def test_from_profile_raises_when_seam_missing() -> None:
     """Missing seam registry → clear RuntimeError,not silent success or late mystery."""
     from cordis import Context
 
-    from lca_kernel.observability import ObservabilityRuntime
+    from lca_kernel.runtime.observability import ObservabilityRuntime
 
     ctx = Context()  # no observability.<seam> bindings
 
@@ -308,7 +308,7 @@ def test_from_profile_raises_when_provider_key_missing() -> None:
     from cordis import Context
 
     from lca.infrastructure.observability import NamedRegistry
-    from lca_kernel.observability import ObservabilityRuntime
+    from lca_kernel.runtime.observability import ObservabilityRuntime
 
     ctx = Context()
     ctx.provide("observability.loop_cursor", NamedRegistry())
@@ -328,8 +328,8 @@ def test_from_profile_uses_default_provider_when_profile_has_no_hints(
     tmp_path: Path, seam_ctx: Any
 ) -> None:
     """Profile without ``observability.loop_cursor.implementation`` → standard provider is used."""
-    from lca.infrastructure.observability.loop_cursor.factory import LoopCursorFactory
-    from lca_kernel.observability import ObservabilityRuntime
+    from lca.infrastructure.observability.loop_cursor.factory.factory import LoopCursorFactory
+    from lca_kernel.runtime.observability import ObservabilityRuntime
 
     class _StubPersistence:
         def flush(self) -> bool:

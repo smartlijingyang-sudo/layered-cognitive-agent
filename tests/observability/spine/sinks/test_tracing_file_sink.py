@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from lca.infrastructure.observability.spine.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.event_record import EventRecord
 from lca.infrastructure.observability.spine.sinks.tracing_file_sink import (
     TracingFileSink,
     _safe_class_name,

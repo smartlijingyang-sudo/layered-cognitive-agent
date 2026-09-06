@@ -5,15 +5,15 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from unittest import IsolatedAsyncioTestCase, mock
 
-from lca.contracts.atoms.enums import LLMStreamEventType
-from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
-from lca.infrastructure.llm_adapter.failover import (
+from lca.contracts.atoms.enums.enums import LLMStreamEventType
+from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
+from lca.infrastructure.llm_adapter.failover.failover import (
     FailoverLLMAdapter,
     LLMFailoverCandidate,
     LLMRetryPolicy,
     RetryingLLMAdapter,
 )
-from lca.plugins.think.llm_resolver_seam import (
+from lca.plugins.think.llm.llm_resolver_seam import (
     Config,
     FallbackConfig,
     RetryConfig,

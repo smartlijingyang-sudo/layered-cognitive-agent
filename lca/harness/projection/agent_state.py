@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from lca.contracts.harness.tasks.session import SessionEvent
-from lca.contracts.models.core.budget import Budget
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.observability.status import RunLifecycleStatus
+from lca.contracts.models.core.policy.budget import Budget
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.observability.registry.status import RunLifecycleStatus
 
 
 @dataclass

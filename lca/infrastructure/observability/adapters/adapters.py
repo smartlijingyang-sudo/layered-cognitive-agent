@@ -17,10 +17,10 @@ from typing import Any
 
 import structlog
 
-from lca.contracts.atoms.enums import LLMStreamEventType, StreamChannel
+from lca.contracts.atoms.enums.enums import LLMStreamEventType, StreamChannel
 from lca.contracts.harness.memory.events import ThinkingCompleted, ThinkingDelta
-from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
+from lca.contracts.models.observability.journal.journal import (
     LlmCallCompleted,
     LlmCallStarted,
     ReasoningCompleted,
@@ -32,7 +32,7 @@ from lca.infrastructure.observability.adapters.memory_adapter import (
     TelemetryMemoryAdapter as TelemetryMemoryAdapter,
 )
 from lca.infrastructure.observability.diagnostics.diagnostic_emitters import record_llm_completion
-from lca.infrastructure.observability.facade.facade import record
+from lca.infrastructure.observability.facade.facade.facade import record
 from lca.infrastructure.observability.stream.llm_stream_activity import (
     LLM_STREAM_IDLE_TIMEOUT_S,
     LlmStreamActivityTracker,
@@ -102,7 +102,7 @@ def _maybe_fail_model(*, turn: int, step: int, error: str) -> None:
     """Emit ``model.failed.v1`` when step identity is known from kwargs."""
     if step <= 0:
         return
-    from lca.infrastructure.session.lifecycle_emit import fail_model
+    from lca.infrastructure.session.emit.lifecycle_emit import fail_model
 
     turn_no = turn if turn > 0 else 1
     fail_model(turn=turn_no, step=step, error=error)
@@ -505,7 +505,7 @@ class TelemetryLLMAdapter(LLMAdapter):
         # 历史 bug:此路径曾用 coord.emit_phase 把 ``model=`` 误传成 ``objective=``,
         # 导致 spine 同 EP 出现 objective=模型名 与 objective=用户文本两条。
         # 修复:直接走 cursor.advance,objective_kind 显式 ``model_name``。
-        from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+        from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
             get_current_cursor,
         )
 
@@ -525,7 +525,7 @@ def _open_think_step(prompt: str) -> None:
     ADR-0169 P2:phase.<x>.fold 由 cursor.advance 派生,禁止 coord 双写。
     objective 必须是用户原文,显式标 ``user_text``。
     """
-    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+    from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
         get_current_cursor,
     )
 

@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from lca.infrastructure.computer.constants import (
+from lca.infrastructure.computer.constants.constants import (
     MAX_GLOB_RESULTS,
     MAX_GREP_MATCHES,
     MAX_SEARCH_RESULTS,
 )
 from lca.infrastructure.computer.guest.json_script import compose_json_script
 from lca.infrastructure.computer.guest.preamble import SCRIPT_PRELUDE
-from lca.infrastructure.sandbox.paths import ONLYBOXES
+from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
 
 SEARCH_FILES_SCRIPT = (
     SCRIPT_PRELUDE

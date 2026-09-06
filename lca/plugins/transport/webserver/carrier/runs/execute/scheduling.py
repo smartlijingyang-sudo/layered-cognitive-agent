@@ -10,9 +10,9 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from lca.contracts.observability.status import RunLifecycleStatus
-from lca.contracts.protocols.runtime.infra import MachineResolver
-from lca.plugins.transport.webserver.handlers.runs.session.session import (
+from lca.contracts.observability.registry.status import RunLifecycleStatus
+from lca.contracts.protocols.runtime.infra.infra import MachineResolver
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
     RunRegistry,
     RunSession,
 )

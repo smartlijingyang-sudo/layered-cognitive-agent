@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.atoms.ids import RunId, TraceId
+from lca.contracts.atoms.ids.ids import RunId, TraceId
 
 
 @dataclass(frozen=True)

@@ -18,7 +18,7 @@ from dataclasses import asdict
 from typing import Any
 
 from lca.contracts.harness.tasks.session import SessionEvent, event_type_of
-from lca_kernel.events.session import SessionProtocol
+from lca_kernel.events.session.session import SessionProtocol
 
 
 def emit(

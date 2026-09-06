@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     ApprovalResolved,
     ContextManifested,
     GateDecided,

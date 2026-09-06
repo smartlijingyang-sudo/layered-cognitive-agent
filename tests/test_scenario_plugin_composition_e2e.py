@@ -45,10 +45,10 @@ from lca.cognition.sensors import (
     build_clock_sensor,
     build_workspace_artifacts_sensor,
 )
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.observability.journal import (
+from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.models.core.policy.gate_policy import GateDecided, PolicyFact
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.observability.journal.journal import (
     InboxFollowupCreated,
     TeamMessagePublished,
 )
@@ -204,7 +204,7 @@ class TestPolicyFactEndToEnd:
     @pytest.mark.asyncio
     async def test_gate_events_in_global_journal(self) -> None:
         # Verify the GateDecided journal event is published and recoverable.
-        from lca.contracts.models.observability.journal import GateDecided
+        from lca.contracts.models.observability.journal.journal import GateDecided
 
         store = RunStore()
         # Manually emit a GateDecided through the journal record path.
@@ -367,7 +367,7 @@ class TestLargeComposition:
 
 
 def _dec_with_tool(tool: str):
-    from lca.contracts.models.core.decision import Decision, ToolCall
+    from lca.contracts.models.core.execution.decision import Decision, ToolCall
 
     return Decision(
         decision_id=new_id("dec"),
@@ -379,8 +379,8 @@ def _dec_with_tool(tool: str):
 
 
 def _turn(tool: str, *, success: bool):
-    from lca.contracts.atoms.ids import new_id
-    from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
+    from lca.contracts.atoms.ids.ids import new_id
+    from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall, Turn
 
     return Turn(
         decision=Decision(

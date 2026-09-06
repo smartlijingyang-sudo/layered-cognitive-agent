@@ -7,10 +7,10 @@
 
 from __future__ import annotations
 
-from lca.cognition.brain.critic import SimpleCritic
-from lca.contracts.models.core.decision import Observation
-from lca.contracts.models.core.result import ToolExecutionError, ToolInputError
-from lca.contracts.models.core.state import AgentState, Budget
+from lca.cognition.brain.reasoner.critic import SimpleCritic
+from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.models.core.execution.result import ToolExecutionError, ToolInputError
+from lca.contracts.models.core.state.state import AgentState, Budget
 
 # ---------------------------------------------------------------------------
 # 1. 错误分类协议本身

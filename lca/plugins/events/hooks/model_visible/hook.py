@@ -43,20 +43,20 @@ import logging
 from collections.abc import Callable, Iterable, Mapping
 from typing import TYPE_CHECKING, Any
 
-from lca.contracts.observability.loop_cursor_payloads import ToolSchema
-from lca_kernel.events.fold import EpochHeader, canonicalHeader, headerEquals
-from lca_kernel.events.payloads_model_visible import (
+from lca.contracts.observability.cursor.loop_cursor_payloads import ToolSchema
+from lca_kernel.events.fold.fold import EpochHeader, canonicalHeader, headerEquals
+from lca_kernel.events.payloads.payloads_model_visible import (
     ReasonType,
     SpineLlmRequestHeaderAssistantPayload,
     SpineLlmRequestHeaderPayload,
 )
 
 if TYPE_CHECKING:
-    from lca.contracts.observability.loop_cursor import LoopCursor
+    from lca.contracts.observability.cursor.loop_cursor import LoopCursor
     from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
         CurrentReasonerPrompt,
     )
-    from lca_kernel.events.bus import EnvelopeBus, EventRef
+    from lca_kernel.events.bus.bus import EnvelopeBus, EventRef
 
 _log = logging.getLogger(__name__)
 

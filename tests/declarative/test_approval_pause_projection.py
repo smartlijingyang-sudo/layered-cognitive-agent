@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from lca.contracts.models.core.result import ApprovalPendingError
-from lca.contracts.protocols.act.command_envelope import RunFact
-from lca.contracts.protocols.declarative.declarative_phase_graph import ExecutionOutcome
+from lca.contracts.models.core.execution.result import ApprovalPendingError
+from lca.contracts.protocols.act.command.command_envelope import RunFact
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import ExecutionOutcome
 from lca.harness.declarative.execute.outcome_projection import RunOutcomeProjector
 from lca.harness.graph.traversal import PhaseTraversal
 

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import asyncio
 
-from lca.contracts.observability.w3c_trace_context import W3CTraceContextValidator
-from lca.infrastructure.observability.events.w3c_validator import DefaultW3CValidator
+from lca.contracts.observability.trace.w3c_trace_context import W3CTraceContextValidator
+from lca.infrastructure.observability.events.w3c.w3c_validator import DefaultW3CValidator
 
 
 def _invoke_seam_setup() -> dict[str, object]:
-    from lca.plugins.observability.w3c_validator_seam import Config
-    from lca.plugins.observability.w3c_validator_seam import setup as seam_setup
+    from lca.plugins.observability.w3c.w3c_validator_seam import Config
+    from lca.plugins.observability.w3c.w3c_validator_seam import setup as seam_setup
 
     provided: dict[str, object] = {}
 
@@ -35,7 +35,7 @@ def test_seam_validator_satisfies_protocol() -> None:
 
 
 def test_seam_meta_manifest_is_correct() -> None:
-    from lca.plugins.observability.w3c_validator_seam import setup as seam_setup
+    from lca.plugins.observability.w3c.w3c_validator_seam import setup as seam_setup
 
     meta = getattr(seam_setup, "meta", {})
     assert meta.get("id") == "lca-w3c-validator-seam"

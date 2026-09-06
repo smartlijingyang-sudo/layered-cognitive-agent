@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.mechanisms.capability import (
+from lca.contracts.mechanisms.capability.capability import (
     MissingCapabilityError,
     provider_current,
     require_capability,
 )
-from lca.infrastructure.observability.facade.run_ambit import current_assistant_id
-from lca.infrastructure.skills.assistant_merged_store import AssistantMergedSkillStore
+from lca.infrastructure.observability.facade.run.run_ambit import current_assistant_id
+from lca.infrastructure.skills.assistant.assistant_merged_store import AssistantMergedSkillStore
 
 
 def active_skill_store(scope: object) -> Any:

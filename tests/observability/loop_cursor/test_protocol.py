@@ -6,7 +6,7 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from lca.contracts.observability.loop_cursor import (
+from lca.contracts.observability.cursor.loop_cursor import (
     CloseReason,
     CursorError,
     CursorSnapshot,

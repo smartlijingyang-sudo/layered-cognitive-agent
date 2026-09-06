@@ -30,12 +30,12 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from lca.contracts.observability.loop_cursor import CursorSnapshot
-from lca.contracts.observability.loop_projection import LoopProjectionDefinition
-from lca.infrastructure.observability.spine.event_record import EventRecord
+from lca.contracts.observability.cursor.loop_cursor import CursorSnapshot
+from lca.contracts.observability.cursor.loop_projection import LoopProjectionDefinition
+from lca.infrastructure.observability.spine.event.event_record import EventRecord
 
 if TYPE_CHECKING:
-    from lca.infrastructure.observability.loop_cursor.projection_host import (
+    from lca.infrastructure.observability.loop_cursor.projection.projection_host import (
         ProjectionToken,
         StdProjectionHost,
     )

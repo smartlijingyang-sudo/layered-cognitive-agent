@@ -7,15 +7,15 @@ from pathlib import Path
 
 import pytest
 
-from lca.cognition.memory.layered_retrieval_policy import LayeredRetrievalPolicy
-from lca.cognition.memory.simple_memory import SimpleMemorySystem
+from lca.cognition.memory.layered.layered_retrieval_policy import LayeredRetrievalPolicy
+from lca.cognition.memory.simple.simple_memory import SimpleMemorySystem
 from lca.contracts.capabilities import (
     MEMORY_COMPACTION_POLICY,
     MEMORY_RETRIEVAL_POLICY,
     MEMORY_WRITE_POLICY,
 )
-from lca.harness.profile.boot import boot_profile
-from lca.harness.profile.resolve import resolve_profile
+from lca.harness.profile.boot.boot import boot_profile
+from lca.harness.profile.resolve.resolve import resolve_profile
 
 REPO = Path(__file__).resolve().parents[2]
 

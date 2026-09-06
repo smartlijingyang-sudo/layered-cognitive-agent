@@ -16,7 +16,7 @@ from unittest.mock import patch
 
 import pytest
 
-from lca.infrastructure.session.spine_envelope import with_spine_envelope
+from lca.infrastructure.session.commit.spine_envelope import with_spine_envelope
 from lca.loop.fact_gateway import publish_ep_bound
 from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,

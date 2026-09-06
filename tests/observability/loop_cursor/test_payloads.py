@@ -6,7 +6,7 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from lca.contracts.observability.loop_cursor_payloads import (
+from lca.contracts.observability.cursor.loop_cursor_payloads import (
     RequestHeader,
     ThinkingRecord,
     ToolCallRecord,

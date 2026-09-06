@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
 from lca.contracts.protocols.composition.logic_address import score_logic_address
 from lca.harness.plugin.declaration import definition_from_plugin
-from lca.plugins.sensors.clock import setup as clock_setup
-from lca.plugins.sensors.inbox_facts import setup as inbox_facts_setup
-from lca.plugins.sensors.skill_catalog import setup as skill_catalog_setup
-from lca.plugins.sensors.team_inbox import setup as team_inbox_setup
-from lca.plugins.sensors.workspace_artifacts import setup as workspace_artifacts_setup
-from lca.plugins.sensors.workspace_instructions import setup as workspace_instructions_setup
+from lca.plugins.sensors.clock.clock import setup as clock_setup
+from lca.plugins.sensors.inbox.inbox_facts import setup as inbox_facts_setup
+from lca.plugins.sensors.skill.skill_catalog import setup as skill_catalog_setup
+from lca.plugins.sensors.team.team_inbox import setup as team_inbox_setup
+from lca.plugins.sensors.workspace.workspace_artifacts import setup as workspace_artifacts_setup
+from lca.plugins.sensors.workspace.workspace_instructions import setup as workspace_instructions_setup
 
 
 def test_sensor_primitives_publish_complete_context_addresses() -> None:

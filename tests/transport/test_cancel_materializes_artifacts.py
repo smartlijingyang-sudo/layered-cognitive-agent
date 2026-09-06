@@ -27,13 +27,13 @@ from lca.infrastructure.observability.journal.step.narrative_writer import (
     StepNarrativeWriter,
 )
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
-from lca.plugins.observability.run_ledger_seam import _StepTreeBundle
+from lca.plugins.observability.run.run_ledger_seam import _StepTreeBundle
 from lca.plugins.session.derivers.step_tree import StepTreeFoldDeriver
-from lca.plugins.transport.webserver.read.runs.identity import (
+from lca.plugins.transport.webserver.read.runs.identity.identity import (
     parse_agent_ref,
 )
-from lca.contracts.observability.status import RunLifecycleStatus
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
+from lca.contracts.observability.registry.status import RunLifecycleStatus
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
 
 # registry_commands 必须先于 lifecycle 子模块被进程导入:它拉动 execute 包链,
 # lifecycle 包的懒加载 __getattr__ 依赖该顺序打破循环。因此
@@ -251,7 +251,7 @@ def test_pause_flush_failure_does_not_block_pause(tmp_path: Path) -> None:
 
 
 def test_flush_step_tree_artifacts_contains_errors(tmp_path: Path) -> None:
-    from lca.plugins.transport.webserver.read.runs.step_tree_flush import (
+    from lca.plugins.transport.webserver.read.runs.step.step_tree_flush import (
         flush_step_tree_artifacts,
         journal_outcome_from_session,
     )

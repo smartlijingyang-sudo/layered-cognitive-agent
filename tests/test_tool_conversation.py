@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import unittest
 
-from lca.cognition.brain.reasoner import _context_lines
+from lca.cognition.brain.reasoner.reasoner import _context_lines
 from tests.support.tool_history_fixtures import build_tool_history
-from lca.contracts.atoms.enums import MemoryLayer, MemoryRecordKind
-from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
-from lca.contracts.models.core.memory import MemoryRecord
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.infrastructure.llm_adapter.openai_compat._history import (
+from lca.contracts.atoms.enums.enums import MemoryLayer, MemoryRecordKind
+from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall, Turn
+from lca.contracts.models.core.conversation.memory import MemoryRecord
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.infrastructure.llm_adapter.openai_compat.history._history import (
     anthropic_messages_with_history,
     openai_messages_with_history,
 )

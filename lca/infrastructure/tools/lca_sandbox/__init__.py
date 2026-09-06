@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import Any, cast
 
-from lca.contracts.models.core.tool import ToolApi, ToolManifest, ToolMeta
+from lca.contracts.models.core.execution.tool import ToolApi, ToolManifest, ToolMeta
 from lca.infrastructure.tools.lca_computer.apis import execute_code as _execute_code
 from lca.infrastructure.tools.lca_computer.apis import export_file as _export_file
 from lca.infrastructure.tools.lca_computer.executor import LcaSandboxExecutor
@@ -56,7 +56,7 @@ MANIFEST = ToolManifest(
 
 def _sandbox_obs_builder(store: Any) -> Any:
     """Return an observation builder bound to a FileStore."""
-    from lca.infrastructure.computer.op_result import ComputerOpResult
+    from lca.infrastructure.computer.op.op_result import ComputerOpResult
     from lca.infrastructure.tools.lca_computer.observations import build_computer_observation
 
     def _build(raw: Any, tool_name: str, start: float) -> Any:
@@ -69,15 +69,15 @@ def _sandbox_obs_builder(store: Any) -> Any:
 
 def build_sandbox_tools(**kwargs: Any) -> list:
     """Build sandbox-only tools from the standalone manifest + executor."""
-    from lca.infrastructure.tools.builder import build_tools_from_manifest
+    from lca.infrastructure.tools.builder.builder import build_tools_from_manifest
 
     store = kwargs.get("file_store")
     sandbox = kwargs.get("sandbox")
     if sandbox is None or store is None:
         return []
 
-    from lca.infrastructure.computer.sandbox_computer import SandboxComputer
-    from lca.infrastructure.runtime_plane.resolve import sandbox_ref_from
+    from lca.infrastructure.computer.sandbox.sandbox_computer import SandboxComputer
+    from lca.infrastructure.runtime_plane.resolve.resolve import sandbox_ref_from
     from lca.infrastructure.tools.lca_computer import _invoke_via_executor
 
     plane = kwargs.get("plane") or sandbox_ref_from(sandbox)

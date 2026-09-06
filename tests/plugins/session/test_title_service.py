@@ -25,7 +25,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from lca.plugins.session.runtime.store import SessionStore
+from lca.plugins.session.runtime.store.store import SessionStore
 from lca.plugins.session.title_service.title_service import (
     TITLE_EVENT_TYPE,
     Config,

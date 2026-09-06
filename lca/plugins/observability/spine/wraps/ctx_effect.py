@@ -10,9 +10,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     AuthorityContract,
@@ -21,7 +21,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.observability.spine.runtime_hooks import install_ctx_effect_hook
 

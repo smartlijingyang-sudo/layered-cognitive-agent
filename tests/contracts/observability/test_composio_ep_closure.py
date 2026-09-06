@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from lca.contracts.observability.composio_ep_closure import (
+from lca.contracts.observability.closure.composio_ep_closure import (
     COMPOSIO_EVENT_POINTS,
     all_composio_event_descriptors,
 )
-from lca.contracts.observability.cordis_event_table import lookup_cordis_name
+from lca.contracts.observability.infra.cordis_event_table import lookup_cordis_name
 
 
 def test_composio_closure_count() -> None:

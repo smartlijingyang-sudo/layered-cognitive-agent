@@ -5,14 +5,14 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from lca.contracts.atoms.enums import ContentType
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.atoms.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
-from lca.contracts.models.core.decision import Observation
-from lca.contracts.models.core.tool import ToolApi, ToolManifest, ToolMeta
+from lca.contracts.atoms.enums.enums import ContentType
+from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.atoms.semantic.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
+from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.models.core.execution.tool import ToolApi, ToolManifest, ToolMeta
 from lca.contracts.protocols import Tool
-from lca.infrastructure.file_store import FileStore
-from lca.infrastructure.tools.builder import build_tools_from_manifest
+from lca.infrastructure.file.file_store import FileStore
+from lca.infrastructure.tools.builder.builder import build_tools_from_manifest
 
 IDENTIFIER = "write-file"
 _MAX_CONTENT_BYTES = 10 * 1024 * 1024

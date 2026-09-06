@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from lca.cognition.brain.decision_gates.loop_fingerprint import (
+from lca.cognition.brain.decision_gates.loop.loop_fingerprint import (
     normalize_for_fingerprint,
     tool_call_fingerprint,
 )
-from lca.contracts.models.core.decision import ToolCall
+from lca.contracts.models.core.execution.decision import ToolCall
 
 
 def test_tool_call_fingerprint_stable_for_same_args() -> None:

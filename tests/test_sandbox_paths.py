@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import shlex
 
-from lca.contracts.models.core.guest_layout import GuestLayout, join_under, outputs_under
-from lca.contracts.models.core.sandbox import SANDBOX_MOUNT_ROOT, SANDBOX_OUTPUT_SUBDIR
-from lca.infrastructure.runtime_plane.resolve import make_sandbox_ref
-from lca.infrastructure.sandbox.paths import ONLYBOXES
+from lca.contracts.models.core.state.guest_layout import GuestLayout, join_under, outputs_under
+from lca.contracts.models.core.execution.sandbox import SANDBOX_MOUNT_ROOT, SANDBOX_OUTPUT_SUBDIR
+from lca.infrastructure.runtime_plane.resolve.resolve import make_sandbox_ref
+from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
 
 
 def test_outputs_under_is_the_join_rule() -> None:

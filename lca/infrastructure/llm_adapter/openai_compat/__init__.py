@@ -11,16 +11,16 @@ import os
 from collections.abc import AsyncIterator
 from typing import Any
 
-from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
+from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.protocols import LLMAdapter
-from lca.infrastructure.llm_adapter.api_style import LLMApiStyle
-from lca.infrastructure.llm_adapter.openai_compat._anthropic_messages import (
+from lca.infrastructure.llm_adapter.api.api_style import LLMApiStyle
+from lca.infrastructure.llm_adapter.openai_compat.anthropic._anthropic_messages import (
     _AnthropicMessagesStrategy,
     looks_like_anthropic_base_url,
 )
-from lca.infrastructure.llm_adapter.openai_compat._chat_completions import _ChatCompletionsStrategy
-from lca.infrastructure.llm_adapter.openai_compat._responses import _ResponsesStrategy
-from lca.infrastructure.llm_adapter.openai_compat._strategy import _ApiStrategy
+from lca.infrastructure.llm_adapter.openai_compat.chat._chat_completions import _ChatCompletionsStrategy
+from lca.infrastructure.llm_adapter.openai_compat.responses._responses import _ResponsesStrategy
+from lca.infrastructure.llm_adapter.openai_compat.strategy._strategy import _ApiStrategy
 
 _STRATEGIES: dict[LLMApiStyle, type[Any]] = {
     LLMApiStyle.CHAT_COMPLETIONS: _ChatCompletionsStrategy,

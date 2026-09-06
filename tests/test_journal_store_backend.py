@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     AgentRunFinished,
     AgentRunStarted,
     InboxFollowupCreated,
     RunScope,
     StampedEvent,
 )
-from lca.contracts.observability.journal_store import JournalStoreBackend
+from lca.contracts.observability.journal.journal_store import JournalStoreBackend
 from lca.infrastructure.observability import (
     InMemoryJournalStore,
     RunStore,

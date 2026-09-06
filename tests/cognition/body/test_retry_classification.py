@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from lca.cognition.body import pipeline_safe_executor as _pipeline_mod
 from lca.cognition.body import safe_executor as _safe_mod
-from lca.cognition.body._retry_classification import _DETERMINISTIC_EXCEPTIONS
+from lca.cognition.body.internal._retry_classification import _DETERMINISTIC_EXCEPTIONS
 
 
 def test_deterministic_exceptions_contains_value_error() -> None:

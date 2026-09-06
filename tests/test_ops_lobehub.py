@@ -8,13 +8,13 @@ from unittest.mock import patch
 
 import pytest
 
-from lca.infrastructure.cli.config import KernelServeConfig, LobeHubConfig
-from lca.infrastructure.cli.service import ServiceStatus
-from lca.infrastructure.cli.services.lobehub import (
+from lca.infrastructure.cli.config.config import KernelServeConfig, LobeHubConfig
+from lca.infrastructure.cli.service.service import ServiceStatus
+from lca.infrastructure.cli.services.lobehub.lobehub import (
     LobeHubService,
     _parse_verify_output,
 )
-from lca.infrastructure.cli.state import StateStore
+from lca.infrastructure.cli.state.state import StateStore
 
 
 @dataclass(frozen=True, slots=True)

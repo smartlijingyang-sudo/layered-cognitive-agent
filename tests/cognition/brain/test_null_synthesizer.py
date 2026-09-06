@@ -2,10 +2,10 @@
 
 import pytest
 
-from lca.cognition.brain.null_synthesizer import NullSynthesizer
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.result import Result
-from lca.contracts.models.core.state import Budget
+from lca.cognition.brain.reasoner.null_synthesizer import NullSynthesizer
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.state import Budget
 
 
 @pytest.fixture()

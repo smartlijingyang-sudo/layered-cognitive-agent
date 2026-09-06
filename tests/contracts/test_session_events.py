@@ -1,6 +1,6 @@
 """SessionEventType enum contract tests."""
 
-from lca.contracts.observability.session_events import SessionEventType
+from lca.contracts.observability.event.session_events import SessionEventType
 
 
 def test_session_event_type_is_string_enum():

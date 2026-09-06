@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols.memory.operational_skills import (
     SkillIndexEntry,
 )

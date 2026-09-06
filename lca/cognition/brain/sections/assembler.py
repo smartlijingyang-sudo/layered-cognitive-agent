@@ -34,12 +34,12 @@ from lca.contracts.models.cognition.prompt_assembly import (
 from lca.contracts.models.cognition.prompt_assembly import (
     PromptAssembler as Protocol_,
 )
-from lca.contracts.models.core.activation import ActivatedSkill
-from lca.contracts.models.core.perception import ContextManifest
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.team.role_team import RoleProfile
-from lca.contracts.models.team.team_awareness import TeamAwareness
-from lca.contracts.protocols.runtime.infra import Tool
+from lca.contracts.models.core.workspace.activation import ActivatedSkill
+from lca.contracts.models.core.perceive.perception import ContextManifest
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.team.role.role_team import RoleProfile
+from lca.contracts.models.team.team.team_awareness import TeamAwareness
+from lca.contracts.protocols.runtime.infra.infra import Tool
 
 
 @dataclass(frozen=True, slots=True)

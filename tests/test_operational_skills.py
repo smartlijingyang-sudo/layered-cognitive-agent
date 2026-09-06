@@ -16,30 +16,30 @@ from lca.contracts.protocols.memory.operational_skills import (
     SkillPackage,
     SkillSearchResult,
 )
-from lca.infrastructure.capability.skills import SkillsService
-from lca.infrastructure.file_store import LocalFileStore
-from lca.infrastructure.skills.activation_scope import (
+from lca.infrastructure.capability.skills.skills import SkillsService
+from lca.infrastructure.file.file_store import LocalFileStore
+from lca.infrastructure.skills.activation.activation_scope import (
     activated_skills_scope,
     register_activated,
     resolve_skill_for_exec,
 )
-from lca.infrastructure.skills.disk_store import DiskSkillPackageStore, sanitize_skill_id
-from lca.infrastructure.skills.http_importer import HttpSkillImporter
-from lca.infrastructure.skills.market_auth import (
+from lca.infrastructure.skills.disk.disk_store import DiskSkillPackageStore, sanitize_skill_id
+from lca.infrastructure.skills.http.http_importer import HttpSkillImporter
+from lca.infrastructure.skills.market.market_auth import (
     clear_market_token_cache,
     create_client_assertion,
     resolve_m2m_credentials,
     resolve_market_access_token,
     token_endpoint_for,
 )
-from lca.infrastructure.skills.settings import SkillSettings
-from lca.infrastructure.skills.zip_security import extract_zip_bytes, find_skill_markdown
-from lca.infrastructure.tools.contract.project import project_tool_state
-from lca.infrastructure.tools.default_set import build_default_tools
-from lca.infrastructure.tools.skills.activate_tool import SkillActivateTool
-from lca.infrastructure.tools.skills.import_tool import SkillImportTool
-from lca.infrastructure.tools.skills.read_reference_tool import SkillReadReferenceTool
-from lca.infrastructure.tools.skills.search_tool import SkillSearchTool
+from lca.infrastructure.skills.settings.settings import SkillSettings
+from lca.infrastructure.skills.zip.zip_security import extract_zip_bytes, find_skill_markdown
+from lca.infrastructure.tools.contract.project.project import project_tool_state
+from lca.infrastructure.tools.default.default_set import build_default_tools
+from lca.infrastructure.tools.skills.activate.activate_tool import SkillActivateTool
+from lca.infrastructure.tools.skills.importer.import_tool import SkillImportTool
+from lca.infrastructure.tools.skills.read.read_reference_tool import SkillReadReferenceTool
+from lca.infrastructure.tools.skills.search.search_tool import SkillSearchTool
 
 
 def _make_zip(files: dict[str, str]) -> bytes:

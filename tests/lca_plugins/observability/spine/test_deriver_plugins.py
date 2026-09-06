@@ -12,8 +12,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from lca.harness.plugin.declaration import definition_from_plugin
-from lca.infrastructure.observability.spine.derivers.graph import GraphDeriver
-from lca.infrastructure.observability.spine.event_record import EventRecord
+from lca.infrastructure.observability.spine.derivers.graph.graph import GraphDeriver
+from lca.infrastructure.observability.spine.event.event_record import EventRecord
 from lca.plugins.observability.spine.derivers import (
     graph,
     live_tail,
@@ -101,7 +101,7 @@ def test_narrative_on_event_does_not_raise(tmp_path: Path) -> None:
     from lca.infrastructure.observability.journal.step.narrative_writer import (
         StepNarrativeWriter,
     )
-    from lca.infrastructure.observability.spine.derivers.narrative import (
+    from lca.infrastructure.observability.spine.derivers.narrative.narrative import (
         NarrativeDeriver,
     )
 
@@ -111,7 +111,7 @@ def test_narrative_on_event_does_not_raise(tmp_path: Path) -> None:
 
 def test_live_tail_on_event_does_not_raise() -> None:
     from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
-    from lca.infrastructure.observability.spine.derivers.live_tail import (
+    from lca.infrastructure.observability.spine.derivers.live.live_tail import (
         LiveTailDeriver,
     )
 
@@ -126,7 +126,7 @@ def test_live_tail_subscribe_is_carrier_passthrough_not_event_spine() -> None:
     read as unfinished fold derivation.
     """
     from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
-    from lca.infrastructure.observability.spine.derivers.live_tail import (
+    from lca.infrastructure.observability.spine.derivers.live.live_tail import (
         LiveTailDeriver,
     )
 

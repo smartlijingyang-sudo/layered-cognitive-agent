@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import SAFE_EXECUTOR_SIMPLE
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -16,8 +16,8 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.protocols.runtime.infra import SafeExecutor
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.runtime.infra.infra import SafeExecutor
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
@@ -52,6 +52,6 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Provide the named SafeExecutor factory ``safe_executor.simple``."""
-    from lca.cognition.body.safe_executor import SimpleSafeExecutor
+    from lca.cognition.body.executor.safe_executor import SimpleSafeExecutor
 
     ctx.provide(SAFE_EXECUTOR_SIMPLE.key, SimpleSafeExecutor)

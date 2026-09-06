@@ -21,9 +21,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import cast
 
-from lca.contracts.atoms.enums import MemoryLayer
+from lca.contracts.atoms.enums.enums import MemoryLayer
 from lca.contracts.harness.tasks.session import SessionEvent
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     ApprovalResolved,
     ContextManifested,
     GateDecided,

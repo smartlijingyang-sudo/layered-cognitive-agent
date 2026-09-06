@@ -6,8 +6,8 @@ from lca.plugins.session.projection_registry.projection_registry import Projecti
 from lca.session.append import Session
 from lca.plugins.session.token_meter.token_meter import HeuristicTokenMeter
 from lca.plugins.session.token_usage.token_usage import TokenUsageUnit
-from lca_kernel.events.fold import SURFACE_ASSISTANT_TYPE, SURFACE_USER_TYPE, foldRequestHeader
-from lca_kernel.events.session import SESSION_FORMAT_VERSION, SessionHeader
+from lca_kernel.events.fold.fold import SURFACE_ASSISTANT_TYPE, SURFACE_USER_TYPE, foldRequestHeader
+from lca_kernel.events.session.session import SESSION_FORMAT_VERSION, SessionHeader
 
 
 def _sample_session() -> Session:

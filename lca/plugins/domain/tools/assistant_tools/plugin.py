@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import (
     ASSISTANT_CATALOG,
     ASSISTANT_FRONTEND_BRIDGE,
@@ -25,7 +25,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.protocols import Tool
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 from lca.infrastructure.tools.assistant.create_skill_tool import (
     assistant_create_skill_tool_from_run,
@@ -34,7 +34,7 @@ from lca.infrastructure.tools.assistant.create_tool import AssistantCreateTool
 
 
 @plugin(
-    id="lca.plugins.assistant.tools",
+    id="lca.plugins.assistant.tools.tools",
     requires=(
         ASSISTANT_CATALOG.key,
         ASSISTANT_FRONTEND_BRIDGE.key,

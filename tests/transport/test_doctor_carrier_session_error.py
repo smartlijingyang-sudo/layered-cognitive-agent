@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lca.plugins.tools.diagnostics.debug_run import _extract_failure
+from lca.plugins.tools.diagnostics.debug.debug_run import _extract_failure
 
 
 def test_debug_run_extract_failure_reads_session_error() -> None:
@@ -24,7 +24,7 @@ def test_debug_run_extract_failure_reads_session_error() -> None:
 
 
 def test_record_run_failure_writes_kernel_log(tmp_path: Path, monkeypatch) -> None:
-    from lca.plugins.transport.webserver.handlers.runs.terminal.failure import (
+    from lca.plugins.transport.webserver.handlers.runs.terminal.failure.failure import (
         RunFailureFacts,
         record_run_failure,
     )

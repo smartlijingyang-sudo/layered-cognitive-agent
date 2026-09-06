@@ -12,23 +12,23 @@ from typing import Any, cast
 
 import structlog
 
-from lca.contracts.mechanisms.capability import (
+from lca.contracts.mechanisms.capability.capability import (
     MissingCapabilityError,
     provider_current,
     require_capability,
 )
-from lca.contracts.models.core.plane import PlaneBindings, PlaneKind
-from lca.contracts.protocols.runtime.infra import MachineResolver, Sandbox
-from lca.infrastructure.file_store import FileStore
-from lca.infrastructure.runtime_plane.resolve import (
+from lca.contracts.models.core.state.plane import PlaneBindings, PlaneKind
+from lca.contracts.protocols.runtime.infra.infra import MachineResolver, Sandbox
+from lca.infrastructure.file.file_store import FileStore
+from lca.infrastructure.runtime_plane.resolve.resolve import (
     PlaneRequest,
     ref_of,
     resolve_plane_bindings,
     sandbox_ref_from,
 )
 from lca.plugins.transport.webserver.carrier.runs.execute.loop_drivers import RunLoopDriver
-from lca.plugins.transport.webserver.handlers.runs.session.intent import resolve_run_intent
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
+from lca.plugins.transport.webserver.handlers.runs.session.intent.intent import resolve_run_intent
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
 
 _log = structlog.get_logger(__name__)
 
@@ -98,7 +98,7 @@ def resolve_descriptor_registry(ctx: Any) -> Any:
         registry = None
     if registry is not None:
         return registry
-    from lca.infrastructure.observability.events.event_catalog import EVENT_DESCRIPTOR_REGISTRY
+    from lca.infrastructure.observability.events.event.event_catalog import EVENT_DESCRIPTOR_REGISTRY
 
     return EVENT_DESCRIPTOR_REGISTRY
 

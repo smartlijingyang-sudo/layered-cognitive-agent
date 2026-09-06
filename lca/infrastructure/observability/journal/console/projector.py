@@ -15,7 +15,7 @@ import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     ActionDegraded,
     AgentRunFinished,
     AgentRunStarted,

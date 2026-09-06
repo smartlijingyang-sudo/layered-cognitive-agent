@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.core.stop import StopDecision, StopReason
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.core.policy.stop import StopDecision, StopReason
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     ExecutionOutcome,
     PhaseResult,
 )
@@ -212,13 +212,13 @@ async def test_phase_governance_keeps_rewrite_nonblocking_and_stops_explicitly(
     commits_immediately: bool,
 ) -> None:
     """Governance owns verdict interpretation while the transaction owns later commits."""
-    from lca.contracts.protocols.declarative.declarative_phase_graph import (
+    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
         ContributionRole,
         PhaseContribution,
         SemanticPhase,
     )
-    from lca.harness.declarative.compile.assembler import ExecutableContribution, ExecutableNode
-    from lca.harness.declarative.compile.phase_capabilities import MappingPhaseCapabilities
+    from lca.harness.declarative.compile.assembler.assembler import ExecutableContribution, ExecutableNode
+    from lca.harness.declarative.compile.phase.phase_capabilities import MappingPhaseCapabilities
     from lca.harness.graph.governance.phase_governance import PhaseGovernance
     from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
 
@@ -294,14 +294,14 @@ class _ContextCapturingGovernExecutor:
 @pytest.mark.asyncio
 async def test_phase_governance_uses_semantic_phase_when_node_name_is_custom() -> None:
     """A renamed Think node still exposes its Decision to govern contributions."""
-    from lca.contracts.models.core.decision import Decision
-    from lca.contracts.protocols.declarative.declarative_phase_graph import (
+    from lca.contracts.models.core.execution.decision import Decision
+    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
         ContributionRole,
         PhaseContribution,
         SemanticPhase,
     )
-    from lca.harness.declarative.compile.assembler import ExecutableContribution, ExecutableNode
-    from lca.harness.declarative.compile.phase_capabilities import MappingPhaseCapabilities
+    from lca.harness.declarative.compile.assembler.assembler import ExecutableContribution, ExecutableNode
+    from lca.harness.declarative.compile.phase.phase_capabilities import MappingPhaseCapabilities
     from lca.harness.graph.governance.phase_governance import PhaseGovernance
     from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
 

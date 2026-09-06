@@ -13,8 +13,8 @@ import structlog
 from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.capabilities import RUN_MODE_REGISTRY
-from lca.contracts.mechanisms.capability import require_capability
-from lca.contracts.protocols.session.run_mode import RunModeRegistryProtocol
+from lca.contracts.mechanisms.capability.capability import require_capability
+from lca.contracts.protocols.session.run.run_mode import RunModeRegistryProtocol
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.transport.webserver.carrier.runs.execute.loop_drivers import CognitiveRunDriver
 from lca.plugins.transport.webserver.carrier.runs.lifecycle.runnable_assembly import (

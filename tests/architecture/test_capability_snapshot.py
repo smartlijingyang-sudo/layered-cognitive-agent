@@ -95,7 +95,7 @@ def test_plan_ref_is_independent_of_checkout_path() -> None:
     """Equivalent relative and absolute Profile inputs share one plan identity."""
     from lca.harness.plan import compiled_run_plan_ref
     from lca.harness.composition.plan_compiler import compile_plan
-    from lca.harness.profile.resolve import resolve_profile
+    from lca.harness.profile.resolve.resolve import resolve_profile
 
     relative_plan = compile_plan(resolve_profile(DEFAULT_PROFILE))
     absolute_plan = compile_plan(resolve_profile(REPO / DEFAULT_PROFILE))
@@ -114,7 +114,7 @@ def test_capability_owners_match_production_profile_resolution() -> None:
     diagnostic tree must consume that same seam, rather than silently choosing
     a first owner and reinterpreting later providers as contributors.
     """
-    from lca.harness.profile.resolve import resolve_profile
+    from lca.harness.profile.resolve.resolve import resolve_profile
 
     tree = _build_capability_tree(DEFAULT_PROFILE)
     resolved = resolve_profile(REPO / DEFAULT_PROFILE)

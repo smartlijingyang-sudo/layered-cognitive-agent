@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.cognition.brain.context_manifest import digest_manifest
+from lca.cognition.brain.pipeline.context_manifest import digest_manifest
 from lca.cognition.brain.decision_gates import (
     ChainedDecisionGate,
     ProgressLoopDetector,
@@ -34,11 +34,11 @@ from lca.cognition.sensors import (
     build_clock_sensor,
     build_workspace_artifacts_sensor,
 )
-from lca.contracts.atoms.ids import new_id
+from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.harness.composition.plugin_meta import LAYER_FIELD, NAME_FIELD, PluginMeta
-from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.core.policy.gate_policy import GateDecided, PolicyFact
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.observability.journal.journal import (
     InboxFollowupCreated,
     TeamMessagePublished,
 )
@@ -141,7 +141,7 @@ class TestGatesPrimitive:
 
     @pytest.mark.asyncio
     async def test_tool_loop_breaker_rewrites_to_respond(self) -> None:
-        from lca.contracts.atoms.enums import ActionType
+        from lca.contracts.atoms.enums.enums import ActionType
 
         with bound_session():
             state = _state()
@@ -352,7 +352,7 @@ class TestTeamMessageE2E:
         # The publish tool requires only ``team_id`` + ``thread_id``; the
         # caller picks the topic.  A test confirms the tool accepts the
         # pair.
-        from lca.cognition.body.team_message_tool import (
+        from lca.cognition.body.actions.team_message_tool import (
             build_team_message_publish_tool,
         )
 
@@ -380,7 +380,7 @@ def _state() -> AgentState:
 
 
 def _dec(tool: str):
-    from lca.contracts.models.core.decision import Decision, ToolCall
+    from lca.contracts.models.core.execution.decision import Decision, ToolCall
 
     return Decision(
         decision_id=new_id("dec"),
@@ -392,7 +392,7 @@ def _dec(tool: str):
 
 
 def _failed_turn(tool: str):
-    from lca.contracts.models.core.decision import Observation, Turn
+    from lca.contracts.models.core.execution.decision import Observation, Turn
 
     return Turn(
         decision=_dec(tool),
@@ -406,7 +406,7 @@ def _failed_turn(tool: str):
 
 
 def _ok_turn(tool: str):
-    from lca.contracts.models.core.decision import Observation, Turn
+    from lca.contracts.models.core.execution.decision import Observation, Turn
 
     return Turn(
         decision=_dec(tool),

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from lca.runtime.envelope_emitter import SpineEnvelopeEmitter
+from lca.runtime.projection.envelope_emitter import SpineEnvelopeEmitter
 
 
 def test_spine_envelope_emitter_satisfies_protocol() -> None:
@@ -65,7 +65,7 @@ def test_spine_envelope_emitter_dispatches_to_runtime_emit() -> None:
 
 def test_envelope_emitter_does_not_own_exception_caught() -> None:
     """``exception.caught`` is observability SSOT, not an envelope method."""
-    from lca.contracts.protocols.runtime.envelope_emitter import EnvelopeEmitter
+    from lca.contracts.protocols.runtime.envelope.envelope_emitter import EnvelopeEmitter
 
     assert "emit_exception_caught" not in EnvelopeEmitter.__dict__
     assert not hasattr(SpineEnvelopeEmitter, "emit_exception_caught")

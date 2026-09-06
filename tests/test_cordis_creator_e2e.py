@@ -8,12 +8,12 @@ from pathlib import Path
 
 import pytest
 
-from lca.application.preset_authoring import PresetAuthoring
-from lca.contracts.mechanisms.composition import ComposerErrorCode
-from lca.contracts.models.observability.journal import PluginMounted, PluginMountRejected
+from lca.application.authoring.preset_authoring import PresetAuthoring
+from lca.contracts.mechanisms.composition.composition import ComposerErrorCode
+from lca.contracts.models.observability.journal.journal import PluginMounted, PluginMountRejected
 from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
 from lca.infrastructure.observability.facade import BoundObservability, bind_backends
-from lca.plugins.think.composition_composer_provider import (
+from lca.plugins.think.composition.composition_composer_provider import (
     CordisComposer,
     build_default_invariant_checker,
 )

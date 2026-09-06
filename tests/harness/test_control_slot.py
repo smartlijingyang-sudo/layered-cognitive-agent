@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.atoms.control_slot import (
+from lca.contracts.atoms.control.control_slot import (
     SLOT_PHASE_OWNER,
     ControlSlot,
     all_slot_values,
@@ -176,7 +176,7 @@ class TestDeclarativeControlAudit:
     def test_audit_inventories_native_contribution_and_flags_control_kwarg(
         self, tmp_path: Path
     ) -> None:
-        from lca.harness.diagnostics.audit_control_surface import scan_control_surface
+        from lca.harness.diagnostics.audit.audit_control_surface import scan_control_surface
 
         source = tmp_path / "plugin.py"
         source.write_text(

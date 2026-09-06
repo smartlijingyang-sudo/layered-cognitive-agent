@@ -19,29 +19,29 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.atoms.ids import new_id
+from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.event import Category, EventPayload
 from lca_kernel.events import (
     _DEFAULT_CONFIG_DIR,
     EventRef,
 )
-from lca_kernel.events.bus import (
+from lca_kernel.events.bus.bus import (
     ConsumerHandle,
     EventBus,
     FailureSemantics,
     PayloadSchemaError,
 )
-from lca_kernel.events.errors import (
+from lca_kernel.events.errors.errors import (
     MissingPluginIdentityError,
     UnauthorizedPublishError,
     UnauthorizedSubscribeError,
 )
-from lca_kernel.events.hooks import (
+from lca_kernel.events.hooks.hooks import (
     FailureAction,
     PublishContext,
     SkipDispatch,
 )
-from lca_kernel.events.pipeline import (
+from lca_kernel.events.pipeline.pipeline import (
     ConsumerRule,
     HookSpec,
     Pipeline,
@@ -49,14 +49,14 @@ from lca_kernel.events.pipeline import (
     matches_rule,
     parse_pipeline_yaml,
 )
-from lca_kernel.events.registry import EventRegistry
+from lca_kernel.events.registry.registry import EventRegistry
 
 # ── helpers ──────────────────────────────────────────────────────────────
 
 
 def _make_bus() -> EventBus[EventPayload]:
     """独立 EventBus 实例(从默认 yaml 加载 registry),避免单例串扰。"""
-    from lca_kernel.events.test_catalog import build_test_bus
+    from lca_kernel.events.test.test_catalog import build_test_bus
     return build_test_bus()
 
 
@@ -551,7 +551,7 @@ class TestFailureHook:
     ) -> None:
         """FailureHook(自定义)返回 RETHROW → consumer 抛错最终上抛。"""
         # 用一个 FailureHook 把所有 consumer 失败都升级为 RETHROW。
-        from lca_kernel.events.hooks import FailureHook
+        from lca_kernel.events.hooks.hooks import FailureHook
 
         class _RethrowAll(FailureHook):
             def on_consumer_failure(self, payload, ref, exc):

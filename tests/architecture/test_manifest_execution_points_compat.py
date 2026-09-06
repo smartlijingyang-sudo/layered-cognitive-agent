@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from lca.infrastructure.observability.spine import manifest as manifest_mod
-from lca.infrastructure.observability.spine.manifest import EXECUTION_POINTS
+from lca.infrastructure.observability.spine.manifest.manifest import EXECUTION_POINTS
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _MANIFEST_PATH = _REPO_ROOT / "lca/infrastructure/observability/spine/manifest.py"
@@ -17,7 +17,7 @@ _MANIFEST_PATH = _REPO_ROOT / "lca/infrastructure/observability/spine/manifest.p
 
 def test_execution_points_reexports_yaml_ssot() -> None:
     """COMPAT shim mirrors ``SPINE_EXECUTION_POINTS`` — no parallel tuple."""
-    from lca_kernel.events.payloads_spine import SPINE_EXECUTION_POINTS
+    from lca_kernel.events.payloads.payloads_spine import SPINE_EXECUTION_POINTS
 
     assert tuple(EXECUTION_POINTS) == SPINE_EXECUTION_POINTS
 

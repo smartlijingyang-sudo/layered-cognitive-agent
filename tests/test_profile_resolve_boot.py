@@ -18,19 +18,19 @@ from lca.harness.plugin_api import (
     UndeclaredInteractionError,
 )
 from lca.harness.plugin.spec_projection import native_spec_from_declaration
-from lca.harness.profile.boot import (
+from lca.harness.profile.boot.boot import (
     _boot_plugin,
     boot_entries,
     boot_profile,
     boot_resolved_profile,
     load_profile_entries,
 )
-from lca.harness.profile.boot_products import (
+from lca.harness.profile.boot.boot_products import (
     compiled_plan_from_scope,
     profile_boot_products_from_scope,
     resolved_profile_from_scope,
 )
-from lca.harness.profile.resolve import (
+from lca.harness.profile.resolve.resolve import (
     ProfileResolveError,
     dump_resolved,
     resolve_entries,

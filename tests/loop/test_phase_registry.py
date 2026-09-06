@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.protocols.declarative.declarative_common import SemanticPhase
+from lca.contracts.protocols.declarative.declarative_1.declarative_common import SemanticPhase
 from lca.loop.phases.registry import (
     PHASE_EXECUTOR_CAPABILITY_PREFIX,
     SEMANTIC_PHASE_ORDER,

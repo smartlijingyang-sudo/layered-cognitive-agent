@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from lca.contracts.protocols.journal.spec import AgentSpec
+    from lca.contracts.protocols.journal.spec.spec import AgentSpec
 
 
 @dataclass(frozen=True)

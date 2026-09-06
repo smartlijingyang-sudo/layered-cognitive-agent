@@ -17,8 +17,8 @@ from typing import Any
 import pytest
 from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 
-from lca.contracts.protocols.session.telemetry import SharingPolicy, TelemetryRecord
-from lca.plugins.session.runtime.store import SessionStore
+from lca.contracts.protocols.session.telemetry.telemetry import SharingPolicy, TelemetryRecord
+from lca.plugins.session.runtime.store.store import SessionStore
 from lca.plugins.session.telemetry_capture.telemetry_capture import (
     Config as CaptureConfig,
 )

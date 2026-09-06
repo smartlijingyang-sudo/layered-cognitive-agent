@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import (
     LEARNING_FAILURE_ANALYZER,
     LEARNING_REVIEW_SERVICE,
@@ -27,9 +27,9 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.protocols.runtime.runtime_lifecycle import (
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.runtime.runtime.runtime_lifecycle import (
     RuntimeLifecycleSubscriber,
     RuntimeLifecycleSubscriberContribution,
     RuntimeLifecycleSubscriberRegistry,

@@ -6,14 +6,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from lca.contracts.models.core.sandbox import SANDBOX_PREINSTALLED_CLI_TOOLS
-from lca.infrastructure.skills.bundled import (
+from lca.contracts.models.core.execution.sandbox import SANDBOX_PREINSTALLED_CLI_TOOLS
+from lca.infrastructure.skills.bundled.bundled import (
     OFFICECLI_SKILL_ID,
     default_bundled_skills_root,
     ensure_bundled_skills,
 )
-from lca.infrastructure.skills.disk_store import DiskSkillPackageStore, content_hash
-from lca.infrastructure.skills.settings import SkillSettings
+from lca.infrastructure.skills.disk.disk_store import DiskSkillPackageStore, content_hash
+from lca.infrastructure.skills.settings.settings import SkillSettings
 
 
 class TestOfficecliContracts(unittest.TestCase):

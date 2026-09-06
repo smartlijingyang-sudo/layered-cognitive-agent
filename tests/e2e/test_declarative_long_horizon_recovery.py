@@ -12,14 +12,14 @@ from typing import Any
 
 import pytest
 
-from lca.contracts.protocols.act.command_envelope import CommandEnvelope
+from lca.contracts.protocols.act.command.command_envelope import CommandEnvelope
 from lca.harness.declarative.execute.dispatch import RegistryEffectDispatcher
-from lca.plugins.act.effect_handlers_provider import (
+from lca.plugins.act.effect.effect_handlers_provider import (
     InMemoryEffectHandlerRegistry,
     register_default_effect_handlers,
 )
 from lca.loop.driver import RuntimePhaseCapabilities
-from lca.runtime.idempotency_fixtures import InMemoryFixtureIdempotencyStore
+from lca.runtime._overflow_0.idempotency_fixtures import InMemoryFixtureIdempotencyStore
 
 
 def _default_effect_handlers() -> InMemoryEffectHandlerRegistry:
@@ -68,7 +68,7 @@ class MockStopRule:
     """Mock stop rule."""
 
     async def decide(self, state: Any, decision: Any, observation: Any, reflection: Any) -> Any:
-        from lca.contracts.models.core.stop import StopDecision, StopReason
+        from lca.contracts.models.core.policy.stop import StopDecision, StopReason
 
         return StopDecision(should_stop=False, reason=StopReason.CONTINUE, final_output=None)
 
@@ -109,8 +109,8 @@ class TestEffectIdempotency:
             capabilities, _default_effect_handlers(), idempotency_store=store
         )
 
-        from lca.contracts.protocols.act.command_envelope import CapabilityGrant
-        from lca.contracts.protocols.declarative.declarative_phase_graph import EffectPolicyPlan
+        from lca.contracts.protocols.act.command.command_envelope import CapabilityGrant
+        from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import EffectPolicyPlan
 
         # Create envelope with idempotency key
         envelope = CommandEnvelope(
@@ -149,8 +149,8 @@ class TestEffectIdempotency:
             capabilities, _default_effect_handlers(), idempotency_store=store
         )
 
-        from lca.contracts.protocols.act.command_envelope import CapabilityGrant
-        from lca.contracts.protocols.declarative.declarative_phase_graph import EffectPolicyPlan
+        from lca.contracts.protocols.act.command.command_envelope import CapabilityGrant
+        from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import EffectPolicyPlan
 
         # Create envelope
         envelope = CommandEnvelope(
@@ -180,7 +180,7 @@ class TestEffectIdempotency:
     @pytest.mark.asyncio
     async def test_failed_effect_is_completed_and_not_reissued(self) -> None:
         """A returned failed observation is still a completed effect attempt."""
-        from lca.contracts.models.core.decision import Observation
+        from lca.contracts.models.core.execution.decision import Observation
 
         @dataclass
         class FailedBody:
@@ -203,8 +203,8 @@ class TestEffectIdempotency:
             capabilities, _default_effect_handlers(), idempotency_store=store
         )
 
-        from lca.contracts.protocols.act.command_envelope import CapabilityGrant
-        from lca.contracts.protocols.declarative.declarative_phase_graph import EffectPolicyPlan
+        from lca.contracts.protocols.act.command.command_envelope import CapabilityGrant
+        from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import EffectPolicyPlan
 
         envelope = CommandEnvelope(
             plan_ref="plan_v1",
@@ -236,8 +236,8 @@ class TestEffectIdempotency:
             capabilities, _default_effect_handlers(), idempotency_store=store
         )
 
-        from lca.contracts.protocols.act.command_envelope import CapabilityGrant
-        from lca.contracts.protocols.declarative.declarative_phase_graph import (
+        from lca.contracts.protocols.act.command.command_envelope import CapabilityGrant
+        from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
             DeclarativeValidationError,
             EffectPolicyPlan,
         )

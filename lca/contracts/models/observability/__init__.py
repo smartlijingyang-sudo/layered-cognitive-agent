@@ -1,13 +1,13 @@
 """models/observability — contracts 内部子包（依赖方向由 import-linter 契约强制）。"""
 
-from lca.contracts.models.observability.journal_doc import (
+from lca.contracts.models.observability.journal.journal_doc import (
     JournalDocument,
     JournalMetadata,
     append_step,
     close_document,
     empty_document,
 )
-from lca.contracts.models.observability.journal_step import (
+from lca.contracts.models.observability.journal.journal_step import (
     AttachmentRef,
     JournalStep,
     ReflectTrace,
@@ -22,7 +22,7 @@ from lca.contracts.models.observability.journal_step import (
     make_step_id,
     summarize_step,
 )
-from lca.contracts.models.observability.plan_ref import (
+from lca.contracts.models.observability.plan.plan_ref import (
     get_current_plan_ref,
     plan_ref_scope,
     reset_current_plan_ref,

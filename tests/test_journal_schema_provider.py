@@ -6,23 +6,23 @@
 
 from __future__ import annotations
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     DescriptorRef,
     JournalRecord,
     RunScope,
 )
-from lca.plugins.journal.journal_schema_v2_provider import EnvelopeV2Schema
+from lca.plugins.journal.journal.journal_schema_v2_provider import EnvelopeV2Schema
 
 
 def test_v2_provider_registered_on_seam() -> None:
     """Seam setup registers EnvelopeV2Schema at version v2.0.0."""
     import asyncio
 
-    from lca.plugins.observability.journal_schema_seam import (
+    from lca.plugins.observability.journal.journal_schema_seam import (
         Config,
         JournalSchemaRegistry,
     )
-    from lca.plugins.observability.journal_schema_seam import (
+    from lca.plugins.observability.journal.journal_schema_seam import (
         setup as seam_setup,
     )
 

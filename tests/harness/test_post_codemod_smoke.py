@@ -26,7 +26,7 @@ import json
 
 from pydantic import BaseModel
 
-from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
 from lca.harness.plugin_api import plugin
 from lca.harness.plugin.declaration import definition_from_plugin
 from lca.harness.plugin.manifest import PluginKind
@@ -151,8 +151,8 @@ class TestLegacyKeysStillWork:
         assert defn.contract.observability.descriptors == ()
 
     def test_legacy_logic_address_produces_synthesized_contract(self) -> None:
-        from lca.contracts.atoms.control_slot import ControlSlot
-        from lca.contracts.atoms.scope import Scope
+        from lca.contracts.atoms.control.control_slot import ControlSlot
+        from lca.contracts.atoms.scope.scope import Scope
         from lca.contracts.protocols.composition.logic_address import LogicAddress
 
         @plugin(

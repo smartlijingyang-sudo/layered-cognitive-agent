@@ -13,8 +13,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
-from lca.contracts.observability.status import RunLifecycleStatus
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
+from lca.contracts.observability.registry.status import RunLifecycleStatus
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
 from lca.plugins.transport.webserver.handlers.runs.terminal import registry_commands
 
 if TYPE_CHECKING:

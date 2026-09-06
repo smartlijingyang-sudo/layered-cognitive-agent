@@ -14,21 +14,21 @@ import pytest
 
 from lca.contracts.event import Category, EventPayload
 from lca_kernel.events import EventRef, TeamDelegationCacheHit
-from lca_kernel.events.bus import EventBus, FailureSemantics, reset_trace_id, set_trace_id
-from lca_kernel.events.errors import MissingPluginIdentityError, UnauthorizedSubscribeError
-from lca_kernel.events.hooks import MechanismDispatchObserver
-from lca_kernel.events.payloads import (
+from lca_kernel.events.bus.bus import EventBus, FailureSemantics, reset_trace_id, set_trace_id
+from lca_kernel.events.errors.errors import MissingPluginIdentityError, UnauthorizedSubscribeError
+from lca_kernel.events.hooks.hooks import MechanismDispatchObserver
+from lca_kernel.events.payloads.payloads import (
     DISPATCH_SELF_OBSERVATION_CATEGORIES,
     MechanismDispatchEventPayload,
 )
-from lca_kernel.events.pipeline import HookSpec, Pipeline, Stage
+from lca_kernel.events.pipeline.pipeline import HookSpec, Pipeline, Stage
 
 SINKS_END = "event.bus.dispatch.sinks.end"
 CONSUMERS_END = "event.bus.dispatch.consumers.end"
 
 
 def _make_bus() -> EventBus[EventPayload]:
-    from lca_kernel.events.test_catalog import build_test_bus
+    from lca_kernel.events.test.test_catalog import build_test_bus
     return build_test_bus()
 
 

@@ -9,8 +9,8 @@ from dataclasses import dataclass
 
 import pytest
 
-from lca.harness.profile.boot import _validate_audited_interactions
-from lca.harness.profile.errors import ProfileResolveError
+from lca.harness.profile.boot.boot import _validate_audited_interactions
+from lca.harness.profile.validate.errors import ProfileResolveError
 
 
 @dataclass

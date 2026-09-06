@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from lca.contracts.protocols.declarative.declarative_common import SemanticPhase
-from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseExecutor
+from lca.contracts.protocols.declarative.declarative_1.declarative_common import SemanticPhase
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseExecutor
 
 SEMANTIC_PHASE_ORDER: tuple[SemanticPhase, ...] = (
     SemanticPhase.PERCEIVE,

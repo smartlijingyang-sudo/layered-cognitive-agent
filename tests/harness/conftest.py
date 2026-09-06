@@ -18,7 +18,7 @@ from typing import Any
 
 import pytest
 
-from lca.application.api import ensure_default_ctx
+from lca.application.api.api import ensure_default_ctx
 
 
 @pytest.fixture(scope="session", autouse=True)

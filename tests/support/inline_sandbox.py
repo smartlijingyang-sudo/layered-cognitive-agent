@@ -9,7 +9,7 @@ import sys
 import types
 from typing import Any
 
-from lca.contracts.models.core.sandbox import (
+from lca.contracts.models.core.execution.sandbox import (
     SANDBOX_MOUNT_ROOT,
     SANDBOX_OUTPUT_SUBDIR,
     SandboxFile,
@@ -17,7 +17,7 @@ from lca.contracts.models.core.sandbox import (
     SessionConfig,
     SessionInfo,
 )
-from lca.infrastructure.sandbox.streaming import SandboxStreamEmitter
+from lca.infrastructure.sandbox.streaming.streaming import SandboxStreamEmitter
 
 
 class InlineSandbox:
@@ -43,7 +43,7 @@ class InlineSandbox:
     ) -> SandboxResult:
         del timeout_s
         self.write_files_calls.append(files)
-        from lca.infrastructure.sandbox.onlyboxes_bootstrap import safe_rel_name
+        from lca.infrastructure.sandbox.onlyboxes.onlyboxes_bootstrap import safe_rel_name
 
         vfs = self._sessions[session_id] if session_id and session_id in self._sessions else {}
         for name, source in files.items():

@@ -2,11 +2,11 @@
 
 import pytest
 
-from lca.cognition.memory.layered_retrieval_policy import (
+from lca.cognition.memory.layered.layered_retrieval_policy import (
     LayeredRetrievalPolicy,
 )
-from lca.contracts.atoms.enums import MemoryLayer
-from lca.contracts.models.core.memory import MemoryRecord
+from lca.contracts.atoms.enums.enums import MemoryLayer
+from lca.contracts.models.core.conversation.memory import MemoryRecord
 
 
 def _rec(layer: MemoryLayer, record_id: str, recency: float) -> MemoryRecord:

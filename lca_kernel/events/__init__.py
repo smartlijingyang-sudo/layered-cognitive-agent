@@ -26,8 +26,8 @@ from lca.contracts.event import (
     TeamDelegationCacheHit,
     default_plane,
 )
-from lca.contracts.observability.fsync import FsyncProtocol
-from lca_kernel.events.bus import (
+from lca.contracts.observability.evidence.fsync import FsyncProtocol
+from lca_kernel.events.bus.bus import (
     ConsumerHandle,
     ConsumerResult,
     DeliveryPolicy,
@@ -36,7 +36,7 @@ from lca_kernel.events.bus import (
     EventBus,
     EventRef,
 )
-from lca_kernel.events.fold import (
+from lca_kernel.events.fold.fold import (
     EpochHeader,
     StepTree,
     canonicalHeader,
@@ -44,13 +44,13 @@ from lca_kernel.events.fold import (
     foldRequestHeader,
     headerEquals,
 )
-from lca_kernel.events.persistence import (
+from lca_kernel.events.persistence.persistence import (
     EnvelopeDeliveryObserver,
     PersistenceFlushTimeout,
     PersistenceHealthSnapshot,
     PersistenceObserver,
 )
-from lca_kernel.events.session import (
+from lca_kernel.events.session.session import (
     SESSION_FORMAT_VERSION,
     SessionEvent,
     SessionHeader,

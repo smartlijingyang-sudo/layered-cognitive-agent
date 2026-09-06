@@ -22,7 +22,7 @@ from dataclasses import fields
 
 import pytest
 
-from lca.contracts.models.core.tool import ParameterSpec, ToolManifest
+from lca.contracts.models.core.execution.tool import ParameterSpec, ToolManifest
 from lca.plugins import tools as tools_pkg
 
 
@@ -152,7 +152,7 @@ def test_parameter_spec_parses_yaml_shaped_dict(raw: dict) -> None:
 
 def test_tool_manifest_defaults_to_empty_parameters() -> None:
     """Backward compatibility: a manifest without ``parameters`` keeps working."""
-    from lca.contracts.models.core.tool import ToolApi
+    from lca.contracts.models.core.execution.tool import ToolApi
 
     manifest = ToolManifest(
         identifier="compat",

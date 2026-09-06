@@ -27,14 +27,14 @@ from opentelemetry import trace as otel_trace
 if TYPE_CHECKING:
     from lca.infrastructure.observability.genai.registry import GenAISemanticMapperRegistry
 
-from lca.contracts.atoms.telemetry import (
+from lca.contracts.atoms.telemetry.telemetry import (
     ATTR_AGENT_ROLE,
     ATTR_RATIONALE_PREVIEW,
     ATTR_SUMMARY,
     EventName,
     SpanName,
 )
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     AgentRunFinished,
     AgentRunStarted,
     DelegationCompleted,
@@ -54,7 +54,7 @@ from lca.infrastructure.observability.backends.langfuse_conventions import (
     LANGFUSE_OBSERVATION_TYPE,
     OBSERVATION_TYPE_EVENT,
 )
-from lca.infrastructure.observability.events.event_catalog import may_export_externally
+from lca.infrastructure.observability.events.event.event_catalog import may_export_externally
 from lca.infrastructure.observability.journal.otel import genai_mapping as genai
 from lca.infrastructure.observability.journal.otel import mapping as mapping
 from lca.infrastructure.observability.journal.otel.mapping import EVENT_PROJECTIONS

@@ -12,12 +12,12 @@ from typing import TYPE_CHECKING, Any
 
 from lca.infrastructure.persistence.run_buffer_registry import RunWriteBehindRegistry
 from lca.infrastructure.persistence.run_paths import run_id_from_event_id
-from lca_kernel.events.persistence import PersistenceObserver
-from lca_kernel.events.spine_runtime import is_spine_event
+from lca_kernel.events.persistence.persistence import PersistenceObserver
+from lca_kernel.events.spine.spine_runtime import is_spine_event
 
 if TYPE_CHECKING:
-    from lca_kernel.events.bus import EventRef
-    from lca_kernel.events.spine_runtime import SpineEventRecord
+    from lca_kernel.events.bus.bus import EventRef
+    from lca_kernel.events.spine.spine_runtime import SpineEventRecord
 
 _run_id_of = run_id_from_event_id
 

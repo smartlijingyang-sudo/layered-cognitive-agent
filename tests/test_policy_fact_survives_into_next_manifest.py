@@ -5,9 +5,9 @@ from __future__ import annotations
 import pytest
 
 from lca.cognition.brain.decision_gates import RepeatToolCallGate
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
-from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall, Turn
+from lca.contracts.models.core.state.state import AgentState, Budget
 from tests.support.session_gate_helpers import (
     bound_session,
     extend_control_turns,

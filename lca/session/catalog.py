@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from lca.contracts.harness import memory as _memory_events  # noqa: F401 — register types
 from lca.contracts.harness.tasks.session import event_registry
-from lca_kernel.events.fold import SURFACE_EVENT_TYPES
-from lca_kernel.events.payloads_spine import SPINE_EVENT_CATEGORIES, SPINE_EXECUTION_POINTS
+from lca_kernel.events.fold.fold import SURFACE_EVENT_TYPES
+from lca_kernel.events.payloads.payloads_spine import SPINE_EVENT_CATEGORIES, SPINE_EXECUTION_POINTS
 
 __all__ = [
     "UnknownSessionEventTypeError",

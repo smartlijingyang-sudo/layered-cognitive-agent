@@ -6,12 +6,12 @@ from dataclasses import replace
 
 import pytest
 
-from lca.contracts.protocols.declarative.declarative_common import (
+from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
     DeclarativeValidationError,
     SemanticPhase,
 )
-from lca.contracts.protocols.declarative.declarative_plugin import EffectGovernanceDeclaration
-from lca.harness.declarative.compile.effect_policy import compile_effect_policy
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import EffectGovernanceDeclaration
+from lca.harness.declarative.compile.effect.effect_policy import compile_effect_policy
 from lca.plugins.loop.phase._shared.common import standard_phase_spec
 
 

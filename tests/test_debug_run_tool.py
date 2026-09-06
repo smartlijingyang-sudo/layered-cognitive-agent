@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lca.plugins.tools.diagnostics.debug_run import DebugRunToolAdapter
+from lca.plugins.tools.diagnostics.debug.debug_run import DebugRunToolAdapter
 
 
 def _write_run_dir(

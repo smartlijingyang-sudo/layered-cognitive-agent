@@ -10,25 +10,25 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from lca.contracts.models.core.file_ref import (
+from lca.contracts.models.core.workspace.file_ref import (
     FileRef,
     FileRefKind,
     FileRefSource,
 )
-from lca.contracts.models.core.plane import PlaneKind, PlaneRef
-from lca.contracts.models.core.sandbox import MountEntry, MountManifest
-from lca.contracts.protocols.runtime.attachment import (
+from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
+from lca.contracts.models.core.execution.sandbox import MountEntry, MountManifest
+from lca.contracts.protocols.runtime.attachment.attachment import (
     AttachmentPromptRenderer,
     AttachmentResolver,
     AttachmentStager,
     ResolvedAttachment,
 )
-from lca.contracts.protocols.runtime.attachment_errors import (
+from lca.contracts.protocols.runtime.attachment.attachment_errors import (
     AmbiguousFileRefError,
     AttachmentErrorCode,
     UnresolvedFileRefError,
 )
-from lca.contracts.protocols.runtime.sandbox_backend import SandboxBackend
+from lca.contracts.protocols.runtime.sandbox.sandbox_backend import SandboxBackend
 
 
 def _plane(kind: PlaneKind, root: str) -> PlaneRef:

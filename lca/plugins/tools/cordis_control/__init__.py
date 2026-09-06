@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, Protocol, cast
 from pydantic import BaseModel, ConfigDict, Field
 
 from lca.contracts.capabilities import COMPOSITION_COMPOSE_FACTORY, CORDIS_CONTROL_TOOL_FACTORY
-from lca.contracts.mechanisms.capability import require_capability
+from lca.contracts.mechanisms.capability.capability import require_capability
 from lca.contracts.protocols import Tool
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.tools.cordis_control.tool import (

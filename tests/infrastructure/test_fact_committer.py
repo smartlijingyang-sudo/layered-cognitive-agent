@@ -5,15 +5,15 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from lca.contracts.harness.fold.perceive import fold_context_manifest_from_events
-from lca.contracts.protocols.act.command_envelope import RunFact
+from lca.contracts.protocols.act.command.command_envelope import RunFact
 from lca.contracts.protocols.loop.fact_gateway import AppendReceipt
-from lca.infrastructure.session.fact_committer import SessionFactCommitter, emit_diagnostic
+from lca.infrastructure.session.commit.fact_committer import SessionFactCommitter, emit_diagnostic
 from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
     set_publish_session,
 )
 from lca.session.append import Session
-from lca.runtime.runtime_journal import RuntimeJournalCommitter
+from lca.runtime.loop.runtime_journal import RuntimeJournalCommitter
 
 
 def test_commit_context_injected_returns_receipt_seq() -> None:

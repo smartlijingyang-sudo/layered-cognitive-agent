@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.models.core.budget import BudgetLimits
+from lca.contracts.models.core.policy.budget import BudgetLimits
 
 
 def test_budget_limits_accept_positive_runtime_ceiling() -> None:

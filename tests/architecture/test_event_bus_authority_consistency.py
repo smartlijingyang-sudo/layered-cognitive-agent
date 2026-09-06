@@ -111,7 +111,7 @@ class YamlAuthRecord:
 
 def _collect_yaml_auth() -> list[YamlAuthRecord]:
     """遍历 lca_kernel/events/config/**/*.yaml,装载 EventRegistry-style 鉴权矩阵。"""
-    from lca_kernel.events.registry import EventRegistry
+    from lca_kernel.events.registry.registry import EventRegistry
 
     registry = EventRegistry.load(_EVENT_CONFIG_DIR)
     out: list[YamlAuthRecord] = []

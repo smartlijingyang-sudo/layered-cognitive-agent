@@ -11,8 +11,8 @@ from typing import Any
 
 import pytest
 
-from lca.contracts.mechanisms.capability import MissingCapabilityError
-from lca.plugins.transport.webserver.router import RouteRegistry
+from lca.contracts.mechanisms.capability.capability import MissingCapabilityError
+from lca.plugins.transport.webserver.router.router import RouteRegistry
 
 
 class _FakeRuntime:
@@ -56,7 +56,7 @@ class _FakeCtx:
 
 @pytest.mark.asyncio
 async def test_routes_health_options_register_three_routes() -> None:
-    from lca.plugins.transport.webserver.routes_health_options import setup as plugin
+    from lca.plugins.transport.webserver.routes_1.routes_health_options import setup as plugin
 
     router = RouteRegistry()
     ctx = _FakeCtx(router)
@@ -71,7 +71,7 @@ async def test_routes_health_options_register_three_routes() -> None:
 
 @pytest.mark.asyncio
 async def test_routes_health_options_effects_tracked() -> None:
-    from lca.plugins.transport.webserver.routes_health_options import setup as plugin
+    from lca.plugins.transport.webserver.routes_1.routes_health_options import setup as plugin
 
     router = RouteRegistry()
     ctx = _FakeCtx(router)
@@ -87,7 +87,7 @@ async def test_routes_health_options_effects_tracked() -> None:
 @pytest.mark.asyncio
 async def test_routes_health_options_skips_journal_live_when_capability_missing() -> None:
     """ADR-0163 决策 3:``process_journal`` 缺失 → ``/journal/live`` 不挂。"""
-    from lca.plugins.transport.webserver.routes_health_options import setup as plugin
+    from lca.plugins.transport.webserver.routes_1.routes_health_options import setup as plugin
 
     router = RouteRegistry()
     ctx = _FakeCtx(router, capabilities=())  # explicit no capabilities
@@ -103,7 +103,7 @@ async def test_routes_health_options_skips_journal_live_when_capability_missing(
 
 def test_routes_health_options_exposes_public_routes_constant() -> None:
     """PR-7:``ROUTES`` 公开常量,供 ``build_routes`` 退役后的 catalog 校验。"""
-    from lca.plugins.transport.webserver.routes_health_options import ROUTE_SPECS
+    from lca.plugins.transport.webserver.routes_1.routes_health_options import ROUTE_SPECS
 
     assert isinstance(ROUTE_SPECS, tuple)
     paths = {spec.path for spec in ROUTE_SPECS}

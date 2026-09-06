@@ -4,7 +4,7 @@ from dataclasses import replace
 
 import pytest
 
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     PhaseEdge,
     PhaseInput,
     PhaseResult,
@@ -22,7 +22,7 @@ from lca.harness.declarative.controls.validation import (
 from lca.harness.graph.phase_graph_compiler import compile_phase_graph_projection
 from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.composition.plan_compiler import compile_plan
-from lca.harness.profile.resolve import resolve_profile
+from lca.harness.profile.resolve.resolve import resolve_profile
 from tests.phase_executors import standard_phase_executors
 
 
@@ -233,7 +233,7 @@ class _PrepareContribution:
 
 @pytest.mark.asyncio
 async def test_prepare_contribution_is_resolved_and_executed(standard_plan) -> None:
-    from lca.contracts.protocols.declarative.declarative_phase_graph import (
+    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
         ContributionRole,
         PhaseContribution,
     )

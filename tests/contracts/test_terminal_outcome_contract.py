@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.models.core.terminal_outcome import (
+from lca.contracts.models.core.state.terminal_outcome import (
     ArtifactRef,
     ErrorRef,
     ResumeCursor,
@@ -284,7 +284,7 @@ class TestADRBackwardCompatibilityNote:
     """
 
     def test_terminal_outcome_isolated_from_stop_decision(self) -> None:
-        from lca.contracts.models.core.stop import StopDecision
+        from lca.contracts.models.core.policy.stop import StopDecision
 
         decision = StopDecision(should_stop=True, final_output="legacy")
         outcome = _completed()

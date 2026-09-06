@@ -12,12 +12,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from lca.contracts.observability.loop_cursor import CursorSnapshot
+from lca.contracts.observability.cursor.loop_cursor import CursorSnapshot
 from lca.infrastructure.observability.loop_cursor.projections.otel_projection import (
     OtelProjection,
     otel_sdk_available,
 )
-from lca.infrastructure.observability.spine.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.event_record import EventRecord
 
 
 def _snap(seq: int = 0, step_id: str | None = "s1") -> CursorSnapshot:

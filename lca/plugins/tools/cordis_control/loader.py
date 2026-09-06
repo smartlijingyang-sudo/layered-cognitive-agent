@@ -21,9 +21,9 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any, cast
 
-from lca.application.preset_authoring import PresetAuthoring
+from lca.application.authoring.preset_authoring import PresetAuthoring
 from lca.contracts.harness.composition.plugin_meta import PluginMeta
-from lca.contracts.mechanisms.composition import PluginMetaMissing
+from lca.contracts.mechanisms.composition.composition import PluginMetaMissing
 
 
 def load_plugin_source(path: str) -> tuple[str, str, int]:

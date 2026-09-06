@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from lca.infrastructure.cli.profile import resolve_profile_path
-from lca_kernel.cli import create_app
+from lca.infrastructure.cli.profile.profile import resolve_profile_path
+from lca_kernel.cli.cli import create_app
 
 
 @pytest.mark.asyncio
@@ -48,7 +48,7 @@ async def test_create_app_publishes_one_session_object_graph() -> None:
         "lifespan-driven ctx injection under ADR-0115 决定 6 (thin factory); "
         "see tests/test_thin_factory.py for new shape"
     )
-    from lca.plugins.transport.webserver.handlers.runs.terminal.legacy_adapter import (
+    from lca.plugins.transport.webserver.handlers.runs.terminal.legacy.legacy_adapter import (
         RegistryRunAdapter,
     )
 

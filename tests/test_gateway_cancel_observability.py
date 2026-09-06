@@ -10,13 +10,13 @@ from unittest.mock import patch
 import pytest
 
 from lca.agent.cognitive_agent import CognitiveAgent
-from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
 from lca.session.lifecycle.bind import EventSessionBinder
-from lca.plugins.session.runtime.store import SessionStore
+from lca.plugins.session.runtime.store.store import SessionStore
 from lca.plugins.transport.webserver.carrier.runs.execute import create_run_session, schedule_run
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunStatus
-from lca_kernel.events.bus import EventBus
-from lca_kernel.events.test_catalog import build_test_bus
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunRegistry, RunStatus
+from lca_kernel.events.bus.bus import EventBus
+from lca_kernel.events.test.test_catalog import build_test_bus
 from tests.support.gateway_scripted import ScriptedLLMResolver
 
 

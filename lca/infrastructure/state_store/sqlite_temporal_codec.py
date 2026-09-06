@@ -8,8 +8,8 @@ import sqlite3
 from dataclasses import replace
 from time import time
 
-from lca.contracts.atoms.enums import MemoryLayer, MemoryRecordKind
-from lca.contracts.models.core.memory import MemoryRecord, MemoryTrust
+from lca.contracts.atoms.enums.enums import MemoryLayer, MemoryRecordKind
+from lca.contracts.models.core.conversation.memory import MemoryRecord, MemoryTrust
 
 DEFAULT_SCOPE = "local:default"
 TOKEN_PATTERN = re.compile(r"[\w-]+", re.UNICODE)

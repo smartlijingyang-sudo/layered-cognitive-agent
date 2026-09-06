@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from lca.contracts.models.observability.journal import StampedEvent
+    from lca.contracts.models.observability.journal.journal import StampedEvent
 
 
 class ToolGenAIMapper:
@@ -13,7 +13,7 @@ class ToolGenAIMapper:
     runtime_kind = "tool"
 
     def map(self, stamped: StampedEvent) -> dict[str, str]:
-        from lca.contracts.models.observability.journal import ToolInvoked
+        from lca.contracts.models.observability.journal.journal import ToolInvoked
 
         event = stamped.event
         if not isinstance(event, ToolInvoked):

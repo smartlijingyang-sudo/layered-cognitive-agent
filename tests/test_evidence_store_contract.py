@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import time
 
-from lca.contracts.observability.evidence import (
+from lca.contracts.observability.evidence.evidence import (
     Classification,
     EvidenceIntegrityError,
     EvidencePolicy,

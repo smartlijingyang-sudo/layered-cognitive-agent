@@ -17,8 +17,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.observability.loop_cursor import CursorSnapshot
-from lca.infrastructure.observability.spine.event_record import EventRecord
+from lca.contracts.observability.cursor.loop_cursor import CursorSnapshot
+from lca.infrastructure.observability.spine.event.event_record import EventRecord
 
 # step.thinking.record / step.tool_call.record / llm.request.header
 _EP_THINKING = "step.thinking.record"

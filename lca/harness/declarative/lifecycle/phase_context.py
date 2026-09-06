@@ -5,10 +5,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
-from lca.contracts.models.core.decision import Decision, Observation, Reflection
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.protocols.act.command_envelope import RunDelta, RunFact
-from lca.contracts.protocols.declarative.declarative_execution import (
+from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.protocols.act.command.command_envelope import RunDelta, RunFact
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     JournalCommitter,
     PhaseCapabilityReader,
     PhaseContext,

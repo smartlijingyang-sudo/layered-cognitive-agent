@@ -13,9 +13,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.protocols.declarative.declarative_execution import PhaseResult
-from lca.contracts.protocols.declarative.declarative_graph import LoopGuard, PhaseEdge
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import PhaseResult
+from lca.contracts.protocols.declarative.declarative_1.declarative_graph import LoopGuard, PhaseEdge
 
 
 @dataclass(frozen=True, slots=True)

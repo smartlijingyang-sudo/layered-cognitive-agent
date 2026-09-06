@@ -1,0 +1,71 @@
+"""ComponentRegistry contributor: InMemoryStateStore (ADR-0074).
+
+Injects the shared ComponentRegistry and registers the in-memory
+state_store implementation under ComponentKind.STATE_STORE.
+"""
+
+from __future__ import annotations
+
+from pydantic import BaseModel
+
+from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.enums.enums import ComponentKind
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.capabilities import COMPONENT_REGISTRY
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.journal.spec.spec import STATE_STORE_CHOICE_MEMORY
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
+
+
+@plugin(
+    id="lca-component-state-store-contributor",
+    provides=[],
+    requires=[COMPONENT_REGISTRY.key],
+    layer="L4",
+    kind=PluginKind.PROVIDER,
+    effects="none",
+    description="Register InMemoryStateStore into the shared ComponentRegistry.",
+    test_suite="tests/architecture/test_component_registry_seam.py",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G10_COMPOSITION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=(
+                "lca-component-state-store-contributor.checked",
+                "lca-component-state-store-contributor.served",
+            )
+        ),
+    ),
+    relations=(),
+    ownership=OwnershipDeclaration(
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
+        state_mutation="forbidden",
+    ),
+)
+async def setup(ctx: PluginContext, config: Config) -> None:
+    del config
+    from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
+
+    registry = ctx.require(COMPONENT_REGISTRY.key)
+    registry.register(ComponentKind.STATE_STORE, STATE_STORE_CHOICE_MEMORY, InMemoryStateStore)
+
+
+__all__ = ["Config", "setup"]

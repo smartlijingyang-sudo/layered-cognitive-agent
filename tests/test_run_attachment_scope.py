@@ -12,7 +12,7 @@ split into characters.
 
 from __future__ import annotations
 
-from lca.infrastructure.tools.run_attachment_scope import (
+from lca.infrastructure.tools.run.run_attachment_scope import (
     get_current_run_attachment_ids,
     run_attachment_scope,
 )

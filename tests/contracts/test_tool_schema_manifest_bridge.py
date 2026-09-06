@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.models.core.tool import ParameterSpec, ToolApi, ToolManifest
-from lca.contracts.observability.loop_cursor_payloads import ToolSchema
+from lca.contracts.models.core.execution.tool import ParameterSpec, ToolApi, ToolManifest
+from lca.contracts.observability.cursor.loop_cursor_payloads import ToolSchema
 
 
 def _manifest(*apis: ToolApi, identifier: str = "demo.tool") -> ToolManifest:

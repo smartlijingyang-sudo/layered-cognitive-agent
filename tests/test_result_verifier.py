@@ -38,7 +38,7 @@ def test_verification_report_rejects_inconsistent_outcome(kwargs: dict[str, obje
 
 def test_verification_projects_to_existing_task_status() -> None:
     from lca.contracts.harness.gate.result_verifier import task_status_from_verification
-    from lca.contracts.models.core.lifecycle import TaskStatus
+    from lca.contracts.models.core.state.lifecycle import TaskStatus
 
     assert (
         task_status_from_verification(

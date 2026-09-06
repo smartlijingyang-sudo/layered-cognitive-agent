@@ -9,12 +9,12 @@ import ast
 import unittest
 from pathlib import Path
 
-from lca.contracts.atoms.telemetry import EventName, SpanName
-from lca.contracts.models.observability.journal_catalog import (
+from lca.contracts.atoms.telemetry.telemetry import EventName, SpanName
+from lca.contracts.models.observability.journal.journal_catalog import (
     JOURNAL_EVENT_CLASSES,
 )
-from lca.contracts.models.observability.telemetry_catalog import TELEMETRY_CATALOG
-from lca.infrastructure.observability.events.event_catalog import EVENT_DESCRIPTOR_REGISTRY
+from lca.contracts.models.observability.telemetry.telemetry_catalog import TELEMETRY_CATALOG
+from lca.infrastructure.observability.events.event.event_catalog import EVENT_DESCRIPTOR_REGISTRY
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _LCA_DIR = _REPO_ROOT / "lca"

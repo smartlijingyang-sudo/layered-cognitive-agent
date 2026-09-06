@@ -40,13 +40,13 @@ from lca.plugins.transport.webserver.carrier.runs.execute import (
     create_run_session,
     execute_run,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.session import (
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
     RunRegistry,
     RunSession,
     RunStatus,
 )
 from lca_kernel import run_kernel_lifespan
-from lca_kernel.events.bus import EventBus
+from lca_kernel.events.bus.bus import EventBus
 from tests.harness.scripted_llm import ScriptedLLMAdapter
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from lca.contracts.atoms.enums import ActionType
-from lca.contracts.protocols.session.resume_input import ResumeInput
-from lca.runtime.resume_input import HumanAnswerResumeInputAdapter
+from lca.contracts.atoms.enums.enums import ActionType
+from lca.contracts.protocols.session.resume.resume_input import ResumeInput
+from lca.runtime.support.resume_input import HumanAnswerResumeInputAdapter
 
 
 def test_human_answer_adapter_preserves_empty_resume_without_turn() -> None:

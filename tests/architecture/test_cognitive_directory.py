@@ -40,7 +40,7 @@ class TestCognitiveDirectoryDiscipline:
         count = _direct_py_count(root)
         assert count <= MAX_DIRECT_PY, f"{anchor}/ has {count} direct .py (max {MAX_DIRECT_PY})"
 
-    def test_check_cognitive_directory_passes_anchors(self) -> None:
+    def test_check_cognitive_directory_passes_full_tree(self) -> None:
         proc = subprocess.run(
             ["uv", "run", "python", "scripts/check_cognitive_directory.py"],
             cwd=ROOT,

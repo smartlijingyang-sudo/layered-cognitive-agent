@@ -13,7 +13,7 @@ from typing import Any, Protocol
 import structlog
 
 from lca.contracts.event import EventPayload
-from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
+from lca.contracts.mechanisms.capability.capability import MissingCapabilityError, require_capability
 from lca.plugins.events._session_observe import (
     EventObserverCallback,
     current_session,
@@ -25,8 +25,8 @@ from lca.plugins.events.publishers._session_publish import (
     set_publish_session,
 )
 from lca.session.append import Session
-from lca_kernel.events.bus import EventRef
-from lca_kernel.events.session import SessionEvent, SessionProtocol
+from lca_kernel.events.bus.bus import EventRef
+from lca_kernel.events.session.session import SessionEvent, SessionProtocol
 
 _log = structlog.get_logger(__name__)
 
@@ -171,13 +171,13 @@ def bind_run_event_session_from_store(
     bridge = RunEventSessionBridge(inner)
     token = set_publish_session(bridge)
     set_session(bridge)
-    from lca.infrastructure.session.lifecycle_emit import create_session, reset_lifecycle
+    from lca.infrastructure.session.emit.lifecycle_emit import create_session, reset_lifecycle
 
     reset_lifecycle()
     if profile is not None:
         create_session(profile, preset=preset)
     from lca.infrastructure.persistence.run_buffer_registry import SessionPersistenceFlushListener
-    from lca.plugins.session.runtime.spine_hook import bind_bridge_spine_hook
+    from lca.plugins.session.runtime.spine.spine_hook import bind_bridge_spine_hook
 
     spine_hook_token = bind_bridge_spine_hook(bridge)
     persistence_flush_cancel = inner.register_flush_listener(SessionPersistenceFlushListener())
@@ -217,7 +217,7 @@ def unbind_run_event_session(bound: BoundRunEventSession | None) -> None:
         with contextlib.suppress(Exception):
             bound.persistence_flush_cancel()
     if bound.spine_hook_token is not None:
-        from lca.plugins.session.runtime.spine_hook import reset_bridge_spine_hook
+        from lca.plugins.session.runtime.spine.spine_hook import reset_bridge_spine_hook
 
         with contextlib.suppress(Exception):
             reset_bridge_spine_hook(bound.spine_hook_token)

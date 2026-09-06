@@ -14,14 +14,14 @@ from lca.contracts.capabilities import (
     LEARNING_SKILL_ACQUIRER,
     RUNTIME_LIFECYCLE_SUBSCRIBER_REGISTRY,
 )
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.protocols.runtime.runtime_lifecycle import (
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.protocols.runtime.runtime.runtime_lifecycle import (
     RuntimeBudgetSnapshot,
     RuntimeLifecycleEvent,
     RuntimeLifecycleEventType,
 )
 from lca.harness.composition.plan_compiler import compile_plan
-from lca.harness.profile.resolve import resolve_profile
+from lca.harness.profile.resolve.resolve import resolve_profile
 from lca.infrastructure.learning.review_ticket_store import InMemoryLearningReviewTicketStore
 from lca.plugins.insight.failure_analyzer import FailureAnalyzerService
 from lca.plugins.learning import review_lifecycle
@@ -30,7 +30,7 @@ from lca.plugins.learning.review_lifecycle import (
     LearningReviewTicketStatus,
 )
 from lca.plugins.skill.auto_acquire import AutoAcquireSkillService
-from lca.runtime.runtime_event_publisher import (
+from lca.runtime.loop.runtime_event_publisher import (
     InMemoryRuntimeLifecycleSubscriberRegistry,
 )
 

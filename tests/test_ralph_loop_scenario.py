@@ -43,9 +43,9 @@ from lca.cognition.sensors import (
     build_clock_sensor,
     build_workspace_artifacts_sensor,
 )
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.observability.journal import (
+from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.observability.journal.journal import (
     InboxFollowupCreated,
 )
 from lca.infrastructure.observability.journal.engine.engine import RunStore
@@ -110,7 +110,7 @@ class TestRalphLoop:
         Three consecutive test-run calls produce a PolicyFact warning.
         """
         chain = ChainedDecisionGate(RepeatToolCallGate(), ToolLoopBreakerGate())
-        from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
+        from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall, Turn
 
         def _failed_test_run() -> Turn:
             return Turn(
@@ -154,7 +154,7 @@ class TestRalphLoop:
             assert any(b.gate == "ToolLoopBreakerGate" for b in bucket)
             # The output decision should be RESPOND (ToolLoopBreaker forced it).
             assert out is not None
-            from lca.contracts.atoms.enums import ActionType
+            from lca.contracts.atoms.enums.enums import ActionType
 
             assert out.action_type == ActionType.RESPOND
 
@@ -169,7 +169,7 @@ class TestRalphLoop:
             sensors=[build_clock_sensor()],
             memory=None,
         )
-        from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
+        from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall, Turn
 
         def _failed_test_run() -> Turn:
             return Turn(
@@ -280,7 +280,7 @@ class TestComplexScenarios:
             ProgressLoopDetector(),
             TerminalRespondGate(),
         )
-        from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
+        from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall, Turn
 
         def _failed_test_run() -> Turn:
             return Turn(

@@ -28,21 +28,21 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.harness.declarative.execute.outcome_projection import RunOutcomeProjector
 from lca.infrastructure.observability.journal.step.reader import read_step_document
-from lca.infrastructure.observability.spine.context import SpineContext
-from lca.infrastructure.observability.spine.derivers.step_tree_accumulator import (
+from lca.infrastructure.observability.spine.context.context import SpineContext
+from lca.infrastructure.observability.spine.derivers.step.step_tree_accumulator import (
     StepTreeAccumulatorDeriver,
 )
-from lca.infrastructure.observability.spine.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.event_record import EventRecord
 
 # ── 1. find_spine_file (ssot.py) ────────────────────────────────────────
 
 
 def test_find_spine_file_prefers_new_naming(tmp_path: Path) -> None:
     """新 spine 命名(``<run_id>.spine.jsonl``)存在 → 直接返回。"""
-    from lca.contracts.observability.ssot import find_spine_file
+    from lca.contracts.observability.core.ssot import find_spine_file
 
     run_dir = tmp_path / "run_abc"
     run_dir.mkdir()
@@ -60,7 +60,7 @@ def test_find_spine_file_legacy_fallback_removed(tmp_path: Path) -> None:
     新命名不存在 + legacy 存在 → 抛 ObservationSSOTError(不再 fallback)。
     旧 run 迁移由 importer 一次性完成;不再有 reader 透明兜底。
     """
-    from lca.contracts.observability.ssot import ObservationSSOTError, find_spine_file
+    from lca.contracts.observability.core.ssot import ObservationSSOTError, find_spine_file
 
     run_dir = tmp_path / "run_abc"
     run_dir.mkdir()
@@ -72,7 +72,7 @@ def test_find_spine_file_legacy_fallback_removed(tmp_path: Path) -> None:
 
 def test_find_spine_file_missing_both_raises(tmp_path: Path) -> None:
     """两者都缺 → ObservationSSOTError,不是 silent zero。"""
-    from lca.contracts.observability.ssot import ObservationSSOTError, find_spine_file
+    from lca.contracts.observability.core.ssot import ObservationSSOTError, find_spine_file
 
     run_dir = tmp_path / "run_abc"
     run_dir.mkdir()
@@ -82,7 +82,7 @@ def test_find_spine_file_missing_both_raises(tmp_path: Path) -> None:
 
 def test_find_spine_file_missing_run_dir_raises(tmp_path: Path) -> None:
     """run_dir 本身不存在 → ObservationSSOTError,file name 不存在仅是子集。"""
-    from lca.contracts.observability.ssot import ObservationSSOTError, find_spine_file
+    from lca.contracts.observability.core.ssot import ObservationSSOTError, find_spine_file
 
     with pytest.raises(ObservationSSOTError):
         find_spine_file(tmp_path / "nope", "run_abc")

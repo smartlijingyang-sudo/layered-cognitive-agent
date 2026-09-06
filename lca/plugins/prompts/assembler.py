@@ -5,9 +5,9 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
 
 from lca.cognition.brain.sections.assembler import SectionManifestPromptAssembler
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import (
     PROMPT_ASSEMBLER,
     PROMPT_SECTION_REGISTRY,
@@ -21,7 +21,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

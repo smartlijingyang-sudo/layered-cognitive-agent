@@ -27,7 +27,7 @@ from lca.contracts.harness.tasks.continuous import (
     WorkItem,
     WorkStatus,
 )
-from lca.contracts.observability.assistant_ep_closure import (
+from lca.contracts.observability.closure.assistant_ep_closure import (
     ASSISTANT_JOB_FIRED,
     ASSISTANT_JOB_REGISTERED,
     ASSISTANT_REQUIRED_FIELDS,
@@ -40,8 +40,8 @@ from lca.contracts.protocols.assistant.jobs import (
 )
 from lca.harness.plugin_api import definition_from_plugin
 from lca.harness.plugin.manifest import EffectClass
-from lca.plugins.assistant.catalog import AssistantCatalogImpl
-from lca.plugins.assistant.jobs import AssistantJobsImpl, setup
+from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
+from lca.plugins.assistant.jobs.jobs import AssistantJobsImpl, setup
 
 _FIXED_NOW = datetime(2026, 9, 4, 12, 0, 0, tzinfo=timezone.utc)
 
@@ -213,7 +213,7 @@ class TestRegister:
     def test_register_unknown_assistant_fails_closed(
         self, jobs: AssistantJobsImpl, job_spec: JobSpec
     ) -> None:
-        from lca.plugins.assistant._home_layout import AssistantCatalogError
+        from lca.plugins.assistant.home._home_layout import AssistantCatalogError
 
         with pytest.raises(AssistantCatalogError):
             jobs.register("asst_missing", job_spec)
@@ -367,7 +367,7 @@ class TestJobSpecValidation:
 class TestPluginManifest:
     def test_definition_id_namespace(self) -> None:
         definition = definition_from_plugin(setup)
-        assert definition.spec.id == "lca.plugins.assistant.jobs"
+        assert definition.spec.id == "lca.plugins.assistant.jobs.jobs"
 
     def test_provides_assistant_jobs(self) -> None:
         definition = definition_from_plugin(setup)

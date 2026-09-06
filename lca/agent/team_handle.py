@@ -10,10 +10,10 @@ from __future__ import annotations
 
 import contextlib
 
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.message import AgentMessage, agent_message_as_text
-from lca.contracts.models.core.result import Result
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.models.core.conversation.message import AgentMessage, agent_message_as_text
+from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.observability.journal.journal import (
     TeamRunFinished,
     TeamRunStarted,
 )

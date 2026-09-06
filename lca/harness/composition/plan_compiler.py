@@ -7,24 +7,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lca.contracts.atoms.scope import Scope
-from lca.contracts.protocols.declarative.declarative_phase_graph import SemanticPhase
+from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import SemanticPhase
 from lca.contracts.protocols.state.plan import COMPILED_RUN_PLAN_VERSION, CompiledRunPlan
 from lca.contracts.protocols.state.scope_plan import BudgetCeiling, ScopePlan
-from lca.harness.declarative.compile.compiler import (
+from lca.harness.declarative.compile.compiler.compiler import (
     DeclarativePlanProjection,
     compile_declarative_projection,
 )
 from lca.harness.declarative.controls.validation import require_valid
 from lca.harness.plan import build_input_provenance
-from lca.harness.profile.capability_plan_resolver import (
+from lca.harness.profile.resolve.capability_plan_resolver import (
     CapabilityPlanOptions,
     project_capability_plan,
 )
-from lca.harness.profile.plan_explain import explain_compile_plan
-from lca.harness.profile.projection import ProfileCompilationProjections
-from lca.harness.profile.resolve import ResolvedProfile
-from lca.harness.profile.runtime_binding_validator import validate_runtime_closure
+from lca.harness.profile.plan.plan_explain import explain_compile_plan
+from lca.harness.profile.plan.projection import ProfileCompilationProjections
+from lca.harness.profile.resolve.resolve import ResolvedProfile
+from lca.harness.profile.validate.runtime_binding_validator import validate_runtime_closure
 
 
 class PlanCompilerError(ValueError):

@@ -19,14 +19,14 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from lca.contracts.models.observability.journal_doc import JournalDocument
+from lca.contracts.models.observability.journal.journal_doc import JournalDocument
 from lca.infrastructure.observability.journal.step.projector import (
     JournalDocumentWriter,
 )
 from lca.plugins.session.derivers.step_tree.journal_fold import (
     fold_step_tree,
 )
-from lca_kernel.events.reader import SpineReader
+from lca_kernel.events.reader.reader import SpineReader
 
 log = logging.getLogger(__name__)
 

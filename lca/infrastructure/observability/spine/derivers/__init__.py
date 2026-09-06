@@ -14,13 +14,13 @@ spine. Production step_tree is fold-only (I-SESSION-5).
 
 from __future__ import annotations
 
-from lca.infrastructure.observability.spine.derivers.base import Deriver
-from lca.infrastructure.observability.spine.derivers.graph import GraphDeriver
-from lca.infrastructure.observability.spine.derivers.otel_trace import (
+from lca.infrastructure.observability.spine.derivers.base.base import Deriver
+from lca.infrastructure.observability.spine.derivers.graph.graph import GraphDeriver
+from lca.infrastructure.observability.spine.derivers.otel.otel_trace import (
     OtelSpan,
     OtelTraceDeriver,
 )
-from lca.infrastructure.observability.spine.derivers.waterfall import (
+from lca.infrastructure.observability.spine.derivers.waterfall.waterfall import (
     WaterfallDeriver,
 )
 

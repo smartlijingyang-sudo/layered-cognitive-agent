@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from lca.harness.profile.pipeline_loader import (
+from lca.harness.profile.resolve.pipeline_loader import (
     apply_pipeline,
     load_pipeline_for_profile,
     load_profile_pipeline,
@@ -25,11 +25,11 @@ from lca.harness.profile.pipeline_loader import (
     register_pipeline_once,
 )
 from lca_kernel.events import TeamDelegationCacheHit
-from lca_kernel.events.bus import EventBus, FailureSemantics
-from lca_kernel.events.hooks import DefaultFailureHook, PayloadSchemaHook
-from lca_kernel.events.pipeline import HookSpec, Pipeline, Stage
+from lca_kernel.events.bus.bus import EventBus, FailureSemantics
+from lca_kernel.events.hooks.hooks import DefaultFailureHook, PayloadSchemaHook
+from lca_kernel.events.pipeline.pipeline import HookSpec, Pipeline, Stage
 from lca_kernel.events.sinks.spine_sink import SpineSink, SpineSinkClosedError
-from lca_kernel.events.spine_runtime import SpineEventRecord
+from lca_kernel.events.spine.spine_runtime import SpineEventRecord
 
 REPO_ROOT_PROFILE = Path("profiles/web-standard.yaml")
 
@@ -78,7 +78,7 @@ def _write_yaml(path: Path, data: object) -> Path:
 
 def _make_bus() -> EventBus:
     """独立 EventBus(默认鉴权矩阵),避免单例串扰。"""
-    from lca_kernel.events.test_catalog import build_test_bus
+    from lca_kernel.events.test.test_catalog import build_test_bus
 
     return build_test_bus()
 
@@ -147,7 +147,7 @@ class TestDiscovery:
 
     def test_resolved_profile_input(self) -> None:
         """ResolvedProfile 输入走同一发现链。"""
-        from lca.harness.profile.resolve import resolve_profile
+        from lca.harness.profile.resolve.resolve import resolve_profile
 
         resolved = resolve_profile(REPO_ROOT_PROFILE)
         pipeline = load_pipeline_for_profile(resolved)
@@ -264,7 +264,7 @@ class TestRegisterAndApply:
         from lca.plugins.events.subscribers.console_projector.subscriber import (
             ConsoleProjectorSubscriber,
         )
-        from lca_kernel.events.pipeline import ConsumerRule
+        from lca_kernel.events.pipeline.pipeline import ConsumerRule
 
         pipeline = Pipeline(
             name="rules-apply",
@@ -302,7 +302,7 @@ class TestRegisterAndApply:
 
     def test_apply_pipeline_unauthorized_plugin_parses_without_subscribe(self) -> None:
         """零授权规则仍可进 Pipeline;apply 不 subscribe,故不上抛。"""
-        from lca_kernel.events.pipeline import ConsumerRule
+        from lca_kernel.events.pipeline.pipeline import ConsumerRule
 
         pipeline = Pipeline(
             name="bad-rule",
@@ -314,7 +314,7 @@ class TestRegisterAndApply:
 
 
 def _sink_spec(template: str):
-    from lca_kernel.events.pipeline import SinkSpec
+    from lca_kernel.events.pipeline.pipeline import SinkSpec
 
     return SinkSpec(
         id="spine-fact-chain",
@@ -331,7 +331,7 @@ class TestInspectPipelineCli:
     def test_web_standard_text(self) -> None:
         from typer.testing import CliRunner
 
-        from lca.infrastructure.cli.cli import app
+        from lca.infrastructure.cli.cli.cli import app
 
         result = CliRunner().invoke(app, ["inspect-pipeline", "web-standard"])
         assert result.exit_code == 0, result.output
@@ -344,7 +344,7 @@ class TestInspectPipelineCli:
     def test_web_standard_json(self) -> None:
         from typer.testing import CliRunner
 
-        from lca.infrastructure.cli.cli import app
+        from lca.infrastructure.cli.cli.cli import app
 
         result = CliRunner().invoke(app, ["inspect-pipeline", "web-standard", "--json"])
         assert result.exit_code == 0, result.output
@@ -359,7 +359,7 @@ class TestInspectPipelineCli:
         # `lca-ops inspect-pipeline <missing>` 退出码为 1(手工验证)。
         from typer.testing import CliRunner
 
-        from lca.infrastructure.cli.cli import app
+        from lca.infrastructure.cli.cli.cli import app
 
         result = CliRunner().invoke(app, ["inspect-pipeline", "no-such-profile"])
         assert "Profile not found: no-such-profile" in result.output

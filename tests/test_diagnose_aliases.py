@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.observability.error_codes import ErrorCode
-from lca.harness.diagnostics.diagnose import (
+from lca.contracts.observability.core.error_codes import ErrorCode
+from lca.harness.diagnostics.diagnose.diagnose import (
     DiagnoseReport,
     diagnose_alias,
     list_diagnose_aliases,

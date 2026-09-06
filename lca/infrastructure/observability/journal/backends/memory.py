@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from lca.contracts.models.observability.journal import StampedEvent
+    from lca.contracts.models.observability.journal.journal import StampedEvent
 
 
 class InMemoryJournalStore:

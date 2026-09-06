@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 from lca.contracts.harness.tasks.session import SessionEvent
-from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.harness.projection.agent_state import AgentStateProjection
 
 

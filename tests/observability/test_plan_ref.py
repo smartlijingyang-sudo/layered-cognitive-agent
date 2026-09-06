@@ -13,16 +13,16 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.models.observability.event import (
+from lca.contracts.models.observability.event.event import (
     OperationOutcome,
 )
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     JournalRecord,
     RuntimeObserved,
     StampedEvent,
     stamped_to_journal_record,
 )
-from lca.contracts.models.observability.plan_ref import (
+from lca.contracts.models.observability.plan.plan_ref import (
     get_current_plan_ref,
     plan_ref_scope,
     reset_current_plan_ref,
@@ -37,7 +37,7 @@ class TestGetCurrentPlanRef:
     def test_default_is_empty_string(self) -> None:
         """未 set plan_ref → 默认 ``""``（legacy 兼容路径）。"""
         # Reset to make sure no other test left state
-        from lca.contracts.models.observability.plan_ref import (
+        from lca.contracts.models.observability.plan.plan_ref import (
             _run_plan_ref,
         )
 
@@ -53,7 +53,7 @@ class TestGetCurrentPlanRef:
 
 class TestSetCurrentPlanRef:
     def test_set_and_get(self) -> None:
-        from lca.contracts.models.observability.plan_ref import (
+        from lca.contracts.models.observability.plan.plan_ref import (
             _run_plan_ref,
         )
 
@@ -75,7 +75,7 @@ class TestSetCurrentPlanRef:
 
 class TestPlanRefScope:
     def test_with_block_sets_plan_ref(self) -> None:
-        from lca.contracts.models.observability.plan_ref import (
+        from lca.contracts.models.observability.plan.plan_ref import (
             _run_plan_ref,
         )
 
@@ -92,7 +92,7 @@ class TestPlanRefScope:
             raise
 
     def test_with_block_restores_on_exception(self) -> None:
-        from lca.contracts.models.observability.plan_ref import (
+        from lca.contracts.models.observability.plan.plan_ref import (
             _run_plan_ref,
         )
 
@@ -158,7 +158,7 @@ class TestStampedEventPlanRefField:
 class TestRunStoreAppendStampsPlanRef:
     def test_append_inherits_plan_ref_from_context(self) -> None:
         """RunStore.append reads plan_ref from ContextVar at append time."""
-        from lca.contracts.models.observability.plan_ref import (
+        from lca.contracts.models.observability.plan.plan_ref import (
             _run_plan_ref,
         )
         from lca.infrastructure.observability.journal.engine.engine import RunStore
@@ -181,7 +181,7 @@ class TestRunStoreAppendStampsPlanRef:
 
     def test_append_no_plan_ref_when_unset(self) -> None:
         """未 set plan_ref → StampedEvent.plan_ref = ""（legacy 兼容）。"""
-        from lca.contracts.models.observability.plan_ref import (
+        from lca.contracts.models.observability.plan.plan_ref import (
             _run_plan_ref,
         )
         from lca.infrastructure.observability.journal.engine.engine import RunStore
@@ -305,7 +305,7 @@ class TestV5AcceptanceEveryFactCarriesPlanRef:
         - 每条都应携带 plan_ref（active ContextVar）
         - plan_ref 全为同一值（同 run）
         """
-        from lca.contracts.models.observability.plan_ref import (
+        from lca.contracts.models.observability.plan.plan_ref import (
             _run_plan_ref,
         )
         from lca.infrastructure.observability.journal.engine.engine import RunStore
@@ -337,7 +337,7 @@ class TestV5AcceptanceEveryFactCarriesPlanRef:
 
     def test_run_without_plan_ref_events_have_empty(self) -> None:
         """legacy path：未 set plan_ref → events.plan_ref = ""。"""
-        from lca.contracts.models.observability.plan_ref import (
+        from lca.contracts.models.observability.plan.plan_ref import (
             _run_plan_ref,
         )
         from lca.infrastructure.observability.journal.engine.engine import RunStore

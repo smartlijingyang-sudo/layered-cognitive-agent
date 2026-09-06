@@ -6,17 +6,17 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from lca.contracts.models.core.attachment import AttachmentRecord
+from lca.contracts.models.core.conversation.attachment import AttachmentRecord
 from lca.contracts.protocols import AttachmentIdentity
 from lca.infrastructure.attachment import (
     FileStoreAttachmentIdentity,
     get_attachment_policy,
     reset_attachment_settings_for_tests,
 )
-from lca.infrastructure.attachment.files_info import AttachmentManifest
-from lca.infrastructure.attachment.layout import AttachmentLayout
-from lca.infrastructure.attachment.settings import AttachmentPolicyDocument
-from lca.infrastructure.file_store import LocalFileStore
+from lca.infrastructure.attachment.files.files_info import AttachmentManifest
+from lca.infrastructure.attachment.layout.layout import AttachmentLayout
+from lca.infrastructure.attachment.settings.settings import AttachmentPolicyDocument
+from lca.infrastructure.file.file_store import LocalFileStore
 
 
 class TestAttachmentPolicy(unittest.TestCase):

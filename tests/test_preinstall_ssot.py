@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from lca.contracts.models.core.preinstall import (
+from lca.contracts.models.core.workspace.preinstall import (
     KEY_PYTHON_IMPORTS,
     SANDBOX_PREINSTALLED_PYTHON_PACKAGES,
     python_import_name,

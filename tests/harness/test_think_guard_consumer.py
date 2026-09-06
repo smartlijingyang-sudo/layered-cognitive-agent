@@ -14,10 +14,10 @@ from dataclasses import dataclass
 
 import pytest
 
-from lca.cognition.brain.modular_brain import ModularBrain
-from lca.contracts.models.core.budget import create_budget
-from lca.contracts.models.core.decision import Decision
-from lca.contracts.models.core.state import AgentState
+from lca.cognition.brain.pipeline.modular_brain import ModularBrain
+from lca.contracts.models.core.policy.budget import create_budget
+from lca.contracts.models.core.execution.decision import Decision
+from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import (
     DecisionGate,
     Reasoner,
@@ -37,7 +37,7 @@ class _FakeReasoner(Reasoner):
     response_text: str = "ok"
 
     async def generate_thoughts(self, state: AgentState) -> object:
-        from lca.contracts.models.core.llm import LLMResponse
+        from lca.contracts.models.core.conversation.llm import LLMResponse
 
         return LLMResponse(
             text=self.response_text,
@@ -142,9 +142,9 @@ class TestDeclarativeControlProjection:
     """生产控制只从原生 PluginSpec 贡献编译为计划绑定。"""
 
     def test_think_guard_projection_is_bound_to_the_think_phase(self) -> None:
-        from lca.contracts.protocols.declarative.declarative_common import SemanticPhase
+        from lca.contracts.protocols.declarative.declarative_1.declarative_common import SemanticPhase
         from lca.harness.composition.plan_compiler import compile_plan
-        from lca.harness.profile.resolve import resolve_profile
+        from lca.harness.profile.resolve.resolve import resolve_profile
 
         plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))
         think_entries = tuple(
@@ -157,9 +157,9 @@ class TestDeclarativeControlProjection:
         assert think_entries[0].evidence_required
 
     def test_stop_control_projection_is_bound_to_the_stop_phase(self) -> None:
-        from lca.contracts.protocols.declarative.declarative_common import SemanticPhase
+        from lca.contracts.protocols.declarative.declarative_1.declarative_common import SemanticPhase
         from lca.harness.composition.plan_compiler import compile_plan
-        from lca.harness.profile.resolve import resolve_profile
+        from lca.harness.profile.resolve.resolve import resolve_profile
 
         plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))
         stop_entries = tuple(

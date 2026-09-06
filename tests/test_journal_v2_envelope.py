@@ -13,7 +13,7 @@ from __future__ import annotations
 import dataclasses
 import time
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     AgentRunStarted,
     Causation,
     DescriptorRef,
@@ -22,7 +22,7 @@ from lca.contracts.models.observability.journal import (
     StampedEvent,
     stamped_to_journal_record,
 )
-from lca.contracts.observability.evidence import (
+from lca.contracts.observability.evidence.evidence import (
     Classification,
     EvidenceRef,
     RetentionClass,

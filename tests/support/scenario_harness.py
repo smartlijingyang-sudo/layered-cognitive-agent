@@ -268,10 +268,10 @@ def run_stub_agent(task: str = "hello world") -> Any:
     The stub returns ``Result(status=COMPLETED, output=task)`` — enough
     to assert the contract without exercising the full cognitive loop.
     """
-    from lca.contracts.atoms.ids import new_id
-    from lca.contracts.models.core.lifecycle import TaskStatus
-    from lca.contracts.models.core.result import Result
-    from lca.contracts.models.core.state import Budget
+    from lca.contracts.atoms.ids.ids import new_id
+    from lca.contracts.models.core.state.lifecycle import TaskStatus
+    from lca.contracts.models.core.execution.result import Result
+    from lca.contracts.models.core.state.state import Budget
 
     return Result(
         trace_id=new_id("trace"),

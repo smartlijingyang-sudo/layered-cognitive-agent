@@ -7,14 +7,14 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     PhaseInput,
     PhaseResult,
     SemanticPhase,
 )
-from lca.contracts.protocols.journal.phase_observation import PhaseStateSnapshot
-from lca.harness.declarative.compile.assembler import ExecutableNode
+from lca.contracts.protocols.journal.phase.phase_observation import PhaseStateSnapshot
+from lca.harness.declarative.compile.assembler.assembler import ExecutableNode
 from lca.harness.graph.traversal import PhaseTraversal
 from lca.harness.declarative.lifecycle.phase_observation import PhaseObserver, phase_state_snapshot
 from lca.loop.transaction import PhaseExecutionTransaction

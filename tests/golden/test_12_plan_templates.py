@@ -26,16 +26,16 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.plan_template import (
+from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.plan.plan_template import (
     PlanTemplateId,
     all_plan_template_ids,
     parse_plan_template_id,
     plan_template_to_dict,
     standard_plan_templates,
 )
-from lca.contracts.atoms.relation import Relation
+from lca.contracts.atoms.relation.relation import Relation
 
 PLAN_TEMPLATES_DIR = Path("tests/golden/plan_templates")
 

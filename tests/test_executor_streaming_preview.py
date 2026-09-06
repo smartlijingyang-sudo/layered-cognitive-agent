@@ -18,8 +18,8 @@ from collections.abc import AsyncIterator
 
 import pytest
 
-from lca.contracts.atoms.enums import LLMStreamEventType
-from lca.contracts.models.core.llm import LLMResponse
+from lca.contracts.atoms.enums.enums import LLMStreamEventType
+from lca.contracts.models.core.conversation.llm import LLMResponse
 from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
     set_publish_session,
@@ -70,7 +70,7 @@ class _FakeLLM:
 async def test_executor_emits_exactly_one_resolved_per_tool_call() -> None:
     """Args 完整时仅 commit 一次 tool.call.resolved.v1,不再有 ToolCallStreaming。"""
     from lca.cognition.brain.llm_turn import executor
-    from lca.contracts.models.team.partial_buffer import begin_partial_buffer, reset_partial_buffer
+    from lca.contracts.models.team.partial.partial_buffer import begin_partial_buffer, reset_partial_buffer
 
     session = Session("r-smoke")
     token = set_publish_session(session)

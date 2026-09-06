@@ -49,8 +49,8 @@ def create_scripted_app(
     so existing call sites don't have to be reworked; production
     create_app dropped these parameters.
     """
-    from lca.plugins.transport.webserver.bootstrap import install_bootstrap_state
-    from lca_kernel.cli import create_app
+    from lca.plugins.transport.webserver.bootstrap.bootstrap import install_bootstrap_state
+    from lca_kernel.cli.cli import create_app
 
     app = asyncio.run(create_app(profile_path=profile_path))
     resolver = llm_resolver if llm_resolver is not None else ScriptedLLMResolver()

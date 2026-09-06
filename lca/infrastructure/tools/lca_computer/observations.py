@@ -5,12 +5,12 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from lca.contracts.atoms.enums import ContentType
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.atoms.semantic_keys import FAILURE_KIND, FAILURE_KIND_EXECUTION
-from lca.contracts.models.core.decision import Observation
-from lca.infrastructure.computer.runtime import ComputerOpResult
-from lca.infrastructure.file_store import FileStore, persist_generated_files
+from lca.contracts.atoms.enums.enums import ContentType
+from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.atoms.semantic.semantic_keys import FAILURE_KIND, FAILURE_KIND_EXECUTION
+from lca.contracts.models.core.execution.decision import Observation
+from lca.infrastructure.computer.runtime.runtime import ComputerOpResult
+from lca.infrastructure.file.file_store import FileStore, persist_generated_files
 from lca.infrastructure.text.truncate import ASCII_ELLIPSIS, truncate_text
 from lca.infrastructure.workspace.deliverable import (
     publishable_file_parts,

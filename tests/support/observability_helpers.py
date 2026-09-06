@@ -13,12 +13,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     JournalEvent,
     RuntimeObserved,
     StampedEvent,
 )
-from lca.contracts.observability.ports import AttributePolicyBackend
+from lca.contracts.observability.core.ports import AttributePolicyBackend
 from lca.contracts.protocols import JournalProjector
 from lca.infrastructure.observability import (
     RunStore,
@@ -84,7 +84,7 @@ class RuntimeCategoryFilter:
     """JournalProjector that only forwards ``RuntimeObserved`` of a given category."""
 
     def __init__(self, target_category: Any, sink: JournalProjector) -> None:
-        from lca.contracts.models.observability.diagnostic import DiagnosticCategory
+        from lca.contracts.models.observability.diagnostic.diagnostic import DiagnosticCategory
 
         self._category = DiagnosticCategory(target_category)
         self._sink = sink
@@ -92,8 +92,8 @@ class RuntimeCategoryFilter:
     def on_event(self, stamped: StampedEvent) -> None:
         if not isinstance(stamped.event, RuntimeObserved):
             return
-        from lca.contracts.models.observability.diagnostic import DiagnosticCategory
-        from lca.contracts.models.observability.event import RuntimeKind
+        from lca.contracts.models.observability.diagnostic.diagnostic import DiagnosticCategory
+        from lca.contracts.models.observability.event.event import RuntimeKind
 
         # Inline mapping (was in run_diagnostics._CATEGORY_BY_KIND before its deletion).
         _kind_to_category: dict[RuntimeKind, DiagnosticCategory] = {

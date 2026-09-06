@@ -6,8 +6,8 @@ from collections.abc import Sequence
 from typing import Any
 
 from lca.contracts.harness.tasks.session import SessionEvent
-from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
-from lca.contracts.models.core.perception import ContextItem, ContextManifest
+from lca.contracts.models.core.policy.gate_policy import GateDecided, PolicyFact
+from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
 
 _GATE_DECIDED = "gate.decided.v1"
 _CONTEXT_MANIFESTED = "context.manifested.v1"

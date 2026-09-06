@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     AgentRunStarted,
     LlmCallCompleted,
     RunScope,
@@ -19,7 +19,7 @@ from lca.infrastructure.observability.journal.engine.journal_io import (
     read_journal,
     stamped_to_record,
 )
-from lca.plugins.observability.cli_debug_trace_provider import _DebugTraceCommand
+from lca.plugins.observability.cli.cli_debug_trace_provider import _DebugTraceCommand
 
 
 def _scope() -> RunScope:

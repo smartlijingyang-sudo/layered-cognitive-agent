@@ -16,7 +16,7 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.observability.journal.step.narrative_writer import (
     StepNarrativeWriter,
 )
-from lca.infrastructure.observability.spine.derivers.narrative import NarrativeDeriver
+from lca.infrastructure.observability.spine.derivers.narrative.narrative import NarrativeDeriver
 
 log = logging.getLogger(__name__)
 

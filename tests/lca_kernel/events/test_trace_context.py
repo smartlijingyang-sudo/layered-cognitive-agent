@@ -10,20 +10,20 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.atoms.ids import new_id
+from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.event import EventPayload
 from lca_kernel.events import TeamDelegationCacheHit
-from lca_kernel.events.bus import (
+from lca_kernel.events.bus.bus import (
     EventBus,
     current_trace_id,
     reset_trace_id,
     set_trace_id,
 )
-from lca_kernel.events.hooks import PublishContext, TraceContextHook
+from lca_kernel.events.hooks.hooks import PublishContext, TraceContextHook
 
 
 def _make_bus() -> EventBus[EventPayload]:
-    from lca_kernel.events.test_catalog import build_test_bus
+    from lca_kernel.events.test.test_catalog import build_test_bus
     return build_test_bus()
 
 

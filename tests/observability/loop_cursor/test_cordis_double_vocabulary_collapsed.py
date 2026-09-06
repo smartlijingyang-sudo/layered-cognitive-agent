@@ -65,7 +65,7 @@ def test_event_descriptor_has_cordis_name() -> None:
     """
     from dataclasses import fields
 
-    from lca.contracts.observability.event_descriptor import EventDescriptor
+    from lca.contracts.observability.event.event_descriptor import EventDescriptor
 
     field_names = {f.name for f in fields(EventDescriptor)}
     assert "cordis_name" in field_names, (
@@ -87,11 +87,11 @@ def test_cordis_event_table_covers_descriptor_cordis_names() -> None:
     ``EventDescriptor.derive(ep).cordis_name``,防止派生表与 descriptor
     失同步后某一方独自演化。
     """
-    from lca.contracts.observability.cordis_event_table import (
+    from lca.contracts.observability.infra.cordis_event_table import (
         all_execution_points,
         lookup_cordis_name,
     )
-    from lca.contracts.observability.event_descriptor import EventDescriptor
+    from lca.contracts.observability.event.event_descriptor import EventDescriptor
 
     for ep in all_execution_points():
         entry = lookup_cordis_name(ep)
@@ -108,8 +108,8 @@ def test_event_descriptor_derive_unknown_ep_fails_loud() -> None:
     I-CURSOR-4 + L15 ``UnknownEventType`` 子型:静默 fallback 被禁止;
     调用方必须拿到明确错误码。
     """
-    from lca.contracts.observability.cordis_event_table import UnknownCordisEventError
-    from lca.contracts.observability.event_descriptor import EventDescriptor
+    from lca.contracts.observability.infra.cordis_event_table import UnknownCordisEventError
+    from lca.contracts.observability.event.event_descriptor import EventDescriptor
 
     with pytest.raises(UnknownCordisEventError):
         EventDescriptor.derive("agent.bogus.event.never_registered")

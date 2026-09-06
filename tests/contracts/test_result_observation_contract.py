@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.models.core.decision import Observation
-from lca.contracts.models.core.result import Result
+from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.models.core.execution.result import Result
 
 
 def test_result_observation_metadata_requires_typed_identity() -> None:

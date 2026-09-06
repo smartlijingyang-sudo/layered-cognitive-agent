@@ -7,7 +7,7 @@ step_record_reflect / step_record_span`` 共 7 个 facade 转发方法。
 ``StepCoordinator`` 仍保留为 readonly 装配层(供 fixture / 兼容路径)。
 """
 
-from lca.infrastructure.observability.facade.facade import (
+from lca.infrastructure.observability.facade.facade.facade import (
     BoundObservability,
     EvidenceBinding,
     OperationRecorder,

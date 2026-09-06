@@ -17,16 +17,16 @@ from typing import Any
 
 import pytest
 
-from lca.cognition.body.simple_body import SimpleBody
-from lca.contracts.atoms.enums import ActionType
-from lca.contracts.models.core.budget import create_budget
-from lca.contracts.models.core.decision import Decision, ToolCall
-from lca.contracts.models.core.result import UnregisteredActionError
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.observability.incarnation import Incarnation
-from lca.contracts.observability.loop_cursor import CursorError
+from lca.cognition.body.executor.simple_body import SimpleBody
+from lca.contracts.atoms.enums.enums import ActionType
+from lca.contracts.models.core.policy.budget import create_budget
+from lca.contracts.models.core.execution.decision import Decision, ToolCall
+from lca.contracts.models.core.execution.result import UnregisteredActionError
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.observability.core.incarnation import Incarnation
+from lca.contracts.observability.cursor.loop_cursor import CursorError
 from lca.infrastructure.observability.loop_cursor import StdLoopCursor
-from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
     bind_current_cursor,
     reset_current_cursor,
 )

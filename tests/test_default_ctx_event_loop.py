@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 import pytest
 
-import lca.application.api as api
+import lca.application.api.api as api
 
 pytestmark = pytest.mark.skip(
     reason="set_default_ctx is deprecated by ADR-0115 决定 7; retire 2027-02-28. "

@@ -15,8 +15,8 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 
-from lca.contracts.observability.loop_cursor import CursorSnapshot
-from lca.infrastructure.observability.spine.event_record import EventRecord
+from lca.contracts.observability.cursor.loop_cursor import CursorSnapshot
+from lca.infrastructure.observability.spine.event.event_record import EventRecord
 
 # step.thinking.record payload 字段(ADR-0168.1 §D4 ThinkingRecord)
 _FIELD_TOKENS = "token_count"

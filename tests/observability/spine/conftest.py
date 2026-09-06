@@ -15,12 +15,12 @@ from typing import Any
 
 import pytest
 
-from lca.infrastructure.observability.loop_cursor._spine_port import (
+from lca.infrastructure.observability.loop_cursor.spine._spine_port import (
     bind_session_append_hook,
     reset_session_append_hook,
 )
-from lca.infrastructure.observability.spine.context import SpineContext
-from lca.infrastructure.observability.spine.event_record import EventRecord
+from lca.infrastructure.observability.spine.context.context import SpineContext
+from lca.infrastructure.observability.spine.event.event_record import EventRecord
 from lca.infrastructure.observability.spine.sinks.base import EventSink
 
 log = logging.getLogger(__name__)

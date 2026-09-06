@@ -12,19 +12,19 @@ from typing import cast
 
 import structlog
 
-from lca.contracts.mechanisms.capability import MissingCapabilityError
-from lca.contracts.models.core.plane import PlaneKind
-from lca.contracts.models.observability.journal import (
+from lca.contracts.mechanisms.capability.capability import MissingCapabilityError
+from lca.contracts.models.core.state.plane import PlaneKind
+from lca.contracts.models.observability.journal.journal import (
     AttachmentStagingCompleted,
     AttachmentStagingFailed,
     AttachmentStagingStarted,
 )
-from lca.contracts.protocols.runtime.infra import MachineResolver
+from lca.contracts.protocols.runtime.infra.infra import MachineResolver
 from lca.infrastructure.attachment import FileStoreAttachmentIdentity
-from lca.infrastructure.file_store import FileStore
+from lca.infrastructure.file.file_store import FileStore
 from lca.infrastructure.observability import record
-from lca.infrastructure.runtime_plane.resolve import ref_of
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
+from lca.infrastructure.runtime_plane.resolve.resolve import ref_of
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
 
 _log = structlog.get_logger(__name__)
 

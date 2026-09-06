@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.models.core.conversation import PRIOR_CONVERSATION_WM_KEY
-from lca.contracts.models.team.run_context import RunContext
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
+from lca.contracts.models.core.conversation.conversation import PRIOR_CONVERSATION_WM_KEY
+from lca.contracts.models.team.run.run_context import RunContext
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
 
 
 def run_context_for_session(session: RunSession) -> RunContext:

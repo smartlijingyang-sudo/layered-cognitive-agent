@@ -5,15 +5,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.harness.declarative.lifecycle.phase_observation import NullPhaseObserver
 from lca.loop.driver import (
     DeclarativeExecution,
     DeclarativeRuntimeDriver,
     RuntimePhaseCapabilities,
 )
-from lca.runtime.runtime_bindings import DeclarativeRuntimeBindings
-from lca.runtime.runtime_journal import RuntimeJournalCommitter
+from lca.runtime.support.runtime_bindings import DeclarativeRuntimeBindings
+from lca.runtime.loop.runtime_journal import RuntimeJournalCommitter
 
 
 class _Journal:

@@ -4,11 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from lca.cognition.memory.temporal_memory import TemporalMemorySystem
-from lca.contracts.atoms.enums import ContentType, MemoryLayer, ReflectionVerdict
-from lca.contracts.models.core.decision import Observation, Reflection
-from lca.contracts.models.core.memory import MemoryRecord, MemoryRelationKind, MemoryTrust
-from lca.contracts.models.core.state import AgentState, Budget
+from lca.cognition.memory.temporal.temporal_memory import TemporalMemorySystem
+from lca.contracts.atoms.enums.enums import ContentType, MemoryLayer, ReflectionVerdict
+from lca.contracts.models.core.execution.decision import Observation, Reflection
+from lca.contracts.models.core.conversation.memory import MemoryRecord, MemoryRelationKind, MemoryTrust
+from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.infrastructure.state_store.sqlite_temporal_memory import SqliteTemporalMemoryStore
 
 

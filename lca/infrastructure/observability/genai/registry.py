@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from lca.contracts.models.observability.journal import StampedEvent
-from lca.contracts.observability.genai_semantic import GenAISemanticMapper
+from lca.contracts.models.observability.journal.journal import StampedEvent
+from lca.contracts.observability.trace.genai_semantic import GenAISemanticMapper
 
 
 class GenAISemanticMapperRegistry:

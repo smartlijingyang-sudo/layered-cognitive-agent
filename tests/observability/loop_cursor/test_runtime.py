@@ -19,13 +19,13 @@ from typing import Any
 
 import pytest
 
-from lca.contracts.observability.close_barrier import CloseReport
-from lca.infrastructure.observability.loop_cursor.close_barrier_impl import (
+from lca.contracts.observability.infra.close_barrier import CloseReport
+from lca.infrastructure.observability.loop_cursor.close.close_barrier_impl import (
     StdCloseBarrier,
 )
-from lca.infrastructure.observability.loop_cursor.factory import LoopCursorFactory
-from lca.infrastructure.observability.loop_cursor.projection_host import StdProjectionHost
-from lca_kernel.observability import ObservabilityRuntime
+from lca.infrastructure.observability.loop_cursor.factory.factory import LoopCursorFactory
+from lca.infrastructure.observability.loop_cursor.projection.projection_host import StdProjectionHost
+from lca_kernel.runtime.observability import ObservabilityRuntime
 
 # ── Stubs ───────────────────────────────────────────────────
 
@@ -62,7 +62,7 @@ def _build_seam_ctx() -> Any:
     from cordis import Context
 
     from lca.infrastructure.observability import NamedRegistry
-    from lca.infrastructure.observability.loop_cursor.persistence_coordinator import (
+    from lca.infrastructure.observability.loop_cursor.persistence.persistence_coordinator import (
         NullPersistenceCoordinator,
     )
 

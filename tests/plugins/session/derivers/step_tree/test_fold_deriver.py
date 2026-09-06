@@ -20,7 +20,7 @@ from lca.plugins.session.derivers.step_tree import (
     derive_step_tree,
 )
 from lca.plugins.session.derivers.step_tree.journal_fold import fold_step_tree
-from lca_kernel.events.session import SessionEvent
+from lca_kernel.events.session.session import SessionEvent
 
 # ── fold_step_tree 纯函数 ────────────────────────────────────────
 
@@ -457,7 +457,7 @@ def test_deriver_flush_falls_back_to_snapshot_without_spine(tmp_path: Path) -> N
 
 def test_step_tree_bundle_flush_passes_outcome(tmp_path: Path) -> None:
     """_StepTreeBundle.flush 把 outcome 传给 fold deriver 并写 narrative。"""
-    from lca.plugins.observability.run_ledger_seam import _StepTreeBundle
+    from lca.plugins.observability.run.run_ledger_seam import _StepTreeBundle
 
     class _Narrative:
         def __init__(self) -> None:

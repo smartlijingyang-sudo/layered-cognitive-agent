@@ -19,18 +19,18 @@ from typing import Any, cast
 
 import pytest
 
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.result import Result
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.observability.journal import RunScope
-from lca.contracts.protocols.runtime.runtime_lifecycle import (
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.observability.journal.journal import RunScope
+from lca.contracts.protocols.runtime.runtime.runtime_lifecycle import (
     RuntimeLifecycleEvent,
     RuntimeLifecycleEventType,
 )
-from lca.harness.declarative.compile.instrument_wrap import set_active_spine_accessor
-from lca.infrastructure.observability.facade.run_context import run_scope
-from lca.runtime.runtime_loop import CognitiveRuntime
-from lca_kernel.events.bus import EventBus
+from lca.harness.declarative.compile.instrument.instrument_wrap import set_active_spine_accessor
+from lca.infrastructure.observability.facade.run.run_context import run_scope
+from lca.runtime.loop.runtime_loop import CognitiveRuntime
+from lca_kernel.events.bus.bus import EventBus
 
 
 class _RecordingSpine:

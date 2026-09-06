@@ -17,7 +17,7 @@ from typing import Any
 import pytest
 
 from lca.contracts.event import EventPayload
-from lca.contracts.observability.fsync import FsyncProtocol
+from lca.contracts.observability.evidence.fsync import FsyncProtocol
 from lca_kernel.events import (
     EnvelopeBus,
     EnvelopeRef,
@@ -27,14 +27,14 @@ from lca_kernel.events import (
 from lca_kernel.events import (
     FsyncProtocol as ReexportedFsyncProtocol,
 )
-from lca_kernel.events.persistence import (
+from lca_kernel.events.persistence.persistence import (
     EnvelopeDeliveryObserver,
     PersistenceHealthSnapshot,
 )
-from lca_kernel.events.persistence import (
+from lca_kernel.events.persistence.persistence import (
     EnvelopeDeliveryObserver as DirectEnvelopeDeliveryObserver,
 )
-from lca_kernel.events.persistence import (
+from lca_kernel.events.persistence.persistence import (
     PersistenceObserver as DirectPersistenceObserver,
 )
 
@@ -286,7 +286,7 @@ class TestPersistenceObserverProtocol:
         """``build_record`` 抛错 → contained;observer 仍可用。"""
         sink = _StubSink()
         observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)
-        import lca_kernel.events.persistence as persistence_mod
+        import lca_kernel.events.persistence.persistence as persistence_mod
 
         # 经 __dict__ 取 staticmethod 描述符本体:类属性访问返回解包后的
         # 函数,直接回填会丢 staticmethod 语义,污染后续测试的实例调用。
@@ -342,7 +342,7 @@ class TestExecutionPointLabeling:
 
     def test_session_event_without_ep_derives_from_spine_category(self) -> None:
         """SessionEvent data 无 execution_point → 按 category 反查裸 EP。"""
-        from lca_kernel.events.session import SessionEvent
+        from lca_kernel.events.session.session import SessionEvent
 
         sink = _StubSink()
         observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)
@@ -361,7 +361,7 @@ class TestExecutionPointLabeling:
 
     def test_session_event_with_explicit_ep_kept_verbatim(self) -> None:
         """data 携带 execution_point 时原样保留(反查不回退)。"""
-        from lca_kernel.events.session import SessionEvent
+        from lca_kernel.events.session.session import SessionEvent
 
         sink = _StubSink()
         observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)
@@ -377,7 +377,7 @@ class TestExecutionPointLabeling:
 
     def test_session_event_non_spine_category_stays_unknown(self) -> None:
         """非 spine category 且无 execution_point → 保持 "unknown"。"""
-        from lca_kernel.events.session import SessionEvent
+        from lca_kernel.events.session.session import SessionEvent
 
         sink = _StubSink()
         observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)

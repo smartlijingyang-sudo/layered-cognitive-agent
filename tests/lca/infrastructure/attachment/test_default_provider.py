@@ -14,20 +14,20 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.models.core.plane import PlaneKind, PlaneRef
-from lca.infrastructure.attachment.default_provider import (
+from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
+from lca.infrastructure.attachment.default.default_provider import (
     DefaultAttachmentPromptRenderer,
     DefaultAttachmentResolver,
     DefaultAttachmentStager,
 )
-from lca.infrastructure.attachment.run_machine_root_scope import run_machine_root_scope
-from lca.infrastructure.attachment.settings import (
+from lca.infrastructure.attachment.run.run_machine_root_scope import run_machine_root_scope
+from lca.infrastructure.attachment.settings.settings import (
     reset_attachment_settings_for_tests,
 )
-from lca.infrastructure.attachment.system_role_renderer import render_system_role
-from lca.infrastructure.file_store import LocalFileStore
-from lca.infrastructure.observability.facade.run_ambit import RunAmbit, bind_run_ambit
-from lca.infrastructure.tools.run_attachment_scope import run_attachment_scope
+from lca.infrastructure.attachment.system.system_role_renderer import render_system_role
+from lca.infrastructure.file.file_store import LocalFileStore
+from lca.infrastructure.observability.facade.run.run_ambit import RunAmbit, bind_run_ambit
+from lca.infrastructure.tools.run.run_attachment_scope import run_attachment_scope
 
 
 @pytest.fixture(autouse=True)

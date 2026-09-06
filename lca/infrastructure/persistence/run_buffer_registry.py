@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from lca.contracts.observability.fsync import FsyncProtocol
+from lca.contracts.observability.evidence.fsync import FsyncProtocol
 from lca.infrastructure.persistence.jsonl_sink import JsonlFileSink
 from lca.infrastructure.persistence.run_paths import (
     exceptions_path_for_run,
@@ -25,8 +25,8 @@ from lca.infrastructure.persistence.run_paths import (
 from lca.infrastructure.persistence.write_behind import WriteBehindBuffer
 
 if TYPE_CHECKING:
-    from lca_kernel.events.session import SessionProtocol
-    from lca_kernel.events.spine_runtime import SpineEventRecord
+    from lca_kernel.events.session.session import SessionProtocol
+    from lca_kernel.events.spine.spine_runtime import SpineEventRecord
 
 log = logging.getLogger(__name__)
 

@@ -16,18 +16,18 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.core.terminal_outcome import (
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.core.state.terminal_outcome import (
     ResumeCursor,
     TerminalOutcome,
     TerminalOutcomeKind,
 )
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     DeclarativeRunOutcome,
     ExecutionOutcome,
     PhaseRunCursor,
 )
-from lca.runtime.result_projection import TerminalResultProjection
+from lca.runtime.projection.result_projection import TerminalResultProjection
 
 
 class _StateStore:

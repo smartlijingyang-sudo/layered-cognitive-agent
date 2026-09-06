@@ -47,13 +47,13 @@ from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any
 
-from lca.application.preset_authoring import PresetAuthoring
-from lca.contracts.atoms.enums import LLMStreamEventType
-from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent, NativeToolCall
+from lca.application.authoring.preset_authoring import PresetAuthoring
+from lca.contracts.atoms.enums.enums import LLMStreamEventType
+from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent, NativeToolCall
 from lca.contracts.protocols import LLMAdapter
 from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
 from lca.infrastructure.observability.facade import BoundObservability, bind_backends
-from lca.plugins.think.composition_composer_provider import (
+from lca.plugins.think.composition.composition_composer_provider import (
     CordisComposer,
     build_default_invariant_checker,
 )
@@ -292,7 +292,7 @@ def _build_creator_toolkit(preset_root: Path):
     """
     from cordis import Context
 
-    from lca.infrastructure.capability.tools import ToolsService
+    from lca.infrastructure.capability.tools.tools import ToolsService
 
     ctx = Context()
     composer = CordisComposer(ctx, invariant_checker=build_default_invariant_checker())
@@ -350,8 +350,8 @@ def _build_creator_toolkit_with_preset(preset_id: str, preset_root: Path):
     """
     from cordis import Context
 
-    from lca.contracts.mechanisms.composition import PluginFactory
-    from lca.infrastructure.capability.tools import ToolsService
+    from lca.contracts.mechanisms.composition.composition import PluginFactory
+    from lca.infrastructure.capability.tools.tools import ToolsService
 
     ctx = Context()
     composer = CordisComposer(ctx, invariant_checker=build_default_invariant_checker())
@@ -466,8 +466,8 @@ def _wrap_plugin_as_tool(*, name: str, instance: Any, meta: dict[str, Any]) -> A
             default_timeout_s: ClassVar[int] = 30
 
             async def execute(self: Tool, args: dict[str, Any]) -> Any:
-                from lca.contracts.atoms.ids import new_id
-                from lca.contracts.models.core.decision import Observation
+                from lca.contracts.atoms.ids.ids import new_id
+                from lca.contracts.models.core.execution.decision import Observation
 
                 if not args:
                     payload = plugin_instance()
@@ -551,7 +551,7 @@ class TestCreatorRealScenario:
 
             # 直接构造 CognitiveAgent：role=cordis-creator，goal/backstory 与
             # build_cordis_creator_role_profile() 对齐
-            from lca.application.api import Agent
+            from lca.application.api.api import Agent
 
             role_profile = build_cordis_creator_role_profile()
             # 把 csv_stats 通过 on_mounted 注册到 tool_registry；agent 的
@@ -699,7 +699,7 @@ class TestCreatorRealScenario:
                 "csv_stats 是 preset 挂入 ctx 的 instance 后再 wrap 进 tool_registry"
             )
 
-            from lca.application.api import Agent
+            from lca.application.api.api import Agent
 
             agent = Agent(
                 role="cordis-creator",

@@ -15,12 +15,12 @@ at profile resolve. This __init__.py restores the package surface so
 that ``import lca.plugins.memory`` no longer raises ModuleNotFoundError.
 """
 
-from lca.plugins.memory.compaction_policy import Config as CompactionConfig
-from lca.plugins.memory.compaction_policy import setup as setup_compaction
-from lca.plugins.memory.layered_retrieval import Config as LayeredRetrievalConfig
-from lca.plugins.memory.null_retrieval import Config as NullRetrievalConfig
-from lca.plugins.memory.write_policy import Config as WritePolicyConfig
-from lca.plugins.memory.write_policy import setup as setup_write_policy
+from lca.plugins.memory.policy.compaction_policy import Config as CompactionConfig
+from lca.plugins.memory.policy.compaction_policy import setup as setup_compaction
+from lca.plugins.memory.policy.layered_retrieval import Config as LayeredRetrievalConfig
+from lca.plugins.memory.policy.null_retrieval import Config as NullRetrievalConfig
+from lca.plugins.memory.policy.write_policy import Config as WritePolicyConfig
+from lca.plugins.memory.policy.write_policy import setup as setup_write_policy
 
 __all__ = [
     "CompactionConfig",

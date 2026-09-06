@@ -13,9 +13,9 @@ import re
 from collections.abc import AsyncIterator, Mapping, Sequence
 from typing import Any
 
-from lca.contracts.atoms.enums import LLMStreamEventType
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent, NativeToolCall
+from lca.contracts.atoms.enums.enums import LLMStreamEventType
+from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent, NativeToolCall
 from lca.contracts.protocols import LLMAdapter
 
 _ROLE_RE = re.compile(r"^ROLE:\s*(.+)$", re.MULTILINE)

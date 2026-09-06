@@ -26,7 +26,7 @@ def package() -> SkillPackage:
 
 
 def test_import_skill_emits_meta_events(package: SkillPackage) -> None:
-    from lca.infrastructure.tools.skills.import_tool import SkillImportTool
+    from lca.infrastructure.tools.skills.importer.import_tool import SkillImportTool
 
     class _Importer:
         async def import_from_market(self, ident: str) -> SkillPackage:
@@ -43,7 +43,7 @@ def test_import_skill_emits_meta_events(package: SkillPackage) -> None:
 
 
 def test_activate_skill_emits_meta_events(package: SkillPackage) -> None:
-    from lca.infrastructure.tools.skills.activate_tool import SkillActivateTool
+    from lca.infrastructure.tools.skills.activate.activate_tool import SkillActivateTool
 
     class _Store:
         def get(self, skill_id: str) -> SkillPackage:
@@ -63,7 +63,7 @@ def test_activate_skill_emits_meta_events(package: SkillPackage) -> None:
 
 
 def test_search_skill_emits_meta_events() -> None:
-    from lca.infrastructure.tools.skills.search_tool import SkillSearchTool
+    from lca.infrastructure.tools.skills.search.search_tool import SkillSearchTool
 
     class _Importer:
         async def search_market(self, query: str, *, page: int, page_size: int) -> SkillSearchResult:

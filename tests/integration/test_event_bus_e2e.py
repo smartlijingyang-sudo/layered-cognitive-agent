@@ -26,16 +26,16 @@ from typing import ClassVar
 import pytest
 
 from lca.contracts.event import Category, EventPayload, Plane
-from lca.harness.profile.pipeline_loader import apply_pipeline
+from lca.harness.profile.resolve.pipeline_loader import apply_pipeline
 from lca_kernel.events import EventRef
-from lca_kernel.events.bus import EventBus, FailureSemantics, PayloadSchemaError
-from lca_kernel.events.errors import (
+from lca_kernel.events.bus.bus import EventBus, FailureSemantics, PayloadSchemaError
+from lca_kernel.events.errors.errors import (
     UnauthorizedPublishError,
     UnauthorizedSubscribeError,
 )
-from lca_kernel.events.hooks import PublishContext, SkipDispatch
-from lca_kernel.events.payloads_spine import SpineEventPayload
-from lca_kernel.events.pipeline import (
+from lca_kernel.events.hooks.hooks import PublishContext, SkipDispatch
+from lca_kernel.events.payloads.payloads_spine import SpineEventPayload
+from lca_kernel.events.pipeline.pipeline import (
     ConsumerRule,
     HookSpec,
     Pipeline,
@@ -43,8 +43,8 @@ from lca_kernel.events.pipeline import (
     Stage,
     matches_rule,
 )
-from lca_kernel.events.reader import SpineReader
-from lca_kernel.events.registry import EventRegistry, EventSpec
+from lca_kernel.events.reader.reader import SpineReader
+from lca_kernel.events.registry.registry import EventRegistry, EventSpec
 from lca_kernel.events.sinks.spine_sink import SpineSink
 
 CAT = Category.SPINE_COGNITION_BRAIN_PERCEIVE_START

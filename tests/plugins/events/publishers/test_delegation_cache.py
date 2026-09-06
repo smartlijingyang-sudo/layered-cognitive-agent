@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.models.core.decision import DelegationSpec, Observation
-from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.models.core.execution.decision import DelegationSpec, Observation
+from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.plugins.events.publishers.delegation_cache.plugin import (
     PUBLISHER_PLUGIN_ID,
     DelegationCachePlugin,
 )
 from lca_kernel.events import TeamDelegationCacheHit
-from lca_kernel.events.bus import EventBus, EventRef
+from lca_kernel.events.bus.bus import EventBus, EventRef
 
 
 def _state_with_hit_result(
@@ -20,8 +20,8 @@ def _state_with_hit_result(
 ) -> AgentState:
     from datetime import datetime, timezone
 
-    from lca.contracts.models.team.delegation import DelegationResult
-    from lca.contracts.models.team.team_awareness import TeamAwareness
+    from lca.contracts.models.team.delegation.delegation import DelegationResult
+    from lca.contracts.models.team.team.team_awareness import TeamAwareness
 
     awareness = TeamAwareness(
         results=(
@@ -72,7 +72,7 @@ def test_delegation_cache_plugin_emits_via_session() -> None:
         reset_publish_session,
         set_publish_session,
     )
-    from lca_kernel.events.test_catalog import build_test_bus
+    from lca_kernel.events.test.test_catalog import build_test_bus
 
     bus = build_test_bus()
     EventBus.set_default(bus)
@@ -112,12 +112,12 @@ def test_compatibility_shell_delegates_to_plugin() -> None:
     from typing import Any
     from unittest.mock import MagicMock
 
-    from lca.cognition.body.delegation_cache import cached_delegation_observation
+    from lca.cognition.body.delegation.delegation_cache import cached_delegation_observation
     from lca.plugins.events.publishers._session_publish import (
         reset_publish_session,
         set_publish_session,
     )
-    from lca_kernel.events.test_catalog import build_test_bus
+    from lca_kernel.events.test.test_catalog import build_test_bus
 
     bus = build_test_bus()
     EventBus.set_default(bus)
@@ -149,14 +149,14 @@ def test_unauthorized_plugin_class_cannot_publish() -> None:
     class _RoguePlugin:
         pass
 
-    from lca_kernel.events.test_catalog import build_test_bus
+    from lca_kernel.events.test.test_catalog import build_test_bus
 
     bus = build_test_bus()
     EventBus.set_default(bus)
     try:
         with __import__("pytest").raises(
             __import__(
-                "lca_kernel.events.errors", fromlist=["UnauthorizedPublishError"]
+                "lca_kernel.events.errors.errors", fromlist=["UnauthorizedPublishError"]
             ).UnauthorizedPublishError
         ):
             bus.publish(

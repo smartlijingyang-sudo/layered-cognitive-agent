@@ -6,20 +6,20 @@ from dataclasses import dataclass, replace
 
 import pytest
 
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     ExecutionOutcome,
     PhaseInput,
     PhaseResult,
     SemanticPhase,
 )
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
-from lca.contracts.protocols.runtime.runtime_lifecycle import (
+from lca.contracts.protocols.runtime.runtime.runtime_lifecycle import (
     RuntimeLifecycleEvent,
     RuntimeLifecycleEventType,
 )
 from lca.harness.declarative import GenericPlanInterpreter, GraphAssembler, MappingRestrictedScope
 from lca.harness.composition.plan_compiler import compile_plan
-from lca.harness.profile.resolve import resolve_profile
+from lca.harness.profile.resolve.resolve import resolve_profile
 from tests.phase_executors import standard_phase_executors
 
 

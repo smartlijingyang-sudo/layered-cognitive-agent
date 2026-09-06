@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.models.core.plane import PlaneKind, PlaneRef
-from lca.infrastructure.runtime_plane.paths import outputs_under
-from lca.infrastructure.runtime_plane.resolve import (
+from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
+from lca.infrastructure.runtime_plane.paths.paths import outputs_under
+from lca.infrastructure.runtime_plane.resolve.resolve import (
     PlaneBindingError,
     PlaneRequest,
     make_sandbox_ref,
     ref_of,
     resolve_plane_bindings,
 )
-from lca.infrastructure.runtime_plane.scope import path_needs_approval, resolve_plane_path
+from lca.infrastructure.runtime_plane.scope.scope import path_needs_approval, resolve_plane_path
 
 
 def _machine(**kwargs: str) -> PlaneRef:
@@ -111,9 +111,9 @@ def test_tmp_no_approval() -> None:
 def test_machine_tools_inject_local_system_role() -> None:
     from types import SimpleNamespace
 
-    from lca.cognition.brain.sandbox_prompt import build_cloud_sandbox_prompt
-    from lca.infrastructure.runtime_plane.resolve import PlaneBindings
-    from lca.infrastructure.runtime_plane.scope import plane_bindings_scope
+    from lca.cognition.brain.prompt.sandbox_prompt import build_cloud_sandbox_prompt
+    from lca.infrastructure.runtime_plane.resolve.resolve import PlaneBindings
+    from lca.infrastructure.runtime_plane.scope.scope import plane_bindings_scope
 
     plane = _machine()
     with plane_bindings_scope(PlaneBindings(primary=plane)):

@@ -33,15 +33,15 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from lca.contracts.models.core.conversation import ConversationTurn
-from lca.contracts.protocols.runtime.infra import MachineResolver
+from lca.contracts.models.core.conversation.conversation import ConversationTurn
+from lca.contracts.protocols.runtime.infra.infra import MachineResolver
 from lca.plugins.transport.webserver.carrier.runs.execute.scheduling import (
     schedule_run as schedule_run,
 )
-from lca.plugins.transport.webserver.read.runs.identity import (
+from lca.plugins.transport.webserver.read.runs.identity.identity import (
     AgentRef,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.session import (
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
     RunRegistry,
     RunSession,
 )
@@ -77,14 +77,14 @@ def create_run_session(
     state. ADR-0122 / PR-3.
     """
     if ctx is None:
-        from lca.application.api import get_or_create_default_ctx
+        from lca.application.api.api import get_or_create_default_ctx
 
         ctx = get_or_create_default_ctx()
 
-    from lca.plugins.transport.webserver.handlers.runs.session.setup import (
+    from lca.plugins.transport.webserver.handlers.runs.session.setup.setup import (
         RunSessionFactory,
     )
-    from lca.plugins.transport.webserver.handlers.runs.session.setup_types import (
+    from lca.plugins.transport.webserver.handlers.runs.session.setup.setup_types import (
         RunSessionRequest,
     )
 

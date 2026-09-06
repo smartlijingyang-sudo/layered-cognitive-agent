@@ -9,7 +9,7 @@ from starlette.applications import Starlette
 from starlette.routing import Route, WebSocketRoute
 
 from lca.contracts.protocols.route_registry import RouteRegistryProtocol
-from lca.plugins.transport.webserver.router import RouteRegistry
+from lca.plugins.transport.webserver.router.router import RouteRegistry
 
 
 def _noop(_request: Any) -> None:

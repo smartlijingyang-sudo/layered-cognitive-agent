@@ -5,18 +5,18 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.atoms.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
-from lca.contracts.models.core.decision import Observation
-from lca.contracts.models.core.tool import ToolApi, ToolManifest, ToolMeta
+from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.atoms.semantic.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
+from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.models.core.execution.tool import ToolApi, ToolManifest, ToolMeta
 from lca.contracts.protocols import Tool
-from lca.infrastructure.capability.search import SearchService
-from lca.infrastructure.search.service import (
+from lca.infrastructure.capability.search.search import SearchService
+from lca.infrastructure.search.service.service import (
     build_search_plugin_state,
     format_search_content,
     web_search,
 )
-from lca.infrastructure.tools.builder import build_tools_from_manifest
+from lca.infrastructure.tools.builder.builder import build_tools_from_manifest
 
 IDENTIFIER = "lobe-web-browsing"
 

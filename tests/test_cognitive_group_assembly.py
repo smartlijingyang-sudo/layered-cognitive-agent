@@ -4,11 +4,11 @@ from dataclasses import dataclass
 
 import pytest
 
-from lca.cognition.brain.gate_service import GateService
+from lca.cognition.brain.gate.gate_service import GateService
 from lca.cognition.perceive.service import PerceiveService
-from lca.contracts.mechanisms.capability import MissingCapabilityError
-from lca.contracts.models.core.decision import Decision
-from lca.contracts.models.core.perception import ContextManifest
+from lca.contracts.mechanisms.capability.capability import MissingCapabilityError
+from lca.contracts.models.core.execution.decision import Decision
+from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.protocols.think.cognition import DecisionGateAssembler, PerceiveHubAssembler
 
 
@@ -129,7 +129,7 @@ class TestGateGroupAssembly:
 class TestCognitiveGroupPluginWiring:
     @pytest.mark.asyncio
     async def test_default_profile_selects_both_group_assemblers(self) -> None:
-        from lca.application.api import ensure_default_ctx
+        from lca.application.api.api import ensure_default_ctx
 
         scope = await ensure_default_ctx()
 
@@ -153,5 +153,5 @@ class TestCognitiveGroupPluginWiring:
         root = Path(__file__).resolve().parent.parent
         for name in ("web-app.yaml", "scenario-standard.yaml"):
             content = (root / "bundles" / name).read_text(encoding="utf-8")
-            assert "lca.plugins.perceive.sequential_hub" in content
+            assert "lca.plugins.perceive.sequential.sequential_hub" in content
             assert "lca.plugins.cognitive.gate.chained.plugin" in content

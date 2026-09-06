@@ -4,20 +4,20 @@ from __future__ import annotations
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
-from lca.contracts.models.core.decision import Decision, DelegationSpec
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.result import Result
-from lca.contracts.models.core.state import Budget
-from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseInput, PhaseResult
+from lca.contracts.models.core.execution.decision import Decision, DelegationSpec
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.state import Budget
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseInput, PhaseResult
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.harness.composition.plan_compiler import compile_plan
-from lca.harness.profile.resolve import resolve_profile
-from lca.plugins.composer.runtime.runtime_factory import (
+from lca.harness.profile.resolve.resolve import resolve_profile
+from lca.plugins.composer.runtime.runtime.runtime_factory import (
     NullPerceiveHub,
     RuntimeDeps,
     build_fixture_cognitive_runtime,
 )
-from lca.plugins.strategies.peer_relay import HandoffStrategy
+from lca.plugins.strategies.peer.peer_relay import HandoffStrategy
 from tests.phase_executors import standard_phase_executors
 from tests.support.action_authority import build_test_action_registry, build_test_body
 from tests.support.strategy_registry import build_strategy_registry
@@ -109,9 +109,9 @@ class TestHandoffActionType(unittest.TestCase):
 
     def test_handoff_in_action_registry(self) -> None:
         """handoff 应在 ActionRegistry 的已注册集合中。"""
-        from lca.cognition.body.safe_executor import SimpleSafeExecutor
-        from lca.cognition.body.tool_registry import SimpleToolRegistry
-        from lca.contracts.models.team.role_team import ToolPermissionManifest
+        from lca.cognition.body.executor.safe_executor import SimpleSafeExecutor
+        from lca.cognition.body.tools.tool_registry import SimpleToolRegistry
+        from lca.contracts.models.team.role.role_team import ToolPermissionManifest
         from lca.infrastructure.transport.agent_transport import InternalTransport
         from lca.infrastructure.transport.transport_registry import TransportRegistry
 
@@ -180,7 +180,7 @@ class TestHandoffBodyAction(unittest.IsolatedAsyncioTestCase):
         )
         state = MagicMock()
 
-        from lca.contracts.models.core.result import ToolExecutionError
+        from lca.contracts.models.core.execution.result import ToolExecutionError
 
         with self.assertRaises(ToolExecutionError):
             await body.act(decision, state)
@@ -202,8 +202,8 @@ class TestHandoffRuntimeStop(unittest.IsolatedAsyncioTestCase):
 
     async def test_runtime_stops_on_handoff(self) -> None:
         """handoff action 应触发 StopPolicy 返回 should_stop=True。"""
-        from lca.plugins.journal.artifact_closure_provider import DefaultArtifactClosure
-        from lca.plugins.phase_graph.stop_policy import DefaultStopPolicy
+        from lca.plugins.journal.artifact.artifact_closure_provider import DefaultArtifactClosure
+        from lca.plugins.phase_graph.stop.stop_policy import DefaultStopPolicy
 
         brain = MagicMock()
         body = MagicMock()
@@ -275,7 +275,7 @@ class TestHandoffRegistration(unittest.TestCase):
         self.assertIn("peer_relay", registry)
 
     def test_handoff_resolves(self) -> None:
-        from lca.contracts.models.team.team_coordination import PeerRelay
+        from lca.contracts.models.team.team.team_coordination import PeerRelay
         from lca.contracts.protocols import TeamAssembly
 
         registry = _STRATEGIES

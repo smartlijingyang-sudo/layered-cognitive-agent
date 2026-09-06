@@ -13,19 +13,19 @@ finalize 后调一次,释放 ContextVar token,防止多 run 时 ContextVar 内�
 
 from __future__ import annotations
 
-from lca.contracts.observability.incarnation import Incarnation
+from lca.contracts.observability.core.incarnation import Incarnation
 from lca.infrastructure.observability.loop_cursor import (
     StdLoopCursor,
     install_run_cursor,
     reset_run_cursor,
 )
-from lca.infrastructure.observability.loop_cursor.bind import (
+from lca.infrastructure.observability.loop_cursor.bind.bind import (
     SpineWritePortAdapter,
 )
-from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
     get_current_cursor,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
 
 
 class _StubSpine:
@@ -50,7 +50,7 @@ class _StubSpine:
 
 def _build_run_session() -> RunSession:
     """构造最小 RunSession(real dataclass 实例,字段尽量 stub)。"""
-    from lca.plugins.transport.webserver.handlers.runs.session.session import (
+    from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
         RunSession as _RS,  # noqa: N814
     )
 

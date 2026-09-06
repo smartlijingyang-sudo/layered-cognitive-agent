@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.cognition.brain.context_manifest import digest_manifest
+from lca.cognition.brain.pipeline.context_manifest import digest_manifest
 from lca.cognition.brain.decision_gates import (
     ChainedDecisionGate,
     RepeatToolCallGate,
@@ -30,15 +30,15 @@ from lca.cognition.sensors import (
     build_clock_sensor,
     build_workspace_artifacts_sensor,
 )
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
-from lca.contracts.models.core.execution import (
+from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall, Turn
+from lca.contracts.models.core.execution.execution import (
     ExecutionEnvelope,
     envelope_from_decision,
     find_terminal_tool_invoked,
 )
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.observability.journal.journal import (
     InboxFollowupCreated,
     TeamMessagePublished,
 )

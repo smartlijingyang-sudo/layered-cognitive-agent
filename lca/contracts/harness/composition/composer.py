@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, runtime_checkable
 
-from lca.contracts.atoms.enums import ActionScope
+from lca.contracts.atoms.enums.enums import ActionScope
 
 _STANDARD_PHASE_CAPABILITY_FIELDS = ("brain", "body", "memory", "perceive_hub")
 
@@ -40,7 +40,7 @@ if TYPE_CHECKING:
         TeamStage,
         TeamStrategy,
     )
-    from lca.contracts.protocols.journal.spec import AgentSpec, TeamSpec
+    from lca.contracts.protocols.journal.spec.spec import AgentSpec, TeamSpec
 
 
 # ── Composition requests and graph containers ─────────────────────────

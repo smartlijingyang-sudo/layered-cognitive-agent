@@ -1,14 +1,14 @@
 """Attachment identity plane — files_info document + run-scoped inbox."""
 
-from lca.infrastructure.attachment.layout import AttachmentLayout
-from lca.infrastructure.attachment.prompt import (
+from lca.infrastructure.attachment.layout.layout import AttachmentLayout
+from lca.infrastructure.attachment.prompt.prompt import (
     format_machine_uploaded_files_prompt,
     format_sandbox_uploaded_files_prompt,
     resolve_machine_attachment_paths,
     sandbox_attachment_path,
 )
-from lca.infrastructure.attachment.service import FileStoreAttachmentIdentity
-from lca.infrastructure.attachment.settings import (
+from lca.infrastructure.attachment.service.service import FileStoreAttachmentIdentity
+from lca.infrastructure.attachment.settings.settings import (
     AttachmentPolicyDocument,
     AttachmentSettings,
     get_attachment_policy,

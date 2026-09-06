@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field, SecretStr
 
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     AuthorityContract,
@@ -15,7 +15,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
@@ -62,8 +62,8 @@ def _secret_value(value: SecretStr | str) -> str:
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.infrastructure.integrations.composio.service import ComposioIntegration
-    from lca.infrastructure.integrations.composio.settings import ComposioSettings
+    from lca.infrastructure.integrations.composio.service.service import ComposioIntegration
+    from lca.infrastructure.integrations.composio.settings.settings import ComposioSettings
 
     api_key = _secret_value(config.api_key).strip()
     if not api_key:
@@ -81,7 +81,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     if registry is not None:
         from contextlib import suppress
 
-        from lca.contracts.observability.composio_ep_closure import (
+        from lca.contracts.observability.closure.composio_ep_closure import (
             all_composio_event_descriptors,
         )
 

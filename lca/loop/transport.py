@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.core.state.state import AgentState
 from lca.loop.emit.spine.ep import SpineEmitRef, publish_spine_ep
 
 _TRANSPORT_ACTOR = "transport"

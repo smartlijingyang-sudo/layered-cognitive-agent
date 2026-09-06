@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.models.observability.journal import StampedEvent
+from lca.contracts.models.observability.journal.journal import StampedEvent
 from lca.contracts.protocols import JournalProjector
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 

@@ -7,7 +7,7 @@ later layers win per-id; dict config keys deep-merge; ``id`` is preserved.
 
 from __future__ import annotations
 
-from lca_kernel.source import compose_entries
+from lca_kernel.plan.source import compose_entries
 
 
 def test_compose_entries_returns_empty_when_no_layers() -> None:

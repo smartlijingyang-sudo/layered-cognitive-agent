@@ -19,8 +19,8 @@ from typing import Any
 import structlog
 
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.plugins.session.runtime.spine_event_projection import session_event_to_event_record
-from lca_kernel.events.session import SessionEvent, SessionProtocol
+from lca.plugins.session.runtime.spine.spine_event_projection import session_event_to_event_record
+from lca_kernel.events.session.session import SessionEvent, SessionProtocol
 
 _log = structlog.get_logger(__name__)
 

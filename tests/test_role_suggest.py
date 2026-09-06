@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from lca.application.role_suggest import suggest_from_paths
+from lca.application.authoring.role_suggest import suggest_from_paths
 
 
 class TestSuggestFromPaths(unittest.TestCase):

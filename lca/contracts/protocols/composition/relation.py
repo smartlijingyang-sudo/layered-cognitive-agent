@@ -29,8 +29,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from lca.contracts.atoms.relation import Relation, parse_relation
-from lca.contracts.atoms.scope import Scope, canonical_scope, parse_scope
+from lca.contracts.atoms.relation.relation import Relation, parse_relation
+from lca.contracts.atoms.scope.scope import Scope, canonical_scope, parse_scope
 
 
 @dataclass(frozen=True, slots=True)

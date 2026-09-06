@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from lca_kernel.events.bus import EventBus
+from lca_kernel.events.bus.bus import EventBus
 
 
 def test_writable_matrix_send(bound_session: Any) -> None:
@@ -40,8 +40,8 @@ def test_writable_matrix_send_unknown_ep() -> None:
 
 def test_writable_matrix_send_unauthorized(bus: EventBus) -> None:
     """未注册 plugin 类无法 send：WritableMatrixPlugin 类在 yaml publishers 中。"""
-    from lca_kernel.events.errors import UnauthorizedPublishError
-    from lca_kernel.events.payloads import SpineEventPayload
+    from lca_kernel.events.errors.errors import UnauthorizedPublishError
+    from lca_kernel.events.payloads.payloads import SpineEventPayload
 
     with pytest.raises(UnauthorizedPublishError):
         bus.publish(

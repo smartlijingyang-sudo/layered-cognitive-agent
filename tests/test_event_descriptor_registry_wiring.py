@@ -13,13 +13,13 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.models.observability.journal import LlmCallCompleted
-from lca.infrastructure.observability.events.event_catalog import descriptor_for
-from lca.infrastructure.observability.events.event_descriptor_env import (
+from lca.contracts.models.observability.journal.journal import LlmCallCompleted
+from lca.infrastructure.observability.events.event.event_catalog import descriptor_for
+from lca.infrastructure.observability.events.event.event_descriptor_env import (
     bind_descriptors,
     current_descriptors,
 )
-from lca.infrastructure.observability.events.event_descriptor_registry import (
+from lca.infrastructure.observability.events.event.event_descriptor_registry import (
     InMemoryEventDescriptorRegistry,
 )
 
@@ -94,7 +94,7 @@ def test_custom_descriptor_visible_only_in_bound_scope(
     fresh_registry: InMemoryEventDescriptorRegistry,
 ) -> None:
     """ambient registry 注入的自定义描述符在 scope 内可见；scope 外找不到。"""
-    from lca.contracts.models.observability.event import EventDescriptor
+    from lca.contracts.models.observability.event.event import EventDescriptor
 
     custom_descriptor = EventDescriptor(
         type_name="CustomPluginEvent",
@@ -119,7 +119,7 @@ def test_custom_descriptor_visible_only_in_bound_scope(
 
 def _make_descriptor(type_name: str):
     """构造一个测试用的 EventDescriptor（type_name 仅用作标识）。"""
-    from lca.contracts.models.observability.event import EventDescriptor
+    from lca.contracts.models.observability.event.event import EventDescriptor
 
     return EventDescriptor(
         type_name=type_name,

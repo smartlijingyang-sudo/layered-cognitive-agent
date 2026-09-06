@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lca.contracts.models.core.plane import PlaneKind
-from lca.infrastructure.runtime_plane.preinstall_prompt import render_preinstalled_block
-from lca.infrastructure.sandbox.surface import plane_system_role
+from lca.contracts.models.core.state.plane import PlaneKind
+from lca.infrastructure.runtime_plane.preinstall.preinstall_prompt import render_preinstalled_block
+from lca.infrastructure.sandbox.surface.surface import plane_system_role
 
 
 def test_yaml_is_the_note_ssot() -> None:
@@ -37,7 +37,7 @@ def test_sandbox_block_shares_font_note() -> None:
 
 
 def test_machine_system_role_embeds_yaml_notes() -> None:
-    from lca.contracts.models.core.plane import PlaneRef
+    from lca.contracts.models.core.state.plane import PlaneRef
 
     role = plane_system_role(
         PlaneRef(

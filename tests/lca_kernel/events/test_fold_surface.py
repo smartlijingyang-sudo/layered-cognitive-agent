@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from lca_kernel.events.fold import (
+from lca_kernel.events.fold.fold import (
     SURFACE_ASSISTANT_TYPE,
     SURFACE_EVENT_TYPES,
     SURFACE_TOOL_RESULT_TYPE,

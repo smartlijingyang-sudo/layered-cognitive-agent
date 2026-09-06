@@ -7,14 +7,14 @@ from collections.abc import Callable
 from typing import cast
 
 from lca.contracts.protocols import LLMAdapter
-from lca.contracts.protocols.session.run_mode import RunModeRegistryProtocol
+from lca.contracts.protocols.session.run.run_mode import RunModeRegistryProtocol
 from lca.infrastructure.observability import BoundObservability
 from lca.plugins.transport.webserver.carrier.runs.lifecycle.runnable_assembly import (
     CognitiveRunnableAssembler,
     RunnableAssemblyRequest,
     RunnableBuildRequest,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
 
 
 class _Resolver:

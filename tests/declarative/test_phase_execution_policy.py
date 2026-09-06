@@ -8,22 +8,22 @@ from datetime import timedelta
 
 import pytest
 
-from lca.contracts.atoms.ids import utc_now
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.core.stop import StopReason
-from lca.contracts.protocols.act.command_envelope import RunFact
-from lca.contracts.protocols.declarative.declarative_execution import (
+from lca.contracts.atoms.ids.ids import utc_now
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.core.policy.stop import StopReason
+from lca.contracts.protocols.act.command.command_envelope import RunFact
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     ExecutionOutcome,
     PhaseExecutionFailure,
     PhaseInput,
     PhaseResult,
 )
-from lca.contracts.protocols.declarative.declarative_fault_tolerance import PhaseExecutionPolicy
-from lca.contracts.protocols.declarative.declarative_phase_graph import SemanticPhase
+from lca.contracts.protocols.declarative.declarative_1.declarative_fault_tolerance import PhaseExecutionPolicy
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import SemanticPhase
 from lca.harness.declarative import GenericPlanInterpreter, GraphAssembler, MappingRestrictedScope
-from lca.harness.declarative.compile.assembler import ExecutableNode
-from lca.harness.declarative.compile.phase_execution_policy import (
+from lca.harness.declarative.compile.assembler.assembler import ExecutableNode
+from lca.harness.declarative.compile.phase.phase_execution_policy import (
     PhaseExecutionExhaustedError,
     RunDeadlineExceededError,
     _phase_error_message,
@@ -33,7 +33,7 @@ from lca.harness.graph.traversal import PhaseTraversal
 from lca.harness.declarative.lifecycle.phase_observation import NullPhaseObserver
 from lca.loop.transaction import PhaseExecutionTransaction
 from lca.harness.composition.plan_compiler import compile_plan
-from lca.harness.profile.resolve import resolve_profile
+from lca.harness.profile.resolve.resolve import resolve_profile
 from tests.phase_executors import standard_phase_executors
 
 

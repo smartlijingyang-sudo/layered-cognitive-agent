@@ -15,7 +15,7 @@ import json
 
 import pytest
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     RunScope,
     StampedEvent,
     ToolInvoked,

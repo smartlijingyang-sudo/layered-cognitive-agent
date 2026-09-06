@@ -1,6 +1,6 @@
 """RunManifest holds journal seq, not a hard event_id (ADR-0096 §I7)."""
 
-from lca.contracts.observability.run_manifest import RunManifest
+from lca.contracts.observability.registry.run_manifest import RunManifest
 
 
 def test_run_manifest_has_terminal_event_seq_field() -> None:

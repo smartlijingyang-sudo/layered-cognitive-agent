@@ -7,15 +7,15 @@ from typing import TYPE_CHECKING, cast
 
 from pydantic import BaseModel
 
-from lca.application.api import Agent
+from lca.application.api.api import Agent
 from lca.contracts.capabilities import RUN_MODE_REGISTRY
-from lca.contracts.mechanisms.capability import require_capability
+from lca.contracts.mechanisms.capability.capability import require_capability
 from lca.contracts.protocols import LLMAdapter
-from lca.contracts.protocols.runtime.infra import Tool
-from lca.contracts.protocols.session.run_mode import ModeAdapter
+from lca.contracts.protocols.runtime.infra.infra import Tool
+from lca.contracts.protocols.session.run.run_mode import ModeAdapter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.observability import BoundObservability
-from lca.plugins.state.run_mode_registry_seam import RunModeRegistry
+from lca.plugins.state.run.run_mode_registry_seam import RunModeRegistry
 from lca.plugins.transport.webserver.carrier.runs.lifecycle.runnable_assembly import (
     RunnableBuildRequest,
 )
@@ -23,7 +23,7 @@ from lca.plugins.transport.webserver.carrier.runs.lifecycle.runnable_assembly im
 if TYPE_CHECKING:
     from cordis import Context
 
-    from lca.contracts.models.core.plane import PlaneBindings
+    from lca.contracts.models.core.state.plane import PlaneBindings
 
 
 _SOLO_KEY = "solo"

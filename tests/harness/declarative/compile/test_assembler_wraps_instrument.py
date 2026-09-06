@@ -17,21 +17,21 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any, cast
 
-from lca.contracts.protocols.declarative.declarative_fault_tolerance import (
+from lca.contracts.protocols.declarative.declarative_1.declarative_fault_tolerance import (
     PhaseExecutionPolicy,
 )
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     PhaseInput,
     PhaseResult,
     SemanticPhase,
 )
 from lca.contracts.protocols.state.plan import CompiledRunPlan
-from lca.harness.declarative.compile.assembler import (
+from lca.harness.declarative.compile.assembler.assembler import (
     ExecutableNode,
     GraphAssembler,
     MappingRestrictedScope,
 )
-from lca.harness.declarative.compile.instrument_wrap import (
+from lca.harness.declarative.compile.instrument.instrument_wrap import (
     ASSEMBLER_PROVENANCE,
     WRAP_INSTRUMENTED_ATTR,
     wrap_instrument,
@@ -48,7 +48,7 @@ class _RecordingExecutor:
 
 def _compile_single_node_plan() -> CompiledRunPlan:
     """Build a minimal CompiledRunPlan with one perceive phase node."""
-    from lca.contracts.protocols.declarative.declarative_graph import (
+    from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
         CognitivePhaseGraphPlan,
         PhaseBinding,
         PhaseNode,

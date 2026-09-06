@@ -13,8 +13,8 @@ from __future__ import annotations
 import time
 from typing import cast
 
-from lca.contracts.atoms.ids import RunId, TraceId, new_id
-from lca.contracts.atoms.semantic_keys import (
+from lca.contracts.atoms.ids.ids import RunId, TraceId, new_id
+from lca.contracts.atoms.semantic.semantic_keys import (
     COMPLETION_EMPTY,
     COMPLETION_FULL,
     COMPLETION_PARTIAL,
@@ -24,18 +24,18 @@ from lca.contracts.atoms.semantic_keys import (
     OBS_DELEGATION_ID,
     OBS_TASK_ID,
 )
-from lca.contracts.atoms.telemetry import ATTR_CALLEE_ROLE, ATTR_OK, ATTR_PROTOCOL, SpanName
-from lca.contracts.models.core.budget import DEFAULT_DELEGATION_TIMEOUT_S
-from lca.contracts.models.core.decision import Observation
-from lca.contracts.models.core.lifecycle import AgentCard, TaskStatus
-from lca.contracts.models.observability.diagnostic import DiagnosticCategory
-from lca.contracts.models.observability.journal import (
+from lca.contracts.atoms.telemetry.telemetry import ATTR_CALLEE_ROLE, ATTR_OK, ATTR_PROTOCOL, SpanName
+from lca.contracts.models.core.policy.budget import DEFAULT_DELEGATION_TIMEOUT_S
+from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.models.core.state.lifecycle import AgentCard, TaskStatus
+from lca.contracts.models.observability.diagnostic.diagnostic import DiagnosticCategory
+from lca.contracts.models.observability.journal.journal import (
     DelegationCompleted,
     DelegationIssued,
     DelegationMechanism,
     RunScope,
 )
-from lca.contracts.models.team.delegation_context import (
+from lca.contracts.models.team.delegation.delegation_context import (
     delegation_scope,
     get_delegator_context,
     in_member_invoke,

@@ -32,11 +32,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-from lca.contracts.models.observability.journal_doc import JournalDocument
-from lca.contracts.models.observability.journal_step import (
+from lca.contracts.models.observability.journal.journal_doc import JournalDocument
+from lca.contracts.models.observability.journal.journal_step import (
     summarize_step,
 )
-from lca.contracts.observability.ssot import (
+from lca.contracts.observability.core.ssot import (
     ObservationSSOTError,
     find_spine_file,
 )

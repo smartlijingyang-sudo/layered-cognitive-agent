@@ -13,12 +13,12 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.cognition.memory.simple_memory import SimpleMemorySystem
-from lca.cognition.memory.team_shared_memory import TeamSharedMemoryStore
-from lca.contracts.atoms.enums import MemoryLayer, ReflectionVerdict
-from lca.contracts.models.core.decision import Observation, Reflection
-from lca.contracts.models.core.memory import MemoryRecord
-from lca.contracts.models.core.state import AgentState, Budget
+from lca.cognition.memory.simple.simple_memory import SimpleMemorySystem
+from lca.cognition.memory.team.team_shared_memory import TeamSharedMemoryStore
+from lca.contracts.atoms.enums.enums import MemoryLayer, ReflectionVerdict
+from lca.contracts.models.core.execution.decision import Observation, Reflection
+from lca.contracts.models.core.conversation.memory import MemoryRecord
+from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols import RetrievalPolicy
 
 
@@ -233,12 +233,12 @@ class TestTeamSharedMemoryInjection(unittest.IsolatedAsyncioTestCase):
     """compose_team rebuilds members with shared store (closed graph, ADR-0034)."""
 
     async def test_orchestrator_injects_shared_memory(self) -> None:
-        from lca.application.spawn import spawn_team
-        from lca.contracts.models.team.team_coordination import (
+        from lca.application.api.spawn import spawn_team
+        from lca.contracts.models.team.team.team_coordination import (
             Pipeline,
         )
-        from lca.harness.profile.boot import boot_profile
-        from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
+        from lca.harness.profile.boot.boot import boot_profile
+        from lca.infrastructure.llm_adapter.mock.mock_llm import MockLLMAdapter
         from tests.support.agent_specs import make_spec
 
         llm = MockLLMAdapter()
@@ -262,12 +262,12 @@ class TestTeamSharedMemoryInjection(unittest.IsolatedAsyncioTestCase):
         self.assertIn("orchestrator-shared-fact", b_contents)
 
     async def test_orchestrator_no_shared_memory_when_config_empty(self) -> None:
-        from lca.application.spawn import spawn_team
-        from lca.contracts.models.team.team_coordination import (
+        from lca.application.api.spawn import spawn_team
+        from lca.contracts.models.team.team.team_coordination import (
             Pipeline,
         )
-        from lca.harness.profile.boot import boot_profile
-        from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
+        from lca.harness.profile.boot.boot import boot_profile
+        from lca.infrastructure.llm_adapter.mock.mock_llm import MockLLMAdapter
         from tests.support.agent_specs import make_spec
 
         llm = MockLLMAdapter()
@@ -291,8 +291,8 @@ def _make_minimal_runtime(memory: SimpleMemorySystem):
     """构建最小化 Runtime 桩件，仅支持 run()。"""
     from unittest.mock import AsyncMock, MagicMock
 
-    from lca.contracts.models.core.result import Result
-    from lca.contracts.models.core.state import Budget
+    from lca.contracts.models.core.execution.result import Result
+    from lca.contracts.models.core.state.state import Budget
 
     runtime = MagicMock()
     runtime.body = MagicMock()

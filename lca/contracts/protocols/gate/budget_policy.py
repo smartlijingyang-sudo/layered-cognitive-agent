@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.models.core.budget import BudgetLimits
+from lca.contracts.models.core.policy.budget import BudgetLimits
 
 
 @runtime_checkable

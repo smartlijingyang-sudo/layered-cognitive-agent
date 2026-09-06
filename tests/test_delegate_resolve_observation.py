@@ -18,21 +18,21 @@ from __future__ import annotations
 
 import asyncio
 
-from lca.cognition.body.action_handlers import DelegateOperation
-from lca.contracts.atoms.enums import ActionType, MemoryRecordKind
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.atoms.semantic_keys import (
+from lca.cognition.body.actions.action_handlers import DelegateOperation
+from lca.contracts.atoms.enums.enums import ActionType, MemoryRecordKind
+from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.atoms.semantic.semantic_keys import (
     OBS_MEMBER_RESULTS,
     OBS_MEMBER_SUBTASKS,
     OBS_RESULT_KIND,
     OBS_TASK_IDS,
 )
-from lca.contracts.models.core.decision import (
+from lca.contracts.models.core.execution.decision import (
     Decision,
     DelegationSpec,
     Observation,
 )
-from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.infrastructure.transport.transport_registry import TransportRegistry
 
 
@@ -56,8 +56,8 @@ class TestResolveObservationSeam:
         """Cache hit short-circuits the transport path."""
         from datetime import datetime, timezone
 
-        from lca.contracts.models.team.delegation import DelegationResult
-        from lca.contracts.models.team.team_awareness import TeamAwareness
+        from lca.contracts.models.team.delegation.delegation import DelegationResult
+        from lca.contracts.models.team.team.team_awareness import TeamAwareness
 
         op = DelegateOperation(TransportRegistry())
         state = _state()
@@ -136,7 +136,7 @@ class TestExecuteShape:
     """Sanity: execute() wires the new helpers correctly."""
 
     def test_empty_delegations_raises_tool_execution_error(self) -> None:
-        from lca.contracts.models.core.result import ToolExecutionError
+        from lca.contracts.models.core.execution.result import ToolExecutionError
 
         op = DelegateOperation(TransportRegistry())
         decision = Decision(
@@ -157,8 +157,8 @@ class TestExecuteShape:
         """The single-path branch must still call tag_delegation_extra."""
         from datetime import datetime, timezone
 
-        from lca.contracts.models.team.delegation import DelegationResult
-        from lca.contracts.models.team.team_awareness import TeamAwareness
+        from lca.contracts.models.team.delegation.delegation import DelegationResult
+        from lca.contracts.models.team.team.team_awareness import TeamAwareness
 
         op = DelegateOperation(TransportRegistry())
         state = _state()

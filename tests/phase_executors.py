@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseExecutor
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseExecutor
 from lca.plugins.loop.phase.act.standard.plugin import create_executor as create_act_executor
 from lca.plugins.loop.phase.perceive.standard.plugin import create_executor as create_perceive_executor
 from lca.plugins.loop.phase.reflect.standard.plugin import create_executor as create_reflect_executor

@@ -5,20 +5,20 @@ from typing import Any
 import pytest
 
 from lca.agent.cognitive_agent import CognitiveAgent
-from lca.contracts.atoms.ids import RunId, TraceId
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.result import Result
-from lca.contracts.models.core.state import Budget, StateSnapshot
-from lca.contracts.models.observability.journal import (
+from lca.contracts.atoms.ids.ids import RunId, TraceId
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.state import Budget, StateSnapshot
+from lca.contracts.models.observability.journal.journal import (
     AgentRunFinished,
     AgentRunStarted,
     RunResumed,
 )
-from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
 from lca.session.lifecycle.bind import EventSessionBinder
-from lca.plugins.session.runtime.store import SessionStore
-from lca_kernel.events.bus import EventBus
-from lca_kernel.events.test_catalog import build_test_bus
+from lca.plugins.session.runtime.store.store import SessionStore
+from lca_kernel.events.bus.bus import EventBus
+from lca_kernel.events.test.test_catalog import build_test_bus
 from tests.support.observability_helpers import _RunStoreBackend, make_test_bound
 
 

@@ -20,20 +20,20 @@ from starlette.applications import Starlette
 from starlette.requests import Request
 
 from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
-from lca.infrastructure.file_store import LocalFileStore
-from lca.infrastructure.observability.facade.run_ambit import (
+from lca.infrastructure.file.file_store import LocalFileStore
+from lca.infrastructure.observability.facade.run.run_ambit import (
     RunAmbit,
     bind_run_ambit,
     current_assistant_id,
 )
-from lca.plugins.assistant.catalog import AssistantCatalogImpl
+from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
 from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import (
     CreateRunRequest,
     _to_run_request,
     _validate_assistant_binding,
     decode_create_run,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.setup_types import (
+from lca.plugins.transport.webserver.handlers.runs.session.setup.setup_types import (
     RunSessionRequest,
 )
 

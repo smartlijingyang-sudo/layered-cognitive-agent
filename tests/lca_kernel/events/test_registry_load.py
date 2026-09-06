@@ -8,8 +8,8 @@ import pytest
 
 from lca.contracts.event import Category, EventPayload, Plane
 from lca_kernel.events import _DEFAULT_CONFIG_DIR
-from lca_kernel.events.errors import UnknownCategoryError
-from lca_kernel.events.registry import EventRegistry, EventSpec
+from lca_kernel.events.errors.errors import UnknownCategoryError
+from lca_kernel.events.registry.registry import EventRegistry, EventSpec
 
 
 def test_default_registry_loads() -> None:

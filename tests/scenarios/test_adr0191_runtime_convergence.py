@@ -5,17 +5,17 @@ from __future__ import annotations
 import pytest
 
 from lca.contracts.harness.collaboration.agent import LiveAgentStatus
-from lca.contracts.protocols.session.persistence_service import CheckpointFailure
-from lca.infrastructure.session.bindings import (
+from lca.contracts.protocols.session.persistence.persistence_service import CheckpointFailure
+from lca.infrastructure.session._overflow_0.bindings import (
     assemble_model_history,
     await_model_request_checkpoint,
 )
-from lca.infrastructure.session.model_context_assembler import default_model_context_assembler
-from lca.infrastructure.session.surface_emit import append_human_answer_surface
+from lca.infrastructure.session.context.model_context_assembler import default_model_context_assembler
+from lca.infrastructure.session.emit.surface_emit import append_human_answer_surface
 from lca.session.lifecycle.recovery import recover_live_agent
 from lca.session.lifecycle.repair import repair_interrupted_turn
 from lca.session.append import Session
-from lca_kernel.events.fold import SURFACE_ASSISTANT_TYPE, SURFACE_USER_TYPE
+from lca_kernel.events.fold.fold import SURFACE_ASSISTANT_TYPE, SURFACE_USER_TYPE
 
 
 @pytest.mark.asyncio
@@ -95,7 +95,7 @@ def test_fold_deriver_prefers_session_snapshot(tmp_path) -> None:
 
 @pytest.mark.asyncio
 async def test_step_boundary_checkpoint_called_before_driver(monkeypatch) -> None:
-    from lca.runtime.runtime_loop import CognitiveRuntime
+    from lca.runtime.loop.runtime_loop import CognitiveRuntime
 
     calls: list[str] = []
 
@@ -132,9 +132,9 @@ async def test_step_boundary_checkpoint_called_before_driver(monkeypatch) -> Non
         def new_driver(self):
             class _Driver:
                 async def run(self, state):
-                    from lca.contracts.models.core.budget import create_budget
-                    from lca.contracts.models.core.lifecycle import TaskStatus
-                    from lca.contracts.models.core.result import Result
+                    from lca.contracts.models.core.policy.budget import create_budget
+                    from lca.contracts.models.core.state.lifecycle import TaskStatus
+                    from lca.contracts.models.core.execution.result import Result
 
                     return Result(
                         trace_id="t",

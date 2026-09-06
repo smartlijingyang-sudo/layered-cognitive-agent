@@ -7,22 +7,22 @@ from pathlib import Path
 
 import pytest
 
-from lca.application.policies import LEAD_BUDGET_POLICY_KEY, LeadBudgetPolicy
-from lca.cognition.brain.gate_service import GateService
-from lca.cognition.memory.simple_memory import SimpleMemorySystem
-from lca.cognition.memory.temporal_memory import TemporalMemorySystem
-from lca.contracts.atoms.enums import ComponentKind, DecisionGateName
+from lca.application.authoring.policies import LEAD_BUDGET_POLICY_KEY, LeadBudgetPolicy
+from lca.cognition.brain.gate.gate_service import GateService
+from lca.cognition.memory.simple.simple_memory import SimpleMemorySystem
+from lca.cognition.memory.temporal.temporal_memory import TemporalMemorySystem
+from lca.contracts.atoms.enums.enums import ComponentKind, DecisionGateName
 from lca.contracts.capabilities import COMPONENT_REGISTRY, GATES, LEAD_BUDGET_POLICY_RESOLVER
 from lca.contracts.protocols import DecisionGate, LeadBudgetPolicyResolver
-from lca.contracts.protocols.journal.spec import (
+from lca.contracts.protocols.journal.spec.spec import (
     MEMORY_CHOICE_SIMPLE,
     MEMORY_CHOICE_TEMPORAL,
     STATE_STORE_CHOICE_MEMORY,
 )
-from lca.harness.profile.boot import boot_profile
-from lca.infrastructure.component_registry import ComponentRegistry, RegistryKeyError
+from lca.harness.profile.boot.boot import boot_profile
+from lca.infrastructure.component.component_registry import ComponentRegistry, RegistryKeyError
 from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
-from lca.plugins.state.component_budget_policy_provider import (
+from lca.plugins.state.component.component_budget_policy_provider import (
     ComponentRegistryLeadBudgetPolicyResolver,
 )
 

@@ -10,10 +10,10 @@ scorers 不挂在这里 —— 走独立 ``score()`` 路径，由 facade 解析�
 
 from __future__ import annotations
 
-from lca.contracts.models.observability.journal import JournalEvent, StampedEvent
-from lca.contracts.observability.event_descriptor_registry import EventDescriptorRegistry
-from lca.contracts.observability.ports import AttributePolicyBackend, JournalBackend
-from lca.infrastructure.observability.facade.projection_registry import EventProjection
+from lca.contracts.models.observability.journal.journal import JournalEvent, StampedEvent
+from lca.contracts.observability.event.event_descriptor_registry import EventDescriptorRegistry
+from lca.contracts.observability.core.ports import AttributePolicyBackend, JournalBackend
+from lca.infrastructure.observability.facade.projection.projection_registry import EventProjection
 from lca.infrastructure.observability.journal.engine.engine import RunStore
 
 

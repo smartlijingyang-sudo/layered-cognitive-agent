@@ -10,10 +10,10 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.stop import StopDecision, StopReason
-from lca.contracts.protocols.act.command_envelope import RunDelta
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.models.core.policy.stop import StopDecision, StopReason
+from lca.contracts.protocols.act.command.command_envelope import RunDelta
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     DeclarativeRunOutcome,
     ExecutionOutcome,
     PhaseInput,
@@ -25,7 +25,7 @@ from lca.harness.declarative import GenericPlanInterpreter, GraphAssembler, Mapp
 from lca.harness.graph.governance.phase_governance import classify_control_verdict
 from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.composition.plan_compiler import compile_plan
-from lca.harness.profile.resolve import resolve_profile
+from lca.harness.profile.resolve.resolve import resolve_profile
 from tests.phase_executors import standard_phase_executors
 
 
@@ -95,7 +95,7 @@ def test_govern_verdict_uses_closed_typed_vocabulary(kind, expected) -> None:
 
 def test_govern_verdict_rejects_legacy_dictionary_payload() -> None:
     """A malformed control result must fail closed rather than silently allow."""
-    from lca.contracts.protocols.declarative.declarative_phase_graph import (
+    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
         DeclarativeValidationError,
     )
 
@@ -107,7 +107,7 @@ def test_govern_verdict_rejects_legacy_dictionary_payload() -> None:
 
 def test_interpreter_rejects_state_delta_without_reducer() -> None:
     """A state-changing phase cannot run without the only permitted writer."""
-    from lca.contracts.protocols.declarative.declarative_phase_graph import (
+    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
         DeclarativeValidationError,
     )
 
@@ -235,7 +235,7 @@ def test_outcome_kind_is_execution_outcome_enum() -> None:
 
 def test_outcome_kind_coerces_legacy_strings_and_rejects_unknown() -> None:
     """历史字符串构造被收编为 enum;未知值仍按 PG-009 fail-closed。"""
-    from lca.contracts.protocols.declarative.declarative_common import (
+    from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
         DeclarativeValidationError,
     )
 

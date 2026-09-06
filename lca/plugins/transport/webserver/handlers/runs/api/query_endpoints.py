@@ -14,18 +14,18 @@ from typing import Any
 from starlette.requests import Request
 from starlette.responses import JSONResponse, StreamingResponse
 
-from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
-from lca.contracts.observability.run_locator import RunLocator
+from lca.contracts.mechanisms.capability.capability import MissingCapabilityError, require_capability
+from lca.contracts.observability.registry.run_locator import RunLocator
 from lca.infrastructure.observability.journal.sse.frames import parse_last_event_id
-from lca.plugins.transport.webserver.handlers.cors import cors_headers
+from lca.plugins.transport.webserver.handlers.cors.cors import cors_headers
 from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import _run_port_of
-from lca.plugins.transport.webserver.read.runs.evidence import (
+from lca.plugins.transport.webserver.read.runs.evidence.evidence import (
     EvidencePayloadDecodeError,
     InvalidEvidenceDigestError,
     RunEvidenceNotFoundError,
     RunEvidenceReader,
 )
-from lca.plugins.transport.webserver.handlers.runs.terminal.port import RunPort
+from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import RunPort
 
 _PROFILE_SNAPSHOT_NAME = "profile_snapshot.json"
 _DEFAULT_PROFILE_SNAPSHOT_ROOT = Path("traces") / "runs"
@@ -198,7 +198,7 @@ async def get_run_profile(request: Request) -> JSONResponse:
 
 async def get_run_evidence(request: Request) -> JSONResponse:
     """GET /runs/{run_id}/evidence/{ref} — fetch verified evidence by digest."""
-    from lca.contracts.observability.evidence import EvidenceIntegrityError
+    from lca.contracts.observability.evidence.evidence import EvidenceIntegrityError
 
     run_id = request.path_params["run_id"]
     ref_str = request.path_params["ref"]
@@ -319,7 +319,7 @@ def _read_event_bus_health() -> dict[str, Any] | None:
             "fsync_policy": "n/a",
         }
         try:
-            from lca_kernel.events.persistence import PersistenceObserver
+            from lca_kernel.events.persistence.persistence import PersistenceObserver
 
             observer = PersistenceObserver.default()
             result["queue_depth"] = 0

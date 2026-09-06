@@ -13,19 +13,19 @@ import structlog
 
 from lca.cognition.brain.llm_turn.mode import LlmTurnMode
 from lca.cognition.brain.llm_turn.policy import build_llm_call_kwargs, resolve_llm_turn_mode
-from lca.cognition.brain.tool_call_stream import (
+from lca.cognition.brain.prompt.tool_call_stream import (
     mark_slot_done,
     parse_completed_slot_args,
     pop_completed_slots,
     push_tool_call_stream,
 )
-from lca.contracts.atoms.enums import LLMStreamEventType
-from lca.contracts.models.core.llm import LLMResponse
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.observability.tool_journal_receipt import tool_call_resolved_receipt
-from lca.contracts.models.team.partial_buffer import append_run_partial
+from lca.contracts.atoms.enums.enums import LLMStreamEventType
+from lca.contracts.models.core.conversation.llm import LLMResponse
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.observability.tool.tool_journal_receipt import tool_call_resolved_receipt
+from lca.contracts.models.team.partial.partial_buffer import append_run_partial
 from lca.contracts.protocols import LLMAdapter, Tool
-from lca.infrastructure.session.bindings import (
+from lca.infrastructure.session._overflow_0.bindings import (
     assemble_model_history,
     await_model_request_checkpoint,
 )

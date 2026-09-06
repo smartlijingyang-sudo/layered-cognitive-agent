@@ -9,7 +9,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.core.state.state import AgentState, Budget
 
 
 class TestBudget(unittest.TestCase):
@@ -32,7 +32,7 @@ class TestAgentState(unittest.TestCase):
 
 class TestMockLLMAdapter(unittest.TestCase):
     def test_tool_result_response(self) -> None:
-        from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
+        from lca.infrastructure.llm_adapter.mock.mock_llm import MockLLMAdapter
 
         llm = MockLLMAdapter()
         result = asyncio.run(
@@ -50,7 +50,7 @@ class TestMockLLMAdapter(unittest.TestCase):
 
 class TestLLMStreamEventContract(unittest.TestCase):
     def test_stream_event_type_values_match_responses_sse(self) -> None:
-        from lca.contracts.atoms.enums import LLMStreamEventType
+        from lca.contracts.atoms.enums.enums import LLMStreamEventType
 
         self.assertEqual(LLMStreamEventType.OUTPUT_TEXT_DELTA.value, "response.output_text.delta")
         self.assertEqual(
@@ -62,8 +62,8 @@ class TestLLMStreamEventContract(unittest.TestCase):
     def test_stream_event_frozen_defaults(self) -> None:
         from dataclasses import FrozenInstanceError
 
-        from lca.contracts.atoms.enums import LLMStreamEventType
-        from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
+        from lca.contracts.atoms.enums.enums import LLMStreamEventType
+        from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
 
         event = LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA)
         self.assertEqual(event.text, "")

@@ -21,12 +21,12 @@
 包外禁止 import 任何子模块（守卫测试强制）；本 ``__init__`` 是唯一表面。
 """
 
-from lca.contracts.models.observability.diagnostic import (
+from lca.contracts.models.observability.diagnostic.diagnostic import (
     DiagnosticCategory,
     DiagnosticEvent,
     DiagnosticStatus,
 )
-from lca.contracts.models.observability.event import (
+from lca.contracts.models.observability.event.event import (
     EventAudience,
     EventDescriptor,
     EventDurability,
@@ -35,7 +35,7 @@ from lca.contracts.models.observability.event import (
     OperationOutcome,
     RuntimeKind,
 )
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     ActionDegraded,
     AgentRunFinished,
     AgentRunStarted,
@@ -72,11 +72,11 @@ from lca.contracts.models.observability.journal import (
     ToolInvoked,
     ToolStarted,
 )
-from lca.contracts.models.observability.journal_catalog import (
+from lca.contracts.models.observability.journal.journal_catalog import (
     JOURNAL_EVENT_CLASSES,
     JournalSchemaMeta,
 )
-from lca.contracts.observability.named_registry import NamedRegistry
+from lca.contracts.observability.registry.named_registry import NamedRegistry
 from lca.contracts.protocols import JournalProjector
 from lca.infrastructure.observability.adapters.policy import AttributePolicy, Verbosity
 from lca.infrastructure.observability.adapters.view import SpanView
@@ -96,22 +96,22 @@ from lca.infrastructure.observability.backends.langfuse_conventions import (
     langfuse_span_visible,
 )
 from lca.infrastructure.observability.backends.tracer_backend import OtelTracer
-from lca.infrastructure.observability.events.event_catalog import (
+from lca.infrastructure.observability.events.event.event_catalog import (
     EVENT_DESCRIPTOR_REGISTRY,
     descriptor_for,
     may_export_externally,
 )
-from lca.infrastructure.observability.events.event_descriptor_env import (
+from lca.infrastructure.observability.events.event.event_descriptor_env import (
     bind_descriptors,
     current_descriptors,
 )
-from lca.infrastructure.observability.events.event_descriptor_registry import (
+from lca.infrastructure.observability.events.event.event_descriptor_registry import (
     DuplicateEventDescriptorError,
     InMemoryEventDescriptorRegistry,
     UnknownEventDescriptorError,
 )
-from lca.infrastructure.observability.events.event_descriptors_data import build_default_registry
-from lca.infrastructure.observability.facade.facade import (  # noqa: F401
+from lca.infrastructure.observability.events.event.event_descriptors_data import build_default_registry
+from lca.infrastructure.observability.facade.facade.facade import (  # noqa: F401
     BoundObservability,
     EvidenceBinding,
     OperationRecorder,
@@ -133,11 +133,11 @@ from lca.infrastructure.observability.facade.facade import (  # noqa: F401
     span,
     traced,
 )
-from lca.infrastructure.observability.facade.projection_registry import (
+from lca.infrastructure.observability.facade.projection.projection_registry import (
     EventProjection,
     ProjectionRegistry,
 )
-from lca.infrastructure.observability.facade.run_ambit import (
+from lca.infrastructure.observability.facade.run.run_ambit import (
     RunAmbit,
     bind_run_ambit,
     current_attachment_ids,
@@ -147,14 +147,14 @@ from lca.infrastructure.observability.facade.run_ambit import (
     current_run_ambit,
     current_workspace,
 )
-from lca.infrastructure.observability.facade.run_context import (
+from lca.infrastructure.observability.facade.run.run_context import (
     TEAM_CONTAINER_ROLE,
     adopt_run_scope,
     get_current_run_scope,
     run_scope,
 )
-from lca.infrastructure.observability.facade.settings import ObservabilitySettings
-from lca.infrastructure.observability.facade.team_profile import (
+from lca.infrastructure.observability.facade.settings.settings import ObservabilitySettings
+from lca.infrastructure.observability.facade.team.team_profile import (
     TeamTraceProfile,
     objective_preview,
     team_id_for,

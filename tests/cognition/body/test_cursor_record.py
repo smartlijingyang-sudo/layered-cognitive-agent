@@ -13,16 +13,16 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from lca.cognition.body.cursor_record import CursorRecord
-from lca.contracts.atoms.enums import ActionType
-from lca.contracts.observability.incarnation import Incarnation
-from lca.contracts.observability.loop_cursor import CursorError, PhaseName
-from lca.contracts.observability.loop_cursor_payloads import (
+from lca.cognition.body.executor.cursor_record import CursorRecord
+from lca.contracts.atoms.enums.enums import ActionType
+from lca.contracts.observability.core.incarnation import Incarnation
+from lca.contracts.observability.cursor.loop_cursor import CursorError, PhaseName
+from lca.contracts.observability.cursor.loop_cursor_payloads import (
     ToolCallRecord,
     ToolResultRecord,
 )
 from lca.infrastructure.observability.loop_cursor import StdLoopCursor
-from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
     bind_current_cursor,
     reset_current_cursor,
 )

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from lca.contracts.models.observability.journal import ContextCompacted, MemoryCommitted
-from lca.contracts.models.observability.memory_journal_receipt import (
+from lca.contracts.models.observability.journal.journal import ContextCompacted, MemoryCommitted
+from lca.contracts.models.observability.memory.memory_journal_receipt import (
     MemoryJournalReceipt,
     MemorySpineReceipt,
     context_compacted_receipt,
@@ -21,18 +21,20 @@ from lca.plugins.events.publishers._session_publish import (
 from lca.session.append import Session
 
 
-def test_commit_memory_journal_receipt_uses_journal_append() -> None:
-    from lca.contracts.models.observability.journal import RunScope
-    from lca.infrastructure.observability import bind_backends, run_scope
-    from tests.support.observability_helpers import make_test_bound
-
-    hub = make_test_bound()
-    receipt = memory_committed_receipt(layer="working", record_id="rec-1")
-    with bind_backends(hub), run_scope(RunScope(trace_id="t1", run_id="r1")):
-        stamped = commit_memory_journal_receipt(receipt)
-    assert stamped is not None
-    assert isinstance(stamped.event, MemoryCommitted)
-    assert stamped.event.record_id == "rec-1"
+def test_commit_memory_journal_receipt_uses_fact_gateway() -> None:
+    session = Session("t-memory-committed-1")
+    token = set_publish_session(session)
+    try:
+        receipt = memory_committed_receipt(layer="working", record_id="rec-1")
+        result = commit_memory_journal_receipt(receipt)
+        assert result is not None
+        assert session.event_count == 1
+        event = session.event_at(0)
+        assert event is not None
+        assert event.type == "memory.committed.v1"
+        assert event.data["record_id"] == "rec-1"
+    finally:
+        reset_publish_session(token)
 
 
 def test_commit_memory_journal_receipt_noop_when_unbound() -> None:
@@ -43,26 +45,26 @@ def test_commit_memory_journal_receipt_noop_when_unbound() -> None:
 
 
 def test_commit_context_compacted_receipt() -> None:
-    from lca.contracts.models.observability.journal import RunScope
-    from lca.infrastructure.observability import bind_backends, run_scope
-    from tests.support.observability_helpers import make_test_bound
-
-    hub = make_test_bound()
-    receipt = context_compacted_receipt(
-        step=3,
-        original_kinds=("generic",),
-        kept_kinds=("generic",),
-        mode="enforce",
-        applied=True,
-    )
-    with bind_backends(hub), run_scope(RunScope(trace_id="t1", run_id="r1")):
-        stamped = commit_memory_journal_receipt(receipt)
-    assert stamped is not None
-    event = stamped.event
-    assert isinstance(event, ContextCompacted)
-    assert event.step == 3
-    assert event.mode == "enforce"
-    assert event.applied is True
+    session = Session("t-memory-compacted-1")
+    token = set_publish_session(session)
+    try:
+        receipt = context_compacted_receipt(
+            step=3,
+            original_kinds=("generic",),
+            kept_kinds=("generic",),
+            mode="enforce",
+            applied=True,
+        )
+        result = commit_memory_journal_receipt(receipt)
+        assert result is not None
+        event = session.event_at(0)
+        assert event is not None
+        assert event.type == "context.compacted.v1"
+        assert event.data["step"] == 3
+        assert event.data["mode"] == "enforce"
+        assert event.data["applied"] is True
+    finally:
+        reset_publish_session(token)
 
 
 def test_commit_memory_read_spine_receipt() -> None:

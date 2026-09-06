@@ -5,10 +5,10 @@ from __future__ import annotations
 import inspect
 from typing import TYPE_CHECKING, cast
 
-from lca.infrastructure.llm_resolver import ProductionLLMResolver
+from lca.infrastructure.llm.llm_resolver import ProductionLLMResolver
 
 if TYPE_CHECKING:
-    from lca.infrastructure.capability.llm import LlmService
+    from lca.infrastructure.capability.llm.llm import LlmService
 
 
 class _Providers:

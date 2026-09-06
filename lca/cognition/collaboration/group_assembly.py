@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
-from lca.contracts.mechanisms.capability import MissingCapabilityError
+from lca.contracts.mechanisms.capability.capability import MissingCapabilityError
 
 TContribution = TypeVar("TContribution")
 TAssembler = TypeVar("TAssembler")

@@ -14,7 +14,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from lca.contracts.atoms.telemetry import EventName, SpanName
+from lca.contracts.atoms.telemetry.telemetry import EventName, SpanName
 from lca.infrastructure.observability import (
     bind_backends,
     langfuse_span_visible,

@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from pydantic import SecretStr
 
-from lca.harness.profile.runtime_closure import FallbackPolicy
-from lca.harness.profile.source import load_profile_source
+from lca.harness.profile.boot.runtime_closure import FallbackPolicy
+from lca.harness.profile.resolve.source import load_profile_source
 
 
 def _write_profile_fixture(tmp_path: Path, *, profile_body: str) -> Path:

@@ -166,7 +166,7 @@ def test_read_event_bus_health_swallows_persistence_observer_import_error(
     real_import = builtins.__import__
 
     def _guarded(name: str, *args: Any, **kwargs: Any):
-        if name == "lca_kernel.events.persistence" or name.endswith(".events.persistence"):
+        if name == "lca_kernel.events.persistence.persistence" or name.endswith(".events.persistence"):
             raise ImportError("simulated persistence unavailable")
         return real_import(name, *args, **kwargs)
 

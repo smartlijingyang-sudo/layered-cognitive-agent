@@ -19,15 +19,15 @@ from typing import Any
 
 import pytest
 
-from lca.contracts.protocols.session.projection_unit import ProjectionCheckpoint
+from lca.contracts.protocols.session.projection.projection_unit import ProjectionCheckpoint
 from lca.plugins.session.projection_registry import projection_registry as plugin_module
 from lca.plugins.session.projection_registry.projection_registry import (
     Config,
     ProjectionRegistry,
     setup,
 )
-from lca.plugins.session.runtime.store import SessionStore
-from lca_kernel.events.session import SessionHeader
+from lca.plugins.session.runtime.store.store import SessionStore
+from lca_kernel.events.session.session import SessionHeader
 
 # ── 测试单元 ──────────────────────────────────────────────────────────
 
@@ -400,7 +400,7 @@ async def test_setup_no_store_does_not_raise() -> None:
 
 
 async def test_setup_attaches_restored_session_via_hook() -> None:
-    from lca_kernel.events.session import SESSION_FORMAT_VERSION
+    from lca_kernel.events.session.session import SESSION_FORMAT_VERSION
 
     store = SessionStore()
     ctx = _fake_ctx(store)

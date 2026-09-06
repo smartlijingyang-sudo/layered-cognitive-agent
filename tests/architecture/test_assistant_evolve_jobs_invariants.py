@@ -20,7 +20,7 @@ from typing import Any
 
 import pytest
 
-from lca.contracts.observability.assistant_ep_closure import (
+from lca.contracts.observability.closure.assistant_ep_closure import (
     ASSISTANT_EVENT_POINTS,
     ASSISTANT_JOB_FIRED,
     ASSISTANT_JOB_REGISTERED,
@@ -74,8 +74,8 @@ _EVOLVE_EP_FORBIDDEN_KEYS: frozenset[str] = frozenset(
 
 def _make_env(tmp_path: Path) -> tuple[Any, Any, list[tuple[str, dict[str, Any]]]]:
     """真实 catalog + 真实 evolve impl + EP 记录器。"""
-    from lca.plugins.assistant.catalog import AssistantCatalogImpl
-    from lca.plugins.assistant.evolve import AssistantEvolveImpl
+    from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
+    from lca.plugins.assistant.evolve.evolve import AssistantEvolveImpl
 
     emitted: list[tuple[str, dict[str, Any]]] = []
 
@@ -184,7 +184,7 @@ class TestIA12JobsMustGoThrough0093:
 
     def test_plugin_manifest_requires_control_plane_factory(self) -> None:
         from lca.harness.plugin_api import definition_from_plugin
-        from lca.plugins.assistant.jobs import setup
+        from lca.plugins.assistant.jobs.jobs import setup
 
         definition = definition_from_plugin(setup)
         assert "continuous_control_plane_factory" in definition.required_capability_keys
@@ -194,8 +194,8 @@ class TestIA12JobsMustGoThrough0093:
             JobsCapabilityMissing,
             JobSpec,
         )
-        from lca.plugins.assistant.catalog import AssistantCatalogImpl
-        from lca.plugins.assistant.jobs import AssistantJobsImpl
+        from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
+        from lca.plugins.assistant.jobs.jobs import AssistantJobsImpl
 
         catalog = AssistantCatalogImpl(root=tmp_path)
         assistant_id = catalog.create(CreateAssistantRequest(name="A12")).assistant_id
@@ -262,8 +262,8 @@ class TestEvolveEpPayloadWhitelist:
 
     def test_job_ep_payloads_within_metadata_scope(self, tmp_path: Path) -> None:
         from lca.contracts.protocols.assistant.jobs import JobSpec
-        from lca.plugins.assistant.catalog import AssistantCatalogImpl
-        from lca.plugins.assistant.jobs import AssistantJobsImpl
+        from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
+        from lca.plugins.assistant.jobs.jobs import AssistantJobsImpl
 
         emitted: list[tuple[str, dict[str, Any]]] = []
 
@@ -333,7 +333,7 @@ class TestEvolveImplementsSkillAcquirer:
 
     def test_impl_is_not_global_auto_acquire_service(self, tmp_path: Path) -> None:
         """同一 Protocol、独立实现；两者不得是同一个类。"""
-        from lca.plugins.assistant.evolve import AssistantEvolveImpl
+        from lca.plugins.assistant.evolve.evolve import AssistantEvolveImpl
         from lca.plugins.skill.auto_acquire import AutoAcquireSkillService
 
         assert AssistantEvolveImpl is not AutoAcquireSkillService
@@ -346,7 +346,7 @@ class TestEvolveImplementsSkillAcquirer:
 
     def test_evolve_ownership_emits_subset_of_closure(self) -> None:
         from lca.harness.plugin_api import definition_from_plugin
-        from lca.plugins.assistant.evolve import setup
+        from lca.plugins.assistant.evolve.evolve import setup
 
         definition = definition_from_plugin(setup)
         assert definition.ownership is not None
@@ -354,7 +354,7 @@ class TestEvolveImplementsSkillAcquirer:
 
     def test_jobs_ownership_emits_subset_of_closure(self) -> None:
         from lca.harness.plugin_api import definition_from_plugin
-        from lca.plugins.assistant.jobs import setup
+        from lca.plugins.assistant.jobs.jobs import setup
 
         definition = definition_from_plugin(setup)
         assert definition.ownership is not None

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from lca.contracts.observability.cost import CostPricingTable, ModelPricing
+from lca.contracts.observability.cost.cost import CostPricingTable, ModelPricing
 
 _DEFAULT_PRICING_REF = "lca.cost/v1"
 

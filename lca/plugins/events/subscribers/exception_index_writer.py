@@ -12,9 +12,9 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     AuthorityContract,
@@ -23,15 +23,15 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.persistence.run_buffer_registry import RunWriteBehindRegistry
 from lca.infrastructure.persistence.run_paths import run_id_from_event_id
-from lca_kernel.events.spine_runtime import build_record, is_spine_event
+from lca_kernel.events.spine.spine_runtime import build_record, is_spine_event
 
 if TYPE_CHECKING:
     from lca.contracts.event import EventPayload
-    from lca_kernel.events.bus import EventRef
+    from lca_kernel.events.bus.bus import EventRef
 
 from pydantic import BaseModel
 
@@ -60,7 +60,7 @@ class ExceptionIndexWriter:
             return
         ep = getattr(payload, "execution_point", None)
         if ep != _EXCEPTION_EP:
-            from lca_kernel.events.payloads_spine import category_to_spine_ep
+            from lca_kernel.events.payloads.payloads_spine import category_to_spine_ep
 
             category = getattr(payload, "category", None)
             cat_value = getattr(category, "value", None) or str(category or "")

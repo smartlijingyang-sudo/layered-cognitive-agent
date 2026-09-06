@@ -5,10 +5,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from lca.contracts.atoms.enums import ActionType
-from lca.contracts.atoms.semantic_keys import OBS_TOOL_RESULTS
-from lca.contracts.models.core.decision import Observation, Turn
-from lca.contracts.models.core.state import AgentState
+from lca.contracts.atoms.enums.enums import ActionType
+from lca.contracts.atoms.semantic.semantic_keys import OBS_TOOL_RESULTS
+from lca.contracts.models.core.execution.decision import Observation, Turn
+from lca.contracts.models.core.state.state import AgentState
 
 _TOOL_RESULT_MAX = 32_000
 

@@ -5,11 +5,11 @@ from __future__ import annotations
 import pytest
 
 from lca.cognition.body import action_catalog
-from lca.cognition.body.action_registry import ActionRegistry
-from lca.cognition.body.safe_executor import SimpleSafeExecutor
-from lca.cognition.body.simple_body import SimpleBody
-from lca.cognition.body.tool_registry import SimpleToolRegistry
-from lca.contracts.models.team.role_team import ToolPermissionManifest
+from lca.cognition.body.actions.action_registry import ActionRegistry
+from lca.cognition.body.executor.safe_executor import SimpleSafeExecutor
+from lca.cognition.body.executor.simple_body import SimpleBody
+from lca.cognition.body.tools.tool_registry import SimpleToolRegistry
+from lca.contracts.models.team.role.role_team import ToolPermissionManifest
 from lca.infrastructure.transport.transport_registry import TransportRegistry
 
 

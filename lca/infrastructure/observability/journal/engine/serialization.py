@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     Causation,
     DescriptorRef,
     JournalRecord,
@@ -109,7 +109,7 @@ def journal_record_to_dict(record: JournalRecord) -> dict[str, object]:
 
 def journal_record_from_dict(payload: Mapping[str, object]) -> JournalRecord:
     """Deserialize JournalRecord from a plain dict."""
-    from lca.contracts.observability.evidence import EvidenceRef
+    from lca.contracts.observability.evidence.evidence import EvidenceRef
 
     scope_raw = payload.get("scope", {}) or {}
     scope = scope_from_dict(scope_raw)

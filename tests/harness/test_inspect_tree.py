@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from lca.harness.diagnostics.tree import render_tree
+from lca.harness.diagnostics.tree.tree import render_tree
 
 
 def _make_handle(

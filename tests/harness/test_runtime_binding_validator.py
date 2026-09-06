@@ -15,14 +15,14 @@ import pytest
 
 from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.composition.plan_compiler import CompileOptions, compile_plan
-from lca.harness.profile.resolve import resolve_profile
-from lca.harness.profile.runtime_binding_validator import (
+from lca.harness.profile.resolve.resolve import resolve_profile
+from lca.harness.profile.validate.runtime_binding_validator import (
     MissingBindingError,
     RuntimeBindingValidator,
     profile_allows_test_defaults,
     validate_runtime_closure,
 )
-from lca.harness.profile.runtime_closure import (
+from lca.harness.profile.boot.runtime_closure import (
     FallbackPolicy,
     runtime_closure_requirements,
 )
@@ -300,7 +300,7 @@ fallback_policy:
     profile_path = tmp_path / "test-fallback-invalid.yaml"
     profile_path.write_text(profile_content)
 
-    from lca.harness.profile.resolve import ProfileResolveError
+    from lca.harness.profile.resolve.resolve import ProfileResolveError
 
     with pytest.raises(ProfileResolveError, match="fallback_policy"):
         resolve_profile(profile_path)
@@ -317,7 +317,7 @@ fallback_policy: "just_a_string"
     profile_path = tmp_path / "test-fallback-not-mapping.yaml"
     profile_path.write_text(profile_content)
 
-    from lca.harness.profile.resolve import ProfileResolveError
+    from lca.harness.profile.resolve.resolve import ProfileResolveError
 
     with pytest.raises(ProfileResolveError, match="fallback_policy"):
         resolve_profile(profile_path)
@@ -397,7 +397,7 @@ fallback_policy:
     profile_path = tmp_path / "test-fallback-true.yaml"
     profile_path.write_text(profile_content)
 
-    from lca.harness.profile.resolve import ProfileResolveError
+    from lca.harness.profile.resolve.resolve import ProfileResolveError
 
     with pytest.raises(ProfileResolveError, match="fallback_policy"):
         resolve_profile(profile_path)

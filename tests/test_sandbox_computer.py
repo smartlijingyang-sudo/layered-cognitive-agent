@@ -6,8 +6,8 @@ from typing import Any
 
 import pytest
 
-from lca.contracts.models.core.plane import PlaneKind, PlaneRef
-from lca.infrastructure.computer.sandbox_computer import SandboxComputer, normalize_sandbox_path
+from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
+from lca.infrastructure.computer.sandbox.sandbox_computer import SandboxComputer, normalize_sandbox_path
 
 
 class _FakeSandbox:
@@ -59,7 +59,7 @@ async def test_list_files_uses_plane_root_for_empty_path(monkeypatch: pytest.Mon
     async def fake_guest_op(self: SandboxComputer, script: str, **kwargs: Any) -> Any:
         del kwargs
         captured.append(script)
-        from lca.infrastructure.computer.op_result import ComputerOpResult
+        from lca.infrastructure.computer.op.op_result import ComputerOpResult
 
         return ComputerOpResult(success=True, content="ok", state={"success": True})
 

@@ -28,13 +28,13 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.atoms.scope import Scope
-from lca.contracts.models.observability.event import OperationOutcome
-from lca.contracts.models.observability.journal import (
+from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.models.observability.event.event import OperationOutcome
+from lca.contracts.models.observability.journal.journal import (
     RuntimeObserved,
     StampedEvent,
 )
-from lca.contracts.models.observability.plan_ref import (
+from lca.contracts.models.observability.plan.plan_ref import (
     plan_ref_scope,
 )
 from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan, ProviderBinding
@@ -261,7 +261,7 @@ class TestJournalRecordPlanRefV5:
 
     def test_journal_record_carries_plan_ref(self) -> None:
         """StampedEvent → JournalRecord 升级保留 plan_ref。"""
-        from lca.contracts.models.observability.journal import (
+        from lca.contracts.models.observability.journal.journal import (
             stamped_to_journal_record,
         )
 
@@ -313,7 +313,7 @@ class TestJournalRecordPlanRefV5:
 
     def test_legacy_journal_record_parsed_with_empty_plan_ref(self) -> None:
         """旧 v2 envelope 不含 plan_ref → JournalRecord.plan_ref = ""。"""
-        from lca.contracts.models.observability.journal import JournalRecord
+        from lca.contracts.models.observability.journal.journal import JournalRecord
 
         # Simulate legacy v2 envelope (no plan_ref key)
         legacy_envelope = {
@@ -334,7 +334,7 @@ class TestJournalRecordPlanRefV5:
 
     def test_journal_record_rejects_non_object_scope(self) -> None:
         """A malformed envelope cannot enter replay as an untyped correlation skeleton."""
-        from lca.contracts.models.observability.journal import JournalRecord
+        from lca.contracts.models.observability.journal.journal import JournalRecord
 
         malformed_envelope = {
             "scope": ["not", "an", "object"],

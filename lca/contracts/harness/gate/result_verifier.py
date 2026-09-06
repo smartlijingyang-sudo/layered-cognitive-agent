@@ -7,7 +7,7 @@ from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
 from lca.contracts.harness.journal.artifact_manifest import ArtifactManifest
-from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 
 
 class VerificationStatus(StrEnum):

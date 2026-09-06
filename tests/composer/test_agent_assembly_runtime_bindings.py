@@ -26,8 +26,8 @@ from lca.contracts.capabilities import (
     RESUME_INPUT_ADAPTERS,
     RUNTIME_JOURNAL_FACTORY,
 )
-from lca.contracts.protocols.journal.spec import AgentSpec
-from lca.contracts.protocols.runtime.runtime_composition import (
+from lca.contracts.protocols.journal.spec.spec import AgentSpec
+from lca.contracts.protocols.runtime.runtime.runtime_composition import (
     CheckpointStateResolverFactory,
     DeclarativeInterpreterFactory,
     DeltaReducerFactory,
@@ -36,12 +36,12 @@ from lca.contracts.protocols.runtime.runtime_composition import (
     RuntimeJournalFactory,
 )
 from lca.contracts.protocols.state.plan import CompiledRunPlan
-from lca.harness.profile.boot import boot_profile
-from lca.plugins.composer.runtime.runtime_binding import (
+from lca.harness.profile.boot.boot import boot_profile
+from lca.plugins.composer.runtime.runtime.runtime_binding import (
     ProductionRuntimeDeps,
     bind_runtime_graph,
 )
-from lca.plugins.composer.runtime.runtime_capabilities import RuntimeCapabilityClosure
+from lca.plugins.composer.runtime.runtime.runtime_capabilities import RuntimeCapabilityClosure
 
 REPO = Path(__file__).resolve().parents[2]
 AGENT_ASSEMBLY_PATH = REPO / "lca" / "plugins" / "composer" / "composition" / "agent_assembly.py"
@@ -273,7 +273,7 @@ def test_booted_web_profile_resolves_declarative_runtime_factories() -> None:
 def test_runtime_phase_capability_projection_is_owned_by_runtime_bindings() -> None:
     """Phase capability projection has one runtime-owned test surface."""
 
-    from lca.runtime.phase_capabilities import project_runtime_phase_capabilities
+    from lca.runtime.projection.phase_capabilities import project_runtime_phase_capabilities
 
     brain, body, memory, perceive_hub = object(), object(), object(), object()
     projected = project_runtime_phase_capabilities(

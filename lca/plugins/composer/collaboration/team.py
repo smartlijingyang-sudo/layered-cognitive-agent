@@ -4,17 +4,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
-from lca.contracts.atoms.enums import DecisionGateName
+from lca.contracts.atoms.enums.enums import DecisionGateName
 from lca.contracts.capabilities import GATES, OBSERVABILITY
-from lca.contracts.mechanisms.capability import require_capability
+from lca.contracts.mechanisms.capability.capability import require_capability
 from lca.contracts.protocols import DecisionGate, ObservabilityBackend
-from lca.contracts.protocols.journal.spec import (
+from lca.contracts.protocols.journal.spec.spec import (
     AgentSpec,
     LeadSpec,
     TeamSpec,
     strategy_key_for_governance,
 )
-from lca.contracts.protocols.runtime.infra import AgentTransport, TransportRegistryProtocol
+from lca.contracts.protocols.runtime.infra.infra import AgentTransport, TransportRegistryProtocol
 from lca.infrastructure.observability import BoundObservability, TeamTraceProfile, team_id_for
 
 if TYPE_CHECKING:

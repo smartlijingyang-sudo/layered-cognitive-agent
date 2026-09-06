@@ -6,8 +6,8 @@ instead of a BudgetAware agent. BudgetAware was removed (2026-08-30 cleanup).
 
 from __future__ import annotations
 
-from lca.application.policies import LeadBudgetPolicy
-from lca.contracts.models.core.budget import (
+from lca.application.authoring.policies import LeadBudgetPolicy
+from lca.contracts.models.core.policy.budget import (
     DEFAULT_MAX_WALL_CLOCK_SECONDS,
     LEAD_MIN_MAX_STEPS,
     BudgetLimits,

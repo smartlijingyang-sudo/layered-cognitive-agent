@@ -13,25 +13,25 @@ from typing import TYPE_CHECKING, ParamSpec, TypeVar, overload
 
 from pydantic import BaseModel
 
-from lca.contracts.models.core.activation import ActivatedSkill
-from lca.contracts.models.core.decision import Turn
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.perception import ContextManifest
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.core.stop import StopDecision
-from lca.contracts.models.core.terminal_outcome import (
+from lca.contracts.models.core.workspace.activation import ActivatedSkill
+from lca.contracts.models.core.execution.decision import Turn
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.models.core.perceive.perception import ContextManifest
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.core.policy.stop import StopDecision
+from lca.contracts.models.core.state.terminal_outcome import (
     ErrorRef,
     ResumeCursor,
     TerminalOutcome,
     TerminalOutcomeKind,
     TextRef,
 )
-from lca.contracts.protocols.declarative.declarative_phase_graph import DeclarativeValidationError
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import DeclarativeValidationError
 from lca.contracts.protocols.state.reducer import Reducer
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 if TYPE_CHECKING:
-    from lca.contracts.observability.outcome import Outcome
+    from lca.contracts.observability.evidence.outcome import Outcome
 
 _log = logging.getLogger(__name__)
 
@@ -73,7 +73,7 @@ def _publish_apply_marker(
     与 :class:`~lca.runtime.envelope_emitter.SpineEnvelopeEmitter` 及
     transport ``_safe_emit`` 的装饰性 emit 语义一致;fold 本体异常不受影响。
     """
-    from lca.infrastructure.session.runtime_emit import (
+    from lca.infrastructure.session.emit.runtime_emit import (
         emit_runtime_reducer_apply_end,
         emit_runtime_reducer_apply_start,
     )
@@ -169,19 +169,17 @@ class DefaultReducer(Reducer):
 
     @_instrument_apply
     def apply_perception(self, state: AgentState, manifest: ContextManifest) -> AgentState:
-        """fold ContextManifest 到 state。
+        """fold ContextManifest 到 state.
 
-        Reducer 是 ``AgentState.perceive`` 投影的唯一 writer(C4)。``manifest_digest``
-        仍写入 ``state.extra`` 作为 replay idempotency token，直至 COMPAT 删除。
+        Reducer 是 ``AgentState.perceive`` 投影的唯一 writer(C4)。
         """
-        from lca.contracts.models.core.perceive_projection import PerceiveProjection
+        from lca.contracts.models.core.perceive.perceive_projection import PerceiveProjection
 
         state.perceive = PerceiveProjection(
             manifest=manifest,
             digest=manifest.digest,
             step=state.step,
         )
-        state.extra["manifest_digest"] = manifest.digest
         return state
 
     @_instrument_apply
@@ -200,11 +198,11 @@ class DefaultReducer(Reducer):
         result = self.apply_turn(state, turn)
         writer = session
         if writer is None:
-            from lca.infrastructure.session.bindings import resolve_flushable_session
+            from lca.infrastructure.session._overflow_0.bindings import resolve_flushable_session
 
             writer = resolve_flushable_session()
         if writer is not None:
-            from lca.infrastructure.session.turn_control_reader import append_turn_control_fact
+            from lca.infrastructure.session.context.turn_control_reader import append_turn_control_fact
 
             append_turn_control_fact(writer, turn)
         return result
@@ -435,7 +433,7 @@ class DefaultReducer(Reducer):
 
     def _is_handoff_completion(self, state: AgentState) -> bool:
         """HANDOFF is a valid terminal action even when response_text is empty."""
-        from lca.contracts.atoms.enums import ActionType
+        from lca.contracts.atoms.enums.enums import ActionType
 
         if not state.history:
             return False

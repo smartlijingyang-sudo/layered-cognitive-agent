@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from lca.contracts.event import Category
-from lca_kernel.events.payloads import SpineEventPayload
-from lca_kernel.events.registry import EventRegistry
+from lca_kernel.events.payloads.payloads import SpineEventPayload
+from lca_kernel.events.registry.registry import EventRegistry
 
 
 def test_spine_yaml_loads_spine_events_after_pr6() -> None:
@@ -40,7 +40,7 @@ def test_spine_publisher_resolved() -> None:
     解析为空。本测试改用 :func:`build_test_bus` 注入 catalog，与生产路径
     同形态。
     """
-    from lca_kernel.events.test_catalog import build_test_bus
+    from lca_kernel.events.test.test_catalog import build_test_bus
 
     bus = build_test_bus()
     cat = Category("spine.cognition.brain.perceive.start")
@@ -55,7 +55,7 @@ def test_spine_subscribers_resolved() -> None:
 
     PR-5：catalog 注入后才解析；用 :func:`build_test_bus`。
     """
-    from lca_kernel.events.test_catalog import build_test_bus
+    from lca_kernel.events.test.test_catalog import build_test_bus
 
     bus = build_test_bus()
     from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink
@@ -74,7 +74,7 @@ def test_spine_consumer_rules_cover_all_categories() -> None:
 
     PR-5：catalog 注入后才解析；用 :func:`build_test_bus`。
     """
-    from lca_kernel.events.test_catalog import build_test_bus
+    from lca_kernel.events.test.test_catalog import build_test_bus
 
     bus = build_test_bus()
     registry = bus.registry

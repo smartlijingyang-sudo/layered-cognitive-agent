@@ -39,7 +39,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from lca.harness.profile.resolve import ResolvedProfile
+    from lca.harness.profile.resolve.resolve import ResolvedProfile
 
 REPO = Path(__file__).resolve().parent.parent
 if str(REPO) not in sys.path:
@@ -377,7 +377,7 @@ def _resolve_profile(profile: str) -> ResolvedProfile:
     them here prevents the diagnostic script from maintaining a second, looser
     bundle parser with different semantics.
     """
-    from lca.harness.profile.resolve import resolve_profile
+    from lca.harness.profile.resolve.resolve import resolve_profile
 
     path = Path(profile)
     return resolve_profile(path if path.is_absolute() else REPO / path)

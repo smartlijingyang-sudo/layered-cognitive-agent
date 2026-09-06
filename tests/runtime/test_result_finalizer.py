@@ -4,17 +4,17 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.core.stop import StopDecision, StopReason
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.core.policy.stop import StopDecision, StopReason
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     DeclarativeRunOutcome,
     ExecutionOutcome,
     PhaseRunCursor,
 )
 from lca.harness.declarative.execute.outcome_projection import InterpretationResult
 from lca.plugins.loop.reducer.plugin import DefaultReducer
-from lca.runtime.result_finalizer import RuntimeResultFinalizer
+from lca.runtime.projection.result_finalizer import RuntimeResultFinalizer
 
 
 class _Hooks:

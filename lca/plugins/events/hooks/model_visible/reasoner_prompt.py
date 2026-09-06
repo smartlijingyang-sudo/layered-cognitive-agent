@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from lca.contracts.models.cognition.prompt_assembly import PromptTrace
-from lca.contracts.models.core.perception import ContextManifest
+from lca.contracts.models.core.perceive.perception import ContextManifest
 
 
 @dataclass(frozen=True)

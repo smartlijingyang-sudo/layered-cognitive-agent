@@ -4,23 +4,23 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from lca.application.preset_authoring import PresetAuthoring
-from lca.contracts.atoms.artifact_state import ArtifactState
-from lca.contracts.atoms.scope import Scope
+from lca.application.authoring.preset_authoring import PresetAuthoring
+from lca.contracts.atoms.artifact.artifact_state import ArtifactState
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.journal.artifact import (
     artifact_with_scope,
     capability_artifact_to_dict,
     migrate_to_active,
     migrate_to_retired,
 )
-from lca.contracts.mechanisms.composition import (
+from lca.contracts.mechanisms.composition.composition import (
     ComposerError,
     ComposerErrorCode,
     InvariantViolation,
     PluginFactory,
 )
-from lca.contracts.models.observability.diagnostic import DiagnosticCategory, DiagnosticStatus
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.diagnostic.diagnostic import DiagnosticCategory, DiagnosticStatus
+from lca.contracts.models.observability.journal.journal import (
     PluginMounted,
     PluginMountRejected,
     PluginUnmounted,

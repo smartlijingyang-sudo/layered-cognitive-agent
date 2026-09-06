@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from lca.infrastructure.cli.cli import app
+from lca.infrastructure.cli.cli.cli import app
 from lca.infrastructure.observability.journal.engine.journal_io import stamped_to_record
 
 runner = CliRunner()
@@ -44,7 +44,7 @@ def _write_journal(path: Path, *events) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
         for seq, event in enumerate(events, start=1):
-            from lca.contracts.models.observability.journal import (
+            from lca.contracts.models.observability.journal.journal import (
                 RunScope,
                 StampedEvent,
             )
@@ -82,7 +82,7 @@ class TestDiagnoseCommandExists:
         mention the pattern (proving the dispatch reached the right
         function).
         """
-        from lca.contracts.models.observability.journal import (
+        from lca.contracts.models.observability.journal.journal import (
             ApprovalResolved,
             InboxFollowupCreated,
             MemoryCommitted,
@@ -114,7 +114,7 @@ class TestDiagnoseAliasExecution:
 
     @pytest.fixture
     def journal(self, tmp_path: Path) -> Path:
-        from lca.contracts.models.observability.journal import (
+        from lca.contracts.models.observability.journal.journal import (
             ApprovalResolved,
             MemoryCommitted,
         )

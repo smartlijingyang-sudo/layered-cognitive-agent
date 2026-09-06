@@ -14,8 +14,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from lca.contracts.models.core.decision import Decision, Observation, Reflection
-from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
+from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.think.cognition import (
     Critic,
     DecisionGate,

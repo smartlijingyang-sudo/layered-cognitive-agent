@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     LoopGuard,
     PhaseEdge,
     PhaseResult,

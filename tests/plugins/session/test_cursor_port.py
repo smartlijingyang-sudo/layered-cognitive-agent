@@ -13,9 +13,9 @@ from typing import Any
 
 import pytest
 
-from lca.plugins.session.runtime.cursor_port import SessionWritePortAdapter
+from lca.plugins.session.runtime.cursor.cursor_port import SessionWritePortAdapter
 from lca.session.append import Session
-from lca.plugins.session.runtime.store import SessionStore
+from lca.plugins.session.runtime.store.store import SessionStore
 
 
 def _append_once(

@@ -6,8 +6,8 @@ Production spawn resolves the same factories from the booted plugin tree.
 
 from __future__ import annotations
 
-from lca.contracts.mechanisms.factory_registry import FactoryRegistry
-from lca.contracts.models.team.team_coordination import (
+from lca.contracts.mechanisms.factory.factory_registry import FactoryRegistry
+from lca.contracts.models.team.team.team_coordination import (
     STRATEGY_KEY_DEBATE,
     STRATEGY_KEY_FAN_OUT,
     STRATEGY_KEY_GRAPH,
@@ -16,13 +16,13 @@ from lca.contracts.models.team.team_coordination import (
     STRATEGY_KEY_PEER_SWARM,
     STRATEGY_KEY_PIPELINE,
 )
-from lca.plugins.strategies.debate import build_debate_strategy
-from lca.plugins.strategies.fan_out import build_fan_out_strategy
-from lca.plugins.strategies.graph import build_graph_strategy
-from lca.plugins.strategies.lead import build_lead_strategy
-from lca.plugins.strategies.peer_relay import build_peer_relay_strategy
-from lca.plugins.strategies.peer_swarm import build_peer_swarm_strategy
-from lca.plugins.strategies.pipeline import build_pipeline_strategy
+from lca.plugins.strategies.debate.debate import build_debate_strategy
+from lca.plugins.strategies.fan.fan_out import build_fan_out_strategy
+from lca.plugins.strategies.graph.graph import build_graph_strategy
+from lca.plugins.strategies.lead.lead import build_lead_strategy
+from lca.plugins.strategies.peer.peer_relay import build_peer_relay_strategy
+from lca.plugins.strategies.peer.peer_swarm import build_peer_swarm_strategy
+from lca.plugins.strategies.pipeline.pipeline import build_pipeline_strategy
 from tests.support.graph_node_executors import build_default_graph_node_executor_registry
 
 

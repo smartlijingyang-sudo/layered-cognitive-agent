@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.protocols.state.scope_plan import (
     BudgetCeiling,
     ScopePlan,

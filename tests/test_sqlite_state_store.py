@@ -8,10 +8,10 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.protocols.journal.spec import STATE_STORE_CHOICE_PROFILE_DEFAULT
-from lca.harness.profile.source import load_profile_source
-from lca.infrastructure.capability.state_store import StateStoreService
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.protocols.journal.spec.spec import STATE_STORE_CHOICE_PROFILE_DEFAULT
+from lca.harness.profile.resolve.source import load_profile_source
+from lca.infrastructure.capability.state.state_store import StateStoreService
 from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
 from lca.infrastructure.state_store.sqlite_store import SqliteStateStore
 from lca.plugins.composer.perceive.perceive import resolve_state_store

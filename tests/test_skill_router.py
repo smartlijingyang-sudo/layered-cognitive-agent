@@ -9,11 +9,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.cognition.brain.modular_brain import ModularBrain
-from lca.cognition.brain.skill_router import KeywordSkillRouter, StaticSkillRouter
+from lca.cognition.brain.pipeline.modular_brain import ModularBrain
+from lca.cognition.brain.prompt.skill_router import KeywordSkillRouter, StaticSkillRouter
 from lca.contracts.harness.memory.events import SkillRouted
-from lca.contracts.models.core.llm import LLMResponse
-from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.core.conversation.llm import LLMResponse
+from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
     set_publish_session,

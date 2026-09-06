@@ -47,7 +47,7 @@ class TestWebStandardDoesNotIncludeAssistantRuntime:
 
     @pytest.fixture
     def resolved_web_standard(self) -> Any:
-        from lca.harness.profile.resolve import resolve_profile
+        from lca.harness.profile.resolve.resolve import resolve_profile
 
         return resolve_profile(WEB_STANDARD)
 
@@ -155,7 +155,7 @@ class TestAssistantCatalogEmitsCreatedEP:
 
     def test_plugin_emits_assistant_created(self) -> None:
         from lca.harness.plugin_api import definition_from_plugin
-        from lca.plugins.assistant.catalog import setup
+        from lca.plugins.assistant.catalog.catalog import setup
 
         definition = definition_from_plugin(setup)
         assert definition.ownership is not None, "plugin 缺 OwnershipDeclaration"

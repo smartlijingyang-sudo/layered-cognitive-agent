@@ -8,9 +8,9 @@ import pytest
 
 from lca.contracts.harness.tasks.session import event_registry
 from lca.harness.session.emit import event_type_of
-from lca.plugins.session.runtime.messages import derive_messages
+from lca.plugins.session.runtime.messages.messages import derive_messages
 from lca.session.append import Session
-from lca_kernel.events.fold import REQUEST_HEADER_CATEGORY, SURFACE_ASSISTANT_TYPE, SURFACE_USER_TYPE
+from lca_kernel.events.fold.fold import REQUEST_HEADER_CATEGORY, SURFACE_ASSISTANT_TYPE, SURFACE_USER_TYPE
 
 
 def _minimal_payload(cls: type) -> dict:

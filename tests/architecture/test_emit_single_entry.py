@@ -7,18 +7,6 @@ Loop 热路径 durable 事实应经 ``FactGateway`` (``append_catalog_bound`` /
 ``publish_ep_bound``) 或 ``harness.session.emit``(catalog rollback in
 ``fact_gateway.py``),不得新增平行 ``publish_via_session`` /
 ``append_journal_event`` / 直接 ``Session.append`` 调用。
-
-当前债(exception.caught 平行 emitter):
-
-- ``lca/contracts/protocols/runtime/envelope_emitter.py`` Protocol stub
-- ``lca/runtime/envelope_emitter.py`` SpineEnvelopeEmitter 实现
-- ``lca/plugins/events/publishers/spine_reflector_runtime/plugin.py`` 函数
-
-Loop 热路径已知债(P2-21 baseline,迁移至 FactGateway):
-
-- ``lca/loop/commit/act_journal.py`` — ``append_journal_event``
-- ``lca/loop/commit/memory_journal.py`` — ``append_journal_event``
-- ``lca/loop/commit/delegation_journal.py`` — ``publish_via_session``
 """
 
 from __future__ import annotations
@@ -32,7 +20,7 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCAN_ROOT = _REPO_ROOT / "lca"
 _LOOP_SCAN_ROOT = _REPO_ROOT / "lca" / "loop"
-_SSOT_POSIX = "lca/infrastructure/observability/spine/exception_emit.py"
+_SSOT_POSIX = "lca/infrastructure/observability/spine/exception/exception_emit.py"
 
 # L2 / P-L7: loop 层允许的事实生产面(其余文件不得新增下列 pattern)。
 _LOOP_FACT_SSOT_FILES: frozenset[str] = frozenset(
@@ -40,13 +28,7 @@ _LOOP_FACT_SSOT_FILES: frozenset[str] = frozenset(
         "lca/loop/fact_gateway.py",
     }
 )
-_LOOP_FACT_BASELINE_DEBT: frozenset[str] = frozenset(
-    {
-        "lca/loop/commit/act_journal.py",
-        "lca/loop/commit/memory_journal.py",
-        "lca/loop/commit/delegation_journal.py",
-    }
-)
+_LOOP_FACT_BASELINE_DEBT: frozenset[str] = frozenset()
 _LOOP_FORBIDDEN_PATTERNS: tuple[str, ...] = (
     "publish_via_session",
     "append_journal_event",
@@ -229,6 +211,6 @@ class TestL2LoopFactSingleEntry:
         )
 
     def test_loop_fact_baseline_debt_unchanged(self) -> None:
-        """已知债文件集合稳定;清债后删对应 commit 模块并更新 baseline。"""
+        """Known-debt set is empty after ADR-0194 P1 journal migration."""
         current_debt = {rel for rel in _LOOP_FACT_BASELINE_DEBT if (_REPO_ROOT / rel).exists()}
         assert current_debt == _LOOP_FACT_BASELINE_DEBT

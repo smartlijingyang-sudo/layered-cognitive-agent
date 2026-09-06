@@ -35,7 +35,7 @@ from typing import Any
 
 from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
 from lca.infrastructure.observability.facade import BoundObservability, bind_backends
-from lca.plugins.think.composition_composer_provider import (
+from lca.plugins.think.composition.composition_composer_provider import (
     CordisComposer,
     build_default_invariant_checker,
 )
@@ -71,7 +71,7 @@ def _bootstrap_preset_into_context(
     让 §13.3.1 五条硬约束（C3/C4/C5/PR12/§23.2）在 boot 路径上同样适用——
     不允许 preset 加载跳过 invariant 检查。
     """
-    from lca.contracts.mechanisms.composition import PluginFactory
+    from lca.contracts.mechanisms.composition.composition import PluginFactory
 
     bundle_path = preset_root / preset_id / "bundle.yaml"
     text = bundle_path.read_text(encoding="utf-8")

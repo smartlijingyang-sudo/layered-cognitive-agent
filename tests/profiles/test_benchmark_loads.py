@@ -20,7 +20,7 @@ from pathlib import Path
 
 import yaml
 
-from lca.harness.profile.source import load_profile_source
+from lca.harness.profile.resolve.source import load_profile_source
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROFILE_PATH = REPO_ROOT / "profiles" / "benchmark.yaml"

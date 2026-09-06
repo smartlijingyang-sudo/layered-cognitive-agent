@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.cognition.brain.leaked_tool_call import recover_leaked_tool_calls
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.enums import ActionType
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.atoms.scope import Scope
+from lca.cognition.brain.prompt.leaked_tool_call import recover_leaked_tool_calls
+from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.enums.enums import ActionType
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     AuthorityContract,
@@ -18,9 +18,9 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.models.core.decision import Decision, DelegationSpec, ToolCall
-from lca.contracts.models.core.llm import LLMResponse
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.models.core.execution.decision import Decision, DelegationSpec, ToolCall
+from lca.contracts.models.core.conversation.llm import LLMResponse
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.gate.decision_classifier import DecisionClassifier
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 

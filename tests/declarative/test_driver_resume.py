@@ -4,12 +4,12 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from lca.contracts.models.core.state import AgentState, Budget, StateSnapshot
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.contracts.models.core.state.state import AgentState, Budget, StateSnapshot
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     DeclarativeValidationError,
     PhaseRunCursor,
 )
-from lca.runtime.checkpoint_resolution import (
+from lca.runtime.support.checkpoint_resolution import (
     DeclarativeCheckpoint,
     DeclarativeCheckpointStateResolver,
 )

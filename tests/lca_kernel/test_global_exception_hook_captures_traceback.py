@@ -26,7 +26,7 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
 
-from lca_kernel.lifecycle import (
+from lca_kernel.boot.lifecycle import (
     DefaultShutdownCoordinator,
     install_fail_loud,
 )
@@ -125,7 +125,7 @@ def test_asyncio_handler_captures_task_exception(monkeypatch: pytest.MonkeyPatch
             asyncio.set_event_loop(loop)
             # 重新装(因为 install_fail_loud 在 outer scope 装过,这里覆盖
             # 为可观察的 handler,验证 _on_unhandled 走 SSOT 路径)
-            from lca_kernel.lifecycle import install_fail_loud as _install
+            from lca_kernel.boot.lifecycle import install_fail_loud as _install
             coord = DefaultShutdownCoordinator(kernel=_FakeKernel())
             _install(coord)
             # 拿到刚装的 asyncio handler

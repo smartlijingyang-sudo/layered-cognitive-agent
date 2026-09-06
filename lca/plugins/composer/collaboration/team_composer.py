@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING
 
 from lca.contracts.capabilities import STRATEGIES, TEAM_SEAM
 from lca.contracts.harness.composition.composer import TeamGraph
-from lca.contracts.mechanisms.capability import require_capability
+from lca.contracts.mechanisms.capability.capability import require_capability
 from lca.contracts.protocols import TeamAssembly, TeamStage
-from lca.contracts.protocols.journal.spec import LeadSpec, TeamSpec, strategy_key_for_governance
+from lca.contracts.protocols.journal.spec.spec import LeadSpec, TeamSpec, strategy_key_for_governance
 from lca.plugins.composer.collaboration.team import resolve_team_observability
 from lca.plugins.composer.composition.agent_assembly import AgentAssemblyPort
 

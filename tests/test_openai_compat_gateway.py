@@ -8,13 +8,13 @@ from unittest.mock import AsyncMock, patch
 from starlette.testclient import TestClient
 
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
-from lca.infrastructure.openai_compat import (
+from lca.infrastructure.openai.openai_compat import (
     extract_json_schema_format,
     normalize_chat_messages,
     normalize_responses_input,
     resolve_upstream_model,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.session import (
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
     RunRegistry,
     RunSession,
     RunStatus,
@@ -269,7 +269,7 @@ class TestOpenAiStructuredHelpers(unittest.TestCase):
         self.assertEqual(resolve_upstream_model("gpt-5.4-mini"), "gpt-5.4-mini")
 
     def test_resolve_embedding_model_does_not_use_chat_id(self) -> None:
-        from lca.infrastructure.openai_compat import resolve_embedding_model
+        from lca.infrastructure.openai.openai_compat import resolve_embedding_model
 
         self.assertNotEqual(resolve_embedding_model("solo"), resolve_upstream_model("solo"))
         self.assertEqual(resolve_embedding_model("text-embedding-3-small"), "text-embedding-v3")

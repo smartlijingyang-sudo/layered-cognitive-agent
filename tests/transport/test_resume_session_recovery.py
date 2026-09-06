@@ -8,7 +8,7 @@ import pytest
 
 from lca.contracts.harness.tasks.session import SessionEvent
 from lca.session.lifecycle.recovery import SessionRecoveryError, assert_resume_allowed
-from lca.contracts.observability.status import RunLifecycleStatus
+from lca.contracts.observability.registry.status import RunLifecycleStatus
 
 
 def _event(seq: int, event_type: str, data: dict) -> SessionEvent:

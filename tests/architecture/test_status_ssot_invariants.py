@@ -56,7 +56,7 @@ class TestIFwSsot2:
 
     def test_legacy_names_are_aliases(self) -> None:
         """遗留名字与 RunLifecycleStatus 是同一对象(别名,非平行 enum)。"""
-        from lca.contracts.observability.status import RunLifecycleStatus
+        from lca.contracts.observability.registry.status import RunLifecycleStatus
         from lca.infrastructure.observability.journal.engine.reducer import RunStatus
 
         assert RunStatus is RunLifecycleStatus

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     ContributionRole,
     ControlEntry,
     DeclarativeValidationError,
@@ -109,7 +109,7 @@ def test_control_binding_closure_rejects_unbacked_entry() -> None:
 
 
 def test_capability_plan_options_reject_non_boolean_flags() -> None:
-    from lca.harness.profile.capability_plan_resolver import CapabilityPlanOptions
+    from lca.harness.profile.resolve.capability_plan_resolver import CapabilityPlanOptions
 
     with pytest.raises(TypeError, match="include_disabled must be a boolean"):
         CapabilityPlanOptions(include_disabled="false")  # type: ignore[arg-type]

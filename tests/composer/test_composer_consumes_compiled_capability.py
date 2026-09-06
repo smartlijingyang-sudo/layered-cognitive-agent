@@ -35,12 +35,12 @@ from lca.contracts.capabilities import (
     TEAM_SEAM,
 )
 from lca.contracts.harness.composition.composer import AgentCompositionRequest
-from lca.contracts.protocols.journal.spec import AgentSpec
-from lca.plugins.collaboration.team_communication_seam import (
+from lca.contracts.protocols.journal.spec.spec import AgentSpec
+from lca.plugins.collaboration.team_1.team_communication_seam import (
     DefaultTeamCommunicationAssembler,
 )
-from lca.plugins.collaboration.team_seam_seam import TeamSeam, TeamSeamFactory
-from lca.plugins.collaboration.team_shared_memory_seam import DefaultTeamSharedMemoryResolver
+from lca.plugins.collaboration.team_1.team_seam_seam import TeamSeam, TeamSeamFactory
+from lca.plugins.collaboration.team_2.team_shared_memory_seam import DefaultTeamSharedMemoryResolver
 
 REPO = Path(__file__).resolve().parents[2]
 COMPOSER_DIRECTORY = REPO / "lca" / "plugins" / "composer"
@@ -290,8 +290,8 @@ def test_team_composer_assembles_each_member_once() -> None:
 def test_team_composer_passes_resolved_store_to_one_member_assembly_pass() -> None:
     """A Team member receives the seam-resolved store during its only assembly pass."""
 
-    from lca.contracts.models.team.team_coordination import Pipeline
-    from lca.contracts.protocols.journal.spec import TeamSpec
+    from lca.contracts.models.team.team.team_coordination import Pipeline
+    from lca.contracts.protocols.journal.spec.spec import TeamSpec
     from lca.plugins.composer.collaboration.team_composer import TeamComposer
     from tests.support.agent_specs import make_spec
 
@@ -400,8 +400,8 @@ def test_team_seam_plugin_consumes_shared_memory_resolver_from_scope() -> None:
 def test_team_seam_factory_produces_complete_seam() -> None:
     """The default ``TeamSeamFactory.build`` must return a fully populated seam."""
 
-    from lca.contracts.models.team.team_coordination import Pipeline
-    from lca.contracts.protocols.journal.spec import TeamSpec
+    from lca.contracts.models.team.team.team_coordination import Pipeline
+    from lca.contracts.protocols.journal.spec.spec import TeamSpec
     from lca.infrastructure.transport.agent_transport import InternalTransport
 
     factory = _default_team_seam_factory()
@@ -424,8 +424,8 @@ def test_team_seam_factory_produces_complete_seam() -> None:
 def test_team_seam_factory_returns_no_shared_memory_when_layers_empty() -> None:
     """When no shared layers are declared, ``shared_memory`` is ``None``."""
 
-    from lca.contracts.models.team.team_coordination import Pipeline
-    from lca.contracts.protocols.journal.spec import TeamSpec
+    from lca.contracts.models.team.team.team_coordination import Pipeline
+    from lca.contracts.protocols.journal.spec.spec import TeamSpec
 
     factory = _default_team_seam_factory()
     spec = TeamSpec(members=(), governance=Pipeline())
@@ -527,8 +527,8 @@ def test_default_team_seam_factory_keeps_backend_decisions_independent() -> None
     but each stage has its own narrow test surface.
     """
 
-    from lca.contracts.models.team.team_coordination import Pipeline
-    from lca.contracts.protocols.journal.spec import TeamSpec
+    from lca.contracts.models.team.team.team_coordination import Pipeline
+    from lca.contracts.protocols.journal.spec.spec import TeamSpec
 
     class _SharedMemoryResolver:
         def __init__(self) -> None:

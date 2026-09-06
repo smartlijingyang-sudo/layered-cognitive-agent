@@ -19,7 +19,7 @@ from dataclasses import replace as dc_replace
 from pathlib import Path
 from typing import Any
 
-from lca.contracts.observability.replay import StepContextAt
+from lca.contracts.observability.evidence.replay import StepContextAt
 
 
 class StandardCursor:

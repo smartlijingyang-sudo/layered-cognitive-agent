@@ -21,12 +21,12 @@ from lca.infrastructure.computer.guest.file_ops import (
     build_write_file_script,
 )
 from lca.infrastructure.computer.guest.search_ops import build_grep_content_script
-from lca.infrastructure.computer.parse_result import parse_computer_stdout
-from lca.infrastructure.computer.runtime import ComputerRuntime
-from lca.infrastructure.file_store import LocalFileStore
-from lca.infrastructure.sandbox.onlyboxes_artifacts import ARTIFACT_BEGIN
-from lca.infrastructure.sandbox.runtime_scope import bind_sandbox_runtime, unbind_sandbox_runtime
-from lca.infrastructure.tools.run_finalizer import run_id_scope
+from lca.infrastructure.computer.parse.parse_result import parse_computer_stdout
+from lca.infrastructure.computer.runtime.runtime import ComputerRuntime
+from lca.infrastructure.file.file_store import LocalFileStore
+from lca.infrastructure.sandbox.onlyboxes.onlyboxes_artifacts import ARTIFACT_BEGIN
+from lca.infrastructure.sandbox.runtime.runtime_scope import bind_sandbox_runtime, unbind_sandbox_runtime
+from lca.infrastructure.tools.run.run_finalizer import run_id_scope
 from tests.support.inline_sandbox import InlineSandbox
 
 _PY_NULL_ASSIGN = re.compile(r"^\s*\w+\s*=\s*null\s*$", re.MULTILINE)

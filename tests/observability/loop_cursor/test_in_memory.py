@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.observability.incarnation import Incarnation
-from lca.contracts.observability.loop_cursor import (
+from lca.contracts.observability.core.incarnation import Incarnation
+from lca.contracts.observability.cursor.loop_cursor import (
     CursorError,
     CursorSnapshot,
 )

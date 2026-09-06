@@ -4,15 +4,15 @@ from __future__ import annotations
 import asyncio
 import unittest
 
-from lca.cognition.body.tool_registry import SimpleToolRegistry
-from lca.contracts.models.core.decision import (
+from lca.cognition.body.tools.tool_registry import SimpleToolRegistry
+from lca.contracts.models.core.execution.decision import (
     Decision,
     DelegationSpec,
     Observation,
     ToolCall,
 )
-from lca.contracts.models.core.result import ToolExecutionError
-from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.core.execution.result import ToolExecutionError
+from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.infrastructure.transport.agent_transport import InternalTransport
 from lca.infrastructure.transport.transport_registry import (
     TransportNotFoundError,

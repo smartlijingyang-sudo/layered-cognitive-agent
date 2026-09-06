@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from lca.contracts.atoms.relation import Relation, parse_relation
+from lca.contracts.atoms.relation.relation import Relation, parse_relation
 from lca.contracts.protocols.composition.relation import TypedRelation
 
 

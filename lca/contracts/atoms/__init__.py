@@ -1,6 +1,6 @@
 """atoms — contracts 内部子包（依赖方向由 import-linter 契约强制）。"""
 
-from lca.contracts.atoms.control_slot import (
+from lca.contracts.atoms.control.control_slot import (
     SLOT_PHASE_OWNER,
     ControlSlot,
     all_slot_values,
@@ -10,13 +10,13 @@ from lca.contracts.atoms.control_slot import (
     phase_owner,
     validate_slot_iterable,
 )
-from lca.contracts.atoms.functional_group import (
+from lca.contracts.atoms.functional.functional_group import (
     V3_TO_0069_MAPPING,
     FunctionalGroup,
     all_group_ids,
     parse_functional_group,
 )
-from lca.contracts.atoms.relation import (
+from lca.contracts.atoms.relation.relation import (
     NEW_RELATIONS,
     RELATION_GROUP_HINT,
     Relation,
@@ -24,7 +24,7 @@ from lca.contracts.atoms.relation import (
     parse_relation,
     validate_relations,
 )
-from lca.contracts.atoms.scope import (
+from lca.contracts.atoms.scope.scope import (
     SCOPE_ALIAS,
     Scope,
     all_scope_values,

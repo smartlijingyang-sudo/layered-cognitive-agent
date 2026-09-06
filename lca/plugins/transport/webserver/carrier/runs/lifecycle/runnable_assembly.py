@@ -11,14 +11,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, cast
 
-from lca.application.api import Agent, Team
-from lca.contracts.mechanisms.capability import provider_current, require_capability
-from lca.contracts.models.core.plane import PlaneBindings
+from lca.application.api.api import Agent, Team
+from lca.contracts.mechanisms.capability.capability import provider_current, require_capability
+from lca.contracts.models.core.state.plane import PlaneBindings
 from lca.contracts.protocols import LLMAdapter
-from lca.contracts.protocols.runtime.infra import MachineResolver, Tool
-from lca.contracts.protocols.session.run_mode import RunModeRegistryProtocol
+from lca.contracts.protocols.runtime.infra.infra import MachineResolver, Tool
+from lca.contracts.protocols.session.run.run_mode import RunModeRegistryProtocol
 from lca.infrastructure.observability import BoundObservability
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
 
 if TYPE_CHECKING:
     from cordis import Context

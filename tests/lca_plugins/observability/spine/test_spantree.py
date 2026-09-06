@@ -18,7 +18,7 @@ from typing import Any
 
 import pytest
 
-from lca.infrastructure.observability.spine.context import SpanContext, SpineContext
+from lca.infrastructure.observability.spine.context.context import SpanContext, SpineContext
 
 REQUIRED_KEYS = (
     "span_id",

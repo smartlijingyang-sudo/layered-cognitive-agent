@@ -16,8 +16,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.observability.loop_cursor import CursorSnapshot
-from lca.infrastructure.observability.spine.event_record import EventRecord
+from lca.contracts.observability.cursor.loop_cursor import CursorSnapshot
+from lca.infrastructure.observability.spine.event.event_record import EventRecord
 
 # llm.request.header payload 字段(ADR-0168.1 §D4 RequestHeader)
 _FIELD_STEP_ID = "step_id"

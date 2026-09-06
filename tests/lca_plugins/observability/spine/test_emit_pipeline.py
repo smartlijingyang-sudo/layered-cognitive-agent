@@ -28,10 +28,10 @@ from __future__ import annotations
 from typing import Any
 
 from lca.contracts.observability.spine.producer import FieldProducer
-from lca.infrastructure.observability.spine.context import SpanContext, SpineContext
-from lca.infrastructure.observability.spine.event_record import EventRecord
-from lca.infrastructure.observability.spine.event_spine import EventSpine
-from lca.infrastructure.observability.spine.manifest import EXECUTION_POINTS
+from lca.infrastructure.observability.spine.context.context import SpanContext, SpineContext
+from lca.infrastructure.observability.spine.event.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.event_spine import EventSpine
+from lca.infrastructure.observability.spine.manifest.manifest import EXECUTION_POINTS
 from lca.infrastructure.observability.spine.sinks.base import EventSink
 
 # ── helpers ──────────────────────────────────────────────────────────
@@ -55,7 +55,7 @@ class _CaptureSink:
 
 def _make_spine() -> EventSpine:
     """Return a fresh ``EventSpine`` with capture sink + passthrough hook."""
-    from lca.infrastructure.observability.loop_cursor._spine_port import bind_session_append_hook
+    from lca.infrastructure.observability.loop_cursor.spine._spine_port import bind_session_append_hook
     from tests.observability.spine.conftest import SyncPassthroughHook
 
     SpineContext.set_run("emit-pipeline-test")
@@ -443,7 +443,7 @@ def test_setup_assembles_pipeline_from_producers_and_anomaly() -> None:
     """``setup`` collects field_producer.* + deriver.anomaly and provides EmitPipeline."""
     import asyncio
 
-    from lca.harness.declarative.compile.instrument_wrap import (
+    from lca.harness.declarative.compile.instrument.instrument_wrap import (
         set_active_pipeline_accessor,
     )
     from lca.plugins.observability.spine.emit_pipeline import EmitPipeline, setup
@@ -469,7 +469,7 @@ def test_setup_assembles_pipeline_from_producers_and_anomaly() -> None:
         assert pipeline.anomaly is anomaly
         # Sorted by priority; unrelated non-producer binding is filtered out.
         assert [p.name for p in pipeline.producers] == ["low", "high"]
-        from lca.harness.declarative.compile.instrument_wrap import resolve_active_pipeline
+        from lca.harness.declarative.compile.instrument.instrument_wrap import resolve_active_pipeline
 
         assert resolve_active_pipeline() is None
     finally:

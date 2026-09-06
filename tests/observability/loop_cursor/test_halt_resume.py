@@ -13,15 +13,15 @@ from dataclasses import FrozenInstanceError, dataclass, field
 
 import pytest
 
-from lca.contracts.observability.incarnation import Incarnation
-from lca.contracts.observability.loop_cursor import CursorError
-from lca.contracts.observability.loop_cursor_payloads import (
+from lca.contracts.observability.core.incarnation import Incarnation
+from lca.contracts.observability.cursor.loop_cursor import CursorError
+from lca.contracts.observability.cursor.loop_cursor_payloads import (
     RequestHeader,
     ThinkingRecord,
     ToolCallRecord,
     ToolResultRecord,
 )
-from lca.contracts.observability.resume import ResumeSpec
+from lca.contracts.observability.registry.resume import ResumeSpec
 from lca.infrastructure.observability.loop_cursor import (
     InMemoryLoopCursor,
     StdLoopCursor,

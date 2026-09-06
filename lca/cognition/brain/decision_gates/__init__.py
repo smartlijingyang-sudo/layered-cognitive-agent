@@ -5,25 +5,25 @@ Gate chains assemble via ``GateService`` + ``gates.chain.sequential`` bundle.
 Tests may use :func:`build_default_workspace_gate_chain` for the standard 5-gate chain.
 """
 
-from lca.cognition.brain.decision_gates.artifact_respond_injector import (
+from lca.cognition.brain.decision_gates.artifact.artifact_respond_injector import (
     ArtifactRespondInjector,
 )
-from lca.cognition.brain.decision_gates.chained import (
+from lca.cognition.brain.decision_gates.chained.chained import (
     ChainedDecisionGate,
     record_gate_decided,
 )
-from lca.cognition.brain.decision_gates.must_consult_all import (
+from lca.cognition.brain.decision_gates.must.must_consult_all import (
     MustConsultAllMembers,
 )
-from lca.cognition.brain.decision_gates.office_works_sealer import (
+from lca.cognition.brain.decision_gates.office.office_works_sealer import (
     OfficeWorksSealer,  # deprecated: kept for backwards compat imports
 )
-from lca.cognition.brain.decision_gates.progress_loop_detector import (
+from lca.cognition.brain.decision_gates.progress.progress_loop_detector import (
     ProgressLoopDetector,
 )
-from lca.cognition.brain.decision_gates.repeat_tool_call import RepeatToolCallGate
-from lca.cognition.brain.decision_gates.terminal_respond import TerminalRespondGate
-from lca.cognition.brain.decision_gates.tool_loop_breaker import ToolLoopBreakerGate
+from lca.cognition.brain.decision_gates.repeat.repeat_tool_call import RepeatToolCallGate
+from lca.cognition.brain.decision_gates.terminal.terminal_respond import TerminalRespondGate
+from lca.cognition.brain.decision_gates.tool.tool_loop_breaker import ToolLoopBreakerGate
 from lca.contracts.protocols.think.cognition import DecisionGate
 
 

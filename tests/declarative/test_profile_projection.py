@@ -9,8 +9,8 @@ import pytest
 
 from lca.harness.plugin_api import EffectClass, PluginDefinition, PluginKind
 from lca.harness.plugin.spec_projection import native_spec_from_declaration
-from lca.harness.profile.projection import ResolvedProfileProjection
-from lca.harness.profile.resolve import ResolvedPlugin, ResolvedProfile
+from lca.harness.profile.plan.projection import ResolvedProfileProjection
+from lca.harness.profile.resolve.resolve import ResolvedPlugin, ResolvedProfile
 
 
 async def _setup(*_args: object, **_kwargs: object) -> None:

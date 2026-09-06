@@ -18,7 +18,7 @@ from lca.infrastructure.observability.backends.langfuse_conventions import (
 )
 
 if TYPE_CHECKING:
-    from lca.contracts.models.observability.journal import StampedEvent
+    from lca.contracts.models.observability.journal.journal import StampedEvent
 
 
 class LlmGenAIMapper:
@@ -26,7 +26,7 @@ class LlmGenAIMapper:
     runtime_kind = "llm"
 
     def map(self, stamped: StampedEvent) -> dict[str, str]:
-        from lca.contracts.models.observability.journal import LlmCallCompleted
+        from lca.contracts.models.observability.journal.journal import LlmCallCompleted
 
         event = stamped.event
         if not isinstance(event, LlmCallCompleted):

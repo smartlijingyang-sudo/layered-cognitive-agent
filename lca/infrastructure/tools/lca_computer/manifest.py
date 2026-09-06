@@ -11,20 +11,20 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from lca.contracts.models.core.tool import ToolApi, ToolManifest, ToolMeta
-from lca.infrastructure.tools.lca_computer.apis import edit_file as _edit_file
-from lca.infrastructure.tools.lca_computer.apis import execute_code as _execute_code
-from lca.infrastructure.tools.lca_computer.apis import export_file as _export_file
-from lca.infrastructure.tools.lca_computer.apis import get_command_output as _get_command_output
-from lca.infrastructure.tools.lca_computer.apis import glob_files as _glob_files
-from lca.infrastructure.tools.lca_computer.apis import grep_content as _grep_content
-from lca.infrastructure.tools.lca_computer.apis import kill_command as _kill_command
-from lca.infrastructure.tools.lca_computer.apis import list_files as _list_files
-from lca.infrastructure.tools.lca_computer.apis import move_files as _move_files
-from lca.infrastructure.tools.lca_computer.apis import read_file as _read_file
-from lca.infrastructure.tools.lca_computer.apis import run_command as _run_command
-from lca.infrastructure.tools.lca_computer.apis import search_files as _search_files
-from lca.infrastructure.tools.lca_computer.apis import write_file as _write_file
+from lca.contracts.models.core.execution.tool import ToolApi, ToolManifest, ToolMeta
+from lca.infrastructure.tools.lca_computer.apis.edit import edit_file as _edit_file
+from lca.infrastructure.tools.lca_computer.apis.execute import execute_code as _execute_code
+from lca.infrastructure.tools.lca_computer.apis.export import export_file as _export_file
+from lca.infrastructure.tools.lca_computer.apis.get import get_command_output as _get_command_output
+from lca.infrastructure.tools.lca_computer.apis.glob import glob_files as _glob_files
+from lca.infrastructure.tools.lca_computer.apis.grep import grep_content as _grep_content
+from lca.infrastructure.tools.lca_computer.apis.kill import kill_command as _kill_command
+from lca.infrastructure.tools.lca_computer.apis.list import list_files as _list_files
+from lca.infrastructure.tools.lca_computer.apis.move import move_files as _move_files
+from lca.infrastructure.tools.lca_computer.apis.read import read_file as _read_file
+from lca.infrastructure.tools.lca_computer.apis.run import run_command as _run_command
+from lca.infrastructure.tools.lca_computer.apis.search import search_files as _search_files
+from lca.infrastructure.tools.lca_computer.apis.write import write_file as _write_file
 from lca.infrastructure.tools.lca_computer.types import SANDBOX_ONLY_APIS, ApiName
 
 LOCAL_SYSTEM_ID = "lobe-local-system"

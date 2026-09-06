@@ -6,18 +6,18 @@ from typing import Any
 
 import pytest
 
-from lca.application.api import Agent
-from lca.application.spawn import spawn_agent
-from lca.contracts.atoms.enums import ActionScope
-from lca.contracts.mechanisms.capability import MissingCapabilityError
-from lca.harness.profile.boot import boot_entries, boot_profile, load_profile_entries
-from lca.harness.profile.boot_products import resolved_profile_from_scope
-from lca.harness.profile.resolve import ProfileResolveError
-from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
-from lca.infrastructure.llm_resolver import live_credential
+from lca.application.api.api import Agent
+from lca.application.api.spawn import spawn_agent
+from lca.contracts.atoms.enums.enums import ActionScope
+from lca.contracts.mechanisms.capability.capability import MissingCapabilityError
+from lca.harness.profile.boot.boot import boot_entries, boot_profile, load_profile_entries
+from lca.harness.profile.boot.boot_products import resolved_profile_from_scope
+from lca.harness.profile.resolve.resolve import ProfileResolveError
+from lca.infrastructure.llm_adapter.mock.mock_llm import MockLLMAdapter
+from lca.infrastructure.llm.llm_resolver import live_credential
 from lca.plugins.composer.perceive.perceive import build_perceive_hub
 from lca.plugins.transport.webserver.carrier.runs.execute import create_run_session, execute_run
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunStatus
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunRegistry, RunStatus
 
 DEFAULT_PROFILE = "profiles/web-standard.yaml"
 
@@ -173,7 +173,7 @@ async def test_omitting_seam_plugin_does_not_bypass(
 
     monkeypatch.setattr("lca.infrastructure.sandbox.factory.resolve_sandbox", _boom)
     monkeypatch.setattr("lca.infrastructure.tools.default_set.resolve_sandbox", _boom)
-    import lca.infrastructure.file_store as file_store_module
+    import lca.infrastructure.file.file_store as file_store_module
 
     assert not hasattr(file_store_module, "get_default_file_store")
     assert not hasattr(file_store_module, "set_default_file_store")
@@ -246,7 +246,7 @@ async def test_omitting_skills_provider_does_not_call_resolve_skill_store(
 
     monkeypatch.setattr("lca.infrastructure.skills.factory.resolve_skill_store", _boom)
 
-    from lca.cognition.memory.simple_memory import SimpleMemorySystem
+    from lca.cognition.memory.simple.simple_memory import SimpleMemorySystem
 
     with pytest.raises(MissingCapabilityError, match="skills"):
         build_perceive_hub(
@@ -350,7 +350,7 @@ async def test_two_execute_runs_complete_with_scripted_text(no_llm_key: None) ->
 
 @pytest.mark.asyncio
 async def test_dump_profile_matches_boot_ids() -> None:
-    from lca.harness.profile.boot import load_profile_entries
+    from lca.harness.profile.boot.boot import load_profile_entries
 
     ctx = await boot_profile(DEFAULT_PROFILE)
     dumped = {

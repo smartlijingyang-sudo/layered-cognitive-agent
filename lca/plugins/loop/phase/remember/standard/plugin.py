@@ -5,9 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import cast
 
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     AuthorityContract,
@@ -16,15 +16,15 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.models.core.decision import Decision, Observation, Reflection
-from lca.contracts.protocols.act.command_envelope import CapabilityGrant, RunDelta, mint_envelope
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
+from lca.contracts.protocols.act.command.command_envelope import CapabilityGrant, RunDelta, mint_envelope
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     PhaseContext,
     PhaseInput,
     PhaseResult,
     SemanticPhase,
 )
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.loop.phase._shared.capabilities import StandardPhaseCapabilities
 from lca.plugins.loop.phase._shared.common import (

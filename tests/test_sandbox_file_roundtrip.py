@@ -6,7 +6,7 @@ import base64
 import json
 import unittest
 
-from lca.infrastructure.sandbox.onlyboxes_artifacts import (
+from lca.infrastructure.sandbox.onlyboxes.onlyboxes_artifacts import (
     ARTIFACT_BEGIN,
     ARTIFACT_END,
     strip_artifacts,

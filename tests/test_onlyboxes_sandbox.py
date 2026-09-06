@@ -9,14 +9,14 @@ import unittest
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from lca.infrastructure.sandbox.factory import resolve_sandbox, sandbox_backend
-from lca.infrastructure.sandbox.onlyboxes_adapter import OnlyboxesSandboxAdapter
-from lca.infrastructure.sandbox.onlyboxes_artifacts import (
+from lca.infrastructure.sandbox.factory.factory import resolve_sandbox, sandbox_backend
+from lca.infrastructure.sandbox.onlyboxes.onlyboxes_adapter import OnlyboxesSandboxAdapter
+from lca.infrastructure.sandbox.onlyboxes.onlyboxes_artifacts import (
     ARTIFACT_BEGIN,
     ARTIFACT_END,
     strip_artifacts,
 )
-from lca.infrastructure.sandbox.paths import ONLYBOXES
+from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
 
 
 def _artifact_block(files: list[tuple[str, bytes]]) -> str:
@@ -336,8 +336,8 @@ class ParseTerminalResponseHarvestTests(unittest.TestCase):
         return resp
 
     def test_harvests_artifact_block_from_stdout(self) -> None:
-        from lca.infrastructure.sandbox.onlyboxes_bootstrap import parse_terminal_response
-        from lca.infrastructure.sandbox.streaming import SandboxStreamEmitter
+        from lca.infrastructure.sandbox.onlyboxes.onlyboxes_bootstrap import parse_terminal_response
+        from lca.infrastructure.sandbox.streaming.streaming import SandboxStreamEmitter
 
         stdout = "result: 42\n" + _artifact_block([("report.pdf", b"%PDF-1.4...")])
         emitter = SandboxStreamEmitter("inv_test")
@@ -352,8 +352,8 @@ class ParseTerminalResponseHarvestTests(unittest.TestCase):
         self.assertNotIn(ARTIFACT_BEGIN, result.stdout)
 
     def test_no_artifact_block_is_safe_noop(self) -> None:
-        from lca.infrastructure.sandbox.onlyboxes_bootstrap import parse_terminal_response
-        from lca.infrastructure.sandbox.streaming import SandboxStreamEmitter
+        from lca.infrastructure.sandbox.onlyboxes.onlyboxes_bootstrap import parse_terminal_response
+        from lca.infrastructure.sandbox.streaming.streaming import SandboxStreamEmitter
 
         emitter = SandboxStreamEmitter("inv_test")
         result = parse_terminal_response(self._make_response("hello world\n"), emitter)
@@ -371,7 +371,7 @@ class ExecuteCodeArtifactTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_scanner_injected_in_code(self) -> None:
         """The code passed to the sandbox should contain the artifact scanner."""
-        from lca.infrastructure.sandbox.artifact_scanner import GUEST_ARTIFACT_SCANNER
+        from lca.infrastructure.sandbox.artifact.artifact_scanner import GUEST_ARTIFACT_SCANNER
 
         self.assertIn("/mnt/data/outputs", GUEST_ARTIFACT_SCANNER)
         self.assertIn("__LCA_ONLYBOXES_ARTIFACTS__", GUEST_ARTIFACT_SCANNER)

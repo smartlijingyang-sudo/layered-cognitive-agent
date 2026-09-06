@@ -26,7 +26,8 @@ except ImportError:
 
 ROOT = Path(__file__).resolve().parent.parent
 PLAN = Path(__file__).resolve().parent / "directory_split_plan.toml"
-SKIP = frozenset({"__pycache__", ".git", ".venv", "vendor", "lobehub-ui", "node_modules", "tests"})
+SKIP_DIRS = frozenset({"__pycache__", ".git", ".venv", "vendor", "lobehub-ui", "node_modules"})
+SKIP_ROOTS = frozenset({"tests"})  # only when scanning for splits, not import rewrite
 
 
 def _load_plan() -> dict:
@@ -93,9 +94,11 @@ def _collect_moves(max_per: int, roots: list[str], plan: dict) -> list[tuple[Pat
         root = ROOT / root_name
         if not root.is_dir():
             continue
+        directories_to_scan: list[Path] = [root]
         for directory in sorted(root.rglob("*")):
-            if not directory.is_dir() or any(p in SKIP for p in directory.parts):
-                continue
+            if directory.is_dir() and not any(p in SKIP_DIRS for p in directory.parts):
+                directories_to_scan.append(directory)
+        for directory in directories_to_scan:
             files = _direct_py(directory)
             if len(files) <= max_per:
                 continue
@@ -142,7 +145,7 @@ def _rewrite_imports(moves: list[tuple[Path, Path]]) -> int:
         if not base.is_dir():
             continue
         for path in base.rglob("*.py"):
-            if any(p in SKIP for p in path.parts):
+            if any(p in SKIP_DIRS for p in path.parts):
                 continue
             text = path.read_text(encoding="utf-8")
             original = text

@@ -31,14 +31,14 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.atoms.artifact_state import (
+from lca.contracts.atoms.artifact.artifact_state import (
     LEGAL_TRANSITIONS,
     ArtifactState,
     all_states,
     is_legal_transition,
     parse_artifact_state,
 )
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.journal.artifact import (
     ArtifactController,
     CapabilityArtifact,

@@ -31,7 +31,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.harness.profile.boot import boot_entries, boot_profile, load_profile_entries
+from lca.harness.profile.boot.boot import boot_entries, boot_profile, load_profile_entries
 
 _ROOT = Path(__file__).resolve().parent.parent
 _PLUGINS_DIR = _ROOT / "lca" / "plugins"
@@ -193,7 +193,7 @@ def test_factory_registry_seams() -> None:
     """Factory seams are FactoryRegistry; contributors fill named entries."""
     import asyncio
 
-    from lca.contracts.mechanisms.factory_registry import FactoryRegistry
+    from lca.contracts.mechanisms.factory.factory_registry import FactoryRegistry
 
     ctx = asyncio.run(boot_profile(DEFAULT_PROFILE))
     for key in _REGISTRY_SEAMS:
@@ -210,7 +210,7 @@ def test_factory_registry_seams() -> None:
 
 
 def test_factory_registry_duplicate_register_fails() -> None:
-    from lca.contracts.mechanisms.factory_registry import FactoryRegistry
+    from lca.contracts.mechanisms.factory.factory_registry import FactoryRegistry
 
     reg = FactoryRegistry("bodies")
     reg.register("simple", object)
@@ -222,7 +222,7 @@ def test_require_capability_has_no_seam_path() -> None:
     """``seam:`` Path-2 is gone — missing plain key fails immediately."""
     import asyncio
 
-    from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
+    from lca.contracts.mechanisms.capability.capability import MissingCapabilityError, require_capability
 
     ctx = asyncio.run(boot_profile(DEFAULT_PROFILE))
     with pytest.raises(MissingCapabilityError, match="no_such_capability"):
@@ -239,7 +239,7 @@ def test_boot_fails_when_seam_provider_missing() -> None:
     import tempfile
     from pathlib import Path
 
-    from lca.harness.profile.resolve import ProfileResolveError, resolve_profile
+    from lca.harness.profile.resolve.resolve import ProfileResolveError, resolve_profile
 
     with tempfile.TemporaryDirectory() as tmp:
         profile = Path(tmp) / "no-memory.yaml"
@@ -257,7 +257,7 @@ def test_boot_fails_when_seam_provider_missing() -> None:
     # Programmatic entries retain their fixture role: after the Manifest graph
     # resolves, an omitted runtime provider remains observable as a missing
     # capability instead of being replaced by a module-level fallback.
-    from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
+    from lca.contracts.mechanisms.capability.capability import MissingCapabilityError, require_capability
 
     entries = load_profile_entries(DEFAULT_PROFILE)
     dropped = {"lca-memory-service", "lca-memory-provider"}

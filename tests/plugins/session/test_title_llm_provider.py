@@ -19,8 +19,8 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from lca.contracts.models.core.llm import LLMResponse
-from lca.plugins.session.runtime.store import SessionStore
+from lca.contracts.models.core.conversation.llm import LLMResponse
+from lca.plugins.session.runtime.store.store import SessionStore
 from lca.plugins.session.title_llm_provider.title_llm_provider import (
     PROVIDER_ID,
     Config,

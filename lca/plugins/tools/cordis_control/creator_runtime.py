@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from lca.contracts.atoms.artifact_state import ArtifactState
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.artifact.artifact_state import ArtifactState
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.journal.artifact import (
     capability_artifact_to_dict,
     make_capability_artifact,
     migrate_to_verified,
 )
-from lca.contracts.models.observability.diagnostic import DiagnosticCategory, DiagnosticStatus
-from lca.contracts.models.observability.journal import PluginAuthored, PluginInspected
+from lca.contracts.models.observability.diagnostic.diagnostic import DiagnosticCategory, DiagnosticStatus
+from lca.contracts.models.observability.journal.journal import PluginAuthored, PluginInspected
 from lca.infrastructure.observability import record, record_runtime
 from lca.plugins.tools.cordis_control.creator_artifacts import (
     AuthoredPlugin,

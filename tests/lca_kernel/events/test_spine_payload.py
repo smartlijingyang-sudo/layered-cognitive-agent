@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca_kernel.events.payloads import (
+from lca_kernel.events.payloads.payloads import (
     SPINE_EXECUTION_POINTS,
     Category,
     SpineEventPayload,
@@ -52,7 +52,7 @@ def test_category_mapping_for_pilot_ep() -> None:
 
 def test_all_spine_execution_points_have_category_mapping() -> None:
     """SPINE_EXECUTION_POINTS 闭集内每个 EP 都必须登记 category 映射。"""
-    from lca_kernel.events.payloads_spine import _SPINE_EP_TO_CATEGORY
+    from lca_kernel.events.payloads.payloads_spine import _SPINE_EP_TO_CATEGORY
 
     missing = sorted(ep for ep in SPINE_EXECUTION_POINTS if ep not in _SPINE_EP_TO_CATEGORY)
     assert missing == [], f"missing _SPINE_EP_TO_CATEGORY entries: {missing}"

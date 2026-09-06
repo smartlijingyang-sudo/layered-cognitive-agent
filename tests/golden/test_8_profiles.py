@@ -32,7 +32,7 @@ from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.composition.plan_compiler import (
     compile_plan as compile_plan_factory,
 )
-from lca.harness.profile.resolve import resolve_profile
+from lca.harness.profile.resolve.resolve import resolve_profile
 
 GOLDEN_PROFILES_DIR = Path("tests/golden/profiles")
 

@@ -27,9 +27,9 @@ from lca.contracts.observability import (
     ExceptionRecord,
     exc_to_record,
 )
-from lca.infrastructure.observability.spine.event_record import EventRecord
-from lca.infrastructure.observability.spine.event_spine import EventSpine
-from lca.infrastructure.observability.spine.exception_emit import (
+from lca.infrastructure.observability.spine.event.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.event_spine import EventSpine
+from lca.infrastructure.observability.spine.exception.exception_emit import (
     emit_exception_caught,
 )
 from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
@@ -202,7 +202,7 @@ def test_emit_exception_caught_has_single_definition() -> None:
 
 def test_emit_exception_caught_writes_sidecar_for_any_exception(tmp_path: Path) -> None:
     """任何异常事件 payload size > 4 KiB → FileSink 自动 offload → sidecar 必有。"""
-    from lca.harness.declarative.compile.instrument_wrap import (
+    from lca.harness.declarative.compile.instrument.instrument_wrap import (
         set_active_spine_accessor,
     )
 
@@ -276,7 +276,7 @@ def test_emit_exception_caught_small_message_still_offloads_due_to_call_frames(
     tmp_path: Path,
 ) -> None:
     """即使 exception_message 短,call_frames + traceback_text 也让 payload 超 4 KiB。"""
-    from lca.harness.declarative.compile.instrument_wrap import (
+    from lca.harness.declarative.compile.instrument.instrument_wrap import (
         set_active_spine_accessor,
     )
 
@@ -309,7 +309,7 @@ def test_emit_exception_caught_small_message_still_offloads_due_to_call_frames(
 
 def test_instrument_wrap_exception_payload_uses_ssot() -> None:
     """装饰器 ``_exception_payload`` 必须返回 ``exc_to_record(...).asdict()``。"""
-    from lca.harness.declarative.compile.instrument_wrap import _exception_payload
+    from lca.harness.declarative.compile.instrument.instrument_wrap import _exception_payload
 
     try:
         raise KeyError("wrap path")
@@ -367,7 +367,7 @@ def test_classify_exception_business_builtin_maps_to_internal() -> None:
     这部分异常在本仓出现意味着 LCA 代码的意外,不是外部网络/取消/SANDBOX,
     应走 triage 路径(读 traceback 而非 retry)。
     """
-    from lca.contracts.observability.exception_capture import classify_exception
+    from lca.contracts.observability.trace.exception_capture import classify_exception
 
     assert classify_exception(ValueError("x")) is ErrKind.INTERNAL
     assert classify_exception(KeyError("k")) is ErrKind.INTERNAL
@@ -377,7 +377,7 @@ def test_classify_exception_business_builtin_maps_to_internal() -> None:
 def test_classify_exception_unknown_when_no_signal() -> None:
     """非 builtin / 非已知名 = UNKNOWN 兜底。"""
 
-    from lca.contracts.observability.exception_capture import classify_exception
+    from lca.contracts.observability.trace.exception_capture import classify_exception
 
     class _Unknown(BaseException):
         pass
@@ -444,7 +444,7 @@ def test_lifecycle_path_emit_includes_err_kind(tmp_path: Path) -> None:
     err_kind 仍以 JSON 行(主 ledger 或 offload)记录。本测试用 call_stack
     触发一个 frame 充足的 ValueError,这样 file_sink 必然 offload 到 sidecar。
     """
-    from lca.harness.declarative.compile.instrument_wrap import (
+    from lca.harness.declarative.compile.instrument.instrument_wrap import (
         set_active_spine_accessor,
     )
 

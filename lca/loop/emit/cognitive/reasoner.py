@@ -6,10 +6,10 @@ Think pipeline calls this seam so ``PromptReasoner`` stays pure; infrastructure
 
 from __future__ import annotations
 
-from lca.contracts.models.core.llm import LLMResponse
-from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.core.conversation.llm import LLMResponse
+from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import Reasoner
-from lca.infrastructure.session.cognitive_emit import (
+from lca.infrastructure.session.emit.cognitive_emit import (
     run_reasoner_generate_thoughts_with_spine_facts,
 )
 

@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from lca.contracts.protocols.session.telemetry import SharingPolicy, TelemetryRecord
-from lca.plugins.session.runtime.fork import fork_session
+from lca.contracts.protocols.session.telemetry.telemetry import SharingPolicy, TelemetryRecord
+from lca.plugins.session.runtime.fork.fork import fork_session
 from lca.session.append import Session
-from lca.plugins.session.runtime.store import SessionStore
+from lca.plugins.session.runtime.store.store import SessionStore
 from lca.plugins.session.telemetry_capture.telemetry_capture import (
     SessionTelemetryCapture,
     _seed_telemetry_cursor,
 )
-from lca_kernel.events.fold import SURFACE_USER_TYPE
+from lca_kernel.events.fold.fold import SURFACE_USER_TYPE
 
 
 class _CollectBackend:

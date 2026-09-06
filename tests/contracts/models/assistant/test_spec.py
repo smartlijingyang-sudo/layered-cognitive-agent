@@ -12,8 +12,8 @@ from dataclasses import FrozenInstanceError, dataclass, replace
 import pytest
 
 from lca.contracts.models.assistant.spec import AssistantBootstrapRefs, AssistantSpec
-from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.protocols.journal.spec import AgentSpec
+from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.protocols.journal.spec.spec import AgentSpec
 
 # ── helpers ────────────────────────────────────────────────
 

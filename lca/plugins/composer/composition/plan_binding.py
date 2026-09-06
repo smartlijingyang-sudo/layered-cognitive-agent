@@ -5,15 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from lca.contracts.atoms.enums import ActionScope
+from lca.contracts.atoms.enums.enums import ActionScope
 from lca.contracts.harness.composition.composer import (
     AgentCompositionRequest,
     AgentGraphComposer,
     TeamGraphComposer,
 )
-from lca.harness.declarative.compile.authority import action_authority_for_scope
+from lca.harness.declarative.compile.authority.authority import action_authority_for_scope
 from lca.harness.plan import compiled_run_plan_ref
-from lca.harness.profile.boot_products import compiled_plan_from_scope
+from lca.harness.profile.boot.boot_products import compiled_plan_from_scope
 from lca.plugins.composer.composition.capability_resolution import (
     CapabilityResolutionError,
     ScopeCapabilityResolver,
@@ -24,8 +24,8 @@ if TYPE_CHECKING:
 
     from lca.contracts.harness.composition.composer import AgentGraph, TeamGraph
     from lca.contracts.protocols import DecisionGate, SharedMemoryStore
-    from lca.contracts.protocols.journal.spec import AgentSpec, TeamSpec
-    from lca.contracts.protocols.runtime.infra import AgentTransport
+    from lca.contracts.protocols.journal.spec.spec import AgentSpec, TeamSpec
+    from lca.contracts.protocols.runtime.infra.infra import AgentTransport
     from lca.contracts.protocols.state.plan import CompiledRunPlan
 
 

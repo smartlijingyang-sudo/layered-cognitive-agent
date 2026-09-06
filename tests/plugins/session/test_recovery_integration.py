@@ -72,7 +72,7 @@ def test_bind_run_emits_session_created() -> None:
         bind_run_event_session_from_store,
         unbind_run_event_session,
     )
-    from lca.plugins.session.runtime.store import SessionStore
+    from lca.plugins.session.runtime.store.store import SessionStore
 
     store = SessionStore()
     bound = bind_run_event_session_from_store(

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from lca.infrastructure.cli.service import http_ready
+from lca.infrastructure.cli.service.service import http_ready
 
 
 def _curl_result(*, code: str, returncode: int = 0) -> MagicMock:

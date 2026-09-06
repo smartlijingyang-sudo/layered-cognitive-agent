@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.models.core.decision import Observation
-from lca.contracts.models.core.result import ApprovalPendingError
-from lca.contracts.models.core.tool import ToolApi, ToolManifest, ToolMeta
+from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.models.core.execution.result import ApprovalPendingError
+from lca.contracts.models.core.execution.tool import ToolApi, ToolManifest, ToolMeta
 from lca.contracts.protocols import Tool
-from lca.infrastructure.tools.builder import build_tools_from_manifest
+from lca.infrastructure.tools.builder.builder import build_tools_from_manifest
 
 IDENTIFIER = "lobe-user-interaction"
 _MAX_QUESTIONS = 4

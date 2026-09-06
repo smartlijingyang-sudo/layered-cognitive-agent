@@ -7,10 +7,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from lca.infrastructure.computer.constants import COMPUTER_RESULT_BEGIN, COMPUTER_RESULT_END
-from lca.infrastructure.computer.parse_result import parse_computer_stdout
-from lca.infrastructure.file_store import LocalFileStore
-from lca.infrastructure.tools.default_set import build_default_tools
+from lca.infrastructure.computer.constants.constants import COMPUTER_RESULT_BEGIN, COMPUTER_RESULT_END
+from lca.infrastructure.computer.parse.parse_result import parse_computer_stdout
+from lca.infrastructure.file.file_store import LocalFileStore
+from lca.infrastructure.tools.default.default_set import build_default_tools
 from lca.infrastructure.tools.lca_computer import (
     build_computer_tools,
     build_machine_computer_tools,
@@ -60,7 +60,7 @@ class TestCloudSandboxWire(unittest.TestCase):
     def test_machine_tools_exclude_sandbox_only(self) -> None:
         from unittest.mock import MagicMock
 
-        from lca.contracts.models.core.plane import PlaneKind, PlaneRef
+        from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
 
         plane = PlaneRef(
             id="dev-1",
@@ -112,7 +112,7 @@ class TestDefaultToolsComputer(unittest.TestCase):
     def test_both_available_without_extra_has_no_local_face(self) -> None:
         from unittest.mock import patch
 
-        from lca.contracts.models.core.plane import PlaneKind, PlaneRef
+        from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
 
         machine = PlaneRef(
             id="dev-1",
@@ -141,9 +141,9 @@ class TestBuildComputerObservationFiles(unittest.TestCase):
         import tempfile
         from pathlib import Path
 
-        from lca.contracts.models.core.sandbox import SandboxFile
-        from lca.infrastructure.computer.runtime import ComputerOpResult
-        from lca.infrastructure.file_store import LocalFileStore
+        from lca.contracts.models.core.execution.sandbox import SandboxFile
+        from lca.infrastructure.computer.runtime.runtime import ComputerOpResult
+        from lca.infrastructure.file.file_store import LocalFileStore
         from lca.infrastructure.tools.lca_computer.observations import build_computer_observation
 
         result = ComputerOpResult(
@@ -180,9 +180,9 @@ class TestBuildComputerObservationFiles(unittest.TestCase):
         import tempfile
         from pathlib import Path
 
-        from lca.contracts.models.core.sandbox import SandboxFile
-        from lca.infrastructure.computer.runtime import ComputerOpResult
-        from lca.infrastructure.file_store import LocalFileStore
+        from lca.contracts.models.core.execution.sandbox import SandboxFile
+        from lca.infrastructure.computer.runtime.runtime import ComputerOpResult
+        from lca.infrastructure.file.file_store import LocalFileStore
         from lca.infrastructure.tools.lca_computer.observations import build_computer_observation
 
         existing = {
@@ -215,8 +215,8 @@ class TestBuildComputerObservationFiles(unittest.TestCase):
         import tempfile
         from pathlib import Path
 
-        from lca.infrastructure.computer.runtime import ComputerOpResult
-        from lca.infrastructure.file_store import LocalFileStore
+        from lca.infrastructure.computer.runtime.runtime import ComputerOpResult
+        from lca.infrastructure.file.file_store import LocalFileStore
         from lca.infrastructure.tools.lca_computer.observations import build_computer_observation
         from lca.infrastructure.workspace.scope import run_workspace_scope
 
@@ -250,8 +250,8 @@ class TestBuildComputerObservationFiles(unittest.TestCase):
         import tempfile
         from pathlib import Path
 
-        from lca.infrastructure.computer.runtime import ComputerOpResult
-        from lca.infrastructure.file_store import LocalFileStore
+        from lca.infrastructure.computer.runtime.runtime import ComputerOpResult
+        from lca.infrastructure.file.file_store import LocalFileStore
         from lca.infrastructure.tools.lca_computer.observations import build_computer_observation
 
         result = ComputerOpResult(

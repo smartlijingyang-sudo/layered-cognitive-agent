@@ -102,11 +102,11 @@ def test_append_diagnostic_noop() -> None:
 
 def test_cognitive_emit_gate_decided_returns_append_receipt() -> None:
     from lca.contracts.harness.fold.perceive import fold_gate_decisions_from_events
-    from lca.contracts.models.core.budget import create_budget
-    from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
-    from lca.contracts.models.core.state import AgentState
+    from lca.contracts.models.core.policy.budget import create_budget
+    from lca.contracts.models.core.policy.gate_policy import GateDecided, PolicyFact
+    from lca.contracts.models.core.state.state import AgentState
     from lca.contracts.protocols.loop.fact_gateway import AppendReceipt
-    from lca.infrastructure.session.cognitive_emit import emit_gate_decided_from_policy
+    from lca.infrastructure.session.emit.cognitive_emit import emit_gate_decided_from_policy
 
     session = Session("gate_gateway")
     state = AgentState(
@@ -143,10 +143,10 @@ def test_cognitive_emit_gate_decided_returns_append_receipt() -> None:
 
 
 def test_cognitive_emit_gate_decided_noop_when_unbound() -> None:
-    from lca.contracts.models.core.budget import create_budget
-    from lca.contracts.models.core.gate_policy import GateDecided
-    from lca.contracts.models.core.state import AgentState
-    from lca.infrastructure.session.cognitive_emit import emit_gate_decided_from_policy
+    from lca.contracts.models.core.policy.budget import create_budget
+    from lca.contracts.models.core.policy.gate_policy import GateDecided
+    from lca.contracts.models.core.state.state import AgentState
+    from lca.infrastructure.session.emit.cognitive_emit import emit_gate_decided_from_policy
 
     state = AgentState(
         trace_id="trace:cognitive-emit-loop",
@@ -170,9 +170,9 @@ def test_cognitive_emit_gate_decided_noop_when_unbound() -> None:
 
 def test_cognitive_emit_context_manifested_via_gateway() -> None:
     from lca.contracts.harness.fold.perceive import fold_context_manifest_from_events
-    from lca.contracts.models.core.perception import ContextItem, ContextManifest
+    from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
     from lca.contracts.protocols.loop.fact_gateway import AppendReceipt
-    from lca.infrastructure.session.cognitive_emit import emit_context_manifested
+    from lca.infrastructure.session.emit.cognitive_emit import emit_context_manifested
 
     session = Session("manifest_gateway")
     manifest = ContextManifest(
@@ -200,10 +200,10 @@ def test_cognitive_emit_context_manifested_via_gateway() -> None:
 
 
 def test_cognitive_emit_context_manifested_for_state_uses_bound_session() -> None:
-    from lca.contracts.models.core.budget import create_budget
-    from lca.contracts.models.core.perception import ContextManifest
-    from lca.contracts.models.core.state import AgentState
-    from lca.infrastructure.session.cognitive_emit import emit_context_manifested_for_state
+    from lca.contracts.models.core.policy.budget import create_budget
+    from lca.contracts.models.core.perceive.perception import ContextManifest
+    from lca.contracts.models.core.state.state import AgentState
+    from lca.infrastructure.session.emit.cognitive_emit import emit_context_manifested_for_state
 
     session = Session("manifest_bound")
     token = set_publish_session(session)

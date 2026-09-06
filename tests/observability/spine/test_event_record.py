@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from lca.infrastructure.observability.spine.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.event_record import EventRecord
 
 
 def _rec(**overrides):

@@ -29,19 +29,19 @@ from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Any
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     JournalEvent,
     JournalRecord,
     RunScope,
     StampedEvent,
 )
-from lca.contracts.models.observability.journal_catalog import (
+from lca.contracts.models.observability.journal.journal_catalog import (
     JOURNAL_EVENT_CLASSES,
 )
 from lca.infrastructure.observability.journal.engine.serialization import (
     stamped_to_journal_record,
 )
-from lca.plugins.journal.journal_schema_v2_provider import EnvelopeV2Schema
+from lca.plugins.journal.journal.journal_schema_v2_provider import EnvelopeV2Schema
 
 _DEFAULT_SCHEMA = EnvelopeV2Schema()
 
@@ -261,7 +261,7 @@ def record_to_stamped(
       ``*_preview`` / ``plugin_state``(ADR-0065 §四 旧 schema),``record_to_stamped``
       按 ``dataclasses.fields()`` 过滤未知键以保持前向兼容。
     """
-    from lca.contracts.observability.evidence import EvidenceRef as _EvidenceRef
+    from lca.contracts.observability.evidence.evidence import EvidenceRef as _EvidenceRef
 
     normalized = record_normalize(record)
     if normalized.get("schema") != V2_SCHEMA:

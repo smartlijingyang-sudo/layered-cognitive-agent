@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from lca.session.append import Session
 from lca.plugins.session.session_turn_control.session_turn_control import TurnControlUnit
-from lca_kernel.events.session import SessionEvent
+from lca_kernel.events.session.session import SessionEvent
 
 
 def _event(seq: int, event_type: str, data: dict) -> SessionEvent:

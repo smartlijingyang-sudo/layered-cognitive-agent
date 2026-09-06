@@ -4,19 +4,19 @@ from __future__ import annotations
 
 import unittest
 
-from lca.contracts.atoms.ids import RunId, TraceId
-from lca.contracts.models.observability.journal import RunScope
-from lca.infrastructure.observability.facade.run_context import (
+from lca.contracts.atoms.ids.ids import RunId, TraceId
+from lca.contracts.models.observability.journal.journal import RunScope
+from lca.infrastructure.observability.facade.run.run_context import (
     TEAM_CONTAINER_ROLE,
     adopt_run_scope,
     run_scope,
 )
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
-from lca.plugins.transport.webserver.read.runs.identity import (
+from lca.plugins.transport.webserver.read.runs.identity.identity import (
     default_agent_ref,
     parse_agent_ref,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.session import (
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
     RunRegistry,
     RunSession,
     RunStatus,

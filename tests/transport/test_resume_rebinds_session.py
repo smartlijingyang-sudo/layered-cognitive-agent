@@ -23,12 +23,12 @@ from lca.plugins.events.publishers._session_publish import (
     set_publish_session,
 )
 from lca.session.append import Session
-from lca.plugins.transport.webserver.handlers.runs.session.event_session import (
+from lca.plugins.transport.webserver.handlers.runs.session.event.event_session import (
     BoundRunEventSession,
     RunEventSessionBridge,
 )
-from lca.contracts.observability.status import RunLifecycleStatus
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
+from lca.contracts.observability.registry.status import RunLifecycleStatus
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
 from lca.plugins.transport.webserver.handlers.runs.terminal import registry_commands
 
 

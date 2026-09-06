@@ -12,8 +12,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from lca.contracts.models.core.perception import ContextItem
-from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.core.perceive.perception import ContextItem
+from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import Sensor
 
 

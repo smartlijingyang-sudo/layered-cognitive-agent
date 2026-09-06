@@ -6,8 +6,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from lca.contracts.atoms.enums import StreamChannel
-from lca.infrastructure.file_store import LocalFileStore
+from lca.contracts.atoms.enums.enums import StreamChannel
+from lca.infrastructure.file.file_store import LocalFileStore
 from lca.plugins.transport.webserver.handlers.runs.ingest import (
     FileRef,
     HttpxFileFetcher,
@@ -19,7 +19,7 @@ from lca.plugins.transport.webserver.handlers.runs.ingest import (
     reset_ingest_cache_for_tests,
     select_ingest_files,
 )
-from lca.plugins.transport.webserver.handlers.runs.ingest.ingress import (
+from lca.plugins.transport.webserver.handlers.runs.ingest.ingress.ingress import (
     compose_run_question,
     parse_messages,
     prepare_run_from_messages,
@@ -313,7 +313,7 @@ class TestLiveTailKeepsEveryChannel(unittest.TestCase):
     """LiveTail does not filter. Decision vs answer is Transport's ignore table."""
 
     def test_both_channels_stay_on_the_tail(self) -> None:
-        from lca.contracts.models.observability.journal import RunScope, StampedEvent, StepTextDelta
+        from lca.contracts.models.observability.journal.journal import RunScope, StampedEvent, StepTextDelta
         from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 
         tail = LiveTail()

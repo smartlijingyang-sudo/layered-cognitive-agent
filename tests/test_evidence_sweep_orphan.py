@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lca.contracts.observability.evidence import (
+from lca.contracts.observability.evidence.evidence import (
     Classification,
     RetentionClass,
 )

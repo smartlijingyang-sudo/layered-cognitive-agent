@@ -5,42 +5,42 @@ from __future__ import annotations
 import pytest
 from cordis import Context
 
-from lca.application.api import Agent, Team, ensure_default_ctx
-from lca.cognition.body.action_registry import ActionRegistry
-from lca.cognition.body.safe_executor import SimpleSafeExecutor
-from lca.cognition.body.simple_body import SimpleBody
-from lca.cognition.body.tool_registry import SimpleToolRegistry
-from lca.cognition.brain.critic import SimpleCritic
-from lca.cognition.brain.modular_brain import ModularBrain
+from lca.application.api.api import Agent, Team, ensure_default_ctx
+from lca.cognition.body.actions.action_registry import ActionRegistry
+from lca.cognition.body.executor.safe_executor import SimpleSafeExecutor
+from lca.cognition.body.executor.simple_body import SimpleBody
+from lca.cognition.body.tools.tool_registry import SimpleToolRegistry
+from lca.cognition.brain.reasoner.critic import SimpleCritic
+from lca.cognition.brain.pipeline.modular_brain import ModularBrain
 from lca.cognition.brain.prompts import load_builtin_prompt
-from lca.cognition.brain.reasoner import PromptReasoner
-from lca.cognition.brain.skill_router import StaticSkillRouter
-from lca.cognition.brain.hook_registry import CordisHookRegistry
-from lca.contracts.atoms.enums import ActionType, LLMStreamEventType, ReflectionVerdict
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.models.core.decision import Decision, Observation, Reflection
-from lca.contracts.models.core.lifecycle import AgentCard, TaskStatus
-from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
-from lca.contracts.models.core.result import UnregisteredActionError
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.models.team.team_coordination import Debate
+from lca.cognition.brain.reasoner.reasoner import PromptReasoner
+from lca.cognition.brain.prompt.skill_router import StaticSkillRouter
+from lca.cognition.brain.gate.hook_registry import CordisHookRegistry
+from lca.contracts.atoms.enums.enums import ActionType, LLMStreamEventType, ReflectionVerdict
+from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
+from lca.contracts.models.core.state.lifecycle import AgentCard, TaskStatus
+from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
+from lca.contracts.models.core.execution.result import UnregisteredActionError
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.team.team_coordination import Debate
 from lca.contracts.protocols import LLMAdapter
-from lca.contracts.protocols.act.action import ActionRegistryProtocol
-from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseInput, PhaseResult
+from lca.contracts.protocols.act.action.action import ActionRegistryProtocol
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseInput, PhaseResult
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.harness.composition.plan_compiler import compile_plan
-from lca.harness.profile.resolve import resolve_profile
+from lca.harness.profile.resolve.resolve import resolve_profile
 from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
 from lca.infrastructure.transport.transport_registry import TransportRegistry
-from lca.plugins.composer.runtime.runtime_factory import (
+from lca.plugins.composer.runtime.runtime.runtime_factory import (
     NullPerceiveHub,
     RuntimeDeps,
     build_fixture_cognitive_runtime,
 )
-from lca.plugins.phase_graph.stop_policy import DefaultStopPolicy
+from lca.plugins.phase_graph.stop.stop_policy import DefaultStopPolicy
 from lca.plugins.gate.decision_classifier_provider import DefaultDecisionClassifier
-from lca.plugins.journal.artifact_closure_provider import DefaultArtifactClosure
+from lca.plugins.journal.artifact.artifact_closure_provider import DefaultArtifactClosure
 from lca.plugins.loop.reducer.plugin import DefaultReducer
 from tests.phase_executors import standard_phase_executors
 
@@ -51,8 +51,8 @@ def _state() -> AgentState:
 
 class TestLifecycleTwins:
     def test_single_agent_card_definition(self) -> None:
-        import lca.contracts.models.core.decision as decision_mod
-        import lca.contracts.models.core.lifecycle as life_mod
+        import lca.contracts.models.core.execution.decision as decision_mod
+        import lca.contracts.models.core.state.state.lifecycle as life_mod
 
         assert decision_mod.AgentCard is life_mod.AgentCard
         assert not hasattr(decision_mod, "TaskStatus")
@@ -262,6 +262,6 @@ class TestActionRegistryProtocolImport:
         assert isinstance(ActionRegistry(), ActionRegistryProtocol)
 
     def test_no_pass_through_builder_in_handlers(self) -> None:
-        import lca.cognition.body.action_handlers as ah
+        import lca.cognition.body.actions.action_handlers as ah
 
         assert not hasattr(ah, "build_default_action_registry")

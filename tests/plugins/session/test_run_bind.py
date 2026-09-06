@@ -15,10 +15,10 @@ from lca.session.lifecycle.bind import (
     bind_run_event_session_from_store,
     unbind_run_event_session,
 )
-from lca.plugins.session.runtime.store import SessionStore
-from lca_kernel.events.bus import EventBus
-from lca_kernel.events.errors import MissingPublishSessionError
-from lca_kernel.events.test_catalog import build_test_bus
+from lca.plugins.session.runtime.store.store import SessionStore
+from lca_kernel.events.bus.bus import EventBus
+from lca_kernel.events.errors.errors import MissingPublishSessionError
+from lca_kernel.events.test.test_catalog import build_test_bus
 
 
 @pytest.fixture
@@ -30,7 +30,7 @@ def bus() -> EventBus:
 
 
 def _payload() -> Any:
-    from lca_kernel.events.payloads import Category, SpineEventPayload
+    from lca_kernel.events.payloads.payloads import Category, SpineEventPayload
 
     return SpineEventPayload(
         category=Category("spine.cognition.brain.perceive.start"),

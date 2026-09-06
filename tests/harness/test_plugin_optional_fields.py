@@ -10,16 +10,16 @@ from __future__ import annotations
 import pytest
 from pydantic import BaseModel
 
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     PluginContract,
     PluginIdentity,
 )
 from lca.contracts.protocols.composition.logic_address import LogicAddress
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     ContributionRole,
     PhaseContribution,
     SemanticPhase,
@@ -268,7 +268,7 @@ class TestRelationsMustBeIterable:
 class TestDeclarativeControlProjection:
     def test_default_profile_projects_every_executable_control_from_native_specs(self) -> None:
         from lca.harness.composition.plan_compiler import compile_plan
-        from lca.harness.profile.resolve import resolve_profile
+        from lca.harness.profile.resolve.resolve import resolve_profile
 
         plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))
         entries = plan.control_entries

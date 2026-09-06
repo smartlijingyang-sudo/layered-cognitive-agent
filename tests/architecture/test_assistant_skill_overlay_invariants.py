@@ -81,8 +81,8 @@ class TestWritePathConstrainedToHomeSkills:
         """动态:HOME 重定向后,本地源安装不在 ``$HOME/.lca/skills`` 落任何文件。"""
         from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
         from lca.contracts.protocols.assistant.skill_overlay import SkillSource
-        from lca.plugins.assistant.catalog import AssistantCatalogImpl
-        from lca.plugins.assistant.skill_overlay import AssistantSkillOverlayImpl
+        from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
+        from lca.plugins.assistant.skill.skill_overlay import AssistantSkillOverlayImpl
 
         fake_home = tmp_path / "fake-home"
         fake_home.mkdir()
@@ -115,8 +115,8 @@ class TestUnverifiedPackageCannotActivate:
     async def test_manually_drafted_package_rejected(self, tmp_path: Path) -> None:
         from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
         from lca.contracts.protocols.assistant.skill_overlay import SkillNotVerified
-        from lca.plugins.assistant.catalog import AssistantCatalogImpl
-        from lca.plugins.assistant.skill_overlay import AssistantSkillOverlayImpl
+        from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
+        from lca.plugins.assistant.skill.skill_overlay import AssistantSkillOverlayImpl
 
         catalog = AssistantCatalogImpl(root=tmp_path / "assistants")
         overlay = AssistantSkillOverlayImpl(catalog=catalog)
@@ -129,7 +129,7 @@ class TestUnverifiedPackageCannotActivate:
             overlay.activate(handle.assistant_id, "rogue")
 
     def test_activate_state_allowlist_is_closed(self) -> None:
-        from lca.plugins.assistant.skill_overlay import _ACTIVATABLE_STATES
+        from lca.plugins.assistant.skill.skill_overlay import _ACTIVATABLE_STATES
 
         assert frozenset({"verified", "active"}) == _ACTIVATABLE_STATES
 
@@ -140,15 +140,15 @@ class TestUnverifiedPackageCannotActivate:
 class TestEPClosureForInstallAndActivate:
     @pytest.mark.asyncio
     async def test_install_and_activate_eps_carry_required_fields(self, tmp_path: Path) -> None:
-        from lca.contracts.observability.assistant_ep_closure import (
+        from lca.contracts.observability.closure.assistant_ep_closure import (
             ASSISTANT_REQUIRED_FIELDS,
             ASSISTANT_SKILL_ACTIVATED,
             ASSISTANT_SKILL_INSTALLED,
         )
         from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
         from lca.contracts.protocols.assistant.skill_overlay import SkillSource
-        from lca.plugins.assistant.catalog import AssistantCatalogImpl
-        from lca.plugins.assistant.skill_overlay import AssistantSkillOverlayImpl
+        from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
+        from lca.plugins.assistant.skill.skill_overlay import AssistantSkillOverlayImpl
 
         emitted: list[tuple[str, dict[str, Any]]] = []
 
@@ -175,12 +175,12 @@ class TestEPClosureForInstallAndActivate:
                 assert field_name in by_ep[ep], f"{ep} payload 缺 {field_name}"
 
     def test_plugin_ownership_declares_both_eps(self) -> None:
-        from lca.contracts.observability.assistant_ep_closure import (
+        from lca.contracts.observability.closure.assistant_ep_closure import (
             ASSISTANT_SKILL_ACTIVATED,
             ASSISTANT_SKILL_INSTALLED,
         )
         from lca.harness.plugin_api import definition_from_plugin
-        from lca.plugins.assistant.skill_overlay import setup
+        from lca.plugins.assistant.skill.skill_overlay import setup
 
         definition = definition_from_plugin(setup)
         assert definition.ownership is not None
@@ -190,7 +190,7 @@ class TestEPClosureForInstallAndActivate:
     def test_ep_emission_limited_to_two_skill_eps(self) -> None:
         """PR-6 只允许发 ``assistant.skill.installed`` + ``assistant.skill.activated``。"""
         from lca.harness.plugin_api import definition_from_plugin
-        from lca.plugins.assistant.skill_overlay import setup
+        from lca.plugins.assistant.skill.skill_overlay import setup
 
         definition = definition_from_plugin(setup)
         assert definition.ownership is not None

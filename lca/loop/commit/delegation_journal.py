@@ -1,18 +1,14 @@
-"""Delegation journal commit seam (ADR-0194 P1-16).
+"""Delegation cache-hit commit seam (ADR-0194 P1-16).
 
-Cognition prepares delegation cache-hit facts; loop layer commits via the bound
-Session publish path. Unbound session → no-op (tests / offline).
+Cognition prepares delegation cache-hit facts; loop layer commits via
+:class:`FactGateway` (``publish_ep_bound``). Unbound session → no-op.
 """
 
 from __future__ import annotations
 
-from lca.contracts.models.core.state import AgentState
-from lca.plugins.events.publishers._session_publish import (
-    current_publish_session,
-    publish_via_session,
-)
-from lca.plugins.events.publishers.delegation_cache.plugin import DelegationCachePlugin
-from lca_kernel.events import TeamDelegationCacheHit
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.protocols.loop.fact_gateway import AppendReceipt
+from lca.loop.fact_gateway import publish_ep_bound
 
 
 def commit_delegation_cache_hit(
@@ -21,18 +17,20 @@ def commit_delegation_cache_hit(
     subtask: str,
     step: int,
     state: AgentState | None = None,
-) -> None:
-    """Commit one ``team.delegation.cache_hit`` v2 fact; no-op when unbound."""
-    del state
-    if current_publish_session() is None:
-        return
-    publish_via_session(
-        TeamDelegationCacheHit(
-            callee_role=callee_role,
-            subtask=subtask,
-            step=step,
-        ),
-        producer=DelegationCachePlugin,
+    session: object | None = None,
+    actor: str = "delegation",
+) -> AppendReceipt | None:
+    """Commit one ``team.delegation.cache_hit`` spine fact; no-op when unbound."""
+    return publish_ep_bound(
+        "team.delegation.cache_hit",
+        {
+            "callee_role": callee_role,
+            "subtask": subtask,
+            "step": step,
+        },
+        state=state,
+        session=session,
+        actor=actor,
     )
 
 

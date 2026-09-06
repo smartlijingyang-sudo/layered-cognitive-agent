@@ -14,7 +14,7 @@ from dataclasses import asdict, is_dataclass
 from enum import Enum
 from typing import Any, cast
 
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     CognitivePhaseGraphPlan,
     PluginSpec,
     ValidationReport,

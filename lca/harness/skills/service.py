@@ -7,8 +7,8 @@ import json
 from dataclasses import asdict, dataclass
 from typing import Any, ClassVar
 
-from lca.contracts.atoms.enums import ContentType
-from lca.contracts.atoms.ids import new_id
+from lca.contracts.atoms.enums.enums import ContentType
+from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.harness.memory.events import (
     ContextInjected,
     SkillActivated,
@@ -23,8 +23,8 @@ from lca.contracts.harness.memory.skill import (
     SkillEventSink,
     SkillProvider,
 )
-from lca.contracts.models.core.budget import DEFAULT_TOOL_TIMEOUT_S
-from lca.contracts.models.core.decision import Observation
+from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
+from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.protocols import Tool
 from lca.contracts.protocols.memory.operational_skills import (
     SkillNotFoundError,

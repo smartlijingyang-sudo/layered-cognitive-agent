@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from lca.plugins.transport.webserver.router import RouteRegistry
+from lca.plugins.transport.webserver.router.router import RouteRegistry
 
 
 class _FakeRuntime:
@@ -40,7 +40,7 @@ async def test_routes_runs_sessions_register_8_routes() -> None:
     /runs/{run_id}/profile, /runs/{run_id}/evidence/{ref:path},
     /runs/{run_id}/cancel, /runs/{run_id}/answer
     """
-    from lca.plugins.transport.webserver.routes_runs_sessions import setup as plugin
+    from lca.plugins.transport.webserver.routes_2.routes_runs_sessions import setup as plugin
 
     router = RouteRegistry()
     ctx = _FakeCtx(router)
@@ -51,7 +51,7 @@ async def test_routes_runs_sessions_register_8_routes() -> None:
 
 @pytest.mark.asyncio
 async def test_routes_runs_sessions_paths_match_migration_baseline() -> None:
-    from lca.plugins.transport.webserver.routes_runs_sessions import setup as plugin
+    from lca.plugins.transport.webserver.routes_2.routes_runs_sessions import setup as plugin
 
     router = RouteRegistry()
     ctx = _FakeCtx(router)
@@ -72,7 +72,7 @@ async def test_routes_runs_sessions_paths_match_migration_baseline() -> None:
 
 @pytest.mark.asyncio
 async def test_routes_runs_sessions_effects_tracked() -> None:
-    from lca.plugins.transport.webserver.routes_runs_sessions import setup as plugin
+    from lca.plugins.transport.webserver.routes_2.routes_runs_sessions import setup as plugin
 
     router = RouteRegistry()
     ctx = _FakeCtx(router)
@@ -83,7 +83,7 @@ async def test_routes_runs_sessions_effects_tracked() -> None:
 
 def test_routes_runs_sessions_exposes_public_routes_constant() -> None:
     """``ROUTE_SPECS`` 是路径 catalog 的 SSOT,供测试/诊断直接 import。"""
-    from lca.plugins.transport.webserver.routes_runs_sessions import ROUTE_SPECS
+    from lca.plugins.transport.webserver.routes_2.routes_runs_sessions import ROUTE_SPECS
 
     assert isinstance(ROUTE_SPECS, tuple)
     paths = {spec.path for spec in ROUTE_SPECS}
@@ -93,7 +93,7 @@ def test_routes_runs_sessions_exposes_public_routes_constant() -> None:
 
 def test_run_request_carries_optional_assistant_id() -> None:
     """``RunRequest`` 携带可选 ``assistant_id`` 字段。"""
-    from lca.plugins.transport.webserver.handlers.runs.terminal.port import RunRequest
+    from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import RunRequest
 
     base = RunRequest(
         profile="web-standard",

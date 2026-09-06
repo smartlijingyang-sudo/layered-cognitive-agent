@@ -22,8 +22,8 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.protocols.act.command_envelope import RunDelta
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.protocols.act.command.command_envelope import RunDelta
 from lca.contracts.protocols.state.reducer import Reducer
 
 

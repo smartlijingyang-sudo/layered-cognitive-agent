@@ -5,13 +5,13 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.protocols.act.command_envelope import RunDelta, RunFact
-from lca.contracts.protocols.declarative.declarative_execution import (
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.protocols.act.command.command_envelope import RunDelta, RunFact
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     PhaseAttemptFailure,
     PhaseExecutionFailure,
 )
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     DeclarativeRunOutcome,
     DeclarativeValidationError,
     DeltaReducer,
@@ -23,9 +23,9 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     PhaseResult,
     SemanticPhase,
 )
-from lca.harness.declarative.compile.assembler import ExecutableNode
-from lca.harness.declarative.compile.phase_capabilities import normalize_phase_capabilities
-from lca.harness.declarative.compile.phase_execution_policy import execute_with_policy
+from lca.harness.declarative.compile.assembler.assembler import ExecutableNode
+from lca.harness.declarative.compile.phase.phase_capabilities import normalize_phase_capabilities
+from lca.harness.declarative.compile.phase.phase_execution_policy import execute_with_policy
 from lca.harness.declarative.controls.effect_receipt import adapt_effect_receipt
 from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
 from lca.harness.declarative.lifecycle.phase_observation import PhaseObserver, phase_state_snapshot

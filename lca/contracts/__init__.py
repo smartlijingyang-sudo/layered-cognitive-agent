@@ -16,10 +16,10 @@ from lca.contracts.mechanisms import (
     HookRegistry,
     NamedRegistryProtocol,
 )
-from lca.contracts.mechanisms.registries import Registries
-from lca.contracts.models.core.approval import ApprovalDecision, ApprovalRequest
-from lca.contracts.models.core.budget import create_budget
-from lca.contracts.models.core.decision import (
+from lca.contracts.mechanisms.registries.registries import Registries
+from lca.contracts.models.core.workspace.approval import ApprovalDecision, ApprovalRequest
+from lca.contracts.models.core.policy.budget import create_budget
+from lca.contracts.models.core.execution.decision import (
     Decision,
     DelegationSpec,
     Observation,
@@ -27,34 +27,34 @@ from lca.contracts.models.core.decision import (
     ToolCall,
     Turn,
 )
-from lca.contracts.models.core.lifecycle import AgentCard, TaskStatus, TeamMessage
-from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent, TokenUsage
-from lca.contracts.models.core.memory import MemoryRecord, MemoryRelationKind, MemoryTrust
-from lca.contracts.models.core.result import (
+from lca.contracts.models.core.state.lifecycle import AgentCard, TaskStatus, TeamMessage
+from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent, TokenUsage
+from lca.contracts.models.core.conversation.memory import MemoryRecord, MemoryRelationKind, MemoryTrust
+from lca.contracts.models.core.execution.result import (
     ApprovalPendingError,
     BudgetExceededError,
     Result,
     ToolExecutionError,
 )
-from lca.contracts.models.core.state import AgentState, Budget, StateSnapshot
-from lca.contracts.models.core.stop import StopDecision, StopReason
-from lca.contracts.models.team.delegation import DelegationResult, find_result
-from lca.contracts.models.team.graph import (
+from lca.contracts.models.core.state.state import AgentState, Budget, StateSnapshot
+from lca.contracts.models.core.policy.stop import StopDecision, StopReason
+from lca.contracts.models.team.delegation.delegation import DelegationResult, find_result
+from lca.contracts.models.team.graph.graph import (
     ExecutionGraph,
     GraphEdge,
     GraphNode,
     GraphValidationError,
 )
-from lca.contracts.models.team.member_status import MemberStatus
-from lca.contracts.models.team.role_team import (
+from lca.contracts.models.team.member.member_status import MemberStatus
+from lca.contracts.models.team.role.role_team import (
     CacheConfig,
     RetryPolicy,
     RoleProfile,
     ToolPermissionManifest,
 )
-from lca.contracts.models.team.run_context import RunContext
-from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
-from lca.contracts.models.team.team_coordination import (
+from lca.contracts.models.team.run.run_context import RunContext
+from lca.contracts.models.team.team.team_awareness import ConsultDuty, TeamAwareness
+from lca.contracts.models.team.team.team_coordination import (
     Debate,
     FanOut,
     Graph,
@@ -69,8 +69,8 @@ from lca.contracts.protocols import (
     StopPolicy,
     TransportRegistryProtocol,
 )
-from lca.contracts.protocols.act.action import Action, ActionRegistryProtocol
-from lca.contracts.protocols.journal.spec import (
+from lca.contracts.protocols.act.action.action import Action, ActionRegistryProtocol
+from lca.contracts.protocols.journal.spec.spec import (
     Governance,
     TeamSpec,
     strategy_key_for_governance,

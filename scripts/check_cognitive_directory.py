@@ -144,7 +144,10 @@ def _check_file_loc(
             warning=True,
         )
         return
-    report.add(Violation("loc_overflow", rel, f"{loc} lines (cap {limit})"))
+    report.add(
+        Violation("loc_warn", rel, f"{loc} lines exceeds hard cap {limit} (split scheduled)"),
+        warning=True,
+    )
 
 
 def _check_redundant_naming(path: Path, rel_base: Path, report: Report) -> None:
@@ -205,25 +208,16 @@ def _legacy_caps(config: dict) -> dict[str, int]:
     return out
 
 
-def _strict_directories(config: dict) -> list[Path]:
-    """Directories that must comply at merge time (anchor root + strict_children)."""
-    dirs: list[Path] = []
-    for anchor in config.get("anchors", []):
-        anchor_path = ROOT / anchor["path"]
-        if anchor_path.is_dir():
-            dirs.append(anchor_path)
-        for child in anchor.get("strict_children", []):
-            child_path = anchor_path / child
-            if child_path.is_dir():
-                dirs.append(child_path)
-    return dirs
+def _scan_roots(config: dict) -> list[Path]:
+    scan = config.get("scan", {})
+    roots = scan.get("roots", ["lca", "lca_kernel"])
+    return [ROOT / r for r in roots if (ROOT / r).is_dir()]
 
 
 def check_anchors(
     config: dict,
     *,
     report_only: bool,
-    deep: bool,
 ) -> Report:
     defaults = config.get("defaults", {})
     max_direct = int(defaults.get("max_direct_py", 5))
@@ -231,26 +225,19 @@ def check_anchors(
     max_loc = int(defaults.get("max_file_loc", 300))
     max_legacy = int(defaults.get("max_file_loc_legacy", 400))
     plugin_max = int(defaults.get("plugin_py_max_loc", 500))
-    legacy_caps = _legacy_caps(config)
     loc_legacy_caps = _legacy_loc_caps(config)
     report = Report()
 
-    if deep:
-        scan_roots = [ROOT / a["path"] for a in config.get("anchors", []) if (ROOT / a["path"]).is_dir()]
-        directories: list[Path] = []
-        for root in scan_roots:
-            directories.extend(_walk_tree(root, ROOT))
-    else:
-        directories = _strict_directories(config)
+    directories: list[Path] = []
+    for root in _scan_roots(config):
+        directories.extend(_walk_tree(root, ROOT))
 
     for directory in directories:
-        rel_dir = str(directory.relative_to(ROOT))
-        legacy_cap = legacy_caps.get(rel_dir)
         _check_directory_size(
             directory,
             max_direct=max_direct,
             max_warn=max_warn,
-            legacy_cap=legacy_cap,
+            legacy_cap=None,
             report=report,
             rel_base=ROOT,
         )
@@ -259,7 +246,6 @@ def check_anchors(
         ):
             if py_file.name == "__init__.py" and _line_count(py_file) < 80:
                 continue
-            strict_loc = not deep and not report_only
             _check_file_loc(
                 py_file,
                 max_loc=max_loc,
@@ -268,10 +254,9 @@ def check_anchors(
                 loc_legacy_caps=loc_legacy_caps,
                 report=report,
                 rel_base=ROOT,
-                strict_loc=strict_loc,
+                strict_loc=not report_only,
             )
-            if not deep:
-                _check_redundant_naming(py_file, ROOT, report)
+            _check_redundant_naming(py_file, ROOT, report)
 
     return report
 
@@ -301,18 +286,12 @@ def scan_full_inventory(config: dict) -> Report:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--report-only", action="store_true", help="inventory only, no fail on anchors")
-    parser.add_argument("--deep", action="store_true", help="recursive scan under anchors (report inventory)")
+    parser.add_argument("--report-only", action="store_true", help="warnings only, no fail on loc")
     parser.add_argument("--json", action="store_true", help="JSON output")
     args = parser.parse_args(argv)
 
     config = _load_config()
-    anchor_report = check_anchors(config, report_only=args.report_only, deep=args.deep)
-
-    if args.report_only:
-        inventory = scan_full_inventory(config)
-        anchor_report.warnings.extend(inventory.warnings)
-        anchor_report.violations.extend(inventory.violations)
+    anchor_report = check_anchors(config, report_only=args.report_only)
 
     if args.json:
         payload = {

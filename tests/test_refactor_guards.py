@@ -99,8 +99,8 @@ class TestLeadWallClockPropagation(unittest.TestCase):
         from unittest.mock import MagicMock
 
         from lca.agent.cognitive_agent import CognitiveAgent
-        from lca.application.policies import LeadBudgetPolicy
-        from lca.application.spawn import promote_lead
+        from lca.application.authoring.policies import LeadBudgetPolicy
+        from lca.application.api.spawn import promote_lead
         from lca.harness.observability.assemble import make_minimal_bound
 
         runtime = MagicMock()
@@ -159,8 +159,8 @@ class TestAdrIndexMatchesFilesystem(unittest.TestCase):
 class TestProgressiveDisclosureVocabulary(unittest.TestCase):
     def test_agent_state_uses_team_awareness_not_progress_text(self) -> None:
         from lca.cognition.member_status import InMemoryMemberStatus
-        from lca.contracts.models.core.state import AgentState, Budget
-        from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
+        from lca.contracts.models.core.state.state import AgentState, Budget
+        from lca.contracts.models.team.team.team_awareness import ConsultDuty, TeamAwareness
 
         board = InMemoryMemberStatus(role_order=("a",))
         state = AgentState(
@@ -194,9 +194,9 @@ class TestProgressiveDisclosureVocabulary(unittest.TestCase):
 
         from lca.cognition.brain.decision_gates import MustConsultAllMembers
         from lca.cognition.member_status import InMemoryMemberStatus
-        from lca.contracts.models.core.decision import Decision
-        from lca.contracts.models.core.state import AgentState, Budget
-        from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
+        from lca.contracts.models.core.execution.decision import Decision
+        from lca.contracts.models.core.state.state import AgentState, Budget
+        from lca.contracts.models.team.team.team_awareness import ConsultDuty, TeamAwareness
 
         board = InMemoryMemberStatus(role_order=("analyst",))
         state = AgentState(

@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from lca_kernel.events.session import (
+from lca_kernel.events.session.session import (
     SESSION_FORMAT_VERSION,
     FlushListener,
     FlushResult,

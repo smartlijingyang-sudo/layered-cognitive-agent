@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import unittest
 
-from lca.cognition.brain.leaked_tool_call import recover_leaked_tool_calls
-from lca.contracts.models.core.llm import LLMResponse
+from lca.cognition.brain.prompt.leaked_tool_call import recover_leaked_tool_calls
+from lca.contracts.models.core.conversation.llm import LLMResponse
 from lca.plugins.gate.decision_classifier_provider import DefaultDecisionClassifier
 
 

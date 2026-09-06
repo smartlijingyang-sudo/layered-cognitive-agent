@@ -17,7 +17,7 @@ from typing import Any
 
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
-from lca.infrastructure.observability.spine.derivers.live_tail import LiveTailDeriver
+from lca.infrastructure.observability.spine.derivers.live.live_tail import LiveTailDeriver
 
 log = logging.getLogger(__name__)
 

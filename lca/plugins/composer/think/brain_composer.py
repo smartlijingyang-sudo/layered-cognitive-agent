@@ -9,7 +9,7 @@ from lca.contracts.harness.composition.composer import (
     AgentCompositionRequest,
     AgentGraphContribution,
 )
-from lca.contracts.mechanisms.capability import require_capability
+from lca.contracts.mechanisms.capability.capability import require_capability
 from lca.plugins.composer.think.brain import (
     apply_lead_brain,
     instrument_llm,

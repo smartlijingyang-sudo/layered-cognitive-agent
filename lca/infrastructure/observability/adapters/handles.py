@@ -23,7 +23,7 @@ from lca.infrastructure.observability.adapters.policy import otel_safe_attribute
 if TYPE_CHECKING:
     from opentelemetry.context import Context, Token
 
-    from lca.contracts.observability.ports import AttributePolicyBackend
+    from lca.contracts.observability.core.ports import AttributePolicyBackend
 
 _log = structlog.get_logger("lca.observability")
 

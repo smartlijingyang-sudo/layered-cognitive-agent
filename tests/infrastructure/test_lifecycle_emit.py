@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from lca.contracts.harness.collaboration.agent import LiveAgentStatus
 from lca.contracts.harness.memory.events import ThinkingCompleted, ThinkingDelta
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.result import Result
-from lca.contracts.models.core.state import Budget, StateSnapshot
-from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseRunCursor
-from lca.infrastructure.session.lifecycle_emit import (
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.state import Budget, StateSnapshot
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseRunCursor
+from lca.infrastructure.session.emit.lifecycle_emit import (
     accept_user_message,
     begin_turn,
     checkpoint,
@@ -28,7 +28,7 @@ from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
     set_publish_session,
 )
-from lca.plugins.session.runtime.messages import derive_messages
+from lca.plugins.session.runtime.messages.messages import derive_messages
 from lca.session.lifecycle.recovery import recover_live_agent
 from lca.session.append import Session
 

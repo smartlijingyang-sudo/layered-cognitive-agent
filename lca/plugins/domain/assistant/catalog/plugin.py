@@ -32,8 +32,8 @@ from typing import Any
 import structlog
 from pydantic import BaseModel, ConfigDict, Field
 
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import ASSISTANT_CATALOG
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -47,11 +47,11 @@ from lca.contracts.models.assistant.spec import (
     AssistantBootstrapRefs,
     AssistantSpec,
 )
-from lca.contracts.models.team.role_team import (
+from lca.contracts.models.team.role.role_team import (
     RoleProfile,
     ToolPermissionManifest,
 )
-from lca.contracts.observability.assistant_ep_closure import (
+from lca.contracts.observability.closure.assistant_ep_closure import (
     ASSISTANT_BOOTSTRAP_COMPLETED,
     ASSISTANT_CREATED,
 )
@@ -63,10 +63,10 @@ from lca.contracts.protocols.assistant.catalog import (
     PlanRevision,
     ProfilePatch,
 )
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.protocols.journal.spec import AgentSpec
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.journal.spec.spec import AgentSpec
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
-from lca.plugins.assistant._events import (
+from lca.plugins.assistant.events._events import (
     AssistantBootstrapCompletedEventPayload,
     AssistantCreatedEventPayload,
 )
@@ -490,7 +490,7 @@ def _int_or_default(value: object, default: int) -> int:
 
 
 @plugin(
-    id="lca.plugins.assistant.catalog",
+    id="lca.plugins.assistant.catalog.catalog",
     provides=(ASSISTANT_CATALOG.key,),
     requires=("event.bus", "event_descriptor_registry"),
     layer="L4",
@@ -560,7 +560,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     if registry is not None:
         from contextlib import suppress
 
-        from lca.contracts.observability.assistant_ep_closure import (
+        from lca.contracts.observability.closure.assistant_ep_closure import (
             all_assistant_event_descriptors,
         )
 

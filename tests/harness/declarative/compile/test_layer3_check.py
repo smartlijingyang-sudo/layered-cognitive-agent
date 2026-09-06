@@ -12,14 +12,14 @@ from collections.abc import Mapping
 
 import pytest
 
-from lca.contracts.protocols.declarative.declarative_fault_tolerance import PhaseExecutionPolicy
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_1.declarative_fault_tolerance import PhaseExecutionPolicy
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     PhaseInput,
     PhaseResult,
     SemanticPhase,
 )
 from lca.contracts.protocols.state.plan import CompiledRunPlan
-from lca.harness.declarative.compile.assembler import (
+from lca.harness.declarative.compile.assembler.assembler import (
     ExecutableNode,
     ExecutablePlan,
     UninstrumentedNode,
@@ -211,7 +211,7 @@ def test_assembler_assemble_hard_fails_on_uninstrumented_scope() -> None:
     every compiled binding.
     """
 
-    from lca.harness.declarative.compile.assembler import (
+    from lca.harness.declarative.compile.assembler.assembler import (
         GraphAssembler,
         wrap_executor,
     )

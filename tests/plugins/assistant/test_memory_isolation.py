@@ -29,14 +29,14 @@ from typing import Any
 
 import pytest
 
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
 from lca.contracts.protocols.state.scope_plan import BudgetCeiling, ScopePlan
-from lca.plugins.assistant._home_layout import (
+from lca.plugins.assistant.home._home_layout import (
     CONFIG_FACE_FILES,
     sha256_digest,
 )
-from lca.plugins.assistant.catalog import (
+from lca.plugins.assistant.catalog.catalog import (
     AssistantCatalogImpl,
     AssistantDigestMismatch,
 )

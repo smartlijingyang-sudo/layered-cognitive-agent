@@ -50,22 +50,22 @@ from typing import Literal
 
 import pytest
 
-from lca.contracts.observability.incarnation import Incarnation
-from lca.contracts.observability.loop_cursor import (
+from lca.contracts.observability.core.incarnation import Incarnation
+from lca.contracts.observability.cursor.loop_cursor import (
     CloseReason,
     CursorError,
     CursorSnapshot,
     LoopCursor,
     PhaseName,
 )
-from lca.contracts.observability.loop_cursor_payloads import (
+from lca.contracts.observability.cursor.loop_cursor_payloads import (
     RequestHeader,
     ThinkingRecord,
     ToolCallRecord,
     ToolResultRecord,
 )
 from lca.infrastructure.observability.loop_cursor import StdLoopCursor
-from lca.infrastructure.observability.loop_cursor.state import _CursorState
+from lca.infrastructure.observability.loop_cursor.state.state import _CursorState
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 

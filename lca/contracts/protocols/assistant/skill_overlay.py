@@ -26,7 +26,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.atoms.artifact_state import parse_artifact_state
+from lca.contracts.atoms.artifact.artifact_state import parse_artifact_state
 
 __all__ = [
     "AssistantSkillOverlay",

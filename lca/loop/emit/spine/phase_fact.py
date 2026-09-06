@@ -6,16 +6,16 @@ Imports are lazy to avoid harness ↔ infrastructure session binding cycles.
 
 from __future__ import annotations
 
-from lca.contracts.models.core.perception import ContextManifest
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.contracts.models.core.perceive.perception import ContextManifest
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     PhaseResult,
     SemanticPhase,
 )
 
 
 def _current_cursor():
-    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+    from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
         current_cursor,
     )
 
@@ -37,8 +37,8 @@ def emit_phase_catalog_facts(
 
 
 def _emit_perceive(*, result: PhaseResult, state: AgentState) -> None:
-    from lca.infrastructure.session.cognitive_emit import emit_context_manifested_for_state
-    from lca.infrastructure.session.lifecycle_emit import begin_step
+    from lca.infrastructure.session.emit.cognitive_emit import emit_context_manifested_for_state
+    from lca.infrastructure.session.emit.lifecycle_emit import begin_step
 
     step = getattr(state, "step", 0) + 1
     begin_step(step=step)
@@ -51,7 +51,7 @@ def _emit_perceive(*, result: PhaseResult, state: AgentState) -> None:
 
 
 def _emit_remember(*, state: AgentState) -> None:
-    from lca.infrastructure.session.lifecycle_emit import end_step
+    from lca.infrastructure.session.emit.lifecycle_emit import end_step
 
     step = max(getattr(state, "step", 0), 1)
     end_step(step=step)

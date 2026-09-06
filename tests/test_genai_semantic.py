@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     LlmCallCompleted,
     RunScope,
     StampedEvent,
@@ -76,7 +76,7 @@ def test_registry_dispatches_by_event_type() -> None:
 
 
 def test_registry_returns_none_for_unknown() -> None:
-    from lca.contracts.models.observability.journal import TeamRunStarted
+    from lca.contracts.models.observability.journal.journal import TeamRunStarted
 
     registry = build_default_registry()
     stamped = _stamped(1, TeamRunStarted(team_id="t1"))

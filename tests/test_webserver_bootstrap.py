@@ -17,13 +17,13 @@ from typing import cast
 
 import pytest
 
-from lca.contracts.models.core.plane import PlaneRef
-from lca.contracts.protocols.runtime.infra import MachineResolver, MachineTransport
-from lca.infrastructure.file_store import LocalFileStore
-from lca.plugins.transport.device_hub.hub import DeviceHub
-from lca.plugins.transport.device_hub.registry import DeviceRegistry
-from lca.plugins.transport.device_hub.settings import DeviceHubSettings
-from lca.plugins.transport.webserver.bootstrap import (
+from lca.contracts.models.core.state.plane import PlaneRef
+from lca.contracts.protocols.runtime.infra.infra import MachineResolver, MachineTransport
+from lca.infrastructure.file.file_store import LocalFileStore
+from lca.plugins.transport.device_hub.hub.hub import DeviceHub
+from lca.plugins.transport.device_hub.registry.registry import DeviceRegistry
+from lca.plugins.transport.device_hub.settings.settings import DeviceHubSettings
+from lca.plugins.transport.webserver.bootstrap.bootstrap import (
     DefaultWebserverBootstrapFactory,
     WebserverBootstrap,
     WebserverBootstrapConfig,

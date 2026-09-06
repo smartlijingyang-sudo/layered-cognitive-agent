@@ -6,17 +6,17 @@ from dataclasses import replace
 from typing import TYPE_CHECKING, Protocol, cast
 
 from lca.agent.cognitive_agent import CognitiveAgent
-from lca.contracts.atoms.enums import ActionScope
+from lca.contracts.atoms.enums.enums import ActionScope
 from lca.contracts.capabilities import LEAD_BUDGET_POLICY_RESOLVER
-from lca.contracts.mechanisms.capability import require_capability
-from lca.contracts.models.team.team_coordination import LeadMandate, gate_name_for_mandate
+from lca.contracts.mechanisms.capability.capability import require_capability
+from lca.contracts.models.team.team.team_coordination import LeadMandate, gate_name_for_mandate
 from lca.contracts.protocols import BudgetPolicy, LeadBudgetPolicyResolver, SharedMemoryStore
-from lca.contracts.protocols.journal.spec import AgentSpec
-from lca.contracts.protocols.runtime.infra import AgentTransport
+from lca.contracts.protocols.journal.spec.spec import AgentSpec
+from lca.contracts.protocols.runtime.infra.infra import AgentTransport
 from lca.infrastructure.observability import BoundObservability
 from lca.plugins.composer.collaboration.team import resolve_decision_gate
 from lca.plugins.composer.composition.plan_binding import bind_agent_from_scope
-from lca.plugins.composer.runtime.runtime_assembly import assemble_runtime_from_graph
+from lca.plugins.composer.runtime.runtime.runtime_assembly import assemble_runtime_from_graph
 
 if TYPE_CHECKING:
     from cordis import Context

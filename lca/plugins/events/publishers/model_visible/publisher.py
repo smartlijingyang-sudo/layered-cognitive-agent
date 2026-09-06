@@ -31,9 +31,9 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     AuthorityContract,
@@ -42,9 +42,9 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
     get_current_cursor,
 )
 
@@ -127,7 +127,7 @@ async def setup(ctx: PluginContext, config: _Config) -> None:
        composer ``instrument_llm(llm, ctx=...)`` 软查该键,把
        :class:`ModelVisibleHookAdapter` 挂到 LLM adapter 装饰器链最外层。
     """
-    from lca_kernel.events.bus import EnvelopeBus
+    from lca_kernel.events.bus.bus import EnvelopeBus
 
     ctx.provide("event.bus.publisher.model_visible", ModelVisiblePublisher)
 

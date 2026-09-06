@@ -10,10 +10,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.protocols.act.command_envelope import RunDelta, RunFact
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.protocols.act.command.command_envelope import RunDelta, RunFact
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     DeclarativeValidationError,
     DeltaReducer,
     EffectDispatcher,
@@ -25,13 +25,13 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     PhaseRunCursor,
 )
 from lca.contracts.protocols.gate.loop_guard import LoopGuardEvaluator
-from lca.contracts.protocols.runtime.runtime_lifecycle import (
+from lca.contracts.protocols.runtime.runtime.runtime_lifecycle import (
     RuntimeBudgetSnapshot,
     RuntimeLifecycleEvent,
     RuntimeLifecycleEventType,
     RuntimeLifecyclePublisher,
 )
-from lca.harness.declarative.compile.assembler import ExecutablePlan
+from lca.harness.declarative.compile.assembler.assembler import ExecutablePlan
 from lca.harness.declarative.controls.validation import require_valid
 from lca.harness.declarative.execute.loop_guard import DeclarativeLoopGuardEvaluator
 from lca.harness.declarative.execute.outcome_projection import (
@@ -219,7 +219,7 @@ class GenericPlanInterpreter:
         # contextvars 拿到 trace_id(decorator 不接 trace_id 参数)。
         if derived_trace_id:
             try:
-                from lca.infrastructure.observability.spine.context import (
+                from lca.infrastructure.observability.spine.context.context import (
                     SpineContext,
                 )
 
@@ -347,7 +347,7 @@ class GenericPlanInterpreter:
                     causation_refs=result.evidence_refs,
                 )
         except Exception as exc:
-            from lca.contracts.models.core.result import ApprovalPendingError
+            from lca.contracts.models.core.execution.result import ApprovalPendingError
 
             if isinstance(exc, ApprovalPendingError):
                 return self._outcomes.approval_pending(

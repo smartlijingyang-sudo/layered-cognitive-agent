@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from lca.contracts.models.core.result import Result
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseRunCursor
-from lca.contracts.protocols.runtime.runtime_composition import ResultFinalizer
+from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseRunCursor
+from lca.contracts.protocols.runtime.runtime.runtime_composition import ResultFinalizer
 from lca.harness.declarative import GraphAssembler
-from lca.runtime.checkpoint_resolution import DeclarativeCheckpoint
-from lca.runtime.runtime_bindings import (
+from lca.runtime.support.checkpoint_resolution import DeclarativeCheckpoint
+from lca.runtime.support.runtime_bindings import (
     DeclarativeRuntimeBindings,
     RuntimePhaseCapabilities,
 )
-from lca.runtime.runtime_journal import RuntimeJournal, RuntimeJournalCommitter
+from lca.runtime.loop.runtime_journal import RuntimeJournal, RuntimeJournalCommitter
 
 
 class DeclarativeExecution:

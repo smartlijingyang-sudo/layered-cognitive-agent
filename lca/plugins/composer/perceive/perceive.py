@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import cast
 
-from lca.contracts.atoms.enums import ActionScope
-from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
+from lca.contracts.atoms.enums.enums import ActionScope
+from lca.contracts.mechanisms.capability.capability import MissingCapabilityError, require_capability
 from lca.contracts.protocols import (
     MemorySystem,
     PerceiveHub,
@@ -13,9 +13,9 @@ from lca.contracts.protocols import (
     StateStore,
     StopPolicy,
 )
-from lca.contracts.protocols.journal.spec import STATE_STORE_CHOICE_PROFILE_DEFAULT
-from lca.infrastructure.capability.memory import MemoryService
-from lca.infrastructure.capability.state_store import StateStoreService
+from lca.contracts.protocols.journal.spec.spec import STATE_STORE_CHOICE_PROFILE_DEFAULT
+from lca.infrastructure.capability.memory.memory import MemoryService
+from lca.infrastructure.capability.state.state_store import StateStoreService
 from lca.infrastructure.observability.adapters import TelemetryMemoryAdapter
 from lca.plugins.composer.composition.skill_store import active_skill_store
 

@@ -8,16 +8,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.infrastructure.llm_adapter.api_style import LLMApiStyle
-from lca.infrastructure.llm_adapter.factory import load_dotenv_if_present, resolve_llm_adapter
-from lca.infrastructure.llm_adapter.failover import (
+from lca.infrastructure.llm_adapter.api.api_style import LLMApiStyle
+from lca.infrastructure.llm_adapter.factory.factory import load_dotenv_if_present, resolve_llm_adapter
+from lca.infrastructure.llm_adapter.failover.failover import (
     FailoverLLMAdapter,
     LLMFailoverCandidate,
     LLMRetryPolicy,
     RetryingLLMAdapter,
 )
-from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
-from lca.infrastructure.llm_adapter.settings import (
+from lca.infrastructure.llm_adapter.mock.mock_llm import MockLLMAdapter
+from lca.infrastructure.llm_adapter.settings.settings import (
     LLMSettings,
     clear_llm_settings_cache,
     get_llm_settings,

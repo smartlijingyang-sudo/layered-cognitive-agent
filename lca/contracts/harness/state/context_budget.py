@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lca.contracts.models.core.perception import ContextItem
+from lca.contracts.models.core.perceive.perception import ContextItem
 
 DEFAULT_CONTEXT_BUDGET_CHARS = 50_000
 

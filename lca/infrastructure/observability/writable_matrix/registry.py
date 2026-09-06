@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.observability.writable_matrix import (
+from lca.contracts.observability.cursor.writable_matrix import (
     Coalescer,
     EventEmitter,
     EventStorage,

@@ -14,12 +14,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
-from lca.contracts.observability.run_journal import LiveRunProjection
+from lca.contracts.mechanisms.capability.capability import MissingCapabilityError, require_capability
+from lca.contracts.observability.journal.run_journal import LiveRunProjection
 from lca.contracts.protocols import JournalProjector
 from lca.infrastructure.observability import BoundObservability
-from lca.infrastructure.observability.facade.settings import ObservabilitySettings
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
+from lca.infrastructure.observability.facade.settings.settings import ObservabilitySettings
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
 
 
 def assemble_run_hub(

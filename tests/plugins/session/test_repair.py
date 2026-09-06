@@ -18,9 +18,9 @@ from lca.session.lifecycle.repair import (
     SessionRepairError,
     repair_interrupted_turn,
 )
-from lca.plugins.session.runtime.store import SessionStore
-from lca_kernel.events.fold import SURFACE_ASSISTANT_TYPE, SURFACE_TOOL_RESULT_TYPE
-from lca_kernel.events.session import SESSION_FORMAT_VERSION, SessionHeader
+from lca.plugins.session.runtime.store.store import SessionStore
+from lca_kernel.events.fold.fold import SURFACE_ASSISTANT_TYPE, SURFACE_TOOL_RESULT_TYPE
+from lca_kernel.events.session.session import SESSION_FORMAT_VERSION, SessionHeader
 
 _SESSION = "repair-test"
 

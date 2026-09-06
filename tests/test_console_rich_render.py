@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     DecisionMade,
     LlmCallCompleted,
     RunScope,
@@ -124,7 +124,7 @@ def test_tool_renders_arguments(projector: ConsoleJournalProjector) -> None:
 def test_tool_renders_evidence_ref_when_no_inline_output(
     projector: ConsoleJournalProjector,
 ) -> None:
-    from lca.contracts.observability.evidence import EvidenceRef
+    from lca.contracts.observability.evidence.evidence import EvidenceRef
 
     event = ToolInvoked(
         tool_name="bash",
@@ -267,8 +267,8 @@ def test_mapping_repr_handles_non_serializable() -> None:
 
 def test_record_runtime_fallback_on_unknown_category() -> None:
     """record_runtime 收到未知 category 时不应抛异常；落 _DEFAULT_KIND。"""
-    from lca.contracts.models.observability.event import RuntimeKind
-    from lca.infrastructure.observability.facade.facade import (
+    from lca.contracts.models.observability.event.event import RuntimeKind
+    from lca.infrastructure.observability.facade.facade.facade import (
         _DEFAULT_KIND,
         record_runtime,
     )

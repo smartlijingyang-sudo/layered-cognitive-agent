@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from lca.contracts.capabilities import PROMPT_SECTION_REGISTRY
-from lca.harness.profile.resolve import resolve_profile
+from lca.harness.profile.resolve.resolve import resolve_profile
 
 
 def test_registry_plugin_provides_the_seam() -> None:

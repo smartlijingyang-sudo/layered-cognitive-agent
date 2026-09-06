@@ -13,8 +13,8 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from lca.infrastructure.observability.spine.context import SpineContext
-from lca.infrastructure.observability.spine.event_spine import EventSpine
+from lca.infrastructure.observability.spine.context.context import SpineContext
+from lca.infrastructure.observability.spine.event.event_spine import EventSpine
 from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
 
 if TYPE_CHECKING:
@@ -36,7 +36,7 @@ def test_deriver_failing_one_does_not_block_business(
     try:
         with caplog.at_level(
             logging.WARNING,
-            logger="lca.infrastructure.observability.spine.event_spine",
+            logger="lca.infrastructure.observability.spine.event.event_spine",
         ):
             rec = spine.append(
                 execution_point="brain.think.start",
@@ -66,6 +66,6 @@ def test_deriver_protocol_satisfied_by_structural_class() -> None:
         def on_event(self, event) -> None:
             return None
 
-    from lca.infrastructure.observability.spine.derivers.base import Deriver
+    from lca.infrastructure.observability.spine.derivers.base.base import Deriver
 
     assert isinstance(GoodDeriver(), Deriver)

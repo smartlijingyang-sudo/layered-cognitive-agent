@@ -9,11 +9,11 @@
 
 from __future__ import annotations
 
-from lca.contracts.protocols.declarative.declarative_execution import (
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     PhaseAttemptFailure,
     PhaseExecutionFailure,
 )
-from lca.plugins.phase_graph.failure_stop import (
+from lca.plugins.phase_graph.failure.failure_stop import (
     _summarize_attempts,
     phase_failure_stop_result,
 )
@@ -180,7 +180,7 @@ def test_frontend_display_string_carries_label_and_root_cause() -> None:
     tests/test_run_diagnostic.py::test_reducer_apply_stop_propagates_diagnostic_message),
     故此处直接验证 failure_stop 合成串到前端格式化函数的完整投影。
     """
-    from lca.plugins.transport.webserver.read.runs.error_presentation import (
+    from lca.plugins.transport.webserver.read.runs.error.error_presentation import (
         format_user_error,
     )
 

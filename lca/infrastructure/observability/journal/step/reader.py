@@ -14,11 +14,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-from lca.contracts.models.observability.journal_doc import (
+from lca.contracts.models.observability.journal.journal_doc import (
     JournalDocument,
     JournalMetadata,
 )
-from lca.contracts.models.observability.journal_step import (
+from lca.contracts.models.observability.journal.journal_step import (
     AttachmentRef,
     JournalStep,
     ReflectTrace,
@@ -29,7 +29,7 @@ from lca.contracts.models.observability.journal_step import (
     ToolCallRecord,
     ToolResult,
 )
-from lca.contracts.models.observability.journal_totals import (
+from lca.contracts.models.observability.journal.journal_totals import (
     PhaseRecord,
     Totals,
 )

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.infrastructure.observability.spine.derivers.graph import GraphDeriver
+from lca.infrastructure.observability.spine.derivers.graph.graph import GraphDeriver
 
 log = logging.getLogger(__name__)
 

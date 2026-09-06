@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.infrastructure.file_store import LocalFileStore
+from lca.infrastructure.file.file_store import LocalFileStore
 from lca_kernel import run_kernel_lifespan
 
 DEFAULT_PROFILE = Path("profiles/web-standard.yaml")

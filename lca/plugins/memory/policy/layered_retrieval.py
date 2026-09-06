@@ -1,0 +1,65 @@
+"""LayeredRetrievalPolicy plugin — named factory ``retrieval.layered`` (ADR-0068)."""
+
+from __future__ import annotations
+
+from pydantic import BaseModel
+
+from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.capabilities import MEMORY_RETRIEVAL_POLICY
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
+from lca.contracts.protocols import RetrievalPolicy
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
+
+
+@plugin(
+    id="lca-retrieval-layered",
+    provides=["retrieval.layered", MEMORY_RETRIEVAL_POLICY.key],
+    implements=[RetrievalPolicy],
+    layer="L0",
+    effects="none",
+    description=(
+        "Provide LayeredRetrievalPolicy as ``retrieval.layered``. "
+        "Standard bundle upgrades default null retrieval to per-layer weighted."
+    ),
+    test_suite="tests/test_plugin_alignment.py",
+    kind=PluginKind.PRIMITIVE,
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G3_FACTS, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=("lca-retrieval-layered.checked", "lca-retrieval-layered.served")
+        ),
+    ),
+    relations=(),
+    ownership=OwnershipDeclaration(
+        reads=("retrieval.layered",),
+        emits=("retrieval.layered.checked",),
+        state_mutation="forbidden",
+    ),
+)
+async def setup(ctx: PluginContext, config: Config) -> None:
+    """Provide LayeredRetrievalPolicy as ``retrieval.layered``."""
+    from lca.cognition.memory.layered.layered_retrieval_policy import (
+        LayeredRetrievalPolicy,
+    )
+
+    ctx.provide("retrieval.layered", LayeredRetrievalPolicy)
+    ctx.provide(MEMORY_RETRIEVAL_POLICY.key, LayeredRetrievalPolicy)

@@ -7,9 +7,9 @@ import contextlib
 import time
 from collections.abc import Callable
 
-from lca.contracts.atoms.enums import RunActivityPhase
-from lca.contracts.models.observability.journal import RunActivity
-from lca.infrastructure.observability.facade.facade import record
+from lca.contracts.atoms.enums.enums import RunActivityPhase
+from lca.contracts.models.observability.journal.journal import RunActivity
+from lca.infrastructure.observability.facade.facade.facade import record
 
 LLM_ACTIVITY_HEARTBEAT_S: float = 5.0
 """Emit RunActivity when no LLM delta for this many seconds."""

@@ -6,8 +6,8 @@ import json
 
 import pytest
 
-from lca.contracts.atoms.enums import StreamChannel
-from lca.contracts.models.observability.journal import (
+from lca.contracts.atoms.enums.enums import StreamChannel
+from lca.contracts.models.observability.journal.journal import (
     ReasoningDelta,
     RunScope,
     StampedEvent,

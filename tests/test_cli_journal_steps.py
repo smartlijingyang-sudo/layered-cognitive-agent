@@ -29,7 +29,7 @@ from lca.contracts.models.observability import (
     close_document,
     empty_document,
 )
-from lca.infrastructure.cli.cli import app
+from lca.infrastructure.cli.cli.cli import app
 from lca.infrastructure.observability.journal.step.narrative_writer import (
     StepNarrativeWriter,
 )

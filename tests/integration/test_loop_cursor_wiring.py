@@ -19,15 +19,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lca.contracts.observability.incarnation import Incarnation
-from lca.contracts.observability.loop_cursor_payloads import (
+from lca.contracts.observability.core.incarnation import Incarnation
+from lca.contracts.observability.cursor.loop_cursor_payloads import (
     ThinkingRecord,
     ToolCallRecord,
     ToolResultRecord,
 )
-from lca.infrastructure.observability.loop_cursor.bind import SpineWritePortAdapter
-from lca.infrastructure.observability.loop_cursor.std import StdLoopCursor
-from lca.infrastructure.observability.spine.event_spine import EventSpine
+from lca.infrastructure.observability.loop_cursor.bind.bind import SpineWritePortAdapter
+from lca.infrastructure.observability.loop_cursor.std.std import StdLoopCursor
+from lca.infrastructure.observability.spine.event.event_spine import EventSpine
 from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
 
 

@@ -26,7 +26,7 @@ if str(ROOT) not in sys.path:
 
 import yaml  # noqa: E402
 
-from lca_kernel.events.config_parser import (  # noqa: E402
+from lca_kernel.events.config.config_parser import (  # noqa: E402
     SubscriberRule,
     subscribers_from_rules,
 )
@@ -105,7 +105,7 @@ def main() -> int:
         )
 
     # typed 校验：EventRegistry.load 物化集合 == 工作树字符串级集合
-    from lca_kernel.events.registry import EventRegistry
+    from lca_kernel.events.registry.registry import EventRegistry
 
     worktree_auth: dict[str, frozenset[str]] = {}
     for rel in CONFIG_FILES:

@@ -18,7 +18,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from lca.contracts.protocols.act.command_envelope import (
+from lca.contracts.protocols.act.command.command_envelope import (
     BudgetReservation,
     CapabilityGrant,
     CommandEnvelope,
@@ -450,7 +450,7 @@ class TestV4ArchitectureTestGate:
         """
         import inspect
 
-        from lca.cognition.body.pipeline_safe_executor import (
+        from lca.cognition.body.executor.pipeline_safe_executor import (
             PipelineSafeExecutor,
         )
 

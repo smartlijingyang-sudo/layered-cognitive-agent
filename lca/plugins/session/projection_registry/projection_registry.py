@@ -24,22 +24,22 @@ from weakref import WeakKeyDictionary
 import structlog
 from pydantic import BaseModel
 
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     LifecycleContract,
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.protocols.session.projection_unit import (
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.session.projection.projection_unit import (
     ProjectionCheckpoint,
     ProjectionSnapshot,
     ProjectionUnit,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca_kernel.events.session import SessionEvent, SessionHeader
+from lca_kernel.events.session.session import SessionEvent, SessionHeader
 
 _log = structlog.get_logger(__name__)
 

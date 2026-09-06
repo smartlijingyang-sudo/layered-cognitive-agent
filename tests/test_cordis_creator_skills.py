@@ -17,15 +17,15 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from lca.infrastructure.skills.activation_scope import activated_skills_scope
-from lca.infrastructure.skills.bundled import (
+from lca.infrastructure.skills.activation.activation_scope import activated_skills_scope
+from lca.infrastructure.skills.bundled.bundled import (
     default_bundled_skills_root,
     ensure_bundled_skills,
 )
-from lca.infrastructure.skills.disk_store import DiskSkillPackageStore
-from lca.infrastructure.skills.settings import SkillSettings
-from lca.infrastructure.tools.skills.activate_tool import SkillActivateTool
-from lca.infrastructure.tools.skills.read_reference_tool import SkillReadReferenceTool
+from lca.infrastructure.skills.disk.disk_store import DiskSkillPackageStore
+from lca.infrastructure.skills.settings.settings import SkillSettings
+from lca.infrastructure.tools.skills.activate.activate_tool import SkillActivateTool
+from lca.infrastructure.tools.skills.read.read_reference_tool import SkillReadReferenceTool
 
 CORDIS_PLUGIN_DEVELOPMENT_SKILL_ID: str = "cordis-plugin-development"
 EDITING_LCA_COMPOSITIONS_SKILL_ID: str = "editing-lca-compositions"
@@ -158,7 +158,7 @@ class TestRenderAvailableSkills(unittest.TestCase):
         self._tmp.cleanup()
 
     def test_catalog_includes_skill_id_and_name(self) -> None:
-        from lca.application.spawn import _render_available_skills
+        from lca.application.api.spawn import _render_available_skills
 
         rendered = _render_available_skills(_stub_scope_with_skill_store(self.store))
         self.assertIn(CORDIS_PLUGIN_DEVELOPMENT_SKILL_ID, rendered)
@@ -167,7 +167,7 @@ class TestRenderAvailableSkills(unittest.TestCase):
 
     def test_catalog_includes_summary_for_each_skill(self) -> None:
         """Summaries must surface so the model can route without loading body."""
-        from lca.application.spawn import _render_available_skills
+        from lca.application.api.spawn import _render_available_skills
 
         rendered = _render_available_skills(_stub_scope_with_skill_store(self.store))
         for skill_id in _EXPECTED_BUNDLED_IDS:
@@ -178,7 +178,7 @@ class TestRenderAvailableSkills(unittest.TestCase):
                 self.assertIn(package.summary[:32], rendered)
 
     def test_catalog_includes_version_when_present(self) -> None:
-        from lca.application.spawn import _render_available_skills
+        from lca.application.api.spawn import _render_available_skills
 
         rendered = _render_available_skills(_stub_scope_with_skill_store(self.store))
         for skill_id in _EXPECTED_BUNDLED_IDS:
@@ -190,7 +190,7 @@ class TestRenderAvailableSkills(unittest.TestCase):
 
     def test_catalog_handles_empty_store(self) -> None:
         """Empty store should produce the documented fallback string."""
-        from lca.application.spawn import _render_available_skills
+        from lca.application.api.spawn import _render_available_skills
 
         empty_store = DiskSkillPackageStore(SkillSettings(cache_dir=Path(self._tmp.name) / "empty"))
         _patch_skill_store_resolution(self._monkey, empty_store)
@@ -396,19 +396,19 @@ class TestCordisCreatorEndToEndPrompt(unittest.TestCase):
 
     def _render_full_prompt(self) -> str:
         """Compose the exact prompt the cordis-creator agent sees at step 0."""
-        from lca.application.spawn import (
+        from lca.application.api.spawn import (
             _format_tools_xml,
             _render_available_skills,
         )
         from lca.cognition.brain.prompts._loader import load_builtin_prompt
-        from lca.cognition.brain.reasoner import (
+        from lca.cognition.brain.reasoner.reasoner import (
             _context_lines,
             _role_prompt_vars,
         )
         from lca.cognition.sensors.skill_catalog import SkillCatalogSensor
-        from lca.contracts.atoms.ids import new_id
-        from lca.contracts.models.core.budget import Budget
-        from lca.contracts.models.core.state import AgentState
+        from lca.contracts.atoms.ids.ids import new_id
+        from lca.contracts.models.core.policy.budget import Budget
+        from lca.contracts.models.core.state.state import AgentState
         from lca.plugins.roles.cordis_creator import build_cordis_creator_role_profile
 
         profile = build_cordis_creator_role_profile()
@@ -527,11 +527,11 @@ class TestCordisCreatorEndToEndAgentStep(unittest.TestCase):
         """Run ``SkillActivateTool.execute(skill_id)`` and return
         (observation, body_text, state_after). state_after is a plain
         dict snapshot of state.activated_skills contents."""
-        from lca.infrastructure.skills.activation_scope import (
+        from lca.infrastructure.skills.activation.activation_scope import (
             activated_skills_scope,
             register_activated,
         )
-        from lca.infrastructure.tools.skills.activate_tool import SkillActivateTool
+        from lca.infrastructure.tools.skills.activate.activate_tool import SkillActivateTool
 
         with activated_skills_scope(()):
             tool = SkillActivateTool(self.store)
@@ -540,7 +540,7 @@ class TestCordisCreatorEndToEndAgentStep(unittest.TestCase):
             # machinery; here we simulate the resulting state mutation
             # so we can assert what state.activated_skills would look like.
             register_activated(skill_id, skill_id)
-            from lca.infrastructure.skills.activation_scope import (
+            from lca.infrastructure.skills.activation.activation_scope import (
                 resolve_skill_for_exec,
             )
 
@@ -560,7 +560,7 @@ class TestCordisCreatorEndToEndAgentStep(unittest.TestCase):
     def test_second_step_loads_editing_lca_compositions(self) -> None:
         """After step 1, the model would call activate_skill again for the
         second skill — verify the body and the activated list updates."""
-        from lca.infrastructure.skills.activation_scope import (
+        from lca.infrastructure.skills.activation.activation_scope import (
             activated_skills_scope,
             register_activated,
         )

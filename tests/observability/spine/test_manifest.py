@@ -1,4 +1,4 @@
-from lca.infrastructure.observability.spine.manifest import EXECUTION_POINTS
+from lca.infrastructure.observability.spine.manifest.manifest import EXECUTION_POINTS
 
 
 def test_execution_points_close_set():

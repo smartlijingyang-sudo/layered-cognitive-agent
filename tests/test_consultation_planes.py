@@ -6,9 +6,9 @@ import asyncio
 import unittest
 from unittest.mock import MagicMock
 
-from lca.cognition.body.action_handlers import resolve_spec_timeout_s
-from lca.cognition.body.tool_registry import SimpleToolRegistry
-from lca.cognition.brain.decision_gates.must_consult_all import MustConsultAllMembers
+from lca.cognition.body.actions.action_handlers import resolve_spec_timeout_s
+from lca.cognition.body.tools.tool_registry import SimpleToolRegistry
+from lca.cognition.brain.decision_gates.must.must_consult_all import MustConsultAllMembers
 from lca.cognition.member_status import (
     InMemoryMemberStatus,
     classify_synthesis,
@@ -16,33 +16,33 @@ from lca.cognition.member_status import (
     record_delegation_return,
 )
 from lca.cognition.member_status.tracking import duty_consult
-from lca.contracts.atoms.enums import RoleStatus
-from lca.contracts.atoms.semantic_keys import (
+from lca.contracts.atoms.enums.enums import RoleStatus
+from lca.contracts.atoms.semantic.semantic_keys import (
     COMPLETION_PARTIAL,
     FAILURE_KIND,
     FAILURE_KIND_TRANSIENT,
     OBS_COMPLETION_QUALITY,
 )
-from lca.contracts.models.core.budget import (
+from lca.contracts.models.core.policy.budget import (
     DEFAULT_DELEGATION_TIMEOUT_S,
     resolve_delegation_timeout_s,
 )
-from lca.contracts.models.core.decision import Decision, DelegationSpec, Observation
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.team.consultation import (
+from lca.contracts.models.core.execution.decision import Decision, DelegationSpec, Observation
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.team.consultation.consultation import (
     ConsultationDisposition,
     ConsultationOutcome,
     SynthesisMethod,
     usable_outcomes,
 )
-from lca.contracts.models.team.partial_buffer import (
+from lca.contracts.models.team.partial.partial_buffer import (
     append_run_partial,
     begin_partial_buffer,
     drain_run_partial,
     reset_partial_buffer,
 )
-from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
-from lca.contracts.protocols.journal.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
+from lca.contracts.models.team.team.team_awareness import ConsultDuty, TeamAwareness
+from lca.contracts.protocols.journal.spec.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
 from lca.infrastructure.transport.agent_transport import InternalTransport
 from lca.infrastructure.transport.transport_registry import TransportRegistry
 from tests.support.action_authority import build_test_body

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.atoms.artifact_state import ArtifactState
-from lca.contracts.atoms.scope import Scope, parse_scope
+from lca.contracts.atoms.artifact.artifact_state import ArtifactState
+from lca.contracts.atoms.scope.scope import Scope, parse_scope
 from lca.plugins.creator.personas import CreatorFace, CreatorResult, PromoteSpec, parse_creator_face
 
 

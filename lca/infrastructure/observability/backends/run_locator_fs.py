@@ -20,7 +20,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from pathlib import Path
 
-from lca.contracts.observability.run_locator import RunLocator
+from lca.contracts.observability.registry.run_locator import RunLocator
 from lca.infrastructure.observability.spine.sinks.naming import (
     spine_filename_for_run,
 )

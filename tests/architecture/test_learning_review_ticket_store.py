@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.protocols.think.learning import (
     LearningReviewAssessment,
     LearningReviewTicket,

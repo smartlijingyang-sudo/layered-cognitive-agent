@@ -12,9 +12,9 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, ConfigDict
 
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import BRAIN_PROMPT_CATALOG_FACTORY
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -24,9 +24,9 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.memory.operational_skills import SkillIndexEntry, SkillPackageStore
-from lca.contracts.protocols.runtime.infra import Tool
+from lca.contracts.protocols.runtime.infra.infra import Tool
 from lca.contracts.protocols.think.cognition import BrainPromptCatalog, BrainPromptCatalogFactory
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 

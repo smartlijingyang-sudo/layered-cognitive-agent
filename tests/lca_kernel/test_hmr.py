@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from lca_kernel.errors import ReloadError
-from lca_kernel.hmr import (
+from lca_kernel.cli.errors import ReloadError
+from lca_kernel.runtime.hmr import (
     DEFAULT_PATCH_PATH,
     MIN_DEBOUNCE_MS,
     PATCH_EVENT_KIND,
@@ -277,7 +277,7 @@ def test_reload_error_carries_path_and_reason(tmp_path: Path) -> None:
     assert err.path == config.path
     assert err.reason == "missing"
     # ReloadError must be a KernelError (single except clause at transport boundary).
-    from lca_kernel.errors import KernelError
+    from lca_kernel.cli.errors import KernelError
 
     assert isinstance(err, KernelError)
 

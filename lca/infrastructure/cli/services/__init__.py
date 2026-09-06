@@ -8,14 +8,14 @@ start / stop / restart 显式 raise NotImplementedError,与 ADR 一致。
 本模块还管 lobehub / infra / daemon / onlyboxes 等外部平台服务。
 """
 
-from lca.infrastructure.cli.config import OpsConfig
-from lca.infrastructure.cli.registry import ServiceRegistry
-from lca.infrastructure.cli.services.daemon import DaemonService
-from lca.infrastructure.cli.services.infra import InfraService
-from lca.infrastructure.cli.services.kernel_serve import KernelServeService
-from lca.infrastructure.cli.services.lobehub import LobeHubService
-from lca.infrastructure.cli.services.onlyboxes import OnlyboxesService
-from lca.infrastructure.cli.sudo import Sudo
+from lca.infrastructure.cli.config.config import OpsConfig
+from lca.infrastructure.cli.registry.registry import ServiceRegistry
+from lca.infrastructure.cli.services.daemon.daemon import DaemonService
+from lca.infrastructure.cli.services.infra.infra import InfraService
+from lca.infrastructure.cli.services.kernel.kernel_serve import KernelServeService
+from lca.infrastructure.cli.services.lobehub.lobehub import LobeHubService
+from lca.infrastructure.cli.services.onlyboxes.onlyboxes import OnlyboxesService
+from lca.infrastructure.cli.sudo.sudo import Sudo
 
 __all__ = [
     "DaemonService",

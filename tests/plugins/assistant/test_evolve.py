@@ -23,7 +23,7 @@ from typing import Any
 import pytest
 
 from lca.contracts.capabilities import ASSISTANT_EVOLVE
-from lca.contracts.observability.assistant_ep_closure import (
+from lca.contracts.observability.closure.assistant_ep_closure import (
     ASSISTANT_REQUIRED_FIELDS,
     ASSISTANT_SKILL_EVOLVED_PROMOTED,
     ASSISTANT_SKILL_EVOLVED_PROPOSED,
@@ -36,8 +36,8 @@ from lca.contracts.protocols.assistant.evolve import (
 from lca.contracts.protocols.think.learning import SkillAcquirer
 from lca.harness.plugin_api import definition_from_plugin
 from lca.harness.plugin.manifest import EffectClass
-from lca.plugins.assistant.catalog import AssistantCatalogImpl
-from lca.plugins.assistant.evolve import (
+from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
+from lca.plugins.assistant.evolve.evolve import (
     AssistantEvolveImpl,
     MissingWriteApproval,
     PromoteGateRejected,
@@ -122,7 +122,7 @@ class TestObserve:
             evolve.observe(assistant_id, ())
 
     def test_observe_unknown_assistant_fails_closed(self, evolve: AssistantEvolveImpl) -> None:
-        from lca.plugins.assistant._home_layout import AssistantCatalogError
+        from lca.plugins.assistant.home._home_layout import AssistantCatalogError
 
         with pytest.raises(AssistantCatalogError):
             evolve.observe("asst_missing", ("run-1",))
@@ -455,7 +455,7 @@ class TestCrossAssistantIsolation:
 class TestPluginManifest:
     def test_definition_id_namespace(self) -> None:
         definition = definition_from_plugin(setup)
-        assert definition.spec.id == "lca.plugins.assistant.evolve"
+        assert definition.spec.id == "lca.plugins.assistant.evolve.evolve"
 
     def test_provides_assistant_evolve(self) -> None:
         definition = definition_from_plugin(setup)
@@ -484,7 +484,7 @@ class TestPluginManifest:
     def test_config_rejects_extra_keys(self) -> None:
         from pydantic import ValidationError
 
-        from lca.plugins.assistant.evolve import Config
+        from lca.plugins.assistant.evolve.evolve import Config
 
         with pytest.raises(ValidationError):
             Config.model_validate({"min_confidence": 0.5, "extra": "x"})

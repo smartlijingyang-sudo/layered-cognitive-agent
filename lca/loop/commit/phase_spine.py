@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.loop.fact_gateway import AppendReceipt
 from lca.loop.fact_gateway import publish_ep_bound
 

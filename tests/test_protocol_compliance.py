@@ -13,17 +13,17 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # L3
 from lca.agent.cognitive_agent import CognitiveAgent
-from lca.cognition.body.action_registry import ActionRegistry
-from lca.cognition.body.safe_executor import SimpleSafeExecutor
-from lca.cognition.body.simple_body import SimpleBody
-from lca.cognition.body.tool_registry import SimpleToolRegistry
+from lca.cognition.body.actions.action_registry import ActionRegistry
+from lca.cognition.body.executor.safe_executor import SimpleSafeExecutor
+from lca.cognition.body.executor.simple_body import SimpleBody
+from lca.cognition.body.tools.tool_registry import SimpleToolRegistry
 
 # L1
-from lca.cognition.brain.critic import SimpleCritic
-from lca.cognition.brain.modular_brain import ModularBrain
-from lca.cognition.brain.reasoner import PromptReasoner
-from lca.cognition.brain.hook_registry import CordisHookRegistry
-from lca.cognition.memory.simple_memory import SimpleMemorySystem
+from lca.cognition.brain.reasoner.critic import SimpleCritic
+from lca.cognition.brain.pipeline.modular_brain import ModularBrain
+from lca.cognition.brain.reasoner.reasoner import PromptReasoner
+from lca.cognition.brain.gate.hook_registry import CordisHookRegistry
+from lca.cognition.memory.simple.simple_memory import SimpleMemorySystem
 from lca.contracts.protocols import (
     AgentTransport,
     AgentUnit,
@@ -42,20 +42,20 @@ from lca.contracts.protocols import (
     ToolRegistry,
 )
 from lca.harness.observability import make_minimal_bound
-from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
+from lca.infrastructure.llm_adapter.mock.mock_llm import MockLLMAdapter
 from lca.infrastructure.llm_adapter.openai_compat import OpenAICompatAdapter
 from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
 from lca.infrastructure.tools.weather import build_tools as build_weather_tools
 from lca.infrastructure.transport.agent_transport import InternalTransport
 from lca.infrastructure.transport.transport_registry import TransportRegistry
-from lca.plugins.composer.runtime.runtime_factory import (
+from lca.plugins.composer.runtime.runtime.runtime_factory import (
     NullPerceiveHub,
     RuntimeDeps,
     build_fixture_cognitive_runtime,
 )
-from lca.plugins.phase_graph.stop_policy import DefaultStopPolicy
+from lca.plugins.phase_graph.stop.stop_policy import DefaultStopPolicy
 from lca.plugins.gate.decision_classifier_provider import DefaultDecisionClassifier
-from lca.plugins.journal.artifact_closure_provider import DefaultArtifactClosure
+from lca.plugins.journal.artifact.artifact_closure_provider import DefaultArtifactClosure
 
 # L2
 from lca.plugins.loop.reducer.plugin import DefaultReducer
@@ -114,7 +114,7 @@ class TestL1ProtocolCompliance(unittest.TestCase):
 
     def _build_brain_deps(self):
         """构建 ModularBrain 所需的依赖。"""
-        from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
+        from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
 
         llm = MockLLMAdapter()
         rp = RoleProfile(
@@ -145,7 +145,7 @@ class TestL1ProtocolCompliance(unittest.TestCase):
 
     def test_simple_body(self):
         tool_reg = SimpleToolRegistry()
-        from lca.contracts.models.team.role_team import ToolPermissionManifest
+        from lca.contracts.models.team.role.role_team import ToolPermissionManifest
 
         executor = SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[]))
         body = SimpleBody(tool_reg, executor, TransportRegistry(), ActionRegistry())
@@ -155,7 +155,7 @@ class TestL1ProtocolCompliance(unittest.TestCase):
         self.assertIsInstance(SimpleToolRegistry(), ToolRegistry)
 
     def test_simple_safe_executor(self):
-        from lca.contracts.models.team.role_team import ToolPermissionManifest
+        from lca.contracts.models.team.role.role_team import ToolPermissionManifest
 
         executor = SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[]))
         self.assertIsInstance(executor, SafeExecutor)
@@ -171,7 +171,7 @@ class TestL2ProtocolCompliance(unittest.TestCase):
     """L2 运行时层。"""
 
     def test_cognitive_runtime_is_runtime(self):
-        from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
+        from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
 
         llm = MockLLMAdapter()
         rp = RoleProfile(
@@ -221,7 +221,7 @@ class TestL3ProtocolCompliance(unittest.TestCase):
     """L3 Agent 层。"""
 
     def _build_agent(self):
-        from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
+        from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
 
         llm = MockLLMAdapter()
         rp = RoleProfile(
@@ -278,8 +278,8 @@ class TestL3ProtocolCompliance(unittest.TestCase):
         self.assertIsInstance(sup, AgentUnit)
 
     def test_team_handle_is_team_runtime(self):
-        from lca.application.spawn import spawn_team
-        from lca.contracts.models.team.team_coordination import (
+        from lca.application.api.spawn import spawn_team
+        from lca.contracts.models.team.team.team_coordination import (
             Pipeline,
         )
         from tests.support.agent_specs import make_spec
@@ -298,13 +298,13 @@ class TestBrainFactoryRegistryIntegration(unittest.TestCase):
     def test_default_brain_registered(self):
         import asyncio
 
-        from lca.harness.profile.boot import boot_profile
+        from lca.harness.profile.boot.boot import boot_profile
 
         ctx = asyncio.run(boot_profile("profiles/test-minimal.yaml"))
         self.assertIn("default", ctx.inject("brains"))
 
     def test_agent_with_string_brain(self):
-        from lca.application.api import Agent
+        from lca.application.api.api import Agent
 
         agent = Agent(
             role="测试",
@@ -318,10 +318,10 @@ class TestBrainFactoryRegistryIntegration(unittest.TestCase):
         self.assertEqual(result.status, "completed")
 
     def test_agent_with_custom_brain(self):
-        from lca.application.api import Agent
-        from lca.contracts.atoms.ids import new_id
-        from lca.contracts.models.core.decision import Decision, Reflection
-        from lca.contracts.models.core.state import AgentState
+        from lca.application.api.api import Agent
+        from lca.contracts.atoms.ids.ids import new_id
+        from lca.contracts.models.core.execution.decision import Decision, Reflection
+        from lca.contracts.models.core.state.state import AgentState
 
         class StubBrain(Brain):
             async def think(self, state: AgentState):
@@ -349,7 +349,7 @@ class TestBrainFactoryRegistryIntegration(unittest.TestCase):
         self.assertEqual(result.output, "stub")
 
     def test_agent_with_unknown_brain_raises(self):
-        from lca.application.api import Agent
+        from lca.application.api.api import Agent
 
         with self.assertRaises(ValueError) as ctx:
             Agent(

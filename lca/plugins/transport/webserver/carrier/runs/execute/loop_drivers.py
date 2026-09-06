@@ -18,10 +18,10 @@ from dataclasses import dataclass
 from itertools import count
 from typing import TYPE_CHECKING, Any, Protocol
 
-from lca.application.api import Agent
-from lca.contracts.mechanisms.capability import require_capability
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.team.run_context import RunContext
+from lca.application.api.api import Agent
+from lca.contracts.mechanisms.capability.capability import require_capability
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.models.team.run.run_context import RunContext
 from lca.infrastructure.observability import BoundObservability
 from lca.plugins.loop.driver.plugin import (
     RunLoopDriverRegistry as RunLoopDriverRegistry,
@@ -33,7 +33,7 @@ from lca.plugins.transport.webserver.carrier.runs.lifecycle.runnable_assembly im
     CognitiveRunnableAssembler,
     RunnableAssemblyRequest,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
 
 if TYPE_CHECKING:
     from cordis import Context
@@ -139,7 +139,7 @@ def _record_inbox_followup(*, session: RunSession, question: str, mode: str) -> 
     preview = question[:200] if isinstance(question, str) else ""
     with suppress(Exception):
         from lca.infrastructure.observability.meta_event_emit import emit_inbox_spliced
-        from lca.infrastructure.session.lifecycle_emit import resolve_run_session_writer
+        from lca.infrastructure.session.emit.lifecycle_emit import resolve_run_session_writer
 
         writer = resolve_run_session_writer(session)
         emit_inbox_spliced(

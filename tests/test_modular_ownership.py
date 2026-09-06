@@ -54,8 +54,8 @@ def test_ingress_only_orchestrates_text_history_and_file_reference_parsing() -> 
     """Message ingress must not regain its platform-specific parsing implementations."""
     source = _source("gateway/runs/ingest/ingress.py")
 
-    assert "lca.plugins.transport.webserver.handlers.runs.session.message_history" in source
-    assert "lca.plugins.transport.webserver.handlers.runs.session.message_text" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.session.message.message_history" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.session.message.message_text" in source
     assert "lca.plugins.transport.webserver.handlers.runs.api.file_reference_parsing" in source
     assert "re.compile(" not in source
     assert "def _collect_file_refs" not in source
@@ -65,10 +65,10 @@ def test_ingest_facade_keeps_policy_cache_transport_and_mirroring_separate() -> 
     """The stable ingest path must not become a second implementation container."""
     source = _source("gateway/runs/ingest/ingest.py")
 
-    assert "lca.plugins.transport.webserver.handlers.runs.ingest.cache" in source
-    assert "lca.plugins.transport.webserver.handlers.runs.ingest.integrity" in source
-    assert "lca.plugins.transport.webserver.handlers.runs.ingest.policy" in source
-    assert "lca.plugins.transport.webserver.handlers.runs.ingest.service" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.ingest.cache.cache" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.ingest.integrity.integrity" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.ingest.policy.policy" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.ingest.service.service" in source
     assert "class IngestCache" not in source
     assert "async def ingest_file_refs" not in source
 
@@ -102,8 +102,8 @@ def test_terminalizer_only_coordinates_terminal_transition_order() -> None:
     """Terminal status, artifact closure, manifest, and exporter cleanup have owners."""
     source = _source("lca/plugins/transport/webserver/handlers/runs/terminal/terminalizer.py")
 
-    assert "lca.plugins.transport.webserver.handlers.runs.terminal.status" in source
-    assert "lca.plugins.transport.webserver.read.runs.artifact_closure" in source
+    assert "lca.plugins.transport.webserver.handlers.runs.terminal.status.status" in source
+    assert "lca.plugins.transport.webserver.read.runs.artifact.artifact_closure" in source
     assert "lca.plugins.transport.webserver.read.runs.terminal.materialization" in source
     assert "lca.plugins.transport.webserver.carrier.runs.lifecycle.export_disposal" in source
     assert "def _derive_terminal_status" not in source

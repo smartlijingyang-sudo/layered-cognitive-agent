@@ -18,7 +18,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from lca_kernel.events.fold import (
+from lca_kernel.events.fold.fold import (
     EpochHeader,
     canonicalHeader,
     foldRequestHeader,

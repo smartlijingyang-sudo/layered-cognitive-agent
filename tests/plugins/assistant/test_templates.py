@@ -19,19 +19,19 @@ from typing import Any
 
 import pytest
 
-from lca.contracts.observability.assistant_ep_closure import (
+from lca.contracts.observability.closure.assistant_ep_closure import (
     ASSISTANT_BOOTSTRAP_COMPLETED,
     ASSISTANT_CREATED,
 )
 from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
-from lca.plugins.assistant._home_layout import (
+from lca.plugins.assistant.home._home_layout import (
     CONFIG_FACE_FILES,
     TEMPLATE_REGISTRY,
     AssistantCatalogError,
     known_template_ids,
     render_template,
 )
-from lca.plugins.assistant.catalog import AssistantCatalogImpl
+from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
 
 ROLE_TEMPLATES: tuple[str, ...] = (
     "assistant.research",

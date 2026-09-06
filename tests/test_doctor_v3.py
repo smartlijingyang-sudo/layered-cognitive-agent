@@ -31,7 +31,7 @@ from lca.plugins.transport.webserver.doctor.doctor import (
 
 def _build_doc(*, broken_chain: bool = False, fail_step: int | None = None) -> object:
     """构造一个 step 序列 document。"""
-    from lca.contracts.models.observability.journal_step import (
+    from lca.contracts.models.observability.journal.journal_step import (
         ToolCallRecord,
         ToolResult,
         summarize_step,
@@ -204,7 +204,7 @@ def test_h4_ui_mode_explicit_skipped(tmp_path: Path) -> None:
 def test_h7_no_tools_none(tmp_path: Path) -> None:
     """无 tool_call 的 step → H7 ok=None(no tools calls.。"""
     # 不传 tool_call —— _build_doc_with_no_tools
-    from lca.contracts.models.observability.journal_step import ReflectTrace
+    from lca.contracts.models.observability.journal.journal_step import ReflectTrace
 
     meta = JournalMetadata(agent_role="x", strategy_key="solo", plan_ref="", objective="t")
     doc = empty_document(run_id="r", trace_id="t", metadata=meta, started_at=0.0)

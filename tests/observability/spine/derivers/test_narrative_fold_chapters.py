@@ -28,7 +28,7 @@ from lca.contracts.models.observability import (
 from lca.infrastructure.observability.journal.step.narrative_writer import (
     StepNarrativeWriter,
 )
-from lca_kernel.events.fold import EpochHeader
+from lca_kernel.events.fold.fold import EpochHeader
 
 # ── helpers ──────────────────────────────────────────────────────────────
 
@@ -137,7 +137,7 @@ def _fake_fold_full(*, step_id: str) -> Any:
 
 def _fake_assistant_payload(*, step_id: str, assistant_content: str) -> Any:
     """构造 :class:`SpineLlmRequestHeaderAssistantPayload` pydantic 实例。"""
-    from lca_kernel.events.payloads_model_visible import (
+    from lca_kernel.events.payloads.payloads_model_visible import (
         SpineLlmRequestHeaderAssistantPayload,
     )
 

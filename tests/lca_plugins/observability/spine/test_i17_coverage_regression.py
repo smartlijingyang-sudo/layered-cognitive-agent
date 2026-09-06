@@ -8,7 +8,7 @@ journal execution_points 进入消费侧 union 集合。
 
 from __future__ import annotations
 
-from lca.infrastructure.observability.spine.manifest import EXECUTION_POINTS
+from lca.infrastructure.observability.spine.manifest.manifest import EXECUTION_POINTS
 
 
 def test_execution_points_whitelist_admits_new_eps() -> None:

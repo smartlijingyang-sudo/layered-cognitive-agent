@@ -22,7 +22,7 @@ from typing import Any
 import pytest
 
 from lca.contracts.capabilities import ASSISTANT_SKILL_OVERLAY
-from lca.contracts.observability.assistant_ep_closure import (
+from lca.contracts.observability.closure.assistant_ep_closure import (
     ASSISTANT_REQUIRED_FIELDS,
     ASSISTANT_SKILL_ACTIVATED,
     ASSISTANT_SKILL_INSTALLED,
@@ -33,20 +33,20 @@ from lca.contracts.protocols.assistant.skill_overlay import (
     SkillNotVerified,
     SkillSource,
 )
-from lca.contracts.protocols.declarative.declarative_common import PluginSpecKind
+from lca.contracts.protocols.declarative.declarative_1.declarative_common import PluginSpecKind
 from lca.contracts.protocols.memory.operational_skills import (
     SkillImportError,
     SkillPackage,
 )
 from lca.harness.plugin_api import definition_from_plugin
 from lca.harness.plugin.manifest import EffectClass
-from lca.infrastructure.skills.disk_store import DiskSkillPackageStore
-from lca.infrastructure.skills.settings import SkillSettings
-from lca.plugins.assistant.catalog import (
+from lca.infrastructure.skills.disk.disk_store import DiskSkillPackageStore
+from lca.infrastructure.skills.settings.settings import SkillSettings
+from lca.plugins.assistant.catalog.catalog import (
     AssistantCatalogError,
     AssistantCatalogImpl,
 )
-from lca.plugins.assistant.skill_overlay import (
+from lca.plugins.assistant.skill.skill_overlay import (
     AssistantSkillOverlayImpl,
     Config,
     setup,
@@ -500,7 +500,7 @@ class TestCrossAssistantIsolation:
 class TestPluginManifest:
     def test_definition_id_namespace(self) -> None:
         definition = definition_from_plugin(setup)
-        assert definition.spec.id == "lca.plugins.assistant.skill_overlay"
+        assert definition.spec.id == "lca.plugins.assistant.skill.skill_overlay"
 
     def test_provides_assistant_skill_overlay(self) -> None:
         definition = definition_from_plugin(setup)

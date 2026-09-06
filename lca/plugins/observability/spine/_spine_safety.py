@@ -27,12 +27,12 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from lca.infrastructure.observability.spine.event_record import (
+from lca.infrastructure.observability.spine.event.event_record import (
     Channel,
     EventRecord,
     Outcome,
 )
-from lca.infrastructure.observability.spine.event_spine import EventSpine
+from lca.infrastructure.observability.spine.event.event_spine import EventSpine
 
 _log = logging.getLogger(__name__)
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.observability.evidence import Classification, RetentionClass
+from lca.contracts.observability.evidence.evidence import Classification, RetentionClass
 from lca.infrastructure.observability.evidence.policy import DefaultEvidencePolicy
 
 

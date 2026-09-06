@@ -9,8 +9,8 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.atoms.semantic_keys import (
+from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.atoms.semantic.semantic_keys import (
     COMPLETION_EMPTY,
     COMPLETION_FULL,
     COMPLETION_PARTIAL,
@@ -20,9 +20,9 @@ from lca.contracts.atoms.semantic_keys import (
     FAILURE_KIND_VALIDATION,
     OBS_COMPLETION_QUALITY,
 )
-from lca.contracts.models.core.budget import DEFAULT_TIMEOUT_HARVEST_GRACE_S
-from lca.contracts.models.core.decision import AgentCard, Observation
-from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.policy.budget import DEFAULT_TIMEOUT_HARVEST_GRACE_S
+from lca.contracts.models.core.execution.decision import AgentCard, Observation
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.protocols import AgentTransport
 
 AgentHandler = Callable[[str], Awaitable[Observation]]

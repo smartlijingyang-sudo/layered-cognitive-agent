@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.models.observability.journal import RuntimeObserved, StampedEvent
-from lca.contracts.observability.ports import AttributePolicyBackend
+from lca.contracts.models.observability.journal.journal import RuntimeObserved, StampedEvent
+from lca.contracts.observability.core.ports import AttributePolicyBackend
 from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
 from lca.infrastructure.observability.journal.engine.engine import RunStore
 

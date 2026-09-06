@@ -73,7 +73,7 @@ class TestISession1:
     def test_i_session_1_session_protocol_exists(self) -> None:
         """SessionProtocol / SessionObserver / SessionEvent 可从 session 模块导入。"""
         assert _SESSION_MODULE.exists(), "lca_kernel/events/session.py missing"
-        from lca_kernel.events.session import (
+        from lca_kernel.events.session.session import (
             SessionEvent,
             SessionObserver,
             SessionProtocol,

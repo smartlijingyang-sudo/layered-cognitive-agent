@@ -10,9 +10,9 @@ from dataclasses import dataclass
 
 import pytest
 
-from lca.contracts.models.observability.journal import AgentRunFinished, StampedEvent
-from lca.contracts.observability.journal_store import JournalStoreBackend
-from lca.contracts.observability.ledger import LedgerDurabilityError, LedgerUnregisteredError
+from lca.contracts.models.observability.journal.journal import AgentRunFinished, StampedEvent
+from lca.contracts.observability.journal.journal_store import JournalStoreBackend
+from lca.contracts.observability.journal.ledger import LedgerDurabilityError, LedgerUnregisteredError
 from lca.infrastructure.observability.journal.engine.engine import RunStore
 
 

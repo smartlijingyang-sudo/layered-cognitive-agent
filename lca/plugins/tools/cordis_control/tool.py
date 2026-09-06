@@ -6,11 +6,11 @@ import time
 from pathlib import Path
 from typing import Any, ClassVar
 
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.atoms.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
-from lca.contracts.mechanisms.composition import ComposerError
-from lca.contracts.models.core.decision import Observation
-from lca.contracts.models.core.tool import ParameterSpec, ToolApi, ToolManifest, ToolMeta
+from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.atoms.semantic.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
+from lca.contracts.mechanisms.composition.composition import ComposerError
+from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.models.core.execution.tool import ParameterSpec, ToolApi, ToolManifest, ToolMeta
 from lca.contracts.protocols import Tool
 from lca.plugins.tools.cordis_control.creator_runtime import CreatorRuntime
 

@@ -14,22 +14,22 @@ from lca.contracts.protocols import (
     PerceiveHub,
     StateStore,
 )
-from lca.contracts.protocols.act.effect_handler import EffectHandlerRegistry
-from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseExecutor
-from lca.contracts.protocols.journal.idempotency import IdempotencyStore
-from lca.contracts.protocols.session.resume_input import ResumeInputAdapter
+from lca.contracts.protocols.act.effect.effect_handler import EffectHandlerRegistry
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseExecutor
+from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
+from lca.contracts.protocols.session.resume.resume_input import ResumeInputAdapter
 from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.state.plan import CompiledRunPlan
 from lca.contracts.protocols.state.reducer import Reducer
 from lca.harness.declarative.lifecycle.phase_observation import PhaseObserver
-from lca.plugins.composer.runtime.fixture_runtime_adapter import FixtureRuntimeAdapter
-from lca.plugins.composer.runtime.runtime_factory import (
+from lca.plugins.composer.runtime.fixture.fixture_runtime_adapter import FixtureRuntimeAdapter
+from lca.plugins.composer.runtime.runtime.runtime_factory import (
     ProductionRuntimeDeps,
     RuntimeDeps,
     build_cognitive_runtime,
     build_fixture_cognitive_runtime,
 )
-from lca.plugins.journal.declarative_runtime_seams_provider import (
+from lca.plugins.journal.declarative.declarative_runtime_seams_provider import (
     DefaultCheckpointStateResolverFactory,
     DefaultDeclarativeInterpreterFactory,
     DefaultResultFinalizerFactory,
@@ -38,7 +38,7 @@ from lca.plugins.journal.declarative_runtime_seams_provider import (
     RegistryEffectDispatcherFactory,
 )
 from lca.plugins.loop.reducer.plugin import DefaultReducer
-from lca.runtime.resume_input import HumanAnswerResumeInputAdapter
+from lca.runtime.support.resume_input import HumanAnswerResumeInputAdapter
 
 
 def _fixture_deps() -> RuntimeDeps:

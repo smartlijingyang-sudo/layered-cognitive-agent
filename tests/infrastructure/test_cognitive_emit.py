@@ -6,17 +6,17 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from lca.cognition.brain.decision_gates.chained import record_gate_decided
+from lca.cognition.brain.decision_gates.chained.chained import record_gate_decided
 from lca.contracts.harness.fold.perceive import (
     fold_context_manifest_from_events,
     fold_gate_decisions_from_events,
 )
-from lca.contracts.models.core.budget import create_budget
-from lca.contracts.models.core.decision import Decision
-from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
-from lca.contracts.models.core.perception import ContextItem, ContextManifest
-from lca.contracts.models.core.state import AgentState
-from lca.infrastructure.session.cognitive_emit import (
+from lca.contracts.models.core.policy.budget import create_budget
+from lca.contracts.models.core.execution.decision import Decision
+from lca.contracts.models.core.policy.gate_policy import GateDecided, PolicyFact
+from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
+from lca.contracts.models.core.state.state import AgentState
+from lca.infrastructure.session.emit.cognitive_emit import (
     emit_brain_think_end_for_state,
     emit_brain_think_start_for_state,
     emit_context_manifested_for_state,
@@ -114,9 +114,9 @@ def test_emit_gate_decided_noop_when_session_unbound() -> None:
 
 @pytest.mark.asyncio
 async def test_phase_fact_emitter_appends_context_manifested() -> None:
-    from lca.contracts.models.core.budget import create_budget
-    from lca.contracts.models.core.perception import ContextManifest
-    from lca.contracts.protocols.declarative.declarative_phase_graph import (
+    from lca.contracts.models.core.policy.budget import create_budget
+    from lca.contracts.models.core.perceive.perception import ContextManifest
+    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
         PhaseResult,
         SemanticPhase,
     )
@@ -270,9 +270,9 @@ async def test_run_brain_think_with_spine_facts_emits_failure_on_error() -> None
 
 @pytest.mark.asyncio
 async def test_run_reasoner_generate_thoughts_emits_prompt_assembler_eps() -> None:
-    from lca.cognition.brain.reasoner import PromptReasoner
-    from lca.contracts.models.core.llm import LLMResponse
-    from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
+    from lca.cognition.brain.reasoner.reasoner import PromptReasoner
+    from lca.contracts.models.core.conversation.llm import LLMResponse
+    from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
     from lca.contracts.protocols import LLMAdapter
 
     class _NoopLLM(LLMAdapter):

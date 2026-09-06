@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from lca_kernel import run_kernel_lifespan
-from lca_kernel.cli import create_app
+from lca_kernel.cli.cli import create_app
 
 if TYPE_CHECKING:
     from starlette.applications import Starlette
@@ -98,7 +98,7 @@ async def test_failed_boot_does_not_leak_module_singletons() -> None:
     FileNotFoundError(读 profile YAML 失败);验证 lca_kernel.cli 模块本身
     不被 boot 失败污染。
     """
-    import lca_kernel.cli as cli_module
+    import lca_kernel.cli.cli as cli_module
 
     with pytest.raises(FileNotFoundError):
         await create_app(profile_path="profiles/__missing__.yaml")

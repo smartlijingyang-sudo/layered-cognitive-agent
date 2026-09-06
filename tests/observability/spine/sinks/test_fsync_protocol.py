@@ -19,14 +19,14 @@ from typing import Any
 
 import pytest
 
-from lca.contracts.observability.fsync import FsyncProtocol
-from lca.contracts.observability.ssot import FsyncProtocol as SsotFsyncProtocol
-from lca.infrastructure.observability.spine.event_record import EventRecord
+from lca.contracts.observability.evidence.fsync import FsyncProtocol
+from lca.contracts.observability.core.ssot import FsyncProtocol as SsotFsyncProtocol
+from lca.infrastructure.observability.spine.event.event_record import EventRecord
 from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
 from lca.infrastructure.observability.spine.sinks.tracing_file_sink import (
     TracingFileSink,
 )
-from lca_kernel.events.persistence import FsyncProtocol as KernelFsyncProtocol
+from lca_kernel.events.persistence.persistence import FsyncProtocol as KernelFsyncProtocol
 
 
 def _make_rec(**overrides: Any) -> EventRecord:

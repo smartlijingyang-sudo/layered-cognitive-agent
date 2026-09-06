@@ -7,21 +7,21 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from lca.cognition.brain.modular_brain import ModularBrain
-from lca.contracts.atoms.enums import ReflectionVerdict
-from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.cognition.brain.pipeline.modular_brain import ModularBrain
+from lca.contracts.atoms.enums.enums import ReflectionVerdict
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
 from lca.contracts.capabilities import (
     COGNITIVE_REFLECTION_PIPELINE,
     COGNITIVE_THINK_PIPELINE,
 )
-from lca.contracts.models.core.decision import Decision, Observation, Reflection
-from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
+from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols import (
     CognitiveReflectionPipeline,
     CognitiveThinkPipeline,
 )
 from lca.harness.plugin.declaration import definition_from_plugin
-from lca.harness.profile.resolve import resolve_profile
+from lca.harness.profile.resolve.resolve import resolve_profile
 from lca.plugins.cognitive.brain._standard_factory import STANDARD_COGNITIVE_BRAIN_FACTORY_REQUIREMENTS
 
 REPO = Path(__file__).resolve().parents[1]

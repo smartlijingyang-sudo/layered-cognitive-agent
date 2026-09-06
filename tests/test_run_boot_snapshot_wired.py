@@ -3,12 +3,12 @@
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from lca.plugins.observability.profile_snapshot_run_boot_provider import RunBootSnapshot
+from lca.plugins.observability.profile.profile_snapshot_run_boot_provider import RunBootSnapshot
 
 
 def test_snapshot_recorder_writes_file(monkeypatch) -> None:
     """Mocked context; verify write() is called with correct args."""
-    from lca.plugins.transport.webserver.handlers.runs.session.diagnostics import (
+    from lca.plugins.transport.webserver.handlers.runs.session.diagnostics.diagnostics import (
         RunBootSnapshotRecorder,
     )
 
@@ -36,7 +36,7 @@ def test_snapshot_recorder_writes_file(monkeypatch) -> None:
 
 def test_snapshot_recorder_swallows_write_errors(monkeypatch) -> None:
     """If write fails, recorder does not raise (snapshot is diagnostic only)."""
-    from lca.plugins.transport.webserver.handlers.runs.session.diagnostics import (
+    from lca.plugins.transport.webserver.handlers.runs.session.diagnostics.diagnostics import (
         RunBootSnapshotRecorder,
     )
 
@@ -56,7 +56,7 @@ def test_snapshot_recorder_swallows_write_errors(monkeypatch) -> None:
 
 def test_snapshot_outdir_uses_default_when_no_locator() -> None:
     """Without run_locator capability, falls back to traces/runs/<id>."""
-    from lca.plugins.transport.webserver.handlers.runs.session.diagnostics import (
+    from lca.plugins.transport.webserver.handlers.runs.session.diagnostics.diagnostics import (
         _snapshot_outdir_for,
     )
 

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from lca.contracts.protocols.session.telemetry import SharingPolicy, TelemetryRecord
-from lca.plugins.session.runtime.store import SessionStore
+from lca.contracts.protocols.session.telemetry.telemetry import SharingPolicy, TelemetryRecord
+from lca.plugins.session.runtime.store.store import SessionStore
 from lca.plugins.session.telemetry_capture.telemetry_capture import SessionTelemetryCapture
 
 

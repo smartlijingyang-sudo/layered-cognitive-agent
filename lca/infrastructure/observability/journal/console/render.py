@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 
 _CARD_WIDTH = 62
 

@@ -384,6 +384,86 @@ class ToolInvokedCommitted:
     projected_state: dict[str, Any] = field(default_factory=dict)
 
 
+@session_event("decision.made.v1", visibility="model")
+@dataclass(frozen=True)
+class DecisionMadeCommitted:
+    """Durable decision fact for Session SSOT (ADR-0194 P1-11; maps to ``DecisionMade``)."""
+
+    step: int = 0
+    action_type: str = ""
+    rationale_preview: str = ""
+    delegate_target: str = ""
+    delegate_count: int = 0
+    tool_name: str = ""
+    confidence: float = 0.0
+    response_text: str = ""
+    output_truncated: bool = False
+
+
+@session_event("approval.requested.v1", visibility="model")
+@dataclass(frozen=True)
+class ApprovalRequestedCommitted:
+    """Durable HIL approval queue fact (ADR-0194 P1-11; maps to ``ApprovalRequested``)."""
+
+    envelope_id: str = ""
+    tool_name: str = ""
+    capability_grant: str = ""
+    risk_level: str = ""
+
+
+@session_event("synthesis.completed.v1", visibility="model")
+@dataclass(frozen=True)
+class SynthesisCompletedCommitted:
+    """Board synthesis completion for Session SSOT (maps to ``SynthesisCompleted``)."""
+
+    method: str = ""
+    candidate_count: int = 0
+    output_text: str = ""
+    output_truncated: bool = False
+
+
+@session_event("team.message.published.v1", visibility="model")
+@dataclass(frozen=True)
+class TeamMessagePublishedCommitted:
+    """Team inbox message for Session SSOT (maps to ``TeamMessagePublished``)."""
+
+    team_id: str = ""
+    thread_id: str = ""
+    sender_role: str = ""
+    recipient_role: str = ""
+    step: int = 0
+    body_preview: str = ""
+
+
+@session_event("memory.committed.v1", visibility="model")
+@dataclass(frozen=True)
+class MemoryCommittedCommitted:
+    """Memory layer write for Session SSOT (ADR-0194 P1-13; maps to ``MemoryCommitted``)."""
+
+    layer: str = ""
+    record_kind: str = ""
+    record_id: str = ""
+
+
+@session_event("context.compacted.v1", visibility="model")
+@dataclass(frozen=True)
+class ContextCompactedCommitted:
+    """Compaction audit for Session SSOT (ADR-0194 P1-13; maps to ``ContextCompacted``)."""
+
+    step: int = 0
+    original_kinds: tuple[str, ...] = ()
+    kept_kinds: tuple[str, ...] = ()
+    mode: str = "selection"
+    applied: bool = False
+    reason: str = ""
+    source_record_count: int = 0
+    summary_record_id: str = ""
+    original_characters: int = 0
+    result_characters: int = 0
+    compression_ratio: float = 0.0
+    coverage_ratio: float = 0.0
+
+
 @session_event("turn.control.v1", visibility="internal")
 @dataclass(frozen=True)
 class TurnControlCommitted:

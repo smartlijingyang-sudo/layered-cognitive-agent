@@ -12,8 +12,8 @@ import asyncio
 import sys
 from unittest.mock import patch
 
-from lca_kernel.errors import KernelError
-from lca_kernel.lifecycle import (
+from lca_kernel.cli.errors import KernelError
+from lca_kernel.boot.lifecycle import (
     FAIL_LOUD_RELEASE_TIMEOUT_MS,
     DefaultShutdownCoordinator,
     ShutdownCoordinator,

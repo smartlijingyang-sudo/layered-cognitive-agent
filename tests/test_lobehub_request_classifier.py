@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from lca.plugins.transport.webserver.handlers.openai_shim import classify_lobehub_chat_request
+from lca.plugins.transport.webserver.handlers.openai.openai_shim import classify_lobehub_chat_request
 
 
 class TestLobeHubRequestClassifier(unittest.TestCase):

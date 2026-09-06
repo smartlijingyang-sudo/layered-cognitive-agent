@@ -6,13 +6,13 @@ PromptReasoner is shape-agnostic: awareness renders itself into prompt vars.
 
 from __future__ import annotations
 
-from lca.cognition.brain.reasoner import build_teammates_text
+from lca.cognition.brain.reasoner.reasoner import build_teammates_text
 from lca.cognition.member_status import InMemoryMemberStatus
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.models.team.run_context import RunContext
-from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
-from lca.contracts.protocols.journal.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.run.run_context import RunContext
+from lca.contracts.models.team.team.team_awareness import ConsultDuty, TeamAwareness
+from lca.contracts.protocols.journal.spec.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
 
 
 def _make_profile(role: str, goal: str = "test") -> RoleProfile:
@@ -116,8 +116,8 @@ class _CapturingStreamLLM:
         self.prompts: list[str] = []
 
     async def stream(self, prompt: str, **kwargs: object):
-        from lca.contracts.atoms.enums import LLMStreamEventType
-        from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
+        from lca.contracts.atoms.enums.enums import LLMStreamEventType
+        from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
 
         self.prompts.append(prompt)
         response = LLMResponse(text=self.text)
@@ -129,7 +129,7 @@ class TestPromptReasonerSolo:
     """Without awareness the reasoner renders the plain role prompt."""
 
     async def test_solo_prompt_only(self) -> None:
-        from lca.cognition.brain.reasoner import PromptReasoner
+        from lca.cognition.brain.reasoner.reasoner import PromptReasoner
 
         llm = _CapturingStreamLLM()
         reasoner = PromptReasoner(
@@ -148,7 +148,7 @@ class TestPromptReasonerAwareness:
     """With awareness the reasoner merges awareness vars and its default template."""
 
     async def test_teammates_injected_from_awareness(self) -> None:
-        from lca.cognition.brain.reasoner import PromptReasoner
+        from lca.cognition.brain.reasoner.reasoner import PromptReasoner
 
         llm = _CapturingStreamLLM()
         reasoner = PromptReasoner(
@@ -169,7 +169,7 @@ class TestPromptReasonerAwareness:
         assert "write code" in prompt
 
     async def test_active_template_override(self) -> None:
-        from lca.cognition.brain.reasoner import PromptReasoner
+        from lca.cognition.brain.reasoner.reasoner import PromptReasoner
 
         llm = _CapturingStreamLLM()
         reasoner = PromptReasoner(

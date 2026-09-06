@@ -35,7 +35,7 @@ async def main() -> int:
     # ── Step 1: Boot profile ──────────────────────────────────────
     print("\n[1/6] resolve_profile + boot_resolved_profile ...")
     try:
-        from lca.harness.profile.resolve import resolve_profile
+        from lca.harness.profile.resolve.resolve import resolve_profile
 
         resolved = resolve_profile("profiles/web-standard.yaml")
         print(
@@ -51,7 +51,7 @@ async def main() -> int:
         return 1
 
     try:
-        from lca.harness.profile.boot import boot_resolved_profile
+        from lca.harness.profile.boot.boot import boot_resolved_profile
 
         ctx = await boot_resolved_profile(resolved)
         print(f"  ✓ Boot OK, context type={type(ctx).__name__}")
@@ -138,12 +138,12 @@ async def main() -> int:
     # ── Step 5: Spawn Agent ───────────────────────────────────────
     print("\n[5/6] spawn_agent (plan-bound assembly) ...")
     try:
-        from lca.application.spawn import spawn_agent
-        from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
-        from lca.contracts.protocols.journal.spec import AgentSpec
+        from lca.application.api.spawn import spawn_agent
+        from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
+        from lca.contracts.protocols.journal.spec.spec import AgentSpec
 
         # Use mock LLM to avoid needing a real key
-        from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
+        from lca.infrastructure.llm_adapter.mock.mock_llm import MockLLMAdapter
 
         spec = AgentSpec(
             profile=RoleProfile(

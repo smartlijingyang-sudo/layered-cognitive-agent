@@ -13,9 +13,9 @@ from __future__ import annotations
 
 import json
 
-from lca.contracts.models.observability.event import EventAudience
-from lca.contracts.models.observability.journal import StampedEvent
-from lca.infrastructure.observability.events.event_catalog import descriptor_for
+from lca.contracts.models.observability.event.event import EventAudience
+from lca.contracts.models.observability.journal.journal import StampedEvent
+from lca.infrastructure.observability.events.event.event_catalog import descriptor_for
 from lca.infrastructure.observability.journal.engine.journal_io import stamped_to_record
 
 SSE_SENTINEL: None = None

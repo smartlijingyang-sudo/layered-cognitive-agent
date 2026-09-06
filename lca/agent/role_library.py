@@ -15,7 +15,7 @@ from pathlib import Path
 
 import yaml
 
-from lca.contracts.protocols.collaboration.casting import (
+from lca.contracts.protocols.collaboration.casting.casting import (
     CastingError,
     RoleCard,
     RoleIndexEntry,

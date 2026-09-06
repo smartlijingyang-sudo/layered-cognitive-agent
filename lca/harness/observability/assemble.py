@@ -14,8 +14,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.observability.named_registry import NamedRegistry
-from lca.contracts.observability.ports import (
+from lca.contracts.observability.registry.named_registry import NamedRegistry
+from lca.contracts.observability.core.ports import (
     AttributePolicyBackend,
     JournalBackend,
     ScorerFn,

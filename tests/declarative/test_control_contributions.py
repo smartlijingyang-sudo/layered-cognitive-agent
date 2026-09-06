@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.atoms.enums import ActionType, ReflectionVerdict
-from lca.contracts.models.core.budget import Budget
-from lca.contracts.models.core.decision import Decision, Observation, Reflection, ToolCall, Turn
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseInput
+from lca.contracts.atoms.enums.enums import ActionType, ReflectionVerdict
+from lca.contracts.models.core.policy.budget import Budget
+from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection, ToolCall, Turn
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseInput
 from lca.contracts.protocols.gate.control_verdict import ControlVerdictKind
-from lca.harness.declarative.compile.phase_capabilities import MappingPhaseCapabilities
+from lca.harness.declarative.compile.phase.phase_capabilities import MappingPhaseCapabilities
 from lca.plugins.control_contributions import (
     ActAuthorizeExecutor,
     ActBudgetExecutor,

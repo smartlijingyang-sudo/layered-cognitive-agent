@@ -14,31 +14,31 @@ from pathlib import Path
 
 import pytest
 
-from lca.cognition.body.tool_batch_execution import SafeToolBatchExecutionPolicy
-from lca.contracts.protocols.act.action_handler import ActionHandlerRegistry
-from lca.contracts.protocols.act.command_envelope import CapabilityGrant, CommandEnvelope
-from lca.contracts.protocols.act.effect_handler import EffectHandler, EffectHandlerRegistry
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.cognition.body.tools.tool_batch_execution import SafeToolBatchExecutionPolicy
+from lca.contracts.protocols.act.action.action_handler import ActionHandlerRegistry
+from lca.contracts.protocols.act.command.command_envelope import CapabilityGrant, CommandEnvelope
+from lca.contracts.protocols.act.effect.effect_handler import EffectHandler, EffectHandlerRegistry
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     DeclarativeValidationError,
     EffectPolicyPlan,
 )
 from lca.contracts.protocols.state.delta_handler import DeltaHandler, DeltaHandlerRegistry
 from lca.harness.declarative.execute.dispatch import RegistryEffectDispatcher
-from lca.plugins.act.action_handlers_provider import (
+from lca.plugins.act.action.action_handlers_provider import (
     DefaultActionHandlerRegistry,
     InMemoryActionHandlerRegistry,
     register_default_action_handlers,
 )
-from lca.plugins.act.delta_handlers_provider import (
+from lca.plugins.act.delta.delta_handlers_provider import (
     DefaultDeltaHandlerRegistry,
     InMemoryDeltaHandlerRegistry,
     register_default_delta_handlers,
 )
-from lca.plugins.act.effect_handlers_provider import (
+from lca.plugins.act.effect.effect_handlers_provider import (
     InMemoryEffectHandlerRegistry,
 )
 from lca.loop.driver import RuntimePhaseCapabilities
-from lca.runtime.idempotency_fixtures import InMemoryFixtureIdempotencyStore
+from lca.runtime._overflow_0.idempotency_fixtures import InMemoryFixtureIdempotencyStore
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -405,8 +405,8 @@ async def test_effect_class_rejects_non_string_metadata_before_handler() -> None
 @pytest.mark.parametrize("operation", ["", 7, None])
 def test_delta_reducer_rejects_invalid_operation_before_registry_lookup(operation) -> None:
     """Delta operation names are typed inputs at the reducer seam."""
-    from lca.contracts.models.core.state import AgentState, Budget
-    from lca.contracts.protocols.act.command_envelope import RunDelta
+    from lca.contracts.models.core.state.state import AgentState, Budget
+    from lca.contracts.protocols.act.command.command_envelope import RunDelta
     from lca.harness.declarative.execute.dispatch import RegistryDeltaReducer
 
     class _Reducer:

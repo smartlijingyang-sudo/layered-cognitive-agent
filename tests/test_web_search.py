@@ -5,10 +5,10 @@ from __future__ import annotations
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from lca.infrastructure.search.models import SearchHit, SearchResponse
-from lca.infrastructure.search.router import is_search_intent, resolve_llm_search_kwargs
-from lca.infrastructure.search.scope import search_run_scope
-from lca.infrastructure.search.service import format_search_content
+from lca.infrastructure.search.models.models import SearchHit, SearchResponse
+from lca.infrastructure.search.router.router import is_search_intent, resolve_llm_search_kwargs
+from lca.infrastructure.search.scope.scope import search_run_scope
+from lca.infrastructure.search.service.service import format_search_content
 from lca.infrastructure.tools.web_search import build_tools as build_web_search_tools
 
 

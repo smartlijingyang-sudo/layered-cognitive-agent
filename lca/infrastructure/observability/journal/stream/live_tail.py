@@ -14,8 +14,8 @@ from dataclasses import dataclass
 
 import structlog
 
-from lca.contracts.models.observability.journal import StampedEvent, StepTextDelta
-from lca.contracts.observability.run_journal import LiveRunProjection
+from lca.contracts.models.observability.journal.journal import StampedEvent, StepTextDelta
+from lca.contracts.observability.journal.run_journal import LiveRunProjection
 from lca.contracts.protocols import JournalProjector
 from lca.infrastructure.observability.journal.sse.frames import stamped_to_sse_frame
 

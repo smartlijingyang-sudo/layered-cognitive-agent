@@ -27,8 +27,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from lca.contracts.observability.incarnation import Incarnation
-from lca.contracts.observability.loop_cursor_payloads import RequestHeader
+from lca.contracts.observability.core.incarnation import Incarnation
+from lca.contracts.observability.cursor.loop_cursor_payloads import RequestHeader
 from lca.infrastructure.observability.loop_cursor import StdLoopCursor
 
 # ── stub spine + helpers ──────────────────────────────────────────────

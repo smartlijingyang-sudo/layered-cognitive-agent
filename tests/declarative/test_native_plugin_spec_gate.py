@@ -7,8 +7,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from lca.harness.declarative.compile.compiler import compile_declarative_projection
-from lca.harness.profile.resolve import resolve_profile
+from lca.harness.declarative.compile.compiler.compiler import compile_declarative_projection
+from lca.harness.profile.resolve.resolve import resolve_profile
 
 
 def test_declarative_compilation_rejects_an_active_legacy_plugin_definition() -> None:

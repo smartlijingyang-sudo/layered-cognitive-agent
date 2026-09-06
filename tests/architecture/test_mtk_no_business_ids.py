@@ -14,7 +14,7 @@ MTK_ROOTS = (
     LCA / "harness" / "graph",
     LCA / "loop" / "driver.py",
     LCA / "loop" / "transaction.py",
-    LCA / "loop" / "phase_fact_emitter.py",
+    LCA / "loop" / "emit" / "spine" / "phase_fact.py",
 )
 
 # Concrete bundle/profile plugin ids and tool brands — MTK uses capability prefixes only.

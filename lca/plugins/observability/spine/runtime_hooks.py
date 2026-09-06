@@ -54,14 +54,14 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from lca.harness.declarative.compile.instrument_wrap import (
+from lca.harness.declarative.compile.instrument.instrument_wrap import (
     _emit_spine_direct,
     set_active_spine_accessor,
 )
-from lca.infrastructure.observability.spine.context import SpineContext
-from lca.infrastructure.observability.spine.event_record import Channel
-from lca.infrastructure.observability.spine.event_record import Outcome as OutcomeT
-from lca.infrastructure.observability.spine.event_spine import EventSpine
+from lca.infrastructure.observability.spine.context.context import SpineContext
+from lca.infrastructure.observability.spine.event.event_record import Channel
+from lca.infrastructure.observability.spine.event.event_record import Outcome as OutcomeT
+from lca.infrastructure.observability.spine.event.event_spine import EventSpine
 
 log = logging.getLogger(__name__)
 
@@ -116,7 +116,7 @@ def emit_through_pipeline(
     if exc is not None:
         # Reuse the wrap-side helper so the two emission paths emit
         # identical field names and traceback caps.
-        from lca.harness.declarative.compile.instrument_wrap import (
+        from lca.harness.declarative.compile.instrument.instrument_wrap import (
             _exception_payload,
         )
 

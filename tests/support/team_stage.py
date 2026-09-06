@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from unittest.mock import MagicMock
 
 from lca.agent.member_invoke import TransportMemberInvoker
-from lca.contracts.models.core.decision import Observation
+from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.protocols import TeamStage
 from lca.infrastructure.transport.agent_transport import InternalTransport
 

@@ -8,9 +8,9 @@ from typing import Any
 import httpx
 import structlog
 
-from lca.infrastructure.search.constants import NEWS_TOPIC_HINTS, PROVIDER_TAVILY
-from lca.infrastructure.search.models import SearchHit, SearchResponse
-from lca.infrastructure.search.settings import SearchSettings, get_search_settings
+from lca.infrastructure.search.constants.constants import NEWS_TOPIC_HINTS, PROVIDER_TAVILY
+from lca.infrastructure.search.models.models import SearchHit, SearchResponse
+from lca.infrastructure.search.settings.settings import SearchSettings, get_search_settings
 
 _log = structlog.get_logger(__name__)
 

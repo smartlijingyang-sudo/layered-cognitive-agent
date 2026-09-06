@@ -197,7 +197,7 @@ class TestStrictPlanBinding:
         """Production Agent binding must not accept a second plan interpretation."""
 
         from lca.contracts.protocols.state.plan import CapabilityBinding
-        from lca.harness.profile.boot_products import (
+        from lca.harness.profile.boot.boot_products import (
             ProfileBootProducts,
             attach_profile_boot_products,
         )
@@ -247,7 +247,7 @@ class TestStrictPlanBinding:
         )
 
     def test_plan_ref_is_propagated(self) -> None:
-        from lca.contracts.protocols.declarative.declarative_phase_graph import CapabilityBinding
+        from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import CapabilityBinding
         from lca.harness.plan import compiled_run_plan_ref
 
         plan = _plan(
@@ -338,7 +338,7 @@ class TestStrictTeamBinding:
                 ),
             ),
         )
-        from lca.harness.profile.boot_products import (
+        from lca.harness.profile.boot.boot_products import (
             ProfileBootProducts,
             attach_profile_boot_products,
         )
@@ -355,9 +355,9 @@ class TestStrictTeamBinding:
 class TestDefaultProfilePlanBinding:
     @pytest.mark.asyncio
     async def test_default_profile_binds_plan_to_solo_agent(self) -> None:
-        from lca.application.api import ensure_default_ctx
-        from lca.application.spawn import spawn_agent
-        from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
+        from lca.application.api.api import ensure_default_ctx
+        from lca.application.api.spawn import spawn_agent
+        from lca.infrastructure.llm_adapter.mock.mock_llm import MockLLMAdapter
         from tests.support.agent_specs import make_spec
 
         scope = await ensure_default_ctx()
@@ -366,7 +366,7 @@ class TestDefaultProfilePlanBinding:
         assert agent.runtime is not None
 
     def test_spawn_agent_exposes_no_legacy_selection_parameters(self) -> None:
-        from lca.application.spawn import spawn_agent
+        from lca.application.api.spawn import spawn_agent
 
         parameters = inspect.signature(spawn_agent).parameters
         assert "compiled_plan" not in parameters
@@ -387,8 +387,8 @@ def _plan(
     ``capability_bindings`` consumed by ``_composer_bindings`` to discover
     composers from the compiled plan (ADR-0074/0075 cutover).
     """
-    from lca.contracts.atoms.scope import Scope
-    from lca.contracts.protocols.declarative.declarative_phase_graph import (
+    from lca.contracts.atoms.scope.scope import Scope
+    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
         ActionAuthorityPlan,
         CognitivePhaseGraphPlan,
         PhaseBinding,

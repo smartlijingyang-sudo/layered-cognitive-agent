@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from lca.infrastructure.computer.op_result import ComputerOpResult
-from lca.infrastructure.computer.ops import ComputerOps, SandboxExecOps
+from lca.infrastructure.computer.op.op_result import ComputerOpResult
+from lca.infrastructure.computer.ops.ops import ComputerOps, SandboxExecOps
 from lca.infrastructure.tools.lca_computer.types import ApiName
 
 
@@ -139,7 +139,7 @@ class LcaComputerExecutor:
         )
 
     async def execute_code(self, params: dict[str, Any]) -> ComputerOpResult:
-        from lca.contracts.models.core.sandbox import DEFAULT_SANDBOX_TIMEOUT_S
+        from lca.contracts.models.core.execution.sandbox import DEFAULT_SANDBOX_TIMEOUT_S
 
         return await self._ops.execute_code(
             code=_str_arg(params, "code"),

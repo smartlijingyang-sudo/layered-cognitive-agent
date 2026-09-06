@@ -7,18 +7,18 @@ Plugin ``DelegationCachePlugin`` delegates to this module for shared semantics.
 
 from __future__ import annotations
 
-from lca.contracts.atoms.enums import MemoryRecordKind
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.atoms.semantic_keys import (
+from lca.contracts.atoms.enums.enums import MemoryRecordKind
+from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.atoms.semantic.semantic_keys import (
     OBS_CACHE_HIT,
     OBS_MEMBER_RESULTS,
     OBS_MEMBER_SUBTASKS,
     OBS_RESULT_KIND,
     OBS_TASK_ID,
 )
-from lca.contracts.models.core.decision import DelegationSpec, Observation
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.team.delegation import find_result
+from lca.contracts.models.core.execution.decision import DelegationSpec, Observation
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.team.delegation.delegation import find_result
 
 
 def cached_delegation_observation(spec: DelegationSpec, state: AgentState) -> Observation | None:

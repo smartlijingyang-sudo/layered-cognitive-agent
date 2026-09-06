@@ -11,7 +11,7 @@ import sys
 
 from lca.harness.graph.execute.interpreter import compiled_run_plan_ref
 from lca.harness.composition.plan_compiler import CompileOptions, compile_plan
-from lca.harness.profile.resolve import resolve_profile
+from lca.harness.profile.resolve.resolve import resolve_profile
 
 # ---------- 0. 编译计划 --------------------------------------------------------
 profile_path = sys.argv[1] if len(sys.argv) > 1 else "profiles/web-standard.yaml"

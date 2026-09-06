@@ -16,12 +16,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from lca.infrastructure.observability.spine.context import SpineContext
-from lca.infrastructure.observability.spine.derivers.step_tree_accumulator import (
+from lca.infrastructure.observability.spine.context.context import SpineContext
+from lca.infrastructure.observability.spine.derivers.step.step_tree_accumulator import (
     StepTreeAccumulatorDeriver,
 )
-from lca.infrastructure.observability.spine.event_record import EventRecord
-from lca.infrastructure.observability.spine.event_spine import EventSpine
+from lca.infrastructure.observability.spine.event.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.event_spine import EventSpine
 from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
 from lca.infrastructure.observability.writable_matrix import (
     LineCoalescer,
@@ -31,7 +31,7 @@ from lca.infrastructure.observability.writable_matrix import (
     StandardDriver,
     WritableFaceRegistry,
 )
-from lca.runtime.journal_setup import BuildJournalMetadata, build_step_coordinator
+from lca.runtime.support.journal_setup import BuildJournalMetadata, build_step_coordinator
 
 
 def _make_event(**overrides: object) -> EventRecord:

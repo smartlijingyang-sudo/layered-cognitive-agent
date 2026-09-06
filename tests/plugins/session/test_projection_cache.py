@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from lca.contracts.protocols.session.projection_unit import ProjectionCheckpoint
+from lca.contracts.protocols.session.projection.projection_unit import ProjectionCheckpoint
 from lca.infrastructure.persistence.atomic_json_sink import AtomicJsonFileSink, AtomicJsonSnapshot
 from lca.plugins.session.projection_cache.projection_cache import ProjectionCache
 from lca.session.append import Session

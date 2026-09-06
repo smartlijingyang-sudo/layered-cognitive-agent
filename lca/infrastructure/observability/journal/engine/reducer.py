@@ -9,12 +9,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     AgentRunFinished,
     StampedEvent,
     TeamRunFinished,
 )
-from lca.contracts.observability.status import RunLifecycleStatus
+from lca.contracts.observability.registry.status import RunLifecycleStatus
 
 # COMPAT(delete-when: rg "\bRunStatus\." 生产引用归零、全部改走 RunLifecycleStatus,
 # tracking: ADR-0183 PR-11)

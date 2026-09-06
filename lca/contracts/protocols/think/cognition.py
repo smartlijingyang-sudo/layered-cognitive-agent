@@ -9,14 +9,14 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.models.core.decision import Decision, Observation, Reflection
-from lca.contracts.models.core.llm import LLMResponse
-from lca.contracts.models.core.perception import ContextItem, ContextManifest
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.team.role_team import RoleProfile
+from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
+from lca.contracts.models.core.conversation.llm import LLMResponse
+from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.team.role.role_team import RoleProfile
 from lca.contracts.protocols.memory.memory import MemorySystem
 from lca.contracts.protocols.memory.operational_skills import SkillPackageStore
-from lca.contracts.protocols.runtime.infra import LLMAdapter, Tool
+from lca.contracts.protocols.runtime.infra.infra import LLMAdapter, Tool
 
 
 @runtime_checkable

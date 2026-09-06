@@ -22,8 +22,8 @@ import logging
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
-from lca.contracts.atoms.enums import LLMStreamEventType
-from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
+from lca.contracts.atoms.enums.enums import LLMStreamEventType
+from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.protocols import LLMAdapter
 
 if TYPE_CHECKING:
@@ -81,7 +81,7 @@ def _tool_calls_payload(response: LLMResponse) -> list[dict[str, Any]] | None:
 
 
 def _emit_lifecycle_pre(step_index: int, kwargs: dict[str, Any]) -> None:
-    from lca.infrastructure.session.lifecycle_emit import request_model
+    from lca.infrastructure.session.emit.lifecycle_emit import request_model
 
     _turn, step = 1, step_index + 1
     provider, model = _model_identity(kwargs)
@@ -89,7 +89,7 @@ def _emit_lifecycle_pre(step_index: int, kwargs: dict[str, Any]) -> None:
 
 
 def _emit_lifecycle_post(step_index: int, response: LLMResponse) -> None:
-    from lca.infrastructure.session.lifecycle_emit import complete_model
+    from lca.infrastructure.session.emit.lifecycle_emit import complete_model
 
     _turn, step = 1, step_index + 1
     usage = response.usage if isinstance(response.usage, dict) else None
@@ -103,7 +103,7 @@ def _emit_lifecycle_post(step_index: int, response: LLMResponse) -> None:
 
 
 def _emit_lifecycle_fail(step_index: int, error: str) -> None:
-    from lca.infrastructure.session.lifecycle_emit import fail_model
+    from lca.infrastructure.session.emit.lifecycle_emit import fail_model
 
     fail_model(turn=1, step=step_index + 1, error=error)
 

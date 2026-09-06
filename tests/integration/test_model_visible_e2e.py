@@ -23,7 +23,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from lca.contracts.observability.replay import StepContextAt
+from lca.contracts.observability.evidence.replay import StepContextAt
 from lca.infrastructure.observability.replay import (
     SOURCE_FOLD,
     StandardCursor,
@@ -32,8 +32,8 @@ from lca.infrastructure.observability.replay import (
 from lca.infrastructure.observability.spine.sinks.naming import (
     spine_filename_for_run,
 )
-from lca_kernel.events.fold import canonicalHeader, headerEquals
-from lca_kernel.events.payloads_model_visible import (
+from lca_kernel.events.fold.fold import canonicalHeader, headerEquals
+from lca_kernel.events.payloads.payloads_model_visible import (
     SpineLlmRequestHeaderAssistantPayload,
 )
 
@@ -151,7 +151,7 @@ def test_e2e_spine_jsonl_contains_both_event_types(tmp_path: Path) -> None:
     _write_spine(tmp_path, run_id, events)
 
     # 读 spine ledger,断言两类事件各 1 条 + 数量正确
-    from lca_kernel.events.reader import SpineReader
+    from lca_kernel.events.reader.reader import SpineReader
 
     spine_path = tmp_path / "runs" / run_id / spine_filename_for_run(run_id)
     records = list(SpineReader(run_id=run_id, path=spine_path).events())
@@ -206,7 +206,7 @@ def test_e2e_fold_reconstructs_header_byte_equal_to_publisher_payload(
 
 def _payload_to_epoch_header(payload: Mapping[str, Any]) -> Any:
     """``spine.llm.request.header`` payload → :class:`EpochHeader` 形态。"""
-    from lca_kernel.events.fold import EpochHeader
+    from lca_kernel.events.fold.fold import EpochHeader
 
     return EpochHeader(
         config=payload.get("config"),
@@ -325,7 +325,7 @@ def test_e2e_standard_cursor_walks_fold_path(tmp_path: Path) -> None:
     from lca.infrastructure.observability.replay.fold_source import (
         _canonical_digest,
     )
-    from lca_kernel.events.fold import EpochHeader
+    from lca_kernel.events.fold.fold import EpochHeader
 
     expected_canonical = canonicalHeader(
         EpochHeader(

@@ -16,14 +16,14 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from lca.contracts.observability.cordis_event_table import (
+from lca.contracts.observability.infra.cordis_event_table import (
     CordisEventTableEntry,
     UnknownCordisEventError,
     all_execution_points,
     lookup_cordis_name,
 )
-from lca.contracts.observability.event_descriptor import EventDescriptor
-from lca.contracts.observability.loop_cursor import PhaseName
+from lca.contracts.observability.event.event_descriptor import EventDescriptor
+from lca.contracts.observability.cursor.loop_cursor import PhaseName
 
 
 def test_event_descriptor_is_frozen() -> None:

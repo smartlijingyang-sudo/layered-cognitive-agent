@@ -11,11 +11,11 @@ if TYPE_CHECKING:
     import pytest
 
 from lca.contracts.capabilities import BRAIN_PROMPT_CATALOG_FACTORY, BRAINS
-from lca.contracts.models.core.decision import Decision, Observation, Reflection
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.protocols.journal.spec import AgentSpec
-from lca.harness.profile.resolve import resolve_profile
+from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.protocols.journal.spec.spec import AgentSpec
+from lca.harness.profile.resolve.resolve import resolve_profile
 from lca.plugins.composer.composition.prompt_catalog import DefaultBrainPromptCatalogFactory
 from lca.plugins.composer.think import brain
 

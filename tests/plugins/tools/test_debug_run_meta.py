@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.plugins.tools.diagnostics.debug_run import _spine_meta_family_counts
+from lca.plugins.tools.diagnostics.debug.debug_run import _spine_meta_family_counts
 
 
 def test_spine_meta_family_counts_groups_events() -> None:

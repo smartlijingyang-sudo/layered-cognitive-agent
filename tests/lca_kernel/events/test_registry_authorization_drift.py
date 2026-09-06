@@ -21,8 +21,8 @@ from pathlib import Path
 
 import pytest
 
-from lca_kernel.events.errors import AuthMatrixMismatchError, UnknownPluginIdError
-from lca_kernel.events.registry import EventRegistry
+from lca_kernel.events.errors.errors import AuthMatrixMismatchError, UnknownPluginIdError
+from lca_kernel.events.registry.registry import EventRegistry
 
 
 def _config_dir() -> Path:
@@ -36,7 +36,7 @@ def test_validate_publisher_authorization_passes_with_aligned_catalog() -> None:
     + spine_loop_cursor + spine_writable_matrix)。此测试用同一份 catalog
     注入,验证 :meth:`validate_publisher_authorization` 不抛。
     """
-    from lca_kernel.events.test_catalog import build_test_catalog
+    from lca_kernel.events.test.test_catalog import build_test_catalog
 
     config_dir = _config_dir()
     catalog = build_test_catalog()
@@ -66,7 +66,7 @@ def test_validate_publisher_authorization_fails_with_empty_catalog() -> None:
 
 def test_validate_publisher_authorization_drift_message_includes_token() -> None:
     """Drift 信息含具体 token,运营可据此定位 yaml 错位行。"""
-    from lca_kernel.events.test_catalog import build_test_catalog
+    from lca_kernel.events.test.test_catalog import build_test_catalog
 
     # 拿掉一个 reflector 的 catalog 项,模拟"yaml 引用了但 plugin 没启"
     catalog = build_test_catalog()
@@ -82,7 +82,7 @@ def test_validate_publisher_authorization_drift_message_includes_token() -> None
 
 def test_check_manifest_emits_aligned_passes_for_known_publisher() -> None:
     """plugin 声明的 emits 都是已登记 category 且 plugin 在 publishers 集合 → 通过。"""
-    from lca_kernel.events.test_catalog import build_test_catalog
+    from lca_kernel.events.test.test_catalog import build_test_catalog
 
     catalog = build_test_catalog()
     registry = EventRegistry.load(_config_dir(), catalog=catalog)
@@ -102,7 +102,7 @@ def test_check_manifest_emits_aligned_passes_for_known_publisher() -> None:
 
 def test_check_manifest_emits_aligned_fails_for_unknown_execution_point() -> None:
     """plugin emits 包含未登记的 execution_point → AuthMatrixMismatchError。"""
-    from lca_kernel.events.test_catalog import build_test_catalog
+    from lca_kernel.events.test.test_catalog import build_test_catalog
 
     catalog = build_test_catalog()
     registry = EventRegistry.load(_config_dir(), catalog=catalog)
@@ -117,7 +117,7 @@ def test_check_manifest_emits_aligned_fails_for_unknown_execution_point() -> Non
 
 def test_check_manifest_emits_aligned_fails_for_emits_not_in_publishers() -> None:
     """plugin 用了别的 plugin 授权的 category(自己不在 publishers 集合)→ fail。"""
-    from lca_kernel.events.test_catalog import build_test_catalog
+    from lca_kernel.events.test.test_catalog import build_test_catalog
 
     catalog = build_test_catalog()
     registry = EventRegistry.load(_config_dir(), catalog=catalog)
@@ -132,7 +132,7 @@ def test_check_manifest_emits_aligned_fails_for_emits_not_in_publishers() -> Non
 
 def test_check_manifest_emits_aligned_passes_for_empty_emits() -> None:
     """emits 为空(未声明)→ 不抛(向后兼容:不强制每个 plugin 都声明 emits)。"""
-    from lca_kernel.events.test_catalog import build_test_catalog
+    from lca_kernel.events.test.test_catalog import build_test_catalog
 
     catalog = build_test_catalog()
     registry = EventRegistry.load(_config_dir(), catalog=catalog)

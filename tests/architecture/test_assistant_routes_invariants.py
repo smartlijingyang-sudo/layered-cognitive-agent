@@ -85,27 +85,27 @@ class TestIAssistantRoutesProfileIsolation:
     """
 
     def test_web_standard_does_not_resolve_routes_assistants(self) -> None:
-        from lca.harness.profile.resolve import resolve_profile
+        from lca.harness.profile.resolve.resolve import resolve_profile
 
         resolved = resolve_profile("profiles/web-standard.yaml")
         ids = {plugin.id for plugin in resolved.plugins}
-        assert "lca.plugins.transport.webserver.routes_assistants" not in ids, (
+        assert "lca.plugins.transport.webserver.routes_1.routes_assistants" not in ids, (
             "I-A10 violated: routes_assistants must not appear in web-standard"
         )
 
     def test_web_standard_does_not_resolve_assistant_catalog(self) -> None:
         """Catalog plugin 来自 ``assistant-runtime`` bundle（PR-3）；
         ``web-standard`` 不装载，避免 I-A1 / P6 存量零打扰破坏。"""
-        from lca.harness.profile.resolve import resolve_profile
+        from lca.harness.profile.resolve.resolve import resolve_profile
 
         resolved = resolve_profile("profiles/web-standard.yaml")
         ids = {plugin.id for plugin in resolved.plugins}
-        assert "lca.plugins.assistant.catalog" not in ids
-        assert "lca.plugins.assistant.bootstrap" not in ids
-        assert "lca.plugins.assistant.workspace" not in ids
-        assert "lca.plugins.assistant.skill_overlay" not in ids
-        assert "lca.plugins.assistant.jobs" not in ids
-        assert "lca.plugins.assistant.evolve" not in ids
+        assert "lca.plugins.assistant.catalog.catalog" not in ids
+        assert "lca.plugins.assistant.bootstrap.bootstrap" not in ids
+        assert "lca.plugins.assistant.workspace.workspace" not in ids
+        assert "lca.plugins.assistant.skill.skill_overlay" not in ids
+        assert "lca.plugins.assistant.jobs.jobs" not in ids
+        assert "lca.plugins.assistant.evolve.evolve" not in ids
 
 
 # ── I-A9: 不新增顶层 loop 类（PR-5 delete-when 守门）─────────────────────────
@@ -223,19 +223,19 @@ class TestIAssistantRoutesBootContract:
     """
 
     def test_module_id_matches_convention(self) -> None:
-        from lca.plugins.transport.webserver.routes_assistants import setup as plugin
+        from lca.plugins.transport.webserver.routes_1.routes_assistants import setup as plugin
 
         defn = plugin._lca_definition
-        assert defn.id == "lca.plugins.transport.webserver.routes_assistants"
+        assert defn.id == "lca.plugins.transport.webserver.routes_1.routes_assistants"
 
     def test_requires_is_only_route_registry(self) -> None:
-        from lca.plugins.transport.webserver.routes_assistants import setup as plugin
+        from lca.plugins.transport.webserver.routes_1.routes_assistants import setup as plugin
 
         defn = plugin._lca_definition
         assert set(defn.required_capability_keys) == {"route_registry"}
 
     def test_plugin_does_not_declare_filesystem_or_network_effects(self) -> None:
-        from lca.plugins.transport.webserver.routes_assistants import setup as plugin
+        from lca.plugins.transport.webserver.routes_1.routes_assistants import setup as plugin
 
         defn = plugin._lca_definition
         effect_values = set(getattr(defn, "effects", set()) or set())

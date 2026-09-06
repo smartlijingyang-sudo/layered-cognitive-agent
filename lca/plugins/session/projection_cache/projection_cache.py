@@ -30,26 +30,26 @@ from typing import TYPE_CHECKING, Any, cast
 import structlog
 from pydantic import BaseModel
 
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     LifecycleContract,
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.protocols.session.projection_unit import (
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.session.projection.projection_unit import (
     ProjectionCheckpoint,
     ProjectionSnapshot,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.persistence.atomic_json_sink import AtomicJsonFileSink, AtomicJsonSnapshot
 from lca.infrastructure.persistence.write_behind import WriteBehindBuffer
-from lca_kernel.events.session import SessionEvent
+from lca_kernel.events.session.session import SessionEvent
 
 if TYPE_CHECKING:
-    from lca_kernel.events.session import SessionProtocol
+    from lca_kernel.events.session.session import SessionProtocol
 
 _log = structlog.get_logger(__name__)
 

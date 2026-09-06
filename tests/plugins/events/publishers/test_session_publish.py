@@ -22,20 +22,20 @@ from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
     set_publish_session,
 )
-from lca_kernel.events.bus import EventBus
-from lca_kernel.events.errors import MissingPublishSessionError
+from lca_kernel.events.bus.bus import EventBus
+from lca_kernel.events.errors.errors import MissingPublishSessionError
 
 
 @pytest.fixture
 def bus() -> EventBus:
     config_dir = Path(__file__).resolve().parents[4] / "lca_kernel" / "events" / "config"
-    from lca_kernel.events.test_catalog import build_test_bus
+    from lca_kernel.events.test.test_catalog import build_test_bus
 
     return build_test_bus(config_dir)
 
 
 def _sp_payload(execution_point: str, channel: str = "fact") -> Any:
-    from lca_kernel.events.payloads import Category, SpineEventPayload
+    from lca_kernel.events.payloads.payloads import Category, SpineEventPayload
 
     return SpineEventPayload(
         category=Category("spine.cognition.brain.perceive.start"),
@@ -112,7 +112,7 @@ def test_publish_via_session_does_not_call_eventbus_when_session_set(
     bus: EventBus,
 ) -> None:
     """Session 已注入时,鉴权后走 Session.append,不触达 EventBus.publish。"""
-    from lca_kernel.events.payloads import Category, SpineEventPayload
+    from lca_kernel.events.payloads.payloads import Category, SpineEventPayload
 
     # 不装载 sink,EventBus 走 zero-sink strict 路径会抛 ——
     # 但 Session 路径不走 EventBus.publish,所以此 publish 应无异常。
@@ -186,7 +186,7 @@ def test_set_publish_session_wraps_runtime_session(bus: EventBus) -> None:
     from lca.plugins.events.publishers.delegation_cache.plugin import (
         DelegationCachePlugin,
     )
-    from lca.plugins.session.runtime.bus_facade import SessionBusFacade
+    from lca.plugins.session.runtime.bus.bus_facade import SessionBusFacade
     from lca.session.append import Session
 
     session = Session("pub-wrap")
@@ -212,7 +212,7 @@ def test_set_publish_session_wraps_runtime_session(bus: EventBus) -> None:
 
 
 def test_set_publish_session_does_not_rewrap_facade() -> None:
-    from lca.plugins.session.runtime.bus_facade import SessionBusFacade
+    from lca.plugins.session.runtime.bus.bus_facade import SessionBusFacade
     from lca.session.append import Session
 
     facade = SessionBusFacade(Session("pub-once"))

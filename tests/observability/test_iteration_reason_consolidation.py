@@ -29,7 +29,7 @@ from __future__ import annotations
 from typing import get_args
 
 from lca.contracts.observability import resume as resume_module
-from lca.contracts.observability.loop_cursor import IterationReason as CanonicalReason
+from lca.contracts.observability.cursor.loop_cursor import IterationReason as CanonicalReason
 
 
 def test_iteration_reason_alias_is_loop_cursor_symbol() -> None:
@@ -70,7 +70,7 @@ def test_iteration_reason_rejects_unknown_value() -> None:
 
 def test_resume_spec_default_iteration_reason_is_known() -> None:
     """``ResumeSpec.iteration_reason`` defaults to a known close-set value."""
-    from lca.contracts.observability.resume import ResumeSpec
+    from lca.contracts.observability.registry.resume import ResumeSpec
 
     spec = ResumeSpec(
         run_id="r",

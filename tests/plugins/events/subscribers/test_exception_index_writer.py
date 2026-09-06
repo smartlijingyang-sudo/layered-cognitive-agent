@@ -10,7 +10,7 @@ import pytest
 from lca.infrastructure.persistence.run_buffer_registry import RunWriteBehindRegistry
 from lca.plugins.events.subscribers.exception_index_writer import ExceptionIndexWriter
 from lca_kernel.events import EventRef
-from lca_kernel.events.payloads import SpineEventPayload
+from lca_kernel.events.payloads.payloads import SpineEventPayload
 
 
 @pytest.fixture(autouse=True)

@@ -1,3 +1,5 @@
+# Semantic directory split plan — see scripts/split_oversized_directories.py
+
 max_per_dir = 5
 
 [lca.contracts.observability]
@@ -12,14 +14,6 @@ closure = ["assistant_ep_closure.py", "composio_ep_closure.py", "skill_meta_ep_c
 infra = ["close_barrier.py", "cli_debug_command.py", "coding_agent_tools.py", "cordis_event_table.py"]
 core = ["error_codes.py", "incarnation.py", "ports.py", "ssot.py"]
 
-[lca.contracts.models.core]
-state = ["state.py", "lifecycle.py", "terminal_outcome.py", "guest_layout.py", "plane.py"]
-execution = ["execution.py", "decision.py", "result.py", "tool.py", "sandbox.py"]
-conversation = ["conversation.py", "message.py", "llm.py", "memory.py", "attachment.py"]
-policy = ["gate_policy.py", "loop_policy.py", "sandbox_policy.py", "budget.py", "stop.py"]
-workspace = ["workspace.py", "file_ref.py", "preinstall.py", "activation.py", "approval.py"]
-perceive = ["perception.py", "perceive_projection.py"]
-
 [lca.cognition.body]
 executor = ["safe_executor.py", "pipeline_safe_executor.py", "simple_body.py", "cursor_record.py"]
 tools = ["tool_registry.py", "tool_batch_execution.py", "tool_batch_executor.py", "tool_result_preview.py", "tool_wire_gate.py"]
@@ -33,41 +27,10 @@ reasoner = ["reasoner.py", "critic.py", "synthesizer.py", "null_critic.py", "nul
 prompt = ["conversation_prompt.py", "sandbox_prompt.py", "skill_router.py", "tool_call_stream.py", "leaked_tool_call.py"]
 gate = ["gate_service.py", "hook_registry.py"]
 
-[lca.harness.profile]
-boot = ["boot.py", "boot_products.py", "boot_projection.py", "runtime_closure.py"]
-resolve = ["resolve.py", "source.py", "pipeline_loader.py", "capability_plan_resolver.py"]
-plan = ["declarations.py", "immutable.py", "plan_explain.py", "projection.py", "plugin_metadata.py"]
-validate = ["errors.py", "runtime_binding_validator.py"]
-
-[lca.infrastructure.session]
-emit = ["cognitive_emit.py", "lifecycle_emit.py", "runtime_emit.py", "surface_emit.py"]
-commit = ["fact_committer.py", "spine_envelope.py"]
-context = ["model_context_assembler.py", "turn_control_reader.py"]
-
-[lca.plugins.memory]
-seams = ["memory_seam.py", "attachment_seam.py", "skills_seam.py", "search_seam.py", "file_store_seam.py"]
-providers = ["memory_provider.py", "attachment_provider.py", "skills_provider.py", "search_provider.py", "file_store_provider.py"]
-store = ["journal_memory_provider.py", "component_memory_provider.py", "workspace_provider.py", "tree_cache.py", "four_layer.py"]
-policy = ["write_policy.py", "compaction_policy.py", "layered_retrieval.py", "null_retrieval.py", "remember_effects_seam.py"]
-
-[lca.runtime]
-loop = ["runtime_loop.py", "runtime_lifecycle.py", "runtime_lifecycle_emitter.py", "runtime_event_publisher.py", "runtime_journal.py"]
-projection = ["result_projection.py", "result_finalizer.py", "envelope_emitter.py", "phase_capabilities.py"]
-support = ["checkpoint_resolution.py", "diagnostic.py", "journal_setup.py", "resume_input.py", "runtime_bindings.py"]
-
-[lca.application]
-api = ["api.py", "spawn.py", "default_context.py"]
-authoring = ["preset_authoring.py", "role_suggest.py", "casting.py", "policies.py"]
-
-[lca_kernel]
-boot = ["boot.py", "closure.py", "lifecycle.py", "lifespan.py", "stages.py"]
-plan = ["plan.py", "resolve.py", "source.py", "declarations.py"]
-runtime = ["env.py", "hmr.py", "trace.py", "observability.py"]
-cli = ["cli.py", "errors.py"]
-
-[lca.infrastructure.cli.commands]
-run = ["run_create.py", "run_debug.py", "run_list.py", "run_cancel.py", "run_export.py"]
-journal = ["journal_trace.py", "journal_tail.py", "journal_doctor.py", "journal_repair.py", "journal_fold.py"]
-profile = ["profile_resolve.py", "profile_diff.py", "profile_apply.py", "profile_explain.py", "profile_list.py"]
-diagnose = ["diagnose.py", "audit.py", "notes_check.py", "notes_audit.py", "plugin_why.py"]
-kernel = ["kernel_restart.py", "kernel_status.py", "e2e_timeline.py", "debug_run.py", "status.py"]
+[lca.contracts.atoms]
+artifact = ["artifact_state.py"]
+control = ["control_slot.py"]
+functional = ["functional_group.py"]
+plan = ["plan_template.py"]
+misc = ["enums.py", "exhaustive.py", "ids.py", "relation.py", "scope.py"]
+telemetry_group = ["semantic_keys.py", "telemetry.py"]

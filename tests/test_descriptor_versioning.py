@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
-from lca.contracts.models.observability.event import (
+from lca.contracts.models.observability.event.event import (
     EventAudience,
     EventDescriptor,
     EventDurability,

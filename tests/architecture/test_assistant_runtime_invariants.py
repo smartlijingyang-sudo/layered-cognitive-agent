@@ -28,9 +28,9 @@ ASSISTANT_RUNTIME_BUNDLE = BUNDLES / "assistant-runtime.yaml"
 
 # PR-4 三 plugin id(必须存在)
 PR4_PLUGIN_IDS: tuple[str, ...] = (
-    "lca.plugins.assistant.catalog",
-    "lca.plugins.assistant.bootstrap",
-    "lca.plugins.assistant.workspace",
+    "lca.plugins.assistant.catalog.catalog",
+    "lca.plugins.assistant.bootstrap.bootstrap",
+    "lca.plugins.assistant.workspace.workspace",
 )
 
 
@@ -42,13 +42,13 @@ class TestWebAssistantProfileContainsAssistantPlugins:
 
     @pytest.fixture
     def resolved_web_assistant(self) -> Any:
-        from lca.harness.profile.resolve import resolve_profile
+        from lca.harness.profile.resolve.resolve import resolve_profile
 
         return resolve_profile(WEB_ASSISTANT)
 
     @pytest.fixture
     def resolved_web_standard(self) -> Any:
-        from lca.harness.profile.resolve import resolve_profile
+        from lca.harness.profile.resolve.resolve import resolve_profile
 
         return resolve_profile(WEB_STANDARD)
 
@@ -108,9 +108,9 @@ class TestAssistantRuntimeBundleShape:
     def test_bundle_modules_use_dotted_path(self) -> None:
         text = ASSISTANT_RUNTIME_BUNDLE.read_text(encoding="utf-8")
         for module in (
-            "lca.plugins.assistant.catalog",
-            "lca.plugins.assistant.bootstrap",
-            "lca.plugins.assistant.workspace",
+            "lca.plugins.assistant.catalog.catalog",
+            "lca.plugins.assistant.bootstrap.bootstrap",
+            "lca.plugins.assistant.workspace.workspace",
         ):
             assert f"$module: {module}" in text, f"assistant-runtime bundle 应 import {module!r}"
 

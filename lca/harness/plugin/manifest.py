@@ -19,13 +19,13 @@ from typing import TYPE_CHECKING, Generic, TypeAlias, TypeVar
 
 from pydantic import BaseModel
 
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.protocols.declarative.declarative_plugin import PluginSpec
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import PluginSpec
 
 if TYPE_CHECKING:
     from lca.contracts.harness.composition.plugin_contract import PluginContract
     from lca.contracts.protocols.composition.logic_address import LogicAddress
-    from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+    from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
     from lca.harness.plugin.context import PluginContext
 
 

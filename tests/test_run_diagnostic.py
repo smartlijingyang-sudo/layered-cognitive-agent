@@ -20,14 +20,14 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
 
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.stop import StopDecision, StopReason
-from lca.contracts.protocols.declarative.declarative_execution import (
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.models.core.policy.stop import StopDecision, StopReason
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     PhaseAttemptFailure,
     PhaseExecutionFailure,
 )
-from lca.plugins.phase_graph.failure_stop import phase_failure_stop_result
-from lca.runtime.diagnostic import (
+from lca.plugins.phase_graph.failure.failure_stop import phase_failure_stop_result
+from lca.runtime.support.diagnostic import (
     PhaseAttemptSummary,
     RunDiagnostic,
     StackFrame,
@@ -87,8 +87,8 @@ def test_phase_failure_stop_result_binds_diagnostic_not_final_output() -> None:
 
 def test_reducer_apply_stop_propagates_diagnostic_message() -> None:
     """``state.last_error`` must be filled from the RunDiagnostic, not fall back."""
-    from lca.contracts.models.core.state import AgentState, Budget
-    from lca.plugins.phase_graph.failure_stop import _summarize_attempts
+    from lca.contracts.models.core.state.state import AgentState, Budget
+    from lca.plugins.phase_graph.failure.failure_stop import _summarize_attempts
     from lca.plugins.loop.reducer.plugin import DefaultReducer
 
     # ADR-clean-truths 决策 一:用真构造路径(phase_failure_stop_result 用的
@@ -128,9 +128,9 @@ def test_reducer_apply_stop_propagates_diagnostic_message() -> None:
 
 def test_terminal_outcome_error_ref_carries_diagnostic() -> None:
     """TerminalOutcome.error_ref.diagnostic preserves the typed failure."""
-    from lca.contracts.models.core.state import AgentState, Budget
-    from lca.contracts.models.core.terminal_outcome import ErrorRef
-    from lca.plugins.phase_graph.failure_stop import _summarize_attempts
+    from lca.contracts.models.core.state.state import AgentState, Budget
+    from lca.contracts.models.core.state.terminal_outcome import ErrorRef
+    from lca.plugins.phase_graph.failure.failure_stop import _summarize_attempts
     from lca.plugins.loop.reducer.plugin import DefaultReducer
 
     failure = PhaseExecutionFailure(

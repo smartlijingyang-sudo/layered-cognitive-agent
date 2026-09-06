@@ -13,7 +13,7 @@ from lca.contracts.models.cognition.prompt_assembly import (
     PromptTrace,
     SelectorDecisionPath,
 )
-from lca.contracts.models.core.perception import ContextManifest
+from lca.contracts.models.core.perceive.perception import ContextManifest
 
 
 @dataclass(frozen=True, slots=True)

@@ -9,7 +9,7 @@ surface; the file-level rename is a follow-up PR.
 
 from __future__ import annotations
 
-from lca.runtime.checkpoint_resolution import (
+from lca.runtime.support.checkpoint_resolution import (
     DeclarativeCheckpoint,
     DeclarativeCheckpointStateResolver,
     RuntimeCheckpoint,
@@ -20,7 +20,7 @@ from lca.loop.driver import (
     RuntimeDriver,
     TurnExecutor,
 )
-from lca.runtime.runtime_bindings import (
+from lca.runtime.support.runtime_bindings import (
     DeclarativeRuntimeBindings,
     RuntimeBindings,
     RuntimePhaseCapabilities,
@@ -63,10 +63,10 @@ class TestDeclarativePrefixAliases:
         semantics); it stays under its canonical name only.
         """
         # Verify the class still resolves from its canonical module
-        assert DeclarativeCheckpointStateResolver.__module__ == "lca.runtime.checkpoint_resolution"
+        assert DeclarativeCheckpointStateResolver.__module__ == "lca.runtime.support.checkpoint_resolution"
 
     def test_unrelated_module_keeps_canonical_location(self) -> None:
         """RuntimePhaseCapabilities has no 'Declarative' prefix and is
         unchanged; verify it lives on lca/runtime/runtime_bindings too.
         """
-        assert RuntimePhaseCapabilities.__module__ == "lca.runtime.runtime_bindings"
+        assert RuntimePhaseCapabilities.__module__ == "lca.runtime.support.runtime_bindings"

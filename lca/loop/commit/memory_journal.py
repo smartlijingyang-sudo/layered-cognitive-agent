@@ -1,21 +1,31 @@
 """Memory journal commit seam (ADR-0194 P1-13).
 
 Prepared :class:`MemoryJournalReceipt` / :class:`MemorySpineReceipt` from cognition
-memory commit here. Legacy ``JournalEvent`` types use ``append_journal_event`` until
-Session catalog migration; spine EPs use ``FactGateway.publish_ep``.
+memory commit here via :class:`FactGateway`.
 """
 
 from __future__ import annotations
 
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.observability.journal import StampedEvent
-from lca.contracts.models.observability.memory_journal_receipt import (
+from dataclasses import asdict
+
+from lca.contracts.harness.memory.events import ContextCompactedCommitted, MemoryCommittedCommitted
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.observability.journal.journal import ContextCompacted, JournalEvent, MemoryCommitted
+from lca.contracts.models.observability.memory.memory_journal_receipt import (
     MemoryJournalReceipt,
     MemorySpineReceipt,
 )
-from lca.contracts.protocols.loop.fact_gateway import AppendReceipt
-from lca.infrastructure.observability.journal_append import append_journal_event
-from lca.loop.fact_gateway import publish_ep_bound
+from lca.contracts.protocols.loop.fact_gateway import AppendReceipt, SessionCatalogEvent
+from lca.loop.fact_gateway import append_catalog_bound, publish_ep_bound
+
+
+def _catalog_from_journal(event: JournalEvent) -> SessionCatalogEvent:
+    if isinstance(event, MemoryCommitted):
+        return MemoryCommittedCommitted(**asdict(event))
+    if isinstance(event, ContextCompacted):
+        return ContextCompactedCommitted(**asdict(event))
+    msg = f"unsupported memory journal event type: {type(event).__name__}"
+    raise TypeError(msg)
 
 
 def commit_memory_journal_receipt(
@@ -23,10 +33,15 @@ def commit_memory_journal_receipt(
     *,
     state: AgentState | None = None,
     session: object | None = None,
-) -> StampedEvent | None:
-    """Commit one prepared memory journal fact; no-op when journal unbound."""
-    del state, session
-    return append_journal_event(receipt.journal_event)
+) -> AppendReceipt | None:
+    """Commit one prepared memory catalog fact via FactGateway; no-op if unbound."""
+    catalog = _catalog_from_journal(receipt.journal_event)
+    return append_catalog_bound(
+        catalog,
+        state=state,
+        session=session,
+        actor=receipt.actor,
+    )
 
 
 def commit_memory_spine_receipt(

@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from unittest.mock import patch
 
 from lca.contracts.harness.tasks.session import session_event
-from lca.contracts.models.core.budget import create_budget
-from lca.contracts.models.core.gate_policy import GateDecided
-from lca.contracts.models.core.state import AgentState
-from lca.infrastructure.session.cognitive_emit import emit_gate_decided_from_policy
+from lca.contracts.models.core.policy.budget import create_budget
+from lca.contracts.models.core.policy.gate_policy import GateDecided
+from lca.contracts.models.core.state.state import AgentState
+from lca.infrastructure.session.emit.cognitive_emit import emit_gate_decided_from_policy
 from lca.loop.fact_gateway import append_catalog_bound, publish_ep_bound
 from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,

@@ -7,8 +7,8 @@ import pytest
 from lca.plugins.events.publishers.delegation_cache.plugin import DelegationCachePlugin
 from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink
 from lca_kernel.events import Category, EventRef, TeamDelegationCacheHit
-from lca_kernel.events.bus import EventBus, FailureSemantics
-from lca_kernel.events.errors import (
+from lca_kernel.events.bus.bus import EventBus, FailureSemantics
+from lca_kernel.events.errors.errors import (
     MissingPluginIdentityError,
     UnauthorizedPublishError,
     UnauthorizedSubscribeError,
@@ -16,7 +16,7 @@ from lca_kernel.events.errors import (
 
 
 def _make_bus() -> EventBus:
-    from lca_kernel.events.test_catalog import build_test_bus
+    from lca_kernel.events.test.test_catalog import build_test_bus
     return build_test_bus()
 
 

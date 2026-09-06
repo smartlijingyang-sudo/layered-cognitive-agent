@@ -20,7 +20,7 @@ from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict
 
-from lca.cognition.brain.sandbox_prompt import build_cloud_sandbox_prompt
+from lca.cognition.brain.prompt.sandbox_prompt import build_cloud_sandbox_prompt
 from lca.cognition.brain.sections.types import (
     block,
     clock_from_state,
@@ -35,9 +35,9 @@ from lca.cognition.brain.sections.types import (
     render_subtasks_block,
     render_teammates,
 )
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import PROMPT_SECTION_REGISTRY
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -50,13 +50,13 @@ from lca.contracts.harness.composition.plugin_contract import (
 from lca.contracts.models.cognition.prompt_assembly import (
     SectionOutput,
 )
-from lca.contracts.models.core.activation import ActivatedSkill
-from lca.contracts.models.core.perception import ContextManifest
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.team.role_team import RoleProfile
-from lca.contracts.models.team.team_awareness import TeamAwareness
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
-from lca.contracts.protocols.runtime.infra import Tool
+from lca.contracts.models.core.workspace.activation import ActivatedSkill
+from lca.contracts.models.core.perceive.perception import ContextManifest
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.team.role.role_team import RoleProfile
+from lca.contracts.models.team.team.team_awareness import TeamAwareness
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.runtime.infra.infra import Tool
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 # ── Per-section Pydantic Config ────────────────────────────────────
@@ -344,7 +344,7 @@ class EvidencePackSection:
         tools: Sequence[Tool],
         activated_skills: tuple[ActivatedSkill, ...],
     ) -> SectionOutput:
-        from lca.contracts.models.team.consultation import build_evidence_pack_text
+        from lca.contracts.models.team.consultation.consultation import build_evidence_pack_text
 
         outcomes = awareness.consult_duty.outcomes if awareness and awareness.consult_duty else ()
         text = build_evidence_pack_text(outcomes)

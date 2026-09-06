@@ -9,7 +9,7 @@ import os
 
 import pytest
 
-from lca.contracts.atoms.telemetry import SpanName
+from lca.contracts.atoms.telemetry.telemetry import SpanName
 from lca.infrastructure.llm_adapter import load_dotenv_if_present, resolve_llm_adapter
 from tests.harness.collector import InMemoryObservability
 from tests.harness.runner import run_mode

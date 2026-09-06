@@ -11,11 +11,11 @@ from starlette.applications import Starlette
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from lca.infrastructure.integrations.composio.models import ComposioConnection, ComposioToolDef
-from lca.infrastructure.integrations.composio.service import ComposioIntegration
-from lca.infrastructure.integrations.composio.settings import ComposioSettings
+from lca.infrastructure.integrations.composio.models.models import ComposioConnection, ComposioToolDef
+from lca.infrastructure.integrations.composio.service.service import ComposioIntegration
+from lca.infrastructure.integrations.composio.settings.settings import ComposioSettings
 from lca.plugins.transport.webserver.handlers.composio import endpoints as composio_handlers
-from lca.plugins.transport.webserver.route_register import _instrument_route_handler
+from lca.plugins.transport.webserver.route.route_register import _instrument_route_handler
 
 
 def _settings(tmp: Path) -> ComposioSettings:
@@ -115,8 +115,8 @@ def test_list_connections_returns_plugin_shape() -> None:
 
 @pytest.mark.asyncio
 async def test_routes_composio_plugin_registers_when_capability_present() -> None:
-    from lca.contracts.mechanisms.capability import MissingCapabilityError
-    from lca.plugins.transport.webserver.router import RouteRegistry
+    from lca.contracts.mechanisms.capability.capability import MissingCapabilityError
+    from lca.plugins.transport.webserver.router.router import RouteRegistry
 
     class _FakeRuntime:
         def __init__(self) -> None:
@@ -145,7 +145,7 @@ async def test_routes_composio_plugin_registers_when_capability_present() -> Non
         integration = ComposioIntegration(_settings(Path(tmp)))
         router = RouteRegistry()
         ctx = _FakeCtx(router, integration)
-        from lca.plugins.transport.webserver.routes_composio import setup as plugin
+        from lca.plugins.transport.webserver.routes_1.routes_composio import setup as plugin
 
         await plugin.setup(ctx, None)
         assert "/composio/oauth/callback" in router._exact

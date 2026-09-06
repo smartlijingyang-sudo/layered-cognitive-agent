@@ -11,7 +11,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
-from lca.contracts.observability.ports import AttributePolicyBackend, TracerBackend
+from lca.contracts.observability.core.ports import AttributePolicyBackend, TracerBackend
 from lca.infrastructure.observability.adapters.handles import NullSpanHandle, SpanHandle
 from lca.infrastructure.observability.adapters.policy import otel_safe_attributes
 

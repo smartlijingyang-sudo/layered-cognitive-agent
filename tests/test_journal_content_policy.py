@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from lca.contracts.models.observability.journal import ReasoningDelta, TeamRunFinished
+from lca.contracts.models.observability.journal.journal import ReasoningDelta, TeamRunFinished
 from lca.infrastructure.observability.adapters.policy import (
     AttributePolicy,
     Verbosity,
@@ -64,7 +64,7 @@ class JournalContentPolicyTests(unittest.TestCase):
 
     def test_internal_event_unaffected_by_confidential_redaction(self) -> None:
         """non-confidential 事件走标准 verbosity 路径，不被强制 redact。"""
-        from lca.contracts.models.observability.journal import InboxFollowupCreated
+        from lca.contracts.models.observability.journal.journal import InboxFollowupCreated
 
         text = "a" * 200  # 在 standard 预算内
         store = RunStore(policy=AttributePolicy(Verbosity.STANDARD))

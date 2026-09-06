@@ -14,9 +14,9 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     AuthorityContract,
@@ -25,7 +25,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
@@ -40,9 +40,14 @@ def _null_factory() -> type:
     using ``spine=None`` so the cursor never writes to a spine. This is the
     ADR-0169 L13 "no spine writes" pattern.
     """
-    from lca.infrastructure.observability.loop_cursor.in_memory import InMemoryLoopCursor
-    from lca.infrastructure.observability.loop_cursor.state import _CursorState
-    from lca.contracts.observability.incarnation import Incarnation
+    import importlib
+
+    _in_memory_mod = importlib.import_module(
+        "lca.infrastructure.observability.loop_cursor.in.in_memory"
+    )
+    InMemoryLoopCursor = _in_memory_mod.InMemoryLoopCursor
+    from lca.infrastructure.observability.loop_cursor.state.state import _CursorState
+    from lca.contracts.observability.core.incarnation import Incarnation
 
     class _NullLoopCursorFactory:
         """In-memory only LoopCursorFactory(ADR-0169 L13)."""

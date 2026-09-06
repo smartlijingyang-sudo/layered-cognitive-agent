@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from lca.plugins.session.runtime.query import filter_session_events, fold_tool_invocations
-from lca_kernel.events.session import SessionEvent
+from lca.plugins.session.runtime.query.query import filter_session_events, fold_tool_invocations
+from lca_kernel.events.session.session import SessionEvent
 
 
 def _event(

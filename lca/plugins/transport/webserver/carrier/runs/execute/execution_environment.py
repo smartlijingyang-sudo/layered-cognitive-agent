@@ -14,23 +14,23 @@ from typing import Any, cast
 
 import structlog
 
-from lca.contracts.atoms.ids import RunId, TraceId
-from lca.contracts.models.core.plane import PlaneBindings
-from lca.contracts.models.observability.journal import RunScope
-from lca.contracts.models.team.run_context import RunContext
-from lca.contracts.protocols.runtime.infra import MachineResolver
-from lca.infrastructure.file_store import FileStore
+from lca.contracts.atoms.ids.ids import RunId, TraceId
+from lca.contracts.models.core.state.plane import PlaneBindings
+from lca.contracts.models.observability.journal.journal import RunScope
+from lca.contracts.models.team.run.run_context import RunContext
+from lca.contracts.protocols.runtime.infra.infra import MachineResolver
+from lca.infrastructure.file.file_store import FileStore
 from lca.infrastructure.observability import BoundObservability, bind_backends, run_scope
-from lca.infrastructure.observability.events.event_descriptor_env import bind_descriptors
-from lca.infrastructure.observability.facade.run_ambit import (
+from lca.infrastructure.observability.events.event.event_descriptor_env import bind_descriptors
+from lca.infrastructure.observability.facade.run.run_ambit import (
     RunAmbit,
     bind_run_ambit,
 )
-from lca.infrastructure.runtime_plane.scope import plane_bindings_scope
-from lca.infrastructure.sandbox.runtime_scope import bind_sandbox_runtime
-from lca.infrastructure.search.scope import search_run_scope
-from lca.infrastructure.tools.run_attachment_scope import run_attachment_scope
-from lca.infrastructure.tools.run_finalizer import run_id_scope
+from lca.infrastructure.runtime_plane.scope.scope import plane_bindings_scope
+from lca.infrastructure.sandbox.runtime.runtime_scope import bind_sandbox_runtime
+from lca.infrastructure.search.scope.scope import search_run_scope
+from lca.infrastructure.tools.run.run_attachment_scope import run_attachment_scope
+from lca.infrastructure.tools.run.run_finalizer import run_id_scope
 from lca.infrastructure.workspace import run_workspace_scope
 from lca.plugins.transport.webserver.carrier.runs.execute.environment_bindings import (
     resolve_bindings as _resolve_bindings,
@@ -51,7 +51,7 @@ from lca.plugins.transport.webserver.carrier.runs.lifecycle.run_context_factory 
 from lca.plugins.transport.webserver.handlers.runs.api.attachment_staging import (
     stage_machine_attachments as _stage_machine_attachments,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
 
 
 @dataclass(frozen=True)

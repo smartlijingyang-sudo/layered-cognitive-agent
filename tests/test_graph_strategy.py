@@ -9,17 +9,17 @@ from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.contracts.models.core.result import Result
-from lca.contracts.models.core.state import Budget
-from lca.contracts.models.team.graph import (
+from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.state import Budget
+from lca.contracts.models.team.graph.graph import (
     ExecutionGraph,
     GraphEdge,
     GraphNode,
     GraphValidationError,
 )
-from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.protocols import TeamAssembly
-from lca.plugins.strategies.graph import GraphStrategy
+from lca.plugins.strategies.graph.graph import GraphStrategy
 from tests.support.graph_node_executors import build_default_graph_node_executor_registry
 from tests.support.team_stage import stage_with_invoker
 
@@ -339,14 +339,14 @@ class TestGraphStrategyRegistration(unittest.TestCase):
     """GraphStrategy 注册与解析（工厂接收 TeamAssembly，ADR-0034）。"""
 
     def test_graph_registered_by_default(self) -> None:
-        from lca.contracts.models.team.team_coordination import STRATEGY_KEY_GRAPH
+        from lca.contracts.models.team.team.team_coordination import STRATEGY_KEY_GRAPH
         from tests.support.strategy_registry import build_strategy_registry
 
         registry = build_strategy_registry()
         self.assertIn(STRATEGY_KEY_GRAPH, registry)
 
     def test_graph_resolves_correctly(self) -> None:
-        from lca.contracts.models.team.team_coordination import STRATEGY_KEY_GRAPH, Graph
+        from lca.contracts.models.team.team.team_coordination import STRATEGY_KEY_GRAPH, Graph
         from tests.support.strategy_registry import build_strategy_registry
 
         registry = build_strategy_registry()
@@ -357,7 +357,7 @@ class TestGraphStrategyRegistration(unittest.TestCase):
         self.assertIsInstance(strategy, GraphStrategy)
 
     def test_graph_requires_graph_coordination(self) -> None:
-        from lca.contracts.models.team.team_coordination import STRATEGY_KEY_GRAPH, Pipeline
+        from lca.contracts.models.team.team.team_coordination import STRATEGY_KEY_GRAPH, Pipeline
         from tests.support.strategy_registry import build_strategy_registry
 
         registry = build_strategy_registry()

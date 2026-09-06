@@ -6,7 +6,7 @@ RuntimeObserved has no ``scope`` / ``payload`` fields; inventory lives in
 
 from __future__ import annotations
 
-from lca.contracts.models.observability.journal import RuntimeObserved
+from lca.contracts.models.observability.journal.journal import RuntimeObserved
 from lca.infrastructure.observability.journal.engine.engine import RunStore
 
 

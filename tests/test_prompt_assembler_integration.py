@@ -15,22 +15,22 @@ from typing import Any
 
 import pytest
 
-from lca.cognition.brain.reasoner import PromptReasoner
+from lca.cognition.brain.reasoner.reasoner import PromptReasoner
 from lca.cognition.brain.sections.assembler import (
     SectionManifestPromptAssembler,
     render_template,
 )
 from lca.cognition.member_status import InMemoryMemberStatus
-from lca.contracts.atoms.enums import MemoryLayer, MemoryRecordKind
+from lca.contracts.atoms.enums.enums import MemoryLayer, MemoryRecordKind
 from lca.contracts.models.cognition.prompt_assembly import (
     PromptTemplate,
     SectionReference,
 )
-from lca.contracts.models.core.memory import MemoryRecord
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.team.delegation import DelegationResult
-from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
+from lca.contracts.models.core.conversation.memory import MemoryRecord
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.team.delegation.delegation import DelegationResult
+from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.team.team_awareness import ConsultDuty, TeamAwareness
 from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
     set_publish_session,
@@ -62,8 +62,8 @@ from lca.plugins.prompts.template_provider import (
     _builtin_templates,
     _ProviderImpl,
 )
-from lca_kernel.events.bus import EventBus
-from lca_kernel.events.test_catalog import build_test_bus
+from lca_kernel.events.bus.bus import EventBus
+from lca_kernel.events.test.test_catalog import build_test_bus
 
 
 @dataclass(frozen=True)
@@ -284,8 +284,8 @@ def test_reasoner_uses_assembler_and_selector_when_wired() -> None:
 
         async def stream(self, prompt: str, **kwargs: object):
             captured["stream"] = prompt
-            from lca.contracts.atoms.enums import LLMStreamEventType
-            from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
+            from lca.contracts.atoms.enums.enums import LLMStreamEventType
+            from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
 
             text = '{"action_type": "respond", "response_text": "ok"}'
             captured["complete"] = text

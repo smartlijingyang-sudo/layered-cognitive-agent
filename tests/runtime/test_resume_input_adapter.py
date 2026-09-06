@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.models.core.message import agent_message_text
-from lca.runtime.resume_input import HumanAnswerResumeInputAdapter
+from lca.contracts.models.core.conversation.message import agent_message_text
+from lca.runtime.support.resume_input import HumanAnswerResumeInputAdapter
 
 
 def test_human_answer_adapter_preserves_text_and_none() -> None:

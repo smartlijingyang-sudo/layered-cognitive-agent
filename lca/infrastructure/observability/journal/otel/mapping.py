@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from lca.contracts.atoms.telemetry import (
+from lca.contracts.atoms.telemetry.telemetry import (
     ATTR_ACTION_TYPE,
     ATTR_AGENT_ROLE,
     ATTR_ATTEMPT,
@@ -50,7 +50,7 @@ from lca.contracts.atoms.telemetry import (
     EventName,
     SpanName,
 )
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     ActionDegraded,
     AgentRunFinished,
     AgentRunStarted,

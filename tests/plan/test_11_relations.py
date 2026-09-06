@@ -20,7 +20,7 @@ from dataclasses import replace
 
 import pytest
 
-from lca.contracts.atoms.relation import (
+from lca.contracts.atoms.relation.relation import (
     NEW_RELATIONS,
     RELATION_GROUP_HINT,
     Relation,
@@ -28,7 +28,7 @@ from lca.contracts.atoms.relation import (
     parse_relation,
     validate_relations,
 )
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.protocols.composition.relation import (
     TypedRelation,
     typed_relation_to_dict,
@@ -43,12 +43,12 @@ from lca.contracts.protocols.perceive.capability_plan import (
     relations_of_kind,
     relations_to_plugin,
 )
-from lca.harness.profile.capability_plan_resolver import (
+from lca.harness.profile.resolve.capability_plan_resolver import (
     CapabilityPlanOptions,
     CapabilityPlanResolveError,
     project_capability_plan,
 )
-from lca.harness.profile.resolve import resolve_profile
+from lca.harness.profile.resolve.resolve import resolve_profile
 
 # ── Relation enum ────────────────────────────────────────────────────
 

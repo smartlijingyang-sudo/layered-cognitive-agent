@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from lca.harness.profile.boot import boot_profile
+from lca.harness.profile.boot.boot import boot_profile
 from lca.plugins.composer.act.body_composer import BodyComposer
 from lca.plugins.composer.collaboration.team_composer import TeamComposer
 from lca.plugins.composer.perceive.perceive_composer import PerceiveComposer

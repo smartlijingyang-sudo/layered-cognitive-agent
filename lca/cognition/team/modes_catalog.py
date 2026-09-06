@@ -21,10 +21,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
 from lca.contracts.capabilities import RUN_MODE_REGISTRY
-from lca.contracts.mechanisms.capability import require_capability
+from lca.contracts.mechanisms.capability.capability import require_capability
 
 if TYPE_CHECKING:
-    from lca.plugins.state.run_mode_registry_seam import RunModeRegistry
+    from lca.plugins.state.run.run_mode_registry_seam import RunModeRegistry
 
 
 @dataclass(frozen=True)

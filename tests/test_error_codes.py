@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from lca.contracts.observability.error_codes import (
+from lca.contracts.observability.core.error_codes import (
     DIAGNOSE_ALIASES,
     DIAGNOSE_HINTS,
     ErrorCategory,

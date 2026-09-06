@@ -19,12 +19,12 @@ PLUGINS = LCA / "plugins"
 
 
 _SENSOR_PLUGINS: tuple[str, ...] = (
-    "lca.plugins.sensors.clock",
-    "lca.plugins.sensors.workspace_artifacts",
-    "lca.plugins.sensors.inbox_facts",
-    "lca.plugins.sensors.team_inbox",
-    "lca.plugins.sensors.workspace_instructions",
-    "lca.plugins.sensors.skill_catalog",
+    "lca.plugins.sensors.clock.clock",
+    "lca.plugins.sensors.workspace.workspace_artifacts",
+    "lca.plugins.sensors.inbox.inbox_facts",
+    "lca.plugins.sensors.team.team_inbox",
+    "lca.plugins.sensors.workspace.workspace_instructions",
+    "lca.plugins.sensors.skill.skill_catalog",
 )
 _GATE_PLUGINS: tuple[str, ...] = (
     "lca.plugins.cognitive.gate.service.plugin",
@@ -38,7 +38,7 @@ _GATE_PLUGINS: tuple[str, ...] = (
 _ACT_RUNTIME_PLUGINS: tuple[str, ...] = (
     "lca.plugins.cognitive.body.simple",
     "lca.plugins.cognitive.body.safe_executor",
-    "lca.plugins.phase_graph.stop_policy",
+    "lca.plugins.phase_graph.stop.stop_policy",
     "lca.plugins.runtime.hook_registry",
 )
 _EXPECTED_SENSOR_ORDER: tuple[str, ...] = (
@@ -147,9 +147,9 @@ class TestSensorBaseClass:
 
     def test_journal_sensor_uses_dict_projection(self) -> None:
         from lca.cognition.sensors.journal_backed import InboxFactsSensor
-        from lca.contracts.atoms.ids import new_id
-        from lca.contracts.models.core.state import AgentState, Budget
-        from lca.contracts.models.observability.journal import InboxFollowupCreated
+        from lca.contracts.atoms.ids.ids import new_id
+        from lca.contracts.models.core.state.state import AgentState, Budget
+        from lca.contracts.models.observability.journal.journal import InboxFollowupCreated
         from lca.infrastructure.observability.journal.engine.engine import RunStore
 
         store = RunStore()

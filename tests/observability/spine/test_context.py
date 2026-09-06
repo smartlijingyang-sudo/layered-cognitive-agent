@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.infrastructure.observability.spine.context import (
+from lca.infrastructure.observability.spine.context.context import (
     PhaseMachineViolation,
     SpineContext,
 )

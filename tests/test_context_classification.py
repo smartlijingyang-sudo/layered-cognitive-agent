@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from lca.contracts.models.core.perception import ContextClass, ContextItem, ContextManifest
+from lca.contracts.models.core.perceive.perception import ContextClass, ContextItem, ContextManifest
 
 
 def test_context_manifest_separates_instruction_from_data() -> None:

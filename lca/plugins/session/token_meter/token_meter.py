@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from lca.contracts.observability.token_meter import TokenMeterNode, TokenMeterSnapshot
-from lca_kernel.events.fold import foldRequestHeader
+from lca.contracts.observability.cost.token_meter import TokenMeterNode, TokenMeterSnapshot
+from lca_kernel.events.fold.fold import foldRequestHeader
 
 __all__ = ["HeuristicTokenMeter", "estimate_text_tokens"]
 

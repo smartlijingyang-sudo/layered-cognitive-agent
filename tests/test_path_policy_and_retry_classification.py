@@ -23,12 +23,12 @@ import pytest
 
 from lca.cognition.body import pipeline_safe_executor as pipeline_executor_module
 from lca.cognition.body import safe_executor as safe_executor_module
-from lca.contracts.atoms.semantic_keys import (
+from lca.contracts.atoms.semantic.semantic_keys import (
     FAILURE_KIND,
     FAILURE_KIND_EXECUTION,
     FAILURE_KIND_VALIDATION,
 )
-from lca.infrastructure.path_policy import validate_writable_file
+from lca.infrastructure.path.path_policy import validate_writable_file
 from lca.plugins.tools.file_write import FileWriteTool
 
 # ────────────────────────────────────────────────────────────

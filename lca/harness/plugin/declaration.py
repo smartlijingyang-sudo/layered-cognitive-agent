@@ -21,7 +21,7 @@ from cordis.plugin import Plugin as CordisPlugin
 from cordis.plugin import plugin as _cordis_plugin
 from pydantic import BaseModel
 
-from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
 from lca.contracts.capabilities import Capability, cap_key
 from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
@@ -29,7 +29,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     contract_snapshot_for_meta,
 )
 from lca.contracts.protocols.composition.logic_address import LogicAddress
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin.manifest import (
     _LAYER_VALUES,
     EffectClass,
@@ -42,7 +42,7 @@ from lca.harness.plugin.manifest import (
 from lca.harness.plugin.spec_projection import native_spec_from_declaration
 
 if TYPE_CHECKING:
-    from lca.contracts.protocols.declarative.declarative_phase_graph import (
+    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
         PhaseContribution,
         PluginSpec,
     )
@@ -381,7 +381,7 @@ def _resolve_functional_group(value: FunctionalGroup | str | None) -> Functional
     """Resolve FunctionalGroup from str / enum / None; returns enum or None."""
     if value is None:
         return None
-    from lca.contracts.atoms.functional_group import parse_functional_group
+    from lca.contracts.atoms.functional.functional_group import parse_functional_group
 
     if isinstance(value, FunctionalGroup):
         return value
@@ -429,7 +429,7 @@ def _normalize_contributes(value: Sequence[object] | None) -> tuple[PhaseContrib
         return ()
     if not isinstance(value, (list, tuple)):
         raise TypeError(f"@plugin contributes must be list/tuple, got {type(value).__name__}")
-    from lca.contracts.protocols.declarative.declarative_phase_graph import (
+    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
         ContributionRole,
         PhaseContribution,
         SemanticPhase,

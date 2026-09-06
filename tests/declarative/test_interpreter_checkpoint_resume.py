@@ -11,8 +11,8 @@ from dataclasses import replace
 
 import pytest
 
-from lca.contracts.models.core.result import ApprovalPendingError
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.contracts.models.core.execution.result import ApprovalPendingError
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     ExecutionOutcome,
     PhaseEdge,
     PhaseInput,
@@ -25,7 +25,7 @@ from lca.contracts.protocols.gate.control_verdict import ControlVerdict, Control
 from lca.harness.declarative import GenericPlanInterpreter, GraphAssembler, MappingRestrictedScope
 from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.composition.plan_compiler import compile_plan
-from lca.harness.profile.resolve import resolve_profile
+from lca.harness.profile.resolve.resolve import resolve_profile
 from tests.phase_executors import standard_phase_executors
 
 
@@ -191,7 +191,7 @@ async def test_resume_from_terminal_cursor_is_noop(standard_plan) -> None:
 @pytest.mark.asyncio
 async def test_resume_rejects_cursor_from_different_plan(standard_plan) -> None:
     """Resume must reject a cursor whose plan_ref doesn't match the executable plan."""
-    from lca.contracts.protocols.declarative.declarative_phase_graph import (
+    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
         DeclarativeValidationError,
     )
 

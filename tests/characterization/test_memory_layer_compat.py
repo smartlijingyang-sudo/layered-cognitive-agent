@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 
-from lca.contracts.atoms.enums import SHAREABLE_LAYERS, MemoryLayer
+from lca.contracts.atoms.enums.enums import SHAREABLE_LAYERS, MemoryLayer
 
 
 class TestStringEquality:

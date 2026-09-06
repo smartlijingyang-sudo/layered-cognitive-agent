@@ -77,14 +77,14 @@ def test_set_default_ctx_still_assigns_ctx_to_holder() -> None:
 
 def test_application_api_no_longer_exports_set_default_ctx() -> None:
     """``lca.application.api.__all__`` must not include set_default_ctx."""
-    import lca.application.api as api
+    import lca.application.api.api as api
 
     assert "set_default_ctx" not in api.__all__
 
 
 def test_application_api_no_longer_imports_set_default_ctx_directly() -> None:
     """``lca.application.api`` must not import set_default_ctx as a symbol."""
-    import lca.application.api as api
+    import lca.application.api.api as api
 
     assert not hasattr(api, "set_default_ctx"), (
         "set_default_ctx should not be re-exported from lca.application.api"

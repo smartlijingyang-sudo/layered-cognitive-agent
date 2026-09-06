@@ -18,18 +18,18 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     JournalEvent,
     ToolLifecycleEnded,
     ToolRetryProgress,
 )
-from lca.contracts.protocols.declarative.declarative_execution import (
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     PhaseResult,
 )
-from lca.contracts.protocols.declarative.declarative_fault_tolerance import (
+from lca.contracts.protocols.declarative.declarative_1.declarative_fault_tolerance import (
     PhaseExecutionPolicy,
 )
-from lca.harness.declarative.compile.phase_execution_policy import (
+from lca.harness.declarative.compile.phase.phase_execution_policy import (
     PhaseExecutionExhaustedError,
     PhaseExecutionRunner,
 )
@@ -51,7 +51,7 @@ def journal() -> Iterator[_CapturingJournal]:
     from dataclasses import replace
 
     from lca.infrastructure.observability.facade import facade as facade_module
-    from lca.infrastructure.observability.facade.facade import BoundObservability
+    from lca.infrastructure.observability.facade.facade.facade import BoundObservability
 
     class _StubJournal:
         def __init__(self, cap: _CapturingJournal) -> None:

@@ -12,8 +12,8 @@ from typing import Any
 
 import yaml
 
-from lca.application.api import Agent, Team, TeamLead
-from lca.contracts.models.team.team_coordination import (
+from lca.application.api.api import Agent, Team, TeamLead
+from lca.contracts.models.team.team.team_coordination import (
     Debate,
     FanOut,
     Graph,

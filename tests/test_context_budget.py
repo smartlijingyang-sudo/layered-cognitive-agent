@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from lca.contracts.harness.state.context_budget import ContextBudgeter
-from lca.contracts.models.core.perception import ContextItem
+from lca.contracts.models.core.perceive.perception import ContextItem
 
 
 def test_context_budgeter_preserves_input_order_within_budget() -> None:

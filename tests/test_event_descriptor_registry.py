@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
-from lca.contracts.models.observability.event import (
+from lca.contracts.models.observability.event.event import (
     EventAudience,
     EventDescriptor,
     EventDurability,
     EventSensitivity,
 )
-from lca.contracts.models.observability.journal import LlmCallCompleted
-from lca.infrastructure.observability.events.event_catalog import (
+from lca.contracts.models.observability.journal.journal import LlmCallCompleted
+from lca.infrastructure.observability.events.event.event_catalog import (
     EVENT_DESCRIPTOR_REGISTRY,
     descriptor_for,
     may_export_externally,
 )
-from lca.infrastructure.observability.events.event_descriptor_registry import (
+from lca.infrastructure.observability.events.event.event_descriptor_registry import (
     DuplicateEventDescriptorError,
     InMemoryEventDescriptorRegistry,
     UnknownEventDescriptorError,

@@ -12,8 +12,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from lca.contracts.protocols.declarative.declarative_common import DECLARATIVE_PLAN_VERSION
-from lca.contracts.protocols.declarative.declarative_graph import (
+from lca.contracts.protocols.declarative.declarative_1.declarative_common import DECLARATIVE_PLAN_VERSION
+from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
     ActionAuthorityPlan,
     CapabilityBinding,
     CognitivePhaseGraphPlan,
@@ -23,10 +23,10 @@ from lca.contracts.protocols.declarative.declarative_graph import (
     ReplacementDecision,
     ValidationReport,
 )
-from lca.contracts.protocols.declarative.declarative_graph import (
+from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
     ControlEntry as DeclarativeControlEntry,
 )
-from lca.contracts.protocols.declarative.declarative_plugin import PluginSpec
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import PluginSpec
 from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan
 from lca.contracts.protocols.state.scope_plan import ScopePlan
 

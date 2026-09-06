@@ -8,13 +8,13 @@ from typing import Any
 
 import structlog
 
-from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.observability import exc_to_record
-from lca.contracts.observability.status import RunLifecycleStatus
-from lca.contracts.protocols.runtime.infra import MachineResolver
-from lca.infrastructure.observability.facade.run_ambit import bind_run_ambit
-from lca.infrastructure.runtime_plane.resolve import PlaneBindingError
-from lca.infrastructure.runtime_plane.scope import plane_bindings_scope
+from lca.contracts.observability.registry.status import RunLifecycleStatus
+from lca.contracts.protocols.runtime.infra.infra import MachineResolver
+from lca.infrastructure.observability.facade.run.run_ambit import bind_run_ambit
+from lca.infrastructure.runtime_plane.resolve.resolve import PlaneBindingError
+from lca.infrastructure.runtime_plane.scope.scope import plane_bindings_scope
 from lca.infrastructure.workspace import run_workspace_scope
 from lca.plugins.loop.driver.plugin import (
     _UnknownExecutionTargetError as _UnknownExecutionTargetError,
@@ -23,19 +23,19 @@ from lca.plugins.transport.webserver.carrier.runs.execute.execution_environment 
     RunExecutionEnvironment,
 )
 from lca.plugins.transport.webserver.carrier.runs.binding import ensure_session_hub
-from lca.plugins.transport.webserver.read.runs.step_tree_flush import (
+from lca.plugins.transport.webserver.read.runs.step.step_tree_flush import (
     flush_step_tree_artifacts,
 )
-from lca.plugins.transport.webserver.handlers.runs.session.session import (
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
     RunRegistry,
     RunSession,
 )
-from lca.plugins.transport.webserver.handlers.runs.terminal.failure import (
+from lca.plugins.transport.webserver.handlers.runs.terminal.failure.failure import (
     RunFailureFacts,
     record_run_failure,
 )
-from lca.plugins.transport.webserver.handlers.runs.terminal.outcome import RunOutcomeApplier
-from lca.plugins.transport.webserver.handlers.runs.terminal.terminalizer import RunTerminalizer
+from lca.plugins.transport.webserver.handlers.runs.terminal.outcome.outcome import RunOutcomeApplier
+from lca.plugins.transport.webserver.handlers.runs.terminal.terminalizer.terminalizer import RunTerminalizer
 
 _log = structlog.get_logger(__name__)
 
@@ -77,11 +77,11 @@ class RunLifecycleCoordinator:
         workspace: Any = None
         success = False
         run_outcome: str = "failure"
-        from lca.infrastructure.observability.spine.context import SpineContext
-        from lca.infrastructure.observability.spine.exception_emit import (
+        from lca.infrastructure.observability.spine.context.context import SpineContext
+        from lca.infrastructure.observability.spine.exception.exception_emit import (
             emit_exception_caught,
         )
-        from lca.infrastructure.session.runtime_emit import (
+        from lca.infrastructure.session.emit.runtime_emit import (
             emit_exception_finally as emit_carrier_exception_finally,
         )
         from lca.loop.transport import (
@@ -240,7 +240,7 @@ class RunLifecycleCoordinator:
     def _format_exception(exc: Exception, session: RunSession) -> str:
         """Keep exception presentation at the lifecycle error seam."""
 
-        from lca.plugins.transport.webserver.read.runs.error_presentation import (
+        from lca.plugins.transport.webserver.read.runs.error.error_presentation import (
             format_user_error,
         )
 

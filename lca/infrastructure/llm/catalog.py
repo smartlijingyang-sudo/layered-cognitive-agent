@@ -7,7 +7,7 @@ from functools import lru_cache
 from typing import Final
 
 from lca.infrastructure.llm.config import load_provider_settings
-from lca.infrastructure.llm_adapter.factory import load_dotenv_if_present
+from lca.infrastructure.llm_adapter.factory.factory import load_dotenv_if_present
 
 CHAT: Final = "chat"
 EMBEDDINGS: Final = "embeddings"

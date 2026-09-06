@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import unittest
 
-from lca.application.api import Agent, Team, TeamLead
-from lca.cognition.memory.simple_memory import SimpleMemorySystem
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.models.core.decision import Decision, Reflection
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.team.team_coordination import LeadMandate, Pipeline
+from lca.application.api.api import Agent, Team, TeamLead
+from lca.cognition.memory.simple.simple_memory import SimpleMemorySystem
+from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.models.core.execution.decision import Decision, Reflection
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.team.team.team_coordination import LeadMandate, Pipeline
 from lca.contracts.protocols import AgentUnit, Brain, TeamUnit
-from lca.contracts.protocols.journal.spec import AgentSpec, LeadSpec
-from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
+from lca.contracts.protocols.journal.spec.spec import AgentSpec, LeadSpec
+from lca.infrastructure.llm_adapter.mock.mock_llm import MockLLMAdapter
 
 
 class _StubBrain(Brain):
@@ -87,7 +87,7 @@ class TestExplicitComposerInjection(unittest.IsolatedAsyncioTestCase):
     """自定义注册必须经显式 composer 贯通 Agent 与 Team（无隐式全局）。"""
 
     async def test_custom_memory_flows_through_team(self) -> None:
-        from lca.application.api import get_or_create_default_ctx
+        from lca.application.api.api import get_or_create_default_ctx
 
         ctx = get_or_create_default_ctx()
         ctx.inject("memory").register("custom", SimpleMemorySystem)
@@ -101,7 +101,7 @@ class TestExplicitComposerInjection(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(member.runtime.memory.inner, SimpleMemorySystem)  # type: ignore[attr-defined]
 
     async def test_unknown_component_without_composer_raises(self) -> None:
-        from lca.contracts.mechanisms.capability import MissingCapabilityError
+        from lca.contracts.mechanisms.capability.capability import MissingCapabilityError
 
         with self.assertRaises(MissingCapabilityError):
             _agent(memory="custom_not_registered")

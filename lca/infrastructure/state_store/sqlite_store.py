@@ -17,7 +17,7 @@ from hashlib import sha256
 from pathlib import Path
 from time import time
 
-from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import StateStore
 
 

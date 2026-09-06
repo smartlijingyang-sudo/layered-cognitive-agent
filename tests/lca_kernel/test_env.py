@@ -15,8 +15,8 @@ from types import MappingProxyType
 
 import pytest
 
-from lca_kernel.env import EnvSnapshot, load_layered_env
-from lca_kernel.errors import KernelError
+from lca_kernel.runtime.env import EnvSnapshot, load_layered_env
+from lca_kernel.cli.errors import KernelError
 
 
 def _write_dotenv(path: Path, content: str) -> None:

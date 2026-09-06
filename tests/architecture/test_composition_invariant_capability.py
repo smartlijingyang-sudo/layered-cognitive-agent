@@ -6,8 +6,8 @@ import asyncio
 from pathlib import Path
 
 from lca.contracts.capabilities import COMPOSITION_INVARIANT_CHECKER
-from lca.harness.profile.boot import boot_profile
-from lca.harness.profile.resolve import resolve_profile
+from lca.harness.profile.boot.boot import boot_profile
+from lca.harness.profile.resolve.resolve import resolve_profile
 
 REPO = Path(__file__).resolve().parents[2]
 

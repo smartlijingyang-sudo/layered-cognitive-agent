@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.harness.diagnostics.audit_hook_attach import (
+from lca.harness.diagnostics.audit.audit_hook_attach import (
     Finding,
     format_report,
     scan_hook_attach,

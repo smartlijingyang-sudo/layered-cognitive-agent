@@ -398,7 +398,7 @@ def test_substitution_axes_have_a_corresponding_seam() -> None:
     """
 
     import lca.contracts.capabilities as caps
-    from lca.harness.profile.runtime_closure import runtime_closure_requirements
+    from lca.harness.profile.boot.runtime_closure import runtime_closure_requirements
 
     declared_typed = {
         getattr(caps, name).key

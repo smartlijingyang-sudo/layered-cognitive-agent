@@ -7,20 +7,20 @@ import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
-from lca.application.api import Agent, Team, ensure_default_ctx
-from lca.contracts.atoms.enums import DecisionGateName
-from lca.contracts.models.core.decision import Decision
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.llm import LLMResponse
-from lca.contracts.models.core.result import Result
-from lca.contracts.models.core.state import Budget
-from lca.contracts.models.team.graph import ExecutionGraph, GraphEdge, GraphNode
-from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.models.team.team_coordination import Graph, PeerRelay, PeerSwarm, Pipeline
+from lca.application.api.api import Agent, Team, ensure_default_ctx
+from lca.contracts.atoms.enums.enums import DecisionGateName
+from lca.contracts.models.core.execution.decision import Decision
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.models.core.conversation.llm import LLMResponse
+from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.state import Budget
+from lca.contracts.models.team.graph.graph import ExecutionGraph, GraphEdge, GraphNode
+from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.team.team_coordination import Graph, PeerRelay, PeerSwarm, Pipeline
 from lca.contracts.protocols import TeamAssembly
-from lca.plugins.strategies.peer_relay import HandoffStrategy
-from lca.plugins.strategies.peer_swarm import SwarmStrategy
-from lca.plugins.strategies.pipeline import SequentialStrategy
+from lca.plugins.strategies.peer.peer_relay import HandoffStrategy
+from lca.plugins.strategies.peer.peer_swarm import SwarmStrategy
+from lca.plugins.strategies.pipeline.pipeline import SequentialStrategy
 from tests.support.strategy_registry import build_strategy_registry
 from tests.support.team_stage import stage_with_invoker
 
@@ -127,8 +127,8 @@ class TestHonestFacade(unittest.IsolatedAsyncioTestCase):
                 return LLMResponse(text="node-out")
 
             async def stream(self, prompt: str, **kwargs: object):
-                from lca.contracts.atoms.enums import LLMStreamEventType
-                from lca.contracts.models.core.llm import LLMStreamEvent
+                from lca.contracts.atoms.enums.enums import LLMStreamEventType
+                from lca.contracts.models.core.conversation.llm import LLMStreamEvent
 
                 response = await self.complete(prompt, **kwargs)
                 yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text=response.text)
@@ -155,7 +155,7 @@ class TestHonestFacade(unittest.IsolatedAsyncioTestCase):
             tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
         )
         rt = MagicMock()
-        from lca.cognition.brain.reasoner import PromptReasoner
+        from lca.cognition.brain.reasoner.reasoner import PromptReasoner
 
         rt.brain = MagicMock()
         rt.brain.reasoner = PromptReasoner(
@@ -172,7 +172,7 @@ class TestHonestFacade(unittest.IsolatedAsyncioTestCase):
         rt.memory = MagicMock()
         # ROUTING + consult_duty is not expressible as LeadMandate; BOARD is consultation+gate.
         # Invalid combinations are type-excluded; ROUTING mode never installs a gate.
-        from lca.contracts.models.team.team_coordination import LeadMandate, gate_name_for_mandate
+        from lca.contracts.models.team.team.team_coordination import LeadMandate, gate_name_for_mandate
 
         self.assertEqual(gate_name_for_mandate(LeadMandate.ROUTING), DecisionGateName.NONE)
         # assemble still requires real agents with llm — use Assembly path for smoke

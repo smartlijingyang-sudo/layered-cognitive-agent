@@ -25,8 +25,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from lca.infrastructure.cli.cli import app
-from lca.infrastructure.observability.spine.event_record import (
+from lca.infrastructure.cli.cli.cli import app
+from lca.infrastructure.observability.spine.event.event_record import (
     EventRecord,
     Outcome,
 )
@@ -500,7 +500,7 @@ def test_journal_trace_register_is_callable() -> None:
 
 def test_journal_trace_module_export() -> None:
     """``journal_trace`` exposes ``register`` as its public surface."""
-    import lca.infrastructure.cli.commands.journal_trace as module
+    import lca.infrastructure.cli.commands.journal_extra.journal_trace as module
 
     assert "register" in module.__all__
 

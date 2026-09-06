@@ -19,16 +19,16 @@ import inspect
 import re
 from dataclasses import dataclass, field
 
-from lca.cognition.body.safe_executor import (
+from lca.cognition.body.executor.safe_executor import (
     _record_tool_call_evidence,
     _record_tool_result_evidence,
 )
-from lca.contracts.observability.incarnation import Incarnation
-from lca.contracts.observability.loop_cursor import (
+from lca.contracts.observability.core.incarnation import Incarnation
+from lca.contracts.observability.cursor.loop_cursor import (
     CursorSnapshot,
 )
 from lca.infrastructure.observability.loop_cursor import StdLoopCursor
-from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
     CoordinatorAdapter,
     current_cursor,
 )
@@ -125,7 +125,7 @@ def test_perceive_hub_runtime_emits_phase_perceive_fold_on_cursor() -> None:
     注入 cursor → 调用 hub.perceive → 验证 spine.records 含 phase.perceive.fold EP,
     且 cursor.snapshot.phase == 'perceive'。
     """
-    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+    from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
         bind_current_cursor,
         reset_current_cursor,
     )
@@ -264,7 +264,7 @@ def test_tool_journal_emit_runtime_records_tool_call_ep_when_cursor_bound() -> N
     注入 cursor → 调 emit_tool_started → spine 必新增 step.tool_call.record EP。
     """
     from lca.cognition.body import tool_journal_emit
-    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+    from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
         bind_current_cursor,
         reset_current_cursor,
     )
@@ -348,7 +348,7 @@ def test_safe_executor_evidence_runtime_records_tool_result_ep_when_cursor_bound
 
     ACT phase 上 cursor.record_tool_result 必落 step.tool_result.record EP。
     """
-    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+    from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
         bind_current_cursor,
         reset_current_cursor,
     )
@@ -382,7 +382,7 @@ def test_safe_executor_record_tool_call_evidence_swallows_cursor_phase_error() -
     """
     cursor, _ = _make_cursor()
     cursor.advance("think")
-    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+    from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
         bind_current_cursor,
         reset_current_cursor,
     )
@@ -414,7 +414,7 @@ def test_emit_tool_started_swallows_cursor_phase_error() -> None:
     cursor.advance("perceive")
     cursor.advance("think")
 
-    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+    from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
         bind_current_cursor,
         reset_current_cursor,
     )
@@ -444,7 +444,7 @@ def test_coordinator_adapter_current_cursor_returns_none_when_unbound() -> None:
 
 def test_coordinator_adapter_current_cursor_round_trip() -> None:
     """``bind_current_cursor(cursor)`` → ``current_cursor()`` 返回该 cursor。"""
-    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+    from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
         bind_current_cursor,
         reset_current_cursor,
     )

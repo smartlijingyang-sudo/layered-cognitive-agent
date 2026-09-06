@@ -11,8 +11,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from hashlib import sha256
 
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.protocols.runtime.runtime_lifecycle import (
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.protocols.runtime.runtime.runtime_lifecycle import (
     RuntimeLifecycleEvent,
     RuntimeLifecycleEventType,
     RuntimeLifecycleSubscriber,

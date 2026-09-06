@@ -28,11 +28,11 @@ from lca.plugins.events.publishers._session_publish import (
     current_publish_session,
     publish_via_session,
 )
-from lca.plugins.session.runtime.store import SessionStore
+from lca.plugins.session.runtime.store.store import SessionStore
 from lca.plugins.transport.webserver.carrier.runs.execute import create_run_session
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry
-from lca_kernel.events.bus import EventBus
-from lca_kernel.events.test_catalog import build_test_bus
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunRegistry
+from lca_kernel.events.bus.bus import EventBus
+from lca_kernel.events.test.test_catalog import build_test_bus
 
 
 class _StubSpine:
@@ -61,7 +61,7 @@ class _SpyFactory:
     def create_run_components(self, *, spine_path: Path) -> Any:
         from dataclasses import dataclass as _dc
 
-        from lca.contracts.observability.run_journal import RunJournalComponents
+        from lca.contracts.observability.journal.run_journal import RunJournalComponents
         from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 
         @_dc(frozen=True)
@@ -103,14 +103,14 @@ class _Context:
         if session_store is not None:
             self._services["session.store"] = session_store
         from lca.infrastructure.observability import NamedRegistry
-        from lca.infrastructure.observability.loop_cursor.close_barrier_impl import (
+        from lca.infrastructure.observability.loop_cursor.close.close_barrier_impl import (
             StdCloseBarrier,
         )
-        from lca.infrastructure.observability.loop_cursor.factory import LoopCursorFactory
-        from lca.infrastructure.observability.loop_cursor.persistence_coordinator import (
+        from lca.infrastructure.observability.loop_cursor.factory.factory import LoopCursorFactory
+        from lca.infrastructure.observability.loop_cursor.persistence.persistence_coordinator import (
             NullPersistenceCoordinator,
         )
-        from lca.infrastructure.observability.loop_cursor.projection_host import (
+        from lca.infrastructure.observability.loop_cursor.projection.projection_host import (
             StdProjectionHost,
         )
 
@@ -179,7 +179,7 @@ def _teardown(session: Any) -> None:
 
 
 def _sp_payload() -> Any:
-    from lca_kernel.events.payloads import Category, SpineEventPayload
+    from lca_kernel.events.payloads.payloads import Category, SpineEventPayload
 
     return SpineEventPayload(
         category=Category("spine.cognition.brain.perceive.start"),
@@ -225,7 +225,7 @@ def test_builder_binds_session_store_to_publish_and_observe_slots(tmp_path: Path
 
 def test_builder_without_session_store_fail_loud(tmp_path: Path) -> None:
     """缺 session.store → RunSessionBuilder fail-loud（与 requires_session_store 同锁）。"""
-    from lca.contracts.mechanisms.capability import MissingCapabilityError
+    from lca.contracts.mechanisms.capability.capability import MissingCapabilityError
 
     ctx, _spine = _build_ctx(session_store=None)
     registry = RunRegistry(locator=FilesystemRunLocator(root=tmp_path))
@@ -305,7 +305,7 @@ def test_builder_routes_cursor_writes_through_session_when_store_bound(
     cursor EP 事件经单一生产入口 ``Session.append`` 落 Session,不再写 legacy
     spine 链(``SpineWritePortAdapter`` → ``EventSpine.append`` → FileSink)。
     """
-    from lca.plugins.session.runtime.cursor_port import SessionWritePortAdapter
+    from lca.plugins.session.runtime.cursor.cursor_port import SessionWritePortAdapter
 
     store = SessionStore()
     ctx, spine = _build_ctx(session_store=store)

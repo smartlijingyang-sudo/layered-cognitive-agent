@@ -14,70 +14,70 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import Any, Protocol, TypeVar, runtime_checkable
 
-from lca.contracts.mechanisms.capability import (
+from lca.contracts.mechanisms.capability.capability import (
     REQUIRED_CAPABILITY_KEYS as REQUIRED_CAPABILITY_KEYS,
 )
-from lca.contracts.mechanisms.capability import (
+from lca.contracts.mechanisms.capability.capability import (
     CapabilityContext as CapabilityContext,
 )
-from lca.contracts.mechanisms.capability import (
+from lca.contracts.mechanisms.capability.capability import (
     CapabilityKey as CapabilityKey,
 )
-from lca.contracts.mechanisms.capability import (
+from lca.contracts.mechanisms.capability.capability import (
     MissingCapabilityError as MissingCapabilityError,
 )
-from lca.contracts.mechanisms.capability import (
+from lca.contracts.mechanisms.capability.capability import (
     provider_current as provider_current,
 )
-from lca.contracts.mechanisms.capability import (
+from lca.contracts.mechanisms.capability.capability import (
     require_capability as require_capability,
 )
-from lca.contracts.mechanisms.composition import (
+from lca.contracts.mechanisms.composition.composition import (
     CapabilityGrantExceeded as CapabilityGrantExceeded,
 )
-from lca.contracts.mechanisms.composition import (
+from lca.contracts.mechanisms.composition.composition import (
     Composer as Composer,
 )
-from lca.contracts.mechanisms.composition import (
+from lca.contracts.mechanisms.composition.composition import (
     ComposerError as ComposerError,
 )
-from lca.contracts.mechanisms.composition import (
+from lca.contracts.mechanisms.composition.composition import (
     ComposerErrorCode as ComposerErrorCode,
 )
-from lca.contracts.mechanisms.composition import (
+from lca.contracts.mechanisms.composition.composition import (
     InspectEntry as InspectEntry,
 )
-from lca.contracts.mechanisms.composition import (
+from lca.contracts.mechanisms.composition.composition import (
     InspectResult as InspectResult,
 )
-from lca.contracts.mechanisms.composition import (
+from lca.contracts.mechanisms.composition.composition import (
     InvariantChecker as InvariantChecker,
 )
-from lca.contracts.mechanisms.composition import (
+from lca.contracts.mechanisms.composition.composition import (
     InvariantViolation as InvariantViolation,
 )
-from lca.contracts.mechanisms.composition import (
+from lca.contracts.mechanisms.composition.composition import (
     MountResult as MountResult,
 )
-from lca.contracts.mechanisms.composition import (
+from lca.contracts.mechanisms.composition.composition import (
     NameConflict as NameConflict,
 )
-from lca.contracts.mechanisms.composition import (
+from lca.contracts.mechanisms.composition.composition import (
     NotMounted as NotMounted,
 )
-from lca.contracts.mechanisms.composition import (
+from lca.contracts.mechanisms.composition.composition import (
     PluginFactory as PluginFactory,
 )
-from lca.contracts.mechanisms.composition import (
+from lca.contracts.mechanisms.composition.composition import (
     PluginMetaMissing as PluginMetaMissing,
 )
-from lca.contracts.mechanisms.composition import (
+from lca.contracts.mechanisms.composition.composition import (
     UnmountResult as UnmountResult,
 )
-from lca.contracts.mechanisms.seam import (
+from lca.contracts.mechanisms.seam.seam import (
     consume as consume,
 )
-from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.core.state.state import AgentState
 
 T = TypeVar("T")
 

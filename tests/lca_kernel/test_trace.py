@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from lca_kernel.stages import Stage
-from lca_kernel.trace import BootTrace
+from lca_kernel.boot.stages import Stage
+from lca_kernel.runtime.trace import BootTrace
 
 
 def test_boot_trace_is_frozen_dataclass() -> None:

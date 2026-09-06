@@ -7,15 +7,15 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.models.core.activation import ActivatedSkill
-from lca.contracts.models.core.budget import create_budget
-from lca.contracts.models.core.decision import Decision, Observation, Reflection, Turn
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.perception import ContextItem, ContextManifest
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.core.stop import StopDecision
+from lca.contracts.models.core.workspace.activation import ActivatedSkill
+from lca.contracts.models.core.policy.budget import create_budget
+from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection, Turn
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.core.policy.stop import StopDecision
 from lca.plugins.loop.reducer.plugin import DefaultReducer
-from lca_kernel.events.payloads_spine import SpineEventPayload
+from lca_kernel.events.payloads.payloads_spine import SpineEventPayload
 
 
 def _state() -> AgentState:
@@ -163,7 +163,7 @@ def test_apply_artifact_closure_method_is_removed() -> None:
 
 
 def test_apply_terminal_outcome_rejects_waiting_input_without_durable_cursor() -> None:
-    from lca.contracts.protocols.declarative.declarative_phase_graph import (
+    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
         DeclarativeValidationError,
     )
 
@@ -213,7 +213,7 @@ class TestFailedTerminalCarriesErrorRef:
         )
 
     def test_failed_with_empty_state_error_still_builds_error_ref(self) -> None:
-        from lca.contracts.models.core.stop import StopReason
+        from lca.contracts.models.core.policy.stop import StopReason
 
         stop = StopDecision(
             should_stop=True,
@@ -234,7 +234,7 @@ class TestFailedTerminalCarriesErrorRef:
         assert outcome.error_ref.message  # non-empty fallback derived from stop reason
 
     def test_failed_with_explicit_state_error_preserves_message(self) -> None:
-        from lca.contracts.models.core.stop import StopReason
+        from lca.contracts.models.core.policy.stop import StopReason
 
         stop = StopDecision(
             should_stop=True,
@@ -274,7 +274,7 @@ class _CollectingPublishSession:
         if isinstance(event_type_or_payload, str) and data is not None:
             from types import SimpleNamespace
 
-            from lca_kernel.events.payloads import Category, SpineEventPayload
+            from lca_kernel.events.payloads.payloads import Category, SpineEventPayload
 
             payload_dict = dict(data)  # type: ignore[arg-type]
             sp = SpineEventPayload(
@@ -299,8 +299,8 @@ def _bind_collecting_session() -> tuple[_CollectingPublishSession, object, objec
     from lca.plugins.events.publishers._session_publish import (
         set_publish_session,
     )
-    from lca_kernel.events.bus import EventBus
-    from lca_kernel.events.test_catalog import build_test_bus
+    from lca_kernel.events.bus.bus import EventBus
+    from lca_kernel.events.test.test_catalog import build_test_bus
 
     bus = build_test_bus()
     session = _CollectingPublishSession(bus)
@@ -311,7 +311,7 @@ def _bind_collecting_session() -> tuple[_CollectingPublishSession, object, objec
 
 def _reset_active_run_id() -> None:
     """marker payload 的 run_id 取 thread active run;测试钉为空串(C8)。"""
-    from lca.infrastructure.session.runtime_emit import set_active_run_id
+    from lca.infrastructure.session.emit.runtime_emit import set_active_run_id
 
     set_active_run_id(None)
 
@@ -322,7 +322,7 @@ class TestInstrumentApply:
     def test_instrument_apply_success_emits_paired_markers(self) -> None:
         """One fold emits start + end markers to the bound publish Session."""
         from lca.plugins.events.publishers._session_publish import reset_publish_session
-        from lca_kernel.events.bus import EventBus
+        from lca_kernel.events.bus.bus import EventBus
 
         _reset_active_run_id()
         session, token, _bus = _bind_collecting_session()
@@ -347,11 +347,11 @@ class TestInstrumentApply:
 
     def test_instrument_apply_failure_outcome_and_exception_propagate(self) -> None:
         """A raising fold emits ``outcome="failure"`` and re-raises the error."""
-        from lca.contracts.protocols.declarative.declarative_phase_graph import (
+        from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
             DeclarativeValidationError,
         )
         from lca.plugins.events.publishers._session_publish import reset_publish_session
-        from lca_kernel.events.bus import EventBus
+        from lca_kernel.events.bus.bus import EventBus
 
         _reset_active_run_id()
         session, token, _bus = _bind_collecting_session()
@@ -381,7 +381,7 @@ class TestInstrumentApply:
     def test_instrument_apply_routes_to_bound_session_only(self) -> None:
         """marker 只落当前上下文绑定的 Session;未绑定的收集实例收不到。"""
         from lca.plugins.events.publishers._session_publish import reset_publish_session
-        from lca_kernel.events.bus import EventBus
+        from lca_kernel.events.bus.bus import EventBus
 
         _reset_active_run_id()
         bound, token, _bus = _bind_collecting_session()

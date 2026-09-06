@@ -6,7 +6,7 @@ import ast
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
-from lca.plugins.transport.webserver.handlers.runs.terminal.failure import RunFailureFacts
+from lca.plugins.transport.webserver.handlers.runs.terminal.failure.failure import RunFailureFacts
 
 ROOT = Path(__file__).parents[2]
 FAILURE_RECORDING = (
@@ -32,7 +32,7 @@ def test_failure_recording_does_not_import_mutable_run_carrier() -> None:
         if isinstance(node, ast.ImportFrom) and node.module is not None
     }
 
-    assert "lca.plugins.transport.webserver.handlers.runs.session.session" not in imported_modules
+    assert "lca.plugins.transport.webserver.handlers.runs.session.session.session" not in imported_modules
 
 
 def test_failure_facts_are_immutable_and_observation_ready() -> None:

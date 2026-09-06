@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import pytest
 
-from lca.cognition.brain.decision_gates.artifact_respond_injector import (
+from lca.cognition.brain.decision_gates.artifact.artifact_respond_injector import (
     ArtifactRespondInjector,
 )
-from lca.cognition.brain.decision_gates.office_works_sealer import OfficeWorksSealer
-from lca.cognition.brain.decision_gates.terminal_respond import TerminalRespondGate
-from lca.cognition.brain.decision_gates.tool_loop_breaker import ToolLoopBreakerGate
-from lca.contracts.models.core.budget import TOOL_LOOP_BREAK_THRESHOLD
-from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
-from lca.contracts.models.core.state import AgentState, Budget
+from lca.cognition.brain.decision_gates.office.office_works_sealer import OfficeWorksSealer
+from lca.cognition.brain.decision_gates.terminal.terminal_respond import TerminalRespondGate
+from lca.cognition.brain.decision_gates.tool.tool_loop_breaker import ToolLoopBreakerGate
+from lca.contracts.models.core.policy.budget import TOOL_LOOP_BREAK_THRESHOLD
+from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall, Turn
+from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.infrastructure.text.safe_boundary import sanitize_stream_text
 from lca.infrastructure.workspace.artifact_ledger import (
     ArtifactLedger,
@@ -21,7 +21,7 @@ from lca.infrastructure.workspace.artifact_ledger import (
     rewrite_artifact_markdown,
 )
 from lca.infrastructure.workspace.scope import effective_agent_wall_clock, run_workspace_scope
-from lca.plugins.journal.artifact_closure_provider import DefaultArtifactClosure
+from lca.plugins.journal.artifact.artifact_closure_provider import DefaultArtifactClosure
 
 
 class TestSafeBoundary:
@@ -312,7 +312,7 @@ class TestArtifactClosure:
 @pytest.mark.asyncio
 class TestArtifactRespondInjector:
     async def test_rewrites_relative_images_and_appends_links(self) -> None:
-        from lca.cognition.brain.context_manifest import build_manifest_from_items
+        from lca.cognition.brain.pipeline.context_manifest import build_manifest_from_items
         from tests.support.session_gate_helpers import seed_manifest_projection
 
         gate = ArtifactRespondInjector()
@@ -327,7 +327,7 @@ class TestArtifactRespondInjector:
             # v3 PR6.D.4: gate reads from the typed manifest slot.
             # Populate from the workspace ledger.
             snap = workspace.artifacts.snapshot()
-            from lca.contracts.models.core.perception import ContextItem
+            from lca.contracts.models.core.perceive.perception import ContextItem
 
             manifest = build_manifest_from_items(
                 items=[
@@ -364,7 +364,7 @@ class TestArtifactRespondInjector:
         assert "[📥 01_绩效总分排名.png](/files/file_aaa)" in text
 
     async def test_keeps_ledger_urls_and_drops_unknown_ones(self) -> None:
-        from lca.cognition.brain.context_manifest import build_manifest_from_items
+        from lca.cognition.brain.pipeline.context_manifest import build_manifest_from_items
         from tests.support.session_gate_helpers import seed_manifest_projection
 
         gate = ArtifactRespondInjector()
@@ -376,7 +376,7 @@ class TestArtifactRespondInjector:
             )
             state = AgentState(trace_id="t", task="x", budget=Budget(max_steps=5))
             snap = workspace.artifacts.snapshot()
-            from lca.contracts.models.core.perception import ContextItem
+            from lca.contracts.models.core.perceive.perception import ContextItem
 
             manifest = build_manifest_from_items(
                 items=[

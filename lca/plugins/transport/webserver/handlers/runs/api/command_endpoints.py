@@ -25,18 +25,18 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from lca.cognition.team.modes_catalog import resolve_profile_mode
-from lca.contracts.models.core.conversation import ConversationTurn
-from lca.infrastructure.file_store import LocalFileStore
-from lca.plugins.transport.webserver.handlers.cors import cors_headers
-from lca.plugins.transport.webserver.handlers.runs.ingest.ingress import (
+from lca.contracts.models.core.conversation.conversation import ConversationTurn
+from lca.infrastructure.file.file_store import LocalFileStore
+from lca.plugins.transport.webserver.handlers.cors.cors import cors_headers
+from lca.plugins.transport.webserver.handlers.runs.ingest.ingress.ingress import (
     LobeHubRunInput,
     prepare_run_from_messages,
 )
-from lca.plugins.transport.webserver.read.runs.identity import (
+from lca.plugins.transport.webserver.read.runs.identity.identity import (
     AgentRef,
     parse_agent_ref,
 )
-from lca.plugins.transport.webserver.handlers.runs.terminal.port import (
+from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import (
     RunPort,
     RunReceipt,
     RunRequest,
@@ -210,7 +210,7 @@ def _validate_assistant_binding(request: Request, assistant_id: str) -> JSONResp
     try:
         catalog.get(assistant_id)
     except Exception as exc:
-        from lca.plugins.assistant._home_layout import (
+        from lca.plugins.assistant.home._home_layout import (
             AssistantCatalogError,
             AssistantDigestMismatch,
         )
@@ -298,7 +298,7 @@ async def record_run_feedback(request: Request) -> JSONResponse:
             headers=cors_headers(),
         )
     from lca.infrastructure.observability.meta_event_emit import emit_feedback_record
-    from lca.infrastructure.session.lifecycle_emit import resolve_run_session_writer
+    from lca.infrastructure.session.emit.lifecycle_emit import resolve_run_session_writer
 
     emit_feedback_record(
         text=text,

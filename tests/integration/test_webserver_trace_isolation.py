@@ -16,9 +16,9 @@ from lca.plugins.events.publishers.delegation_cache.plugin import (
     DelegationCachePlugin,
 )
 from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink
-from lca.plugins.transport.webserver.lifespan_adapter import TraceIdMiddleware
+from lca.plugins.transport.webserver.lifespan.lifespan_adapter import TraceIdMiddleware
 from lca_kernel.events import TeamDelegationCacheHit
-from lca_kernel.events.bus import (
+from lca_kernel.events.bus.bus import (
     EventBus,
     current_trace_id,
     reset_trace_id,
@@ -28,7 +28,7 @@ from lca_kernel.events.bus import (
 
 @pytest.fixture
 def bus() -> EventBus[EventPayload]:
-    from lca_kernel.events.test_catalog import build_test_bus
+    from lca_kernel.events.test.test_catalog import build_test_bus
     return build_test_bus()
 
 

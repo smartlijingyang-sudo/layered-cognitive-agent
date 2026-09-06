@@ -18,14 +18,14 @@ from abc import abstractmethod
 from collections.abc import Iterator, Sequence
 from typing import Any, Protocol
 
-from lca.contracts.models.core.perception import ContextItem, ItemKind
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.core.perceive.perception import ContextItem, ItemKind
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.observability.journal.journal import (
     InboxFollowupCreated,
     StampedEvent,
     TeamMessagePublished,
 )
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     JournalEvent as _JournalEvent,
 )
 from lca.contracts.protocols import Sensor

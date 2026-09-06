@@ -11,7 +11,7 @@ import pytest
 from starlette.applications import Starlette
 from starlette.testclient import TestClient
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     AgentRunFinished,
     ReasoningDelta,
     RunScope,
@@ -22,9 +22,9 @@ from lca.contracts.models.observability.journal import (
     ToolStarted,
 )
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunSession
-from lca.plugins.transport.webserver.handlers.runs.terminal.legacy_adapter import RegistryRunAdapter
-from lca.plugins.transport.webserver.router import RouteRegistry
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunRegistry, RunSession
+from lca.plugins.transport.webserver.handlers.runs.terminal.legacy.legacy_adapter import RegistryRunAdapter
+from lca.plugins.transport.webserver.router.router import RouteRegistry
 
 _SEQ = [0]
 
@@ -84,12 +84,12 @@ def _app(registry: RunRegistry) -> Starlette:
     # 拼装等价 route catalog;plugin 是 ADR-0115 决定 6 的唯一 route SSOT。
     # 各 plugin 暴露 ``async setup(ctx, config)`` 把 starlette Route 直接注册到
     # ``RouteRegistry``;测试不再 import 旧 ``ROUTES`` 常量(plugin 重构后已退役)。
-    from lca.plugins.transport.webserver.routes_device import setup as setup_device
-    from lca.plugins.transport.webserver.routes_health_options import setup as setup_health
-    from lca.plugins.transport.webserver.routes_openai_compat_files import (
+    from lca.plugins.transport.webserver.routes_1.routes_device import setup as setup_device
+    from lca.plugins.transport.webserver.routes_1.routes_health_options import setup as setup_health
+    from lca.plugins.transport.webserver.routes_1.routes_openai_compat_files import (
         setup as setup_openai,
     )
-    from lca.plugins.transport.webserver.routes_runs_sessions import setup as setup_runs
+    from lca.plugins.transport.webserver.routes_2.routes_runs_sessions import setup as setup_runs
 
     router = RouteRegistry()
     ctx = _FakeCtx(router)
@@ -167,7 +167,7 @@ async def _drain(bytes_iter: Any) -> list[bytes]:
 
 def test_live_route_is_registered() -> None:
     """PR-7:``/runs/{run_id}/live`` 由 ``routes_runs_sessions`` plugin 注册。"""
-    from lca.plugins.transport.webserver.routes_runs_sessions import ROUTE_SPECS
+    from lca.plugins.transport.webserver.routes_2.routes_runs_sessions import ROUTE_SPECS
 
     paths = {spec.path for spec in ROUTE_SPECS}
     assert "/runs/{run_id}/live" in paths

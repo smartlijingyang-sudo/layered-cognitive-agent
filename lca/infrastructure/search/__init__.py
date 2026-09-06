@@ -1,20 +1,20 @@
 """Search plane — unified web search replacing LobeHub server SearchService."""
 
-from lca.infrastructure.search.constants import (
+from lca.infrastructure.search.constants.constants import (
     LOBE_WEB_BROWSING_ID,
     PROVIDER_LLM_NATIVE,
     PROVIDER_TAVILY,
     WEB_BROWSING_API_SEARCH,
     WEB_SEARCH_TOOL,
 )
-from lca.infrastructure.search.router import (
+from lca.infrastructure.search.router.router import (
     is_search_intent,
     resolve_llm_search_kwargs,
     search_routing_hint,
 )
-from lca.infrastructure.search.scope import search_run_scope
-from lca.infrastructure.search.service import any_search_provider_available, web_search
-from lca.infrastructure.search.settings import get_search_settings
+from lca.infrastructure.search.scope.scope import search_run_scope
+from lca.infrastructure.search.service.service import any_search_provider_available, web_search
+from lca.infrastructure.search.settings.settings import get_search_settings
 
 __all__ = [
     "LOBE_WEB_BROWSING_ID",

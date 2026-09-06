@@ -7,20 +7,20 @@ from typing import TYPE_CHECKING, cast
 
 from pydantic import BaseModel
 
-from lca.application.api import Agent
+from lca.application.api.api import Agent
 from lca.contracts.capabilities import (
     CORDIS_CONTROL_TOOL_FACTORY,
     CORDIS_CREATOR_ROLE,
     RUN_MODE_REGISTRY,
 )
-from lca.contracts.mechanisms.capability import require_capability
-from lca.contracts.models.team.role_team import RoleProfile
+from lca.contracts.mechanisms.capability.capability import require_capability
+from lca.contracts.models.team.role.role_team import RoleProfile
 from lca.contracts.protocols import LLMAdapter
-from lca.contracts.protocols.runtime.infra import Tool
-from lca.contracts.protocols.session.run_mode import ModeAdapter
+from lca.contracts.protocols.runtime.infra.infra import Tool
+from lca.contracts.protocols.session.run.run_mode import ModeAdapter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.observability import BoundObservability
-from lca.plugins.state.run_mode_registry_seam import RunModeRegistry
+from lca.plugins.state.run.run_mode_registry_seam import RunModeRegistry
 from lca.plugins.tools.cordis_control import CordisControlToolFactoryProtocol
 from lca.plugins.transport.webserver.carrier.runs.lifecycle.runnable_assembly import (
     RunnableBuildRequest,

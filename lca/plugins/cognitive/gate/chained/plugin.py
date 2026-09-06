@@ -4,10 +4,10 @@ from collections.abc import Sequence
 
 from pydantic import BaseModel
 
-from lca.cognition.brain.decision_gates.chained import ChainedDecisionGate
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
+from lca.cognition.brain.decision_gates.chained.chained import ChainedDecisionGate
+from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     AuthorityContract,
@@ -17,7 +17,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.protocols import DecisionGate
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
 from lca.contracts.protocols.think.cognition import DecisionGateAssembler
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 

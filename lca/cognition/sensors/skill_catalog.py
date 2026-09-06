@@ -15,8 +15,8 @@ import json
 from dataclasses import asdict
 
 from lca.contracts.harness.memory.skill import SkillCatalogEntry
-from lca.contracts.models.core.perception import ContextItem
-from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.core.perceive.perception import ContextItem
+from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import Sensor
 from lca.contracts.protocols.memory.operational_skills import SkillPackageStore
 

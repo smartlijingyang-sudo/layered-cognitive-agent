@@ -11,8 +11,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lca.contracts.models.observability.journal import LlmCallCompleted, StampedEvent
-from lca.contracts.observability.cost import (
+from lca.contracts.models.observability.journal.journal import LlmCallCompleted, StampedEvent
+from lca.contracts.observability.cost.cost import (
     CostCalculator,
     ModelPricing,
 )
@@ -30,7 +30,7 @@ def _make_event(
     completion_tokens: int,
     pricing_ref: str = "",
 ) -> StampedEvent:
-    from lca.contracts.models.observability.journal import RunScope
+    from lca.contracts.models.observability.journal.journal import RunScope
 
     return StampedEvent(
         seq=seq,
@@ -110,7 +110,7 @@ def test_cost_projector_accumulates_by_pricing_ref() -> None:
 def test_cost_projector_ignores_non_llm_events() -> None:
     projector = CostProjector()
     # StampedEvent with non-LlmCallCompleted event
-    from lca.contracts.models.observability.journal import (
+    from lca.contracts.models.observability.journal.journal import (
         AgentRunStarted,
         RunScope,
     )

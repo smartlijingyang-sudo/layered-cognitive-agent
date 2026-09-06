@@ -9,7 +9,7 @@ from lca.contracts.capabilities import (
     PROMPT_TEMPLATE_PROVIDER,
     PROMPT_TEMPLATE_SELECTOR,
 )
-from lca.harness.profile.resolve import resolve_profile
+from lca.harness.profile.resolve.resolve import resolve_profile
 from lca.plugins.prompts.template_provider import Config as ProviderConfig
 
 REPO = Path(__file__).resolve().parents[2]

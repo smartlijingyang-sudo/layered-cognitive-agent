@@ -11,7 +11,7 @@ from lca.contracts.harness.collaboration.agent import (
     LiveAgentStatus,
 )
 from lca.contracts.harness.tasks.session import SessionEvent
-from lca.plugins.session.runtime.resume_point import deserialize_resume_point
+from lca.plugins.session.runtime.resume.resume_point import deserialize_resume_point
 
 
 class SessionRecoveryError(ValueError):
@@ -65,7 +65,7 @@ def recovery_from_events(events: Iterable[SessionEvent]) -> LiveAgentRecovery:
 
 
 def sync_run_status_from_recovery(session: _RunStatusMutable, recovery: LiveAgentRecovery) -> None:
-    from lca.contracts.observability.status import RunLifecycleStatus
+    from lca.contracts.observability.registry.status import RunLifecycleStatus
 
     status_map = {
         LiveAgentStatus.IDLE: RunLifecycleStatus.COMPLETED,

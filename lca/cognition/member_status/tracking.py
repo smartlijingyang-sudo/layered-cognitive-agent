@@ -6,9 +6,9 @@
 
 from __future__ import annotations
 
-from lca.contracts.atoms.enums import RoleStatus
-from lca.contracts.atoms.ids import new_id, utc_now
-from lca.contracts.atoms.semantic_keys import (
+from lca.contracts.atoms.enums.enums import RoleStatus
+from lca.contracts.atoms.ids.ids import new_id, utc_now
+from lca.contracts.atoms.semantic.semantic_keys import (
     COMPLETION_EMPTY,
     COMPLETION_FULL,
     COMPLETION_PARTIAL,
@@ -19,16 +19,16 @@ from lca.contracts.atoms.semantic_keys import (
     OBS_DELEGATION_ID,
     OBS_TASK_ID,
 )
-from lca.contracts.models.core.budget import DEFAULT_MIN_USABLE_PARTIAL_CHARS
-from lca.contracts.models.core.decision import DelegationSpec, Observation
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.team.consultation import (
+from lca.contracts.models.core.policy.budget import DEFAULT_MIN_USABLE_PARTIAL_CHARS
+from lca.contracts.models.core.execution.decision import DelegationSpec, Observation
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.team.consultation.consultation import (
     ConsultationDisposition,
     ConsultationOutcome,
 )
-from lca.contracts.models.team.delegation import DelegationResult
-from lca.contracts.models.team.member_status import MemberStatus
-from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
+from lca.contracts.models.team.delegation.delegation import DelegationResult
+from lca.contracts.models.team.member.member_status import MemberStatus
+from lca.contracts.models.team.team.team_awareness import ConsultDuty, TeamAwareness
 
 
 def duty_board(state: AgentState) -> MemberStatus | None:

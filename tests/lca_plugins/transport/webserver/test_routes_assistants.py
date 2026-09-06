@@ -14,7 +14,7 @@ import pytest
 from starlette.applications import Starlette
 from starlette.testclient import TestClient
 
-from lca.plugins.transport.webserver.router import RouteRegistry
+from lca.plugins.transport.webserver.router.router import RouteRegistry
 
 
 class _FakeRuntime:
@@ -48,7 +48,7 @@ def _setup_plugin() -> tuple[Any, RouteRegistry]:
     Returns the cordis plugin instance (for manifest assertions) and the
     populated :class:`RouteRegistry`.
     """
-    from lca.plugins.transport.webserver.routes_assistants import setup as plugin
+    from lca.plugins.transport.webserver.routes_1.routes_assistants import setup as plugin
 
     router = RouteRegistry()
     ctx = _FakeCtx(router)
@@ -101,7 +101,7 @@ async def test_routes_assistants_effects_tracked() -> None:
 
 
 def test_routes_assistants_exposes_public_routes_constant() -> None:
-    from lca.plugins.transport.webserver.routes_assistants import ROUTE_SPECS
+    from lca.plugins.transport.webserver.routes_1.routes_assistants import ROUTE_SPECS
 
     assert isinstance(ROUTE_SPECS, tuple)
     paths = {spec.path for spec in ROUTE_SPECS}
@@ -271,11 +271,11 @@ class _FakeOverlay:
 
             raise SkillImportError("invariant 闸失败: 资源数超过上限")
         if self.outcome == "not_found":
-            from lca.plugins.assistant.catalog import AssistantCatalogError
+            from lca.plugins.assistant.catalog.catalog import AssistantCatalogError
 
             raise AssistantCatalogError("assistant home 不存在")
         if self.outcome == "digest_mismatch":
-            from lca.plugins.assistant.catalog import AssistantDigestMismatch
+            from lca.plugins.assistant.catalog.catalog import AssistantDigestMismatch
 
             raise AssistantDigestMismatch("digest mismatch")
         from lca.contracts.protocols.assistant.skill_overlay import SkillInstallReceipt
@@ -394,10 +394,10 @@ def test_install_skill_invalid_json_maps_to_400() -> None:
 
 def test_routes_assistants_plugin_id_convention() -> None:
     """ADR-0187 §3 D6 plugin module id must align with the dir hierarchy."""
-    from lca.plugins.transport.webserver.routes_assistants import setup as plugin
+    from lca.plugins.transport.webserver.routes_1.routes_assistants import setup as plugin
 
     defn = plugin._lca_definition
-    assert defn.id == "lca.plugins.transport.webserver.routes_assistants"
+    assert defn.id == "lca.plugins.transport.webserver.routes_1.routes_assistants"
 
 
 def test_routes_assistants_plugin_does_not_require_catalog_at_boot() -> None:
@@ -408,7 +408,7 @@ def test_routes_assistants_plugin_does_not_require_catalog_at_boot() -> None:
     plugin stays mountable on profiles that do not opt into
     ``assistant-runtime``.
     """
-    from lca.plugins.transport.webserver.routes_assistants import setup as plugin
+    from lca.plugins.transport.webserver.routes_1.routes_assistants import setup as plugin
 
     defn = plugin._lca_definition
     required = set(defn.required_capability_keys)
@@ -425,7 +425,7 @@ def test_routes_assistants_provides_route_seam() -> None:
     ``provides`` 声明而不在 setup 兑现会被 boot 审计拒收
     （missing_provide）。
     """
-    from lca.plugins.transport.webserver.routes_assistants import setup as plugin
+    from lca.plugins.transport.webserver.routes_1.routes_assistants import setup as plugin
 
     defn = plugin._lca_definition
     provided = set(defn.provided_capability_keys)
@@ -437,7 +437,7 @@ def test_routes_assistants_provides_route_seam() -> None:
 
 def test_not_implemented_marker_carries_delete_when() -> None:
     """The COMPAT marker must carry a delete-when condition (AGENTS.md §1)."""
-    from lca.plugins.transport.webserver.routes_assistants import (
+    from lca.plugins.transport.webserver.routes_1.routes_assistants import (
         _ASSISTANT_NOT_IMPLEMENTED_MARKER,
     )
 
@@ -453,7 +453,7 @@ def test_handlers_tolerate_missing_state() -> None:
     for objects that don't expose ``app.state`` (e.g. plain ASGI scopes
     during early boot / dry-run); handlers then short-circuit to 501.
     """
-    from lca.plugins.transport.webserver.routes_assistants import (
+    from lca.plugins.transport.webserver.routes_1.routes_assistants import (
         _catalog_from_request,
         _jobs_from_request,
         _skill_overlay_from_request,
@@ -470,7 +470,7 @@ def test_handlers_tolerate_missing_state() -> None:
 
 def test_helpers_use_app_state_when_present() -> None:
     """When ``app.state`` carries the catalog, the helper returns it."""
-    from lca.plugins.transport.webserver.routes_assistants import (
+    from lca.plugins.transport.webserver.routes_1.routes_assistants import (
         _catalog_from_request,
         _jobs_from_request,
         _skill_overlay_from_request,
@@ -499,7 +499,7 @@ def test_handlers_are_coroutine_callables() -> None:
     """Sanity: each exported handler is an async coroutine function."""
     import inspect
 
-    from lca.plugins.transport.webserver.routes_assistants import (
+    from lca.plugins.transport.webserver.routes_1.routes_assistants import (
         create_assistant,
         create_assistant_job,
         fire_assistant_job,
@@ -532,7 +532,7 @@ def _app_with_catalog(tmp_path: Any) -> tuple[Starlette, Any]:
     """Materialise routes with a live AssistantCatalog on app.state."""
     from pathlib import Path
 
-    from lca.plugins.assistant.catalog import AssistantCatalogImpl
+    from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
 
     plugin, router, ctx = _setup_plugin()
     _run_plugin_setup(plugin, ctx)

@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.atoms.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
-from lca.contracts.models.core.decision import Observation
-from lca.contracts.models.core.tool import ToolApi, ToolManifest, ToolMeta
+from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.atoms.semantic.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
+from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.models.core.execution.tool import ToolApi, ToolManifest, ToolMeta
 from lca.contracts.protocols import Tool
 from lca.infrastructure.integrations.composio import get_app_by_identifier
-from lca.infrastructure.integrations.composio.service import ComposioIntegration
-from lca.infrastructure.tools.builder import build_tools_from_manifest
+from lca.infrastructure.integrations.composio.service.service import ComposioIntegration
+from lca.infrastructure.tools.builder.builder import build_tools_from_manifest
 
 IDENTIFIER = "composio"
 

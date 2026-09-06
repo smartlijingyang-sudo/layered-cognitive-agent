@@ -14,7 +14,7 @@ import re
 import pytest
 from starlette.routing import Route, WebSocketRoute
 
-from lca_kernel.cli import create_app
+from lca_kernel.cli.cli import create_app
 
 # Prefix / exact owners. Keep this list next to the routes plugins
 # in lca/plugins/transport/webserver/.

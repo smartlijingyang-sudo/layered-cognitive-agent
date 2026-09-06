@@ -10,12 +10,12 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.protocols.runtime.attachment_errors import (
+from lca.contracts.protocols.runtime.attachment.attachment_errors import (
     AmbiguousFileRefError,
     UnresolvedFileRefError,
 )
-from lca.infrastructure.file_store import LocalFileStore
-from lca.infrastructure.observability.facade.run_ambit import RunAmbit, bind_run_ambit
+from lca.infrastructure.file.file_store import LocalFileStore
+from lca.infrastructure.observability.facade.run.run_ambit import RunAmbit, bind_run_ambit
 from lca.infrastructure.tools.seam.file_ref_args import resolve_path_arg
 
 
@@ -72,7 +72,7 @@ class TestResolvePathArg:
     def test_ambiguous_attachment_id_raises(self) -> None:
         aid = "file_collide"
         # Two distinct FileRefs sharing the same attachment_id → ambiguity.
-        from lca.contracts.models.core.file_ref import FileRef
+        from lca.contracts.models.core.workspace.file_ref import FileRef
 
         refs = (
             FileRef(

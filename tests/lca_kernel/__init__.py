@@ -11,7 +11,7 @@ BootTrace, and ``lca-ops logs --scope boot`` filtering. These tests assert:
 
 from __future__ import annotations
 
-from lca_kernel.stages import Stage
+from lca_kernel.boot.stages import Stage
 
 
 def test_stage_source_value_is_one() -> None:

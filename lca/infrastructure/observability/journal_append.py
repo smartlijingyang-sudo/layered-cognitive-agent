@@ -9,12 +9,12 @@ Kept outside ``journal/`` package to avoid eager RunStore imports on load.
 
 from __future__ import annotations
 
-from lca.contracts.models.observability.journal import JournalEvent, StampedEvent
+from lca.contracts.models.observability.journal.journal import JournalEvent, StampedEvent
 
 
 def append_journal_event(event: JournalEvent) -> StampedEvent | None:
     """Append one catalog ``JournalEvent`` to the run ledger."""
-    from lca.infrastructure.observability.facade.facade import record
+    from lca.infrastructure.observability.facade.facade.facade import record
 
     return record(event)
 

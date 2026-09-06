@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from lca_kernel.events.reader import SpineFileMissingError, SpineReader
+from lca_kernel.events.reader.reader import SpineFileMissingError, SpineReader
 
 
 def test_locate_returns_canonical_spine_path(tmp_path: Path) -> None:

@@ -29,6 +29,6 @@ def test_session_projection_keeps_registry_import_type_only() -> None:
 
     assert "if TYPE_CHECKING:" in projection
     assert (
-        "from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession"
+        "from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession"
         in projection
     )

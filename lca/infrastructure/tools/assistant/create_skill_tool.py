@@ -7,16 +7,16 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from lca.contracts.atoms.enums import ContentType
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.atoms.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
-from lca.contracts.models.core.budget import DEFAULT_TOOL_TIMEOUT_S
-from lca.contracts.models.core.decision import Observation
+from lca.contracts.atoms.enums.enums import ContentType
+from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.atoms.semantic.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
+from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
+from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.protocols import Tool
 from lca.contracts.protocols.assistant.skill_overlay import SkillSource
-from lca.infrastructure.observability.facade.run_ambit import current_assistant_id
-from lca.infrastructure.skills.disk_store import sanitize_skill_id
-from lca.infrastructure.skills.frontmatter import skill_title, split_frontmatter
+from lca.infrastructure.observability.facade.run.run_ambit import current_assistant_id
+from lca.infrastructure.skills.disk.disk_store import sanitize_skill_id
+from lca.infrastructure.skills.frontmatter.frontmatter import skill_title, split_frontmatter
 
 if TYPE_CHECKING:
     from lca.contracts.protocols.assistant.skill_overlay import AssistantSkillOverlay
@@ -135,7 +135,7 @@ class AssistantCreateSkillTool(Tool):
 
 def _read_sandbox_skill_md(sandbox_path: str) -> str:
     """Best-effort read of a sandbox-relative SKILL.md via workspace seam."""
-    from lca.infrastructure.observability.facade.run_ambit import current_workspace
+    from lca.infrastructure.observability.facade.run.run_ambit import current_workspace
 
     workspace = current_workspace()
     if workspace is None:

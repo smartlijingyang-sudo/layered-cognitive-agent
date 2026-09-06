@@ -8,26 +8,26 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from lca.cognition.body.safe_executor import SimpleSafeExecutor
-from lca.contracts.models.core.sandbox import (
+from lca.cognition.body.executor.safe_executor import SimpleSafeExecutor
+from lca.contracts.models.core.execution.sandbox import (
     SANDBOX_MOUNT_ROOT,
     SANDBOX_OUTPUT_SUBDIR,
 )
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     RunScope,
     StampedEvent,
     ToolInvoked,
     ToolStarted,
     run_scope,
 )
-from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
-from lca.infrastructure.file_store import LocalFileStore
+from lca.contracts.models.team.role.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
+from lca.infrastructure.file.file_store import LocalFileStore
 from lca.infrastructure.observability import bind_backends
-from lca.infrastructure.sandbox.runtime_scope import bind_sandbox_runtime, unbind_sandbox_runtime
-from lca.infrastructure.tools.default_set import build_default_tools
-from lca.infrastructure.tools.run_attachment_scope import run_attachment_scope
-from lca.infrastructure.tools.run_finalizer import finalize_run, run_id_scope
-from lca.infrastructure.tools.sandbox_runtime_tools import (
+from lca.infrastructure.sandbox.runtime.runtime_scope import bind_sandbox_runtime, unbind_sandbox_runtime
+from lca.infrastructure.tools.default.default_set import build_default_tools
+from lca.infrastructure.tools.run.run_attachment_scope import run_attachment_scope
+from lca.infrastructure.tools.run.run_finalizer import finalize_run, run_id_scope
+from lca.infrastructure.tools.sandbox.sandbox_runtime_tools import (
     SANDBOX_EXECUTE_TOOL_NAME,
     SANDBOX_INSPECT_TOOL_NAME,
     SandboxExecuteTool,

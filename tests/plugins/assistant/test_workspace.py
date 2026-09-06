@@ -33,12 +33,12 @@ from lca.contracts.models.act.execution_space import (
 from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
 from lca.harness.plugin_api import definition_from_plugin
 from lca.harness.plugin.manifest import EffectClass
-from lca.plugins.assistant.catalog import (
+from lca.plugins.assistant.catalog.catalog import (
     AssistantCatalogError,
     AssistantCatalogImpl,
     AssistantDigestMismatch,
 )
-from lca.plugins.assistant.workspace import (
+from lca.plugins.assistant.workspace.workspace import (
     WorkspaceMaterialization,
     WorkspaceMaterializationService,
     materialize_workspace_from_assistant,
@@ -79,7 +79,7 @@ def workspace_service(catalog: AssistantCatalogImpl) -> WorkspaceMaterialization
 class TestPluginManifest:
     def test_definition_id_namespace(self) -> None:
         definition = definition_from_plugin(setup)
-        assert definition.spec.id == "lca.plugins.assistant.workspace"
+        assert definition.spec.id == "lca.plugins.assistant.workspace.workspace"
 
     def test_provides_assistant_workspace(self) -> None:
         definition = definition_from_plugin(setup)
@@ -100,7 +100,7 @@ class TestPluginManifest:
         列表含非 ``"none"`` 项会降级为 PROVIDER;workspace effect 含
         FILESYSTEM ⇒ 归 PROVIDER。
         """
-        from lca.contracts.protocols.declarative.declarative_common import PluginSpecKind
+        from lca.contracts.protocols.declarative.declarative_1.declarative_common import PluginSpecKind
 
         definition = definition_from_plugin(setup)
         assert definition.spec.kind is PluginSpecKind.PROVIDER

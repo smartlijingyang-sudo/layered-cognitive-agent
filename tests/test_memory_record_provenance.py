@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.atoms.enums import MemoryLayer
-from lca.contracts.models.core.memory import MemoryRecord
+from lca.contracts.atoms.enums.enums import MemoryLayer
+from lca.contracts.models.core.conversation.memory import MemoryRecord
 
 
 def test_memory_record_accepts_provenance_and_confidence() -> None:

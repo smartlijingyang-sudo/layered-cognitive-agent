@@ -12,13 +12,13 @@
 
 from __future__ import annotations
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     JournalEvent,
     ToolAbandonedBeforeInvoke,
     ToolLifecycleEnded,
     ToolRetryProgress,
 )
-from lca.contracts.models.observability.journal_catalog import JOURNAL_EVENT_CLASSES
+from lca.contracts.models.observability.journal.journal_catalog import JOURNAL_EVENT_CLASSES
 
 
 def test_tool_lifecycle_ended_is_registered_in_catalog() -> None:
@@ -76,7 +76,7 @@ def test_tool_retry_progress_defaults() -> None:
 def test_tool_lifecycle_end_kind_excludes_not_invoked_after_stream() -> None:
     """ADR-0162 决策 一:TLE 枚举收窄为「用户能感知」三类,NOT_INVOKED_AFTER_STREAM 迁出。"""
 
-    from lca.contracts.models.observability.journal import ToolLifecycleEndKind
+    from lca.contracts.models.observability.journal.journal import ToolLifecycleEndKind
 
     members = {m.name for m in ToolLifecycleEndKind}
     assert "NOT_INVOKED_AFTER_STREAM" not in members

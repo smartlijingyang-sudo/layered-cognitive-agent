@@ -22,7 +22,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from lca.infrastructure.observability.spine.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.event_record import EventRecord
 
 # ── shared fixtures ──────────────────────────────────────────────────
 
@@ -81,7 +81,7 @@ def test_anomaly_detector_has_exactly_8_check_methods() -> None:
 
 def test_anomaly_detector_satisfies_deriver_protocol() -> None:
     """Structural typing: ``AnomalyDetector`` must implement the Deriver Protocol."""
-    from lca.infrastructure.observability.spine.derivers.base import Deriver
+    from lca.infrastructure.observability.spine.derivers.base.base import Deriver
     from lca.plugins.observability.spine.derivers.anomaly import AnomalyDetector
 
     detector = AnomalyDetector()

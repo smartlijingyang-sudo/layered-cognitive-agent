@@ -157,7 +157,7 @@ def test_section_manifest_prompt_assembler_returns_tuple_with_template_id():
 
 
 def _role_profile():
-    from lca.contracts.models.team.role_team import (
+    from lca.contracts.models.team.role.role_team import (
         RoleProfile,
         ToolPermissionManifest,
     )

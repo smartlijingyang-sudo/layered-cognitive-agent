@@ -7,13 +7,13 @@ helpers make tests state the same dependency explicitly instead of relying on
 
 from __future__ import annotations
 
-from lca.cognition.body.action_registry import ActionRegistry
-from lca.cognition.body.simple_body import SimpleBody
+from lca.cognition.body.actions.action_registry import ActionRegistry
+from lca.cognition.body.executor.simple_body import SimpleBody
 from lca.cognition.wire.registry_factory import build_transport_registry
-from lca.contracts.atoms.enums import ActionType
+from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.protocols import SafeExecutor, ToolRegistry, TransportRegistryProtocol
 from lca.plugins.composer.act.action_authority import build_action_registry_from_authority
-from lca.plugins.act.action_handlers_provider import DefaultActionHandlerRegistry
+from lca.plugins.act.action.action_handlers_provider import DefaultActionHandlerRegistry
 
 DEFAULT_EXECUTABLE_ACTIONS = frozenset(
     {

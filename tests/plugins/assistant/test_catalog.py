@@ -23,7 +23,7 @@ from typing import Any
 import pytest
 
 from lca.contracts.capabilities import ASSISTANT_CATALOG
-from lca.contracts.observability.assistant_ep_closure import (
+from lca.contracts.observability.closure.assistant_ep_closure import (
     ASSISTANT_CREATED,
     ASSISTANT_REQUIRED_FIELDS,
 )
@@ -31,12 +31,12 @@ from lca.contracts.protocols.assistant.catalog import (
     CreateAssistantRequest,
     ProfilePatch,
 )
-from lca.contracts.protocols.declarative.declarative_common import PluginSpecKind
+from lca.contracts.protocols.declarative.declarative_1.declarative_common import PluginSpecKind
 from lca.harness.plugin_api import definition_from_plugin
 from lca.harness.plugin.manifest import EffectClass
-from lca.plugins.assistant._events import AssistantCreatedEventPayload
-from lca.plugins.assistant._home_layout import CONFIG_FACE_FILES, SCHEMA_VERSION
-from lca.plugins.assistant.catalog import (
+from lca.plugins.assistant.events._events import AssistantCreatedEventPayload
+from lca.plugins.assistant.home._home_layout import CONFIG_FACE_FILES, SCHEMA_VERSION
+from lca.plugins.assistant.catalog.catalog import (
     AssistantCatalogError,
     AssistantCatalogImpl,
     AssistantDigestMismatch,
@@ -419,7 +419,7 @@ class TestAssistantCreatedEventPayload:
 class TestPluginManifest:
     def test_definition_id_namespace(self) -> None:
         definition = definition_from_plugin(setup)
-        assert definition.spec.id == "lca.plugins.assistant.catalog"
+        assert definition.spec.id == "lca.plugins.assistant.catalog.catalog"
 
     def test_provides_assistant_catalog(self) -> None:
         definition = definition_from_plugin(setup)

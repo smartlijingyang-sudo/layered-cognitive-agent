@@ -13,8 +13,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from lca.contracts.models.observability.journal import LlmCallCompleted, StampedEvent
-from lca.contracts.observability.cost import (
+from lca.contracts.models.observability.journal.journal import LlmCallCompleted, StampedEvent
+from lca.contracts.observability.cost.cost import (
     CostCalculator,
     CostEntry,
 )

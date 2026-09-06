@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lca.plugins.assistant._home_layout import render_template, write_home_files
-from lca.plugins.assistant.persona import persona_from_home
+from lca.plugins.assistant.home._home_layout import render_template, write_home_files
+from lca.plugins.assistant.persona.persona import persona_from_home
 
 
 def _materialize(home: Path, template_id: str = "assistant.research") -> None:

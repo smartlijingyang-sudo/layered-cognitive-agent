@@ -12,7 +12,7 @@ from enum import Enum
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from lca.infrastructure.llm_adapter.factory import load_dotenv_if_present
+from lca.infrastructure.llm_adapter.factory.factory import load_dotenv_if_present
 
 DEFAULT_CHAT_MODEL = "qwen3.7-plus"
 
@@ -177,7 +177,7 @@ def _or_none(value: str) -> str | None:
 def _looks_like_anthropic(base_url: str | None) -> bool:
     if not base_url:
         return False
-    from lca.infrastructure.llm_adapter.openai_compat._anthropic_messages import (
+    from lca.infrastructure.llm_adapter.openai_compat.anthropic._anthropic_messages import (
         looks_like_anthropic_base_url,
     )
 

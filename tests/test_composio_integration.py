@@ -8,13 +8,13 @@ import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-from lca.infrastructure.integrations.composio.catalog import (
+from lca.infrastructure.integrations.composio.catalog.catalog import (
     get_app_by_identifier,
     resolve_identifier_for_tool_slug,
 )
-from lca.infrastructure.integrations.composio.connection_store import ComposioConnectionStore
-from lca.infrastructure.integrations.composio.models import ComposioConnection, ComposioToolDef
-from lca.infrastructure.integrations.composio.settings import ComposioSettings
+from lca.infrastructure.integrations.composio.connection.connection_store import ComposioConnectionStore
+from lca.infrastructure.integrations.composio.models.models import ComposioConnection, ComposioToolDef
+from lca.infrastructure.integrations.composio.settings.settings import ComposioSettings
 from lca.infrastructure.tools.composio import build_tools
 from lca.plugins.transport.webserver.handlers.runs.wire.wire import resolve
 
@@ -60,7 +60,7 @@ class TestComposioTools(unittest.IsolatedAsyncioTestCase):
                 api_key="test-key",
                 connections_path=str(Path(tmp) / "connections.json"),
             )
-            from lca.infrastructure.integrations.composio.service import ComposioIntegration
+            from lca.infrastructure.integrations.composio.service.service import ComposioIntegration
 
             integration = ComposioIntegration(settings)
             tool = next(t for t in build_tools(integration) if t.name == "composioConnect")
@@ -87,7 +87,7 @@ class TestComposioTools(unittest.IsolatedAsyncioTestCase):
                 api_key="test-key",
                 connections_path=str(path),
             )
-            from lca.infrastructure.integrations.composio.service import ComposioIntegration
+            from lca.infrastructure.integrations.composio.service.service import ComposioIntegration
 
             integration = ComposioIntegration(settings)
             tools = build_tools(integration)
@@ -118,7 +118,7 @@ class TestComposioOAuthCallback(unittest.IsolatedAsyncioTestCase):
                 api_key="test-key",
                 connections_path=str(Path(tmp) / "connections.json"),
             )
-            from lca.infrastructure.integrations.composio.service import ComposioIntegration
+            from lca.infrastructure.integrations.composio.service.service import ComposioIntegration
 
             integration = ComposioIntegration(settings)
             integration.import_connection(
@@ -157,7 +157,7 @@ class TestComposioOAuthCallback(unittest.IsolatedAsyncioTestCase):
 
 class TestComposioMigration(unittest.TestCase):
     def test_row_to_connection_from_plugin_row(self) -> None:
-        from lca.infrastructure.integrations.composio.migrate_lobehub import row_to_connection
+        from lca.infrastructure.integrations.composio.migrate.migrate_lobehub import row_to_connection
 
         conn = row_to_connection(
             {

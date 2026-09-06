@@ -12,9 +12,9 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     AuthorityContract,
@@ -23,7 +23,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
@@ -68,7 +68,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     directly to produce ``(cursor, incarnation)``.
     """
     from lca.infrastructure.observability import NamedRegistry
-    from lca.infrastructure.observability.loop_cursor.factory import LoopCursorFactory
+    from lca.infrastructure.observability.loop_cursor.factory.factory import LoopCursorFactory
 
     del config
     registry: NamedRegistry = ctx.require("observability.loop_cursor")

@@ -24,7 +24,7 @@ from typing import Any
 
 import pytest
 
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import (
     ASSISTANT_BOOTSTRAP,
     ASSISTANT_CATALOG,
@@ -35,8 +35,8 @@ from lca.contracts.protocols.assistant.catalog import (
     CreateAssistantRequest,
 )
 from lca.contracts.protocols.state.scope_plan import BudgetCeiling, ScopePlan
-from lca.plugins.assistant.bootstrap import BootstrapProjectionService
-from lca.plugins.assistant.workspace import WorkspaceMaterializationService
+from lca.plugins.assistant.bootstrap.bootstrap import BootstrapProjectionService
+from lca.plugins.assistant.workspace.workspace import WorkspaceMaterializationService
 
 WEB_ASSISTANT = Path("profiles/web-assistant.yaml")
 WEB_STANDARD = Path("profiles/web-standard.yaml")
@@ -54,7 +54,7 @@ def assistants_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
 async def _boot_and_get_services(
     profile: Path,
 ) -> tuple[Any, AssistantCatalog, BootstrapProjectionService, WorkspaceMaterializationService]:
-    from lca.harness.profile.boot import boot_profile
+    from lca.harness.profile.boot.boot import boot_profile
 
     ctx = await boot_profile(profile)
     catalog = ctx.inject(ASSISTANT_CATALOG.key)
@@ -135,14 +135,14 @@ class TestWebAssistantE2E:
 
         web-standard 默认行为 = 启用前基线(I-A1 / I-A10)。
         """
-        from lca.harness.profile.resolve import resolve_profile
+        from lca.harness.profile.resolve.resolve import resolve_profile
 
         resolved = resolve_profile(WEB_STANDARD)
         plugin_ids = {plugin.id for plugin in resolved.plugins}
         for pid in (
-            "lca.plugins.assistant.catalog",
-            "lca.plugins.assistant.bootstrap",
-            "lca.plugins.assistant.workspace",
+            "lca.plugins.assistant.catalog.catalog",
+            "lca.plugins.assistant.bootstrap.bootstrap",
+            "lca.plugins.assistant.workspace.workspace",
         ):
             assert pid not in plugin_ids, (
                 f"web-standard 不应挂 {pid};实际 {sorted(p for p in plugin_ids if p.startswith('lca.plugins.assistant'))}"
@@ -153,7 +153,7 @@ class TestWebAssistantE2E:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """web-standard profile boot 后 ctx 不暴露 assistant.* capability。"""
-        from lca.harness.profile.boot import boot_profile
+        from lca.harness.profile.boot.boot import boot_profile
 
         ctx = await boot_profile(WEB_STANDARD)
         try:
@@ -193,7 +193,7 @@ class TestWebAssistantCrossAssistantIsolation:
             # 改写 A 的 SOUL.md 并同步 digest,确认 B 投影不含
             import json
 
-            from lca.plugins.assistant._home_layout import sha256_digest
+            from lca.plugins.assistant.home._home_layout import sha256_digest
 
             unique = "ASSISTANT_A_E2E_UNIQUE"
             soul_a = Path(a.home_path) / "SOUL.md"

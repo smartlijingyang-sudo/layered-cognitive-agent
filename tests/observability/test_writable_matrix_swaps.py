@@ -15,7 +15,7 @@ from typing import Any
 
 import pytest
 
-from lca.infrastructure.observability.spine.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.event_record import EventRecord
 from lca.infrastructure.observability.writable_matrix import (
     LineCoalescer,
     NdjsonSerializer,
@@ -191,7 +191,7 @@ def test_swap_coalescer_is_isolated(tmp_path: Path) -> None:
 
 def test_swap_emitter_requires_same_protocol_surface(tmp_path: Path) -> None:
     """I-PLUG3-d: 任意遵循 EventEmitter Protocol 的实例可换入。"""
-    from lca.contracts.observability.writable_matrix import EventEmitter
+    from lca.contracts.observability.cursor.writable_matrix import EventEmitter
 
     class _LocalEmitter:
         def __init__(self) -> None:
@@ -208,7 +208,7 @@ def test_swap_emitter_requires_same_protocol_surface(tmp_path: Path) -> None:
 
 def test_swap_driver_rejects_double_begin(tmp_path: Path) -> None:
     """I-PLUG3-e: 任何 Driver 必须 LIFO 闭环；替换不影响不变量。"""
-    from lca.contracts.observability.writable_matrix import StepDriver
+    from lca.contracts.observability.cursor.writable_matrix import StepDriver
 
     class _LenientDriver:
         """故意宽松的 driver：允许双重 begin。"""

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from lca.plugins.session.runtime.fork import SESSION_END_SEED_TYPE, SessionForkError, fork_session
-from lca.plugins.session.runtime.messages import derive_messages, export_transcript
+from lca.plugins.session.runtime.fork.fork import SESSION_END_SEED_TYPE, SessionForkError, fork_session
+from lca.plugins.session.runtime.messages.messages import derive_messages, export_transcript
 from lca.session.append import Session
-from lca.plugins.session.runtime.store import SessionStore
-from lca_kernel.events.fold import SURFACE_ASSISTANT_TYPE, SURFACE_USER_TYPE
+from lca.plugins.session.runtime.store.store import SessionStore
+from lca_kernel.events.fold.fold import SURFACE_ASSISTANT_TYPE, SURFACE_USER_TYPE
 
 
 def _surface_user(seq: int, content: str) -> dict:

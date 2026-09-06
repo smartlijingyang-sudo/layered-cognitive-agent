@@ -5,8 +5,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import cast
 
-from lca.harness.profile.plugin_metadata import plugin_metadata
-from lca.harness.profile.resolve import ResolvedPlugin
+from lca.harness.profile.plan.plugin_metadata import plugin_metadata
+from lca.harness.profile.resolve.resolve import ResolvedPlugin
 
 
 def _plugin_with_setup(setup: object) -> ResolvedPlugin:

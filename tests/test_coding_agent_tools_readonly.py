@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lca.contracts.observability.coding_agent_tools import (
+from lca.contracts.observability.infra.coding_agent_tools import (
     DiffContextTool,
     FailureExplainerTool,
     MinimalReproductionPackage,
@@ -20,21 +20,21 @@ from lca.contracts.observability.coding_agent_tools import (
     RunDiffTool,
     TraceInspectorTool,
 )
-from lca.plugins.tools.diagnostics.diff_context import DiffContext
-from lca.plugins.tools.diagnostics.failure_explainer import (
+from lca.plugins.tools.diagnostics.diff.diff_context import DiffContext
+from lca.plugins.tools.diagnostics.failure.failure_explainer import (
     FailureExplainer,
 )
-from lca.plugins.tools.diagnostics.minimal_reproduction import (
+from lca.plugins.tools.diagnostics.minimal.minimal_reproduction import (
     MinimalReproduction,
 )
-from lca.plugins.tools.diagnostics.optimization_finder import (
+from lca.plugins.tools.diagnostics.optimization.optimization_finder import (
     OptimizationFinder,
 )
-from lca.plugins.tools.diagnostics.plugin_graph_renderer import (
+from lca.plugins.tools.diagnostics.plugin.plugin_graph_renderer import (
     PluginGraphRenderer,
 )
-from lca.plugins.tools.diagnostics.run_diff import RunDiffToolAdapter
-from lca.plugins.tools.diagnostics.trace_inspector_tool import (
+from lca.plugins.tools.diagnostics.run.run_diff import RunDiffToolAdapter
+from lca.plugins.tools.diagnostics.trace.trace_inspector_tool import (
     TraceInspectorToolAdapter,
 )
 

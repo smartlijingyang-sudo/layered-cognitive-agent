@@ -1,0 +1,244 @@
+"""Session 契约 —— DSH 风格 append-only session 真值的最小契约面（PR-3c）。
+
+对齐 deepseek-harness ``packages/core/session/src/types.ts`` + ``index.ts`` 的
+SessionHeader / SessionEvent / observer 语义；实现在
+:mod:`lca.session.append`。
+
+契约边界：
+
+- 本模块只声明数据形态 + Protocol + 错误，不含 log / observer / fold 实现。
+- 事件词表开放：``SessionEvent.type`` 是 category 字符串，本契约不做
+  close-set 校验（新 category 走 yaml 注册，ADR-0183）。
+- ``SessionProtocol.request_header`` 的 fold 复用 :mod:`lca_kernel.events.fold`
+  （ADR-0185 PR-0）；``SessionEvent`` 暴露只读 ``category`` / ``payload``
+  投影满足 :func:`lca_kernel.events.fold.foldRequestHeader` 的入参形态。
+- flush 链路（ADR-0186）：``flush()`` 异步等待注册过的 durability listener，
+  同时对已注册的 append observer duck-type 探测 ``.flush(session)``；
+  单个 listener 失败 contained + 记入 :class:`FlushResult`，不中断其余 listener。
+
+失败语义：契约层不抛错；``SessionReentryError`` 由实现层在嵌套 append 时抛出。
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
+from typing import Any, Protocol, runtime_checkable
+
+from lca_kernel.events.fold.fold import EpochHeader
+
+SESSION_FORMAT_VERSION: int = 0
+"""Session header 格式版本（对齐 dsh ``SESSION_FORMAT_VERSION``）。
+
+harness 未发布期固定为 0：不承诺兼容，持久化后端按该值校验加载。
+结构性变更（header 形态 / 事件信封 / 核心事件语义）才 bump。
+"""
+
+
+class SessionReentryError(RuntimeError):
+    """进行中的 append 尚未结束（observer 正在 fire）时再次 append。
+
+    实现层在 append 入口检测 ``_appending`` 标记后抛出；嵌套调用方
+    （通常是 observer 内部再次 append）必须自行处理，外层 append 不受影响。
+    """
+
+
+@dataclass(frozen=True, slots=True)
+class SessionHeader:
+    """Session 存储元数据（不进事件日志，存储关注点而非可重放会话状态）。
+
+    字段对齐 dsh ``SessionHeader`` 最小集：
+
+    - ``version`` — 创建时盖章 :data:`SESSION_FORMAT_VERSION`
+    - ``id`` — session 唯一标识（与所属 Session 的 id 一致）
+    - ``created_at`` — 创建时刻 Unix epoch 毫秒（非负整数）
+    - ``is_seeded`` — 是否含 fork/重放继承的事件前缀
+    - ``assistant_id`` —— ADR-0187 §3 D7 session 级助理绑定（PR-5）；
+      ``None``（默认）= 继承遗留默认 agent；非空字符串 = 绑定到该助理
+      id。落盘经 ``Session.observe`` → ``SpineFileSink`` 写 ``<run_id>.spine.jsonl``
+      （ADR-0183 I-FW-SSOT-1）；读端对缺字段做 fail-open，向前兼容旧 record。
+    """
+
+    version: int
+    id: str
+    created_at: int
+    is_seeded: bool = False
+    assistant_id: str | None = None
+    # 业务 lineage 字段（创建时盖章；落盘为 header 可选字段，读端容缺）
+    cwd: str | None = None
+    parent_session: str | None = None
+    seed_length: int | None = None
+    origin: str | None = None
+    delegation_depth: int | None = None
+    agent_preset: str | None = None
+    profile_digest: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.assistant_id is not None and not self.assistant_id.strip():
+            raise ValueError("assistant_id must be None or non-empty string")
+
+
+from lca.contracts.harness.tasks.session import SessionEvent  # noqa: E402
+
+SessionEvent.__doc__ = """Session 日志的唯一不可变事件信封（DSH 对齐）。
+
+- ``type`` — 事件 category 字符串（spine category 是本仓原生词表）
+- ``seq`` — 日志内单调连续序号，恒等于入日志时的 ``len(log)``
+- ``time`` — append 时刻 Unix epoch 毫秒
+- ``data`` — JSON 值域 payload；实现层入日志前做无损 JSON 快照
+- ``session_id`` — 所属 session；``actor``/``visibility`` 为审计投影
+
+``category`` / ``payload`` 是只读投影，适配
+:func:`lca_kernel.events.fold.foldRequestHeader` 的 spine 事件形态。
+全仓唯一信封类型：旧 ``lca_kernel.events.session.SessionEvent`` 本地定义已删除。
+"""
+
+
+@runtime_checkable
+class SessionObserver(Protocol):
+    """append 提交后的同步观察者。
+
+    时序：事件已入日志后才被调用；单个观察者抛错被实现层 contained
+    （记录后继续下一个），不改变 append 返回值，不阻止后续观察者。
+
+    Duck-type flush 探测（ADR-0186）：实现层 ``flush()`` 对注册的 observer
+    调用 ``getattr(observer, 'flush', None)``；若有且可调用，视为该 observer
+    自带 durability 回调，由 ``flush()`` 一并 await。
+    """
+
+    def __call__(self, session: SessionProtocol, event: SessionEvent) -> None: ...
+
+
+@runtime_checkable
+class FlushListener(Protocol):
+    """显式注册的 flush 回调：持久化 / 投递等 durability 副作用。
+
+    ``flush(session)`` 在 ``flush()`` 调用时被 await；单个 listener 抛错
+    被 contained，记入 :class:`FlushResult`，不中断其余 listener。
+    返回值的 ``event_count`` 由实现层统一填充，listener 自身只返回成功标记。
+    """
+
+    async def flush(self, session: SessionProtocol) -> None: ...
+
+
+@dataclass(frozen=True, slots=True)
+class FlushResult:
+    """单次 flush 调用的结果记录。
+
+    ``ok`` 标记该 listener 是否成功完成；``error`` 仅当 ``ok=False`` 时
+    持有异常对象；``event_count`` 是 flush 时刻 session 的日志长度
+    （给 listener 做幂等 / 断点判断）。
+    """
+
+    listener: FlushListener
+    ok: bool
+    event_count: int
+    error: BaseException | None = field(default=None, compare=False)
+
+
+@runtime_checkable
+class SessionProtocol(Protocol):
+    """事件溯源 Session 的公开面（对齐 dsh ``Session`` 核心方法集）。
+
+    不变量：
+
+    - 日志是追加式唯一真值；``seq`` 从 0 连续递增（``seq = len(log)``）。
+    - ``append`` 在 observer fire 期间拒绝重入（抛 :class:`SessionReentryError`）。
+    - ``request_header`` 是 ``foldRequestHeader(snapshot_events())`` 的增量
+      等价形态：每条 header 事件只在首次见到时被 fold 一次。
+    - ``flush`` 异步等待全部 flush listener + observer-duck-typed flush，
+      单个失败 contained，返回每个 listener 的 :class:`FlushResult`。
+    """
+
+    @property
+    def header(self) -> SessionHeader:
+        """创建时盖章的不可变存储元数据。"""
+        ...
+
+    @property
+    def id(self) -> str:
+        """session 唯一标识，派生自 ``header.id`` 的单份真值。"""
+        ...
+
+    @property
+    def seq(self) -> int:
+        """下一条事件的序号 —— 恒等于当前日志长度。"""
+        ...
+
+    def append(
+        self,
+        event_type: str,
+        data: Mapping[str, Any],
+        *,
+        actor: str | None = None,
+        visibility: str = "model",
+    ) -> SessionEvent:
+        """校验 → 入日志 → fire observers（contained）→ 返回落日志的事件。
+
+        precondition：``event_type`` 非空字符串；``data`` 可无损 JSON 序列化。
+        失败语义：校验不过抛 ``TypeError`` / ``ValueError``，日志不变；
+        observer 抛错被 contained，不影响返回值。重入抛
+        :class:`SessionReentryError`，同样不改日志。
+        ``actor`` / ``visibility`` 写入事件信封元数据（审计/可见性投影）。
+        """
+        ...
+
+    def snapshot_events(
+        self, from_seq: int = 0, to_seq_exclusive: int | None = None
+    ) -> tuple[SessionEvent, ...]:
+        """半开区间 ``[from_seq, to_seq_exclusive)`` 的不可变事件快照。
+
+        ``to_seq_exclusive`` 缺省 = 当前日志尾。全量快照在下次 append 前
+        复用同一对象；已返回的快照不被后续 append 改变。
+        """
+        ...
+
+    def event_at(self, seq: int) -> SessionEvent | None:
+        """按精确序号取事件；不存在返回 ``None``。"""
+        ...
+
+    def request_header(self) -> EpochHeader | None:
+        """最后一条 header 事件生效后的 :class:`EpochHeader`；无 header 返回 ``None``。
+
+        增量维护：新事件才触发 fold，重复读是 O(1)。
+        """
+        ...
+
+    def derive_messages(self) -> list[dict[str, Any]]:
+        """从 surface fold 投影 message 序列（DSH ``deriveMessages`` 对位）。"""
+        ...
+
+    def observe(self, observer: SessionObserver) -> Callable[[], None]:
+        """注册 append 观察者；返回幂等取消函数。"""
+        ...
+
+    async def flush(self) -> list[FlushResult]:
+        """await 全部 durability listener + observer-duck-typed flush。
+
+        调用顺序：先跑显式 ``register_flush_listener`` 注册的 listener，再对每个
+        ``observe`` 注册的 observer 探测 ``getattr(observer, 'flush', None)``
+        并按同样语义 await。单个 listener/observer flush 抛错被 contained：
+        记入 :class:`FlushResult.ok=False`，不打断其余 listener。
+        返回结果列表按调用顺序排列。
+        """
+        ...
+
+    def register_flush_listener(self, listener: FlushListener) -> Callable[[], None]:
+        """注册 flush durability listener；返回幂等取消函数。
+
+        时序：注册只对**后续** ``flush()`` 调用生效；取消后下次 flush 不再
+        调用该 listener，已在跑的 flush 不受影响。
+        """
+        ...
+
+
+__all__ = [
+    "SESSION_FORMAT_VERSION",
+    "FlushListener",
+    "FlushResult",
+    "SessionEvent",
+    "SessionHeader",
+    "SessionObserver",
+    "SessionProtocol",
+    "SessionReentryError",
+]

@@ -10,18 +10,18 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.loop.fact_gateway import AppendReceipt, FactGateway
 from lca.harness.session.emit import emit
-from lca.infrastructure.observability.loop_cursor._spine_port import is_session_ssot_hook_active
-from lca.infrastructure.observability.spine.event_record import Channel
-from lca.infrastructure.observability.spine.spine_enrich import (
+from lca.infrastructure.observability.loop_cursor.spine._spine_port import is_session_ssot_hook_active
+from lca.infrastructure.observability.spine.event.event_record import Channel
+from lca.infrastructure.observability.spine.spine.spine_enrich import (
     enrich_spine_payload,
     get_active_field_producers,
 )
-from lca.infrastructure.session.bindings import resolve_session_for_emit
-from lca_kernel.events.payloads import SpineEventPayload
-from lca_kernel.events.session import SessionEvent, SessionProtocol
+from lca.infrastructure.session._overflow_0.bindings import resolve_session_for_emit
+from lca_kernel.events.payloads.payloads import SpineEventPayload
+from lca_kernel.events.session.session import SessionEvent, SessionProtocol
 
 
 def _record_to_receipt(record: SessionEvent) -> AppendReceipt:

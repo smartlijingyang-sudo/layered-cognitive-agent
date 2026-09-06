@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from lca.plugins.transport.webserver.doctor import DoctorReport, diagnose
-from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunRegistry
 from lca.plugins.transport.webserver.read.runs import live as run_live
 
 

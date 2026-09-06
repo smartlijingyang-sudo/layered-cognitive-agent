@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.observability.close_barrier import CloseReport
-from lca.infrastructure.observability.loop_cursor.close_barrier_impl import (
+from lca.contracts.observability.infra.close_barrier import CloseReport
+from lca.infrastructure.observability.loop_cursor.close.close_barrier_impl import (
     StdCloseBarrier,
 )
 
@@ -230,7 +230,7 @@ def test_persistence_failure_does_not_skip_projection_flush() -> None:
 
 # ── 6. close_barrier 满足 Protocol(运行期 isinstance 钉死)───────────
 def test_std_close_barrier_satisfies_closebarrier_protocol() -> None:
-    from lca.contracts.observability.close_barrier import CloseBarrier as CBProtocol
+    from lca.contracts.observability.infra.close_barrier import CloseBarrier as CBProtocol
 
     barrier = StdCloseBarrier(
         persistence=_Recorder(),

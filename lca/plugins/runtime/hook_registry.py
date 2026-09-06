@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import HOOKS
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -17,7 +17,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.protocols import HookRegistry
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
@@ -34,7 +34,7 @@ def build_simple_hook_registry(ctx: PluginContext) -> HookRegistry:
     路径走 ``cursor.advance(phase)`` + ``cursor.record_*(...)`` 直接写 spine。
     本函数保留只为兼容现有 plugin manifest 装配,返回空注册实例。
     """
-    from lca.cognition.brain.hook_registry import CordisHookRegistry
+    from lca.cognition.brain.gate.hook_registry import CordisHookRegistry
 
     return CordisHookRegistry(ctx)
 

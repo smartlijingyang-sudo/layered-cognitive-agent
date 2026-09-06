@@ -15,11 +15,11 @@ import pytest
 
 from lca.infrastructure.persistence.run_buffer_registry import RunWriteBehindRegistry
 from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink, _run_id_of
-from lca.plugins.session.runtime.bus_facade import SessionBusFacade
+from lca.plugins.session.runtime.bus.bus_facade import SessionBusFacade
 from lca.session.append import Session
 from lca_kernel.events import EventRef
-from lca_kernel.events.payloads import SpineEventPayload
-from lca_kernel.events.persistence import PersistenceObserver
+from lca_kernel.events.payloads.payloads import SpineEventPayload
+from lca_kernel.events.persistence.persistence import PersistenceObserver
 
 
 @pytest.fixture(autouse=True)
@@ -130,7 +130,7 @@ def test_spine_file_sink_raises_without_run_context(tmp_path: Path, event_id: st
 
 def test_spine_file_sink_append_record_routes_by_record_event_id(tmp_path: Path) -> None:
     """SinkBackend.append 与 __call__ 同源：run_id 取 record.event_id 前缀。"""
-    from lca_kernel.events.spine_runtime import build_record
+    from lca_kernel.events.spine.spine_runtime import build_record
 
     sink = SpineFileSink(run_dir=tmp_path)
     sink.append(build_record(_payload(), _ref("run-rec:7")))

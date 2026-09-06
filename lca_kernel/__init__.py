@@ -25,21 +25,21 @@ cordis Context。Kernel 不知道有 transport 存在,通过 ``lint-imports`` �
 
 from typing import TYPE_CHECKING
 
-from lca_kernel.boot import (
+from lca_kernel.boot.boot import (
     boot_entries,
     install_compile_result,
     run_kernel,
     run_resolved_kernel,
     stop_kernel,
 )
-from lca_kernel.errors import (
+from lca_kernel.cli.errors import (
     FailLoudError,
     KernelError,
     ReloadError,
     ReloadReason,
     StageError,
 )
-from lca_kernel.hmr import (
+from lca_kernel.runtime.hmr import (
     DEFAULT_PATCH_PATH,
     MIN_DEBOUNCE_MS,
     PATCH_EVENT_KIND,
@@ -50,7 +50,7 @@ from lca_kernel.hmr import (
     summarize_patch,
     validate_patch,
 )
-from lca_kernel.lifecycle import (
+from lca_kernel.boot.lifecycle import (
     FAIL_LOUD_RELEASE_TIMEOUT_MS,
     DefaultShutdownCoordinator,
     ShutdownCoordinator,
@@ -59,11 +59,11 @@ from lca_kernel.lifecycle import (
     install_signal_handlers,
     run_kernel_lifespan,
 )
-from lca_kernel.observability import ObservabilityRuntime
-from lca_kernel.stages import Stage
+from lca_kernel.runtime.observability import ObservabilityRuntime
+from lca_kernel.boot.stages import Stage
 
 if TYPE_CHECKING:
-    from lca.harness.profile.resolve import ResolvedProfile
+    from lca.harness.profile.resolve.resolve import ResolvedProfile
 
 
 def compile_profile(resolved: "ResolvedProfile") -> object:
@@ -72,7 +72,7 @@ def compile_profile(resolved: "ResolvedProfile") -> object:
     命名遵循 ADR-0106 §8.1 函数前缀表(``compile_*``);实现委托给
     :mod:`lca_kernel.plan`。
     """
-    from lca_kernel.plan import compile_run_plan
+    from lca_kernel.plan.plan import compile_run_plan
 
     return compile_run_plan(resolved)
 

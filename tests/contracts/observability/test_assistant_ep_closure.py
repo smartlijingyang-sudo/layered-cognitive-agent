@@ -16,13 +16,13 @@
 
 from __future__ import annotations
 
-from lca.contracts.models.observability.event import (
+from lca.contracts.models.observability.event.event import (
     EventAudience,
     EventDescriptor,
     EventDurability,
     EventSensitivity,
 )
-from lca.contracts.observability.assistant_ep_closure import (
+from lca.contracts.observability.closure.assistant_ep_closure import (
     ASSISTANT_BOOTSTRAP_COMPLETED,
     ASSISTANT_CORDIS_NAMES,
     ASSISTANT_CREATED,
@@ -40,7 +40,7 @@ from lca.contracts.observability.assistant_ep_closure import (
     ASSISTANT_SKILL_INSTALLED,
     all_assistant_event_descriptors,
 )
-from lca.contracts.observability.cordis_event_table import (
+from lca.contracts.observability.infra.cordis_event_table import (
     all_execution_points,
     lookup_cordis_name,
 )

@@ -10,7 +10,7 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict
 
-from lca.contracts.models.observability.journal import JournalRecord
+from lca.contracts.models.observability.journal.journal import JournalRecord
 
 SCHEMA_VERSION: Literal["v2.0.0"] = "v2.0.0"
 

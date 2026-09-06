@@ -11,16 +11,16 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from lca.cognition.body.safe_executor import SimpleSafeExecutor
-from lca.cognition.body.tool_result_preview import tool_files
-from lca.contracts.models.core.decision import Observation
-from lca.contracts.models.observability.journal import (
+from lca.cognition.body.executor.safe_executor import SimpleSafeExecutor
+from lca.cognition.body.tools.tool_result_preview import tool_files
+from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.models.observability.journal.journal import (
     RunScope,
     StampedEvent,
     ToolInvoked,
 )
-from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
-from lca.infrastructure.file_store import LocalFileStore
+from lca.contracts.models.team.role.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
+from lca.infrastructure.file.file_store import LocalFileStore
 from lca.infrastructure.observability import bind_backends, run_scope
 from lca.infrastructure.tools.write_file import build_tools as build_write_file_tools
 from tests.support.observability_helpers import make_test_bound

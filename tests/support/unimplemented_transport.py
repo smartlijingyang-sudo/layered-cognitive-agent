@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.models.core.decision import AgentCard, Observation
+from lca.contracts.models.core.execution.decision import AgentCard, Observation
 from lca.contracts.protocols import AgentTransport
 
 

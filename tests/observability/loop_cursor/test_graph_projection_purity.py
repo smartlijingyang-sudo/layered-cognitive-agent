@@ -24,13 +24,13 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from lca.contracts.observability.loop_cursor import CursorSnapshot
-from lca.contracts.observability.loop_projection import LoopProjectionDefinition
+from lca.contracts.observability.cursor.loop_cursor import CursorSnapshot
+from lca.contracts.observability.cursor.loop_projection import LoopProjectionDefinition
 from lca.infrastructure.observability.loop_cursor.projections.defaults import (
     _GraphProjection,
     _GraphState,
 )
-from lca.infrastructure.observability.spine.event_record import (
+from lca.infrastructure.observability.spine.event.event_record import (
     EventRecord,
 )
 

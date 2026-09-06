@@ -9,8 +9,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 
-from lca.contracts.atoms.ids import remaining_seconds, utc_now
-from lca.contracts.models.core.budget import DEFAULT_RUN_WALL_CLOCK_SECONDS
+from lca.contracts.atoms.ids.ids import remaining_seconds, utc_now
+from lca.contracts.models.core.policy.budget import DEFAULT_RUN_WALL_CLOCK_SECONDS
 from lca.infrastructure.workspace.artifact_ledger import ArtifactLedger
 
 _current_workspace: ContextVar[RunWorkspace | None] = ContextVar("lca_run_workspace", default=None)

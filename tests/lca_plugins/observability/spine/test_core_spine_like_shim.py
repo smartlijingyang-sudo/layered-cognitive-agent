@@ -21,8 +21,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from lca.infrastructure.observability.spine.event_record import EventRecord
-from lca.infrastructure.observability.spine.event_spine import EventSpine
+from lca.infrastructure.observability.spine.event.event_record import EventRecord
+from lca.infrastructure.observability.spine.event.event_spine import EventSpine
 from lca.infrastructure.observability.writable_matrix.defaults import (
     SpineEmitter,
     SpineLike,

@@ -7,30 +7,30 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from lca.cognition.brain.critic import SimpleCritic
-from lca.cognition.brain.decision_gates.must_consult_all import (
+from lca.cognition.brain.reasoner.critic import SimpleCritic
+from lca.cognition.brain.decision_gates.must.must_consult_all import (
     MustConsultAllMembers,
 )
-from lca.cognition.brain.modular_brain import ModularBrain
+from lca.cognition.brain.pipeline.modular_brain import ModularBrain
 from lca.cognition.member_status import (
     InMemoryMemberStatus,
     compute_required_action,
     record_delegation_return,
 )
 from lca.cognition.member_status.tracking import _next_role_status
-from lca.contracts.atoms.enums import RoleStatus
-from lca.contracts.atoms.ids import elapsed_seconds, remaining_seconds, utc_now
-from lca.contracts.atoms.semantic_keys import (
+from lca.contracts.atoms.enums.enums import RoleStatus
+from lca.contracts.atoms.ids.ids import elapsed_seconds, remaining_seconds, utc_now
+from lca.contracts.atoms.semantic.semantic_keys import (
     FAILURE_KIND,
     FAILURE_KIND_VALIDATION,
 )
-from lca.contracts.models.core.decision import Decision, DelegationSpec, Observation
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.team.consultation import ConsultationDisposition
-from lca.contracts.models.team.role_status_rules import is_success_status, is_terminal_status
-from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
+from lca.contracts.models.core.execution.decision import Decision, DelegationSpec, Observation
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.team.consultation.consultation import ConsultationDisposition
+from lca.contracts.models.team.role.role_status_rules import is_success_status, is_terminal_status
+from lca.contracts.models.team.team.team_awareness import ConsultDuty, TeamAwareness
 from lca.contracts.protocols import SupportsShortcut
-from lca.contracts.protocols.journal.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
+from lca.contracts.protocols.journal.spec.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
 from lca.plugins.gate.decision_classifier_provider import DefaultDecisionClassifier
 from lca.plugins.loop.reducer.plugin import DefaultReducer
 

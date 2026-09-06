@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
-from lca.contracts.models.team.team_coordination import (
+from lca.contracts.models.team.team.team_coordination import (
     STRATEGY_KEY_DEBATE,
     STRATEGY_KEY_FAN_OUT,
     STRATEGY_KEY_GRAPH,
@@ -52,15 +52,15 @@ class TestOrchestrationCoverage(unittest.IsolatedAsyncioTestCase):
         self.assertIn("nonexistent_strategy", str(ctx.exception))
 
     async def test_graph_strategy_requires_execution_graph(self) -> None:
-        from lca.plugins.strategies.graph import GraphStrategy
+        from lca.plugins.strategies.graph.graph import GraphStrategy
 
         with self.assertRaises(TypeError):
             GraphStrategy(stage_with_invoker([]))  # type: ignore[call-arg]
 
     async def test_debate_strategy_is_functional(self) -> None:
-        from lca.contracts.models.core.result import Result
-        from lca.contracts.models.core.state import Budget
-        from lca.plugins.strategies.debate import DebateStrategy
+        from lca.contracts.models.core.execution.result import Result
+        from lca.contracts.models.core.state.state import Budget
+        from lca.plugins.strategies.debate.debate import DebateStrategy
 
         agent = MagicMock()
         agent.role_profile = MagicMock()
@@ -83,7 +83,7 @@ class TestOrchestrationCoverage(unittest.IsolatedAsyncioTestCase):
 
     def test_governance_keys_drive_registry_dispatch(self) -> None:
         """ADR-0034：strategy key 由 governance 单向派生，注册表按 key 分发。"""
-        from lca.contracts.protocols.journal.spec import strategy_key_for_governance
+        from lca.contracts.protocols.journal.spec.spec import strategy_key_for_governance
 
         self.assertEqual(strategy_key_for_governance(Pipeline()), STRATEGY_KEY_PIPELINE)
         self.assertEqual(strategy_key_for_governance(Debate()), STRATEGY_KEY_DEBATE)

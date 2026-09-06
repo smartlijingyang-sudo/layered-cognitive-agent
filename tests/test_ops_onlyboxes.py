@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lca.infrastructure.cli.config import OnlyboxesConfig
-from lca.infrastructure.cli.service import ServiceStatus
-from lca.infrastructure.cli.services.onlyboxes import OnlyboxesService
+from lca.infrastructure.cli.config.config import OnlyboxesConfig
+from lca.infrastructure.cli.service.service import ServiceStatus
+from lca.infrastructure.cli.services.onlyboxes.onlyboxes import OnlyboxesService
 
 CONFIGURE = "./deploy/onlyboxes/configure-terminal-runtime.sh"
 BUILD = "./deploy/onlyboxes/build-terminal-image.sh"
@@ -25,7 +25,7 @@ class _FakeProbe:
     configure_calls: int = 0
 
     def observe(self):
-        from lca.infrastructure.cli.services.onlyboxes import OnlyboxesObservation
+        from lca.infrastructure.cli.services.onlyboxes.onlyboxes import OnlyboxesObservation
 
         return OnlyboxesObservation(
             image_present=self.image_present,
@@ -110,12 +110,12 @@ def test_heal_runs_configure_when_runtime_is_wrong() -> None:
 
 
 def test_stack_status_includes_onlyboxes() -> None:
-    from lca.infrastructure.cli.steps import STATUS_SERVICES
+    from lca.infrastructure.cli.steps.steps import STATUS_SERVICES
 
     assert "onlyboxes" in STATUS_SERVICES
     assert (
         "onlyboxes"
-        not in __import__("lca.infrastructure.cli.steps", fromlist=["STOP_SERVICES"]).STOP_SERVICES
+        not in __import__("lca.infrastructure.cli.steps.steps", fromlist=["STOP_SERVICES"]).STOP_SERVICES
     )
 
 
@@ -126,7 +126,7 @@ def test_stack_status_includes_kernel_serve() -> None:
     kernel 死了 status 看不到 → 浏览器报 500 时 operator 不知道 kernel 没在跑。
     加 kernel_serve 后 operator 一眼能看到 LCA 进程状态 + next_action。
     """
-    from lca.infrastructure.cli.steps import STATUS_SERVICES
+    from lca.infrastructure.cli.steps.steps import STATUS_SERVICES
 
     assert "kernel_serve" in STATUS_SERVICES, (
         f"kernel_serve must be in STATUS_SERVICES so lca-ops status reports "

@@ -5,12 +5,12 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
-from lca.plugins.transport.device_hub.auth import AuthError, verify_token
-from lca.plugins.transport.device_hub.bind import DeviceMachineResolver
-from lca.plugins.transport.device_hub.hub import DeviceHub
-from lca.plugins.transport.device_hub.models import DeviceConnection
-from lca.plugins.transport.device_hub.registry import DeviceRegistry
-from lca.plugins.transport.device_hub.settings import DeviceHubSettings
+from lca.plugins.transport.device_hub.auth.auth import AuthError, verify_token
+from lca.plugins.transport.device_hub.bind.bind import DeviceMachineResolver
+from lca.plugins.transport.device_hub.hub.hub import DeviceHub
+from lca.plugins.transport.device_hub.models.models import DeviceConnection
+from lca.plugins.transport.device_hub.registry.registry import DeviceRegistry
+from lca.plugins.transport.device_hub.settings.settings import DeviceHubSettings
 
 
 def test_register_is_idempotent(tmp_path: Path) -> None:

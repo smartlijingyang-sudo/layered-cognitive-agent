@@ -17,7 +17,7 @@ from typing import Any
 
 import pytest
 
-from lca_kernel.cli import create_app
+from lca_kernel.cli.cli import create_app
 
 
 async def _drive_lifespan(app: Any, hold: asyncio.Event | None = None) -> None:
@@ -72,7 +72,7 @@ async def test_dispose_one_app_does_not_affect_other() -> None:
 @pytest.mark.asyncio
 async def test_ensure_default_ctx_caches_across_calls() -> None:
     """Library-level default ctx caches so Agent(...) sees one boot."""
-    from lca.application.api import ensure_default_ctx
+    from lca.application.api.api import ensure_default_ctx
 
     ctx1 = await ensure_default_ctx()
     ctx2 = await ensure_default_ctx()

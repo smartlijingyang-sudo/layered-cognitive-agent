@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     AgentRunFinished,
     ReasoningCompleted,
     ReasoningDelta,

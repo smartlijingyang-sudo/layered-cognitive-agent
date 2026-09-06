@@ -9,7 +9,7 @@ from lca.contracts.harness.composition.composer import (
     AgentCompositionRequest,
     AgentGraphContribution,
 )
-from lca.contracts.mechanisms.capability import require_capability
+from lca.contracts.mechanisms.capability.capability import require_capability
 from lca.plugins.composer.collaboration.team import resolve_observability
 from lca.plugins.composer.perceive.perceive import (
     build_perceive_hub,

@@ -11,7 +11,7 @@ from __future__ import annotations
 from importlib import import_module
 from typing import Any
 
-from lca.contracts.models.team.team_coordination import (
+from lca.contracts.models.team.team.team_coordination import (
     Debate,
     FanOut,
     Graph,
@@ -20,7 +20,7 @@ from lca.contracts.models.team.team_coordination import (
     PeerSwarm,
     Pipeline,
 )
-from lca.contracts.protocols.journal.spec import AgentSpec, Governance, LeadSpec, TeamSpec
+from lca.contracts.protocols.journal.spec.spec import AgentSpec, Governance, LeadSpec, TeamSpec
 
 __all__ = [
     "Agent",
@@ -53,7 +53,7 @@ def __getattr__(name: str) -> Any:
 
     if name not in _LAZY_COMPOSITION_SYMBOLS:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    api = import_module("lca.application.api")
+    api = import_module("lca.application.api.api")
     value = getattr(api, name)
     globals()[name] = value
     return value

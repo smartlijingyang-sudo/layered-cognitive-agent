@@ -29,9 +29,9 @@ import warnings
 from dataclasses import dataclass
 from typing import Any
 
-from lca.contracts.atoms.control_slot import ControlSlot, parse_slot
-from lca.contracts.atoms.functional_group import FunctionalGroup, parse_functional_group
-from lca.contracts.atoms.scope import Scope, canonical_scope, parse_scope
+from lca.contracts.atoms.control.control_slot import ControlSlot, parse_slot
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup, parse_functional_group
+from lca.contracts.atoms.scope.scope import Scope, canonical_scope, parse_scope
 
 _DEPRECATION_MSG = (
     "LogicAddress(...) is deprecated per ADR-0110 D2; "

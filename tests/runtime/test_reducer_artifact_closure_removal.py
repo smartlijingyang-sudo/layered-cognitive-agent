@@ -12,7 +12,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols.state.reducer import Reducer
 from lca.plugins.loop.reducer.plugin import DefaultReducer
 
@@ -63,7 +63,7 @@ def test_artifact_closure_delta_handler_class_deleted() -> None:
     """ArtifactClosureDeltaHandler 类删除(走 transport 投影通道)。"""
 
     try:
-        from lca.plugins.act.delta_handlers_provider import (
+        from lca.plugins.act.delta.delta_handlers_provider import (
             ArtifactClosureDeltaHandler,  # type: ignore[attr-defined]
         )
 

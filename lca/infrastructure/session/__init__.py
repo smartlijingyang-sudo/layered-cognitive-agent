@@ -1,6 +1,6 @@
 """Session runtime seams consumed by cognition (model context + checkpoint)."""
 
-from lca.infrastructure.session.bindings import (
+from lca.infrastructure.session._overflow_0.bindings import (
     assemble_model_history,
     await_model_request_checkpoint,
     await_step_boundary_checkpoint,
@@ -11,7 +11,7 @@ from lca.infrastructure.session.bindings import (
     set_checkpoint_policy,
     set_model_context_assembler,
 )
-from lca.infrastructure.session.model_context_assembler import (
+from lca.infrastructure.session.context.model_context_assembler import (
     DefaultModelContextAssembler,
 )
 

@@ -12,8 +12,8 @@ import threading
 
 import pytest
 
-from lca.contracts.models.observability.journal import AgentRunStarted
-from lca.contracts.observability.ledger import LedgerSeqMismatchError
+from lca.contracts.models.observability.journal.journal import AgentRunStarted
+from lca.contracts.observability.journal.ledger import LedgerSeqMismatchError
 from lca.infrastructure.observability.journal.engine.engine import RunStore
 
 

@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from lca.plugins.transport.webserver.router import RouteRegistry
+from lca.plugins.transport.webserver.router.router import RouteRegistry
 
 
 class _FakeRuntime:
@@ -32,7 +32,7 @@ class _FakeCtx:
 
 @pytest.mark.asyncio
 async def test_routes_device_register_seven_http_routes() -> None:
-    from lca.plugins.transport.webserver.routes_device import setup as plugin
+    from lca.plugins.transport.webserver.routes_1.routes_device import setup as plugin
 
     router = RouteRegistry()
     ctx = _FakeCtx(router)
@@ -43,7 +43,7 @@ async def test_routes_device_register_seven_http_routes() -> None:
 
 @pytest.mark.asyncio
 async def test_routes_device_register_one_websocket() -> None:
-    from lca.plugins.transport.webserver.routes_device import setup as plugin
+    from lca.plugins.transport.webserver.routes_1.routes_device import setup as plugin
 
     router = RouteRegistry()
     ctx = _FakeCtx(router)
@@ -55,7 +55,7 @@ async def test_routes_device_register_one_websocket() -> None:
 
 @pytest.mark.asyncio
 async def test_routes_device_paths_match_baseline() -> None:
-    from lca.plugins.transport.webserver.routes_device import setup as plugin
+    from lca.plugins.transport.webserver.routes_1.routes_device import setup as plugin
 
     router = RouteRegistry()
     ctx = _FakeCtx(router)
@@ -76,7 +76,7 @@ async def test_routes_device_paths_match_baseline() -> None:
 @pytest.mark.asyncio
 async def test_routes_device_effects_tracked() -> None:
     """8 routes × 1 effect each = 8 effects(7 HTTP + 1 WS)。"""
-    from lca.plugins.transport.webserver.routes_device import setup as plugin
+    from lca.plugins.transport.webserver.routes_1.routes_device import setup as plugin
 
     router = RouteRegistry()
     ctx = _FakeCtx(router)

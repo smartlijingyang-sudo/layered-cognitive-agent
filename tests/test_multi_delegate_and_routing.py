@@ -6,21 +6,21 @@ import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
-from lca.cognition.body.tool_registry import SimpleToolRegistry
-from lca.cognition.brain.decision_gates.must_consult_all import MustConsultAllMembers
+from lca.cognition.body.tools.tool_registry import SimpleToolRegistry
+from lca.cognition.brain.decision_gates.must.must_consult_all import MustConsultAllMembers
 from lca.cognition.member_status import InMemoryMemberStatus
-from lca.contracts.atoms.enums import DecisionGateName, RoleStatus
-from lca.contracts.models.core.decision import Decision, DelegationSpec, Observation
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.result import Result
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
-from lca.contracts.protocols.journal.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
+from lca.contracts.atoms.enums.enums import DecisionGateName, RoleStatus
+from lca.contracts.models.core.execution.decision import Decision, DelegationSpec, Observation
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.team.role.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.team.team_awareness import ConsultDuty, TeamAwareness
+from lca.contracts.protocols.journal.spec.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
 from lca.infrastructure.transport.agent_transport import InternalTransport
 from lca.infrastructure.transport.transport_registry import TransportRegistry
-from lca.plugins.strategies.lead import LeadStrategy
-from lca.plugins.strategies.peer_swarm import SwarmStrategy
+from lca.plugins.strategies.lead.lead import LeadStrategy
+from lca.plugins.strategies.peer.peer_swarm import SwarmStrategy
 from tests.support.action_authority import build_test_body
 from tests.support.team_stage import stage_with_invoker
 
@@ -114,7 +114,7 @@ class TestMustConsultMultiShortcut(unittest.IsolatedAsyncioTestCase):
 
 class TestRoutingPlane(unittest.IsolatedAsyncioTestCase):
     async def test_routing_mode_never_maps_to_duty_gate(self) -> None:
-        from lca.contracts.models.team.team_coordination import LeadMandate, gate_name_for_mandate
+        from lca.contracts.models.team.team.team_coordination import LeadMandate, gate_name_for_mandate
 
         self.assertEqual(gate_name_for_mandate(LeadMandate.ROUTING), DecisionGateName.NONE)
         # Illegal plane×gate product is not representable via LeadMandate.

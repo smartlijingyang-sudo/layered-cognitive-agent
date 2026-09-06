@@ -9,28 +9,28 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-from lca.contracts.atoms.enums import RoleStatus
-from lca.contracts.atoms.ids import elapsed_seconds
-from lca.contracts.models.core.budget import (
+from lca.contracts.atoms.enums.enums import RoleStatus
+from lca.contracts.atoms.ids.ids import elapsed_seconds
+from lca.contracts.models.core.policy.budget import (
     DEFAULT_DELEGATION_TIMEOUT_S,
     DEFAULT_MIN_USABLE_PARTIAL_CHARS,
     DelegationBudget,
 )
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.team.consultation import (
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.team.consultation.consultation import (
     ConsultationDisposition,
     ConsultationOutcome,
     SynthesisMethod,
     latest_outcome_for_role,
     usable_outcomes,
 )
-from lca.contracts.models.team.member_status import MemberStatus
-from lca.contracts.models.team.role_status_rules import (
+from lca.contracts.models.team.member.member_status import MemberStatus
+from lca.contracts.models.team.role.role_status_rules import (
     is_full_success_status,
     is_success_status,
     is_terminal_status,
 )
-from lca.contracts.models.team.team_awareness import ConsultDuty
+from lca.contracts.models.team.team.team_awareness import ConsultDuty
 
 
 @dataclass(frozen=True)

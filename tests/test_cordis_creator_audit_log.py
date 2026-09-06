@@ -21,7 +21,7 @@ import json
 from contextlib import contextmanager
 from pathlib import Path
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     PluginAuthored,
     PluginInspected,
     PluginMounted,
@@ -37,7 +37,7 @@ from lca.infrastructure.observability.journal.engine.journal_io import (
     read_journal,
     stamped_to_record,
 )
-from lca.plugins.think.composition_composer_provider import (
+from lca.plugins.think.composition.composition_composer_provider import (
     CordisComposer,
     build_default_invariant_checker,
 )
@@ -120,7 +120,7 @@ def _infer_source(stamped: StampedEvent) -> str:
     if isinstance(p, PluginAuthored):
         return "lca.plugins.tools.cordis_control"
     if isinstance(p, PresetPublished):
-        return "lca.application.preset_authoring"
+        return "lca.application.authoring.preset_authoring"
     if isinstance(p, RuntimeObserved):
         return str(getattr(p, "source", "") or "runtime")
     return ""

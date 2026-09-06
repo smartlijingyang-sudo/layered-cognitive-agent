@@ -34,7 +34,7 @@ from lca.infrastructure.observability.replay.fold_source import (
     SOURCE_FOLD,
     fold_model_visible,
 )
-from lca_kernel.events.fold import (
+from lca_kernel.events.fold.fold import (
     EpochHeader,
     canonicalHeader,
     foldRequestHeader,
@@ -275,7 +275,7 @@ def test_fold_system_change_reconstructs_to_new_system(tmp_path: Path) -> None:
     assert folded_002.header.system == "prompt v2"
 
     # fold 端到端(SpineReader.events() 直接)与 fold_model_visible 字节级等。
-    from lca_kernel.events.reader import SpineReader
+    from lca_kernel.events.reader.reader import SpineReader
 
     records = list(SpineReader(run_id=run_id, path=run_dir / f"{run_id}.spine.jsonl").events())
     direct_fold = foldRequestHeader(records, step_id="step-002")

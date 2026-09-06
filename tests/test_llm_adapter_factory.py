@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest import mock
 
 from lca.infrastructure.llm.openai_client import LLMUnavailableError
-from lca.infrastructure.llm_adapter.factory import (
+from lca.infrastructure.llm_adapter.factory.factory import (
     load_dotenv_if_present,
     resolve_llm_adapter,
 )
@@ -64,7 +64,7 @@ class TestResolveLLMAdapter(unittest.TestCase):
 
     @unittest.skipUnless(_HAS_OPENAI, "openai SDK not installed")
     def test_api_param_forwarded_to_openai_compat(self) -> None:
-        from lca.infrastructure.llm_adapter.api_style import LLMApiStyle
+        from lca.infrastructure.llm_adapter.api.api_style import LLMApiStyle
 
         with (
             mock.patch.dict(os.environ, {"LLM_API_KEY": "sk-test-fake-key"}, clear=False),

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.cognition.brain.modular_brain import ModularBrain
-from lca.cognition.brain.reasoner import PromptReasoner
+from lca.cognition.brain.pipeline.modular_brain import ModularBrain
+from lca.cognition.brain.reasoner.reasoner import PromptReasoner
 from lca.contracts.capabilities import BRAIN_PROMPT_CATALOG_FACTORY, BRAINS
 from lca.contracts.mechanisms import consume
-from lca.contracts.mechanisms.capability import require_capability
+from lca.contracts.mechanisms.capability.capability import require_capability
 from lca.contracts.protocols import (
     Brain,
     BrainPromptCatalog,
@@ -16,11 +16,11 @@ from lca.contracts.protocols import (
     DecisionGate,
     LLMAdapter,
 )
-from lca.contracts.protocols.journal.spec import AgentSpec
+from lca.contracts.protocols.journal.spec.spec import AgentSpec
 from lca.infrastructure.observability.adapters import (
     TelemetryLLMAdapter,
 )
-from lca.infrastructure.session.lifecycle_emit import session_append_for_thinking
+from lca.infrastructure.session.emit.lifecycle_emit import session_append_for_thinking
 from lca.plugins.composer.composition.skill_store import active_skill_store
 
 _MODEL_VISIBLE_HOOK_KEY = "llm.adapter.hook.model_visible"

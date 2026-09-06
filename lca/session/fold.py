@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca_kernel.events.fold import (
+from lca_kernel.events.fold.fold import (
     REQUEST_HEADER_CATEGORY,
     SURFACE_ASSISTANT_TYPE,
     SURFACE_TOOL_RESULT_TYPE,

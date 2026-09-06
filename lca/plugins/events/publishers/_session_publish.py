@@ -20,7 +20,7 @@ import contextvars
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 if TYPE_CHECKING:
-    from lca_kernel.events.bus import EventRef
+    from lca_kernel.events.bus.bus import EventRef
 
 
 def _authorize_producer(payload: Any, producer: Any) -> None:
@@ -30,8 +30,8 @@ def _authorize_producer(payload: Any, producer: Any) -> None:
     ``EnvelopeBus.publish``. Raises ``UnauthorizedPublishError`` on deny.
     Missing plugin identity / category defers to EnvelopeBus / schema checks.
     """
-    from lca_kernel.events.bus import EnvelopeBus
-    from lca_kernel.events.errors import UnauthorizedPublishError
+    from lca_kernel.events.bus.bus import EnvelopeBus
+    from lca_kernel.events.errors.errors import UnauthorizedPublishError
 
     bus = EnvelopeBus.default()
     coerce = getattr(bus, "_coerce_producer", None)
@@ -85,7 +85,7 @@ def set_publish_session(
     bus Protocol facade；已是 ``append(payload, *, producer)`` 形态的对象
     原样装载。
     """
-    from lca.plugins.session.runtime.bus_facade import as_bus_facade
+    from lca.plugins.session.runtime.bus.bus_facade import as_bus_facade
 
     return _current_session.set(cast("_PublishSession | None", as_bus_facade(session)))
 
@@ -124,7 +124,7 @@ def publish_via_session(
     族：装饰性 transport emit 可吞；业务 publish 仍 fail-loud。
     ``UnauthorizedPublishError``——S1 registry 拒绝该 producer/category。
     """
-    from lca_kernel.events.errors import MissingPublishSessionError
+    from lca_kernel.events.errors.errors import MissingPublishSessionError
 
     session = _current_session.get()
     if session is None:

@@ -23,7 +23,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 class TestInspectCapabilityGraph:
     def test_inspect_tree_includes_implements(self) -> None:
         """The capability graph MUST include ``implements``."""
-        from lca.harness.diagnostics.inspect import format_capability_graph
+        from lca.harness.diagnostics.inspect.inspect import format_capability_graph
 
         meta = {
             "name": "lca.clock.sensor",
@@ -40,7 +40,7 @@ class TestInspectCapabilityGraph:
 
     def test_inspect_tree_includes_emitted_events(self) -> None:
         """The capability graph MUST include ``emitted_events``."""
-        from lca.harness.diagnostics.inspect import format_capability_graph
+        from lca.harness.diagnostics.inspect.inspect import format_capability_graph
 
         meta = {
             "name": "lca.memory.commit",
@@ -58,7 +58,7 @@ class TestInspectCapabilityGraph:
 
     def test_format_capability_graph_returns_dict(self) -> None:
         """``format_capability_graph`` MUST return a ``dict`` (graph shape)."""
-        from lca.harness.diagnostics.inspect import format_capability_graph
+        from lca.harness.diagnostics.inspect.inspect import format_capability_graph
 
         meta = {
             "name": "p",
@@ -82,7 +82,7 @@ class TestInspectCapabilityGraph:
             kind = "service"
             seam_key = "agent.before_think"
 
-        from lca.harness.diagnostics.inspect import format_capability_graph_from_legacy
+        from lca.harness.diagnostics.inspect.inspect import format_capability_graph_from_legacy
 
         graph = format_capability_graph_from_legacy(_LegacyManifest())
         assert graph.get("layer") == "service"
@@ -97,7 +97,7 @@ class TestInspectCapabilityGraph:
         """
         from typer.testing import CliRunner
 
-        from lca.infrastructure.cli.cli import app
+        from lca.infrastructure.cli.cli.cli import app
 
         # Write a minimal YAML profile.
         profile = tmp_path / "mini.yaml"

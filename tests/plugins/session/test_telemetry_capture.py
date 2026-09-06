@@ -17,12 +17,12 @@ from typing import Any
 
 import pytest
 
-from lca.contracts.protocols.session.telemetry import (
+from lca.contracts.protocols.session.telemetry.telemetry import (
     CHANNEL_LEDGER,
     SharingPolicy,
     TelemetryRecord,
 )
-from lca.plugins.session.runtime.store import SessionStore
+from lca.plugins.session.runtime.store.store import SessionStore
 from lca.plugins.session.telemetry_capture.telemetry_capture import (
     Config,
     SessionTelemetryCapture,

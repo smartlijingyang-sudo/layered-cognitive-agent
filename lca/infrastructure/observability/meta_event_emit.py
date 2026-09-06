@@ -31,14 +31,14 @@ from lca.contracts.harness.memory.events import (
     ToolSchemaPublished,
 )
 from lca.contracts.harness.memory.skill import SkillCatalogEntry
-from lca.contracts.observability.skill_meta_ep_closure import (
+from lca.contracts.observability.closure.skill_meta_ep_closure import (
     SKILL_PACKAGE_ACTIVATED,
     SKILL_PACKAGE_INSTALL_FAILED,
     SKILL_PACKAGE_INSTALLED,
     SKILL_PACKAGE_SEARCHED,
 )
 from lca.contracts.protocols.loop.fact_gateway import AppendReceipt
-from lca.infrastructure.session.bindings import resolve_session_reader
+from lca.infrastructure.session._overflow_0.bindings import resolve_session_reader
 from lca.loop.fact_gateway import append_catalog_bound, publish_ep_bound
 
 log = structlog.get_logger(__name__)

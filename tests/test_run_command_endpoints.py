@@ -15,8 +15,8 @@ from starlette.routing import Route
 from starlette.testclient import TestClient
 
 from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import create_run
-from lca.plugins.transport.webserver.handlers.runs.ingest.ingress import LobeHubRunInput
-from lca.plugins.transport.webserver.handlers.runs.terminal.port import RunReceipt
+from lca.plugins.transport.webserver.handlers.runs.ingest.ingress.ingress import LobeHubRunInput
+from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import RunReceipt
 
 
 def _identity_mode(_ctx: object, key: str) -> str:

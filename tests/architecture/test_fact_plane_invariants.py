@@ -51,7 +51,7 @@ def _rg(pattern: str, root: Path) -> list[str]:
 class TestIFact1:
     def test_i_fact_1_fact_committer_protocol_importable(self) -> None:
         from lca.contracts.protocols.observability.fact_committer import FactCommitter
-        from lca.infrastructure.session.fact_committer import SessionFactCommitter
+        from lca.infrastructure.session.commit.fact_committer import SessionFactCommitter
 
         assert isinstance(SessionFactCommitter(), FactCommitter)
 
@@ -84,7 +84,7 @@ class TestIFact2:
         """Cognition must route journal writes through append_journal_event seam."""
         forbidden_patterns = (
             "from lca.infrastructure.observability import record",
-            "from lca.infrastructure.observability.facade.facade import record",
+            "from lca.infrastructure.observability.facade.facade.facade import record",
             "record_runtime(",
         )
         matches: list[str] = []
@@ -114,8 +114,8 @@ class TestIFact3:
         assert "emit_phase_catalog_facts" in text
 
     def test_i_fact_3_runtime_journal_uses_session_committer(self) -> None:
-        from lca.infrastructure.session.fact_committer import SessionFactCommitter
-        from lca.runtime.runtime_journal import RuntimeJournalCommitter
+        from lca.infrastructure.session.commit.fact_committer import SessionFactCommitter
+        from lca.runtime.loop.runtime_journal import RuntimeJournalCommitter
 
         assert issubclass(RuntimeJournalCommitter, SessionFactCommitter)
 

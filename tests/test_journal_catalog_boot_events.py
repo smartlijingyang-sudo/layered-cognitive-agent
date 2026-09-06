@@ -17,16 +17,16 @@ from enum import IntEnum
 
 import pytest
 
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal.journal import (
     BootObservabilityAssembled,
     BootPluginFiberSpawned,
     BootProfileResolved,
 )
-from lca.contracts.models.observability.journal_catalog import JOURNAL_EVENT_CLASSES
-from lca.infrastructure.observability.events.event_descriptors_data import (
+from lca.contracts.models.observability.journal.journal_catalog import JOURNAL_EVENT_CLASSES
+from lca.infrastructure.observability.events.event.event_descriptors_data import (
     build_default_registry,
 )
-from lca_kernel.stages import Stage
+from lca_kernel.boot.stages import Stage
 
 _BOOT_EVENT_NAMES = frozenset(
     {"BootProfileResolved", "BootPluginFiberSpawned", "BootObservabilityAssembled"}
@@ -59,7 +59,7 @@ class TestBootEventShapes:
         [BootProfileResolved, BootPluginFiberSpawned, BootObservabilityAssembled],
     )
     def test_event_inherits_journal_event(self, cls: type) -> None:
-        from lca.contracts.models.observability.journal import JournalEvent
+        from lca.contracts.models.observability.journal.journal import JournalEvent
 
         assert issubclass(cls, JournalEvent), f"{cls.__name__} 必须继承 JournalEvent"
 
@@ -222,11 +222,11 @@ class TestEventDescriptorsBootEvents:
         assert descriptor.payload_class is BootProfileResolved
 
         descriptor = registry.require("BootPluginFiberSpawned")
-        assert descriptor.emitter == "lca_kernel.boot"
+        assert descriptor.emitter == "lca_kernel.boot.boot"
         assert descriptor.payload_class is BootPluginFiberSpawned
 
         descriptor = registry.require("BootObservabilityAssembled")
-        assert descriptor.emitter == "lca_kernel.observability"
+        assert descriptor.emitter == "lca_kernel.runtime.observability"
         assert descriptor.payload_class is BootObservabilityAssembled
 
 

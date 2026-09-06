@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     AuthorityContract,
@@ -15,13 +15,13 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     PhaseContext,
     PhaseInput,
     PhaseResult,
     SemanticPhase,
 )
-from lca.contracts.protocols.declarative.declarative_plugin import OwnershipDeclaration
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.loop.phase._shared.capabilities import StandardPhaseCapabilities
 from lca.plugins.loop.phase._shared.common import (
@@ -49,7 +49,7 @@ class StandardThinkExecutor:
                 result_kind="decision",
                 input=input,
             )
-        from lca.infrastructure.session.cognitive_emit import run_brain_think_with_spine_facts
+        from lca.infrastructure.session.emit.cognitive_emit import run_brain_think_with_spine_facts
 
         decision = await run_brain_think_with_spine_facts(brain, context.state)
         return PhaseResult(result_kind="decision", payload=decision)

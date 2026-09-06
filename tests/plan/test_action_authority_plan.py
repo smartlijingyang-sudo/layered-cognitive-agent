@@ -10,16 +10,16 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from lca.contracts.atoms.enums import ActionScope, ActionType
-from lca.contracts.atoms.functional_group import FunctionalGroup
-from lca.contracts.protocols.declarative.declarative_phase_graph import ActionAuthorityPlan
-from lca.harness.declarative.compile.action_authority import compile_action_authority
-from lca.harness.declarative.compile.authority import (
+from lca.contracts.atoms.enums.enums import ActionScope, ActionType
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import ActionAuthorityPlan
+from lca.harness.declarative.compile.action.action_authority import compile_action_authority
+from lca.harness.declarative.compile.authority.authority import (
     action_authority_for_scope,
     action_is_permitted,
 )
 from lca.harness.composition.plan_compiler import compile_plan
-from lca.harness.profile.resolve import resolve_profile
+from lca.harness.profile.resolve.resolve import resolve_profile
 
 # ── Data class contract ───────────────────────────────────────────────
 
@@ -67,7 +67,7 @@ def test_action_authority_plan_rejects_empty_scope() -> None:
 
     import pytest
 
-    from lca.contracts.protocols.declarative.declarative_phase_graph import (
+    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
         DeclarativeValidationError,
     )
 

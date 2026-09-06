@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from lca.infrastructure.search.settings import get_search_settings
+from lca.infrastructure.search.settings.settings import get_search_settings
 
 
 def resolve_sandbox_env() -> dict[str, str]:

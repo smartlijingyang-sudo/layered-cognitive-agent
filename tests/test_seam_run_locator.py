@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import asyncio
 
-from lca.contracts.observability.run_locator import RunLocator
+from lca.contracts.observability.registry.run_locator import RunLocator
 from lca.infrastructure.observability.backends.run_locator_fs import FilesystemRunLocator
 
 
 def _invoke_seam_setup() -> dict[str, object]:
-    from lca.plugins.observability.run_locator_seam import Config
-    from lca.plugins.observability.run_locator_seam import setup as seam_setup
+    from lca.plugins.observability.run.run_locator_seam import Config
+    from lca.plugins.observability.run.run_locator_seam import setup as seam_setup
 
     provided: dict[str, object] = {}
 
@@ -36,7 +36,7 @@ def test_seam_locator_satisfies_protocol() -> None:
 
 
 def test_seam_meta_manifest_is_correct() -> None:
-    from lca.plugins.observability.run_locator_seam import setup as seam_setup
+    from lca.plugins.observability.run.run_locator_seam import setup as seam_setup
 
     meta = getattr(seam_setup, "meta", {})
     assert meta.get("id") == "lca-run-locator-seam"

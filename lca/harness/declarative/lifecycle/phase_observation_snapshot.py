@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.protocols.journal.phase_observation import (
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.protocols.journal.phase.phase_observation import (
     PhaseBudgetSnapshot,
     PhaseStateSnapshot,
 )

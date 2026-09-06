@@ -34,10 +34,10 @@ from lca.contracts.capabilities import (
     TEAM_CASTER,
     TEAM_ROLE_LIBRARY,
 )
-from lca.contracts.mechanisms.capability import MissingCapabilityError
-from lca.contracts.protocols.session.run_mode import ModeAdapter
+from lca.contracts.mechanisms.capability.capability import MissingCapabilityError
+from lca.contracts.protocols.session.run.run_mode import ModeAdapter
 from lca.harness.plugin_api import definition_from_plugin
-from lca.plugins.state.run_mode_registry_seam import (
+from lca.plugins.state.run.run_mode_registry_seam import (
     RunModeRegistry,
 )
 
@@ -47,7 +47,7 @@ from lca.plugins.state.run_mode_registry_seam import (
 def test_seam_provides_empty_registry() -> None:
     """``lca-run-mode-registry-seam.setup`` mounts an empty registry on ctx."""
 
-    from lca.plugins.state.run_mode_registry_seam import setup as seam_setup
+    from lca.plugins.state.run.run_mode_registry_seam import setup as seam_setup
 
     assert seam_setup is not None
     registry = RunModeRegistry()

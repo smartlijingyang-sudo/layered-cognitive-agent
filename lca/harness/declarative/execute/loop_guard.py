@@ -10,9 +10,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.protocols.declarative.declarative_execution import PhaseResult
-from lca.contracts.protocols.declarative.declarative_graph import LoopGuard, PhaseEdge
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import PhaseResult
+from lca.contracts.protocols.declarative.declarative_1.declarative_graph import LoopGuard, PhaseEdge
 from lca.contracts.protocols.gate.loop_guard import LoopGuardEvaluator, LoopGuardVerdict
 from lca.harness.graph.predicate import evaluate_restricted_predicate
 

@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from lca.contracts.protocols import TeamAssembly, TeamStrategy
-from lca.infrastructure.component_registry import NamedRegistry
+from lca.infrastructure.component.component_registry import NamedRegistry
 
 OrchestrationFactory = Callable[[TeamAssembly], TeamStrategy]
 

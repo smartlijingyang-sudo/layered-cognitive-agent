@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca_kernel.stages import Stage
+from lca_kernel.boot.stages import Stage
 
 
 def test_stage_values_one_through_six() -> None:

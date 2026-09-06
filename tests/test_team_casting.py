@@ -11,15 +11,15 @@ import unittest
 from typing import Any
 
 from lca.agent.role_library import FileRoleLibrary
-from lca.application.api import Team
-from lca.application.casting import (
+from lca.application.api.api import Team
+from lca.application.authoring.casting import (
     LLMTeamCaster,
     build_from_casting_plan,
     parse_casting_output,
     repair_invalid_role_ids,
 )
-from lca.contracts.models.team.team_coordination import LeadMandate, Pipeline
-from lca.contracts.protocols.collaboration.casting import (
+from lca.contracts.models.team.team.team_coordination import LeadMandate, Pipeline
+from lca.contracts.protocols.collaboration.casting.casting import (
     CastingError,
     CastingPlan,
     RoleCard,
@@ -27,8 +27,8 @@ from lca.contracts.protocols.collaboration.casting import (
     RoleNotFoundError,
     SelectedRole,
 )
-from lca.contracts.protocols.journal.spec import LeadSpec
-from lca.plugins.collaboration.team_casting_prompt_renderer_seam import (
+from lca.contracts.protocols.journal.spec.spec import LeadSpec
+from lca.plugins.collaboration.team_1.team_casting_prompt_renderer_seam import (
     BuiltinCastingPromptRenderer,
 )
 from tests.harness.collector import InMemoryObservability
@@ -88,7 +88,7 @@ def _caster() -> LLMTeamCaster:
 
 
 def _caster_llm(*responses: str) -> ScriptedLLMAdapter:
-    from lca.contracts.models.core.llm import LLMResponse
+    from lca.contracts.models.core.conversation.llm import LLMResponse
 
     return ScriptedLLMAdapter(
         {"caster": [LLMResponse(text=r, model="scripted-llm") for r in responses]},

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.harness.diagnostics.audit_direct_commands import (
+from lca.harness.diagnostics.audit.audit_direct_commands import (
     format_report,
     scan_direct_commands,
 )
@@ -107,7 +107,7 @@ class TestScanDirectCommands:
             '"""A well-behaved Body module."""\n'
             "\n"
             "from lca.cognition.body import ActionRegistry, SafeExecutor\n"
-            "from lca.cognition.body.action_registry import ActionDescriptor\n"
+            "from lca.cognition.body.actions.action_registry import ActionDescriptor\n"
             "\n"
             "\n"
             "def register_ping(registry: ActionRegistry) -> None:\n"

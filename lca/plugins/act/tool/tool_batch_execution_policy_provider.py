@@ -1,0 +1,90 @@
+"""Profile provider for scheduling a model-emitted batch of tool calls."""
+
+from __future__ import annotations
+
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict
+
+from lca.cognition.body.tools.tool_batch_execution import (
+    ParallelToolBatchExecutionPolicy,
+    SafeToolBatchExecutionPolicy,
+    SegmentedSafeToolBatchExecutionPolicy,
+    SequentialToolBatchExecutionPolicy,
+)
+from lca.contracts.atoms.control.control_slot import ControlSlot
+from lca.contracts.atoms.functional.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.capabilities import TOOL_BATCH_EXECUTION_POLICY
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
+from lca.contracts.protocols.act.tool.tool_batch_execution import ToolBatchExecutionPolicy
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+
+
+class Config(BaseModel):
+    """Choose one profile-owned tool-batch scheduling strategy."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["safe", "segmented_safe", "parallel", "sequential"] = "safe"
+
+
+def build_tool_batch_execution_policy(mode: str) -> ToolBatchExecutionPolicy:
+    """Construct one validated scheduling strategy without ambient configuration."""
+
+    policies: dict[str, ToolBatchExecutionPolicy] = {
+        "safe": SafeToolBatchExecutionPolicy(),
+        "segmented_safe": SegmentedSafeToolBatchExecutionPolicy(),
+        "parallel": ParallelToolBatchExecutionPolicy(),
+        "sequential": SequentialToolBatchExecutionPolicy(),
+    }
+    try:
+        return policies[mode]
+    except KeyError as exc:
+        raise ValueError(f"unsupported tool batch execution mode: {mode!r}") from exc
+
+
+@plugin(
+    id="lca-tool-batch-execution-policy",
+    requires=[],
+    provides=[TOOL_BATCH_EXECUTION_POLICY.key],
+    implements=[ToolBatchExecutionPolicy],
+    layer="L1",
+    effects="none",
+    kind=PluginKind.PRIMITIVE,
+    description=(
+        "Provide a profile-selected safe, segmented-safe, parallel, or sequential "
+        "strategy for model-emitted multi-tool batches without changing Body or SafeExecutor."
+    ),
+    test_suite="tests/cognition/body/test_tool_batch_execution.py",
+    functional_group=FunctionalGroup.G7_EXECUTION,
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G7_EXECUTION, control_slots=(ControlSlot.ACT_EXECUTE,)
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.TURN,)),
+        authority=AuthorityContract(grants=(TOOL_BATCH_EXECUTION_POLICY.key,)),
+        observability=EvidenceContract(descriptors=("tool.batch.execution.planned",)),
+    ),
+    ownership=OwnershipDeclaration(
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
+        state_mutation="forbidden",
+    ),
+)
+async def setup(ctx: PluginContext, config: Config) -> None:
+    """Expose one pure scheduling policy to the action-handler provider."""
+
+    ctx.provide(TOOL_BATCH_EXECUTION_POLICY.key, build_tool_batch_execution_policy(config.mode))
+
+
+__all__ = ["Config", "build_tool_batch_execution_policy", "setup"]

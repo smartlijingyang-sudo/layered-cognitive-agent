@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.atoms.scope import Scope
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.protocols.perceive.capability_plan import (
     CapabilityPlan,
     capability_plan_hash,
@@ -37,8 +37,8 @@ from lca.harness.composition.plan_compiler import (
     compile_plan,
     explain_compile_plan,
 )
-from lca.harness.profile.resolve import ResolvedProfile, resolve_profile
-from lca.infrastructure.cli.commands.declarative import render_declarative_graph
+from lca.harness.profile.resolve.resolve import ResolvedProfile, resolve_profile
+from lca.infrastructure.cli.commands.profile.declarative import render_declarative_graph
 
 # ── build_input_provenance ──────────────────────────────────────────
 
@@ -101,7 +101,7 @@ class TestCompiledPlanPatchProvenance:
 
 def _minimal_plan_inputs() -> tuple[CapabilityPlan, ScopePlan]:
     resolved = resolve_profile("profiles/web-standard.yaml")
-    from lca.harness.profile.capability_plan_resolver import project_capability_plan
+    from lca.harness.profile.resolve.capability_plan_resolver import project_capability_plan
 
     capability = project_capability_plan(resolved)
     scope = ScopePlan(
@@ -302,7 +302,7 @@ class TestCompilePlan:
         assert provider_bindings[declared.key].revision == source.definition.spec.revision
 
     def test_compilation_projections_reuse_active_view_by_default(self) -> None:
-        from lca.harness.profile.projection import ProfileCompilationProjections
+        from lca.harness.profile.plan.projection import ProfileCompilationProjections
 
         resolved = resolve_profile("profiles/web-standard.yaml")
         projections = ProfileCompilationProjections.build(resolved)
@@ -312,7 +312,7 @@ class TestCompilePlan:
         assert projections.active.include_disabled is False
 
     def test_compilation_projections_isolate_inspection_view(self) -> None:
-        from lca.harness.profile.projection import ProfileCompilationProjections
+        from lca.harness.profile.plan.projection import ProfileCompilationProjections
 
         resolved = resolve_profile("profiles/web-standard.yaml")
         projections = ProfileCompilationProjections.build(resolved, include_disabled=True)
@@ -324,7 +324,7 @@ class TestCompilePlan:
         assert projections.selected.include_disabled is True
 
     def test_compile_reuses_one_profile_projection(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from lca.harness.profile.projection import ResolvedProfileProjection
+        from lca.harness.profile.plan.projection import ResolvedProfileProjection
 
         resolved = resolve_profile("profiles/web-standard.yaml")
         original_build = ResolvedProfileProjection.build
@@ -352,8 +352,8 @@ class TestCompilePlan:
         assert builds == 1
 
     def test_projection_reuse_rejects_a_different_resolved_profile(self) -> None:
-        from lca.harness.profile.capability_plan_resolver import project_capability_plan
-        from lca.harness.profile.projection import ResolvedProfileProjection
+        from lca.harness.profile.resolve.capability_plan_resolver import project_capability_plan
+        from lca.harness.profile.plan.projection import ResolvedProfileProjection
 
         projection = ResolvedProfileProjection.build(resolve_profile("profiles/web-standard.yaml"))
         other_resolved = resolve_profile("profiles/web-standard.yaml")

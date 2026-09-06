@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from contextlib import suppress
 
-from lca.contracts.atoms.ids import new_id
+from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.harness.collaboration.agent import AgentIdentity, AgentOptions
 from lca.contracts.harness.collaboration.subagent import (
     ActivatedSubagent,

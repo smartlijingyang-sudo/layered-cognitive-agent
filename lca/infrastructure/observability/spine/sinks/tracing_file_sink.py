@@ -31,8 +31,8 @@ import os
 from pathlib import Path
 from typing import Any, ClassVar
 
-from lca.contracts.observability.fsync import FsyncProtocol
-from lca.infrastructure.observability.spine.event_record import EventRecord
+from lca.contracts.observability.evidence.fsync import FsyncProtocol
+from lca.infrastructure.observability.spine.event.event_record import EventRecord
 from lca.infrastructure.observability.spine.sinks.file_sink import (
     FileSink,
     safe_class_name,

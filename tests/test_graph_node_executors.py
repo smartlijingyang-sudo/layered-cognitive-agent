@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import unittest
 
-from lca.contracts.models.core.result import Result
-from lca.contracts.models.core.state import Budget
-from lca.contracts.models.team.graph import ExecutionGraph, GraphEdge, GraphNode, NodeType
+from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.state import Budget
+from lca.contracts.models.team.graph.graph import ExecutionGraph, GraphEdge, GraphNode, NodeType
 from lca.contracts.protocols import GraphNodeExecutionContext, GraphNodeExecutor
-from lca.plugins.phase_graph.aggregator import AggregatorGraphNodeExecutor
-from lca.plugins.phase_graph.registry import GraphNodeExecutorRegistry
-from lca.plugins.phase_graph.topology import TopologyGraphNodeExecutor
-from lca.plugins.strategies.graph import GraphStrategy
+from lca.plugins.phase_graph.aggregator.aggregator import AggregatorGraphNodeExecutor
+from lca.plugins.phase_graph.registry.registry import GraphNodeExecutorRegistry
+from lca.plugins.phase_graph.topology.topology import TopologyGraphNodeExecutor
+from lca.plugins.strategies.graph.graph import GraphStrategy
 from tests.support.team_stage import stage_with_invoker
 
 

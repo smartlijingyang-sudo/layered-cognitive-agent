@@ -16,8 +16,8 @@ from typing import Any
 
 import pytest
 
-from lca.contracts.observability.incarnation import Incarnation
-from lca.contracts.observability.loop_cursor import (
+from lca.contracts.observability.core.incarnation import Incarnation
+from lca.contracts.observability.cursor.loop_cursor import (
     CursorError,
     LoopCursor,
 )
@@ -256,7 +256,7 @@ def test_fork_after_close_raises() -> None:
 
 def _stub_header(*, step_id: str, incarnation: int) -> Any:
     """构造最小 RequestHeader —— 仅用于测试 step_index 自增。"""
-    from lca.contracts.observability.loop_cursor_payloads import RequestHeader
+    from lca.contracts.observability.cursor.loop_cursor_payloads import RequestHeader
 
     return RequestHeader(
         step_id=step_id,

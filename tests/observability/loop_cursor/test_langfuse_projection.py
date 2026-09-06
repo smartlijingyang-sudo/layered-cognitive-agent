@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from lca.contracts.observability.loop_cursor import CursorSnapshot
+from lca.contracts.observability.cursor.loop_cursor import CursorSnapshot
 from lca.infrastructure.observability.loop_cursor.projections.langfuse_projection import (
     LangfuseProjection,
     langfuse_sdk_available,

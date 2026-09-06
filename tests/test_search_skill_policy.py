@@ -8,15 +8,15 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from lca.contracts.protocols.memory.operational_skills import SkillIndexEntry, SkillSearchResult
-from lca.infrastructure.search.skill_policy import (
+from lca.infrastructure.search.skill.skill_policy import (
     filter_skill_search_result,
     is_redundant_cli_search_skill,
 )
-from lca.infrastructure.skills.disk_store import DiskSkillPackageStore
-from lca.infrastructure.skills.http_importer import HttpSkillImporter
-from lca.infrastructure.skills.settings import SkillSettings
-from lca.infrastructure.tools.skills.activate_tool import SkillActivateTool
-from lca.infrastructure.tools.skills.search_tool import SkillSearchTool
+from lca.infrastructure.skills.disk.disk_store import DiskSkillPackageStore
+from lca.infrastructure.skills.http.http_importer import HttpSkillImporter
+from lca.infrastructure.skills.settings.settings import SkillSettings
+from lca.infrastructure.tools.skills.activate.activate_tool import SkillActivateTool
+from lca.infrastructure.tools.skills.search.search_tool import SkillSearchTool
 
 
 class TestSearchSkillPolicy(unittest.TestCase):

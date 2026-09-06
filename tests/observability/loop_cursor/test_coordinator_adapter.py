@@ -19,20 +19,20 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from lca.contracts.models.observability.journal_step import (
+from lca.contracts.models.observability.journal.journal_step import (
     ThinkingTrace,
 )
-from lca.contracts.models.observability.journal_step import (
+from lca.contracts.models.observability.journal.journal_step import (
     ToolCallRecord as LegacyToolCallRecord,
 )
-from lca.contracts.models.observability.journal_step import (
+from lca.contracts.models.observability.journal.journal_step import (
     ToolResult as LegacyToolResult,
 )
-from lca.contracts.observability.incarnation import Incarnation
-from lca.contracts.observability.loop_cursor import CursorError, CursorSnapshot
+from lca.contracts.observability.core.incarnation import Incarnation
+from lca.contracts.observability.cursor.loop_cursor import CursorError, CursorSnapshot
 from lca.infrastructure.observability.loop_cursor import StdLoopCursor
-from lca.infrastructure.observability.loop_cursor._spine_port import WritePort
-from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
+from lca.infrastructure.observability.loop_cursor.spine._spine_port import WritePort
+from lca.infrastructure.observability.loop_cursor.coordinator.coordinator_adapter import (
     CoordinatorAdapter,
     sha256_digest,
 )

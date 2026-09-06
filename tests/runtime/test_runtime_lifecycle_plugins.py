@@ -11,23 +11,23 @@ from lca.contracts.capabilities import (
     RUNTIME_LIFECYCLE_PUBLISHER,
     RUNTIME_LIFECYCLE_SUBSCRIBER_REGISTRY,
 )
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.result import Result
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.protocols.runtime.runtime_lifecycle import (
+from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.protocols.runtime.runtime.runtime_lifecycle import (
     RuntimeBudgetSnapshot,
     RuntimeLifecycleEvent,
     RuntimeLifecycleEventType,
     RuntimeLifecycleSubscriberContribution,
 )
 from lca.plugins.state import runtime_lifecycle_provider, runtime_lifecycle_logging_provider
-from lca.runtime.runtime_event_publisher import (
+from lca.runtime.loop.runtime_event_publisher import (
     CompositeRuntimeLifecyclePublisher,
     InMemoryRuntimeLifecycleSubscriberRegistry,
     LifecyclePublisherFailureMode,
     RuntimeLifecyclePublisherError,
 )
-from lca.runtime.runtime_loop import CognitiveRuntime, _event_type_for_result
+from lca.runtime.loop.runtime_loop import CognitiveRuntime, _event_type_for_result
 
 
 @dataclass

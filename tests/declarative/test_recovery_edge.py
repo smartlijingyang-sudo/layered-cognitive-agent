@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.protocols.declarative.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     CapabilityDeclaration,
     EvidenceDeclaration,
     LifecycleDeclaration,
@@ -14,10 +14,10 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     SemanticPhase,
     VerificationDeclaration,
 )
-from lca.harness.declarative.compile.compiler import compile_declarative_projection
+from lca.harness.declarative.compile.compiler.compiler import compile_declarative_projection
 from lca.harness.graph.phase_graph_compiler import compile_phase_graph_projection
-from lca.harness.profile.resolve import resolve_profile
-from lca.plugins.phase_graph.recovery import SPEC, RecoveryEdgeConfig
+from lca.harness.profile.resolve.resolve import resolve_profile
+from lca.plugins.phase_graph.recovery.recovery import SPEC, RecoveryEdgeConfig
 
 
 def test_recovery_provider_has_native_spec() -> None:
@@ -70,7 +70,7 @@ def _make_recovery_spec() -> PluginSpec:
         layer="L2",
         functional_group="cognitive-phase",
         implementation=PluginImplementation(
-            module="lca.plugins.phase_graph.recovery",
+            module="lca.plugins.phase_graph.recovery.recovery",
             setup="setup",
         ),
         configuration=PluginConfiguration(
@@ -147,7 +147,7 @@ def test_phase_graph_includes_recovery_edge() -> None:
 
 def test_no_edge_without_phase_edge_capability() -> None:
     """Plugin without phase.edge.* capability should not produce edges."""
-    from lca.contracts.protocols.declarative.declarative_phase_graph import (
+    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
         ContributionRole,
         PhaseContribution,
     )

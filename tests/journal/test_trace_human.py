@@ -28,8 +28,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from lca.infrastructure.cli.cli import app
-from lca.infrastructure.observability.spine.event_record import EventRecord
+from lca.infrastructure.cli.cli.cli import app
+from lca.infrastructure.observability.spine.event.event_record import EventRecord
 from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
 
 runner = CliRunner()

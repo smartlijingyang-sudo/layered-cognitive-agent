@@ -17,7 +17,7 @@ from typing import Any
 
 import pytest
 
-from lca.cognition.brain.reasoner import PromptReasoner
+from lca.cognition.brain.reasoner.reasoner import PromptReasoner
 from lca.contracts.models.cognition.prompt_assembly import (
     PromptTemplate,
     PromptTemplateProvider,
@@ -25,15 +25,15 @@ from lca.contracts.models.cognition.prompt_assembly import (
     SectionKind,
     SectionReference,
 )
-from lca.contracts.models.core.llm import LLMResponse
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.team.role_team import RoleProfile
+from lca.contracts.models.core.conversation.llm import LLMResponse
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.team.role.role_team import RoleProfile
 from lca.contracts.protocols import LLMAdapter
-from lca.infrastructure.session.cognitive_emit import (
+from lca.infrastructure.session.emit.cognitive_emit import (
     run_reasoner_generate_thoughts_with_spine_facts,
 )
-from lca_kernel.events.bus import EventBus
-from lca_kernel.events.test_catalog import build_test_bus
+from lca_kernel.events.bus.bus import EventBus
+from lca_kernel.events.test.test_catalog import build_test_bus
 
 
 @pytest.fixture(autouse=True)
@@ -148,8 +148,8 @@ class _NoopLLM(LLMAdapter):
 
 
 def _build_state() -> AgentState:
-    from lca.contracts.models.core.lifecycle import TaskStatus
-    from lca.contracts.models.core.state import Budget
+    from lca.contracts.models.core.state.lifecycle import TaskStatus
+    from lca.contracts.models.core.state.state import Budget
 
     return AgentState(
         trace_id="t-001",
@@ -182,7 +182,7 @@ def _make_assembler(template: PromptTemplate, registry):
 
 
 async def test_prompt_assembler_eps_emitted_with_payload():
-    from lca.contracts.models.team.role_team import (
+    from lca.contracts.models.team.role.role_team import (
         ToolPermissionManifest,
     )
     from lca.plugins.events.publishers._session_publish import (
@@ -241,7 +241,7 @@ async def test_prompt_assembler_eps_emitted_with_payload():
 def test_skill_router_route_emits_decision_path():
     import asyncio
 
-    from lca.cognition.brain.skill_router import KeywordSkillRouter
+    from lca.cognition.brain.prompt.skill_router import KeywordSkillRouter
     from lca.plugins.events.publishers._session_publish import (
         reset_publish_session,
         set_publish_session,
