@@ -232,6 +232,12 @@ def test_apply_injects_marker_and_writes_driver(tmp_path: Path) -> None:
     assert "observeRunLive" in source
     assert (ui / "src/store/chat/agents/transports/lcaJournal.ts").is_file()
     assert (ui / "src/store/chat/agents/transports/lcaRunObserve.ts").is_file()
+    observe = (ui / "src/store/chat/agents/transports/lcaRunObserve.ts").read_text(
+        encoding="utf-8"
+    )
+    assert "applyLiveGapCursorAdvance" in observe
+    assert "projected.kind === 'live-gap'" in observe
+    assert "advanceLiveGapCursor(cursor, projected)" not in observe
     assert (ui / "src/store/chat/agents/transports/lcaRunCommand.ts").is_file()
     journal = (ui / "src/store/chat/agents/transports/lcaJournal.ts").read_text(encoding="utf-8")
     assert "projectJournalFrame" in journal
