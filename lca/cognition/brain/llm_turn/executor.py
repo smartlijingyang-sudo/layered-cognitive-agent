@@ -19,7 +19,6 @@ from lca.cognition.brain.tool_call_stream import (
     pop_completed_slots,
     push_tool_call_stream,
 )
-from lca.cognition.brain.tool_conversation import build_tool_history
 from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.models.core.state import AgentState
@@ -27,6 +26,10 @@ from lca.contracts.models.observability.journal import ToolCallResolved
 from lca.contracts.models.team.partial_buffer import append_run_partial
 from lca.contracts.protocols import LLMAdapter, Tool
 from lca.infrastructure.observability import record
+from lca.infrastructure.session.bindings import (
+    assemble_model_history,
+    await_model_request_checkpoint,
+)
 
 _log = structlog.get_logger(__name__)
 
@@ -46,7 +49,8 @@ async def execute_llm_turn(
     """Run one LobeHub-aligned ``call_llm`` turn."""
     mode = resolve_llm_turn_mode(state)
     llm_kwargs = build_llm_call_kwargs(state=state, task=task)
-    llm_kwargs["history"] = build_tool_history(state)
+    llm_kwargs["history"] = assemble_model_history(step=step)
+    await await_model_request_checkpoint()
     if mode == LlmTurnMode.SUMMARIZE:
         return await _summarize_after_search(llm, tools, prompt, step=step, llm_kwargs=llm_kwargs)
     return await _stream_turn(llm, tools, prompt, step=step, llm_kwargs=llm_kwargs)

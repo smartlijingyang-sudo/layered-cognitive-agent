@@ -43,6 +43,9 @@ class StandardPerceiveExecutor:
     """Collect the profile-selected context manifest for the perceive node."""
 
     async def execute(self, context: PhaseContext, input: PhaseInput) -> PhaseResult:
+        from lca.infrastructure.session.bindings import await_step_boundary_checkpoint
+
+        await await_step_boundary_checkpoint()
         hub = StandardPhaseCapabilities(context.capabilities).perceive_hub
         if hub is None:
             return fallback_phase_result(

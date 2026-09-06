@@ -153,8 +153,12 @@ class SessionStore:
         seq 连续）。``log_path`` 通常是 ``<run_dir>/<run_id>.spine.jsonl``。
         """
         from lca.plugins.session.runtime.log_reader import load_session_events
+        from lca.plugins.session.runtime.repair import repair_interrupted_turn
 
         events = load_session_events(log_path, session_id=session_id)
+        closers = repair_interrupted_turn(events, cold_load=True)
+        if closers:
+            events = [*events, *closers]
         return self.restore(session_id, header, events)
 
     def fork(

@@ -94,6 +94,9 @@ class TurnDeltaHandler(DeltaHandler):
 
     def apply(self, state: AgentState, delta: RunDelta, reducer: Reducer) -> AgentState:
         turn: Turn = _extract_turn(delta.metadata)
+        commit = getattr(reducer, "commit_turn", None)
+        if callable(commit):
+            return commit(state, turn)
         return reducer.apply_turn(state, turn)
 
 

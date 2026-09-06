@@ -17,10 +17,14 @@ from __future__ import annotations
 from lca.cognition.brain.decision_gates.chained import record_gate_decided
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.ids import new_id
-from lca.contracts.models.core.decision import Decision, Turn
+from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import DecisionGate
+from lca.infrastructure.session.turn_control_reader import (
+    consecutive_same_tool,
+    last_observation_success,
+)
 
 _THRESHOLD = 3
 _FACT_KIND = "repeat_tool_call"
@@ -43,14 +47,14 @@ class RepeatToolCallGate(DecisionGate):
             return decision
 
         tool_name = decision.tool_calls[0].tool_name
-        consecutive = self._consecutive_same_tool(state, tool_name)
+        consecutive = consecutive_same_tool(state, tool_name)
         if consecutive < _THRESHOLD:
             return decision
 
         # Build the warning payload.  is_rewritten=False: this is a warning,
         # not a structural rewrite of the decision.
-        last_obs = state.history[-1].observation if state.history else None
-        failed = bool(last_obs is not None and not last_obs.success)
+        last_success = last_observation_success(state)
+        failed = bool(last_success is False)
         message = _WARNING_TEMPLATE.format(
             count=consecutive,
             tool=tool_name,
@@ -73,17 +77,3 @@ class RepeatToolCallGate(DecisionGate):
             ),
         )
         return decision
-
-    @staticmethod
-    def _consecutive_same_tool(state: AgentState, tool_name: str) -> int:
-        count = 0
-        for turn in reversed(state.history):
-            if not isinstance(turn, Turn):
-                break
-            dec = turn.decision
-            if dec.action_type != ActionType.USE_TOOL or not dec.tool_calls:
-                break
-            if dec.tool_calls[0].tool_name != tool_name:
-                break
-            count += 1
-        return count

@@ -19,6 +19,10 @@ _TOOL_RESULT_MAX = 32_000
 
 
 def build_tool_history(state: AgentState) -> list[dict[str, Any]]:
+    # COMPAT(owner: ADR-0191, from: build_tool_history(state.history),
+    #   to: ModelContextAssembler.assemble(session),
+    #   delete_when: rg 'build_tool_history' lca/cognition/ = 0 && parity tests green,
+    #   forbidden_new_usage: cognition 新代码不得 import build_tool_history)
     """Neutral history: assistant tool_calls + tool results, in turn order.
 
     Parallel tool calls (one Decision → N tool_calls) are emitted as one

@@ -21,10 +21,14 @@ from lca.cognition.brain.decision_gates.chained import record_gate_decided
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.budget import TOOL_LOOP_BREAK_THRESHOLD
-from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
+from lca.contracts.models.core.decision import Decision, ToolCall
 from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import DecisionGate
+from lca.infrastructure.session.turn_control_reader import (
+    ControlTurnView,
+    iter_control_turns_reversed,
+)
 
 _BLOCKED_FAILURE_RATIONALE = (
     "同一工具已连续失败多次，禁止再次调用。请换用其他工具、修正代码，或直接 respond 收口。"
@@ -102,13 +106,10 @@ class ToolLoopBreakerGate(DecisionGate):
         """Count same-tool failures, preserving the established failure circuit breaker."""
 
         count = 0
-        for turn in reversed(state.history):
-            if not isinstance(turn, Turn):
-                continue
-            tool_call = _first_tool_call(turn)
-            if tool_call is None or tool_call.tool_name != tool_name:
+        for turn in iter_control_turns_reversed(state):
+            if turn.tool_name != tool_name:
                 break
-            if turn.observation.success:
+            if turn.observation_success:
                 break
             count += 1
         return count
@@ -123,19 +124,18 @@ class ToolLoopBreakerGate(DecisionGate):
         hard stop; the independent failure breaker remains active.
         """
 
-        candidate_fingerprint = _tool_fingerprint(candidate)
+        candidate_fingerprint = _tool_call_fingerprint(candidate)
         if candidate_fingerprint is None:
             return 0
 
         count = 0
         expected_observation: str | None = None
-        for turn in reversed(state.history):
-            if not isinstance(turn, Turn):
-                continue
-            prior_call = _first_tool_call(turn)
-            if prior_call is None or _tool_fingerprint(prior_call) != candidate_fingerprint:
+        for turn in iter_control_turns_reversed(state):
+            if turn.tool_name != candidate.tool_name:
                 break
-            observation_fingerprint = _observation_fingerprint(turn.observation)
+            if _view_tool_fingerprint(turn) != candidate_fingerprint:
+                break
+            observation_fingerprint = _view_observation_fingerprint(turn)
             if observation_fingerprint is None:
                 return 0
             if expected_observation is None:
@@ -149,13 +149,10 @@ class ToolLoopBreakerGate(DecisionGate):
     def _last_tool_error(state: AgentState, tool_name: str) -> str:
         """Return the latest same-tool error without leaking unrelated observations."""
 
-        for turn in reversed(state.history):
-            if not isinstance(turn, Turn):
+        for turn in iter_control_turns_reversed(state):
+            if turn.tool_name != tool_name:
                 continue
-            tool_call = _first_tool_call(turn)
-            if tool_call is None or tool_call.tool_name != tool_name:
-                continue
-            error = (turn.observation.error or "").strip()
+            error = (turn.observation_error or "").strip()
             if error:
                 return error
         return ""
@@ -184,18 +181,7 @@ class ToolLoopBreakerGate(DecisionGate):
         )
 
 
-def _first_tool_call(turn: Turn) -> ToolCall | None:
-    """Return the current single-call decision shape used by the existing gate."""
-
-    decision = turn.decision
-    if decision.action_type != ActionType.USE_TOOL or not decision.tool_calls:
-        return None
-    return decision.tool_calls[0]
-
-
-def _tool_fingerprint(tool_call: ToolCall) -> str | None:
-    """Hash a portable tool identity without treating call ids as semantic progress."""
-
+def _tool_call_fingerprint(tool_call: ToolCall) -> str | None:
     payload = _normalize_for_fingerprint(
         {"tool_name": tool_call.tool_name, "arguments": tool_call.arguments}
     )
@@ -204,14 +190,23 @@ def _tool_fingerprint(tool_call: ToolCall) -> str | None:
     return _fingerprint(payload)
 
 
-def _observation_fingerprint(observation: Observation) -> str | None:
-    """Hash success, normalized payload and error to distinguish polling progress."""
+def _view_tool_fingerprint(turn: ControlTurnView) -> str | None:
+    if turn.tool_name is None:
+        return None
+    payload = _normalize_for_fingerprint(
+        {"tool_name": turn.tool_name, "arguments": turn.tool_arguments or {}}
+    )
+    if payload is None:
+        return None
+    return _fingerprint(payload)
 
+
+def _view_observation_fingerprint(turn: ControlTurnView) -> str | None:
     payload = _normalize_for_fingerprint(
         {
-            "success": observation.success,
-            "payload": observation.payload,
-            "error": observation.error,
+            "success": turn.observation_success,
+            "payload": turn.observation_payload,
+            "error": turn.observation_error,
         }
     )
     if payload is None:

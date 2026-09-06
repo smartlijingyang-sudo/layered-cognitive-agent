@@ -164,6 +164,30 @@ class RegistryRunCommands:
                 error="run not waiting for input",
                 error_status=409,
             )
+        bound = session.event_session
+        if bound is not None:
+            inner = getattr(bound, "inner", None) or getattr(bound, "session", None)
+            snapshot = getattr(inner, "snapshot_events", None)
+            if callable(snapshot):
+                from lca.plugins.session.runtime.transport_recovery import (
+                    assert_resume_allowed,
+                )
+
+                try:
+                    assert_resume_allowed(session, snapshot())
+                except Exception as exc:
+                    _log.warning(
+                        "run_resume_rejected",
+                        run_id=run_id,
+                        reason="session_recovery_mismatch",
+                        error=str(exc),
+                        idempotency_key=idempotency_key,
+                    )
+                    return RunCommandReceipt(
+                        accepted=False,
+                        error="session recovery facts disagree with resume",
+                        error_status=409,
+                    )
         if session.snapshot is None or session.runnable is None:
             _log.warning(
                 "run_resume_rejected",
@@ -204,7 +228,20 @@ class RegistryRunCommands:
             from lca.plugins.events.publishers._session_publish import (
                 set_publish_session,
             )
+            from lca.plugins.session.runtime.transport_recovery import (
+                append_approval_resolved_if_pending,
+            )
 
+            inner = getattr(bound, "inner", None) or getattr(bound, "session", None)
+            snapshot = getattr(inner, "snapshot_events", None)
+            if callable(snapshot):
+                append_approval_resolved_if_pending(
+                    inner,
+                    snapshot(),
+                    approval_id=pending_approval_id or approval_id,
+                    payload=payload,
+                    command_id=idempotency_key or f"resume:{run_id}:{approval_id}",
+                )
             set_publish_session(bound.bridge)
             set_session(bound.bridge)
         session.task = asyncio.create_task(resume_run(session, self._registry, payload))

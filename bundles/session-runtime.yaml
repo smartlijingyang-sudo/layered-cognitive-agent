@@ -60,6 +60,11 @@ entries:
     $module: lca.plugins.session.token_usage.token_usage
     config: {}
 
+  - id: lca.plugins.session.turn_control
+    name: session_turn_control
+    $module: lca.plugins.session.session_turn_control.session_turn_control
+    config: {}
+
   # ── 标题家族（DSH session-title 对齐；LLM provider 按部署选挂）────
   - id: lca.plugins.session.title_service
     name: session_title_service

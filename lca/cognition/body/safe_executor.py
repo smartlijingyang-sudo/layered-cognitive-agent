@@ -29,6 +29,7 @@ from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPe
 from lca.contracts.observability.evidence import EvidenceRef
 from lca.contracts.protocols import SafeExecutor, Tool
 from lca.infrastructure.observability import record
+from lca.infrastructure.session.bindings import await_tool_side_effect_checkpoint
 from lca.infrastructure.tools.tool_invocation_scope import tool_invocation_scope
 
 _log = structlog.get_logger("lca.safe_executor")
@@ -212,6 +213,7 @@ class SimpleSafeExecutor(SafeExecutor):
                     evidence_store=evidence_store,
                     evidence_policy=evidence_policy,
                 )
+                await await_tool_side_effect_checkpoint()
 
             # PR-3.3: instrument the sandbox boundary. ``tool_invocation_scope``
             # binds the invocation_id that adapters/sandbox tools read to

@@ -195,6 +195,16 @@ class CognitiveRuntime(Runtime):
             resume_input.input_value,
             resume_input.turn,
         )
+        from lca.infrastructure.session.bindings import resolve_session_reader
+        from lca.infrastructure.session.surface_emit import append_human_answer_surface
+
+        session_reader = resolve_session_reader()
+        if session_reader is not None and resume_input.turn is not None:
+            obs = resume_input.turn.observation
+            if obs is not None and (obs.extra or {}).get("source") == "human_answer":
+                payload = obs.payload
+                if isinstance(payload, str):
+                    append_human_answer_surface(session_reader, payload)
 
         phase_cursor = snapshot.phase_cursor
         if phase_cursor is None:
@@ -284,6 +294,9 @@ class CognitiveRuntime(Runtime):
         # Mutable holder so the except branches can update the outcome
         # that the finally block reads when emitting resume.end / finally.
         outcome_holder: dict[str, Outcome] = {"value": "success"}
+        from lca.infrastructure.session.bindings import await_step_boundary_checkpoint
+
+        await await_step_boundary_checkpoint()
         try:
             result = await runner()
         except asyncio.CancelledError as exc:

@@ -30,10 +30,14 @@ from __future__ import annotations
 from lca.cognition.brain.decision_gates.chained import record_gate_decided
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.ids import new_id
-from lca.contracts.models.core.decision import Decision, Turn
+from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import DecisionGate
+from lca.infrastructure.session.turn_control_reader import (
+    control_turns,
+    iter_control_turns_reversed,
+)
 
 _PROGRESS_WARNING_THRESHOLD = 3
 _PROGRESS_BREAK_THRESHOLD = 6
@@ -116,27 +120,22 @@ class ProgressLoopDetector(DecisionGate):
     def _count_consecutive_no_progress(state: AgentState) -> int:
         """Count consecutive recent turns that produced no progress."""
         count = 0
-        for turn in reversed(state.history):
-            if not isinstance(turn, Turn):
+        for turn in iter_control_turns_reversed(state):
+            if turn.action_type != ActionType.USE_TOOL:
                 break
-            if turn.decision.action_type != ActionType.USE_TOOL:
-                break
-            obs = turn.observation
-            if obs is not None and obs.success:
+            if turn.observation_success:
                 break
             count += 1
         return count
 
     @staticmethod
     def _recent_tool_history(state: AgentState, *, n: int) -> list[str]:
-        """Return the last n tool names from history (oldest-first)."""
+        """Return the last n tool names from control turns (oldest-first)."""
         tools: list[str] = []
-        for turn in state.history:
-            if not isinstance(turn, Turn):
+        for turn in control_turns(state):
+            if turn.action_type != ActionType.USE_TOOL:
                 continue
-            if turn.decision.action_type != ActionType.USE_TOOL:
+            if not turn.tool_name:
                 continue
-            if not turn.decision.tool_calls:
-                continue
-            tools.append(turn.decision.tool_calls[0].tool_name)
+            tools.append(turn.tool_name)
         return tools[-n:] if n else []

@@ -77,7 +77,7 @@ def _publish_apply_marker(
         emit_runtime_reducer_apply_end,
         emit_runtime_reducer_apply_start,
     )
-    from lca_kernel.events.errors import MissingPublishSessionError
+    from lca_kernel.events.errors import MissingPublishSessionError, UnauthorizedPublishError
 
     try:
         if phase == "start":
@@ -86,9 +86,10 @@ def _publish_apply_marker(
             if outcome is None:
                 raise ValueError(f"phase='end' marker requires outcome: method={method}")
             emit_runtime_reducer_apply_end(method=method, outcome=outcome)
-    except MissingPublishSessionError:
+    except (MissingPublishSessionError, UnauthorizedPublishError):
         _log.debug(
-            "runtime.reducer.apply marker skipped (no bound publish session): method=%s phase=%s",
+            "runtime.reducer.apply marker skipped (no publish session or unauthorized): "
+            "method=%s phase=%s",
             method,
             phase,
         )
@@ -180,6 +181,26 @@ class DefaultReducer(Reducer):
     def apply_turn(self, state: AgentState, turn: Turn) -> AgentState:
         state.history.append(turn)
         return state
+
+    def commit_turn(
+        self,
+        state: AgentState,
+        turn: Turn,
+        *,
+        session: object | None = None,
+    ) -> AgentState:
+        """RunCommitter alias (ADR-0191): control-plane turn commit."""
+        result = self.apply_turn(state, turn)
+        writer = session
+        if writer is None:
+            from lca.infrastructure.session.bindings import resolve_flushable_session
+
+            writer = resolve_flushable_session()
+        if writer is not None:
+            from lca.infrastructure.session.turn_control_reader import append_turn_control_fact
+
+            append_turn_control_fact(writer, turn)
+        return result
 
     @_instrument_apply
     def apply_skill_route(self, state: AgentState, active_template: str | None) -> AgentState:
