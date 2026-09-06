@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 
 from lca.cognition.brain.reasoner import _context_lines
-from lca.cognition.brain.tool_conversation import build_tool_history
+from tests.support.tool_history_fixtures import build_tool_history
 from lca.contracts.atoms.enums import MemoryLayer, MemoryRecordKind
 from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
 from lca.contracts.models.core.memory import MemoryRecord

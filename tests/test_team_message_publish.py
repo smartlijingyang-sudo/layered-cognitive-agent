@@ -38,7 +38,6 @@ from lca.cognition.sensors import (
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.harness.composition.plugin_meta import LAYER_FIELD, NAME_FIELD, PluginMeta
 from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
-from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.observability.journal import (
     InboxFollowupCreated,
@@ -47,6 +46,11 @@ from lca.contracts.models.observability.journal import (
 from lca.contracts.protocols import Sensor
 from lca.contracts.protocols.think.cognition import SensorDisabledError
 from lca.infrastructure.observability.journal.engine.engine import RunStore
+from tests.support.session_gate_helpers import (
+    bound_session,
+    extend_control_turns,
+    gate_decisions_for_step,
+)
 
 # ─────────────────────────────────────────────────────────────
 # Sensors — fine-grained
@@ -129,34 +133,37 @@ class TestGatesPrimitive:
 
     @pytest.mark.asyncio
     async def test_repeat_warns_after_threshold(self) -> None:
-        state = _state()
-        state.history.extend(_failed_turn("executeCode") for _ in range(3))
-        gate = RepeatToolCallGate()
-        await gate.enforce(state, _dec("executeCode"))
-        bucket = PerceiveState.from_agent_state(state).gate_decided
-        assert len(bucket) == 1
-        assert bucket[0].verdict == "warn"
+        with bound_session():
+            state = _state()
+            extend_control_turns(state, [_failed_turn("executeCode") for _ in range(3)])
+            gate = RepeatToolCallGate()
+            await gate.enforce(state, _dec("executeCode"))
+            bucket = gate_decisions_for_step(state)
+            assert len(bucket) == 1
+            assert bucket[0].verdict == "warn"
 
     @pytest.mark.asyncio
     async def test_tool_loop_breaker_rewrites_to_respond(self) -> None:
         from lca.contracts.atoms.enums import ActionType
 
-        state = _state()
-        state.history.extend(_failed_turn("executeCode") for _ in range(3))
-        gate = ToolLoopBreakerGate()
-        out = await gate.enforce(state, _dec("executeCode"))
-        assert out.action_type == ActionType.RESPOND
-        bucket = PerceiveState.from_agent_state(state).gate_decided
-        assert any(b.gate == "ToolLoopBreakerGate" for b in bucket)
+        with bound_session():
+            state = _state()
+            extend_control_turns(state, [_failed_turn("executeCode") for _ in range(3)])
+            gate = ToolLoopBreakerGate()
+            out = await gate.enforce(state, _dec("executeCode"))
+            assert out.action_type == ActionType.RESPOND
+            bucket = gate_decisions_for_step(state)
+            assert any(b.gate == "ToolLoopBreakerGate" for b in bucket)
 
     @pytest.mark.asyncio
     async def test_allow_verdict_does_not_record(self) -> None:
         """The spec: ``allow`` 默认不记.  No warning on a normal tool call."""
-        state = _state()
-        state.history.append(_ok_turn("executeCode"))
-        gate = RepeatToolCallGate()
-        await gate.enforce(state, _dec("executeCode"))
-        assert PerceiveState.from_agent_state(state).gate_decided == []
+        with bound_session():
+            state = _state()
+            state.history.append(_ok_turn("executeCode"))
+            gate = RepeatToolCallGate()
+            await gate.enforce(state, _dec("executeCode"))
+            assert gate_decisions_for_step(state) == []
 
     @pytest.mark.asyncio
     async def test_chain_order_preserved(self) -> None:
@@ -166,14 +173,14 @@ class TestGatesPrimitive:
             ProgressLoopDetector(),
             TerminalRespondGate(),
         )
-        state = _state()
-        state.history.extend(_failed_turn("executeCode") for _ in range(3))
-        await chain.enforce(state, _dec("executeCode"))
-        # The chain fires each gate in order; bucket contains both.
-        bucket = PerceiveState.from_agent_state(state).gate_decided
-        gates = [b.gate for b in bucket]
-        assert "RepeatToolCallGate" in gates
-        assert "ToolLoopBreakerGate" in gates
+        with bound_session():
+            state = _state()
+            extend_control_turns(state, [_failed_turn("executeCode") for _ in range(3)])
+            await chain.enforce(state, _dec("executeCode"))
+            bucket = gate_decisions_for_step(state)
+            gates = [b.gate for b in bucket]
+            assert "RepeatToolCallGate" in gates
+            assert "ToolLoopBreakerGate" in gates
 
 
 # ─────────────────────────────────────────────────────────────
@@ -186,45 +193,40 @@ class TestHubPrimitive:
 
     @pytest.mark.asyncio
     async def test_hub_emits_manifest_with_digest(self) -> None:
-        store = RunStore()
         hub = SequentialPerceiveHub(
             sensors=[build_clock_sensor()],
             memory=None,
-            sink=JournalSink.for_store(store),
         )
         manifest = await hub.perceive(_state())
         digest = digest_manifest(manifest)
         assert digest != ""
-        stamped = store.get(store.seq)
-        assert stamped is not None
-        assert stamped.event.digest == digest
+        assert manifest.has_kind("clock")
 
     @pytest.mark.asyncio
-    async def test_hub_drains_gate_decided(self) -> None:
+    async def test_hub_folds_session_gate_decisions(self) -> None:
         store = RunStore()
         hub = SequentialPerceiveHub(
             sensors=[],
             memory=None,
             sink=JournalSink.for_store(store),
         )
-        state = _state()
-        # Pre-seed the bucket.
-        record_gate_decided(
-            state,
-            GateDecided(
-                event_id=new_id("gate"),
-                gate="RepeatToolCallGate",
-                verdict="warn",
-                is_rewritten=False,
-                policy_fact=PolicyFact(
-                    kind="repeat_tool_call", message="warning", source="repeat_tool_call"
+        with bound_session():
+            state = _state()
+            record_gate_decided(
+                state,
+                GateDecided(
+                    event_id=new_id("gate"),
+                    gate="RepeatToolCallGate",
+                    verdict="warn",
+                    is_rewritten=False,
+                    policy_fact=PolicyFact(
+                        kind="repeat_tool_call", message="warning", source="repeat_tool_call"
+                    ),
                 ),
-            ),
-        )
-        state.step = 1
-        manifest = await hub.perceive(state)
-        assert manifest.has_kind("policy_fact")
-        assert PerceiveState.from_agent_state(state).gate_decided == []
+            )
+            state.step = 1
+            manifest = await hub.perceive(state)
+            assert manifest.has_kind("policy_fact")
 
     @pytest.mark.asyncio
     async def test_hub_with_null_sink_does_not_record(self) -> None:
@@ -265,14 +267,13 @@ class TestCompositionLarge:
                 TeamInboxSensor(store),
             ],
             memory=None,
-            sink=JournalSink.for_store(store),
         )
-        state = _state()
-        # Pre-seed a gate so the policy_fact fold is exercised.
-        state.history.extend(_failed_turn("executeCode") for _ in range(3))
-        await RepeatToolCallGate().enforce(state, _dec("executeCode"))
-        state.step = 1
-        manifest = await hub.perceive(state)
+        with bound_session():
+            state = _state()
+            extend_control_turns(state, [_failed_turn("executeCode") for _ in range(3)])
+            await RepeatToolCallGate().enforce(state, _dec("executeCode"))
+            state.step = 1
+            manifest = await hub.perceive(state)
         kinds = [item.kind for item in manifest.items]
         assert "clock" in kinds
         assert "inbox_facts" in kinds

@@ -20,8 +20,6 @@ from lca.infrastructure.session.model_context_assembler import (
     default_model_context_assembler,
 )
 from lca.plugins.events.publishers._session_publish import current_publish_session
-from lca.plugins.session.runtime.bus_facade import SessionBusFacade
-from lca.plugins.session.runtime.session import Session
 
 _model_context_assembler: contextvars.ContextVar[ModelContextAssembler | None] = (
     contextvars.ContextVar("lca_model_context_assembler", default=None)
@@ -32,9 +30,12 @@ _checkpoint_policy_var: contextvars.ContextVar[SessionCheckpointPolicyProtocol |
 _default_checkpoint_policy: SessionCheckpointPolicyProtocol | None = None
 
 
-def _resolve_runtime_session(target: object | None) -> Session | None:
+def _resolve_runtime_session(target: object | None) -> object | None:
     if target is None:
         return None
+    from lca.plugins.session.runtime.bus_facade import SessionBusFacade
+    from lca.plugins.session.runtime.session import Session
+
     if isinstance(target, Session):
         return target
     inner = getattr(target, "inner", None)
@@ -61,7 +62,7 @@ def resolve_flushable_session() -> FlushableSession | None:
     return resolve_session_reader()
 
 
-def resolve_session_for_emit(state: AgentState | None = None) -> Session | None:
+def resolve_session_for_emit(state: AgentState | None = None) -> object | None:
     """Bound Session writer for cognitive fact emission, or ``None``.
 
     ``state`` is accepted for call-site symmetry (step metadata lives on

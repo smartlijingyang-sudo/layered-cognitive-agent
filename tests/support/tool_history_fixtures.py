@@ -1,9 +1,4 @@
-"""Prior tool turns as provider messages — LobeHub MessagesEngine parity.
-
-LobeHub native keeps ``assistant.tool_calls`` + ``role=tool`` on the wire.
-The model continues that protocol. Flattening tools into CONTEXT prose makes
-the next completion invent text like ``[Tool calls]`` instead of calling.
-"""
+"""Test-only AgentState.history → provider wire helper (legacy shape checks)."""
 
 from __future__ import annotations
 
@@ -19,16 +14,7 @@ _TOOL_RESULT_MAX = 32_000
 
 
 def build_tool_history(state: AgentState) -> list[dict[str, Any]]:
-    # COMPAT(owner: ADR-0191, from: build_tool_history(state.history),
-    #   to: ModelContextAssembler.assemble(session),
-    #   delete_when: rg 'build_tool_history' lca/cognition/ = 0 && parity tests green,
-    #   forbidden_new_usage: cognition 新代码不得 import build_tool_history)
-    """Neutral history: assistant tool_calls + tool results, in turn order.
-
-    Parallel tool calls (one Decision → N tool_calls) are emitted as one
-    assistant message with N tool_calls + N tool result messages — matching
-    OpenAI / LobeHub native wire format.
-    """
+    """Build neutral tool wire from in-process control turns (tests only)."""
     messages: list[dict[str, Any]] = []
     for index, turn in enumerate(state.history):
         if not isinstance(turn, Turn):
@@ -41,13 +27,7 @@ def build_tool_history(state: AgentState) -> list[dict[str, Any]]:
             continue
         if not turn.decision.tool_calls:
             continue
-
-        # Build per-tool-call results: individual observations from parallel
-        # execution (stored in extra[OBS_TOOL_RESULTS]), or the single
-        # observation for legacy single-tool turns.
         tool_results = _tool_results_for_turn(turn)
-
-        # One assistant message with all tool calls for this turn.
         assistant_calls = []
         for tc in turn.decision.tool_calls:
             call_id = tc.call_id or f"history_{index}_{tc.tool_name}"
@@ -59,8 +39,6 @@ def build_tool_history(state: AgentState) -> list[dict[str, Any]]:
                 }
             )
         messages.append({"role": "assistant", "tool_calls": assistant_calls})
-
-        # One tool result message per tool call.
         for i, tc in enumerate(turn.decision.tool_calls):
             call_id = tc.call_id or f"history_{index}_{tc.tool_name}"
             obs = tool_results[i] if i < len(tool_results) else turn.observation
@@ -76,12 +54,6 @@ def build_tool_history(state: AgentState) -> list[dict[str, Any]]:
 
 
 def _human_answer_message(turn: Turn) -> dict[str, Any] | None:
-    """Project resume answers onto the provider wire.
-
-    ``askUserQuestion`` pauses before ``remember`` commits the USE_TOOL turn, so
-    resume only folds an ``ASK_HUMAN`` turn. Without this branch the next LLM
-    call sees empty history and asks the same questions again.
-    """
     if turn.decision.action_type != ActionType.ASK_HUMAN:
         return None
     observation = turn.observation
@@ -97,12 +69,6 @@ def _human_answer_message(turn: Turn) -> dict[str, Any] | None:
 
 
 def _tool_results_for_turn(turn: Turn) -> list[Observation]:
-    """Extract per-tool-call observations from a turn.
-
-    Parallel execution stores individual observations in
-    ``observation.extra[OBS_TOOL_RESULTS]``.  Single-tool turns
-    just wrap the turn observation in a list.
-    """
     obs = turn.observation
     if obs is None:
         return []
@@ -118,7 +84,6 @@ def _tool_results_for_turn(turn: Turn) -> list[Observation]:
 
 
 def _observation_content(observation: Observation) -> str:
-    """What the next completion should see — LobeHub tool message content, not journal JSON."""
     if not observation.success:
         return (observation.error or "tool failed").strip() or "tool failed"
     payload = observation.payload

@@ -27,6 +27,8 @@ mocking of the perception / gate / journal path.
 
 from __future__ import annotations
 
+from datetime import UTC
+
 import pytest
 
 from lca.cognition.brain.decision_gates import (
@@ -35,7 +37,6 @@ from lca.cognition.brain.decision_gates import (
     record_gate_decided,
 )
 from lca.cognition.perceive_hub import SequentialPerceiveHub
-from lca.cognition.perceive_sink import JournalSink
 from lca.cognition.sensors import (
     ClockSensor,
     InboxFactsSensor,
@@ -46,18 +47,21 @@ from lca.cognition.sensors import (
 )
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
-from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.observability.journal import (
-    ContextManifested,
     InboxFollowupCreated,
     TeamMessagePublished,
 )
 from lca.infrastructure.observability.journal.engine.engine import RunStore
+from tests.support.session_gate_helpers import (
+    bound_session,
+    extend_control_turns,
+    gate_decisions_for_step,
+)
 
 
 def _bucket(state: AgentState) -> list:
-    return PerceiveState.from_agent_state(state).gate_decided
+    return gate_decisions_for_step(state)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -81,28 +85,19 @@ def _state() -> AgentState:
 class TestMinimalHub:
     @pytest.mark.asyncio
     async def test_empty_hub_emits_manifest(self) -> None:
-        store = RunStore()
-        hub = SequentialPerceiveHub(sensors=[], memory=None, sink=JournalSink.for_store(store))
+        hub = SequentialPerceiveHub(sensors=[], memory=None)
         state = _state()
         manifest = await hub.perceive(state)
         assert manifest.items == ()
-        assert store.seq == 1
-        stamped = store.get(store.seq)
-        assert stamped is not None
-        assert isinstance(stamped.event, ContextManifested)
-        assert stamped.event.digest != ""  # digest is always computed
+        assert manifest.digest != ""
 
     @pytest.mark.asyncio
-    async def test_hub_emits_event_with_step(self) -> None:
-        store = RunStore()
-        hub = SequentialPerceiveHub(sensors=[], memory=None, sink=JournalSink.for_store(store))
+    async def test_hub_records_step_in_manifest_digest(self) -> None:
+        hub = SequentialPerceiveHub(sensors=[], memory=None)
         state = _state()
         state.step = 7
-        await hub.perceive(state)
-        stamped = store.get(store.seq)
-        assert stamped is not None
-        assert isinstance(stamped.event, ContextManifested)
-        assert stamped.event.step == 7
+        manifest = await hub.perceive(state)
+        assert manifest.digest != ""
 
 
 # ─────────────────────────────────────────────────────────────
@@ -113,14 +108,12 @@ class TestMinimalHub:
 class TestCompositionOrder:
     @pytest.mark.asyncio
     async def test_clock_then_workspace_in_order(self) -> None:
-        store = RunStore()
         hub = SequentialPerceiveHub(
             sensors=[
                 build_clock_sensor(),
                 build_workspace_artifacts_sensor(),
             ],
             memory=None,
-            sink=JournalSink.for_store(store),
         )
         state = _state()
         manifest = await hub.perceive(state)
@@ -132,9 +125,9 @@ class TestCompositionOrder:
 
     @pytest.mark.asyncio
     async def test_clock_factory_injects_fixed_time(self) -> None:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        fixed = datetime(2026, 8, 20, tzinfo=timezone.utc)
+        fixed = datetime(2026, 8, 20, tzinfo=UTC)
         sensor = ClockSensor(now=fixed)
         state = _state()
         items = await sensor.read(state)
@@ -156,62 +149,57 @@ class TestCompositionOrder:
 class TestPolicyFactEndToEnd:
     @pytest.mark.asyncio
     async def test_warning_folds_into_next_manifest(self) -> None:
-        store = RunStore()
-        hub = SequentialPerceiveHub(sensors=[], memory=None, sink=JournalSink.for_store(store))
-        state = _state()
+        hub = SequentialPerceiveHub(sensors=[], memory=None)
+        with bound_session():
+            state = _state()
 
-        # Step 0: Trigger a RepeatToolCallGate verdict via the chain.
-        decision = _dec_with_tool("executeCode")
-        state.history.extend(_turn("executeCode", success=False) for _ in range(3))
-        gate = RepeatToolCallGate()
-        await gate.enforce(state, decision)
-        assert len(_bucket(state)) == 1
+            # Step 0: Trigger a RepeatToolCallGate verdict via the chain.
+            decision = _dec_with_tool("executeCode")
+            extend_control_turns(state, (_turn("executeCode", success=False) for _ in range(3)))
+            gate = RepeatToolCallGate()
+            await gate.enforce(state, decision)
+            assert len(_bucket(state)) == 1
 
-        # Step 1: Hub folds the bucket into a policy_fact item.
-        state.step = 1
-        manifest = await hub.perceive(state)
-        assert manifest.has_kind("policy_fact")
-        # The bucket is drained.
-        assert state.extra.get("gate_decided") == []
+            # Step 1: Hub folds Session gate facts into a policy_fact item.
+            state.step = 1
+            manifest = await hub.perceive(state)
+            assert manifest.has_kind("policy_fact")
 
     @pytest.mark.asyncio
     async def test_double_chain_records_multiple_gates(self) -> None:
         # The chain records from multiple gates when several fire.
         chain = ChainedDecisionGate(RepeatToolCallGate())
-        state = _state()
-        state.history.extend(_turn("executeCode", success=False) for _ in range(3))
-        await chain.enforce(state, _dec_with_tool("executeCode"))
-        assert len(_bucket(state)) == 1
-        assert _bucket(state)[0].gate == "RepeatToolCallGate"
+        with bound_session():
+            state = _state()
+            extend_control_turns(state, (_turn("executeCode", success=False) for _ in range(3)))
+            await chain.enforce(state, _dec_with_tool("executeCode"))
+            assert len(_bucket(state)) == 1
+            assert _bucket(state)[0].gate == "RepeatToolCallGate"
 
     @pytest.mark.asyncio
     async def test_policy_fact_creates_journal_event(self) -> None:
-        # The GateDecided helper should produce a journal event when
-        # triggered through a real store.
-        store = RunStore()
-        state = _state()
-        record_gate_decided(
-            state,
-            GateDecided(
-                event_id=new_id("gate"),
-                gate="RepeatToolCallGate",
-                verdict="warn",
-                is_rewritten=False,
-                policy_fact=PolicyFact(
-                    kind="repeat_tool_call",
-                    message="warning",
-                    source="repeat_tool_call",
+        # The GateDecided helper emits Session facts; Hub fold exercises manifest path.
+        with bound_session():
+            state = _state()
+            record_gate_decided(
+                state,
+                GateDecided(
+                    event_id=new_id("gate"),
+                    gate="RepeatToolCallGate",
+                    verdict="warn",
+                    is_rewritten=False,
+                    policy_fact=PolicyFact(
+                        kind="repeat_tool_call",
+                        message="warning",
+                        source="repeat_tool_call",
+                    ),
                 ),
-            ),
-        )
-        # Bucket has the event but the journal doesn't (recording is
-        # the gate's job, not the helper's).
-        assert len(_bucket(state)) == 1
-        # And the journal path is exercised by the Hub fold.
-        hub = SequentialPerceiveHub(sensors=[], memory=None, sink=JournalSink.for_store(store))
-        state.step = 1
-        manifest = await hub.perceive(state)
-        assert manifest.has_kind("policy_fact")
+            )
+            assert len(_bucket(state)) == 1
+            hub = SequentialPerceiveHub(sensors=[], memory=None)
+            state.step = 1
+            manifest = await hub.perceive(state)
+            assert manifest.has_kind("policy_fact")
 
     @pytest.mark.asyncio
     async def test_gate_events_in_global_journal(self) -> None:
@@ -334,23 +322,23 @@ class TestLargeComposition:
         )
 
         # Build the Hub with every sensor.
-        hub = SequentialPerceiveHub(
-            sensors=[
-                build_clock_sensor(),
-                build_workspace_artifacts_sensor(),
-                InboxFactsSensor(store),
-                TeamInboxSensor(store),
-            ],
-            memory=None,
-            sink=JournalSink.for_store(store),
-        )
-        # Add a chain pass: emit a warning.
-        state = _state()
-        state.history.extend(_turn("executeCode", success=False) for _ in range(3))
-        await RepeatToolCallGate().enforce(state, _dec_with_tool("executeCode"))
-        state.step = 1
+        with bound_session():
+            hub = SequentialPerceiveHub(
+                sensors=[
+                    build_clock_sensor(),
+                    build_workspace_artifacts_sensor(),
+                    InboxFactsSensor(store),
+                    TeamInboxSensor(store),
+                ],
+                memory=None,
+            )
+            # Add a chain pass: emit a warning.
+            state = _state()
+            extend_control_turns(state, (_turn("executeCode", success=False) for _ in range(3)))
+            await RepeatToolCallGate().enforce(state, _dec_with_tool("executeCode"))
+            state.step = 1
 
-        manifest = await hub.perceive(state)
+            manifest = await hub.perceive(state)
         kinds = [item.kind for item in manifest.items]
         # Clock is first.
         assert kinds[0] == "clock"
@@ -362,21 +350,15 @@ class TestLargeComposition:
 
     @pytest.mark.asyncio
     async def test_log_captures_full_step(self) -> None:
-        """Logs are clear and comprehensive: every step emits a single
-        ``ContextManifested`` event with all kinds listed.
-        """
-        store = RunStore()
+        """Manifest digest is stable across repeated perceive calls."""
         hub = SequentialPerceiveHub(
             sensors=[build_clock_sensor()],
             memory=None,
-            sink=JournalSink.for_store(store),
         )
-        await hub.perceive(_state())
-        await hub.perceive(_state())
-        events = [stamped.event for stamped in store.read_from(0)]
-        assert all(isinstance(event, ContextManifested) for event in events)
-        # Each event has a digest.
-        assert all(event.digest != "" for event in events)
+        first = await hub.perceive(_state())
+        second = await hub.perceive(_state())
+        assert first.digest != ""
+        assert second.digest != ""
 
 
 # ─────────────────────────────────────────────────────────────

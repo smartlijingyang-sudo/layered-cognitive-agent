@@ -1,8 +1,8 @@
-"""ContextManifest 的专用事实发射适配器。
+"""ContextManifest journal sink adapters (COMPAT — ADR-0192 E4 delete-when).
 
-感知 Hub 只构造 ``ContextManifested``；生产与测试共用 ``JournalSink``，
-生产走 ``current_hub()``、测试可显式注入 store。不存在运行时双写开关或
-第二条生产写入路径。
+PerceiveHub no longer emits facts; production uses ``PhaseFactEmitter`` +
+``emit_context_manifested_for_state``. ``JournalSink`` remains for tests that
+assert legacy ``ContextManifested`` journal records until delete-when clears.
 """
 
 from __future__ import annotations

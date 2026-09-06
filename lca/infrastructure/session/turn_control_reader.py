@@ -120,9 +120,9 @@ def _history_control_turns(state: AgentState) -> tuple[ControlTurnView, ...]:
 
 
 def control_turns(state: AgentState) -> tuple[ControlTurnView, ...]:
-    """Session projection when bound; otherwise in-process control cache."""
+    """Session projection when populated; otherwise in-process control cache."""
     projected = projected_control_turns(state)
-    if projected is not None:
+    if projected:
         return projected
     return _history_control_turns(state)
 

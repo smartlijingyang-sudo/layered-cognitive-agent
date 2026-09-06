@@ -38,20 +38,22 @@ from lca.cognition.brain.decision_gates import (
     ToolLoopBreakerGate,
 )
 from lca.cognition.perceive_hub import SequentialPerceiveHub
-from lca.cognition.perceive_sink import JournalSink
 from lca.cognition.sensors import (
     InboxFactsSensor,
     build_clock_sensor,
     build_workspace_artifacts_sensor,
 )
 from lca.contracts.atoms.ids import new_id
-from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.observability.journal import (
-    ContextManifested,
     InboxFollowupCreated,
 )
 from lca.infrastructure.observability.journal.engine.engine import RunStore
+from tests.support.session_gate_helpers import (
+    bound_session,
+    extend_control_turns,
+    gate_decisions_for_step,
+)
 
 # ─────────────────────────────────────────────────────────────
 # Scenario: Ralph loop
@@ -88,7 +90,6 @@ class TestRalphLoop:
                 InboxFactsSensor(store),
             ],
             memory=None,
-            sink=JournalSink.for_store(store),
         )
         state = AgentState(
             trace_id=new_id("trace"),
@@ -99,11 +100,7 @@ class TestRalphLoop:
         kinds = [item.kind for item in manifest.items]
         assert "clock" in kinds
         assert "inbox_facts" in kinds
-        # The manifest event was recorded.
-        stamped = store.get(store.seq)
-        assert stamped is not None
-        assert isinstance(stamped.event, ContextManifested)
-        assert stamped.event.step == 0
+        assert manifest.digest != ""
 
     @pytest.mark.asyncio
     async def test_ralph_chain_emits_repeat_warning(self) -> None:
@@ -113,34 +110,27 @@ class TestRalphLoop:
         Three consecutive test-run calls produce a PolicyFact warning.
         """
         chain = ChainedDecisionGate(RepeatToolCallGate(), ToolLoopBreakerGate())
-        state = AgentState(
-            trace_id=new_id("trace"),
-            task="fix bug #123",
-            budget=Budget(max_steps=10),
-        )
-        # Three consecutive failed test-runs.
         from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
 
-        for _ in range(3):
-            state.history.append(
-                Turn(
-                    decision=Decision(
-                        decision_id=new_id("dec"),
-                        action_type="use_tool",
-                        rationale="x",
-                        confidence=0.5,
-                        tool_calls=[
-                            ToolCall(call_id=new_id("tc"), tool_name="test_run", arguments={})
-                        ],
-                    ),
-                    observation=Observation(
-                        observation_id=new_id("obs"),
-                        success=False,
-                        payload="",
-                        error="test failed",
-                    ),
-                )
+        def _failed_test_run() -> Turn:
+            return Turn(
+                decision=Decision(
+                    decision_id=new_id("dec"),
+                    action_type="use_tool",
+                    rationale="x",
+                    confidence=0.5,
+                    tool_calls=[
+                        ToolCall(call_id=new_id("tc"), tool_name="test_run", arguments={})
+                    ],
+                ),
+                observation=Observation(
+                    observation_id=new_id("obs"),
+                    success=False,
+                    payload="",
+                    error="test failed",
+                ),
             )
+
         dec = Decision(
             decision_id=new_id("dec"),
             action_type="use_tool",
@@ -148,18 +138,25 @@ class TestRalphLoop:
             confidence=0.5,
             tool_calls=[ToolCall(call_id=new_id("tc"), tool_name="test_run", arguments={})],
         )
-        out = await chain.enforce(state, dec)
-        bucket = PerceiveState.from_agent_state(state).gate_decided
-        # RepeatToolCallGate fired (warn) and ToolLoopBreakerGate fired
-        # (rewrite) — 2 entries total.
-        assert len(bucket) >= 2
-        assert any(b.gate == "RepeatToolCallGate" for b in bucket)
-        assert any(b.gate == "ToolLoopBreakerGate" for b in bucket)
-        # The output decision should be RESPOND (ToolLoopBreaker forced it).
-        assert out is not None
-        from lca.contracts.atoms.enums import ActionType
+        with bound_session():
+            state = AgentState(
+                trace_id=new_id("trace"),
+                task="fix bug #123",
+                budget=Budget(max_steps=10),
+            )
+            extend_control_turns(state, (_failed_test_run() for _ in range(3)))
+            out = await chain.enforce(state, dec)
+            bucket = gate_decisions_for_step(state)
+            # RepeatToolCallGate fired (warn) and ToolLoopBreakerGate fired
+            # (rewrite) — 2 entries total.
+            assert len(bucket) >= 2
+            assert any(b.gate == "RepeatToolCallGate" for b in bucket)
+            assert any(b.gate == "ToolLoopBreakerGate" for b in bucket)
+            # The output decision should be RESPOND (ToolLoopBreaker forced it).
+            assert out is not None
+            from lca.contracts.atoms.enums import ActionType
 
-        assert out.action_type == ActionType.RESPOND
+            assert out.action_type == ActionType.RESPOND
 
     @pytest.mark.asyncio
     async def test_ralph_fold_carries_policy_fact_into_next_step(self) -> None:
@@ -168,40 +165,31 @@ class TestRalphLoop:
         The Hub MUST drain the bucket so the next step's manifest
         carries the PolicyFact into the prompt.
         """
-        store = RunStore()
         hub = SequentialPerceiveHub(
             sensors=[build_clock_sensor()],
             memory=None,
-            sink=JournalSink.for_store(store),
         )
-        state = AgentState(
-            trace_id=new_id("trace"),
-            task="fix bug #123",
-            budget=Budget(max_steps=10),
-        )
-        # Step 0: gate fires.
         from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
 
-        for _ in range(3):
-            state.history.append(
-                Turn(
-                    decision=Decision(
-                        decision_id=new_id("dec"),
-                        action_type="use_tool",
-                        rationale="x",
-                        confidence=0.5,
-                        tool_calls=[
-                            ToolCall(call_id=new_id("tc"), tool_name="test_run", arguments={})
-                        ],
-                    ),
-                    observation=Observation(
-                        observation_id=new_id("obs"),
-                        success=False,
-                        payload="",
-                        error="test failed",
-                    ),
-                )
+        def _failed_test_run() -> Turn:
+            return Turn(
+                decision=Decision(
+                    decision_id=new_id("dec"),
+                    action_type="use_tool",
+                    rationale="x",
+                    confidence=0.5,
+                    tool_calls=[
+                        ToolCall(call_id=new_id("tc"), tool_name="test_run", arguments={})
+                    ],
+                ),
+                observation=Observation(
+                    observation_id=new_id("obs"),
+                    success=False,
+                    payload="",
+                    error="test failed",
+                ),
             )
+
         dec = Decision(
             decision_id=new_id("dec"),
             action_type="use_tool",
@@ -209,13 +197,17 @@ class TestRalphLoop:
             confidence=0.5,
             tool_calls=[ToolCall(call_id=new_id("tc"), tool_name="test_run", arguments={})],
         )
-        await RepeatToolCallGate().enforce(state, dec)
-        # Step 1: Hub folds the bucket.
-        state.step = 1
-        manifest = await hub.perceive(state)
-        assert manifest.has_kind("policy_fact")
-        # Bucket is drained.
-        assert PerceiveState.from_agent_state(state).gate_decided == []
+        with bound_session():
+            state = AgentState(
+                trace_id=new_id("trace"),
+                task="fix bug #123",
+                budget=Budget(max_steps=10),
+            )
+            extend_control_turns(state, (_failed_test_run() for _ in range(3)))
+            await RepeatToolCallGate().enforce(state, dec)
+            state.step = 1
+            manifest = await hub.perceive(state)
+            assert manifest.has_kind("policy_fact")
 
     @pytest.mark.asyncio
     async def test_ralph_workspace_sensor_optional(self) -> None:
@@ -254,25 +246,23 @@ class TestComplexScenarios:
         """A pipeline run produces one manifest per step; each manifests
         carries the previous step's PolicyFact fold.
         """
-        store = RunStore()
         hub = SequentialPerceiveHub(
             sensors=[build_clock_sensor()],
             memory=None,
-            sink=JournalSink.for_store(store),
         )
         state = AgentState(
             trace_id=new_id("trace"),
             task="pipeline",
             budget=Budget(max_steps=10),
         )
-        # 3 steps, each emitting ContextManifested.
+        digests: list[str] = []
         for step in range(3):
             state.step = step
-            await hub.perceive(state)
-        events = [stamped.event for stamped in store.read_from(0)]
-        assert all(isinstance(event, ContextManifested) for event in events)
-        # Step numbers are preserved.
-        assert [event.step for event in events] == [0, 1, 2]
+            manifest = await hub.perceive(state)
+            assert manifest.has_kind("clock")
+            digests.append(manifest.digest)
+        assert len(digests) == 3
+        assert all(digest for digest in digests)
 
     @pytest.mark.asyncio
     async def test_complex_chain_with_multiple_gates(self) -> None:
@@ -290,34 +280,27 @@ class TestComplexScenarios:
             ProgressLoopDetector(),
             TerminalRespondGate(),
         )
-        state = AgentState(
-            trace_id=new_id("trace"),
-            task="t",
-            budget=Budget(max_steps=10),
-        )
-        # Three failed test-runs.
         from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
 
-        for _ in range(3):
-            state.history.append(
-                Turn(
-                    decision=Decision(
-                        decision_id=new_id("dec"),
-                        action_type="use_tool",
-                        rationale="x",
-                        confidence=0.5,
-                        tool_calls=[
-                            ToolCall(call_id=new_id("tc"), tool_name="test_run", arguments={})
-                        ],
-                    ),
-                    observation=Observation(
-                        observation_id=new_id("obs"),
-                        success=False,
-                        payload="",
-                        error="test failed",
-                    ),
-                )
+        def _failed_test_run() -> Turn:
+            return Turn(
+                decision=Decision(
+                    decision_id=new_id("dec"),
+                    action_type="use_tool",
+                    rationale="x",
+                    confidence=0.5,
+                    tool_calls=[
+                        ToolCall(call_id=new_id("tc"), tool_name="test_run", arguments={})
+                    ],
+                ),
+                observation=Observation(
+                    observation_id=new_id("obs"),
+                    success=False,
+                    payload="",
+                    error="test failed",
+                ),
             )
+
         dec = Decision(
             decision_id=new_id("dec"),
             action_type="use_tool",
@@ -325,9 +308,16 @@ class TestComplexScenarios:
             confidence=0.5,
             tool_calls=[ToolCall(call_id=new_id("tc"), tool_name="test_run", arguments={})],
         )
-        await chain.enforce(state, dec)
-        bucket = PerceiveState.from_agent_state(state).gate_decided
-        # At least the RepeatToolCallGate fired.
-        assert len(bucket) >= 1
-        gates = {b.gate for b in bucket}
-        assert "RepeatToolCallGate" in gates
+        with bound_session():
+            state = AgentState(
+                trace_id=new_id("trace"),
+                task="t",
+                budget=Budget(max_steps=10),
+            )
+            extend_control_turns(state, (_failed_test_run() for _ in range(3)))
+            await chain.enforce(state, dec)
+            bucket = gate_decisions_for_step(state)
+            # At least the RepeatToolCallGate fired.
+            assert len(bucket) >= 1
+            gates = {b.gate for b in bucket}
+            assert "RepeatToolCallGate" in gates

@@ -6,7 +6,6 @@ import json
 from typing import Any
 
 from lca.contracts.observability.token_meter import TokenMeterNode, TokenMeterSnapshot
-from lca.plugins.session.runtime.messages import derive_messages
 from lca_kernel.events.fold import foldRequestHeader
 
 __all__ = ["HeuristicTokenMeter", "estimate_text_tokens"]
@@ -40,8 +39,8 @@ class HeuristicTokenMeter:
     """纯函数计量:derive_messages + header fold;usage 锚定需 header 一致。"""
 
     def measure(self, session: Any, *, header: dict[str, Any] | None = None) -> TokenMeterSnapshot:
+        messages = session.derive_messages()
         events = session.snapshot_events()
-        messages = derive_messages(events)
         surface_tokens = sum(estimate_text_tokens(_message_text(m)) for m in messages)
         header_fold = foldRequestHeader(events)
         baseline = 0

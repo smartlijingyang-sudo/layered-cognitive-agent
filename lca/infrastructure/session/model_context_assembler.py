@@ -1,4 +1,4 @@
-"""Default ModelContextAssembler — delegates to Session.derive_messages()."""
+"""Default ModelContextAssembler — Session projection fabric read path (ADR-0193)."""
 
 from __future__ import annotations
 

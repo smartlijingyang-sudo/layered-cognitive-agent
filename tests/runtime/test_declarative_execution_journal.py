@@ -189,10 +189,13 @@ def test_runtime_journal_committer_exposes_monotonic_turn_sequence() -> None:
 
     journal = RuntimeJournalCommitter()
 
-    with patch("lca.runtime.runtime_journal.record_runtime", return_value=None):
+    with patch(
+        "lca.infrastructure.session.fact_committer.publish_structural_event",
+        return_value=None,
+    ):
         first = journal.commit_evidence("evidence-1", plan_ref="plan", node_ref="think")
         second = journal.commit_observation({"ok": True}, plan_ref="plan", node_ref="act")
 
-    assert first == "plan:think:phase.evidence:1"
-    assert second == "plan:act:effect.receipt:2"
+    assert first == "evidence-1"
+    assert second == "act:observation:2"
     assert journal.sequence == 2

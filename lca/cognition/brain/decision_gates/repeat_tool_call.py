@@ -31,6 +31,8 @@ _WARNING_TEMPLATE = (
     "⚠️ 你已连续 {count} 次调用工具 {tool}{failed}。请换一种方法或工具，不要继续重复相同的调用。"
 )
 
+_FACT_KIND = "repeat_tool_call"
+
 
 class RepeatToolCallGate(DecisionGate):
     """Warn (not block) on consecutive identical tool calls.

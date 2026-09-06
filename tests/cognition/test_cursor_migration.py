@@ -98,33 +98,28 @@ def _make_cursor() -> tuple[StdLoopCursor, _StubSpine]:
     return cursor, spine
 
 
-# ── 1. perceive_hub calls cursor.advance('perceive') ───────────
+# ── 1. PhaseFactEmitter owns cursor.advance('perceive') (ADR-0192) ──
 
 
 def test_perceive_hub_uses_cursor_advance_not_coord_emit_phase() -> None:
-    """``perceive_hub.perceive`` 必须调 ``cursor.advance('perceive')``,不是 ``coord.emit_phase``。
-
-    通过 inspect 读取源代码静态校验:无 ``coord.emit_phase`` 残留,且出现
-    ``cursor.advance('perceive')`` 调用。docstring 内的提及用 AST 排除。
-    """
+    """PerceiveHub is pure; PhaseFactEmitter calls cursor.advance('perceive')."""
     import ast
     import textwrap
 
     from lca.cognition import perceive_hub
+    from lca.harness.declarative.lifecycle import phase_fact_emitter
 
-    source = textwrap.dedent(inspect.getsource(perceive_hub.SequentialPerceiveHub.perceive))
-    tree = ast.parse(source)
-    # 仅在非 docstring 节点里查找 "coord.emit_phase" / "cursor.advance"
-    body_text = ast.unparse(tree)
-    assert "coord.emit_phase" not in body_text, (
-        "perceive_hub.perceive still calls coord.emit_phase (ADR-0169 §D9 deletion list)"
+    hub_source = textwrap.dedent(inspect.getsource(perceive_hub.SequentialPerceiveHub.perceive))
+    hub_text = ast.unparse(ast.parse(hub_source))
+    assert "coord.emit_phase" not in hub_text
+    assert "cursor.advance" not in hub_text
+    assert "emit_context" not in hub_text
+
+    emitter_source = textwrap.dedent(
+        inspect.getsource(phase_fact_emitter._emit_perceive)
     )
-    assert "cursor.advance" in body_text, (
-        "perceive_hub.perceive must call cursor.advance(phase) (ADR-0169 §D1)"
-    )
-    assert "cursor.advance" in body_text and "perceive" in body_text, (
-        "perceive_hub.perceive must call cursor.advance('perceive')"
-    )
+    emitter_text = ast.unparse(ast.parse(emitter_source))
+    assert 'advance("perceive")' in emitter_text
 
 
 def test_perceive_hub_runtime_emits_phase_perceive_fold_on_cursor() -> None:

@@ -34,11 +34,12 @@ ALLOW_HARNESS_ONLY: frozenset[str] = frozenset(
 )
 
 # lifecycle_emit seam helpers → catalog wire types they produce.
+# Catalog step boundaries may also be emitted from phase_fact_emitter (ADR-0192).
 _LIFECYCLE_SEAM_PRODUCERS: dict[str, tuple[str, ...]] = {
     "turn.started.v1": ("begin_turn",),
     "turn.ended.v1": ("end_turn",),
-    "step.started.v1": ("begin_step", "request_model"),
-    "step.ended.v1": ("end_step", "end_turn"),
+    "step.started.v1": ("begin_step", "request_model", "emit_phase_catalog_facts", "_emit_perceive"),
+    "step.ended.v1": ("end_step", "end_turn", "_emit_remember"),
     "model.requested.v1": ("request_model",),
     "model.completed.v1": ("complete_model",),
     "model.failed.v1": ("fail_model",),

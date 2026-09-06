@@ -16,15 +16,13 @@ import pytest
 
 from lca.cognition.brain.decision_gates import record_gate_decided
 from lca.cognition.perceive_hub import SequentialPerceiveHub
-from lca.cognition.perceive_sink import JournalSink
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.perception import ContextItem
 from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.observability.journal import ContextManifested
 from lca.contracts.protocols import PerceiveHub, Sensor
 from lca.contracts.protocols.think.cognition import SensorDisabledError
-from lca.infrastructure.observability.journal.engine.engine import RunStore
+from tests.support.session_gate_helpers import bound_session
 
 
 def _state() -> AgentState:
@@ -58,23 +56,15 @@ class _DisabledSensor(Sensor):
 
 @pytest.mark.asyncio
 async def test_perceive_emits_manifest_with_sensor_items() -> None:
-    store = RunStore()
     state = _state()
     hub: PerceiveHub = SequentialPerceiveHub(
         sensors=[_ClockSensor()],
         memory=None,
-        sink=JournalSink.for_store(store),
     )
     manifest = await hub.perceive(state)
     assert manifest.has_kind("clock")
     clock_item = manifest.by_kind("clock")[0]
     assert clock_item.payload == "2026-01-01"
-    # The ContextManifested event was recorded.
-    last_seq = store.seq
-    stamped = store.get(last_seq)
-    assert stamped is not None
-    assert isinstance(stamped.event, ContextManifested)
-    assert "clock" in stamped.event.item_kinds
 
 
 @pytest.mark.asyncio
@@ -109,33 +99,29 @@ async def test_policy_fact_fold_into_next_manifest() -> None:
 
     The Hub drains the bucket on read so the next step starts fresh.
     """
-    state = _state()
-    # Step 0: emit a GateDecided (PR4).
-    record_gate_decided(
-        state,
-        GateDecided(
-            event_id=new_id("gate"),
-            gate="RepeatToolCallGate",
-            verdict="warn",
-            is_rewritten=False,
-            policy_fact=PolicyFact(
-                kind="repeat_tool_call",
-                message="warning",
-                source="repeat_tool_call",
+    with bound_session():
+        state = _state()
+        # Step 0: emit a GateDecided (PR4).
+        record_gate_decided(
+            state,
+            GateDecided(
+                event_id=new_id("gate"),
+                gate="RepeatToolCallGate",
+                verdict="warn",
+                is_rewritten=False,
+                policy_fact=PolicyFact(
+                    kind="repeat_tool_call",
+                    message="warning",
+                    source="repeat_tool_call",
+                ),
             ),
-        ),
-    )
-    state.step = 1
-    hub: PerceiveHub = SequentialPerceiveHub(sensors=[], memory=None)
-    manifest = await hub.perceive(state)
-    assert manifest.has_kind("policy_fact")
-    pf_items = manifest.by_kind("policy_fact")
-    assert any(it.payload == "warning" for it in pf_items)
-    # Bucket is drained.
-    from lca.contracts.models.core.perceive_state import PerceiveState
-
-    view = PerceiveState.from_agent_state(state)
-    assert view.gate_decided == []
+        )
+        state.step = 1
+        hub: PerceiveHub = SequentialPerceiveHub(sensors=[], memory=None)
+        manifest = await hub.perceive(state)
+        assert manifest.has_kind("policy_fact")
+        pf_items = manifest.by_kind("policy_fact")
+        assert any(it.payload == "warning" for it in pf_items)
 
 
 @pytest.mark.asyncio

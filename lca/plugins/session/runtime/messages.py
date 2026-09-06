@@ -2,7 +2,10 @@
 
 LCA surface 词表是 spine category(见 ``lca_kernel.events.fold``),不是 dsh
 斜杠名;``foldSurface`` + :func:`derive_event_message` 是 deriveMessages 的
-纯函数形态,Session 运行时增量缓存见 :meth:`Session.derive_messages`。
+纯函数形态(offline/fork SSOT)。运行时增量读走
+:class:`~lca.plugins.session.session_model_visible.session_model_visible.ModelVisibleUnit`
+投影(ADR-0193);:meth:`Session.derive_messages` 经
+:func:`~lca.plugins.session.runtime.projection_reader.model_visible_messages`。
 """
 
 from __future__ import annotations
@@ -65,18 +68,6 @@ def derive_event_message(event: SessionEvent | Mapping[str, Any]) -> dict[str, A
         message = data.get("message")
         if isinstance(message, Mapping):
             return dict(message)
-        return None
-
-    # LCA session 词表 fallback(无 surfaceOp 的简单路径)
-    if event_type == "message.accepted.v1":
-        content_ref = data.get("content_ref") or data.get("content")
-        if isinstance(content_ref, str) and content_ref:
-            return {"role": "user", "content": content_ref}
-        return None
-    if event_type == "assistant.responded.v1":
-        content = data.get("content")
-        if isinstance(content, str) and content:
-            return {"role": "assistant", "content": content}
         return None
 
     return None

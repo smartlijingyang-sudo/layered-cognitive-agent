@@ -113,6 +113,7 @@ class Session(SessionProtocol):
         self._events_snapshot: tuple[SessionEvent, ...] | None = None
         self._header_fold: EpochHeader | None = None
         self._header_fold_seq = 0
+        self._projections: Any | None = None
 
     @property
     def event_count(self) -> int:
@@ -315,11 +316,15 @@ class Session(SessionProtocol):
             self._header_fold_seq = len(self._log)
         return self._header_fold
 
-    def derive_messages(self) -> list[dict[str, Any]]:
-        """从 surface fold 投影 message 序列（DSH ``deriveMessages`` 对位）。"""
-        from lca.plugins.session.runtime.messages import derive_messages
+    def _attach_projection_registry(self, registry: Any) -> None:
+        """Wire projection registry for incremental model-visible reads (ADR-0193)."""
+        self._projections = registry
 
-        return derive_messages(self.snapshot_events())
+    def derive_messages(self) -> list[dict[str, Any]]:
+        """Model-visible messages via projection fabric, else pure fold replay."""
+        from lca.plugins.session.runtime.projection_reader import model_visible_messages
+
+        return model_visible_messages(self, registry=self._projections)
 
     def observe(self, observer: SessionObserver) -> Callable[[], None]:
         """注册 append 观察者；返回幂等取消函数。

@@ -45,6 +45,11 @@ entries:
     $module: lca.plugins.session.projection_cache.projection_cache
     config: {}
 
+  - id: lca.plugins.session.model_visible
+    name: session_model_visible
+    $module: lca.plugins.session.session_model_visible.session_model_visible
+    config: {}
+
   - id: lca.plugins.session.session_stats
     name: session_projection_stats
     $module: lca.plugins.session.session_stats.session_stats

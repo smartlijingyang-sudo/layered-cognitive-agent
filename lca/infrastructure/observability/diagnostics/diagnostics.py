@@ -34,6 +34,29 @@ from lca.contracts.models.observability.journal import (
 )
 from lca.infrastructure.observability.journal.engine.engine import RunStore
 
+_CONTEXT_MANIFESTED_V1 = "context.manifested.v1"
+
+
+def _manifest_evidence_from_session(
+    session_events: Sequence[SessionEvent] | None,
+) -> tuple[bool, tuple[str, ...]]:
+    if not session_events:
+        return False, ()
+    kinds: list[str] = []
+    for event in session_events:
+        if event.type != _CONTEXT_MANIFESTED_V1:
+            continue
+        data = event.data if isinstance(event.data, dict) else {}
+        items = data.get("items")
+        if isinstance(items, list):
+            for item in items:
+                if isinstance(item, dict) and item.get("kind"):
+                    kinds.append(str(item["kind"]))
+        digest = data.get("digest")
+        if digest:
+            kinds.append(f"digest:{digest}")
+    return bool(kinds or any(e.type == _CONTEXT_MANIFESTED_V1 for e in session_events)), tuple(kinds)
+
 
 class DiagnosePattern(str, Enum):
     """The four canonical patterns from spec §24.5."""
@@ -70,14 +93,12 @@ def diagnose_model_not_seen(
     *,
     expected_kind: str,
     trace_id: str | None = None,
+    session_events: Sequence[SessionEvent] | None = None,
 ) -> DiagnosisReport:
     """Diagnose why the model didn't see an expected manifest item kind.
 
-    Spec §24.5.2: walk
-        journal → InboxFollowupCreated → inbox-facts sensor → Hub.merge →
-        Budgeter.select → Manifest.items → Brain.think(manifest)
-
-    The check stops at the earliest step where evidence is missing.
+    Prefers Session ``context.manifested.v1`` facts (ADR-0192); falls back to
+    legacy Journal ``ContextManifested`` when session snapshot is absent.
     """
     findings: list[Finding] = []
 
@@ -93,6 +114,7 @@ def diagnose_model_not_seen(
         if isinstance(e.event, ContextManifested)
         and (trace_id is None or e.scope.trace_id == trace_id)
     ]
+    session_has_manifest, session_kinds = _manifest_evidence_from_session(session_events)
 
     if not inbox:
         findings.append(
@@ -109,16 +131,38 @@ def diagnose_model_not_seen(
         )
         return DiagnosisReport(DiagnosePattern.MODEL_NOT_SEEN, tuple(findings))
 
-    if not manifests:
+    if not manifests and not session_has_manifest:
         findings.append(
             Finding(
                 pattern=DiagnosePattern.MODEL_NOT_SEEN,
                 severity="high",
-                summary="No ContextManifested events; Hub did not run.",
+                summary="No context manifest facts; PerceiveHub or PhaseFactEmitter did not run.",
                 evidence_refs=tuple(inbox),
-                detail="Check: PerceiveHub is wired into CognitiveRuntime.",
+                detail="Check: PerceiveHub is wired; PhaseFactEmitter emits context.manifested.v1.",
             )
         )
+        return DiagnosisReport(DiagnosePattern.MODEL_NOT_SEEN, tuple(findings))
+
+    if session_has_manifest:
+        item_kinds = tuple(
+            k for k in session_kinds if not k.startswith("digest:")
+        )
+        if expected_kind not in item_kinds:
+            findings.append(
+                Finding(
+                    pattern=DiagnosePattern.MODEL_NOT_SEEN,
+                    severity="medium",
+                    summary=(
+                        f"Session manifest has no '{expected_kind}' item; "
+                        f"observed: {item_kinds or session_kinds}"
+                    ),
+                    evidence_refs=(),
+                    detail=(
+                        "Check: Profile references the sensor; Budgeter didn't drop it; "
+                        "the sensor's read didn't throw."
+                    ),
+                )
+            )
         return DiagnosisReport(DiagnosePattern.MODEL_NOT_SEEN, tuple(findings))
 
     last_manifest_seq = manifests[-1]

@@ -146,6 +146,9 @@ class ProjectionRegistry:
 
     def register_to(self, session: Any) -> Callable[[], None]:
         """挂驱动 observer；重复挂入安全（水位闸门跳过已折入事件）。"""
+        attach = getattr(session, "_attach_projection_registry", None)
+        if callable(attach):
+            attach(self)
         return session.observe(_ProjectionObserver(self))
 
     def on_session_event(self, session: Any, event: SessionEvent) -> None:

@@ -18,7 +18,6 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.gate_policy import GateDecided
-from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ContributionRole,
@@ -53,15 +52,13 @@ def _latest_gate_event(state: AgentState) -> GateDecided | None:
     from lca.infrastructure.session.bindings import resolve_session_reader
 
     session = resolve_session_reader()
-    if session is not None:
-        decisions = fold_gate_decisions_from_events(
-            session.snapshot_events(),
-            step=state.step,
-        )
-        if decisions:
-            return decisions[-1]
-    events = PerceiveState.from_agent_state(state).gate_decided
-    return events[-1] if events else None
+    if session is None:
+        return None
+    decisions = fold_gate_decisions_from_events(
+        session.snapshot_events(),
+        step=state.step,
+    )
+    return decisions[-1] if decisions else None
 
 
 def _gate_verdict_kind(event: GateDecided) -> ControlVerdictKind:

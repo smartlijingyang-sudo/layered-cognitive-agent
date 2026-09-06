@@ -5,8 +5,6 @@ from __future__ import annotations
 import pytest
 
 from lca.cognition.brain.decision_gates.chained import record_gate_decided
-from lca.cognition.perceive_hub import SequentialPerceiveHub
-from lca.cognition.perceive_sink import NullSink
 from lca.contracts.harness.fold.perceive import (
     fold_context_manifest_from_events,
     fold_gate_decisions_from_events,
@@ -107,13 +105,35 @@ def test_emit_gate_decided_noop_when_session_unbound() -> None:
 
 
 @pytest.mark.asyncio
-async def test_perceive_hub_appends_context_manifested() -> None:
+async def test_phase_fact_emitter_appends_context_manifested() -> None:
+    from lca.contracts.models.core.budget import create_budget
+    from lca.contracts.models.core.perception import ContextManifest
+    from lca.contracts.protocols.declarative.declarative_phase_graph import (
+        PhaseResult,
+        SemanticPhase,
+    )
+    from lca.harness.declarative.lifecycle.phase_fact_emitter import emit_phase_catalog_facts
+    from lca.plugins.events.publishers._session_publish import (
+        reset_publish_session,
+        set_publish_session,
+    )
+    from lca.plugins.session.runtime.session import Session
+
     session = Session("manifest_emit")
     token = set_publish_session(session)
     try:
-        state = _state(step=3)
-        hub = SequentialPerceiveHub(sensors=[], memory=None, sink=NullSink())
-        manifest = await hub.perceive(state)
+        state = AgentState(
+            trace_id="trace:cognitive-emit",
+            task="test",
+            budget=create_budget(max_steps=8),
+            step=3,
+        )
+        manifest = ContextManifest(items=(), digest="abc123")
+        emit_phase_catalog_facts(
+            semantic_phase=SemanticPhase.PERCEIVE,
+            result=PhaseResult(result_kind="context", payload=manifest),
+            state=state,
+        )
         events = [
             event for event in session.snapshot_events() if event.type == "context.manifested.v1"
         ]

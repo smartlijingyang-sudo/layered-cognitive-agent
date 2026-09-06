@@ -7,7 +7,7 @@ from collections.abc import Sequence
 import structlog
 
 from lca.cognition.brain.context_manifest import build_manifest_from_items, digest_manifest
-from lca.cognition.perceive_sink import ManifestSink, default_sink
+from lca.cognition.perceive_sink import ManifestSink
 from lca.contracts.harness.fold.perceive import fold_gate_decisions_from_events
 from lca.contracts.harness.state.context_budget import (
     DEFAULT_CONTEXT_BUDGET_CHARS,
@@ -20,14 +20,14 @@ from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.diagnostic import DiagnosticCategory, DiagnosticStatus
 from lca.contracts.protocols import MemorySystem, PerceiveHub, Sensor
 from lca.contracts.protocols.think.cognition import SensorDisabledError
-from lca.infrastructure.observability import record_runtime
 from lca.infrastructure.session.bindings import resolve_session_reader
+from lca.infrastructure.session.fact_committer import emit_diagnostic
 
 _log = structlog.get_logger("lca.perceive_hub")
 
 
 class SequentialPerceiveHub(PerceiveHub):
-    """Default Hub: composition order, no fan-out."""
+    """Default Hub: composition order, no fan-out, no fact I/O (ADR-0192)."""
 
     def __init__(
         self,
@@ -37,31 +37,15 @@ class SequentialPerceiveHub(PerceiveHub):
         sink: ManifestSink | None = None,
         max_context_chars: int = DEFAULT_CONTEXT_BUDGET_CHARS,
     ) -> None:
+        del sink  # COMPAT(ADR-0192 E4): JournalSink ignored; facts via PhaseFactEmitter
         self._sensors = list(sensors)
         self._memory = memory
-        self._sink: ManifestSink = sink if sink is not None else default_sink()
         self._budgeter = ContextBudgeter(max_context_chars)
 
     async def perceive(self, state: AgentState) -> ContextManifest:
         items = await self._fold(state)
         digest = digest_manifest(build_manifest_from_items(items))
-        manifest = ContextManifest(items=tuple(items), digest=digest)
-
-        from lca.contracts.models.observability.journal import ContextManifested
-
-        event = ContextManifested(
-            step=state.step,
-            item_kinds=tuple(item.kind for item in items),
-            digest=digest,
-            item_refs=(),
-            persist_full_prompt=False,
-        )
-        self._sink.emit(event, manifest)
-
-        from lca.infrastructure.session.cognitive_emit import emit_context_manifested_for_state
-
-        emit_context_manifested_for_state(state, manifest)
-        return manifest
+        return ContextManifest(items=tuple(items), digest=digest)
 
     async def _fold(self, state: AgentState) -> list[ContextItem]:
         items: list[ContextItem] = []
@@ -77,13 +61,13 @@ class SequentialPerceiveHub(PerceiveHub):
                     sensor=type(sensor).__name__,
                     error=str(exc),
                 )
-                record_runtime(
-                    DiagnosticCategory.PLUGIN,
-                    "sensor.read",
+                emit_diagnostic(
+                    category=DiagnosticCategory.PLUGIN.value,
+                    operation="sensor.read",
                     plugin=type(sensor).__name__,
                     attributes={"step": state.step},
                     output={"error": str(exc)},
-                    status=DiagnosticStatus.FAILED,
+                    status=DiagnosticStatus.FAILED.value,
                 )
                 continue
 
@@ -93,13 +77,13 @@ class SequentialPerceiveHub(PerceiveHub):
                 items.extend(_memory_items(memory_state))
             except Exception as exc:
                 _log.warning("memory_perceive_failed", error=str(exc))
-                record_runtime(
-                    DiagnosticCategory.MEMORY,
-                    "memory.perceive",
+                emit_diagnostic(
+                    category=DiagnosticCategory.MEMORY.value,
+                    operation="memory.perceive",
                     plugin=type(self._memory).__name__,
                     attributes={"step": state.step},
                     output={"error": str(exc)},
-                    status=DiagnosticStatus.FAILED,
+                    status=DiagnosticStatus.FAILED.value,
                 )
 
         items.extend(_policy_fact_items(state))
@@ -127,8 +111,9 @@ def _policy_fact_items(state: AgentState) -> list[ContextItem]:
                 session.snapshot_events(),
                 step=prior_step,
             )
-            _drain_gate_decided_bucket(state)
-            return [_policy_fact_item(event) for event in decisions if event.policy_fact]
+            if decisions:
+                _drain_gate_decided_bucket(state)
+                return [_policy_fact_item(event) for event in decisions if event.policy_fact]
     return _policy_fact_items_from_bucket(state)
 
 
@@ -166,3 +151,6 @@ def _policy_fact_item(event: GateDecided) -> ContextItem:
         provenance=fact.source,
         extra={"kind": fact.kind, "gate": event.gate},
     )
+
+
+__all__ = ["SequentialPerceiveHub"]

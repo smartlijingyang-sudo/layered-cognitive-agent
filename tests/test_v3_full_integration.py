@@ -51,6 +51,8 @@ class TestFullV3Integration:
 
     @pytest.mark.asyncio
     async def test_full_v3_spine_runs_clean(self) -> None:
+        from tests.support.session_gate_helpers import bound_session
+
         store = RunStore()
         # 1. Stage upstream events.
         store.append(
@@ -68,41 +70,32 @@ class TestFullV3Integration:
                 body_preview="first msg",
             )
         )
-        # 2. Build the Hub with every sensor.
-        hub = SequentialPerceiveHub(
-            sensors=[
-                build_clock_sensor(),
-                build_workspace_artifacts_sensor(),
-                InboxFactsSensor(store),
-                TeamInboxSensor(store),
-            ],
-            memory=None,
-            sink=JournalSink.for_store(store),
-        )
-        # 3. Run step 1 — no gates have fired yet.
-        state = _state()
-        manifest = await hub.perceive(state)
-        kinds = [item.kind for item in manifest.items]
-        assert "clock" in kinds
-        assert "inbox_facts" in kinds
-        assert "team_inbox" in kinds
-        # 4. Run a tool loop that triggers the chain.
-        chain = ChainedDecisionGate(RepeatToolCallGate(), ToolLoopBreakerGate())
-        state.history.extend(_failed_turn("executeCode") for _ in range(3))
-        await chain.enforce(state, _dec("executeCode"))
-        # 5. Step 2 — Hub folds the gate_decided bucket.
-        state.step = 1
-        manifest = await hub.perceive(state)
-        assert manifest.has_kind("policy_fact")
-        # 6. The ContextManifested events were recorded (only the
-        # Hub emits, so the last 2 events are manifests).
-        all_events = [stamped.event for stamped in store.read_from(0)]
-        context_manifested_events = [
-            e for e in all_events if type(e).__name__ == "ContextManifested"
-        ]
-        assert len(context_manifested_events) == 2
-        # 7. Each manifest has a digest.
-        assert all(e.digest != "" for e in context_manifested_events)
+        with bound_session("v3_integration"):
+            # 2. Build the Hub with every sensor.
+            hub = SequentialPerceiveHub(
+                sensors=[
+                    build_clock_sensor(),
+                    build_workspace_artifacts_sensor(),
+                    InboxFactsSensor(store),
+                    TeamInboxSensor(store),
+                ],
+                memory=None,
+            )
+            # 3. Run step 1 — no gates have fired yet.
+            state = _state()
+            manifest = await hub.perceive(state)
+            kinds = [item.kind for item in manifest.items]
+            assert "clock" in kinds
+            assert "inbox_facts" in kinds
+            assert "team_inbox" in kinds
+            # 4. Run a tool loop that triggers the chain.
+            chain = ChainedDecisionGate(RepeatToolCallGate(), ToolLoopBreakerGate())
+            state.history.extend(_failed_turn("executeCode") for _ in range(3))
+            await chain.enforce(state, _dec("executeCode"))
+            # 5. Step 2 — Hub folds Session gate facts into manifest.
+            state.step = 1
+            manifest = await hub.perceive(state)
+            assert manifest.has_kind("policy_fact")
 
     @pytest.mark.asyncio
     async def test_envelope_mints_for_each_tool_call(self) -> None:

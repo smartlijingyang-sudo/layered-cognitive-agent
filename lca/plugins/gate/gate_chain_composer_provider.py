@@ -1,9 +1,17 @@
 """GateChainComposer Provider plugin — Tier-2 (ADR-0074).
 
+# COMPAT(owner: ADR-0191, from: GateChainComposer + DefaultGateChainComposer,
+# to: GateService + gates.chain.sequential bundle wiring,
+# delete_when: rg 'gate_chain_composer|DefaultGateChainComposer|build_workspace_agent_gate_with_composer'
+#   tests/ lca/cognition/ = 0 except this module + protocol,
+# forbidden_new_usage: new production gate assembly via GateChainComposer)
+
 Migrates the hard-coded ``build_workspace_agent_gate()`` logic from
 ``lca/cognition/brain/decision_gates/__init__.py`` into a pluggable
 default provider. Profile can replace via ``ctx.provide("gate_chain_composer", ...)``
 to customize gate ordering/composition.
+
+Production bundles use ``GateService`` + ``gates.chain.sequential`` instead.
 """
 
 from __future__ import annotations

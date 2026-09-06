@@ -30,6 +30,7 @@ from lca.harness.declarative.compile.phase_governance import GovernanceResult, P
 from lca.harness.declarative.controls.effect_receipt import adapt_effect_receipt
 from lca.harness.declarative.graph.traversal import PhaseTraversal
 from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
+from lca.harness.declarative.lifecycle.phase_fact_emitter import emit_phase_catalog_facts
 from lca.harness.declarative.lifecycle.phase_observation import PhaseObserver, phase_state_snapshot
 
 
@@ -194,6 +195,11 @@ class PhaseExecutionTransaction:
         )
         for delta in (*result.deltas, *context.proposed_deltas):
             state = self.apply_delta(state, delta)
+        emit_phase_catalog_facts(
+            semantic_phase=semantic_phase,
+            result=result,
+            state=state,
+        )
         return PhaseTransactionResult(
             state=state,
             result=result,

@@ -54,16 +54,6 @@ class StandardPerceiveExecutor:
                 input=input,
             )
         manifest = await hub.perceive(context.state)
-        step = getattr(context.state, "step", 0) + 1
-        from lca.infrastructure.observability.meta_event_emit import emit_context_injected
-        from lca.infrastructure.session.lifecycle_emit import begin_step
-
-        begin_step(step=step)
-        if manifest.digest:
-            emit_context_injected(
-                source="perceive",
-                content_ref=f"manifest:{manifest.digest}",
-            )
         return PhaseResult(
             result_kind="context",
             payload=manifest,
