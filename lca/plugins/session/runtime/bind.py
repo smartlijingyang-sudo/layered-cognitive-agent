@@ -170,6 +170,9 @@ def bind_run_event_session_from_store(store: Any, run_id: str) -> BoundRunEventS
     bridge = RunEventSessionBridge(inner)
     token = set_publish_session(bridge)
     set_session(bridge)
+    from lca.infrastructure.session.lifecycle_emit import reset_lifecycle
+
+    reset_lifecycle()
     from lca.infrastructure.persistence.run_buffer_registry import SessionPersistenceFlushListener
     from lca.plugins.session.runtime.spine_hook import bind_bridge_spine_hook
 

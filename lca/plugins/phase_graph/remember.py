@@ -71,6 +71,9 @@ class StandardRememberExecutor:
                 "reflection": reflection,
             },
         )
+        from lca.infrastructure.session.lifecycle_emit import end_step
+
+        end_step(step=getattr(context.state, "step", 1))
         return PhaseResult(
             result_kind="write_set",
             payload={"admitted": True},

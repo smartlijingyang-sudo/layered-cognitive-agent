@@ -1,0 +1,84 @@
+# composio domain events — Session spine SSOT (debug / audit).
+
+consumer_rules:
+  - prefix: "spine.composio."
+    subscribers:
+      - lca.plugins.events.sinks.spine_file_sink.sink.SpineFileSink
+
+events:
+  - category: spine.composio.oauth.callback.received
+    plane: lca.contracts.event.Plane.STRUCTURAL
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields: {}
+    publishers:
+      - events.spine.reflector.composio
+
+  - category: spine.composio.oauth.callback.failed
+    plane: lca.contracts.event.Plane.STRUCTURAL
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields: {}
+    publishers:
+      - events.spine.reflector.composio
+
+  - category: spine.composio.oauth.callback.processed
+    plane: lca.contracts.event.Plane.STRUCTURAL
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields: {}
+    publishers:
+      - events.spine.reflector.composio
+
+  - category: spine.composio.connection.created
+    plane: lca.contracts.event.Plane.STRUCTURAL
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields: {}
+    publishers:
+      - events.spine.reflector.composio
+
+  - category: spine.composio.connection.pending
+    plane: lca.contracts.event.Plane.STRUCTURAL
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields: {}
+    publishers:
+      - events.spine.reflector.composio
+
+  - category: spine.composio.connection.refreshed
+    plane: lca.contracts.event.Plane.STRUCTURAL
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields: {}
+    publishers:
+      - events.spine.reflector.composio
+
+  - category: spine.composio.connection.activated
+    plane: lca.contracts.event.Plane.STRUCTURAL
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields: {}
+    publishers:
+      - events.spine.reflector.composio
+
+  - category: spine.composio.connection.deleted
+    plane: lca.contracts.event.Plane.STRUCTURAL
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields: {}
+    publishers:
+      - events.spine.reflector.composio
+
+  - category: spine.composio.tool.execution.started
+    plane: lca.contracts.event.Plane.STRUCTURAL
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields: {}
+    publishers:
+      - events.spine.reflector.composio
+
+  - category: spine.composio.tool.executed
+    plane: lca.contracts.event.Plane.STRUCTURAL
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields: {}
+    publishers:
+      - events.spine.reflector.composio
+
+  - category: spine.composio.tool.execution.failed
+    plane: lca.contracts.event.Plane.STRUCTURAL
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields: {}
+    publishers:
+      - events.spine.reflector.composio

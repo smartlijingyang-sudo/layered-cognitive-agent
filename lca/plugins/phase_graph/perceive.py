@@ -54,6 +54,10 @@ class StandardPerceiveExecutor:
                 input=input,
             )
         manifest = await hub.perceive(context.state)
+        step = getattr(context.state, "step", 0) + 1
+        from lca.infrastructure.session.lifecycle_emit import begin_step
+
+        begin_step(step=step)
         return PhaseResult(
             result_kind="context",
             payload=manifest,

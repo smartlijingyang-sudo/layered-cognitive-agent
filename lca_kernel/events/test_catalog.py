@@ -88,6 +88,16 @@ def build_test_catalog() -> dict[str, type]:
             "ReflectorClass",
         ),
         (
+            "events.spine.reflector.assistant",
+            "lca.plugins.events.publishers.spine_reflector_assistant.plugin",
+            "ReflectorClass",
+        ),
+        (
+            "events.spine.reflector.composio",
+            "lca.plugins.events.publishers.spine_reflector_composio.plugin",
+            "ReflectorClass",
+        ),
+        (
             "events.spine.reflector.control",
             "lca.plugins.events.publishers.spine_reflector_control.plugin",
             "ReflectorClass",

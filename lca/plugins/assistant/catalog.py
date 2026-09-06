@@ -539,8 +539,11 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     root = Path(config.assistants_root).expanduser()  # noqa: ASYNC240 - setup path resolution, not async file IO
 
     def _emit(event: str, payload: Mapping[str, Any]) -> Any:
-        # audit event 类型已由 ctx.emit 守门(走 audited PluginEventBus.emit)
-        return ctx.emit(event, dict(payload))
+        from lca.plugins.events.publishers.spine_reflector_assistant.plugin import (
+            emit_assistant_domain_event,
+        )
+
+        return emit_assistant_domain_event(execution_point=event, payload=payload)
 
     catalog = _AssistantCatalogImpl(root=root, event_emitter=_emit)
     ctx.provide(ASSISTANT_CATALOG.key, catalog)

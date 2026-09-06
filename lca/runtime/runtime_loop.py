@@ -171,6 +171,15 @@ class CognitiveRuntime(Runtime):
         if ctx and ctx.extra.get(PRIOR_CONVERSATION_WM_KEY):
             state.extra[PRIOR_CONVERSATION_WM_KEY] = ctx.extra[PRIOR_CONVERSATION_WM_KEY]
         self._bindings.require_executable_plan()
+        from lca.infrastructure.session.lifecycle_emit import (
+            accept_user_message,
+            begin_turn,
+            reset_lifecycle,
+        )
+
+        reset_lifecycle()
+        begin_turn()
+        accept_user_message(message_id=f"task:{trace_id}", content=task)
         await self._lifecycle.publish(RuntimeLifecycleEventType.STARTED, state)
         await self.hooks.trigger(HookEvent.ON_START.value, state)
         return await self._run_driver(state, runner=lambda: self._bindings.new_driver().run(state))
@@ -338,6 +347,9 @@ class CognitiveRuntime(Runtime):
                     outcome=outcome_holder["value"],
                 )
         await self._lifecycle.publish_terminal(state, result)
+        from lca.infrastructure.session.lifecycle_emit import end_turn
+
+        end_turn(reason=result.status.value if hasattr(result.status, "value") else "completed")
         return result
 
 

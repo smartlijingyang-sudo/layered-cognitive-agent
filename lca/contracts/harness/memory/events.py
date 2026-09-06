@@ -259,6 +259,19 @@ class SessionCheckpoint:
     status: str
 
 
+@session_event("turn.control.v1", visibility="internal")
+@dataclass(frozen=True)
+class TurnControlCommitted:
+    """Control-plane turn summary for gate/projection fold (ADR-0191 Wave C)."""
+
+    action_type: str
+    tool_name: str | None = None
+    observation_success: bool | None = None
+    tool_arguments: dict[str, Any] | None = None
+    observation_payload: Any | None = None
+    observation_error: str | None = None
+
+
 @session_event("session.end_seed.v1", visibility="audit")
 @dataclass(frozen=True)
 class SessionEndSeed:

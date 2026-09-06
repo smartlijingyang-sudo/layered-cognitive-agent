@@ -77,4 +77,15 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         auth_config_ids=config.auth_config_ids,
         connections_path=config.connections_path,
     )
+    registry = ctx.soft_get("event_descriptor_registry")
+    if registry is not None:
+        from contextlib import suppress
+
+        from lca.contracts.observability.composio_ep_closure import (
+            all_composio_event_descriptors,
+        )
+
+        for descriptor in all_composio_event_descriptors():
+            with suppress(ValueError):
+                registry.register(descriptor, replace=False)
     ctx.provide("composio", ComposioIntegration(settings))

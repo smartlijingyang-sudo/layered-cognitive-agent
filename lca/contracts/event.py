@@ -152,6 +152,31 @@ class Category(str, Enum):
     SPINE_BOOT_PLUGIN_FIBER_SPAWNED = "spine.boot.plugin.fiber.spawned"
     SPINE_BOOT_OBSERVABILITY_ASSEMBLED = "spine.boot.observability.assembled"
     SPINE_RUNTIME_OBSERVED = "spine.runtime.observed"
+    # observability/spine — ADR-0187 assistant domain (12 EP)
+    SPINE_ASSISTANT_CREATED = "spine.assistant.created"
+    SPINE_ASSISTANT_BOOTSTRAP_COMPLETED = "spine.assistant.bootstrap.completed"
+    SPINE_ASSISTANT_PROFILE_REVISED = "spine.assistant.profile.revised"
+    SPINE_ASSISTANT_PAUSED = "spine.assistant.paused"
+    SPINE_ASSISTANT_RESUMED = "spine.assistant.resumed"
+    SPINE_ASSISTANT_SKILL_INSTALLED = "spine.assistant.skill.installed"
+    SPINE_ASSISTANT_SKILL_ACTIVATED = "spine.assistant.skill.activated"
+    SPINE_ASSISTANT_SKILL_EVOLVED_PROPOSED = "spine.assistant.skill.evolved.proposed"
+    SPINE_ASSISTANT_SKILL_EVOLVED_PROMOTED = "spine.assistant.skill.evolved.promoted"
+    SPINE_ASSISTANT_JOB_REGISTERED = "spine.assistant.job.registered"
+    SPINE_ASSISTANT_JOB_FIRED = "spine.assistant.job.fired"
+    SPINE_ASSISTANT_RETIRED = "spine.assistant.retired"
+    # observability/spine — composio integration (11 EP)
+    SPINE_COMPOSIO_OAUTH_CALLBACK_RECEIVED = "spine.composio.oauth.callback.received"
+    SPINE_COMPOSIO_OAUTH_CALLBACK_FAILED = "spine.composio.oauth.callback.failed"
+    SPINE_COMPOSIO_OAUTH_CALLBACK_PROCESSED = "spine.composio.oauth.callback.processed"
+    SPINE_COMPOSIO_CONNECTION_CREATED = "spine.composio.connection.created"
+    SPINE_COMPOSIO_CONNECTION_PENDING = "spine.composio.connection.pending"
+    SPINE_COMPOSIO_CONNECTION_REFRESHED = "spine.composio.connection.refreshed"
+    SPINE_COMPOSIO_CONNECTION_ACTIVATED = "spine.composio.connection.activated"
+    SPINE_COMPOSIO_CONNECTION_DELETED = "spine.composio.connection.deleted"
+    SPINE_COMPOSIO_TOOL_EXECUTION_STARTED = "spine.composio.tool.execution.started"
+    SPINE_COMPOSIO_TOOL_EXECUTED = "spine.composio.tool.executed"
+    SPINE_COMPOSIO_TOOL_EXECUTION_FAILED = "spine.composio.tool.execution.failed"
 
 
 class Plane(str, Enum):
@@ -275,6 +300,29 @@ CATEGORY_DEFAULT_PLANE: dict[Category, Plane] = {
     Category.SPINE_BOOT_PLUGIN_FIBER_SPAWNED: Plane.STRUCTURAL,
     Category.SPINE_BOOT_OBSERVABILITY_ASSEMBLED: Plane.STRUCTURAL,
     Category.SPINE_RUNTIME_OBSERVED: Plane.OBSERVABILITY,
+    Category.SPINE_ASSISTANT_CREATED: Plane.STRUCTURAL,
+    Category.SPINE_ASSISTANT_BOOTSTRAP_COMPLETED: Plane.STRUCTURAL,
+    Category.SPINE_ASSISTANT_PROFILE_REVISED: Plane.STRUCTURAL,
+    Category.SPINE_ASSISTANT_PAUSED: Plane.STRUCTURAL,
+    Category.SPINE_ASSISTANT_RESUMED: Plane.STRUCTURAL,
+    Category.SPINE_ASSISTANT_SKILL_INSTALLED: Plane.STRUCTURAL,
+    Category.SPINE_ASSISTANT_SKILL_ACTIVATED: Plane.STRUCTURAL,
+    Category.SPINE_ASSISTANT_SKILL_EVOLVED_PROPOSED: Plane.STRUCTURAL,
+    Category.SPINE_ASSISTANT_SKILL_EVOLVED_PROMOTED: Plane.STRUCTURAL,
+    Category.SPINE_ASSISTANT_JOB_REGISTERED: Plane.STRUCTURAL,
+    Category.SPINE_ASSISTANT_JOB_FIRED: Plane.STRUCTURAL,
+    Category.SPINE_ASSISTANT_RETIRED: Plane.STRUCTURAL,
+    Category.SPINE_COMPOSIO_OAUTH_CALLBACK_RECEIVED: Plane.STRUCTURAL,
+    Category.SPINE_COMPOSIO_OAUTH_CALLBACK_FAILED: Plane.STRUCTURAL,
+    Category.SPINE_COMPOSIO_OAUTH_CALLBACK_PROCESSED: Plane.STRUCTURAL,
+    Category.SPINE_COMPOSIO_CONNECTION_CREATED: Plane.STRUCTURAL,
+    Category.SPINE_COMPOSIO_CONNECTION_PENDING: Plane.STRUCTURAL,
+    Category.SPINE_COMPOSIO_CONNECTION_REFRESHED: Plane.STRUCTURAL,
+    Category.SPINE_COMPOSIO_CONNECTION_ACTIVATED: Plane.STRUCTURAL,
+    Category.SPINE_COMPOSIO_CONNECTION_DELETED: Plane.STRUCTURAL,
+    Category.SPINE_COMPOSIO_TOOL_EXECUTION_STARTED: Plane.STRUCTURAL,
+    Category.SPINE_COMPOSIO_TOOL_EXECUTED: Plane.STRUCTURAL,
+    Category.SPINE_COMPOSIO_TOOL_EXECUTION_FAILED: Plane.STRUCTURAL,
 }
 
 

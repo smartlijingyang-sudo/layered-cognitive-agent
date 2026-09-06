@@ -168,6 +168,51 @@ _CORDIS_EVENT_TABLE_ENTRIES: Final[tuple[CordisEventTableEntry, ...]] = (
         execution_point="assistant.retired",
         cordis_name="agent.assistant.retired",
     ),
+    # Composio integration (connection + tool debug)
+    CordisEventTableEntry(
+        execution_point="composio.oauth.callback.received",
+        cordis_name="agent.composio.oauth.callback.received",
+    ),
+    CordisEventTableEntry(
+        execution_point="composio.oauth.callback.failed",
+        cordis_name="agent.composio.oauth.callback.failed",
+    ),
+    CordisEventTableEntry(
+        execution_point="composio.oauth.callback.processed",
+        cordis_name="agent.composio.oauth.callback.processed",
+    ),
+    CordisEventTableEntry(
+        execution_point="composio.connection.created",
+        cordis_name="agent.composio.connection.created",
+    ),
+    CordisEventTableEntry(
+        execution_point="composio.connection.pending",
+        cordis_name="agent.composio.connection.pending",
+    ),
+    CordisEventTableEntry(
+        execution_point="composio.connection.refreshed",
+        cordis_name="agent.composio.connection.refreshed",
+    ),
+    CordisEventTableEntry(
+        execution_point="composio.connection.activated",
+        cordis_name="agent.composio.connection.activated",
+    ),
+    CordisEventTableEntry(
+        execution_point="composio.connection.deleted",
+        cordis_name="agent.composio.connection.deleted",
+    ),
+    CordisEventTableEntry(
+        execution_point="composio.tool.execution.started",
+        cordis_name="agent.composio.tool.execution.started",
+    ),
+    CordisEventTableEntry(
+        execution_point="composio.tool.executed",
+        cordis_name="agent.composio.tool.executed",
+    ),
+    CordisEventTableEntry(
+        execution_point="composio.tool.execution.failed",
+        cordis_name="agent.composio.tool.execution.failed",
+    ),
 )
 
 _CORDIS_EVENT_TABLE_BY_EP: Final[dict[str, CordisEventTableEntry]] = {

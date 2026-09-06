@@ -149,6 +149,31 @@ SPINE_EXECUTION_POINTS: tuple[str, ...] = (
     "boot.observability.assembled",
     # Runtime observed (PR-6)
     "runtime.observed",
+    # Assistant domain (ADR-0187)
+    "assistant.created",
+    "assistant.bootstrap.completed",
+    "assistant.profile.revised",
+    "assistant.paused",
+    "assistant.resumed",
+    "assistant.skill.installed",
+    "assistant.skill.activated",
+    "assistant.skill.evolved.proposed",
+    "assistant.skill.evolved.promoted",
+    "assistant.job.registered",
+    "assistant.job.fired",
+    "assistant.retired",
+    # Composio integration
+    "composio.oauth.callback.received",
+    "composio.oauth.callback.failed",
+    "composio.oauth.callback.processed",
+    "composio.connection.created",
+    "composio.connection.pending",
+    "composio.connection.refreshed",
+    "composio.connection.activated",
+    "composio.connection.deleted",
+    "composio.tool.execution.started",
+    "composio.tool.executed",
+    "composio.tool.execution.failed",
 )
 
 
@@ -277,6 +302,31 @@ _SPINE_EP_TO_CATEGORY: dict[str, str] = {
     "boot.observability.assembled": "spine.boot.observability.assembled",
     # Runtime observed (PR-6)
     "runtime.observed": "spine.runtime.observed",
+    # Assistant domain (ADR-0187)
+    "assistant.created": "spine.assistant.created",
+    "assistant.bootstrap.completed": "spine.assistant.bootstrap.completed",
+    "assistant.profile.revised": "spine.assistant.profile.revised",
+    "assistant.paused": "spine.assistant.paused",
+    "assistant.resumed": "spine.assistant.resumed",
+    "assistant.skill.installed": "spine.assistant.skill.installed",
+    "assistant.skill.activated": "spine.assistant.skill.activated",
+    "assistant.skill.evolved.proposed": "spine.assistant.skill.evolved.proposed",
+    "assistant.skill.evolved.promoted": "spine.assistant.skill.evolved.promoted",
+    "assistant.job.registered": "spine.assistant.job.registered",
+    "assistant.job.fired": "spine.assistant.job.fired",
+    "assistant.retired": "spine.assistant.retired",
+    # Composio integration
+    "composio.oauth.callback.received": "spine.composio.oauth.callback.received",
+    "composio.oauth.callback.failed": "spine.composio.oauth.callback.failed",
+    "composio.oauth.callback.processed": "spine.composio.oauth.callback.processed",
+    "composio.connection.created": "spine.composio.connection.created",
+    "composio.connection.pending": "spine.composio.connection.pending",
+    "composio.connection.refreshed": "spine.composio.connection.refreshed",
+    "composio.connection.activated": "spine.composio.connection.activated",
+    "composio.connection.deleted": "spine.composio.connection.deleted",
+    "composio.tool.execution.started": "spine.composio.tool.execution.started",
+    "composio.tool.executed": "spine.composio.tool.executed",
+    "composio.tool.execution.failed": "spine.composio.tool.execution.failed",
 }
 
 

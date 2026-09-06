@@ -55,6 +55,8 @@ Session 事件流是唯一事实:`Session.append` 是唯一写入口,持久化�
 
 ### 3.1 事件词表分组(Session 平面)
 
+> 完整 DSH ↔ LCA 生产消费映射见 [session-event-lifecycle-map.md](session-event-lifecycle-map.md)。
+
 | 组 | 作用 | LCA 代表 |
 |---|---|---|
 | 回合边界 | 标记一次用户驱动的完整回合;即使没有模型步骤也留下边界事实 | `turn.started.v1` / `turn.ended.v1` |

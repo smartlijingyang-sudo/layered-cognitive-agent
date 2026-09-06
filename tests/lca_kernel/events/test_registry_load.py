@@ -15,8 +15,7 @@ from lca_kernel.events.registry import EventRegistry, EventSpec
 def test_default_registry_loads() -> None:
     registry = EventRegistry.load(_DEFAULT_CONFIG_DIR)
     assert len(registry.specs) >= 1
-    spec = registry.specs[0]
-    assert spec.category == Category.TEAM_DELEGATION_CACHE_HIT
+    spec = next(s for s in registry.specs if s.category == Category.TEAM_DELEGATION_CACHE_HIT)
     assert spec.plane is Plane.STRUCTURAL
     assert spec.payload_class is not None
     assert issubclass(spec.payload_class, EventPayload)

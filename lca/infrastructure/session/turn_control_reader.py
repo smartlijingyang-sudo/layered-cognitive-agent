@@ -6,8 +6,10 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 
 from lca.contracts.atoms.enums import ActionType
+from lca.contracts.harness.memory.events import TurnControlCommitted
 from lca.contracts.models.core.decision import Turn
 from lca.contracts.models.core.state import AgentState
+from lca.harness.session.emit import emit
 from lca.infrastructure.session.bindings import resolve_session_reader
 from lca.plugins.session.session_turn_control.session_turn_control import TurnControlUnit
 from lca_kernel.events.session import SessionEvent
@@ -40,24 +42,20 @@ class ControlTurnView:
 
 def append_turn_control_fact(session: object, turn: Turn) -> None:
     """Append one ``turn.control.v1`` fact for TurnControlUnit fold."""
-    append = getattr(session, "append", None)
-    if not callable(append):
-        return
     decision = turn.decision
     tool_name = decision.tool_calls[0].tool_name if decision.tool_calls else None
     observation = turn.observation
     tool_arguments = decision.tool_calls[0].arguments if decision.tool_calls else None
-    append(
-        _TURN_CONTROL,
-        {
-            "action_type": _action_type_text(decision.action_type),
-            "tool_name": tool_name,
-            "observation_success": observation.success if observation is not None else None,
-            "tool_arguments": tool_arguments,
-            "observation_payload": observation.payload if observation is not None else None,
-            "observation_error": observation.error if observation is not None else None,
-        },
-        visibility="internal",
+    emit(
+        session,
+        TurnControlCommitted(
+            action_type=_action_type_text(decision.action_type),
+            tool_name=tool_name,
+            observation_success=observation.success if observation is not None else None,
+            tool_arguments=tool_arguments,
+            observation_payload=observation.payload if observation is not None else None,
+            observation_error=observation.error if observation is not None else None,
+        ),
     )
 
 

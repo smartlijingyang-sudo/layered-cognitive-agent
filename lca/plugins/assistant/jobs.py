@@ -379,7 +379,11 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         )
 
     def _emit(event: str, payload: Mapping[str, Any]) -> Any:
-        return ctx.emit(event, dict(payload))
+        from lca.plugins.events.publishers.spine_reflector_assistant.plugin import (
+            emit_assistant_domain_event,
+        )
+
+        return emit_assistant_domain_event(execution_point=event, payload=payload)
 
     impl = _AssistantJobsImpl(
         catalog=catalog,

@@ -10,22 +10,26 @@ from lca_kernel.events.registry import EventRegistry
 
 
 def test_spine_yaml_loads_spine_events_after_pr6() -> None:
-    """spine.yaml PR-6 后 + ADR-0185 PR-1 + loop cursor record_*: 101 + 7 = 108。
+    """spine.yaml PR-6 后 + ADR-0185 PR-1 + loop cursor record_* + assistant/composio domain.
 
     删-when：spine.yaml 退化为单一 cognition 测试时（本测试断言的事件数）。
 
     ADR-0185 PR-1 新增 1 个 model-visible 类别（``spine.llm.request.header.assistant``）,
     替换 ``spine.llm.request.header`` shell entry 为 typed payload,替换不增数。
     loop cursor record_* + i17 self-observation 新增 7 个 spine 类别。
+    assistant.yaml + composio.yaml 新增 23 个 spine 类别（ADR-0187 + composio debug）。
     """
     config_dir = Path(__file__).resolve().parents[3] / "lca_kernel" / "events" / "config"
     registry = EventRegistry.load(config_dir)
     spine_specs = [s for s in registry.specs if s.category.value.startswith("spine.")]
-    assert len(spine_specs) == 108, (
-        f"spine.yaml 应 108 个 spine 事件（101 + loop cursor/i17 7）；found {len(spine_specs)}"
+    assert len(spine_specs) == 131, (
+        f"spine 事件应 131 个（108 + assistant 12 + composio 11）；found {len(spine_specs)}"
     )
-    spec = spine_specs[0]
-    assert spec.category == Category("spine.cognition.brain.perceive.start")
+    spec = next(
+        s
+        for s in spine_specs
+        if s.category == Category("spine.cognition.brain.perceive.start")
+    )
     assert spec.payload_class is SpineEventPayload
 
 
@@ -56,23 +60,19 @@ def test_spine_subscribers_resolved() -> None:
     from lca_kernel.events.test_catalog import build_test_bus
 
     bus = build_test_bus()
-    cat = Category("spine.cognition.brain.perceive.start")
-    subs = bus.registry.subscribers[cat]
-    from lca.plugins.events.sinks.spine_chain_sink.sink import SpineChainSink
-    from lca.plugins.events.subscribers.console_projector.subscriber import (
-        ConsoleProjectorSubscriber,
-    )
-    from lca.plugins.events.subscribers.spine_step_tree_accumulator.subscriber import (
-        SpineStepTreeAccumulator,
-    )
+    from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink
 
-    assert SpineChainSink in subs
-    assert SpineStepTreeAccumulator in subs
-    assert ConsoleProjectorSubscriber in subs
+    for cat_name in (
+        "spine.cognition.brain.perceive.start",
+        "spine.assistant.skill.installed",
+        "spine.composio.connection.created",
+    ):
+        subs = bus.registry.subscribers[Category(cat_name)]
+        assert subs == {SpineFileSink}
 
 
 def test_spine_consumer_rules_cover_all_categories() -> None:
-    """顶层 consumer_rules：最少前缀规则覆盖全部 100 category。
+    """顶层 consumer_rules：最少前缀规则覆盖全部 spine + team category。
 
     PR-5：catalog 注入后才解析；用 :func:`build_test_bus`。
     """
@@ -82,16 +82,7 @@ def test_spine_consumer_rules_cover_all_categories() -> None:
     registry = bus.registry
     assert {r.prefix for r in registry.consumer_rules} == {
         "spine.",
-        "spine.cognition.brain.perceive.",
+        "spine.assistant.",
+        "spine.composio.",
         "team.",
     }
-    # perceive 子树命中两条规则：并集比兜底规则多 SpineStepTreeAccumulator
-    from lca.plugins.events.subscribers.spine_step_tree_accumulator.subscriber import (
-        SpineStepTreeAccumulator,
-    )
-
-    base = next(r.subscribers for r in registry.consumer_rules if r.prefix == "spine.")
-    perceive = registry.subscribers[Category("spine.cognition.brain.perceive.start")]
-    think = registry.subscribers[Category("spine.cognition.brain.think.start")]
-    assert think == base
-    assert perceive == base | {SpineStepTreeAccumulator}

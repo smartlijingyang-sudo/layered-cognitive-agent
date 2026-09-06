@@ -103,6 +103,16 @@ entries:
     $module: lca.plugins.events.publishers.spine_reflector_team.plugin
     config: {}
 
+  - id: events.spine.reflector.assistant
+    name: events_spine_reflector_assistant
+    $module: lca.plugins.events.publishers.spine_reflector_assistant.plugin
+    config: {}
+
+  - id: events.spine.reflector.composio
+    name: events_spine_reflector_composio
+    $module: lca.plugins.events.publishers.spine_reflector_composio.plugin
+    config: {}
+
   - id: events.spine.reflector.writable
     name: events_spine_reflector_writable
     $module: lca.plugins.events.publishers.spine_reflector_writable.plugin

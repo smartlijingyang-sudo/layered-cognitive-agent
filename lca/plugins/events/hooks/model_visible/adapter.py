@@ -56,6 +56,52 @@ def _snapshot_attrs(cursor: Any) -> tuple[str, int, int] | None:
     return run_id, step_index, incarnation
 
 
+def _model_identity(kwargs: dict[str, Any]) -> tuple[str, str]:
+    config = kwargs.get("config")
+    if isinstance(config, dict):
+        model = str(config.get("model") or config.get("model_id") or "unknown")
+        provider = str(config.get("provider") or config.get("provider_id") or "unknown")
+        return provider, model
+    return "unknown", "unknown"
+
+
+def _tool_calls_payload(response: LLMResponse) -> list[dict[str, Any]] | None:
+    if not response.tool_calls:
+        return None
+    out: list[dict[str, Any]] = []
+    for call in response.tool_calls:
+        out.append(
+            {
+                "id": getattr(call, "call_id", ""),
+                "name": getattr(call, "tool_name", ""),
+                "arguments": getattr(call, "arguments", {}),
+            }
+        )
+    return out
+
+
+def _emit_lifecycle_pre(step_index: int, kwargs: dict[str, Any]) -> None:
+    from lca.infrastructure.session.lifecycle_emit import request_model
+
+    _turn, step = 1, step_index + 1
+    provider, model = _model_identity(kwargs)
+    request_model(turn=_turn, step=step, provider=provider, model=model)
+
+
+def _emit_lifecycle_post(step_index: int, response: LLMResponse) -> None:
+    from lca.infrastructure.session.lifecycle_emit import complete_model
+
+    _turn, step = 1, step_index + 1
+    usage = response.usage if isinstance(response.usage, dict) else None
+    complete_model(
+        turn=_turn,
+        step=step,
+        usage=usage,
+        content=response.text or "",
+        tool_calls=_tool_calls_payload(response),
+    )
+
+
 class ModelVisibleHookAdapter(LLMAdapter):
     """LLM adapter decorator wiring :class:`ModelVisibleHook` to the boundary.
 
@@ -93,6 +139,7 @@ class ModelVisibleHookAdapter(LLMAdapter):
         if attrs is not None:
             run_id, step_index, incarnation = attrs
             try:
+                _emit_lifecycle_pre(step_index, kwargs)
                 self._hook.capture_pre_llm(
                     run_id=run_id,
                     step_index=step_index,
@@ -111,6 +158,7 @@ class ModelVisibleHookAdapter(LLMAdapter):
                     incarnation=incarnation,
                     response=response,
                 )
+                _emit_lifecycle_post(step_index, response)
             except Exception as exc:  # INTENTIONAL: L10 + D5 不挡业务
                 _log.debug("model_visible_post_hook_failed: %s", exc)
         return response
@@ -122,6 +170,7 @@ class ModelVisibleHookAdapter(LLMAdapter):
         if attrs is not None:
             run_id, step_index, incarnation = attrs
             try:
+                _emit_lifecycle_pre(step_index, kwargs)
                 self._hook.capture_pre_llm(
                     run_id=run_id,
                     step_index=step_index,
@@ -148,6 +197,7 @@ class ModelVisibleHookAdapter(LLMAdapter):
                             incarnation=incarnation,
                             response=event.response,
                         )
+                        _emit_lifecycle_post(step_index, event.response)
                     except Exception as exc:  # INTENTIONAL: L10 + D5 不挡业务
                         _log.debug("model_visible_post_hook_failed: %s", exc)
                 post_emitted = True
