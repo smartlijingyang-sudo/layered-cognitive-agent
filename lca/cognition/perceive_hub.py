@@ -1,21 +1,4 @@
-"""PerceiveHub — the sole ``ContextManifested`` emitter (PR3a / v3 §3.5).
-
-Combines ``Memory.perceive`` with a list of Sensors into a single
-``ContextManifest`` per step.  The fold order is fixed (per spec §5.5):
-
-    sensors (composition order) → Budgeter → Memory adapter → GateDecided
-    fold → ContextManifested emit
-
-Sensors failures are isolated: a single bad sensor does not poison the
-manifest.  The Hub does NOT mutate ``state.history`` or
-``state.working_memory`` directly — the Reasoner never reads
-working_memory for world facts.
-
-The Hub's outputs are written to two typed slots on AgentState:
-
-- ``state.current_manifest`` (typed) → readable by the Reasoner
-- ``state.gate_decided`` (typed bucket) → drained on each fold
-"""
+"""PerceiveHub — fold sensors + memory + gate policy facts into ContextManifest."""
 
 from __future__ import annotations
 
@@ -23,43 +6,24 @@ from collections.abc import Sequence
 
 import structlog
 
-from lca.cognition.brain.context_manifest import (
-    build_manifest_from_items,
-    digest_manifest,
-)
+from lca.cognition.brain.context_manifest import build_manifest_from_items, digest_manifest
 from lca.cognition.perceive_sink import ManifestSink, default_sink
+from lca.contracts.harness.fold.perceive import fold_gate_decisions_from_events
 from lca.contracts.models.core.gate_policy import GateDecided
 from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.perception import ContextItem, ContextManifest
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.diagnostic import DiagnosticCategory, DiagnosticStatus
-from lca.contracts.observability.loop_cursor import LoopCursor
 from lca.contracts.protocols import MemorySystem, PerceiveHub, Sensor
 from lca.contracts.protocols.think.cognition import SensorDisabledError
 from lca.infrastructure.observability import record_runtime
+from lca.infrastructure.session.bindings import resolve_session_reader
 
 _log = structlog.get_logger("lca.perceive_hub")
 
 
-def _current_cursor() -> LoopCursor | None:
-    """取当前 run 绑定的 LoopCursor(ADR-0169 PR-26 业务迁 cursor)。
-
-    由 ``CoordinatorAdapter.cursor`` ContextVar 暴露;未注入返回 ``None``。
-    """
-    from lca.infrastructure.observability.loop_cursor.coordinator_adapter import (
-        current_cursor,
-    )
-
-    return current_cursor()
-
-
 class SequentialPerceiveHub(PerceiveHub):
-    """Default Hub: composition order, no fan-out.
-
-    The Hub is the SOLE emitter of ``ContextManifested`` (PR2).  The
-    result is a pure ``ContextManifest`` so the Reasoner can render its
-    prompt strictly from this object.
-    """
+    """Default Hub: composition order, no fan-out."""
 
     def __init__(
         self,
@@ -73,19 +37,10 @@ class SequentialPerceiveHub(PerceiveHub):
         self._sink: ManifestSink = sink if sink is not None else default_sink()
 
     async def perceive(self, state: AgentState) -> ContextManifest:
-        # ADR-0169 PR-26:业务路径只允许 ``cursor.advance(phase)`` 派生 phase EP;
-        # 旧 facade phase-emit API 已在 ADR-0169 §D9 删除清单中。Cursor 由 wiring 层
-        # 通过 ``CoordinatorAdapter.cursor`` 注入;未注入时静默跳过(无 run 上下文)。
-        cursor: LoopCursor | None = _current_cursor()
-
         items = await self._fold(state)
         digest = digest_manifest(build_manifest_from_items(items))
         manifest = ContextManifest(items=tuple(items), digest=digest)
-        # Write the typed slot — the Reasoner reads this.
-        view = PerceiveState.from_agent_state(state)
-        view.current_manifest = manifest
-        view.commit(state)
-        # Emit the journal event through the typed sink.
+
         from lca.contracts.models.observability.journal import ContextManifested
 
         event = ContextManifested(
@@ -100,16 +55,11 @@ class SequentialPerceiveHub(PerceiveHub):
         from lca.infrastructure.session.cognitive_emit import emit_context_manifested_for_state
 
         emit_context_manifested_for_state(state, manifest)
-
-        if cursor is not None:
-            # 派生 phase.perceive.fold EP(ADR-0169 P2 / L3)。
-            cursor.advance("perceive")
         return manifest
 
     async def _fold(self, state: AgentState) -> list[ContextItem]:
         items: list[ContextItem] = []
 
-        # 1. Sensors (composition order; failures isolated).
         for sensor in self._sensors:
             try:
                 items.extend(await sensor.read(state))
@@ -131,7 +81,6 @@ class SequentialPerceiveHub(PerceiveHub):
                 )
                 continue
 
-        # 2. Memory adapter (per spec §5.5): consume its returned state value.
         if self._memory is not None:
             try:
                 memory_state = await self._memory.perceive(state)
@@ -147,16 +96,11 @@ class SequentialPerceiveHub(PerceiveHub):
                     status=DiagnosticStatus.FAILED,
                 )
 
-        # 3. GateDecided fold (PR4): PolicyFacts from the previous step's
-        # gate decisions.  The Reasoner never reads state.working_memory
-        # for these — they reach the prompt via the manifest.
-        items.extend(_gate_decided_items(state))
-
+        items.extend(_policy_fact_items(state))
         return items
 
 
 def _memory_items(state: AgentState) -> list[ContextItem]:
-    """Fold the memory protocol's returned retrieval context into one item."""
     if not state.retrieved_context:
         return []
     return [
@@ -168,13 +112,21 @@ def _memory_items(state: AgentState) -> list[ContextItem]:
     ]
 
 
-def _gate_decided_items(state: AgentState) -> list[ContextItem]:
-    """Fold the typed ``gate_decided`` bucket into PolicyFacts.
+def _policy_fact_items(state: AgentState) -> list[ContextItem]:
+    session = resolve_session_reader()
+    if session is not None:
+        prior_step = state.step - 1
+        if prior_step >= 0:
+            decisions = fold_gate_decisions_from_events(
+                session.snapshot_events(),
+                step=prior_step,
+            )
+            _drain_gate_decided_bucket(state)
+            return [_policy_fact_item(event) for event in decisions if event.policy_fact]
+    return _policy_fact_items_from_bucket(state)
 
-    The bucket is drained on read so the next step starts fresh.  This
-    makes the fold equivalent to a journal ``apply_delta`` for this
-    slice of state.
-    """
+
+def _policy_fact_items_from_bucket(state: AgentState) -> list[ContextItem]:
     view = PerceiveState.from_agent_state(state)
     if not view.gate_decided:
         return []
@@ -184,14 +136,27 @@ def _gate_decided_items(state: AgentState) -> list[ContextItem]:
             continue
         if event.policy_fact is None:
             continue
-        items.append(
-            ContextItem(
-                kind="policy_fact",
-                payload=event.policy_fact.message,
-                provenance=event.policy_fact.source,
-                extra={"kind": event.policy_fact.kind, "gate": event.gate},
-            )
-        )
+        items.append(_policy_fact_item(event))
     view.gate_decided = []
     view.commit(state)
     return items
+
+
+def _drain_gate_decided_bucket(state: AgentState) -> None:
+    view = PerceiveState.from_agent_state(state)
+    if not view.gate_decided:
+        return
+    view.gate_decided = []
+    view.commit(state)
+
+
+def _policy_fact_item(event: GateDecided) -> ContextItem:
+    fact = event.policy_fact
+    if fact is None:
+        raise ValueError("policy_fact_item requires GateDecided.policy_fact")
+    return ContextItem(
+        kind="policy_fact",
+        payload=fact.message,
+        provenance=fact.source,
+        extra={"kind": fact.kind, "gate": event.gate},
+    )

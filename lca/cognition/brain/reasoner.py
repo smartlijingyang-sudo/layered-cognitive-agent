@@ -189,9 +189,9 @@ class PromptReasoner:
         self._legacy_templates[name] = template
 
     async def generate_thoughts(self, state: AgentState) -> LLMResponse:
-        from lca.contracts.models.core.perceive_state import PerceiveState
+        from lca.contracts.models.core.perceive_projection import current_manifest_from_state
 
-        manifest = PerceiveState.from_agent_state(state).current_manifest
+        manifest = current_manifest_from_state(state)
         template_id, decision_path = self._select_template(state)
         annotate(**{ATTR_PROMPT_TEMPLATE: template_id})
 

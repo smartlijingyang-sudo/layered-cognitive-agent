@@ -17,7 +17,7 @@ from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.budget import TERMINAL_RESERVE_STEPS
 from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
-from lca.contracts.models.core.perceive_state import PerceiveState
+from lca.contracts.models.core.perceive_projection import current_manifest_from_state
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import DecisionGate
 
@@ -50,7 +50,7 @@ def _closure_from_manifest(state: AgentState) -> str:
     directly.  v3 §5.1 forbids live workspace reads in Gates — the
     Hub's ``WorkspaceArtifactsSensor`` is the only legitimate source.
     """
-    manifest = PerceiveState.from_agent_state(state).current_manifest
+    manifest = current_manifest_from_state(state)
     if manifest is None:
         return ""
     for item in manifest.items:

@@ -200,9 +200,9 @@ def render_context_lines(
 
 
 def clock_from_state(state: AgentState) -> ManifestClock | None:
-    from lca.contracts.models.core.perceive_state import PerceiveState
+    from lca.contracts.models.core.perceive_projection import current_manifest_from_state
 
-    manifest = PerceiveState.from_agent_state(state).current_manifest
+    manifest = current_manifest_from_state(state)
     if manifest is None:
         return None
     for item in manifest.items:
@@ -212,9 +212,9 @@ def clock_from_state(state: AgentState) -> ManifestClock | None:
 
 
 def subtasks_from_state(state: AgentState) -> ManifestSubtasks:
-    from lca.contracts.models.core.perceive_state import PerceiveState
+    from lca.contracts.models.core.perceive_projection import current_manifest_from_state
 
-    manifest = PerceiveState.from_agent_state(state).current_manifest
+    manifest = current_manifest_from_state(state)
     if manifest is None:
         return ManifestSubtasks(items=())
     for item in manifest.items:
@@ -224,9 +224,9 @@ def subtasks_from_state(state: AgentState) -> ManifestSubtasks:
 
 
 def artifacts_from_state(state: AgentState) -> ManifestArtifacts:
-    from lca.contracts.models.core.perceive_state import PerceiveState
+    from lca.contracts.models.core.perceive_projection import current_manifest_from_state
 
-    manifest = PerceiveState.from_agent_state(state).current_manifest
+    manifest = current_manifest_from_state(state)
     if manifest is None:
         return ManifestArtifacts(items=())
     for item in manifest.items:

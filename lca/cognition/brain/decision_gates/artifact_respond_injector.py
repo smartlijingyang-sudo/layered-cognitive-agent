@@ -24,7 +24,7 @@ from typing import Any, cast
 
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.models.core.decision import Decision
-from lca.contracts.models.core.perceive_state import PerceiveState
+from lca.contracts.models.core.perceive_projection import current_manifest_from_state
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.core.workspace import ArtifactLedgerSnapshot
 from lca.contracts.protocols import DecisionGate
@@ -41,7 +41,7 @@ def _artifacts_from_manifest(state: AgentState) -> list[dict[str, object]]:
     The item payload is the list of dicts produced by
     ``WorkspaceArtifactsSensor`` (path / url / mime / size keys).
     """
-    manifest = PerceiveState.from_agent_state(state).current_manifest
+    manifest = current_manifest_from_state(state)
     if manifest is None:
         return []
     for item in manifest.items:
