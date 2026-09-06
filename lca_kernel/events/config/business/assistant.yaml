@@ -8,84 +8,84 @@ consumer_rules:
 events:
   - category: spine.assistant.created
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields: {}
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.assistant.bootstrap.completed
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields: {}
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.assistant.profile.revised
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields: {}
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.assistant.paused
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields: {}
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.assistant.resumed
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields: {}
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.assistant.skill.installed
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields: {}
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.assistant.skill.activated
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields: {}
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.assistant.skill.evolved.proposed
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields: {}
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.assistant.skill.evolved.promoted
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields: {}
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.assistant.job.registered
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields: {}
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.assistant.job.fired
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields: {}
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.assistant.retired
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields: {}
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway

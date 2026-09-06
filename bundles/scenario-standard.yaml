@@ -27,31 +27,31 @@ entries:
   name: gates_chain_sequential
   $module: lca.plugins.cognitive.gate.chained.plugin
   config: {}
-- id: lca-sensor-clock
+- id: sensor.clock
   name: sensor_clock
-  $module: lca.plugins.sensors.clock
+  $module: lca.plugins.sensors.clock.clock
   config: {}
-- id: lca-sensor-workspace-artifacts
+- id: sensor.workspace-artifacts
   name: sensor_workspace_artifacts
-  $module: lca.plugins.sensors.workspace_artifacts
+  $module: lca.plugins.sensors.workspace.artifacts
   config: {}
-- id: lca-sensor-inbox-facts
+- id: sensor.inbox-facts
   name: sensor_inbox_facts
-  $module: lca.plugins.sensors.inbox_facts
+  $module: lca.plugins.sensors.inbox.facts
   config: {}
-- id: lca-sensor-skill-catalog
+- id: sensor.skill-catalog
   name: sensor_skill_catalog
-  $module: lca.plugins.sensors.skill_catalog
+  $module: lca.plugins.sensors.skill.catalog
   config: {}
-- id: lca-gate-repeat-tool-call
+- id: gate.repeat-tool-call
   name: lca_gate_repeat_tool_call
   $module: lca.plugins.cognitive.gate.repeat_tool_call.plugin
   config: {}
-- id: lca-gate-loop-breaker
+- id: gate.tool-loop-breaker
   name: lca_gate_loop_breaker
   $module: lca.plugins.cognitive.gate.tool_loop_breaker.plugin
   config: {}
-- id: lca-gate-progress-detector
+- id: gate.progress-loop-detector
   name: lca_gate_progress_detector
   $module: lca.plugins.cognitive.gate.progress_loop_detector.plugin
   config: {}

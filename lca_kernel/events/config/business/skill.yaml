@@ -8,28 +8,28 @@ consumer_rules:
 events:
   - category: spine.skill.package.installed
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields: {}
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.skill.package.install.failed
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields: {}
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.skill.package.activated
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields: {}
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
   - category: spine.skill.package.searched
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields: {}
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway

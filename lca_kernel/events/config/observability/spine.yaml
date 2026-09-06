@@ -15,7 +15,7 @@ events:
   # "emit_brain_\|emit_critic_\|emit_reasoner_\|emit_prompt_assembler_\|emit_synthesizer_\|emit_skill_router_\|emit_memory_" lca/ = 0）
   - category: spine.cognition.brain.perceive.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       state_id: str
     publishers:
@@ -23,7 +23,7 @@ events:
 
   - category: spine.cognition.brain.perceive.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       state_id: str
       outcome: str
@@ -32,7 +32,7 @@ events:
 
   - category: spine.cognition.brain.think.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       state_id: str
     publishers:
@@ -40,7 +40,7 @@ events:
 
   - category: spine.cognition.brain.think.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       state_id: str
       outcome: str
@@ -49,7 +49,7 @@ events:
 
   - category: spine.cognition.think.gate.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       state_id: str
     publishers:
@@ -57,7 +57,7 @@ events:
 
   - category: spine.cognition.think.gate.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       state_id: str
       outcome: str
@@ -66,7 +66,7 @@ events:
 
   - category: spine.cognition.critic.eval.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       state_id: str
     publishers:
@@ -74,7 +74,7 @@ events:
 
   - category: spine.cognition.critic.eval.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       state_id: str
       outcome: str
@@ -83,7 +83,7 @@ events:
 
   - category: spine.cognition.reasoner.reason.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       state_id: str
     publishers:
@@ -91,7 +91,7 @@ events:
 
   - category: spine.cognition.reasoner.reason.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       state_id: str
       outcome: str
@@ -100,7 +100,7 @@ events:
 
   - category: spine.cognition.prompt_assembler.assemble.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       state_id: str
       template_id: str
@@ -110,7 +110,7 @@ events:
 
   - category: spine.cognition.prompt_assembler.assemble.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       state_id: str
       template_id: str
@@ -121,7 +121,7 @@ events:
 
   - category: spine.cognition.synthesizer.merge
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       state_id: str
     publishers:
@@ -129,7 +129,7 @@ events:
 
   - category: spine.cognition.skill_router.route
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       state_id: str
       decision_path: str
@@ -138,7 +138,7 @@ events:
 
   - category: spine.cognition.memory.read
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       state_id: str
       outcome: str
@@ -147,7 +147,7 @@ events:
 
   - category: spine.cognition.memory.write
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       state_id: str
       outcome: str
@@ -157,7 +157,7 @@ events:
   # ── Body（PR-3）─────────────────────────────────────────────
   - category: spine.body.tool.execute.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       tool_name: str
       invocation_id: str
@@ -167,7 +167,7 @@ events:
 
   - category: spine.body.tool.execute.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       tool_name: str
       invocation_id: str
@@ -178,7 +178,7 @@ events:
 
   - category: spine.body.tool.retry
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       tool_name: str
       invocation_id: str
@@ -189,7 +189,7 @@ events:
 
   - category: spine.body.sandbox.enter
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       invocation_id: str
       tool_name: str
@@ -198,7 +198,7 @@ events:
 
   - category: spine.body.sandbox.exit
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       invocation_id: str
       tool_name: str
@@ -209,7 +209,7 @@ events:
   # ── Lifecycle normalization（PR-3，ADR-0166 S5）───────────────
   - category: spine.lifecycle.finally
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       boundary: str
       trace_id: str
@@ -219,7 +219,7 @@ events:
   # ── LLM（PR-3）──────────────────────────────────────────────
   - category: spine.llm.call.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       model: str
       stream: bool
@@ -229,7 +229,7 @@ events:
 
   - category: spine.llm.call.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       model: str
       stream: bool
@@ -239,7 +239,7 @@ events:
 
   - category: spine.llm.stream.token
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       model: str
       text_delta: str
@@ -250,7 +250,7 @@ events:
 
   - category: spine.llm.stream.stall
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       model: str
       idle_ms: int
@@ -260,7 +260,7 @@ events:
 
   - category: spine.llm.request.header
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_model_visible.SpineLlmRequestHeaderPayload
+    payload_class: lca_kernel.events.payloads.model_visible.SpineLlmRequestHeaderPayload
     fields:
       step_id: str
       incarnation: int
@@ -276,7 +276,7 @@ events:
 
   - category: spine.llm.request.header.assistant
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_model_visible.SpineLlmRequestHeaderAssistantPayload
+    payload_class: lca_kernel.events.payloads.model_visible.SpineLlmRequestHeaderAssistantPayload
     fields:
       step_id: str
       incarnation: int
@@ -291,7 +291,7 @@ events:
   # ── Exception（PR-3）─────────────────────────────────────────
   - category: spine.exception.caught
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       boundary: str
       exc_type: str
@@ -302,7 +302,7 @@ events:
 
   - category: spine.exception.finally
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       boundary: str
       trace_id: str
@@ -313,7 +313,7 @@ events:
   # ── Runtime observed（PR-3 与 exception 一起迁，PR-6 新加 runtime.observed 类别）──
   - category: spine.runtime.reducer.apply
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       method: str
       phase: str
@@ -323,7 +323,7 @@ events:
 
   - category: spine.runtime.checkpoint.create
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       plan_ref: str
       state_ref: str
@@ -334,7 +334,7 @@ events:
 
   - category: spine.runtime.resume.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       plan_ref: str
       state_ref: str
@@ -344,7 +344,7 @@ events:
 
   - category: spine.runtime.resume.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       plan_ref: str
       state_ref: str
@@ -355,7 +355,7 @@ events:
 
   - category: spine.runtime.event_publisher.publish
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       event_type: str
       trace_id: str
@@ -366,7 +366,7 @@ events:
   # ── Transport（PR-4）─────────────────────────────────────────────
   - category: spine.transport.route.enter
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       path: str
       method: str
@@ -376,7 +376,7 @@ events:
 
   - category: spine.transport.route.exit
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       path: str
       method: str
@@ -387,7 +387,7 @@ events:
 
   - category: spine.transport.sse.publish
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       path: str
       run_id: str
@@ -397,7 +397,7 @@ events:
   # ── Kernel lifecycle（PR-4）─────────────────────────────────────
   - category: spine.kernel.boot.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       profile: str
     publishers:
@@ -405,7 +405,7 @@ events:
 
   - category: spine.kernel.boot.completed
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       profile: str
       outcome: str
@@ -414,7 +414,7 @@ events:
 
   - category: spine.kernel.run.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
       trace_id: str
@@ -423,7 +423,7 @@ events:
 
   - category: spine.kernel.run.stop
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
       trace_id: str
@@ -433,7 +433,7 @@ events:
 
   - category: spine.kernel.run.cancelled
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
       trace_id: str
@@ -443,7 +443,7 @@ events:
   # ── Agent loop + agent + loop fork（PR-4）─────────────────────────
   - category: spine.agent_loop.iteration.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       trace_id: str
       role: str
@@ -453,7 +453,7 @@ events:
 
   - category: spine.agent_loop.iteration.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       trace_id: str
       role: str
@@ -464,7 +464,7 @@ events:
 
   - category: spine.loop.fork
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       child_role: str
       parent_step: int
@@ -473,7 +473,7 @@ events:
 
   - category: spine.agent.spawn
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       trace_id: str
       role: str
@@ -483,7 +483,7 @@ events:
 
   - category: spine.agent.iteration
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       trace_id: str
       role: str
@@ -494,7 +494,7 @@ events:
 
   - category: spine.agent.final
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       trace_id: str
       role: str
@@ -506,7 +506,7 @@ events:
   # ── Writable matrix（PR-5）───────────────────────────────────────
   - category: spine.writable.step.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       step: int
       run_id: str
@@ -516,7 +516,7 @@ events:
 
   - category: spine.writable.step.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       step: int
       run_id: str
@@ -527,7 +527,7 @@ events:
 
   - category: spine.writable.segment.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       segment: int
       step: int
@@ -538,7 +538,7 @@ events:
 
   - category: spine.writable.segment.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       segment: int
       step: int
@@ -550,7 +550,7 @@ events:
 
   - category: spine.writable.iteration.halt
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
       reason: str
@@ -560,7 +560,7 @@ events:
 
   - category: spine.writable.iteration.closing
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
     publishers:
@@ -569,7 +569,7 @@ events:
 
   - category: spine.writable.iteration.close
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
     publishers:
@@ -579,7 +579,7 @@ events:
   # ── Loop cursor record_*（ADR-0167 D2 / ADR-0181 PR-10）──────────
   - category: spine.step.thinking.record
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
     publishers:
@@ -587,7 +587,7 @@ events:
 
   - category: spine.step.tool_call.record
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
       tool_name: str
@@ -596,7 +596,7 @@ events:
 
   - category: spine.step.tool_result.record
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
       tool_name: str
@@ -605,7 +605,7 @@ events:
 
   - category: spine.step.reflect.record
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
     publishers:
@@ -613,7 +613,7 @@ events:
 
   - category: spine.step.span.record
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
     publishers:
@@ -621,7 +621,7 @@ events:
 
   - category: spine.i17.rejected
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       attempted_ep: str
     publishers:
@@ -629,7 +629,7 @@ events:
 
   - category: spine.producer.failure
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       producer_name: str
       key: str
@@ -639,7 +639,7 @@ events:
   # ── Phase（PR-5）────────────────────────────────────────────────
   - category: spine.perceive.phase.fold
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       step: int
       run_id: str
@@ -649,7 +649,7 @@ events:
 
   - category: spine.phase.perceive.fold
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       step: int
       run_id: str
@@ -659,7 +659,7 @@ events:
 
   - category: spine.phase.think.fold
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       step: int
       run_id: str
@@ -670,7 +670,7 @@ events:
 
   - category: spine.phase.remember.fold
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       step: int
       run_id: str
@@ -680,7 +680,7 @@ events:
 
   - category: spine.phase.stop.fold
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       step: int
       run_id: str
@@ -691,7 +691,7 @@ events:
 
   - category: spine.phase.reflect.fold
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       step: int
       run_id: str
@@ -702,7 +702,7 @@ events:
 
   - category: spine.phase.act.fold.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       step: int
       run_id: str
@@ -713,7 +713,7 @@ events:
 
   - category: spine.phase.act.fold.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       step: int
       run_id: str
@@ -725,7 +725,7 @@ events:
 
   - category: spine.phase.act.fold
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       step: int
       run_id: str
@@ -737,7 +737,7 @@ events:
 
   - category: spine.phase.tool.call.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       step: int
       run_id: str
@@ -749,7 +749,7 @@ events:
 
   - category: spine.phase.tool.call.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       step: int
       run_id: str
@@ -762,7 +762,7 @@ events:
 
   - category: spine.phase.tool.denied
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       step: int
       run_id: str
@@ -775,7 +775,7 @@ events:
   # ── Phase graph（PR-5）──────────────────────────────────────────
   - category: spine.phase_graph.node.start
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       node_id: str
       run_id: str
@@ -784,7 +784,7 @@ events:
 
   - category: spine.phase_graph.node.end
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       node_id: str
       run_id: str
@@ -794,7 +794,7 @@ events:
 
   - category: spine.phase_graph.edge.transit
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       from_node: str
       to_node: str
@@ -804,7 +804,7 @@ events:
 
   - category: spine.phase_graph.instrument.coverage
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       covered_nodes: int
       total_nodes: int
@@ -815,7 +815,7 @@ events:
   # ── Team（PR-6 新加）─────────────────────────────────────────
   - category: spine.team.casting.started
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       team_id: str
       requested_roles: str
@@ -825,7 +825,7 @@ events:
 
   - category: spine.team.casting.completed
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       team_id: str
       selected_roles: str
@@ -835,7 +835,7 @@ events:
 
   - category: spine.team.casting.failed
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       team_id: str
       reason: str
@@ -845,7 +845,7 @@ events:
 
   - category: spine.team.delegation.issued
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       team_id: str
       callee_role: str
@@ -856,7 +856,7 @@ events:
 
   - category: spine.team.delegation.completed
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       team_id: str
       callee_role: str
@@ -878,7 +878,7 @@ events:
 
   - category: spine.team.message.published
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       team_id: str
       sender: str
@@ -890,7 +890,7 @@ events:
   # ── Perception（PR-6）────────────────────────────────────────
   - category: spine.perception.observe
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
       source: str
@@ -899,7 +899,7 @@ events:
 
   - category: spine.perception.attention.focus
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
       target: str
@@ -908,7 +908,7 @@ events:
 
   - category: spine.perception.attention.blur
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
       target: str
@@ -917,7 +917,7 @@ events:
 
   - category: spine.perception.signal.detected
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
       signal_kind: str
@@ -927,7 +927,7 @@ events:
 
   - category: spine.perception.fused
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
       artifact_id: str
@@ -937,7 +937,7 @@ events:
 
   - category: spine.perception.artifact.built
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
       artifact_id: str
@@ -948,7 +948,7 @@ events:
   # ── Control（PR-6）──────────────────────────────────────────
   - category: spine.control.dispatch
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
       target: str
@@ -958,7 +958,7 @@ events:
 
   - category: spine.control.invoke
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
       target: str
@@ -967,7 +967,7 @@ events:
 
   - category: spine.control.signal
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
       name: str
@@ -976,7 +976,7 @@ events:
 
   - category: spine.control.approve.request
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
       request_id: str
@@ -986,7 +986,7 @@ events:
 
   - category: spine.control.approve.response
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
       request_id: str
@@ -997,7 +997,7 @@ events:
 
   - category: spine.control.deny
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
       request_id: str
@@ -1007,7 +1007,7 @@ events:
 
   - category: spine.control.revoke
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
       target: str
@@ -1016,7 +1016,7 @@ events:
 
   - category: spine.control.pause
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
       reason: str
@@ -1025,7 +1025,7 @@ events:
 
   - category: spine.control.resume
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
     publishers:
@@ -1033,7 +1033,7 @@ events:
 
   - category: spine.control.stop
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
       outcome: str
@@ -1042,7 +1042,7 @@ events:
 
   - category: spine.control.accept
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
       request_id: str
@@ -1052,7 +1052,7 @@ events:
   # ── Boot（PR-6）─────────────────────────────────────────────
   - category: spine.boot.profile.resolved
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       profile: str
       plugins: int
@@ -1061,7 +1061,7 @@ events:
 
   - category: spine.boot.plugin.fiber.spawned
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       plugin_id: str
       layer: str
@@ -1070,7 +1070,7 @@ events:
 
   - category: spine.boot.observability.assembled
     plane: lca.contracts.event.Plane.STRUCTURAL
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       sinks: int
       derivers: int
@@ -1080,7 +1080,7 @@ events:
   # ── Runtime observed（PR-6）──────────────────────────────────
   - category: spine.runtime.observed
     plane: lca.contracts.event.Plane.OBSERVABILITY
-    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       observed_at: str
       detail: str

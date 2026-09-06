@@ -344,7 +344,7 @@ class EnvelopeBus(Generic[P]):
         if cls._default_instance is None:
             from pathlib import Path
 
-            config_dir = Path(__file__).parent / "config"
+            config_dir = Path(__file__).resolve().parent.parent / "config"
             registry = EventRegistry.load(config_dir)
             cls._default_instance = cls(registry)
         return cls._default_instance

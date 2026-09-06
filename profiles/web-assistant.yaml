@@ -50,12 +50,12 @@ bundles:
 patch:
   # 兜底:LCA_ASSISTANTS_ROOT 未设置时落到用户数据盘默认路径;
   # Profile 装配期优先 env,然后 patch literal。
-  - id: lca.plugins.assistant.catalog
+  - id: lca.plugins.assistant.catalog.catalog
     config:
       assistants_root: "~/.lca/assistants"
   # 兜底:LCA_LOBEHUB_URL 未设置时指向本机 lobehub dev 端口(3010);
   # 空字符串 = 关闭前端注册。
-  - id: lca.plugins.assistant.webserver_bridge
+  - id: lca.plugins.assistant.webserver.bridge
     config:
       lobehub_url: "http://10.36.6.252:3010"
   - id: lca-composio-provider

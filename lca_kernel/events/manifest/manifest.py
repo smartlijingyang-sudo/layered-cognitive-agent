@@ -66,7 +66,7 @@ async def setup_bus(ctx: PluginContext, config: _BusConfig) -> None:
     """机制 boot：构造 EnvelopeBus 默认实例（EventBus compat shim）+ 设为全局默认 + provide。"""
     from pathlib import Path
 
-    config_dir = Path(__file__).parent / "config"
+    config_dir = Path(__file__).resolve().parent.parent / "config"
     registry = EventRegistry.load(config_dir)
     # EventBus compat subclass required for register_pipeline until G6 delete-when.
     bus: EventBus = EventBus(registry)
