@@ -1,8 +1,8 @@
 """spine_loop_cursor plugin（ADR-0181 PR-10 / ADR-0183 PR-7）。
 
-# COMPAT(delete-when: cursor 完全切到 EventBus, tracking: ADR-0169)
+# COMPAT(delete-when: cursor 完全切到 Session/FactGateway, tracking: ADR-0169)
 # cursor phase.fold / step.record_* / writable.iteration.* EP 都从此
-# EventBus 入口走；旧 self._spine.append 路径在 cursor worktree
+# EnvelopeBus/Session 入口走；旧 self._spine.append 路径在 cursor worktree
 # 改造 PR 中被替身（PR-10 仅引入入口骨架，不动 cursor 内部）。
 """
 

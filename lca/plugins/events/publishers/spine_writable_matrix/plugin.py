@@ -1,8 +1,8 @@
 """spine_writable_matrix plugin（ADR-0181 PR-10 / ADR-0183 PR-7）。
 
-# COMPAT(delete-when: cursor 完全切到 EventBus, tracking: ADR-0181)
+# COMPAT(delete-when: cursor 完全切到 Session/FactGateway, tracking: ADR-0181)
 # cursor 旧 self._spine.append(execution_point=..., payload=...) 路径仍
-# 是 EventSpine 接口。PR-10 提供 EventBus 入口骨架；cursor 改造
+# 是 EventSpine 接口。PR-10 提供 Session 入口骨架；cursor 改造
 # 在 spine-writable-matrix worktree 中分批做（cursor 内部 5+ 处 append
 # 需逐个适配；本 PR 不动 cursor 内部代码）。
 """

@@ -66,6 +66,7 @@ async def setup_bus(ctx: PluginContext, config: _BusConfig) -> None:
 
     config_dir = Path(__file__).parent / "config"
     registry = EventRegistry.load(config_dir)
+    # EventBus compat subclass required for register_pipeline until G6 delete-when.
     bus: EventBus = EventBus(registry)
     ctx.provide("event.bus", bus)
     # 进程级单例：业务方无 ctx 也能调 EventBus.default()（ADR-0183 §3.1）。
