@@ -141,6 +141,8 @@
 | [0196](0196-convergence-control-plane-and-prompt-surface.md) | Convergence 控制面与 PromptSurface — 交付谓词、调试事件、工具/Prompt SSOT | Implemented (P1–P3) |
 | [0197](0197-guard-stack-hermes-dsh-convergence.md) | Guard Stack — Hermes 分层收敛 + DSH guard 插件化融合 | Accepted (P1–P2) |
 | [0198](0198-observability-compile-graph.md) | Observability Compile Graph — yaml SSOT、ObservabilityCompiler、fold merge | Accepted (P0) |
+| [0199](0199-hermes-inspired-cognitive-plugin-convergence.md) | Hermes 启发的认知插件架构收敛 — RuntimeFacade、Plugin Doctor、分域 Registry、privilege 分离 | Proposed (P0 done; P1 approved) |
+| [0200](0200-hermes-product-capabilities-absorption.md) | Hermes 产品能力吸收 — review-fork、Curator、ContextEngine、MemoryProvider、no_agent Routine | Proposed |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
 

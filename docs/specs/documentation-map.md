@@ -19,6 +19,8 @@
 | 查询已结束实施、研究和审计的原始记录 | [history](../../history/README.md) | 非现行、仅供追溯的过程材料 |
 | 查询 Kernel / Transport 边界与启动链路 | [ADR-0115](../adr/0115-kernel-transport-boundary.md) · [ADR-0116](../adr/0116-boot-event-observability-convergence.md) · [ADR-0117](../adr/0117-process-lifecycle-env-whitelist.md) · [lca_kernel/README.md](../../lca_kernel/README.md) |
 | 查询全栈平台架构收敛（Loop + Obs + Transport + Plugins） | [ADR-0195](../adr/0195-platform-architecture-convergence.md) · [ADR-0194](../adr/0194-cognitive-loop-architecture-convergence.md) · [observability/platform-readme.md](../observability/platform-readme.md) | K1–K8 公共面、Boot journal 词表、process lifecycle + env 白名单 |
+| 查询 Hermes 启发的入口/插件治理收敛 | [ADR-0199](../adr/0199-hermes-inspired-cognitive-plugin-convergence.md) · [0199-implementation-plan.md](0199-implementation-plan.md) | RuntimeFacade、RunIntent、Plugin Doctor；**52 PR 实施表** |
+| 查询 Hermes 产品能力（学习/策展/调度） | [ADR-0200](../adr/0200-hermes-product-capabilities-absorption.md) | review-fork、Curator、ContextEngine、MemoryProvider、0093 no_agent |
 | 查询 Gateway routes plugin 化 | [ADR-0112](../adr/0112-gateway-routes-as-plugins.md) | Gateway router + 4 routes plugin |
 
 ## 维护边界
