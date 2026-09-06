@@ -24,7 +24,6 @@ import { toLcaChatMessageError } from './lcaError';
 import {
   cancelLcaRun,
   createLcaRun,
-  fetchRunSnapshot,
   lcaAuthHeaders,
   planeFieldsFromAgent,
   toWireMessages,
@@ -39,6 +38,7 @@ import {
   toolCallId,
   type Projected,
 } from './lcaJournal';
+import { presentAskUserCard } from './lcaRunHil';
 import { persistAssistantRow } from './lcaPersist';
 import { WIRE } from './lcaWire';
 
@@ -416,106 +416,27 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
     return currentTurnTools.find((rec) => rec.call.function.name === wireName);
   };
 
-  /**
-   * Present the pending askUserQuestion card when the run pauses for human
-   * input. Journal `ToolStarted` already opens the askUserQuestion tool row;
-   * reuse it and stamp `pluginIntervention` + `pluginState.lca` instead of
-   * inserting a second question card (which looked like an endless re-ask loop).
-   */
-  const presentAskUserCard = async () => {
-    const snapRes = await fetchRunSnapshot(runId);
-    const questions = Array.isArray(snapRes.approval_request?.questions)
-      ? snapRes.approval_request.questions
-      : [];
-    if (!questions.length) return;
-
-    await ensureTurn();
-    const pair = WIRE.askUserQuestion;
-    const existing = findAskUserTurnTool();
-    if (existing?.resultMsgId && pair) {
-      existing.call.function.arguments = mergeInvocationArgs(existing.call.function.arguments, {
-        lca_run_id: runId,
-        questions,
-      });
-      dispatchMessage(existing.resultMsgId, {
-        plugin: {
-          apiName: pair[1],
-          arguments: existing.call.function.arguments,
-          identifier: pair[0],
-          id: existing.call.id,
-          type: 'builtin',
-        },
-        pluginIntervention: { status: 'pending' },
-      });
-      await get().optimisticUpdatePluginState(
-        existing.resultMsgId,
-        { lca: { run_id: runId, status: 'waiting_input' } },
-        { operationId: options.operationId },
-      );
-      publishTurnTools(false);
-      await persistRow();
-      return;
-    }
-
-    const callId = `ask_${runId}`;
-    const call: MessageToolCall = {
-      function: {
-        arguments: JSON.stringify({ lca_run_id: runId, questions }),
-        name: 'lobe-user-interaction____askUserQuestion',
+  const presentAskUserCardForRun = async () =>
+    presentAskUserCard({
+      agentId: ctx.agentId,
+      assistantId,
+      currentTurnTools,
+      dispatchMessage,
+      ensureTurn,
+      findAskUserTurnTool,
+      get,
+      mergeInvocationArgs,
+      operationId: options.operationId,
+      persistRow,
+      publishTurnTools,
+      runId,
+      setLastResultMsgId: (id) => {
+        lastResultMsgId = id;
       },
-      id: callId,
-      type: 'function',
-    };
-    const rec: TurnTool = { call };
-    tools.set(callId, rec);
-    currentTurnTools.push(rec);
-    const created = await get().optimisticCreateMessage(
-      {
-        content: '',
-        parentId: assistantId,
-        plugin: {
-          apiName: 'askUserQuestion',
-          // lca_run_id rides along in the tool arguments so the Intervention's
-          // prepareCustomInteractionSubmit can hand it to handleLcaAskUserSubmit
-          // via context.requestArgs — the handler is a module-level function and
-          // cannot read the context-scoped conversation store.
-          arguments: JSON.stringify({ lca_run_id: runId, questions }),
-          identifier: 'lobe-user-interaction',
-          id: callId,
-          type: 'builtin',
-        },
-        // Mark the tool message as a pending intervention so LobeHub's native
-        // InterventionBar renders the interactive askUserQuestion card (the
-        // same surface native runs use). Submit goes through
-        // customInteractionHandlers.handleLcaAskUserSubmit which resumes
-        // the gateway run via POST /runs/<id>/answer.
-        pluginIntervention: { status: 'pending' },
-        role: 'tool',
-        tool_call_id: callId,
-        topicId: ctx.topicId,
-        ...(ctx.agentId ? { agentId: ctx.agentId } : {}),
-        ...(ctx.threadId ? { threadId: ctx.threadId } : {}),
-      },
-      { operationId: options.operationId },
-    );
-    rec.resultMsgId = created?.id;
-    lastResultMsgId = created?.id || lastResultMsgId;
-    if (created?.id) {
-      // Persist pluginState.lca to the DB so that handleLcaAskUserSubmit
-      // (customInteractionHandlers) and skipToolInteraction (conversationControl)
-      // can read run_id via getDbMessageById and POST /runs/<id>/answer to
-      // resume this run. A plain internal_dispatchMessage only updates the
-      // in-memory store; the submit handler reads from DB and would see an
-      // empty run_id, causing the answer to be lost and a fresh run created.
-      await get().optimisticUpdatePluginState(
-        created.id,
-        { lca: { run_id: runId, status: 'waiting_input' } },
-        { operationId: options.operationId },
-      );
-    }
-    publishTurnTools(false);
-    await persistRow();
-  };
+      threadId: ctx.threadId,
+      tools,
+      topicId: ctx.topicId,
+    });
 
   const applyProjected = async (projected: Projected): Promise<void> => {
     switch (projected.kind) {
@@ -739,7 +660,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
       }
       case 'run-finished': {
         if (projected.status === 'input-required' || projected.status === 'awaiting_human') {
-          await presentAskUserCard();
+          await presentAskUserCardForRun();
           return;
         }
         if (projected.status && TERMINAL.has(projected.status)) {

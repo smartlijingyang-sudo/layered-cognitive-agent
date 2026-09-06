@@ -149,6 +149,21 @@ class TelemetryLLMAdapter(LLMAdapter):
         if inspect.isawaitable(result):
             await result
 
+    def _schedule_thinking_session_event(self, payload: object) -> None:
+        """Fire-and-forget Session thinking delta — keep LLM stream unblocked."""
+        if self._session_append is None:
+            return
+
+        async def _run() -> None:
+            try:
+                result = self._session_append(payload)
+                if inspect.isawaitable(result):
+                    await result
+            except Exception:
+                _log.warning("thinking_session_append_failed", exc_info=True)
+
+        asyncio.create_task(_run())
+
     async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
         model = _model_label(self._inner)
         started = time.perf_counter()
@@ -321,7 +336,7 @@ class TelemetryLLMAdapter(LLMAdapter):
                                 seq=reasoning_seq,
                             )
                         )
-                        await self._append_thinking_session_event(
+                        self._schedule_thinking_session_event(
                             ThinkingDelta(
                                 turn=turn,
                                 step=step,

@@ -27,6 +27,7 @@ meta = PatchMeta(
         f"{_UI_TRANSPORTS}/lcaJournal.ts",
         f"{_UI_TRANSPORTS}/lcaRunObserve.ts",
         f"{_UI_TRANSPORTS}/lcaRunCommand.ts",
+        f"{_UI_TRANSPORTS}/lcaRunHil.ts",
         f"{_UI_TRANSPORTS}/lcaError.ts",
         f"{_UI_TRANSPORTS}/lcaPersist.ts",
         f"{_UI_TRANSPORTS}/lcaArtifacts.ts",
