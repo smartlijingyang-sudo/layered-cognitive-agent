@@ -56,6 +56,8 @@ class SkillsProjection:
                     "seq": event.seq,
                 }
             )
+        elif event.type == "skill.searched.v1":
+            state.setdefault("searched", []).append(event.data)
         return state
 
     def view(self, state: dict[str, Any]) -> dict[str, Any]:

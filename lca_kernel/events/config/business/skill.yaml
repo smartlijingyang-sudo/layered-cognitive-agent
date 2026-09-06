@@ -1,0 +1,35 @@
+# Operational skill meta-events — Session spine SSOT (skill.package.* debug).
+
+consumer_rules:
+  - prefix: "spine.skill.package."
+    subscribers:
+      - lca.plugins.events.sinks.spine_file_sink.sink.SpineFileSink
+
+events:
+  - category: spine.skill.package.installed
+    plane: lca.contracts.event.Plane.STRUCTURAL
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields: {}
+    publishers:
+      - events.spine.reflector.skill
+
+  - category: spine.skill.package.install.failed
+    plane: lca.contracts.event.Plane.STRUCTURAL
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields: {}
+    publishers:
+      - events.spine.reflector.skill
+
+  - category: spine.skill.package.activated
+    plane: lca.contracts.event.Plane.STRUCTURAL
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields: {}
+    publishers:
+      - events.spine.reflector.skill
+
+  - category: spine.skill.package.searched
+    plane: lca.contracts.event.Plane.STRUCTURAL
+    payload_class: lca_kernel.events.payloads_spine.SpineEventPayload
+    fields: {}
+    publishers:
+      - events.spine.reflector.skill

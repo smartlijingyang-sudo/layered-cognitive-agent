@@ -132,6 +132,48 @@ class SkillRouted:
     source: str = "skill_router"
 
 
+@session_event("skill.searched.v1", visibility="audit")
+@dataclass(frozen=True)
+class SkillSearched:
+    """Operational skill search audit (``search_skill`` tool)."""
+
+    query: str
+    result_count: int
+    source: str = "tool:search_skill"
+    page: int = 1
+    page_size: int = 20
+
+
+@session_event("tool.schema.published.v1", visibility="audit")
+@dataclass(frozen=True)
+class ToolSchemaPublished:
+    """Run-resolved tool manifest digest (factory materialize boundary)."""
+
+    tool_names: tuple[str, ...]
+    digest: str
+
+
+@session_event("prompt.section.published.v1", visibility="audit")
+@dataclass(frozen=True)
+class PromptSectionPublished:
+    """One prompt section rendered into the model request (digest-only audit)."""
+
+    section_key: str
+    digest: str
+    template_id: str = ""
+    text_chars: int = 0
+
+
+@session_event("assistant.run.bound.v1", visibility="audit")
+@dataclass(frozen=True)
+class AssistantRunBound:
+    """Run bound to an assistant Home (ADR-0187 §3 D7)."""
+
+    assistant_id: str
+    run_id: str
+    profile: str = ""
+
+
 @session_event("model.requested.v1", visibility="audit")
 @dataclass(frozen=True)
 class ModelRequested:

@@ -82,6 +82,14 @@ class SkillSearchTool(Tool):
         )
         body = self._format_body(result)
         items = to_market_skill_items(result.items)
+        from lca.infrastructure.observability.meta_event_emit import emit_skill_searched
+
+        emit_skill_searched(
+            query=query,
+            result_count=result.total,
+            page=result.page,
+            page_size=result.page_size,
+        )
         latency_ms = int((time.monotonic() - start) * 1000)
         return Observation(
             observation_id=new_id("obs"),

@@ -113,6 +113,11 @@ entries:
     $module: lca.plugins.events.publishers.spine_reflector_composio.plugin
     config: {}
 
+  - id: events.spine.reflector.skill
+    name: events_spine_reflector_skill
+    $module: lca.plugins.events.publishers.spine_reflector_skill.plugin
+    config: {}
+
   - id: events.spine.reflector.writable
     name: events_spine_reflector_writable
     $module: lca.plugins.events.publishers.spine_reflector_writable.plugin

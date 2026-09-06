@@ -214,8 +214,8 @@ def test_tool_journal_emit_routes_start_through_cursor_record_tool_call() -> Non
         "(directly or via CursorRecord wrapper; ADR-0169 SSOT)"
     )
     assert "coord.emit" not in body, "emit_tool_started no longer calls coord.emit (ADR-0169 §D9)"
-    assert "phase.tool.call.start" not in body, (
-        "emit_tool_started no longer emits phase.tool.call.start EP"
+    assert "_emit_phase_tool_call_start" in body, (
+        "emit_tool_started mirrors phase.tool.call.start for journal trace / debug-run"
     )
 
 
@@ -233,7 +233,7 @@ def test_tool_journal_emit_routes_end_through_cursor_record_tool_result() -> Non
         "(directly or via CursorRecord wrapper; ADR-0169 SSOT)"
     )
     assert "coord.emit" not in body
-    assert "phase.tool.call.end" not in body
+    assert "_emit_phase_tool_call_end" in body
 
 
 def test_tool_journal_emit_routes_denied_through_cursor_record_tool_result() -> None:
@@ -251,7 +251,7 @@ def test_tool_journal_emit_routes_denied_through_cursor_record_tool_result() -> 
     )
     assert '"denied"' in body
     assert "coord.emit" not in body
-    assert "phase.tool.denied" not in body
+    assert "_emit_phase_tool_denied" in body
 
 
 def test_tool_journal_emit_runtime_records_tool_call_ep_when_cursor_bound() -> None:

@@ -63,6 +63,7 @@ Session 事件流是唯一事实:`Session.append` 是唯一写入口,持久化�
 | 步骤边界 | 一步 = 一次模型请求及其触发的执行 | `step.started.v1` / `step.ended.v1` |
 | 模型表面 | 参与模型消息历史派生(surface) | `message.accepted.v1`、`assistant.responded.v1`、`context.injected.v1` |
 | 执行与重建 | 失败尝试、审批、恢复所需的上下文状态 | `model.requested/completed/failed.v1`、`thinking.delta.v1`、`approval.persisted/resolved.v1`、`session.checkpoint.v1`、`inbox.spliced.v1` |
+| Skill / Tool meta | 包操作与注册清单审计(非 invocation 细节) | `skill.*.v1`、`tool.schema.published.v1`；闭集见 [meta_event_taxonomy](../../lca/contracts/observability/meta_event_taxonomy.py) |
 
 ### 3.2 三档可见性:模型表面 / log-only / 瞬时帧
 

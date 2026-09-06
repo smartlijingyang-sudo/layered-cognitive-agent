@@ -59,6 +59,7 @@ class DebugRunReport:
     spine_event_count: int
     spine_missing_seqs: tuple[int, ...]
     spine_execution_points: tuple[str, ...]
+    spine_meta_families: tuple[tuple[str, int], ...]
     kernel_log_path: str
     kernel_log_tail: str
     phase_cursor: str | None
@@ -83,6 +84,7 @@ class DebugRunReport:
             "spine_event_count": self.spine_event_count,
             "spine_missing_seqs": list(self.spine_missing_seqs),
             "spine_execution_points": list(self.spine_execution_points),
+            "spine_meta_families": list(self.spine_meta_families),
             "kernel_log_path": self.kernel_log_path,
             "kernel_log_tail": self.kernel_log_tail,
             "phase_cursor": self.phase_cursor,
@@ -123,6 +125,9 @@ class DebugRunReport:
             lines.append(
                 "      spine.points        " + " → ".join(self.spine_execution_points[-8:])
             )
+        if self.spine_meta_families:
+            summary = ", ".join(f"{name}={count}" for name, count in self.spine_meta_families)
+            lines.append(f"      spine.meta          {summary}")
         lines.append(f"[3/8] kernel.log          {self.kernel_log_path}")
         for line in self.kernel_log_tail.splitlines()[-5:]:
             lines.append(f"      {line}")
@@ -181,6 +186,7 @@ class DebugRunToolAdapter:
             for e in spine_events
             if isinstance(e.get("execution_point"), str)
         )
+        spine_meta = _spine_meta_family_counts(spine_events)
 
         failure_node_id, error_message, error_type = _extract_failure(
             manifest_summary, spine_events
@@ -214,6 +220,7 @@ class DebugRunToolAdapter:
             spine_event_count=len(spine_events),
             spine_missing_seqs=missing_seqs,
             spine_execution_points=spine_points,
+            spine_meta_families=spine_meta,
             kernel_log_path=str(kernel_log_path),
             kernel_log_tail=tail,
             phase_cursor=phase_cursor,
@@ -226,6 +233,29 @@ class DebugRunToolAdapter:
             plan_ref=plan_ref,
             replay_commands=tuple(replay_commands),
         )
+
+
+def _spine_event_key(event: dict[str, Any]) -> str:
+    for field in ("execution_point", "category", "event_type", "type"):
+        raw = event.get(field)
+        if isinstance(raw, str) and raw:
+            return raw
+    return ""
+
+
+def _spine_meta_family_counts(events: list[dict[str, Any]]) -> tuple[tuple[str, int], ...]:
+    from lca.contracts.observability.meta_event_taxonomy import classify_spine_event_key
+
+    counts: dict[str, int] = {}
+    for event in events:
+        key = _spine_event_key(event)
+        if not key:
+            continue
+        family = classify_spine_event_key(key)
+        if family is None:
+            continue
+        counts[family] = counts.get(family, 0) + 1
+    return tuple(sorted(counts.items()))
 
 
 def _safe_json(path: Path) -> dict[str, Any]:

@@ -213,6 +213,22 @@ _CORDIS_EVENT_TABLE_ENTRIES: Final[tuple[CordisEventTableEntry, ...]] = (
         execution_point="composio.tool.execution.failed",
         cordis_name="agent.composio.tool.execution.failed",
     ),
+    CordisEventTableEntry(
+        execution_point="skill.package.installed",
+        cordis_name="agent.skill.package.installed",
+    ),
+    CordisEventTableEntry(
+        execution_point="skill.package.install.failed",
+        cordis_name="agent.skill.package.install.failed",
+    ),
+    CordisEventTableEntry(
+        execution_point="skill.package.activated",
+        cordis_name="agent.skill.package.activated",
+    ),
+    CordisEventTableEntry(
+        execution_point="skill.package.searched",
+        cordis_name="agent.skill.package.searched",
+    ),
 )
 
 _CORDIS_EVENT_TABLE_BY_EP: Final[dict[str, CordisEventTableEntry]] = {

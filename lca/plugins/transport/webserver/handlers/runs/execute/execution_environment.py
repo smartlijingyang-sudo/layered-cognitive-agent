@@ -165,6 +165,14 @@ class RunExecutionEnvironment:
             if assistant_id:
                 log_context["assistant_id"] = assistant_id
             structlog.contextvars.bind_contextvars(**log_context)
+            if assistant_id:
+                from lca.infrastructure.observability.meta_event_emit import emit_assistant_run_bound
+
+                emit_assistant_run_bound(
+                    assistant_id=assistant_id,
+                    run_id=str(session.run_id),
+                    profile=str(getattr(session, "profile", "") or ""),
+                )
             try:
                 with (
                     run_workspace_scope(session.run_id) as workspace,

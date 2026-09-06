@@ -84,6 +84,9 @@ class SkillImportTool(Tool):
                 package = await self._importer.import_from_url(url, kind=kind)
         except (SkillImportError, ValueError) as exc:
             latency_ms = int((time.monotonic() - start) * 1000)
+            from lca.infrastructure.observability.meta_event_emit import emit_skill_install_failed
+
+            emit_skill_install_failed(reason=str(exc), source=ident or url)
             return Observation(
                 observation_id=new_id("obs"),
                 success=False,
@@ -93,6 +96,13 @@ class SkillImportTool(Tool):
                 extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
             )
         latency_ms = int((time.monotonic() - start) * 1000)
+        from lca.infrastructure.observability.meta_event_emit import emit_skill_loaded
+
+        emit_skill_loaded(
+            skill_id=package.skill_id,
+            content_hash=package.content_hash,
+            invocation="tool:import_skill",
+        )
         text = (
             f"已安装 skill「{package.name}」({package.skill_id})，"
             f"资源 {len(package.resource_paths)} 个。"

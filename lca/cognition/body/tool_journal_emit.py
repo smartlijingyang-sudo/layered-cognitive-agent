@@ -42,6 +42,105 @@ from lca.infrastructure.tools.contract.project import project_tool_state
 _log = structlog.get_logger(__name__)
 
 
+def _phase_tool_context() -> tuple[int, str]:
+    from lca.infrastructure.observability.facade.run_ambit import current_run_ambit
+    from lca.infrastructure.observability.facade.run_context import get_current_run_scope
+
+    scope = get_current_run_scope()
+    step = scope.step if scope is not None else 0
+    run_id = str(scope.run_id) if scope is not None and scope.run_id else ""
+    if not run_id:
+        ambit = current_run_ambit()
+        if ambit is not None and ambit.run_id:
+            run_id = str(ambit.run_id)
+    return step, run_id
+
+
+def _emit_phase_tool_call_start(
+    *,
+    tool_name: str,
+    invocation_id: str,
+    arguments_summary: str = "",
+) -> None:
+    try:
+        from lca.infrastructure.observability.domain_event_publish import publish_structural_event
+        from lca.plugins.events.publishers.spine_reflector_phase.plugin import ReflectorClass
+
+        step, run_id = _phase_tool_context()
+        payload: dict[str, Any] = {
+            "step": step,
+            "run_id": run_id,
+            "tool_name": tool_name,
+            "invocation_id": invocation_id,
+        }
+        if arguments_summary:
+            payload["arguments_summary"] = arguments_summary
+        publish_structural_event(
+            execution_point="phase.tool.call.start",
+            channel="control",
+            payload=payload,
+            producer=ReflectorClass,
+        )
+    except Exception:
+        _log.debug("phase.tool.call.start emit failed", exc_info=True)
+
+
+def _emit_phase_tool_call_end(
+    *,
+    tool_name: str,
+    invocation_id: str,
+    outcome: str,
+    ok: bool | None = None,
+    latency_ms: int | None = None,
+) -> None:
+    try:
+        from lca.infrastructure.observability.domain_event_publish import publish_structural_event
+        from lca.plugins.events.publishers.spine_reflector_phase.plugin import ReflectorClass
+
+        step, run_id = _phase_tool_context()
+        payload: dict[str, Any] = {
+            "step": step,
+            "run_id": run_id,
+            "tool_name": tool_name,
+            "invocation_id": invocation_id,
+            "outcome": outcome,
+        }
+        if ok is not None:
+            payload["ok"] = ok
+        if latency_ms is not None:
+            payload["latency_ms"] = latency_ms
+        publish_structural_event(
+            execution_point="phase.tool.call.end",
+            channel="control",
+            payload=payload,
+            producer=ReflectorClass,
+        )
+    except Exception:
+        _log.debug("phase.tool.call.end emit failed", exc_info=True)
+
+
+def _emit_phase_tool_denied(*, tool_name: str, reason: str) -> None:
+    try:
+        from lca.infrastructure.observability.domain_event_publish import publish_structural_event
+        from lca.plugins.events.publishers.spine_reflector_phase.plugin import ReflectorClass
+
+        step, run_id = _phase_tool_context()
+        publish_structural_event(
+            execution_point="phase.tool.denied",
+            channel="control",
+            payload={
+                "step": step,
+                "run_id": run_id,
+                "tool_name": tool_name,
+                "reason": reason,
+            },
+            producer=ReflectorClass,
+        )
+    except Exception:
+        _log.debug("phase.tool.denied emit failed", exc_info=True)
+
+
+
 def prepare_state_evidence(
     state: Mapping[str, Any],
     *,
@@ -152,6 +251,11 @@ def emit_tool_started(
         arguments=inline_args,
         arguments_summary=_summarize_args(args_dict),
     )
+    _emit_phase_tool_call_start(
+        tool_name=tool.name,
+        invocation_id=invocation_id,
+        arguments_summary=_summarize_args(args_dict),
+    )
     return arguments_ref
 
 
@@ -175,6 +279,7 @@ def emit_tool_denied(tool: Tool, reason: str) -> None:
         attributes={"tool_name": tool.name, "reason": reason},
     )
     record(ToolDenied(tool_name=tool.name, reason=reason))
+    _emit_phase_tool_denied(tool_name=tool.name, reason=reason)
     # ADR-0169 PR-1/S1: route through LoopCursor.record_tool_result with
     # outcome="denied". Canonical ToolDenied JournalEvent above remains
     # (ADR-0063 SSOT).
@@ -289,6 +394,13 @@ def emit_tool_invoked(
         files_created=tuple(str(f.get("name") or "") for f in tool_files(obs)),
         error=obs.error or None,
         delta_summary=delta,
+    )
+    _emit_phase_tool_call_end(
+        tool_name=tool.name,
+        invocation_id=resolved_id,
+        outcome="ok" if obs.success else "failure",
+        ok=obs.success,
+        latency_ms=latency_ms,
     )
 
 

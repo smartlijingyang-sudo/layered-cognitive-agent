@@ -275,6 +275,24 @@ class PromptReasoner:
             outcome="success",
             variant=trace.variant if trace is not None else variant_preview,
         )
+        if section_outputs:
+            from lca.infrastructure.observability.meta_event_emit import (
+                emit_prompt_sections_from_trace,
+            )
+
+            emit_prompt_sections_from_trace(
+                template_id=template_id,
+                sections=section_outputs,
+            )
+        if activated_skill_ids:
+            from lca.infrastructure.observability.meta_event_emit import emit_context_injected
+
+            for skill_id in activated_skill_ids:
+                emit_context_injected(
+                    source=f"skill:{skill_id}",
+                    content_ref=f"skill:{skill_id}@prompt",
+                    model_visible=True,
+                )
 
         emit_reasoner_reason_start(state_id=state_id)
         try:

@@ -111,4 +111,7 @@ class ToolsService(ToolRegistry):
                 out.extend(bound)
             else:
                 out.append(bound)
+        from lca.infrastructure.observability.meta_event_emit import emit_tool_schema_published
+
+        emit_tool_schema_published(tuple(tool.name for tool in out))
         return out

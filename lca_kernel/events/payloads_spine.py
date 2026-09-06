@@ -174,6 +174,11 @@ SPINE_EXECUTION_POINTS: tuple[str, ...] = (
     "composio.tool.execution.started",
     "composio.tool.executed",
     "composio.tool.execution.failed",
+    # Operational skill package meta
+    "skill.package.installed",
+    "skill.package.install.failed",
+    "skill.package.activated",
+    "skill.package.searched",
 )
 
 
@@ -327,6 +332,10 @@ _SPINE_EP_TO_CATEGORY: dict[str, str] = {
     "composio.tool.execution.started": "spine.composio.tool.execution.started",
     "composio.tool.executed": "spine.composio.tool.executed",
     "composio.tool.execution.failed": "spine.composio.tool.execution.failed",
+    "skill.package.installed": "spine.skill.package.installed",
+    "skill.package.install.failed": "spine.skill.package.install.failed",
+    "skill.package.activated": "spine.skill.package.activated",
+    "skill.package.searched": "spine.skill.package.searched",
 }
 
 

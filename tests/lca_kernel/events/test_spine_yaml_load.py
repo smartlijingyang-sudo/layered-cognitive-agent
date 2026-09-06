@@ -22,8 +22,8 @@ def test_spine_yaml_loads_spine_events_after_pr6() -> None:
     config_dir = Path(__file__).resolve().parents[3] / "lca_kernel" / "events" / "config"
     registry = EventRegistry.load(config_dir)
     spine_specs = [s for s in registry.specs if s.category.value.startswith("spine.")]
-    assert len(spine_specs) == 131, (
-        f"spine 事件应 131 个（108 + assistant 12 + composio 11）；found {len(spine_specs)}"
+    assert len(spine_specs) == 135, (
+        f"spine 事件应 135 个（131 + skill.package 4）；found {len(spine_specs)}"
     )
     spec = next(
         s
@@ -84,5 +84,6 @@ def test_spine_consumer_rules_cover_all_categories() -> None:
         "spine.",
         "spine.assistant.",
         "spine.composio.",
+        "spine.skill.package.",
         "team.",
     }

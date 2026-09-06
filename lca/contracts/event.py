@@ -177,6 +177,11 @@ class Category(str, Enum):
     SPINE_COMPOSIO_TOOL_EXECUTION_STARTED = "spine.composio.tool.execution.started"
     SPINE_COMPOSIO_TOOL_EXECUTED = "spine.composio.tool.executed"
     SPINE_COMPOSIO_TOOL_EXECUTION_FAILED = "spine.composio.tool.execution.failed"
+    # observability/spine — operational skill package meta (4 EP)
+    SPINE_SKILL_PACKAGE_INSTALLED = "spine.skill.package.installed"
+    SPINE_SKILL_PACKAGE_INSTALL_FAILED = "spine.skill.package.install.failed"
+    SPINE_SKILL_PACKAGE_ACTIVATED = "spine.skill.package.activated"
+    SPINE_SKILL_PACKAGE_SEARCHED = "spine.skill.package.searched"
 
 
 class Plane(str, Enum):
@@ -323,6 +328,10 @@ CATEGORY_DEFAULT_PLANE: dict[Category, Plane] = {
     Category.SPINE_COMPOSIO_TOOL_EXECUTION_STARTED: Plane.STRUCTURAL,
     Category.SPINE_COMPOSIO_TOOL_EXECUTED: Plane.STRUCTURAL,
     Category.SPINE_COMPOSIO_TOOL_EXECUTION_FAILED: Plane.STRUCTURAL,
+    Category.SPINE_SKILL_PACKAGE_INSTALLED: Plane.STRUCTURAL,
+    Category.SPINE_SKILL_PACKAGE_INSTALL_FAILED: Plane.STRUCTURAL,
+    Category.SPINE_SKILL_PACKAGE_ACTIVATED: Plane.STRUCTURAL,
+    Category.SPINE_SKILL_PACKAGE_SEARCHED: Plane.STRUCTURAL,
 }
 
 
