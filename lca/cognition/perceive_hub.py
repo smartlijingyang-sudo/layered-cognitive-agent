@@ -9,6 +9,10 @@ import structlog
 from lca.cognition.brain.context_manifest import build_manifest_from_items, digest_manifest
 from lca.cognition.perceive_sink import ManifestSink, default_sink
 from lca.contracts.harness.fold.perceive import fold_gate_decisions_from_events
+from lca.contracts.harness.state.context_budget import (
+    DEFAULT_CONTEXT_BUDGET_CHARS,
+    ContextBudgeter,
+)
 from lca.contracts.models.core.gate_policy import GateDecided
 from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.perception import ContextItem, ContextManifest
@@ -31,10 +35,12 @@ class SequentialPerceiveHub(PerceiveHub):
         memory: MemorySystem | None,
         *,
         sink: ManifestSink | None = None,
+        max_context_chars: int = DEFAULT_CONTEXT_BUDGET_CHARS,
     ) -> None:
         self._sensors = list(sensors)
         self._memory = memory
         self._sink: ManifestSink = sink if sink is not None else default_sink()
+        self._budgeter = ContextBudgeter(max_context_chars)
 
     async def perceive(self, state: AgentState) -> ContextManifest:
         items = await self._fold(state)
@@ -97,7 +103,7 @@ class SequentialPerceiveHub(PerceiveHub):
                 )
 
         items.extend(_policy_fact_items(state))
-        return items
+        return list(self._budgeter.trim(tuple(items)))
 
 
 def _memory_items(state: AgentState) -> list[ContextItem]:

@@ -6,6 +6,8 @@ from dataclasses import dataclass
 
 from lca.contracts.models.core.perception import ContextItem
 
+DEFAULT_CONTEXT_BUDGET_CHARS = 50_000
+
 
 @dataclass(frozen=True)
 class ContextBudgeter:
@@ -27,4 +29,4 @@ class ContextBudgeter:
         return tuple(selected)
 
 
-__all__ = ["ContextBudgeter"]
+__all__ = ["DEFAULT_CONTEXT_BUDGET_CHARS", "ContextBudgeter"]
