@@ -31,6 +31,21 @@ from lca.plugins.transport.webserver.handlers.runs.terminal.terminalizer import 
 _log = structlog.get_logger(__name__)
 
 
+def _emit_command_rejected(session: object | None, *, command_type: str, reason: str) -> None:
+    """Best-effort ``command.rejected.v1`` when a transport command fails."""
+    if session is None:
+        return
+    with contextlib.suppress(Exception):
+        from lca.infrastructure.observability.meta_event_emit import emit_command_rejected
+        from lca.infrastructure.session.lifecycle_emit import resolve_run_session_writer
+
+        emit_command_rejected(
+            command_type=command_type,
+            reason=reason,
+            session=resolve_run_session_writer(session),
+        )
+
+
 class RegistryRunCommands:
     """Own create, cancel, and approval-resume mutations for registry runs."""
 
@@ -130,6 +145,8 @@ class RegistryRunCommands:
                 reason="payload_not_string",
                 idempotency_key=idempotency_key,
             )
+            session = self._registry.get(run_id)
+            _emit_command_rejected(session, command_type="resume_approval", reason="payload_not_string")
             return RunCommandReceipt(
                 accepted=False,
                 error="approval payload must be a string",
@@ -137,6 +154,7 @@ class RegistryRunCommands:
             )
         session = self._registry.get(run_id)
         if session is None:
+            _emit_command_rejected(None, command_type="resume_approval", reason="run_not_found")
             _log.warning(
                 "run_resume_rejected",
                 run_id=run_id,
@@ -159,6 +177,7 @@ class RegistryRunCommands:
                 status=session.status.value,
                 idempotency_key=idempotency_key,
             )
+            _emit_command_rejected(session, command_type="resume_approval", reason="not_waiting_input")
             return RunCommandReceipt(
                 accepted=False,
                 error="run not waiting for input",
@@ -183,6 +202,11 @@ class RegistryRunCommands:
                         error=str(exc),
                         idempotency_key=idempotency_key,
                     )
+                    _emit_command_rejected(
+                        session,
+                        command_type="resume_approval",
+                        reason="session_recovery_mismatch",
+                    )
                     return RunCommandReceipt(
                         accepted=False,
                         error="session recovery facts disagree with resume",
@@ -195,6 +219,7 @@ class RegistryRunCommands:
                 reason="no_resume_state",
                 idempotency_key=idempotency_key,
             )
+            _emit_command_rejected(session, command_type="resume_approval", reason="no_resume_state")
             return RunCommandReceipt(
                 accepted=False,
                 error="no resume state available",

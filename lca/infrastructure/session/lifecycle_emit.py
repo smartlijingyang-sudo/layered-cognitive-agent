@@ -305,6 +305,51 @@ def end_turn(*, turn: int | None = None, reason: str = "completed") -> None:
     state.message_accepted = False
 
 
+def resolve_run_session_writer(run_session: Any) -> Any | None:
+    """Return the DSH Session writer for a transport ``RunSession`` when bound."""
+    bound = getattr(run_session, "event_session", None)
+    if bound is None:
+        return _session()
+    bridge = getattr(bound, "bridge", None)
+    if bridge is not None:
+        inner = getattr(bridge, "inner", None)
+        if inner is not None:
+            return inner
+    return _session()
+
+
+def emit_run_attachments(
+    run_session: Any,
+    attachment_ids: tuple[str, ...],
+    *,
+    file_store: Any,
+) -> None:
+    """``attachment.committed.v1`` for each run-bound attachment at session build."""
+    if not attachment_ids:
+        return
+    import contextlib
+
+    from lca.infrastructure.observability.meta_event_emit import emit_attachment_committed
+
+    writer = resolve_run_session_writer(run_session)
+    get_meta = getattr(file_store, "get", None)
+    if not callable(get_meta):
+        return
+    for attachment_id in attachment_ids:
+        meta = None
+        with contextlib.suppress(Exception):
+            meta = get_meta(attachment_id)
+        if meta is None:
+            continue
+        emit_attachment_committed(
+            attachment_id=str(getattr(meta, "attachment_id", attachment_id)),
+            name=str(getattr(meta, "name", attachment_id)),
+            size_bytes=int(getattr(meta, "size_bytes", 0) or 0),
+            mime_type=str(getattr(meta, "mime_type", "") or "application/octet-stream"),
+            session=writer,
+        )
+
+
 __all__ = [
     "accept_user_message",
     "begin_step",
@@ -313,12 +358,14 @@ __all__ = [
     "complete_model",
     "create_session",
     "emit_approval_pause_from_result",
+    "emit_run_attachments",
     "end_step",
     "end_turn",
     "fail_model",
     "persist_approval",
     "request_model",
     "reset_lifecycle",
+    "resolve_run_session_writer",
     "session_append_for_thinking",
     "terminal_checkpoint_status",
 ]

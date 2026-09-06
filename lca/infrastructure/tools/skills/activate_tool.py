@@ -96,6 +96,20 @@ class SkillActivateTool(Tool):
                 extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
             )
         register_activated(package.skill_id, package.name)
+        from lca.infrastructure.observability.meta_event_emit import emit_skill_activated
+
+        emit_skill_activated(
+            skill_id=package.skill_id,
+            name=package.name,
+            content_hash=package.content_hash,
+            source="tool:activate_skill",
+        )
+        from lca.infrastructure.observability.meta_event_emit import emit_context_injected
+
+        emit_context_injected(
+            source=f"skill:{package.skill_id}",
+            content_ref=f"skill:{package.skill_id}@{package.content_hash}",
+        )
         from lca.infrastructure.sandbox.surface import skill_preamble
 
         body = skill_preamble() + package.content

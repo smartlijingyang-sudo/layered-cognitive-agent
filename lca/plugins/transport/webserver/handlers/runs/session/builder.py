@@ -236,7 +236,7 @@ class RunSessionBuilder:
         )
 
         try:
-            return RunSession(
+            run_session = RunSession(
                 run_id=run_id,
                 trace_id=trace_id,
                 spine_path=spine_path,
@@ -266,6 +266,18 @@ class RunSessionBuilder:
         except BaseException:
             unbind_run_event_session(event_session)
             raise
+        try:
+            from lca.infrastructure.session.lifecycle_emit import emit_run_attachments
+
+            file_store = require_capability(self._ctx, "file_store")
+            emit_run_attachments(
+                run_session,
+                cleaned_attachment_ids,
+                file_store=file_store,
+            )
+        except MissingCapabilityError:
+            pass
+        return run_session
 
 
 def _lookup_event_session(ctx: Any, run_id: str) -> Any | None:

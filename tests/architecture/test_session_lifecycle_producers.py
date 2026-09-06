@@ -25,19 +25,9 @@ _LCA_ROOT = _REPO_ROOT / "lca"
 _CATALOG_MODULE = _LCA_ROOT / "contracts" / "harness" / "memory" / "events.py"
 
 # Documented harness-only exceptions (session-event-lifecycle-map.md §2).
+# Skill domain + transport/meta events are covered by test_session_meta_event_producers.py.
 ALLOW_HARNESS_ONLY: frozenset[str] = frozenset(
     {
-        # skill.* — catalog published; runtime wiring pending
-        "skill.catalog.published.v1",
-        "skill.loaded.v1",
-        "skill.user_invoked.v1",
-        "skill.activated.v1",
-        "skill.routed.v1",
-        "inbox.spliced.v1",
-        "attachment.committed.v1",
-        "command.rejected.v1",
-        "context.injected.v1",
-        "feedback.record.v1",
         "session.title.v1",
         "session.end_seed.v1",
     }
@@ -135,7 +125,9 @@ def _rg(pattern: str, root: Path) -> list[tuple[str, int, str]]:
 
 
 def _is_lifecycle_required(event_type: str) -> bool:
-    if event_type in ALLOW_HARNESS_ONLY or event_type.startswith("skill."):
+    if event_type in ALLOW_HARNESS_ONLY:
+        return False
+    if event_type.startswith("skill."):
         return False
     if event_type.startswith(("turn.", "step.", "model.")):
         return True

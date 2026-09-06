@@ -20,18 +20,11 @@ from lca.plugins.events.publishers._session_publish import (
 )
 from lca.plugins.gate.decision_classifier_provider import DefaultDecisionClassifier
 from lca.plugins.runtime.reducer import DefaultReducer
+from lca.plugins.session.runtime.session import Session
 
 
 def _make_state(task: str) -> AgentState:
     return AgentState(trace_id="test", task=task, budget=Budget())
-
-
-class _SpinePublishSession:
-    """测试替身：满足 ADR-0183 fail-loud 绑定的 publish Session，丢弃 spine 信封。"""
-
-    def append(self, payload: object, *, producer: object) -> object:
-        del payload, producer
-        return None
 
 
 class _SpineSessionBound(unittest.IsolatedAsyncioTestCase):
@@ -39,7 +32,8 @@ class _SpineSessionBound(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self) -> None:
         super().setUp()
-        self._publish_token = set_publish_session(_SpinePublishSession())
+        self._session = Session("skill_router_test")
+        self._publish_token = set_publish_session(self._session)
 
     def tearDown(self) -> None:
         reset_publish_session(self._publish_token)

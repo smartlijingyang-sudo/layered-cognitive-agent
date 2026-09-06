@@ -93,7 +93,10 @@ class ModularBrain(Brain):
         )
 
         state_id = state.trace_id
-        emit_brain_think_start(state_id=state_id)
+        try:
+            emit_brain_think_start(state_id=state_id)
+        except Exception:  # INTENTIONAL: spine mirror must not block think
+            pass
         try:
             decision = await self._think_pipeline.decide(
                 state=state,
@@ -105,9 +108,15 @@ class ModularBrain(Brain):
                 reducer=self.reducer,
             )
         except BaseException:
-            emit_brain_think_end(state_id=state_id, outcome="failure")
+            try:
+                emit_brain_think_end(state_id=state_id, outcome="failure")
+            except Exception:  # INTENTIONAL: spine mirror must not block think
+                pass
             raise
-        emit_brain_think_end(state_id=state_id, outcome="success")
+        try:
+            emit_brain_think_end(state_id=state_id, outcome="success")
+        except Exception:  # INTENTIONAL: spine mirror must not block think
+            pass
         return decision
 
     async def reflect(self, state: AgentState, observation: Observation) -> Reflection:

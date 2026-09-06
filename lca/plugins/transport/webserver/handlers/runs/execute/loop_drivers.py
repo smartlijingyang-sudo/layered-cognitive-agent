@@ -307,14 +307,29 @@ def _record_inbox_followup(*, session: RunSession, question: str, mode: str) -> 
     The inbox-facts sensor folds these into the next perceive cycle.
     Best-effort: a failure here must not block run start.
     """
+    inbox_id = f"inbox-{session.run_id}-{next(_FOLLOWUP_COUNTER)}"
+    preview = question[:200] if isinstance(question, str) else ""
     with suppress(Exception):
         record(
             InboxFollowupCreated(
-                inbox_id=f"inbox-{session.run_id}-{next(_FOLLOWUP_COUNTER)}",
+                inbox_id=inbox_id,
                 actor="user",
                 target="next_turn",
                 priority="task" if mode == SOLO_MODE_KEY else "background",
                 step=0,
-                payload_preview=question[:200] if isinstance(question, str) else "",
+                payload_preview=preview,
             )
+        )
+    with suppress(Exception):
+        from lca.infrastructure.observability.meta_event_emit import emit_inbox_spliced
+        from lca.infrastructure.session.lifecycle_emit import resolve_run_session_writer
+
+        writer = resolve_run_session_writer(session)
+        emit_inbox_spliced(
+            op="append",
+            target="next_turn",
+            message_ids=(inbox_id,),
+            messages=({"role": "user", "content": preview},) if preview else (),
+            actor="user",
+            session=writer,
         )

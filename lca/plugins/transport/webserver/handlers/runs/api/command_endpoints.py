@@ -273,6 +273,42 @@ async def cancel_run(request: Request) -> JSONResponse:
     return JSONResponse({"status": receipt.status or "canceled"}, headers=cors_headers())
 
 
+async def record_run_feedback(request: Request) -> JSONResponse:
+    """``POST /runs/{run_id}/feedback`` — append ``feedback.record.v1`` (ADR-0189)."""
+    run_id = request.path_params["run_id"]
+    registry = getattr(request.app.state, "registry", None)
+    get_run = getattr(registry, "get", None)
+    session = get_run(run_id) if callable(get_run) else None
+    if session is None:
+        return JSONResponse({"error": "run not found"}, status_code=404, headers=cors_headers())
+    try:
+        body = await request.json()
+    except json.JSONDecodeError:
+        return JSONResponse({"error": "invalid JSON body"}, status_code=400, headers=cors_headers())
+    text = str(body.get("text") or body.get("feedback") or "").strip() or None
+    rating = str(body.get("rating") or "").strip() or None
+    raw_tags = body.get("tags")
+    tags: tuple[str, ...] = ()
+    if isinstance(raw_tags, list):
+        tags = tuple(str(item).strip() for item in raw_tags if str(item).strip())
+    if text is None and rating is None and not tags:
+        return JSONResponse(
+            {"error": "feedback requires text, rating, or tags"},
+            status_code=400,
+            headers=cors_headers(),
+        )
+    from lca.infrastructure.observability.meta_event_emit import emit_feedback_record
+    from lca.infrastructure.session.lifecycle_emit import resolve_run_session_writer
+
+    emit_feedback_record(
+        text=text,
+        rating=rating,
+        tags=tags,
+        session=resolve_run_session_writer(session),
+    )
+    return JSONResponse({"run_id": run_id, "status": "recorded"}, headers=cors_headers())
+
+
 async def answer_run(request: Request) -> JSONResponse:
     """``POST /runs/{run_id}/answer`` — adapt one durable approval resume command."""
     run_id = request.path_params["run_id"]
@@ -314,5 +350,6 @@ __all__ = [
     "cancel_run",
     "create_run",
     "decode_create_run",
+    "record_run_feedback",
     "render_create_run_receipt",
 ]

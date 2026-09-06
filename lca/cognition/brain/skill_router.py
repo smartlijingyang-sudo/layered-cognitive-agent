@@ -8,6 +8,18 @@ from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import SkillRouter
 
 
+def _safe_spine_route(**kwargs: object) -> None:
+    """Best-effort spine envelope; routing must continue when publish is unauthorized."""
+    from lca.plugins.events.publishers.spine_reflector_cognition import (
+        emit_skill_router_route,
+    )
+
+    try:
+        emit_skill_router_route(**kwargs)  # type: ignore[arg-type]
+    except Exception:  # INTENTIONAL: L10 spine mirror must not block routing
+        return
+
+
 async def _emit_session_routed(
     session_events: SkillEventSink | None, template_id: str, decision_path: str
 ) -> None:
@@ -17,11 +29,17 @@ async def _emit_session_routed(
     时序：在对应 ``emit_skill_router_route`` spine 信封之后调用。
     失败语义：sink append 抛错时向 ``route()`` 调用方传播。
     """
+    from lca.infrastructure.observability.meta_event_emit import emit_skill_routed
+
+    emit_skill_routed(template_id=template_id, decision_path=decision_path)
     if session_events is None:
         return
-    await session_events.append(
-        SkillRouted(template_id=template_id, decision_path=decision_path), actor="system"
-    )
+    try:
+        await session_events.append(
+            SkillRouted(template_id=template_id, decision_path=decision_path), actor="system"
+        )
+    except Exception:  # INTENTIONAL: harness sink must not block routing
+        return
 
 
 class KeywordSkillRouter(SkillRouter):
@@ -51,16 +69,11 @@ class KeywordSkillRouter(SkillRouter):
         self._session_events = session_events
 
     async def route(self, state: AgentState) -> str:
-        # PR-3.2: spine envelope for the skill_router.route execution point.
-        from lca.plugins.events.publishers.spine_reflector_cognition import (
-            emit_skill_router_route,
-        )
-
         try:
             task_lower = state.task.lower()
             for template_name, keywords in self._rules.items():
                 if any(kw.lower() in task_lower for kw in keywords):
-                    emit_skill_router_route(
+                    _safe_spine_route(
                         state_id=state.trace_id,
                         template=template_name,
                         decision_path="keyword_match",
@@ -70,14 +83,14 @@ class KeywordSkillRouter(SkillRouter):
                     return template_name
             template = self._default
         except BaseException:
-            emit_skill_router_route(
+            _safe_spine_route(
                 state_id=state.trace_id,
                 template=self._default,
                 decision_path="keyword_default",
                 outcome="failure",
             )
             raise
-        emit_skill_router_route(
+        _safe_spine_route(
             state_id=state.trace_id,
             template=template,
             decision_path="keyword_default",
@@ -101,13 +114,8 @@ class StaticSkillRouter(SkillRouter):
         self._session_events = session_events
 
     async def route(self, state: AgentState) -> str:
-        # PR-3.2: spine envelope for the skill_router.route execution point.
-        from lca.plugins.events.publishers.spine_reflector_cognition import (
-            emit_skill_router_route,
-        )
-
         template = self._template
-        emit_skill_router_route(
+        _safe_spine_route(
             state_id=state.trace_id,
             template=template,
             decision_path="static",

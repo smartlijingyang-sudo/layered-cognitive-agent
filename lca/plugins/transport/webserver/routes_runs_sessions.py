@@ -28,6 +28,7 @@ from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import 
     answer_run,
     cancel_run,
     create_run,
+    record_run_feedback,
 )
 from lca.plugins.transport.webserver.handlers.runs.api.query_endpoints import (
     get_run,
@@ -47,6 +48,7 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
     RouteSpec("/runs/{run_id}/evidence/{ref:path}", get_run_evidence, ("GET",)),
     RouteSpec("/runs/{run_id}/cancel", cancel_run, ("POST", "OPTIONS")),
     RouteSpec("/runs/{run_id}/answer", answer_run, ("POST", "OPTIONS")),
+    RouteSpec("/runs/{run_id}/feedback", record_run_feedback, ("POST", "OPTIONS")),
 )
 
 
