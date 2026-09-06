@@ -37,7 +37,8 @@ heal
   ./scripts/lca-ops journal logs              tail 最新 run 的 spine ledger
   ./scripts/lca-ops journal logs -v           + 完整 payload + offloaded sidecar traceback
   ./scripts/lca-ops journal logs -r <run_id>  离线回放指定 run 的 spine ledger
-  ./scripts/lca-ops journal logs lobehub      Next.js 进程日志
+  ./scripts/lca-ops journal logs lobehub      Next.js :3010 日志
+  ./scripts/lca-ops journal logs lobehub-spa  Vite :9876 日志（模块 504/缺文件先看此）
   ./scripts/lca-ops journal logs daemon       sandbox 连接器日志
   ./scripts/lca-ops logs                      (alias → journal logs)
 
@@ -52,7 +53,9 @@ infra      postgres / redis / s3
   start   端口不通才 docker compose up，不拆已有 lobe-postgres
   ./scripts/lca-ops infra start
 
-lobehub    Next 前端 :3010    日志 .lca-ops/lobehub.log
+lobehub    Next 前端 :3010 + Vite SPA :9876
+  日志    .lca-ops/lobehub.log（Next）/ .lca-ops/lobehub-spa.log（Vite）
+  排障    docs/debug/lobehub-frontend-debug.md（闪错/无限刷新/504 Outdated Optimize Dep）
   动作    start | stop | restart | status | ensure
   ensure  同步源码 / 打补丁 / 写 .env / bun install，不启进程
           ⚠ ensure 是 short-circuit（hash 没变就不重打）；

@@ -44,6 +44,8 @@ LCA Agent/Team
 
 环境模板：`deploy/lobehub/.env.lca` → 自动复制为 `lobehub-ui/.env`
 
+**前端排障**（Agent 页闪错、无限刷新、`504 Outdated Optimize Dep`）：[lobehub-frontend-debug.md](../debug/lobehub-frontend-debug.md)
+
 ## 目录说明
 
 | 路径 | 说明 |

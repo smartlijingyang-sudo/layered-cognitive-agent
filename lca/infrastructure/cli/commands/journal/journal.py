@@ -58,7 +58,7 @@ def register(app: typer.Typer, group: typer.Typer | None = None) -> None:
     def logs(
         target: str = typer.Argument(
             "",
-            help="空=tail 最新 run 的 spine SSOT；lobehub | daemon = 进程日志",
+            help="空=tail 最新 run 的 spine SSOT；lobehub | lobehub-spa | daemon = 进程日志",
         ),
         replay: str = typer.Option(
             "",
@@ -80,10 +80,11 @@ def register(app: typer.Typer, group: typer.Typer | None = None) -> None:
 
         log_map = {
             "lobehub": ops_config.state_dir / "lobehub.log",
+            "lobehub-spa": ops_config.state_dir / "lobehub-spa.log",
             "daemon": Path(f"/home/{ops_config.daemon.user}/.lca/daemon.log"),
         }
         if target not in log_map:
-            print(f"Unknown target: {target}. Use: journal, lobehub, daemon")
+            print(f"Unknown target: {target}. Use: journal, lobehub, lobehub-spa, daemon")
             raise typer.Exit(1)
         log_file = log_map[target]
         if not log_file.exists():

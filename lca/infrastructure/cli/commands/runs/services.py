@@ -29,16 +29,17 @@ def register(app: typer.Typer) -> None:
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
         config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
     ) -> None:
-        """Next 前端 :3010。日志 .lca-ops/lobehub.log。ensure=源码补丁依赖，不启进程。"""
+        """Next :3010 + Vite SPA :9876。ensure=源码补丁依赖，不启进程。"""
         if action is None:
             typer.echo(
-                "lobehub  Next 前端  :3010\n"
-                "  日志    .lca-ops/lobehub.log\n"
+                "lobehub  Next :3010 + Vite SPA :9876\n"
+                "  日志    .lca-ops/lobehub.log（Next）/ lobehub-spa.log（Vite）\n"
+                "  排障    docs/debug/lobehub-frontend-debug.md\n"
                 "  动作    start | stop | restart | status | ensure\n"
                 "  ensure  同步源码、打补丁、写 .env、bun install\n"
                 "  注意    lobehub 自身不带 LCA 后端;后端进程见 ./scripts/lca-ops kernel_serve\n"
                 "  例子    ./scripts/lca-ops lobehub restart\n"
-                "          ./scripts/lca-ops logs lobehub\n"
+                "          ./scripts/lca-ops journal logs lobehub-spa\n"
             )
             raise typer.Exit(0)
         ctx = make_context(json_mode, quiet, config)

@@ -25,6 +25,18 @@
 
 日常用 `heal`，不要先 `restart`。首次装配走 `provision`（已删的 `dev` / `compose` 子命令见 ADR-0119 决定 4）。
 
+## 前端排障（Agent 闪错 / 无限刷新）
+
+Dev 模式浏览器同时依赖 **:3010**（Next）与 **:9876**（Vite）。完整 SOP：[docs/debug/lobehub-frontend-debug.md](../../docs/debug/lobehub-frontend-debug.md)
+
+```bash
+./scripts/lca-ops status --json | jq '.[] | select(.service=="lobehub")'
+./scripts/lca-ops journal logs lobehub-spa    # Vite；查 Outdated Optimize Dep / 缺 import
+./scripts/lca-ops journal logs lobehub        # Next.js
+rg 'Failed to resolve import|Outdated Optimize Dep|connection lost' .lca-ops/lobehub-spa.log | tail -20
+./scripts/lca-ops lobehub restart             # 重启后浏览器硬刷新 Ctrl+Shift+R
+```
+
 ## 状态与补丁：status 字段语义
 
 `./scripts/lca-ops status` 的 lobehub 块有两层补丁检查，含义不同：

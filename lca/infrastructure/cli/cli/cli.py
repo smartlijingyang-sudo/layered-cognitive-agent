@@ -117,7 +117,7 @@ typecheck.register(app)
 def logs_alias(
     target: str = typer.Argument(
         "",
-        help="空=tail 最新 run；lobehub | daemon = 进程日志(同 journal logs)",
+        help="空=tail 最新 run；lobehub | lobehub-spa | daemon = 进程日志(同 journal logs)",
     ),
     replay: str = typer.Option("", "--replay", "-r", help="(同 -r) 离线回放指定 run_id"),
     verbose: bool = typer.Option(

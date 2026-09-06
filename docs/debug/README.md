@@ -48,6 +48,12 @@ LCA 的"高级工程师自助定位"基础设施入口。所有 debug / observab
 | `lca-ops journal logs` | 默认 tail 最新 run 的 spine SSOT(`traces/runs/<id>/events.jsonl`) |
 | `lca-ops journal logs -r <run_id>` | 离线回放指定 run(优先 events.jsonl,否则兜底 journal.raw.jsonl) |
 | `lca-ops journal logs -v` | 展开 payload + error 通道 traceback |
+| `lca-ops journal logs lobehub` | Next.js :3010 进程日志(`.lca-ops/lobehub.log`) |
+| `lca-ops journal logs lobehub-spa` | Vite :9876 进程日志(`.lca-ops/lobehub-spa.log`) |
+
+### LobeHub 前端（非 run）
+
+Agent 页闪错 / 无限刷新 / `504 Outdated Optimize Dep` → [lobehub-frontend-debug.md](./lobehub-frontend-debug.md)
 
 ## fail-loud
 
