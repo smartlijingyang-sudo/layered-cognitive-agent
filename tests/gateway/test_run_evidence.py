@@ -10,7 +10,7 @@ from lca.contracts.observability.evidence import (
     EvidenceIntegrityError,
     EvidenceRef,
 )
-from lca.plugins.transport.webserver.handlers.runs.observability.evidence import (
+from lca.plugins.transport.webserver.read.runs.evidence import (
     EvidencePayloadDecodeError,
     InvalidEvidenceDigestError,
     RunEvidenceNotFoundError,

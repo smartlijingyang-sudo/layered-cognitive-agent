@@ -18,7 +18,7 @@ from lca.contracts.protocols.runtime.runtime_lifecycle import (
     RuntimeLifecycleEventType,
 )
 from lca.harness.declarative import GenericPlanInterpreter, GraphAssembler, MappingRestrictedScope
-from lca.harness.profile.plan_compiler import compile_plan
+from lca.harness.composition.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
 from tests.phase_executors import standard_phase_executors
 

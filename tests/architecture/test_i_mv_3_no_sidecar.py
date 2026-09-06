@@ -8,7 +8,7 @@ I-MV-3: 禁止任何生产代码读 ``<run_dir>/model_visible/`` 旁路文件,�
 - ``docs/adr/0*.md`` 历史归档(0169 / 0175 / 0176 + 0185 自身)
 - 本测试文件本身
 
-已知边界:``lca/plugins/transport/webserver/handlers/runs/doctor/`` 的
+已知边界:``lca/plugins/transport/webserver/doctor/`` 的
 run 体检路径仍会探测旧 run 目录里的旁路文件(诊断历史产物,只读报告);
 其路径拼接不出现 ``model_visible/step_`` 字面模板,不在本守门 pattern 内。
 """

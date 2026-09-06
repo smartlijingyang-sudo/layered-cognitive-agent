@@ -13,13 +13,13 @@ from lca.infrastructure.observability.loop_cursor._spine_port import (
 from lca.infrastructure.observability.spine.context import SpineContext
 from lca.infrastructure.observability.spine.event_spine import EventSpine
 from lca.infrastructure.observability.spine.sinks.base import EventSink
-from lca.plugins.observability.spine.spine_enrich import (
+from lca.infrastructure.observability.spine.spine_enrich import (
     I17Violation,
     enrich_spine_payload,
     set_active_field_producers,
     set_active_spine_enricher,
 )
-from lca.plugins.session.runtime.bind import (
+from lca.session.bind import (
     bind_run_event_session_from_store,
     unbind_run_event_session,
 )

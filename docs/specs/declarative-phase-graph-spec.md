@@ -73,10 +73,10 @@ kind: contribution
 layer: L1
 functionalGroup: gate
 implementation:
-  module: lca.plugins.gates.repeat_tool_call
+  module: lca.plugins.cognitive.gate.repeat_tool_call.plugin
   setup: setup
 configuration:
-  schema: lca.plugins.gates.repeat_tool_call.RepeatToolCallConfig
+  schema: lca.plugins.cognitive.gate.repeat_tool_call.plugin.RepeatToolCallConfig
 capabilities:
   provides:
     - key: control.executor.repeat-tool-call

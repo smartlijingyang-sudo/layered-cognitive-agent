@@ -214,7 +214,7 @@ class TestIFwBus2:
         "lca/infrastructure/observability/journal/stream/live_tail.py",  # tail.subscribe
         "lca/infrastructure/observability/spine/derivers/live_tail.py",  # self._tail.subscribe
         "lca/harness/agent/activation.py",  # store.subscribe (projection 订阅)
-        "lca/plugins/transport/webserver/handlers/runs/terminal/registry_queries.py",  # session.tail.subscribe
+        "lca/plugins/transport/webserver/read/runs/terminal/registry_queries.py",  # session.tail.subscribe
         "lca/plugins/transport/webserver/read/runs/live.py",  # session.tail.subscribe (SSE read path)
     )
 

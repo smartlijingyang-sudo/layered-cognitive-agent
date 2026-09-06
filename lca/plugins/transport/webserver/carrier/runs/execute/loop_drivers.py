@@ -23,10 +23,10 @@ from lca.contracts.mechanisms.capability import require_capability
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.team.run_context import RunContext
 from lca.infrastructure.observability import BoundObservability
-from lca.plugins.loop_drivers.registry import (
+from lca.plugins.loop.driver.plugin import (
     RunLoopDriverRegistry as RunLoopDriverRegistry,
 )
-from lca.plugins.loop_drivers.registry import (
+from lca.plugins.loop.driver.plugin import (
     _UnknownExecutionTargetError as _UnknownExecutionTargetError,
 )
 from lca.plugins.transport.webserver.carrier.runs.lifecycle.runnable_assembly import (

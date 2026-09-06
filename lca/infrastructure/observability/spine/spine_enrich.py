@@ -4,9 +4,9 @@ Enrichment runs at :meth:`lca.loop.fact_gateway.DefaultFactGateway.publish_ep`
 and at the Session append hook when a run-bound ``SessionAppendHook`` is
 installed. ``EmitPipeline.emit`` delegates here only on hook-less test paths.
 
-# COMPAT(owner: ADR-0194 P2-06, from: lca.plugins.observability.spine.spine_enrich,
+# COMPAT(owner: ADR-0194 P2-06, from: lca.infrastructure.observability.spine.spine_enrich,
 #         to: infrastructure/observability/spine/spine_enrich (FactGateway SSOT),
-#         delete_when: rg 'lca.plugins.observability.spine.spine_enrich' lca/ = 0
+#         delete_when: rg 'lca.infrastructure.observability.spine.spine_enrich' lca/ = 0
 #                       (re-export shim only),
 #         forbidden_new_usage: duplicate FieldProducer merge outside this module)
 """

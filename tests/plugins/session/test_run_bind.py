@@ -10,7 +10,7 @@ from lca.plugins.events.publishers._session_publish import (
     current_publish_session,
     publish_via_session,
 )
-from lca.plugins.session.runtime.bind import (
+from lca.session.bind import (
     EventSessionBinder,
     bind_run_event_session_from_store,
     unbind_run_event_session,
@@ -41,9 +41,7 @@ def _payload() -> Any:
 
 
 def test_bind_enables_publish_via_session(bus: EventBus) -> None:
-    from lca.plugins.events.publishers.spine_reflector_cognition.plugin import (
-        ReflectorClass,
-    )
+    from lca.loop.fact_gateway import DefaultFactGateway as ReflectorClass
 
     store = SessionStore()
     bound = bind_run_event_session_from_store(store, "run_bind_1")
@@ -71,9 +69,7 @@ def test_binder_skips_when_already_bound(bus: EventBus) -> None:
 
 
 def test_binder_binds_when_slot_empty(bus: EventBus) -> None:
-    from lca.plugins.events.publishers.spine_reflector_cognition.plugin import (
-        ReflectorClass,
-    )
+    from lca.loop.fact_gateway import DefaultFactGateway as ReflectorClass
 
     store = SessionStore()
     binder = EventSessionBinder(store)

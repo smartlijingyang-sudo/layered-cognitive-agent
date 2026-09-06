@@ -16,7 +16,7 @@ import pytest
 from lca.infrastructure.persistence.run_buffer_registry import RunWriteBehindRegistry
 from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink, _run_id_of
 from lca.plugins.session.runtime.bus_facade import SessionBusFacade
-from lca.plugins.session.runtime.session import Session
+from lca.session.append import Session
 from lca_kernel.events import EventRef
 from lca_kernel.events.payloads import SpineEventPayload
 from lca_kernel.events.persistence import PersistenceObserver

@@ -1,7 +1,7 @@
 """execute subpackage — carrier run trigger surface (ADR-0195 P3-02).
 
 Re-exports the carrier surface from the facade module. Legacy import path:
-``handlers/runs/execute`` (COMPAT shim).
+Legacy import path ``handlers/runs/execute`` removed (ADR-0195 P3-02); use this package.
 
 ``RunLifecycleCoordinator`` is lazy-loaded to avoid circular import with
 ``carrier/runs/lifecycle`` (lifecycle imports ``execution_environment``).

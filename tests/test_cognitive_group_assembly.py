@@ -154,4 +154,4 @@ class TestCognitiveGroupPluginWiring:
         for name in ("web-app.yaml", "scenario-standard.yaml"):
             content = (root / "bundles" / name).read_text(encoding="utf-8")
             assert "lca.plugins.perceive.sequential_hub" in content
-            assert "lca.plugins.gates.chained" in content
+            assert "lca.plugins.cognitive.gate.chained.plugin" in content

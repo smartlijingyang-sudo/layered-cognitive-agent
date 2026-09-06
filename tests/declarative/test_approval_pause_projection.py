@@ -6,7 +6,7 @@ from lca.contracts.models.core.result import ApprovalPendingError
 from lca.contracts.protocols.act.command_envelope import RunFact
 from lca.contracts.protocols.declarative.declarative_phase_graph import ExecutionOutcome
 from lca.harness.declarative.execute.outcome_projection import RunOutcomeProjector
-from lca.harness.declarative.graph.traversal import PhaseTraversal
+from lca.harness.graph.traversal import PhaseTraversal
 
 
 @dataclass

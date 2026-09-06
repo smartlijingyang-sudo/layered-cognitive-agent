@@ -58,7 +58,7 @@ from lca.plugins.gate.decision_classifier_provider import DefaultDecisionClassif
 from lca.plugins.journal.artifact_closure_provider import DefaultArtifactClosure
 
 # L2
-from lca.plugins.runtime.reducer import DefaultReducer
+from lca.plugins.loop.reducer.plugin import DefaultReducer
 from tests.support.unimplemented_transport import UnimplementedTransport
 
 

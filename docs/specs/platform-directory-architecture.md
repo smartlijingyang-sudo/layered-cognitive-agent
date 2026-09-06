@@ -211,7 +211,7 @@ plugins/<seam>/<group>/<plugin-id>/
 **迁移态模板（代码注释）：**
 
 ```text
-# MIGRATION(owner: ADR-0195, from: lca.plugins.phase_graph.perceive,
+# MIGRATION(owner: ADR-0195, from: lca.plugins.loop.phase.perceive.standard.plugin,
 #           to: lca.plugins.loop.phase.perceive.standard,
 #           delete_when: bundles 全部改 $module 且 grep from 路径为 0)
 ```

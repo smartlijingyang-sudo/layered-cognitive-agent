@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from lca.infrastructure.observability.loop_cursor._spine_port import get_session_append_hook
-from lca.plugins.session.runtime.bind import (
+from lca.session.bind import (
     bind_run_event_session_from_store,
     unbind_run_event_session,
 )

@@ -10,7 +10,7 @@ plugin 装配入口是 :mod:`lca.plugins.session.runtime.plugin`（``@plugin``
 """
 
 from lca.plugins.session.runtime.bus_facade import SessionBusFacade
-from lca.plugins.session.runtime.session import Session
+from lca.session.append import Session
 from lca.plugins.session.runtime.store import SessionStore
 
 __all__ = ["Session", "SessionBusFacade", "SessionStore"]

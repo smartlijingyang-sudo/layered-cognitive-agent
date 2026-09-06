@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from lca.harness.plan import compiled_run_plan_ref
-from lca.harness.profile.plan_compiler import CompileOptions, compile_plan
+from lca.harness.composition.plan_compiler import CompileOptions, compile_plan
 from lca.harness.profile.resolve import resolve_profile
 from lca.harness.profile.runtime_binding_validator import (
     MissingBindingError,
@@ -149,7 +149,7 @@ patch:
 
 def test_default_reducer_plugin_declares_reducer_capability() -> None:
     """lca-default-reducer 必须声明 ``provides=["reducer"]``（ADR-0076 §三）。"""
-    from lca.plugins.runtime.reducer import setup
+    from lca.plugins.loop.reducer.plugin import setup
 
     defn = setup._lca_definition
     assert "reducer" in defn.provided_capability_keys, (

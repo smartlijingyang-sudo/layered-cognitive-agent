@@ -16,7 +16,7 @@ from typing import Any
 
 from lca.infrastructure.runtime_plane.execution_target import parse_execution_target
 from lca.infrastructure.runtime_plane.resolve import PlaneRequest
-from lca.plugins.loop_drivers.registry import (
+from lca.plugins.loop.driver.plugin import (
     RunLoopDriverRegistry,
     _UnknownExecutionTargetError,
 )

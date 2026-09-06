@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from lca.contracts.protocols.session.telemetry import SharingPolicy, TelemetryRecord
 from lca.plugins.session.runtime.fork import fork_session
-from lca.plugins.session.runtime.session import Session
+from lca.session.append import Session
 from lca.plugins.session.runtime.store import SessionStore
 from lca.plugins.session.telemetry_capture.telemetry_capture import (
     SessionTelemetryCapture,

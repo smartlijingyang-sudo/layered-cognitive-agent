@@ -23,7 +23,7 @@ from lca.contracts.models.observability import (
     empty_document,
 )
 from lca.infrastructure.observability.journal.step.projector import JournalDocumentWriter
-from lca.plugins.transport.webserver.handlers.runs.doctor.doctor import (
+from lca.plugins.transport.webserver.doctor.doctor import (
     diagnose,
     diagnose_step_tree,
 )
@@ -339,7 +339,7 @@ def test_doctor_report_outcome_exposed_as_top_level_field(tmp_path: Path) -> Non
     早先 as_dict() 没暴露 outcome,manifest.doctor_report.outcome 读不到;
     现在 wire 字段一致。
     """
-    from lca.plugins.transport.webserver.handlers.runs.doctor.models import (
+    from lca.plugins.transport.webserver.doctor.models import (
         DoctorReport,
         HopVerdict,
     )
@@ -372,7 +372,7 @@ def test_diagnose_step_tree_outcome_in_report(tmp_path: Path) -> None:
     # 写一份 journal.json(metadata.outcome=completed,有 step)
     import json
 
-    from lca.plugins.transport.webserver.handlers.runs.doctor.step_check import (
+    from lca.plugins.transport.webserver.doctor.step_check import (
         diagnose_step_tree,
     )
 

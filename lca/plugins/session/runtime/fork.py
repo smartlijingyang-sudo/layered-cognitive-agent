@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 
-from lca.plugins.session.runtime.session import Session
+from lca.session.append import Session
 from lca.plugins.session.runtime.store import SessionStore
 from lca_kernel.events.session import SESSION_FORMAT_VERSION, SessionHeader
 

@@ -279,7 +279,7 @@ async def test_observe_checkpoint_allows_valid_step():
 @pytest.mark.asyncio
 async def test_think_guard_enforce_passthrough_without_gate_service():
     """Without gates capability the transform contribution keeps the candidate."""
-    from lca.plugins.control_contributions.think_guard import ThinkGuardEnforceExecutor
+    from lca.plugins.loop.control.think_guard.plugin import ThinkGuardEnforceExecutor
 
     executor = ThinkGuardEnforceExecutor()
     state = _make_working_state()
@@ -297,7 +297,7 @@ async def test_think_guard_enforce_passthrough_without_gate_service():
 @pytest.mark.asyncio
 async def test_think_guard_govern_allows_without_gate_facts():
     """GOVERN contribution allows when no durable gate facts exist yet."""
-    from lca.plugins.control_contributions.think_guard import ThinkGuardExecutor
+    from lca.plugins.loop.control.think_guard.plugin import ThinkGuardExecutor
 
     executor = ThinkGuardExecutor()
     state = _make_working_state()

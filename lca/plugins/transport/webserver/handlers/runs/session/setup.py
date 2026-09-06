@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.plugins.transport.webserver.handlers.runs.observability.binding import (
+from lca.plugins.transport.webserver.carrier.runs.binding import (
     assemble_run_hub,
     ensure_session_hub,
 )

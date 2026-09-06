@@ -50,7 +50,7 @@ def test_session_observer_protocol_structural() -> None:
 
 
 def test_session_protocol_structural_via_runtime() -> None:
-    from lca.plugins.session.runtime.session import Session
+    from lca.session.append import Session
 
     s = Session(session_id="s-test")
     assert isinstance(s, SessionProtocol)

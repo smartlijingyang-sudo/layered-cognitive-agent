@@ -19,10 +19,10 @@ from typing import Any
 from lca.infrastructure.observability.backends.run_locator_fs import FilesystemRunLocator
 from lca.infrastructure.observability.journal.engine.journal_io import JOURNAL_SCHEMA_VERSION
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
-from lca.plugins.transport.webserver.handlers.runs.doctor import diagnose
-from lca.plugins.transport.webserver.handlers.runs.observability.identity import parse_agent_ref
+from lca.plugins.transport.webserver.doctor import diagnose
+from lca.plugins.transport.webserver.read.runs.identity import parse_agent_ref
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession, RunStatus
-from lca.plugins.transport.webserver.handlers.runs.terminal.materialization import (
+from lca.plugins.transport.webserver.read.runs.terminal.materialization import (
     record_terminal_materialization,
 )
 

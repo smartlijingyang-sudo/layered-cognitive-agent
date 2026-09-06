@@ -1,6 +1,6 @@
 """Session 的 EventBus Protocol 适配面（publish append / observe callback）。
 
-runtime :class:`~lca.plugins.session.runtime.session.Session` 的公开面是
+runtime :class:`~lca.session.append.Session` 的公开面是
 ``append(event_type, data) → SessionEvent`` 与
 ``observe(SessionObserver) → cancel``。publisher / consumer 接缝要的是
 ``append(payload, *, producer) → EventRef`` 与
@@ -28,7 +28,7 @@ from typing import Any, cast
 import structlog
 
 from lca.contracts.event import EventPayload
-from lca.plugins.session.runtime.session import Session
+from lca.session.append import Session
 from lca_kernel.events.bus import EventRef
 from lca_kernel.events.session import SessionEvent, SessionProtocol
 

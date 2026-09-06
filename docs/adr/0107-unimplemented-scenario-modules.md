@@ -22,7 +22,7 @@ Phase A 修复 `lca.plugins.memory` 时，在 bundle YAML 中发现 4 个 scenar
 | memgpt | `lca.plugins.memory.four_layer`, `lca.plugins.policy.compaction`, `lca.plugins.budgeter.memgpt` |
 | lats | `lca.plugins.brain.lats`, `lca.plugins.critic.value_network`, `lca.plugins.memory.tree_cache` |
 | voyager | `lca.plugins.skill.auto_acquire`, `lca.plugins.memory.four_layer`, `lca.plugins.tools.bash`, `lca.plugins.tools.file_write`, `lca.plugins.tools.test_run` |
-| standard | `lca.plugins.brain.modular`, `lca.plugins.memory.four_layer` |
+| standard | `lca.plugins.cognitive.brain.modular`, `lca.plugins.memory.four_layer` |
 
 `git log --all -- lca/plugins/memory/four_layer.py` 等命令返回空——**这些 module 从未存在过**。也就是说：
 
@@ -82,7 +82,7 @@ ADR-0107 **不跟踪**（需要各自 ADR）：
 - `lca.plugins.tools.bash`
 - `lca.plugins.tools.file_write`
 - `lca.plugins.tools.test_run`
-- `lca.plugins.brain.modular`
+- `lca.plugins.cognitive.brain.modular`
 
 ## 实现
 

@@ -9,7 +9,7 @@ from typing import cast
 from lca.contracts.protocols import LLMAdapter
 from lca.contracts.protocols.session.run_mode import RunModeRegistryProtocol
 from lca.infrastructure.observability import BoundObservability
-from lca.plugins.transport.webserver.handlers.runs.lifecycle.runnable_assembly import (
+from lca.plugins.transport.webserver.carrier.runs.lifecycle.runnable_assembly import (
     CognitiveRunnableAssembler,
     RunnableAssemblyRequest,
     RunnableBuildRequest,

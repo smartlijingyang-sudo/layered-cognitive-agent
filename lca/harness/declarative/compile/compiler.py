@@ -34,7 +34,7 @@ from lca.harness.declarative.controls.validation import (
     PluginSpecValidator,
     validate_control_binding_closure,
 )
-from lca.harness.declarative.graph.phase_graph_compiler import compile_phase_graph_projection
+from lca.harness.graph.phase_graph_compiler import compile_phase_graph_projection
 from lca.harness.profile.projection import ResolvedProfileProjection
 from lca.harness.profile.resolve import ResolvedProfile
 

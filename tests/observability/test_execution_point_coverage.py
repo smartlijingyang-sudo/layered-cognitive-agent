@@ -189,7 +189,7 @@ async def test_prompt_assembler_eps_emitted_with_payload():
         reset_publish_session,
         set_publish_session,
     )
-    from lca.plugins.session.runtime.session import Session
+    from lca.session.append import Session
 
     session = Session("prompt-assembler-eps")
     token = set_publish_session(session)
@@ -246,7 +246,7 @@ def test_skill_router_route_emits_decision_path():
         reset_publish_session,
         set_publish_session,
     )
-    from lca.plugins.session.runtime.session import Session
+    from lca.session.append import Session
 
     session = Session("skill-router-eps")
     token = set_publish_session(session)

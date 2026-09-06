@@ -19,8 +19,8 @@ from lca.plugins.events.publishers._session_publish import (
     set_publish_session,
 )
 from lca.plugins.gate.decision_classifier_provider import DefaultDecisionClassifier
-from lca.plugins.runtime.reducer import DefaultReducer
-from lca.plugins.session.runtime.session import Session
+from lca.plugins.loop.reducer.plugin import DefaultReducer
+from lca.session.append import Session
 
 
 def _make_state(task: str) -> AgentState:

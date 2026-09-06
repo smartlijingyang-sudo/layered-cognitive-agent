@@ -12,8 +12,8 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     PhaseResult,
 )
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
-from lca.harness.declarative.compile.phase_governance import interpret_control_verdict
-from lca.harness.declarative.graph.traversal import PhaseTraversal
+from lca.harness.graph.governance.phase_governance import interpret_control_verdict
+from lca.harness.graph.traversal import PhaseTraversal
 from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
 
 
@@ -219,7 +219,7 @@ async def test_phase_governance_keeps_rewrite_nonblocking_and_stops_explicitly(
     )
     from lca.harness.declarative.compile.assembler import ExecutableContribution, ExecutableNode
     from lca.harness.declarative.compile.phase_capabilities import MappingPhaseCapabilities
-    from lca.harness.declarative.compile.phase_governance import PhaseGovernance
+    from lca.harness.graph.governance.phase_governance import PhaseGovernance
     from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
 
     journal = _Journal()
@@ -302,7 +302,7 @@ async def test_phase_governance_uses_semantic_phase_when_node_name_is_custom() -
     )
     from lca.harness.declarative.compile.assembler import ExecutableContribution, ExecutableNode
     from lca.harness.declarative.compile.phase_capabilities import MappingPhaseCapabilities
-    from lca.harness.declarative.compile.phase_governance import PhaseGovernance
+    from lca.harness.graph.governance.phase_governance import PhaseGovernance
     from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
 
     journal = _Journal()

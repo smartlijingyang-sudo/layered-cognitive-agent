@@ -16,8 +16,8 @@ from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
     set_publish_session,
 )
-from lca.plugins.runtime.reducer import DefaultReducer
-from lca.plugins.session.runtime.session import Session
+from lca.plugins.loop.reducer.plugin import DefaultReducer
+from lca.session.append import Session
 
 
 def test_commit_turn_appends_turn_control_fact() -> None:

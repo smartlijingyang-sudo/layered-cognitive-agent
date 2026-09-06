@@ -18,7 +18,7 @@ from lca.harness.declarative.compile.authority import (
     action_authority_for_scope,
     action_is_permitted,
 )
-from lca.harness.profile.plan_compiler import compile_plan
+from lca.harness.composition.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
 
 # ── Data class contract ───────────────────────────────────────────────
@@ -161,7 +161,7 @@ def test_compile_plan_action_authority_forbids_actions_via_task_contract() -> No
     assert "use_tool" in plan.action_authority.allowed_actions
 
     # Compile again with task_id that triggers a carve-out.
-    from lca.harness.profile.plan_compiler import CompileOptions
+    from lca.harness.composition.plan_compiler import CompileOptions
 
     carved_plan = compile_plan(
         resolved,

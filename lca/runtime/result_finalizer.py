@@ -12,7 +12,7 @@ from lca.contracts.protocols.journal.artifact_closure import ArtifactClosure
 from lca.contracts.protocols.runtime.infra import StateStore
 from lca.contracts.protocols.runtime.runtime_composition import ResultFinalizer
 from lca.contracts.protocols.state.reducer import Reducer
-from lca.harness.declarative.execute.interpreter import InterpretationResult
+from lca.harness.graph.execute.interpreter import InterpretationResult
 from lca.runtime.result_projection import TerminalResultProjection
 
 

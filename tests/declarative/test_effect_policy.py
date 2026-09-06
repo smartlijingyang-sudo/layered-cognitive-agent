@@ -12,7 +12,7 @@ from lca.contracts.protocols.declarative.declarative_common import (
 )
 from lca.contracts.protocols.declarative.declarative_plugin import EffectGovernanceDeclaration
 from lca.harness.declarative.compile.effect_policy import compile_effect_policy
-from lca.plugins.phase_graph.common import standard_phase_spec
+from lca.plugins.loop.phase._shared.common import standard_phase_spec
 
 
 def _spec(

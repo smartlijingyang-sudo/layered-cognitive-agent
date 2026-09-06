@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from lca.contracts.harness.tasks.session import SessionEvent
-from lca.plugins.session.runtime.event_catalog import (
+from lca.session.catalog import (
     UnknownSessionEventTypeError,
     validate_event_type_for_read,
 )

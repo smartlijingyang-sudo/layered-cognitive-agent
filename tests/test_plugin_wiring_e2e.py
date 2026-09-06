@@ -27,17 +27,17 @@ _SENSOR_PLUGINS: tuple[str, ...] = (
     "lca.plugins.sensors.skill_catalog",
 )
 _GATE_PLUGINS: tuple[str, ...] = (
-    "lca.plugins.gates.service",
-    "lca.plugins.gates.repeat_tool_call",
-    "lca.plugins.gates.tool_loop_breaker",
-    "lca.plugins.gates.progress_loop_detector",
-    "lca.plugins.gates.terminal_respond",
-    "lca.plugins.gates.artifact_respond_injector",
-    "lca.plugins.gates.must_consult_all",
+    "lca.plugins.cognitive.gate.service.plugin",
+    "lca.plugins.cognitive.gate.repeat_tool_call.plugin",
+    "lca.plugins.cognitive.gate.tool_loop_breaker.plugin",
+    "lca.plugins.cognitive.gate.progress_loop_detector.plugin",
+    "lca.plugins.cognitive.gate.terminal_respond.plugin",
+    "lca.plugins.cognitive.gate.artifact_respond_injector.plugin",
+    "lca.plugins.cognitive.gate.must_consult_all.plugin",
 )
 _ACT_RUNTIME_PLUGINS: tuple[str, ...] = (
-    "lca.plugins.body.simple",
-    "lca.plugins.body.safe_executor",
+    "lca.plugins.cognitive.body.simple",
+    "lca.plugins.cognitive.body.safe_executor",
     "lca.plugins.phase_graph.stop_policy",
     "lca.plugins.runtime.hook_registry",
 )

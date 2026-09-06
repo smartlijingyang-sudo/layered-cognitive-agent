@@ -68,7 +68,7 @@ async def test_gateway_reuses_receipt_after_runtime_reconstruction(tmp_path) -> 
         InMemoryEffectHandlerRegistry,
         register_default_effect_handlers,
     )
-    from lca.runtime.declarative_runtime import RuntimePhaseCapabilities
+    from lca.loop.driver import RuntimePhaseCapabilities
 
     class Body:
         calls = 0

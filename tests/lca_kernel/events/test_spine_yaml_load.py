@@ -45,9 +45,7 @@ def test_spine_publisher_resolved() -> None:
     bus = build_test_bus()
     cat = Category("spine.cognition.brain.perceive.start")
     pubs = bus.registry.publishers[cat]
-    from lca.plugins.events.publishers.spine_reflector_cognition.plugin import (
-        ReflectorClass,
-    )
+    from lca.loop.fact_gateway import DefaultFactGateway as ReflectorClass
 
     assert ReflectorClass in pubs
 

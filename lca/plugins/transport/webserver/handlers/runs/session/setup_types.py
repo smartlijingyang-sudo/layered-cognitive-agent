@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from lca.cognition.team.modes_catalog import DEFAULT_MODE
 from lca.contracts.models.core.conversation import ConversationTurn
-from lca.plugins.transport.webserver.handlers.runs.observability.identity import AgentRef
+from lca.plugins.transport.webserver.read.runs.identity import AgentRef
 
 
 @dataclass(frozen=True)

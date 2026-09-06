@@ -22,7 +22,7 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.observability import BoundObservability
 from lca.plugins.state.run_mode_registry_seam import RunModeRegistry
 from lca.plugins.tools.cordis_control import CordisControlToolFactoryProtocol
-from lca.plugins.transport.webserver.handlers.runs.lifecycle.runnable_assembly import (
+from lca.plugins.transport.webserver.carrier.runs.lifecycle.runnable_assembly import (
     RunnableBuildRequest,
 )
 

@@ -60,7 +60,7 @@ class TestPostCodemodSmoke:
         assert defn.logic_address.revision == defn.contract.identity.version
 
     def test_act_authorize_is_G6_DECISION(self) -> None:
-        from lca.plugins.control_contributions.act_authorize import setup
+        from lca.plugins.loop.control.act_authorize.plugin import setup
 
         self._assert_contract_complete(
             type("M", (), {"setup": staticmethod(setup)}),
@@ -68,7 +68,7 @@ class TestPostCodemodSmoke:
         )
 
     def test_observe_wildcard_is_G6_DECISION(self) -> None:
-        from lca.plugins.control_contributions.observe_wildcard import setup
+        from lca.plugins.loop.control.observe_wildcard.plugin import setup
 
         self._assert_contract_complete(
             type("M", (), {"setup": staticmethod(setup)}),

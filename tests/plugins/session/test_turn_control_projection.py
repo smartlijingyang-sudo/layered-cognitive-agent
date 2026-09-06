@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.plugins.session.runtime.session import Session
+from lca.session.append import Session
 from lca.plugins.session.session_turn_control.session_turn_control import TurnControlUnit
 from lca_kernel.events.session import SessionEvent
 

@@ -7,7 +7,7 @@ import unittest
 
 from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.protocols import LLMAdapter
-from lca.plugins.transport.webserver.handlers.runs.execute import create_run_session, execute_run
+from lca.plugins.transport.webserver.carrier.runs.execute import create_run_session, execute_run
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry, RunStatus
 from lca_kernel import run_kernel_lifespan as profile_lifespan
 from tests.harness.scripted_llm import ScriptedLLMAdapter

@@ -2796,7 +2796,7 @@ git commit -m "bundles: create base.yaml (25 Tier-1+2 entries)"
 plugins:
   - id: lca-brain-modular
     name: lca-brain-modular
-    $module: lca.plugins.brain.modular
+    $module: lca.plugins.cognitive.brain.modular
   - id: lca-reasoner-prompt
     name: lca-reasoner-prompt
     $module: lca.plugins.reasoner.prompt

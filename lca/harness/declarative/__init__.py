@@ -1,6 +1,6 @@
 """ADR-0075 最小可信内核的声明式编译、组装与执行实现。
 
-公开符号 lazy 导出，避免 ``import lca.harness.declarative.graph.*`` 时 eager 拉全链。
+公开符号 lazy 导出，避免 ``import lca.harness.graph.*`` 时 eager 拉全链。
 """
 
 from __future__ import annotations

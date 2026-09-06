@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 
 from lca.harness.plan import compiled_run_plan_ref
-from lca.harness.profile.plan_compiler import CompileOptions, compile_plan
+from lca.harness.composition.plan_compiler import CompileOptions, compile_plan
 from lca.harness.profile.resolve import resolve_profile
 from lca.harness.profile.runtime_binding_validator import (
     MissingBindingError,

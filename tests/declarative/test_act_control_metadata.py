@@ -6,11 +6,11 @@ from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.protocols.composition.logic_address import score_logic_address
 from lca.harness.plugin_declaration import definition_from_plugin
-from lca.plugins.control_contributions.act_authorize import setup as authorize_setup
-from lca.plugins.control_contributions.act_budget import setup as budget_setup
-from lca.plugins.control_contributions.act_constrain import setup as constrain_setup
-from lca.plugins.control_contributions.act_execute import setup as execute_setup
-from lca.plugins.control_contributions.act_safe_boundary import setup as safe_boundary_setup
+from lca.plugins.loop.control.act_authorize.plugin import setup as authorize_setup
+from lca.plugins.loop.control.act_budget.plugin import setup as budget_setup
+from lca.plugins.loop.control.act_constrain.plugin import setup as constrain_setup
+from lca.plugins.loop.control.act_execute.plugin import setup as execute_setup
+from lca.plugins.loop.control.act_safe_boundary.plugin import setup as safe_boundary_setup
 
 
 def test_act_control_chain_has_complete_ordered_g6_addresses() -> None:

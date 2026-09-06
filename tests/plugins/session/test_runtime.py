@@ -18,7 +18,7 @@ from typing import Any
 
 import pytest
 
-from lca.plugins.session.runtime.session import Session
+from lca.session.append import Session
 from lca.plugins.session.runtime.store import SessionStore
 from lca_kernel.events.fold import EpochHeader, foldRequestHeader, headerEquals
 from lca_kernel.events.session import (

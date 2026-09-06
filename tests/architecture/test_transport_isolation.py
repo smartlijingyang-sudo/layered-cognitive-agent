@@ -36,7 +36,12 @@ _IMPORT_LINE = re.compile(r"^\s*(from\s+\S+\s+import|import\s+\S+)")
 
 # 已知债(2026-09-06): transport 尚无代码级违规;注释/README 不计入。
 _BASELINE_OFFENDERS: frozenset[str] = frozenset()
-_BASELINE_CARRIER_FOLD_OFFENDERS: frozenset[str] = frozenset()
+# 已知债(2026-09-06): P3 shim 删除后 carrier lifecycle/execute 仍直接 import
+# read.runs (flush/error/identity);delete-when 上述 import 经 seam 注入或迁 carrier。
+_BASELINE_CARRIER_FOLD_OFFENDERS: frozenset[str] = frozenset({
+    "lca/plugins/transport/webserver/carrier/runs/execute/execute.py",
+    "lca/plugins/transport/webserver/carrier/runs/lifecycle/lifecycle.py",
+})
 
 
 def _code_line(line: str) -> str:

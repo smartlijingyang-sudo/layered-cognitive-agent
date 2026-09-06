@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from lca.contracts.protocols.runtime.infra import MachineResolver
-from lca.plugins.transport.webserver.handlers.runs.doctor import DoctorReport
+from lca.plugins.transport.webserver.doctor import DoctorReport
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry
 from lca.plugins.transport.webserver.handlers.runs.terminal.port import (
     RunCommandReceipt,
@@ -22,7 +22,7 @@ from lca.plugins.transport.webserver.handlers.runs.terminal.port import (
 from lca.plugins.transport.webserver.handlers.runs.terminal.registry_commands import (
     RegistryRunCommands,
 )
-from lca.plugins.transport.webserver.handlers.runs.terminal.registry_queries import (
+from lca.plugins.transport.webserver.read.runs.terminal.registry_queries import (
     RegistryRunQueries,
 )
 

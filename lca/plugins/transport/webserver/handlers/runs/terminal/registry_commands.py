@@ -14,11 +14,11 @@ import structlog
 
 from lca.contracts.observability.status import RunLifecycleStatus
 from lca.contracts.protocols.runtime.infra import MachineResolver
-from lca.plugins.transport.webserver.handlers.runs.execute.execute import (
+from lca.plugins.transport.webserver.carrier.runs.execute.execute import (
     create_run_session,
     resume_run,
 )
-from lca.plugins.transport.webserver.handlers.runs.execute.scheduling import (
+from lca.plugins.transport.webserver.carrier.runs.execute.scheduling import (
     schedule_run,
 )
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry
@@ -184,7 +184,7 @@ class RegistryRunCommands:
                 error="run not waiting for input",
                 error_status=409,
             )
-        from lca.plugins.session.runtime.recovery import SessionRecoveryError
+        from lca.session.recovery import SessionRecoveryError
         from lca.plugins.transport.webserver.carrier.runs.resume import (
             resume_cache_ready,
             validate_durable_resume,

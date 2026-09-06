@@ -19,7 +19,7 @@ from unittest.mock import MagicMock
 # when lifecycle.lifecycle is the first module loaded.
 from lca.plugins.transport.webserver.handlers.runs.terminal import registry_commands  # noqa: F401
 from lca.infrastructure.observability.facade.run_ambit import RunAmbit, current_file_store
-from lca.plugins.transport.webserver.handlers.runs.lifecycle.lifecycle import RunLifecycleCoordinator
+from lca.plugins.transport.webserver.carrier.runs.lifecycle.lifecycle import RunLifecycleCoordinator
 from lca.contracts.observability.status import RunLifecycleStatus
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunSession
 # isort: on

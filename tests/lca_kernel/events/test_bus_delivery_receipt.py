@@ -69,9 +69,7 @@ def subscriber_plugin() -> type:
 @pytest.fixture
 def spine_producer() -> type:
     """yaml publishers 白名单内的持久类(observability)发送方。"""
-    from lca.plugins.events.publishers.spine_reflector_cognition.plugin import (
-        ReflectorClass,
-    )
+    from lca.loop.fact_gateway import DefaultFactGateway as ReflectorClass
 
     return ReflectorClass
 

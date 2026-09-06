@@ -13,7 +13,7 @@ from lca.runtime.checkpoint_resolution import (
     DeclarativeCheckpoint,
     DeclarativeCheckpointStateResolver,
 )
-from lca.runtime.declarative_runtime import DeclarativeRuntimeDriver
+from lca.loop.driver import DeclarativeRuntimeDriver
 
 EXPECTED_PLAN_REF = "expected-plan-ref"
 

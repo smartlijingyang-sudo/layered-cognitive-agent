@@ -22,7 +22,7 @@ def test_executor_uses_assembler_not_derive_messages() -> None:
 
 
 def test_session_derive_messages_uses_projection_fabric() -> None:
-    src = (ROOT / "lca" / "plugins" / "session" / "runtime" / "session.py").read_text(
+    src = (ROOT / "lca" / "session" / "append.py").read_text(
         encoding="utf-8"
     )
     assert "model_visible_messages" in src

@@ -31,11 +31,11 @@ from lca.infrastructure.observability.facade.run_ambit import RunAmbit
 from lca.infrastructure.observability.loop_cursor import (
     reset_run_cursor,
 )
-from lca.plugins.transport.webserver.handlers.runs.observability.identity import (
+from lca.plugins.transport.webserver.read.runs.identity import (
     AgentRef,
     default_agent_ref,
 )
-from lca.plugins.transport.webserver.handlers.runs.observability.journal_projection_binding import (
+from lca.plugins.transport.webserver.read.runs.journal_projection_binding import (
     ProcessJournalBinding,
 )
 from lca.plugins.transport.webserver.handlers.runs.session.event_session import (

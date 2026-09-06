@@ -22,7 +22,7 @@ from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
     set_publish_session,
 )
-from lca.plugins.session.runtime.session import Session
+from lca.session.append import Session
 
 
 def test_decorator_emits_start_then_end_on_success() -> None:

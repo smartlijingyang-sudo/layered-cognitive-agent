@@ -1,6 +1,6 @@
 """Three-regex error sanitizer — no protocol chain."""
 
-from lca.plugins.transport.webserver.handlers.runs.observability.error_presentation import (
+from lca.plugins.transport.webserver.read.runs.error_presentation import (
     sanitize_error,
 )
 

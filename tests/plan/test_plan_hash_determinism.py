@@ -28,7 +28,7 @@ from lca.harness.plan import (
     control_entries_sub_plan_hash,
     scope_sub_plan_hash,
 )
-from lca.harness.profile.plan_compiler import CompileOptions, compile_plan
+from lca.harness.composition.plan_compiler import CompileOptions, compile_plan
 from lca.harness.profile.resolve import resolve_profile
 
 WEB_STANDARD = "profiles/web-standard.yaml"

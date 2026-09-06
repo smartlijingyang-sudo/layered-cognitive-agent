@@ -23,7 +23,7 @@ from lca.contracts.protocols.declarative.declarative_execution import (
     PhaseRunCursor,
 )
 from lca.harness.declarative.controls.approval import ApprovalStateMachine, ApprovalTransition
-from lca.harness.declarative.graph.traversal import PhaseTraversal
+from lca.harness.graph.traversal import PhaseTraversal
 
 
 @dataclass(frozen=True, slots=True)

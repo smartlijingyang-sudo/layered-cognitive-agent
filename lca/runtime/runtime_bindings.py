@@ -51,7 +51,7 @@ from lca.harness.plan import compiled_run_plan_ref
 from lca.runtime.runtime_event_publisher import NullRuntimeLifecyclePublisher
 
 if TYPE_CHECKING:
-    from lca.runtime.declarative_runtime import DeclarativeRuntimeDriver
+    from lca.loop.driver import DeclarativeRuntimeDriver
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,7 +256,7 @@ class DeclarativeRuntimeBindings:
     def new_driver(self) -> DeclarativeRuntimeDriver:
         """为一次 fresh 或 resume Turn 创建隔离的声明式 driver。"""
 
-        from lca.runtime.declarative_runtime import DeclarativeRuntimeDriver
+        from lca.loop.driver import DeclarativeRuntimeDriver
 
         return DeclarativeRuntimeDriver(self, journal=self.journal_factory.create())
 

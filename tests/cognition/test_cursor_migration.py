@@ -104,7 +104,7 @@ def test_perceive_hub_uses_cursor_advance_not_coord_emit_phase() -> None:
     import textwrap
 
     from lca.cognition import perceive_hub
-    from lca.harness.declarative.lifecycle import phase_fact_emitter
+    from lca.loop import phase_fact_emitter
 
     hub_source = textwrap.dedent(inspect.getsource(perceive_hub.SequentialPerceiveHub.perceive))
     hub_text = ast.unparse(ast.parse(hub_source))

@@ -155,7 +155,7 @@ def _agent_from_bound_graph(
 ) -> CognitiveAgent:
     """Close the plan-bound complete AgentGraph into a CognitiveAgent."""
 
-    from lca.plugins.session.runtime.bind import event_session_binder_from_scope
+    from lca.session.bind import event_session_binder_from_scope
 
     runtime = assemble_runtime_from_graph(spec, graph, plan=plan, scope=scope)
     return CognitiveAgent(

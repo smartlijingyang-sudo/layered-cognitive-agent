@@ -29,7 +29,7 @@ from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
     set_publish_session,
 )
-from lca.plugins.session.runtime.session import Session
+from lca.session.append import Session
 
 
 def _state(*, step: int = 0) -> AgentState:
@@ -120,12 +120,12 @@ async def test_phase_fact_emitter_appends_context_manifested() -> None:
         PhaseResult,
         SemanticPhase,
     )
-    from lca.harness.declarative.lifecycle.phase_fact_emitter import emit_phase_catalog_facts
+    from lca.loop.phase_fact_emitter import emit_phase_catalog_facts
     from lca.plugins.events.publishers._session_publish import (
         reset_publish_session,
         set_publish_session,
     )
-    from lca.plugins.session.runtime.session import Session
+    from lca.session.append import Session
 
     session = Session("manifest_emit")
     token = set_publish_session(session)

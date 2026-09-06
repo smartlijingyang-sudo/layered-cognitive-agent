@@ -10,8 +10,8 @@ from lca.infrastructure.observability.loop_cursor._spine_port import (
 )
 from lca.infrastructure.observability.spine.event_record import EventRecord
 from lca.plugins.observability.spine.emit_pipeline import EmitPipeline
-from lca.plugins.observability.spine.spine_enrich import enrich_spine_payload, set_active_spine_enricher
-from lca.plugins.session.runtime.bind import (
+from lca.infrastructure.observability.spine.spine_enrich import enrich_spine_payload, set_active_spine_enricher
+from lca.session.bind import (
     bind_run_event_session_from_store,
     unbind_run_event_session,
 )
@@ -40,7 +40,7 @@ class _CountingAnomaly:
 
 
 def test_session_event_projection_maps_spine_category() -> None:
-    from lca.plugins.session.runtime.session import Session
+    from lca.session.append import Session
 
     session = Session("run_proj")
     session.append(

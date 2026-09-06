@@ -396,7 +396,7 @@ def test_deriver_flush_folds_spine_alongside_session_snapshot(tmp_path: Path) ->
     出 spine 侧的 step,否则 journal totals 恒 0、doctor H-xref 断
     (回归:run_b2c1424d93d4 等 4 连发)。
     """
-    from lca.plugins.session.runtime.session import Session
+    from lca.session.append import Session
 
     session = Session("r_spine_first")
     session.append("AgentRunStarted", {"run_id": "r_spine_first"})
@@ -437,7 +437,7 @@ def test_deriver_flush_folds_spine_alongside_session_snapshot(tmp_path: Path) ->
 
 def test_deriver_flush_falls_back_to_snapshot_without_spine(tmp_path: Path) -> None:
     """spine 文件缺失时回落 Session.snapshot_events(in-process 路径)。"""
-    from lca.plugins.session.runtime.session import Session
+    from lca.session.append import Session
 
     session = Session("r_sess")
     session.append("writable.step.start", {"phase": "act"})

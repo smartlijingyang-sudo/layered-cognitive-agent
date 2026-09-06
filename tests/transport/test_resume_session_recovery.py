@@ -65,8 +65,8 @@ def test_assert_resume_allowed_rejects_idle_recovery() -> None:
 
 
 def test_append_approval_resolved_if_pending() -> None:
-    from lca.plugins.session.runtime.session import Session
-    from lca.plugins.session.runtime.transport_recovery import append_approval_resolved_if_pending
+    from lca.session.append import Session
+    from lca.session.recovery import append_approval_resolved_if_pending
 
     session = Session("run_2")
     events = [

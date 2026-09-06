@@ -374,12 +374,12 @@ def test_wrap_instrument_bypasses_emit_pipeline_when_session_ssot_hook() -> None
         bind_session_append_hook,
         reset_session_append_hook,
     )
-    from lca.plugins.observability.spine.spine_enrich import (
+    from lca.infrastructure.observability.spine.spine_enrich import (
         enrich_spine_payload,
         set_active_field_producers,
         set_active_spine_enricher,
     )
-    from lca.plugins.session.runtime.bind import (
+    from lca.session.bind import (
         bind_run_event_session_from_store,
         unbind_run_event_session,
     )

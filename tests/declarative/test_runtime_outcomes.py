@@ -22,9 +22,9 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
 )
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.harness.declarative import GenericPlanInterpreter, GraphAssembler, MappingRestrictedScope
-from lca.harness.declarative.compile.phase_governance import classify_control_verdict
+from lca.harness.graph.governance.phase_governance import classify_control_verdict
 from lca.harness.plan import compiled_run_plan_ref
-from lca.harness.profile.plan_compiler import compile_plan
+from lca.harness.composition.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
 from tests.phase_executors import standard_phase_executors
 
@@ -261,7 +261,7 @@ def test_outcome_projector_records_failure_without_executing_a_graph() -> None:
 
     from lca.harness.declarative import InMemoryJournalCommitter
     from lca.harness.declarative.execute.outcome_projection import RunOutcomeProjector
-    from lca.harness.declarative.graph.traversal import PhaseTraversal
+    from lca.harness.graph.traversal import PhaseTraversal
 
     journal = InMemoryJournalCommitter()
     traversal = PhaseTraversal.start(

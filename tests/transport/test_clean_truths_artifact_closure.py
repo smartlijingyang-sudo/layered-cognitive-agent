@@ -18,7 +18,7 @@ import pytest
 
 from lca.contracts.atoms.enums import StreamChannel
 from lca.contracts.models.observability.journal import StepTextDelta
-from lca.plugins.transport.webserver.handlers.runs.observability.artifact_closure import (
+from lca.plugins.transport.webserver.read.runs.artifact_closure import (
     emit_artifact_closure_if_needed,
 )
 from lca.contracts.observability.status import RunLifecycleStatus

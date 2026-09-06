@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.protocols.state.reducer import Reducer
-from lca.plugins.runtime.reducer import DefaultReducer
+from lca.plugins.loop.reducer.plugin import DefaultReducer
 
 
 def _state() -> AgentState:

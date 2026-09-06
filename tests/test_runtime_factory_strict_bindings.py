@@ -37,7 +37,7 @@ from lca.plugins.journal.declarative_runtime_seams_provider import (
     RegistryDeltaReducerFactory,
     RegistryEffectDispatcherFactory,
 )
-from lca.plugins.runtime.reducer import DefaultReducer
+from lca.plugins.loop.reducer.plugin import DefaultReducer
 from lca.runtime.resume_input import HumanAnswerResumeInputAdapter
 
 

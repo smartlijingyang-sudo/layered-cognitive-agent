@@ -24,7 +24,7 @@ from lca.infrastructure.observability.loop_cursor.bind import reset_run_cursor
 from lca.infrastructure.observability.loop_cursor.factory import LoopCursorFactory
 from lca.infrastructure.observability.loop_cursor.projection_host import StdProjectionHost
 from lca.plugins.session.runtime.store import SessionStore
-from lca.plugins.transport.webserver.handlers.runs.execute import create_run_session
+from lca.plugins.transport.webserver.carrier.runs.execute import create_run_session
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry
 
 

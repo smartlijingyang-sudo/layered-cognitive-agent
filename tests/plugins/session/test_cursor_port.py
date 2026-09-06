@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 
 from lca.plugins.session.runtime.cursor_port import SessionWritePortAdapter
-from lca.plugins.session.runtime.session import Session
+from lca.session.append import Session
 from lca.plugins.session.runtime.store import SessionStore
 
 
@@ -54,7 +54,7 @@ def test_append_translates_to_session_event_with_ep_type_and_incarnation() -> No
 
 def test_append_accepts_run_session_bridge() -> None:
     """构造接受 run bind 产出的 bridge(读 ``.inner``),与裸 Session 等价。"""
-    from lca.plugins.session.runtime.bind import (
+    from lca.session.bind import (
         bind_run_event_session_from_store,
         unbind_run_event_session,
     )

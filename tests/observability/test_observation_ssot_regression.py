@@ -288,7 +288,7 @@ def test_outcome_projector_failed_emits_exception_caught(
     通过 stub ``emit_exception_caught`` 验证被调用 + payload 携带
     ``traceback_text``。
     """
-    from lca.harness.declarative.graph.traversal import PhaseTraversal
+    from lca.harness.graph.traversal import PhaseTraversal
 
     journal = _CapturingJournal()
     captured: list[dict] = []

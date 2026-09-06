@@ -24,7 +24,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.harness.declarative import GenericPlanInterpreter, GraphAssembler, MappingRestrictedScope
 from lca.harness.plan import compiled_run_plan_ref
-from lca.harness.profile.plan_compiler import compile_plan
+from lca.harness.composition.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
 from tests.phase_executors import standard_phase_executors
 

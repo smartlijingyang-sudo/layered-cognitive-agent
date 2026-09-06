@@ -20,7 +20,7 @@ from lca.contracts.protocols.runtime.runtime_lifecycle import (
     RuntimeLifecycleEvent,
     RuntimeLifecycleEventType,
 )
-from lca.harness.profile.plan_compiler import compile_plan
+from lca.harness.composition.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
 from lca.infrastructure.learning.review_ticket_store import InMemoryLearningReviewTicketStore
 from lca.plugins.insight.failure_analyzer import FailureAnalyzerService

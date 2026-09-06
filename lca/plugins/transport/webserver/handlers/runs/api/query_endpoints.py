@@ -19,7 +19,7 @@ from lca.contracts.observability.run_locator import RunLocator
 from lca.infrastructure.observability.journal.sse.frames import parse_last_event_id
 from lca.plugins.transport.webserver.handlers.cors import cors_headers
 from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import _run_port_of
-from lca.plugins.transport.webserver.handlers.runs.observability.evidence import (
+from lca.plugins.transport.webserver.read.runs.evidence import (
     EvidencePayloadDecodeError,
     InvalidEvidenceDigestError,
     RunEvidenceNotFoundError,

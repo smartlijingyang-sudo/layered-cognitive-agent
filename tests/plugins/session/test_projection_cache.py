@@ -9,7 +9,7 @@ from typing import Any
 from lca.contracts.protocols.session.projection_unit import ProjectionCheckpoint
 from lca.infrastructure.persistence.atomic_json_sink import AtomicJsonFileSink, AtomicJsonSnapshot
 from lca.plugins.session.projection_cache.projection_cache import ProjectionCache
-from lca.plugins.session.runtime.session import Session
+from lca.session.append import Session
 
 
 class _StubRegistry:

@@ -17,7 +17,7 @@ from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
     set_publish_session,
 )
-from lca.plugins.session.runtime.session import Session
+from lca.session.append import Session
 
 
 @contextmanager

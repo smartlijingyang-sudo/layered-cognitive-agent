@@ -6,10 +6,10 @@ from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.protocols.composition.logic_address import score_logic_address
 from lca.harness.plugin_declaration import definition_from_plugin
-from lca.plugins.gates.artifact_respond_injector import setup as artifact_respond_setup
-from lca.plugins.gates.must_consult_all import setup as must_consult_all_setup
-from lca.plugins.gates.progress_loop_detector import setup as progress_loop_setup
-from lca.plugins.gates.terminal_respond import setup as terminal_respond_setup
+from lca.plugins.cognitive.gate.artifact_respond_injector.plugin import setup as artifact_respond_setup
+from lca.plugins.cognitive.gate.must_consult_all.plugin import setup as must_consult_all_setup
+from lca.plugins.cognitive.gate.progress_loop_detector.plugin import setup as progress_loop_setup
+from lca.plugins.cognitive.gate.terminal_respond.plugin import setup as terminal_respond_setup
 
 
 def test_gate_primitives_publish_complete_g6_guard_addresses() -> None:

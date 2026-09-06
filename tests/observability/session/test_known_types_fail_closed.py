@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.plugins.session.runtime.event_catalog import (
+from lca.session.catalog import (
     UnknownSessionEventTypeError,
     known_session_event_types,
     validate_event_type_for_read,

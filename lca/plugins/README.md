@@ -57,7 +57,7 @@ async def setup_<name>(ctx: PluginContext, config: Config) -> None: ...
 # bundles/web-app.yaml（节选）
 plugins:
   - id: lca-brain-modular
-    $module: lca.plugins.brain.modular
+    $module: lca.plugins.cognitive.brain.modular
   - id: lca.plugins.observability.journal.default
     $module: lca.plugins.observability.journal.default
 ```

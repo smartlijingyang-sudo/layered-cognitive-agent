@@ -77,7 +77,7 @@ plugins/<seam>/<group>/<plugin-id>/
 # bundles/*.yaml
 plugins:
   - id: phase.perceive.standard
-    $module: lca.plugins.phase_graph.perceive   # 迁移后 → lca.plugins.loop.phase.perceive.standard
+    $module: lca.plugins.loop.phase.perceive.standard.plugin   # 迁移后 → lca.plugins.loop.phase.perceive.standard
 ```
 
 ## 8. 验证

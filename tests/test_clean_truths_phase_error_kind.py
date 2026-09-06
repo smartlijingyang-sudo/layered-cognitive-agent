@@ -180,7 +180,7 @@ def test_frontend_display_string_carries_label_and_root_cause() -> None:
     tests/test_run_diagnostic.py::test_reducer_apply_stop_propagates_diagnostic_message),
     故此处直接验证 failure_stop 合成串到前端格式化函数的完整投影。
     """
-    from lca.plugins.transport.webserver.handlers.runs.observability.error_presentation import (
+    from lca.plugins.transport.webserver.read.runs.error_presentation import (
         format_user_error,
     )
 

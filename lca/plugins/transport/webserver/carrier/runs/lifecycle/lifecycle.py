@@ -16,14 +16,14 @@ from lca.infrastructure.observability.facade.run_ambit import bind_run_ambit
 from lca.infrastructure.runtime_plane.resolve import PlaneBindingError
 from lca.infrastructure.runtime_plane.scope import plane_bindings_scope
 from lca.infrastructure.workspace import run_workspace_scope
-from lca.plugins.loop_drivers.registry import (
+from lca.plugins.loop.driver.plugin import (
     _UnknownExecutionTargetError as _UnknownExecutionTargetError,
 )
 from lca.plugins.transport.webserver.carrier.runs.execute.execution_environment import (
     RunExecutionEnvironment,
 )
-from lca.plugins.transport.webserver.handlers.runs.observability.binding import ensure_session_hub
-from lca.plugins.transport.webserver.handlers.runs.observability.step_tree_flush import (
+from lca.plugins.transport.webserver.carrier.runs.binding import ensure_session_hub
+from lca.plugins.transport.webserver.read.runs.step_tree_flush import (
     flush_step_tree_artifacts,
 )
 from lca.plugins.transport.webserver.handlers.runs.session.session import (
@@ -240,7 +240,7 @@ class RunLifecycleCoordinator:
     def _format_exception(exc: Exception, session: RunSession) -> str:
         """Keep exception presentation at the lifecycle error seam."""
 
-        from lca.plugins.transport.webserver.handlers.runs.observability.error_presentation import (
+        from lca.plugins.transport.webserver.read.runs.error_presentation import (
             format_user_error,
         )
 

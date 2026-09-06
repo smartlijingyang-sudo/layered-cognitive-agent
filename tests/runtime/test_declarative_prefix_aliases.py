@@ -14,7 +14,7 @@ from lca.runtime.checkpoint_resolution import (
     DeclarativeCheckpointStateResolver,
     RuntimeCheckpoint,
 )
-from lca.runtime.declarative_runtime import (
+from lca.loop.driver import (
     DeclarativeExecution,
     DeclarativeRuntimeDriver,
     RuntimeDriver,

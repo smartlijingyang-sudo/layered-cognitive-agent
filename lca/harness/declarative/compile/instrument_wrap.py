@@ -88,7 +88,6 @@ def _is_i17_violation(exc: BaseException) -> bool:
         in (
             "lca.infrastructure.observability.spine.spine_enrich",
             "lca.plugins.observability.spine.emit_pipeline",
-            "lca.plugins.observability.spine.spine_enrich",
         )
     )
 

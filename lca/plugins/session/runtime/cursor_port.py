@@ -2,7 +2,7 @@
 
 cursor 的 6 字段 :class:`~lca.infrastructure.observability.loop_cursor._spine_port.WritePort`
 append 经本 adapter 落到当前 run 的
-:class:`~lca.plugins.session.runtime.session.Session`(单一生产入口
+:class:`~lca.session.append.Session`(单一生产入口
 ``Session.append``),不再走 legacy spine 链
 (``SpineWritePortAdapter`` → ``EventSpine.append`` → FileSink)。
 
@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.plugins.session.runtime.session import Session
+from lca.session.append import Session
 
 __all__ = ["SessionWritePortAdapter"]
 

@@ -95,7 +95,7 @@ _RUNTIME_CLOSURE_CATALOG: tuple[RuntimeClosureRequirement, ...] = (
     ),
     RuntimeClosureRequirement(
         "reducer",
-        "lca.plugins.runtime.reducer",
+        "lca.plugins.loop.reducer.plugin",
     ),
     RuntimeClosureRequirement(
         "artifact_closure",

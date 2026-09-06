@@ -38,7 +38,7 @@ from lca.contracts.protocols.runtime.infra import MachineResolver
 from lca.plugins.transport.webserver.carrier.runs.execute.scheduling import (
     schedule_run as schedule_run,
 )
-from lca.plugins.transport.webserver.handlers.runs.observability.identity import (
+from lca.plugins.transport.webserver.read.runs.identity import (
     AgentRef,
 )
 from lca.plugins.transport.webserver.handlers.runs.session.session import (

@@ -18,7 +18,7 @@ from lca.plugins.act.effect_handlers_provider import (
     InMemoryEffectHandlerRegistry,
     register_default_effect_handlers,
 )
-from lca.runtime.declarative_runtime import RuntimePhaseCapabilities
+from lca.loop.driver import RuntimePhaseCapabilities
 from lca.runtime.idempotency_fixtures import InMemoryFixtureIdempotencyStore
 
 

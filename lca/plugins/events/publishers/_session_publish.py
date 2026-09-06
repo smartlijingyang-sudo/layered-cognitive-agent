@@ -81,7 +81,7 @@ def set_publish_session(
 ) -> contextvars.Token[_PublishSession | None]:
     """设置当前上下文的 active Session;返回 token 供 reset。
 
-    runtime :class:`~lca.plugins.session.runtime.session.Session` 自动包成
+    runtime :class:`~lca.session.append.Session` 自动包成
     bus Protocol facade；已是 ``append(payload, *, producer)`` 形态的对象
     原样装载。
     """

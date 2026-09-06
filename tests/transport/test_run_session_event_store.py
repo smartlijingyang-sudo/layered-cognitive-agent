@@ -29,7 +29,7 @@ from lca.plugins.events.publishers._session_publish import (
     publish_via_session,
 )
 from lca.plugins.session.runtime.store import SessionStore
-from lca.plugins.transport.webserver.handlers.runs.execute import create_run_session
+from lca.plugins.transport.webserver.carrier.runs.execute import create_run_session
 from lca.plugins.transport.webserver.handlers.runs.session.session import RunRegistry
 from lca_kernel.events.bus import EventBus
 from lca_kernel.events.test_catalog import build_test_bus
@@ -237,9 +237,7 @@ def test_builder_without_session_store_fail_loud(tmp_path: Path) -> None:
 def test_bound_session_append_records_log_and_returns_eventref(
     tmp_path: Path,
 ) -> None:
-    from lca.plugins.events.publishers.spine_reflector_cognition.plugin import (
-        ReflectorClass,
-    )
+    from lca.loop.fact_gateway import DefaultFactGateway as ReflectorClass
 
     store = SessionStore()
     ctx, _spine = _build_ctx(session_store=store)
@@ -270,9 +268,7 @@ def test_bound_session_append_records_log_and_returns_eventref(
 def test_bind_attaches_boot_catalogued_observers(tmp_path: Path) -> None:
     """Boot 先 register（无 Session）→ create_run_session set_session → append 派发。"""
     from lca.contracts.event import EventPayload
-    from lca.plugins.events.publishers.spine_reflector_cognition.plugin import (
-        ReflectorClass,
-    )
+    from lca.loop.fact_gateway import DefaultFactGateway as ReflectorClass
     from lca_kernel.events import EventRef
 
     seen: list[tuple[EventPayload, EventRef]] = []

@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from lca.contracts.harness.tasks.session import SessionEvent
-from lca.plugins.session.runtime.repair import (
+from lca.session.repair import (
     TOOL_NOT_STARTED,
     TOOL_OUTCOME_UNKNOWN,
     SessionRepairError,

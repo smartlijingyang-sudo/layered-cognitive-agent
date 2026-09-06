@@ -22,7 +22,7 @@ from lca.contracts.models.observability import (
     empty_document,
 )
 from lca.infrastructure.observability.journal.step.projector import JournalDocumentWriter
-from lca.plugins.transport.webserver.handlers.runs.doctor.step_check import (
+from lca.plugins.transport.webserver.doctor.step_check import (
     diagnose_step_tree,
 )
 

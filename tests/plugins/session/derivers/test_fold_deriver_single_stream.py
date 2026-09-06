@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from lca.plugins.session.derivers.step_tree.fold_deriver import StepTreeFoldDeriver
-from lca.plugins.session.runtime.session import Session
+from lca.session.append import Session
 
 
 def test_iter_events_session_only_when_snapshot_nonempty(tmp_path: Path) -> None:

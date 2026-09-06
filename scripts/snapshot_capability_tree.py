@@ -430,7 +430,7 @@ def _build_capability_tree(profile: str) -> CapabilityTree:
     }
 
     from lca.harness.plan import compiled_run_plan_ref
-    from lca.harness.profile.plan_compiler import compile_plan
+    from lca.harness.composition.plan_compiler import compile_plan
 
     compiled_plan = compile_plan(resolved)
     declarative_control_contributions: dict[str, list[str]] = {}

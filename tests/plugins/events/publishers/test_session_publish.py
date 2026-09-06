@@ -69,9 +69,7 @@ def test_set_reset_publish_session_roundtrip() -> None:
 
 def test_publish_via_session_requires_bound_session() -> None:
     """无 Session 时 → MissingPublishSessionError,不走 EventBus.publish。"""
-    from lca.plugins.events.publishers.spine_reflector_cognition.plugin import (
-        ReflectorClass,
-    )
+    from lca.loop.fact_gateway import DefaultFactGateway as ReflectorClass
 
     assert current_publish_session() is None
     with pytest.raises(MissingPublishSessionError, match="set_publish_session"):
@@ -86,9 +84,7 @@ def test_publish_via_session_requires_bound_session() -> None:
 
 def test_publish_via_session_delegates_to_session_when_set(bus: EventBus) -> None:
     """有 Session 时 → Session.append(payload, producer=...) 被调用,且 payload/producer 不变。"""
-    from lca.plugins.events.publishers.spine_reflector_cognition.plugin import (
-        ReflectorClass,
-    )
+    from lca.loop.fact_gateway import DefaultFactGateway as ReflectorClass
 
     captured: dict[str, Any] = {}
 
@@ -134,7 +130,7 @@ def test_publish_via_session_does_not_call_eventbus_when_session_set(
     EventBus.set_default(bus)
     token = set_publish_session(FakeSession())
     try:
-        from lca.plugins.events.publishers.spine_reflector_cognition.plugin import ReflectorClass
+        from lca.loop.fact_gateway import DefaultFactGateway as ReflectorClass
 
         ref = publish_via_session(payload, producer=ReflectorClass)
         assert ref is not None
@@ -191,7 +187,7 @@ def test_set_publish_session_wraps_runtime_session(bus: EventBus) -> None:
         DelegationCachePlugin,
     )
     from lca.plugins.session.runtime.bus_facade import SessionBusFacade
-    from lca.plugins.session.runtime.session import Session
+    from lca.session.append import Session
 
     session = Session("pub-wrap")
     EventBus.set_default(bus)
@@ -217,7 +213,7 @@ def test_set_publish_session_wraps_runtime_session(bus: EventBus) -> None:
 
 def test_set_publish_session_does_not_rewrap_facade() -> None:
     from lca.plugins.session.runtime.bus_facade import SessionBusFacade
-    from lca.plugins.session.runtime.session import Session
+    from lca.session.append import Session
 
     facade = SessionBusFacade(Session("pub-once"))
     token = set_publish_session(facade)

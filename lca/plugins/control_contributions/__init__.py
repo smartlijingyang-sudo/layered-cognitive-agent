@@ -5,18 +5,18 @@ previously in DefaultControlPolicyEngine. These executors return PhaseResult
 with ControlVerdict payloads.
 """
 
-from lca.plugins.control_contributions.act_authorize import ActAuthorizeExecutor
-from lca.plugins.control_contributions.act_budget import ActBudgetExecutor
-from lca.plugins.control_contributions.act_constrain import ActConstrainExecutor
-from lca.plugins.control_contributions.act_execute import ActExecuteExecutor
-from lca.plugins.control_contributions.act_safe_boundary import ActSafeBoundaryExecutor
-from lca.plugins.control_contributions.observe_checkpoint import ObserveCheckpointExecutor
-from lca.plugins.control_contributions.observe_wildcard import ObserveWildcardExecutor
-from lca.plugins.control_contributions.perceive_context import PerceiveContextExecutor
-from lca.plugins.control_contributions.remember_admit import RememberAdmitExecutor
-from lca.plugins.control_contributions.stop_decide import StopDecideExecutor
-from lca.plugins.control_contributions.stop_focus import FocusStopExecutor
-from lca.plugins.control_contributions.think_guard import (
+from lca.plugins.loop.control.act_authorize.plugin import ActAuthorizeExecutor
+from lca.plugins.loop.control.act_budget.plugin import ActBudgetExecutor
+from lca.plugins.loop.control.act_constrain.plugin import ActConstrainExecutor
+from lca.plugins.loop.control.act_execute.plugin import ActExecuteExecutor
+from lca.plugins.loop.control.act_safe_boundary.plugin import ActSafeBoundaryExecutor
+from lca.plugins.loop.control.observe_checkpoint.plugin import ObserveCheckpointExecutor
+from lca.plugins.loop.control.observe_wildcard.plugin import ObserveWildcardExecutor
+from lca.plugins.loop.control.perceive_context.plugin import PerceiveContextExecutor
+from lca.plugins.loop.control.remember_admit.plugin import RememberAdmitExecutor
+from lca.plugins.loop.control.stop_decide.plugin import StopDecideExecutor
+from lca.plugins.loop.control.stop_focus.plugin import FocusStopExecutor
+from lca.plugins.loop.control.think_guard.plugin import (
     ThinkGuardEnforceExecutor,
     ThinkGuardExecutor,
 )

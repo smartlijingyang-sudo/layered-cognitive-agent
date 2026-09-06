@@ -267,7 +267,7 @@ class TestRelationsMustBeIterable:
 
 class TestDeclarativeControlProjection:
     def test_default_profile_projects_every_executable_control_from_native_specs(self) -> None:
-        from lca.harness.profile.plan_compiler import compile_plan
+        from lca.harness.composition.plan_compiler import compile_plan
         from lca.harness.profile.resolve import resolve_profile
 
         plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))

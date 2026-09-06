@@ -13,8 +13,8 @@ from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 from lca.contracts.models.core.conversation import ConversationTurn
-from lca.plugins.transport.webserver.handlers.runs.doctor import DoctorReport
-from lca.plugins.transport.webserver.handlers.runs.observability.identity import AgentRef
+from lca.plugins.transport.webserver.doctor import DoctorReport
+from lca.plugins.transport.webserver.read.runs.identity import AgentRef
 
 
 @dataclass(frozen=True, slots=True)

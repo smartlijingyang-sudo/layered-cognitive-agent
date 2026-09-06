@@ -12,7 +12,7 @@ from lca.infrastructure.observability.facade.run_context import (
     run_scope,
 )
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
-from lca.plugins.transport.webserver.handlers.runs.observability.identity import (
+from lca.plugins.transport.webserver.read.runs.identity import (
     default_agent_ref,
     parse_agent_ref,
 )

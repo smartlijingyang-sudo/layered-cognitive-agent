@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from lca.infrastructure.session.model_context_assembler import DefaultModelContextAssembler
 from lca.plugins.session.runtime.messages import derive_messages
-from lca.plugins.session.runtime.session import Session
+from lca.session.append import Session
 from lca_kernel.events.fold import (
     REQUEST_HEADER_CATEGORY,
     SURFACE_ASSISTANT_TYPE,

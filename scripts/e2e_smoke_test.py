@@ -68,7 +68,7 @@ async def main() -> int:
             validation_errors,
         )
         from lca.harness.plan import compiled_run_plan_ref
-        from lca.harness.profile.plan_compiler import compile_plan
+        from lca.harness.composition.plan_compiler import compile_plan
 
         plan = compile_plan(resolved)
         print(f"  ✓ CompiledRunPlan: plan_ref={compiled_run_plan_ref(plan)}")

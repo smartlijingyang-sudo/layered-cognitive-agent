@@ -37,7 +37,7 @@ from lca.plugins.act.delta_handlers_provider import (
 from lca.plugins.act.effect_handlers_provider import (
     InMemoryEffectHandlerRegistry,
 )
-from lca.runtime.declarative_runtime import RuntimePhaseCapabilities
+from lca.loop.driver import RuntimePhaseCapabilities
 from lca.runtime.idempotency_fixtures import InMemoryFixtureIdempotencyStore
 
 REPO = Path(__file__).resolve().parents[2]

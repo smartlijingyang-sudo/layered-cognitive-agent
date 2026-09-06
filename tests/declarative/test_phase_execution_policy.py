@@ -29,10 +29,10 @@ from lca.harness.declarative.compile.phase_execution_policy import (
     _phase_error_message,
 )
 from lca.harness.declarative.controls.validation import PhaseGraphValidator, validation_errors
-from lca.harness.declarative.graph.traversal import PhaseTraversal
+from lca.harness.graph.traversal import PhaseTraversal
 from lca.harness.declarative.lifecycle.phase_observation import NullPhaseObserver
-from lca.harness.declarative.lifecycle.phase_transaction import PhaseExecutionTransaction
-from lca.harness.profile.plan_compiler import compile_plan
+from lca.loop.transaction import PhaseExecutionTransaction
+from lca.harness.composition.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
 from tests.phase_executors import standard_phase_executors
 

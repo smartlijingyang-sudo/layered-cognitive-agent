@@ -27,9 +27,9 @@ def _source(relative_path: str) -> str:
 
 def test_execution_environment_only_coordinates_scope_order() -> None:
     """Binding resolution and attachment effects must stay outside the coordinator."""
-    source = _source("gateway/runs/execute/execution_environment.py")
+    source = _source("lca/plugins/transport/webserver/carrier/runs/execute/execution_environment.py")
 
-    assert "lca.plugins.transport.webserver.handlers.runs.execute.environment_bindings" in source
+    assert "lca.plugins.transport.webserver.carrier.runs.execute.environment_bindings" in source
     assert "lca.plugins.transport.webserver.handlers.runs.api.attachment_staging" in source
     assert "resolve_plane_bindings(" not in source
     assert "FileStoreAttachmentIdentity" not in source
@@ -75,15 +75,15 @@ def test_ingest_facade_keeps_policy_cache_transport_and_mirroring_separate() -> 
 
 def test_doctor_facade_routes_step_tree_and_session_spine() -> None:
     """Doctor facade delegates step-tree 和 Session Spine paths;legacy jsonl 已下线。"""
-    source = _source("lca/plugins/transport/webserver/handlers/runs/doctor/doctor.py")
+    source = _source("lca/plugins/transport/webserver/doctor/doctor.py")
 
-    assert "lca.plugins.transport.webserver.handlers.runs.doctor.session_check" in source
-    assert "lca.plugins.transport.webserver.handlers.runs.doctor.step_check" in source
-    assert "lca.plugins.transport.webserver.handlers.runs.doctor.legacy" not in source
+    assert "lca.plugins.transport.webserver.doctor.session_check" in source
+    assert "lca.plugins.transport.webserver.doctor.step_check" in source
+    assert "lca.plugins.transport.webserver.doctor.legacy" not in source
     assert "def _scan_jsonl" not in source
     assert "def _hop_h2" not in source
 
-    legacy_path = ROOT / "lca/plugins/transport/webserver/handlers/runs/doctor/legacy.py"
+    legacy_path = ROOT / "lca/plugins/transport/webserver/doctor/legacy.py"
     assert not legacy_path.exists()
 
 
@@ -100,12 +100,12 @@ def test_temporal_memory_store_delegates_schema_and_record_codec() -> None:
 
 def test_terminalizer_only_coordinates_terminal_transition_order() -> None:
     """Terminal status, artifact closure, manifest, and exporter cleanup have owners."""
-    source = _source("gateway/runs/terminal/terminalizer.py")
+    source = _source("lca/plugins/transport/webserver/handlers/runs/terminal/terminalizer.py")
 
     assert "lca.plugins.transport.webserver.handlers.runs.terminal.status" in source
-    assert "lca.plugins.transport.webserver.handlers.runs.observability.artifact_closure" in source
-    assert "lca.plugins.transport.webserver.handlers.runs.terminal.materialization" in source
-    assert "lca.plugins.transport.webserver.handlers.runs.lifecycle.export_disposal" in source
+    assert "lca.plugins.transport.webserver.read.runs.artifact_closure" in source
+    assert "lca.plugins.transport.webserver.read.runs.terminal.materialization" in source
+    assert "lca.plugins.transport.webserver.carrier.runs.lifecycle.export_disposal" in source
     assert "def _derive_terminal_status" not in source
     assert "def _record_terminal_materialization" not in source
 

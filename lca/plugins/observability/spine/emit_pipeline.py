@@ -1,7 +1,7 @@
 """``spine.emit_pipeline`` — commit + anomaly seam (enrich → Session hook).
 
 FieldProducer merge and I17 enforcement live in
-:mod:`lca.plugins.observability.spine.spine_enrich` and run at the
+:mod:`lca.infrastructure.observability.spine.spine_enrich` and run at the
 Session append hook when a run is bound (ADR-0186 wave 2).
 
 Anomaly detection runs on committed Session spine events via

@@ -6,7 +6,7 @@ import ast
 from pathlib import Path
 from typing import Any
 
-from lca.harness.profile.plan_compiler import compile_plan, explain_compile_plan
+from lca.harness.composition.plan_compiler import compile_plan, explain_compile_plan
 from lca.harness.profile.resolve import resolve_profile
 
 

@@ -29,8 +29,8 @@ from lca.plugins.events.publishers._session_publish import (
     set_publish_session,
 )
 from lca.plugins.session.runtime.messages import derive_messages
-from lca.plugins.session.runtime.recovery import recover_live_agent
-from lca.plugins.session.runtime.session import Session
+from lca.session.recovery import recover_live_agent
+from lca.session.append import Session
 
 
 def test_lifecycle_emit_noop_when_session_unbound() -> None:

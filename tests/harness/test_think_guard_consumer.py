@@ -25,7 +25,7 @@ from lca.contracts.protocols import (
     SkillRouter,
 )
 from lca.plugins.gate.decision_classifier_provider import DefaultDecisionClassifier
-from lca.plugins.runtime.reducer import DefaultReducer
+from lca.plugins.loop.reducer.plugin import DefaultReducer
 
 # ── Test doubles ─────────────────────────────────────────────────────
 
@@ -143,7 +143,7 @@ class TestDeclarativeControlProjection:
 
     def test_think_guard_projection_is_bound_to_the_think_phase(self) -> None:
         from lca.contracts.protocols.declarative.declarative_common import SemanticPhase
-        from lca.harness.profile.plan_compiler import compile_plan
+        from lca.harness.composition.plan_compiler import compile_plan
         from lca.harness.profile.resolve import resolve_profile
 
         plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))
@@ -158,7 +158,7 @@ class TestDeclarativeControlProjection:
 
     def test_stop_control_projection_is_bound_to_the_stop_phase(self) -> None:
         from lca.contracts.protocols.declarative.declarative_common import SemanticPhase
-        from lca.harness.profile.plan_compiler import compile_plan
+        from lca.harness.composition.plan_compiler import compile_plan
         from lca.harness.profile.resolve import resolve_profile
 
         plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))

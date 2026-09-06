@@ -461,7 +461,7 @@ bundle YAML `$module` 字段相应改为模块路径：
 |---|---|---|---|
 | **Tier-1: Definition Plugin** | 声明 seam + 挂载 Definition 服务 | 21 | `lca.plugins.llm_service` 挂 `LlmService` |
 | **Tier-2: Provider Plugin** | 实现 Definition 接口，挂载到 Definition | 30+ | `lca.plugins.providers.llm.mock` 注册 `MockLLMAdapter` |
-| **Tier-3: Behavior Plugin** | 业务行为（Brain / Loop / Coordination / Middleware） | 15+ | `lca.plugins.brain.modular` 装 `ModularBrain` |
+| **Tier-3: Behavior Plugin** | 业务行为（Brain / Loop / Coordination / Middleware） | 15+ | `lca.plugins.cognitive.brain.modular` 装 `ModularBrain` |
 
 **第一轮 spec 只覆盖 Tier-1**。"完全贯彻"必须把 Tier-2 + Tier-3 也 plugin 化。
 
@@ -594,7 +594,7 @@ plugins:
 
 | Behavior | Plugin | 备注 |
 |---|---|---|
-| Brain 默认实现 | `lca.plugins.brain.modular` / `lca.plugins.brain.simple` | Tier-3 |
+| Brain 默认实现 | `lca.plugins.cognitive.brain.modular` / `lca.plugins.cognitive.brain.simple` | Tier-3 |
 | Reasoner | `lca.plugins.reasoner.prompt` / `lca.plugins.reasoner.critic` | Tier-3 |
 | Synthesizer | `lca.plugins.synthesizer.concat` / `lca.plugins.synthesizer.streaming` | Tier-3 |
 | Loop Driver | `lca.plugins.loop_cognitive` / `lca.plugins.loop_replay` | Tier-3 |
@@ -940,7 +940,7 @@ plugins:
   # Brain / Reasoner / Synthesizer
   - id: lca-brain-modular
     name: lca-brain-modular
-    $module: lca.plugins.brain.modular
+    $module: lca.plugins.cognitive.brain.modular
   - id: lca-reasoner-prompt
     name: lca-reasoner-prompt
     $module: lca.plugins.reasoner.prompt

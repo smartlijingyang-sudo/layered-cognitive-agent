@@ -24,7 +24,7 @@ from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
     set_publish_session,
 )
-from lca.plugins.session.runtime.session import Session
+from lca.session.append import Session
 from lca_kernel.events.bus import EventBus
 from lca_kernel.events.test_catalog import build_test_bus
 

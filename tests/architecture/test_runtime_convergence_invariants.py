@@ -95,7 +95,6 @@ class TestTransportRecoveryAuthority:
 
     def test_recovery_public_api_exists(self) -> None:
         assert (ROOT / "lca" / "session" / "recovery.py").is_file()
-        assert (ROOT / "lca/plugins/session/runtime/transport_recovery.py").is_file()
 
     def test_runtime_loop_awaits_step_boundary(self) -> None:
         src = (ROOT / "lca/runtime/runtime_loop.py").read_text(encoding="utf-8")

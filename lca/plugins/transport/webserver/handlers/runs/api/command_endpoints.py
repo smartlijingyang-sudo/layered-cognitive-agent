@@ -32,7 +32,7 @@ from lca.plugins.transport.webserver.handlers.runs.ingest.ingress import (
     LobeHubRunInput,
     prepare_run_from_messages,
 )
-from lca.plugins.transport.webserver.handlers.runs.observability.identity import (
+from lca.plugins.transport.webserver.read.runs.identity import (
     AgentRef,
     parse_agent_ref,
 )

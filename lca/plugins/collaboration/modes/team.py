@@ -31,7 +31,7 @@ from lca.infrastructure.observability import (
     run_scope,
 )
 from lca.plugins.state.run_mode_registry_seam import RunModeRegistry
-from lca.plugins.transport.webserver.handlers.runs.lifecycle.runnable_assembly import (
+from lca.plugins.transport.webserver.carrier.runs.lifecycle.runnable_assembly import (
     RunnableBuildRequest,
 )
 

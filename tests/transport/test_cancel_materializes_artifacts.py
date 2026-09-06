@@ -29,7 +29,7 @@ from lca.infrastructure.observability.journal.step.narrative_writer import (
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 from lca.plugins.observability.run_ledger_seam import _StepTreeBundle
 from lca.plugins.session.derivers.step_tree import StepTreeFoldDeriver
-from lca.plugins.transport.webserver.handlers.runs.observability.identity import (
+from lca.plugins.transport.webserver.read.runs.identity import (
     parse_agent_ref,
 )
 from lca.contracts.observability.status import RunLifecycleStatus
@@ -213,7 +213,7 @@ def test_second_cancel_is_noop(tmp_path: Path) -> None:
 
 def test_pause_flushes_journal_incrementally(tmp_path: Path) -> None:
     """WAITING_INPUT 是增量派生点:不等终态,暂停即写 journal.json。"""
-    from lca.plugins.transport.webserver.handlers.runs.lifecycle import (
+    from lca.plugins.transport.webserver.carrier.runs.lifecycle import (
         RunLifecycleCoordinator,
     )
 
@@ -231,7 +231,7 @@ def test_pause_flushes_journal_incrementally(tmp_path: Path) -> None:
 
 def test_pause_flush_failure_does_not_block_pause(tmp_path: Path) -> None:
     """派生失败只留痕,不阻塞暂停(控制面 / 观察面分离)。"""
-    from lca.plugins.transport.webserver.handlers.runs.lifecycle import (
+    from lca.plugins.transport.webserver.carrier.runs.lifecycle import (
         RunLifecycleCoordinator,
     )
 
@@ -251,7 +251,7 @@ def test_pause_flush_failure_does_not_block_pause(tmp_path: Path) -> None:
 
 
 def test_flush_step_tree_artifacts_contains_errors(tmp_path: Path) -> None:
-    from lca.plugins.transport.webserver.handlers.runs.observability.step_tree_flush import (
+    from lca.plugins.transport.webserver.read.runs.step_tree_flush import (
         flush_step_tree_artifacts,
         journal_outcome_from_session,
     )

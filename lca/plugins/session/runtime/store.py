@@ -19,7 +19,7 @@ from pathlib import Path
 
 import structlog
 
-from lca.plugins.session.runtime.session import Session
+from lca.session.append import Session
 from lca_kernel.events.fold import foldRequestHeader
 from lca_kernel.events.session import SessionEvent, SessionHeader
 
@@ -153,7 +153,7 @@ class SessionStore:
         seq 连续）。``log_path`` 通常是 ``<run_dir>/<run_id>.spine.jsonl``。
         """
         from lca.plugins.session.runtime.log_reader import load_session_events
-        from lca.plugins.session.runtime.repair import repair_interrupted_turn
+        from lca.session.repair import repair_interrupted_turn
 
         events = load_session_events(log_path, session_id=session_id)
         closers = repair_interrupted_turn(events, cold_load=True)

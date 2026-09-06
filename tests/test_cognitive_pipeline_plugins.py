@@ -22,7 +22,7 @@ from lca.contracts.protocols import (
 )
 from lca.harness.plugin_declaration import definition_from_plugin
 from lca.harness.profile.resolve import resolve_profile
-from lca.plugins.brain._standard_factory import STANDARD_COGNITIVE_BRAIN_FACTORY_REQUIREMENTS
+from lca.plugins.cognitive.brain._standard_factory import STANDARD_COGNITIVE_BRAIN_FACTORY_REQUIREMENTS
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -89,7 +89,7 @@ def test_standard_cognitive_plugins_share_a_g5_primitive_boundary() -> None:
     ):
         assert by_id[plugin_id].functional_group is FunctionalGroup.G5_COGNITION
 
-    from lca.plugins.brain.modular import setup as modular_setup
+    from lca.plugins.cognitive.brain.modular import setup as modular_setup
 
     modular_definition = definition_from_plugin(modular_setup)
     assert modular_definition.functional_group is FunctionalGroup.G5_COGNITION

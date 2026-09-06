@@ -27,7 +27,7 @@ class TestRunExecutionFacade(unittest.IsolatedAsyncioTestCase):
         registry = RunRegistry()
         coordinator = _Coordinator()
         context = object()
-        execution_module = import_module("lca.plugins.transport.webserver.handlers.runs.execute")
+        execution_module = import_module("lca.plugins.transport.webserver.carrier.runs.execute")
 
         with patch.object(
             execution_module,
@@ -59,7 +59,7 @@ class TestRunExecutionFacade(unittest.IsolatedAsyncioTestCase):
         registry = RunRegistry()
         coordinator = _Coordinator()
         session = cast("RunSession", object())
-        execution_module = import_module("lca.plugins.transport.webserver.handlers.runs.execute")
+        execution_module = import_module("lca.plugins.transport.webserver.carrier.runs.execute")
 
         with patch.object(
             execution_module,

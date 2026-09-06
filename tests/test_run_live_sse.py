@@ -299,12 +299,12 @@ async def test_text_channel_none_disables_filter() -> None:
 async def test_gateway_api_iter_live_sse_emits_frames() -> None:
     """ADR-0163 决策 5:the runs/api carrier SSE helper is now a sibling re-export
     stub. The live SSE generator lives at
-    :func:`lca.plugins.transport.webserver.handlers.runs.terminal.live_compat.iter_live_sse`
+    :func:`lca.plugins.transport.webserver.read.runs.terminal.live_compat.iter_live_sse`
     (a forwarder over :mod:`lca.infrastructure.observability.journal.stream.live_tail`).
     This regression confirms the carrier-facing surface still yields frames
     without the legacy ``redact=`` parameter drift.
     """
-    from lca.plugins.transport.webserver.handlers.runs.terminal.live_compat import (
+    from lca.plugins.transport.webserver.read.runs.terminal.live_compat import (
         iter_live_sse as carrier_iter_live_sse,
     )
 

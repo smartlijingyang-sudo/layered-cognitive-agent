@@ -19,9 +19,9 @@ from lca.harness.declarative.controls.validation import (
     is_validation_valid,
     validation_errors,
 )
-from lca.harness.declarative.graph.phase_graph_compiler import compile_phase_graph_projection
+from lca.harness.graph.phase_graph_compiler import compile_phase_graph_projection
 from lca.harness.plan import compiled_run_plan_ref
-from lca.harness.profile.plan_compiler import compile_plan
+from lca.harness.composition.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
 from tests.phase_executors import standard_phase_executors
 

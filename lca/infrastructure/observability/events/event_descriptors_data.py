@@ -548,7 +548,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             InboxFollowupCreated,
             domain=VocabDomain.EVENT,
-            emitter="lca.plugins.transport.webserver.handlers.runs.execute.loop_drivers",
+            emitter="lca.plugins.transport.webserver.carrier.runs.execute.loop_drivers",
             required=("inbox_id",),
             description="用户输入经 Inbox 注入",
             durability="required",

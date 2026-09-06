@@ -2,7 +2,7 @@
 
 对齐 deepseek-harness ``packages/core/session/src/types.ts`` + ``index.ts`` 的
 SessionHeader / SessionEvent / observer 语义；实现在
-:mod:`lca.plugins.session.runtime.session`。
+:mod:`lca.session.append`。
 
 契约边界：
 

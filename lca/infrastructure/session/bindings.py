@@ -34,7 +34,7 @@ def _resolve_runtime_session(target: object | None) -> object | None:
     if target is None:
         return None
     from lca.plugins.session.runtime.bus_facade import SessionBusFacade
-    from lca.plugins.session.runtime.session import Session
+    from lca.session.append import Session
 
     if isinstance(target, Session):
         return target

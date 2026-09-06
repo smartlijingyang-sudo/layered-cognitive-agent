@@ -29,7 +29,7 @@ from lca.contracts.protocols import LLMAdapter
 from lca.contracts.protocols.act.action import ActionRegistryProtocol
 from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseInput, PhaseResult
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
-from lca.harness.profile.plan_compiler import compile_plan
+from lca.harness.composition.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
 from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
 from lca.infrastructure.transport.transport_registry import TransportRegistry
@@ -41,7 +41,7 @@ from lca.plugins.composer.runtime.runtime_factory import (
 from lca.plugins.phase_graph.stop_policy import DefaultStopPolicy
 from lca.plugins.gate.decision_classifier_provider import DefaultDecisionClassifier
 from lca.plugins.journal.artifact_closure_provider import DefaultArtifactClosure
-from lca.plugins.runtime.reducer import DefaultReducer
+from lca.plugins.loop.reducer.plugin import DefaultReducer
 from tests.phase_executors import standard_phase_executors
 
 

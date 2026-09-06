@@ -32,7 +32,7 @@ from lca.harness.plan import (
     declarative_plan_hash,
     scope_sub_plan_hash,
 )
-from lca.harness.profile.plan_compiler import (
+from lca.harness.composition.plan_compiler import (
     CompileOptions,
     compile_plan,
     explain_compile_plan,

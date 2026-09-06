@@ -7,7 +7,7 @@ import pytest
 
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.harness.declarative.lifecycle.phase_observation import NullPhaseObserver
-from lca.runtime.declarative_runtime import (
+from lca.loop.driver import (
     DeclarativeExecution,
     DeclarativeRuntimeDriver,
     RuntimePhaseCapabilities,
@@ -104,7 +104,7 @@ async def test_declarative_execution_uses_the_injected_turn_journal() -> None:
     interpretation = object()
 
     with (
-        patch("lca.runtime.declarative_runtime.GraphAssembler") as assembler,
+        patch("lca.loop.driver.GraphAssembler") as assembler,
         patch(
             "lca.runtime.runtime_bindings.DeclarativeRuntimeBindings.new_interpreter"
         ) as interpreter_factory,

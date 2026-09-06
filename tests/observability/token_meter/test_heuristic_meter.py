@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.plugins.session.runtime.session import Session
+from lca.session.append import Session
 from lca.plugins.session.token_meter.token_meter import HeuristicTokenMeter, estimate_text_tokens
 from lca_kernel.events.fold import SURFACE_ASSISTANT_TYPE, SURFACE_USER_TYPE
 

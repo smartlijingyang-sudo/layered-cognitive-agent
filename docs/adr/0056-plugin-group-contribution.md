@@ -128,7 +128,7 @@ entries:
     $module: lca.plugins.gates
 
   - id: gate.repeat-tool-call
-    $module: lca.plugins.gates.repeat_tool_call
+    $module: lca.plugins.cognitive.gate.repeat_tool_call.plugin
 
   - id: tool.bash
     $module: lca.plugins.tools.bash

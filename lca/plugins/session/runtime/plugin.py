@@ -1,7 +1,7 @@
 """Session runtime plugin —— 提供 ``session.store`` capability（PR-3c 骨架）。
 
 装配 DSH 风格 in-memory Session runtime：:class:`SessionStore` 持有活
-Session 索引，:class:`lca.plugins.session.runtime.session.Session` 承担
+Session 索引，:class:`lca.session.append.Session` 承担
 append-only 日志真值 + observer contained fire + reentry 拒绝 + 增量
 header fold。
 
@@ -66,7 +66,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     """Session runtime boot：provide 一个全新 SessionStore（每次 profile 启动一个）。
 
     外部后果：``session.store`` 由 run 边界
-    :mod:`lca.plugins.session.runtime.bind` 按 run_id 消费（Carrier 与
+    :mod:`lca.session.bind` 按 run_id 消费（Carrier 与
     in-process spawn 共用）；缺席时 ``publish_via_session`` fail-loud。
     """
     del config

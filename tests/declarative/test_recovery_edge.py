@@ -15,7 +15,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     VerificationDeclaration,
 )
 from lca.harness.declarative.compile.compiler import compile_declarative_projection
-from lca.harness.declarative.graph.phase_graph_compiler import compile_phase_graph_projection
+from lca.harness.graph.phase_graph_compiler import compile_phase_graph_projection
 from lca.harness.profile.resolve import resolve_profile
 from lca.plugins.phase_graph.recovery import SPEC, RecoveryEdgeConfig
 
@@ -160,11 +160,11 @@ def test_no_edge_without_phase_edge_capability() -> None:
         layer="L2",
         functional_group="cognitive-phase",
         implementation=PluginImplementation(
-            module="lca.plugins.phase_graph.reflect",
+            module="lca.plugins.loop.phase.reflect.standard.plugin",
             setup="setup",
         ),
         configuration=PluginConfiguration(
-            schema="lca.plugins.phase_graph.common.StandardPhaseConfig",
+            schema="lca.plugins.loop.phase._shared.common.StandardPhaseConfig",
             values={},
         ),
         provides=(CapabilityDeclaration(key="phase.reflect.standard", cardinality="one"),),
