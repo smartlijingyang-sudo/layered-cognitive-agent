@@ -17,6 +17,14 @@ const LCA_TOKEN = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
 
 export const LIVE_TERMINAL = new Set(['canceled', 'completed', 'failed']);
 export const LIVE_PAUSED = new Set(['waiting_input', 'awaiting_human', 'input-required']);
+/**
+ * Hard cap on consecutive SSE reconnects without terminal evidence.
+ * Prevents an infinite poll loop when the backend GC's a run before the
+ * cursor / snapshot agree on terminal (run gone → snapshot 404 → reconnect
+ * → repeat). Caller treats this as terminal: stop streaming, fall back to
+ * the last-known cursor / snapshot.
+ */
+export const LIVE_MAX_RECONNECTS = 8;
 
 /** ADR-0100 resume cursor — server reads ``?after=``, not ``Last-Event-ID``. */
 export function liveUrl(runId: string, afterSeq: number): string {
@@ -96,6 +104,21 @@ export type LiveObserveOptions = {
 /**
  * Subscribe to one run's live SSE until terminal ``done``, abort, or snapshot
  * agreement. Reconnects with exponential backoff on the same run_id + cursor.
+ *
+ * Termination contract (any one of these exits the loop):
+ *   1. ``options.signal.aborted`` — caller cancelled.
+ *   2. ``cursor.streamTerminal`` — driver observed a terminal ``run-finished``.
+ *   3. SSE delivered ``run-finished`` with status in {@link LIVE_TERMINAL}.
+ *   4. {@link fetchRunSnapshot} returns a terminal status
+ *      ({@link LIVE_TERMINAL} ∪ {@link LIVE_PAUSED} ∪ ``missing=true``).
+ *   5. Reconnect budget exhausted ({@link LIVE_MAX_RECONNECTS}).
+ *
+ * ``LIVE_PAUSED`` is treated as terminal-for-SSE because the live stream is
+ * irrelevant once the run is blocked on a human; the driver renders the
+ * askUserQuestion card from the snapshot and the SSE poll must stop.
+ * ``missing=true`` covers the GC-after-completion case where the backend
+ * has dropped the run record — without it the observation face would loop
+ * forever asking for ``/live`` on a run that no longer exists.
  */
 export async function observeRunLive(
   options: LiveObserveOptions,
@@ -107,45 +130,77 @@ export async function observeRunLive(
 
   while (!options.signal.aborted) {
     cursor.streamTerminal = false;
-    const streamRes = await fetch(liveUrl(options.runId, cursor.afterSeq), {
-      headers: authHeaders,
-      signal: options.signal,
-    });
-    if (!streamRes.ok) {
-      const text = await streamRes.text();
-      throw new Error(`live HTTP ${streamRes.status}: ${text.slice(0, 200)}`);
-    }
-    for await (const frame of readSse(streamRes)) {
-      if (typeof frame.seq === 'number') {
-        cursor.lastSeq = frame.seq;
-        cursor.afterSeq = frame.seq;
-        reconnectAttempt = 0;
-      }
-      const projected = projectJournalFrame(frame);
-      if (projected.kind === 'live-gap' && typeof projected.oldestSeq === 'number') {
-        if (projected.oldestSeq > 0) {
-          cursor.afterSeq = Math.max(cursor.afterSeq, projected.oldestSeq - 1);
+    let streamOk = true;
+    try {
+      const streamRes = await fetch(liveUrl(options.runId, cursor.afterSeq), {
+        headers: authHeaders,
+        signal: options.signal,
+      });
+      if (!streamRes.ok) {
+        const text = await streamRes.text();
+        // 404/410 on the live endpoint means the run is gone — stop polling.
+        if (streamRes.status === 404 || streamRes.status === 410) {
+          streamOk = false;
+          cursor.streamTerminal = true;
+        } else {
+          throw new Error(`live HTTP ${streamRes.status}: ${text.slice(0, 200)}`);
         }
-        console.warn('lca: live gap — ring buffer evicted events', {
-          afterSeq: cursor.afterSeq,
-          oldestSeq: projected.oldestSeq,
-          requestedSeq: projected.requestedSeq,
-        });
-        continue;
+      } else {
+        for await (const frame of readSse(streamRes)) {
+          if (typeof frame.seq === 'number') {
+            cursor.lastSeq = frame.seq;
+            cursor.afterSeq = frame.seq;
+            reconnectAttempt = 0;
+          }
+          const projected = projectJournalFrame(frame);
+          if (projected.kind === 'live-gap' && typeof projected.oldestSeq === 'number') {
+            if (projected.oldestSeq > 0) {
+              cursor.afterSeq = Math.max(cursor.afterSeq, projected.oldestSeq - 1);
+            }
+            console.warn('lca: live gap — ring buffer evicted events', {
+              afterSeq: cursor.afterSeq,
+              oldestSeq: projected.oldestSeq,
+              requestedSeq: projected.requestedSeq,
+            });
+            continue;
+          }
+          await handlers.onProjected(projected);
+          if (cursor.streamTerminal) break;
+        }
       }
-      await handlers.onProjected(projected);
-      if (cursor.streamTerminal) break;
+    } catch (error) {
+      if (options.signal.aborted) return;
+      // Transport error: hand to caller (driver decides retry/abort policy).
+      throw error;
     }
-    if (options.signal.aborted || cursor.streamTerminal) break;
 
-    const snap = await fetchRunSnapshot(options.runId);
+    if (options.signal.aborted || cursor.streamTerminal) break;
+    if (!streamOk) break;
+
+    const snap = await fetchRunSnapshot(options.runId, options.signal);
     const snapStatus = String(snap.status ?? '');
     if (handlers.onSnapshot) {
       await handlers.onSnapshot({ error: snap.error, status: snapStatus });
     }
-    if (LIVE_TERMINAL.has(snapStatus)) break;
+    // Terminal-or-paused: stop the SSE loop. Driver handles paused runs
+    // through the askUserQuestion card; missing means the run was GC'd.
+    if (
+      LIVE_TERMINAL.has(snapStatus) ||
+      LIVE_PAUSED.has(snapStatus) ||
+      snap.missing === true
+    ) {
+      break;
+    }
 
     reconnectAttempt += 1;
+    if (reconnectAttempt > LIVE_MAX_RECONNECTS) {
+      console.warn('lca: live reconnect budget exhausted, stopping', {
+        runId: options.runId,
+        afterSeq: cursor.afterSeq,
+        attempts: reconnectAttempt,
+      });
+      break;
+    }
     handlers.onReconnectAttempt?.(reconnectAttempt);
     await new Promise((resolve) => setTimeout(resolve, reconnectDelayMs(reconnectAttempt)));
   }

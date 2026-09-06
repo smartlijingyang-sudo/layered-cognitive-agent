@@ -135,11 +135,27 @@ export async function createLcaRun(
   return (await response.json()) as CreateRunResult;
 }
 
-export async function fetchRunSnapshot(runId: string): Promise<RunSnapshot> {
+/**
+ * Fetch a run snapshot. Returns ``{ missing: true }`` when the backend has
+ * GC'd the run (HTTP 404/410) — the observation face treats missing as
+ * terminal so it does not keep polling ``/live`` for a run it cannot prove
+ * is still alive. Network errors propagate; the observation face catches
+ * them and treats the SSE loop as terminal as well.
+ */
+export async function fetchRunSnapshot(
+  runId: string,
+  signal?: AbortSignal,
+): Promise<RunSnapshot & { missing?: boolean }> {
   const response = await fetch(`/lca-api/runs/${runId}`, {
     headers: lcaAuthHeaders(),
+    signal,
   });
-  if (!response.ok) return {};
+  if (response.status === 404 || response.status === 410) {
+    return { missing: true };
+  }
+  if (!response.ok) {
+    throw new Error(`run snapshot HTTP ${response.status}`);
+  }
   return (await response.json()) as RunSnapshot;
 }
 
