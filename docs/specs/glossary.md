@@ -88,7 +88,7 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **ModularBrain** | 默认 Brain（reasoner / critic 可替换）；原生 function calling 直接产出 Decision，无需 DecisionParser |
 | **Turn** | 单步记录：decision + act result + reflection |
 | **Budget** | token / cost / steps / wall_clock 预算 |
-| **Hook** / **HookRegistry** / **EventBus** | 生命周期钩子与事件总线（业务事实经遥测桥进入 trace 管道） |
+| **Hook** / **HookRegistry** / **EventBus** | 生命周期钩子与事件总线。`EventBus`（canonical 名 `EnvelopeBus`，ADR-0183）是进程级实时事件分发机制（publish → hook → sink dispatch），不是事实平面。事实平面 SSOT 是 `Session.append`（ADR-0186/0192）。 |
 | **Telemetry** | 业务层唯一发射门面契约：span / event / score，不耦合任何后端 |
 | **SpanName** / **EventName** | 封闭遥测词表（span 名 / 业务事件名），配 **VocabDef** 目录登记唯一发射点 |
 | **SpanView** | OTel span 的本地投影视图 |
@@ -232,7 +232,7 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **MirrorDiff** | upstream 旧版差异报告；已退役 — 替代：Layer0 upstream scan |
 | **ObservabilityHub** | 旧 observability facade 类；改名 — 替代：lca.infrastructure.observability.facade |
 | **ScorerFn** | 旧版评分函数；已退役 — 替代：observability eval pipeline |
-| **SimpleEventBus** | 本地事件分发兼容实现；已退役 — 替代：由 booted Cordis Context 持有的 `CordisEventBus` |
+| **SimpleEventBus** | 本地事件分发兼容实现；已退役 — 替代：`EnvelopeBus`（ADR-0183） |
 | **SimpleHookRegistry** | 本地钩子分发兼容实现；已退役 — 替代：由 booted Cordis Context 持有的 `CordisHookRegistry` |
 | **SpanContext** | 旧 span context 类；改名 — 替代：lca.contracts.atoms.semantic_keys.SpanContext |
 | **UpstreamTree** | upstream 仓库目录树；已退役 — 替代：Layer0 upstream patch scan |

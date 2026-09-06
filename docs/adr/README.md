@@ -134,7 +134,7 @@
 | [0187](0187-assistant-agent.md) | AssistantAgent — 可配置、可隔离、可进化的个人助理产品面（Home SSOT + 同一 Resolve/Compile + 0093 jobs + G11 进化闸） | Accepted |
 | [0188](0188-session-title-event.md) | Session 标题事件 — `session.title.v1` 入词表（log-only 审计档，标题模块唯一事实载体） | Proposed |
 | [0191](0191-runtime-loop-dsh-convergence-and-control-plane.md) | Runtime Loop DSH 收敛与 LCA 控制面保留 — 事实/模型/控制/Ephemeral 四态分离 + Reducer 演进 | Accepted |
-| [0192](0192-fact-plane-convergence.md) | Fact Plane 收敛 — FactCommitter + PhaseFactEmitter；Journal 平面从 cognition 退役 | Proposed |
+| [0192](0192-fact-plane-convergence.md) | Fact Plane 收敛 — FactCommitter + PhaseFactEmitter；Journal 平面从 cognition 退役 | Implemented（via 0186/0194/0195） |
 | [0193](0193-session-projection-fabric-model-visible.md) | Session Projection Fabric — ModelVisibleUnit 增量投影；统一 model-visible 读面 | Accepted |
 | [0194](0194-cognitive-loop-architecture-convergence.md) | 认知 Loop 架构收敛 — 图内核 / FactGateway 单轨 / 六 phase 正名 / 极端插件化目录 | Implemented (P0–P5 core) |
 | [0195](0195-platform-architecture-convergence.md) | 全栈平台架构收敛 — Kernel · Transport · Observability 四段链 · 插件 seam 树 · SSOT 矩阵 | Implemented (P0–P5 core) |
