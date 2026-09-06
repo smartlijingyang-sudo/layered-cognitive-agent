@@ -2,7 +2,12 @@
 
 Re-exports the carrier surface from the facade module. Legacy import path:
 ``handlers/runs/execute`` (COMPAT shim).
+
+``RunLifecycleCoordinator`` is lazy-loaded to avoid circular import with
+``carrier/runs/lifecycle`` (lifecycle imports ``execution_environment``).
 """
+
+from __future__ import annotations
 
 from lca.plugins.transport.webserver.carrier.runs.execute.execute import (
     create_run_session,
@@ -10,7 +15,6 @@ from lca.plugins.transport.webserver.carrier.runs.execute.execute import (
     resume_run,
     schedule_run,
 )
-from lca.plugins.transport.webserver.carrier.runs.lifecycle import RunLifecycleCoordinator
 
 __all__ = [
     "RunLifecycleCoordinator",
@@ -19,3 +23,14 @@ __all__ = [
     "resume_run",
     "schedule_run",
 ]
+
+
+def __getattr__(name: str):
+    if name == "RunLifecycleCoordinator":
+        from lca.plugins.transport.webserver.carrier.runs.lifecycle.lifecycle import (
+            RunLifecycleCoordinator,
+        )
+
+        globals()["RunLifecycleCoordinator"] = RunLifecycleCoordinator
+        return RunLifecycleCoordinator
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

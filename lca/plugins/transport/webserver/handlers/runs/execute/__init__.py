@@ -4,9 +4,7 @@
 #         forbidden_new_usage: 新 carrier 代码不得 import 本路径)
 """Shim — re-exports ``carrier/runs/execute``."""
 
-from lca.plugins.transport.webserver.carrier.runs.execute import *  # noqa: F403
-from lca.plugins.transport.webserver.carrier.runs.execute import (
-    RunLifecycleCoordinator,
+from lca.plugins.transport.webserver.carrier.runs.execute.execute import (
     create_run_session,
     execute_run,
     resume_run,
@@ -20,3 +18,14 @@ __all__ = [
     "resume_run",
     "schedule_run",
 ]
+
+
+def __getattr__(name: str):
+    if name == "RunLifecycleCoordinator":
+        from lca.plugins.transport.webserver.carrier.runs.lifecycle.lifecycle import (
+            RunLifecycleCoordinator,
+        )
+
+        globals()["RunLifecycleCoordinator"] = RunLifecycleCoordinator
+        return RunLifecycleCoordinator
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

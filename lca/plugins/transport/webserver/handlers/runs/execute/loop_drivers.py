@@ -4,17 +4,14 @@
 #         forbidden_new_usage: 新 carrier 代码不得 import 本路径)
 """Shim — see ``carrier/runs/execute/loop_drivers.py``."""
 
-from lca.plugins.transport.webserver.carrier.runs.execute.loop_drivers import *  # noqa: F403
 from lca.plugins.transport.webserver.carrier.runs.execute.loop_drivers import (
     CognitiveRunDriver,
     DriverOutcome,
     RunLoopDriver,
-    build_solo_agent,
 )
 
 __all__ = [
     "CognitiveRunDriver",
     "DriverOutcome",
     "RunLoopDriver",
-    "build_solo_agent",
 ]
