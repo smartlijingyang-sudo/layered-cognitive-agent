@@ -11,5 +11,14 @@
   "mypy-type-checker.enabled": false,
   "python.analysis.typeCheckingMode": "basic",
   "python.analysis.diagnosticMode": "workspace",
+  "python.analysis.disabledModules": [
+    "structlog",
+    "structlog.*",
+    "langfuse",
+    "langfuse.*"
+  ],
+  "python.analysis.useImportHeuristic": false,
+  "python.analysis.reportMissingImports": "none",
+  "python.analysis.reportMissingTypeStubs": "none",
   "editor.rulers": [100]
 }
