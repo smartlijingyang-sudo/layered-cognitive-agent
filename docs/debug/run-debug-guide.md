@@ -197,6 +197,38 @@ LCA_GATEWAY_PUBLIC_URL=http://<host>:<port> python3 deploy/lobehub/patch_lobehub
 
 ---
 
+### Step 0.5 — Cache invalidation: 改完代码后再 hard-refresh
+
+**WHY.** 上面三个 Step (0 / 0b / 0d) 都假设"刚改的代码已经在跑"。当 fix 看起来"没生效",**九成是缓存**:Vite 的 `.node_modules/.vite/`、Next dev 的 `.next/dev/cache/turbopack/`、lobehub-spa 的 `subprocess` 仍持有旧 module 句柄、浏览器 ETag 命中旧 module。本 Step 强制把"是不是缓存"和"是不是 bug"分开。
+
+**DO.** 按代码改动路径,挑对应命令跑(完整表见 [`docs/debug/README.md` "缓存何时清"](./README.md#缓存何时清-改完代码后必做的命令)):
+
+```sh
+# 改了 kernel / handler / profile / JWT seam
+./scripts/lca-ops kernel-restart
+
+# 改了 deploy/lobehub/patches/ 任何 .py / .ts
+./scripts/lca-ops lobehub restart
+
+# 改了 lca/infrastructure/cli/services/lobehub/lobehub.py(start / ensure_patches)
+./scripts/lca-ops lobehub restart
+
+# 浏览器 / React UI 仍 0 反应:
+rm -rf lobehub-ui/node_modules/.vite lobehub-ui/.next && \
+  ./scripts/lca-ops lobehub restart
+# 然后用户在浏览器硬刷新:macOS Cmd+Shift+R / Win Linux Ctrl+Shift+R
+# (DevTools → Network → Disable cache 是同等手段)
+
+# 确认 vite serve 的 bundle 已经是新版本(不是缓存里的旧 module)
+curl -sS http://127.0.0.1:9876/src/path/to/just/changed.ts | grep "你刚加的字符串"
+```
+
+**OUTPUT.** 如果 curl 看到新字符串但浏览器还显示旧行为,问题在浏览器;否则清缓存 + 重启。
+
+**FAIL.** `./scripts/lca-ops lobehub restart` 自己 exit 0 但 `ss -ltn | grep 9876` 还是没 port —— lobehub-spa 的 bun dev 死了。可能是 patch apply 期间(见 `_ensure_patches`)抛了 SystemExit 把 bun parent 干掉了。**别 `pkill -f vite`** 那个 self-kill(见 Step 0d FAIL 段),用 `kill $(ss -ltnp | grep 9876 | grep -oP 'pid=\\K[0-9]+')` 或者直接 `kill <bun_pid>` 然后 restart。
+
+---
+
 ### Step 1 — One-shot 8-section diagnostic
 
 **WHY.** `debug-run` is the canonical "tell me about this run" entry point (ADR-0122). It collects manifest, journal summary, error_ref, stack frames, and a suggested action in one shot.
