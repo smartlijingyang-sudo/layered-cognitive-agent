@@ -191,6 +191,11 @@ events:
       attempt: int
       outcome: str
       activation_ref: str
+      # 工具结果成败(由 commit_body_tool_execute_end 在 outcome=failure 时写入)。
+      # 第一性原则:成败字段不允许默认值,fold binding 据此与
+      # step.tool_result.record 互相对账,避免 journal.tool_result.ok
+      # 与 phase.tool.call.end.ok 出现矛盾。
+      ok: bool
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
