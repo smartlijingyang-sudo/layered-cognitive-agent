@@ -128,6 +128,13 @@ class StepScan:
     fold_source: str = "none"
     fold_step_hits: tuple[int, ...] = ()
     fold_step_misses: tuple[int, ...] = ()
+    # H7 多源对账(回归锁 run_1f5360d2fa47):spine phase.tool.call.end.ok
+    # 与 journal step.tool_result.ok 互相对账,不一致即 H7.ok=False。
+    spine_phase_tool_call_end_total: int = 0
+    spine_phase_tool_call_end_ok_count: int = 0
+    spine_phase_tool_call_end_failure_count: int = 0
+    # ok=True 与 error 非空矛盾的 step_index 列表(fold invariant 触发时填)。
+    tool_ok_error_conflicts: tuple[int, ...] = ()
 
 
 __all__ = [

@@ -211,6 +211,12 @@ def _scan_xref(run_dir: Path, run_id: str, scan: StepScan) -> StepScan:
     # 与 spine_counts 在同一次遍历中收集,避免重复读文件。
     phase_fold_payload_kinds: dict[str, set[str]] = {}
     phase_fold_objective_anomalies: list[dict[str, Any]] = []
+    # H7 多源对账(回归锁 run_1f5360d2fa47):spine phase.tool.call.end.ok
+    # 与 journal step.tool_result.ok 互相对账。第一性原则:成败字段
+    # 不允许默认值,spine 写入 path 已声明 ``ok: bool``(spine.yaml)。
+    spine_phase_tool_call_end_total = 0
+    spine_phase_tool_call_end_ok_count = 0
+    spine_phase_tool_call_end_failure_count = 0
     if spine_path is not None:
         try:
             for ln in spine_path.read_text(encoding="utf-8").splitlines():
@@ -226,6 +232,19 @@ def _scan_xref(run_dir: Path, run_id: str, scan: StepScan) -> StepScan:
                 ep = rec.get("execution_point")
                 if isinstance(ep, str):
                     spine_counts[ep] = spine_counts.get(ep, 0) + 1
+                # H7 多源对账:统计 phase.tool.call.end.ok
+                if (
+                    isinstance(ep, str)
+                    and ep == "phase.tool.call.end"
+                    and isinstance(rec.get("payload"), dict)
+                ):
+                    payload = rec["payload"]
+                    if "ok" in payload:
+                        spine_phase_tool_call_end_total += 1
+                        if payload["ok"] is True:
+                            spine_phase_tool_call_end_ok_count += 1
+                        elif payload["ok"] is False:
+                            spine_phase_tool_call_end_failure_count += 1
                 # SSOT watchdog: phase.*.fold payload schema drift
                 payload = rec.get("payload")
                 if (
@@ -291,6 +310,9 @@ def _scan_xref(run_dir: Path, run_id: str, scan: StepScan) -> StepScan:
         tool_schema_count=tool_schema_count,
         tool_schema_empty_count=tool_schema_empty_count,
         tool_schema_source=tool_schema_source,
+        spine_phase_tool_call_end_total=spine_phase_tool_call_end_total,
+        spine_phase_tool_call_end_ok_count=spine_phase_tool_call_end_ok_count,
+        spine_phase_tool_call_end_failure_count=spine_phase_tool_call_end_failure_count,
     )
 
 
@@ -420,6 +442,7 @@ def _scan_step_doc(path: Path) -> StepScan:
             has_output=False,
             outcome="",
             schema_version=None,
+            tool_ok_error_conflicts=(),
         )
     doc = read_step_document(path)
     tool_total = 0
@@ -427,12 +450,19 @@ def _scan_step_doc(path: Path) -> StepScan:
     failure_steps: list[int] = []
     consecutive = 0
     max_consec = 0
+    # 回归锁 run_1f5360d2fa47:fold invariant 在生产路径上抛
+    # FoldConsistencyError,但残留 journal 文件可能含历史矛盾样本。
+    # doctor 仍要识别它们并报 H7.ok=False。
+    tool_ok_error_conflicts: list[int] = []
     for step in doc.steps:
         if step.tool_call is not None:
             tool_total += 1
             if step.tool_result is not None and step.tool_result.ok:
                 tool_success += 1
                 consecutive = 0
+                # ok=True 与 error 非空矛盾(fold invariant 该拒绝的样本)
+                if step.tool_result.error and str(step.tool_result.error).strip():
+                    tool_ok_error_conflicts.append(step.step_index)
             elif step.outcome == "fail":
                 failure_steps.append(step.step_index)
                 consecutive += 1
@@ -469,6 +499,7 @@ def _scan_step_doc(path: Path) -> StepScan:
         totals_phases=totals_phases,
         step_segment_counts=step_segment_counts,
         phase_time_inversions=phase_time_inversions,
+        tool_ok_error_conflicts=tuple(tool_ok_error_conflicts),
     )
 
 
@@ -601,6 +632,42 @@ def _hop_h7(scan: StepScan) -> HopVerdict:
         return HopVerdict(ok=None, detail="no tool calls", extra=extra)
     rate = scan.tool_success / scan.tool_total
     extra["success_rate"] = round(rate, 3)
+    # 回归锁 run_1f5360d2fa47:fold invariant 应在生产路径上抛
+    # FoldConsistencyError;残留 journal 文件可能含历史矛盾样本,
+    # doctor 必须显式识别。
+    if scan.tool_ok_error_conflicts:
+        return HopVerdict(
+            ok=False,
+            detail=(
+                f"工具结果矛盾 step(s)={list(scan.tool_ok_error_conflicts)} "
+                f"(ok=True 但 error 非空 — fold invariant 已被上游触发或绕过)"
+            ),
+            extra={
+                **extra,
+                "tool_ok_error_conflicts": list(scan.tool_ok_error_conflicts),
+            },
+        )
+    # H7 多源对账:spine phase.tool.call.end.ok 与 journal step.tool_result.ok
+    # 互相对账。不一致即 H7.ok=False。
+    if scan.spine_phase_tool_call_end_total > 0:
+        spine_fail = scan.spine_phase_tool_call_end_failure_count
+        spine_total = scan.spine_phase_tool_call_end_total
+        journal_fail = scan.tool_total - scan.tool_success
+        if spine_fail > 0 and journal_fail == 0:
+            return HopVerdict(
+                ok=False,
+                detail=(
+                    f"journal↔spine inconsistency: spine 报 {spine_fail}/{spine_total} 失败, "
+                    f"但 journal 报 0 失败(失真源在 step.tool_result.record)"
+                ),
+                extra={
+                    **extra,
+                    "spine_phase_tool_call_end_total": spine_total,
+                    "spine_phase_tool_call_end_failure_count": spine_fail,
+                    "journal_tool_total": scan.tool_total,
+                    "journal_tool_success": scan.tool_success,
+                },
+            )
     if scan.max_consecutive_fail >= 3:
         return HopVerdict(
             ok=False,
@@ -731,7 +798,9 @@ def diagnose_step_tree(
         "H4": _hop_h4(mode),
         "H5": _hop_h5(mode, scan),
         "H6": _hop_h6(scan),
-        "H7": _hop_h7(scan),
+        # H7 多源对账(回归锁 run_1f5360d2fa47):需要 spine counts,
+        # 因此走 xref_scan 而非 scan。
+        "H7": _hop_h7(xref_scan),
         "H8": _hop_h8(scan),
         "H-seg": _hop_h_seg(scan),
         "H-phase": _hop_h_phase(scan),
