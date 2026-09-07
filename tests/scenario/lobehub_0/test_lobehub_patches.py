@@ -198,6 +198,15 @@ def _seed_ui(tmp_path: Path) -> Path:
     dispatcher.parent.mkdir(parents=True, exist_ok=True)
     dispatcher.write_text("export const dispatchAgent = () => {};\n", encoding="utf-8")
 
+    # Mirror what ``lobehub.py::_ensure_dev_env`` produces on real starts:
+    # a ``.env`` carrying the gateway URL is the source of truth for the
+    # patch engine. Tests exercising the "no URL" path overwrite or
+    # delete this file explicitly.
+    (tmp_path / ".env").write_text(
+        "LCA_GATEWAY_PUBLIC_URL=http://127.0.0.1:8765\n",
+        encoding="utf-8",
+    )
+
     return tmp_path
 
 
@@ -248,3 +257,60 @@ def test_apply_raises_when_anchor_missing(tmp_path: Path) -> None:
     ctx = PatchContext(ui_dir=ui)
     with pytest.raises(SystemExit, match="lca_runtime_agent_gateway"):
         apply(ctx)
+
+
+# ── gateway URL source: lobehub-ui/.env, never os.environ ──────────────
+
+
+def _write_dotenv(ui: Path, *lines: str) -> None:
+    """Write a minimal ``.env`` under the seeded UI tree."""
+    (ui / ".env").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def test_resolve_gateway_http_reads_dotenv(tmp_path: Path, monkeypatch) -> None:
+    # ``LCA_GATEWAY_PUBLIC_URL`` from ``lobehub-ui/.env`` is the source
+    # of truth; shell env is ignored even when set to a wrong value.
+    from deploy.lobehub.patches.runtime.lca_runtime_agent_gateway import (
+        _resolve_gateway_http,
+    )
+
+    ui = _seed_ui(tmp_path)
+    _write_dotenv(ui, "LCA_GATEWAY_PUBLIC_URL=http://10.36.6.252:8765")
+    monkeypatch.setenv("LCA_GATEWAY_PUBLIC_URL", "http://wrong-host:1")
+
+    ctx = PatchContext(ui_dir=ui)
+    assert _resolve_gateway_http(ctx) == "http://10.36.6.252:8765"
+
+
+def test_resolve_gateway_http_ignores_os_environ_only(tmp_path: Path, monkeypatch) -> None:
+    # Regression — the previous implementation read ``os.environ`` and
+    # silently wrote a ``ws://lca-gateway-unset:0000`` placeholder into
+    # ``client.ts`` whenever shell env was empty. The fix pins the
+    # source to ``.env``; the helper returns ``""`` to signal the caller
+    # should raise.
+    from deploy.lobehub.patches.runtime.lca_runtime_agent_gateway import (
+        _resolve_gateway_http,
+    )
+
+    ui = _seed_ui(tmp_path)
+    (ui / ".env").unlink()
+    monkeypatch.setenv("LCA_GATEWAY_PUBLIC_URL", "http://from-shell:8765")
+
+    ctx = PatchContext(ui_dir=ui)
+    assert _resolve_gateway_http(ctx) == ""
+
+
+def test_resolve_gateway_http_returns_empty_when_key_missing(
+    tmp_path: Path, monkeypatch
+) -> None:
+    # ``.env`` exists but lacks the key → ``""``.
+    from deploy.lobehub.patches.runtime.lca_runtime_agent_gateway import (
+        _resolve_gateway_http,
+    )
+
+    ui = _seed_ui(tmp_path)
+    _write_dotenv(ui, "OPENAI_API_KEY=sk-test", "FOO=bar")
+    monkeypatch.setenv("LCA_GATEWAY_PUBLIC_URL", "http://from-shell:8765")
+
+    ctx = PatchContext(ui_dir=ui)
+    assert _resolve_gateway_http(ctx) == ""

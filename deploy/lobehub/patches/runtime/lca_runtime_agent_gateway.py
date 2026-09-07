@@ -1349,24 +1349,39 @@ def _patch_gateway_event_handler_lca_tool_end_content(ctx: PatchContext) -> bool
     return True
 
 
-def apply(ctx: PatchContext) -> bool:
-    import os
+def _resolve_gateway_http(ctx: PatchContext) -> str:
+    # Source of truth: ``lobehub-ui/.env``. Read by scanning lines, never
+    # process env. ``lobehub.py::_ensure_dev_env`` guarantees the file
+    # exists and contains the URL on every restart, so this lookup is
+    # total in normal operation. Returns ``""`` when the key is missing;
+    # the caller treats that as a configuration error.
+    env_file = ctx._ui / ".env"
+    if not env_file.is_file():
+        return ""
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        if line.startswith("LCA_GATEWAY_PUBLIC_URL="):
+            return line.split("=", 1)[1].strip().rstrip("/")
+    return ""
 
+
+def apply(ctx: PatchContext) -> bool:
     changed = False
 
     # Inject the build-time LCA gateway WS URL into lcaGateway/client.ts
     # so the browser bundle carries the URL as a literal (the lobehub-spa
     # Vite dev server does NOT expose ``process.env.NEXT_PUBLIC_*`` to the
-    # client bundle by default — only ``VITE_*``). The placeholder in the
-    # patch source carries an obvious sentinel value
-    # (``ws://lca-gateway-unset:0000``) so a forgotten inject is loud.
-    gateway_http = os.environ.get("LCA_GATEWAY_PUBLIC_URL", "").rstrip("/")
-    gateway_ws = (
-        gateway_http.replace("http://", "ws://", 1).replace(
-            "https://", "wss://", 1
+    # client bundle by default — only ``VITE_*``). Sourced from
+    # ``lobehub-ui/.env`` — never process env — so the patch engine
+    # behaves identically whether called from ``lca-ops`` or directly.
+    gateway_http = _resolve_gateway_http(ctx)
+    if not gateway_http:
+        raise SystemExit(
+            "lca_runtime_agent_gateway: LCA_GATEWAY_PUBLIC_URL missing "
+            "from lobehub-ui/.env — run `lca-ops lobehub restart` to "
+            "regenerate it, or set the key manually."
         )
-        if gateway_http
-        else "ws://lca-gateway-unset:0000"
+    gateway_ws = gateway_http.replace("http://", "ws://", 1).replace(
+        "https://", "wss://", 1
     )
 
     for fname in _NEW_FILES:

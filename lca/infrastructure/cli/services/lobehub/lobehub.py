@@ -661,6 +661,14 @@ class LobeHubService:
             elif line.startswith("NEXT_PUBLIC_LCA_GATEWAY_URL="):
                 updated.append(f"NEXT_PUBLIC_LCA_GATEWAY_URL={gateway_ws}")
                 changed = True
+            elif line.startswith("LCA_GATEWAY_PUBLIC_URL="):
+                # Mirror of NEXT_PUBLIC_LCA_GATEWAY_URL: read by
+                # lca_runtime_agent_gateway patch engine to inject
+                # LCA_GATEWAY_WS_URL into lcaGateway/client.ts. Kept in
+                # sync so the patch engine never falls back to its
+                # sentinel literal.
+                updated.append(f"LCA_GATEWAY_PUBLIC_URL={gateway_base}")
+                changed = True
             else:
                 updated.append(line)
 
