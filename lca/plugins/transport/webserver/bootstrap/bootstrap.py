@@ -143,6 +143,19 @@ def install_bootstrap_state(
     app.state.file_store = file_store
     app.state.device_hub = boot.device_hub
 
+    from lca.infrastructure.observability.running_operation_store import (
+        SqliteRunningOperationStore,
+    )
+    from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.coordinator_factory import (
+        build_agent_runtime_coordinator,
+    )
+
+    running_operation_store = SqliteRunningOperationStore()
+    app.state.running_operation_store = running_operation_store
+    app.state.agent_runtime_coordinator = build_agent_runtime_coordinator(
+        running_operation_store
+    )
+
     if carrier_ctx is not None:
         with contextlib.suppress(Exception):
             app.state.bound_observability = carrier_ctx.inject("observability")

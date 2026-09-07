@@ -52,7 +52,7 @@ WS_ROUTE_SPEC: RouteSpec = RouteSpec(
 )
 
 
-ROUTE_SPECS: tuple[RouteSpec, ...] = (
+HTTP_ROUTE_SPECS: tuple[RouteSpec, ...] = (
     RouteSpec(
         path=RUNNING_OP_PATH,
         handler=get_running_operation,
@@ -63,11 +63,13 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
         handler=refresh_ws_token,
         methods=("POST", "OPTIONS"),
     ),
-    WS_ROUTE_SPEC,
 )
+
+ROUTE_SPECS: tuple[RouteSpec, ...] = (*HTTP_ROUTE_SPECS, WS_ROUTE_SPEC)
 
 
 __all__ = (
+    "HTTP_ROUTE_SPECS",
     "ROUTE_SPECS",
     "RUNNING_OP_PATH",
     "WS_PATH",

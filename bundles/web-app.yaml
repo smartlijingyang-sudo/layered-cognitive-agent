@@ -296,3 +296,7 @@ entries:
     host: 0.0.0.0
     port: 8765
     log_level: info
+- id: lca-gateway-ws-mount
+  name: lca_gateway_ws_mount
+  $module: lca.plugins.transport.webserver.routes_2.routes_agent_gateway_ws
+  config: {}

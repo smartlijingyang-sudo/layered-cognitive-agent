@@ -24,6 +24,7 @@ _LCA_GATEWAY_DIR = f"{_UI_TRANSPORTS}/lcaGateway"
 _NEW_FILES = (
     "connect.ts",
     "execute.ts",
+    "executeGatewayRun.ts",
     "reconnect.ts",
     "event_handler.ts",
     "event_router.ts",
@@ -46,10 +47,17 @@ _MODIFICATIONS: tuple[dict, ...] = (
         "marker": "/* LCA-P1: lcaGateway runtime mode */",
         "insert": (
             "/* LCA-P1: lcaGateway runtime mode */\n"
-            "// LCA adds the lcaGateway transport as a sibling of `gateway`\n"
-            "// and `client`. Resolution lives in the chat store; this\n"
-            "// file is only annotated so the patch is idempotent on\n"
-            "// re-apply. See lcaGateway/connect.ts.\n"
+            "export function isLcaGatewayMode(_agentId?: string): boolean {\n"
+            "  try {\n"
+            "    const envUrl =\n"
+            "      typeof process !== 'undefined'\n"
+            "        ? process.env.NEXT_PUBLIC_LCA_GATEWAY_URL\n"
+            "        : undefined;\n"
+            "    return !!(envUrl && envUrl.length > 0);\n"
+            "  } catch {\n"
+            "    return false;\n"
+            "  }\n"
+            "}\n"
         ),
     },
     {

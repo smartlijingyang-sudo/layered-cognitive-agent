@@ -12,6 +12,7 @@ export interface LcaStartRunBody {
   agent: { id: string; name: string };
   messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
   parent_message_id?: string;
+  topic_id?: string;
   resume_approval?: {
     approvalId: string;
     parentMessageId: string;
@@ -54,7 +55,14 @@ export async function lcaStartRun(
       Authorization: `Bearer ${bearer()}`,
       [TOKEN_HEADER_NAME]: bearer(),
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      agent: body.agent,
+      messages: body.messages,
+      ...(body.parent_message_id ? { parent_message_id: body.parent_message_id } : {}),
+      ...(body.topic_id ? { topic_id: body.topic_id } : {}),
+      ...(body.resume_approval ? { resume_approval: body.resume_approval } : {}),
+      ...(body.resume_tool_result ? { resume_tool_result: body.resume_tool_result } : {}),
+    }),
   });
   if (!resp.ok) {
     throw new Error(`lca /runs HTTP ${resp.status}`);

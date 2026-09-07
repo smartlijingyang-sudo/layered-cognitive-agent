@@ -41,6 +41,9 @@ from lca.plugins.transport.webserver.handlers.runs.api.query_endpoints import (
     get_run_profile,
     stream_run_live,
 )
+from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.wire.routes import (
+    HTTP_ROUTE_SPECS,
+)
 from lca.plugins.transport.webserver.route.register import register_routes
 
 ROUTE_SPECS: tuple[RouteSpec, ...] = (
@@ -55,6 +58,7 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
     RouteSpec("/runs/{run_id}/cancel", cancel_run, ("POST", "OPTIONS")),
     RouteSpec("/runs/{run_id}/answer", answer_run, ("POST", "OPTIONS")),
     RouteSpec("/runs/{run_id}/feedback", record_run_feedback, ("POST", "OPTIONS")),
+    *HTTP_ROUTE_SPECS,
 )
 
 

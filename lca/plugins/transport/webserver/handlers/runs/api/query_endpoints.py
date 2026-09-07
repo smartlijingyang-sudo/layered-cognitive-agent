@@ -142,29 +142,20 @@ def _parse_after(request: Request) -> int:
 
 
 async def stream_run_live(request: Request) -> StreamingResponse | JSONResponse:
-    """GET /runs/{run_id}/live — Journal SSE for one run (event = class name).
+    """GET /runs/{run_id}/live — RETIRED in P1.
 
-    Tool lifecycle frames carry the renderer-facing ``projected_state``
-    field directly (set by ``lca/cognition/body/tool_journal_emit.py``
-    via each Tool's RenderContract). No further lifting is required —
-    the frontend's ``projectToolCall()`` reads the projected_state as-is.
+    Returns 410 Gone. Use the LcaAgentGateway WebSocket at
+    ``/v1/runs/{run_id}/ws`` instead (ADR-0200).
     """
     if request.method == "OPTIONS":
         return JSONResponse({}, headers=cors_headers())
-    run_id = request.path_params["run_id"]
-    if await _run_port_of(request).summary(run_id) is None:
-        return JSONResponse({"error": "run not found"}, status_code=404, headers=cors_headers())
-    frames = _run_port_of(request).stream_run_live(run_id, _parse_after(request))
-    return StreamingResponse(
-        frames,
-        media_type="text/event-stream",
-        headers=cors_headers(
-            **{
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",
-            }
-        ),
+    return JSONResponse(
+        {
+            "error": "this endpoint is retired; use /v1/runs/{run_id}/ws (WebSocket) instead",
+            "spec": "docs/adr/0200-p1-agent-gateway-bridge.md",
+        },
+        status_code=410,
+        headers=cors_headers(),
     )
 
 

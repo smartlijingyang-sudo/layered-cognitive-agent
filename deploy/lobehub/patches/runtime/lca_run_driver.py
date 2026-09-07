@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from deploy.lobehub.engine import PatchContext, PatchMeta
-from lca.plugins.transport.webserver.handlers.runs.wire import WIRE
+from deploy.lobehub.patches.runtime._wire_loader import load_wire
 
 _HERE = Path(__file__).resolve().parent
 _UI_TRANSPORTS = "src/store/chat/agents/transports"
@@ -96,6 +96,24 @@ _IMPORT_INSERT_DQ = (
 _RUN_BLOCK = """    /* LCA: every chat is a Run */
     const lcaModel = model === 'team' || model === 'auto' ? model : 'solo';
     if (lcaModel === 'solo' || lcaModel === 'team' || lcaModel === 'auto') {
+      const { isLcaGatewayMode } = await import(
+        '@/store/chat/slices/agentRun/actions/dispatch/agentDispatcher'
+      );
+      if (isLcaGatewayMode()) {
+        const { lcaExecuteGatewayRun } = await import(
+          '@/store/chat/agents/transports/lcaGateway/executeGatewayRun'
+        );
+        return await lcaExecuteGatewayRun(this.#get, {
+          context,
+          messages,
+          model: lcaModel,
+          operationId,
+          parentMessageId,
+          parentMessageType,
+          scope,
+          params,
+        });
+      }
       const projected = await runLcaJournal(this.#get, {
         messages,
         model: lcaModel,
@@ -135,7 +153,7 @@ def apply(ctx: PatchContext) -> bool:
             f"{_UI_TRANSPORTS}/{name}", (_HERE / name).read_text(encoding="utf-8")
         ):
             changed = True
-    if ctx.write_if_changed(f"{_UI_TRANSPORTS}/lcaWire.ts", render_wire_ts(WIRE)):
+    if ctx.write_if_changed(f"{_UI_TRANSPORTS}/lcaWire.ts", render_wire_ts(load_wire())):
         changed = True
 
     # askUserQuestion: 复用原生 lobe-user-interaction 包的 Inspector + Intervention + Render。

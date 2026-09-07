@@ -34,10 +34,12 @@ def mount_ws_route(
 ) -> WebSocketRoute:
     """Append a WebSocketRoute to ``app`` and return the new route.
 
-    Duplicate paths raise (Starlette's default behaviour). The
-    returned route is the actual ``WebSocketRoute`` instance, useful
-    for test introspection.
+    Duplicate paths raise explicitly so boot misconfiguration is visible.
     """
+    existing = [getattr(r, "path", None) for r in app.router.routes]
+    if path in existing:
+        msg = f"WebSocket route already mounted at {path!r}"
+        raise RuntimeError(msg)
     route = WebSocketRoute(path, handler)
     app.router.routes.append(route)
     return route

@@ -126,81 +126,43 @@ def test_live_route_is_registered() -> None:
     assert "/runs/{run_id}/live" in paths
 
 
-def test_get_live_unknown_run_returns_404() -> None:
+def test_get_live_http_returns_410_gone() -> None:
+    """P1 retires GET /runs/{id}/live in favour of the WS gateway."""
     client = TestClient(_app(RunRegistry()))
     response = client.get("/runs/missing-run/live")
-    assert response.status_code == 404
-    assert response.json() == {"error": "run not found"}
+    assert response.status_code == 410
+    body = response.json()
+    assert "retired" in body["error"]
+    assert "/v1/runs/{run_id}/ws" in body["error"]
 
 
-def test_get_live_emits_four_ui_events() -> None:
+def test_get_live_http_returns_410_for_known_run() -> None:
     _SEQ[0] = 0
     registry = RunRegistry()
     session = _seed_journal(registry)
     client = TestClient(_app(registry))
     response = client.get(f"/runs/{session.run_id}/live")
-    assert response.status_code == 200
-    assert "text/event-stream" in response.headers.get("content-type", "")
+    assert response.status_code == 410
 
-    body = response.content.decode("utf-8")
-    names = [line[len("event: ") :] for line in body.splitlines() if line.startswith("event: ")]
-    assert "reasoning" in names
-    assert "text" in names
-    assert names.count("tool") == 2
-    assert "done" in names
-    assert "ReasoningDelta" not in names
-    assert "AgentRunFinished" not in names
 
-    frames = _parse_sse(response.content)
-    assert frames[0]["event"] == "reasoning"
-    assert frames[0]["data"] == {"text": "think-token"}
-    assert frames[-1]["event"] == "done"
-    assert frames[-1]["data"]["status"] == "completed"
+def _skip_http_sse_tests_replaced_by_410() -> None:
+    """Legacy HTTP SSE tests removed — adapter-level tests below remain valid."""
+
+
+def test_get_live_emits_four_ui_events() -> None:
+    pytest.skip("HTTP /live retired (410); see adapter tests below")
 
 
 def test_get_live_has_no_done_sentinel_or_chat_completion() -> None:
-    _SEQ[0] = 0
-    registry = RunRegistry()
-    session = _seed_journal(registry, run_id="run-no-openai")
-    client = TestClient(_app(registry))
-    response = client.get(f"/runs/{session.run_id}/live")
-    assert response.status_code == 200
-    body = response.content.decode("utf-8")
-    assert "data: [DONE]" not in body
-    assert "[DONE]" not in body
-    assert "chat.completion" not in body
-    assert "event: deltas" not in body
-    assert "event: projection." not in body
-    assert "event: terminal" not in body
+    pytest.skip("HTTP /live retired (410); see adapter tests below")
 
 
 def test_get_live_after_skips_earlier_seqs() -> None:
-    _SEQ[0] = 0
-    registry = RunRegistry()
-    session = _seed_journal(registry, run_id="run-after")
-    client = TestClient(_app(registry))
-    response = client.get(f"/runs/{session.run_id}/live", params={"after": 1})
-    assert response.status_code == 200
-    frames = _parse_sse(response.content)
-    assert all(frame["id"] > 1 for frame in frames)
-    assert all(frame["event"] != "reasoning" for frame in frames)
-    assert "tool" in [frame["event"] for frame in frames]
-    assert frames[-1]["event"] == "done"
+    pytest.skip("HTTP /live retired (410); see adapter tests below")
 
 
 def test_get_live_ignores_last_event_id_header() -> None:
-    _SEQ[0] = 0
-    registry = RunRegistry()
-    session = _seed_journal(registry, run_id="run-leid")
-    client = TestClient(_app(registry))
-    response = client.get(
-        f"/runs/{session.run_id}/live",
-        headers={"Last-Event-ID": "99"},
-    )
-    assert response.status_code == 200
-    frames = _parse_sse(response.content)
-    assert frames[0]["id"] == 1
-    assert frames[0]["event"] == "reasoning"
+    pytest.skip("HTTP /live retired (410); see adapter tests below")
 
 
 @pytest.mark.asyncio

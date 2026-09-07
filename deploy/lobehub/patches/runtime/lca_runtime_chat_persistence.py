@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from deploy.lobehub.engine import PatchContext, PatchMeta
-from lca.plugins.transport.webserver.handlers.runs.wire import WIRE
+from deploy.lobehub.patches.runtime._wire_loader import load_wire
 
 _HERE = Path(__file__).resolve().parent
 _UI_TRANSPORTS = "src/store/chat/agents/transports"
@@ -28,6 +28,8 @@ meta = PatchMeta(
         f"{_UI_TRANSPORTS}/lcaArtifacts.ts",
         f"{_UI_TRANSPORTS}/lcaWire.ts",
         f"{_UI_TRANSPORTS}/lcaToolRender/contracts.generated.ts",
+        f"{_UI_TRANSPORTS}/lcaToolRender/projection.ts",
+        f"{_UI_TRANSPORTS}/lcaToolRender/lca_tool_render_register.ts",
     ),
     risk="medium",
     category="runtime",
@@ -91,16 +93,20 @@ def apply(ctx: PatchContext) -> bool:
 
     # Generate lcaWire.ts from the WIRE table.
     wire_rel = f"{_UI_TRANSPORTS}/lcaWire.ts"
-    wire_text = render_wire_ts(WIRE)
+    wire_text = render_wire_ts(load_wire())
     if ctx.write_if_changed(wire_rel, wire_text):
         changed = True
 
-    # contracts.generated.ts is pre-built by codegen_ts.py; just copy.
-    contracts_rel = f"{_UI_TRANSPORTS}/lcaToolRender/contracts.generated.ts"
-    contracts_src = _HERE / "lcaToolRender" / "contracts.generated.ts"
-    if not contracts_src.is_file():
-        raise SystemExit(f"missing patch source: {contracts_src}")
-    if ctx.write_if_changed(contracts_rel, contracts_src.read_text(encoding="utf-8")):
-        changed = True
+    for rel_suffix, src_name in (
+        ("lcaToolRender/contracts.generated.ts", "contracts.generated.ts"),
+        ("lcaToolRender/projection.ts", "projection.ts"),
+        ("lcaToolRender/lca_tool_render_register.ts", "lca_tool_render_register.ts"),
+    ):
+        rel = f"{_UI_TRANSPORTS}/{rel_suffix}"
+        src = _HERE / "lcaToolRender" / src_name
+        if not src.is_file():
+            raise SystemExit(f"missing patch source: {src}")
+        if ctx.write_if_changed(rel, src.read_text(encoding="utf-8")):
+            changed = True
 
     return changed

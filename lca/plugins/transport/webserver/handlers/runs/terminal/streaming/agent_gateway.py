@@ -30,6 +30,7 @@ future cannot wedge the loop.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 from typing import Any, Protocol
 
@@ -334,4 +335,32 @@ def _extract_id_from_sse_frame(frame: bytes) -> str | None:
     return None
 
 
-__all__ = ("RunPort", "build_agent_gateway_app")
+def make_production_ws_handler() -> Any:
+    """Return a WebSocket handler that resolves ``run_port`` from ``app.state``."""
+
+    stream_manager = LcaStreamEventManager(get_agent_runtime_redis_client())
+
+    async def handler(websocket: WebSocket) -> None:
+        run_id = websocket.path_params.get("run_id")
+        run_port: RunPort | None = getattr(websocket.app.state, "run_port", None)
+        await websocket.accept()
+        try:
+            await _run_session(
+                websocket,
+                run_id=run_id,
+                stream_manager=stream_manager,
+                run_port=run_port,
+            )
+        except WebSocketDisconnect:
+            return
+        except Exception as exc:
+            print(f"[lca_agent_gateway] unhandled: {exc!r}", flush=True)
+        finally:
+            if websocket.client_state != WebSocketState.DISCONNECTED:
+                with contextlib.suppress(Exception):
+                    await websocket.close()
+
+    return handler
+
+
+__all__ = ("RunPort", "build_agent_gateway_app", "make_production_ws_handler")

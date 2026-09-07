@@ -162,10 +162,9 @@ def render_create_run_receipt(receipt: RunReceipt, agent: AgentRef) -> JSONRespo
 
     P1 (§5.6.1) adds ``ws_token`` so the front-end can open the WS
     gateway immediately. The legacy keys (``run_id``, ``trace_id``,
-    ``agent``, ``live_url``) are preserved byte-compat — see the
-    2026-09-07-p1-facade-ws-token-todo Agent Note: a future PR will
-    plumb the `metadata_writer` so the running-operation row is
-    populated; in the meantime ``ws_token`` is the bridge.
+    ``agent``, ``live_url``) are preserved byte-compat.
+    ``register_gateway_run`` (called from :func:`create_run`) writes
+    the running-operation row and publishes ``agent_runtime_init``.
     """
     from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.auth import (
         DEFAULT_TTL_SECONDS,
@@ -275,6 +274,19 @@ async def create_run(request: Request) -> JSONResponse:
     receipt = await _run_port_of(request).create_and_dispatch(_to_run_request(decoded))
     if not receipt.accepted:
         return _err(receipt.rejection_reason or "run creation rejected", status_code=400)
+
+    from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.gateway_lifecycle import (
+        register_gateway_run,
+        topic_id_from_body,
+    )
+
+    await register_gateway_run(
+        request,
+        run_id=receipt.run_id,
+        topic_id=topic_id_from_body(body),
+        agent_id=str(decoded.agent.agent_id or "solo"),
+        body=body,
+    )
     return render_create_run_receipt(receipt, decoded.agent)
 
 
@@ -356,6 +368,9 @@ async def answer_run(request: Request) -> JSONResponse:
             status_code=receipt.error_status,
             headers=cors_headers(),
         )
+    store = getattr(request.app.state, "running_operation_store", None)
+    if store is not None:
+        await store.record_answer_key(run_id, idempotency_key)
     return JSONResponse(
         {"run_id": run_id, "status": receipt.status or "resumed"},
         headers=cors_headers(),
