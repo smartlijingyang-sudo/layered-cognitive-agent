@@ -105,6 +105,7 @@ interface ExecuteCodeParams {
 const ExecuteCode = memo<BuiltinRenderProps<ExecuteCodeParams, ExecuteCodeState>>(
   ({ args, pluginState }) => {
     const language = args.language || 'python';
+    const output = pluginState?.stdout || pluginState?.output;
 
     return (
       <Flexbox className={styles.container} gap={8}>
@@ -118,7 +119,7 @@ const ExecuteCode = memo<BuiltinRenderProps<ExecuteCodeParams, ExecuteCodeState>
           >
             {args.code}
           </Highlighter>
-          {pluginState?.output && (
+          {output && (
             <Highlighter
               wrap
               language={'text'}
@@ -126,7 +127,7 @@ const ExecuteCode = memo<BuiltinRenderProps<ExecuteCodeParams, ExecuteCodeState>
               style={{ maxHeight: 200, overflow: 'auto', paddingInline: 8 }}
               variant={'filled'}
             >
-              {pluginState.output}
+              {output}
             </Highlighter>
           )}
           {pluginState?.stderr && (

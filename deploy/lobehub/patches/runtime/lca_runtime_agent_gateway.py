@@ -1177,6 +1177,178 @@ def _patch_gateway_event_handler_lca_tool_lifecycle(ctx: PatchContext) -> bool:
     return True
 
 
+def _patch_gateway_event_handler_lca_tool_args_normalize(ctx: PatchContext) -> bool:
+    """Stringify object tool args for ChatToolPayload; defer empty tool-row create."""
+    rel = (
+        "src/store/chat/slices/agentRun/actions/transports/gateway/"
+        "gatewayEventHandler.ts"
+    )
+    text = ctx.read(rel)
+    if "stringifyLcaToolsCallingArguments" in text:
+        return False
+
+    old_helpers = (
+        "  return Array.from(byId.values());\n"
+        "};\n"
+        "\n"
+        "const isToolStateChunkData = (data: unknown): data is ToolStateChunkData =>\n"
+    )
+    new_helpers = (
+        "  return Array.from(byId.values());\n"
+        "};\n"
+        "\n"
+        "/** LCA spine sends object args; ``ChatToolPayload.arguments`` must be JSON strings. */\n"
+        "const stringifyLcaToolsCallingArguments = <T extends { id: string }>(\n"
+        "  tools: readonly T[],\n"
+        "): T[] =>\n"
+        "  tools.map((tool) => {\n"
+        "    if (!isRecord(tool)) return tool;\n"
+        "    const raw = tool.arguments;\n"
+        "    if (raw === undefined || typeof raw === 'string') return tool;\n"
+        "    return { ...tool, arguments: JSON.stringify(isRecord(raw) ? raw : {}) } as T;\n"
+        "  });\n"
+        "\n"
+        "const lcaToolArgumentsJson = (tool: Record<string, unknown>): string => {\n"
+        "  const raw = tool.arguments;\n"
+        "  return typeof raw === 'string' ? raw : JSON.stringify(isRecord(raw) ? raw : {});\n"
+        "};\n"
+        "\n"
+        "const hasMaterialLcaToolArguments = (argsStr: string): boolean => {\n"
+        "  if (!argsStr || argsStr === '{}') return false;\n"
+        "  try {\n"
+        "    const parsed = JSON.parse(argsStr) as unknown;\n"
+        "    return isRecord(parsed) && Object.keys(parsed).length > 0;\n"
+        "  } catch {\n"
+        "    return argsStr.length > 2;\n"
+        "  }\n"
+        "};\n"
+        "\n"
+        "const isToolStateChunkData = (data: unknown): data is ToolStateChunkData =>\n"
+    )
+    if old_helpers not in text:
+        raise SystemExit(
+            "[lca_runtime_agent_gateway] gatewayEventHandler mergeLcaToolsCallingChunks anchor not found"
+        )
+    text = text.replace(old_helpers, new_helpers, 1)
+
+    old_ensure = (
+        "      const existingRow = getToolMessageByCallId(toolId);\n"
+        "      if (existingRow?.id) {\n"
+        "        ensured[index] = { ...tool, result_msg_id: existingRow.id };\n"
+        "        changed = true;\n"
+        "        continue;\n"
+        "      }\n"
+        "\n"
+        "      const identifier = typeof tool.identifier === 'string' ? tool.identifier : undefined;\n"
+        "      const apiName = typeof tool.apiName === 'string' ? tool.apiName : undefined;\n"
+        "      if (!identifier || !apiName) continue;\n"
+        "\n"
+        "      const rawArgs = tool.arguments;\n"
+        "      const argsStr =\n"
+        "        typeof rawArgs === 'string' ? rawArgs : JSON.stringify(isRecord(rawArgs) ? rawArgs : {});\n"
+        "\n"
+        "      const created = await get().optimisticCreateMessage(\n"
+    )
+    new_ensure = (
+        "      const existingRow = getToolMessageByCallId(toolId);\n"
+        "      const argsStr = lcaToolArgumentsJson(tool);\n"
+        "      if (existingRow?.id) {\n"
+        "        ensured[index] = { ...tool, result_msg_id: existingRow.id };\n"
+        "        changed = true;\n"
+        "        if (hasMaterialLcaToolArguments(argsStr) && existingRow.plugin?.arguments !== argsStr) {\n"
+        "          get().internal_dispatchMessage(\n"
+        "            {\n"
+        "              id: existingRow.id,\n"
+        "              type: 'updateMessagePlugin',\n"
+        "              value: { arguments: argsStr },\n"
+        "            },\n"
+        "            dispatchContext,\n"
+        "          );\n"
+        "        }\n"
+        "        continue;\n"
+        "      }\n"
+        "\n"
+        "      const identifier = typeof tool.identifier === 'string' ? tool.identifier : undefined;\n"
+        "      const apiName = typeof tool.apiName === 'string' ? tool.apiName : undefined;\n"
+        "      if (!identifier || !apiName) continue;\n"
+        "\n"
+        "      if (!hasMaterialLcaToolArguments(argsStr)) continue;\n"
+        "\n"
+        "      const created = await get().optimisticCreateMessage(\n"
+    )
+    if old_ensure not in text:
+        raise SystemExit(
+            "[lca_runtime_agent_gateway] gatewayEventHandler ensureLcaGatewayToolMessages anchor not found"
+        )
+    text = text.replace(old_ensure, new_ensure, 1)
+
+    old_tools = (
+        "            if (params.preserveStreamedContentOnTerminal) {\n"
+        "              toolsCalling = await ensureLcaGatewayToolMessages(toolsCalling);\n"
+        "            }\n"
+        "\n"
+        "            get().internal_dispatchMessage(\n"
+    )
+    new_tools = (
+        "            if (params.preserveStreamedContentOnTerminal) {\n"
+        "              toolsCalling = await ensureLcaGatewayToolMessages(toolsCalling);\n"
+        "              toolsCalling = stringifyLcaToolsCallingArguments(toolsCalling);\n"
+        "            }\n"
+        "\n"
+        "            get().internal_dispatchMessage(\n"
+    )
+    if old_tools not in text:
+        raise SystemExit(
+            "[lca_runtime_agent_gateway] gatewayEventHandler tools_calling stringify anchor not found"
+        )
+    text = text.replace(old_tools, new_tools, 1)
+
+    ctx.write(rel, text)
+    return True
+
+
+def _patch_gateway_event_handler_lca_tool_end_content(ctx: PatchContext) -> bool:
+    """Fill assistant tool result.content from state.stdout when catalog omits output_text."""
+    rel = (
+        "src/store/chat/slices/agentRun/actions/transports/gateway/"
+        "gatewayEventHandler.ts"
+    )
+    text = ctx.read(rel)
+    if "rawResult && isRecord(rawResult.state) && !rawResult.content" in text:
+        return False
+
+    old = (
+        "          const payload = unwrapToolPayload(data?.payload);\n"
+        "          const result = data?.result as\n"
+        "            { state?: unknown; workRegistration?: unknown } | undefined;\n"
+        "          if (params.preserveStreamedContentOnTerminal && completedToolCallId && isRecord(result?.state)) {\n"
+    )
+    new = (
+        "          const payload = unwrapToolPayload(data?.payload);\n"
+        "          const rawResult = data?.result as\n"
+        "            | { content?: unknown; state?: unknown; workRegistration?: unknown }\n"
+        "            | undefined;\n"
+        "          const result =\n"
+        "            rawResult && isRecord(rawResult.state) && !rawResult.content\n"
+        "              ? {\n"
+        "                  ...rawResult,\n"
+        "                  content:\n"
+        "                    typeof (rawResult.state as { stdout?: unknown }).stdout === 'string'\n"
+        "                      ? (rawResult.state as { stdout: string }).stdout\n"
+        "                      : rawResult.content,\n"
+        "                }\n"
+        "              : rawResult;\n"
+        "          if (params.preserveStreamedContentOnTerminal && completedToolCallId && isRecord(result?.state)) {\n"
+    )
+    if old not in text:
+        raise SystemExit(
+            "[lca_runtime_agent_gateway] gatewayEventHandler tool_end content anchor not found"
+        )
+    text = text.replace(old, new, 1)
+    ctx.write(rel, text)
+    return True
+
+
 def apply(ctx: PatchContext) -> bool:
     import os
 
@@ -1223,6 +1395,8 @@ def apply(ctx: PatchContext) -> bool:
         _patch_tool_surfaces,
         _patch_gateway_event_handler_lca_stream,
         _patch_gateway_event_handler_lca_tool_lifecycle,
+        _patch_gateway_event_handler_lca_tool_args_normalize,
+        _patch_gateway_event_handler_lca_tool_end_content,
     ):
         if patch_fn(ctx):
             changed = True
