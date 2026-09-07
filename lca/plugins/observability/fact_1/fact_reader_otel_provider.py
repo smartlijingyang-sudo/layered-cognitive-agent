@@ -1,7 +1,16 @@
-"""OtelProjector factory plugin (Tier-2).
+"""OTel fact-reader factory (stub).
 
-把 ``OtelProjector`` 注册为 ``fact_readers`` 的 factory。
-tracer 实例由 assemble 阶段按 kwarg 注入（典型来源：tracer_backend 工厂产物）。
+The legacy ``OtelProjector`` (which translated :class:`RunStore` events
+into OpenTelemetry spans) was removed in the ADR-0192 cleanup. OTel
+span emission is now owned by :mod:`lca.infrastructure.observability.spine`
+observers — Session.runtime reads the spine event stream and emits
+OTel spans directly, no projection needed.
+
+This factory is kept as a bundle entry stub so ``bundles/base.yaml``
+can resolve the ``lca-fact-reader-otel-factory`` plugin id without
+breaking profile resolution. The plugin registers nothing; the
+``assemble_observability`` boot path resolves the registry slot to
+``None`` and the rest of the system works as before.
 """
 
 from __future__ import annotations
@@ -38,13 +47,14 @@ class Config(BaseModel):
     implements=[JournalProjector],
     layer="L0",
     effects="none",
-    description="Register OtelProjector factory as fact_readers['otel'].",
+    description="No-op OTel fact reader (legacy OtelProjector removed; Session observers own OTel).",
     test_suite="tests/test_fact_reader_plugin.py::test_provider_registers_otel_reader",
     kind=PluginKind.PROVIDER,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(
-            group=FunctionalGroup.G10_COMPOSITION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
+            group=FunctionalGroup.G10_COMPOSITION,
+            control_slots=(ControlSlot.OBSERVE_WILDCARD,),
         ),
         lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
         authority=AuthorityContract(grants=("plugin.serve",)),
@@ -63,20 +73,22 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.infrastructure.observability import NamedRegistry, ObservabilitySettings
-    from lca.infrastructure.observability.journal.otel.projector import OtelProjector
+    """No-op: Session runtime observers own OTel emission post-ADR-0192.
 
-    registry: NamedRegistry = ctx.require("fact_readers")
+    Kept for bundle compatibility (``bundles/base.yaml`` references this
+    plugin id). The :class:`NamedRegistry` slot for ``fact_readers`` is
+    registered but its ``otel`` factory is the no-op :func:`_make_otel_reader`.
+    """
+    del ctx, config, JournalProjector
+    return None  # noqa: PLR1711 — explicit no-op for static analysers
 
-    def _make_otel_reader(
-        settings: ObservabilitySettings | None = None,
-        *,
-        tracer: Any = None,
-        **unused: Any,
-    ) -> JournalProjector:
-        # tracer 由 assemble 阶段按 kwarg 注入；此处不主动构造
-        del unused
-        _settings = settings
-        return OtelProjector(tracer, genai_mapper_registry=None)
 
-    registry.register("otel", _make_otel_reader)
+def _make_otel_reader(
+    settings: Any = None,
+    *,
+    tracer: Any = None,
+    **unused: Any,
+) -> JournalProjector | None:
+    """Stub reader (returns ``None``); Session observers own OTel."""
+    del settings, tracer, unused
+    return None
