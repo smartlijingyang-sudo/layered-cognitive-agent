@@ -158,13 +158,31 @@ async def _decode_json_body(request: Request) -> dict[str, Any] | JSONResponse:
 
 
 def render_create_run_receipt(receipt: RunReceipt, agent: AgentRef) -> JSONResponse:
-    """Format a :class:`RunReceipt` to the 202 compatibility envelope."""
+    """Format a :class:`RunReceipt` to the 202 compatibility envelope.
+
+    P1 (§5.6.1) adds ``ws_token`` so the front-end can open the WS
+    gateway immediately. The legacy keys (``run_id``, ``trace_id``,
+    ``agent``, ``live_url``) are preserved byte-compat — see the
+    2026-09-07-p1-facade-ws-token-todo Agent Note: a future PR will
+    plumb the `metadata_writer` so the running-operation row is
+    populated; in the meantime ``ws_token`` is the bridge.
+    """
+    from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.auth import (
+        DEFAULT_TTL_SECONDS,
+        mint_user_jwt,
+    )
+    ws_token = mint_user_jwt(
+        user_id=str(agent.agent_id or "lca-local"),
+        operation_id=receipt.run_id,
+        ttl_seconds=DEFAULT_TTL_SECONDS,
+    )
     return JSONResponse(
         {
             "run_id": receipt.run_id,
             "trace_id": receipt.trace_id,
             "agent": {"id": agent.agent_id, "name": agent.name},
             "live_url": f"/runs/{receipt.run_id}/live",
+            "ws_token": ws_token,
         },
         status_code=202,
         headers=cors_headers(),
@@ -347,9 +365,33 @@ async def answer_run(request: Request) -> JSONResponse:
 __all__ = [
     "CreateRunRequest",
     "answer_run",
+    "build_create_run_app",
     "cancel_run",
     "create_run",
     "decode_create_run",
     "record_run_feedback",
     "render_create_run_receipt",
 ]
+
+
+def build_create_run_app() -> "Starlette":
+    """Test factory mirroring the production /runs route mounting.
+
+    The production router in :mod:`lca.plugins.transport.webserver.handlers.runs.api.routes`
+    mounts ``create_run`` under ``POST /lca-api/runs``; this factory
+    exposes the same handler at the bare ``/runs`` path so integration
+    tests can hit it directly without standing up the whole
+    composition root.
+    """
+    from starlette.applications import Starlette
+    from starlette.requests import Request
+    from starlette.routing import Route
+
+    async def _create_run_starlette(request: Request) -> JSONResponse:
+        # Re-bind so the existing implementation reads app.state from
+        # the request scope (it already does).
+        return await create_run(request)
+
+    return Starlette(
+        routes=[Route("/runs", _create_run_starlette, methods=["POST", "OPTIONS"])]
+    )
