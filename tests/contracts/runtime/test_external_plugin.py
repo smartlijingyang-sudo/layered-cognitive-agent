@@ -126,32 +126,34 @@ def test_default_dict_values_are_known_kinds() -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.subprocess
 def test_no_io_imports_in_module() -> None:
     """The contracts module must not import I/O, env, logging, or upper layers.
 
     Per AGENTS §2.1 + importlinter contract #3: ``contracts`` is pure
-    data. Catching the violation statically (via ``sys.modules``) guards
-    against a regression where a contributor adds a side-effecting
-    helper to the closed-set module.
+    data. This test runs in a SUBPROCESS to avoid sys.modules pollution
+    from sibling test files that transitively import lca.harness etc.
     """
-    forbidden_substrings = (
-        "lca.harness",
-        "lca.application",
-        "lca.infrastructure",
-        "lca.cognition",
-        "lca.runtime",
-        "lca.agent",
-        "lca.plugins",
+    import subprocess
+    import sys as _sys
+    result = subprocess.run(
+        [_sys.executable, "-c", """
+import sys
+import lca.contracts.runtime.external_plugin
+forbidden = (
+    "lca.harness", "lca.application", "lca.infrastructure",
+    "lca.cognition", "lca.runtime", "lca.agent", "lca.plugins",
+)
+leaked = sorted(
+    n for n in sys.modules
+    if any(n == root or n.startswith(root + ".") for root in forbidden)
+)
+assert leaked == [], f"external_plugin pulled upper-layer: {leaked}"
+print("OK")
+"""],
+        capture_output=True, text=True, check=False, cwd="/home/lichao/layered-cognitive-agent",
     )
-    leaked = sorted(
-        name
-        for name in sys.modules
-        if any(name == root or name.startswith(root + ".") for root in forbidden_substrings)
-    )
-    assert leaked == [], (
-        f"lca.contracts.runtime.external_plugin transitively pulled in "
-        f"upper-layer modules: {leaked}"
-    )
+    assert result.returncode == 0, f"subprocess failed: {result.stderr}"
 
 
 # ---------------------------------------------------------------------------

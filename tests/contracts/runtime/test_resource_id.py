@@ -296,26 +296,32 @@ def test_no_io_imports_in_module() -> None:
     assert leaked == [], f"resource module leaks impure names: {leaked!r}"
 
 
+@pytest.mark.subprocess
 def test_no_upper_layer_lca_imports() -> None:
     """``resource.py`` does not import any upper-layer ``lca.*`` module.
 
     Per I-HPC-1 / importlinter contract #3 the contracts layer is pure.
+
+    This test runs in a SUBPROCESS to avoid sys.modules pollution from
+    other test files (which transitively import lca.harness and friends).
     """
-    module = importlib.import_module("lca.contracts.runtime.resource")
-    module_file = module.__file__ or ""
-    assert module_file.endswith("resource.py"), f"unexpected module file: {module_file!r}"
-    # Spot-check the module spec: only lca.contracts.* should be reachable.
-    forbidden_lca = (
-        "lca.infrastructure",
-        "lca.cognition",
-        "lca.runtime",
-        "lca.agent",
-        "lca.harness",
-        "lca.application",
-        "lca.plugins",
+    import subprocess
+    import sys as _sys
+    result = subprocess.run(
+        [_sys.executable, "-c", """
+import sys
+import lca.contracts.runtime.resource
+forbidden = (
+    "lca.infrastructure", "lca.cognition", "lca.runtime", "lca.agent",
+    "lca.harness", "lca.application", "lca.plugins",
+)
+leaked = [n for n in sys.modules if n in forbidden]
+assert leaked == [], f"resource pulled upper-layer modules: {leaked!r}"
+print("OK")
+"""],
+        capture_output=True, text=True, check=False, cwd="/home/lichao/layered-cognitive-agent",
     )
-    leaked = [name for name in sys.modules if name in forbidden_lca]
-    assert leaked == [], f"resource module pulled upper-layer modules: {leaked!r}"
+    assert result.returncode == 0, f"subprocess failed: {result.stderr}"
 
 
 # ---------------------------------------------------------------------------

@@ -250,34 +250,36 @@ def test_is_plugin_contract_empty_when_truly_default() -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.subprocess
 def test_no_journal_or_session_import() -> None:
     """Module stays contracts-layer clean: no I/O, no journal/session imports.
 
-    Loading the module and inspecting ``sys.modules`` must not pull in
-    harness, journal, session, runtime, or plugin implementations.
+    Runs in a SUBPROCESS to avoid sys.modules pollution from sibling
+    test files that transitively import lca.harness / lca.journal etc.
     """
-    forbidden_substrings = (
-        "lca.harness",
-        "lca.journal",
-        "lca.session",
-        "lca.runtime",
-        "lca.plugins",
-        "lca.application",
-        "lca.cognition",
-        "lca.infrastructure",
-        "lca.agent",
+    import subprocess
+    import sys as _sys
+    result = subprocess.run(
+        [_sys.executable, "-c", """
+import sys
+import lca.contracts.harness.composition.plugin_contract
+forbidden = (
+    "lca.harness", "lca.journal", "lca.session", "lca.runtime",
+    "lca.plugins", "lca.application", "lca.cognition",
+    "lca.infrastructure", "lca.agent",
+)
+leaked = [
+    n for n in sys.modules
+    if n.startswith("lca.")
+    and any(sub in n for sub in forbidden)
+    and n != "lca.contracts.harness.composition.plugin_contract"
+]
+assert leaked == [], f"plugin_contract pulled: {leaked}"
+print("OK")
+"""],
+        capture_output=True, text=True, check=False, cwd="/home/lichao/layered-cognitive-agent",
     )
-    module = importlib.import_module("lca.contracts.harness.composition.plugin_contract")
-    leaked = [
-        name
-        for name in sys.modules
-        if name.startswith("lca.")
-        and any(sub in name for sub in forbidden_substrings)
-        and name != module.__name__
-    ]
-    assert leaked == [], (
-        f"plugin_contract module must not import lca.{forbidden_substrings}; leaked: {leaked}"
-    )
+    assert result.returncode == 0, f"subprocess failed: {result.stderr}"
 
 
 # ---------------------------------------------------------------------------
