@@ -159,10 +159,26 @@ class ReplacementDecision:
 
 @dataclass(frozen=True, slots=True)
 class EffectPolicyPlan:
+    """Plan-owned effect governance and privilege projection (ADR-0199 §3.1 + P3-06).
+
+    ``gateway_capability``, ``allowed_effects``, ``approval_required`` and
+    ``idempotency_required`` describe the Body-side enforcement shape
+    compiled from ``PluginSpec.effects`` + ``effect_governance``. The new
+    ``privileges`` field (ADR-0199 §3.1 fourth dimension, P3-06) carries
+    the union of ``PluginContract.privileges`` declared by every active
+    plugin, so the Body path can enforce I-HPC-5 (undeclared privilege
+    fails setup) without a separate scan.
+
+    Default ``privileges=()`` keeps the field backward-compatible: any code
+    that constructs ``EffectPolicyPlan`` without naming it keeps working
+    unchanged.
+    """
+
     gateway_capability: str = "effect.gateway"
     allowed_effects: tuple[str, ...] = ("none",)
     approval_required: tuple[str, ...] = ()
     idempotency_required: tuple[str, ...] = ()
+    privileges: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.gateway_capability:
@@ -171,6 +187,8 @@ class EffectPolicyPlan:
             )
         if not self.allowed_effects:
             raise DeclarativeValidationError("PS-006", "effect policy must declare allowed effects")
+        if not isinstance(self.privileges, tuple):
+            object.__setattr__(self, "privileges", tuple(self.privileges))
 
 
 @dataclass(frozen=True, slots=True)
