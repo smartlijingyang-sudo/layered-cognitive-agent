@@ -33,6 +33,13 @@ from pathlib import Path
 import httpx
 import pytest
 
+pytestmark = pytest.mark.skip(
+    reason=(
+        "GET /runs/{id}/live retired in P1 (ADR-0200); "
+        "migrate to WS gateway before re-enabling (PR-5)."
+    ),
+)
+
 # LobeHub ``LcaRunDriver`` L37-38:
 TERMINAL_STATUSES = frozenset({"canceled", "completed", "failed"})
 PAUSED_STATUSES = frozenset({"waiting_input"})
