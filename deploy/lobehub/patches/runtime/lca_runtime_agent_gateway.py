@@ -117,6 +117,7 @@ _MARKER_INSERTIONS: tuple[dict[str, str], ...] = (
 
 def _modified_files() -> tuple[str, ...]:
     rels = [
+        "src/store/chat/slices/agentRun/actions/transports/gateway/gateway.ts",
         "src/store/chat/slices/agentRun/actions/transports/client/streamingExecutor.ts",
         (
             "src/features/Conversation/Messages/AssistantGroup/Tool/Detail/"
@@ -539,6 +540,52 @@ def _patch_tool_surfaces(ctx: PatchContext) -> bool:
     return True
 
 
+def _patch_gateway_create_client(ctx: PatchContext) -> bool:
+    """Route connectToGateway through LcaAgentStreamClient when LCA mode is on."""
+    rel = "src/store/chat/slices/agentRun/actions/transports/gateway/gateway.ts"
+    text = ctx.read(rel)
+    marker = "/* LCA-P1: LcaAgentStreamClient factory */"
+    if marker in text:
+        return False
+
+    import_anchor = "import { messageMapKey } from '@/store/chat/utils/messageMapKey';"
+    if import_anchor not in text:
+        raise SystemExit("[lca_runtime_agent_gateway] gateway.ts import anchor not found")
+    text = text.replace(
+        import_anchor,
+        import_anchor
+        + "\nimport { lcaConnectToGateway } from "
+        + "'@/store/chat/agents/transports/lcaGateway/connect';"
+        + "\nimport { isLcaGatewayMode } from "
+        + "'@/store/chat/slices/agentRun/actions/dispatch/agentDispatcher';",
+        1,
+    )
+
+    old = (
+        "  /** Overridable factory for testing */\n"
+        "  createClient: (options: AgentStreamClientOptions) => GatewayConnection['client'] = (options) =>\n"
+        "    new AgentStreamClient(options);"
+    )
+    new = (
+        "  /** Overridable factory for testing */\n"
+        "  /* LCA-P1: LcaAgentStreamClient factory */\n"
+        "  createClient: (options: AgentStreamClientOptions) => GatewayConnection['client'] = (options) => {\n"
+        "    if (isLcaGatewayMode()) {\n"
+        "      return lcaConnectToGateway({\n"
+        "        operationId: options.operationId,\n"
+        "        resumeOnConnect: options.resumeOnConnect,\n"
+        "        token: options.token,\n"
+        "      });\n"
+        "    }\n"
+        "    return new AgentStreamClient(options);\n"
+        "  };"
+    )
+    if old not in text:
+        raise SystemExit("[lca_runtime_agent_gateway] gateway createClient anchor not found")
+    ctx.write(rel, text.replace(old, new, 1))
+    return True
+
+
 def apply(ctx: PatchContext) -> bool:
     import os
 
@@ -575,6 +622,7 @@ def apply(ctx: PatchContext) -> bool:
             changed = True
 
     for patch_fn in (
+        _patch_gateway_create_client,
         _patch_streaming_executor,
         _patch_agent_dispatcher,
         _patch_custom_interaction_handlers,

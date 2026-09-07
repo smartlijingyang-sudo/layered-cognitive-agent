@@ -2,14 +2,21 @@
 //
 // Called from streamingExecutor.ts (patched by lca_runtime_agent_gateway) when
 // isLcaGatewayMode() is true. Starts the run via POST /lca-api/runs,
-// then hands off to the native chat-store gateway connect path.
+// then opens the LCA agent-gateway WebSocket and wires native gateway events.
 
+import type { ConversationContext } from '@lobechat/types';
+
+import { buildRunLifecycle } from '@/store/chat/slices/agentRun/actions/lifecycle/buildRunLifecycle';
+import type { RunScope } from '@/store/chat/slices/agentRun/actions/lifecycle/types';
+import { createGatewayEventRouter } from '@/store/chat/slices/agentRun/actions/transports/gateway/gatewayEventRouter';
+import type { ChatStore } from '@/store/chat/store';
+
+import { getLcaGatewayUrl } from './client';
+import { createLcaGatewayEventHandler } from './event_handler';
 import { lcaStartRun } from './execute';
 
-type ChatGet = () => Record<string, unknown>;
-
 export async function lcaExecuteGatewayRun(
-  get: ChatGet,
+  get: () => ChatStore,
   params: {
     context: unknown;
     messages: Array<{ role: string; content: unknown }>;
@@ -31,8 +38,9 @@ export async function lcaExecuteGatewayRun(
       : JSON.stringify(lastUser?.content ?? '');
 
   const state = get();
-  const topicId =
-    typeof state.activeTopicId === 'string' ? state.activeTopicId : '';
+  const context = params.context as ConversationContext;
+  const topicId = context.topicId ?? state.activeTopicId ?? '';
+  const assistantMessageId = params.parentMessageId ?? '';
 
   const receipt = await lcaStartRun({
     agent: { id: params.model, name: params.model },
@@ -41,27 +49,71 @@ export async function lcaExecuteGatewayRun(
     topic_id: topicId || undefined,
   });
 
-  const connect =
-    (state.connectToGatewayOperation as
-      | ((args: Record<string, unknown>) => Promise<void>)
-      | undefined) ??
-    (state.reconnectToGatewayOperation as
-      | ((args: Record<string, unknown>) => Promise<void>)
-      | undefined);
+  const { operationId: gatewayOpId } = state.startOperation({
+    context,
+    metadata: { serverOperationId: receipt.runId },
+    ...(params.operationId ? { parentOperationId: params.operationId } : {}),
+    type: 'execServerAgentRuntime',
+  });
 
-  if (typeof connect !== 'function') {
-    throw new Error(
-      'chat store missing connectToGatewayOperation / reconnectToGatewayOperation',
-    );
+  if (assistantMessageId) {
+    state.associateMessageWithOperation(assistantMessageId, gatewayOpId);
   }
 
-  await connect({
-    assistantMessageId: params.parentMessageId ?? params.params?.parentMessageId,
+  if (params.operationId) {
+    state.completeOperation(params.operationId);
+  }
+
+  state.onOperationCancel(gatewayOpId, async () => {
+    await fetch(`/lca-api/runs/${receipt.runId}/cancel`, {
+      headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local'}` },
+      method: 'POST',
+    }).catch((err) => console.error('[LCA] cancel failed:', err));
+  });
+
+  const runScope: RunScope = params.scope === 'sub_agent' ? 'sub_agent' : 'top_level';
+  const eventHandler = createLcaGatewayEventHandler(get, {
+    assistantMessageId,
+    context,
+    gatewayOperationId: receipt.runId,
+    operationId: gatewayOpId,
+    runLifecycle: buildRunLifecycle(get, {
+      context,
+      parentMessageId: assistantMessageId,
+      parentMessageType: 'assistant',
+      runId: gatewayOpId,
+      runScope,
+      runtimeType: 'gateway',
+    }),
+  });
+
+  const eventRouter = createGatewayEventRouter({
+    createMemberHandler: () => () => undefined,
+    ownerHandler: eventHandler,
+    ownerOperationId: receipt.runId,
+  });
+
+  state.connectToGateway({
+    gatewayUrl: getLcaGatewayUrl(),
+    onEvent: eventRouter,
+    onSessionComplete: ({ terminalReceived, authFailed, succeeded }) => {
+      if (!terminalReceived) state.completeOperation(gatewayOpId);
+      if (authFailed) state.completeOperation(gatewayOpId);
+      if (topicId) {
+        const viewing = state.activeTopicId === topicId;
+        if (viewing || !succeeded) {
+          void state.updateTopicStatus?.({
+            agentId: context.agentId,
+            groupId: context.groupId,
+            status: 'active',
+            topicId,
+          });
+        }
+      }
+    },
     operationId: receipt.runId,
-    scope: params.scope,
-    threadId: params.params?.threadId,
-    topicId,
     token: receipt.token,
+    topicId: topicId || undefined,
   });
 
   return { model: params.model, provider: 'openai' };
