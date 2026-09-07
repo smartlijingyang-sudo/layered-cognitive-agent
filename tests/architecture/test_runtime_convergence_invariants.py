@@ -66,6 +66,98 @@ class TestControlPlaneProtocols:
         assert (ROOT / "lca/contracts/protocols/session/control_state.py").is_file()
         assert (ROOT / "lca/contracts/protocols/state/run_committer.py").is_file()
 
+    def test_run_committer_is_reducer_subclass(self) -> None:
+        """Wave C2: RunCommitter extends Reducer (alias contract)."""
+        from lca.contracts.protocols.state.reducer import Reducer
+        from lca.contracts.protocols.state.run_committer import RunCommitter
+
+        assert issubclass(RunCommitter, Reducer)
+        assert "commit_turn" in RunCommitter.__dict__ or any(
+            "commit_turn" in base.__dict__ for base in RunCommitter.__mro__
+        )
+
+    def test_default_reducer_implements_commit_turn(self) -> None:
+        """Wave C2: DefaultReducer exposes commit_turn (RunCommitter alias)."""
+        from lca.plugins.loop.reducer.plugin import DefaultReducer
+
+        reducer = DefaultReducer()
+        assert callable(getattr(reducer, "commit_turn", None))
+
+    def test_commit_turn_appends_turn_control_fact(self) -> None:
+        """Wave C2: commit_turn routes fact append through Session (ADR-0186 SSOT)."""
+        from lca.contracts.atoms.enums.enums import ActionType
+        from lca.contracts.models.core.execution.decision import (
+            Decision,
+            Observation,
+            ToolCall,
+            Turn,
+        )
+        from lca.contracts.models.core.policy.budget import create_budget
+        from lca.contracts.models.core.state.state import AgentState
+        from lca.infrastructure.session.context.turn_control_reader import (
+            projected_control_turns,
+        )
+        from lca.plugins.events.publishers._session_publish import (
+            reset_publish_session,
+            set_publish_session,
+        )
+        from lca.plugins.loop.reducer.plugin import DefaultReducer
+        from lca.session.append import Session
+
+        session = Session("wave_c2_smoke")
+        token = set_publish_session(session)
+        try:
+            reducer = DefaultReducer()
+            state = AgentState(
+                trace_id="t",
+                task="task",
+                budget=create_budget(max_steps=8),
+            )
+            turn = Turn(
+                decision=Decision(
+                    decision_id="d-c2",
+                    action_type=ActionType.USE_TOOL,
+                    rationale="r",
+                    confidence=1.0,
+                    tool_calls=[
+                        ToolCall(call_id="c1", tool_name="search", arguments={"q": "x"})
+                    ],
+                ),
+                observation=Observation(
+                    observation_id="o1",
+                    success=True,
+                    payload={"ok": True},
+                ),
+            )
+            reducer.commit_turn(state, turn)
+            projected = projected_control_turns(state)
+            assert projected is not None
+            assert len(projected) == 1
+            assert projected[0].tool_name == "search"
+        finally:
+            reset_publish_session(token)
+
+    def test_remember_phase_emits_turn_delta(self) -> None:
+        """Wave C2: remember phase appends turn facts via the 'turn' RunDelta.
+
+        The standard remember executor always emits a ``RunDelta`` with
+        ``metadata['operation'] == 'turn'``; ``TurnDeltaHandler`` then
+        routes it through ``reducer.commit_turn`` → ``Session.append``,
+        so fact append is gated on the remember phase for every run
+        whose remember phase executes.
+        """
+        src = (
+            ROOT / "lca/plugins/loop/phase/remember/standard/plugin.py"
+        ).read_text(encoding="utf-8")
+        assert '"operation": "turn"' in src
+        assert "decision" in src
+        assert "observation" in src
+
+        handler_src = (
+            ROOT / "lca/plugins/act/delta/handlers_provider.py"
+        ).read_text(encoding="utf-8")
+        assert "commit_turn" in handler_src
+
     def test_gates_do_not_import_model_context_assembler(self) -> None:
         gates_dir = ROOT / "lca/cognition/brain/decision_gates"
         for path in gates_dir.glob("*.py"):

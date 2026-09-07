@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel
 
@@ -19,6 +19,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
+from lca.contracts.protocols.session.control_state import ControlState, ControlTurn
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca_kernel.events.session.session import SessionEvent
 
@@ -78,6 +79,66 @@ class TurnControlUnit:
 
     def view(self, state: dict[str, Any]) -> dict[str, Any]:
         return dict(state)
+
+    def fold(self, session: Any) -> ControlState:
+        """Build :class:`ControlState` directly from a Session snapshot.
+
+        Implements :class:`TurnControlProjection` (ADR-0191 §C1). The
+        fold is pure: it iterates ``session.snapshot_events()`` from
+        empty state and never reads ``state.control_turns``. When
+        ``session`` exposes no snapshot surface (cold/unbound path),
+        returns an empty :class:`ControlState` — gates must treat empty
+        projection as "no control signal" rather than fall back to
+        in-process state.
+        """
+        snapshot = getattr(session, "snapshot_events", None)
+        if not callable(snapshot):
+            return ControlState()
+        state = self.init(getattr(session, "header", None))
+        for event in cast("Any", snapshot)():
+            state = self.apply(state, event)
+        return _state_to_control_state(state)
+
+
+def _state_to_control_state(state: dict[str, Any]) -> ControlState:
+    """Convert the internal fold state into the gate-facing view.
+
+    Drops ``turn.ended.v1`` markers (``turn``/``reason`` keys): gates
+    consume control summaries, not session-end markers — they were an
+    internal fold input to advance the last-action cursor. Fold input
+    facts stay in the event log; the view is the only projection
+    surface gates read.
+    """
+    raw_turns = state.get("turns") or []
+    turns: list[ControlTurn] = []
+    for item in raw_turns:
+        if not isinstance(item, dict):
+            continue
+        if "turn" in item:
+            # ``turn.ended.v1`` marker: not a gate-facing control entry.
+            continue
+        tool_arguments = item.get("tool_arguments")
+        if tool_arguments is not None and not isinstance(tool_arguments, dict):
+            tool_arguments = None
+        files_created = item.get("files_created") or ()
+        if not isinstance(files_created, (list, tuple)):
+            files_created = ()
+        turns.append(
+            ControlTurn(
+                action_type=item.get("action_type"),
+                tool_name=item.get("tool_name"),
+                observation_success=item.get("observation_success"),
+                tool_arguments=tool_arguments,
+                observation_payload=item.get("observation_payload"),
+                observation_error=item.get("observation_error"),
+                files_created=tuple(str(x) for x in files_created),
+            )
+        )
+    return ControlState(
+        turns=tuple(turns),
+        last_action_type=state.get("last_action_type"),
+        last_tool_name=state.get("last_tool_name"),
+    )
 
 
 class Config(BaseModel):
