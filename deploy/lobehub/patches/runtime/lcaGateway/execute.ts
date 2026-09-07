@@ -10,7 +10,16 @@ import type { LcaRunReceipt } from './types';
 
 export interface LcaStartRunBody {
   agent: { id: string; name: string };
-  messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
+  // ``imageList`` / ``fileList`` / ``files`` mirror the LobeHub
+  // ``UIChatMessage`` shape so the LCA ingress can hydrate attachments
+  // before they reach the prompt assembler (ADR-0099-compatible schema).
+  messages: Array<{
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+    imageList?: Array<{ id: string; url: string; alt?: string }>;
+    fileList?: Array<{ id: string; name?: string; url?: string; fileType?: string }>;
+    files?: string[];
+  }>;
   parent_message_id?: string;
   topic_id?: string;
   resume_approval?: {

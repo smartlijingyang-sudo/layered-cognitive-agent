@@ -56,7 +56,13 @@ export async function lcaExecuteGatewayRun(
   get: () => ChatStore,
   params: {
     context: unknown;
-    messages: Array<{ role: string; content: unknown }>;
+    messages: Array<{
+      role: string;
+      content: unknown;
+      imageList?: Array<{ id: string; url: string; alt?: string }>;
+      fileList?: Array<{ id: string; name?: string; url?: string; fileType?: string }>;
+      files?: string[];
+    }>;
     model: string;
     operationId?: string;
     parentMessageId?: string;
@@ -74,6 +80,36 @@ export async function lcaExecuteGatewayRun(
       ? lastUser.content
       : JSON.stringify(lastUser?.content ?? '');
 
+  // Forward LobeHub-side attachment fields so LCA ingress can hydrate the
+  // FileStore before composing the run prompt. Empty arrays are dropped to
+  // keep the wire shape stable for text-only turns.
+  const attachmentExtras: {
+    imageList?: Array<{ id: string; url: string; alt?: string }>;
+    fileList?: Array<{ id: string; name?: string; url?: string; fileType?: string }>;
+    files?: string[];
+  } = {};
+  const imageList = (lastUser as { imageList?: unknown } | undefined)?.imageList;
+  if (Array.isArray(imageList) && imageList.length > 0) {
+    attachmentExtras.imageList = imageList as Array<{
+      id: string;
+      url: string;
+      alt?: string;
+    }>;
+  }
+  const fileList = (lastUser as { fileList?: unknown } | undefined)?.fileList;
+  if (Array.isArray(fileList) && fileList.length > 0) {
+    attachmentExtras.fileList = fileList as Array<{
+      id: string;
+      name?: string;
+      url?: string;
+      fileType?: string;
+    }>;
+  }
+  const files = (lastUser as { files?: unknown } | undefined)?.files;
+  if (Array.isArray(files) && files.length > 0) {
+    attachmentExtras.files = files as string[];
+  }
+
   const state = get();
   const context = params.context as ConversationContext;
   const topicId = context.topicId ?? state.activeTopicId ?? '';
@@ -87,7 +123,7 @@ export async function lcaExecuteGatewayRun(
 
   const receipt = await lcaStartRun({
     agent: { id: params.model, name: params.model },
-    messages: [{ role: 'user', content }],
+    messages: [{ role: 'user', content, ...attachmentExtras }],
     parent_message_id: assistantMessageId || params.parentMessageId,
     topic_id: topicId || undefined,
   });
