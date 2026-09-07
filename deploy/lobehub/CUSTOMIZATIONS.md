@@ -24,7 +24,6 @@ Title / embeddings 仍走 `openai_shim`（`/v1/chat|embeddings|responses`），�
 |---|---|---|
 | `lca_runtime_agent_gateway` | A | `lcaGateway/*` WS 客户端 + streamingExecutor/HIL 源修改（PR-4 接替 `lca_run_driver`） |
 | `lca_runtime_chat_persistence` | A | 持久化 helper + `lcaToolRender/projection.ts`（PR-3 拆分自 run_driver） |
-| `lca_runtime_agent_gateway` | A | `lcaGateway/*` WS 客户端 + gateway marker 注入 |
 | `lca_runtime_use_gateway_reconnect` | A | `useGatewayReconnect` 读 `/lca-api/topics/.../running-op` |
 | `office_preview_local` | A | 本地 Office 产物走下载，不喂 officeapps.live.com |
 | `file_list_gateway_preview` | A | 组级 FileListViewer 对 `/files` 走 URL 预览，不进 LobeHub file-store |

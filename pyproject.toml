@@ -341,6 +341,7 @@ markers = [
     "real_llm: 需要 LLM_API_KEY 才会执行的真实 LLM 集成测试",
     "profile_integration: golden profile + PlanResolutionService 集成测试 (需要真实 profile YAML)",
     "subprocess: 隔离 sys.modules 的子进程 purity 测试 (避开 sibling test pollution)",
+    "stability: 1 h stability smoke; runs in nightly job, not on every PR",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning:lca",

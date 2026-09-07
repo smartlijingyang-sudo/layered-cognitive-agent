@@ -1,7 +1,8 @@
-"""SQLite-backed RunningOperationStore (ADR-0200 I-AGB-5: no status column)."""
+"""RunningOperationStore backends — SQLite (dev) and Postgres (LobeHub stack)."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 import sqlite3
 from collections.abc import Iterator
@@ -10,6 +11,7 @@ from pathlib import Path
 from typing import Any, Final
 
 from lca.contracts.observability.running_operation import RunningOperationStore
+from lca.infrastructure.persistence.postgres import database_url_from_env, postgres_connection
 
 _DEFAULT_PATH: Final[Path] = Path("traces/runtime/lca_running_operations.sqlite3")
 _MEMORY_URI = "file:lca_running_operations?mode=memory&cache=shared"
@@ -169,4 +171,166 @@ class SqliteRunningOperationStore(RunningOperationStore):
             connection.execute("DELETE FROM lca_running_operations")
 
 
-__all__ = ("SqliteRunningOperationStore",)
+class PostgresRunningOperationStore(RunningOperationStore):
+    """Postgres store sharing the LobeHub ``DATABASE_URL`` (spec §3.2)."""
+
+    def __init__(self, database_url: str | None = None) -> None:
+        self._database_url = database_url or database_url_from_env()
+
+    def _ensure_schema(self) -> None:
+        with postgres_connection(self._database_url) as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS lca_running_operations (
+                    run_id                text PRIMARY KEY,
+                    topic_id              text NOT NULL,
+                    agent_id              text NOT NULL,
+                    assistant_message_id  text,
+                    scope                 text NOT NULL DEFAULT 'main',
+                    created_at            timestamptz NOT NULL DEFAULT now(),
+                    accepted_answer_keys  jsonb NOT NULL DEFAULT '[]'::jsonb
+                )
+                """
+            )
+            cur.execute(
+                """
+                CREATE INDEX IF NOT EXISTS lca_running_operations_topic_id_idx
+                    ON lca_running_operations (topic_id, created_at DESC)
+                """
+            )
+            conn.commit()
+
+    async def insert(
+        self,
+        *,
+        run_id: str,
+        topic_id: str,
+        agent_id: str,
+        assistant_message_id: str | None,
+        scope: str,
+    ) -> None:
+        await asyncio.to_thread(
+            self._insert_sync,
+            run_id=run_id,
+            topic_id=topic_id,
+            agent_id=agent_id,
+            assistant_message_id=assistant_message_id,
+            scope=scope,
+        )
+
+    def _insert_sync(
+        self,
+        *,
+        run_id: str,
+        topic_id: str,
+        agent_id: str,
+        assistant_message_id: str | None,
+        scope: str,
+    ) -> None:
+        self._ensure_schema()
+        with postgres_connection(self._database_url) as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO lca_running_operations
+                    (run_id, topic_id, agent_id, assistant_message_id, scope)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (run_id) DO NOTHING
+                """,
+                (run_id, topic_id, agent_id, assistant_message_id, scope),
+            )
+            conn.commit()
+
+    async def get_latest_for_topic(self, topic_id: str) -> dict | None:
+        return await asyncio.to_thread(self._get_latest_sync, topic_id)
+
+    def _get_latest_sync(self, topic_id: str) -> dict | None:
+        self._ensure_schema()
+        with postgres_connection(self._database_url) as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT run_id, topic_id, agent_id, assistant_message_id, scope,
+                       created_at, accepted_answer_keys
+                FROM lca_running_operations
+                WHERE topic_id = %s
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (topic_id,),
+            )
+            row = cur.fetchone()
+        if row is None:
+            return None
+        cols = (
+            "run_id",
+            "topic_id",
+            "agent_id",
+            "assistant_message_id",
+            "scope",
+            "created_at",
+            "accepted_answer_keys",
+        )
+        data = dict(zip(cols, row, strict=True))
+        accepted = data.get("accepted_answer_keys")
+        if accepted is None:
+            data["accepted_answer_keys"] = []
+        if hasattr(data["created_at"], "isoformat"):
+            data["created_at"] = data["created_at"].isoformat()
+        return data
+
+    async def record_answer_key(self, run_id: str, idempotency_key: str) -> None:
+        await asyncio.to_thread(self._record_answer_key_sync, run_id, idempotency_key)
+
+    def _record_answer_key_sync(self, run_id: str, idempotency_key: str) -> None:
+        self._ensure_schema()
+        with postgres_connection(self._database_url) as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE lca_running_operations
+                SET accepted_answer_keys = (
+                    SELECT COALESCE(jsonb_agg(DISTINCT v), '[]'::jsonb)
+                    FROM jsonb_array_elements_text(
+                        accepted_answer_keys || to_jsonb(ARRAY[%s]::text[])
+                    ) AS v
+                )
+                WHERE run_id = %s
+                """,
+                (idempotency_key, run_id),
+            )
+            conn.commit()
+
+    async def delete(self, run_id: str) -> None:
+        await asyncio.to_thread(self._delete_sync, run_id)
+
+    def _delete_sync(self, run_id: str) -> None:
+        with postgres_connection(self._database_url) as conn, conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM lca_running_operations WHERE run_id = %s",
+                (run_id,),
+            )
+            conn.commit()
+
+    async def delete_all_for_test(self) -> None:
+        """Test helper; never call from production."""
+        await asyncio.to_thread(self._truncate_sync)
+
+    def _truncate_sync(self) -> None:
+        self._ensure_schema()
+        with postgres_connection(self._database_url) as conn, conn.cursor() as cur:
+            cur.execute("TRUNCATE lca_running_operations")
+            conn.commit()
+
+
+def resolve_running_operation_store() -> RunningOperationStore:
+    """Prefer Postgres when ``DATABASE_URL`` connects; else process-local SQLite."""
+    from lca.infrastructure.persistence.postgres import postgres_available
+
+    if postgres_available():
+        return PostgresRunningOperationStore()
+    return SqliteRunningOperationStore()
+
+
+__all__ = (
+    "PostgresRunningOperationStore",
+    "SqliteRunningOperationStore",
+    "resolve_running_operation_store",
+)

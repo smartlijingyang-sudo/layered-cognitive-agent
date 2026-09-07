@@ -126,49 +126,6 @@ async def stream_journal_live(request: Request) -> StreamingResponse | JSONRespo
     )
 
 
-def _parse_after(request: Request) -> int:
-    """Parse ``?after=`` as a non-negative int; invalid values start from 0.
-
-    ADR-0100 / run-live.md: per-run live resume uses the query param only.
-    ``Last-Event-ID`` is intentionally **not** honored here (see
-    ``test_get_live_ignores_last_event_id_header``); clients must pass
-    ``?after=<last_drawn_seq>`` on reconnect within the same run.
-    """
-    raw = request.query_params.get("after", "0")
-    try:
-        return max(0, int(raw))
-    except (TypeError, ValueError):
-        return 0
-
-
-async def _stream_run_live_gone(request: Request) -> JSONResponse:
-    """GET /runs/{run_id}/live — retired in PR-4 (ADR-0200 §4).
-
-    The legacy per-run SSE endpoint has been replaced by the WS gateway
-    at ``/v1/runs/{run_id}/ws`` (PR-2) plus the WS-token mint endpoint
-    ``/v1/runs/{run_id}/ws-token`` (PR-3). This route now returns 410
-    Gone so any pre-PR-4 client gets
-    a deterministic, machine-readable signal to migrate instead of a
-    silent 404 or a wedged SSE stream.
-    """
-    if request.method == "OPTIONS":
-        return JSONResponse({}, headers=cors_headers())
-    return JSONResponse(
-        {
-            "error": "gone",
-            "message": (
-                "/runs/{run_id}/live retired in PR-4. "
-                "Use the WS gateway: POST /v1/runs/{run_id}/ws-token, "
-                "then connect to /v1/runs/{run_id}/ws."
-            ),
-            "ws_token_endpoint": "/v1/runs/{run_id}/ws-token",
-            "ws_endpoint": "/v1/runs/{run_id}/ws",
-        },
-        status_code=410,
-        headers=cors_headers(),
-    )
-
-
 async def get_run(request: Request) -> JSONResponse:
     """GET /runs/{run_id} — retrieve a compatibility summary through the owner."""
     run_id = request.path_params["run_id"]

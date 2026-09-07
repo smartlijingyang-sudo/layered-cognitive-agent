@@ -33,7 +33,6 @@ from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import 
     record_run_feedback,
 )
 from lca.plugins.transport.webserver.handlers.runs.api.query_endpoints import (
-    _stream_run_fold_gone,
     get_run,
     get_run_doctor,
     get_run_evidence,
@@ -49,7 +48,6 @@ from lca.plugins.transport.webserver.route.register import register_routes
 ROUTE_SPECS: tuple[RouteSpec, ...] = (
     RouteSpec("/runs", create_run, ("POST", "OPTIONS")),
     RouteSpec("/runs/{run_id}", get_run, ("GET",)),
-    RouteSpec("/runs/{run_id}/live", _stream_run_fold_gone, ("GET", "OPTIONS")),
     RouteSpec("/runs/{run_id}/doctor", get_run_doctor, ("GET",)),
     RouteSpec("/runs/{run_id}/failure", get_run_failure, ("GET",)),
     RouteSpec("/runs/{run_id}/exceptions", get_run_exceptions, ("GET",)),
