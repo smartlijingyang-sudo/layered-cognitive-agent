@@ -257,6 +257,9 @@ ignore = [
 "lca/contracts/protocols/**/*.py" = ["ARG002", "TC002"]
 "lca/contracts/mechanisms.py" = ["ARG002"]
 "lca/contracts/action.py" = ["ARG002"]
+# contracts/transport mirrors the native TS wire; camelCase JSON keys (assistantMessage,
+# toolCalling, ...) are intentional byte-compat with the TS source, not Python naming.
+"lca/contracts/transport/**/*.py" = ["N815", "N802"]
 "lca/plugins/transport/**/*.py" = ["TC002"]
 "lca/infrastructure/cli/cli.py" = ["B008", "S603"]  # typer defaults + tail logs
 "lca/infrastructure/cli/commands/**/*.py" = ["B008", "S603"]  # typer + subprocess runners
