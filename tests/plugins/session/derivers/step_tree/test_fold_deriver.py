@@ -56,7 +56,7 @@ def test_fold_single_step_from_writable_events() -> None:
     doc = fold_step_tree(events, run_id="r1")
     assert len(doc.steps) == 1
     assert doc.steps[0].phase == "think"
-    assert doc.steps[0].outcome == "success"
+    assert doc.steps[0].outcome == "ok"
     assert doc.totals is not None
     assert doc.totals.steps == 1
 
@@ -80,7 +80,7 @@ def test_fold_brain_think_start_end_creates_implicit_step() -> None:
     doc = fold_step_tree(events, run_id="r_implicit")
     assert doc.totals is not None
     assert doc.totals.steps == 1
-    assert doc.steps[0].outcome == "success"
+    assert doc.steps[0].outcome == "ok"
 
 
 def test_fold_phase_fold_creates_phase_record() -> None:
@@ -345,7 +345,7 @@ def test_fold_iso_when_and_session_event() -> None:
     ]
     doc = fold_step_tree(events, run_id="r_coerce")
     assert len(doc.steps) == 1
-    assert doc.steps[0].outcome == "success"
+    assert doc.steps[0].outcome == "ok"
     assert doc.steps[0].duration_ms is not None
     assert doc.steps[0].duration_ms >= 0
 
@@ -432,7 +432,7 @@ def test_deriver_flush_folds_spine_alongside_session_snapshot(tmp_path: Path) ->
     assert deriver.document.totals is not None
     assert deriver.document.totals.steps == 1
     assert deriver.document.steps[0].phase == "think"
-    assert deriver.document.steps[0].outcome == "success"
+    assert deriver.document.steps[0].outcome == "ok"
 
 
 def test_deriver_flush_falls_back_to_snapshot_without_spine(tmp_path: Path) -> None:
@@ -569,7 +569,7 @@ def test_deriver_flush_merges_session_snapshot_and_spine_with_dedup(tmp_path: Pa
     # 不重复计步。
     assert doc.totals.steps == 1
     assert [s.step_id for s in doc.steps] == ["step-001"]
-    assert doc.steps[0].outcome == "success"
+    assert doc.steps[0].outcome == "ok"
     # 去重:两流同条 phase.think.fold 只计一次
     assert doc.totals.phases == 1
     assert doc.totals.segments == sum(len(s.segments) for s in doc.steps)

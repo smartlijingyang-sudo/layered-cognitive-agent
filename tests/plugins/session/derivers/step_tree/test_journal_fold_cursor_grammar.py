@@ -39,7 +39,7 @@ def test_session_shaped_prefixed_events_fold_step_and_outcome() -> None:
     assert doc.totals is not None
     assert doc.totals.steps == 1
     assert doc.steps[0].phase == "think"
-    assert doc.steps[0].outcome == "success"
+    assert doc.steps[0].outcome == "ok"
     assert doc.metadata.outcome == "completed"
 
 
@@ -83,7 +83,7 @@ def test_llm_request_header_opens_step_with_payload_identity() -> None:
     step = doc.steps[0]
     assert step.step_id == "step-001"
     assert step.phase == "think"
-    assert step.outcome == "success"
+    assert step.outcome == "ok"
 
 
 def test_second_header_closes_first_step() -> None:
@@ -105,11 +105,11 @@ def test_second_header_closes_first_step() -> None:
     assert doc.totals.steps == 2
     first, second = doc.steps
     assert first.step_id == "step-001"
-    assert first.outcome == "success"
+    assert first.outcome == "ok"
     assert first.exited_at is not None
     assert second.step_id == "step-002"
     # 无终态信号 → 残留 step 维持 cancelled
-    assert second.outcome == "cancelled"
+    assert second.outcome == "skip"
 
 
 def test_header_without_step_id_generates_sequential_id() -> None:
@@ -149,7 +149,7 @@ def test_header_upgrades_empty_think_frame_in_place() -> None:
     assert doc.totals is not None
     assert doc.totals.steps == 1
     assert doc.steps[0].step_id == "step-001"
-    assert doc.steps[0].outcome == "success"
+    assert doc.steps[0].outcome == "ok"
 
 
 def test_header_after_thinking_opens_new_step() -> None:
@@ -176,9 +176,9 @@ def test_header_after_thinking_opens_new_step() -> None:
     assert doc.totals is not None
     assert [s.step_id for s in doc.steps] == ["step-001", "step-002"]
     assert doc.steps[0].thinking is not None
-    assert doc.steps[0].outcome == "success"
+    assert doc.steps[0].outcome == "ok"
     # 第二步仍开着,无终态信号 → materialize 按 cancelled 收口
-    assert doc.steps[1].outcome == "cancelled"
+    assert doc.steps[1].outcome == "skip"
 
 
 # ── step.thinking.record ─────────────────────────────────────────
@@ -262,7 +262,7 @@ def test_residual_open_step_closes_success_on_terminal_completed() -> None:
         },
     ]
     doc = fold_step_tree(events, run_id="r_residual_ok")
-    assert doc.steps[0].outcome == "success"
+    assert doc.steps[0].outcome == "ok"
     assert doc.metadata.outcome == "completed"
 
 
@@ -289,7 +289,7 @@ def test_explicit_step_boundary_marks_window_signal_explicit() -> None:
     step = doc.steps[0]
     assert step.step_id == "step-001"
     assert step.extra == {"window_signal": "explicit"}
-    assert step.outcome == "success"
+    assert step.outcome == "ok"
 
 
 def test_implicit_think_fallback_marks_window_signal_implicit() -> None:
@@ -345,7 +345,7 @@ def test_merged_flow_think_header_start_single_explicit_step() -> None:
     step = doc.steps[0]
     assert step.step_id == "step-001"
     assert step.extra == {"window_signal": "explicit"}
-    assert step.outcome == "success"
+    assert step.outcome == "ok"
 
 
 def test_boundary_first_order_start_then_header_single_step() -> None:
@@ -425,7 +425,7 @@ def test_step_end_outcome_falls_back_to_payload() -> None:
         },
     ]
     doc = fold_step_tree(events, run_id="r_end_outcome")
-    assert doc.steps[0].outcome == "cancelled"
+    assert doc.steps[0].outcome == "skip"
 
 
 def test_step_end_without_open_frame_is_noop() -> None:

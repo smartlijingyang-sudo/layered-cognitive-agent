@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 LCA_COGNITION = ROOT / "lca" / "cognition"
 EXECUTOR = LCA_COGNITION / "brain" / "llm_turn" / "executor.py"
-SAFE_EXECUTOR = LCA_COGNITION / "body" / "safe_executor.py"
+SAFE_EXECUTOR = LCA_COGNITION / "body" / "executor" / "safe_executor.py"
 
 
 class TestModelContextRuntimePath:
