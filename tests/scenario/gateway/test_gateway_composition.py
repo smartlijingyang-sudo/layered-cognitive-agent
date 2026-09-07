@@ -48,7 +48,7 @@ async def test_create_app_publishes_one_session_object_graph() -> None:
         "lifespan-driven ctx injection under ADR-0115 决定 6 (thin factory); "
         "see tests/test_thin_factory.py for new shape"
     )
-    from lca.plugins.transport.webserver.handlers.runs.terminal.legacy.adapter import (
+    from lca.plugins.transport.webserver.handlers.runs.terminal.registry_adapter import (
         RegistryRunAdapter,
     )
 

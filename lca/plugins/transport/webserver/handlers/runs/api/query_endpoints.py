@@ -126,39 +126,6 @@ async def stream_journal_live(request: Request) -> StreamingResponse | JSONRespo
     )
 
 
-def _parse_after(request: Request) -> int:
-    """Parse ``?after=`` as a non-negative int; invalid values start from 0.
-
-    ADR-0100 / run-live.md: per-run live resume uses the query param only.
-    ``Last-Event-ID`` is intentionally **not** honored here (see
-    ``test_get_live_ignores_last_event_id_header``); clients must pass
-    ``?after=<last_drawn_seq>`` on reconnect within the same run.
-    """
-    raw = request.query_params.get("after", "0")
-    try:
-        return max(0, int(raw))
-    except (TypeError, ValueError):
-        return 0
-
-
-async def stream_run_live(request: Request) -> StreamingResponse | JSONResponse:
-    """GET /runs/{run_id}/live — RETIRED in P1.
-
-    Returns 410 Gone. Use the LcaAgentGateway WebSocket at
-    ``/v1/runs/{run_id}/ws`` instead (ADR-0200).
-    """
-    if request.method == "OPTIONS":
-        return JSONResponse({}, headers=cors_headers())
-    return JSONResponse(
-        {
-            "error": "this endpoint is retired; use /v1/runs/{run_id}/ws (WebSocket) instead",
-            "spec": "docs/adr/0200-p1-agent-gateway-bridge.md",
-        },
-        status_code=410,
-        headers=cors_headers(),
-    )
-
-
 async def get_run(request: Request) -> JSONResponse:
     """GET /runs/{run_id} — retrieve a compatibility summary through the owner."""
     run_id = request.path_params["run_id"]
@@ -389,5 +356,4 @@ __all__ = [
     "get_run_profile",
     "health_payload",
     "stream_journal_live",
-    "stream_run_live",
 ]

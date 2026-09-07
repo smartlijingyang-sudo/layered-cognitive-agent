@@ -81,7 +81,6 @@ def test_create_run_receipt_includes_ws_token_and_keeps_live_url(
     """The 202 envelope carries ``ws_token`` AND keeps ``live_url`` for back-compat."""
     from lca.infrastructure.file.store import LocalFileStore
 
-    monkeypatch.delenv("LCA_RUNTIME_FACADE", raising=False)
     file_store = LocalFileStore(tmp_path / "files")
     port = _StubRunPort(run_id="run_node07")
 

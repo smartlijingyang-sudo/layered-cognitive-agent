@@ -1,4 +1,4 @@
-"""Patch tests for lca_run_driver (Journal projector hijack, 2026-08-21 surface)."""
+"""Patch tests for lca_runtime_agent_gateway (P1 gateway runtime surface)."""
 
 from __future__ import annotations
 
@@ -7,10 +7,10 @@ from pathlib import Path
 import pytest
 
 from deploy.lobehub.engine import PatchContext, discover_patches
-from deploy.lobehub.patches.runtime.lca_run_driver import apply, meta
+from deploy.lobehub.patches.runtime.lca_runtime_agent_gateway import apply, meta
 
 _EXECUTOR = "src/store/chat/slices/agentRun/actions/transports/client/streamingExecutor.ts"
-_DRIVER = "src/store/chat/agents/transports/LcaRunDriver.ts"
+_DRIVER = "src/store/chat/agents/transports/lcaGateway/executeGatewayRun.ts"
 _MARKER = "/* LCA: every chat is a Run */"
 
 # Realistic executeClientAgent snippet copied from LobeHub v2.2.13.
@@ -192,24 +192,26 @@ def _seed_ui(tmp_path: Path) -> Path:
     tool_surfaces.parent.mkdir(parents=True, exist_ok=True)
     tool_surfaces.write_text(_STUB_TOOL_SURFACES, encoding="utf-8")
 
+    dispatcher = (
+        tmp_path / "src/store/chat/slices/agentRun/actions/dispatch/agentDispatcher.ts"
+    )
+    dispatcher.parent.mkdir(parents=True, exist_ok=True)
+    dispatcher.write_text("export const dispatchAgent = () => {};\n", encoding="utf-8")
+
     return tmp_path
 
 
-def test_journal_driver_and_openai_guard_are_retired() -> None:
+def test_gateway_runtime_patches_registered() -> None:
     root = Path("deploy/lobehub/patches")
-    assert (root / "runtime" / "lca_run_driver.py").is_file()
-    # openai_guard retired: the gateway /v1/responses endpoint now adapts the wire
-    # shape to LobeHub's Responses parser, so LobeHub code stays untouched and
-    # no virtual-model allowlist is hardcoded into the SDK.
-    assert not (root / "provider" / "openai_guard.py").exists()
+    assert (root / "runtime" / "lca_runtime_agent_gateway.py").is_file()
+    assert not (root / "runtime" / "lca_run_driver.py").exists()
     names = {pm.meta.name for pm in discover_patches()}
-    assert "lca_run_driver" in names
+    assert "lca_runtime_agent_gateway" in names
+    assert "lca_run_driver" not in names
     assert "openai_guard" not in names
-    assert "lca_agent_driver" not in names
-    assert "drop_lca_chat_hijack" not in names
 
 
-def test_apply_injects_marker_and_writes_driver(tmp_path: Path) -> None:
+def test_apply_injects_gateway_block(tmp_path: Path) -> None:
     ui = _seed_ui(tmp_path)
     ctx = PatchContext(ui_dir=ui)
 
@@ -217,42 +219,14 @@ def test_apply_injects_marker_and_writes_driver(tmp_path: Path) -> None:
 
     executor = (ui / _EXECUTOR).read_text(encoding="utf-8")
     assert _MARKER in executor
-    assert "runLcaJournal" in executor
-    assert "finishLcaChat" in executor
-    assert "new GeneralChatAgent" in executor.split(_MARKER, 1)[1]
+    assert "lcaExecuteGatewayRun" in executor
+    assert "isLcaGatewayMode" in executor
     hijack = executor.split(_MARKER, 1)[1].split("const modelRuntimeConfig", 1)[0]
-    assert "await runLcaJournal" in hijack
-    assert "await finishLcaChat" in hijack
-    assert "model === 'team' || model === 'auto' ? model : 'solo'" in hijack
+    assert "await lcaExecuteGatewayRun" in hijack
+    assert "runLcaJournal" not in hijack
 
-    driver = ui / _DRIVER
-    assert driver.is_file()
-    source = driver.read_text(encoding="utf-8")
-    assert "runLcaJournal" in source
-    assert "observeRunLive" in source
-    assert (ui / "src/store/chat/agents/transports/lcaJournal.ts").is_file()
-    assert (ui / "src/store/chat/agents/transports/lcaRunObserve.ts").is_file()
-    observe = (ui / "src/store/chat/agents/transports/lcaRunObserve.ts").read_text(encoding="utf-8")
-    assert "applyLiveGapCursorAdvance" in observe
-    assert "projected.kind === 'live-gap'" in observe
-    assert "advanceLiveGapCursor(cursor, projected)" not in observe
-    # Termination contract: max reconnect budget + missing-snapshot branch
-    # + paused-treated-as-terminal all need to be present so the live
-    # observation face never hammers /live?after= for a run that no
-    # longer exists (or is paused waiting on a human).
-    assert "LIVE_MAX_RECONNECTS" in observe
-    assert "LIVE_PAUSED.has(snapStatus)" in observe
-    assert "snap.missing === true" in observe
-    command = (ui / "src/store/chat/agents/transports/lcaRunCommand.ts").read_text(encoding="utf-8")
-    assert "missing: true" in command
-    assert "response.status === 404 || response.status === 410" in command
-    assert (ui / "src/store/chat/agents/transports/lcaRunCommand.ts").is_file()
-    journal = (ui / "src/store/chat/agents/transports/lcaJournal.ts").read_text(encoding="utf-8")
-    assert "projectJournalFrame" in journal
-    assert (ui / "src/store/chat/agents/transports/lcaWire.ts").is_file()
-
-    assert meta.verify_marker == _MARKER
-    assert meta.name == "lca_run_driver"
+    assert meta.verify_marker == "export function lcaConnectToGateway"
+    assert meta.name == "lca_runtime_agent_gateway"
 
 
 def test_apply_is_idempotent_when_marker_present(tmp_path: Path) -> None:
@@ -272,5 +246,5 @@ def test_apply_raises_when_anchor_missing(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     ctx = PatchContext(ui_dir=ui)
-    with pytest.raises(SystemExit, match="lca_run_driver"):
+    with pytest.raises(SystemExit, match="lca_runtime_agent_gateway"):
         apply(ctx)

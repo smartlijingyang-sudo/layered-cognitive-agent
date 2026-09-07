@@ -42,10 +42,10 @@ class TestToolWireTable(unittest.TestCase):
 
 
 class TestLcaWireGeneration(unittest.TestCase):
-    """The lca_run_driver patch generates lobehub-ui lcaWire.ts from WIRE."""
+    """The lca_runtime_chat_persistence patch generates lobehub-ui lcaWire.ts from WIRE."""
 
     def test_generated_wire_includes_create_assistant(self) -> None:
-        from deploy.lobehub.patches.runtime.lca_run_driver import render_wire_ts
+        from deploy.lobehub.patches.runtime.lca_runtime_chat_persistence import render_wire_ts
 
         output = render_wire_ts(WIRE)
         self.assertIn("'create_assistant'", output)

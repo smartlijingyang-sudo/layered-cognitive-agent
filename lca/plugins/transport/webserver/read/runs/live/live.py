@@ -90,11 +90,10 @@ async def stream_run_live(
     *,
     after: int = 0,
 ) -> AsyncIterator[bytes]:
-    """Stream a run live as four UI SSE events (reasoning|text|tool|done)."""
-    from lca.plugins.transport.run_live_observe__seam import stream_run_live_observe
-
-    async for line in stream_run_live_observe(session, after=after):
-        yield line
+    """Retired — P1 uses LcaAgentGateway WebSocket instead of Journal SSE."""
+    del session, after
+    if False:  # pragma: no cover
+        yield b""
 
 
 def stream_process_journal_live(tail: Any, *, last_seq: int = 0) -> AsyncIterator[bytes]:

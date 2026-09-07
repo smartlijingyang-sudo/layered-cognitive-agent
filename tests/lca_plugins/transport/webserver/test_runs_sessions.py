@@ -1,7 +1,4 @@
-"""lca-gateway-routes-runs-sessions plugin — register /runs (8)。
-
-``/v1/sessions`` 命令面已随旧 Session Spine 退役（命令入口归 runs 平面）。
-"""
+"""lca-gateway-routes-runs-sessions plugin — register /runs routes."""
 
 from __future__ import annotations
 
@@ -10,6 +7,7 @@ from typing import Any
 import pytest
 
 from lca.plugins.transport.webserver.router.router import RouteRegistry
+from lca.plugins.transport.webserver.routes_2.routes_runs_sessions import ROUTE_SPECS
 
 
 class _FakeRuntime:
@@ -34,40 +32,28 @@ class _FakeCtx:
 
 
 @pytest.mark.asyncio
-async def test_routes_runs_sessions_register_8_routes() -> None:
-    """/runs 子树 8 条:
-    /runs, /runs/{run_id}, /runs/{run_id}/live, /runs/{run_id}/doctor,
-    /runs/{run_id}/profile, /runs/{run_id}/evidence/{ref:path},
-    /runs/{run_id}/cancel, /runs/{run_id}/answer
-    """
+async def test_routes_runs_sessions_register_expected_count() -> None:
     from lca.plugins.transport.webserver.routes_2.routes_runs_sessions import setup as plugin
 
     router = RouteRegistry()
     ctx = _FakeCtx(router)
     await plugin.setup(ctx, None)
 
-    assert len(router._exact) == 8
+    assert len(router._exact) == len(ROUTE_SPECS)
 
 
 @pytest.mark.asyncio
-async def test_routes_runs_sessions_paths_match_migration_baseline() -> None:
+async def test_routes_runs_sessions_paths_match_catalog() -> None:
     from lca.plugins.transport.webserver.routes_2.routes_runs_sessions import setup as plugin
 
     router = RouteRegistry()
     ctx = _FakeCtx(router)
     await plugin.setup(ctx, None)
 
-    expected_runs = {
-        "/runs",
-        "/runs/{run_id}",
-        "/runs/{run_id}/live",
-        "/runs/{run_id}/doctor",
-        "/runs/{run_id}/profile",
-        "/runs/{run_id}/evidence/{ref:path}",
-        "/runs/{run_id}/cancel",
-        "/runs/{run_id}/answer",
-    }
+    expected_runs = {spec.path for spec in ROUTE_SPECS}
     assert expected_runs.issubset(router._exact.keys())
+    assert "/runs/{run_id}/live" not in router._exact
+    assert "/v1/runs/{run_id}/ws-token" in router._exact
 
 
 @pytest.mark.asyncio
@@ -78,21 +64,17 @@ async def test_routes_runs_sessions_effects_tracked() -> None:
     ctx = _FakeCtx(router)
     await plugin.setup(ctx, None)
 
-    assert len(ctx._fake_runtime.effects) == 8
+    assert len(ctx._fake_runtime.effects) == len(ROUTE_SPECS)
 
 
 def test_routes_runs_sessions_exposes_public_routes_constant() -> None:
-    """``ROUTE_SPECS`` 是路径 catalog 的 SSOT,供测试/诊断直接 import。"""
-    from lca.plugins.transport.webserver.routes_2.routes_runs_sessions import ROUTE_SPECS
-
-    assert isinstance(ROUTE_SPECS, tuple)
     paths = {spec.path for spec in ROUTE_SPECS}
     assert "/runs/{run_id}/profile" in paths
     assert "/runs/{run_id}/evidence/{ref:path}" in paths
+    assert "/runs/{run_id}/live" not in paths
 
 
 def test_run_request_carries_optional_assistant_id() -> None:
-    """``RunRequest`` 携带可选 ``assistant_id`` 字段。"""
     from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import RunRequest
 
     base = RunRequest(

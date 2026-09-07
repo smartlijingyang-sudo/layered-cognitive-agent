@@ -28,7 +28,7 @@ from lca.plugins.transport.webserver.handlers.runs.session.session.session impor
     RunRegistry,
     RunSession,
 )
-from lca.plugins.transport.webserver.handlers.runs.terminal.legacy.adapter import RegistryRunAdapter
+from lca.plugins.transport.webserver.handlers.runs.terminal.registry_adapter import RegistryRunAdapter
 from lca_kernel.cli.cli import create_app
 from tests.support.webserver_app import create_scripted_app
 

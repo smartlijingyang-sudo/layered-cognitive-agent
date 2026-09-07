@@ -37,14 +37,6 @@ class RegistryRunQueries:
         async for item in run_live.iter_stamped_events(session, after_seq=after_seq):
             yield item
 
-    async def stream_run_live(self, run_id: str, after: int = 0) -> AsyncIterator[bytes]:
-        """Stream a run live as four UI SSE events (reasoning|text|tool|done)."""
-        session = self._registry.get(run_id)
-        if session is None:
-            return
-        async for line in run_live.stream_run_live(session, after=after):
-            yield line
-
     async def doctor(self, run_id: str) -> DoctorReport | None:
         session = self._registry.get(run_id)
         spine_path = (

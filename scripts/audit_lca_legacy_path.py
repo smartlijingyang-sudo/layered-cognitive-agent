@@ -12,7 +12,6 @@ ROOT = Path(__file__).resolve().parents[1]
 RETIRED = {
     "modules": [
         "lca.plugins.transport.webserver.handlers.runs.api.legacy_dispatcher_adapter",
-        "lca.plugins.transport.webserver.handlers.runs.terminal.legacy.adapter",
         "lca.plugins.transport.run_ui_encoder__encoder_provider",
         "lca.plugins.transport.run_live_observe__seam",
     ],

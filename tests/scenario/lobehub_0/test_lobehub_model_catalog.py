@@ -7,7 +7,7 @@ from pathlib import Path
 from lca.cognition.team.modes_catalog import LCA_UI_MODELS
 
 _CATALOG = Path("deploy/lobehub/patches/provider/lca_model_catalog.py").read_text(encoding="utf-8")
-_DRIVER = Path("deploy/lobehub/patches/runtime/lca_run_driver.py").read_text(encoding="utf-8")
+_DRIVER = Path("deploy/lobehub/patches/runtime/lca_runtime_agent_gateway.py").read_text(encoding="utf-8")
 _CUSTOMIZATIONS = Path("deploy/lobehub/CUSTOMIZATIONS.md").read_text(encoding="utf-8")
 _ENV = Path("deploy/lobehub/.env.lca").read_text(encoding="utf-8")
 
@@ -23,7 +23,7 @@ def test_ui_catalog_is_solo_team_auto_cordis_creator() -> None:
 
 
 def test_unknown_model_remaps_to_solo() -> None:
-    assert "every chat is a Run" in _DRIVER
+    assert "lca_runtime_agent_gateway" in _DRIVER
     assert "model === 'team' || model === 'auto' ? model : 'solo'" in _DRIVER
     assert "model: lcaModel" in _DRIVER
 

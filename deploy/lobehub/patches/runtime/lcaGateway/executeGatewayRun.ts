@@ -1,6 +1,6 @@
 // LCA-P1: streamingExecutor entry when gateway mode is enabled.
 //
-// Called from streamingExecutor.ts (patched by lca_run_driver) when
+// Called from streamingExecutor.ts (patched by lca_runtime_agent_gateway) when
 // isLcaGatewayMode() is true. Starts the run via POST /lca-api/runs,
 // then hands off to the native chat-store gateway connect path.
 

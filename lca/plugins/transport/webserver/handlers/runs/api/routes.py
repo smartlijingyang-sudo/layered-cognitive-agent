@@ -13,7 +13,6 @@ For the live HTTP surface use:
 - :func:`lca.plugins.transport.webserver.handlers.runs.api.command_endpoints.cancel_run`
 - :func:`lca.plugins.transport.webserver.handlers.runs.api.command_endpoints.answer_run`
 - :func:`lca.plugins.transport.webserver.handlers.runs.api.query_endpoints.stream_journal_live`
-- :func:`lca.plugins.transport.webserver.handlers.runs.api.query_endpoints.stream_run_live`
 - :func:`lca.plugins.transport.webserver.handlers.runs.api.query_endpoints.get_run`
 - :func:`lca.plugins.transport.webserver.handlers.runs.api.query_endpoints.get_run_doctor`
 

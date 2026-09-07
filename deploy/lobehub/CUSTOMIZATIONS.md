@@ -22,7 +22,7 @@ Title / embeddings 仍走 `openai_shim`（`/v1/chat|embeddings|responses`），�
 
 | 补丁 | 级 | 存在理由 |
 |---|---|---|
-| `lca_run_driver` | A | 拷贝 TS 投影器 + 生成 `lcaWire.ts`；Journal → 原生 assistant/tool 图（PR-4 退役） |
+| `lca_runtime_agent_gateway` | A | `lcaGateway/*` WS 客户端 + streamingExecutor/HIL 源修改（PR-4 接替 `lca_run_driver`） |
 | `lca_runtime_chat_persistence` | A | 持久化 helper + `lcaToolRender/projection.ts`（PR-3 拆分自 run_driver） |
 | `lca_runtime_agent_gateway` | A | `lcaGateway/*` WS 客户端 + gateway marker 注入 |
 | `lca_runtime_use_gateway_reconnect` | A | `useGatewayReconnect` 读 `/lca-api/topics/.../running-op` |

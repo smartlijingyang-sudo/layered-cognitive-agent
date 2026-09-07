@@ -121,7 +121,7 @@ def install_bootstrap_state(
     boot = factory.create(cfg)
 
     from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunRegistry
-    from lca.plugins.transport.webserver.handlers.runs.terminal.legacy.adapter import (
+    from lca.plugins.transport.webserver.handlers.runs.terminal.registry_adapter import (
         RegistryRunAdapter,
     )
 

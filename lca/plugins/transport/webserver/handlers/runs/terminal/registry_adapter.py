@@ -1,4 +1,4 @@
-"""Legacy registry-backed ``/runs`` facade.
+"""Registry-backed ``/runs`` facade.
 
 The facade preserves the stable RunPort vocabulary while keeping ownership
 explicit: lifecycle mutations live in ``RegistryRunCommands`` and read-side
@@ -28,7 +28,7 @@ from lca.plugins.transport.webserver.read.runs.terminal.registry_queries import 
 
 
 class RegistryRunAdapter:
-    """Compatibility facade over separately owned registry commands and queries."""
+    """Facade over separately owned registry commands and queries."""
 
     def __init__(
         self,
@@ -74,11 +74,6 @@ class RegistryRunAdapter:
         """Forward ``RegistryRunQueries.iter_stamped_events``."""
         async for stamped in self._queries.iter_stamped_events(run_id, after_seq):
             yield stamped
-
-    async def stream_run_live(self, run_id: str, after: int = 0) -> AsyncIterator[bytes]:
-        """Journal SSE per run (event = class name)."""
-        async for line in self._queries.stream_run_live(run_id, after):
-            yield line
 
     async def doctor(self, run_id: str) -> DoctorReport | None:
         return await self._queries.doctor(run_id)
