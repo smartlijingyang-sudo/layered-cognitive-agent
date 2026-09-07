@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.observability.tool.journal_receipt import ToolJournalReceipt
 from lca.contracts.protocols.loop.fact_gateway import AppendReceipt
@@ -159,26 +160,40 @@ def commit_body_tool_execute_end(
     attempt: int = 1,
     outcome: str = "success",
     latency_ms: int | None = None,
+    observation: Observation | None = None,
     state: AgentState | None = None,
     session: object | None = None,
     actor: str = "body",
 ) -> AppendReceipt | None:
-    """Commit ``body.tool.execute.end`` (invocation layer) via FactGateway."""
-    payload: dict[str, Any] = {
-        "tool_name": tool_name,
-        "invocation_id": invocation_id,
-        "attempt": attempt,
-        "outcome": outcome,
-    }
-    if latency_ms is not None:
-        payload["latency_ms"] = latency_ms
-    return publish_ep_bound(
+    """Commit model-visible ``body.tool.execute.end`` surface (ADR-0201 single append)."""
+    from lca.infrastructure.session.emit.tool_surface_emit import append_tool_result_surface
+    from lca.loop.fact_gateway import _record_to_receipt, enrich_ep_payload
+
+    del state
+    enriched = enrich_ep_payload(
         "body.tool.execute.end",
-        payload,
-        state=state,
+        {
+            "tool_name": tool_name,
+            "invocation_id": invocation_id,
+            "attempt": attempt,
+            "outcome": outcome,
+            **({"latency_ms": latency_ms} if latency_ms is not None else {}),
+        },
+    )
+    event = append_tool_result_surface(
+        tool_name=tool_name,
+        invocation_id=invocation_id,
+        attempt=attempt,
+        outcome=outcome,
+        observation=observation,
+        latency_ms=latency_ms,
         session=session,
         actor=actor,
+        enriched_fields=enriched,
     )
+    if event is None:
+        return None
+    return _record_to_receipt(event)  # type: ignore[arg-type]
 
 
 def commit_body_tool_decision_start(

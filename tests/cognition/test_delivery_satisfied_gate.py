@@ -10,6 +10,7 @@ from lca.contracts.models.core.execution.decision import Decision, Observation, 
 from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
 from lca.contracts.models.core.perceive.projection import PerceiveProjection
 from lca.contracts.models.core.state.state import AgentState, Budget
+from tests.support.session_gate_helpers import append_control_turn, bound_session
 
 
 @pytest.mark.asyncio
@@ -56,38 +57,40 @@ async def test_delivery_satisfied_rewrites_producer_tool_to_respond() -> None:
 
 @pytest.mark.asyncio
 async def test_delivery_satisfied_with_stdout_only() -> None:
-    state = AgentState(
-        trace_id="t",
-        task="用python写一个图计划的笑话",
-        budget=Budget(),
-    )
-    state.history.append(
-        Turn(
-            decision=Decision(
-                decision_id="d0",
-                action_type=ActionType.USE_TOOL,
-                rationale="run",
-                confidence=0.9,
-                tool_calls=[ToolCall(call_id="c0", tool_name="executeCode", arguments={})],
-            ),
-            observation=Observation(
-                observation_id="o0",
-                success=True,
-                payload={"stdout": "图计划笑话：Oct 31 == Dec 25！" + ("哈" * 40)},
+    with bound_session("delivery-stdout-joke"):
+        state = AgentState(
+            trace_id="t",
+            task="用python写一个图计划的笑话",
+            budget=Budget(),
+        )
+        append_control_turn(
+            state,
+            Turn(
+                decision=Decision(
+                    decision_id="d0",
+                    action_type=ActionType.USE_TOOL,
+                    rationale="run",
+                    confidence=0.9,
+                    tool_calls=[ToolCall(call_id="c0", tool_name="executeCode", arguments={})],
+                ),
+                observation=Observation(
+                    observation_id="o0",
+                    success=True,
+                    payload={"stdout": "图计划笑话：Oct 31 == Dec 25！" + ("哈" * 40)},
+                ),
             ),
         )
-    )
-    gate = DeliverySatisfiedGate()
-    decision = Decision(
-        decision_id="d1",
-        action_type=ActionType.USE_TOOL,
-        rationale="again",
-        confidence=0.9,
-        tool_calls=[ToolCall(call_id="c1", tool_name="executeCode", arguments={"code": "print(1)"})],
-    )
-    forced = await gate.enforce(state, decision)
-    assert forced.action_type == ActionType.RESPOND
-    assert "Oct 31" in (forced.response_text or "")
+        gate = DeliverySatisfiedGate()
+        decision = Decision(
+            decision_id="d1",
+            action_type=ActionType.USE_TOOL,
+            rationale="again",
+            confidence=0.9,
+            tool_calls=[ToolCall(call_id="c1", tool_name="executeCode", arguments={"code": "print(1)"})],
+        )
+        forced = await gate.enforce(state, decision)
+        assert forced.action_type == ActionType.RESPOND
+        assert "Oct 31" in (forced.response_text or "")
 
 
 @pytest.mark.asyncio
@@ -113,35 +116,41 @@ async def test_delivery_not_satisfied_allows_producer() -> None:
 async def test_delivery_satisfied_rewrites_listfiles_repeat_to_respond() -> None:
     """Inspect tools with substantive stdout count as delivery (listFiles-once scenario)."""
     file_list = '[{"name": ".lca", "type": "directory"}, {"name": "outputs", "type": "directory"}]'
-    state = AgentState(
-        trace_id="t",
-        task="Use listFiles once on . then reply with file count only.",
-        budget=Budget(),
-    )
-    state.history.append(
-        Turn(
-            decision=Decision(
-                decision_id="d0",
-                action_type=ActionType.USE_TOOL,
-                rationale="list",
-                confidence=0.9,
-                tool_calls=[ToolCall(call_id="c0", tool_name="listFiles", arguments={"directoryPath": "."})],
-            ),
-            observation=Observation(
-                observation_id="o0",
-                success=True,
-                payload={"stdout": file_list},
+    with bound_session("delivery-listfiles-gate"):
+        state = AgentState(
+            trace_id="t",
+            task="Use listFiles once on . then reply with file count only.",
+            budget=Budget(),
+        )
+        append_control_turn(
+            state,
+            Turn(
+                decision=Decision(
+                    decision_id="d0",
+                    action_type=ActionType.USE_TOOL,
+                    rationale="list",
+                    confidence=0.9,
+                    tool_calls=[
+                        ToolCall(call_id="c0", tool_name="listFiles", arguments={"directoryPath": "."})
+                    ],
+                ),
+                observation=Observation(
+                    observation_id="o0",
+                    success=True,
+                    payload={"stdout": file_list},
+                ),
             ),
         )
-    )
-    gate = DeliverySatisfiedGate()
-    decision = Decision(
-        decision_id="d1",
-        action_type=ActionType.USE_TOOL,
-        rationale="list again",
-        confidence=0.9,
-        tool_calls=[ToolCall(call_id="c1", tool_name="listFiles", arguments={"directoryPath": "/mnt/data"})],
-    )
-    forced = await gate.enforce(state, decision)
-    assert forced.action_type == ActionType.RESPOND
-    assert file_list.strip() in (forced.response_text or "")
+        gate = DeliverySatisfiedGate()
+        decision = Decision(
+            decision_id="d1",
+            action_type=ActionType.USE_TOOL,
+            rationale="list again",
+            confidence=0.9,
+            tool_calls=[
+                ToolCall(call_id="c1", tool_name="listFiles", arguments={"directoryPath": "/mnt/data"})
+            ],
+        )
+        forced = await gate.enforce(state, decision)
+        assert forced.action_type == ActionType.RESPOND
+        assert file_list.strip() in (forced.response_text or "")

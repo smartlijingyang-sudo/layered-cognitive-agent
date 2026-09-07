@@ -74,6 +74,7 @@ def collect_delivery_material(state: AgentState) -> DeliveryMaterial:
         if turn_has_delivery_signal(
             turn.observation_payload,
             files_created=turn.files_created,
+            task=state.task or "",
         ):
             best_stdout = stdout
             best_files = files

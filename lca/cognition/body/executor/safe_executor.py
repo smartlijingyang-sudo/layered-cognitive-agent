@@ -476,20 +476,23 @@ class SimpleSafeExecutor(SafeExecutor):
         )
         execute_started = time.perf_counter()
         outcome: Literal["success", "failure"] = "success"
+        observation: Observation | None = None
         try:
-            return await tool.execute(args)
+            observation = await tool.execute(args)
+            return observation
         except ApprovalPendingError:
             outcome = "failure"
             raise
         except ToolExecutionError as err:
             outcome = "failure"
-            return Observation(
+            observation = Observation(
                 observation_id=new_id("obs"),
                 success=False,
                 payload=None,
                 error=str(err),
                 extra={FAILURE_KIND: FAILURE_KIND_EXECUTION},
             )
+            return observation
         except Exception as err:
             outcome = "failure"
             _log.warning(
@@ -506,13 +509,14 @@ class SimpleSafeExecutor(SafeExecutor):
                 if isinstance(err, _DETERMINISTIC_EXCEPTIONS)
                 else FAILURE_KIND_TRANSIENT
             )
-            return Observation(
+            observation = Observation(
                 observation_id=new_id("obs"),
                 success=False,
                 payload=None,
                 error=str(err),
                 extra={FAILURE_KIND: failure_kind},
             )
+            return observation
         finally:
             commit_body_tool_execute_end(
                 tool_name=tool.name,
@@ -520,6 +524,7 @@ class SimpleSafeExecutor(SafeExecutor):
                 attempt=attempt + 1,
                 outcome=outcome,
                 latency_ms=_elapsed_ms(execute_started),
+                observation=observation,
             )
 
     @staticmethod

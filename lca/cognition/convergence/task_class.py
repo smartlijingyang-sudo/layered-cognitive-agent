@@ -26,6 +26,10 @@ _CODE = re.compile(
     r"用\s*python|写代码|写个脚本|execute|run code|python写",
     re.I,
 )
+_SYNTHESIS = re.compile(
+    r"分析|analyze|解读|summarize|总结|综述|评估|evaluate|review|报告",
+    re.I,
+)
 
 
 def classify_task(task: str) -> TaskClass:
@@ -63,6 +67,11 @@ def _hint_from_manifest(state: AgentState) -> TaskClass | None:
     return None
 
 
+def task_requires_synthesis(task: str) -> bool:
+    """True when the user goal needs model synthesis, not raw tool stdout."""
+    return bool(_SYNTHESIS.search((task or "").strip()))
+
+
 def resolve_task_class(state: AgentState) -> TaskClass:
     """Perceive sensor hint overrides regex heuristic."""
     hinted = _hint_from_manifest(state)
@@ -71,4 +80,4 @@ def resolve_task_class(state: AgentState) -> TaskClass:
     return classify_task(state.task or "")
 
 
-__all__ = ["classify_task", "resolve_task_class"]
+__all__ = ["classify_task", "resolve_task_class", "task_requires_synthesis"]

@@ -34,6 +34,16 @@ def _record_to_receipt(record: SessionEvent) -> AppendReceipt:
     )
 
 
+def enrich_ep_payload(
+    ep: str,
+    payload: Mapping[str, Any],
+    *,
+    channel: str = "fact",
+) -> dict[str, Any]:
+    """Merge caller payload with active spine enrich seam (public wrapper)."""
+    return _enrich_publish_payload(ep, payload, channel=channel)
+
+
 def _enrich_publish_payload(
     ep: str,
     payload: Mapping[str, Any],
@@ -177,6 +187,7 @@ def publish_ep_bound(
 __all__ = [
     "DefaultFactGateway",
     "append_catalog_bound",
+    "enrich_ep_payload",
     "fact_gateway_for_emit",
     "publish_ep_bound",
 ]

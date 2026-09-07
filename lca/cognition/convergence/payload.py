@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from lca.cognition.convergence.constants import MIN_SUBSTANTIVE_STDOUT_CHARS
+from lca.cognition.convergence.task_class import task_requires_synthesis
 from lca.contracts.models.core.execution.decision import Observation
 
 _STDOUT_KEYS = ("output", "stdout", "content", "text")
@@ -62,9 +63,12 @@ def turn_has_delivery_signal(
     payload: object | None,
     *,
     files_created: tuple[str, ...] = (),
+    task: str = "",
 ) -> bool:
     if merge_files_created(payload, files_created=files_created):
         return True
+    if task_requires_synthesis(task):
+        return False
     return is_substantive_stdout(payload_stdout(payload))
 
 

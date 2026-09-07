@@ -11,6 +11,7 @@ from lca.contracts.atoms.semantic.keys import (
     FAILURE_KIND_EXECUTION,
     FAILURE_KIND_TRANSIENT,
     FAILURE_KIND_VALIDATION,
+    OBS_TOOL_RESULTS,
 )
 from lca.contracts.models.core.execution.decision import Observation, Reflection
 from lca.contracts.models.core.state.state import AgentState
@@ -33,6 +34,9 @@ class SimpleCritic(Critic):
         return self._evaluate(state, observation)
 
     def _evaluate(self, state: AgentState, observation: Observation) -> Reflection:
+        partial = self._partial_batch_reflection(observation)
+        if partial is not None:
+            return partial
         if observation.success:
             tool_name = self._last_tool_name(state)
             if tool_name:
@@ -54,6 +58,39 @@ class SimpleCritic(Critic):
             verdict=ReflectionVerdict.NEEDS_CORRECTION,
             lesson=lesson,
             extra={FAILURE_KIND: failure_kind},
+        )
+
+    @staticmethod
+    def _partial_batch_reflection(observation: Observation) -> Reflection | None:
+        """Parallel batch: partial success must not collapse to step-wide failure."""
+        if observation.success:
+            return None
+        extra = observation.extra if isinstance(observation.extra, dict) else {}
+        raw = extra.get(OBS_TOOL_RESULTS)
+        if not isinstance(raw, list) or not raw:
+            return None
+        ok_names: list[str] = []
+        fail_names: list[str] = []
+        for entry in raw:
+            if not isinstance(entry, dict):
+                continue
+            name = str(entry.get("tool_name") or "tool")
+            nested = entry.get("observation")
+            if isinstance(nested, Observation) and nested.success:
+                ok_names.append(name)
+            elif isinstance(nested, Observation):
+                fail_names.append(name)
+        if not ok_names or not fail_names:
+            return None
+        lesson = (
+            f"部分工具成功({', '.join(ok_names)}); "
+            f"失败({', '.join(fail_names)}): {observation.error or 'see tool results'}"
+        )
+        return Reflection(
+            reflection_id=new_id("refl"),
+            verdict=ReflectionVerdict.ON_TRACK,
+            lesson=lesson,
+            extra={FAILURE_KIND: FAILURE_KIND_EXECUTION},
         )
 
     @staticmethod

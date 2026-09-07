@@ -82,9 +82,25 @@ def _resolve_model_config(inner: LLMAdapter) -> dict[str, Any] | None:
     return None
 
 
-def _kwargs_for_hook(kwargs: dict[str, Any], *, inner: LLMAdapter) -> dict[str, Any]:
+def _kwargs_for_hook(
+    kwargs: dict[str, Any],
+    *,
+    inner: LLMAdapter,
+    prompt: str = "",
+) -> dict[str, Any]:
     out = dict(kwargs)
-    if "messages" not in out and "history" in out:
+    history = out.get("history")
+    if isinstance(history, (list, tuple)) and history:
+        wire_prompt = (prompt or str(out.get("prompt") or "")).strip()
+        if wire_prompt:
+            from lca.infrastructure.llm_adapter.openai_compat.history import (
+                openai_messages_with_history,
+            )
+
+            out["messages"] = tuple(openai_messages_with_history(wire_prompt, list(history)))
+        elif "messages" not in out:
+            out["messages"] = tuple(history)
+    elif "messages" not in out and "history" in out:
         out["messages"] = out["history"]
     cfg = _resolve_model_config(inner)
     if cfg is not None:
@@ -181,7 +197,7 @@ class ModelVisibleHookAdapter(LLMAdapter):
                     run_id=run_id,
                     step_index=step_index,
                     incarnation=incarnation,
-                    kwargs=_kwargs_for_hook(kwargs, inner=self._inner),
+                    kwargs=_kwargs_for_hook(kwargs, inner=self._inner, prompt=prompt),
                 )
             except Exception as exc:  # INTENTIONAL: L10 + D5 不挡业务
                 _log.debug("model_visible_pre_hook_failed: %s", exc)
@@ -221,7 +237,7 @@ class ModelVisibleHookAdapter(LLMAdapter):
                     run_id=run_id,
                     step_index=step_index,
                     incarnation=incarnation,
-                    kwargs=_kwargs_for_hook(kwargs, inner=self._inner),
+                    kwargs=_kwargs_for_hook(kwargs, inner=self._inner, prompt=prompt),
                 )
             except Exception as exc:  # INTENTIONAL: L10 + D5 不挡业务
                 _log.debug("model_visible_pre_hook_failed: %s", exc)

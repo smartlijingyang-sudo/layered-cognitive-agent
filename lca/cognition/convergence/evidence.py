@@ -40,6 +40,7 @@ def _has_user_visible_delivery(state: AgentState) -> bool:
         if turn_has_delivery_signal(
             turn.observation_payload,
             files_created=turn.files_created,
+            task=state.task or "",
         ):
             return True
     return False
