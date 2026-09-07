@@ -5,7 +5,7 @@ import os
 
 import pytest
 from starlette.testclient import TestClient
-from starlette.websockets import WebSocket, WebSocketDisconnect
+from starlette.websockets import WebSocket
 
 from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.wire.routes import (
     ROUTE_SPECS,
@@ -21,8 +21,8 @@ from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.wire.ws im
 @pytest.fixture(scope="module", autouse=True)
 def rsa_keys_module():
     """Generate a fresh RSA key pair for the test module (mirrors L2 pattern)."""
-    from cryptography.hazmat.primitives.asymmetric import rsa
     from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
 
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     private_pem = private_key.private_bytes(
@@ -48,7 +48,7 @@ def test_ws_path_is_in_route_specs() -> None:
 
 def test_ws_token_path_is_in_route_specs() -> None:
     assert WS_TOKEN_PATH in [spec.path for spec in ROUTE_SPECS]
-    assert WS_TOKEN_PATH == "/v1/runs/{run_id}/ws-token"
+    assert WS_TOKEN_PATH == "/v1/runs/{run_id}/ws-token"  # noqa: S105 (path literal)
 
 
 def test_running_op_path_is_in_route_specs() -> None:
@@ -77,10 +77,9 @@ def test_mount_ws_route_makes_ws_reachable() -> None:
     app = Starlette(routes=[Route("/probe", probe, methods=["GET"])])
     mount_ws_route(app, handler=fake_handler)
 
-    with TestClient(app) as client:
-        with client.websocket_connect("/v1/runs/abc/ws") as ws:
-            ws.send_text("hello")
-            assert ws.receive_text() == "echo:hello"
+    with TestClient(app) as client, client.websocket_connect("/v1/runs/abc/ws") as ws:
+        ws.send_text("hello")
+        assert ws.receive_text() == "echo:hello"
 
     assert received == ["hello"]
 

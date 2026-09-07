@@ -29,8 +29,8 @@ from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.wire.http 
 @pytest.fixture(scope="module", autouse=True)
 def rsa_keys_module():
     """Generate a fresh RSA key pair (same shape as test_lca_agent_gateway)."""
-    from cryptography.hazmat.primitives.asymmetric import rsa
     from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
 
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     private_pem = private_key.private_bytes(
@@ -64,7 +64,7 @@ def test_refresh_ws_token_returns_404_when_run_redis_key_missing() -> None:
     run_id = f"ws404_{uuid.uuid4().hex[:8]}"
     # Make sure the key is really gone.
     import redis.asyncio as aioredis
-    from lca.infrastructure.observability.stream import LcaStreamEventManager
+
     from lca.contracts.transport.stream_keys import stream_key
 
     async def _drop() -> None:
@@ -87,6 +87,7 @@ def test_refresh_ws_token_returns_404_when_run_redis_key_missing() -> None:
 def test_refresh_ws_token_returns_200_with_token_when_redis_key_alive() -> None:
     """Live stream key → 200 with a 3-part JWT (header.payload.signature)."""
     import redis.asyncio as aioredis
+
     from lca.infrastructure.observability.stream import LcaStreamEventManager
 
     app = build_http_app()
@@ -115,7 +116,7 @@ def test_refresh_ws_token_returns_200_with_token_when_redis_key_alive() -> None:
             assert resp.status_code == 200, resp.text
             body = resp.json()
             assert "token" in body
-            assert body["token_type"] == "Bearer"
+            assert body["token_type"] == "Bearer"  # noqa: S105 (token type literal)
             assert isinstance(body["expires_in"], int) and body["expires_in"] > 0
             assert len(body["token"].split(".")) == 3
     finally:

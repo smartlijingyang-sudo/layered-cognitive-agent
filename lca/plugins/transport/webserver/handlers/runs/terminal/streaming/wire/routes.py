@@ -21,14 +21,13 @@ from __future__ import annotations
 from typing import Any
 
 from lca.contracts.routing import RouteSpec
-
 from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.wire.http import (
     get_running_operation,
     refresh_ws_token,
 )
 
 WS_PATH: str = "/v1/runs/{run_id}/ws"
-WS_TOKEN_PATH: str = "/v1/runs/{run_id}/ws-token"
+WS_TOKEN_PATH: str = "/v1/runs/{run_id}/ws-token"  # noqa: S105 (path literal, not a credential)
 RUNNING_OP_PATH: str = "/v1/topics/{topic_id}/running-op"
 
 

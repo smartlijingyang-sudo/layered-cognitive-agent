@@ -15,10 +15,10 @@ from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.wire.http 
 )
 from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.wire.routes import (
     ROUTE_SPECS,
+    RUNNING_OP_PATH,
     WS_PATH,
     WS_ROUTE_SPEC,
     WS_TOKEN_PATH,
-    RUNNING_OP_PATH,
 )
 from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.wire.ws import (
     mount_ws_route,

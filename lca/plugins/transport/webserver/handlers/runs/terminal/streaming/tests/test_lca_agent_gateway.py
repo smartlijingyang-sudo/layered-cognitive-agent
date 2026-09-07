@@ -13,7 +13,6 @@ Reliability notes (lca-ci-test-reliability):
   so a slow pump cannot stall the suite past the lane budget.
 """
 import asyncio
-import contextlib
 import os
 import uuid
 
@@ -25,8 +24,8 @@ from starlette.websockets import WebSocketDisconnect
 # Pre-generate an RSA key pair for the test module
 @pytest.fixture(scope="module", autouse=True)
 def rsa_keys_module():
-    from cryptography.hazmat.primitives.asymmetric import rsa
     from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
 
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     private_pem = private_key.private_bytes(
@@ -62,16 +61,16 @@ def mint_for_test(user_id: str, op: str, private_pem: str) -> str:
 
 def test_invalid_token_rejected_with_auth_failed(gateway_app):
     """L2-1: An invalid token receives `auth_failed` and the socket closes."""
-    with TestClient(gateway_app) as client:
-        with client.websocket_connect("/v1/runs/op1/ws") as ws:
-            ws.send_json({"type": "auth", "token": "this.is.not.valid"})
-            msg = ws.receive_json()
-            assert msg["type"] == "auth_failed"
+    with TestClient(gateway_app) as client, client.websocket_connect("/v1/runs/op1/ws") as ws:
+        ws.send_json({"type": "auth", "token": "this.is.not.valid"})
+        msg = ws.receive_json()
+        assert msg["type"] == "auth_failed"
 
 
 def test_resume_replays_history_then_emits_resume_complete(gateway_app, rsa_keys_module):
     """L2-2: A fresh client connecting with lastEventId=0 receives prior events in order."""
     import redis.asyncio as aioredis
+
     from lca.infrastructure.observability.stream import LcaStreamEventManager
 
     run_id = f"test_resume_{uuid.uuid4().hex[:8]}"
@@ -101,20 +100,22 @@ def test_resume_replays_history_then_emits_resume_complete(gateway_app, rsa_keys
     try:
         asyncio.run(seed_then_cleanup())
 
-        with TestClient(gateway_app) as client:
-            with client.websocket_connect(f"/v1/runs/{run_id}/ws") as ws:
-                ws.send_json({"type": "auth", "token": token})
-                assert ws.receive_json() == {"type": "auth_success"}
-                ws.send_json({"type": "resume", "lastEventId": "0", "wantStatus": True})
-                frames = []
-                for _ in range(3):
-                    try:
-                        frames.append(ws.receive_text())
-                    except WebSocketDisconnect:
-                        break
-                assert any('"agent_runtime_init"' in f for f in frames), frames
-                assert any('"stream_chunk"' in f and '"hello"' in f for f in frames), frames
-                assert any('"type":"resume_complete"' in f for f in frames), frames
+        with (
+            TestClient(gateway_app) as client,
+            client.websocket_connect(f"/v1/runs/{run_id}/ws") as ws,
+        ):
+            ws.send_json({"type": "auth", "token": token})
+            assert ws.receive_json() == {"type": "auth_success"}
+            ws.send_json({"type": "resume", "lastEventId": "0", "wantStatus": True})
+            frames = []
+            for _ in range(3):
+                try:
+                    frames.append(ws.receive_text())
+                except WebSocketDisconnect:
+                    break
+            assert any('"agent_runtime_init"' in f for f in frames), frames
+            assert any('"stream_chunk"' in f and '"hello"' in f for f in frames), frames
+            assert any('"type":"resume_complete"' in f for f in frames), frames
     finally:
         asyncio.run(cleanup_only())
 
@@ -129,14 +130,16 @@ def test_heartbeat_gets_heartbeat_ack(gateway_app, rsa_keys_module):
     run_id = f"test_heartbeat_{uuid.uuid4().hex[:8]}"
     token = mint_for_test("u1", run_id, rsa_keys_module["private"])
 
-    with TestClient(gateway_app) as client:
-        with client.websocket_connect(f"/v1/runs/{run_id}/ws") as ws:
-            ws.send_json({"type": "auth", "token": token})
-            assert ws.receive_json() == {"type": "auth_success"}
-            ws.send_json({"type": "resume", "lastEventId": "0", "wantStatus": False})
-            ws.send_json({"type": "heartbeat"})
-            ack = ws.receive_json()
-            assert ack == {"type": "heartbeat_ack"}
+    with (
+        TestClient(gateway_app) as client,
+        client.websocket_connect(f"/v1/runs/{run_id}/ws") as ws,
+    ):
+        ws.send_json({"type": "auth", "token": token})
+        assert ws.receive_json() == {"type": "auth_success"}
+        ws.send_json({"type": "resume", "lastEventId": "0", "wantStatus": False})
+        ws.send_json({"type": "heartbeat"})
+        ack = ws.receive_json()
+        assert ack == {"type": "heartbeat_ack"}
 
 
 def test_interrupt_triggers_run_port_cancel(rsa_keys_module):
@@ -159,12 +162,11 @@ def test_interrupt_triggers_run_port_cancel(rsa_keys_module):
     run_id = f"test_interrupt_{uuid.uuid4().hex[:8]}"
     token = mint_for_test("u1", run_id, rsa_keys_module["private"])
 
-    with TestClient(app) as client:
-        with client.websocket_connect(f"/v1/runs/{run_id}/ws") as ws:
-            ws.send_json({"type": "auth", "token": token})
-            ws.receive_json()  # auth_success
-            ws.send_json({"type": "resume", "lastEventId": "0", "wantStatus": False})
-            ws.send_json({"type": "interrupt"})
-            with pytest.raises(WebSocketDisconnect):
-                ws.receive_text()
+    with TestClient(app) as client, client.websocket_connect(f"/v1/runs/{run_id}/ws") as ws:
+        ws.send_json({"type": "auth", "token": token})
+        ws.receive_json()  # auth_success
+        ws.send_json({"type": "resume", "lastEventId": "0", "wantStatus": False})
+        ws.send_json({"type": "interrupt"})
+        with pytest.raises(WebSocketDisconnect):
+            ws.receive_text()
     assert cancel_calls == [run_id]

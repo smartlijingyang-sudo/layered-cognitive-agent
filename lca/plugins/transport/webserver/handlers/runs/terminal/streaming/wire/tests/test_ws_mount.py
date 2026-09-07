@@ -39,9 +39,8 @@ def test_empty_app_with_mounted_handler_is_dialable() -> None:
     route = mount_ws_route(app, handler=fake_handler)
     assert route.path == "/v1/runs/{run_id}/ws"
 
-    with TestClient(app) as client:
-        with client.websocket_connect("/v1/runs/probe-1/ws") as ws:
-            ws.send_text("ping")
-            assert ws.receive_text() == "got:ping"
+    with TestClient(app) as client, client.websocket_connect("/v1/runs/probe-1/ws") as ws:
+        ws.send_text("ping")
+        assert ws.receive_text() == "got:ping"
 
     assert received == ["ping"]
