@@ -2,7 +2,9 @@
 
 ## 状态
 
-Accepted（2026-09-06）。延伸 ADR-0186（Session SSOT）、0185（model-visible fold）、0189（derive/fork 词表）、0070（Reducer-as-Plugin）、0077（TerminalOutcome）、0078（HIL）。
+**Implemented — 2026-09-08。** Wave A (model wire + checkpoint) + Wave B (repair + resume) + Wave C (gates → projection + RunCommitter) + Wave D (single stream) 全部关闭。详细验收见 `tests/architecture/test_runtime_convergence_invariants.py` 与 `tests/scenarios/test_adr0191_runtime_convergence.py`。
+
+延伸 ADR-0186（Session SSOT）、0185（model-visible fold）、0189（derive/fork 词表）、0070（Reducer-as-Plugin）、0077（TerminalOutcome）、0078（HIL）。
 
 **实施状态（2026-09-06）**
 

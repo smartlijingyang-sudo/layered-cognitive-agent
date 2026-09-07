@@ -2,7 +2,7 @@
 
 ## 状态
 
-Proposed（2026-09-04 起草）。实施按 §5 PR-3a–3i 推进；本 PR-3i 只落 ADR 草稿、配套 Note 与架构不变量骨架。
+**Implemented — 2026-09-08。** PR-3a/3b/3c/3d/3e/3f/3g/3h/3i 全部关闭：Session.append 为公开生产入口、fold 纯函数锚点、Session runtime plugin、publishers 迁移、PersistenceObserver 重命名、subscribers/Session.observe 接入、deriver 切流、EventSpine/spine_port shim、架构不变量骨架。详细验收见 `tests/architecture/test_session_ssot_invariants.py` 中 I-SESSION-1..5 不变量测试。
 
 **延伸**：ADR-0183（事件总线框架 + 单 SSOT）、ADR-0184（事件生命周期受管理投递）。
 
