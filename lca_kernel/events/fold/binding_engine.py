@@ -22,6 +22,25 @@ from lca_kernel.events.fold.merge import merge_dataclass
 _PROJECTION_ID = "journal.step_tree"
 
 
+class FoldConsistencyError(RuntimeError):
+    """Fold invariant violation: tool_result.ok=True 与 error 非空矛盾。
+
+    第一性原则:成败字段不允许默认值。fold binding 拒绝把矛盾事实
+    落地到 journal,以免 HOP / fold / 前端读到自相矛盾的数据。
+
+    抛出而非静默修复:这是事实源,修复应该是上游发射器的事。
+    """
+
+
+def _is_nonempty_error(err: Any) -> bool:
+    """True if ``err`` is a non-empty, non-trivial error string."""
+    if err is None:
+        return False
+    if not isinstance(err, str):
+        return True
+    return err.strip() not in ("", "0", "ok")
+
+
 def extract_from_payload(payload: Mapping[str, Any], source: str) -> Any:
     """Extract one value; ``payload.a|payload.b`` tries alternates left-to-right."""
     for alt in source.split("|"):
@@ -114,8 +133,10 @@ class JournalBindingEngine:
         payload: Mapping[str, Any],
         execution_point: str,
         *,
-        ok_default: bool = True,
+        ok_default: bool = False,
     ) -> ToolResult:
+        # 第一性原则:成败字段不允许 True 默认。fold 默认 False,
+        # 没有 ok 字段的 payload 视为失败(防御默认)。
         rules = match_rules(self._rules, execution_point, payload)
         strategy = merge_strategy_for_rules(rules)
         extracted = {}
@@ -136,6 +157,13 @@ class JournalBindingEngine:
             error=extracted.get("error"),
             delta_summary=str(extracted.get("delta_summary") or ""),
         )
+        # invariant: ok=True 与 error 非空矛盾 → 拒绝落地,阻断失真事实进入 journal
+        if incoming.ok and _is_nonempty_error(incoming.error):
+            raise FoldConsistencyError(
+                f"tool_result contradiction in {execution_point!r}: "
+                f"ok=True but error={incoming.error!r} "
+                f"(rules={[(r.rule_id, r.target_field) for r in rules]})"
+            )
         result = merge_dataclass(existing, incoming, strategy)
         return cast("ToolResult", result)
 
