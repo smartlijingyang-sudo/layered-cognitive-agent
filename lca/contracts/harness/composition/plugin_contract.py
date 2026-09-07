@@ -1,10 +1,10 @@
-"""PluginContract 9 段契约（ADR-0069 §六 + tracker §12 + ADR-0110）。
+"""PluginContract 10 段契约（ADR-0069 §六 + tracker §12 + ADR-0110 + ADR-0199 §3.1）。
 
 PluginContract 是 plugin 作者的 typed section（ADR-0069 §六原是**可选并存**；
 ADR-0110 D1 将其升级为插件侧**唯一合约面**，``functional_group=`` 与
 ``logic_address=`` 在 ``@plugin(...)`` 装饰器中退化为 alias 键。
 
-9 段：
+10 段（ADR-0199 P3-01 在原 9 段基础上扩展 ``privileges`` 维度）：
 
 1. ``identity`` — PluginIdentity（id / version / owner）
 2. ``architecture`` — ArchitectureContract（group / role / control slots）
@@ -16,6 +16,11 @@ ADR-0110 D1 将其升级为插件侧**唯一合约面**，``functional_group=`` 
 8. ``verification`` — VerificationContract（schemas / fixtures / property tests）
 9. ``contribution`` — 可选的静态补充说明；不参与运行计划编译。可执行控制
    仅由原生 ``PluginSpec.contributes`` 表达。
+10. ``privileges`` — ADR-0199 §3.1 第四维：声明被授权的副作用，正交于
+    ``provides``；Body / Guard stack 在 setup 期对照 ``TrustEnvelope``
+    执行 fail-closed（I-HPC-5：未声明 privilege 的 effect 必须
+    fail-closed）。``provides`` 表示 **能提供** 什么 capability；
+    ``privileges`` 表示 **被授权** 做什么副作用——两者不可互换。
 
 注意：``PluginContract`` 是 **协议**（不是强制门禁）。PluginManifest
 可填可空；空 ``PluginContract()`` 等价于"作者未声明"。
@@ -24,10 +29,14 @@ ADR-0015 contracts 纯类型契约：所有派生值通过 module-level 函数�
 ADR-0110 PR-A：本模块新增 ``compose_plugin_contract`` / ``logic_address_to_plugin_contract`` /
 ``contract_snapshot_for_meta``，作为 ``@plugin(...)`` 装饰器 3 入口
 归一到 canonical PluginContract 的唯一 seam。
+ADR-0199 §3.1 + §3.3 #5 + I-HPC-5：本模块新增 ``privileges`` 字段与
+``PRIVILEGE_PREFIXES`` 闭集前缀常量；``UndeclaredPrivilegeError`` 供
+harness / guard stack 在 setup 期 fail-loud。
 """
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast
@@ -41,6 +50,51 @@ from lca.contracts.atoms.scope.scope import Scope, parse_scope
 
 if TYPE_CHECKING:
     from lca.contracts.protocols.composition.logic_address import LogicAddress
+
+
+# ── Privilege closed-set (ADR-0199 §3.1) ────────────────────────────
+
+#: ADR-0199 §3.1 第四维契约 ``privileges`` 的闭集前缀常量。
+#:
+#: 约定形式 ``"domain.verb[.scope]"``（例：``"journal.append"``、
+#: ``"network.egress"``）。闭集前缀定义已声明 privilege 的形态；
+#: 未列出前缀视为新提案，须先更新本常量 + ADR / doctor 规则。
+#:
+#: 仅用于 **警告**：``__post_init__`` 检测到未知前缀时发出
+#: :class:`UserWarning`，不阻断构造（保留向前兼容能力）。后续 PR
+#: 可将警告升级为硬错误（I-HPC-5 fail-closed）。
+PRIVILEGE_PREFIXES: frozenset[str] = frozenset(
+    {
+        "journal.",  # Session.append、durable writes
+        "state.",  # Reducer-only state writes (Reducer 单写 / C4)
+        "memory.",  # Memory backend read/write
+        "tools.",  # Tool invocation (C10 narrow gate)
+        "policy.",  # Policy / Gate effects
+        "network.",  # Network egress（默认仅 untrusted 来源）
+        "process.",  # Process spawn（sandbox-gated）
+        "fs.",  # Filesystem writes outside the workspace
+        "k3.",  # K3 boot / fiber setup
+    }
+)
+"""Closed-set of privilege prefixes (ADR-0199 §3.1).
+
+Convention: ``"domain.verb[.scope]"`` — e.g. ``"journal.append"``,
+``"network.egress"``. Unknown prefixes emit :class:`UserWarning`
+from :meth:`PluginContract.__post_init__` to allow forward-compatible
+additions; widening the closed set is a follow-up PR.
+"""
+
+
+class UndeclaredPrivilegeError(ValueError):
+    """Raised when a plugin attempts a privilege not declared in its contract.
+
+    Per ADR-0199 §3.3 #5 and I-HPC-5: setup fail-closed on undeclared
+    privilege. The harness / guard stack must raise this error when a
+    plugin tries to execute an effect whose privilege string is absent
+    from :attr:`PluginContract.privileges` and not granted by the
+    active :class:`~lca.contracts.runtime.trust.TrustEnvelope`.
+    """
+
 
 # ── Section dataclasses (all Optional / default-empty) ──────────────
 
@@ -137,15 +191,22 @@ class VerificationContract:
 
 @dataclass(frozen=True, slots=True)
 class PluginContract:
-    """PluginContract 9 段 root（ADR-0069 §六）。
+    """PluginContract 10 段 root（ADR-0069 §六 + ADR-0199 §3.1）。
 
     全部字段 optional；缺失段不阻断 plugin 加载。``contribution`` 与
     ``architecture.control_slots`` 仅用于静态架构说明；它们不会进入
     ``CompiledRunPlan``，也不会影响控制执行。
 
+    ``privileges``（ADR-0199 §3.1 第四维）正交于 ``provides``：
+    ``provides`` 表达插件 **能做什么**；``privileges`` 表达插件
+    **被授权做什么副作用**。Body / Guard stack 在 setup 期与运行期
+    对照 :class:`~lca.contracts.runtime.trust.TrustEnvelope` 执行
+    fail-closed（I-HPC-5）。空 tuple 等价于"作者未声明"——任何 effect
+    路径将触发 :class:`UndeclaredPrivilegeError`。
+
     派生值见 module-level 函数：
 
-    - ``is_plugin_contract_empty(c)`` — 9 段是否全部默认
+    - ``is_plugin_contract_empty(c)`` — 10 段是否全部默认
     - ``plugin_contract_control_slots(c)`` — 从 architecture.control_slots 取
     - ``plugin_contract_functional_group(c)`` — 从 architecture.group 取
     """
@@ -159,10 +220,32 @@ class PluginContract:
     observability: EvidenceContract = field(default_factory=EvidenceContract)
     verification: VerificationContract = field(default_factory=VerificationContract)
     contribution: tuple[Any, ...] = ()
+    privileges: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.contribution, tuple):
             object.__setattr__(self, "contribution", tuple(self.contribution))
+        if not isinstance(self.privileges, tuple):
+            object.__setattr__(self, "privileges", tuple(self.privileges))
+        # ADR-0199 §3.1 + I-HPC-5: reject empty privilege strings and warn
+        # on unknown prefixes (forward-compatible; hardening is a later PR).
+        for privilege in self.privileges:
+            if not isinstance(privilege, str):
+                raise UndeclaredPrivilegeError(
+                    f"PluginContract.privileges entries must be str, got {type(privilege).__name__}"
+                )
+            if not privilege:
+                raise UndeclaredPrivilegeError(
+                    "PluginContract.privileges must not contain empty strings"
+                )
+            if not any(privilege.startswith(prefix) for prefix in PRIVILEGE_PREFIXES):
+                warnings.warn(
+                    f"PluginContract.privileges entry {privilege!r} does not "  # noqa: S608 — warning text, not a query sink
+                    f"start with a known prefix from PRIVILEGE_PREFIXES; "
+                    "update the closed set via ADR before relying on it",
+                    UserWarning,
+                    stacklevel=2,
+                )
 
 
 # ── Module-level accessors (ADR-0015 contracts purity) ──────────────
@@ -180,6 +263,7 @@ def is_plugin_contract_empty(contract: PluginContract) -> bool:
         and contract.observability == EvidenceContract()
         and contract.verification == VerificationContract()
         and not contract.contribution
+        and not contract.privileges
     )
 
 
@@ -322,6 +406,7 @@ def contract_snapshot_for_meta(contract: PluginContract) -> dict[str, object]:
 
 
 __all__ = [
+    "PRIVILEGE_PREFIXES",
     "ArchitectureContract",
     "AuthorityContract",
     "CapabilityContract",
@@ -330,6 +415,7 @@ __all__ = [
     "OwnershipContract",
     "PluginContract",
     "PluginIdentity",
+    "UndeclaredPrivilegeError",
     "VerificationContract",
     "compose_plugin_contract",
     "contract_snapshot_for_meta",
