@@ -57,9 +57,11 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.infrastructure.observability import NamedRegistry, ToolGenAIMapper
+    """No-op: legacy OTel projection path removed in ADR-0192.
 
-    registry: NamedRegistry = ctx.require("genai_semantic_mapper")
-    mapper = ToolGenAIMapper()
-    registry.register(mapper.event_type, mapper)
-    ctx.register("genai_semantic_mapper", mapper.event_type, mapper)
+    Kept so ``bundles/base.yaml`` resolves the ``lca-genai-tool-mapper``
+    plugin id without breaking profile resolution. The seam slot remains
+    provided by ``lca-genai-semantic-mapper-seam``; nothing reads from
+    it post-ADR-0192 (Session observers own GenAI attribute emission).
+    """
+    return None  # noqa: PLR1711 — explicit no-op for static analysers
