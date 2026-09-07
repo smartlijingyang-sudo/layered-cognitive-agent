@@ -65,6 +65,55 @@ curl -sS -X POST -H 'Content-Type: application/json' \
 
 详见 [notes/jwt-secret-injection-via-profile.md](../notes/implemented/seam/2026-09-07-jwt-secret-injection-via-profile.md)。
 
+## 前端 SPA / Vite / patch injection
+
+**症状**: `lca-ops status` 全部 healthy, kernel 日志显示 `POST /runs 202 + ws_token`,但浏览器里的 chat **完全不走 LCA gateway**,而走 lobehub 原生 `/webapi/chat/openai` 路径——前端根本看不到 LCA 模型 + agent loop。日志里搜索 LCA 关键字**永远 0 命中**。
+
+**根因** (至少三种之一):
+
+| 根因 | 关键字 |
+|---|---|
+| **Vite 默认只 expose `VITE_*` env**;`process.env.NEXT_PUBLIC_*` 在浏览器 bundle 是 `undefined` —— `isLcaGatewayMode()` 永远返回 `false`。 | Vite dev server logs, `getLcaGatewayUrl()` throws "lcaGatewayUrl not configured" |
+| **`lca-ops lobehub restart` 跑完 SPA bundle 没被重新 inject 真 URL**(lobehub-spa Vite 仍加载旧的占位符字符串 `ws://lca-gateway-unset:0000`) | `grep 'LCA_GATEWAY_WS_URL' lobehub-ui/src/store/chat/agents/transports/lcaGateway/client.ts` 看到占位符 |
+| lobehub-spa 进程**根本没在跑** —— Vite dev server (:9876) listener 没了,前端 SPA bundle 取不到 | `ss -ltn \| grep 9876` 没输出;`curl http://127.0.0.1:9876/` 返回 `connection refused` |
+
+### 复现 / 验证命令
+
+```bash
+# 1. 浏览器请求真的走到 LCA gateway 了吗?
+grep -E "lca-api|runs|ws-token" .lca-ops/lobehub.log | tail -20
+# Next.js rewrite 把 /lca-api/* 改写到 /runs/*,所以 access log 显示的是
+# rewrite 后的路径 (/runs),而不是原始 /lca-api/runs —— 这是正常的。
+
+# 2. Vite 服务端有没有把 NEXT_PUBLIC_LCA_GATEWAY_URL 注入 SPA bundle?
+curl -sS "http://127.0.0.1:9876/src/store/chat/agents/transports/lcaGateway/client.ts" | grep LCA_GATEWAY_WS_URL
+# 期望: const LCA_GATEWAY_WS_URL = "ws://<host>:<port>";
+# 如果看到 "ws://lca-gateway-unset:0000" → patch engine 没 inject 真值,跑
+# ./scripts/lca-ops lobehub restart,会看到 "[lca] patch applied: lca_runtime_agent_gateway"
+
+# 3. isLcaGatewayMode() 在前端是不是 true?
+# 在浏览器 DevTools Console 跑:
+#   __BUILD_TIME_LCA_GATEWAY_URL  (console 里 __vite_something 或 grep 上面 url)
+# 或 grep agentDispatcher.ts bundle:
+curl -sS "http://127.0.0.1:9876/src/store/chat/slices/agentRun/actions/dispatch/agentDispatcher.ts" \
+    | grep -A2 isLcaGatewayMode
+```
+
+### 修复路径
+
+- **Vite 默认不 expose `NEXT_PUBLIC_*`**: LCA 的 `lca_runtime_agent_gateway` patch engine 在 apply 阶段读 `LCA_GATEWAY_PUBLIC_URL` env,把真 URL **字符串字面量**写进 `lcaGateway/client.ts`(Vite 看到字符串字面量直接 inline 到 bundle)。重启 lobehub 必须重新 inject —— `./scripts/lca-ops lobehub restart` 会自动跑(commit `c4303f50`)。
+- **SPA bundle 没拿到真值**: 跑 `LCA_GATEWAY_PUBLIC_URL=http://<host>:<port> python3 deploy/lobehub/patch_lobehub.py apply lca_runtime_agent_gateway` 手动重 inject,然后 `lca-ops lobehub restart`。
+- **lobehub-spa 死了**: `ss -ltn | grep 9876` 没有 LISTEN。`./scripts/lca-ops lobehub restart` 重启。**别用 `pkill -f vite`** —— 自身 argv 匹配容易 self-kill;从 `kill <pid>` 或 `pid=$(ss -ltnp | grep 9876 | grep -oP 'pid=\K[0-9]+')` 拿 PID 再 kill。
+
+### Debug 中几个常见的陷阱
+
+1. **`.lca-ops/kernel-serve.log` 是旧 kernel PID 的 log**,不是当前 kernel 的。当前 kernel 的 stdout 在 `/tmp/lca-kernel.log`(由 `lca-ops kernel_serve` spawn 时打开)。两者文件指针完全不同。看到一个没新内容别下结论"kernel 没工作" —— `ls -la --time-style=full-iso /tmp/lca-kernel.log .lca-ops/kernel-serve.log` 看哪个最近更新。
+2. **lobehub log 里的 `ECONNREFUSED 10.36.6.252:8765` 可能不是当前问题** —— 这是 lobehub 的 `/api/device/devices` proxy 在 kernel 短暂重启时打印的,跟前端 chat 路径没关系。`grep -B2 ECONNREFUSED` 看时间点。
+3. **`lca-ops lobehub restart` 输出"dev server ready"** 但 SPA bundle 仍是旧的 —— 见上"修复路径"第二项。
+4. **Vite 在 dev mode 不 restart**,只是 HMR 文件改动。如果磁盘改了 client.ts 但浏览器还是看到老值,确认 `lca-ops lobehub restart` **真的**杀了 Vite 进程(否则 Vite 用 cache 返回旧文件)。
+
+## 一次性命令速查
+
 ## 一次性命令速查
 
 按"我要做什么"选命令;每个命令的完整语义、副作用、边界见 `run-debug-guide.md` 和 `lca-ops <cmd> --help`。
@@ -109,6 +158,27 @@ curl -sS -X POST -H 'Content-Type: application/json' \
 | `lca-ops journal logs lobehub-spa` | Vite :9876 进程日志(`.lca-ops/lobehub-spa.log`) |
 | `lca-ops logs` | alias → `journal logs`(同 `journal logs`) |
 | `lca-ops logs kernel` | tail `/tmp/lca-kernel.log`(kernel 进程 stdout/stderr) — 后端 5xx 的第一站 |
+
+### Patch engine(LCA ↔ lobehub-ui)
+
+lobehub-ui 是 vendor 目录(`deploy/lobehub/patches/runtime/<name>.py` + `<name>.ts`)。`./scripts/lca-ops lobehub restart` 会自动跑 `apply_patches()` 并打印 `[lca] patch applied/skipped: <name>`。
+
+```bash
+# 手动跑 patch(改了 deploy/lobehub/patches/ 后)
+LCA_GATEWAY_PUBLIC_URL=http://<host>:<port> python3 deploy/lobehub/patch_lobehub.py
+
+# 看 manifest(JSON;哪个 patch 的哪次 apply 的 SHA 在用)
+python3 deploy/lobehub/patch_lobehub.py manifest
+
+# 检查某个 patch 是否还健康
+python3 deploy/lobehub/patch_lobehub.py verify
+
+# 列出已 discover 的 patch
+python3 deploy/lobehub/patch_lobehub.py list
+
+# 抓 drift(直接改 lobehub-ui 源码没 register)
+python3 deploy/lobehub/patch_lobehub.py drift
+```
 
 ### LobeHub 前端（非 run）
 

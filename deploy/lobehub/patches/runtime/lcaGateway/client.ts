@@ -21,7 +21,7 @@
 //      does not crash SSR.
 
 // LCA_PATCH_BEGIN: build-time URL (replaced by lca_runtime_agent_gateway.apply)
-const LCA_GATEWAY_WS_URL: string = '__LCA_GATEWAY_WS_URL__:ws://lca-gateway-unset:0000__';
+export const LCA_GATEWAY_WS_URL: string = '__LCA_GATEWAY_WS_URL__:ws://lca-gateway-unset:0000__';
 // LCA_PATCH_END
 
 let cachedUrl: string | null = null;

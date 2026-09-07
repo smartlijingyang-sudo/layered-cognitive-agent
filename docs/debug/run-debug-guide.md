@@ -165,6 +165,38 @@ the fix is in, jump to Step 7 (verify on the live system).
 
 ---
 
+### Step 0d — SPA / Vite / patch injection ("backend works, front-end looks healthy but chat never reaches LCA")
+
+**WHY.** Distinct from Step 0b. The kernel is fine, the backend 5xx is gone, but `lca-ops status` says everything is up while the browser-side chat silently routes to lobehub's native `/webapi/chat/openai` provider — never touching the LCA gateway. Cause: `process.env.NEXT_PUBLIC_*` is **undefined** in the browser bundle because the lobehub-spa Vite dev server only whitelists `VITE_*` env, and the LCA patch that bakes the URL into the bundle has not been re-applied (or did not receive `LCA_GATEWAY_PUBLIC_URL`).
+
+**DO.**
+
+```sh
+# 1. Confirm the LCA gateway URL is baked into the SPA bundle (Vite serves it on the fly):
+curl -sS "http://127.0.0.1:9876/src/store/chat/agents/transports/lcaGateway/client.ts" \
+    | grep -E 'LCA_GATEWAY_WS_URL\s*='
+# Expect: const LCA_GATEWAY_WS_URL = "ws://<host>:<port>";
+# If you see "ws://lca-gateway-unset:0000", the patch apply did not inject the URL.
+
+# 2. Confirm isLcaGatewayMode() in agentDispatcher has the same URL:
+curl -sS "http://127.0.0.1:9876/src/store/chat/slices/agentRun/actions/dispatch/agentDispatcher.ts" \
+    | grep -A2 isLcaGatewayMode
+
+# 3. Re-run the patch engine with the env, then restart lobehub:
+LCA_GATEWAY_PUBLIC_URL=http://<host>:<port> python3 deploy/lobehub/patch_lobehub.py
+./scripts/lca-ops lobehub restart
+
+# 4. Verify (1) again — should now show the real URL.
+```
+
+**OUTPUT.** After step 3 the `LCA_GATEWAY_WS_URL` line in the bundle is the real URL. Confirm `isLcaGatewayMode()` returns `true` in the browser by opening DevTools console and checking that no chat attempt goes through `/webapi/chat/openai` (use the Network tab; LCA traffic goes to `/lca-api/runs` → `/v1/runs/{id}/ws-token` → `WS /v1/runs/{id}/ws`).
+
+**NEXT.** If the bundle is correct but the chat still goes to `/webapi/chat/openai`, the agent configuration on the lobehub side is overriding the gateway dispatch — check `lobehub-ui/.env` for `OPENAI_PROXY_URL` and `NEXT_PUBLIC_LCA_GATEWAY_URL`, and confirm the active agent config (`.lca-ops/runtime/state.db`) sets the agent to `solo`/`team`/`auto`, not `general`. Otherwise this is the JWT-key bug above; jump to Step 0b.
+
+**FAIL.** `curl http://127.0.0.1:9876/` returns connection refused → the Vite dev server is not running. `ss -ltn | grep 9876` confirms. `./scripts/lca-ops lobehub restart` brings it back. **Do not** `pkill -f vite` from inside an interactive bash that has `vite` in its argv; that self-kills the shell before it reaches the inner command. Use `kill $(ss -ltnp | grep 9876 | grep -oP 'pid=\\K[0-9]+')` or open a fresh shell.
+
+---
+
 ### Step 1 — One-shot 8-section diagnostic
 
 **WHY.** `debug-run` is the canonical "tell me about this run" entry point (ADR-0122). It collects manifest, journal summary, error_ref, stack frames, and a suggested action in one shot.
