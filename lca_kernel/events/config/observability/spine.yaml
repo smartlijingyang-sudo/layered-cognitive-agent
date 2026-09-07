@@ -18,6 +18,7 @@ events:
     payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       state_id: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -27,6 +28,7 @@ events:
     fields:
       state_id: str
       outcome: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -35,6 +37,7 @@ events:
     payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       state_id: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -44,6 +47,7 @@ events:
     fields:
       state_id: str
       outcome: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -52,6 +56,7 @@ events:
     payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       state_id: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -61,6 +66,7 @@ events:
     fields:
       state_id: str
       outcome: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -69,6 +75,7 @@ events:
     payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       state_id: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -78,6 +85,7 @@ events:
     fields:
       state_id: str
       outcome: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -86,6 +94,7 @@ events:
     payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       state_id: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -95,6 +104,7 @@ events:
     fields:
       state_id: str
       outcome: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -105,6 +115,7 @@ events:
       state_id: str
       template_id: str
       variant: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -116,6 +127,7 @@ events:
       template_id: str
       section_count: int
       variant: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -124,6 +136,7 @@ events:
     payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       state_id: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -133,6 +146,7 @@ events:
     fields:
       state_id: str
       decision_path: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -142,6 +156,7 @@ events:
     fields:
       state_id: str
       outcome: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -151,6 +166,7 @@ events:
     fields:
       state_id: str
       outcome: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -162,6 +178,7 @@ events:
       tool_name: str
       invocation_id: str
       attempt: int
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -173,6 +190,7 @@ events:
       invocation_id: str
       attempt: int
       outcome: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -184,6 +202,7 @@ events:
       invocation_id: str
       attempt: int
       reason: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -193,6 +212,7 @@ events:
     fields:
       invocation_id: str
       tool_name: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -203,6 +223,7 @@ events:
       invocation_id: str
       tool_name: str
       outcome: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -213,6 +234,7 @@ events:
     fields:
       boundary: str
       trace_id: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -224,6 +246,7 @@ events:
       model: str
       stream: bool
       prompt_preview: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -234,6 +257,7 @@ events:
       model: str
       stream: bool
       outcome: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -245,6 +269,7 @@ events:
       text_delta: str
       seq: int
       channel_kind: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -255,6 +280,7 @@ events:
       model: str
       idle_ms: int
       seq: int
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -297,6 +323,7 @@ events:
       exc_type: str
       message: str
       trace_id: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -307,6 +334,7 @@ events:
       boundary: str
       trace_id: str
       outcome: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -318,6 +346,7 @@ events:
       method: str
       phase: str
       outcome: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -360,6 +389,7 @@ events:
       event_type: str
       trace_id: str
       outcome: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -371,6 +401,7 @@ events:
       path: str
       method: str
       run_id: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -382,6 +413,7 @@ events:
       method: str
       run_id: str
       outcome: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -391,6 +423,7 @@ events:
     fields:
       path: str
       run_id: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -400,6 +433,7 @@ events:
     payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       profile: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -409,6 +443,7 @@ events:
     fields:
       profile: str
       outcome: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -418,6 +453,7 @@ events:
     fields:
       run_id: str
       trace_id: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -428,6 +464,7 @@ events:
       run_id: str
       trace_id: str
       outcome: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -437,6 +474,7 @@ events:
     fields:
       run_id: str
       trace_id: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -448,6 +486,7 @@ events:
       trace_id: str
       role: str
       iteration_kind: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -459,6 +498,7 @@ events:
       role: str
       iteration_kind: str
       outcome: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -468,6 +508,7 @@ events:
     fields:
       child_role: str
       parent_step: int
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -478,6 +519,7 @@ events:
       trace_id: str
       role: str
       agent_id: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -489,6 +531,7 @@ events:
       role: str
       agent_id: str
       iteration: int
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -500,6 +543,7 @@ events:
       role: str
       agent_id: str
       outcome: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -624,6 +668,7 @@ events:
     payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       attempted_ep: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -633,6 +678,7 @@ events:
     fields:
       producer_name: str
       key: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -820,6 +866,7 @@ events:
       team_id: str
       requested_roles: str
       run_id: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -830,6 +877,7 @@ events:
       team_id: str
       selected_roles: str
       run_id: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -840,6 +888,7 @@ events:
       team_id: str
       reason: str
       run_id: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -851,6 +900,7 @@ events:
       callee_role: str
       subtask: str
       run_id: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -863,6 +913,7 @@ events:
       subtask: str
       outcome: str
       run_id: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -873,6 +924,7 @@ events:
       callee_role: str
       subtask: str
       step: int
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -884,6 +936,7 @@ events:
       sender: str
       recipient: str
       run_id: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -894,6 +947,7 @@ events:
     fields:
       run_id: str
       source: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -903,6 +957,7 @@ events:
     fields:
       run_id: str
       target: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -912,6 +967,7 @@ events:
     fields:
       run_id: str
       target: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -922,6 +978,7 @@ events:
       run_id: str
       signal_kind: str
       score: float
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -932,6 +989,7 @@ events:
       run_id: str
       artifact_id: str
       sources: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -942,6 +1000,7 @@ events:
       run_id: str
       artifact_id: str
       size_bytes: int
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -953,6 +1012,7 @@ events:
       run_id: str
       target: str
       intent: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -962,6 +1022,7 @@ events:
     fields:
       run_id: str
       target: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -971,6 +1032,7 @@ events:
     fields:
       run_id: str
       name: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -981,6 +1043,7 @@ events:
       run_id: str
       request_id: str
       intent: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -992,6 +1055,7 @@ events:
       request_id: str
       verdict: str
       actor: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -1002,6 +1066,7 @@ events:
       run_id: str
       request_id: str
       reason: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -1011,6 +1076,7 @@ events:
     fields:
       run_id: str
       target: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -1020,6 +1086,7 @@ events:
     fields:
       run_id: str
       reason: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -1028,6 +1095,7 @@ events:
     payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
     fields:
       run_id: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -1037,6 +1105,7 @@ events:
     fields:
       run_id: str
       outcome: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -1046,6 +1115,7 @@ events:
     fields:
       run_id: str
       request_id: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -1056,6 +1126,7 @@ events:
     fields:
       profile: str
       plugins: int
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -1065,6 +1136,7 @@ events:
     fields:
       plugin_id: str
       layer: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -1074,6 +1146,7 @@ events:
     fields:
       sinks: int
       derivers: int
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -1085,6 +1158,7 @@ events:
       observed_at: str
       detail: str
       run_id: str
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -1098,6 +1172,7 @@ events:
       status: str
       attributes: dict
       output: dict
+      activation_ref: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
