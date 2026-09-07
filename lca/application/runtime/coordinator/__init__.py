@@ -6,5 +6,15 @@ into Redis via LcaStreamEventManager.
 """
 
 from lca.application.runtime.coordinator.event_translator import EventTranslator
+from lca.application.runtime.coordinator.terminal_hints import (
+    TerminalHint,
+    is_stream_terminal_status,
+    resolve_live_terminal_hint,
+)
 
-__all__ = ("EventTranslator",)
+__all__ = (
+    "EventTranslator",
+    "TerminalHint",
+    "is_stream_terminal_status",
+    "resolve_live_terminal_hint",
+)
