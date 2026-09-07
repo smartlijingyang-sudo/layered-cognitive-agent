@@ -8,7 +8,7 @@ observability; loop ``tool_journal_commit`` commits catalog + phase spine facts.
 ADR-0101 PR-2:tool 事件回归事实账本。``arguments`` / ``output`` 经
 ``EvidenceStore.prepare()`` 落到 evidence/<sha256>.json,event 的
 ``arguments_ref`` / ``output_ref`` 字段写入 ``EvidenceRef``;消费方
-(lcaJournal.ts / lobehub UI)经由 ref + EvidenceStore.get() 重组完整
+(前端 lobehub UI)经由 ref + EvidenceStore.get() 重组完整
 state(可验证完整性)。``arguments`` inline 路径保留但 v1 强制走
 evidence 平面,inline 由后续 EvidencePolicy.should_inline() 决策启用。
 """

@@ -85,15 +85,16 @@ async def iter_stamped_events(
             return
 
 
-async def stream_run_live(
+async def stream_run_fold(
     session: RunSession,
     *,
     after: int = 0,
 ) -> AsyncIterator[bytes]:
-    """Retired — P1 uses LcaAgentGateway WebSocket instead of Journal SSE."""
-    del session, after
-    if False:  # pragma: no cover
-        yield b""
+    """Stream a run live as four UI SSE events (reasoning|text|tool|done)."""
+    from lca.plugins.transport.run_live_observe__seam import stream_run_fold_observe
+
+    async for line in stream_run_fold_observe(session, after=after):
+        yield line
 
 
 def stream_process_journal_live(tail: Any, *, last_seq: int = 0) -> AsyncIterator[bytes]:
@@ -109,5 +110,5 @@ __all__ = [
     "iter_stamped_events",
     "stream_chat_completion",
     "stream_process_journal_live",
-    "stream_run_live",
+    "stream_run_fold",
 ]

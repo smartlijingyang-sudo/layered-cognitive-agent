@@ -8,7 +8,7 @@
 2. 提供 ``assistant.frontend_bridge`` capability —— 把新建助理投影成
    LobeHub agents 行（TRPC ``agent.createAgent``），使前端助理列表与
    ``/agent/<agt_id>`` 可见。映射真值 = agents 行
-   ``agencyConfig.lcaAssistantId``（前端 LcaRunDriver 读回并发
+   ``agencyConfig.lcaAssistantId``（前端 lobehub UI 读回并发
    ``assistant_id`` 进 ``POST /runs``）；本插件不落第二份映射文件。
 
 失败语义：前端注册是 fail-soft 投影 —— 网络失败 / 非 200 / 解析失败
@@ -114,7 +114,7 @@ class AssistantFrontendBridge:
             "avatar": emoji,
             "model": "solo",
             "systemRole": system_role[:_SOUL_SUMMARY_MAX_CHARS],
-            # 映射真值：前端 LcaRunDriver 读 agencyConfig.lcaAssistantId
+            # 映射真值：前端 lobehub UI 读 agencyConfig.lcaAssistantId
             # 并在 POST /runs 带出 assistant_id（ADR-0187 §3 D7 绑定）。
             "agencyConfig": {"lcaAssistantId": assistant_id},
         }

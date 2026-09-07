@@ -9,6 +9,6 @@
 // from '@/store/chat/agents/transports/lcaGateway/event_handler'`.
 //
 // When the patch is not applied, the chat store falls back to the
-// legacy LcaRunDriver path (PR-4 retires it).
+// legacy SSE path (retired in PR-4).
 
 export { createGatewayEventHandler as createLcaGatewayEventHandler } from '@/store/chat/slices/agentRun/actions/transports/gateway/gatewayEventHandler';

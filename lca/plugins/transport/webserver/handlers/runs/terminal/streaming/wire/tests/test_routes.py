@@ -85,15 +85,10 @@ def test_mount_ws_route_makes_ws_reachable() -> None:
 
 
 def test_mount_ws_route_duplicate_path_raises() -> None:
-    """Mounting the same WS path twice is detectable by Starlette at request time.
+    """Mounting the same WS path twice must raise at setup time.
 
-    Starlette itself does not eagerly dedupe ``app.router.routes``; the
-    first matching route wins. So a duplicate mount is silently allowed
-    by Starlette and the second ``WebSocketRoute`` is dead. We assert
-    that ``mount_ws_route`` raises explicitly to make the dup visible
-    at setup time. The current implementation appends unconditionally,
-    so this test pins the contract for a future strict version (it
-    documents the desired behaviour).
+    The implementation checks existing routes before appending; a dup
+    mount is a boot misconfiguration and must be visible immediately.
     """
     from starlette.applications import Starlette
 
@@ -103,11 +98,5 @@ def test_mount_ws_route_duplicate_path_raises() -> None:
 
     app = Starlette()
     mount_ws_route(app, handler=handler)
-    # We append a second time. The two routes are now both mounted; the
-    # router picks the first match. We just confirm the app is still
-    # functional (i.e. the mount did not corrupt the route list) and
-    # surface the count so a stricter version can be detected here.
-    mount_ws_route(app, handler=handler)
-    assert sum(
-        1 for r in app.router.routes if getattr(r, "path", None) == "/v1/runs/{run_id}/ws"
-    ) >= 1
+    with pytest.raises(RuntimeError, match="already mounted"):
+        mount_ws_route(app, handler=handler)

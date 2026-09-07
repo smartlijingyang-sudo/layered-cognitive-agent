@@ -73,9 +73,10 @@ def _timeline(
 ) -> None:
     """Simulate frontend wire — ``POST {frontend}/lca-api/runs`` + SSE ``/live``.
 
-    Mirrors ``LcaRunDriver.ts``. Use ``--frontend-url`` to point at a
-    reachable LobeHub dev/prod host; the bare gateway port does not
-    serve the ``/lca-api`` rewrite prefix.
+    Mirrors the legacy lobehub UI SSE consumer (retired in PR-4).
+    Use ``--frontend-url`` to point at a reachable LobeHub dev/prod
+    host; the bare gateway port does not serve the ``/lca-api``
+    rewrite prefix.
     """
     script = _script_path("e2e_timeline_smoke.py")
     extra = {"LCA_FRONTEND_URL": frontend_url, "LCA_TOKEN": token}
