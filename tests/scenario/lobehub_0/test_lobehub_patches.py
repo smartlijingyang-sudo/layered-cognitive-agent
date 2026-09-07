@@ -314,3 +314,41 @@ def test_resolve_gateway_http_returns_empty_when_key_missing(
 
     ctx = PatchContext(ui_dir=ui)
     assert _resolve_gateway_http(ctx) == ""
+
+
+# ── attachment forwarding: imageList / fileList / files ────────────────
+
+
+_EXECUTE_PATCH_PATH = Path("deploy/lobehub/patches/runtime/lcaGateway/execute.ts")
+_DRIVER_PATCH_PATH = Path(
+    "deploy/lobehub/patches/runtime/lcaGateway/executeGatewayRun.ts"
+)
+
+
+def test_patch_source_declares_attachment_extras_in_execute_ts() -> None:
+    """``LcaStartRunBody.messages`` must declare imageList/fileList/files so
+    the LCA ingress can hydrate attachments before composing the run prompt.
+
+    Regression: prior to the patch, the type only had ``role`` / ``content``;
+    UIChatMessage imageList / fileList metadata was silently dropped on the
+    wire and the model received no attachment context.
+    """
+    body = _EXECUTE_PATCH_PATH.read_text(encoding="utf-8")
+    assert "imageList?" in body
+    assert "fileList?" in body
+    assert "files?" in body
+
+
+def test_patch_source_forwards_attachment_extras_in_driver() -> None:
+    """``lcaExecuteGatewayRun`` must build ``attachmentExtras`` from the
+    trailing user message and spread it into the messages posted to LCA.
+    Empty arrays are dropped to keep the wire shape stable for text turns.
+    """
+    driver = _DRIVER_PATCH_PATH.read_text(encoding="utf-8")
+    assert "attachmentExtras" in driver
+    assert "...attachmentExtras" in driver
+    # Only forward non-empty arrays; the LobeHub UI side ships `[]` on
+    # text-only turns and we must not echo those on the wire.
+    assert "imageList.length > 0" in driver
+    assert "fileList.length > 0" in driver
+    assert "files.length > 0" in driver
