@@ -340,7 +340,7 @@ def test_safe_executor_evidence_helpers_silent_when_no_cursor_bound() -> None:
     """
     # 默认 ContextVar 为 None → helpers 必须立即返回
     _record_tool_call_evidence("test_tool", "inv-1")
-    _record_tool_result_evidence(tool_name="test_tool", invocation_id="inv-1", outcome="ok")
+    _record_tool_result_evidence(tool_name="test_tool", invocation_id="inv-1", outcome="ok", ok=True)
 
 
 def test_safe_executor_evidence_runtime_records_tool_result_ep_when_cursor_bound() -> None:
@@ -360,7 +360,7 @@ def test_safe_executor_evidence_runtime_records_tool_result_ep_when_cursor_bound
     token = bind_current_cursor(cursor)
     try:
         _record_tool_call_evidence("test_tool", "inv-1")
-        _record_tool_result_evidence(tool_name="test_tool", invocation_id="inv-1", outcome="ok")
+        _record_tool_result_evidence(tool_name="test_tool", invocation_id="inv-1", outcome="ok", ok=True)
     finally:
         reset_current_cursor(token)
 

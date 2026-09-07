@@ -202,6 +202,7 @@ def record_tool_denied_observability(tool: Tool, reason: str) -> None:
         tool_name=tool.name,
         result_digest=reason,
         outcome="denied",
+        ok=False,
     )
 
 

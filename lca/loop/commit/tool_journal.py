@@ -164,12 +164,20 @@ def commit_body_tool_execute_end(
     state: AgentState | None = None,
     session: object | None = None,
     actor: str = "body",
+    ok: bool | None = None,
 ) -> AppendReceipt | None:
-    """Commit model-visible ``body.tool.execute.end`` surface (ADR-0201 single append)."""
+    """Commit model-visible ``body.tool.execute.end`` surface (ADR-0201 single append).
+
+    ``ok`` 与 ``outcome`` 一致:outcome="success" 对应 True,其他 False。
+    显式接受 bool 是为了 fold binding / HOP 多源对账能拿到这个字段
+    (spine.yaml 已声明 ``ok: bool``)。不传时从 outcome 派生。
+    """
     from lca.infrastructure.session.emit.tool_surface_emit import append_tool_result_surface
     from lca.loop.fact_gateway import enrich_ep_payload
 
     del state
+    if ok is None:
+        ok = outcome == "success"
     enriched = enrich_ep_payload(
         "body.tool.execute.end",
         {
@@ -177,6 +185,7 @@ def commit_body_tool_execute_end(
             "invocation_id": invocation_id,
             "attempt": attempt,
             "outcome": outcome,
+            "ok": ok,
             **({"latency_ms": latency_ms} if latency_ms is not None else {}),
         },
     )

@@ -340,6 +340,7 @@ class PipelineSafeExecutor(SafeExecutor):
                     tool_name=tool.name,
                     result_digest="ok",
                     outcome="ok",
+                    ok=observation.success,
                 )
                 act_closed = True
                 return observation
@@ -359,6 +360,7 @@ class PipelineSafeExecutor(SafeExecutor):
                 tool_name=tool.name,
                 result_digest=observation.error,
                 outcome="failure",
+                ok=observation.success,
             )
             act_closed = True
             return observation
@@ -368,6 +370,7 @@ class PipelineSafeExecutor(SafeExecutor):
                     tool_name=tool.name,
                     result_digest=str(exc),
                     outcome="failure",
+                    ok=False,
                 )
             raise
 

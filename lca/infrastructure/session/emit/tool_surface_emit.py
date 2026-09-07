@@ -27,6 +27,7 @@ def append_tool_result_surface(
     if not invocation_id.strip():
         return None
     fields = dict(enriched_fields or {})
+    ok = fields.get("ok") if "ok" in fields else None
     data = build_tool_surface_data(
         tool_name=str(fields.get("tool_name", tool_name)),
         invocation_id=str(fields.get("invocation_id", invocation_id)),
@@ -34,6 +35,7 @@ def append_tool_result_surface(
         outcome=str(fields.get("outcome", outcome)),
         observation=observation,
         latency_ms=latency_ms if latency_ms is not None else fields.get("latency_ms"),  # type: ignore[arg-type]
+        ok=ok if isinstance(ok, bool) else None,
     )
     return append_surface_bound(
         SURFACE_TOOL_RESULT_TYPE,

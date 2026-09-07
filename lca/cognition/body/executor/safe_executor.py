@@ -525,6 +525,7 @@ class SimpleSafeExecutor(SafeExecutor):
                 outcome=outcome,
                 latency_ms=_elapsed_ms(execute_started),
                 observation=observation,
+                ok=observation.success if observation is not None else (outcome == "success"),
             )
 
     @staticmethod
@@ -558,6 +559,7 @@ def _record_tool_result_evidence(
     tool_name: str,
     invocation_id: str,
     outcome: str,
+    ok: bool,
     error: str | None = None,
 ) -> None:
     """Write one ``step.tool_result.record`` EP via the bound LoopCursor.
@@ -567,8 +569,12 @@ def _record_tool_result_evidence(
     Phase 不在 act → CursorError 由 caller 降级。
 
     R2: thin wrapper over :class:`CursorRecord` SSOT helper.
+
+    ``ok`` 必须由调用方显式提供 —— cursor SSOT
+    不接受成败默认值(否则 outcome="failure" 也会
+    被写成 ok=True,与 error 字段自相矛盾)。
     """
-    cursor_outcome: Literal["ok", "failure", "timeout", "denied"]
+    cursor_outcome: literal["ok", "failure", "timeout", "denied"]
     if outcome == "ok":
         cursor_outcome = "ok"
     elif outcome == "timeout":
@@ -581,4 +587,5 @@ def _record_tool_result_evidence(
         tool_name=tool_name,
         result_digest=error or outcome,
         outcome=cursor_outcome,
+        ok=ok,
     )

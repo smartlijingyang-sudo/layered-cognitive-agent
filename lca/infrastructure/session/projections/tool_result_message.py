@@ -65,14 +65,23 @@ def build_tool_surface_data(
     outcome: str,
     observation: Observation | None,
     latency_ms: int | None = None,
+    ok: bool | None = None,
 ) -> dict[str, Any]:
-    """Session surface payload for ``SURFACE_TOOL_RESULT_TYPE`` append."""
+    """Session surface payload for ``SURFACE_TOOL_RESULT_TYPE`` append.
+
+    ``ok`` 与 ``outcome`` 一致:outcome="success" 对应 True,其他 False。
+    第一性原则:成败字段不允许默认 True(spine.yaml 已声明 ``ok: bool``),
+    fold binding 据此与 step.tool_result.record 互相对账。
+    """
     content = observation_tool_result_content(observation)
+    if ok is None:
+        ok = outcome == "success"
     data: dict[str, Any] = {
         "tool_name": tool_name,
         "invocation_id": invocation_id,
         "attempt": attempt,
         "outcome": outcome,
+        "ok": ok,
         "message": build_openai_tool_result_message(
             tool_call_id=invocation_id,
             content=content,
