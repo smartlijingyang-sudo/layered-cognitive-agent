@@ -3,6 +3,12 @@
 ``resolve_profile`` 只承担插件 Manifest 导入、配置模型校验、依赖图验证与不可变
 ``ResolvedProfile`` 构造。YAML、Bundle、Patch、环境引用和 fallback policy 的输入适配
 统一由 ``profile.source`` 处理，避免语义解析器泄漏外部文件格式细节。
+
+Per ADR-0199 §3.4 + I-HPC-11 (信任默认拒绝), ``_resolve_source`` applies
+``filter_untrusted_default_disabled`` before capability / layer / DAG
+validation. ``project`` and ``pip`` plugins (default-untrusted per ADR §3.4
+table) are dropped unless the active ``profile_path`` explicitly admits them
+via provenance.
 """
 
 from __future__ import annotations
@@ -82,6 +88,12 @@ def _resolve_source(source: ProfileSource) -> ResolvedProfile:
 
     resolved_plugins, env_refs = _resolve_plugins(source)
     enabled = [plugin for plugin in resolved_plugins if not plugin.disabled]
+    enabled = list(
+        filter_untrusted_default_disabled(
+            tuple(enabled),
+            profile_path=source.profile_path,
+        )
+    )
     _validate_capability_owners(enabled)
     _validate_layer_edges(enabled)
     order, edges = _topo_sort(enabled)
@@ -101,6 +113,144 @@ def _resolve_source(source: ProfileSource) -> ResolvedProfile:
         env_refs=tuple(env_refs),
         fallback_policy=source.fallback_policy,
     )
+
+
+def filter_untrusted_default_disabled(
+    plugins: tuple[ResolvedPlugin, ...],
+    *,
+    profile_path: str | Path,
+    warn_filtered: bool = True,
+    entry_point_group_by_module: Mapping[str, str] | None = None,
+) -> tuple[ResolvedPlugin, ...]:
+    """Filter plugins whose ``PluginOrigin`` defaults to disabled.
+
+    Per ADR-0199 §3.4 + I-HPC-11 (信任默认拒绝):
+
+    - ``bundled`` plugins: always kept (kernel-shipped core).
+    - ``user`` plugins: kept (operator-vetted by default).
+    - ``project`` plugins (``".lca/plugins/"``): kept only when the active
+      profile explicitly admits them via provenance.
+    - ``pip`` entry-point plugins: kept only when the active profile
+      explicitly admits them via provenance.
+
+    "Explicit admission" is decided by comparing ``profile_path`` against
+    the plugin's own ``source`` provenance (the bundle/profile path that
+    declared the plugin during resolve) and ``PluginOrigin.discovered_at``.
+    The active profile is the admission authority if either string is a
+    substring of the other, equal, or shares a directory.
+
+    ``pip`` plugins can only be classified when the discovery stage knows
+    the entry-point group; pass ``entry_point_group_by_module`` to feed
+    that information in (P3-03 emits it; this filter is a downstream
+    consumer). When absent, ``resolve_plugin_origin`` falls back to
+    ``bundled`` for module paths it cannot classify.
+
+    Per I-HPC-11, dropped plugins are reported via :func:`warnings.warn`
+    (not raised) so an operator can still resolve a profile with the
+    trusted subset. To silence the warning, pass ``warn_filtered=False``.
+
+    Args:
+        plugins: candidate plugin set from declarative spec.
+        profile_path: the path of the profile that's resolving this set;
+            used as the "enabled_by" provenance check.
+        warn_filtered: when True, emit one warning naming every filtered
+            plugin id.
+        entry_point_group_by_module: optional map ``module -> entry-point
+            group`` forwarded to :func:`resolve_plugin_origin` for
+            per-module pip classification.
+
+    Returns:
+        Filtered tuple with untrusted-disabled plugins removed. The input
+        tuple is not mutated.
+    """
+    from lca.harness.profile.resolve.plugin_origin import (
+        is_untrusted_default_disabled,
+        resolve_plugin_origin,
+    )
+
+    profile_path_str = str(profile_path) if profile_path else ""
+    kept: list[ResolvedPlugin] = []
+    filtered: list[tuple[ResolvedPlugin, str]] = []
+
+    for plugin in plugins:
+        ep_group = (
+            entry_point_group_by_module.get(plugin.module)
+            if entry_point_group_by_module is not None
+            else None
+        )
+        origin = resolve_plugin_origin(plugin.module, entry_point_group=ep_group)
+        if not is_untrusted_default_disabled(origin):
+            # bundled / user → trusted by default
+            kept.append(plugin)
+            continue
+
+        # project / pip → require explicit profile provenance
+        plugin_source = plugin.source or ""
+        profile_path_obj = Path(profile_path_str) if profile_path_str else None
+        admitted = _profile_explicitly_admits(
+            profile_path_str=profile_path_str,
+            profile_path_obj=profile_path_obj,
+            plugin_source=plugin_source,
+            discovered_at=origin.discovered_at,
+        )
+        if admitted:
+            kept.append(plugin)
+        else:
+            filtered.append((plugin, origin.source))
+
+    if warn_filtered and filtered:
+        ids = ", ".join(f"{p.id} (source={s})" for p, s in filtered)
+        warnings.warn(
+            "untrusted-default plugins filtered (ADR-0199 §3.4 / I-HPC-11): "
+            f"{ids}. Enable explicitly via profile provenance to admit.",
+            stacklevel=2,
+        )
+
+    return tuple(kept)
+
+
+def _profile_explicitly_admits(
+    *,
+    profile_path_str: str,
+    profile_path_obj: Path | None,
+    plugin_source: str,
+    discovered_at: str,
+) -> bool:
+    """Decide whether the active profile explicitly admits a plugin.
+
+    A plugin is explicitly admitted when the profile path appears as a
+    substring of the plugin's declared source / discovery path, when the
+    two strings are equal, or when one is a directory ancestor of the
+    other. Sibling-directory bundles imported by the profile share the
+    same parent and therefore match via the directory check.
+    """
+    if not profile_path_str:
+        return False
+    if profile_path_str == plugin_source:
+        return True
+    if plugin_source and profile_path_str in plugin_source:
+        return True
+    if plugin_source and plugin_source in profile_path_str:
+        return True
+    if discovered_at and profile_path_str in discovered_at:
+        return True
+    if profile_path_obj is not None and plugin_source:
+        try:
+            plugin_path = Path(plugin_source).resolve()
+        except (OSError, RuntimeError, ValueError):
+            plugin_path = None
+        if plugin_path is not None:
+            try:
+                plugin_path.relative_to(profile_path_obj.parent)
+                return True
+            except ValueError:
+                pass
+            try:
+                profile_path_obj.relative_to(plugin_path.parent)
+                return True
+            except ValueError:
+                pass
+    return False
 
 
 def _resolve_plugins(
@@ -431,6 +581,7 @@ __all__ = [
     "ResolvedPlugin",
     "ResolvedProfile",
     "dump_resolved",
+    "filter_untrusted_default_disabled",
     "resolve_entries",
     "resolve_profile",
 ]
