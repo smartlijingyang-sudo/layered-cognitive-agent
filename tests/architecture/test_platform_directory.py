@@ -31,7 +31,7 @@ SEAM_TREE_ANCHORS = ("cognitive", "loop", "observability", "transport", "domain"
 class TestPlatformDirectory:
     def test_lca_top_level_packages(self) -> None:
         actual = {p.name for p in LCA.iterdir() if p.is_dir() and not p.name.startswith("_")}
-        assert REQUIRED_LCA_TOP <= actual, f"missing packages: {sorted(REQUIRED_LCA_TOP - actual)}"
+        assert actual >= REQUIRED_LCA_TOP, f"missing packages: {sorted(REQUIRED_LCA_TOP - actual)}"
 
     def test_session_and_loop_packages_exist(self) -> None:
         assert (LCA / "session" / "README.md").is_file()

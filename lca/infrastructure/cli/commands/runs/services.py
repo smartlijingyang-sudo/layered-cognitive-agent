@@ -27,7 +27,7 @@ def register(app: typer.Typer) -> None:
         action: str = typer.Argument(None, help="start | stop | restart | status | ensure"),
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
+        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
     ) -> None:
         """Next :3010 + Vite SPA :9876。ensure=源码补丁依赖，不启进程。"""
         if action is None:
@@ -62,7 +62,7 @@ def register(app: typer.Typer) -> None:
         action: str = typer.Argument(None, help="start | stop | status"),
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
+        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
     ) -> None:
         """postgres / redis / s3。start 只补缺的，已有容器会复用。"""
         if action is None:
@@ -92,7 +92,7 @@ def register(app: typer.Typer) -> None:
         action: str = typer.Argument(None, help="start | stop | restart | status | ensure"),
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
+        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
     ) -> None:
         """sandbox-user 连 gateway。日志 /home/sandbox-user/.lca/daemon.log。"""
         if action is None:

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +34,7 @@ LCA = REPO / "lca"
 JOBS_MODULE = LCA / "plugins" / "assistant" / "jobs.py"
 EVOLVE_MODULE = LCA / "plugins" / "assistant" / "evolve.py"
 
-_FIXED_NOW = datetime(2026, 9, 4, 12, 0, 0, tzinfo=timezone.utc)
+_FIXED_NOW = datetime(2026, 9, 4, 12, 0, 0, tzinfo=UTC)
 
 # I-A12 静态扫描：调度**机制**词表（声明式 ``schedule`` 字段名是数据不是机制，
 # 不在禁词表；机制 = 线程 / 定时器 / 调度库）。

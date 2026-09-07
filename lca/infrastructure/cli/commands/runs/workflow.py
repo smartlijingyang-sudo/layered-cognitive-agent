@@ -24,7 +24,7 @@ def register(app: typer.Typer) -> None:
     def stop(
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
+        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
     ) -> None:
         """停 daemon / lobehub / infra。不含 LCA 进程(kernel serve 自管)。"""
         ctx = make_context(json_mode, quiet, config)
@@ -36,7 +36,7 @@ def register(app: typer.Typer) -> None:
     def status(
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
+        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
     ) -> None:
         """看五个服务现在怎样。异常会写出原因。heal 会自己修。"""
         ctx = make_context(json_mode, quiet, config)
@@ -48,7 +48,7 @@ def register(app: typer.Typer) -> None:
     def heal(
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
+        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
     ) -> None:
         """自己修：缺的容器拉起、过期 gateway 重启、daemon 连上。不用再拆命令。"""
         ctx = make_context(json_mode, quiet, config)
@@ -63,7 +63,7 @@ def register(app: typer.Typer) -> None:
     def provision(
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
+        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
     ) -> None:
         """装系统包、venv、sandbox 用户、工作区、CLI。新机器跑一次。"""
         ctx = make_context(json_mode, quiet, config)
@@ -78,7 +78,7 @@ def register(app: typer.Typer) -> None:
     def kernel_restart(
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
+        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
     ) -> None:
         """LCA 进程本地便捷重启: SIGTERM 现有 → 等 K6 dispose → spawn 新。
 
