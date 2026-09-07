@@ -2,7 +2,7 @@
 
 ## 状态
 
-**Accepted**（2026-09-06）。P1：LoopGuardPolicy、ToolGuardService、DSH 对标 act guards、gate 链配置化。P2：`RepeatToolCallGate` 精确 args 指纹 + 多级 threshold（DSH repeat-tool-reminder 对标）。
+**Implemented**（2026-09-07）。P1+P2 已落地：`LoopGuardPolicy`（`lca/cognition/brain/guard/loop_policy.py`）、`ToolGuardService` + `wrapped_executor`（`lca/cognition/body/guard/`）、`RepeatToolCallGate` 精确 args 指纹（`lca/cognition/brain/decision_gates/repeat/tool_call.py`），`bundles/guard-stack.yaml` 组合包就绪。
 
 ## 0. 决策摘要
 

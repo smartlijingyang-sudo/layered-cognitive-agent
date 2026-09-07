@@ -2,7 +2,7 @@
 
 ## 状态
 
-**Accepted**（2026-09-06）。P1 实现：Delivery Gate、PromptSurface、调试事件、Progress/Terminal Gate 语义修正。
+**Implemented (P1–P3)**（2026-09-07）。P1：Delivery Gate、PromptSurface、调试事件、Progress/Terminal Gate 语义修正。P2：`ConvergencePolicy` + `ConvergenceRuntime` 默认装配、`sensor.convergence-task` 写 manifest `convergence_task_class` hint、`turn.control.v1` 携带 `files_created` 供 gate fold。P3：Stop grace respond 经 `ConvergenceRuntime.evaluate_budget_and_emit` + `synthesize`。Guard 插件化见 ADR-0197。
 
 ## 0. 决策摘要
 

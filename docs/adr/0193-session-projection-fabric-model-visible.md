@@ -2,7 +2,7 @@
 
 ## 状态
 
-Accepted（2026-09-06）。延伸 ADR-0191（四态分离）、0189（derive/fork）、0186（Session SSOT）、0185（model-visible fold）。
+Implemented（2026-09-07）。D1–D7 全部落地：`ModelVisibleUnit` + bundle 注册、projection_reader、Session._projections 接线、Session.derive_messages / assembler、HeuristicTokenMeter 切换、`build_tool_history` / `.v1` fallback 退役、`I-MV-PROJ-*` 架构守卫。延伸 ADR-0191（四态分离）、0189（derive/fork）、0186（Session SSOT）、0185（model-visible fold）。
 
 **配套 Note**：[`docs/notes/implemented/seam/2026-09-06-session-projection-fabric.md`](../notes/implemented/seam/2026-09-06-session-projection-fabric.md)。
 
