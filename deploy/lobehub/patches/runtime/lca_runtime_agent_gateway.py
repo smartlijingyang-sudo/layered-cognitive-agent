@@ -71,13 +71,16 @@ _RUN_BLOCK = """    /* LCA: every chat is a Run */
 
 _IS_LCA_GATEWAY_MODE = (
     "/* LCA-P1: lcaGateway runtime mode */\n"
+    "// ``LCA_GATEWAY_WS_URL`` is the build-time literal baked into\n"
+    "// ``lcaGateway/client.ts`` by the LCA patch engine (see that\n"
+    "// file's LCA_PATCH_BEGIN/END markers). Reading it here avoids the\n"
+    "// ``process.env.NEXT_PUBLIC_*`` reference that Vite dev mode does\n"
+    "// not expose to the browser bundle.\n"
+    "import { LCA_GATEWAY_WS_URL as LCA_GATEWAY_URL } from "
+    "'@/store/chat/agents/transports/lcaGateway/client';\n"
     "export function isLcaGatewayMode(_agentId?: string): boolean {\n"
     "  try {\n"
-    "    const envUrl =\n"
-    "      typeof process !== 'undefined'\n"
-    "        ? process.env.NEXT_PUBLIC_LCA_GATEWAY_URL\n"
-    "        : undefined;\n"
-    "    return !!(envUrl && envUrl.length > 0);\n"
+    "    return !!(LCA_GATEWAY_URL && LCA_GATEWAY_URL.length > 0);\n"
     "  } catch {\n"
     "    return false;\n"
     "  }\n"
@@ -537,14 +540,38 @@ def _patch_tool_surfaces(ctx: PatchContext) -> bool:
 
 
 def apply(ctx: PatchContext) -> bool:
+    import os
+
     changed = False
+
+    # Inject the build-time LCA gateway WS URL into lcaGateway/client.ts
+    # so the browser bundle carries the URL as a literal (the lobehub-spa
+    # Vite dev server does NOT expose ``process.env.NEXT_PUBLIC_*`` to the
+    # client bundle by default — only ``VITE_*``). The placeholder in the
+    # patch source carries an obvious sentinel value
+    # (``ws://lca-gateway-unset:0000``) so a forgotten inject is loud.
+    gateway_http = os.environ.get("LCA_GATEWAY_PUBLIC_URL", "").rstrip("/")
+    gateway_ws = (
+        gateway_http.replace("http://", "ws://", 1).replace(
+            "https://", "wss://", 1
+        )
+        if gateway_http
+        else "ws://lca-gateway-unset:0000"
+    )
 
     for fname in _NEW_FILES:
         rel = f"{_LCA_GATEWAY_DIR}/{fname}"
         src = _HERE / "lcaGateway" / fname
         if not src.is_file():
             raise SystemExit(f"missing patch source: {src}")
-        if ctx.write_if_changed(rel, src.read_text(encoding="utf-8")):
+        text = src.read_text(encoding="utf-8")
+        if fname == "client.ts":
+            # Replace the placeholder literal with the env-derived URL.
+            text = text.replace(
+                "'__LCA_GATEWAY_WS_URL__:ws://lca-gateway-unset:0000__'",
+                f"'{gateway_ws}'",
+            )
+        if ctx.write_if_changed(rel, text):
             changed = True
 
     for patch_fn in (
