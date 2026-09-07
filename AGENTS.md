@@ -104,6 +104,7 @@ contracts → infrastructure → cognition → runtime → agent
 - 用动态 import、全局注册、反射字符串或 context 属性绕过 import 边界
 - 用异常吞没、空 catch、隐式 fallback 或默认放行掩盖契约缺失
 - 新增平行事件词表、平行 schema、平行 plugin manifest 或第二套 Profile 解析
+- **新增平行 ADR/Note/Proposal** — 任何"新提方案"必须先查 `docs/adr/` 与 `docs/notes/` 是否已有覆盖机制;能扩展就扩展,不能平行;特别检查 ADR-0186/0191/0192/0193/0194/0195/0196 与对应 implemented Note(`grep -l '<本方案核心概念>' docs/adr/*.{,zh.}md docs/notes/implemented/**/*.md`)
 - 在诊断/观测路径执行修复性副作用(除非命令名和测试明确表达)
 - 插件自行读取凭证;Gateway 绑定具体认知实现
 - 不直接改 `lobehub-ui/` 或 `vendor/`
