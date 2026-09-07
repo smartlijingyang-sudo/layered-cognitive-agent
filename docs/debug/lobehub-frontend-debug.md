@@ -4,6 +4,8 @@ LobeHub dev 是**双进程**：Next.js `:3010`（HTML/API 壳）+ Vite SPA `:987
 
 环境变量 SSOT：`deploy/lobehub/.env.lca` → `lobehub-ui/.env`（`VITE_DEV_HOST`、`APP_URL` 必须与浏览器访问的主机名一致）。
 
+**`NEXT_PUBLIC_LCA_GATEWAY_URL` / `NEXT_PUBLIC_LCA_HOST_CONSOLE` 由 `lca-ops lobehub start/restart` 注入到 bun 子进程 env**（不是仅写 `.env`）：vite 的 DefinePlugin 在启动时读一次进程 env，不会热加载 `.env`。如果只改 `.env` 不重启 dev stack，front-end SPA bundle 里 `process.env.NEXT_PUBLIC_LCA_GATEWAY_URL` 是 `undefined`，chat 会抛 `[LCA] chat attempted without LCA gateway configured`。手动 `bun run dev:next` / `bun run dev:spa` 不会注入这两个 env，调试时用 `env NEXT_PUBLIC_LCA_GATEWAY_URL=ws://<host>:<port> bun run dev:*`。
+
 ## 1. 30 秒健康检查（服务端）
 
 ```bash
@@ -48,6 +50,7 @@ rg -n 'Failed to resolve import|Outdated Optimize Dep|ECONNREFUSED|500 in|server
 | `Failed to resolve import "./lcaRunCommand"` | LCA 补丁 TS 缺失 | `patch_lobehub.py apply lca_run_driver` + restart |
 | `Failed to fetch dynamically imported module …/_layout/index.tsx` | 上述任一导致模块链失败 | 先修 Vite/补丁，再硬刷新 |
 | `chrome-extension://…` | 浏览器插件噪声 | **忽略**，与 LobeHub 无关 |
+| `Uncaught (in promise) Error: [LCA] chat attempted without LCA gateway configured. Set NEXT_PUBLIC_LCA_GATEWAY_URL.` | dev 进程没拿到该 env；只写 `.env` 不够 | `./scripts/lca-ops lobehub restart`（让 `_child_env()` 注入）；硬刷新浏览器；调试点 |
 
 ## 4. 客户端 curl 误判
 

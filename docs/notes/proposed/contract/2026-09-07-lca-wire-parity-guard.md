@@ -96,6 +96,14 @@ checked the assumption.
   - `deploy/lobehub/.env.lca` (`NEXT_PUBLIC_LCA_GATEWAY_URL` injected)
   - `scripts/audit_lca_legacy_path.py` (forbidden_imports rule)
   - `tests/architecture/test_lca_wire_parity.py` (new)
+  - `lca/infrastructure/cli/services/lobehub/lobehub.py`
+    (`_child_env()` injects `NEXT_PUBLIC_LCA_GATEWAY_URL` /
+    `NEXT_PUBLIC_LCA_HOST_CONSOLE` into the bun subprocess env so
+    vite's DefinePlugin sees them at dev start; `_ensure_env()` writes
+    the same values to `lobehub-ui/.env` as a fallback for manual
+    `bun run dev:*`)
+  - `tests/infrastructure/cli/test_lobehub_child_env_lca.py` (new — pins
+    `_child_env()` contract)
 - Delete-when (the audit exit 0 + the wire parity test pass is the
   gate that tells future maintainers the guard is in place; removal
   must touch ADR-0200 §1 + routes.py in the same commit).
@@ -103,7 +111,12 @@ checked the assumption.
 ## Verification
 
 - `python scripts/audit_lca_legacy_path.py` exits 0.
-- `pytest tests/architecture/test_lca_wire_parity.py -q` exits 0.
+- `pytest tests/architecture/test_lca_wire_parity.py
+  tests/infrastructure/cli/test_lobehub_child_env_lca.py -q` exit 0.
+- Manual: `./scripts/lca-ops lobehub restart` produces a vite dev
+  process whose environment contains `NEXT_PUBLIC_LCA_GATEWAY_URL`
+  (`cat /proc/$(pgrep -f vite)/environ | tr '\0' '\n' | grep
+  NEXT_PUBLIC_LCA`).
 - Manual: with `NEXT_PUBLIC_LCA_GATEWAY_URL` unset, opening chat
   throws the hard-fail error (no `/webapi/chat/<provider>` network
   call observed in the browser devtools network panel).

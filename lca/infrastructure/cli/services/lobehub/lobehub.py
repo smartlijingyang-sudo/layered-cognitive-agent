@@ -14,7 +14,7 @@ import subprocess
 import time
 from contextlib import suppress
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from lca.infrastructure.cli.config.config import KernelServeConfig, LobeHubConfig
@@ -555,7 +555,7 @@ class LobeHubService:
 
         if worked:
             marker_payload = {
-                "applied_at": datetime.now(timezone.utc).isoformat(),
+                "applied_at": datetime.now(UTC).isoformat(),
                 "patched_count": len(patched),
             }
             if failed:
@@ -567,7 +567,7 @@ class LobeHubService:
             marker.write_text(
                 json.dumps(
                     {
-                        "applied_at": datetime.now(timezone.utc).isoformat(),
+                        "applied_at": datetime.now(UTC).isoformat(),
                         "patched_count": 0,
                         "failed": failed,
                     }
@@ -593,6 +593,13 @@ class LobeHubService:
         lines = env_file.read_text().splitlines()
         updated = []
         changed = False
+        # ADR-0200 §1: the front-end SPA bundle needs NEXT_PUBLIC_LCA_GATEWAY_URL
+        # at vite DefinePlugin time. Writing to .env is a fallback for manual
+        # `bun run dev:*` (where process env may be empty); the primary path
+        # is _child_env() which carries the same value into subprocess env.
+        gateway_ws = gateway_base.replace("http://", "ws://", 1).replace(
+            "https://", "wss://", 1
+        )
 
         for line in lines:
             if line.startswith("OPENAI_PROXY_URL="):
@@ -609,6 +616,9 @@ class LobeHubService:
                 changed = True
             elif line.startswith("QWEN_API_KEY="):
                 updated.append("QWEN_API_KEY=lca-local")
+                changed = True
+            elif line.startswith("NEXT_PUBLIC_LCA_GATEWAY_URL="):
+                updated.append(f"NEXT_PUBLIC_LCA_GATEWAY_URL={gateway_ws}")
                 changed = True
             else:
                 updated.append(line)
@@ -633,7 +643,7 @@ class LobeHubService:
             if vite_host:
                 return f"http://{vite_host}:{self._kernel_serve.port}"
         bind = self._kernel_serve.host
-        if bind in {"0.0.0.0", "::"}:
+        if bind in {"0.0.0.0", "::"}:  # noqa: S104 — checking bind, not binding
             return f"http://127.0.0.1:{self._kernel_serve.port}"
         return self._kernel_serve.base_url.rstrip("/")
 
@@ -713,6 +723,17 @@ class LobeHubService:
     def _child_env(self) -> dict[str, str]:
         import os
 
+        # ADR-0200 §1: LcaAgentStreamClient dials `<gatewayBase>/v1/runs/<id>/ws`.
+        # The frontend (lobehub SPA, vite dev) needs the base URL injected
+        # as a process env at spawn time — vite's DefinePlugin reads
+        # process.env.NEXT_PUBLIC_* once at start, so the value must travel
+        # through this dict rather than only into .env. Same for the host
+        # console gate, which must default off in any production-shaped
+        # deployment.
+        gateway_http = self._client_gateway_base()
+        gateway_ws = gateway_http.replace("http://", "ws://", 1).replace(
+            "https://", "wss://", 1
+        )
         return {
             **os.environ,
             "PORT": str(self._config.dev_port),
@@ -721,6 +742,10 @@ class LobeHubService:
             "OPENAI_PROXY_URL": f"{self._kernel_serve.base_url}/v1",
             "OPENAI_API_KEY": "lca-local",
             "ENABLED_OPENAI": "1",
+            "NEXT_PUBLIC_LCA_GATEWAY_URL": gateway_ws,
+            "NEXT_PUBLIC_LCA_HOST_CONSOLE": os.environ.get(
+                "NEXT_PUBLIC_LCA_HOST_CONSOLE", "0"
+            ),
         }
 
     def _spawn_script(self, script: str, log_name: str) -> int | None:
