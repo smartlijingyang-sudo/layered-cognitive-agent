@@ -71,7 +71,7 @@ def test_repair_then_recover_idle() -> None:
 
 def test_human_answer_surface_in_derive_messages() -> None:
     session = Session("adr0191_4")
-    append_human_answer_surface(session, "user answer")
+    append_human_answer_surface("user answer", session=session)
     messages = session.derive_messages()
     assert messages and messages[-1]["role"] == "user"
     assert messages[-1]["content"] == "user answer"
@@ -105,19 +105,19 @@ async def test_step_boundary_checkpoint_called_before_driver(monkeypatch) -> Non
         calls.append("step_boundary")
 
     monkeypatch.setattr(
-        "lca.infrastructure.session.bindings.await_step_boundary_checkpoint",
+        "lca.infrastructure.session._overflow_0.bindings.await_step_boundary_checkpoint",
         _fake_checkpoint,
     )
     monkeypatch.setattr(
-        "lca.infrastructure.session.runtime_emit.emit_lifecycle_finally",
+        "lca.infrastructure.session.emit.runtime_emit.emit_lifecycle_finally",
         lambda **_kwargs: None,
     )
     monkeypatch.setattr(
-        "lca.infrastructure.session.runtime_emit.emit_exception_finally",
+        "lca.infrastructure.session.emit.runtime_emit.emit_exception_finally",
         lambda **_kwargs: None,
     )
     monkeypatch.setattr(
-        "lca.infrastructure.observability.spine.exception_emit.emit_exception_caught",
+        "lca.infrastructure.observability.spine.exception.emit.emit_exception_caught",
         lambda *_args, **_kwargs: None,
     )
 

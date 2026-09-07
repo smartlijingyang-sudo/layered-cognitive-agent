@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable, Mapping
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from lca.infrastructure.observability.spine.event.record import Outcome
@@ -205,10 +205,7 @@ class CognitiveRuntime(Runtime):
             resume_input.turn,
         )
         from lca.infrastructure.session._overflow_0.bindings import resolve_session_reader
-        from lca.infrastructure.session.emit.surface_emit import (
-            _SurfaceSession,
-            append_human_answer_surface,
-        )
+        from lca.infrastructure.session.emit.surface_emit import append_human_answer_surface
 
         session_reader = resolve_session_reader()
         if session_reader is not None and resume_input.turn is not None:
@@ -216,10 +213,7 @@ class CognitiveRuntime(Runtime):
             if obs is not None and (obs.extra or {}).get("source") == "human_answer":
                 payload = obs.payload
                 if isinstance(payload, str):
-                    append_human_answer_surface(
-                        cast("_SurfaceSession", session_reader),
-                        payload,
-                    )
+                    append_human_answer_surface(payload)
 
         phase_cursor = snapshot.phase_cursor
         if phase_cursor is None:

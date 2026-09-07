@@ -42,6 +42,16 @@ class FactGateway(Protocol):
         actor: str,
     ) -> AppendReceipt: ...
 
+    def append_surface(
+        self,
+        event_type: str,
+        data: Mapping[str, Any],
+        *,
+        actor: str,
+        surface_op: str = "append",
+        visibility: str = "model",
+    ) -> AppendReceipt: ...
+
     def append_diagnostic(self, diag: DiagnosticFact) -> AppendReceipt | None: ...
 
 

@@ -167,7 +167,7 @@ def commit_body_tool_execute_end(
 ) -> AppendReceipt | None:
     """Commit model-visible ``body.tool.execute.end`` surface (ADR-0201 single append)."""
     from lca.infrastructure.session.emit.tool_surface_emit import append_tool_result_surface
-    from lca.loop.fact_gateway import _record_to_receipt, enrich_ep_payload
+    from lca.loop.fact_gateway import enrich_ep_payload
 
     del state
     enriched = enrich_ep_payload(
@@ -180,7 +180,7 @@ def commit_body_tool_execute_end(
             **({"latency_ms": latency_ms} if latency_ms is not None else {}),
         },
     )
-    event = append_tool_result_surface(
+    receipt = append_tool_result_surface(
         tool_name=tool_name,
         invocation_id=invocation_id,
         attempt=attempt,
@@ -191,9 +191,7 @@ def commit_body_tool_execute_end(
         actor=actor,
         enriched_fields=enriched,
     )
-    if event is None:
-        return None
-    return _record_to_receipt(event)  # type: ignore[arg-type]
+    return receipt
 
 
 def commit_body_tool_decision_start(

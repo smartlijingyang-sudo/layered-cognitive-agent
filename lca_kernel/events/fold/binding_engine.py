@@ -158,7 +158,7 @@ class JournalBindingEngine:
         if execution_point == "llm.request.header":
             model = str(extracted.get("model") or frame_model or "unknown")
             if existing is None:
-                return ThinkingTrace(model=model, latency_ms=0, reasoning="", decision="respond")
+                return None
             if strategy == "fill_empty_only" and existing.model and existing.model != "unknown":
                 return existing
             return replace(existing, model=model)
@@ -168,7 +168,7 @@ class JournalBindingEngine:
             if not model:
                 return existing
             if existing is None:
-                return ThinkingTrace(model=model, latency_ms=0, reasoning="", decision="respond")
+                return None
             if existing.model and existing.model != "unknown":
                 return existing
             return replace(existing, model=model)
@@ -182,7 +182,6 @@ class JournalBindingEngine:
                 model=model,
                 latency_ms=latency_ms,
                 reasoning="",
-                decision="respond",
             )
             return replace(
                 base,

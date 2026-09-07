@@ -630,7 +630,6 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
                 model=model,
                 latency_ms=latency_ms,
                 reasoning=reasoning_kept,
-                decision="respond",
                 prompt_tokens=int(prompt_tokens)
                 if isinstance(prompt_tokens, (int, float))
                 else None,
@@ -671,6 +670,13 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
                     else thinking.raw_response_preview,
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
+                    decision="use_tool"
+                    if isinstance(tool_calls, list) and tool_calls
+                    else (
+                        "respond"
+                        if assistant_content.strip()
+                        else thinking.decision
+                    ),
                 )
             else:
                 # llm.call.end 未到达或失败 → 直接从 assistant_content 构造
@@ -680,7 +686,9 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
                     model=target.model or "unknown",
                     latency_ms=0,
                     reasoning="",
-                    decision="respond",
+                    decision="use_tool"
+                    if isinstance(tool_calls, list) and tool_calls
+                    else ("respond" if assistant_content.strip() else ""),
                     prompt_tokens=int(prompt_tokens_raw)
                     if isinstance(prompt_tokens_raw, (int, float))
                     else None,

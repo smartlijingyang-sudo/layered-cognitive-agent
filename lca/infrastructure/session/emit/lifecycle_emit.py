@@ -106,7 +106,6 @@ def accept_user_message(
         MessageAccepted(message_id=message_id, role=role, content_ref=text),
     )
     append_user_surface(
-        session,
         {"role": role, "content": text},
     )
     state.message_accepted = True
@@ -168,9 +167,12 @@ def complete_model(
             ),
         )
         if text:
-            session.append(
+            from lca.loop.fact_gateway import append_surface_bound
+
+            append_surface_bound(
                 SURFACE_ASSISTANT_TYPE,
                 {"message": {"role": "assistant", "content": text}},
+                actor=_LIFECYCLE_ACTOR,
                 surface_op="append",
                 visibility="model",
             )

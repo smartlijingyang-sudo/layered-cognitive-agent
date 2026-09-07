@@ -31,7 +31,8 @@ _checkpoint_policy_var: contextvars.ContextVar[SessionCheckpointPolicyProtocol |
 _default_checkpoint_policy: SessionCheckpointPolicyProtocol | None = None
 
 
-def _resolve_runtime_session(target: object | None) -> Session | None:
+def resolve_raw_session(target: object | None) -> Session | None:
+    """Unwrap publish seam (bridge / facade) to the in-process :class:`Session`."""
     if target is None:
         return None
     from lca.plugins.session.runtime.bus.facade import SessionBusFacade
@@ -51,7 +52,7 @@ def _resolve_runtime_session(target: object | None) -> Session | None:
 
 def resolve_session_reader() -> SessionReader | None:
     """Bound publish/observe Session as :class:`SessionReader`, or ``None``."""
-    session = _resolve_runtime_session(current_publish_session())
+    session = resolve_raw_session(current_publish_session())
     if session is None:
         return None
     return session
@@ -59,7 +60,7 @@ def resolve_session_reader() -> SessionReader | None:
 
 def resolve_flushable_session() -> FlushableSession | None:
     """Bound runtime Session for checkpoint ``flush()``, or ``None``."""
-    return _resolve_runtime_session(current_publish_session())
+    return resolve_raw_session(current_publish_session())
 
 
 def resolve_session_for_emit(state: AgentState | None = None) -> object | None:
@@ -70,7 +71,7 @@ def resolve_session_for_emit(state: AgentState | None = None) -> object | None:
     """
     _ = state
     writer = current_publish_session()
-    resolved = _resolve_runtime_session(writer)
+    resolved = resolve_raw_session(writer)
     if resolved is not None:
         return resolved
     return writer
@@ -163,6 +164,7 @@ __all__ = [
     "await_tool_side_effect_checkpoint",
     "current_model_context_assembler",
     "resolve_flushable_session",
+    "resolve_raw_session",
     "resolve_session_for_emit",
     "resolve_session_reader",
     "set_checkpoint_policy",
