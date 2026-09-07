@@ -178,11 +178,26 @@ async def get_run(request: Request) -> JSONResponse:
 
 
 async def get_run_doctor(request: Request) -> JSONResponse:
-    """GET /runs/{run_id}/doctor — expose the owner's diagnostic projection."""
+    """GET /runs/{run_id}/doctor — expose the owner's diagnostic projection.
+
+    Optional ``?shape=contracts`` returns the contracts-layer
+    ``DoctorReport`` (ADR-0199 §5.3 / P2-11) instead of the native web
+    ``doctor.v3`` shape, so external tooling can share one schema across
+    CLI / CI / web consumers. Defaults to the native shape for backward
+    compatibility.
+    """
     run_id = request.path_params["run_id"]
     report = await _run_port_of(request).doctor(run_id)
     if report is None:
         return JSONResponse({"error": "run not found"}, status_code=404, headers=cors_headers())
+    shape = request.query_params.get("shape")
+    if shape == "contracts":
+        from lca.plugins.transport.webserver.doctor.contracts_adapter import (
+            web_to_contracts_report,
+        )
+
+        contracts_doc = web_to_contracts_report(report)
+        return JSONResponse(contracts_doc.to_jsonable(), headers=cors_headers())
     return JSONResponse(report.as_dict(), headers=cors_headers())
 
 
