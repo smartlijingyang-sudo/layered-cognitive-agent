@@ -1,0 +1,42 @@
+{
+  "11-relations-coverage.yaml": {
+    "errors": 0,
+    "info": 1,
+    "warnings": 0
+  },
+  "4-state-artifact.yaml": {
+    "errors": 0,
+    "info": 1,
+    "warnings": 0
+  },
+  "coding-agent.yaml": {
+    "errors": 0,
+    "info": 1,
+    "warnings": 0
+  },
+  "control-slot-coverage.yaml": {
+    "errors": 0,
+    "info": 1,
+    "warnings": 0
+  },
+  "hitl-loop.yaml": {
+    "errors": 0,
+    "info": 1,
+    "warnings": 0
+  },
+  "patch-priority.yaml": {
+    "errors": 0,
+    "info": 1,
+    "warnings": 0
+  },
+  "standard-solo.yaml": {
+    "errors": 0,
+    "info": 1,
+    "warnings": 0
+  },
+  "standard-team.yaml": {
+    "errors": 0,
+    "info": 1,
+    "warnings": 0
+  }
+}
