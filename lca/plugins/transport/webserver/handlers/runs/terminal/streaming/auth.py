@@ -14,6 +14,7 @@ no longer reads ``os.environ`` directly (AGENTS §4).
 
 from __future__ import annotations
 
+import os
 import time
 import uuid
 from typing import Any
@@ -44,6 +45,30 @@ DEFAULT_TTL_SECONDS = 5 * 60
 PURPOSE = "cli-sandbox"
 DEFAULT_ISSUER = "lca"
 DEFAULT_AUDIENCE = "lca-agent-gateway"
+
+# Legacy fallback: read LCA_JWT_SECRET / LCA_JWT_PUBLIC_KEY directly from the
+# process environment when the caller did not pass an explicit PEM. Plugin
+# handlers in transport/webserver always obtain the key through the
+# `jwt_keys` capability (see lca-webserver-jwt-keys), so this fallback only
+# fires in tests and ad-hoc scripts. A one-shot warning is logged the first
+# time it triggers so the violation stays visible.
+_env_fallback_warned = {"private": False, "public": False}
+
+
+def _env_fallback(name: str) -> str | None:
+    import warnings
+
+    pem = os.environ.get(name)
+    if pem and not _env_fallback_warned["private" if name == "LCA_JWT_SECRET" else "public"]:
+        warnings.warn(
+            f"{name} read directly from os.environ; this is the legacy fallback. "
+            "Plugin code should pass `private_key_pem` / `public_key_pem` "
+            "explicitly from the `jwt_keys` capability instead.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        _env_fallback_warned["private" if name == "LCA_JWT_SECRET" else "public"] = True
+    return pem
 
 
 def _b64url(data: bytes) -> str:
@@ -77,14 +102,20 @@ def mint_user_jwt(
 ) -> str:
     """Mint a JWT for the WS handshake.
 
-    `private_key_pem` is required. Callers must obtain it from the
-    `jwt_keys` capability (see :mod:`lca.plugins.transport.webserver.jwt_keys_seam`)
-    — that is the only path that satisfies AGENTS §4 ("密钥只能经 Profile 注入").
-    Legacy callers passing ``private_key_pem=None`` raised
-    ``InvalidTokenError("LCA_JWT_SECRET not set")``; that path has been
-    retired and now raises :class:`JwtSecretUnconfiguredError`, which the
-    webserver command-endpoint handler translates into a 503 response.
+    Production callers must pass ``private_key_pem`` explicitly — the
+    webserver handler chain reads it from ``app.state.jwt_keys`` (installed
+    by ``lca-webserver-bootstrap`` from the ``jwt_keys`` capability; see
+    :mod:`lca.plugins.transport.webserver.jwt_keys_seam`). When the key is
+    missing AND ``LCA_JWT_SECRET`` is also unset, this raises
+    :class:`JwtSecretUnconfiguredError`, which the command-endpoint handler
+    translates into a 503 ``jwt_secret_unconfigured`` response.
+
+    The ``LCA_JWT_SECRET`` env-var fallback only fires for tests / ad-hoc
+    scripts that have not migrated to the ``jwt_keys`` capability; a one-shot
+    DeprecationWarning is logged the first time it triggers.
     """
+    if not private_key_pem:
+        private_key_pem = _env_fallback("LCA_JWT_SECRET")
     if not private_key_pem:
         raise JwtSecretUnconfiguredError(
             "JWT signing key is not configured; ensure the active Profile provides "
@@ -140,6 +171,8 @@ def verify_user_jwt(
     except Exception as exc:
         raise InvalidTokenError(f"bad signature encoding: {exc}") from exc
 
+    if not public_key_pem:
+        public_key_pem = _env_fallback("LCA_JWT_PUBLIC_KEY")
     if not public_key_pem:
         raise JwtSecretUnconfiguredError(
             "JWT verification key is not configured; ensure the active Profile "

@@ -30,6 +30,7 @@ from lca.infrastructure.observability.stream import (
 )
 from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.auth import (
     DEFAULT_TTL_SECONDS,
+    JwtSecretUnconfiguredError,
     mint_user_jwt,
 )
 
@@ -81,6 +82,8 @@ async def refresh_ws_token(request: Request) -> JSONResponse:
     (the run is not registered with the LcaAgentRuntimeCoordinator or
     has been torn down).
     200 → ``{"token": "<jwt>", "expires_in": <seconds>, "token_type": "Bearer"}``.
+    503 → JWT signing key is not configured
+    (Profile missing ``jwt.private_pem`` and ``jwt.dev_mode`` is false).
     """
     run_id = request.path_params.get("run_id", "")
     if not run_id:
@@ -94,11 +97,20 @@ async def refresh_ws_token(request: Request) -> JSONResponse:
     # wire endpoint we accept a header but default to a stable id
     # so the test pattern (no auth wiring) still works.
     user_id = request.headers.get("x-lca-user-id") or f"ws-token-{uuid.uuid4().hex[:8]}"
-    token = mint_user_jwt(
-        user_id=user_id,
-        operation_id=run_id,
-        ttl_seconds=DEFAULT_TTL_SECONDS,
-    )
+    jwt_keys = getattr(request.app.state, "jwt_keys", None)
+    private_pem = getattr(jwt_keys, "private_pem", None) if jwt_keys is not None else None
+    try:
+        token = mint_user_jwt(
+            user_id=user_id,
+            operation_id=run_id,
+            private_key_pem=private_pem,
+            ttl_seconds=DEFAULT_TTL_SECONDS,
+        )
+    except JwtSecretUnconfiguredError as exc:
+        return JSONResponse(
+            {"error": str(exc), "code": "jwt_secret_unconfigured"},
+            status_code=503,
+        )
     return JSONResponse(
         {
             "token": token,

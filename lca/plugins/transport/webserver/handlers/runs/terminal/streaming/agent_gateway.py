@@ -76,12 +76,15 @@ def build_agent_gateway_app(*, run_port: RunPort | None = None) -> Starlette:
     async def handler(websocket: WebSocket) -> None:
         run_id = websocket.path_params.get("run_id")
         await websocket.accept()
+        jwt_keys = getattr(websocket.app.state, "jwt_keys", None)
+        public_pem = getattr(jwt_keys, "public_pem", None) if jwt_keys is not None else None
         try:
             await _run_session(
                 websocket,
                 run_id=run_id,
                 stream_manager=stream_manager,
                 run_port=run_port,
+                public_pem=public_pem,
             )
         except WebSocketDisconnect:
             return
@@ -103,6 +106,7 @@ async def _run_session(
     run_id: str | None,
     stream_manager: LcaStreamEventManager,
     run_port: RunPort | None,
+    public_pem: str | None = None,
 ) -> None:
     # 1. auth handshake
     try:
@@ -114,7 +118,7 @@ async def _run_session(
         return
     token = first.get("token", "")
     try:
-        verify_user_jwt(token, expected_operation_id=run_id)
+        verify_user_jwt(token, expected_operation_id=run_id, public_key_pem=public_pem)
     except InvalidTokenError as exc:
         await ws.send_json({"type": "auth_failed", "reason": str(exc)})
         return
@@ -343,6 +347,10 @@ def make_production_ws_handler() -> Any:
     async def handler(websocket: WebSocket) -> None:
         run_id = websocket.path_params.get("run_id")
         run_port: RunPort | None = getattr(websocket.app.state, "run_port", None)
+        jwt_keys = getattr(websocket.app.state, "jwt_keys", None)
+        public_pem = (
+            getattr(jwt_keys, "public_pem", None) if jwt_keys is not None else None
+        )
         await websocket.accept()
         try:
             await _run_session(
@@ -350,6 +358,7 @@ def make_production_ws_handler() -> Any:
                 run_id=run_id,
                 stream_manager=stream_manager,
                 run_port=run_port,
+                public_pem=public_pem,
             )
         except WebSocketDisconnect:
             return
