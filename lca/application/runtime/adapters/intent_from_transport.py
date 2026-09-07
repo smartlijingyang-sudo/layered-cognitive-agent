@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from lca.application.runtime.adapters._mode import coerce_mode
 from lca.contracts.models.core.conversation.conversation import ConversationTurn
 from lca.contracts.runtime.intent import RunIntent
 from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import RunRequest
@@ -55,7 +56,7 @@ def run_request_to_intent(
     return RunIntent(
         profile_path=request.profile,
         user_text=request.user_text,
-        mode=str(getattr(request, "mode", "solo")),
+        mode=coerce_mode(getattr(request, "mode", "solo")),
         session_id=None,
         assistant_id=assistant_id,
         attachment_ids=attachment_ids,

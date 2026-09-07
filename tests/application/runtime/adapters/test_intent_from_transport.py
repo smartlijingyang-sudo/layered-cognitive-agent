@@ -18,6 +18,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+import pytest
+
 from lca.application.runtime.adapters.intent_from_transport import (
     run_request_to_intent,
 )
@@ -227,3 +229,23 @@ class TestOverrides:
         """Empty-string override does NOT clobber the request's value."""
         intent = run_request_to_intent(_request(device_id="dev-request"), device_id="")
         assert intent.device_id == "dev-request"
+
+
+# ── Mode coercion ───────────────────────────────────────────────────
+
+
+class TestModeCoercion:
+    def test_rejects_unknown_mode(self) -> None:
+        """An unknown mode string raises ``ValueError`` at the L0 boundary."""
+        with pytest.raises(ValueError, match="mode"):
+            run_request_to_intent(_request(mode="parallel"))
+
+    def test_rejects_none_mode(self) -> None:
+        """``mode=None`` is rejected (literal must be the exact string)."""
+        with pytest.raises(ValueError, match="mode"):
+            run_request_to_intent(_request(mode=None))
+
+    def test_team_mode_passes_through(self) -> None:
+        """``mode='team'`` survives the coercion."""
+        intent = run_request_to_intent(_request(mode="team"))
+        assert intent.mode == "team"

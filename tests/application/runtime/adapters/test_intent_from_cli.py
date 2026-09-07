@@ -128,3 +128,26 @@ class TestOptionsForwarding:
         args = CliRunArgs(profile="/p.yaml", user_text="hi", options=None)
         intent = cli_args_to_intent(args)
         assert dict(intent.options) == {}
+
+
+# ── Mode coercion ───────────────────────────────────────────────────
+
+
+class TestModeCoercion:
+    def test_rejects_unknown_mode(self) -> None:
+        """An unknown mode string raises ``ValueError`` at the L0 boundary."""
+        args = CliRunArgs(profile="/p.yaml", user_text="hi", mode="parallel")
+        with pytest.raises(ValueError, match="mode"):
+            cli_args_to_intent(args)
+
+    def test_rejects_none_mode(self) -> None:
+        """``mode=None`` is rejected (literal must be the exact string)."""
+        args = CliRunArgs(profile="/p.yaml", user_text="hi", mode=None)  # type: ignore[arg-type]
+        with pytest.raises(ValueError, match="mode"):
+            cli_args_to_intent(args)
+
+    def test_team_mode_passes_through(self) -> None:
+        """``mode='team'`` survives the coercion."""
+        args = CliRunArgs(profile="/p.yaml", user_text="hi", mode="team")
+        intent = cli_args_to_intent(args)
+        assert intent.mode == "team"

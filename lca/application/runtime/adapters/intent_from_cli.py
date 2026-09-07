@@ -16,6 +16,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from lca.application.runtime.adapters._mode import coerce_mode
 from lca.contracts.runtime.intent import RunIntent
 
 
@@ -58,7 +59,7 @@ def cli_args_to_intent(
     return RunIntent(
         profile_path=args.profile,
         user_text=args.user_text,
-        mode=args.mode,  # type: ignore[arg-type]
+        mode=coerce_mode(args.mode),
         session_id=args.session_id,
         assistant_id=args.assistant_id,
         attachment_ids=tuple(args.attachment_ids),
