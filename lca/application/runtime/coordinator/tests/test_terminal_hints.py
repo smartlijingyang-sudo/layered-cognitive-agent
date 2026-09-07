@@ -6,6 +6,7 @@ Mirrors the native `STREAM_END_STATUSES` set in
 `done | error | interrupted | waiting_for_human` are stream-terminal.
 `running | waiting_for_async_tool` are not.
 """
+
 from unittest.mock import MagicMock
 
 import pytest
@@ -16,18 +17,21 @@ from lca.application.runtime.coordinator.terminal_hints import (
 )
 
 
-@pytest.mark.parametrize("status,expected", [
-    ("done", "completed"),
-    ("completed", "completed"),
-    ("error", "error"),
-    ("interrupted", "interrupted"),
-    ("waiting_input", "waiting_input"),
-    ("waiting_for_human", "waiting_input"),
-    ("awaiting_human", "waiting_input"),
-    ("input-required", "waiting_input"),
-    ("running", "running"),
-    ("paused", "running"),
-])
+@pytest.mark.parametrize(
+    "status,expected",
+    [
+        ("done", "completed"),
+        ("completed", "completed"),
+        ("error", "error"),
+        ("interrupted", "interrupted"),
+        ("waiting_input", "waiting_input"),
+        ("waiting_for_human", "waiting_input"),
+        ("awaiting_human", "waiting_input"),
+        ("input-required", "waiting_input"),
+        ("running", "running"),
+        ("paused", "running"),
+    ],
+)
 def test_resolve_live_terminal_hint_maps_status(status, expected):
     session = MagicMock()
     session.status = status
@@ -42,7 +46,9 @@ def test_resolve_live_terminal_hint_with_error_falls_back_to_error():
     assert resolve_live_terminal_hint(session) == "error"
 
 
-@pytest.mark.parametrize("status", ["done", "error", "interrupted", "waiting_for_human", "completed", "waiting_input"])
+@pytest.mark.parametrize(
+    "status", ["done", "error", "interrupted", "waiting_for_human", "completed", "waiting_input"]
+)
 def test_is_stream_terminal_status_true_for_terminal(status):
     assert is_stream_terminal_status(status) is True
 

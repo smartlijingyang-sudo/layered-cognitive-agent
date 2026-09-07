@@ -6,9 +6,11 @@ StampedEvent via EventTranslator, persists tool_state to DB
 (spec §5.3.1) BEFORE publishing `tool_end`, and runs a watchdog to
 synthesise a terminal event if the natural SpineClose is missing.
 """
+
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from typing import Any
 
 from lca.application.runtime.coordinator.event_translator import EventTranslator
 from lca.application.runtime.coordinator.terminal_hints import (
@@ -62,25 +64,15 @@ class LcaAgentRuntimeCoordinator:
     async def handle_stamped(self, run_id: str, stamped: dict) -> None:
         """Fold one StampedEvent to AgentStreamEvent and publish.
 
-        spec §5.3.1: for ToolInvoked, write tool_state_writer BEFORE
-        publishing tool_end so the front-end can read the populated
-        messages[].pluginState row.
+        spec §5.3.1: persist ``projected_state`` into ``messages[].pluginState``
+        BEFORE publishing ``tool_end`` so the front-end refetch reads a
+        populated row.
         """
         event = (stamped or {}).get("event") or {}
         etype = event.get("type")
         step_index = int(event.get("step_index") or event.get("stepIndex") or 0)
 
-        # Pre-publish side effects
-        if etype == "ToolInvoked":
-            projected = event.get("projected_state")
-            payload = event.get("payload") or {}
-            tool_call_id = (payload.get("toolCalling") or {}).get("id") if isinstance(payload, dict) else None
-            if projected is not None and tool_call_id:
-                await self._tool_state_writer(
-                    run_id=run_id,
-                    tool_call_id=tool_call_id,
-                    state=projected,
-                )
+        await self._persist_tool_plugin_state(run_id, event, etype=etype)
 
         envelope = self._translator.translate(stamped)
         if envelope is None:
@@ -90,6 +82,52 @@ class LcaAgentRuntimeCoordinator:
         # Track natural terminal publication
         if envelope["type"] == "agent_runtime_end":
             self._natural_terminal_published.add(run_id)
+
+    async def _persist_tool_plugin_state(
+        self,
+        run_id: str,
+        event: dict,
+        *,
+        etype: str | None,
+    ) -> None:
+        if etype == "ToolStarted":
+            payload = event.get("payload") or event.get("toolCalling") or {}
+            if not isinstance(payload, dict):
+                return
+            tool_call_id = payload.get("id")
+            if not isinstance(tool_call_id, str) or not tool_call_id:
+                return
+            arguments = payload.get("arguments")
+            initial_state: dict[str, Any] = {
+                "identifier": payload.get("identifier"),
+                "apiName": payload.get("apiName"),
+            }
+            if isinstance(arguments, dict):
+                initial_state.update(arguments)
+            await self._tool_state_writer(
+                run_id=run_id,
+                tool_call_id=tool_call_id,
+                state=initial_state,
+            )
+            return
+
+        if etype != "ToolInvoked":
+            return
+
+        projected = event.get("projected_state")
+        if not isinstance(projected, dict) or not projected:
+            return
+        payload = event.get("payload") or {}
+        tool_call_id = (
+            (payload.get("toolCalling") or {}).get("id") if isinstance(payload, dict) else None
+        )
+        if not isinstance(tool_call_id, str) or not tool_call_id:
+            return
+        await self._tool_state_writer(
+            run_id=run_id,
+            tool_call_id=tool_call_id,
+            state=projected,
+        )
 
     async def terminal(
         self,

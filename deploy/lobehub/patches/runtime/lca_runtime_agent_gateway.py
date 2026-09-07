@@ -771,6 +771,412 @@ def _patch_gateway_lca_routing(ctx: PatchContext) -> bool:
     return True
 
 
+def _patch_gateway_event_handler_lca_stream(ctx: PatchContext) -> bool:
+    """Keep in-memory streamed tools when LCA gateway skips hollow DB refetches."""
+    rel = (
+        "src/store/chat/slices/agentRun/actions/transports/gateway/"
+        "gatewayEventHandler.ts"
+    )
+    text = ctx.read(rel)
+    marker = "/* LCA-P1: mergeToolsCallingChunks */"
+    if marker in text or "shouldSkipMidStreamMessageFetch" in text:
+        return False
+
+    old_skip = (
+        "const shouldSkipMessageFetch = (\n"
+        "  event: AgentStreamEvent,\n"
+        "  runtimeType: 'gateway' | 'hetero',\n"
+        "): boolean => runtimeType === 'hetero' && event.data?.skipMessageFetch === true;\n"
+    )
+    new_skip = (
+        "const shouldSkipMessageFetch = (\n"
+        "  event: AgentStreamEvent,\n"
+        "  runtimeType: 'gateway' | 'hetero',\n"
+        "): boolean => runtimeType === 'hetero' && event.data?.skipMessageFetch === true;\n"
+        "\n"
+        "/** LCA gateway streams tools/content in-memory; mid-run DB rows are hollow. */\n"
+        "const shouldSkipMidStreamMessageFetch = (\n"
+        "  event: AgentStreamEvent,\n"
+        "  runtimeType: 'gateway' | 'hetero',\n"
+        "  preserveStreamedContentOnTerminal?: boolean,\n"
+        "): boolean =>\n"
+        "  shouldSkipMessageFetch(event, runtimeType) || preserveStreamedContentOnTerminal === true;\n"
+        "\n"
+        "/* LCA-P1: mergeToolsCallingChunks */\n"
+        "const mergeToolsCallingChunks = <T extends { id: string }>(\n"
+        "  existing: readonly T[] | undefined,\n"
+        "  incoming: readonly T[],\n"
+        "): T[] => {\n"
+        "  if (!existing?.length) return [...incoming];\n"
+        "  const byId = new Map(existing.map((tool) => [tool.id, tool]));\n"
+        "  for (const tool of incoming) {\n"
+        "    byId.set(tool.id, { ...byId.get(tool.id), ...tool });\n"
+        "  }\n"
+        "  return Array.from(byId.values());\n"
+        "};\n"
+    )
+    if old_skip not in text:
+        raise SystemExit(
+            "[lca_runtime_agent_gateway] gatewayEventHandler shouldSkipMessageFetch anchor not found"
+        )
+    text = text.replace(old_skip, new_skip, 1)
+
+    old_tools = (
+        "            const toolsCalling = preserveToolResultMessageIds(\n"
+        "              data.toolsCalling as unknown[],\n"
+        "              dbMessageSelectors.getDbMessageById(currentAssistantMessageId)(get())?.tools,\n"
+        "            ) as NonNullable<StreamChunkData['toolsCalling']>;\n"
+        "\n"
+        "            get().internal_dispatchMessage(\n"
+    )
+    new_tools = (
+        "            const existingTools = dbMessageSelectors.getDbMessageById(currentAssistantMessageId)(\n"
+        "              get(),\n"
+        "            )?.tools;\n"
+        "            const preserved = preserveToolResultMessageIds(\n"
+        "              data.toolsCalling as unknown[],\n"
+        "              existingTools,\n"
+        "            ) as NonNullable<StreamChunkData['toolsCalling']>;\n"
+        "            /* LCA-P1: spine emits one tool per chunk — merge by id instead of replace */\n"
+        "            const toolsCalling = params.preserveStreamedContentOnTerminal\n"
+        "              ? (mergeToolsCallingChunks(\n"
+        "                  existingTools as { id: string }[] | undefined,\n"
+        "                  preserved,\n"
+        "                ) as NonNullable<StreamChunkData['toolsCalling']>)\n"
+        "              : preserved;\n"
+        "\n"
+        "            get().internal_dispatchMessage(\n"
+    )
+    if old_tools not in text:
+        raise SystemExit(
+            "[lca_runtime_agent_gateway] gatewayEventHandler tools_calling anchor not found"
+        )
+    text = text.replace(old_tools, new_tools, 1)
+
+    old_tool_end = (
+        "        enqueue(async () => {\n"
+        "          const maybeRefresh = shouldSkipMessageFetch(event, runtimeType)\n"
+        "            ? Promise.resolve()\n"
+        "            : fetchAndReplaceMessages(get, context, { skipWorks: true }).catch(console.error);\n"
+        "          const payload = unwrapToolPayload(data?.payload);\n"
+    )
+    new_tool_end = (
+        "        enqueue(async () => {\n"
+        "          /* LCA-P1: hollow DB rows clobber in-memory tools — refetch only on native path */\n"
+        "          const skipToolEndFetch = shouldSkipMidStreamMessageFetch(\n"
+        "            event,\n"
+        "            runtimeType,\n"
+        "            params.preserveStreamedContentOnTerminal,\n"
+        "          );\n"
+        "          const maybeRefresh = skipToolEndFetch\n"
+        "            ? Promise.resolve()\n"
+        "            : fetchAndReplaceMessages(get, context, { skipWorks: true }).catch(console.error);\n"
+        "          const payload = unwrapToolPayload(data?.payload);\n"
+    )
+    if old_tool_end not in text:
+        raise SystemExit(
+            "[lca_runtime_agent_gateway] gatewayEventHandler tool_end anchor not found"
+        )
+    text = text.replace(old_tool_end, new_tool_end, 1)
+
+    old_step = (
+        "            if (!shouldSkipMessageFetch(event, runtimeType)) {\n"
+        "              await fetchAndReplaceMessages(get, context, { skipWorks: true }).catch(console.error);\n"
+        "            }\n"
+        "          });\n"
+        "        }\n"
+        "        break;\n"
+        "      }\n"
+        "\n"
+        "      case 'agent_runtime_end': {\n"
+    )
+    new_step = (
+        "            if (\n"
+        "              !shouldSkipMidStreamMessageFetch(\n"
+        "                event,\n"
+        "                runtimeType,\n"
+        "                params.preserveStreamedContentOnTerminal,\n"
+        "              )\n"
+        "            ) {\n"
+        "              await fetchAndReplaceMessages(get, context, { skipWorks: true }).catch(console.error);\n"
+        "            }\n"
+        "          });\n"
+        "        }\n"
+        "        break;\n"
+        "      }\n"
+        "\n"
+        "      case 'agent_runtime_end': {\n"
+    )
+    if old_step not in text:
+        raise SystemExit(
+            "[lca_runtime_agent_gateway] gatewayEventHandler step_complete anchor not found"
+        )
+    text = text.replace(old_step, new_step, 1)
+
+    ctx.write(rel, text)
+    return True
+
+
+def _patch_gateway_event_handler_lca_tool_lifecycle(ctx: PatchContext) -> bool:
+    """LCA gateway tool rows + pluginState: merge chunks, optimistic create, skip hollow refetch."""
+    rel = (
+        "src/store/chat/slices/agentRun/actions/transports/gateway/"
+        "gatewayEventHandler.ts"
+    )
+    text = ctx.read(rel)
+    marker = "/* LCA-P1: ensureLcaGatewayToolMessages */"
+    if marker in text or "ensureLcaGatewayToolMessages" in text:
+        return False
+
+    old_merge_lca = (
+        "const getToolResultMessageId = (tool: unknown): string | undefined =>\n"
+        "  isRecord(tool) ? pickNonEmptyString(tool.result_msg_id) : undefined;\n"
+        "\n"
+        "const isToolStateChunkData = (data: unknown): data is ToolStateChunkData =>\n"
+    )
+    new_merge_lca = (
+        "const getToolResultMessageId = (tool: unknown): string | undefined =>\n"
+        "  isRecord(tool) ? pickNonEmptyString(tool.result_msg_id) : undefined;\n"
+        "\n"
+        "/** LCA gateway: merge tool chunks without clobbering args / result_msg_id. */\n"
+        "const mergeLcaToolsCallingChunks = <T extends { id: string }>(\n"
+        "  existing: readonly T[] | undefined,\n"
+        "  incoming: readonly T[],\n"
+        "): T[] => {\n"
+        "  if (!existing?.length) return [...incoming];\n"
+        "  const byId = new Map(existing.map((tool) => [tool.id, tool]));\n"
+        "  for (const tool of incoming) {\n"
+        "    const prev = byId.get(tool.id);\n"
+        "    if (!prev) {\n"
+        "      byId.set(tool.id, tool);\n"
+        "      continue;\n"
+        "    }\n"
+        "    const merged = { ...prev, ...tool } as T & Record<string, unknown>;\n"
+        "    const prevArgs = (prev as Record<string, unknown>).arguments;\n"
+        "    const nextArgs = (tool as Record<string, unknown>).arguments;\n"
+        "    if (isRecord(prevArgs) && isRecord(nextArgs) && Object.keys(nextArgs).length === 0) {\n"
+        "      merged.arguments = prevArgs;\n"
+        "    } else if (isRecord(prevArgs) && isRecord(nextArgs)) {\n"
+        "      merged.arguments = { ...prevArgs, ...nextArgs };\n"
+        "    }\n"
+        "    const prevResultMsgId = getToolResultMessageId(prev);\n"
+        "    if (prevResultMsgId && !getToolResultMessageId(tool)) {\n"
+        "      merged.result_msg_id = prevResultMsgId;\n"
+        "    }\n"
+        "    byId.set(tool.id, merged as T);\n"
+        "  }\n"
+        "  return Array.from(byId.values());\n"
+        "};\n"
+        "\n"
+        "const isToolStateChunkData = (data: unknown): data is ToolStateChunkData =>\n"
+    )
+    if old_merge_lca not in text:
+        raise SystemExit(
+            "[lca_runtime_agent_gateway] gatewayEventHandler getToolResultMessageId anchor not found"
+        )
+    text = text.replace(old_merge_lca, new_merge_lca, 1)
+
+    old_ensure = (
+        "  const getToolMessageByCallId = (toolCallId: string): UIChatMessage | undefined => {\n"
+        "    const messages = get().dbMessagesMap[messageMapKey(context)] ?? [];\n"
+        "    // Tool-call ids are operation-scoped, not topic-global. Codex can reuse an\n"
+        "    // id in a later run while that run's newly persisted tool row has not yet\n"
+        "    // reached the store. Parent scoping prevents us from mistaking the prior\n"
+        "    // run's row for the current one and skipping the bootstrap refetch.\n"
+        "    return messages.findLast(\n"
+        "      (message) =>\n"
+        "        message.tool_call_id === toolCallId && message.parentId === currentAssistantMessageId,\n"
+        "    );\n"
+        "  };\n"
+        "\n"
+        "  const applyLatestToolState = (toolCallId: string, reapplyAfterRefetch = false): boolean => {\n"
+    )
+    new_ensure = (
+        "  const getToolMessageByCallId = (toolCallId: string): UIChatMessage | undefined => {\n"
+        "    const messages = get().dbMessagesMap[messageMapKey(context)] ?? [];\n"
+        "    // Tool-call ids are operation-scoped, not topic-global. Codex can reuse an\n"
+        "    // id in a later run while that run's newly persisted tool row has not yet\n"
+        "    // reached the store. Parent scoping prevents us from mistaking the prior\n"
+        "    // run's row for the current one and skipping the bootstrap refetch.\n"
+        "    return messages.findLast(\n"
+        "      (message) =>\n"
+        "        message.tool_call_id === toolCallId && message.parentId === currentAssistantMessageId,\n"
+        "    );\n"
+        "  };\n"
+        "\n"
+        "  /** LCA gateway: native server creates tool rows; LCA must mirror via optimistic create. */\n"
+        "  /* LCA-P1: ensureLcaGatewayToolMessages */\n"
+        "  const ensureLcaGatewayToolMessages = async (\n"
+        "    toolsCalling: NonNullable<StreamChunkData['toolsCalling']>,\n"
+        "  ): Promise<NonNullable<StreamChunkData['toolsCalling']>> => {\n"
+        "    const ensured: NonNullable<StreamChunkData['toolsCalling']> = [...toolsCalling];\n"
+        "    let changed = false;\n"
+        "\n"
+        "    for (let index = 0; index < ensured.length; index += 1) {\n"
+        "      const tool = ensured[index];\n"
+        "      if (!isRecord(tool)) continue;\n"
+        "\n"
+        "      const toolId = getToolId(tool);\n"
+        "      const existingResultMsgId = getToolResultMessageId(tool);\n"
+        "      if (!toolId || existingResultMsgId) continue;\n"
+        "\n"
+        "      const existingRow = getToolMessageByCallId(toolId);\n"
+        "      if (existingRow?.id) {\n"
+        "        ensured[index] = { ...tool, result_msg_id: existingRow.id };\n"
+        "        changed = true;\n"
+        "        continue;\n"
+        "      }\n"
+        "\n"
+        "      const identifier = typeof tool.identifier === 'string' ? tool.identifier : undefined;\n"
+        "      const apiName = typeof tool.apiName === 'string' ? tool.apiName : undefined;\n"
+        "      if (!identifier || !apiName) continue;\n"
+        "\n"
+        "      const rawArgs = tool.arguments;\n"
+        "      const argsStr =\n"
+        "        typeof rawArgs === 'string' ? rawArgs : JSON.stringify(isRecord(rawArgs) ? rawArgs : {});\n"
+        "\n"
+        "      const created = await get().optimisticCreateMessage(\n"
+        "        {\n"
+        "          content: '',\n"
+        "          parentId: currentAssistantMessageId,\n"
+        "          plugin: {\n"
+        "            apiName,\n"
+        "            arguments: argsStr,\n"
+        "            identifier,\n"
+        "            id: toolId,\n"
+        "            type: 'builtin',\n"
+        "          },\n"
+        "          role: 'tool',\n"
+        "          tool_call_id: toolId,\n"
+        "          topicId: context.topicId ?? undefined,\n"
+        "          ...(context.agentId ? { agentId: context.agentId } : {}),\n"
+        "          ...(context.threadId ? { threadId: context.threadId } : {}),\n"
+        "        },\n"
+        "        { operationId },\n"
+        "      );\n"
+        "\n"
+        "      if (created?.id) {\n"
+        "        ensured[index] = { ...tool, result_msg_id: created.id };\n"
+        "        changed = true;\n"
+        "      }\n"
+        "    }\n"
+        "\n"
+        "    return changed ? ensured : toolsCalling;\n"
+        "  };\n"
+        "\n"
+        "  const applyLatestToolState = (toolCallId: string, reapplyAfterRefetch = false): boolean => {\n"
+    )
+    if old_ensure not in text:
+        raise SystemExit(
+            "[lca_runtime_agent_gateway] gatewayEventHandler getToolMessageByCallId anchor not found"
+        )
+    text = text.replace(old_ensure, new_ensure, 1)
+
+    old_tools = (
+        "            /* LCA-P1: spine emits one tool per chunk — merge by id instead of replace */\n"
+        "            const toolsCalling = params.preserveStreamedContentOnTerminal\n"
+        "              ? (mergeToolsCallingChunks(\n"
+        "                  existingTools as { id: string }[] | undefined,\n"
+        "                  preserved,\n"
+        "                ) as NonNullable<StreamChunkData['toolsCalling']>)\n"
+        "              : preserved;\n"
+        "\n"
+        "            get().internal_dispatchMessage(\n"
+    )
+    new_tools = (
+        "            /* LCA-P1: spine emits one tool per chunk — merge by id instead of replace */\n"
+        "            let toolsCalling = params.preserveStreamedContentOnTerminal\n"
+        "              ? (mergeLcaToolsCallingChunks(\n"
+        "                  existingTools as { id: string }[] | undefined,\n"
+        "                  preserved,\n"
+        "                ) as NonNullable<StreamChunkData['toolsCalling']>)\n"
+        "              : preserved;\n"
+        "\n"
+        "            if (params.preserveStreamedContentOnTerminal) {\n"
+        "              toolsCalling = await ensureLcaGatewayToolMessages(toolsCalling);\n"
+        "            }\n"
+        "\n"
+        "            get().internal_dispatchMessage(\n"
+    )
+    if old_tools not in text:
+        raise SystemExit(
+            "[lca_runtime_agent_gateway] gatewayEventHandler tools_calling lifecycle anchor not found"
+        )
+    text = text.replace(old_tools, new_tools, 1)
+
+    old_tool_end = (
+        "          const payload = unwrapToolPayload(data?.payload);\n"
+        "          if (\n"
+        "            didToolMutateWorkView({\n"
+        "              apiName: typeof payload?.apiName === 'string' ? payload.apiName : undefined,\n"
+        "              identifier: typeof payload?.identifier === 'string' ? payload.identifier : undefined,\n"
+        "              result: data?.result,\n"
+        "              succeeded: data?.isSuccess === true,\n"
+        "              workRegistration: Boolean(\n"
+        "                (data?.result as { workRegistration?: unknown } | undefined)?.workRegistration,\n"
+        "              ),\n"
+        "            })\n"
+        "          ) {\n"
+    )
+    new_tool_end = (
+        "          const payload = unwrapToolPayload(data?.payload);\n"
+        "          const result = data?.result as\n"
+        "            { state?: unknown; workRegistration?: unknown } | undefined;\n"
+        "          if (params.preserveStreamedContentOnTerminal && completedToolCallId && isRecord(result?.state)) {\n"
+        "            const toolMsg =\n"
+        "              getToolMessageByCallId(completedToolCallId) ??\n"
+        "              (() => {\n"
+        "                const assistant = dbMessageSelectors.getDbMessageById(currentAssistantMessageId)(\n"
+        "                  get(),\n"
+        "                );\n"
+        "                const toolRow = assistant?.tools?.find(\n"
+        "                  (tool) => getToolId(tool) === completedToolCallId,\n"
+        "                );\n"
+        "                const toolMsgId = toolRow ? getToolResultMessageId(toolRow) : undefined;\n"
+        "                return toolMsgId\n"
+        "                  ? dbMessageSelectors.getDbMessageById(toolMsgId)(get())\n"
+        "                  : undefined;\n"
+        "              })();\n"
+        "            if (toolMsg?.id) {\n"
+        "              get().internal_dispatchMessage(\n"
+        "                {\n"
+        "                  id: toolMsg.id,\n"
+        "                  type: 'replaceMessagePluginState',\n"
+        "                  value: result.state,\n"
+        "                },\n"
+        "                dispatchContext,\n"
+        "              );\n"
+        "            }\n"
+        "            get().internal_dispatchMessage(\n"
+        "              {\n"
+        "                id: currentAssistantMessageId,\n"
+        "                type: 'updateMessageTools',\n"
+        "                tool_call_id: completedToolCallId,\n"
+        "                value: { result },\n"
+        "              },\n"
+        "              dispatchContext,\n"
+        "            );\n"
+        "          }\n"
+        "          if (\n"
+        "            didToolMutateWorkView({\n"
+        "              apiName: typeof payload?.apiName === 'string' ? payload.apiName : undefined,\n"
+        "              identifier: typeof payload?.identifier === 'string' ? payload.identifier : undefined,\n"
+        "              result,\n"
+        "              succeeded: data?.isSuccess === true,\n"
+        "              workRegistration: Boolean(result?.workRegistration),\n"
+        "            })\n"
+        "          ) {\n"
+    )
+    if old_tool_end not in text:
+        raise SystemExit(
+            "[lca_runtime_agent_gateway] gatewayEventHandler tool_end lifecycle anchor not found"
+        )
+    text = text.replace(old_tool_end, new_tool_end, 1)
+
+    ctx.write(rel, text)
+    return True
+
+
 def apply(ctx: PatchContext) -> bool:
     import os
 
@@ -815,6 +1221,8 @@ def apply(ctx: PatchContext) -> bool:
         _patch_intervention_index,
         _patch_conversation_control,
         _patch_tool_surfaces,
+        _patch_gateway_event_handler_lca_stream,
+        _patch_gateway_event_handler_lca_tool_lifecycle,
     ):
         if patch_fn(ctx):
             changed = True

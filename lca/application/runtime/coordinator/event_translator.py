@@ -28,7 +28,7 @@ def _inner_payload(e: dict[str, Any]) -> dict[str, Any]:
     return e
 
 
-def _wire_tool_call(
+def wire_tool_call(
     tool_name: str,
     invocation_id: str,
     arguments: dict[str, Any] | None = None,
@@ -143,7 +143,7 @@ class EventTranslator:
     def _tool_started(e: dict) -> dict:
         payload = e.get("payload") or e.get("toolCalling") or {}
         if not payload and e.get("tool_name"):
-            payload = _wire_tool_call(
+            payload = wire_tool_call(
                 str(e.get("tool_name") or ""),
                 str(e.get("invocation_id") or ""),
                 e.get("arguments") if isinstance(e.get("arguments"), dict) else {},
@@ -158,12 +158,17 @@ class EventTranslator:
 
     @staticmethod
     def _tool_invoked(e: dict) -> dict:
-        """spec §5.3.1: NO projected_state in the WS event — server writes it to DB."""
+        """spec §5.3.1: NO top-level projected_state — use ``result.state`` (native shape)."""
+        result_raw = e.get("result")
+        result: dict[str, Any] = dict(result_raw) if isinstance(result_raw, dict) else {}
+        projected = e.get("projected_state")
+        if isinstance(projected, dict) and projected:
+            result["state"] = projected
         return {
             "type": "tool_end",
             "data": {
                 "isSuccess": e.get("isSuccess", True),
-                "result": e.get("result"),
+                "result": result or None,
                 "payload": e.get("payload"),
                 "executionTime": e.get("executionTime"),
             },
@@ -315,7 +320,7 @@ class EventTranslator:
             "type": "stream_chunk",
             "data": {
                 "chunkType": "tools_calling",
-                "toolsCalling": [_wire_tool_call(tool_name, invocation_id, arguments)],
+                "toolsCalling": [wire_tool_call(tool_name, invocation_id, arguments)],
             },
         }
 
@@ -326,7 +331,7 @@ class EventTranslator:
         invocation_id = str(payload.get("invocation_id") or "")
         if not tool_name:
             return None
-        tool_calling = _wire_tool_call(tool_name, invocation_id, {})
+        tool_calling = wire_tool_call(tool_name, invocation_id, {})
         return {
             "type": "tool_start",
             "data": {
@@ -343,7 +348,7 @@ class EventTranslator:
         outcome = str(payload.get("outcome") or "")
         ok = payload.get("ok")
         is_success = ok if isinstance(ok, bool) else outcome not in ("failure", "failed", "error")
-        tool_calling = _wire_tool_call(tool_name, invocation_id, {})
+        tool_calling = wire_tool_call(tool_name, invocation_id, {})
         output_text = payload.get("output_text")
         result: dict[str, Any] | None = None
         if isinstance(output_text, str) and output_text:
@@ -405,4 +410,4 @@ _SPINE_HANDLERS = {
 }
 
 
-__all__ = ("EventTranslator",)
+__all__ = ("EventTranslator", "wire_tool_call")

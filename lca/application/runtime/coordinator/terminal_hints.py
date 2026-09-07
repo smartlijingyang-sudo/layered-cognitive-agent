@@ -4,17 +4,31 @@ The native AgentGateway exposes a 6-value status enum on `resume_complete`
 and on the data of `agent_runtime_end`. This module maps the existing
 LCA `RunSession.status` (an internal enum) to that wire contract.
 """
+
 from __future__ import annotations
 
 from typing import Literal
 
 TerminalHint = Literal[
-    "running", "waiting_input", "waiting_confirmation",
-    "completed", "error", "interrupted",
+    "running",
+    "waiting_input",
+    "waiting_confirmation",
+    "completed",
+    "error",
+    "interrupted",
 ]
 
 
-_TERMINAL_STATUSES = {"done", "error", "interrupted", "waiting_for_human", "completed", "waiting_input", "awaiting_human", "input-required"}
+_TERMINAL_STATUSES = {
+    "done",
+    "error",
+    "interrupted",
+    "waiting_for_human",
+    "completed",
+    "waiting_input",
+    "awaiting_human",
+    "input-required",
+}
 
 
 def is_stream_terminal_status(status: str) -> bool:

@@ -32,16 +32,40 @@ def test_spine_llm_stream_token_maps_execution_point():
     assert stamped["event"]["parentMessageId"] == "msg_assistant"
 
 
-def test_thinking_delta_maps_to_reasoning_delta():
-    stamped = session_event_to_stamped(
-        "thinking.delta.v1",
-        {"text_delta": "ponder"},
-        assistant_message_id="a1",
+def test_thinking_delta_is_ignored_when_spine_token_is_ssot():
+    assert (
+        session_event_to_stamped(
+            "thinking.delta.v1",
+            {"text_delta": "ponder"},
+            assistant_message_id="a1",
+        )
+        is None
     )
-    assert stamped == {
-        "event": {
-            "type": "ReasoningDelta",
-            "text_delta": "ponder",
-            "parentMessageId": "a1",
-        }
-    }
+
+
+def test_assistant_responded_is_ignored_when_header_assistant_is_ssot():
+    assert (
+        session_event_to_stamped(
+            "assistant.responded.v1",
+            {"content": "你好"},
+            assistant_message_id="a1",
+        )
+        is None
+    )
+
+
+def test_spine_llm_request_header_assistant_maps_from_session_event_type():
+    """Session append stores category as event.type, not inside data."""
+    stamped = session_event_to_stamped(
+        "spine.llm.request.header.assistant",
+        {
+            "step_id": "step-001",
+            "assistant_content": "你好呀！",
+            "finish_reason": "stop",
+        },
+        assistant_message_id="msg_assistant",
+    )
+    assert stamped is not None
+    assert stamped["event"]["execution_point"] == "llm.request.header.assistant"
+    assert stamped["event"]["assistant_content"] == "你好呀！"
+    assert stamped["event"]["parentMessageId"] == "msg_assistant"

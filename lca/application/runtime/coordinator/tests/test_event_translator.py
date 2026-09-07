@@ -77,6 +77,21 @@ def test_spine_llm_stream_token_reasoning():
     assert out["data"]["reasoning"] == "plan"
 
 
+def test_spine_llm_header_assistant_becomes_stream_chunk_text():
+    t = EventTranslator()
+    stamped = {
+        "event": {
+            "execution_point": "llm.request.header.assistant",
+            "assistant_content": "你好呀！",
+        }
+    }
+    out = t.translate(stamped)
+    assert out is not None
+    assert out["type"] == "stream_chunk"
+    assert out["data"]["chunkType"] == "text"
+    assert out["data"]["content"] == "你好呀！"
+
+
 def test_spine_tool_call_record_becomes_tools_calling():
     t = EventTranslator()
     stamped = {
@@ -128,6 +143,7 @@ def test_tool_invoked_becomes_tool_end_without_projected_state():
             "result": {"content": "ok"},
             "isSuccess": True,
             "executionTime": 120,
+            "projected_state": {"stdout": "ok", "exitCode": 0},
         }
     }
     out = t.translate(stamped)
@@ -135,7 +151,8 @@ def test_tool_invoked_becomes_tool_end_without_projected_state():
     assert out["type"] == "tool_end"
     assert "projected_state" not in out["data"]  # spec §5.3.1
     assert out["data"]["isSuccess"] is True
-    assert out["data"]["result"] == {"content": "ok"}
+    assert out["data"]["result"]["content"] == "ok"
+    assert out["data"]["result"]["state"] == {"stdout": "ok", "exitCode": 0}
 
 
 def test_step_start_with_human_approval_has_requires_approval():

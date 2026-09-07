@@ -13,6 +13,10 @@ import asyncio
 import contextlib
 from typing import Any
 
+from lca.application.runtime.coordinator.session_catalog_map import (
+    catalog_session_event_to_stamped,
+    is_suppressed_spine_ep,
+)
 from lca.contracts.models.observability.journal.journal import StampedEvent
 from lca.contracts.observability.registry.status import RunLifecycleStatus
 
@@ -43,31 +47,25 @@ def session_event_to_stamped(
     assistant_message_id: str | None = None,
 ) -> dict[str, Any] | None:
     """Map one committed Session event to an EventTranslator input envelope."""
+    catalog = catalog_session_event_to_stamped(
+        event_type,
+        data,
+        assistant_message_id=assistant_message_id,
+    )
+    if catalog is not None:
+        return catalog
+
     parent = assistant_message_id or None
 
     if event_type == "thinking.delta.v1":
-        delta = str(data.get("text_delta") or "")
-        if not delta:
-            return None
-        return {
-            "event": {
-                "type": "ReasoningDelta",
-                "text_delta": delta,
-                "parentMessageId": parent,
-            }
-        }
+        # Session SSOT already publishes ``llm.stream.token`` for the same
+        # delta via LlmSpineEmitter; translating both doubles every chunk.
+        return None
 
     if event_type == "assistant.responded.v1":
-        content = str(data.get("content") or "")
-        if not content:
-            return None
-        return {
-            "event": {
-                "type": "assistant.responded.v1",
-                "content": content,
-                "parentMessageId": parent,
-            }
-        }
+        # ModelVisibleHook already commits ``spine.llm.request.header.assistant``
+        # with the same assistant body; translating both duplicates reply text.
+        return None
 
     execution_point = data.get("execution_point")
     if not execution_point and event_type.startswith("spine."):
@@ -76,9 +74,16 @@ def session_event_to_stamped(
         execution_point = category_to_spine_ep(event_type)
 
     inner_payload = data.get("payload") if isinstance(data.get("payload"), dict) else {}
-    category = inner_payload.get("category") or data.get("category")
+    category = (
+        inner_payload.get("category")
+        or data.get("category")
+        or (event_type if event_type.startswith("spine.") else None)
+    )
     if category == "spine.llm.request.header.assistant":
         execution_point = "llm.request.header.assistant"
+
+    if execution_point and is_suppressed_spine_ep(execution_point):
+        return None
 
     if execution_point:
         body: dict[str, Any] = {**data, **inner_payload}
@@ -108,6 +113,13 @@ async def _publish_session_event(
         await coordinator.handle_stamped(run_id, stamped)
 
 
+def _run_is_terminal(session: Any) -> bool:
+    status = getattr(session, "status", None)
+    if status is not None and str(getattr(status, "value", status)) in _TERMINAL:
+        return True
+    return bool(getattr(session, "_closed", False))
+
+
 async def _pump_gateway_session(
     session: Any,
     coordinator: Any,
@@ -124,6 +136,21 @@ async def _pump_gateway_session(
         return
 
     queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=512)
+    published_seqs: set[int] = set()
+
+    async def _publish_log_event(event: Any) -> None:
+        seq = getattr(event, "seq", None)
+        if isinstance(seq, int):
+            if seq in published_seqs:
+                return
+            published_seqs.add(seq)
+        await _publish_session_event(
+            coordinator,
+            run_id,
+            event.type,
+            dict(event.data),
+            assistant_message_id=assistant_message_id,
+        )
 
     def _observer(_sess: Any, event: Any) -> None:
         with contextlib.suppress(asyncio.QueueFull):
@@ -132,37 +159,32 @@ async def _pump_gateway_session(
     cancel = inner.observe(_observer)
 
     for prior in list(getattr(inner, "_log", ())):
-        await _publish_session_event(
-            coordinator,
-            run_id,
-            prior.type,
-            dict(prior.data),
-            assistant_message_id=assistant_message_id,
-        )
+        await _publish_log_event(prior)
+
+    async def _drain_queue() -> None:
+        while True:
+            try:
+                event = queue.get_nowait()
+            except asyncio.QueueEmpty:
+                return
+            await _publish_log_event(event)
 
     try:
         while True:
-            status = getattr(session, "status", None)
-            if status is not None and str(getattr(status, "value", status)) in _TERMINAL:
-                break
-            if getattr(session, "_closed", False):
-                break
             try:
                 event = await asyncio.wait_for(queue.get(), timeout=0.5)
             except TimeoutError:
+                await _drain_queue()
+                if _run_is_terminal(session):
+                    break
                 continue
-            await _publish_session_event(
-                coordinator,
-                run_id,
-                event.type,
-                dict(event.data),
-                assistant_message_id=assistant_message_id,
-            )
+            await _publish_log_event(event)
     except asyncio.CancelledError:
         raise
     except Exception:
         return
     finally:
+        await _drain_queue()
         with contextlib.suppress(Exception):
             cancel()
         with contextlib.suppress(Exception):

@@ -9,11 +9,48 @@ import type { ConversationContext } from '@lobechat/types';
 import { buildRunLifecycle } from '@/store/chat/slices/agentRun/actions/lifecycle/buildRunLifecycle';
 import type { RunScope } from '@/store/chat/slices/agentRun/actions/lifecycle/types';
 import { createGatewayEventRouter } from '@/store/chat/slices/agentRun/actions/transports/gateway/gatewayEventRouter';
+import { dbMessageSelectors } from '@/store/chat/slices/message/selectors/dbMessage';
 import type { ChatStore } from '@/store/chat/store';
 
 import { getLcaGatewayUrl } from './client';
 import { createLcaGatewayEventHandler } from './event_handler';
 import { lcaStartRun } from './execute';
+import { persistAssistantRow } from '../lcaPersist';
+
+type MessageLike = { id?: string; parentId?: string; role?: string };
+
+/** Map a user-turn parent id to the assistant placeholder LobeHub created for this reply. */
+function resolveAssistantMessageId(
+  parentMessageId: string | undefined,
+  parentMessageType: string | undefined,
+  messages: MessageLike[],
+  nested: Record<string, unknown>,
+): string {
+  const findAssistantForUser = (userId: string): string | undefined =>
+    messages.find((m) => m.role === 'assistant' && m.parentId === userId)?.id;
+
+  const userMessageId =
+    typeof nested.userMessageId === 'string' ? nested.userMessageId : undefined;
+
+  if (parentMessageId) {
+    const parentRow = messages.find((m) => m.id === parentMessageId);
+    if (parentRow?.role === 'user') {
+      return findAssistantForUser(parentMessageId) ?? parentMessageId;
+    }
+    if (parentMessageType === 'assistant' || parentRow?.role === 'assistant') {
+      return parentMessageId;
+    }
+    if (parentMessageType === 'user') {
+      return findAssistantForUser(parentMessageId) ?? parentMessageId;
+    }
+  }
+
+  if (userMessageId) {
+    return findAssistantForUser(userMessageId) ?? parentMessageId ?? '';
+  }
+
+  return parentMessageId ?? '';
+}
 
 export async function lcaExecuteGatewayRun(
   get: () => ChatStore,
@@ -40,12 +77,18 @@ export async function lcaExecuteGatewayRun(
   const state = get();
   const context = params.context as ConversationContext;
   const topicId = context.topicId ?? state.activeTopicId ?? '';
-  const assistantMessageId = params.parentMessageId ?? '';
+  const nested = params.params;
+  const assistantMessageId = resolveAssistantMessageId(
+    params.parentMessageId,
+    params.parentMessageType,
+    params.messages,
+    nested,
+  );
 
   const receipt = await lcaStartRun({
     agent: { id: params.model, name: params.model },
     messages: [{ role: 'user', content }],
-    parent_message_id: params.parentMessageId,
+    parent_message_id: assistantMessageId || params.parentMessageId,
     topic_id: topicId || undefined,
   });
 
@@ -77,6 +120,7 @@ export async function lcaExecuteGatewayRun(
     context,
     gatewayOperationId: receipt.runId,
     operationId: gatewayOpId,
+    preserveStreamedContentOnTerminal: true,
     runLifecycle: buildRunLifecycle(get, {
       context,
       parentMessageId: assistantMessageId,
@@ -99,6 +143,20 @@ export async function lcaExecuteGatewayRun(
     onSessionComplete: ({ terminalReceived, authFailed, succeeded }) => {
       if (!terminalReceived) state.completeOperation(gatewayOpId);
       if (authFailed) state.completeOperation(gatewayOpId);
+      if (terminalReceived && succeeded && assistantMessageId) {
+        const msg = dbMessageSelectors.getDbMessageById(assistantMessageId)(get());
+        const text = typeof msg?.content === 'string' ? msg.content : '';
+        const tools = msg?.tools;
+        if (msg && (msg.reasoning?.content || text || tools?.length)) {
+          void persistAssistantRow(get, assistantMessageId, {
+            content: text,
+            model: params.model,
+            operationId: gatewayOpId,
+            ...(msg.reasoning ? { reasoning: msg.reasoning } : {}),
+            ...(tools?.length ? { tools } : {}),
+          }).catch(console.error);
+        }
+      }
       if (topicId) {
         const viewing = state.activeTopicId === topicId;
         if (viewing || !succeeded) {
