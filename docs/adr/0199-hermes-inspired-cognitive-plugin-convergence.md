@@ -2,7 +2,7 @@
 
 ## 状态
 
-**Proposed**（2026-09-06）。**Phase 0（本 ADR 冻结）已完成**；**Phase 1（Runtime Facade + RunIntent 契约）已批准进入实现**。
+**Accepted (Phase 1+2+3+4+5 closed)**（2026-09-08）。Phase 0（本 ADR 冻结）已完成；Phase 1（Runtime Facade + RunIntent 契约）、Phase 2（Plugin Doctor）、Phase 3（Privilege / PluginOrigin）、Phase 4（ResourceRegistry + PlanProposal）、Phase 5（External Plugin Trust）全部关闭。详见 [0199-delete-when-inventory.md](../specs/0199-delete-when-inventory.md)。
 
 **延伸并统摄**：[ADR-0061](0061-plugin-manifest-resolve-boot.md)（Resolve/Boot）、[ADR-0068](0068-compiled-plugin-kernel-and-unified-run-plan.md)（CompiledRunPlan）、[ADR-0075](0075-declarative-phase-graph-and-minimal-trusted-kernel.md)（PhaseGraph）、[ADR-0115](0115-kernel-transport-boundary.md)（Kernel/Transport）、[ADR-0183](0183-event-bus-framework-ssot.md) / [ADR-0186](0186-session-as-event-ssot.md)（事实平面）、[ADR-0194](0194-cognitive-loop-architecture-convergence.md)（Loop 收敛）、[ADR-0195](0195-platform-architecture-convergence.md)（平台三时态）、[ADR-0197](0197-guard-stack-hermes-dsh-convergence.md)（Guard Stack）、[ADR-0198](0198-observability-compile-graph.md)（观测 compile graph）。
 
@@ -644,6 +644,14 @@ Hermes 已验证多入口与工具生态。但 LCA 插件异构性（phase/gate/
 5. skill/resource 零隐式 tool 注册（Phase 4）。
 6. Doctor、replay、failure attribution 可通过 `activation_ref` 定位闭包（Phase 2+）。
 7. HPC-L1–L8 门禁建立且区分既有 baseline 失败。
+
+### 17.1 状态历史
+
+- **2026-09-06** — Phase 0 冻结本 ADR；状态 Proposed。
+- **2026-09-07** — Phase 1（Runtime Facade + RunIntent）P1-01..14 合并；`activation_ref` 在 CLI/HTTP/测试三入口一致。
+- **2026-09-07** — Phase 2（Plugin Doctor）P2-01..12 合并；`DoctorFacade` + 4 个 pass + golden profiles CI 门禁（HPC-L5）。
+- **2026-09-07** — Phase 3（Privilege + PluginOrigin）P3-01..10 合并；privileges / `PluginOrigin` / `EffectPolicyPlan` 投影 / `AuditedPluginContext` / HPC-L6 到位；§9 不变量由 `tests/architecture/test_0199_invariants_snapshot.py` 锚定进 CI（验收条件 #7）。
+- **2026-09-08** — Status promoted to Accepted. Phase 1+2+3+4+5 closed. COMPAT inventory & delete-when conditions consolidated in [0199-delete-when-inventory.md](../specs/0199-delete-when-inventory.md). PR-0199-P5-06 closure.
 
 ---
 
