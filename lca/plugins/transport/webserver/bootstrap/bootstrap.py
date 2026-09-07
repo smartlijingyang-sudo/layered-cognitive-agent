@@ -152,13 +152,22 @@ def install_bootstrap_state(
 
     running_operation_store = resolve_running_operation_store()
     app.state.running_operation_store = running_operation_store
-    app.state.agent_runtime_coordinator = build_agent_runtime_coordinator(
-        running_operation_store
-    )
+    app.state.agent_runtime_coordinator = build_agent_runtime_coordinator(running_operation_store)
 
     if carrier_ctx is not None:
         with contextlib.suppress(Exception):
             app.state.bound_observability = carrier_ctx.inject("observability")
+
+    # JWT signing keys come from the `lca-webserver-jwt-keys` plugin; that
+    # plugin raises at setup when neither `jwt.private_pem` nor
+    # `jwt.dev_mode` is configured, so by this point we expect either a
+    # real JwtKeys or a None. Falling back to None keeps a dev workflow
+    # possible (handlers translate the missing key into 503).
+    jwt_keys: Any = None
+    if carrier_ctx is not None:
+        with contextlib.suppress(Exception):
+            jwt_keys = carrier_ctx.inject("jwt_keys")
+    app.state.jwt_keys = jwt_keys
 
     if carrier_ctx is not None:
         journal_factory: Any = None

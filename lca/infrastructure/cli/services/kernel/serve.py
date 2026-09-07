@@ -114,6 +114,15 @@ class KernelServeService:
 
     def _spawn(self) -> bool:
         """Spawn a detached ``lca_kernel serve`` and wait until /health answers."""
+        preflight = self._preflight_jwt_secret()
+        if preflight == "block":
+            return False
+        if preflight == "warn":
+            print(
+                "[WARN] lca-ops: JWT key auto-generation (dev_mode=true); "
+                "key changes on every kernel restart — not safe for multi-replica.",
+                flush=True,
+            )
         self._LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
         log = self._LOG_PATH.open("ab", buffering=0)
         try:
@@ -169,6 +178,94 @@ class KernelServeService:
 
     def ensure_ready(self) -> bool:  # pragma: no cover - intentional stub
         return False
+
+    # ── Preflight: JWT secret injection ──────────────────────────────
+
+    def _preflight_jwt_secret(self) -> str:
+        """Inspect the active Profile's JWT config + ambient env before spawn.
+
+        Returns:
+            "ok"     — neither blocks nor warns (production key injected).
+            "warn"   — dev_mode=true; keypair will be auto-generated in-process.
+            "block"  — neither dev-mode nor a usable LCA_JWT_SECRET; refuse to
+                       spawn so the operator does not hit another 500.
+
+        The check mirrors the runtime contract enforced by
+        ``lca-webserver-jwt-keys``: ``jwt.private_pem`` may be a literal,
+        a ``{from_env: NAME}`` reference (Profile-harness-resolved at boot),
+        or fall back to ``jwt.dev_mode: true``.
+        """
+        import os
+
+        try:
+            import yaml
+
+            profile_path = Path(self._config.profile)
+            if not profile_path.is_absolute():
+                profile_path = self._root / profile_path
+            data = yaml.safe_load(profile_path.read_text())
+        except (OSError, yaml.YAMLError) as exc:
+            print(
+                f"[WARN] lca-ops: cannot read profile {self._config.profile} for JWT "
+                f"preflight ({exc}); skipping check",
+                flush=True,
+            )
+            return "ok"
+
+        def _bundles_list(node: object) -> list[object]:
+            if isinstance(node, dict):
+                return list(node.get("bundles", []))
+            return []
+
+        def _walk_for_jwt(node: object) -> dict[str, object] | None:
+            if isinstance(node, dict):
+                if node.get("id") == "lca-webserver-jwt-keys":
+                    cfg = node.get("config") or {}
+                    return cfg if isinstance(cfg, dict) else None
+                for v in node.values():
+                    found = _walk_for_jwt(v)
+                    if found is not None:
+                        return found
+            elif isinstance(node, list):
+                for item in node:
+                    found = _walk_for_jwt(item)
+                    if found is not None:
+                        return found
+            return None
+
+        jwt_cfg = _walk_for_jwt(data)
+        if jwt_cfg is None:
+            # JWT plugin not in this profile — assume the operator knows what
+            # they are doing and let the kernel's own boot-time check fire.
+            return "ok"
+
+        if bool(jwt_cfg.get("dev_mode")):
+            return "warn"
+
+        private_pem = jwt_cfg.get("private_pem")
+        if isinstance(private_pem, dict) and "from_env" in private_pem:
+            env_name = str(private_pem["from_env"])
+            if os.environ.get(env_name):
+                return "ok"
+            print(
+                f"[ERROR] lca-ops: Profile requires `{env_name}` for the JWT signing "
+                f"key, but the env var is not set. Refusing to spawn kernel — set the "
+                f"env var (or temporarily add `jwt.dev_mode: true` to the Profile) and "
+                f"retry. See docs/notes/jwt-secret-injection-via-profile.md.",
+                flush=True,
+            )
+            return "block"
+
+        if isinstance(private_pem, str) and private_pem.strip():
+            return "ok"
+
+        print(
+            "[ERROR] lca-ops: Profile has neither `jwt.private_pem` nor `jwt.dev_mode`. "
+            "Refusing to spawn kernel. Configure one of the two and retry. See "
+            "docs/notes/jwt-secret-injection-via-profile.md.",
+            flush=True,
+        )
+        return "block"
 
 
 __all__ = ["KernelServeService"]

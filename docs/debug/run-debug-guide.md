@@ -34,6 +34,7 @@ Trigger phrases (run this immediately, do not ask for clarification):
 | "理解一下过程" / "走了一遍啥逻辑" / "DSH 风格轨迹" / "给我个 HTML" | yes |
 | supplies a `run_<id>` directly | yes |
 | "刚才服务挂了" / "kernel 不响应" | no — go to AGENTS.md §6 service matrix |
+| "POST /lca-api/runs 500" / "看起来 healthy 但调用挂" / "接口挂了但 status 正常" | no — go to **Step 0b** in this SOP |
 
 **Hard rule for run_id**: resolve it as the newest-mtime directory under
 `traces/runs/` (no pointer file exists):
@@ -69,6 +70,98 @@ Each step has five labels you should expect to find in your own output:
 **NEXT.** If any service is down: `./scripts/lca-ops heal --json`, then re-check. Once `kernel_serve: healthy`, advance to Step 1.
 
 **FAIL.** `./scripts/lca-ops` itself fails → check `which lca-ops`, run with `bash -x ./scripts/lca-ops status --json` to see where it dies.
+
+---
+
+### Step 0b — Backend 5xx ("service looks healthy but the call returns 500")
+
+**WHY.** `lca-ops status` may show `kernel_serve: healthy` because `/health` answers 200, yet `POST /lca-api/runs` (or any other handler) returns 500 with no obvious source. The 5xx can come from the kernel, from lobehub, or from a reverse proxy — and the log lives in a different file in each case. This step is the "I see the red square in the browser, where do I read" answer.
+
+**DO.**
+
+```sh
+# 1. Sanity: where is the error?
+curl -sS -i -X POST -H 'Content-Type: application/json' \
+     -d '{"messages":[{"role":"user","content":"hello"}]}' \
+     http://127.0.0.1:8765/runs | head -20
+
+# 2. Read the kernel process log (NOT traces/runs/<id>/kernel.log — that one
+#    is only for the post-run tail). The actual kernel stdout/stderr is at
+#    /tmp/lca-kernel.log; `lca-ops logs` (alias for `journal logs`) tails it.
+./scripts/lca-ops logs | tail -120
+
+# 3. If the error references a transport handler, also read the lobehub
+#    log (lobehub reverse-proxies /lca-api/* → 127.0.0.1:8765):
+./scripts/lca-ops journal logs lobehub | tail -80
+
+# 4. Filter the kernel log for the keyword shown in the user's screenshot
+#    or in the curl response body:
+grep -nE "POST /runs HTTP|InvalidTokenError|LcaContractError|CapabilityGrantExceededError|Traceback" \
+     /tmp/lca-kernel.log | tail -40
+
+# 5. If the failure mentions a run_id, hand off to the regular run-debrief
+#    flow (Step 1 onwards). For pure transport-layer 5xx with no run_id
+#    yet, jump straight to Step 0c below.
+```
+
+**OUTPUT.** A traceback pointing at one of:
+
+- `lca/plugins/transport/webserver/handlers/...` — handler logic bug or
+  contract gap (the file path tells you which handler; ADR-0122 §3 maps
+  paths to routes).
+- `lca_kernel/lifecycle.py` — K6 disposal / SIGTERM teardown.
+- `lca/cognition/...` or `lca/runtime/...` — Reducer or phase-graph
+  failure (rare; should appear in `traces/runs/<id>/kernel.log` too).
+- `ConnectionError` / `ECONNREFUSED 10.36.6.252:8765` in
+  `.lca-ops/lobehub.log` — lobehub is talking to the wrong kernel host;
+  check `LCA_GATEWAY_PUBLIC_URL` in lobehub's environment (the Next.js
+  rewrite base).
+
+**NEXT.** Three paths:
+
+- **Handler-layer bug** (e.g. `InvalidTokenError`,
+  `JwtSecretUnconfiguredError`, missing env var) → fix in the handler
+  or the Profile; restart kernel.
+- **Lobehub → kernel misrouting** → fix `LCA_GATEWAY_PUBLIC_URL` env;
+  restart lobehub.
+- **Reducer / cognitive failure inside an existing run** → `traces/runs/<id>/`
+  has the canonical record (see Step 3). Step 1 onwards applies.
+
+**FAIL.** `/tmp/lca-kernel.log` empty → the kernel PID is not writing
+there. Check `pid=$(pgrep -f 'lca_kernel serve' | head -1); ls -l /proc/$pid/fd/1`;
+the actual path follows the symlink at `/proc/<pid>/fd/1`. If the kernel
+was started outside `lca-ops` (e.g. `python -m lca_kernel serve` directly),
+stdout may instead point to a per-launch log; `grep -r 'Uvicorn running on'
+/tmp/` finds it.
+
+---
+
+### Step 0c — Read the traceback to file:line
+
+**WHY.** Once Step 0b surfaces the exception, you need the offending line.
+The kernel log is the only place that has the Python traceback — the
+HTTP response body is just `Internal Server Error` (Starlette default).
+
+**DO.**
+
+```sh
+# Most-recent traceback from /tmp/lca-kernel.log
+grep -nE "Traceback|Error|Exception|appended exception" /tmp/lca-kernel.log | tail -60
+
+# For a specific run_id: the run directory contains a sidecar
+# <run_id>.exceptions.jsonl (preferred) or, if that is missing, an inline
+# `kernel.log`. Both live under traces/runs/<id>/; do NOT confuse them
+# with /tmp/lca-kernel.log (process stdout/stderr).
+./scripts/lca-ops debug-run <run_id> --json | jq '.sections."3.kernel.log", ."5.error_ref"'
+```
+
+**OUTPUT.** Traceback frames with absolute file paths and line numbers;
+the bottom frame names the exception class
+(`InvalidTokenError`, `RuntimeError`, etc.).
+
+**NEXT.** Open the offending file:line in your editor. Cross-check
+against AGENTS §3 invariants (C2, C5, C10 — typical 5xx hotspots). Once
+the fix is in, jump to Step 7 (verify on the live system).
 
 ---
 
@@ -424,6 +517,15 @@ After dispatch, immediately query the terminal state with
 | `journal.narrative.md` | `StepNarrativeWriter` | same as `journal.json` |
 | `<sha256>.json` | I10 size-offload sidecar (≥ 4 KB event) | only if any event exceeded `_ATOMIC_THRESHOLD` (typical for exception-bearing events) |
 | `kernel.log` | `record_run_failure` (terminal failure fallback) | **mostly absent** — written only when the run's finishing path itself failed; a single best-effort line, not an internals log |
+
+> **Two "kernel logs" — do not confuse them.**
+>
+> | Path | Owner | What it holds | When to read |
+> |---|---|---|---|
+> | `/tmp/lca-kernel.log` | kernel process stdout/stderr (written by `lca-ops kernel_serve` spawn) | Every Python `Traceback`, every `INFO: POST /runs HTTP/1.1 500`, every `anomaly_detector:` line, across **all** requests | **First place to look** when `lca-ops status` says `kernel_serve: healthy` but a specific endpoint returns 5xx. `lca-ops logs` is an alias for `journal logs` which tails this file. |
+> | `traces/runs/<id>/kernel.log` | `record_run_failure()` | A single `run_failure_observed ...` line, only if the run's finishing path itself failed | Use the run-debug SOP Step 3 after you already have a `run_id`. |
+>
+> The trace you need for "POST returns 500" almost always lives in `/tmp/lca-kernel.log`, **not** in any `traces/runs/` directory.
 
 ---
 

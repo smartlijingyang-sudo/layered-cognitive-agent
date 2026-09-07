@@ -289,6 +289,11 @@ entries:
   name: lca_webserver_bootstrap
   $module: lca.plugins.transport.webserver.bootstrap.bootstrap
   config: {}
+- id: lca-webserver-jwt-keys
+  name: lca_webserver_jwt_keys
+  $module: lca.plugins.transport.webserver.jwt_keys_seam.jwt_keys
+  config:
+    dev_mode: true
 - id: lca-web-server
   name: lca_web_server
   $module: lca.plugins.transport.webserver.server.server

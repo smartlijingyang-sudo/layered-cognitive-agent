@@ -7,13 +7,13 @@ Wire invariant (spec §5.4):
     `operation_id: <run_id>`
   - `iss` / `aud` are configurable
 
-Keys are loaded from:
-  - LCA_JWT_SECRET     — PEM-encoded PKCS8 RSA private key (sign)
-  - LCA_JWT_PUBLIC_KEY — PEM-encoded SPKI RSA public key (verify)
+Keys are passed in explicitly via the ``jwt_keys`` seam
+(:mod:`lca.plugins.transport.webserver.jwt_keys_seam.jwt_keys`) — this module
+no longer reads ``os.environ`` directly (AGENTS §4).
 """
+
 from __future__ import annotations
 
-import os
 import time
 import uuid
 from typing import Any
@@ -31,45 +31,37 @@ class InvalidTokenError(Exception):
     """Token missing, malformed, expired, or signed with the wrong key."""
 
 
+class JwtSecretUnconfiguredError(InvalidTokenError):
+    """Profile did not inject the JWT signing key.
+
+    The webserver handler that builds the run receipt must translate this
+    into a 503 ``jwt_secret_unconfigured`` response rather than letting it
+    surface as a generic 500 — see ``docs/notes/jwt-secret-injection-via-profile.md``.
+    """
+
+
 DEFAULT_TTL_SECONDS = 5 * 60
 PURPOSE = "cli-sandbox"
 DEFAULT_ISSUER = "lca"
 DEFAULT_AUDIENCE = "lca-agent-gateway"
 
 
-def _load_private_key() -> RSAPrivateKey:
-    pem = os.environ.get("LCA_JWT_SECRET")
-    if not pem:
-        raise InvalidTokenError("LCA_JWT_SECRET not set")
-    key = serialization.load_pem_private_key(pem.encode(), password=None)
-    if not isinstance(key, RSAPrivateKey):
-        raise InvalidTokenError("LCA_JWT_SECRET is not an RSA private key")
-    return key
-
-
-def _load_public_key() -> RSAPublicKey:
-    pem = os.environ.get("LCA_JWT_PUBLIC_KEY")
-    if not pem:
-        raise InvalidTokenError("LCA_JWT_PUBLIC_KEY not set")
-    key = serialization.load_pem_public_key(pem.encode())
-    if not isinstance(key, RSAPublicKey):
-        raise InvalidTokenError("LCA_JWT_PUBLIC_KEY is not an RSA public key")
-    return key
-
-
 def _b64url(data: bytes) -> str:
     import base64
+
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
 
 
 def _b64url_decode(s: str) -> bytes:
     import base64
+
     pad = "=" * ((4 - len(s) % 4) % 4)
     return base64.urlsafe_b64decode((s + pad).encode("ascii"))
 
 
 def _canonical(payload: dict[str, Any]) -> bytes:
     import json
+
     return json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
 
 
@@ -85,14 +77,23 @@ def mint_user_jwt(
 ) -> str:
     """Mint a JWT for the WS handshake.
 
-    Pass `private_key_pem` for tests; production reads LCA_JWT_SECRET.
+    `private_key_pem` is required. Callers must obtain it from the
+    `jwt_keys` capability (see :mod:`lca.plugins.transport.webserver.jwt_keys_seam`)
+    — that is the only path that satisfies AGENTS §4 ("密钥只能经 Profile 注入").
+    Legacy callers passing ``private_key_pem=None`` raised
+    ``InvalidTokenError("LCA_JWT_SECRET not set")``; that path has been
+    retired and now raises :class:`JwtSecretUnconfiguredError`, which the
+    webserver command-endpoint handler translates into a 503 response.
     """
-    if private_key_pem is None:
-        key = _load_private_key()
-    else:
-        key = serialization.load_pem_private_key(private_key_pem.encode(), password=None)
-        if not isinstance(key, RSAPrivateKey):
-            raise ValueError("private_key_pem is not an RSA private key")
+    if not private_key_pem:
+        raise JwtSecretUnconfiguredError(
+            "JWT signing key is not configured; ensure the active Profile provides "
+            "`jwt.private_pem` (or `{from_env: LCA_JWT_SECRET}`) or enable "
+            "`jwt.dev_mode: true` for local development."
+        )
+    key = serialization.load_pem_private_key(private_key_pem.encode(), password=None)
+    if not isinstance(key, RSAPrivateKey):
+        raise ValueError("private_key_pem is not an RSA private key")
 
     now = issued_at if issued_at is not None else int(time.time())
     payload = {
@@ -139,12 +140,14 @@ def verify_user_jwt(
     except Exception as exc:
         raise InvalidTokenError(f"bad signature encoding: {exc}") from exc
 
-    if public_key_pem is None:
-        key = _load_public_key()
-    else:
-        key = serialization.load_pem_public_key(public_key_pem.encode())
-        if not isinstance(key, RSAPublicKey):
-            raise InvalidTokenError("public_key_pem is not an RSA public key")
+    if not public_key_pem:
+        raise JwtSecretUnconfiguredError(
+            "JWT verification key is not configured; ensure the active Profile "
+            "provides `jwt.public_pem` (or `{from_env: LCA_JWT_PUBLIC_KEY}`)."
+        )
+    key = serialization.load_pem_public_key(public_key_pem.encode())
+    if not isinstance(key, RSAPublicKey):
+        raise InvalidTokenError("public_key_pem is not an RSA public key")
 
     try:
         key.verify(signature, signing_input, padding.PKCS1v15(), hashes.SHA256())
@@ -175,6 +178,7 @@ def verify_user_jwt(
 __all__ = (
     "DEFAULT_TTL_SECONDS",
     "InvalidTokenError",
+    "JwtSecretUnconfiguredError",
     "mint_user_jwt",
     "verify_user_jwt",
 )

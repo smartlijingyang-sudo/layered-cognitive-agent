@@ -157,7 +157,12 @@ async def _decode_json_body(request: Request) -> dict[str, Any] | JSONResponse:
     return body
 
 
-def render_create_run_receipt(receipt: RunReceipt, agent: AgentRef) -> JSONResponse:
+def render_create_run_receipt(
+    receipt: RunReceipt,
+    agent: AgentRef,
+    *,
+    jwt_keys: Any | None = None,
+) -> JSONResponse:
     """Format a :class:`RunReceipt` to the 202 compatibility envelope.
 
     P1 (§5.6.1) adds ``ws_token`` so the front-end can open the WS
@@ -165,16 +170,29 @@ def render_create_run_receipt(receipt: RunReceipt, agent: AgentRef) -> JSONRespo
     ``agent``, ``live_url``) are preserved byte-compat.
     ``register_gateway_run`` (called from :func:`create_run`) writes
     the running-operation row and publishes ``agent_runtime_init``.
+
+    `jwt_keys` is the resolved :class:`lca.plugins.transport.webserver.jwt_keys_seam.JwtKeys`
+    instance installed on ``request.app.state.jwt_keys`` by the webserver
+    bootstrap. When it is missing (Profile did not provide one and
+    ``jwt.dev_mode`` is false) we return 503 ``jwt_secret_unconfigured``
+    rather than letting ``mint_user_jwt`` raise and surface as 500.
     """
     from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.auth import (
         DEFAULT_TTL_SECONDS,
+        JwtSecretUnconfiguredError,
         mint_user_jwt,
     )
-    ws_token = mint_user_jwt(
-        user_id=str(agent.agent_id or "lca-local"),
-        operation_id=receipt.run_id,
-        ttl_seconds=DEFAULT_TTL_SECONDS,
-    )
+
+    private_pem = getattr(jwt_keys, "private_pem", None) if jwt_keys is not None else None
+    try:
+        ws_token = mint_user_jwt(
+            user_id=str(agent.agent_id or "lca-local"),
+            operation_id=receipt.run_id,
+            private_key_pem=private_pem,
+            ttl_seconds=DEFAULT_TTL_SECONDS,
+        )
+    except JwtSecretUnconfiguredError as exc:
+        return _err(str(exc), status_code=503, code="jwt_secret_unconfigured")
     return JSONResponse(
         {
             "run_id": receipt.run_id,
@@ -287,7 +305,8 @@ async def create_run(request: Request) -> JSONResponse:
         agent_id=str(decoded.agent.agent_id or "solo"),
         body=body,
     )
-    return render_create_run_receipt(receipt, decoded.agent)
+    jwt_keys = getattr(request.app.state, "jwt_keys", None)
+    return render_create_run_receipt(receipt, decoded.agent, jwt_keys=jwt_keys)
 
 
 async def cancel_run(request: Request) -> JSONResponse:
@@ -399,7 +418,6 @@ def build_create_run_app() -> "Starlette":
     composition root.
     """
     from starlette.applications import Starlette
-    from starlette.requests import Request
     from starlette.routing import Route
 
     async def _create_run_starlette(request: Request) -> JSONResponse:
@@ -407,6 +425,4 @@ def build_create_run_app() -> "Starlette":
         # the request scope (it already does).
         return await create_run(request)
 
-    return Starlette(
-        routes=[Route("/runs", _create_run_starlette, methods=["POST", "OPTIONS"])]
-    )
+    return Starlette(routes=[Route("/runs", _create_run_starlette, methods=["POST", "OPTIONS"])])
