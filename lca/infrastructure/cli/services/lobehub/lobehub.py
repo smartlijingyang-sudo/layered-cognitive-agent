@@ -10,6 +10,7 @@ tracks what's been done via stamps so restart doesn't redo setup.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import time
 from contextlib import suppress
@@ -123,11 +124,22 @@ class LobeHubService:
     # ── Lifecycle ─────────────────────────────────────────────────────
 
     def start(self) -> ServiceState:
-        """Start Vite sidecar first, then Next (Next proxies SPA HTML from Vite)."""
-        current = self.state()
-        if current.is_running:
-            return current
+        """Start Vite sidecar first, then Next (Next proxies SPA HTML from Vite).
 
+        Always runs ``ensure_ready()`` first so LCA patches and
+        ``.env.lca`` are re-applied. The previous ``if current.is_running:
+        return current`` short-circuit was dangerous: ``stop()`` only kills
+        the bun parent and the Next child stays HTTP-ready for a few
+        seconds, so ``ensure_ready()`` was being skipped on restart and
+        ``lca_runtime_agent_gateway.apply`` did not re-inject the
+        ``LCA_GATEWAY_PUBLIC_URL`` into the SPA bundle. We instead clear
+        the stored PIDs and force a fresh spawn — ``_ensure_spa`` and
+        ``_ensure_next`` already detect the running port and reuse it,
+        so the only behaviour change is that patches and env are
+        guaranteed to be applied.
+        """
+        self._state.remove_pid(self.name)
+        self._state.remove_pid(self._SPA_NAME)
         self.ensure_ready()
         spa_pid = self._ensure_spa()
         if spa_pid is None:
@@ -449,28 +461,57 @@ class LobeHubService:
         return summary
 
     def _ensure_patches(self) -> bool:
-        """Apply patches if source changed."""
-        # Check if patches need reapplication
-        deploy_dir = self._root / "deploy" / "lobehub"
-        if not self._state.has_changed("patches", [deploy_dir], "*"):
-            return False
+        """Apply LCA patches every restart.
 
-        # Apply patches
-        patch_script = self._root / "deploy" / "lobehub" / "patch_lobehub.py"
-        if not patch_script.exists():
+        The patch engine's ``reconcile()`` is idempotent: when on-disk
+        content already matches the source SHA, the apply pass is a no-op
+        (returns without writing). We therefore call it unconditionally
+        rather than gating on a state hash, which would otherwise miss
+        two cases:
+
+        - A previous apply ran without ``LCA_GATEWAY_PUBLIC_URL`` and
+          left ``client.ts`` holding the obvious placeholder
+          ``ws://lca-gateway-unset:0000``. The placeholder matches the
+          source SHA so ``has_changed`` returns False and the SPA bundle
+          ships with the broken URL even after restart.
+        - A developer (or ``deploy/lobehub`` automation) edited a patched
+          file under ``lobehub-ui/src/...`` directly. ``has_changed``
+          only watches ``deploy/lobehub/`` and misses this.
+
+        The unconditional call costs a few hundred milliseconds of
+        ``reconcile()`` wall time on the happy path (no drift) and
+        prevents the "looks healthy, chat does nothing" regression that
+        is otherwise invisible to ``lca-ops status``.
+        """
+        deploy_dir = self._root / "deploy" / "lobehub"
+        if not deploy_dir.exists():
             return False
 
         try:
-            subprocess.run(  # noqa: S603
-                ["python3", str(patch_script)],  # noqa: S607
-                cwd=self._root,
-                capture_output=True,
-                timeout=60,
-            )
+            # Pass LCA_GATEWAY_PUBLIC_URL via os.environ so the patch
+            # engine's ``lca_runtime_agent_gateway.apply`` can bake the
+            # WS URL into ``lcaGateway/client.ts`` as a build-time string
+            # literal (Vite dev mode does not expose
+            # ``process.env.NEXT_PUBLIC_*`` to the browser bundle by
+            # default). Call the engine in-process so we can surface
+            # apply results in ``lca-ops`` output instead of swallowing
+            # them through ``subprocess.run(capture_output=True)``.
+            os.environ["LCA_GATEWAY_PUBLIC_URL"] = self._client_gateway_base()
+
+            from deploy.lobehub.engine import apply_patches
+
+            # In-process call so stdout/stderr flows to ``lca-ops``
+            # output (subprocess.run swallows it). ``apply_patches``
+            # is the canonical entry point from ``patch_lobehub.py`` CLI.
+            results = apply_patches()
+            for r in results:
+                tag = "applied" if r.status == "applied" else r.status
+                print(f"[lca] patch {tag}: {r.name}", flush=True)
             self._state.save_snapshot("patches", [deploy_dir], "*")
             self._verify_cache = None
-            return True
-        except Exception:
+            return any(r.status == "applied" for r in results)
+        except Exception as exc:  # noqa: BLE001 — health check best-effort
+            print(f"[lca] patch ensure failed: {type(exc).__name__}: {exc}", flush=True)
             return False
 
     def _ensure_pnpm_patches(self) -> bool:
