@@ -3,7 +3,7 @@
 from lca.application.runtime.coordinator.event_translator import EventTranslator
 
 
-def test_llm_call_started_becomes_stream_start():
+def test_llm_call_started_becomes_stream_start() -> None:
     t = EventTranslator()
     stamped = {"event": {"type": "LlmCallStarted", "assistantMessage": {"id": "a1"}}}
     out = t.translate(stamped)
@@ -12,7 +12,7 @@ def test_llm_call_started_becomes_stream_start():
     assert out["data"]["assistantMessage"]["id"] == "a1"
 
 
-def test_text_delta_becomes_stream_chunk_text():
+def test_text_delta_becomes_stream_chunk_text() -> None:
     t = EventTranslator()
     stamped = {"event": {"type": "LlmCallTextDelta", "delta": "hi"}}
     out = t.translate(stamped)
@@ -23,7 +23,7 @@ def test_text_delta_becomes_stream_chunk_text():
     assert out["data"]["snapshotMode"] == "append"
 
 
-def test_step_text_delta_answer_channel_becomes_stream_chunk_text():
+def test_step_text_delta_answer_channel_becomes_stream_chunk_text() -> None:
     t = EventTranslator()
     stamped = {"event": {"type": "StepTextDelta", "text_delta": "hi", "channel": "answer"}}
     out = t.translate(stamped)
@@ -32,13 +32,13 @@ def test_step_text_delta_answer_channel_becomes_stream_chunk_text():
     assert out["data"]["content"] == "hi"
 
 
-def test_step_text_delta_decision_channel_is_ignored():
+def test_step_text_delta_decision_channel_is_ignored() -> None:
     t = EventTranslator()
     stamped = {"event": {"type": "StepTextDelta", "text_delta": "secret", "channel": "decision"}}
     assert t.translate(stamped) is None
 
 
-def test_reasoning_delta_becomes_stream_chunk_reasoning():
+def test_reasoning_delta_becomes_stream_chunk_reasoning() -> None:
     t = EventTranslator()
     stamped = {"event": {"type": "ReasoningDelta", "text_delta": "thinking"}}
     out = t.translate(stamped)
@@ -48,7 +48,7 @@ def test_reasoning_delta_becomes_stream_chunk_reasoning():
     assert out["data"]["reasoning"] == "thinking"
 
 
-def test_spine_llm_call_start_becomes_stream_start_with_parent():
+def test_spine_llm_call_start_becomes_stream_start_with_parent() -> None:
     t = EventTranslator()
     stamped = {
         "event": {
@@ -63,7 +63,7 @@ def test_spine_llm_call_start_becomes_stream_start_with_parent():
     assert out["data"]["assistantMessage"]["id"] == "msg_assistant"
 
 
-def test_spine_llm_stream_token_reasoning():
+def test_spine_llm_stream_token_reasoning() -> None:
     t = EventTranslator()
     stamped = {
         "event": {
@@ -77,7 +77,7 @@ def test_spine_llm_stream_token_reasoning():
     assert out["data"]["reasoning"] == "plan"
 
 
-def test_spine_llm_header_assistant_becomes_stream_chunk_text():
+def test_spine_llm_header_assistant_becomes_stream_chunk_text() -> None:
     t = EventTranslator()
     stamped = {
         "event": {
@@ -92,7 +92,7 @@ def test_spine_llm_header_assistant_becomes_stream_chunk_text():
     assert out["data"]["content"] == "你好呀！"
 
 
-def test_spine_tool_call_record_becomes_tools_calling():
+def test_spine_tool_call_record_becomes_tools_calling() -> None:
     t = EventTranslator()
     stamped = {
         "event": {
@@ -113,7 +113,7 @@ def test_spine_tool_call_record_becomes_tools_calling():
     assert tools[0]["identifier"] == "lobe-cloud-sandbox"
 
 
-def test_tool_started_becomes_tool_start_with_parent_message_id():
+def test_tool_started_becomes_tool_start_with_parent_message_id() -> None:
     t = EventTranslator()
     stamped = {
         "event": {
@@ -134,7 +134,7 @@ def test_tool_started_becomes_tool_start_with_parent_message_id():
     assert out["data"]["toolCalling"]["identifier"] == "lobe-local-system"
 
 
-def test_tool_invoked_becomes_tool_end_without_projected_state():
+def test_tool_invoked_becomes_tool_end_without_projected_state() -> None:
     t = EventTranslator()
     stamped = {
         "event": {
@@ -155,7 +155,7 @@ def test_tool_invoked_becomes_tool_end_without_projected_state():
     assert out["data"]["result"]["state"] == {"stdout": "ok", "exitCode": 0}
 
 
-def test_step_start_with_human_approval_has_requires_approval():
+def test_step_start_with_human_approval_has_requires_approval() -> None:
     t = EventTranslator()
     stamped = {
         "event": {
@@ -173,7 +173,7 @@ def test_step_start_with_human_approval_has_requires_approval():
     assert out["data"]["pendingToolsCalling"] == [{"id": "tc1"}]
 
 
-def test_spine_close_with_waiting_human_becomes_agent_runtime_end():
+def test_spine_close_with_waiting_human_becomes_agent_runtime_end() -> None:
     t = EventTranslator()
     stamped = {
         "event": {
@@ -190,21 +190,22 @@ def test_spine_close_with_waiting_human_becomes_agent_runtime_end():
     assert out["data"]["phase"] == "execution_complete"
 
 
-def test_spine_close_with_done_becomes_agent_runtime_end_completed():
+def test_spine_close_with_done_becomes_agent_runtime_end_completed() -> None:
     t = EventTranslator()
     stamped = {
         "event": {"type": "SpineClose", "reason": "completed", "final_state": {"status": "done"}}
     }
     out = t.translate(stamped)
+    assert out is not None
     assert out["type"] == "agent_runtime_end"
     assert out["data"]["reason"] == "completed"
 
 
-def test_unknown_event_returns_none():
+def test_unknown_event_returns_none() -> None:
     t = EventTranslator()
     assert t.translate({"event": {"type": "UnknownThing"}}) is None
 
 
-def test_unknown_event_kind_returns_none():
+def test_unknown_event_kind_returns_none() -> None:
     t = EventTranslator()
     assert t.translate({"event": {"type": "LlmCallTextDelta", "kind": "ignore"}}) is None

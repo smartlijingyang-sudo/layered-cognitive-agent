@@ -42,7 +42,7 @@ def is_stream_terminal_status(status: str) -> bool:
     return status in _TERMINAL_STATUSES
 
 
-def resolve_live_terminal_hint(session) -> TerminalHint:
+def resolve_live_terminal_hint(session: object) -> TerminalHint:
     """Map RunSession.status to the wire 6-value enum."""
     status = getattr(session, "status", None)
     # session.error set on any terminal-like state overrides to "error"

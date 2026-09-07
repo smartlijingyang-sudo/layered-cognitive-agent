@@ -32,14 +32,14 @@ from lca.application.runtime.coordinator.terminal_hints import (
         ("paused", "running"),
     ],
 )
-def test_resolve_live_terminal_hint_maps_status(status, expected):
+def test_resolve_live_terminal_hint_maps_status(status: str, expected: str) -> None:
     session = MagicMock()
     session.status = status
     session.error = None
     assert resolve_live_terminal_hint(session) == expected
 
 
-def test_resolve_live_terminal_hint_with_error_falls_back_to_error():
+def test_resolve_live_terminal_hint_with_error_falls_back_to_error() -> None:
     session = MagicMock()
     session.status = "done"
     session.error = "something broke"
@@ -49,10 +49,10 @@ def test_resolve_live_terminal_hint_with_error_falls_back_to_error():
 @pytest.mark.parametrize(
     "status", ["done", "error", "interrupted", "waiting_for_human", "completed", "waiting_input"]
 )
-def test_is_stream_terminal_status_true_for_terminal(status):
+def test_is_stream_terminal_status_true_for_terminal(status: str) -> None:
     assert is_stream_terminal_status(status) is True
 
 
 @pytest.mark.parametrize("status", ["running", "waiting_for_async_tool", "paused"])
-def test_is_stream_terminal_status_false_for_live(status):
+def test_is_stream_terminal_status_false_for_live(status: str) -> None:
     assert is_stream_terminal_status(status) is False

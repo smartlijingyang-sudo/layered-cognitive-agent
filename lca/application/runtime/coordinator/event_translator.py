@@ -66,6 +66,8 @@ class EventTranslator:
                 return spine_handler(event)
 
         etype = event.get("type")
+        if not isinstance(etype, str):
+            return None
         handler = _HANDLERS.get(etype)
         if handler is None:
             return None

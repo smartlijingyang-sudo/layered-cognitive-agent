@@ -7,7 +7,7 @@ from lca.application.runtime.coordinator.session_catalog_map import (
 from lca.application.runtime.coordinator.session_gateway_pump import session_event_to_stamped
 
 
-def test_tool_invoked_v1_maps_with_projected_state():
+def test_tool_invoked_v1_maps_with_projected_state() -> None:
     stamped = catalog_session_event_to_stamped(
         "tool.invoked.v1",
         {
@@ -33,7 +33,7 @@ def test_tool_invoked_v1_maps_with_projected_state():
     assert event["parentMessageId"] == "msg_a"
 
 
-def test_tool_started_v1_maps_to_tool_started():
+def test_tool_started_v1_maps_to_tool_started() -> None:
     stamped = catalog_session_event_to_stamped(
         "tool.started.v1",
         {
@@ -49,7 +49,7 @@ def test_tool_started_v1_maps_to_tool_started():
     assert stamped["event"]["payload"]["arguments"] == {"command": "echo hi"}
 
 
-def test_session_checkpoint_waiting_input_maps_to_spine_close():
+def test_session_checkpoint_waiting_input_maps_to_spine_close() -> None:
     stamped = catalog_session_event_to_stamped(
         "session.checkpoint.v1",
         {"status": "waiting_input"},
@@ -59,7 +59,7 @@ def test_session_checkpoint_waiting_input_maps_to_spine_close():
     assert stamped["event"]["reason"] == "waiting_for_human"
 
 
-def test_body_tool_execute_end_spine_is_suppressed():
+def test_body_tool_execute_end_spine_is_suppressed() -> None:
     assert is_suppressed_spine_ep("body.tool.execute.end")
     assert (
         session_event_to_stamped(
@@ -76,7 +76,7 @@ def test_body_tool_execute_end_spine_is_suppressed():
     )
 
 
-def test_catalog_tool_invoked_takes_precedence_over_spine_end():
+def test_catalog_tool_invoked_takes_precedence_over_spine_end() -> None:
     """Catalog path must win when both facts exist in the session log."""
     catalog = session_event_to_stamped(
         "tool.invoked.v1",

@@ -73,7 +73,8 @@ def session_event_to_stamped(
 
         execution_point = category_to_spine_ep(event_type)
 
-    inner_payload = data.get("payload") if isinstance(data.get("payload"), dict) else {}
+    payload_raw = data.get("payload")
+    inner_payload = payload_raw if isinstance(payload_raw, dict) else {}
     category = (
         inner_payload.get("category")
         or data.get("category")

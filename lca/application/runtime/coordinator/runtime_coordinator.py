@@ -10,7 +10,7 @@ synthesise a terminal event if the natural SpineClose is missing.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, Protocol
 
 from lca.application.runtime.coordinator.event_translator import EventTranslator
 from lca.application.runtime.coordinator.terminal_hints import (
@@ -19,7 +19,16 @@ from lca.application.runtime.coordinator.terminal_hints import (
 from lca.infrastructure.observability.stream import LcaStreamEventManager
 
 MetadataWriter = Callable[[str, dict], Awaitable[None]]
-ToolStateWriter = Callable[[str, str, dict], Awaitable[None]]
+
+
+class ToolStateWriter(Protocol):
+    async def __call__(
+        self,
+        *,
+        run_id: str,
+        tool_call_id: str,
+        state: dict[str, Any],
+    ) -> None: ...
 
 
 class LcaAgentRuntimeCoordinator:
@@ -155,7 +164,7 @@ class LcaAgentRuntimeCoordinator:
         )
         self._natural_terminal_published.add(run_id)
 
-    async def synthesize_terminal_if_pending(self, run_id: str, *, session) -> None:
+    async def synthesize_terminal_if_pending(self, run_id: str, *, session: object) -> None:
         """Watchdog: if no natural agent_runtime_end was published but the
         session has reached a terminal status, synthesise one.
 

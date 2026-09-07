@@ -3,7 +3,7 @@
 from lca.application.runtime.coordinator.session_gateway_pump import session_event_to_stamped
 
 
-def test_spine_llm_call_start_maps_execution_point():
+def test_spine_llm_call_start_maps_execution_point() -> None:
     stamped = session_event_to_stamped(
         "spine.llm.call.start",
         {
@@ -17,7 +17,7 @@ def test_spine_llm_call_start_maps_execution_point():
     assert stamped["event"]["parentMessageId"] == "msg_assistant"
 
 
-def test_spine_llm_stream_token_maps_execution_point():
+def test_spine_llm_stream_token_maps_execution_point() -> None:
     stamped = session_event_to_stamped(
         "spine.llm.stream.token",
         {
@@ -32,7 +32,7 @@ def test_spine_llm_stream_token_maps_execution_point():
     assert stamped["event"]["parentMessageId"] == "msg_assistant"
 
 
-def test_thinking_delta_is_ignored_when_spine_token_is_ssot():
+def test_thinking_delta_is_ignored_when_spine_token_is_ssot() -> None:
     assert (
         session_event_to_stamped(
             "thinking.delta.v1",
@@ -43,7 +43,7 @@ def test_thinking_delta_is_ignored_when_spine_token_is_ssot():
     )
 
 
-def test_assistant_responded_is_ignored_when_header_assistant_is_ssot():
+def test_assistant_responded_is_ignored_when_header_assistant_is_ssot() -> None:
     assert (
         session_event_to_stamped(
             "assistant.responded.v1",
@@ -54,7 +54,7 @@ def test_assistant_responded_is_ignored_when_header_assistant_is_ssot():
     )
 
 
-def test_spine_llm_request_header_assistant_maps_from_session_event_type():
+def test_spine_llm_request_header_assistant_maps_from_session_event_type() -> None:
     """Session append stores category as event.type, not inside data."""
     stamped = session_event_to_stamped(
         "spine.llm.request.header.assistant",
