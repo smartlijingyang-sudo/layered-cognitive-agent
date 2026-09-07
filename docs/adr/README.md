@@ -124,6 +124,8 @@
 | [0174](0174-profile-cursor-bundles.md) | Profile 分批装配 — `loop_cursor.spine_*` bundle 落地 | Proposed |
 | [0175](0175-prompt-trace-into-model-visible.md) | Prompt trace 落 model_visible / spine EP payload 扩字段 | Accepted |
 | [0176](0176-step-tree-deriver-closure-and-model-visible-dedup.md) | StepTreeAccumulator 闭环 + Model-Visible 去重重构 + Prompt Section 真值化 | Accepted |
+| [0177](0177-envelope-emitter-binding.md) | EnvelopeEmitter binding — 收束 runtime/agent 对 spine reflector 的反向 import | Proposed |
+| [0178](0178-observation-control-state-convergence.md) | 观测面 / 控制面 / 状态机三方收口 — 四级收敛与单 SSOT 体系 | Proposed |
 | [0180](0180-event-mechanism-as-kernel-plugin.md) | 事件机制 — kernel 元层插件 + 鉴权矩阵 SSOT | Accepted |
 | [0181](0181-spine-as-events-publishers-subscribers.md) | spine 降级为 publishers / sinks / subscribers（被 0183 吸收） | Superseded |
 | [0182](0182-event-consumer-record-and-whitelist-convergence.md) | 消费入口收口 + 框架契约补齐（被 0183 吸收） | Superseded |
@@ -133,18 +135,24 @@
 | [0186](0186-session-as-event-ssot.md) | Session 为事件 SSOT — append + observer + fold（延伸 0183/0184；互补 0185） | Implemented |
 | [0187](0187-assistant-agent.md) | AssistantAgent — 可配置、可隔离、可进化的个人助理产品面（Home SSOT + 同一 Resolve/Compile + 0093 jobs + G11 进化闸） | Accepted |
 | [0188](0188-session-title-event.md) | Session 标题事件 — `session.title.v1` 入词表（log-only 审计档，标题模块唯一事实载体） | Proposed |
+| [0189](0189-session-obs-dsh-parity-events.md) | Session 观察面 DSH 对齐 — 信封扩展与 fork/derive/feedback 词表 | Proposed |
+| [0190](adr-0190-extreme-plugin-organization.md) | LCA 极端插件化组织规范（文件名 `adr-0190-`；文档自标 0189，见下方注） | Keep |
 | [0191](0191-runtime-loop-dsh-convergence-and-control-plane.md) | Runtime Loop DSH 收敛与 LCA 控制面保留 — 事实/模型/控制/Ephemeral 四态分离 + Reducer 演进 | Implemented |
 | [0192](0192-fact-plane-convergence.md) | Fact Plane 收敛 — FactCommitter + PhaseFactEmitter；Journal 平面从 cognition 退役 | Implemented（via 0186/0194/0195） |
-| [0193](0193-session-projection-fabric-model-visible.md) | Session Projection Fabric — ModelVisibleUnit 增量投影；统一 model-visible 读面 | Accepted |
+| [0193](0193-session-projection-fabric-model-visible.md) | Session Projection Fabric — ModelVisibleUnit 增量投影；统一 model-visible 读面 | Implemented (D1–D7) |
 | [0194](0194-cognitive-loop-architecture-convergence.md) | 认知 Loop 架构收敛 — 图内核 / FactGateway 单轨 / 六 phase 正名 / 极端插件化目录 | Implemented (P0–P5 core) |
 | [0195](0195-platform-architecture-convergence.md) | 全栈平台架构收敛 — Kernel · Transport · Observability 四段链 · 插件 seam 树 · SSOT 矩阵 | Implemented (P0–P5 core) |
 | [0196](0196-convergence-control-plane-and-prompt-surface.md) | Convergence 控制面与 PromptSurface — 交付谓词、调试事件、工具/Prompt SSOT | Implemented (P1–P3) |
-| [0197](0197-guard-stack-hermes-dsh-convergence.md) | Guard Stack — Hermes 分层收敛 + DSH guard 插件化融合 | Accepted (P1–P2) |
+| [0197](0197-guard-stack-hermes-dsh-convergence.md) | Guard Stack — Hermes 分层收敛 + DSH guard 插件化融合 | Implemented (P1–P2) |
 | [0198](0198-observability-compile-graph.md) | Observability Compile Graph — yaml SSOT、ObservabilityCompiler、fold merge | Accepted (P0) |
 | [0199](0199-hermes-inspired-cognitive-plugin-convergence.md) | Hermes 启发的认知插件架构收敛 — RuntimeFacade、Plugin Doctor、分域 Registry、privilege 分离 | Proposed (P0 done; P1 approved) |
 | [0200](0200-hermes-product-capabilities-absorption.md) | Hermes 产品能力吸收 — review-fork、Curator、ContextEngine、MemoryProvider、no_agent Routine | Proposed |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
+
+> 点号后缀 ADR([0167.1](0167.1-step-tree-deriver-wiring-and-run-layout-cleanup.md)、[0168.1](0168.1-loop-cursor-state-machine.md))是父 ADR 的收尾件,索引按主编号 `0167` / `0168` 归属,不单独占号。
+>
+> [adr-0190-extreme-plugin-organization.md](adr-0190-extreme-plugin-organization.md) 文件名带 `adr-` 前缀且文档内自标 ADR-0189(写作时 0187=AssistantAgent 已占号),而 0189 另有 [0189-session-obs-dsh-parity-events.md](0189-session-obs-dsh-parity-events.md)。ADR-0200 引用时用 "0189" 标签;差异记录见 [0200-phase0-cross-reference-verification.md](../specs/0200-phase0-cross-reference-verification.md) §3.2。
 
 ## 维护规则
 - 不改旧文件；新决策用 `Supersedes: ADR-XXXX` 标记

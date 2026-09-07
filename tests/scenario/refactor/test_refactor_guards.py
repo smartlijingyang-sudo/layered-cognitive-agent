@@ -126,11 +126,13 @@ class TestAdrIndexMatchesFilesystem(unittest.TestCase):
         for path in adr_files:
             if path.name == "README.md":
                 continue
-            match = re.match(r"^(\d{4})(?:-([\w-]+))?-", path.name)
+            # 允许 `adr-` 前缀与 `.N` 点号后缀（0167.1 / adr-0190）；
+            # 索引以主编号(NNNN)为准，point release 复用父 ADR 的 README 条目
+            match = re.match(r"^(?:adr-)?(\d{4})(\.\d+)?(?:-([\w-]+))?-", path.name)
             self.assertIsNotNone(match, f"ADR 文件名不符合 NNNN- 前缀: {path.name}")
             file_numbers.append(match.group(1))
-            slug = match.group(2) or path.stem
-            file_ids.append(f"{match.group(1)}:{slug}")
+            slug = match.group(3) or path.stem
+            file_ids.append(f"{match.group(1)}{match.group(2) or ''}:{slug}")
 
         duplicates = {n for n in file_numbers if file_numbers.count(n) > 1}
         # ADR 同号允许多个文件（follow-up / 双 0165），用 file_ids 查重
