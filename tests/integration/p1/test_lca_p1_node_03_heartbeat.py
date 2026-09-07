@@ -34,27 +34,26 @@ def test_heartbeat_frame_echoes_ack(rsa_keys: dict[str, str]) -> None:
         private_key_pem=rsa_keys["private"],
         ttl_seconds=60,
     )
-    with TestClient(app) as client:
-        with client.websocket_connect(f"/v1/runs/{run_id}/ws") as ws:
-            ws.send_json({"type": "auth", "token": token})
-            assert ws.receive_json() == {"type": "auth_success"}
-            # Skip the resume handshake — gateway uses the next frame as
-            # either resume OR (in some shapes) as the first control frame
-            # the live loop processes. Send resume with no history; the
-            # gateway enters the live loop and the next frame we send
-            # goes through _handle_control_frame.
-            ws.send_json(
-                {"type": "resume", "lastEventId": "0", "wantStatus": False}
-            )
-            ws.send_json({"type": "heartbeat"})
+    with TestClient(app) as client, client.websocket_connect(f"/v1/runs/{run_id}/ws") as ws:
+        ws.send_json({"type": "auth", "token": token})
+        assert ws.receive_json() == {"type": "auth_success"}
+        # Skip the resume handshake — gateway uses the next frame as
+        # either resume OR (in some shapes) as the first control frame
+        # the live loop processes. Send resume with no history; the
+        # gateway enters the live loop and the next frame we send
+        # goes through _handle_control_frame.
+        ws.send_json(
+            {"type": "resume", "lastEventId": "0", "wantStatus": False}
+        )
+        ws.send_json({"type": "heartbeat"})
 
-            # Read frames until heartbeat_ack; collect all we see.
-            for _ in range(10):
-                try:
-                    frame = ws.receive_json()
-                except Exception:
-                    break
-                if frame.get("type") == "heartbeat_ack":
-                    return  # success
-            # If we get here, never saw heartbeat_ack — collect for debug.
-            pytest.fail("heartbeat_ack not received")
+        # Read frames until heartbeat_ack; collect all we see.
+        for _ in range(10):
+            try:
+                frame = ws.receive_json()
+            except Exception:
+                break
+            if frame.get("type") == "heartbeat_ack":
+                return  # success
+        # If we get here, never saw heartbeat_ack — collect for debug.
+        pytest.fail("heartbeat_ack not received")

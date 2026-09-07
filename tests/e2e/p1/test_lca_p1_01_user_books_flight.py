@@ -16,9 +16,6 @@ scenarios that bind WS events to a real producer.
 
 from __future__ import annotations
 
-import asyncio
-import uuid
-
 import pytest
 
 

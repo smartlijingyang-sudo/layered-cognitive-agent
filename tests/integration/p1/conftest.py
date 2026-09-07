@@ -37,7 +37,7 @@ def rsa_keys() -> dict[str, str]:
 
 
 @pytest.fixture
-def lca_gateway_app(rsa_keys):  # noqa: ARG001
+def lca_gateway_app(rsa_keys):
     """Build the LcaAgentGateway Starlette app with no injected RunPort."""
     from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.agent_gateway import (
         build_agent_gateway_app,

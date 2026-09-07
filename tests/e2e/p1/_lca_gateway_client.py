@@ -212,7 +212,7 @@ class LcaGatewayClient:
                 break
             try:
                 raw = await asyncio.wait_for(self._ws.recv(), timeout=remaining)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 break
             frame = json.loads(raw)
             if frame.get("type") == "agent_event":

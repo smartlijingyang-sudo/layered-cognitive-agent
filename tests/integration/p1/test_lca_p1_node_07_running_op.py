@@ -76,7 +76,7 @@ def _request(body: dict[str, Any], state: Any) -> Request:
 def test_create_run_receipt_includes_ws_token_and_keeps_live_url(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    rsa_keys: dict[str, str],  # noqa: ARG001 — autouse session fixture
+    rsa_keys: dict[str, str],
 ) -> None:
     """The 202 envelope carries ``ws_token`` AND keeps ``live_url`` for back-compat."""
     from lca.infrastructure.file.store import LocalFileStore
