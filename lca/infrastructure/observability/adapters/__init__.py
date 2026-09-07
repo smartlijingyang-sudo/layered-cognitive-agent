@@ -1,17 +1,16 @@
-"""observability.adapters — adapter subpackage。
+"""observability.adapters — LLM boundary observability (Session SSOT only).
 
-ADR-0185 PR-4:旧 model-visible LLM 装饰器随旁路文件一并删除 —
-model-visible 走 spine event + foldRequestHeader 重建,不再挂旧装饰器链。
+LLM call boundaries emit ``llm.call.start`` / ``llm.call.end`` /
+``llm.stream.token`` / ``llm.stream.stall`` via :class:`LlmSpineEmitter`,
+which routes through :func:`Session.append` per ADR-0186 / ADR-0192.
+
+The legacy ``TelemetryMemoryAdapter`` dual-write to ``MemoryJournal``
+(``facade.record`` / ``facade.span``) had no readers outside descriptors
+and tests; it is removed (delete-when met).
 """
 
 from lca.infrastructure.observability.adapters.adapters import (
     TelemetryLLMAdapter,
 )
-from lca.infrastructure.observability.adapters.memory_adapter import (
-    TelemetryMemoryAdapter,
-)
 
-__all__ = [
-    "TelemetryLLMAdapter",
-    "TelemetryMemoryAdapter",
-]
+__all__ = ["TelemetryLLMAdapter"]

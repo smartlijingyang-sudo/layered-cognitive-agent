@@ -19,7 +19,6 @@ from lca.contracts.protocols import (
 from lca.contracts.protocols.journal.spec.spec import STATE_STORE_CHOICE_PROFILE_DEFAULT
 from lca.infrastructure.capability.memory.memory import MemoryService
 from lca.infrastructure.capability.state.store import StateStoreService
-from lca.infrastructure.observability.adapters import TelemetryMemoryAdapter
 from lca.plugins.composer.composition.skill_store import active_skill_store
 
 
@@ -28,7 +27,7 @@ def resolve_memory(
     shared_store: SharedMemoryStore | None,
     memory_service: MemoryService,
 ) -> MemorySystem:
-    """Resolve memory ownership, then apply the standard telemetry decorator."""
+    """Resolve memory ownership (no telemetry decorator — Session SSOT only)."""
 
     if shared_store is not None:
         memory: MemorySystem = memory_service.create(shared_store=shared_store)
@@ -38,7 +37,7 @@ def resolve_memory(
         memory = memory_service.providers.get(choice)()
     else:
         raise MissingCapabilityError("memory")
-    return TelemetryMemoryAdapter(memory)
+    return memory
 
 
 def resolve_state_store(choice: str | StateStore, service: StateStoreService) -> StateStore:

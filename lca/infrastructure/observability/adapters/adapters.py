@@ -1,9 +1,27 @@
-"""观测装饰器（Decorator 模式）—— 组合根装配，业务代码零埋点。
+"""LLM adapter decorator — Session EP emit + cursor advance (SSOT only).
 
-- ``TelemetryLLMAdapter``：LLM 调用 → journal ``LlmCallCompleted``
-  （OTel 投影为 generation，gen_ai 语义约定 + token/成本自动核算）；
-- ``TelemetryMemoryAdapter``：记忆读写 → memory.read / memory.write span
-  （机制平面，verbose 档调试细节）。
+ADR-0186 / ADR-0192: every durable fact routes through
+``Session.append``. ``TelemetryLLMAdapter`` previously dual-wrote to
+the legacy journal (``record(StepTextDelta/ReasoningDelta/LlmCallCompleted)``)
+through ``facade.record()`` which only landed in ``InMemoryJournalStore``
+plus projection fan-out — never the ``<run_id>.spine.jsonl``. That dual
+path has zero readers outside descriptors/tests and is removed.
+
+What stays:
+
+- ``emit_llm_call_start`` / ``emit_llm_call_end`` → ``Session.append``
+- ``emit_llm_stream_token`` (channel_kind reasoning | output) → ``Session.append``
+- ``emit_llm_stream_stall`` (idle timeout) → ``Session.append``
+- ``cursor.advance("think", ...)`` for ``phase.think.fold`` (cursor SSOT)
+
+What goes:
+
+- ``record(StepTextDelta)`` / ``record(ReasoningDelta)`` / ``record(LlmCallCompleted)``
+- ``record_llm_completion`` (no spine EP for ``llm.complete``)
+- The ``MemoryJournal`` ``record()`` facade, ``RunStore``, ``InMemoryJournalStore``
+  — these are legacy journal storage and are still used by harness/test
+  paths, so they remain at the storage layer; the active production
+  emit path no longer writes to them.
 """
 
 from __future__ import annotations
@@ -17,37 +35,21 @@ from typing import Any, cast
 
 import structlog
 
-from lca.contracts.atoms.enums.enums import LLMStreamEventType, StreamChannel
+from lca.contracts.atoms.enums.enums import LLMStreamEventType
 from lca.contracts.harness.memory.events import ThinkingCompleted, ThinkingDelta
 from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
-from lca.contracts.models.observability.journal.journal import (
-    LlmCallCompleted,
-    ReasoningCompleted,
-    ReasoningDelta,
-    StepTextDelta,
-)
 from lca.contracts.protocols import LLMAdapter
 from lca.contracts.protocols.observability.llm_spine_emit import LlmSpineEmitter
-from lca.infrastructure.observability.adapters.memory_adapter import (
-    TelemetryMemoryAdapter as TelemetryMemoryAdapter,
-)
-from lca.infrastructure.observability.diagnostics.diagnostic_emitters import record_llm_completion
-from lca.infrastructure.observability.facade.facade.facade import record
 from lca.infrastructure.observability.stream.llm_stream_activity import (
-    LLM_STREAM_IDLE_TIMEOUT_S,
     LlmStreamActivityTracker,
 )
-from lca.infrastructure.observability.stream.response_text_stream import ResponseTextStreamExtractor
 
 _PERF_COUNTER_SCALE = 1000
-"""perf_counter 秒 → 毫秒换算。"""
 
 SessionAppend = Callable[[Any], Awaitable[object] | None]
-"""Session thinking.* 双写注入口签名。
+"""Session thinking.* 注入口（optional, no-op when unbound）。
 
-接受一个 session 事件 payload dataclass（``ThinkingDelta`` /
-``ThinkingCompleted``）；实现可以是同步（返回 ``None``）或异步
-（返回 awaitable，由调用方 await）。append 失败向上抛，不吞。
+未注入 ``session_append`` 时 thinking events 静默丢弃；append 抛错向上传。
 """
 
 _log = structlog.get_logger("lca.telemetry_llm")
@@ -71,11 +73,6 @@ def _usage_of(response: LLMResponse) -> tuple[int, int]:
 
 
 def _stream_observability_kwargs(kwargs: dict[str, Any]) -> tuple[int, int, dict[str, Any]]:
-    """Extract session ``turn`` / journal ``step`` before forwarding kwargs.
-
-    两个键都是观测专用（``_OBSERVABILITY_KWARG_KEYS`` 同步登记），不得
-    透传给 provider API。
-    """
     turn = kwargs.get("turn", 0)
     if not isinstance(turn, int):
         turn = 0
@@ -97,7 +94,19 @@ def _maybe_fail_model(*, turn: int, step: int, error: str) -> None:
 
 
 class TelemetryLLMAdapter(LLMAdapter):
-    """装饰器：LLM 边界记录 LlmCallCompleted，不持有后端（ambient journal）。"""
+    """Decorator: Session EP emit only — no legacy journal writes.
+
+    Owns LLM call boundary observability:
+
+    - ``llm.call.start`` / ``llm.call.end`` via :class:`LlmSpineEmitter`
+      (Session runtime → ``<run_id>.spine.jsonl``)
+    - ``llm.stream.token`` per delta (reasoning | output)
+    - ``llm.stream.stall`` on idle timeout
+    - ``phase.think.fold`` via cursor SSOT (ADR-0169 P2)
+
+    The class name stays for the assembly seam (``instrument_llm``);
+    the behaviour is single-writer — no :func:`facade.record` calls.
+    """
 
     name = "telemetry-llm"
 
@@ -109,13 +118,12 @@ class TelemetryLLMAdapter(LLMAdapter):
         session_append: SessionAppend | None = None,
         spine_emit: LlmSpineEmitter | None = None,
     ) -> None:
-        """装配参数。
-
-        ``session_append``：可选 Session 双写注入口（见 :data:`SessionAppend`）。
-        ``spine_emit``：LLM spine EP 生产入口，由组合根注入（ADR-0194 P2-13）。
-        """
         self._inner = inner
         self.name = f"telemetry({getattr(inner, 'name', type(inner).__name__)})"
+        from lca.infrastructure.observability.stream.llm_stream_activity import (
+            LLM_STREAM_IDLE_TIMEOUT_S,
+        )
+
         self._idle_timeout_s = (
             LLM_STREAM_IDLE_TIMEOUT_S if idle_timeout_s is None else idle_timeout_s
         )
@@ -131,18 +139,11 @@ class TelemetryLLMAdapter(LLMAdapter):
 
     @property
     def inner(self) -> LLMAdapter:
-        """被装饰的 LLM 适配器（组合无损性内省用）。"""
+        """Decorated adapter (composition introspection)."""
         return self._inner
 
-    # COMPAT(delete-when: UI / 子 session 完全改从 Session thinking.* fold 读取,
-    #   且 Journal ReasoningDelta / ReasoningCompleted 读取方清零(rg 计数为 0);
-    #   tracking: thinking.* Session 双写改动, 2026-09-04)
     async def _append_thinking_session_event(self, payload: object) -> None:
-        """把 reasoning 事件追加到 Session 平面（双写,可选注入）。
-
-        未注入 ``session_append`` 时 no-op。append 抛错向上传播
-        （fail-loud,与 Journal record 同边界）。
-        """
+        """Append thinking event to Session (optional injection)."""
         if self._session_append is None:
             return
         result = self._session_append(payload)
@@ -150,13 +151,10 @@ class TelemetryLLMAdapter(LLMAdapter):
             await result
 
     def _schedule_thinking_session_event(self, payload: object) -> None:
-        """Fire-and-forget Session thinking delta — keep LLM stream unblocked."""
+        """Fire-and-forget thinking delta — keep LLM stream unblocked."""
         if self._session_append is None:
             return
-
         append = self._session_append
-        if append is None:
-            return
 
         async def _run() -> None:
             try:
@@ -166,15 +164,13 @@ class TelemetryLLMAdapter(LLMAdapter):
             except Exception:
                 _log.warning("thinking_session_append_failed", exc_info=True)
 
-        # Fire-and-forget: reasoning deltas must not block the LLM read loop.
+        # Reasoning deltas must not block the LLM read loop.
         _ = asyncio.create_task(_run())  # noqa: RUF006
 
     async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
         model = _model_label(self._inner)
         started = time.perf_counter()
-        # ADR-0164: open think step at LLM boundary (auto dual-write seam).
         _open_think_step(prompt)
-        # PR-3.3: spine emits llm.call.start/end around the inner call.
         self._spine().emit_llm_call_start(
             model=model,
             stream=False,
@@ -183,7 +179,6 @@ class TelemetryLLMAdapter(LLMAdapter):
         try:
             response = await self._inner.complete(prompt, **kwargs)
         except Exception as exc:
-            self._record(model, prompt, "", False, started, 0, 0, stream=False)
             self._spine().emit_llm_call_end(
                 model=model,
                 stream=False,
@@ -194,16 +189,6 @@ class TelemetryLLMAdapter(LLMAdapter):
             _maybe_fail_model(turn=_turn, step=step, error=str(exc))
             raise
         prompt_tokens, completion_tokens = _usage_of(response)
-        self._record(
-            model,
-            prompt,
-            response.text,
-            True,
-            started,
-            prompt_tokens,
-            completion_tokens,
-            stream=False,
-        )
         self._spine().emit_llm_call_end(
             model=model,
             stream=False,
@@ -212,33 +197,28 @@ class TelemetryLLMAdapter(LLMAdapter):
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
         )
+        _advance_think_fold(model=model, ok=True)
         return response
 
     async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[LLMStreamEvent]:
         model = _model_label(self._inner)
         started = time.perf_counter()
-        accumulated_text = ""
         reasoning_text = ""
         reasoning_started: float | None = None
         reasoning_seq = 0
         final_response: LLMResponse | None = None
         turn, step, inner_kwargs = _stream_observability_kwargs(dict(kwargs))
-        delta_seq = 0
-        recorded = False
-        answer_extractor = ResponseTextStreamExtractor()
 
-        # ADR-0164: open think step at LLM stream boundary.
         _open_think_step(prompt)
-        # PR-3.3: spine emits llm.call.start at the beginning of the stream.
         self._spine().emit_llm_call_start(
             model=model,
             stream=True,
             prompt_preview=prompt,
         )
-        # llm.call.end must fire in ``finally``: consumers (``_stream_turn``)
-        # ``break`` on COMPLETED, which injects GeneratorExit and skips any
-        # code after the async-for. CancelledError is BaseException and also
-        # skipped the old ``except Exception`` end emit.
+
+        # ``llm.call.end`` must fire in ``finally`` because consumers
+        # ``_stream_turn`` ``break`` on COMPLETED, which injects GeneratorExit
+        # and skips post-yield code on some paths.
         spine_end_emitted = False
         saw_completed = False
         end_outcome: str = "success"
@@ -268,7 +248,7 @@ class TelemetryLLMAdapter(LLMAdapter):
                     aclose_fn = getattr(inner_stream, "aclose", None)
                     if callable(aclose_fn):
                         with contextlib.suppress(Exception):
-                            await cast("Any", aclose_fn())
+                            await cast("Any", aclose_fn)()
                     _log.warning(
                         "llm_stream_idle_timeout",
                         adapter=type(self._inner).__name__,
@@ -285,13 +265,6 @@ class TelemetryLLMAdapter(LLMAdapter):
                             duration_ms = int(
                                 (time.perf_counter() - reasoning_started) * _PERF_COUNTER_SCALE
                             )
-                        record(
-                            ReasoningCompleted(
-                                step=step,
-                                duration_ms=duration_ms,
-                                content_preview=reasoning_text,
-                            )
-                        )
                         await self._append_thinking_session_event(
                             ThinkingCompleted(
                                 turn=turn,
@@ -301,24 +274,6 @@ class TelemetryLLMAdapter(LLMAdapter):
                             )
                         )
                     final_response = event.response
-                    if final_response is not None:
-                        prompt_tokens, completion_tokens = _usage_of(final_response)
-                        self._record(
-                            model,
-                            prompt,
-                            final_response.text,
-                            True,
-                            started,
-                            prompt_tokens,
-                            completion_tokens,
-                            stream=True,
-                            reasoning_text=reasoning_text,
-                        )
-                        recorded = True
-                    # Emit success end BEFORE yielding COMPLETED. Consumers
-                    # (``_stream_turn``) break on COMPLETED, which aclose()s the
-                    # generator and can lose post-yield finally state on some
-                    # paths; bracketing here keeps llm.call.end durable.
                     if not spine_end_emitted:
                         pt, ct = _usage_of(final_response) if final_response is not None else (0, 0)
                         self._spine().emit_llm_call_end(
@@ -336,13 +291,6 @@ class TelemetryLLMAdapter(LLMAdapter):
                         if reasoning_started is None:
                             reasoning_started = time.perf_counter()
                         reasoning_text += delta_text
-                        record(
-                            ReasoningDelta(
-                                step=step,
-                                text_delta=delta_text,
-                                seq=reasoning_seq,
-                            )
-                        )
                         self._schedule_thinking_session_event(
                             ThinkingDelta(
                                 turn=turn,
@@ -351,8 +299,9 @@ class TelemetryLLMAdapter(LLMAdapter):
                                 seq=reasoning_seq,
                             )
                         )
-                        # ADR-0167 D4b / PR-3: 流式 delta 由 coalescer 合并后落
-                        # step.thinking.reasoning，不按 token 写 EP / span —— bridge 已删。
+                        # ADR-0167 D4b / PR-3: reasoning delta coalesces into
+                        # step.thinking.reasoning; per-token EP path is the
+                        # spine ``llm.stream.token`` only.
                         self._spine().emit_llm_stream_token(
                             model=model,
                             text_delta=delta_text,
@@ -360,105 +309,20 @@ class TelemetryLLMAdapter(LLMAdapter):
                             channel_kind="reasoning",
                         )
                         reasoning_seq += 1
-                elif event.type == LLMStreamEventType.OUTPUT_TEXT_DELTA:
-                    delta_text = event.text or ""
-                    accumulated_text += delta_text
-                    record(
-                        StepTextDelta(
-                            step=step,
-                            text_delta=delta_text,
-                            seq=delta_seq,
-                            channel=StreamChannel.DECISION.value,
-                        )
-                    )
-                    # ADR-0167 D4b / PR-3: 流式 delta 不写 EP / span（已删 bridge_*）
-                    self._spine().emit_llm_stream_token(
-                        model=model,
-                        text_delta=delta_text,
-                        seq=delta_seq,
-                        channel_kind="output",
-                    )
-                    delta_seq += 1
-                    answer_delta = answer_extractor.feed(delta_text)
-                    if answer_delta:
-                        record(
-                            StepTextDelta(
-                                step=step,
-                                text_delta=answer_delta,
-                                seq=delta_seq,
-                                channel=StreamChannel.ANSWER.value,
-                            )
-                        )
-                        delta_seq += 1
                 yield event
         except asyncio.CancelledError:
             end_outcome = "cancelled"
-            if not recorded:
-                preview = final_response.text if final_response is not None else accumulated_text
-                self._record(
-                    model,
-                    prompt,
-                    preview,
-                    False,
-                    started,
-                    0,
-                    0,
-                    stream=True,
-                    reasoning_text=reasoning_text,
-                )
             raise
         except TimeoutError:
             end_outcome = "timeout"
-            if not recorded:
-                preview = final_response.text if final_response is not None else accumulated_text
-                self._record(
-                    model,
-                    prompt,
-                    preview,
-                    False,
-                    started,
-                    0,
-                    0,
-                    stream=True,
-                    reasoning_text=reasoning_text,
-                )
             _maybe_fail_model(turn=turn, step=step, error="timeout")
             raise
         except Exception as exc:
             end_outcome = "failure"
-            if not recorded:
-                preview = final_response.text if final_response is not None else accumulated_text
-                self._record(
-                    model,
-                    prompt,
-                    preview,
-                    False,
-                    started,
-                    0,
-                    0,
-                    stream=True,
-                    reasoning_text=reasoning_text,
-                )
             _maybe_fail_model(turn=turn, step=step, error=str(exc))
             raise
         finally:
             await activity.close()
-            if not recorded and end_outcome == "success":
-                _log.warning(
-                    "inner_adapter_stream_missing_completed",
-                    adapter=type(self._inner).__name__,
-                )
-                self._record(
-                    model,
-                    prompt,
-                    accumulated_text,
-                    True,
-                    started,
-                    0,
-                    0,
-                    stream=True,
-                    reasoning_text=reasoning_text,
-                )
             if not spine_end_emitted:
                 outcome = end_outcome
                 if outcome == "success" and not saw_completed:
@@ -474,68 +338,40 @@ class TelemetryLLMAdapter(LLMAdapter):
                     prompt_tokens=prompt_tokens or None,
                     completion_tokens=completion_tokens or None,
                 )
-                spine_end_emitted = True
+            # Cursor advance for phase.think.fold is unconditional: every
+            # LLM call resolves to either ``respond`` (success) or
+            # ``error`` (failure). Skip on cancelled — the loop driver
+            # owns that signal and emits its own fold.
+            if end_outcome != "cancelled":
+                _advance_think_fold(model=model, ok=(end_outcome == "success"))
 
-    @staticmethod
-    def _record(
-        model: str,
-        prompt: str,
-        response_text: str,
-        ok: bool,
-        started: float,
-        prompt_tokens: int,
-        completion_tokens: int,
-        *,
-        stream: bool,
-        reasoning_text: str = "",
-    ) -> None:
-        latency_ms = int((time.perf_counter() - started) * _PERF_COUNTER_SCALE)
-        record_llm_completion(
-            model=model,
-            stream=stream,
-            ok=ok,
-            prompt=prompt,
-            prompt_tokens=prompt_tokens,
-            response_text=response_text,
-            completion_tokens=completion_tokens,
-            latency_ms=latency_ms,
-        )
-        record(
-            LlmCallCompleted(
-                model=model,
-                ok=ok,
-                latency_ms=latency_ms,
-                prompt_preview=prompt,
-                response_preview=response_text,
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-                stream=stream,
-                reasoning_preview=reasoning_text[:1024],
-            )
-        )
-        # SSOT:phase.think.fold 由 cursor 唯一派生(ADR-0169 P2)。
-        # 历史 bug:此路径曾用 coord.emit_phase 把 ``model=`` 误传成 ``objective=``,
-        # 导致 spine 同 EP 出现 objective=模型名 与 objective=用户文本两条。
-        # 修复:直接走 cursor.advance,objective_kind 显式 ``model_name``。
-        from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
-            get_current_cursor,
-        )
 
-        cursor = get_current_cursor()
-        if cursor is not None:
-            cursor.advance(
-                "think",
-                objective_kind="model_name",
-                objective=model,
-                summary=("respond" if ok else "error"),
-            )
+def _advance_think_fold(*, model: str, ok: bool) -> None:
+    """Close the think fold via cursor (SSOT for ``phase.think.fold``).
+
+    ADR-0169 P2: cursor is the single writer; ``coord.*`` is forbidden.
+    """
+    from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
+        get_current_cursor,
+    )
+
+    cursor = get_current_cursor()
+    if cursor is None:
+        return
+    cursor.advance(
+        "think",
+        objective_kind="model_name",
+        objective=model,
+        summary=("respond" if ok else "error"),
+    )
 
 
 def _open_think_step(prompt: str) -> None:
-    """Emit think 边 via cursor —— cursor 是唯一 writer(SSOT 收口)。
+    """Emit think entry via cursor (SSOT).
 
-    ADR-0169 P2:phase.<x>.fold 由 cursor.advance 派生,禁止 coord 双写。
-    objective 必须是用户原文,显式标 ``user_text``。
+    ADR-0169 P2: ``phase.<x>.fold`` is cursor-derived. objective must
+    be the user prompt (kind ``user_text``); model name is recorded at
+    fold time, not here.
     """
     from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
         get_current_cursor,
@@ -553,3 +389,6 @@ def _open_think_step(prompt: str) -> None:
         objective=objective or "llm.complete",
         summary="started",
     )
+
+
+__all__ = ["TelemetryLLMAdapter"]
