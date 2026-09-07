@@ -31,6 +31,32 @@ RETIRED = {
     "env_flags": [
         "LCA_RUNTIME_FACADE",
     ],
+    # ADR-0200 §1 + §6.1.2 + PR-3 wire-parity post-mortem.
+    # LCA's front-end chat transport MUST NOT import the upstream
+    # AgentStreamClient: its buildWsUrl() emits `<base>/ws?operationId=...`
+    # which is the lobehub-native gateway wire path, not LCA's
+    # `/v1/runs/{run_id}/ws`. Re-using it produced the PR-3 silent
+    # mismatch where chat silently fell back to /webapi/chat/<provider>.
+    # See tests/architecture/test_lca_wire_parity.py for the SSOT guard.
+    "forbidden_imports": [
+        # Match a value import of the AgentStreamClient class only.
+        # `import type { AgentStreamEvent }` (event shapes) is fine — those
+        # mirror the wire schema and have no path-pinning. The bug is
+        # `import { AgentStreamClient }` because the class hard-codes the
+        # upstream `<base>/ws?operationId=...` URL.
+        ("lobehub-ui/src/store/chat/agents/transports/lcaGateway",
+         r"^\s*import\s*\{[^}]*\bAgentStreamClient\b",
+         "value import of upstream AgentStreamClient in lcaGateway/* — wire path mismatch, use LcaAgentStreamClient instead"),
+        ("lobehub-ui/src/store/chat/agents/transports/lcaGateway",
+         r"new\s+AgentStreamClient\b",
+         "construction of upstream AgentStreamClient in lcaGateway/* — wire path mismatch, use LcaAgentStreamClient instead"),
+    ],
+    # The original native chat dispatch path (`/webapi/chat/<provider>`)
+    # is retired from LCA's runtime; streamingExecutor.ts has a hard
+    # fail when isLcaGatewayMode() is false. We don't add a separate
+    # path audit here because the streamingExecutor hard fail + the
+    # `lcaGateway` value-import rule above already block reintroduction;
+    # a noisy false-positive on comments is worse than the gap.
 }
 
 _IGNORE_GLOBS = [
@@ -79,6 +105,13 @@ def main() -> int:
     for env in RETIRED["env_flags"]:
         for hit in _rg(env, search_paths):
             failures.append(f"retired env {env}: {hit}")
+
+    for rel_dir, pattern, why in RETIRED.get("forbidden_imports", []):
+        # Constrain the ripgrep to the directory so we don't false-positive
+        # on the patch source mirror under deploy/lobehub/patches/...
+        scoped = [rel_dir]
+        for hit in _rg(pattern, scoped):
+            failures.append(f"{why}: {hit}")
 
     if failures:
         print("FAIL: retired LCA symbols still referenced:", file=sys.stderr)

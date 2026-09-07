@@ -22,6 +22,7 @@ _UI_TRANSPORTS = "src/store/chat/agents/transports"
 _LCA_GATEWAY_DIR = f"{_UI_TRANSPORTS}/lcaGateway"
 
 _NEW_FILES = (
+    "LcaAgentStreamClient.ts",
     "connect.ts",
     "execute.ts",
     "executeGatewayRun.ts",
@@ -56,6 +57,15 @@ _RUN_BLOCK = """    /* LCA: every chat is a Run */
           params,
         });
       }
+      // LCA: hard fail. Per ADR-0200 §1 chat is exclusively routed through
+      // the LCA agent-gateway WS (LcaAgentStreamClient → /v1/runs/<id>/ws).
+      // Falling back to GeneralChatAgent would expose provider selection
+      // (e.g. /webapi/chat/qwen) which is exactly the bug this guard
+      // exists to prevent. The env must be wired before the front-end is
+      // shipped; see NEXT_PUBLIC_LCA_GATEWAY_URL in deploy/lobehub/.env.lca.
+      throw new Error(
+        '[LCA] chat attempted without LCA gateway configured. Set NEXT_PUBLIC_LCA_GATEWAY_URL.'
+      );
     }
 """
 

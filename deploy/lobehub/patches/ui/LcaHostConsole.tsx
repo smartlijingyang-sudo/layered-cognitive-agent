@@ -15,21 +15,24 @@ const encodeKey = (event: KeyboardEvent): string | null => {
     if (code >= 97 && code <= 122) return String.fromCharCode(code - 96);
   }
   if (event.key === 'Enter') return '\r';
-  if (event.key === 'Backspace') return '\x7f';
+  if (event.key === 'Backspace') return '\x7F';
   if (event.key === 'Tab') return '\t';
-  if (event.key === 'Escape') return '\x1b';
-  if (event.key === 'ArrowUp') return '\x1b[A';
-  if (event.key === 'ArrowDown') return '\x1b[B';
-  if (event.key === 'ArrowRight') return '\x1b[C';
-  if (event.key === 'ArrowLeft') return '\x1b[D';
-  if (event.key === 'Home') return '\x1b[H';
-  if (event.key === 'End') return '\x1b[F';
-  if (event.key === 'Delete') return '\x1b[3~';
+  if (event.key === 'Escape') return '\x1B';
+  if (event.key === 'ArrowUp') return '\x1B[A';
+  if (event.key === 'ArrowDown') return '\x1B[B';
+  if (event.key === 'ArrowRight') return '\x1B[C';
+  if (event.key === 'ArrowLeft') return '\x1B[D';
+  if (event.key === 'Home') return '\x1B[H';
+  if (event.key === 'End') return '\x1B[F';
+  if (event.key === 'Delete') return '\x1B[3~';
   if (event.key.length === 1) return event.key;
   return null;
 };
 
-const LcaHostConsole = memo(() => {
+const isLcaHostConsoleEnabled =
+  typeof process !== 'undefined' && process.env.NEXT_PUBLIC_LCA_HOST_CONSOLE === '1';
+
+const LcaHostConsoleInner = () => {
   const [open, setOpen] = useState(false);
   const [devices, setDevices] = useState<Device[]>([]);
   const [buffer, setBuffer] = useState('');
@@ -108,12 +111,12 @@ const LcaHostConsole = memo(() => {
   return (
     <>
       <button
+        style={fabStyle}
+        type="button"
         onClick={() => {
           setOpen((value) => !value);
           if (!open && online) void attach(online.deviceId);
         }}
-        style={fabStyle}
-        type="button"
       >
         {online ? '本机终端' : '终端离线'}
       </button>
@@ -122,25 +125,25 @@ const LcaHostConsole = memo(() => {
           <div style={headerStyle}>
             <span>{online ? `${online.hostname} · ${status}` : 'host sidecar 未连接'}</span>
             <button
+              type="button"
               onClick={() => {
                 wsRef.current?.close();
                 setOpen(false);
               }}
-              type="button"
             >
               关闭
             </button>
           </div>
           <pre
+            ref={screenRef}
+            style={screenStyle}
+            tabIndex={0}
             onKeyDown={(event) => {
               const data = encodeKey(event.nativeEvent);
               if (!data || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
               event.preventDefault();
               wsRef.current.send(JSON.stringify({ data, type: 'input' }));
             }}
-            ref={screenRef}
-            style={screenStyle}
-            tabIndex={0}
           >
             {buffer || (online ? '点击此区域后开始输入' : '启动栈后会自动连上本机 host')}
           </pre>
@@ -148,7 +151,11 @@ const LcaHostConsole = memo(() => {
       ) : null}
     </>
   );
-});
+};
+
+const LcaHostConsole = memo(() =>
+  isLcaHostConsoleEnabled ? <LcaHostConsoleInner /> : null,
+);
 
 LcaHostConsole.displayName = 'LcaHostConsole';
 

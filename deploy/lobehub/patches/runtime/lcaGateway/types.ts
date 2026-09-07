@@ -8,9 +8,13 @@
 // independent so server-side type drift fails at the patch boundary.
 
 import type {
-  AgentStreamClient,
-  AgentStreamClientOptions,
+  AgentStreamClientEvents,
+  AgentStreamEvent,
+  ConnectionStatus,
 } from '@lobechat/agent-gateway-client';
+
+import type { LcaAgentStreamClient as LcaAgentStreamClientImpl } from './LcaAgentStreamClient';
+import type { LcaAgentStreamClientOptions } from './LcaAgentStreamClient';
 
 export interface LcaRunReceipt {
   run_id: string;
@@ -34,5 +38,12 @@ export interface LcaConnectParams {
   resumeOnConnect?: boolean;
 }
 
-export type LcaAgentStreamClient = AgentStreamClient;
-export type LcaAgentStreamClientOptions = AgentStreamClientOptions;
+/**
+ * The LCA WS client. Public shape is compatible with the upstream
+ * AgentStreamClient so createLcaGatewayEventHandler (which is the
+ * re-exported upstream handler) keeps working unchanged. See
+ * LcaAgentStreamClient.ts for the full rationale.
+ */
+export type LcaAgentStreamClient = LcaAgentStreamClientImpl;
+export type { LcaAgentStreamClientOptions };
+export type { AgentStreamClientEvents, AgentStreamEvent, ConnectionStatus };
