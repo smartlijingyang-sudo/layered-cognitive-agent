@@ -317,6 +317,7 @@ ignore_missing_imports = true
 [tool.pyright]
 pythonVersion = "3.11"
 typeCheckingMode = "basic"
+venvPath = ".venv"
 include = ["lca"]
 exclude = [
     "vendor/**",
@@ -329,7 +330,7 @@ exclude = [
 reportMissingImports = true
 
 [[tool.pyright.overrides]]
-module = ["langfuse", "langfuse.*"]
+module = ["langfuse", "langfuse.*", "structlog", "structlog.*"]
 reportMissingImports = false
 
 [tool.pytest.ini_options]

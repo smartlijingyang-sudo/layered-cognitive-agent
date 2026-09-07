@@ -138,9 +138,9 @@ def _now_ms() -> int:
     return int(time.time() * 1000)
 
 
-def _parse_redis_stream_row(row: tuple[str, dict]) -> dict:
+def _parse_redis_stream_row(row: tuple[object, dict[str, object]]) -> dict[str, object]:
     msg_id, fields = row
-    out: dict = {"id": msg_id, "type": fields.get("type")}
+    out: dict[str, object] = {"id": msg_id, "type": fields.get("type")}
     try:
         out["stepIndex"] = int(fields.get("stepIndex", "0"))
     except (TypeError, ValueError):

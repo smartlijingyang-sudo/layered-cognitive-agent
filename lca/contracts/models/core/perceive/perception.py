@@ -37,6 +37,7 @@ ItemKind = Literal[
     "policy_fact",
     "memory",
     "subtasks",
+    "convergence_task_class",
 ]
 
 

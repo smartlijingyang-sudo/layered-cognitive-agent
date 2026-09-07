@@ -4,7 +4,7 @@ All 18 event types are present. The `data` payload shape matches the TS
 interface for the same event type.
 """
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -20,11 +20,11 @@ class _WireBase(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    def model_dump(self, **kwargs):  # type: ignore[override]
+    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         kwargs.setdefault("exclude_none", True)
         return super().model_dump(**kwargs)
 
-    def model_dump_json(self, **kwargs):  # type: ignore[override]
+    def model_dump_json(self, **kwargs: Any) -> str:
         kwargs.setdefault("exclude_none", True)
         return super().model_dump_json(**kwargs)
 

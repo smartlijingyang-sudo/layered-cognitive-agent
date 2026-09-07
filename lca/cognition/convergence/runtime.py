@@ -40,7 +40,15 @@ class ConvergenceRuntime:
     ) -> ConvergenceVerdict:
         evaluate_budget = getattr(self.policy, "evaluate_budget_exhausted", None)
         if callable(evaluate_budget):
-            return evaluate_budget(state, evidence=evidence)
+            result = evaluate_budget(state, evidence=evidence)
+            if isinstance(result, ConvergenceVerdict):
+                return result
+            # Fallback if the dynamic method returns something unexpected
+            return ConvergenceVerdict(
+                kind="grace_respond",
+                rationale="budget exhausted (dynamic evaluator returned non-verdict)",
+                evidence=evidence,
+            )
         if evidence.satisfied:
             return ConvergenceVerdict(
                 kind="grace_respond",

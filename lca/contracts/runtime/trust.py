@@ -21,7 +21,7 @@ or ``lca.plugins``.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Self
+from typing import Literal, Self, cast
 
 __all__ = (
     "EMPTY_TRUST_ENVELOPE",
@@ -157,7 +157,7 @@ class TrustEnvelope:
         :class:`SessionActivation` and then attempting any action
         fail-closes by construction.
         """
-        return EMPTY_TRUST_ENVELOPE
+        return cast("Self", EMPTY_TRUST_ENVELOPE)
 
     def grants(self, privilege: str) -> bool:
         """Pure membership check: is ``privilege`` in the granted set?"""
