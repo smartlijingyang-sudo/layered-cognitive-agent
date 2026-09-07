@@ -21,6 +21,7 @@ dependencies = [
     "taiyi-cosmokit",
     "taiyi-schemastery",
     "ulid-py>=1.0.0",
+    "redis>=8.1.0",
 ]
 
 [tool.uv.sources]
@@ -251,6 +252,9 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101"]
+# Infra-side test subdirs (e.g. lca/infrastructure/observability/stream/tests/) live
+# inside the package tree, not under tests/. Mirror the same allowance here.
+"lca/**/tests/*.py" = ["S101"]
 "tests/lca_plugins/transport/**/*.py" = ["TC002"]
 "gateway/*" = ["TC002"]
 "scripts/*" = ["S101"]
