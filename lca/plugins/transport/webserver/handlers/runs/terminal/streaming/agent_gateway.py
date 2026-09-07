@@ -84,13 +84,13 @@ def build_agent_gateway_app(*, run_port: RunPort | None = None) -> Starlette:
             )
         except WebSocketDisconnect:
             return
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             print(f"[lca_agent_gateway] unhandled: {exc!r}", flush=True)
         finally:
             if websocket.client_state != WebSocketState.DISCONNECTED:
                 try:
                     await websocket.close()
-                except Exception:  # noqa: BLE001
+                except Exception:
                     pass
 
     return Starlette(routes=[WebSocketRoute("/v1/runs/{run_id}/ws", handler)])
@@ -171,7 +171,7 @@ async def _live_loop(
                 if pump_stop.is_set():
                     return
                 await frame_queue.put(frame)
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
 
     async def _drain_queue() -> list[bytes]:
@@ -199,7 +199,7 @@ async def _live_loop(
                     timeout=_RACE_TIMEOUT_S,
                     return_when=asyncio.FIRST_COMPLETED,
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 recv_task.cancel()
                 continue
 
@@ -226,7 +226,7 @@ async def _live_loop(
                     msg = recv_task.result()
                 except WebSocketDisconnect:
                     return
-                except Exception:  # noqa: BLE001
+                except Exception:
                     msg = None
                 if msg is not None:
                     handled = await _handle_control_frame(
@@ -241,7 +241,7 @@ async def _live_loop(
             recv_task.cancel()
             try:
                 await recv_task
-            except (asyncio.CancelledError, WebSocketDisconnect, Exception):  # noqa: BLE001
+            except (asyncio.CancelledError, WebSocketDisconnect, Exception):
                 pass
     finally:
         pump_stop.set()
@@ -249,7 +249,7 @@ async def _live_loop(
             pump_task.cancel()
             try:
                 await pump_task
-            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+            except (asyncio.CancelledError, Exception):
                 pass
 
 
@@ -269,7 +269,7 @@ async def _handle_control_frame(
         if run_port is not None:
             try:
                 await run_port.cancel(run_id)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass
         return "interrupt"
     if mtype == "tool_result":
@@ -281,7 +281,7 @@ async def _handle_control_frame(
                     msg.get("content", ""),
                     msg.get("idempotencyKey", ""),
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass
         return "ok"
     return "ok"
