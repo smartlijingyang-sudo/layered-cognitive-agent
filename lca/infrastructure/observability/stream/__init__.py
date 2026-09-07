@@ -5,6 +5,7 @@ in the native LobeHub implementation. Same Redis key prefix, same TTL,
 same MAXLEN.
 """
 
+from lca.infrastructure.observability.stream.redis_client import get_agent_runtime_redis_client
 from lca.infrastructure.observability.stream.stream_event_manager import LcaStreamEventManager
 
-__all__ = ("LcaStreamEventManager",)
+__all__ = ("LcaStreamEventManager", "get_agent_runtime_redis_client")
