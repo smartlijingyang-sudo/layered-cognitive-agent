@@ -32,6 +32,9 @@
 | `migrate_layer_rename.py` (planned) | Phase 2 layer 名迁移辅助 | ADR-0104 语义化 | N/A | Phase 2 |
 | `quarterly_legacy_cleanup.py` (planned) | legacy_blacklist 季度清理 | Phase 3 §6.6 | N/A | Phase 3 |
 | `lint-imports`（import-linter） | 5 + 10 + 1 contracts: layers + forbidden + independence | ADR-0061 plugin manifest | 是 | baseline + Phase 1 |
+| `tests/architecture/test_0199_doctor_golden.py` | P2-10 golden profiles doctor baseline（不漂移） | [ADR-0199 §11 HPC-L5 / §13.3 / §17 #3](../adr/0199-hermes-inspired-cognitive-plugin-convergence.md) | 是 | Phase 2 |
+| `tests/architecture/test_0199_doctor_ci_gate.py` | P2-12 严格 CI 门：`errors == 0` 8 golden profiles（无 baseline 容忍） | [ADR-0199 §11 HPC-L5 / §17 #3](../adr/0199-hermes-inspired-cognitive-plugin-convergence.md) | 是 | Phase 2 |
+| `tests/infrastructure/cli/test_doctor_ci_integration.py` | P2-12 CLI 集成门：`lca-ops doctor profile --ci --json` 退出码契约 | [ADR-0199 §5.3 / §11 HPC-L5](../adr/0199-hermes-inspired-cognitive-plugin-convergence.md) | 是 | Phase 2 |
 
 ## 验证命令
 
@@ -49,6 +52,11 @@ uv run python scripts/check_package_contracts.py
 
 # 仅 import-linter
 uv run lint-imports
+
+# 仅 Doctor CI 门（ADR-0199 §11 HPC-L5 + §17 #3）
+uv run pytest tests/architecture/test_0199_doctor_golden.py \
+              tests/architecture/test_0199_doctor_ci_gate.py \
+              tests/infrastructure/cli/test_doctor_ci_integration.py -v --no-cov --noconftest
 ```
 
 ## 新增检查脚本的规则
@@ -58,6 +66,32 @@ uv run lint-imports
 3. 必须更新本文档的"检查脚本索引"表
 4. CI 默认阻塞（除非有明确 warning 理由）
 5. 不允许"实现细节放在 check 脚本里"——check 只检查，不修复
+
+## Doctor CI Gate (ADR-0199 §11 HPC-L5 + §17 #3)
+
+`lca-ops doctor profile --ci` 是 Plugin Doctor 的 CI 入口（ADR-0199 §5.3）。
+CI 模式下退出码即诊断结论：`errors == 0` → exit 0；`errors ≥ 1` → exit 1。
+按 ADR-0199 §17 #3 的验收目标，**8 个 golden profile 在 doctor `--ci` 下零 error**。
+
+CI 注册位置：`.github/workflows/ci.yml::quality::Doctor CI gate`。
+该 step 依次运行：
+
+```text
+tests/architecture/test_0199_doctor_golden.py     # P2-10 baseline 容忍（不漂移）
+tests/architecture/test_0199_doctor_ci_gate.py   # P2-12 严格门（errors == 0）
+tests/infrastructure/cli/test_doctor_ci_integration.py  # P2-12 CLI 退出码契约
+```
+
+| 测试文件 | 角色 |
+|---|---|
+| `test_0199_doctor_golden.py` | baseline 比对，记录既有 findings 漂移（pre-existing 失败被允许） |
+| `test_0199_doctor_ci_gate.py` | 严格门：每个 golden profile `summary.errors == 0`（无容忍） |
+| `test_doctor_ci_integration.py` | CLI 表面：`typer.testing.CliRunner` 跑真 CLI 二进制入口，验证 exit code 与 JSON schema |
+
+注意：P2-04 `PluginShapeDoctor` 子进程（`scripts/check_plugin_shape.py`）
+在重定向 stdout 下会挂起，已在 P2-10 baseline 注释中记录。当前严格门和
+CLI 集成门使用 `include_plugin_shape=False` 绕过此既有失败；后续 PR
+修复子进程 TTY 处理后再恢复默认。
 
 ## 相关文档
 
