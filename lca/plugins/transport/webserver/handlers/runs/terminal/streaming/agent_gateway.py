@@ -27,6 +27,7 @@ queue-drain against `ws.receive_text` with `asyncio.wait(..., return_when=FIRST_
 A short timeout (0.5s) bounds each iteration so a stale `recv`
 future cannot wedge the loop.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -138,13 +139,17 @@ async def _run_session(
 
     if run_id is not None:
         history = await stream_manager.read_history(run_id, count=1000)
+        terminal_status = _terminal_status_from_history(history)
         history.reverse()
         for ev in history:
             if ev.get("id") and last_id != "0" and ev["id"] <= last_id:
                 continue
             await _send_agent_event(ws, ev)
         if want_status:
-            status = "completed" if not await stream_manager.exists(run_id) else "running"
+            if terminal_status is not None:
+                status = terminal_status
+            else:
+                status = "running" if await stream_manager.exists(run_id) else "completed"
             await ws.send_json({"type": "resume_complete", "status": status})
             if status in ("completed", "error", "interrupted"):
                 await ws.send_json({"type": "session_complete"})
@@ -214,12 +219,16 @@ async def _live_loop(
                 if ws.client_state == WebSocketState.DISCONNECTED:
                     return
                 try:
-                    await ws.send_bytes(frame)
+                    ev = _parse_sse_agent_event_frame(frame)
+                    if ev is None:
+                        continue
+                    if await _forward_stream_event(ws, ev):
+                        return
                 except (WebSocketDisconnect, RuntimeError):
                     return
-                next_id = _extract_id_from_sse_frame(frame)
+                next_id = ev.get("id") if ev is not None else None
                 if next_id:
-                    last_id = next_id
+                    last_id = str(next_id)
 
             # 2. If a control frame arrived, handle it.
             if recv_task in done:
@@ -302,7 +311,7 @@ async def _recv_json(ws: WebSocket) -> dict | None:
     for line in payload.split("\n"):
         if line.startswith("data:"):
             try:
-                return json.loads(line[len("data:"):].strip())
+                return json.loads(line[len("data:") :].strip())
             except json.JSONDecodeError:
                 continue
     try:
@@ -327,6 +336,63 @@ async def _send_agent_event(ws: WebSocket, ev: dict) -> None:
     await ws.send_json(envelope)
 
 
+async def _forward_stream_event(ws: WebSocket, ev: dict) -> bool:
+    """Forward one Redis stream row; return True when the run is terminal."""
+    await _send_agent_event(ws, ev)
+    if ev.get("type") != "agent_runtime_end":
+        return False
+    await ws.send_json({"type": "session_complete"})
+    return True
+
+
+def _terminal_status_from_history(history: list[dict]) -> str | None:
+    """Map the newest terminal event in history to a resume_complete status."""
+    for ev in history:
+        if ev.get("type") != "agent_runtime_end":
+            continue
+        data = ev.get("data") or {}
+        reason = str(data.get("reason") or "completed")
+        final_state = data.get("finalState") or {}
+        status = str(final_state.get("status") or reason)
+        if status in {"completed", "done"}:
+            return "completed"
+        if status in {"error", "failed"}:
+            return "error"
+        if status in {"interrupted", "canceled", "cancelled"}:
+            return "interrupted"
+        if status in {"waiting_input", "waiting_for_human", "waiting_for_async_tool"}:
+            return "waiting_input"
+        return "completed"
+    return None
+
+
+def _parse_sse_agent_event_frame(frame: bytes) -> dict | None:
+    """Decode one subscribe() SSE frame back into a Redis stream row."""
+    try:
+        text = frame.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    for line in text.split("\n"):
+        if not line.startswith("data:"):
+            continue
+        try:
+            envelope = json.loads(line[len("data:") :].strip())
+        except json.JSONDecodeError:
+            continue
+        if envelope.get("type") != "agent_event":
+            continue
+        inner = envelope.get("event") or {}
+        return {
+            "id": envelope.get("id"),
+            "type": inner.get("type"),
+            "data": inner.get("data"),
+            "operationId": inner.get("operationId"),
+            "stepIndex": inner.get("stepIndex", 0),
+            "timestamp": inner.get("timestamp", 0),
+        }
+    return None
+
+
 def _extract_id_from_sse_frame(frame: bytes) -> str | None:
     """Parse an SSE-shaped frame for the `id:` line, return its value or None."""
     try:
@@ -335,7 +401,7 @@ def _extract_id_from_sse_frame(frame: bytes) -> str | None:
         return None
     for line in text.split("\n"):
         if line.startswith("id:"):
-            return line[len("id:"):].strip() or None
+            return line[len("id:") :].strip() or None
     return None
 
 
@@ -348,9 +414,7 @@ def make_production_ws_handler() -> Any:
         run_id = websocket.path_params.get("run_id")
         run_port: RunPort | None = getattr(websocket.app.state, "run_port", None)
         jwt_keys = getattr(websocket.app.state, "jwt_keys", None)
-        public_pem = (
-            getattr(jwt_keys, "public_pem", None) if jwt_keys is not None else None
-        )
+        public_pem = getattr(jwt_keys, "public_pem", None) if jwt_keys is not None else None
         await websocket.accept()
         try:
             await _run_session(

@@ -7,19 +7,20 @@ PR-2 Task 12 follow-up: after ``RunPort.create_and_dispatch`` succeeds,
    (required by ``refresh_ws_token`` EXISTS check).
 2. ``RunningOperationStore.insert`` records the topic → run mapping
    (required by ``GET /v1/topics/{topic_id}/running-op``).
-3. A background task pumps ``LiveRunProjection`` events into Redis
-   via ``coordinator.handle_stamped`` (the WS broadcaster).
+3. A background task observes the run's Session log and publishes
+   AgentStreamEvents into Redis via ``coordinator.handle_stamped``
+   (the WS broadcaster).
 """
 
 from __future__ import annotations
 
-import asyncio
-import contextlib
 from typing import Any
 
 from starlette.requests import Request
 
-from lca.contracts.models.observability.journal.journal import StampedEvent
+from lca.application.runtime.coordinator.session_gateway_pump import (
+    schedule_gateway_session_pump,
+)
 
 
 def topic_id_from_body(body: dict[str, Any]) -> str:
@@ -35,38 +36,6 @@ def topic_id_from_body(body: dict[str, Any]) -> str:
             if isinstance(raw, str) and raw.strip():
                 return raw.strip()
     return ""
-
-
-def _stamped_payload(stamped: StampedEvent) -> dict[str, Any]:
-    event_body = dict(stamped.data) if stamped.data else {}
-    if "type" not in event_body:
-        event_body["type"] = stamped.event_type or type(stamped.event).__name__
-    return {"event": event_body}
-
-
-async def _pump_gateway_tail(session: Any, coordinator: Any) -> None:
-    run_id = session.run_id
-    try:
-        sub = session.tail.subscribe(after_seq=0)
-        async for item in sub:
-            if isinstance(item, StampedEvent):
-                await coordinator.handle_stamped(run_id, _stamped_payload(item))
-    except asyncio.CancelledError:
-        raise
-    except Exception:
-        return
-    finally:
-        with contextlib.suppress(Exception):
-            await coordinator.synthesize_terminal_if_pending(run_id, session=session)
-
-
-def _schedule_tail_pump(session: Any, coordinator: Any) -> None:
-    if getattr(session, "_gateway_pump_task", None) is not None:
-        return
-    session._gateway_pump_task = asyncio.create_task(
-        _pump_gateway_tail(session, coordinator),
-        name=f"gateway-pump:{session.run_id}",
-    )
 
 
 async def register_gateway_run(
@@ -106,7 +75,11 @@ async def register_gateway_run(
             "assistant_message_id": assistant_message_id,
         },
     )
-    _schedule_tail_pump(session, coordinator)
+    schedule_gateway_session_pump(
+        session,
+        coordinator,
+        assistant_message_id=assistant_message_id,
+    )
 
 
 __all__ = ("register_gateway_run", "topic_id_from_body")

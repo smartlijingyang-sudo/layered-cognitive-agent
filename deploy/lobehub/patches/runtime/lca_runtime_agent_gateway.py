@@ -586,6 +586,191 @@ def _patch_gateway_create_client(ctx: PatchContext) -> bool:
     return True
 
 
+def _patch_gateway_lca_routing(ctx: PatchContext) -> bool:
+    """Keep LCA chat off execAgentTask; wire reconnect token for run_* WS."""
+    rel = "src/store/chat/slices/agentRun/actions/transports/gateway/gateway.ts"
+    text = ctx.read(rel)
+    marker = "/* LCA-P1: disable native gateway routing when LCA WS is active */"
+    if marker in text:
+        return False
+
+    import_anchor = "import { isLcaGatewayMode } from '@/store/chat/slices/agentRun/actions/dispatch/agentDispatcher';"
+    if import_anchor not in text:
+        raise SystemExit("[lca_runtime_agent_gateway] gateway isLcaGatewayMode import missing")
+    text = text.replace(
+        import_anchor,
+        "import { getLcaGatewayUrl } from '@/store/chat/agents/transports/lcaGateway/client';\n"
+        + import_anchor,
+        1,
+    )
+
+    old_enabled = (
+        "  isGatewayModeEnabled = (agentId?: string): boolean => {\n"
+        "    const serverConfig = window.global_serverConfigStore?.getState()?.serverConfig;"
+    )
+    new_enabled = (
+        "  isGatewayModeEnabled = (agentId?: string): boolean => {\n"
+        "    /* LCA-P1: disable native gateway routing when LCA WS is active */\n"
+        "    // LCA chat: POST /runs + LCA WS via executeClientAgent→lcaExecuteGatewayRun.\n"
+        "    if (isLcaGatewayMode()) return false;\n"
+        "\n"
+        "    const serverConfig = window.global_serverConfigStore?.getState()?.serverConfig;"
+    )
+    if old_enabled not in text:
+        raise SystemExit("[lca_runtime_agent_gateway] isGatewayModeEnabled anchor not found")
+    text = text.replace(old_enabled, new_enabled, 1)
+
+    old_reconnect_sig = (
+        "  reconnectToGatewayOperation = async (params: {\n"
+        "    assistantMessageId: string;\n"
+        "    operationId: string;\n"
+        "    scope?: string;\n"
+        "    threadId?: string | null;\n"
+        "    topicId: string;\n"
+        "  }): Promise<void> => {\n"
+        "    const { assistantMessageId, operationId, topicId, scope, threadId } = params;\n"
+        "\n"
+        "    const agentGatewayUrl =\n"
+        "      window.global_serverConfigStore?.getState()?.serverConfig?.agentGatewayUrl;\n"
+        "    if (!agentGatewayUrl) return;"
+    )
+    new_reconnect_sig = (
+        "  reconnectToGatewayOperation = async (params: {\n"
+        "    assistantMessageId: string;\n"
+        "    operationId: string;\n"
+        "    scope?: string;\n"
+        "    threadId?: string | null;\n"
+        "    topicId: string;\n"
+        "    token?: string;\n"
+        "  }): Promise<void> => {\n"
+        "    const { assistantMessageId, operationId, topicId, scope, threadId, token: suppliedToken } =\n"
+        "      params;\n"
+        "\n"
+        "    const agentGatewayUrl = isLcaGatewayMode()\n"
+        "      ? getLcaGatewayUrl()\n"
+        "      : window.global_serverConfigStore?.getState()?.serverConfig?.agentGatewayUrl;\n"
+        "    if (!agentGatewayUrl) return;"
+    )
+    if old_reconnect_sig not in text:
+        raise SystemExit("[lca_runtime_agent_gateway] reconnectToGatewayOperation sig anchor not found")
+    text = text.replace(old_reconnect_sig, new_reconnect_sig, 1)
+
+    old_token = (
+        "    // Get a fresh JWT token (original expired after 5 min). The server throws\n"
+        "    // TRPCError NOT_FOUND when it has no running operation on this topic — our\n"
+        "    // local marker is stale (e.g. an error run cleared the server marker but not\n"
+        "    // the store). Clear it and bail silently so the reconnect SWR fetcher resolves\n"
+        "    // and does not retry the 404 forever.\n"
+        "    let token: string;\n"
+        "    try {\n"
+        "      ({ token } = await aiAgentService.refreshGatewayToken(topicId));\n"
+        "    } catch (error) {\n"
+        "      if (isTrpcErrorCode(error, 'NOT_FOUND')) {\n"
+        "        this.clearLocalRunningOperation({ operationId, topicId });\n"
+        "        return;\n"
+        "      }\n"
+        "      throw error;\n"
+        "    }"
+    )
+    new_token = (
+        "    // Mint or reuse JWT for WS auth (LCA: run_* + ws_token; native: tRPC).\n"
+        "    let token: string;\n"
+        "    if (isLcaGatewayMode()) {\n"
+        "      if (suppliedToken && suppliedToken.length > 0) {\n"
+        "        token = suppliedToken;\n"
+        "      } else {\n"
+        "        const { lcaRefreshWsToken } = await import(\n"
+        "          '@/store/chat/agents/transports/lcaGateway/reconnect'\n"
+        "        );\n"
+        "        try {\n"
+        "          token = await lcaRefreshWsToken(operationId, 'lca-local');\n"
+        "        } catch {\n"
+        "          this.clearLocalRunningOperation({ operationId, topicId });\n"
+        "          return;\n"
+        "        }\n"
+        "      }\n"
+        "    } else {\n"
+        "      try {\n"
+        "        ({ token } = await aiAgentService.refreshGatewayToken(topicId));\n"
+        "      } catch (error) {\n"
+        "        if (isTrpcErrorCode(error, 'NOT_FOUND')) {\n"
+        "          this.clearLocalRunningOperation({ operationId, topicId });\n"
+        "          return;\n"
+        "        }\n"
+        "        throw error;\n"
+        "      }\n"
+        "    }"
+    )
+    if old_token not in text:
+        raise SystemExit("[lca_runtime_agent_gateway] reconnect token anchor not found")
+    text = text.replace(old_token, new_token, 1)
+
+    old_cancel = (
+        "    this.#get().onOperationCancel(gatewayOpId, async () => {\n"
+        "      await aiAgentService\n"
+        "        .interruptTask({ operationId })\n"
+        "        .catch((err) => console.error('[Gateway] interruptTask failed:', err));\n"
+        "    });\n"
+        "\n"
+        "    const eventHandler = createGatewayEventHandler(this.#get, {\n"
+        "      assistantMessageId,\n"
+        "      context,\n"
+        "      // Server-side operation id — needed for tool_result dispatch back over\n"
+        "      // the same WS that gatewayConnections is keyed on.\n"
+        "      gatewayOperationId: operationId,\n"
+        "      operationId: gatewayOpId,\n"
+        "      runLifecycle: buildRunLifecycle(this.#get, {\n"
+        "        context,\n"
+        "        parentMessageId: assistantMessageId,\n"
+        "        parentMessageType: 'assistant',\n"
+        "        runId: gatewayOpId,\n"
+        "        runScope: (context.scope === 'sub_agent' ? 'sub_agent' : 'top_level') as RunScope,\n"
+        "        runtimeType: 'gateway',\n"
+        "      }),\n"
+        "    });\n"
+        "\n"
+        "    // Same demux as the initial-run path: a reconnected supervisor WS can also"
+    )
+    new_cancel = (
+        "    this.#get().onOperationCancel(gatewayOpId, async () => {\n"
+        "      if (isLcaGatewayMode()) {\n"
+        "        const lcaToken = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';\n"
+        "        await fetch(`/lca-api/runs/${operationId}/cancel`, {\n"
+        "          headers: { Authorization: `Bearer ${lcaToken}` },\n"
+        "          method: 'POST',\n"
+        "        }).catch((err) => console.error('[LCA] cancel failed:', err));\n"
+        "        return;\n"
+        "      }\n"
+        "      await aiAgentService\n"
+        "        .interruptTask({ operationId })\n"
+        "        .catch((err) => console.error('[Gateway] interruptTask failed:', err));\n"
+        "    });\n"
+        "\n"
+        "    const eventHandler = createGatewayEventHandler(this.#get, {\n"
+        "      assistantMessageId,\n"
+        "      context,\n"
+        "      // Server-side operation id — needed for tool_result dispatch back over\n"
+        "      // the same WS that gatewayConnections is keyed on.\n"
+        "      gatewayOperationId: operationId,\n"
+        "      operationId: gatewayOpId,\n"
+        "      runLifecycle: buildRunLifecycle(this.#get, {\n"
+        "        context,\n"
+        "        parentMessageId: assistantMessageId,\n"
+        "        parentMessageType: 'assistant',\n"
+        "        runId: gatewayOpId,\n"
+        "        runScope: (context.scope === 'sub_agent' ? 'sub_agent' : 'top_level') as RunScope,\n"
+        "        runtimeType: 'gateway',\n"
+        "      }),\n"
+        "    });\n"
+        "\n"
+        "    // Same demux as the initial-run path: a reconnected supervisor WS can also"
+    )
+    if old_cancel not in text:
+        raise SystemExit("[lca_runtime_agent_gateway] reconnect cancel anchor not found")
+    ctx.write(rel, text.replace(old_cancel, new_cancel, 1))
+    return True
+
+
 def apply(ctx: PatchContext) -> bool:
     import os
 
@@ -623,6 +808,7 @@ def apply(ctx: PatchContext) -> bool:
 
     for patch_fn in (
         _patch_gateway_create_client,
+        _patch_gateway_lca_routing,
         _patch_streaming_executor,
         _patch_agent_dispatcher,
         _patch_custom_interaction_handlers,
