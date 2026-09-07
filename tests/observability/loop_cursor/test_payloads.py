@@ -51,6 +51,7 @@ def test_tool_result_record_outcome_literal() -> None:
         result_digest="x",
         result_path=None,
         outcome="ok",
+        ok=True,
     )
     assert r.outcome == "ok"
 

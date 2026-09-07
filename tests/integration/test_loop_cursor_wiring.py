@@ -83,6 +83,7 @@ def test_cursor_step_writes_land_in_run_spine_file(tmp_path: Path) -> None:
                 result_digest="sha256:2",
                 result_path=None,
                 outcome="ok",
+                ok=True,
             )
         )
         cursor.close("completed")

@@ -169,6 +169,7 @@ def test_record_tool_result_in_act_window() -> None:
             result_digest="x",
             result_path=None,
             outcome="ok",
+            ok=True,
         )
     )
     assert spine.records[-1]["execution_point"] == "step.tool_result.record"

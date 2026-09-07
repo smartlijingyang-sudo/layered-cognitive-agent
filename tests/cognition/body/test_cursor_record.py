@@ -13,6 +13,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+import pytest
+
 from lca.cognition.body.executor.cursor_record import CursorRecord
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.observability.core.incarnation import Incarnation
@@ -107,6 +109,7 @@ def test_try_record_tool_result_is_noop_without_cursor() -> None:
         tool_name="t",
         result_digest="d",
         outcome="ok",
+        ok=True,
     )
 
 
@@ -154,11 +157,13 @@ def test_try_record_tool_result_invokes_cursor() -> None:
             tool_name="my_tool",
             result_digest="ok",
             outcome="ok",
+            ok=True,
         )
         CursorRecord.try_record_tool_result(
             tool_name="my_tool",
             result_digest="failure",
             outcome="failure",
+            ok=False,
         )
     finally:
         reset_current_cursor(token)
@@ -187,6 +192,93 @@ def test_try_record_tool_result_swallows_cursor_error() -> None:
             tool_name="t",
             result_digest="d",
             outcome="failure",
+            ok=False,
         )
     finally:
         reset_current_cursor(token)
+
+
+# ── 回归锁 run_1f5360d2fa47:ok/outcome 必须显式 + 矛盾拒绝 ────────────────────
+
+
+def test_try_record_tool_result_rejects_outcome_failure_without_ok_false() -> None:
+    """``outcome="failure"`` 必须显式 ``ok=False``,否则抛 ValueError。
+
+    防止上游(PipelineSafeExecutor 等)漏传 ok= 导致 ``ok=True`` 默认落地
+    而 outcome 写为 failure 的矛盾样本 —— 这正是 run_1f5360d2fa47 的
+    pdftotext exit_code=127 在 journal 中表现为 ok=True 的根因。
+    """
+    with pytest.raises(ValueError, match="tool_result contradiction"):
+        CursorRecord.try_record_tool_result(
+            tool_name="pdftotext",
+            result_digest="exit_code=127",
+            outcome="failure",
+            ok=True,  # 故意错的,验证 invariant
+        )
+
+
+def test_try_record_tool_result_rejects_outcome_ok_without_ok_true() -> None:
+    """``outcome="ok"`` 与 ``ok=False`` 矛盾 → ValueError。"""
+    with pytest.raises(ValueError, match="tool_result contradiction"):
+        CursorRecord.try_record_tool_result(
+            tool_name="x",
+            result_digest="",
+            outcome="ok",
+            ok=False,
+        )
+
+
+def test_try_record_tool_result_rejects_outcome_denied_with_ok_true() -> None:
+    """``outcome="denied"`` 必须显式 ``ok=False``(tool_journal.py:201 修复锁)。"""
+    with pytest.raises(ValueError, match="tool_result contradiction"):
+        CursorRecord.try_record_tool_result(
+            tool_name="x",
+            result_digest="not in manifest",
+            outcome="denied",
+            ok=True,
+        )
+
+
+def test_tool_result_record_rejects_missing_ok() -> None:
+    """``ToolResultRecord`` 类型层保证 ok 必填 —— 防止回归到 ``ok=True`` 默认。"""
+    with pytest.raises(TypeError):
+        ToolResultRecord(
+            tool_name="t",
+            result_digest="d",
+            result_path=None,
+            outcome="ok",
+            # ok 故意省略
+        )
+
+
+def test_regression_run_1f5360d2fa47_failed_tool_propagates_ok_false() -> None:
+    """回归锁:PipelineSafeExecutor-style 调用链下,failing 工具的 ok=False
+    必须穿过 try_record_tool_result 抵达 cursor。"""
+    spine = _StubSpine()
+    cursor = StdLoopCursor(
+        spine=spine,  # type: ignore[arg-type]
+        run_id="r1",
+        trace_id="t1",
+        incarnation=Incarnation(run_id="r1", plan_ref="solo", incarnation_seq=1),
+    )
+    cursor.advance("perceive")
+    cursor.advance("think")
+    cursor.advance("act")
+    token = bind_current_cursor(cursor)  # type: ignore[arg-type]
+    try:
+        # 模拟 pipeline_safe_executor.py:358 的失败分支
+        CursorRecord.try_record_tool_result(
+            tool_name="runCommand",
+            result_digest="exit_code=127",
+            outcome="failure",
+            ok=False,
+            error="sh: 1: pdftotext: not found",
+        )
+    finally:
+        reset_current_cursor(token)
+    last = spine.records[-1]
+    assert last["execution_point"] == "step.tool_result.record"
+    payload = last["payload"]
+    assert payload["outcome"] == "failure"
+    assert payload["ok"] is False
+    assert "pdftotext" in payload["error"]

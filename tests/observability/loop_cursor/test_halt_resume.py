@@ -117,6 +117,7 @@ def test_halt_locks_record_calls_std() -> None:
                 result_digest="x",
                 result_path=None,
                 outcome="ok",
+                ok=True,
             )
         )
     with pytest.raises(CursorError):

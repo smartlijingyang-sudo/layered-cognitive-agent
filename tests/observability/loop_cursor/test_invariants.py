@@ -494,6 +494,7 @@ def test_l5_record_timing_combined_with_phase_advance() -> None:
             result_digest="r",
             result_path=None,
             outcome="ok",
+            ok=True,
         )
     )
 

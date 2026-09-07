@@ -116,8 +116,8 @@ class CursorRecord:
         tool_name: str,
         result_digest: str | None,
         outcome: Literal["ok", "failure", "timeout", "denied"],
+        ok: bool,
         invocation_id: str = "",
-        ok: bool = True,
         latency_ms: int = 0,
         stdout_head: str = "",
         stdout_chars_total: int = 0,
@@ -131,8 +131,23 @@ class CursorRecord:
 
         所有 caller 已知字段全部透传。``delta_summary`` 兜底 —— caller
         没传时由 ``result_digest`` 取代(同语义,只是人话 vs fingerprint)。
+
+        ``ok`` 与 ``outcome`` 必填且必须一致:成败字段不允许默认值,否则
+        ``PipelineSafeExecutor`` 漏传时会把 outcome="failure" 写成 ok=True,
+        经 fold binding 落地后 H7 报 100% 成功率、journal 与 error 字段自相矛盾。
         """
         from lca.contracts.observability.cursor.loop_cursor_payloads import ToolResultRecord
+
+        if outcome == "ok" and not ok:
+            raise ValueError(
+                f"tool_result contradiction: outcome='ok' requires ok=True, got ok=False "
+                f"(tool={tool_name!r})"
+            )
+        if outcome in ("failure", "timeout", "denied") and ok:
+            raise ValueError(
+                f"tool_result contradiction: outcome={outcome!r} requires ok=False, "
+                f"got ok=True (tool={tool_name!r})"
+            )
 
         cursor = CursorRecord.get()
         if cursor is None:

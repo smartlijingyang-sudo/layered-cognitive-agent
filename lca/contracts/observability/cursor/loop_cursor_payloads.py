@@ -92,9 +92,13 @@ class ToolResultRecord:
     result_digest: str
     result_path: str | None
     outcome: Literal["ok", "failure", "timeout", "denied"]
+    # 必填:成败不可默认(否则 PipelineSafeExecutor 等漏传 ok= 时
+    # 会默认 True,导致 ok=True 与 error≠∅ 矛盾事实落地。
+    # 第一性原则:成败字段不允许默认值 — 与 ToolInvokedReceipt / StepClosed 同款
+    # (ToolResultRecord 是 cursor-side SSOT, 不比其他合约更宽松)。
+    ok: bool
     # Rich fields — step-tree / deriver 可直接读,无需 sidecar round-trip。
     invocation_id: str = ""
-    ok: bool = True
     latency_ms: int = 0
     stdout_head: str = ""
     stdout_chars_total: int = 0
