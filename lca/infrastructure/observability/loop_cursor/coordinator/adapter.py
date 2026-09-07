@@ -231,7 +231,8 @@ class CoordinatorAdapter:
         journal_step ``ToolResult`` 没有 ``tool_name`` 字段(由 caller 上下文
         提供);cursor ``ToolResultRecord`` 必填 tool_name,降级用空串。
         """
-        ok = bool(getattr(result, "ok", True))
+        # 防御默认:缺 ok 视为失败(第一性原则 —— 成败字段不允许 True 默认)
+        ok = bool(getattr(result, "ok", False))
         outcome: str = "ok" if ok else "failure"
         tool_name = getattr(result, "tool_name", "") or ""
         delta_summary = getattr(result, "delta_summary", "") or ""
