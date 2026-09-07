@@ -3,7 +3,13 @@
 # :class:`StepTreeFoldDeriver` (RunSessionBuilder fold-only; I-SESSION-5).
 # This in-memory on_event accumulator is not on the EventSpine.subscribe
 # production builder path; kept for unit tests, CLI replay, and capability
-# provide. Fold facade re-export: ``spine.derivers.step_tree`` (P2-20 thin).
+# provide. ``flush()`` no longer writes ``journal.json`` — the production
+# writer is :class:`StepTreeFoldDeriver`. Fold facade re-export:
+# ``spine.derivers.step_tree`` (P2-20 thin).
+# COMPAT(owner: ADR-0186, from: legacy StepTreeAccumulatorDeriver.flush() writing
+#         journal.json, to: StepTreeFoldDeriver (production fold writer),
+#         delete_when: rg "JournalDocumentWriter" lca/infrastructure/observability/spine/derivers/step/ = 0,
+#         forbidden_new_usage: StepTreeAccumulatorDeriver 作为生产 journal 写者)
 
 """spine-deriver step_tree_accumulator —— in-memory callback 路径（ADR-0167 D11）。
 
@@ -48,9 +54,6 @@ from lca.contracts.models.observability.journal.totals import (
     PhaseRecord,
     SegmentRecord,
     Totals,
-)
-from lca.infrastructure.observability.journal.step.projector import (
-    JournalDocumentWriter,
 )
 from lca.infrastructure.observability.spine.derivers.base.base import Deriver
 from lca.infrastructure.observability.spine.event.record import EventRecord
@@ -244,9 +247,15 @@ class StepTreeAccumulatorDeriver(Deriver):
             )
 
     def flush(self, *, outcome: str | None = None) -> None:
-        """收口：把累积状态写 journal.json。
+        """收口:把累积状态物化为 JournalDocument,留在内存供 ``.document`` 读取。
 
-        真实写盘是 cumulative 终态：open step 若仍在，强制 close（fail-safe）。
+        **不再写 ``journal.json``** —— ADR-0186 / I-SESSION-5 收口后,
+        生产路径由 :class:`StepTreeFoldDeriver`(RunSessionBuilder 装配,
+        :mod:`lca.plugins.session.derivers.step_tree` plugin)负责落盘。
+        本 deriver 已退役到"test / CLI replay / capability provide"用途
+        (见 file header),保留 in-memory 物化是为了测试断言 ``document`` 内容
+        而不必跑 RunSessionBuilder。**任何代码若依赖本方法写 ``journal.json``
+        都会被静默阻断**,需改用 ``StepTreeFoldDeriver.flush()``。
 
         ``outcome`` 来自 materializer 传入的 RunSession 终态(completed/failed/
         stopped/paused)。早先 flush(outcome=...) 被静默丢弃,_build_document
@@ -257,8 +266,9 @@ class StepTreeAccumulatorDeriver(Deriver):
 
         ADR-0176 D1 §1 (3):空写 fail-loud —— 若 ``_open_step is None`` 且
         ``_phases`` 也空,记 ``step_tree_deriver.flush.empty`` structlog.error
-        并把诊断写到 ``manifest.extra.flush_errors``;此时仍写 journal.json
-        (落一份空 doc),但后续 doctor 走 H-xref broken。
+        并把诊断写到 ``manifest.extra.flush_errors``。之前会落一份空 doc 到
+        ``journal.json`` 让后续 doctor 走 H-xref broken;现在不写盘,空 doc 仅
+        留在 ``self._last_document``,manifest 仍记 flush_errors 以暴露问题。
         """
         if outcome is not None:
             self._terminal_outcome = outcome
@@ -290,7 +300,6 @@ class StepTreeAccumulatorDeriver(Deriver):
                     operation="step_tree.flush.empty",
                     error_message="no step and no phase captured",
                 )
-            JournalDocumentWriter(self._run_dir / "journal.json").write(doc)
         except Exception as exc:
             log.warning("step_tree_accumulator.flush failed err=%s", exc)
 

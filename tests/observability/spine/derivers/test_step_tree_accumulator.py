@@ -2,8 +2,11 @@
 
 覆盖:
 - ``on_event`` 累积 step_tree_accumulator 接收的 EP
-- ``flush`` 写到 ``journal.json``(lca.journal/3.1 schema)
+- ``flush`` 仅物化 document 到内存,不再写 ``journal.json``(ADR-0186 收口)
 - ``document`` 在 flush 后可读
+
+注:``journal.json`` 落盘由 ``StepTreeFoldDeriver``(生产 fold plugin)
+负责。本 deriver 退役到 test / CLI replay / capability provide 用途。
 """
 
 from __future__ import annotations
@@ -39,8 +42,13 @@ def _make_event(**overrides: object) -> EventRecord:
     return EventRecord(**base)  # type: ignore[arg-type]
 
 
-def test_flush_writes_journal_json(tmp_path: Path) -> None:
-    """deriver.flush() 写 journal.json + 暴露 document。"""
+def test_flush_materializes_document_in_memory(tmp_path: Path) -> None:
+    """deriver.flush() 仅物化 document 到内存,不再写 journal.json。
+
+    生产 journal.json 落盘由 ``StepTreeFoldDeriver``(RunSessionBuilder 装配)
+    负责(ADR-0186 / I-SESSION-5);本 deriver 退役到 test / CLI replay 用,
+    ``.document`` 属性是测试的唯一事实源。
+    """
     SpineContext.set_run("r1")
     run_dir = tmp_path / "r1"
     deriver = StepTreeAccumulatorDeriver(
@@ -75,9 +83,14 @@ def test_flush_writes_journal_json(tmp_path: Path) -> None:
 
     deriver.flush()
 
+    # journal.json 不再被本 deriver 写
     journal_path = run_dir / "journal.json"
-    assert journal_path.exists(), "deriver.flush did not write journal.json"
+    assert not journal_path.exists(), (
+        "StepTreeAccumulatorDeriver.flush() 不应再写 journal.json;生产落盘"
+        " 由 StepTreeFoldDeriver 负责(ADR-0186)"
+    )
 
+    # 物化在内存,内容仍完整
     doc = deriver.document
     assert doc is not None
     assert doc.run_id == "r1"
@@ -565,9 +578,10 @@ def test_non_empty_flush_does_not_write_flush_error(tmp_path: Path) -> None:
     )
     deriver.flush(outcome="completed")
 
+    import json as _json
+
     manifest_path = tmp_path / "r_ne" / "manifest.json"
     if manifest_path.exists():
-        import json as _json
 
         data = _json.loads(manifest_path.read_text(encoding="utf-8"))
         errors = data.get("extra", {}).get("flush_errors", [])
@@ -582,7 +596,6 @@ def test_llm_stream_tokens_accumulate_into_step_thinking(tmp_path: Path) -> None
 
     Regression:之前 deriver 不订阅 llm.stream.*,thinking.reasoning 永远是空。
     """
-    import json as _json
 
     SpineContext.set_run("r_stream")
     deriver = StepTreeAccumulatorDeriver(
@@ -688,15 +701,17 @@ def test_llm_stream_tokens_accumulate_into_step_thinking(tmp_path: Path) -> None
         )
     )
     deriver.flush(outcome="completed")
-    journal = _json.loads((tmp_path / "r_stream" / "journal.json").read_text())
-    thinking = journal["steps"][0]["thinking"]
+    # ADR-0186:本 deriver 不再写 journal.json;从 .document 读
+    doc = deriver.document
+    assert doc is not None
+    thinking = doc.steps[0].thinking
     assert thinking is not None
-    assert thinking["reasoning"] == "Let me think. Answer?"
-    assert thinking["raw_response_preview"] == "Hello"
-    assert thinking["model"] == "qwen3.7-plus"
-    assert thinking["latency_ms"] == 1234
-    assert thinking["prompt_tokens"] == 10
-    assert thinking["completion_tokens"] == 5
+    assert thinking.reasoning == "Let me think. Answer?"
+    assert thinking.raw_response_preview == "Hello"
+    assert thinking.model == "qwen3.7-plus"
+    assert thinking.latency_ms == 1234
+    assert thinking.prompt_tokens == 10
+    assert thinking.completion_tokens == 5
 
 
 def test_long_reasoning_text_is_truncated_with_marker(tmp_path: Path) -> None:
@@ -704,7 +719,6 @@ def test_long_reasoning_text_is_truncated_with_marker(tmp_path: Path) -> None:
 
     journal.json 不应无限膨胀;完整 text 继续存于 model_visible/messages.json。
     """
-    import json as _json
 
     SpineContext.set_run("r_trunc")
     deriver = StepTreeAccumulatorDeriver(
@@ -773,8 +787,11 @@ def test_long_reasoning_text_is_truncated_with_marker(tmp_path: Path) -> None:
         )
     )
     deriver.flush(outcome="completed")
-    journal = _json.loads((tmp_path / "r_trunc" / "journal.json").read_text())
-    kept = journal["steps"][0]["thinking"]["reasoning"]
+    # ADR-0186:从 .document 读
+    doc = deriver.document
+    assert doc is not None
+    kept = doc.steps[0].thinking.reasoning
+    assert kept is not None
     assert len(kept) < 5000, "长度应被截短"
     assert "truncated" in kept, "中间应明示被截断字符数"
 
@@ -785,7 +802,6 @@ def test_step_tool_call_record_writes_arguments_when_payload_has_them(tmp_path: 
     Regression:之前 arguments=[] 因为 EP payload 不带 arguments;本测试
     走 spine 订阅并验证 arguments 落到 step.tool_call.arguments。
     """
-    import json as _json
 
     SpineContext.set_run("r_tc")
     deriver = StepTreeAccumulatorDeriver(
@@ -832,12 +848,14 @@ def test_step_tool_call_record_writes_arguments_when_payload_has_them(tmp_path: 
         )
     )
     deriver.flush(outcome="completed")
-    journal = _json.loads((tmp_path / "r_tc" / "journal.json").read_text())
-    tc = journal["steps"][0]["tool_call"]
+    # ADR-0186:从 .document 读
+    doc = deriver.document
+    assert doc is not None
+    tc = doc.steps[0].tool_call
     assert tc is not None
-    assert tc["name"] == "executeCode"
-    assert tc["arguments"] == {"code": "print('hi')", "language": "python"}
-    assert tc["arguments_summary"] == "executeCode(python)"
+    assert tc.name == "executeCode"
+    assert tc.arguments == {"code": "print('hi')", "language": "python"}
+    assert tc.arguments_summary == "executeCode(python)"
 
 
 def test_step_tool_call_record_with_flat_payload_writes_arguments(tmp_path: Path) -> None:
@@ -846,7 +864,6 @@ def test_step_tool_call_record_with_flat_payload_writes_arguments(tmp_path: Path
     StdLoopCursor.record_tool_call 现在把 arguments/arguments_summary
     /invocation_id 平铺在 EP payload 上,deriver 必须能从 flat 形取到。
     """
-    import json as _json
 
     SpineContext.set_run("r_tc_flat")
     deriver = StepTreeAccumulatorDeriver(
@@ -918,18 +935,22 @@ def test_step_tool_call_record_with_flat_payload_writes_arguments(tmp_path: Path
         )
     )
     deriver.flush(outcome="completed")
-    journal = _json.loads((tmp_path / "r_tc_flat" / "journal.json").read_text())
-    tc = journal["steps"][0]["tool_call"]
-    tr = journal["steps"][0]["tool_result"]
-    assert tc["name"] == "executeCode"
-    assert tc["arguments"] == {"code": "print('ok')", "language": "python"}
-    assert tc["arguments_summary"] == "executeCode(python)"
-    assert tc["invocation_id"] == "dec_xyz"
-    assert tr["ok"] is True
-    assert tr["latency_ms"] == 1234
-    assert tr["stdout_head"] == "ok\n"
-    assert tr["files_created"] == ["out.md"]
-    assert tr["delta_summary"] == "executed successfully"
+    # ADR-0186:从 .document 读
+    doc = deriver.document
+    assert doc is not None
+    tc = doc.steps[0].tool_call
+    tr = doc.steps[0].tool_result
+    assert tc is not None
+    assert tc.name == "executeCode"
+    assert tc.arguments == {"code": "print('ok')", "language": "python"}
+    assert tc.arguments_summary == "executeCode(python)"
+    assert tc.invocation_id == "dec_xyz"
+    assert tr is not None
+    assert tr.ok is True
+    assert tr.latency_ms == 1234
+    assert tr.stdout_head == "ok\n"
+    assert tr.files_created == ("out.md",)
+    assert tr.delta_summary == "executed successfully"
 
 
 # ── phase whitelist regression (run_2d0bdd30f2fb) ─────────────────────
@@ -1125,6 +1146,8 @@ def test_backend_react_path_flush_not_empty(tmp_path: Path) -> None:
     模拟真实 run:6 个 phase_graph.node.* + phase.perceive.fold + 两次 phase.think.fold。
     期望 totals.phases >= 2,flush.empty 不触发,manifest.flush_errors 为空。
     """
+    import json as _json
+
     SpineContext.set_run("r_react")
     deriver = StepTreeAccumulatorDeriver(
         run_id="r_react",
@@ -1193,7 +1216,6 @@ def test_backend_react_path_flush_not_empty(tmp_path: Path) -> None:
     # manifest.flush_errors 应为空
     manifest_path = tmp_path / "r_react" / "manifest.json"
     if manifest_path.exists():
-        import json as _json
 
         data = _json.loads(manifest_path.read_text(encoding="utf-8"))
         errors = data.get("extra", {}).get("flush_errors", [])

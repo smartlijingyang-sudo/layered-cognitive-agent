@@ -5,8 +5,9 @@
     1. ``build_step_coordinator`` 立即得到一个已 ``bind_run`` 的 coordinator。
     2. RunSessionBuilder 构造 StepTreeAccumulatorDeriver + subscribe 到
        spine event_spine; spine 上 emit 触发的 EP 都被 deriver 累积。
-    3. deriver.flush() 写 ``journal.json``, schema=lca.journal/3.1,
-       totals.steps >= 1。
+    3. deriver.flush() 仅物化 ``JournalDocument`` 到内存,不再写 ``journal.json``
+       —— 生产落盘由 ``StepTreeFoldDeriver`` 负责(ADR-0186 / I-SESSION-5)。
+       schema=lca.journal/3.1, totals.steps >= 1。
     4. deriver.document 在 flush 后可读, ``metadata.agent_role`` 反映入参。
     5. 同一 events 两次 run → 相同 document 内容(等价性)。
 """
@@ -87,8 +88,13 @@ def test_build_step_coordinator_binds_metadata() -> None:
     assert coord.trace_id == "trace_test_bind"
 
 
-def test_step_tree_deriver_writes_journal_via_spine(tmp_path: Path) -> None:
-    """deriver 订阅 spine, deriver.flush() 写 journal.json。"""
+def test_step_tree_deriver_materializes_document_in_memory(tmp_path: Path) -> None:
+    """deriver 订阅 spine, deriver.flush() 仅物化 document 到内存,不再写 journal.json。
+
+    ADR-0186 / I-SESSION-5 收口后,生产 journal.json 落盘由
+    ``StepTreeFoldDeriver``(RunSessionBuilder 装配)负责;本 deriver 退役到
+    test / CLI replay 用途,``.document`` 属性是测试事实源。
+    """
     SpineContext.set_run("run_e2e")
     run_dir = tmp_path / "run_e2e"
     run_dir.mkdir()
@@ -124,8 +130,12 @@ def test_step_tree_deriver_writes_journal_via_spine(tmp_path: Path) -> None:
 
     deriver.flush()
 
+    # 不再写 journal.json(生产由 StepTreeFoldDeriver 负责)
     journal_path = run_dir / "journal.json"
-    assert journal_path.exists(), "deriver.flush did not write journal.json"
+    assert not journal_path.exists(), (
+        "StepTreeAccumulatorDeriver.flush() 不应再写 journal.json;生产落盘"
+        " 由 StepTreeFoldDeriver 负责(ADR-0186)"
+    )
     doc = deriver.document
     assert doc is not None
     assert doc.run_id == "run_e2e"
