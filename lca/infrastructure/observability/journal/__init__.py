@@ -4,11 +4,10 @@
 
 - engine/      RunStore, ProcessJournal, Reducer, 序列化与 IO
 - enrichment/  EventEnrichers
-- otel/        OtelProjector + OTel mapping + span index
 - console/     ConsoleProjector + sequence diagram + table renderer
 - jsonl/       JsonlProjector
 - sse/         SSE frames
-- stream/      LiveTail + FactStream + SidecarHook Protocol (NarrativeSidecar 已删除, 由 StepNarrativeWriter 接管)
+- stream/      LiveTail + FactStream + SidecarHook Protocol
 - backends/    Filesystem + InMemory journal stores
 
 外部一律经本 ``__init__`` 使用公共入口（边界守卫强制）。
@@ -23,10 +22,8 @@ from lca.infrastructure.observability.journal.engine.reducer import (
     RunStatus,
     fold_run_state,
 )
-from lca.infrastructure.observability.journal.otel.projector import OtelProjector
 
 __all__ = [
-    "OtelProjector",
     "RunState",
     "RunStatus",
     "RunStore",

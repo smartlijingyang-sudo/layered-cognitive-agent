@@ -1,11 +1,12 @@
 """LCA 可观测性子系统 —— 唯一公共面（白名单守卫）。
 
-架构三层（Hexagonal / Ports & Adapters）：
-    ① 契约层（contracts）—— Protocol + 数据类（JournalEvent / RunContext / 端口）
-    ② 装配层（harness/observability）—— assemble_observability() 把 plugin 装成 BoundObservability
-    ③ 实现层（journal_backend / tracer_backend / readers）—— adapter，plugin 化
+SSOT: :func:`Session.append` is the single durable-fact entry. The
+legacy :class:`MemoryJournal` / :class:`RunStore` / :func:`facade.record`
+path (ADR-0055) is kept for the boot-time journal backend assembly and
+the graph-execution committer; it is not used by the LLM adapter any
+more (see :mod:`lca.infrastructure.observability.adapters.adapters`).
 
-外部使用（唯一入口）::
+外部使用（唯一定位）::
 
     from lca.infrastructure.observability import (
         record, span, annotate, score,         # dispatch API
@@ -66,7 +67,6 @@ from lca.contracts.models.observability.journal.journal import (
     PresetPublished,
     ReasoningCompleted,
     ReasoningDelta,
-    RunActivity,
     RunScope,
     RuntimeObserved,
     StampedEvent,
@@ -163,13 +163,6 @@ from lca.infrastructure.observability.facade.team.profile import (
     objective_preview,
     team_id_for,
 )
-from lca.infrastructure.observability.genai import (
-    LlmGenAIMapper,
-    ToolGenAIMapper,
-)
-from lca.infrastructure.observability.genai import (
-    build_default_registry as build_default_genai_registry,
-)
 from lca.infrastructure.observability.narrative import plan_steps_joined
 from lca.infrastructure.observability.stream.trace_inspector import TraceInspector, TraceReport
 from lca.infrastructure.observability.stream.trace_tool_runner import (
@@ -220,19 +213,15 @@ __all__ = [
     "EventProjection",
     "EventSensitivity",
     "InMemoryEventDescriptorRegistry",
-    "InMemoryJournalStore",
     "JournalEvent",
     "JournalProjector",
     "JournalSchemaMeta",
-    "JournalStoreBackend",
     "LlmCallCompleted",
     "LlmCallStarted",
-    "LlmGenAIMapper",
     "NamedRegistry",
     "ObservabilitySettings",
     "OperationOutcome",
     "OperationRecorder",
-    "OtelProjector",
     "OtelTracer",
     "PluginAuthored",
     "PluginInspected",
@@ -243,13 +232,9 @@ __all__ = [
     "ProjectionRegistry",
     "ReasoningCompleted",
     "ReasoningDelta",
-    "RunActivity",
     "RunAmbit",
     "RunContext",
     "RunScope",
-    "RunState",
-    "RunStatus",
-    "RunStore",
     "RuntimeKind",
     "RuntimeObserved",
     "SpanContextInfo",
@@ -263,14 +248,12 @@ __all__ = [
     "TeamTraceProfile",
     "ToolCallResolved",
     "ToolDenied",
-    "ToolGenAIMapper",
     "ToolInvoked",
     "ToolStarted",
     "TraceInspector",
     "TraceReport",
     "TraceTool",
     "UnknownEventDescriptorError",
-    "UnregisteredJournalEventError",
     "Verbosity",
     "adopt_run_scope",
     "annotate",
@@ -278,8 +261,6 @@ __all__ = [
     "bind_backends",
     "bind_descriptors",
     "bind_run_ambit",
-    "build_default_genai_registry",
-    "build_default_registry",
     "current_attachment_ids",
     "current_bound",
     "current_context",
@@ -291,7 +272,6 @@ __all__ = [
     "current_workspace",
     "descriptor_for",
     "detached_span",
-    "fold_run_state",
     "get_current_run_scope",
     "get_span_context",
     "langfuse_span_visible",
@@ -303,7 +283,6 @@ __all__ = [
     "may_export_externally",
     "objective_preview",
     "plan_steps_joined",
-    "read_journal",
     "record",
     "record_operation",
     "record_runtime",
@@ -312,12 +291,15 @@ __all__ = [
     "set_actor",
     "set_session",
     "span",
-    "stamped_to_journal_record",
-    "stamped_to_record",
     "team_id_for",
     "traced",
 ]
 
+# Legacy journal storage symbols (RunStore / RunState / fold_run_state /
+# read_journal / UnregisteredJournalEventError / InMemoryJournalStore /
+# stamped_to_record / stamped_to_journal_record) are kept lazy-loaded by
+# PEP 562 __getattr__ so the boot-time journal backend assembly can resolve
+# them without forcing every importer to pull the legacy storage tree.
 if TYPE_CHECKING:
     from lca.infrastructure.observability.journal.backends.memory import InMemoryJournalStore
     from lca.infrastructure.observability.journal.engine.engine import (
@@ -336,10 +318,12 @@ if TYPE_CHECKING:
     from lca.infrastructure.observability.journal.engine.serialization import (
         stamped_to_journal_record,
     )
-    from lca.infrastructure.observability.journal.otel.projector import OtelProjector
 
 _LAZY_JOURNAL_SYMBOLS: dict[str, tuple[str, str]] = {
-    "OtelProjector": ("lca.infrastructure.observability.journal", "OtelProjector"),
+    "InMemoryJournalStore": (
+        "lca.infrastructure.observability.journal.backends",
+        "InMemoryJournalStore",
+    ),
     "RunState": ("lca.infrastructure.observability.journal", "RunState"),
     "RunStatus": ("lca.infrastructure.observability.journal", "RunStatus"),
     "RunStore": ("lca.infrastructure.observability.journal", "RunStore"),
@@ -348,10 +332,6 @@ _LAZY_JOURNAL_SYMBOLS: dict[str, tuple[str, str]] = {
         "UnregisteredJournalEventError",
     ),
     "fold_run_state": ("lca.infrastructure.observability.journal", "fold_run_state"),
-    "InMemoryJournalStore": (
-        "lca.infrastructure.observability.journal.backends",
-        "InMemoryJournalStore",
-    ),
     "read_journal": (
         "lca.infrastructure.observability.journal.engine.journal_io",
         "read_journal",

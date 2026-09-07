@@ -3,9 +3,15 @@
 The facade rewrite removed the monolithic ``ObservabilityHub`` in favour of a
 4-field ``BoundObservability`` (journal / tracer / policy / scorers). Tests
 that previously built a hub now need to assemble the four backends they
-actually exercise. This helper exposes one canonical factory plus small
-composables for common patterns (memory-only, with a tracer, with a filter
-projector).
+actually exercise. This helper exposes one canonical factory plus a
+small ``_RunStoreBackend`` adapter that maps ``RunStore.append`` to the
+``JournalBackend.write`` Protocol.
+
+ADR-0192 / ADR-0194 cleanup note: the legacy OTel journal projector
+(``lca.infrastructure.observability.journal.otel.projector.OtelProjector``)
+is removed; ``otel_tracer`` keyword is kept for backward signature
+compatibility but is a no-op now — OTel span emission is the responsibility
+of the Session runtime's observers, not the legacy journal fan-out.
 """
 
 from __future__ import annotations
@@ -38,20 +44,15 @@ def make_test_bound(
 ) -> BoundObservability:
     """Construct a ``BoundObservability`` with a memory journal + given policy.
 
-    ``otel_tracer`` (raw OTel ``Tracer`` instance) wires an ``OtelProjector`` into
-    the journal projections so journal events produce OTel spans (matching the
-    old ``ObservabilityHub`` behavior where ``llm.chat`` etc. were emitted).
+    ``otel_tracer`` (raw OTel ``Tracer`` instance) is accepted for signature
+    backward compatibility and is a no-op now — Session observers own
+    OTel span emission; legacy journal OTel fan-out was removed.
     """
-    from lca.infrastructure.observability.journal.otel.projector import OtelProjector
-
+    del otel_tracer
     policy_obj = AttributePolicy(verbosity=verbosity, redact=redact)
     policy: AttributePolicyBackend = policy_obj
     all_projections: list[JournalProjector] = list(projections)
-    if otel_tracer is not None:
-        all_projections.insert(0, OtelProjector(otel_tracer))
     store = RunStore(policy=policy_obj, projections=all_projections)
-    # Wrap the store in a thin backend adapter so it satisfies JournalBackend
-    # (``BoundObservability.journal`` requires ``write``, not ``append``).
     return BoundObservability(
         journal=_RunStoreBackend(store),
         tracer=tracer,
@@ -95,7 +96,6 @@ class RuntimeCategoryFilter:
         from lca.contracts.models.observability.diagnostic.diagnostic import DiagnosticCategory
         from lca.contracts.models.observability.event.event import RuntimeKind
 
-        # Inline mapping (was in run_diagnostics._CATEGORY_BY_KIND before its deletion).
         _kind_to_category: dict[RuntimeKind, DiagnosticCategory] = {
             RuntimeKind.AGENT: DiagnosticCategory.AGENT,
             RuntimeKind.PLUGIN: DiagnosticCategory.PLUGIN,

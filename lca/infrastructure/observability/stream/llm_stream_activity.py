@@ -1,4 +1,9 @@
-"""LLM stream activity heartbeat — RunActivity during long model waits (ADR-0051)."""
+"""LLM stream activity heartbeat — emits ``llm.stream.stall`` during long waits.
+
+Session SSOT only. ``RunActivity`` legacy journal event was emitted to
+``MemoryJournal`` which had zero readers outside descriptors and tests;
+deleted with the legacy journal write path (ADR-0192).
+"""
 
 from __future__ import annotations
 
@@ -7,12 +12,8 @@ import contextlib
 import time
 from collections.abc import Callable
 
-from lca.contracts.atoms.enums.enums import RunActivityPhase
-from lca.contracts.models.observability.journal.journal import RunActivity
-from lca.infrastructure.observability.facade.facade.facade import record
-
 LLM_ACTIVITY_HEARTBEAT_S: float = 5.0
-"""Emit RunActivity when no LLM delta for this many seconds."""
+"""Emit llm.stream.stall when no LLM delta for this many seconds."""
 
 LLM_STREAM_IDLE_TIMEOUT_S: float = 60.0
 """Abort an in-flight LLM stream after this many seconds without a delta.
@@ -26,7 +27,12 @@ IdleCallback = Callable[[float, int], None]
 
 
 class LlmStreamActivityTracker:
-    """Background heartbeat while an LLM stream is in flight."""
+    """Background heartbeat while an LLM stream is in flight.
+
+    Owns the idle-detection loop only. ``llm.stream.stall`` emission
+    is delegated to ``on_idle`` (provided by ``TelemetryLLMAdapter``
+    which holds the Session EP emit context).
+    """
 
     def __init__(
         self,
@@ -66,14 +72,6 @@ class LlmStreamActivityTracker:
                 await asyncio.sleep(LLM_ACTIVITY_HEARTBEAT_S)
                 idle_s = time.monotonic() - self._last_delta_at
                 if idle_s >= LLM_ACTIVITY_HEARTBEAT_S - 0.25:
-                    record(
-                        RunActivity(
-                            phase=RunActivityPhase.LLM_THINKING.value,
-                            step=self._step,
-                            detail=f"{self._model} 推理中…",
-                            seq=self._seq,
-                        )
-                    )
                     if self._on_idle is not None:
                         self._on_idle(idle_s, self._seq)
                     self._seq += 1
