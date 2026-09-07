@@ -1,28 +1,51 @@
 """``lca-ops runs create`` — CLI wrapper for ``POST /runs`` (carrier).
 
-The HTTP layer (``plugins/transport/webserver/handlers/runs/api/command_endpoints.py``)
-is the only seam that creates a run, allocates ``run_id``, registers the
-session, and writes ``traces/runs/<id>/`` artifacts. This CLI module is a
-**thin** wrapper around that seam — it does not duplicate the carrier
-logic, only builds the JSON body and POSTs it.
+Per ADR-0199 §10 Phase 1 and §12.2 the CLI is L0 — it only emits a
+``RunIntent`` and consumes the resulting ``SessionActivation`` /
+``RunHandle`` from the L1 :class:`RuntimeFacade`. Two execution paths
+are exposed:
 
-Why this exists:
+* **Default (production):** HTTP shell-out to ``${base_url}/runs``. The
+  HTTP layer
+  (``plugins/transport/webserver/handlers/runs/api/command_endpoints.py``)
+  is the only seam that creates a run, allocates ``run_id``, registers
+  the session, and writes ``traces/runs/<id>/`` artifacts. This CLI
+  module is a **thin** wrapper around that seam — it does not duplicate
+  the carrier logic, only builds the JSON body and POSTs it.
 
-1. Coding agents should not have to remember the ``curl`` form of the carrier.
-2. The legacy ``/v1/chat/completions`` endpoint is **NOT** a run-creation seam:
-   it is a LobeHub UI proxy (ADR-0099) that streams OpenAI-compatible responses
-   without registering a run_id or writing ``traces/runs/<id>/``. Using it as
-   a "trigger a run" command silently produces zero debug artifacts, which
-   is the most common user-visible failure when an agent reaches for "the
-   chat API".
-3. ``lca-ops runs create`` always returns the new ``run_id`` + ``trace_id``,
-   so downstream tooling can immediately ``debug-run <run_id>`` without
-   scraping logs.
+* **Offline / dev / test (``--facade``):** in-process dispatch through
+  :class:`DefaultRuntimeFacade`. Used to prove CLI↔HTTP cross-surface
+  parity — the same ``RunIntent`` yields the same ``plan_ref`` /
+  ``activation_ref`` across both surfaces (P1-13 + the architecture
+  acceptance test). Per ADR-0199 I-HPC-1 the CLI parser never resolves
+  a profile or compiles a plan directly; the facade owns K1+K2.
 
-The contract lives in :mod:`lca.plugins.transport.webserver.handlers.runs.api.command_endpoints`:
-``CreateRunRequest`` (handler-side decode) → ``RunPort.create_and_dispatch``.
-We deliberately do **not** re-decode the body here; we forward whatever the
-agent gives us and let the carrier validate.
+Why both paths:
+
+1. Coding agents should not have to remember the ``curl`` form of the
+   carrier (default path).
+2. The legacy ``/v1/chat/completions`` endpoint is **NOT** a
+   run-creation seam: it is a LobeHub UI proxy (ADR-0099) that streams
+   OpenAI-compatible responses without registering a run_id or writing
+   ``traces/runs/<id>/``. Using it as a "trigger a run" command
+   silently produces zero debug artifacts, which is the most common
+   user-visible failure when an agent reaches for "the chat API".
+3. ``lca-ops runs create`` always returns the new ``run_id`` +
+   ``trace_id``, so downstream tooling can immediately
+   ``debug-run <run_id>`` without scraping logs.
+4. ``--facade`` proves parity without requiring the HTTP carrier; tests
+   and offline runs use it to verify the same RunIntent produces the
+   same plan_ref on both surfaces (acceptance test #1, ADR-0199 §10).
+
+The HTTP contract lives in
+:mod:`lca.plugins.transport.webserver.handlers.runs.api.command_endpoints`:
+``CreateRunRequest`` (handler-side decode) →
+``RunPort.create_and_dispatch``. We deliberately do **not** re-decode
+the body there; we forward whatever the agent gives us and let the
+carrier validate.
+
+The in-process contract lives in
+:mod:`lca.application.runtime.default_facade` (P1-09 + P1-10).
 """
 
 from __future__ import annotations
@@ -55,6 +78,37 @@ def register(app: typer.Typer) -> None:
     app.add_typer(runs_app, name="runs")
 
 
+# ── CLI↔HTTP in-process dispatcher (PR-0199-P1-13) ──────────────────────
+
+
+class CLIInProcessDispatcher:
+    """In-process :class:`RunDispatcher` for ``--facade`` mode.
+
+    Per ADR-0199 §10 Phase 1 + I-HPC-1 the CLI must not start a real
+    run; in offline / test / dev mode the dispatcher only records the
+    activation so the CLI can echo the activation_ref back to the
+    operator for parity verification. The real run-startup seam stays
+    in the HTTP→carrier→coordinator path (default mode).
+    """
+
+    def __init__(self) -> None:
+        self._runs: dict[str, str] = {}
+
+    async def dispatch_run(self, activation, intent):  # type: ignore[no-untyped-def]
+        """Return a synthetic handle correlated with the activation."""
+        from lca.contracts.runtime.facade import RunHandle
+
+        synthetic = f"cli_facade_{activation.activation_ref[:16]}"
+        self._runs[synthetic] = synthetic
+        return RunHandle(synthetic)
+
+    async def dispatch_resume(self, activation, run_id):  # type: ignore[no-untyped-def]
+        """Resume handle for an existing run (offline mode)."""
+        from lca.contracts.runtime.facade import RunHandle
+
+        return RunHandle(f"cli_facade_resume_{run_id[:16]}")
+
+
 def _create(
     user_text: str = typer.Option(..., "--user-text", help="User message (the prompt)."),
     mode: str = typer.Option(
@@ -84,6 +138,22 @@ def _create(
         "--wait",
         help="Block until the run is terminal (polls ``GET /runs/{id}/doctor`` every 2s, max 5 min).",
     ),
+    facade: bool = typer.Option(
+        False,
+        "--facade",
+        help=(
+            "Run in-process via RuntimeFacade (ADR-0199). Skips HTTP carrier. "
+            "For tests, offline mode, and CLI↔HTTP parity verification."
+        ),
+    ),
+    session_id: str | None = typer.Option(
+        None,
+        "--session-id",
+        help=(
+            "Optional session id for the facade path (P1-13). When omitted, "
+            "the facade mints a fresh ``sess_<16hex>`` id."
+        ),
+    ),
 ) -> None:
     """Create one run via the carrier; print ``run_id`` + ``trace_id`` + ``live_url``.
 
@@ -92,7 +162,27 @@ def _create(
 
     This is the canonical "trigger a run" command for coding agents. ``/v1/chat/completions``
     does NOT register a run and is NOT a substitute (it is a LobeHub UI proxy, see ADR-0099).
+
+    Pass ``--facade`` to bypass the HTTP carrier and resolve the activation
+    in-process via :class:`DefaultRuntimeFacade` (ADR-0199 P1-13). The
+    facade path is intended for tests, offline mode, and CLI↔HTTP parity
+    verification; it does NOT start a real run.
     """
+    if facade:
+        _create_via_facade(
+            user_text=user_text,
+            mode=mode,
+            agent=agent,
+            profile=profile,
+            session_id=session_id,
+            assistant_id=None,
+            attachment_ids=(),
+            execution_target="",
+            options={},
+            device_id="",
+        )
+        return
+
     body = {
         "messages": [{"role": "user", "content": user_text}],
         "mode": mode,
@@ -179,4 +269,70 @@ def _create(
     raise typer.Exit(code=1)
 
 
-__all__ = ["register"]
+def _create_via_facade(
+    *,
+    user_text: str,
+    mode: str,
+    agent: str,
+    profile: str,
+    session_id: str | None,
+    assistant_id: str | None,
+    attachment_ids: tuple[str, ...],
+    execution_target: str,
+    options: dict,
+    device_id: str,
+) -> None:
+    """CLI in-process facade path (ADR-0199 P1-13).
+
+    Demonstrates CLI↔HTTP plan_ref parity: the same ``RunIntent``
+    content yields the same ``plan_ref`` + ``activation_ref`` that the
+    HTTP path would. Per ADR-0199 I-HPC-1 the CLI parser never
+    resolves a profile or compiles a plan directly — the facade owns
+    K1+K2 (I-HPC-1 + I-HPC-2).
+
+    The ``agent`` field is L0 principal metadata (UI hint, see
+    I-HPC-1's surface contract) and is intentionally not part of
+    :class:`CliRunArgs` / :class:`RunIntent`; the HTTP path encodes it
+    in the JSON body, the facade path drops it (intentional parity
+    with the contract).
+    """
+    # COMPAT(owner: ADR-0199, from: CLI-direct-resolve, to: RuntimeFacade,
+    #        delete_when: --facade becomes default + CLI↔HTTP parity test in CI
+    #        + zero hits in scripts/route_legacy_patterns.py for "cli_resolve",
+    #        forbidden_new_usage: cli-direct resolve_profile calls)
+    del agent  # HTTP-only field; not part of RunIntent per I-HPC-1.
+    # Lazy imports — facade lives in ``lca.application.runtime``; keep
+    # them out of module import time so we don't pull application /
+    # harness into ``lca.infrastructure`` modules that import this one.
+    from lca.application.runtime.adapters.intent_from_cli import (
+        CliRunArgs,
+        cli_args_to_intent,
+    )
+    from lca.application.runtime.default_facade import DefaultRuntimeFacade
+    from lca.application.runtime.plan_resolution import PlanResolutionService
+
+    args = CliRunArgs(
+        profile=profile,
+        user_text=user_text,
+        mode=mode,
+        session_id=session_id,
+        assistant_id=assistant_id,
+        attachment_ids=attachment_ids,
+        execution_target=execution_target,
+        options=options,
+        device_id=device_id,
+    )
+    intent = cli_args_to_intent(args)
+    facade_obj = DefaultRuntimeFacade(
+        plan_resolution_service=PlanResolutionService(),
+        run_dispatcher=CLIInProcessDispatcher(),
+    )
+    activation = facade_obj.resolve_activation(intent)
+    typer.echo(f"plan_ref         = {activation.plan_ref}")
+    typer.echo(f"graph_ref        = {activation.graph_ref}")
+    typer.echo(f"plugin_set_ref   = {activation.plugin_set_ref}")
+    typer.echo(f"activation_ref   = {activation.activation_ref}")
+    typer.echo(f"session_id       = {activation.session_id}")
+
+
+__all__ = ("CLIInProcessDispatcher", "register")
