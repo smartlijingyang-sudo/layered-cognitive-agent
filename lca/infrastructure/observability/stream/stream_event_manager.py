@@ -18,7 +18,7 @@ import asyncio
 import json
 import time
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from lca.contracts.transport.stream_keys import (
     STREAM_MAXLEN,
@@ -94,7 +94,7 @@ class LcaStreamEventManager:
     async def read_history(self, run_id: str, count: int) -> list[dict]:
         """Return up to `count` most recent events, newest first."""
         result = await self._redis.xrevrange(stream_key(run_id), "+", "-", count=count)
-        return [_parse_redis_stream_row(row) for row in result]
+        return [_parse_redis_stream_row(row) for row in (result or [])]  # type: ignore[arg-type]
 
     async def subscribe(
         self,
@@ -127,10 +127,10 @@ class LcaStreamEventManager:
 
             if not results:
                 continue
-            for _, messages in results:
-                for msg_id, fields in messages:
+            for _, messages in results:  # type: ignore[str-unpack]
+                for msg_id, fields in messages:  # type: ignore[str-unpack, union-attr]
                     current_last_id = str(msg_id)
-                    event = _parse_redis_stream_row((str(msg_id), fields))
+                    event = _parse_redis_stream_row((str(msg_id), fields))  # type: ignore[arg-type]
                     yield _encode_sse_agent_event(event)
 
 
@@ -140,18 +140,21 @@ def _now_ms() -> int:
 
 def _parse_redis_stream_row(row: tuple[object, dict[str, object]]) -> dict[str, object]:
     msg_id, fields = row
-    out: dict[str, object] = {"id": msg_id, "type": fields.get("type")}
+    fields_dict = fields
+    out: dict[str, object] = {"id": msg_id, "type": fields_dict.get("type")}
     try:
-        out["stepIndex"] = int(fields.get("stepIndex", "0"))
+        step_index_raw = fields_dict.get("stepIndex", "0")
+        out["stepIndex"] = int(cast("str", step_index_raw))
     except (TypeError, ValueError):
         out["stepIndex"] = 0
-    out["operationId"] = fields.get("operationId")
+    out["operationId"] = fields_dict.get("operationId")
     try:
-        out["timestamp"] = int(fields.get("timestamp", "0"))
+        timestamp_raw = fields_dict.get("timestamp", "0")
+        out["timestamp"] = int(cast("str", timestamp_raw))
     except (TypeError, ValueError):
         out["timestamp"] = 0
-    raw_data = fields.get("data")
-    if raw_data:
+    raw_data = fields_dict.get("data")
+    if isinstance(raw_data, str) and raw_data:
         try:
             out["data"] = json.loads(raw_data)
         except json.JSONDecodeError:

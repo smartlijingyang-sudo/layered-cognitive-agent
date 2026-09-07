@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.loop.fact_gateway import AppendReceipt, FactGateway
@@ -114,7 +114,8 @@ class DefaultFactGateway(FactGateway):
         if _supports_payload_append(self._session):
             # RunEventSessionBridge / SessionBusFacade: keep typed payload on the
             # observer path so SpineFileSink can build_record (ADR-0186).
-            ref = self._session.append(spine, producer=DefaultFactGateway)
+            producer = cast("Any", DefaultFactGateway)
+            ref = cast("Any", self._session).append(spine, producer=producer)
             return _receipt_from_bus_ref(ref, event_type=spine.category.value)
         data = spine.model_dump(mode="json")
         data.pop("category", None)

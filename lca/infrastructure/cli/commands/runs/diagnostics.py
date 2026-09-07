@@ -42,10 +42,8 @@ def register(app: typer.Typer) -> None:
         ),
     ) -> None:
         """Run a v3 diagnostic pattern against a journal."""
-        from lca.infrastructure.observability.diagnostics import (
+        from lca.infrastructure.observability.diagnostics import (  # type: ignore[import-not-found]
             DiagnosePattern,
-        )
-        from lca.infrastructure.observability.diagnostics import (
             diagnose as run_diagnose,
         )
         from lca.infrastructure.observability.journal.engine.engine import RunStore

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import fields, is_dataclass
-from typing import Any
+from typing import Any, cast
 
 from lca.contracts.observability.compile.plan import MergeStrategy
 
@@ -81,7 +81,9 @@ def merge_dataclass(existing: Any | None, incoming: Any, strategy: MergeStrategy
                 updates[f.name] = new
         if not updates:
             return existing
-        return type(existing)(**{f.name: updates.get(f.name, getattr(existing, f.name)) for f in fields(existing)})
+        merged_dict = {f.name: updates.get(f.name, getattr(existing, f.name)) for f in fields(existing)}
+        new_obj = type(existing)(**merged_dict)  # type: ignore[misc]
+        return cast("Any", new_obj)
 
     raise ValueError(f"unknown merge strategy {strategy!r}")
 

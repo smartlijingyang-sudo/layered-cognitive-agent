@@ -19,6 +19,7 @@ Dependencies:
 
 from __future__ import annotations
 
+from collections.abc import Awaitable
 from typing import TYPE_CHECKING, NewType, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
@@ -75,7 +76,11 @@ class RuntimeFacade(Protocol):
         """
         ...
 
-    def dispatch_run(self, activation: SessionActivation, intent: RunIntent) -> RunHandle:
+    def dispatch_run(
+        self,
+        activation: SessionActivation,
+        intent: RunIntent,
+    ) -> Awaitable[RunHandle]:
         """Dispatch a session activation for execution.
 
         ``intent`` is forwarded because the dispatcher needs the
@@ -94,7 +99,11 @@ class RuntimeFacade(Protocol):
         """
         ...
 
-    def dispatch_resume(self, activation: SessionActivation, run_id: str) -> RunHandle:
+    def dispatch_resume(
+        self,
+        activation: SessionActivation,
+        run_id: str,
+    ) -> Awaitable[RunHandle]:
         """Resume an existing run using a previously-bound activation.
 
         Used for HIL / approval resume paths (ADR-0163 idempotency).

@@ -33,7 +33,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from starlette.applications import Starlette
 from starlette.routing import WebSocketRoute
@@ -311,11 +311,11 @@ async def _recv_json(ws: WebSocket) -> dict | None:
     for line in payload.split("\n"):
         if line.startswith("data:"):
             try:
-                return json.loads(line[len("data:") :].strip())
+                return cast("dict[str, Any]", json.loads(line[len("data:") :].strip()))
             except json.JSONDecodeError:
                 continue
     try:
-        return json.loads(payload)
+        return cast("dict[str, Any]", json.loads(payload))
     except json.JSONDecodeError:
         return None
 

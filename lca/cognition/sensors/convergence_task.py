@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from lca.cognition.convergence.constants import TASK_CLASS_MANIFEST_KIND
 from lca.cognition.convergence.task_class import classify_task
-from lca.contracts.models.core.perceive.perception import ContextItem
+from lca.contracts.models.core.perceive.perception import ContextItem, ItemKind
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import Sensor
 
@@ -16,7 +18,7 @@ class ConvergenceTaskSensor(Sensor):
         task_class = classify_task(state.task or "")
         return [
             ContextItem(
-                kind=TASK_CLASS_MANIFEST_KIND,
+                kind=cast("ItemKind", TASK_CLASS_MANIFEST_KIND),
                 payload=task_class,
                 provenance="sensor.convergence-task",
             )

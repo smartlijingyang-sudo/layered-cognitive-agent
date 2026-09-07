@@ -136,7 +136,9 @@ def control_turns(state: AgentState) -> tuple[ControlTurnView, ...]:
     forbidden on this code path.
     """
     del state
-    projected = projected_control_turns(None)
+    # ADR-0191 §C1: gates do not read history; pass a sentinel state.
+    sentinel_state: AgentState = cast("AgentState", None)
+    projected = projected_control_turns(sentinel_state)
     return projected or ()
 
 

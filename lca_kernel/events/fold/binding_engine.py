@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import replace
-from typing import Any
+from typing import Any, cast
 
 from lca.contracts.models.observability.journal.step import (
     ThinkingTrace,
@@ -105,7 +105,8 @@ class JournalBindingEngine:
             arguments=dict(extracted["arguments"]) if isinstance(extracted.get("arguments"), dict) else {},
             arguments_summary=str(extracted.get("arguments_summary") or ""),
         )
-        return merge_dataclass(existing, incoming, strategy)
+        result = merge_dataclass(existing, incoming, strategy)
+        return cast("ToolCallRecord", result)
 
     def apply_tool_result(
         self,
@@ -135,7 +136,8 @@ class JournalBindingEngine:
             error=extracted.get("error"),
             delta_summary=str(extracted.get("delta_summary") or ""),
         )
-        return merge_dataclass(existing, incoming, strategy)
+        result = merge_dataclass(existing, incoming, strategy)
+        return cast("ToolResult", result)
 
     def apply_thinking_patch(
         self,

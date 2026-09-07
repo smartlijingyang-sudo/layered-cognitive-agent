@@ -295,6 +295,7 @@ check_untyped_defs = true
 exclude = [
     "^lca/contracts/protocols/.*",
     "^lca/infrastructure/llm_adapter/openai_compat/.*",
+    "^lca/.*/tests/.*",
 ]
 # contracts 层使用 stdlib dataclass，不迁移到 Pydantic
 

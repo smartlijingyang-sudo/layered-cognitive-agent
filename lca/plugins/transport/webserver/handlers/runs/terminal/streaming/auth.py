@@ -17,7 +17,7 @@ from __future__ import annotations
 import os
 import time
 import uuid
-from typing import Any
+from typing import Any, cast
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
@@ -205,7 +205,7 @@ def verify_user_jwt(
         raise InvalidTokenError("token expired")
     if int(payload.get("nbf", current + 1)) > current:
         raise InvalidTokenError("token not yet valid")
-    return payload
+    return cast("dict[str, Any]", payload)
 
 
 __all__ = (

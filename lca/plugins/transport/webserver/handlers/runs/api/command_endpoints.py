@@ -19,7 +19,10 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from starlette.applications import Starlette
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse
