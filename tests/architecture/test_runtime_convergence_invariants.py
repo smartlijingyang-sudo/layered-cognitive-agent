@@ -90,7 +90,7 @@ class TestTransportRecoveryAuthority:
     def test_registry_commands_imports_transport_recovery(self) -> None:
         src = (
             ROOT
-            / "lca/plugins/transport/webserver/handlers/runs/terminal/registry_commands.py"
+            / "lca/plugins/transport/webserver/handlers/runs/terminal/registry/commands.py"
         ).read_text(encoding="utf-8")
         assert "validate_durable_resume" in src
         assert "carrier.runs.resume" in src
@@ -99,5 +99,5 @@ class TestTransportRecoveryAuthority:
         assert (ROOT / "lca" / "session" / "lifecycle" / "recovery.py").is_file()
 
     def test_runtime_loop_awaits_step_boundary(self) -> None:
-        src = (ROOT / "lca/runtime/runtime_loop.py").read_text(encoding="utf-8")
+        src = (ROOT / "lca/runtime/loop/runtime_loop.py").read_text(encoding="utf-8")
         assert "await_step_boundary_checkpoint" in src
