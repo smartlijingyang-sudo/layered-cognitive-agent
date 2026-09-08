@@ -23,7 +23,7 @@ class SessionSeq(Node):
     name = "session_log.session.seq"
 
     def execute(self, node, inputs):
-        from agent_lab._session_holder import session
+        from agent_lab.nodes.session_log._sink import get_session
         sess = session()
         return {"seq": Artifact(
             kind=ArtifactKind.FACT,

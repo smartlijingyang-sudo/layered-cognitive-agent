@@ -17,7 +17,7 @@ class AppendEdgeFire(Node):
     name = "session_log.append.edge_fire"
 
     def execute(self, node, inputs):
-        from agent_lab._session_holder import session
+        from agent_lab.nodes.session_log._sink import get_session
         ev_a = inputs.get("event")
         sess = session()
         data = _content_to_dict(ev_a.content) if ev_a else {}

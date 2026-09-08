@@ -19,7 +19,7 @@ class AppendReflection(Node):
     name = "session_log.append.reflection"
 
     def execute(self, node, inputs):
-        from agent_lab._session_holder import session
+        from agent_lab.nodes.session_log._sink import get_session
         ref_a = inputs.get("reflection")
         if ref_a is None:
             return {"seq_ref": Artifact(kind=ArtifactKind.FACT, content={"seq": -1, "id": ""},

@@ -24,7 +24,7 @@ class SnapshotEvents(Node):
     name = "session_log.snapshot.events"
 
     def execute(self, node, inputs):
-        from agent_lab._session_holder import session
+        from agent_lab.nodes.session_log._sink import get_session
         sess = session()
         from_seq = int(node.config.get("from_seq", 0))
         limit = int(node.config.get("limit", 1000))

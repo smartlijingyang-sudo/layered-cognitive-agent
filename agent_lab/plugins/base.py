@@ -264,6 +264,11 @@ def discover() -> dict[str, type[GraphPlugin]]:
         "agent_lab.plugins.tool_guard",
         "agent_lab.plugins.control_slots",
         "agent_lab.plugins.semantic_router",
+        # Framework-emit bridge: routes framework lifecycle hooks into the
+        # session_log graph (which then writes to the LCA Session). The
+        # runner knows nothing about session_log; the plugin is auto-loaded
+        # via this discover() loop.
+        "agent_lab.nodes.session_log.plugin",
     ):
         try:
             importlib.import_module(module_name)

@@ -25,7 +25,7 @@ class FoldHeader(Node):
     name = "session_log.fold.header"
 
     def execute(self, node, inputs):
-        from agent_lab._session_holder import session
+        from agent_lab.nodes.session_log._sink import get_session
         sess = session()
         header = sess.request_header()
         return {"header": Artifact(

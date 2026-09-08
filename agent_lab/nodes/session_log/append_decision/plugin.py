@@ -23,7 +23,7 @@ class AppendDecision(Node):
     name = "session_log.append.decision"
 
     def execute(self, node, inputs):
-        from agent_lab._session_holder import session
+        from agent_lab.nodes.session_log._sink import get_session
         decision_a = inputs.get("decision")
         if decision_a is None:
             return {"seq_ref": Artifact(kind=ArtifactKind.FACT, content={"seq": -1, "id": ""},

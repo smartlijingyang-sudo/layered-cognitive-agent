@@ -23,7 +23,7 @@ class AppendCheckpoint(Node):
     name = "session_log.append.checkpoint"
 
     def execute(self, node, inputs):
-        from agent_lab._session_holder import session
+        from agent_lab.nodes.session_log._sink import get_session
         ck_a = inputs.get("checkpoint")
         data = _content_to_dict(ck_a.content) if ck_a else {}
         sess = session()

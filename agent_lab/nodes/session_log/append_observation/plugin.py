@@ -19,7 +19,7 @@ class AppendObservation(Node):
     name = "session_log.append.observation"
 
     def execute(self, node, inputs):
-        from agent_lab._session_holder import session
+        from agent_lab.nodes.session_log._sink import get_session
         obs_a = inputs.get("observation")
         if obs_a is None:
             return {"seq_ref": Artifact(kind=ArtifactKind.FACT, content={"seq": -1, "id": ""},

@@ -31,7 +31,7 @@ class ConsumeEvents(Node):
         events_a = inputs.get("events")
         # If events not supplied, pull a default window from the Session
         if events_a is None:
-            from agent_lab._session_holder import session
+            from agent_lab.nodes.session_log._sink import get_session
             sess = session()
             from_seq = int(node.config.get("from_seq", 0))
             limit = int(node.config.get("limit", 1000))

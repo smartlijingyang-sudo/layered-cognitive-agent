@@ -25,7 +25,7 @@ class FanoutObservers(Node):
     name = "session_log.fanout.observers"
 
     def execute(self, node, inputs):
-        from agent_lab._session_holder import session
+        from agent_lab.nodes.session_log._sink import get_session
         obs_a = inputs.get("observer")
         observer_fn = getattr(obs_a, "content", None) if obs_a else None
         if not callable(observer_fn):

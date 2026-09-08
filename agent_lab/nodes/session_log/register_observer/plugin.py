@@ -26,7 +26,7 @@ class RegisterObserver(Node):
     name = "session_log.register.observer"
 
     def execute(self, node, inputs):
-        from agent_lab._session_holder import session
+        from agent_lab.nodes.session_log._sink import get_session
         obs_a = inputs.get("observer")
         if obs_a is None or not callable(getattr(obs_a, "content", None)):
             return {"cancel": Artifact(kind=ArtifactKind.FACT, content={"registered": False},

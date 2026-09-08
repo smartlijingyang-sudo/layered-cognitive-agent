@@ -1,35 +1,38 @@
 """session_log nodes — single fact-write surface + framework event tracing.
 
-Three groups (18 nodes total):
+Importing this package registers:
+  - all 19 single-responsibility worker nodes (5 write + 7 trace +
+    3 read + 4 hook/durable + 1 identity host via attach_sink)
+  - SessionLogEmitterPlugin — bridges runner framework hooks into Session
+
+Public plugin kind: "session_log_emitter"
+
+The Session instance used by all nodes is owned by the internal
+``_sink`` module in this package. Tests / runners can call
+``configure_session(...)`` to inject a Session; otherwise an
+in-memory default is built on first use.
+
+# Node groups (19 + 1 host):
 
   WRITE — domain facts (5):
     append_decision / append_observation / append_reflection /
     append_tool_result / append_checkpoint
 
   TRACE — framework lifecycle events (7):
-    append_node_start / append_node_end / append_edge_fire /
-    append_subgraph_enter / append_subgraph_exit /
-    append_before_compile / append_after_compile
+    append.node_start / append.node_end / append.edge_fire /
+    append.subgraph_enter / append.subgraph_exit /
+    append.before_compile / append.after_compile
 
-  READ — fold/snapshot/seal (4):
-    snapshot_events / fold_header / session_seq /
-    fanout_observers (read+trigger)
+  READ — fold/snapshot/seal (3):
+    snapshot.events / fold.header / session.seq
 
-  HOOK — observer registration / pull-based consumption (2):
-    register_observer / consume_events
+  HOOK — observer + consumption (3):
+    register.observer / fanout.observers / consume.events
 
-All nodes share the singleton Session exposed by
-``agent_lab._session_holder``. Configure at boot via
-``configure_session(...)``; otherwise an in-memory default is built.
-
-event_type whitelist (C11 closed set):
-  - domain:    decision.v1, observation.v1, reflection.v1,
-               tool.result.v1, checkpoint.v1
-  - framework: graph.node_start.v1, graph.node_end.v1,
-               graph.edge_fire.v1, graph.subgraph_enter.v1,
-               graph.subgraph_exit.v1, graph.before_compile.v1,
-               graph.after_compile.v1
+  DURABLE — JSONL sink (2):
+    attach.sink / flush.sink
 """
+# Worker nodes
 from agent_lab.nodes.session_log.append_decision.plugin import AppendDecision
 from agent_lab.nodes.session_log.append_observation.plugin import AppendObservation
 from agent_lab.nodes.session_log.append_reflection.plugin import AppendReflection
@@ -52,6 +55,13 @@ from agent_lab.nodes.session_log.register_observer.plugin import RegisterObserve
 from agent_lab.nodes.session_log.fanout_observers.plugin import FanoutObservers
 from agent_lab.nodes.session_log.consume_events.plugin import ConsumeEvents
 
+from agent_lab.nodes.session_log.attach_sink.plugin import AttachSink
+from agent_lab.nodes.session_log.flush_sink.plugin import FlushSink
+
+# Plugin (bridges runner hooks into Session). Importing the submodule
+# triggers @register_plugin on SessionLogEmitterPlugin.
+from agent_lab.nodes.session_log import plugin as _plugin  # noqa: F401
+
 __all__ = [
     # WRITE
     "AppendDecision", "AppendObservation", "AppendReflection",
@@ -64,4 +74,6 @@ __all__ = [
     "SnapshotEvents", "FoldHeader", "SessionSeq",
     # HOOK
     "RegisterObserver", "FanoutObservers", "ConsumeEvents",
+    # DURABLE
+    "AttachSink", "FlushSink",
 ]

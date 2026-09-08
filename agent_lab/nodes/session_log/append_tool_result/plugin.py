@@ -24,7 +24,7 @@ class AppendToolResult(Node):
     name = "session_log.append.tool_result"
 
     def execute(self, node, inputs):
-        from agent_lab._session_holder import session
+        from agent_lab.nodes.session_log._sink import get_session
         msg_a = inputs.get("tool_message")
         if msg_a is None:
             return {"seq_ref": Artifact(kind=ArtifactKind.FACT, content={"seq": -1, "id": ""},
