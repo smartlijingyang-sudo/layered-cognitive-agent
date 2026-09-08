@@ -52,7 +52,7 @@ nodes:
   - id: dispatch
     region: effect
     factory: dispatch_tool
-    config: { from: routed, to: receipt }
+    config: { from: routed, to: receipt, provider: lca }
     ins: [routed]
     outs: [receipt]
 

@@ -10,10 +10,23 @@ from agent_lab.nodes.manifest import NodeKind, NodeLayer, PortInfo, PortKind, no
 from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
 _TOOL_REGISTRY: dict[str, callable] = {}  # name -> callable(intent_dict) -> result_str
+_BODY_PROVIDERS: dict[str, object] = {}  # name -> LcaBodyProvider (lazy)
 
 
 def register_tool(name: str, fn) -> None:
     _TOOL_REGISTRY[name] = fn
+
+
+def register_body_provider(name: str, provider) -> None:
+    _BODY_PROVIDERS[name] = provider
+
+
+def _default_body_provider() -> object:
+    if "default" not in _BODY_PROVIDERS:
+        from agent_lab.adapters.lca_body import LcaBodyProvider
+
+        _BODY_PROVIDERS["default"] = LcaBodyProvider()
+    return _BODY_PROVIDERS["default"]
 
 
 @node(
@@ -105,6 +118,12 @@ class DispatchTool(Node):
                 schema_ref="tool.receipt.v1",
             )}
         args = intent_a.content.get("args", {})
+        # Provider selection: "lca" -> LcaBodyProvider (real executor);
+        # "default" or missing -> in-process _TOOL_REGISTRY.
+        provider_name = node.config.get("provider", "default")
+        if provider_name == "lca" or (provider_name not in _TOOL_REGISTRY and _BODY_PROVIDERS):
+            provider = _BODY_PROVIDERS.get(provider_name) or _default_body_provider()
+            return {out_port: provider.to_receipt_artifact(tool, args, port=out_port)}
         fn = _TOOL_REGISTRY.get(tool)
         if fn is None:
             return {out_port: Artifact(

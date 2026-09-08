@@ -29,11 +29,24 @@ from agent_lab.runtime.runner import run as run_graph
 
 # ---------- Mock providers ------------------------------------------------
 
-def _mock_llm(messages):
-    last_user = next(
-        (m["content"] for m in reversed(messages) if m.get("role") == "user"),
-        "no user message",
-    )
+def _mock_llm(prompt, **kwargs):
+    """Default in-process LLM callable.
+
+    Accepts either a list[dict] of messages (legacy) or a flat prompt
+    string (LCA shim form). Returns an assistant text reply.
+    """
+    if isinstance(prompt, list):
+        last_user = next(
+            (m["content"] for m in reversed(prompt) if isinstance(m, dict) and m.get("role") == "user"),
+            "no user message",
+        )
+        return f"ack: {last_user}"
+    # string prompt — pick last [user] line if present
+    last_user = "no user message"
+    for line in reversed(prompt.split("\n")):
+        if line.startswith("[user]"):
+            last_user = line.removeprefix("[user] ").strip()
+            break
     return f"ack: {last_user}"
 
 
@@ -65,6 +78,53 @@ def _register_lca_mv() -> None:
         register_lca_mv_provider("lca", LcaMvProvider())
     except Exception as exc:
         print(f"[warn] LCA mv provider not registered: {exc!r}")
+
+
+def _register_lca_body() -> None:
+    """Register LCA's SimpleSafeExecutor + Tool shims as the agent_lab body provider.
+
+    Wires two in-process tools (echo, calc) so the executor has something
+    to dispatch. Real apps would register ToolShim objects built from
+    concrete LCA Tool implementations.
+    """
+    try:
+        from agent_lab.adapters.lca_body import LcaBodyProvider, ToolShim
+        from agent_lab.nodes.tool import register_body_provider
+
+        provider = LcaBodyProvider(allowed_tools=("echo", "calc"))
+        provider.register_tool(ToolShim(
+            name="echo",
+            description="Echo the args back as text.",
+            parameters={"type": "object", "properties": {"text": {"type": "string"}}},
+            is_idempotent=True,
+            effect_kind="ephemeral",
+            default_timeout_s=5,
+            _callable=_mock_tool_echo,
+        ))
+        provider.register_tool(ToolShim(
+            name="calc",
+            description="Evaluate a python arithmetic expression.",
+            parameters={"type": "object", "properties": {"expr": {"type": "string"}}},
+            is_idempotent=True,
+            effect_kind="ephemeral",
+            default_timeout_s=5,
+            _callable=_mock_tool_calc,
+        ))
+        register_body_provider("lca", provider)
+    except Exception as exc:
+        print(f"[warn] LCA body provider not registered: {exc!r}")
+
+
+def _register_lca_llm() -> None:
+    """Register LCA's LLMAdapter Protocol-backed provider."""
+    try:
+        from agent_lab.adapters.lca_llm import LcaLlmProvider, LlmAdapterShim
+        from agent_lab.nodes.llm import register_llm_provider_obj
+
+        adapter = LlmAdapterShim(callable_=_mock_llm)
+        register_llm_provider_obj("lca", LcaLlmProvider(adapter))
+    except Exception as exc:
+        print(f"[warn] LCA llm provider not registered: {exc!r}")
 
 
 # ---------- Demo runners --------------------------------------------------
@@ -142,8 +202,8 @@ def _run_negative() -> None:
     dst = src.with_suffix(".broken.yaml")
     text = src.read_text(encoding="utf-8")
     broken = text.replace(
-        "    config: { from: routed, to: receipt }\n    ins: [routed]\n    outs: [receipt]",
-        "    config: { from: routed, to: receipt }\n    ins: [routed]\n    outs: []",
+        "    config: { from: routed, to: receipt, provider: lca }\n    ins: [routed]\n    outs: [receipt]",
+        "    config: { from: routed, to: receipt, provider: lca }\n    ins: [routed]\n    outs: []",
     )
     if broken == text:
         print("FAILED to mutate effect_dispatch.yaml for negative test")
@@ -284,6 +344,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     _register_mocks()
+    _register_lca_body()
+    _register_lca_llm()
     if args.mv_provider == "lca" or args.graph == "mv_assemble":
         _register_lca_mv()
     if args.describe:

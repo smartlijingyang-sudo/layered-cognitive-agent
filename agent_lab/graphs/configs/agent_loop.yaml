@@ -64,7 +64,7 @@ nodes:
     region: phase:think
     factory: call_llm
     config:
-      provider: mock
+      provider: lca
       from: messages_in
       to: response
     ins: [messages_in]

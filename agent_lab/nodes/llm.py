@@ -11,10 +11,38 @@ from agent_lab.nodes.manifest import NodeKind, NodeLayer, PortInfo, PortKind, no
 from agent_lab.primitives.artifact import Artifact, ArtifactKind, make_message
 
 _LLM_PROVIDERS: dict[str, callable] = {}  # name -> callable(messages) -> str
+_LLM_PROVIDER_OBJS: dict[str, object] = {}  # name -> LcaLlmProvider (LCA-backed)
 
 
 def register_llm_provider(name: str, fn) -> None:
     _LLM_PROVIDERS[name] = fn
+
+
+def register_llm_provider_obj(name: str, provider) -> None:
+    _LLM_PROVIDER_OBJS[name] = provider
+
+
+def _default_lca_llm_provider():
+    if "lca" not in _LLM_PROVIDER_OBJS:
+        from agent_lab.adapters.lca_llm import LcaLlmProvider, LlmAdapterShim
+
+        adapter = LlmAdapterShim(callable_=_echo_llm)
+        _LLM_PROVIDER_OBJS["lca"] = LcaLlmProvider(adapter)
+    return _LLM_PROVIDER_OBJS["lca"]
+
+
+def _echo_llm(prompt: str, **kwargs) -> str:
+    """Default in-process LLM callable used by the LCA shim.
+
+    Trivial: echoes the last user line + a synthetic tool_call payload.
+    Real adapters would replace this via register_llm_provider_obj().
+    """
+    lines = [ln for ln in prompt.split("\n") if ln.strip()]
+    last_user = next(
+        (ln.removeprefix("[user] ").strip() for ln in reversed(lines) if ln.startswith("[user]")),
+        "no user message",
+    )
+    return f"ack: {last_user}"
 
 
 @node(
@@ -44,10 +72,20 @@ class CallLLM(Node):
         if not isinstance(msgs, list):
             msgs = [{"role": "user", "content": str(msgs_a.content if msgs_a else "")}]
         provider_fn = _LLM_PROVIDERS.get(provider)
-        if provider_fn is None:
-            raise RuntimeError(f"unknown LLM provider: {provider}")
-        text = provider_fn(msgs)
-        return {out_port: make_message("assistant", text)}
+        if provider_fn is not None:
+            text = provider_fn(msgs)
+            return {out_port: make_message("assistant", text)}
+        # LCA-backed provider path
+        if provider in _LLM_PROVIDER_OBJS or provider == "lca":
+            lca_provider = _LLM_PROVIDER_OBJS.get(provider) or _default_lca_llm_provider()
+            # Reuse the message-list artifact (msgs_a) by re-wrapping it.
+            from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+            messages_artifact = Artifact(
+                kind=ArtifactKind.MESSAGE, content=msgs, schema_ref="openai.messages.v1"
+            )
+            return {out_port: lca_provider.complete(messages_artifact=messages_artifact)}
+        raise RuntimeError(f"unknown LLM provider: {provider}")
 
 
 @node(
