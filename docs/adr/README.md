@@ -153,6 +153,10 @@
 | [0203](0203-end-to-end-field-contract.md) | 端到端字段契约: effect_kind 枚举 + canonical_digest 单一助手 | Proposed |
 | [0204](0204-surface-render-slot-plan-strategy.md) | SurfaceRender — 模型可见消息的 typed Contract 收口 (2026-09-08 重写; ADR-0195 §1.4 C13 信息血统 + §1.5 V2/V4/V5 应用域; OpenAI*Message Pydantic frozen + ModelVisibleUnit.view() 闭合校验 + Manifest `capability.contract.provides` 沿用 ADR-0110; 同 PR 零中间态删 if/elif/平铺字段) | Accepted — Rewritten |
 | [0205](0205-wire-contract-as-plugin-seam.md) | WireContract 元机制 — **2026-09-08 撤回**; 已并入 [ADR-0195 §1.4 / §1.5](0195-platform-architecture-convergence.md) + [ADR-0204](0204-surface-render-slot-plan-strategy.md) 重写版; 历史文件保留追溯 | Deprecated — Superseded |
+| [0206](0206-information-graph-kernel.md) | 信息图内核与信息边编译闭包 — 可编译的 Agent 编排骨架（归属·传递·消化·转化·依赖） | Proposed |
+| [0207](0207-graph-orchestrated-cognitive-agent-kernel.md) | 图编排式认知 Agent 内核 — 多图协作与编译期信息契约 | Proposed |
+| [0206](0206-information-graph-kernel.md) | 信息图内核 — InfoEdgeSpec ⊆ CompiledRunPlan；编译期 Visibility/Receipt/Borrow 不变式；LCA 落点词汇 ControlPlan · InfoEdgeSpec · ProjectionSpec | Proposed |
+| [0207](0207-graph-orchestrated-cognitive-agent-kernel.md) | 图编排式认知 Agent 内核 — 多图协作（编排/认知/上下文/效果/溯源）；think=graph.call；ContextManifest 编译期 Binding；Companion 0206 | Proposed |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
 
