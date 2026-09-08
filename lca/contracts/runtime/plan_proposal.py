@@ -32,11 +32,12 @@ or ``lca.plugins``.
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Final, Literal
+
+from lca.contracts.observability.canonical_digest import canonical_digest
 
 ProposalStatus = Literal[
     "draft",  # proposal created, not yet reviewed
@@ -162,8 +163,11 @@ def compute_proposal_ref(
         "source_activation_ref": source_activation_ref,
     }
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-    return f"{_PROPOSAL_HASH_NAMESPACE}:{digest}"
+    return canonical_digest(
+        canonical,
+        length=64,
+        prefix=f"{_PROPOSAL_HASH_NAMESPACE}:",
+    )
 
 
 def build_proposal(

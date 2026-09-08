@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import hashlib
 import time
 from typing import Any, Protocol
 
+from lca.contracts.observability.canonical_digest import canonical_digest
 from lca.infrastructure.computer.op.result import ComputerOpResult
 from lca.infrastructure.file.store import FileStore
 
@@ -53,7 +53,11 @@ class MachineExecMixin:
         del description
         from lca.infrastructure.computer.machine.harvest import attach_harvested_outputs
 
-        nonce = hashlib.sha256(f"{code}:{time.monotonic()}".encode()).hexdigest()[:12]
+        nonce = canonical_digest(
+            f"{code}:{time.monotonic()}",
+            length=12,
+            prefix="",
+        )
         ext = _LANGUAGE_EXT.get(language.lower(), "py")
         rel = f".lca/exec_{nonce}.{ext}"
         temp_path = f"{str(self.plane.root).rstrip('/')}/{rel}"

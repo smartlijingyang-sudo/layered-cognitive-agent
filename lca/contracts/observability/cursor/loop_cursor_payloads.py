@@ -60,26 +60,15 @@ class ToolCallRecord:
 
     - ``tool_name`` —— 工具名(主字段,canonical)
     - ``call_seq`` —— cursor 内自增,保留。
-    - ``args_digest`` —— **deprecated**(ADR-0185 spec §2.5 P5)。
-      digest 引用;原承担 sidecar 文件指针。保留 1 个 minor 版本以兼容
-      ``StdLoopCursor.record_tool_call`` + fold / spine 现有 consumer;
-      caller 应读 ``tool_name`` + 由 caller 端 caller-projected 字段。
-      delete-when:下个 minor 版本后,或所有 caller 迁移完毕时。
-      tracking: ADR-0185 spec §2.5 P5。
-    - ``args_payload_path`` —— 同上 deprecated(原 sidecar payload path)。
 
-    字段命名冻结(ADR-0185 spec §2.5):``tool_name`` / ``call_seq`` 是
-    canonical,``args_digest`` / ``args_payload_path`` 下个 minor 版本删。
+    字段命名冻结(ADR-0185 spec §2.5 + ADR-0203 §2.3):``tool_name`` /
+    ``call_seq`` / ``arguments`` / ``arguments_summary`` / ``invocation_id``
+    是 canonical;``args_digest`` / ``args_payload_path`` 由 ADR-0203 删除。
+    ``arguments`` + ``arguments_summary`` 已承担旧 sidecar digest / path 字段职责。
     """
 
     tool_name: str
     call_seq: int  # cursor 内自增
-    # COMPAT(delete-when: 下个 minor 版本,或所有 caller 迁完;
-    #   tracking: ADR-0185 spec §2.5 P5)
-    args_digest: str = ""
-    # COMPAT(delete-when: 下个 minor 版本,或所有 caller 迁完;
-    #   tracking: ADR-0185 spec §2.5 P5)
-    args_payload_path: str | None = None
     # Rich fields — step-tree / deriver 可直接读,无需 sidecar round-trip。
     arguments: dict[str, Any] | None = None
     arguments_summary: str = ""

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -10,6 +9,7 @@ from lca.cognition.brain.prompt.sandbox_prompt import build_cloud_sandbox_prompt
 from lca.cognition.convergence.task_class import classify_task, resolve_task_class
 from lca.contracts.models.core.policy.convergence import TaskClass
 from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.observability.canonical_digest import canonical_digest
 from lca.contracts.protocols.runtime.infra.infra import Tool
 
 _EMPTY_TOOLS = "（无可用工具）"
@@ -42,8 +42,7 @@ class PromptSurfaceRender:
 
     @property
     def digest(self) -> str:
-        payload = self.body.encode("utf-8")
-        return hashlib.sha256(payload).hexdigest()[:16]
+        return canonical_digest(self.body, length=16)
 
 
 class PromptSurface:

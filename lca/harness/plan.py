@@ -7,13 +7,13 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, is_dataclass
 from enum import Enum
 from typing import Any, cast
 
+from lca.contracts.observability.canonical_digest import canonical_digest
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     CognitivePhaseGraphPlan,
     PluginSpec,
@@ -36,7 +36,7 @@ def canonical_json(value: Any) -> str:
 def declarative_plan_hash(value: Any) -> str:
     """Return the stable digest used by declarative sub-plan diagnostics."""
 
-    return hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest()[:32]
+    return canonical_digest(canonical_json(value), length=32)
 
 
 def compiled_run_plan_ref(plan: CompiledRunPlan) -> str:
@@ -52,7 +52,7 @@ def compiled_run_plan_ref(plan: CompiledRunPlan) -> str:
         "input_provenance": sorted((kind, path) for kind, path in plan.input_provenance),
         "declarative": _declarative_payload(plan),
     }
-    return hashlib.sha256(canonical_json(payload).encode("utf-8")).hexdigest()[:16]
+    return canonical_digest(canonical_json(payload), length=16)
 
 
 def capability_sub_plan_hash(plan: CompiledRunPlan) -> str:

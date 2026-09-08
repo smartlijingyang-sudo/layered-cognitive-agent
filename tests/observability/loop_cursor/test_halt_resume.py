@@ -105,8 +105,6 @@ def test_halt_locks_record_calls_std() -> None:
         c.record_tool_call(
             ToolCallRecord(
                 tool_name="t",
-                args_digest="x",
-                args_payload_path=None,
                 call_seq=1,
             )
         )

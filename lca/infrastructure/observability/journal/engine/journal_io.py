@@ -23,7 +23,6 @@ canonical 类型;disk v2 envelope 仅存事实字段(typed facts 与 ref)。
 from __future__ import annotations
 
 import dataclasses
-import hashlib
 import json
 from collections.abc import Iterator, Mapping
 from pathlib import Path
@@ -39,6 +38,7 @@ from lca.contracts.models.observability.journal.journal import (
     RunScope,
     StampedEvent,
 )
+from lca.contracts.observability.canonical_digest import canonical_digest
 from lca.infrastructure.observability.journal.engine.serialization import (
     stamped_to_journal_record,
 )
@@ -78,8 +78,8 @@ def _derive_event_id(
     - 跨 run 唯一(``run_id` 是 ULID)。
     - 24 hex chars + ``evt_`` 前缀 = 28 字符,落入工程惯例。
     """
-    material = f"{run_id}|{run_seq}|{event_type}|{ts:.6f}".encode()
-    return "evt_" + hashlib.sha256(material).hexdigest()[:24]
+    material = f"{run_id}|{run_seq}|{event_type}|{ts:.6f}"
+    return canonical_digest(material, length=24, prefix="evt_")
 
 
 # ── 序列化主路径 ──────────────────────────────────────────────────

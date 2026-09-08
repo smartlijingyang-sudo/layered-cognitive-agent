@@ -102,7 +102,6 @@ class CursorRecord:
         *,
         tool_name: str,
         invocation_id: str,
-        args_digest: str = "",
         arguments: dict[str, Any] | None = None,
         arguments_summary: str = "",
     ) -> None:
@@ -116,6 +115,9 @@ class CursorRecord:
           tool 调用内容;
         - exceptions.jsonl / journal.json / model_visible 三处对 tool
           调用的还原走同一条字段链,无需 reader 自己 parse digest。
+
+        ADR-0203 §2.3: ``args_digest`` / ``args_payload_path`` 已从
+        :class:`ToolCallRecord` 删除;这里也删除对应 kwarg。
 
         Idempotency: if ``invocation_id`` was already recorded, this is a
         silent no-op (prevents duplicate ``step.tool_call.record`` events
@@ -134,8 +136,6 @@ class CursorRecord:
             cursor.record_tool_call(
                 ToolCallRecord(
                     tool_name=tool_name,
-                    args_digest=args_digest,
-                    args_payload_path=None,
                     call_seq=hash(invocation_id) & 0x7FFFFFFF,
                     arguments=arguments,
                     arguments_summary=arguments_summary,

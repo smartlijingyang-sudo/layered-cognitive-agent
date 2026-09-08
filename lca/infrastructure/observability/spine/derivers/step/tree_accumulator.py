@@ -514,7 +514,7 @@ class StepTreeAccumulatorDeriver(Deriver):
             # 由 ``CursorRecord`` 透传给 ``cursor.record_tool_call``(后者
             # 已支持 kwargs 透传),再被 std.py 拍平进 event_payload。字段:
             # tool_name / invocation_id / arguments / arguments_summary /
-            # args_digest / call_seq / incarnation / plan_ref / step_index。
+            # call_seq / incarnation / plan_ref / step_index。
             # writable_matrix.coordinator 这条历史路径仍可能发 nested
             # ``payload.call``,这里按字段合并:每个字段独立 flat→nested
             # 兜底(flat 是 canonical 命名空间)。

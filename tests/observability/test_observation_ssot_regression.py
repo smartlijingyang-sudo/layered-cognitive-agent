@@ -139,8 +139,6 @@ def test_step_tree_records_tool_call_from_canonical_payload(tmp_path: Path) -> N
             channel="fact",
             payload={
                 "tool_name": "executeCode",
-                "args_digest": "sha256:abc",
-                "args_payload_path": None,
                 "call_seq": 7,
                 "invocation_id": "inv-001",
                 "arguments": {"code": "print('hi')"},

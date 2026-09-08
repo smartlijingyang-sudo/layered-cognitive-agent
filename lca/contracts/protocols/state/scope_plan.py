@@ -28,13 +28,13 @@ module-level 函数（``scope_plan_hash`` / ``scope_plan_to_dict``）。
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
 from lca.contracts.atoms.scope.scope import Scope, parse_scope
+from lca.contracts.observability.canonical_digest import canonical_digest
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,7 +128,7 @@ def scope_plan_hash(plan: ScopePlan) -> str:
         "revision": plan.revision,
     }
     blob = json.dumps(payload, sort_keys=True, ensure_ascii=False)
-    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+    return canonical_digest(blob, length=16, prefix="")
 
 
 def scope_plan_to_dict(plan: ScopePlan) -> dict[str, Any]:

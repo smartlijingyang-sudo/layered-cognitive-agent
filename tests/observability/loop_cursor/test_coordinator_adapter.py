@@ -218,8 +218,8 @@ def test_adapter_record_tool_call_emits_cursor_tool_call_ep() -> None:
     # ADR-0185 §2.5 P5 + ADR-0203 §2.3: ``args_digest`` 字段在 record_tool_call
     # 路径已退役(deprecated);adapter 不再计算 digest。完整内容由
     # ``arguments`` / ``arguments_summary`` / ``invocation_id`` 字段承载。
-    # std.py 可能仍 emit 空 digest 字段(PR-C 兼容形态),用 ``get`` 防御。
-    assert call_ep["payload"].get("args_digest", "") == ""
+    # std.py 不再 emit digest 字段(ADR-0203 §2.3 删除),用 ``not in`` 断言。
+    assert "args_digest" not in call_ep["payload"]
     assert call_ep["payload"]["arguments"] == {"x": 1}
     assert call_ep["payload"]["arguments_summary"] == "echo(x=1)"
     assert call_ep["payload"]["invocation_id"] == "inv-001"

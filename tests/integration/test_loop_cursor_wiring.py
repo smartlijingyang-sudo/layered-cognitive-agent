@@ -72,8 +72,6 @@ def test_cursor_step_writes_land_in_run_spine_file(tmp_path: Path) -> None:
         cursor.record_tool_call(
             ToolCallRecord(
                 tool_name="echo",
-                args_digest="sha256:1",
-                args_payload_path=None,
                 call_seq=1,
             )
         )

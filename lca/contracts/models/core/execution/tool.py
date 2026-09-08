@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 
 @dataclass(frozen=True)
@@ -39,12 +39,25 @@ class ParameterSpec:
 
 @dataclass(frozen=True)
 class ToolApi:
-    """One callable API exposed by a tool manifest."""
+    """One callable API exposed by a tool manifest.
+
+    ``effect_kind`` classifies the kind of side effect the API leaves
+    behind — orthogonal to ``is_idempotent`` (which describes transport-layer
+    retry safety, not semantic effect taxonomy):
+
+    - ``"ephemeral"`` — no persistent side effect (read-only or
+      process-local).
+    - ``"persistent"`` — each call leaves a fresh, non-recoverable side
+      effect (file write, command exec).
+    - ``"stateful_once"`` — repeated calls within a run should short-circuit
+      after the first activation (e.g. ``activate_skill``).
+    """
 
     name: str
     description: str
     parameters: dict[str, Any]
     is_idempotent: bool = False
+    effect_kind: Literal["ephemeral", "persistent", "stateful_once"] = "ephemeral"
     default_timeout_ms: int = 30_000
 
 

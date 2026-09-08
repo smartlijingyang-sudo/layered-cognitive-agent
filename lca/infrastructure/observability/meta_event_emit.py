@@ -138,6 +138,7 @@ def emit_skill_activated(
             name=name,
             content_hash=content_hash,
             source=source,
+            effect_kind="stateful_once",
         ),
         actor=actor,
     )

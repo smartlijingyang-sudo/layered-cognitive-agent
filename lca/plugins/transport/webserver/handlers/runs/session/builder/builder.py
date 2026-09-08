@@ -16,7 +16,6 @@ ADR-0068 §决策二 + ADR-0167 D11 + ADR-0186 PR-3g:
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import time
 from collections.abc import Sequence
@@ -28,6 +27,7 @@ from lca.contracts.mechanisms.capability.capability import (
     MissingCapabilityError,
     require_capability,
 )
+from lca.contracts.observability.canonical_digest import canonical_digest
 from lca.contracts.observability.journal.run_journal import RunJournalFactory
 from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.profile.boot.products import compiled_plan_from_scope
@@ -90,7 +90,7 @@ def _compute_plan_ref(ctx: Any, request: RunSessionRequest) -> str:
         request.execution_target or "",
     )
     payload = "|".join(parts)
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+    return canonical_digest(payload, length=16, prefix="")
 
 
 class RunSessionBuilder:

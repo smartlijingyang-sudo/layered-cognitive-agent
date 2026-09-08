@@ -46,12 +46,12 @@ from __future__ import annotations
 
 import asyncio
 import functools
-import hashlib
 import inspect
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any, TypeVar, overload
 
+from lca.contracts.observability.canonical_digest import canonical_digest
 from lca.infrastructure.observability.loop_cursor.spine._spine_port import (
     is_session_ssot_hook_active,
 )
@@ -193,8 +193,7 @@ def _fingerprint_value(value: Any) -> str:
         rendered = repr(value)
     except Exception as exc:
         rendered = f"<unreprable: {exc!r}>"
-    digest = hashlib.sha256(rendered.encode("utf-8")).hexdigest()
-    return f"sha256:{digest[:16]}"
+    return canonical_digest(rendered, length=16)
 
 
 # ``_TRACEBACK_CAPPED_BYTES`` mirrors ``_publish_i17_rejection`` (ADR-0165.1 §96).

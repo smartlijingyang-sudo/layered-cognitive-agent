@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from hashlib import sha256
 
 from lca.contracts.models.core.state.lifecycle import TaskStatus
+from lca.contracts.observability.canonical_digest import canonical_digest
 from lca.contracts.protocols.runtime.runtime.lifecycle import (
     RuntimeLifecycleEvent,
     RuntimeLifecycleEventType,
@@ -259,7 +259,7 @@ def _event_key(event: RuntimeLifecycleEvent) -> str:
 def _ticket_id(event_key: str) -> str:
     """Return a deterministic diagnostic id without exposing evidence payloads."""
 
-    digest = sha256(event_key.encode("utf-8")).hexdigest()[:16]
+    digest = canonical_digest(event_key, length=16, prefix="")
     return f"learning-review-{digest}"
 
 

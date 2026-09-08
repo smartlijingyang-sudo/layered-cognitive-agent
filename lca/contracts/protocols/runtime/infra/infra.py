@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Sequence
-from typing import Any, ClassVar, Protocol, runtime_checkable
+from typing import Any, ClassVar, Literal, Protocol, runtime_checkable
 
 from lca.contracts.atoms.enums.enums import LLMStreamEventType
 from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
@@ -52,6 +52,7 @@ class Tool(Protocol):
     description: ClassVar[str]
     parameters: ClassVar[dict[str, Any]]
     is_idempotent: ClassVar[bool]
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]]
     default_timeout_s: ClassVar[int]
 
     async def execute(self, args: dict[str, Any]) -> Observation: ...

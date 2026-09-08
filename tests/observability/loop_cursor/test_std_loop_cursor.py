@@ -152,8 +152,6 @@ def test_record_tool_call_in_act_window() -> None:
     c.record_tool_call(
         ToolCallRecord(
             tool_name="t",
-            args_digest="x",
-            args_payload_path=None,
             call_seq=1,
         )
     )

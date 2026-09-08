@@ -298,7 +298,8 @@ def test_safe_executor_record_tool_call_evidence_routes_through_cursor() -> None
     """``_record_tool_call_evidence`` 经 cursor.record_tool_call 落 evidence EP。
 
     PR-1/S1 + SSOT 收口:允许 CursorRecord.try_record_tool_call 包装层。ToolCallRecord
-    构造在 CursorRecord 内部;helper 只透传 tool_name / invocation_id / args_digest。
+    构造在 CursorRecord 内部;helper 只透传 tool_name / invocation_id
+    (ADR-0203 §2.3 删除 ``args_digest``)。
     """
     from lca.cognition.body.executor import safe_executor
 

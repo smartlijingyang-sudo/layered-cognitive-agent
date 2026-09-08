@@ -483,8 +483,6 @@ def test_l5_record_timing_combined_with_phase_advance() -> None:
     c.record_tool_call(
         ToolCallRecord(
             tool_name="t",
-            args_digest="a",
-            args_payload_path=None,
             call_seq=1,
         )
     )
@@ -504,8 +502,6 @@ def test_l5_record_timing_combined_with_phase_advance() -> None:
         c.record_tool_call(
             ToolCallRecord(
                 tool_name="t",
-                args_digest="a",
-                args_payload_path=None,
                 call_seq=2,
             )
         )
@@ -692,8 +688,6 @@ def test_l14_record_tool_call_envelope_carries_incarnation_and_plan_ref() -> Non
     c.record_tool_call(
         ToolCallRecord(
             tool_name="t",
-            args_digest="d",
-            args_payload_path=None,
             call_seq=1,
         )
     )

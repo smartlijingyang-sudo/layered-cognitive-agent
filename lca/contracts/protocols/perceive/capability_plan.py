@@ -7,12 +7,12 @@ provider binding 与插件关系。未类型化的 Profile 元数据必须由 ha
 
 from __future__ import annotations
 
-import hashlib
 import json
 from dataclasses import dataclass
 from typing import Any
 
 from lca.contracts.atoms.relation.relation import Relation, parse_relation
+from lca.contracts.observability.canonical_digest import canonical_digest
 from lca.contracts.protocols.composition.relation import TypedRelation
 
 
@@ -132,7 +132,7 @@ def capability_plan_hash(plan: CapabilityPlan) -> str:
         ],
     }
     blob = json.dumps(payload, sort_keys=True, ensure_ascii=False)
-    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+    return canonical_digest(blob, length=16, prefix="")
 
 
 def relations_of_kind(plan: CapabilityPlan, kind: str | Relation) -> tuple[TypedRelation, ...]:

@@ -352,8 +352,6 @@ class StdLoopCursor:
             raise CursorError("record_tool_call must be in ACT window")
         event_payload: dict[str, object] = {
             "tool_name": payload.tool_name,
-            "args_digest": payload.args_digest,
-            "args_payload_path": payload.args_payload_path,
             "call_seq": payload.call_seq,
             "incarnation": self._state.incarnation.incarnation_seq,
             "plan_ref": self._state.incarnation.plan_ref,

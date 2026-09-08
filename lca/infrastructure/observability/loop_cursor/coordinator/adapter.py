@@ -192,12 +192,13 @@ class CoordinatorAdapter:
         """``record_tool_call`` —— cursor 唯一 writer。
 
         journal_step ``ToolCallRecord`` 字段 = invocation_id / name / arguments /
-        arguments_summary;cursor ``ToolCallRecord`` 字段 = tool_name / args_digest /
-        args_payload_path / call_seq。映射:
+        arguments_summary;cursor ``ToolCallRecord`` 字段 = tool_name /
+        call_seq / arguments / arguments_summary / invocation_id(ADR-0203 §2.3
+        删除 ``args_digest`` / ``args_payload_path``)。映射:
             tool_name       ← name
-            args_digest     ← sha256:<hex> via sha256_digest
-            args_payload_path ← None(arguments 内容由 payload adapter 处理)
             call_seq        ← cursor's monotonic seq
+            arguments       ← arguments(由 payload adapter 处理)
+            arguments_summary ← arguments_summary
         """
         tool_name = getattr(call, "name", "")
         invocation_id = getattr(call, "invocation_id", "") or ""
@@ -206,8 +207,6 @@ class CoordinatorAdapter:
         self._cursor.record_tool_call(
             ToolCallRecord(
                 tool_name=tool_name,
-                args_digest="",
-                args_payload_path=None,
                 call_seq=self._cursor.snapshot.seq,
                 arguments=arguments,
                 arguments_summary=args_summary,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from lca.contracts.harness.memory.skill import SkillCatalogEntry
 from lca.contracts.harness.tasks.session import session_event
@@ -113,6 +113,13 @@ class SkillActivated:
 
     ``source`` names the activation path, e.g. ``"tool:activate_skill"``,
     ``"slash:/skill"``, ``"skill_tool"``.
+
+    ``effect_kind`` classifies the activation receipt as
+    ``"stateful_once"`` per ADR-0203 — repeated activations within the
+    same run are semantic no-ops (the second call returns the prior
+    receipt rather than re-emitting the side effect). The field defaults
+    to ``"stateful_once"`` so historical callers without an explicit
+    classification still classify correctly.
     """
 
     skill_id: str
@@ -120,6 +127,7 @@ class SkillActivated:
     content_hash: str = ""
     activated_at_step: int = 0
     source: str = "tool"
+    effect_kind: Literal["stateful_once"] = "stateful_once"
 
 
 @session_event("skill.routed.v1", visibility="audit")

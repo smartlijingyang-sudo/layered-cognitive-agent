@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
 from lca.contracts.atoms.artifact.state import LEGAL_TRANSITIONS, ArtifactState, is_legal_transition
 from lca.contracts.atoms.scope.scope import Scope, parse_scope
+from lca.contracts.observability.canonical_digest import canonical_digest
 
 
 class InvalidStateTransitionError(ValueError):
@@ -132,7 +132,7 @@ def make_capability_artifact(
     content_bytes = content.encode("utf-8") if isinstance(content, str) else content
     return CapabilityArtifact(
         logical_id=logical_id,
-        revision_digest=hashlib.sha256(content_bytes).hexdigest()[:16],
+        revision_digest=canonical_digest(content_bytes, length=16, prefix=""),
         state=ArtifactState(state),
         scope=parse_scope(scope) if isinstance(scope, str) else scope,
         grants=tuple(grants),

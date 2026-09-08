@@ -7,12 +7,12 @@ must consume the manifest, not emit it.
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Sequence
 
 from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
 from lca.contracts.models.observability.journal.journal import ContextManifested
+from lca.contracts.observability.canonical_digest import canonical_digest
 
 
 def digest_manifest(manifest: ContextManifest) -> str:
@@ -26,7 +26,7 @@ def digest_manifest(manifest: ContextManifest) -> str:
         sort_keys=True,
         ensure_ascii=False,
     )
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+    return canonical_digest(payload, length=16)
 
 
 def build_manifested_event(

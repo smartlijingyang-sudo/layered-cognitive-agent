@@ -833,7 +833,6 @@ def test_step_tool_call_record_writes_arguments_when_payload_has_them(tmp_path: 
                     "arguments_summary": "executeCode(python)",
                 },
                 "tool_name": "executeCode",
-                "args_digest": "sha256:abcd",
                 "step_index": 1,
             },
         )
@@ -889,8 +888,6 @@ def test_step_tool_call_record_with_flat_payload_writes_arguments(tmp_path: Path
             sequence=2,
             payload={
                 "tool_name": "executeCode",
-                "args_digest": "sha256:abc",
-                "args_payload_path": None,
                 "call_seq": 1,
                 "incarnation": 1,
                 "plan_ref": "p1",

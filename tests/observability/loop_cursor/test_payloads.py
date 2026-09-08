@@ -38,8 +38,6 @@ def test_thinking_record_thinking_kind_literal() -> None:
 def test_tool_call_record_call_seq_required() -> None:
     r = ToolCallRecord(
         tool_name="t",
-        args_digest="x",
-        args_payload_path=None,
         call_seq=1,
     )
     assert r.call_seq == 1

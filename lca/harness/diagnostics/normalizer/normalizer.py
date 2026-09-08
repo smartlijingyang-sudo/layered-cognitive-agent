@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import asdict, dataclass
 from typing import Any, cast
 
 from lca.contracts.harness.state.projection import ProjectionSnapshot
 from lca.contracts.harness.tasks.session import SessionEvent
+from lca.contracts.observability.canonical_digest import canonical_digest
 
 
 def _hash(value: Any) -> str:
-    return hashlib.sha256(repr(value).encode("utf-8")).hexdigest()[:16]
+    return canonical_digest(repr(value), length=16)
 
 
 @dataclass(frozen=True)

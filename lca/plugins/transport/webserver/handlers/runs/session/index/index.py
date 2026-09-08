@@ -8,12 +8,12 @@ resolution and process-journal ownership live in separate collaborators so the
 
 from __future__ import annotations
 
-import hashlib
 import time
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from lca.contracts.models.core.state.plane import PlaneBindings
+from lca.contracts.observability.canonical_digest import canonical_digest
 
 if TYPE_CHECKING:
     from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
@@ -38,8 +38,8 @@ def run_dedup_key(
         sorted(str(item).strip() for item in attachment_ids if str(item).strip())
     )
     principal = agent_id.strip() or "solo"
-    payload = f"{mode}\0{principal}\0{normalized}\0{attachments}".encode()
-    return hashlib.sha256(payload).hexdigest()[:24]
+    payload = f"{mode}\0{principal}\0{normalized}\0{attachments}"
+    return canonical_digest(payload, length=24, prefix="")
 
 
 class RunSessionIndex:

@@ -99,7 +99,6 @@ def test_try_record_tool_call_is_noop_without_cursor() -> None:
     CursorRecord.try_record_tool_call(
         tool_name="t",
         invocation_id="inv-1",
-        args_digest="d",
     )
 
 
@@ -142,7 +141,6 @@ def test_try_record_tool_call_invokes_cursor() -> None:
         CursorRecord.try_record_tool_call(
             tool_name="my_tool",
             invocation_id="inv-1",
-            args_digest="tool:my_tool",
         )
     finally:
         reset_current_cursor(token)
@@ -177,7 +175,6 @@ def test_try_record_tool_call_swallows_cursor_error() -> None:
         CursorRecord.try_record_tool_call(
             tool_name="t",
             invocation_id="inv-1",
-            args_digest="d",
         )
     finally:
         reset_current_cursor(token)

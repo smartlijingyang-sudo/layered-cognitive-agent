@@ -9,7 +9,6 @@ candidate as a reusable skill package.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from hashlib import sha256
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -25,6 +24,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.observability.canonical_digest import canonical_digest
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
@@ -60,9 +60,11 @@ class AutoAcquireSkillService(SkillAcquirer):
             or len(evidence_refs) < self.min_evidence
         ):
             return None
-        digest = sha256(f"{task_ref}\0{procedure}\0{'|'.join(evidence_refs)}".encode()).hexdigest()[
-            :16
-        ]
+        digest = canonical_digest(
+            f"{task_ref}\0{procedure}\0{'|'.join(evidence_refs)}",
+            length=16,
+            prefix="",
+        )
         return SkillAcquisitionCandidate(
             candidate_id=f"skill-candidate-{digest}",
             task_ref=task_ref,
