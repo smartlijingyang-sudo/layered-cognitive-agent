@@ -98,6 +98,50 @@ LCA 在局部（声明式图、Session 方向、Kernel K1–K8、Transport plugi
 
 **可插件化**：具体 Reasoner、Tool、Deriver、Exporter、Transport route handler、Assistant 目录。
 
+### 1.4 信息血统闭合（C13）
+
+五平面只回答"这条信息属哪一面"；本节回答"它从哪里来、被谁改、给谁用"，即**信息在 LCA 内部的归属与传递链**。任一跨边界点（emit / fold / slot / transport / dispatch）必须能静态回答四问：
+
+| 维度 | 静态回答 | 动态回答 |
+|---|---|---|
+| **D1 定义点** (definition) | Schema / Contract / Producer 的 `$module` | Manifest `provides` |
+| **D2 约束** (constraint) | 平面 / Slot / Capability grant / 不变量 ID (C1–C13) | fold / slot 聚合 |
+| **D3 转换链** (transformation) | 沿哪条 DAG 边经哪些节点（Phase / Slot / Reducer / Deriver / Transport / V2 runtime step） | spine event + provenance_marker |
+| **D4 消费者** (consumer) | 订阅者 / fold reader / dispatch 派发点 | subscriber registry |
+
+**强制**：跨 DAG 边（即跨 Phase / 跨 Slot / 跨 Seam / 跨进程）的传递必须经一条 typed Contract。**Contract = Pydantic frozen，`extra="forbid"`**。无 Contract 的跨边 = C13 违反，架构测试 fail-loud。
+
+C13 与 C7（控制/观察分离）、C8（确定性）、C10（执行窄门）同级，是宪法条款，不是某条数据上的 metadata。
+
+**守护四件套**：
+
+- (a) MTK PlanCompiler 编译期校验 Contract 引用闭合
+- (b) 每个 ControlSlot 的 IO Contract 是 Pydantic frozen（沿用 ADR-0066 §三）
+- (c) Manifest `capability.contract.provides` slot（沿用 ADR-0110，不新开 key）
+- (d) 架构测试 `test_c13_provenance_closed` 守护每个跨边界入口
+
+### 1.5 同型 DAG 视图（views on one typed DAG）
+
+LCA 的 agent run 是一条 typed DAG，不同视图是该 DAG 的投影。V1/V3/V4/V5 是 compile-time 拓扑；V2 是 runtime 实例化轨迹，由模型决策驱动，不在 Profile 中写死。
+
+| 视图 | 时态 | 节点 | 边 | SSOT |
+|---|---|---|---|---|
+| **V1 认知阶段图** | compile-time | Phase (`perceive` / `think` / `act` / `reflect` / `remember` / `stop`) | typed IO Contract | ADR-0075 PhaseGraph |
+| **V2 模型决策轨迹** | runtime 实例化（**非 compile-time DAG**） | `Decision(tool_call)`（沿 ADR-0045） | tool_call envelope + tool_result envelope（沿 V1 Contract 词表） | spine event + fold |
+| **V3 控制点图** | compile-time | ControlSlot (`perceive.context` / `think.guard` / `act.authorize` / …) | verdict 类型 | ADR-0066 §三 |
+| **V4 观察流图** | compile-time | Deriver / Exporter | fold projection（C7 禁止反向触发） | ADR-0193 |
+| **V5 事实链** | compile-time 拓扑 + runtime append | Fact（append-only） | cause→effect + provenance_marker | ADR-0186 |
+
+**V2 的特殊性**：模型在 think 阶段决策、在 act 阶段执行的步骤序列（如 `readFile → analyze → edit → verify`）不是 Profile 声明的 DAG 节点。Profile 只声明三件事：
+
+1. 模型能调哪些 tools（capability grants）
+2. 决策空间（slots + policies）
+3. 闭合条件（stop policies）
+
+**V2 的每一步的治理**：每步都是一次 `act` + 一次 tool result，必须经同一套 typed Contract（C13 D1）收口；被 V3 的 ControlSlot 联合守卫（`act.authorize` / `act.budget` / `act.constrain`）；其 fold projection 进入 V5 事实链；其 Model-visible history 进入 V4 观察流。**不允许"模型决策了某步但没进 history"**（run_20951da435a6 的根因）。
+
+**新增视图 = 新增一份 Profile**，不修改 MTK / Kernel / Contract 词表。
+
 ---
 
 ## 2. 目标目录拓扑（全项目）

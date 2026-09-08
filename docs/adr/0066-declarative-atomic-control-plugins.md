@@ -52,19 +52,21 @@ LCA 已经具备比“模块可加载”更强的基础。现有 `PluginDefiniti
 
 首期控制槽位如下。它们是**有限枚举**，新增槽位需要 ADR 或对相应原语协议的审查；插件只能向现有槽位投稿，不能以字符串临时发明 `agent.before_everything`。
 
-| Control Slot | 所属原语 / 阶段 | 允许输入 | 标准输出 | 禁止事项 | 典型原子插件 |
+| Control Slot | 所属原语 / 阶段 | 允许输入 (IO Contract, Pydantic frozen) | 标准输出 (IO Contract, Pydantic frozen) | 禁止事项 | 典型原子插件 |
 |---|---|---|---|---|---|
-| `perceive.context` | Perceive | `StateView`、Journal cursor、任务契约 | `ContextContribution` | 直接改 State、读未授权世界 | clock、workspace 指令、证据检索、上下文预算器。 |
-| `think.guard` | Think / Gate | `StateView`、候选 `Decision`、已提交 `PolicyFact` | `DecisionVerdict`、`PolicyFact` | 调用工具、直接改 Decision / State | action constraint、循环检测、模型路由守卫。 |
-| `act.authorize` | Act / Execution Control | `ExecutionEnvelope`、grant、风险级别 | `AuthorizationVerdict` | 执行副作用、读取未声明秘密 | capability grant、HIL 审批、域名 / 文件路径许可。 |
-| `act.budget` | Act / Execution Control | `ExecutionEnvelope`、预算快照、价格引用 | `BudgetVerdict` | 修改余额、静默超支 | token / 金额 / 时间 / 调用次数检查。 |
-| `act.constrain` | Act / Execution Control | `ExecutionEnvelope`、策略事实 | `ConstraintVerdict` 或受限 envelope | 绕过授权 / 审计 | 幂等、速率、租约、文件范围、数据分类。 |
+| `perceive.context` | Perceive | `PerceiveContextInput` | `ContextContribution` | 直接改 State、读未授权世界 | clock、workspace 指令、证据检索、上下文预算器。 |
+| `think.guard` | Think / Gate | `ThinkGuardInput` | `DecisionVerdict`、`PolicyFact` | 调用工具、直接改 Decision / State | action constraint、循环检测、模型路由守卫。 |
+| `act.authorize` | Act / Execution Control | `ExecutionEnvelope` | `AuthorizationVerdict` | 执行副作用、读取未声明秘密 | capability grant、HIL 审批、域名 / 文件路径许可。 |
+| `act.budget` | Act / Execution Control | `ExecutionEnvelope`、`BudgetSnapshot` | `BudgetVerdict` | 修改余额、静默超支 | token / 金额 / 时间 / 调用次数检查。 |
+| `act.constrain` | Act / Execution Control | `ExecutionEnvelope`、`PolicyFact` | `ConstraintVerdict` 或受限 envelope | 绕过授权 / 审计 | 幂等、速率、租约、文件范围、数据分类。 |
 | `act.execute` | Body / SafeExecutor | 已授权、已约束的 envelope | `Observation` | 回写认知状态 | sandbox、HTTP、工具、设备、A2A transport。 |
-| `remember.admit` | Memory | 候选 `WriteSet`、分类与保留策略 | `MemoryVerdict` | 直接写持久存储 | 去重、隐私过滤、记忆预算、保留策略。 |
-| `stop.decide` | Stop | `StateView`、预算、终态事实 | `StopVerdict` | 修改 State、吞掉失败 | step / 时间 / 成本上限、完成度、人工终止。 |
+| `remember.admit` | Memory | `MemoryAdmitInput` | `MemoryVerdict` | 直接写持久存储 | 去重、隐私过滤、记忆预算、保留策略。 |
+| `stop.decide` | Stop | `StateView`、`BudgetSnapshot`、`StopContext` | `StopVerdict` | 修改 State、吞掉失败 | step / 时间 / 成本上限、完成度、人工终止。 |
 | `observe.*` | 各原语的观察口 | 已提交事件或不可变快照 | 无业务返回值 | 修改 State、Decision、envelope 或 Journal 历史 | metrics、debug trace、告警、可视化。 |
 
 控制槽位以**返回类型和聚合器**定义，而不以“调用前后”定义。例如，授权、预算和约束可分别产生 verdict，由固定的 `ExecutionControl` 聚合器以 fail-closed 规则折叠；插件不会因为排序靠前就获得直接执行权。Think/Gate 中的规则产生 `PolicyFact` 与 `DecisionVerdict`，由 Journal 记录后才进入下一轮 Perceive；它们不再向 `working_memory` 塞入无来源警告。[6]
+
+**控制槽位的 IO Contract 范式（C13 落地）**：上表"允许输入 / 标准输出"列即为该槽位的 IO Contract，**必须是 Pydantic frozen + `extra="forbid"`**。槽位实例在 Manifest 声明其 IO Contract 引用同一份 typed Contract 词表（沿用 ADR-0110 `capability.contract.provides` slot，不新开 key）。跨槽位、跨 Phase、跨进程的传递若不经 IO Contract = C13 违反，架构测试 fail-loud。详见 [ADR-0195 §1.4](0195-platform-architecture-convergence.md)。
 
 ### 三、每个控制插件必须是“声明 + 纯评估或受限执行 + 证据”的三件套
 

@@ -151,8 +151,8 @@
 | [0200](0200-p1-agent-gateway-bridge.md) | P1 Agent Gateway Bridge — WebSocket + Redis Stream 收敛(native LobeHub AgentGateway 协议) | Accepted (PR-1) |
 | [0202](0202-transport-ui-env-ssot.md) | Transport/UI env 配置 SSOT — Profile `{from_env: ...}` seam 收口, 退役 os.environ 直读 | Proposed |
 | [0203](0203-end-to-end-field-contract.md) | 端到端字段契约: effect_kind 枚举 + canonical_digest 单一助手 | Proposed |
-| [0204](0204-surface-render-slot-plan-strategy.md) | SurfaceRender WireContract — 模型可见消息的强类型契约落地 (ADR-0205 WireContract 元机制 P0 第 1 应用域; OpenAIMessage Pydantic frozen + ModelVisibleUnit.wire_view 第 4 步 + Manifest plugin provides; 同 PR 零中间态删 if/elif/平铺字段) | Accepted |
-| [0205](0205-wire-contract-as-plugin-seam.md) | WireContract 元机制 — LCA 唯一的「内部状态 ↔ 外部协议」翻译机制, 覆盖 model / tool / fact / skill / provider 五 seam; PluginContract.capabilities.wire.contract.provides 声明, Resolve DAG 校验; Pydantic frozen + extra="forbid" + fail-loud | Accepted |
+| [0204](0204-surface-render-slot-plan-strategy.md) | SurfaceRender — 模型可见消息的 typed Contract 收口 (2026-09-08 重写; ADR-0195 §1.4 C13 信息血统 + §1.5 V2/V4/V5 应用域; OpenAI*Message Pydantic frozen + ModelVisibleUnit.view() 闭合校验 + Manifest `capability.contract.provides` 沿用 ADR-0110; 同 PR 零中间态删 if/elif/平铺字段) | Accepted — Rewritten |
+| [0205](0205-wire-contract-as-plugin-seam.md) | WireContract 元机制 — **2026-09-08 撤回**; 已并入 [ADR-0195 §1.4 / §1.5](0195-platform-architecture-convergence.md) + [ADR-0204](0204-surface-render-slot-plan-strategy.md) 重写版; 历史文件保留追溯 | Deprecated — Superseded |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
 

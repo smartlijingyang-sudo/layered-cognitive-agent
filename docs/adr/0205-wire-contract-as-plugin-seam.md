@@ -1,8 +1,14 @@
-# ADR-0205 — WireContract 元机制：所有「内部状态 ↔ 外部协议」翻译的唯一架构
+# ADR-0205 — WireContract 元机制（已撤回）
+
+> **SUPERSEDED 2026-09-08**：本 ADR 提出的"WireContract 元机制"已并入宪法 [ADR-0195 §1.4 信息血统闭合 (C13)](0195-platform-architecture-convergence.md) + §1.5 同型 DAG 视图 + [ADR-0066 §三](0066-declarative-atomic-control-plugins.md) ControlSlot IO Contract 范式。**不再单独存在**。原 §0 / §1 / §5 列出的 5 处 wire shape 收口（model / tool / fact / skill / model provider）不再作为本 ADR 的应用域，按各自 bug 现场走单点修复 ADR（如 [ADR-0204](0204-surface-render-slot-plan-strategy.md)）。
+>
+> **保留理由**：历史文件不删除，便于追溯 run_20951da435a6 的修复路径。原"WireContract / WireRegistry / wire.contract.provides"命名空间**禁止新增**，所有 typed Contract 沿用 ADR-0110 `capability.contract.provides` slot。
+>
+> **后续动作**：单点修复见 [ADR-0204 重写版](0204-surface-render-slot-plan-strategy.md)。宪法层级见 [ADR-0195 §1.4 / §1.5](0195-platform-architecture-convergence.md)。
 
 ## 状态
 
-**Accepted** (2026-09-08)。P0（surface render WireContract 落地）随 ADR-0204 升级版同步实施。
+**Deprecated — Superseded by ADR-0195 §1.4 + ADR-0204 (2026-09-08)**。
 
 **触发**: run_20951da435a6 (assistant 消息失踪 + readFile 重复循环) 暴露 LCA 多处同源结构性脆弱（5 处文件各自维护 OpenAI message 形状、字段名漂移、if/elif 散落、silent drop）。
 
