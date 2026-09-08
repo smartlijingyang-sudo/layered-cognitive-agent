@@ -1,22 +1,37 @@
+# =============================================================================
 # effect_dispatch — tool-call sub-graph (ADR-0206 §5.4)
-# Workers chain: build intent -> grant check -> route allow/deny -> dispatch -> receipt -> observation -> project to mv
-# Two parallel branches allowed (allow path and deny path) but in this minimal graph we keep one path.
+# =============================================================================
+# Layer 2 of 3. Runs exactly one tool call end-to-end:
+#   args  →  build_intent  →  grant_check  →  route_verdict  →  dispatch
+#         →  write_receipt  →  integrate  →  (project → mv_assemble.classify)
+#
+# Mounted by: agent_loop.act (see agent_loop.yaml#sub_specs).
+#
+# Side-channel closure (C1/C2): the integrate.observation output is
+# projected CROSS-SPEC into mv_assemble.classify.results, so the next
+# think turn's assembly pipeline sees the tool's observation. That
+# cross-spec edge is the ONLY edge in this file that leaves the spec.
+# =============================================================================
 
 id: effect_dispatch
 version: 0.1.0
 region: effect
-description: >
-  Execute a tool call: build intent, check grant, dispatch, write receipt,
-  integrate observation, project back to model-visible assembly sub-graph.
-  The 'project' edge ending in mv_assemble.in_tool_results is the C1 closure.
+description: Execute a tool call — build intent, check grant, dispatch, write
+  receipt, integrate observation, project back to model-visible assembly.
 
+# -----------------------------------------------------------------------------
+# GRAPH — organizational metadata.
+# -----------------------------------------------------------------------------
 graph:
   id: effect_dispatch
   layer: effect
   purpose: Build, authorize, dispatch, and integrate a tool call.
+  # Local members (declared in this file).
   members: [build_intent, grant_check, route_verdict, dispatch,
             write_receipt, integrate]
-  references: [mv_assemble]
+  # Cross-spec relations. We write into mv_assemble (the observation closure)
+  # and we are called by agent_loop (the act phase).
+  references: [mv_assemble, agent_loop]
   relations:
     - { graph: agent_loop,   kind: child_of,   role: act_phase }
     - { graph: mv_assemble,  kind: writes_to, role: project_observation }
@@ -24,21 +39,43 @@ graph:
     provides: [effect_receipt, observation]
     requires: [tool_intent, grant_verdict]
 
+# -----------------------------------------------------------------------------
+# INITIAL PORTS — what the parent (agent_loop.act) must supply.
+# -----------------------------------------------------------------------------
+# initial.args : the model's tool call (dict: {tool: str, args: dict}).
+#                Comes from agent_loop.think.think_out → agent_loop.act.in_args.
+
+# -----------------------------------------------------------------------------
+# NODES — six workers in a single linear chain. Each owns one job.
+# -----------------------------------------------------------------------------
 nodes:
+
+  # ===== 1) build_intent — package (tool_name, args) into a ToolIntent =====
+  # Tool name comes from the caller's args ({"tool": "<name>", "args": {...}})
+  # — config.tool is a fallback when the caller omits it.  Args are the
+  # tool's own JSON args (matched against the tool's parameters schema).
   - id: build_intent
     region: effect
     factory: build_intent
-    config: { tool: echo, to: intent }
+    config: { tool: bash, to: intent }
     ins: [args]
     outs: [intent]
 
+  # ===== 2) grant_check — static allowlist verdict =========================
+  # Pure config-driven allowlist. Returns verdict ∈ {allow, deny} keyed by
+  # tool name. No business logic — only the routing primitive decides
+  # what to do with the verdict.
   - id: grant_check
     region: effect
     factory: grant_check
-    config: { allow: [echo, calc], to: verdict }
+    config: { allow: [bash, file_write, read_file], to: verdict }
     ins: [intent]
     outs: [verdict]
 
+  # ===== 3) route_verdict — pick one input based on verdict ================
+  # table maps verdict → input port to forward; default is deny_marker.
+  # This is the only place where allow/deny branches fork; the rest of
+  # the chain is single-path because the router collapses the branch.
   - id: route_verdict
     region: effect
     factory: route_on
@@ -49,38 +86,32 @@ nodes:
     ins: [verdict, intent]
     outs: [routed]
 
+  # ===== 4) dispatch — resolve a tool by name and run it ==================
+  # Provider selection is data, not code. provider_kind="lca" maps to the
+  # default LcaBodyProvider. The tool *identity* is NOT declared here —
+  # every tool the agent loop can dispatch lives in
+  # ``agent_lab/tools/registry.yaml`` (the non-executable tool inventory).
+  # This node only declares a *range* of names it's allowed to invoke.
+  # Adding/removing a tool is a one-line edit in the registry.
   - id: dispatch
     region: effect
     factory: dispatch_tool
     config:
+      # port renames ──────────────────────
       from: routed
       to: receipt
+      # provider selection ───────────────
       provider_kind: lca
       provider_ref: agent_lab.adapters.lca_body:LcaBodyProvider
-      provider_config:
-        allowed_tools: [echo, calc]
-        tool_factories:
-          - ref: agent_lab.adapters.lca_body:ToolShim
-            kwargs:
-              name: echo
-              description: Echo the args back as text.
-              parameters: { type: object, properties: { text: { type: string } } }
-              is_idempotent: true
-              effect_kind: ephemeral
-              default_timeout_s: 5
-              callable_ref: agent_lab.adapters.lca_body:_echo_factory_callable
-          - ref: agent_lab.adapters.lca_body:ToolShim
-            kwargs:
-              name: calc
-              description: Evaluate a python arithmetic expression.
-              parameters: { type: object, properties: { expr: { type: string } } }
-              is_idempotent: true
-              effect_kind: ephemeral
-              default_timeout_s: 5
-              callable_ref: agent_lab.adapters.lca_body:_calc_factory_callable
+      # tool range (names resolved against agent_lab/tools/registry.yaml)
+      tools: [bash, file_write, read_file]
     ins: [routed]
     outs: [receipt]
 
+  # ===== 5) write_receipt — pass-through, hook point for journaling =======
+  # Today it just copies receipt → receipt_fact. The seam exists so a
+  # later note/journaling layer can plug in here without touching the
+  # dispatch step.
   - id: write_receipt
     region: effect
     factory: write_receipt
@@ -88,6 +119,10 @@ nodes:
     ins: [receipt]
     outs: [receipt_fact]
 
+  # ===== 6) integrate — turn the receipt into a model-visible text ========
+  # Final local step. Emits a TEXT observation shaped like
+  # "[tool:<name>] <result>" or "[tool-error] <status>". The cross-spec
+  # project edge below carries this into mv_assemble.
   - id: integrate
     region: effect
     factory: integrate_observation
@@ -95,43 +130,56 @@ nodes:
     ins: [receipt_fact]
     outs: [observation]
 
+# -----------------------------------------------------------------------------
+# EDGES — strict linear chain inside the spec + ONE cross-spec project edge.
+# -----------------------------------------------------------------------------
 edges:
+
+  # ── initial → build_intent ──
   - id: e_args_to_build
     from: { spec: effect_dispatch, node: _initial, port: args }
     to:   { spec: effect_dispatch, node: build_intent, port: args }
     kind: data
 
+  # ── build_intent → grant_check ──
   - id: e_build_to_grant
     from: { spec: effect_dispatch, node: build_intent, port: intent }
     to:   { spec: effect_dispatch, node: grant_check,  port: intent }
     kind: data
 
+  # ── grant_check → route_verdict (the verdict) ──
   - id: e_grant_to_route_verdict
     from: { spec: effect_dispatch, node: grant_check, port: verdict }
     to:   { spec: effect_dispatch, node: route_verdict, port: verdict }
     kind: data
 
+  # ── build_intent → route_verdict (the intent, so the router can forward it) ──
   - id: e_intent_to_route
     from: { spec: effect_dispatch, node: build_intent, port: intent }
     to:   { spec: effect_dispatch, node: route_verdict, port: intent }
     kind: data
 
+  # ── route_verdict → dispatch ──
   - id: e_route_to_dispatch
     from: { spec: effect_dispatch, node: route_verdict, port: routed }
     to:   { spec: effect_dispatch, node: dispatch,      port: routed }
     kind: data
 
+  # ── dispatch → write_receipt → integrate (linear tail) ──
   - id: e_dispatch_to_write_receipt
     from: { spec: effect_dispatch, node: dispatch, port: receipt }
     to:   { spec: effect_dispatch, node: write_receipt, port: receipt }
     kind: data
-
   - id: e_write_receipt_to_integrate
     from: { spec: effect_dispatch, node: write_receipt, port: receipt_fact }
     to:   { spec: effect_dispatch, node: integrate,     port: receipt_fact }
     kind: data
 
-  # C1/C2 closure: project observation out of effect sub-graph and into mv_assemble
+  # ── integrate → mv_assemble (CROSS-SPEC PROJECT EDGE) ──
+  # This is the C1/C2 closure: the effect layer's observation is projected
+  # into the model-visible assembly pipeline so the next think turn sees it.
+  # Declared here (not in agent_loop) because the projection is owned by
+  # the effect layer, which is what produced the observation.
   - id: e_integrate_to_mv_project
     from: { spec: effect_dispatch, node: integrate, port: observation }
     to:   { spec: mv_assemble,    node: classify,  port: results }

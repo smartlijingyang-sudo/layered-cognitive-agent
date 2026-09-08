@@ -1,24 +1,49 @@
-# agent_loop — root graph (ADR-0206 §2)
-# Six phases, each holds a sub_spec link to a leaf graph or a tiny stub.
-# In this prototype three phases are live: think, act, stop. The others are
-# stub identity nodes so the root graph compiles + runs end-to-end.
+# =============================================================================
+# agent_loop — root loop (ADR-0206 §2)
+# =============================================================================
+# Layer 1 of 3. Owns the six-phase skeleton. Does NOT do real work itself:
+#   - five phases are identity stubs (perceive / reflect / remember / stop,
+#     and the outer think/act shells)
+#   - two phases are sub_spec mount points that delegate the actual work
+#     to nested graphs (see # ============ SUBSPECS ============ below)
+#
+# Downward references (cross-spec edges / sub_specs):
+#   - assemble_for_think  ──sub_spec──►  mv_assemble        (think: build manifest)
+#   - act                 ──sub_spec──►  effect_dispatch    (act:   run a tool)
+#
+# This file never references the inner nodes of those sub-graphs. To see
+# what runs inside them, read their own YAMLs.
+# =============================================================================
 
 id: agent_loop
 version: 0.1.0
 region: phase:agent_loop
-description: >
-  Root graph for the agent loop. Six phases as sub_spec links or stubs.
-  Three phases hold real nested graphs (think -> mv_assemble, act -> effect_dispatch);
-  the others are stubs to keep the demo runnable.
+description: Root graph for the agent loop. Six phases, two of which are
+  sub_spec links to nested graphs.
 
-# Graph manifest — organizational metadata (ADR-0206 §5 + agent_lab/nodes/manifest.py).
+# -----------------------------------------------------------------------------
+# GRAPH — organizational metadata (not data flow). Used by self-describe.
+# -----------------------------------------------------------------------------
 graph:
   id: agent_loop
   layer: phase
   purpose: Orchestrate the agent loop as six nested sub-graphs wired by sub_spec.
-  members: [perceive, think, assemble_for_think, flatten_manifest, call_llm_node,
-            parse_decision, act, reflect, remember, stop]
-  references: [mv_assemble, effect_dispatch]
+  # Members = node ids declared locally in this file (stubs + sub_spec hosts).
+  members:
+    - perceive              # stub: identity passthrough
+    - think                 # host: holds flatten + llm + parse
+    - assemble_for_think    # host: sub_spec link → mv_assemble
+    - flatten_manifest      # local: assemble_messages
+    - call_llm_node         # local: call_llm (provider from node.config)
+    - parse_decision        # stub: identity passthrough
+    - act                   # host: sub_spec link → effect_dispatch
+    - reflect               # stub: identity passthrough
+    - remember              # stub: identity passthrough
+    - stop                  # terminal: identity passthrough
+  # References = nested graph IDs this spec delegates to (via sub_specs).
+  references:
+    - mv_assemble           # builds the model-visible ContextManifest
+    - effect_dispatch       # runs a tool call, emits a receipt
   relations:
     - { graph: mv_assemble,     kind: contains, role: think_phase_manifest_assembly }
     - { graph: effect_dispatch, kind: contains, role: act_phase_tool_dispatch     }
@@ -26,8 +51,26 @@ graph:
     provides: [agent_run_loop, six_phase_orchestration]
     requires: [model_visible_assembly, effect_dispatch, llm_call]
 
+# -----------------------------------------------------------------------------
+# INITIAL PORTS — what a caller must supply when running this graph.
+# Each port_id here corresponds to one edge with from.node = "_initial"
+# (see EDGES below). These are the external inputs the loop accepts.
+# -----------------------------------------------------------------------------
+# initial.system     : system prompt (text artifact)
+# initial.history    : prior conversation (openai.messages.v1)
+# initial.config     : LLM runtime config (temperature, etc.)
+# initial.tools      : tool schemas (openai-style function list)
+# initial.results    : prior tool observations, for re-assembly
+# initial.user_turn  : this turn's user message (+ optional tool_calls)
+
+# -----------------------------------------------------------------------------
+# NODES — local workers + sub_spec hosts. Identity stubs are passthroughs;
+# non-trivial nodes are tagged with a one-line role comment.
+# -----------------------------------------------------------------------------
 nodes:
-  # --- perceive (stub) ---
+
+  # ===== PHASE: perceive (stub) =============================================
+  # Receives user_turn; emits it untouched. Real perception lives elsewhere.
   - id: perceive
     region: phase:perceive
     factory: identity
@@ -35,7 +78,9 @@ nodes:
     ins: [user_turn]
     outs: [perceive_out]
 
-  # --- think (calls mv_assemble as nested sub-graph) ---
+  # ===== PHASE: think (host) ================================================
+  # Aggregates three think-stage inputs (perceive_out, observe_in, think_in)
+  # and exposes a single think_out. It is a junction, not a worker.
   - id: think
     region: phase:think
     factory: identity
@@ -43,7 +88,10 @@ nodes:
     ins: [perceive_out, observe_in, think_in]
     outs: [think_out]
 
-  # --- assemble step inside think: holds the mv_assemble sub-graph ---
+  # ===== PHASE: think / sub_spec host ======================================
+  # Mounts mv_assemble as a nested graph. Receives 5 inputs (system/history/
+  # config/tools/results), runs the model-visible assembly pipeline, and
+  # exposes out_manifest (frozen ContextManifest) + out_lca_manifest.
   - id: assemble_for_think
     region: model_visible
     factory: identity
@@ -51,7 +99,9 @@ nodes:
     ins: [in_system, in_results, in_history, in_config, in_tools]
     outs: [out_manifest, out_lca_manifest]
 
-  # --- turn the frozen manifest into a flat message list for the LLM ---
+  # ===== PHASE: think / flatten manifest into chat messages ================
+  # Turns (system + history + out_manifest) into a flat ordered message list
+  # ready for the LLM. Pure config-driven; no business logic here.
   - id: flatten_manifest
     region: phase:think
     factory: assemble_messages
@@ -59,24 +109,34 @@ nodes:
     ins: [system, history, manifest]
     outs: [messages_flat]
 
-  # --- feed assembled messages into the LLM ---
+  # ===== PHASE: think / call the LLM =======================================
+  # Provider selection is data, not code.  The graph config IS the
+  # provider selection: ``provider_ref`` is ``module:Class`` for the
+  # provider, ``provider_config.adapter_factory`` is ``module:Class`` for
+  # the real LCA LLMAdapter it wraps.
+  #
+  # Real LCA LLMAdapter used here: ``OpenAICompatAdapter``. It reads
+  # LLM_API_KEY / LLM_MODEL / LLM_BASE_URL / LLM_API_STYLE from env at
+  # construction; no secrets live in this file.
   - id: call_llm_node
     region: phase:think
     factory: call_llm
     config:
+      # provider selection ─────────────────────
       provider_kind: lca
       provider_ref: agent_lab.adapters.lca_llm:LcaLlmProvider
       provider_config:
         adapter_factory:
-          ref: agent_lab.adapters.lca_llm:LlmAdapterShim
-          kwargs:
-            callable_ref: agent_lab.adapters.lca_llm:_echo_llm
+          ref: lca.infrastructure.llm_adapter.openai_compat:OpenAICompatAdapter
+          kwargs: {}
+      # port renames ──────────────────────────
       from: messages_in
       to: response
     ins: [messages_in]
     outs: [response]
 
-  # --- parse LLM response into a structured decision ---
+  # ===== PHASE: think / parse LLM response into a decision =================
+  # Identity passthrough today; future: parse tool_call blocks into intents.
   - id: parse_decision
     region: phase:think
     factory: identity
@@ -84,7 +144,9 @@ nodes:
     ins: [response]
     outs: [think_out]
 
-  # --- act (calls effect_dispatch as nested sub-graph) ---
+  # ===== PHASE: act (host) ==================================================
+  # Mounts effect_dispatch. Receives the think_out (which carries the model's
+  # tool call) as in_args; exposes out_observation after the tool runs.
   - id: act
     region: phase:act
     factory: identity
@@ -92,7 +154,7 @@ nodes:
     ins: [in_args]
     outs: [out_observation]
 
-  # --- reflect (stub) ---
+  # ===== PHASE: reflect (stub) =============================================
   - id: reflect
     region: phase:reflect
     factory: identity
@@ -100,7 +162,7 @@ nodes:
     ins: [reflect_in]
     outs: [reflect_out]
 
-  # --- remember (stub) ---
+  # ===== PHASE: remember (stub) ============================================
   - id: remember
     region: phase:remember
     factory: identity
@@ -108,7 +170,7 @@ nodes:
     ins: [remember_in]
     outs: [remember_out]
 
-  # --- stop ---
+  # ===== PHASE: stop (terminal) ============================================
   - id: stop
     region: phase:stop
     factory: identity
@@ -116,112 +178,119 @@ nodes:
     ins: [stop_in]
     outs: [terminal]
 
+# -----------------------------------------------------------------------------
+# EDGES — local data flow. Edges are grouped by their destination node so
+# the file reads top-to-bottom in the same order as the data path.
+# Cross-spec project edges from this root: NONE. effect_dispatch's project
+# edge into mv_assemble is declared in effect_dispatch.yaml, not here.
+# -----------------------------------------------------------------------------
 edges:
-  # external initial inputs -> assemble_for_think
+
+  # ── initial → assemble_for_think (5 parallel feeds into the sub-graph) ──
   - id: e_init_system_to_assemble
     from: { spec: agent_loop, node: _initial, port: system }
     to:   { spec: agent_loop, node: assemble_for_think, port: in_system }
     kind: data
-
   - id: e_init_history_to_assemble
     from: { spec: agent_loop, node: _initial, port: history }
     to:   { spec: agent_loop, node: assemble_for_think, port: in_history }
     kind: data
-
   - id: e_init_config_to_assemble
     from: { spec: agent_loop, node: _initial, port: config }
     to:   { spec: agent_loop, node: assemble_for_think, port: in_config }
     kind: data
-
   - id: e_init_tools_to_assemble
     from: { spec: agent_loop, node: _initial, port: tools }
     to:   { spec: agent_loop, node: assemble_for_think, port: in_tools }
     kind: data
-
   - id: e_init_results_to_assemble
     from: { spec: agent_loop, node: _initial, port: results }
     to:   { spec: agent_loop, node: assemble_for_think, port: in_results }
     kind: data
 
-  # external user_turn -> perceive
+  # ── initial → perceive (the one external input the loop's skeleton needs) ──
   - id: e_init_user_to_perceive
     from: { spec: agent_loop, node: _initial, port: user_turn }
     to:   { spec: agent_loop, node: perceive, port: user_turn }
     kind: data
 
-  # perceive -> think
+  # ── perceive → think (junctions) ──
   - id: e_perceive_to_think
     from: { spec: agent_loop, node: perceive, port: perceive_out }
     to:   { spec: agent_loop, node: think,    port: perceive_out }
     kind: data
 
-  # assemble_for_think -> think (assembled manifest flows in)
+  # ── assemble_for_think → think (manifest becomes the think's "observation" input) ──
   - id: e_assemble_to_think
     from: { spec: agent_loop, node: assemble_for_think, port: out_manifest }
     to:   { spec: agent_loop, node: think,              port: observe_in }
     kind: data
 
-  # assemble_for_think.out_manifest -> flatten_manifest.manifest
+  # ── assemble_for_think → flatten_manifest (the same manifest feeds the LLM call) ──
   - id: e_assemble_to_flatten
     from: { spec: agent_loop, node: assemble_for_think, port: out_manifest }
     to:   { spec: agent_loop, node: flatten_manifest,  port: manifest }
     kind: data
 
-  # external initial inputs -> flatten_manifest (system + history)
+  # ── initial → flatten_manifest (system + history bypass the sub-graph) ──
   - id: e_init_system_to_flatten
     from: { spec: agent_loop, node: _initial, port: system }
     to:   { spec: agent_loop, node: flatten_manifest, port: system }
     kind: data
-
   - id: e_init_history_to_flatten
     from: { spec: agent_loop, node: _initial, port: history }
     to:   { spec: agent_loop, node: flatten_manifest, port: history }
     kind: data
 
-  # flatten_manifest.messages_flat -> call_llm_node.messages_in
+  # ── flatten_manifest → call_llm_node → parse_decision → think ──
   - id: e_flatten_to_llm
     from: { spec: agent_loop, node: flatten_manifest, port: messages_flat }
     to:   { spec: agent_loop, node: call_llm_node,     port: messages_in }
     kind: data
-
-  # call_llm_node.response -> parse_decision.response
   - id: e_llm_to_parse
     from: { spec: agent_loop, node: call_llm_node, port: response }
     to:   { spec: agent_loop, node: parse_decision, port: response }
     kind: data
-
-  # parse_decision.think_out -> think.think_in (the think stage's official exit)
   - id: e_parse_to_think_in
     from: { spec: agent_loop, node: parse_decision, port: think_out }
     to:   { spec: agent_loop, node: think,          port: think_in }
     kind: data
 
-  # think -> act (model decides a tool call)
+  # ── think → act (decision is forwarded to the act sub-graph as in_args) ──
   - id: e_think_to_act
     from: { spec: agent_loop, node: think, port: think_out }
     to:   { spec: agent_loop, node: act,   port: in_args }
     kind: data
 
-  # act -> reflect
+  # ── act → reflect → remember → stop (the rest of the loop skeleton) ──
   - id: e_act_to_reflect
     from: { spec: agent_loop, node: act,      port: out_observation }
     to:   { spec: agent_loop, node: reflect,  port: reflect_in }
     kind: data
-
-  # reflect -> remember
   - id: e_reflect_to_remember
     from: { spec: agent_loop, node: reflect,  port: reflect_out }
     to:   { spec: agent_loop, node: remember, port: remember_in }
     kind: data
-
-  # remember -> stop
   - id: e_remember_to_stop
     from: { spec: agent_loop, node: remember, port: remember_out }
     to:   { spec: agent_loop, node: stop,     port: stop_in }
     kind: data
 
-# Sub-spec wiring: think -> mv_assemble, act -> effect_dispatch
+# -----------------------------------------------------------------------------
+# SUBSPECS — mount points for nested graphs. Each entry says:
+#   "this local node is a sub_spec host; the named nested graph runs in its
+#    place, with this input_map and output_map glued to the local ports."
+#
+# input_map:  parent port_id  ->  nested graph's port_id
+# output_map: nested graph's port_id  ->  parent port_id
+# -----------------------------------------------------------------------------
 sub_specs:
+
+  # ── think stage: build the next ContextManifest before the LLM call ──
+  # Nested graph: mv_assemble (model-visible assembly pipeline).
+  # Glue: take the 5 caller-supplied inputs verbatim; the nested graph
+  #       decides what to do with them. Surface its `manifest` and
+  #       `lca_manifest` outputs as parent ports out_manifest / out_lca_manifest.
   - node: assemble_for_think
     sub_spec: mv_assemble
     input_map:
@@ -234,6 +303,14 @@ sub_specs:
       manifest: out_manifest
       lca_manifest: out_lca_manifest
 
+  # ── act stage: run the model-decided tool call ──
+  # Nested graph: effect_dispatch (build_intent → grant_check → route →
+  #               dispatch → write_receipt → integrate_observation).
+  # Glue: feed think's output as the sub-graph's `args`; surface its
+  #       `observation` as parent port out_observation.
+  # NOTE: the sub-graph itself projects the observation back into
+  #       mv_assemble via a `kind: project` edge declared inside
+  #       effect_dispatch.yaml — that closure is not this file's concern.
   - node: act
     sub_spec: effect_dispatch
     input_map:
@@ -241,4 +318,9 @@ sub_specs:
     output_map:
       observation: out_observation
 
+# -----------------------------------------------------------------------------
+# MV FEED — which sub_spec's output is the spec's model-visible feed.
+# (Convention used by some downstream consumers to know which nested graph
+#  produced the LLM-bound manifest.)
+# -----------------------------------------------------------------------------
 mv_feed: assemble_for_think

@@ -5,64 +5,45 @@ LCA contracts consumed (read-only):
   - lca.contracts.models.core.conversation.llm.LLMResponse
 
 agent_lab provides (this file):
-  - LlmAdapterShim: implements LCA's LLMAdapter Protocol by wrapping a
-    sync callable(messages) -> str.
-  - LcaLlmProvider: wraps a LlmAdapterShim into agent_lab's provider
-    interface so call_llm node can dispatch via register_llm_provider().
+  - LcaLlmProvider: wraps any ``lca.contracts.protocols.LLMAdapter`` into
+    agent_lab's provider interface so a ``call_llm`` node can dispatch
+    via ``provider_ref``. The wrapper is a thin bridge from agent_lab's
+    ``Artifact`` contract to the adapter's ``prompt: str`` contract.
+
+YAML declares a provider via ``adapter_factory: {ref, kwargs}``. The
+``ref`` resolves to a class implementing ``LLMAdapter`` (e.g.
+``lca.infrastructure.llm_adapter.openai_compat:OpenAICompatAdapter``).
+The default factory for ``provider_kind: lca`` is this ``LcaLlmProvider``
+itself; in production graphs you usually point it at
+``OpenAICompatAdapter`` directly.
 """
 
 from __future__ import annotations
 
+import asyncio
+import importlib
 from typing import Any
 
 from agent_lab.primitives.artifact import Artifact, ArtifactKind, make_message
 
 
-class LlmAdapterShim:
-    """Satisfies LCA's LLMAdapter Protocol; backing callable is sync.
-
-    Uses minimal no-op implementation of ``stream`` (yields a single
-    COMPLETED event). The body of ``complete`` adapts agent_lab's
-    message list back into a single prompt string.
-    """
-
-    def __init__(self, callable_: callable) -> None:
-        self._callable = callable_
-        self.model: str = "agent-lab-shim"
-
-    async def complete(self, prompt: str, **kwargs: Any):
-        # Lazy import to keep agent_lab bootable without lca.
-        from lca.contracts.models.core.conversation.llm import LLMResponse
-
-        text = self._callable(prompt, **kwargs)
-        return LLMResponse(text=text, model=self.model)
-
-    async def stream(self, prompt: str, **kwargs: Any):
-        from lca.contracts.models.core.conversation.llm import (
-            LLMResponse,
-            LLMStreamEvent,
-        )
-        from lca.contracts.models.core.conversation.llm import (
-            LLMStreamEventType as T,
-        )
-
-        text = self._callable(prompt, **kwargs)
-        yield LLMStreamEvent(type=T.OUTPUT_TEXT_DELTA, text=text)
-        yield LLMStreamEvent(type=T.COMPLETED, response=LLMResponse(text=text, model=self.model))
-
-
 class LcaLlmProvider:
-    """Bridge agent_lab call_llm node to LCA LLMAdapter.
+    """Bridge agent_lab call_llm node to a real LCA LLMAdapter.
 
-    Accepts either a pre-built ``LlmAdapterShim`` (``adapter=``) or a
-    factory reference dict (``adapter_factory=``) shaped like
+    Accepts either a pre-built ``LLMAdapter`` (``adapter=``) or a factory
+    reference dict (``adapter_factory=``) shaped like
     ``{"ref": "module:Class", "kwargs": {...}}``. The latter lets YAML
     config fully describe the provider without Python-side setup.
+
+    The real LCA LLMAdapter (e.g. ``OpenAICompatAdapter``) reads
+    ``LLM_API_KEY`` / ``LLM_MODEL`` / ``LLM_BASE_URL`` from the env at
+    construction time; this wrapper passes nothing opaque and lets the
+    adapter do its env resolution.
     """
 
     def __init__(
         self,
-        adapter: LlmAdapterShim | None = None,
+        adapter: Any | None = None,
         *,
         adapter_factory: dict | None = None,
     ) -> None:
@@ -71,20 +52,11 @@ class LcaLlmProvider:
         if adapter is not None:
             self._adapter = adapter
             return
-        # Build adapter from factory ref.
-        import importlib
-
         ref = adapter_factory["ref"]
         kwargs = dict(adapter_factory.get("kwargs", {}) or {})
         module_name, _, class_name = ref.partition(":")
         if not module_name or not class_name:
             raise ValueError(f"adapter_factory.ref must be 'module:Class', got {ref!r}")
-        # Resolve nested callable_ref: module:function -> actual callable.
-        if "callable_ref" in kwargs:
-            cmod, _, cfn = kwargs["callable_ref"].partition(":")
-            cmod_obj = importlib.import_module(cmod)
-            kwargs["callable_"] = getattr(cmod_obj, cfn)
-            kwargs.pop("callable_ref", None)
         module = importlib.import_module(module_name)
         cls = getattr(module, class_name)
         self._adapter = cls(**kwargs)
@@ -98,12 +70,12 @@ class LcaLlmProvider:
         if not isinstance(messages, list):
             messages = [{"role": "user", "content": str(messages)}]
         prompt = self._flatten(messages)
-        # asyncio-free adapter invocation: the shim is async internally but
-        # we run it via asyncio.run for a single round-trip.
-        import asyncio
-
+        # The wrapped adapter is async; this provider is sync (call_llm
+        # node.execute() is sync). Bridge with asyncio.run — safe inside
+        # a sync context, one round-trip per call.
         response = asyncio.run(self._adapter.complete(prompt))
-        return make_message(response.text or "assistant", content=response.text)
+        text = getattr(response, "text", "") or ""
+        return make_message(text, content=text)
 
     @staticmethod
     def _flatten(messages: list[dict]) -> str:
@@ -125,14 +97,4 @@ def make_message_artifact(content: str, role: str = "assistant") -> Artifact:
     )
 
 
-def _echo_llm(prompt: str, **kwargs) -> str:
-    """Default echo-style LLM callable used in demo graph configs.
-
-    Real apps replace this via provider_config.adapter_factory.kwargs.callable_ref.
-    """
-    last_user = "no user message"
-    for line in reversed(prompt.split("\n")):
-        if line.startswith("[user]"):
-            last_user = line.removeprefix("[user] ").strip()
-            break
-    return f"ack: {last_user}"
+__all__ = ["LcaLlmProvider", "make_message_artifact"]

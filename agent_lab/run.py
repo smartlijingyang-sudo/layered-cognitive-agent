@@ -4,9 +4,13 @@ Usage:
   python -m agent_lab.run mv_assemble
   python -m agent_lab.run effect_dispatch
   python -m agent_lab.run agent_loop
-  python -m agent_lab.run --negative agent_loop   # compile a graph with a missing project edge
+  python -m agent_lab.run --negative effect_dispatch
+  python -m agent_lab.run --describe [--target node:<id>|graph:<id>]
 
-Defaults to agent_loop. Mocks the LLM and tools in-process.
+Defaults to agent_loop. Tool dispatch is driven by
+``agent_lab/tools/registry.yaml`` (the named-tool inventory); the LLM
+is driven by graph config and reads its secrets from the env
+(``LLM_API_KEY`` / ``LLM_MODEL`` / ``LLM_BASE_URL``).
 """
 
 from __future__ import annotations
@@ -16,12 +20,7 @@ import json
 import sys
 from pathlib import Path
 
-from agent_lab.graphs import load_registry
-
-# No global registration. Each call_llm node loads its provider from
-# node.config (provider_ref / provider_kind / provider_config).
-# All providers are loaded per-node from graph config. See
-# nodes/llm.py and nodes/tool.py _resolve_provider helpers.
+from agent_lab.graphs import load_graph_manifest, load_registry
 from agent_lab.primitives.artifact import (
     Artifact,
     ArtifactKind,
@@ -30,45 +29,32 @@ from agent_lab.primitives.artifact import (
 )
 from agent_lab.runtime.runner import run as run_graph
 
-# ---------- Mock providers ------------------------------------------------
+# ---------- Boot ---------------------------------------------------------
 
-def _mock_llm(prompt, **kwargs):
-    """Default in-process LLM callable.
+def _bootstrap() -> None:
+    """Eagerly load .env (for LLM secrets) and the tool registry, then wire
+    the registry into the dispatch nodes.
 
-    Accepts either a list[dict] of messages (legacy) or a flat prompt
-    string (LCA shim form). Returns an assistant text reply.
+    This is the only place the registry is loaded.  The dispatch nodes
+    access it via the singleton exposed in
+    :mod:`agent_lab.nodes.tool.dispatch_tool`.
     """
-    if isinstance(prompt, list):
-        last_user = next(
-            (m["content"] for m in reversed(prompt) if isinstance(m, dict) and m.get("role") == "user"),
-            "no user message",
-        )
-        return f"ack: {last_user}"
-    # string prompt — pick last [user] line if present
-    last_user = "no user message"
-    for line in reversed(prompt.split("\n")):
-        if line.startswith("[user]"):
-            last_user = line.removeprefix("[user] ").strip()
-            break
-    return f"ack: {last_user}"
+    # Load project .env if present so OpenAICompatAdapter can read
+    # LLM_API_KEY / LLM_MODEL / LLM_BASE_URL out of the environment.
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+    except Exception:  # noqa: S110 — missing .env is fine, env is the fallback
+        pass
 
+    from agent_lab.nodes.tool import configure_registry
+    from agent_lab.tools import ToolRegistry
 
-def _mock_tool_echo(args):
-    return f"echo({args})"
-
-
-def _mock_tool_calc(args):
-    expr = str(args.get("expr", "0"))
-    # Sandboxed eval; prototype only. noqa because mock is intentionally minimal.
-    return str(eval(expr, {"__builtins__": {}}, {}))  # noqa: S307
-
-
-def _register_mocks() -> None:
-    """No-op stub.
-
-    All providers are now loaded per-node from graph config. Kept as a
-    function for callers that may want an eager-init hook.
-    """
+    registry = ToolRegistry()
+    registry.load_from_yaml(
+        Path(__file__).parent / "tools" / "registry.yaml"
+    )
+    configure_registry(registry)
 
 
 def _register_lca_mv() -> None:
@@ -81,26 +67,8 @@ def _register_lca_mv() -> None:
         from agent_lab.nodes.mv import register_lca_mv_provider
 
         register_lca_mv_provider("lca", LcaMvProvider())
-    except Exception as exc:
+    except Exception as exc:  # pragma: no cover
         print(f"[warn] LCA mv provider not registered: {exc!r}")
-
-
-def _register_lca_body() -> None:
-    """No-op stub.
-
-    Body provider is now loaded per-node from graph config (dispatch_tool
-    reads provider_ref + provider_config from node.config). Kept as a
-    function reference for callers that want an eager-init hook.
-    """
-
-
-def _register_lca_llm() -> None:
-    """No-op stub.
-
-    LLM provider is now loaded per-node from graph config (call_llm reads
-    provider_ref + provider_config from node.config). Kept as a function
-    reference for callers that want an eager-init hook.
-    """
 
 
 # ---------- Demo runners --------------------------------------------------
@@ -115,10 +83,9 @@ def _run_mv_assemble(specs, mv_provider: str = "default") -> None:
         "results": Artifact(kind=ArtifactKind.TEXT, content="result line A\nresult line A\nresult line B", schema_ref="tool.v1"),
         "config": Artifact(kind=ArtifactKind.FACT, content={"temperature": 0.0}, schema_ref="config.v1"),
         "tools": Artifact(kind=ArtifactKind.FACT, content=[
-            {"type": "function", "function": {"name": "echo"}}
+            {"type": "function", "function": {"name": "read_file"}}
         ], schema_ref="tools.v1"),
     }
-    # Override the assemble_lca node config to use the requested provider.
     if mv_provider != "default":
         for n in spec.nodes:
             if n.id == "assemble_lca":
@@ -137,8 +104,15 @@ def _run_mv_assemble(specs, mv_provider: str = "default") -> None:
 
 def _run_effect_dispatch(specs) -> None:
     spec = specs["effect_dispatch"]
+    # Demo call: a real read_file against this very file. The whole point
+    # is that the dispatch graph talks to the real LCA Tool, not a stub.
+    demo_path = str(Path(__file__).resolve())
     initial = {
-        "args": Artifact(kind=ArtifactKind.FACT, content={"text": "hello world"}, schema_ref="tool.args.v1"),
+        "args": Artifact(
+            kind=ArtifactKind.FACT,
+            content={"tool": "read_file", "args": {"path": demo_path, "max_bytes": 256}},
+            schema_ref="tool.args.v1",
+        ),
     }
     trace = run_graph(spec, initial=initial, sub_registry=specs)
     _print_trace(trace)
@@ -149,8 +123,18 @@ def _run_effect_dispatch(specs) -> None:
 
 def _run_agent_loop(specs) -> None:
     spec = specs["agent_loop"]
+    # Demo turn: tell the LLM to call bash; the agent loop will go
+    # through flatten_manifest → call_llm → parse_decision → think →
+    # act (effect_dispatch) → mv_assemble.classify → ... → stop.
+    # The bash call will actually run unless LLM_API_KEY is missing, in
+    # which case OpenAICompatAdapter will surface the auth error in the
+    # receipt (this is the real-failure path, not a hidden mock).
     initial = {
-        "user_turn": make_message("user", "what is 2+2?", tool_calls=[{"tool": "calc", "args": {"expr": "2+2"}}]),
+        "user_turn": make_message(
+            "user",
+            "please run `bash -c 'echo hi from real bash'`",
+            tool_calls=[],
+        ),
         "system": make_text("you are a careful assistant", schema_ref="system.v1"),
         "history": Artifact(kind=ArtifactKind.MESSAGE, content=[], schema_ref="openai.messages.v1"),
         "results": Artifact(kind=ArtifactKind.TEXT, content=""),
@@ -252,9 +236,6 @@ def _describe(target: str | None) -> None:
         # All graph manifests
         print("\n\n=== Graph Manifests ===")
         for stem in ("agent_loop", "mv_assemble", "effect_dispatch"):
-            from pathlib import Path
-
-            from agent_lab.graphs.loader import load_graph_manifest
             yaml_path = Path(__file__).parent / "graphs" / "configs" / f"{stem}.yaml"
             gm = load_graph_manifest(yaml_path)
             if not gm:
@@ -274,6 +255,21 @@ def _describe(target: str | None) -> None:
                     print(f"  provides: {list(caps['provides'])}")
                 if caps.get("requires"):
                     print(f"  requires: {list(caps['requires'])}")
+        # Tool registry
+        from agent_lab.tools import ToolRegistry
+        reg = ToolRegistry()
+        try:
+            reg.load_from_yaml(Path(__file__).parent / "tools" / "registry.yaml")
+        except Exception as exc:  # pragma: no cover
+            print(f"\n[tool registry] load failed: {exc!r}")
+        else:
+            print("\n\n=== Tool Registry ===")
+            for n in reg.names():
+                t = reg.get(n)
+                print(f"\n[{n}]  ({type(t).__module__}.{type(t).__name__})")
+                print(f"  description: {getattr(t, 'description', '')}")
+                print(f"  is_idempotent={getattr(t, 'is_idempotent', '?')}")
+                print(f"  default_timeout_s={getattr(t, 'default_timeout_s', '?')}")
         return
 
     kind, _, name = target.partition(":")
@@ -286,9 +282,6 @@ def _describe(target: str | None) -> None:
         print(f"  emits={list(m.emits)}  consumes={list(m.consumes)}")
         print(f"  relates_to={list(m.relates_to)}")
     elif kind == "graph":
-        from pathlib import Path
-
-        from agent_lab.graphs.loader import load_graph_manifest
         yaml_path = Path(__file__).parent / "graphs" / "configs" / f"{name}.yaml"
         gm = load_graph_manifest(yaml_path)
         if not gm:
@@ -309,27 +302,27 @@ def main(argv: list[str] | None = None) -> int:
                         choices=list(_DISPATCH.keys()),
                         help="which graph to run")
     parser.add_argument("--negative", action="store_true",
-                        help="compile a broken copy of agent_loop and expect a ValidationError")
+                        help="compile a broken copy of effect_dispatch and expect a ValidationError")
     parser.add_argument("--describe", action="store_true",
-                        help="print self-describing node + graph manifests and exit")
+                        help="print self-describing node + graph + tool manifests and exit")
     parser.add_argument("--target", default=None,
                         help="describe target: node:<id> | graph:<id>")
     parser.add_argument("--mv-provider", default="default",
-                        choices=["default", "mock", "lca"],
+                        choices=["default", "lca"],
                         help="for mv_assemble: which provider feeds assemble_lca node")
     args = parser.parse_args(argv)
 
-    _register_mocks()
-    _register_lca_body()
-    _register_lca_llm()
-    if args.mv_provider == "lca" or args.graph == "mv_assemble":
-        _register_lca_mv()
     if args.describe:
         _describe(args.target)
         return 0
     if args.negative:
         _run_negative()
         return 0
+
+    # Real boot: load the tool registry before any graph runs.
+    _bootstrap()
+    if args.mv_provider == "lca" or args.graph == "mv_assemble":
+        _register_lca_mv()
     specs = load_registry("mv_assemble", "effect_dispatch", "agent_loop")
     if args.graph == "mv_assemble":
         _DISPATCH[args.graph](specs, args.mv_provider)
