@@ -26,7 +26,7 @@ LCA 是基于 vendored Cordis 的 Python 插件化认知 Agent 框架。
 4. **改变哪个边界?** 层、seam、控制面/观察面、进程或外部系统。
 5. **现有 Protocol / ADR / Note 能否表达?** 能则扩展,勿新开平行机制。
 6. **失败、重试、恢复和幂等语义是什么?** 覆盖成功、拒绝、部分完成和重复调用。
-7. **如何验证、何时删除兼容?** 给出实际命令、测试和 delete-when 条件。
+7. **如何验证?** 给出实际命令和测试。兼容 shim 必须同 PR 可删,不留跨 PR 后门。
 
 | 情况 | 动作 |
 |---|---|
@@ -114,14 +114,9 @@ contracts → infrastructure → cognition → runtime → agent
 - Session recovery 禁止 checkpoint `working` 状态;`waiting_input` 必须恰好有一个未解决 approval
 - env 三层白名单:`BOOTSTRAP_NAMES`(覆盖已有)/`BOOTSTRAP_PREFIXES`(新增)/`BOOTSTRAP_FORBIDDEN`(禁止);`LCA_PROFILE` 必须来自 argv
 
-**迁移态模板(必须填满,无 delete-when = 红灯):**
+**COMPAT shim 原则(一次性到位):** 引入兼容 shim 的同一 PR 必须同时删除它,不允许跨 PR 留后门。如果旧入口确实需要过渡期,必须在引入时就写明 owner、验证命令和删除时间点,且该时间点必须在同一 PR 的范围内(如同一 PR 的后续 commit)。无 delete-when 的兼容分支 = 红灯。
 
-```text
-# COMPAT(owner: ADR-0xxx, from: <旧入口>, to: <新入口>,
-#         delete_when: <可观察条件>, forbidden_new_usage: <禁止新增用法>)
-```
-
-新代码默认用 `to`。同一变更不能既新增旧用法又声称收敛迁移。删除条件必须包含检测命令或测试。
+新代码默认用 `to`。同一变更不能既新增旧用法又声称收敛迁移。
 
 ## 5. 变更闭环
 
@@ -134,7 +129,7 @@ contracts → infrastructure → cognition → runtime → agent
 | Schema / Journal 字段 | consumer + migration 说明 + 测试 |
 | 注册表 key / Plugin id | Profile/Bundle、`why-plugin`、装配测试 |
 
-**默认要求:** 新公共接口先写 Protocol/DTO;新副作用先写 capability/effects;新状态转移先定义合法/拒绝/恢复状态;每个 bugfix 至少一个回归测试;每个兼容分支必须有 owner 和 delete-when。
+**默认要求:** 新公共接口先写 Protocol/DTO;新副作用先写 capability/effects;新状态转移先定义合法/拒绝/恢复状态;每个 bugfix 至少一个回归测试;引入兼容 shim 的同一 PR 必须同时删除它。
 
 **离开前卫生:** 无新增无期限 TODO;无双写同一 SSOT(除非 COMPAT 写满);死代码/死 import 已清;类型标注完整;`ruff check --fix`;`git diff --check`;提交信息说明"做了什么 / 为什么"。
 
