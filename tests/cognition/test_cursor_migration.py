@@ -4,10 +4,14 @@ ADR-0169 §D9 删除清单要求业务路径 ``coord.begin_step / coord.record_*
 coord.emit_phase`` 在 PR-21~24 阶段迁完 cursor;PR-26 是**准备阶段**,验证:
 
 1. ``perceive_hub`` 调 ``cursor.advance('perceive')`` 而非 ``coord.emit_phase(...)``
-2. ``safe_executor`` / ``tool_journal`` 不再调 ``coord.record_*``(compat 期
+2. ``tool_journal`` / ``safe_executor`` 不再调 ``coord.record_*``(compat 期
    保留 ``coord.emit(...)`` 任意 EP,但 record_* API 已脱钩 cursor)
 3. ``CoordinatorAdapter`` 暴露 ``current_cursor()`` ContextVar 让业务路径取
    cursor(无业务调用方时不报错)
+
+ADR-0185 P5 之后:业务路径完全迁到 ``lca.loop.commit.tool_journal`` wrappers
+(record_step_tool_call / record_step_tool_result),经 FactGateway → Session.append
+单轨。``CursorRecord.try_record_*`` 已退役。
 
 无调用方门禁通过 ``grep coord.record_thinking|coord.record_tool_call|...``
 = 0 验证。
@@ -19,10 +23,6 @@ import inspect
 import re
 from dataclasses import dataclass, field
 
-from lca.cognition.body.executor.safe_executor import (
-    _record_tool_call_evidence,
-    _record_tool_result_evidence,
-)
 from lca.contracts.observability.core.incarnation import Incarnation
 from lca.contracts.observability.cursor.loop_cursor import (
     CursorSnapshot,
@@ -63,25 +63,6 @@ class _StubSpine:
             }
         )
         return seq
-
-
-@dataclass
-class _StubTool:
-    """Minimal Tool stub for emit_tool_started runtime test."""
-
-    name: str
-    description: str = ""
-    parameters: dict[str, object] = field(default_factory=dict)
-    is_idempotent: bool = True
-    default_timeout_s: float = 30.0
-
-    async def execute(self, args: dict[str, object]) -> object:  # pragma: no cover
-        del args
-        raise NotImplementedError
-
-    def validate(self, args: dict[str, object]) -> str | None:  # pragma: no cover
-        del args
-        return None
 
 
 def _make_cursor() -> tuple[StdLoopCursor, _StubSpine]:
@@ -163,7 +144,7 @@ def test_perceive_hub_skips_cursor_advance_when_not_bound() -> None:
     assert spine.records == [], "no cursor bound → no spine records"
 
 
-# ── 2. tool_journal calls cursor-aware EP routes ──────────
+# ── 2. tool_journal routes through lca.loop.commit wrappers ──
 
 
 def _strip_docstrings_and_comments(source: str) -> str:
@@ -188,22 +169,20 @@ def _strip_docstrings_and_comments(source: str) -> str:
     return "\n".join(lines)
 
 
-def test_tool_journal_routes_start_through_cursor_record_tool_call() -> None:
-    """``record_tool_started_observability`` 经 CursorRecord 落 evidence EP。
+def test_tool_journal_routes_start_through_record_step_tool_call() -> None:
+    """``record_tool_started_observability`` 经 ``record_step_tool_call`` 落 spine EP。
 
-    ADR-0169 PR-1/S1 + SSOT 收口:cursor 是 spine writer 唯一入口。ToolCallRecord
-    构造在 CursorRecord 内部;helper 只透传字段。
+    ADR-0185 P5: 业务路径完全迁到 ``lca.loop.commit.tool_journal`` wrappers,
+    经 FactGateway → Session.append 单轨。不再走 cursor.record_tool_call 或
+    CursorRecord.try_record_tool_call。
     """
     from lca.cognition.body.emit import tool_journal
 
     source_started = inspect.getsource(tool_journal.record_tool_started_observability)
     body = _strip_docstrings_and_comments(source_started)
-    assert (
-        "cursor.record_tool_call" in body
-        or "CursorRecord.try_record_tool_call" in body
-    ), (
-        "record_tool_started_observability must route through cursor.record_tool_call "
-        "(directly or via CursorRecord wrapper; ADR-0169 SSOT)"
+    assert "record_step_tool_call" in body, (
+        "record_tool_started_observability must route through record_step_tool_call "
+        "(ADR-0185 P5 single track)"
     )
     assert "coord.emit" not in body
     from lca.cognition.body.executor import safe_executor
@@ -215,18 +194,15 @@ def test_tool_journal_routes_start_through_cursor_record_tool_call() -> None:
     )
 
 
-def test_tool_journal_routes_end_through_cursor_record_tool_result() -> None:
-    """``record_tool_invoked_observability`` 经 cursor.record_tool_result 落 evidence EP。"""
+def test_tool_journal_routes_end_through_record_step_tool_result() -> None:
+    """``record_tool_invoked_observability`` 经 ``record_step_tool_result`` 落 spine EP。"""
     from lca.cognition.body.emit import tool_journal
 
     source_invoked = inspect.getsource(tool_journal.record_tool_invoked_observability)
     body = _strip_docstrings_and_comments(source_invoked)
-    assert (
-        "cursor.record_tool_result" in body
-        or "CursorRecord.try_record_tool_result" in body
-    ), (
-        "record_tool_invoked_observability must route through cursor.record_tool_result "
-        "(directly or via CursorRecord wrapper; ADR-0169 SSOT)"
+    assert "record_step_tool_result" in body, (
+        "record_tool_invoked_observability must route through record_step_tool_result "
+        "(ADR-0185 P5 single track)"
     )
     assert "coord.emit" not in body
     from lca.cognition.body.executor import safe_executor
@@ -236,18 +212,15 @@ def test_tool_journal_routes_end_through_cursor_record_tool_result() -> None:
     assert "commit_tool_phase_call_end" in commit_body
 
 
-def test_tool_journal_routes_denied_through_cursor_record_tool_result() -> None:
-    """``record_tool_denied_observability`` 经 cursor.record_tool_result(outcome="denied")。"""
+def test_tool_journal_routes_denied_through_record_step_tool_result() -> None:
+    """``record_tool_denied_observability`` 经 ``record_step_tool_result(outcome="denied")``。"""
     from lca.cognition.body.emit import tool_journal
 
     source_denied = inspect.getsource(tool_journal.record_tool_denied_observability)
     body = _strip_docstrings_and_comments(source_denied)
-    assert (
-        "cursor.record_tool_result" in body
-        or "CursorRecord.try_record_tool_result" in body
-    ), (
-        "record_tool_denied_observability must route through cursor.record_tool_result "
-        "(directly or via CursorRecord wrapper; ADR-0169 SSOT)"
+    assert "record_step_tool_result" in body, (
+        "record_tool_denied_observability must route through record_step_tool_result "
+        "(ADR-0185 P5 single track)"
     )
     assert '"denied"' in body
     assert "coord.emit" not in body
@@ -258,184 +231,7 @@ def test_tool_journal_routes_denied_through_cursor_record_tool_result() -> None:
     assert "commit_tool_phase_denied" in commit_body
 
 
-def test_tool_journal_runtime_records_tool_call_ep_when_cursor_bound() -> None:
-    """运行时校验:cursor 已 bind 时,``emit_tool_started`` 触发 ``step.tool_call.record``。
-
-    注入 cursor → 调 emit_tool_started → spine 必新增 step.tool_call.record EP。
-    """
-    from lca.cognition.body.emit import tool_journal
-    from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
-        bind_current_cursor,
-        reset_current_cursor,
-    )
-
-    cursor, spine = _make_cursor()
-    # 提前 advance 到 ACT phase —— record_tool_call 需要 ACT window
-    cursor.advance("act")
-    pre_count = len(spine.records)
-
-    token = bind_current_cursor(cursor)
-    try:
-        tool = _StubTool(name="t1")
-        tool_journal.emit_tool_started(
-            tool,
-            {"path": "stub/path"},
-            invocation_id="inv-1",
-        )
-    finally:
-        reset_current_cursor(token)
-
-    new_eps = [r["execution_point"] for r in spine.records[pre_count:]]
-    assert "step.tool_call.record" in new_eps, (
-        f"expected step.tool_call.record EP after emit_tool_started, got {new_eps}"
-    )
-
-
-# ── 3. safe_executor open/close act step ───────────────────────
-
-
-def test_safe_executor_record_tool_call_evidence_routes_through_cursor() -> None:
-    """``_record_tool_call_evidence`` 经 cursor.record_tool_call 落 evidence EP。
-
-    PR-1/S1 + SSOT 收口:允许 CursorRecord.try_record_tool_call 包装层。ToolCallRecord
-    构造在 CursorRecord 内部;helper 只透传 tool_name / invocation_id
-    (ADR-0203 §2.3 删除 ``args_digest``)。
-    """
-    from lca.cognition.body.executor import safe_executor
-
-    source_open = inspect.getsource(safe_executor._record_tool_call_evidence)
-    body = _strip_docstrings_and_comments(source_open)
-    assert (
-        "cursor.record_tool_call" in body
-        or "CursorRecord.try_record_tool_call" in body
-    ), (
-        "_record_tool_call_evidence must route through cursor.record_tool_call "
-        "(ADR-0169 PR-1/S1)"
-    )
-    assert "coord.emit" not in body
-    assert "phase.act.fold.start" not in body
-
-
-def test_safe_executor_record_tool_result_evidence_routes_through_cursor() -> None:
-    """``_record_tool_result_evidence`` 经 cursor.record_tool_result 落 evidence EP。
-
-    ToolResultRecord 构造在 CursorRecord 内部;helper 只透传 tool_name / result_digest / outcome。
-    """
-    from lca.cognition.body.executor import safe_executor
-
-    source_close = inspect.getsource(safe_executor._record_tool_result_evidence)
-    body = _strip_docstrings_and_comments(source_close)
-    assert (
-        "cursor.record_tool_result" in body
-        or "CursorRecord.try_record_tool_result" in body
-    )
-    assert "coord.emit" not in body
-    assert "phase.act.fold.end" not in body
-
-
-def test_safe_executor_evidence_helpers_silent_when_no_cursor_bound() -> None:
-    """未注入 cursor 时 ``_record_tool_call_evidence`` / ``_record_tool_result_evidence`` 静默 no-op(不抛)。
-
-    PR-1/S1: 之前的兼容路径 ``coord.emit`` 已删除,helpers 现走 ``cursor.record_*``;
-    无 cursor 时直接返回,等价于原行为。
-    """
-    # 默认 ContextVar 为 None → helpers 必须立即返回
-    _record_tool_call_evidence("test_tool", "inv-1")
-    _record_tool_result_evidence(tool_name="test_tool", invocation_id="inv-1", outcome="ok", ok=True)
-
-
-def test_safe_executor_evidence_runtime_records_tool_result_ep_when_cursor_bound() -> None:
-    """运行时校验:cursor 已 bind 时,``_record_tool_result_evidence`` 触发 ``step.tool_result.record``。
-
-    ACT phase 上 cursor.record_tool_result 必落 step.tool_result.record EP。
-    """
-    from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
-        bind_current_cursor,
-        reset_current_cursor,
-    )
-
-    cursor, spine = _make_cursor()
-    cursor.advance("act")
-    pre_count = len(spine.records)
-
-    token = bind_current_cursor(cursor)
-    try:
-        _record_tool_call_evidence("test_tool", "inv-1")
-        _record_tool_result_evidence(tool_name="test_tool", invocation_id="inv-1", outcome="ok", ok=True)
-    finally:
-        reset_current_cursor(token)
-
-    new_eps = [r["execution_point"] for r in spine.records[pre_count:]]
-    assert "step.tool_call.record" in new_eps, (
-        f"expected step.tool_call.record from _record_tool_call_evidence, got {new_eps}"
-    )
-    assert "step.tool_result.record" in new_eps, (
-        f"expected step.tool_result.record from _record_tool_result_evidence, got {new_eps}"
-    )
-
-
-def test_safe_executor_record_tool_call_evidence_swallows_cursor_phase_error() -> None:
-    """``_record_tool_call_evidence`` 经 CursorRecord.try_record_tool_call 包装层吞 CursorError。
-
-    SSOT 收口:phase != "act" 时 cursor.record_tool_call 抛 CursorError(契约不变);
-    CursorRecord.try_record_tool_call 包装层吞掉并 warning,不向上抛——避免单 tool
-    调用失败触发整 session RuntimeError(regression for run_9e181f24c275)。
-    """
-    cursor, _ = _make_cursor()
-    cursor.advance("think")
-    from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
-        bind_current_cursor,
-        reset_current_cursor,
-    )
-
-    token = bind_current_cursor(cursor)
-    try:
-        # 不应抛 CursorError:try_record_tool_call 包装层吞掉(PR-26 task-25 政策)。
-        _record_tool_call_evidence("test_tool", "inv-1")
-    finally:
-        reset_current_cursor(token)
-
-
-# ── 3b. emit_tool_started 在非 ACT phase 降级 warning(防 run_9e181f24c275 回归) ─
-
-
-def test_emit_tool_started_swallows_cursor_phase_error() -> None:
-    """``emit_tool_started`` 在 cursor 不在 ACT phase 时降级 warning,不抛。
-
-    Regression for run_9e181f24c275:reasoner 输出 RESPOND,phase 留在 think,
-    下游 phase_graph.node 仍触发 tool execute(自动 replay / 嵌入 tool_call),
-    ``emit_tool_started`` 调 ``cursor.record_tool_call`` 在 think phase 抛 CursorError,
-    一路冒到 phase executor → apply_error → kernel.run.stop=failure。
-
-    ADR-0169 PR-26 task-25 政策:phase 推进责任在 SimpleBody.act;本 seam 只
-    负责落证据 EP,phase 不在 act → 降级 warning,不让单 tool 调用失败
-    触发整 session RuntimeError。
-    """
-    cursor, _ = _make_cursor()
-    cursor.advance("perceive")
-    cursor.advance("think")
-
-    from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
-        bind_current_cursor,
-        reset_current_cursor,
-    )
-
-    token = bind_current_cursor(cursor)
-    try:
-        from lca.cognition.body.emit import tool_journal
-
-        # 必须不抛 —— 这是 run_9e181f24c275 的直接回归锁。
-        result = tool_journal.emit_tool_started(
-            tool=_StubTool(name="t1"),
-            args={"path": "stub/path"},
-            invocation_id="inv-1",
-        )
-        assert result is None  # 无 evidence_store → inline 退路
-    finally:
-        reset_current_cursor(token)
-
-
-# ── 4. CoordinatorAdapter exposes current_cursor ContextVar ─────
+# ── 3. CoordinatorAdapter exposes current_cursor ContextVar ─────
 
 
 def test_coordinator_adapter_current_cursor_returns_none_when_unbound() -> None:
@@ -480,7 +276,7 @@ def test_coordinator_adapter_class_satisfies_loop_cursor_protocol() -> None:
     assert callable(cursor.advance), "StdLoopCursor must implement advance()"
 
 
-# ── 5. Static grep gate: business paths don't use removed coord APIs ──
+# ── 4. Static grep gate: business paths don't use removed coord APIs ──
 
 
 def test_no_business_call_to_coord_record_apis() -> None:
@@ -571,7 +367,7 @@ def test_no_business_call_to_coord_emit_phase() -> None:
     )
 
 
-# ── 6. Cursor Protocol surface stable ──────────────────────────
+# ── 5. Cursor Protocol surface stable ──────────────────────────
 
 
 def test_cursor_protocol_surface_is_pr26_stable() -> None:
@@ -610,7 +406,7 @@ def test_cursor_protocol_surface_is_pr26_stable() -> None:
     assert not leaked, f"LoopCursor Protocol leaked forbidden verbs (ADR-0169 §D1): {leaked}"
 
 
-# ── 7. CoordinatorAdapter existence + delegation sanity ────────
+# ── 6. CoordinatorAdapter existence + delegation sanity ────────
 
 
 def test_coordinator_adapter_exposes_cursor_property() -> None:
@@ -625,7 +421,7 @@ def test_coordinator_adapter_exposes_cursor_property() -> None:
     )
 
 
-# ── 8. Runtime module: ensure no dangling _derive_* / make_journal_emitting_hook ─
+# ── 7. Runtime module: ensure no dangling _derive_* / make_journal_emitting_hook ─
 
 
 def test_runtime_event_emission_does_not_export_removed_symbols() -> None:

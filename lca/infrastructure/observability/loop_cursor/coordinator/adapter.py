@@ -27,17 +27,10 @@ ADR-0169 §D11 PR-1 之后业务路径只允许两件事:``cursor.advance(phase)
   cursor.advance(phase)。
 - 删除条件:grep ``coord.begin_step`` in ``lca/`` = 0 + grep
   ``coord.record_thinking`` in ``lca/`` = 0(ADR-0169 §D9,绑定 PR-21~24 后)。
-
-COMPAT 块(AGENTS.md §1 + G15 模板)
------------------------------------
-# COMPAT(delete-when: PR-21~24 grep 全部为 0, tracking: ADR-0169-task-25)
-# 兼容窗口:web-standard 业务迁移(PR-21~24)期间,coord.* 必须继续工作。
-# 删除条件:``grep -rn "coord.begin_step|coord.record_thinking" lca/cognition lca/body lca/runtime lca/agent`` 输出 0。
 """
 
 from __future__ import annotations
 
-import warnings
 from contextvars import ContextVar, Token
 from typing import Any, get_args
 
@@ -65,22 +58,11 @@ from lca.infrastructure.observability.writable_matrix.coordinator import StepCoo
 
 _VALID_CURSOR_PHASES = frozenset(get_args(PhaseName))
 
-# COMPAT(delete-when: cursor second-track fully retired per ADR-0185 P5 / ADR-0186,
-#   tracking: PR-C)
-# cursor.record_* is deprecated — Session.append is the sole fact production entry.
-warnings.warn(
-    "cursor.record_* is deprecated; route through Session.append (ADR-0185 P5 / ADR-0186)",
-    DeprecationWarning,
-    stacklevel=2,
-)
-
-
-# COMPAT(delete-when: PR-21~24 grep 全部为 0, tracking: ADR-0169-task-25)
 # 当前 cursor 由 CoordinatorAdapter 持有;PR-21~24 业务迁 cursor 期间,
 # 业务路径(perceive_hub / safe_executor / tool_journal_emit)取 cursor 走本
 # ContextVar —— 由 wiring 层在 RunExecutionEnvironment.prepare 阶段 set。
 # 删除条件:业务代码全迁完 cursor 后,直接传 cursor 参数替换 ContextVar 访问。
-_current_cursor: ContextVar[LoopCursor | None] = ContextVar("lca_loop_cursor_current", default=None)
+_current_cursor: ContextVar[LoopCursor | None] = ContextVar("lca-loop_cursor_current", default=None)
 
 
 def get_current_cursor() -> LoopCursor | None:
@@ -102,7 +84,6 @@ def current_cursor() -> LoopCursor | None:
     return _current_cursor.get()
 
 
-# COMPAT(delete-when: PR-21~24 grep 全部为 0, tracking: ADR-0169-task-25)
 class CoordinatorAdapter:
     """``StepCoordinator`` 的 LoopCursor 桥接器(ADR-0169 PR-25)。
 
@@ -119,7 +100,7 @@ class CoordinatorAdapter:
             coord.end_step(...) + cursor.advance('stop')(当 phase == 'act')
 
     业务代码在 PR-25 阶段仍直接用 ``StepCoordinator``;本适配器是为
-    PR-21~24 业务迁移准备的过渡壳(由 wiring 层在切换时把 ``StepCoordinator``
+    PR-21~24 业务迁移准备の过渡壳(由 wiring 层在切换时把 ``StepCoordinator``
     实例包成 ``CoordinatorAdapter``)。
     """
 
@@ -178,7 +159,6 @@ class CoordinatorAdapter:
         prompt_tokens = getattr(trace, "prompt_tokens", 0) or 0
         completion_tokens = getattr(trace, "completion_tokens", 0) or 0
         token_count = prompt_tokens + completion_tokens or None
-        reasoning_text = getattr(trace, "reasoning", "") or ""
         self._cursor.record_thinking(
             ThinkingRecord(
                 content_digest="",

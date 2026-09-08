@@ -136,7 +136,7 @@
 | [0187](0187-assistant-agent.md) | AssistantAgent — 可配置、可隔离、可进化的个人助理产品面（Home SSOT + 同一 Resolve/Compile + 0093 jobs + G11 进化闸） | Accepted |
 | [0188](0188-session-title-event.md) | Session 标题事件 — `session.title.v1` 入词表（log-only 审计档，标题模块唯一事实载体） | Proposed |
 | [0189](0189-session-obs-dsh-parity-events.md) | Session 观察面 DSH 对齐 — 信封扩展与 fork/derive/feedback 词表 | Proposed |
-| [0190](adr-0190-extreme-plugin-organization.md) | LCA 极端插件化组织规范（文件名 `adr-0190-`；文档自标 0189，见下方注） | Keep |
+| [0190](0190-extreme-plugin-organization.md) | LCA 极端插件化组织规范（文件名已正名为 `0190-`；文档自标 0189，见下方注） | Keep |
 | [0191](0191-runtime-loop-dsh-convergence-and-control-plane.md) | Runtime Loop DSH 收敛与 LCA 控制面保留 — 事实/模型/控制/Ephemeral 四态分离 + Reducer 演进 | Implemented |
 | [0192](0192-fact-plane-convergence.md) | Fact Plane 收敛 — FactCommitter + PhaseFactEmitter；Journal 平面从 cognition 退役 | Implemented（via 0186/0194/0195） |
 | [0193](0193-session-projection-fabric-model-visible.md) | Session Projection Fabric — ModelVisibleUnit 增量投影；统一 model-visible 读面 | Implemented (D1–D7) |
@@ -156,7 +156,7 @@
 
 > 点号后缀 ADR([0167.1](0167.1-step-tree-deriver-wiring-and-run-layout-cleanup.md)、[0168.1](0168.1-loop-cursor-state-machine.md))是父 ADR 的收尾件,索引按主编号 `0167` / `0168` 归属,不单独占号。
 >
-> [adr-0190-extreme-plugin-organization.md](adr-0190-extreme-plugin-organization.md) 文件名带 `adr-` 前缀且文档内自标 ADR-0189(写作时 0187=AssistantAgent 已占号),而 0189 另有 [0189-session-obs-dsh-parity-events.md](0189-session-obs-dsh-parity-events.md)。ADR-0200 引用时用 "0189" 标签;差异记录见 [0200-phase0-cross-reference-verification.md](../specs/0200-phase0-cross-reference-verification.md) §3.2。
+> [0190-extreme-plugin-organization.md](0190-extreme-plugin-organization.md) 文件名已正名为 `0190-` 前缀(原 `adr-0190-` 不符合编号规范);文档内自标 ADR-0189(写作时 0187=AssistantAgent 已占号),而 0189 另有 [0189-session-obs-dsh-parity-events.md](0189-session-obs-dsh-parity-events.md)。ADR-0200 引用时用 "0189" 标签;差异记录见 [0200-phase0-cross-reference-verification.md](../specs/0200-phase0-cross-reference-verification.md) §3.2。
 
 ## 维护规则
 - 不改旧文件；新决策用 `Supersedes: ADR-XXXX` 标记
