@@ -3,10 +3,6 @@
 Consolidates the two prior private copies
 (``safe_executor._summarize_args_for_cursor`` and
 ``tool_journal._summarize_args``) so the producer side has one truth.
-
-delete-when: this file replaces both copies in the same PR. After the
-PR lands, callers use ``summarize_args`` and the two old private
-helpers are gone.
 """
 
 from __future__ import annotations

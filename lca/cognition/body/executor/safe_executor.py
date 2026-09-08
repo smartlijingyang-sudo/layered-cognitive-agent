@@ -244,8 +244,6 @@ class SimpleSafeExecutor(SafeExecutor):
         # 2026-09-03 观测面 SSOT 收口:把 ``arguments`` 与 ``arguments_summary``
         # 透传给 record_step_tool_call(Single track via FactGateway →
         # Session.append);deriver 不必再 sidecar round-trip。
-        # delete-when: cursor_record.CursorRecord.try_record_tool_call 退役
-        # (ADR-0185 P5)。
         arguments_for_record = dict(args) if isinstance(args, dict) else {}
         from lca.loop.commit.tool_journal import (
             record_step_tool_call,
@@ -528,10 +526,3 @@ class SimpleSafeExecutor(SafeExecutor):
             return None
         result: str | None = validator(args)
         return result
-
-
-# delete-when: this module previously exposed _record_tool_call_evidence and
-# _record_tool_result_evidence as thin wrappers around CursorRecord.try_record_*.
-# Both helpers were removed in this PR; the business path now goes through
-# ``lca.loop.commit.tool_journal.record_step_tool_call`` / ``record_step_tool_result``
-# (single track via FactGateway → Session.append, ADR-0186 / I-FACT-1).

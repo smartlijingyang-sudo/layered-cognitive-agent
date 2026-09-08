@@ -42,14 +42,14 @@ from lca.harness.plugin.manifest import EffectClass
 from lca.harness.plugin_api import definition_from_plugin
 from lca.infrastructure.skills.disk.store import DiskSkillPackageStore
 from lca.infrastructure.skills.settings.settings import SkillSettings
-from lca.plugins.assistant.catalog.catalog import (
-    AssistantCatalogError,
-    AssistantCatalogImpl,
-)
 from lca.plugins.assistant.skill.overlay import (
     AssistantSkillOverlayImpl,
     Config,
     setup,
+)
+from lca.plugins.domain.assistant.catalog.plugin import (
+    AssistantCatalogError,
+    AssistantCatalogImpl,
 )
 
 # ── helpers ─────────────────────────────────────────────────────────

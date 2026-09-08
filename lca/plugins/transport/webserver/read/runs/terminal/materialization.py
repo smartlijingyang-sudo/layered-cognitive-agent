@@ -78,11 +78,6 @@ def record_terminal_materialization(session: RunSession) -> None:
             extra={
                 "doctor_report": report.as_dict(),
                 "flush_errors": tuple(flush_errors),
-                # COMPAT(owner: ADR-0165.1, from: extra.session_error,
-                # delete_when: rg 'extra\\.session_error' traces/ scripts/ tests/ = 0,
-                # forbidden_new_usage: 新 reader 读顶层 session_error/session_status)
-                "session_error": session_error,
-                "session_status": session_status,
             },
         )
         atomic_write_text(

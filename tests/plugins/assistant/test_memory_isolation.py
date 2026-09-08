@@ -32,13 +32,13 @@ import pytest
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
 from lca.contracts.protocols.state.scope_plan import BudgetCeiling, ScopePlan
-from lca.plugins.assistant.catalog.catalog import (
-    AssistantCatalogImpl,
-    AssistantDigestMismatch,
-)
 from lca.plugins.assistant.home._home_layout import (
     CONFIG_FACE_FILES,
     sha256_digest,
+)
+from lca.plugins.domain.assistant.catalog.plugin import (
+    AssistantCatalogImpl,
+    AssistantDigestMismatch,
 )
 
 # ── helpers ─────────────────────────────────────────────────────────

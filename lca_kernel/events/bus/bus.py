@@ -100,22 +100,10 @@ class EnvelopeRef:
 
 @dataclass(frozen=True, slots=True)
 class EventRef(EnvelopeRef):
-    r"""兼容回执 —— EnvelopeRef + persisted / subscriber_count(ADR-0184 D1)。
+    """兼容回执 —— EnvelopeRef + persisted / subscriber_count(ADR-0184 D1)。
 
-    字段契约:
-    - ``persisted``: S3 是否有 ≥1 个已装载 sink 实际写入成功;
-    - ``subscriber_count``: S4 实际派发的订阅者数量(含 contained 失败)。
-
-    失败语义:字段只反映事实,不抛错;零落盘的抛错由 I2 负责
-    (:class:`EventNoSinkError`)。时序:``publish`` 返回前填充完毕,
-    派生路径(自观察)同样返回填齐的回执。所有权:机制层唯一写方,
-    发送方只读。外部后果:发送方可在调用点立即判断事件停在哪个阶段。
-
-    字段全部 required(ADR-0184 D1 契约:构造方必填,禁止缺字段静默通过)。
-
-    COMPAT(delete-when: rg "EventRef\.persisted|EventRef\.subscriber_count"
-    lca/ = 0;tracking: ADR-0184 PR-1;30 天窗口。PR-3/4 完成后再统一评估
-    全删时机)。
+    字段仍被 EventBus 内部用于 delivery 计数;外部零引用。
+    新代码 MUST 使用 EnvelopeRef。
     """
 
     persisted: bool

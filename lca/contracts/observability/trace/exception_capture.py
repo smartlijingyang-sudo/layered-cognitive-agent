@@ -25,10 +25,6 @@ from enum import Enum
 from typing import Any
 
 _TRACEBACK_FRAME_BUDGET = 64  # frames retained from the most recent
-# Legacy alias kept for the i17 stream-align traceback cap ; byte cap was 4096.
-# COMPAT(delete-when: ``_traceback_byte_cap`` 全部 reader 升级到 frame budget,
-# tracking: ADR-2026-09-03-debug-clarity)
-_TRACEBACK_BYTE_CAP = 4096
 
 
 class ErrKind(str, Enum):

@@ -26,7 +26,7 @@ from lca.infrastructure.observability.facade.run.ambit import (
     bind_run_ambit,
     current_assistant_id,
 )
-from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
+from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
 from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import (
     CreateRunRequest,
     _to_run_request,

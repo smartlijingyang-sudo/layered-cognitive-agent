@@ -81,8 +81,8 @@ class TestWritePathConstrainedToHomeSkills:
         """动态:HOME 重定向后,本地源安装不在 ``$HOME/.lca/skills`` 落任何文件。"""
         from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
         from lca.contracts.protocols.assistant.skill_overlay import SkillSource
-        from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
         from lca.plugins.assistant.skill.overlay import AssistantSkillOverlayImpl
+        from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
 
         fake_home = tmp_path / "fake-home"
         fake_home.mkdir()
@@ -115,8 +115,8 @@ class TestUnverifiedPackageCannotActivate:
     async def test_manually_drafted_package_rejected(self, tmp_path: Path) -> None:
         from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
         from lca.contracts.protocols.assistant.skill_overlay import SkillNotVerified
-        from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
         from lca.plugins.assistant.skill.overlay import AssistantSkillOverlayImpl
+        from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
 
         catalog = AssistantCatalogImpl(root=tmp_path / "assistants")
         overlay = AssistantSkillOverlayImpl(catalog=catalog)
@@ -147,8 +147,8 @@ class TestEPClosureForInstallAndActivate:
         )
         from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
         from lca.contracts.protocols.assistant.skill_overlay import SkillSource
-        from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
         from lca.plugins.assistant.skill.overlay import AssistantSkillOverlayImpl
+        from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
 
         emitted: list[tuple[str, dict[str, Any]]] = []
 

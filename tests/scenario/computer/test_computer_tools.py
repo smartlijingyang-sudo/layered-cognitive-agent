@@ -19,7 +19,7 @@ from lca.infrastructure.tools.lca_computer import (
     build_machine_computer_tools,
 )
 from lca.infrastructure.tools.lca_computer.types import MACHINE_APIS, SANDBOX_ONLY_APIS, ApiName
-from lca.plugins.transport.webserver.handlers.runs.wire.wire import WIRE, resolve
+from lca.plugins.transport.webserver.wire.wire import WIRE, resolve
 from tests.support.inline_sandbox import InlineSandbox
 
 EXECUTE_CODE = ApiName.EXECUTE_CODE

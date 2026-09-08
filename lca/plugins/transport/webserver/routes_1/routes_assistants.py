@@ -66,7 +66,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 from lca.contracts.protocols.memory.operational_skills import SkillImportError
 from lca.contracts.routing import RouteSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.plugins.assistant.catalog.catalog import (
+from lca.plugins.domain.assistant.catalog.plugin import (
     AssistantCatalogError,
     AssistantDigestMismatch,
 )
@@ -560,8 +560,6 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
     effects="none",
     description=(
         "Register /v1/assistants CRUD REST surface (ADR-0187 §3 D7 + PR-5). "
-        "Handler bodies short-circuit with HTTP 501 + COMPAT marker until "
-        "lca.plugins.assistant.catalog (PR-3) binds assistant.catalog."
     ),
     test_suite="tests.lca_plugins.transport.webserver.test_routes_assistants",
     contract=PluginContract(

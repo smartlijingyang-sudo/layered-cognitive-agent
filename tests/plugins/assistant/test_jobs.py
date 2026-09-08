@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -40,10 +40,10 @@ from lca.contracts.protocols.assistant.jobs import (
 )
 from lca.harness.plugin.manifest import EffectClass
 from lca.harness.plugin_api import definition_from_plugin
-from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
 from lca.plugins.assistant.jobs.jobs import AssistantJobsImpl, setup
+from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
 
-_FIXED_NOW = datetime(2026, 9, 4, 12, 0, 0, tzinfo=timezone.utc)
+_FIXED_NOW = datetime(2026, 9, 4, 12, 0, 0, tzinfo=UTC)
 
 
 # ── 0093 fake（内存 WorkQueue 形状）─────────────────────────────────

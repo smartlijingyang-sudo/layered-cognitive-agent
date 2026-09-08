@@ -34,15 +34,15 @@ from lca.contracts.protocols.assistant.catalog import (
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import PluginSpecKind
 from lca.harness.plugin.manifest import EffectClass
 from lca.harness.plugin_api import definition_from_plugin
-from lca.plugins.assistant.catalog.catalog import (
+from lca.plugins.assistant.events._events import AssistantCreatedEventPayload
+from lca.plugins.assistant.home._home_layout import CONFIG_FACE_FILES, SCHEMA_VERSION
+from lca.plugins.domain.assistant.catalog.plugin import (
     AssistantCatalogError,
     AssistantCatalogImpl,
     AssistantDigestMismatch,
     Config,
     setup,
 )
-from lca.plugins.assistant.events._events import AssistantCreatedEventPayload
-from lca.plugins.assistant.home._home_layout import CONFIG_FACE_FILES, SCHEMA_VERSION
 
 # ── helpers ─────────────────────────────────────────────────────────
 
@@ -487,11 +487,11 @@ def test_create_cleans_up_on_failure(
 
     # 在 manifest 写入之前抛错 ⇒ write_home_files 之前 home 已 mkdir ⇒ 触发 cleanup
     monkeypatch.setattr(
-        "lca.plugins.assistant.catalog._new_assistant_id",
+        "lca.plugins.domain.assistant.catalog.plugin._new_assistant_id",
         lambda: "asst_failtest",
     )
     monkeypatch.setattr(
-        "lca.plugins.assistant.catalog.build_manifest",
+        "lca.plugins.domain.assistant.catalog.plugin.build_manifest",
         _raise,
     )
     with pytest.raises(RuntimeError):

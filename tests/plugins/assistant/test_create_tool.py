@@ -22,7 +22,7 @@ from lca.contracts.protocols.assistant.catalog import (
     CreateAssistantRequest,
 )
 from lca.infrastructure.tools.assistant.create_tool import AssistantCreateTool
-from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
+from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
 
 
 @pytest.fixture

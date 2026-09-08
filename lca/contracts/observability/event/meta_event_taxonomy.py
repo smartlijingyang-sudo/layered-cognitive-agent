@@ -240,7 +240,7 @@ META_EVENT_PRODUCER_SEAMS: Final[tuple[MetaEventSlot, ...]] = (
         plane="spine_observability",
         event_key="assistant.created",
         closure_module="lca.contracts.observability.closure.assistant_ep_closure",
-        producer_seam="lca.plugins.assistant.catalog.catalog",
+        producer_seam="lca.plugins.domain.assistant.catalog.plugin",
         debug_run_family="assistant",
     ),
     MetaEventSlot(

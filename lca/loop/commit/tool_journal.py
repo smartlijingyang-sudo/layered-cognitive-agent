@@ -322,10 +322,6 @@ def commit_body_sandbox_exit(
 
 
 # ── step.tool_call.record / step.tool_result.record narrow wrappers ──────────
-# delete-when: cursor_record.CursorRecord.try_record_tool_call / try_record_tool_result
-#   retired (ADR-0185 P5 owner; cursor second-track fully closed).
-#   Until then, business-path callers route through these two functions and
-#   never reach ``CursorRecord`` directly (C4 / I-FACT-1 single production entry).
 
 
 def record_step_tool_call(

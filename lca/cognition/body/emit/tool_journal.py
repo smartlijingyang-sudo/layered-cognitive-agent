@@ -177,12 +177,6 @@ def emit_tool_started(
     return arguments_ref
 
 
-# delete-when: this file previously had a private ``_summarize_args`` that
-# duplicated ``safe_executor._summarize_args_for_cursor``. Both private copies
-# were consolidated into ``lca.cognition.body.emit._args_summary.summarize_args``
-# (single canonical implementation, ADR-0185 P5 / report_digest_inconsistency.md).
-
-
 def prepare_tool_denied(tool: Tool, reason: str) -> ToolJournalReceipt:
     """Prepare ``ToolDenied`` catalog fact; commit via loop commit seam."""
     return tool_denied_receipt(tool_name=tool.name, reason=reason)

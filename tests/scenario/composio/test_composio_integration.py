@@ -19,7 +19,7 @@ from lca.infrastructure.integrations.composio.models.models import (
 )
 from lca.infrastructure.integrations.composio.settings.settings import ComposioSettings
 from lca.infrastructure.tools.composio import build_tools
-from lca.plugins.transport.webserver.handlers.runs.wire.wire import resolve
+from lca.plugins.transport.webserver.wire.wire import resolve
 
 
 class TestComposioCatalog(unittest.TestCase):

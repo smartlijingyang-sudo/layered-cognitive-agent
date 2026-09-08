@@ -271,11 +271,11 @@ class _FakeOverlay:
 
             raise SkillImportError("invariant 闸失败: 资源数超过上限")
         if self.outcome == "not_found":
-            from lca.plugins.assistant.catalog.catalog import AssistantCatalogError
+            from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogError
 
             raise AssistantCatalogError("assistant home 不存在")
         if self.outcome == "digest_mismatch":
-            from lca.plugins.assistant.catalog.catalog import AssistantDigestMismatch
+            from lca.plugins.domain.assistant.catalog.plugin import AssistantDigestMismatch
 
             raise AssistantDigestMismatch("digest mismatch")
         from lca.contracts.protocols.assistant.skill_overlay import SkillInstallReceipt
@@ -532,7 +532,7 @@ def _app_with_catalog(tmp_path: Any) -> tuple[Starlette, Any]:
     """Materialise routes with a live AssistantCatalog on app.state."""
     from pathlib import Path
 
-    from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
+    from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
 
     plugin, router, ctx = _setup_plugin()
     _run_plugin_setup(plugin, ctx)

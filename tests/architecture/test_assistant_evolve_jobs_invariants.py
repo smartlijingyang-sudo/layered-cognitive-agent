@@ -74,8 +74,8 @@ _EVOLVE_EP_FORBIDDEN_KEYS: frozenset[str] = frozenset(
 
 def _make_env(tmp_path: Path) -> tuple[Any, Any, list[tuple[str, dict[str, Any]]]]:
     """真实 catalog + 真实 evolve impl + EP 记录器。"""
-    from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
     from lca.plugins.assistant.evolve.evolve import AssistantEvolveImpl
+    from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
 
     emitted: list[tuple[str, dict[str, Any]]] = []
 
@@ -194,8 +194,8 @@ class TestIA12JobsMustGoThrough0093:
             JobsCapabilityMissing,
             JobSpec,
         )
-        from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
         from lca.plugins.assistant.jobs.jobs import AssistantJobsImpl
+        from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
 
         catalog = AssistantCatalogImpl(root=tmp_path)
         assistant_id = catalog.create(CreateAssistantRequest(name="A12")).assistant_id
@@ -262,8 +262,8 @@ class TestEvolveEpPayloadWhitelist:
 
     def test_job_ep_payloads_within_metadata_scope(self, tmp_path: Path) -> None:
         from lca.contracts.protocols.assistant.jobs import JobSpec
-        from lca.plugins.assistant.catalog.catalog import AssistantCatalogImpl
         from lca.plugins.assistant.jobs.jobs import AssistantJobsImpl
+        from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
 
         emitted: list[tuple[str, dict[str, Any]]] = []
 

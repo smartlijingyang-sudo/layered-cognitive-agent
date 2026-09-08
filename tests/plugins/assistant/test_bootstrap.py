@@ -34,7 +34,7 @@ from lca.plugins.assistant.bootstrap.bootstrap import (
     project_home_to_context_manifest,
     setup,
 )
-from lca.plugins.assistant.catalog.catalog import (
+from lca.plugins.domain.assistant.catalog.plugin import (
     AssistantCatalogError,
     AssistantCatalogImpl,
     AssistantDigestMismatch,

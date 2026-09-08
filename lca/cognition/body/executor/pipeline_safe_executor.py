@@ -305,8 +305,6 @@ class PipelineSafeExecutor(SafeExecutor):
         # ADR-0164 + ADR-0169 PR-26: 写证据 EP (由 SimpleBody.act
         # 负责 advance 到 act phase);失败由 PhaseTransaction 处理,
         # 不让单 tool 调用失败变 session RuntimeError。
-        # delete-when: cursor_record.CursorRecord.try_record_tool_call 退役
-        # (ADR-0185 P5)。
         from lca.loop.commit.tool_journal import (
             record_step_tool_call,
         )
