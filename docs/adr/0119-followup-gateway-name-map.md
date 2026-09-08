@@ -1,5 +1,11 @@
 # ADR-0119 Followup: "gateway" 命名空间历史映射
 
+## 状态
+
+**Superseded** (2026-08-31) by 0119-followup-gateway-name-removal (full 6-class cleanup).。
+
+**Companion**: [ADR-0119 canonical](0119-webserver-as-plugin.md) (root webserver plugin 化决定) + [ADR-0119 followup-2](0119-followup-gateway-name-removal.md) (实际命名清理).
+
 **状态:** Superseded(被 [0119-followup-gateway-name-removal.md](0119-followup-gateway-name-removal.md) 覆盖)
 **日期:** 2026-08-31
 **父 ADR:** [0119-webserver-as-plugin.md](0119-webserver-as-plugin.md)

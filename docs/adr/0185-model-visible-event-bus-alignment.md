@@ -606,9 +606,9 @@ PR-0 spike (fold 模块 1:1 翻译 dsh)                         [已合并]
 | **删除** | `lca/infrastructure/observability/loop_cursor/_capture_io.py`(整个,由 EventBus 统一处理) |
 | **删除** | `<run_dir>/model_visible/` 目录约定(docs 说明改写) |
 | **修改** | `docs/architecture.md` + `docs/specs/*`:删除"model_visible 6 件套"段落;新增"`foldRequestHeader` 从 spine.jsonl 重建"段落 |
-| **修改** | `docs/adr/0169-loop-cursor-control.md` 第 D7 节标题加 `(Superseded by ADR-0185,保留全文作历史)`,正文保留 |
-| **修改** | `docs/adr/0175-prompt-trace-into-model-visible.md` 整篇加 `(Superseded by ADR-0185,保留全文作历史)`,正文保留 |
-| **修改** | `docs/adr/0176-step-tree-deriver-closure-and-model-visible-dedup.md` 第 D4 节加 `(Superseded by ADR-0185 §3.6)`,正文保留 |
+| **修改** | `docs/adr/0169-loop-cursor-control.md` 第 D7 节标题加 `(由本 ADR-0185 取代,保留全文作历史)`,正文保留 |
+| **修改** | `docs/adr/0175-prompt-trace-into-model-visible.md` 整篇加 `(由本 ADR-0185 取代,保留全文作历史)`,正文保留 |
+| **修改** | `docs/adr/0176-step-tree-deriver-closure-and-model-visible-dedup.md` 第 D4 节加 `(由本 ADR-0185 §3.6 取代)`,正文保留 |
 | **新增** | `docs/adr/0185-model-visible-event-bus-alignment.md`(本 ADR,从 Proposed 升 Accepted) |
 | **新增** | `docs/notes/proposed/seam/2026-09-04-model-visible-bus-alignment.md` 移至 `implemented/seam/`,Status 改 `implemented`,`## Proposal` 改写为 `## Decision` |
 | **新增** | `tests/architecture/test_event_bus_invariants.py` 扩展 5 条 I-MV 测试 |

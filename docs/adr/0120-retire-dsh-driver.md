@@ -1,8 +1,12 @@
 # ADR-0120: 退役 DSH (DeepSeek Harness) driver 集成路径
 
-- Status: Accepted (2026-08-31)
-- Supersedes: ADR-0083 (DeepSeek Harness 插件布局实施计划)
-- Decision: 删除 DSH 作为 LCA 执行目标路径。前端执行目标收窄为 `auto` / `local` (用电脑) / `sandbox` (云沙箱) / `device` (其他物理设备);`'dsh'` 选项、运行时、SDK、配置、文档全部退役。
+## 状态
+
+**Accepted** (2026-08-31)
+
+**Supersedes**: ADR-0083 (DeepSeek Harness 插件布局实施计划)
+
+**Decision**: 删除 DSH 作为 LCA 执行目标路径。前端执行目标收窄为 `auto` / `local` (用电脑) / `sandbox` (云沙箱) / `device` (其他物理设备);`'dsh'` 选项、运行时、SDK、配置、文档全部退役。
 
 ## Context
 
@@ -37,7 +41,7 @@
 7. **删除测试断言**:`test_dsh_migration_prefix_allowed` / `BOOTSTRAP_PREFIXES` 中 `"DSH_"` 项 / `scenario_harness.py` 中 `lca-loop-dsh-bridge` 与 `lca-dsh-bridge` plugin id 引用。
 8. **删除 package contracts**:`pyproject.toml` 中 `[tool.lca.package_contracts."lca.infrastructure.dsh"]` 与 `[tool.lca.package_contracts."lca.infrastructure.comparison.dsh_driver"]` 整块删除。
 9. **删除文档**:`docs/design/2026-08-14-deepseek-harness-integration-analysis.md` 与 `docs/design/2026-08-15-dsh-path-a-deep-research.md` 整篇删除;`docs/design/*` 与 `docs/specs/*` 中所有 DSH 段落整段删除。
-10. **关闭 ADR-0083**:ADR-0083 标注 "Superseded by ADR-0120";`docs/adr/README.md` 索引同步。
+10. **关闭 ADR-0083**:ADR-0083 标注 "Superseded by 本 ADR-0120";`docs/adr/README.md` 索引同步。
 
 ## 不变量
 

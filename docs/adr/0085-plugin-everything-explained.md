@@ -1,5 +1,9 @@
 # LCA 仓库“插件一切”架构解读
 
+## 状态
+
+**Explained** (2026-08-30)。
+
 > **结论先行：**“一切皆插件”不是把所有代码都拆成小文件，而是把 Agent 中会变化、需要替换、需要组合、需要授权或需要审计的能力，统一表达成“声明式插件 + capability seam + 注册表 + 编译计划 + 受控运行时”。同时，认知阶段闭集、状态唯一写入者、Journal 事实源、CommandEnvelope 执行窄门等宪法约束并不允许被插件绕开。
 
 本文基于仓库当前工作树源码与配置的静态审读，重点解释 `lca/plugins`、`lca/harness/profile`、`lca/runtime`、`gateway/runs` 之间的关系。按当前 `lca/plugins` 下含 `@plugin` 的 Python 文件扫描，插件模块规模约为 **125 个**；其中源码声明实际使用了 `SEAM`、`PROVIDER`、`PRIMITIVE`、`BRIDGE` 四种类型，分布在 L0–L4 五个层级。[1][2]

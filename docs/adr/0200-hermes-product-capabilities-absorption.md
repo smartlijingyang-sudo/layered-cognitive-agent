@@ -4,6 +4,8 @@
 
 **Proposed**（2026-09-06）
 
+**Companion**: [ADR-0200 p1-bridge](0200-p1-agent-gateway-bridge.md) (P1 Agent Gateway Bridge).
+
 > **一句话**：迁入 Hermes 的 *产品闭环与可插拔缝*（background review-fork 学习、Curator 技能生命周期、ContextEngine 槽、toolset+check_fn、cron×skills、MemoryProvider 槽、write_approval）；**不迁** AIAgent 单体编排、把 Spine/循环热拔成社区插件、无闸自动落盘 skill、平行第二 CognitiveRuntime。用 LCA 的 Resolve→Compile→**RuntimeFacade**（[ADR-0199](0199-hermes-inspired-cognitive-plugin-convergence.md)）、Spine SSOT、ScopeKernel、0067 闸、0093 控制面、0187 AssistantHome、0189 包边界 **上位吸收与重构清理**。
 
 **与 ADR-0199 分工（必读）**：

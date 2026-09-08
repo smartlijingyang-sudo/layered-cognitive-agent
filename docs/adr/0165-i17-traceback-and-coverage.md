@@ -1,5 +1,11 @@
 # ADR-i17-tb: I17 回溯零遮蔽、SourceAttacher 失败可观测、生产 profile 强制覆盖
 
+## 状态
+
+**Accepted** (2026-09-02)。
+
+**Companion**: [ADR-0165 execution-point-enforcement](0165-execution-point-enforcement.md) (父规范).
+
 - 状态: Accepted(2026-09-02)
 - 日期: 2026-09-02
 - 作者: coding-agent

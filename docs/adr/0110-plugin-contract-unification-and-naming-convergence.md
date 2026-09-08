@@ -4,6 +4,8 @@
 
 **Accepted — 2026-08-31**
 
+**Companion**: [ADR-0110 follow-up](0110-followup-plugin-setup-generic.md) (PluginSetupFn 协变 + PluginDefinition 泛型化).
+
 > 8/9 PRs landed on branch `back-ui-821-other-keep`. PR-I was substantively
 > completed by PR-A's `RuntimeBindings.new_*` methods (the 6 seams already
 > wrap their respective factories). Only **PR-D remains** — explicit

@@ -4,6 +4,8 @@
 
 **Accepted — 2026-08-31**
 
+**Companion**: [ADR-0110 canonical](0110-plugin-contract-unification-and-naming-convergence.md) (root 决定).
+
 承接 ADR-0110 PR-A / PR-E 等落地的 PluginManifest 不可变载体。
 本次 follow-up 不改变 PluginDefinition 的字段集合，只修改其类型签名，
 以便 88 个 `@plugin` 装饰的 setup 函数（其中 86 个用具体 `Config`

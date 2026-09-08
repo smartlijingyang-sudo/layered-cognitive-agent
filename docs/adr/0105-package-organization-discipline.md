@@ -1,5 +1,9 @@
 # ADR-0105: Python 包目录规模与命名规范（8/10/15 规则）
 
+## 状态
+
+**Proposed** (2026-08-30)。
+
 > **状态：** Proposed
 > **日期：** 2026-08-30
 > **配套规范：** [docs/specs/package-organization-discipline.md](../specs/package-organization-discipline.md)

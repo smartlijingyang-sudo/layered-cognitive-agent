@@ -1,5 +1,9 @@
 # ADR-0164: Journal step-tree 取代 stream-envelope
 
+## 状态
+
+**Accepted** (2026-09-01)。
+
 - 状态: Accepted（存储形状仍有效；**写路径 / SSOT 以 [ADR-0167](0167-spine-ssot-and-step-materialization.md) 为准**）
 - 日期: 2026-09-01
 - 作者: coding-agent

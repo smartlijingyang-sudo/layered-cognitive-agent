@@ -1,5 +1,9 @@
 # ADR-0166: Step / Segment / Phase 三层计数与 Spine 硬化
 
+## 状态
+
+**Accepted** (2026-09-02)。
+
 - 状态: Accepted
 - 日期: 2026-09-02
 - 作者: coding-agent

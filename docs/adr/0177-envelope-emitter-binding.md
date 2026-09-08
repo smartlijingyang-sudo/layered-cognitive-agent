@@ -1,5 +1,9 @@
 # ADR-0177: EnvelopeEmitter binding — collapse runtime/agent reverse imports of spine reflectors
 
+## 状态
+
+**Proposed** (2026-09-03)。
+
 - Status: Proposed
 - Date: 2026-09-03
 - Supersedes: none

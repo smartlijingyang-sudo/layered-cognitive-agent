@@ -1,5 +1,9 @@
 # ADR-0122: Plugin-native debug & 观测体系 — 从legacy清理到 RunDiagnostic 协议
 
+## 状态
+
+**Accepted** (2026-08-31)。
+
 - Status: Accepted (2026-08-31)
 - Supersedes: 局部兼容收口 ADR-0119 / ADR-0121
 - Decision: 让任何 agent 失败能在 1 条命令 (`lca-ops debug-run <run_id>`) 内自助定位;每种可观测/可调试能力都按 LCA Protocol → Seam → Provider → Adapter → Registry → Plugin 模型落地;清掉双执行路径的 legacy 垃圾;新增 RunDiagnostic / KernelLogProjection 等缺失的诊断插件。

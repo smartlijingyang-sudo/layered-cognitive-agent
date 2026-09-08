@@ -1,5 +1,9 @@
 # ADR-0106: 命名宪法（Naming Constitution）
 
+## 状态
+
+**Proposed** (2026-08-30)。
+
 > **状态：** Proposed
 > **日期：** 2026-08-30
 > **主文档：** [docs/design/naming-constitution.md](../design/naming-constitution.md)

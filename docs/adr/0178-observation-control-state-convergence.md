@@ -1,5 +1,9 @@
 # ADR-0178: 观测面 / 控制面 / 状态机三方收口 — 四级收敛与单 SSOT 体系
 
+## 状态
+
+**Proposed** (2026-09-03)。
+
 - Status: Proposed
 - Date: 2026-09-03
 - Supersedes: none

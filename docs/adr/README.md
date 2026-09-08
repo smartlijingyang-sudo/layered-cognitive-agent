@@ -148,6 +148,9 @@
 | [0198](0198-observability-compile-graph.md) | Observability Compile Graph — yaml SSOT、ObservabilityCompiler、fold merge | Accepted (P0) |
 | [0199](0199-hermes-inspired-cognitive-plugin-convergence.md) | Hermes 启发的认知插件架构收敛 — RuntimeFacade、Plugin Doctor、分域 Registry、privilege 分离 | Proposed (P0 done; P1 approved) |
 | [0200](0200-hermes-product-capabilities-absorption.md) | Hermes 产品能力吸收 — review-fork、Curator、ContextEngine、MemoryProvider、no_agent Routine | Proposed |
+| [0200](0200-p1-agent-gateway-bridge.md) | P1 Agent Gateway Bridge — WebSocket + Redis Stream 收敛(native LobeHub AgentGateway 协议) | Accepted (PR-1) |
+| [0202](0202-transport-ui-env-ssot.md) | Transport/UI env 配置 SSOT — Profile `{from_env: ...}` seam 收口, 退役 os.environ 直读 | Proposed |
+| [0203](0203-end-to-end-field-contract.md) | 端到端字段契约: effect_kind 枚举 + canonical_digest 单一助手 | Proposed |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
 

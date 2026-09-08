@@ -1,5 +1,9 @@
 # ADR-0121: 附件 FileRef SSOT 与单一 AttachmentPlane Provider
 
+## 状态
+
+**Accepted** (2026-08-31)。
+
 - Status: Accepted (2026-08-31)
 - Supersedes: 无
 - Decision: 把"用户上传文件 → system prompt / tool dispatch / 下载 URL"三条链路统一到 `FileRef` SSOT,所有渲染、拦截、staging 由一个 `lca-attachment-default` plugin + 三个独立 Seam(Resolver / Stager / PromptRenderer)+ 一个 `SandboxBackend` 协议共同驱动。彻底关闭 2026-08-31 `run_75e88a76899b` 失效模式(reasoner cloud branch 因 `store is None` 丢 `<uploaded_files>` 注入)。

@@ -1,5 +1,11 @@
 # ADR-0165: Event Spine 统一执行日志（历史入口）
 
+## 状态
+
+**Accepted** (2026-09-02)。
+
+**Companion**: [ADR-0165 execution-point-enforcement](0165-execution-point-enforcement.md) (完整 D1-D11) + [ADR-0165 i17-tb](0165-i17-traceback-and-coverage.md) (I17 回溯).
+
 - 状态: Accepted（historical stub）
 - 日期: 2026-09-01
 - 作者: coding-agent

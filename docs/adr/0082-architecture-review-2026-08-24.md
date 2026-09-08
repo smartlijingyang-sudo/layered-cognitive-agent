@@ -1,5 +1,9 @@
 # Layered Cognitive Agent 架构评估报告
 
+## 状态
+
+**Review** (2026-08-30)。
+
 **审查日期：2026-08-24**
 
 **审查对象：** `smartlijingyang-sudo/layered-cognitive-agent`

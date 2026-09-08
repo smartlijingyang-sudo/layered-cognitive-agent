@@ -1,5 +1,9 @@
 # ADR-0075 实施深度审计
 
+## 状态
+
+**Audit** (2026-08-30)。
+
 > 审计日期：2026-08-22
 >
 > 审计目标：确认默认生产路径是否真正由 `CompiledRunPlan`、`PhaseGraph`、`GraphAssembler` 与 `GenericPlanInterpreter` 驱动，并识别任何仍会造成“双轨”或“空壳”风险的实现。

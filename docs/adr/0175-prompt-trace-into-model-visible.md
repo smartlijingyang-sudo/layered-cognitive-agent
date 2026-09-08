@@ -1,5 +1,9 @@
 # ADR-0175: 把真 brain prompt 捕获进 model_visible/, 并扩 spine EP payload
 
+## 状态
+
+**Superseded** (2026-09-02) by 0185-model-visible-event-bus-alignment.。
+
 > **本文档已被 [ADR-0185](0185-model-visible-event-bus-alignment.md) 取代**;`StdReasonerPromptCapture` 默认实现、`<run_dir>/model_visible/system_prompt.json` 与 `system_prompt_sections.json` 由 ADR-0185 收口(改走 `SpineLlmRequestHeaderPayload.system` 字段)。本文档保留全文作历史。
 
 - Status: proposed(已被 ADR-0185 Superseded)

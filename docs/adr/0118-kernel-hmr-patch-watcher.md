@@ -1,5 +1,9 @@
 # ADR-0118: Kernel HMR — Live Patches for `cordis.patch.yml`
 
+## 状态
+
+**Accepted** (2026-08-31)。
+
 > **状态：** Accepted
 > **日期：** 2026-08-31
 > **配套 ADR：** [ADR-0115](./0115-kernel-transport-boundary.md) K8（hot-reload 职责单独立项）· [ADR-0085](./0085-plugin-everything-explained.md) 插件哲学 · [ADR-0109](./0109-plugin-metadata-mandate-and-budgetaware-removal.md) 元数据 + 废弃 · [ADR-0062](./0062-plugin-runtime-cleanup.md) 插件运行时收口 · [ADR-0071](./0071-composer-per-cluster.md) composer per cluster

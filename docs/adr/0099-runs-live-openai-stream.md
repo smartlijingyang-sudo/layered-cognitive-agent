@@ -1,5 +1,9 @@
 # ADR-0099: `/runs/{id}/live` 收敛到 OpenAI ChatCompletion streaming
 
+**Supersedes**: ADR-0098
+
+**Supersedes**: ADR-0097
+
 > **Superseded by [ADR-0100](0100-chat-command-is-agent-run.md) / 2026-08-29**
 >
 > 聊天 wire（把 Agent Run 伪装成 `POST /v1/chat/completions`）退役。`GET /runs/{id}/live` 由 0100 收回，载荷改为四个 UI 事件，不是三通道。对 ADR-0098 三通道 SSE、LiveBus、LLMStreamTap 的否决仍然有效；Journal-as-Truth 不变。

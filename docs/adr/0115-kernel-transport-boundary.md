@@ -1,5 +1,13 @@
 # ADR-0115: Kernel / Transport 边界 — `lca-kernel` 顶层包与 lint-imports 门禁
 
+## 状态
+
+**Accepted** (2026-08-31)。
+
+**Supersedes**: ADR-0112
+
+**Supersedes**: ADR-0111
+
 > **状态：** Accepted (K1–K8 全部落地)
 > **日期：** 2026-08-31
 > **落地证据：**

@@ -1,5 +1,9 @@
 # ADR-0167: Spine 唯一耐久真值、Step 物化视图与 Model-Visible 轨迹组织
 
+## 状态
+
+**Accepted** (2026-09-02)。
+
 - 状态: Accepted
 - 日期: 2026-09-02
 - 作者: coding-agent

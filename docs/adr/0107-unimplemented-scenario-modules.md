@@ -1,5 +1,9 @@
 # ADR-0107: scenario plugin modules never implemented (tracked gap)
 
+## 状态
+
+**Proposed** (2026-08-30)。
+
 > **状态：** Proposed
 > **日期：** 2026-08-30
 > **触发：** Phase A audit found 4 bundle YAMLs referencing modules that do not exist in any git history.

@@ -4,6 +4,8 @@
 
 Accepted
 
+**Supersedes**: ADR-0001
+
 ## 背景
 
 LCA 当前的一级包名采用 `lca.infrastructure` / `lca.cognition` / `lca.runtime` / `lca.agent` / `lca.application` 编号层。

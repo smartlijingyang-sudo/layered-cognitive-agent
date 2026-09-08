@@ -4,6 +4,8 @@
 
 **Proposed — 2026-08-29。** 取代 ADR-0065 §四 中"typed UI state"段对 tool 事件的设计（保留其余全部内容）。本文是该方向的**根因裁决 + 一刀切方案**，不再"补 key"。
 
+**Supersedes**: [ADR-0101-followup](0101-followup-tool-call-streaming-partial-preview.md) (2026-09-01 followup 已并入 §5.1/§5.3).
+
 > **核心决策：journal 的 tool 事件只携带事实（tool_name、invocation_id、ok/error、latency_ms、attempt、files）。调用参数和调用结果是事实，但它们**走 EvidenceStore 平面**——journal 上只有一个 `arguments_ref` / `output_ref` 指针。渲染（terminal 块 / code 块 / tree / 文件树）由 LobeHub renderer registry 按 `tool_name` 派发，与 journal 无关。前端零改动即可拿到全部参数。**
 
 ---
@@ -382,7 +384,7 @@ Renderer Registry（前端 deploy/lobehub/patches/runtime/renderers/index.ts）
 
 ### V-Doc
 
-- **V13**：ADR-0065 §四中关于 typed UI state 的 6-key 白名单段标记为 Superseded by ADR-0101
+- **V13**：ADR-0065 §四中关于 typed UI state 的 6-key 白名单段标记为 Superseded by 本 ADR-0101
 - **V14**：新增 `docs/specs/tool-renderer-registry.md` 描述 renderer registry 契约
 
 ## 10. 风险与回滚

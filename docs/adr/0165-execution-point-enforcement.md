@@ -1,5 +1,11 @@
 # ADR-0165: Execution Point 强制织入、零字段声明、自发现、Source Trace
 
+## 状态
+
+**Accepted** (2026-09-02)。
+
+**Companion**: [ADR-0165 i17-tb](0165-i17-traceback-and-coverage.md) (I17 三条裂缝修复).
+
 - 状态: Accepted（原 ADR-0165-execution-point-enforcement；编号并入 0165 系列；SSOT 表述见 [ADR-0167](0167-spine-ssot-and-step-materialization.md)）
 - 日期: 2026-09-01
 - 作者: coding-agent

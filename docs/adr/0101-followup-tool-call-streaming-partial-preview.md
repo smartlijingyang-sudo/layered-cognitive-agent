@@ -1,5 +1,9 @@
 # ADR-0101 Followup: ToolCallStreaming partial preview — inline best-effort arguments
 
+## 状态
+
+**Superseded** (2026-09-01) by 0101-tool-facts-and-evidence-only (canonical 0101; this followup merged into §5.1/§5.3).。
+
 **状态**: Proposed — 2026-09-01
 **作者**: LCA Agent
 **取代**: 无（修订 ADR-0101 §5.1 / §5.3 关于 ToolCallStreaming 的字段定义）

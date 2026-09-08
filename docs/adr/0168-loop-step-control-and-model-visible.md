@@ -4,6 +4,8 @@
 
 **Proposed — 2026-09-02;执行计划:`docs/plans/2026-09-02-spine-step-remediation/main.md`。**
 
+**Companion**: [ADR-0168-final](0168-loop-cursor-final.md) (LoopCursor 单状态机).
+
 ## 一句话
 
 新增 `LoopStepControl` Protocol 与 `StdLoopStepControl` 集中切步;业务路径必经 `StepCoordinator`;`Model-Visible` 5 件套真实落盘;`Narrative` / `Graph` deriver per-run subscribe;`event_emission` hook 半残收口。

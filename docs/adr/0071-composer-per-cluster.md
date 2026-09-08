@@ -2,7 +2,7 @@
 
 ## 状态
 
-**Partially Accepted — 2026-08-21（PR-5 / PR-10）**
+**Accepted (Partially)** — 2026-08-21（PR-5 / PR-10）
 
 **现行实现**：Composer Protocol + AgentGraph / TeamGraph frozen dataclasses 由 BrainComposer、BodyComposer、PerceiveComposer 与 TeamComposer 实现。TeamComposer 只依赖 `AgentAssemblyPort`；`PlanBoundAgentAssembler` 负责 profile plan 编译、图绑定、Agent 运行时闭合与 lead 预算提升。`lca/plugins/composer/{agent_assembly,plan_binding,runtime_factory,team_transport}.py` 承载组合 implementation，`lca/application/` 保留兼容导出与 spawn 门面。
 

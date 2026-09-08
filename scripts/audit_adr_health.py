@@ -47,6 +47,9 @@ _STATUS_TOKENS = {
     "Audit",
     "Review",
     "Explained",
+    "Implemented",
+    "Revised",
+    "Withdrawn",
 }
 # Regex that captures the status token after either `## 状态` / `## Status`
 # (whole line) or an inline `Status: <token>` / `Superseded by ADR-XXXX`.
@@ -59,10 +62,10 @@ _STATUS_INLINE = re.compile(r"\*\*Status\*\*\s*[:：]?\s*\*\*([A-Za-z]+)\*\*")
 # non-space, non-CJK-truncation chunk to be the token.
 _STATUS_BOLD_PREFIX = re.compile(r"\*\*Status\*\*\s*[:：]?\s*\*?\*?([A-Za-z]+)")
 _SUPERSEDED_INLINE = re.compile(
-    r"(?:Superseded by|被替代为|被取代为)\s*(?:\[?ADR-?)([0-9]+(?:\.[0-9]+)?)"
+    r"(?:\*\*)?\s*(?:Superseded by|被替代为|被取代为)\s*(?:\*\*)?\s*(?:\[?ADR-?)([0-9]+(?:\.[0-9]+)?)"
 )
 _SUPERSEDES_INLINE = re.compile(
-    r"Supersedes(?:\s*[:：])?\s*(?:\*\*)?\s*ADR-?([0-9]+(?:\.[0-9]+)?)"
+    r"(?:\*\*)?\s*Supersedes\s*(?:\*\*)?\s*[:：]?\s*(?:\*\*)?\s*\[?ADR-?([0-9]+(?:\.[0-9]+)?(?:-[A-Za-z]+)?)"
 )
 # `0169-loop-cursor-control.md` → (169, "loop-cursor-control")
 _FILENAME_RE = re.compile(r"^([0-9]+(?:\.[0-9]+)?)-(.+)\.md$")

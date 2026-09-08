@@ -1,5 +1,9 @@
 # ADR-0109: Plugin 4-Element Declaration Mandate + BudgetAware Removal
 
+## 状态
+
+**Accepted** (2026-08-31)。
+
 > **状态:** Accepted（PR-1 已落地；PR-4 在编）
 > **日期:** 2026-08-30
 > **依赖:** [ADR-0105 包组织纪律](./0105-package-organization-discipline.md)、[ADR-0106 命名宪法](./0106-naming-constitution.md)、[ADR-0108 Phase D/E](./0108-phase-de-and-e.md)

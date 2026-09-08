@@ -1,6 +1,11 @@
 # ADR-0119: Webserver 完全 Plugin 化(对齐 deepseek-harness 范式)
 
-> **状态：** Proposed
+## 状态
+
+**Proposed** (2026-08-31)。
+
+**Companion**: [ADR-0119 followup-1](0119-followup-gateway-name-map.md) (历史命名映射) + [ADR-0119 followup-2](0119-followup-gateway-name-removal.md) (全 6 类命名清理).
+
 > **日期：** 2026-08-31
 > **Supersedes:** [ADR-0115](./0115-kernel-transport-boundary.md) 决定 6(`gateway/app.py` thin factory) + 决定 8(`lca-ops kernel serve` 子命令——本 ADR **彻底删除**,LCA 进程由 `python -m lca_kernel serve` 直接管)
 >

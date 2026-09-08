@@ -8,6 +8,8 @@
 
 **Accepted — 2026-09-02**(§D7 I-MV1 段已被 ADR-0185 Superseded；gate-as-phase 段已被 ADR-0194 修订)
 
+**Supersedes**: ADR-0168.1
+
 > **实施状态(2026-09-02)**: 五缝文件全部落地(`StdLoopCursor` /
 > `StdProjectionHost` / `PersistenceCoordinator` / `ModelVisibleCapture` /
 > `StdCloseBarrier`);``LoopCursorFactory.from_profile`` 公开;webserver

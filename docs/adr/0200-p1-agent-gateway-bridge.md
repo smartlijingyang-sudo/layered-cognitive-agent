@@ -4,6 +4,8 @@
 
 Accepted（2026-09-07）。Phase 1（PR-1：contract + StreamEventManager）已完成；PR-2（coordinator + gateway + facade switch）落地后即标记 `implemented`。
 
+**Companion**: [ADR-0200 hermes 吸收](0200-hermes-product-capabilities-absorption.md) (产品能力吸收).
+
 **延伸并统摄**：[ADR-0186](0186-session-as-event-ssot.md)（事实平面）、[ADR-0194](0194-cognitive-loop-architecture-convergence.md)（Loop 收敛）、[ADR-0195](0195-platform-architecture-convergence.md)（平台三时态）、[ADR-0198](0198-observability-compile-graph.md)（观测 compile graph）、[ADR-0199](0199-hermes-inspired-cognitive-plugin-convergence.md)（Hermes 启发收敛）。
 
 **本文档角色**：在 ADR-0195 平台壳 + ADR-0199 入口统一之上，回答 **「如何以 native LobeHub AgentGateway 协议为 wire surface、把 LCA 的 LiveRunProjection fold 暴露给前端，同时不破坏 Session 事实单轨与 capability monotonic」**。

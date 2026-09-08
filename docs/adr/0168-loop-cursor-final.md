@@ -4,6 +4,8 @@
 
 **Superseded by ADR-0169 — 2026-09-02**
 
+**Companion**: [ADR-0168 step-control](0168-loop-step-control-and-model-visible.md) (原 step-control 提案;保留 §背景).
+
 > **替代关系**: 本 ADR 决策段(§D6 把 deriver / ProjectionRegistry /
 > PersistenceCoordinator / LLMCallHook / ModelVisibleRecorder 五件套塞入
 > ``StdLoopCursor`` 的 God Cursor 设计)被 ADR-0169 §D8 五缝拆分方案取代。
