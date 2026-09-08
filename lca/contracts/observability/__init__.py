@@ -1,5 +1,11 @@
 """Observability contracts —— event types and projection rules."""
 
+from lca.contracts.observability.canonical_digest import (
+    DIGEST_PREFIX as DIGEST_PREFIX,
+)
+from lca.contracts.observability.canonical_digest import (
+    sha256_payload_digest as sha256_payload_digest,
+)
 from lca.contracts.observability.evidence.evidence import (
     Classification as Classification,
 )
@@ -43,6 +49,7 @@ from lca.contracts.observability.trace.exception_capture import (
 )
 
 __all__ = [
+    "DIGEST_PREFIX",
     "Classification",
     "ErrKind",
     "EvidenceIntegrityError",
@@ -58,4 +65,5 @@ __all__ = [
     "SourceLocation",
     "classify_exception",
     "exc_to_record",
+    "sha256_payload_digest",
 ]

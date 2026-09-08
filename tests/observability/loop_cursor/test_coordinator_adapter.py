@@ -33,7 +33,6 @@ from lca.contracts.observability.cursor.loop_cursor import CursorError, CursorSn
 from lca.infrastructure.observability.loop_cursor import StdLoopCursor
 from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
     CoordinatorAdapter,
-    sha256_digest,
 )
 from lca.infrastructure.observability.loop_cursor.spine._spine_port import WritePort
 from lca.infrastructure.observability.writable_matrix.coordinator import StepCoordinator
@@ -189,12 +188,10 @@ def test_adapter_record_thinking_emits_cursor_thinking_ep() -> None:
 
     # payload 字段映射:token_count = prompt + completion = 30
     thinking_ep = next(r for r in spine.records if r["execution_point"] == "step.thinking.record")
-    assert thinking_ep["payload"]["content_digest"].startswith("sha256:")
-    # The digest is computed via ``coordinator_adapter.sha256_digest``; we
-    # accept any sha256:<hex> with the right payload shape so the
-    # test stays independent of the exact hash.
-    expected_thinking_digest = sha256_digest({"reasoning": "reasoning text"})
-    assert thinking_ep["payload"]["content_digest"] == expected_thinking_digest
+    # ADR-0185 §2.5 P5 + PR-C: ``content_digest`` 字段在 record_thinking 路径
+    # 已退役(deprecated);adapter 不再填充。完整内容由 Session.append 走
+    # canonical digest 计算,见 lca/contracts/observability/canonical_digest.py。
+    assert thinking_ep["payload"]["content_digest"] == ""
     assert thinking_ep["payload"]["token_count"] == 30
     assert thinking_ep["payload"]["thinking_kind"] == "reasoning"
     assert thinking_ep["payload"]["incarnation"] == 1
@@ -218,11 +215,14 @@ def test_adapter_record_tool_call_emits_cursor_tool_call_ep() -> None:
     assert "step.tool_call.record" in eps
     call_ep = next(r for r in spine.records if r["execution_point"] == "step.tool_call.record")
     assert call_ep["payload"]["tool_name"] == "echo"
-    # Bug fix (round 2): the legacy adapter used the raw
-    # ``arguments_summary`` text as args_digest, breaking the
-    # sha256:<hex> contract; the bug-fixed adapter now wraps it.
-    expected_call_digest = sha256_digest({"args": "echo(x=1)", "invocation_id": "inv-001"})
-    assert call_ep["payload"]["args_digest"] == expected_call_digest
+    # ADR-0185 §2.5 P5 + ADR-0203 §2.3: ``args_digest`` 字段在 record_tool_call
+    # 路径已退役(deprecated);adapter 不再计算 digest。完整内容由
+    # ``arguments`` / ``arguments_summary`` / ``invocation_id`` 字段承载。
+    # std.py 可能仍 emit 空 digest 字段(PR-C 兼容形态),用 ``get`` 防御。
+    assert call_ep["payload"].get("args_digest", "") == ""
+    assert call_ep["payload"]["arguments"] == {"x": 1}
+    assert call_ep["payload"]["arguments_summary"] == "echo(x=1)"
+    assert call_ep["payload"]["invocation_id"] == "inv-001"
     # Bug fix (round 2): call_seq now uses the cursor's monotonic seq
     # counter (was a process-randomized hash; non-deterministic
     # across runs).
@@ -247,11 +247,10 @@ def test_adapter_record_tool_result_emits_cursor_tool_result_ep() -> None:
     assert "step.tool_result.record" in eps
     result_ep = next(r for r in spine.records if r["execution_point"] == "step.tool_result.record")
     assert result_ep["payload"]["outcome"] == "ok"
-    # Bug fix (round 2): the legacy adapter used the raw
-    # ``delta_summary`` text as result_digest, breaking the
-    # sha256:<hex> contract; the bug-fixed adapter now wraps it.
-    expected_result_digest = sha256_digest({"delta_summary": "echoed"})
-    assert result_ep["payload"]["result_digest"] == expected_result_digest
+    # ADR-0185 §2.5 P5 + PR-C: ``result_digest`` 字段在 record_tool_result 路径
+    # 已退役(deprecated);std.py 不再把它放进 spine event payload。结果内容由
+    # ``stdout_head`` 字段承载(本次 LegacyToolResult 未提供时为空)。
+    assert result_ep["payload"].get("result_digest", "") == ""
     # Bug fix (round 2): tool_name no longer falls back to delta_summary
     # when ``tool_name`` is empty on the legacy result; it stays empty.
     assert result_ep["payload"]["tool_name"] == ""
