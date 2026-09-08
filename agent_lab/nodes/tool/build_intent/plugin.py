@@ -40,8 +40,10 @@ class BuildIntent(Node):
         else:
             tool_name = node.config["tool"]
             tool_args = raw
-        return {out_port: Artifact(
-            kind=ArtifactKind.INTENT,
-            content={"tool": tool_name, "args": tool_args},
-            schema_ref="tool.intent.v1",
-        )}
+        return {
+            out_port: Artifact(
+                kind=ArtifactKind.INTENT,
+                content={"tool": tool_name, "args": tool_args},
+                schema_ref="tool.intent.v1",
+            )
+        }

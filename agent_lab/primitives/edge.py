@@ -13,11 +13,11 @@ from agent_lab.primitives.port import PortRef
 
 
 class EdgeKind(StrEnum):
-    DATA = "data"           # pure data flow
-    EFFECT = "effect"       # triggers an external side-effect; must emit receipt
-    PROJECT = "project"     # enters model-visible closure (mv.assemble input)
-    CONTROL = "control"     # gate/approval/routing signal
-    BORROW = "borrow"       # cross-spec read via Grant
+    DATA = "data"  # pure data flow
+    EFFECT = "effect"  # triggers an external side-effect; must emit receipt
+    PROJECT = "project"  # enters model-visible closure (mv.assemble input)
+    CONTROL = "control"  # gate/approval/routing signal
+    BORROW = "borrow"  # cross-spec read via Grant
 
 
 class Edge(BaseModel):

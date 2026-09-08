@@ -31,8 +31,10 @@ class ValidateManifest(Node):
         messages = src_a.content if src_a else []
         roles = {m.get("role") for m in messages if isinstance(m, dict)}
         ok = all(r in roles for r in required_roles)
-        return {out_port: Artifact(
-            kind=ArtifactKind.FACT,
-            content={"valid": ok, "missing": [r for r in required_roles if r not in roles]},
-            schema_ref="manifest.validate.v1",
-        )}
+        return {
+            out_port: Artifact(
+                kind=ArtifactKind.FACT,
+                content={"valid": ok, "missing": [r for r in required_roles if r not in roles]},
+                schema_ref="manifest.validate.v1",
+            )
+        }

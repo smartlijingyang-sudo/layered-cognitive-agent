@@ -28,8 +28,10 @@ class CommitManifest(Node):
         out_port = node.config.get("to", "manifest")
         src_a = inputs.get(src)
         messages = src_a.content if src_a else []
-        return {out_port: Artifact(
-            kind=ArtifactKind.MANIFEST,
-            content={"messages": messages, "committed": True},
-            schema_ref="context.manifest.v1",
-        )}
+        return {
+            out_port: Artifact(
+                kind=ArtifactKind.MANIFEST,
+                content={"messages": messages, "committed": True},
+                schema_ref="context.manifest.v1",
+            )
+        }

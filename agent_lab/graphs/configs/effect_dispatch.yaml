@@ -15,7 +15,7 @@
 
 id: effect_dispatch
 version: 0.1.0
-region: effect
+region: phase:act
 description: Execute a tool call — build intent, check grant, dispatch, write
   receipt, integrate observation, project back to model-visible assembly.
 
@@ -96,6 +96,8 @@ nodes:
   - id: dispatch
     region: effect
     factory: dispatch_tool
+    on_error: route
+    route_to: deny_handler
     config:
       # port renames ──────────────────────
       from: routed
@@ -107,6 +109,24 @@ nodes:
       tools: [bash, file_write, read_file]
     ins: [routed]
     outs: [receipt]
+
+  # ===== 4b) deny_handler — first-class error route target ================
+  # Receives the EXCEPTION artifact on its first IN port when dispatch
+  # fails (on_error=route, ADR-0206 §5.6). Emits a denormalized receipt
+  # so the model-visible closure sees the failure rather than getting a
+  # silent drop (this is C2/C3: effect failure must land somewhere —
+  # either project or discard; deny_handler is the route half of that
+  # pair). The data edge downstream is added once C6 single-writer on
+  # integrate.receipt_fact is resolved (separate PR — PR-B demonstrates
+  # the routing mechanism only).
+  - id: deny_handler
+    region: effect
+    factory: write_receipt
+    config:
+      from: exception
+      to: receipt_fact
+    ins: [exception]
+    outs: [receipt_fact]
 
   # ===== 5) write_receipt — pass-through, hook point for journaling =======
   # Today it just copies receipt → receipt_fact. The seam exists so a

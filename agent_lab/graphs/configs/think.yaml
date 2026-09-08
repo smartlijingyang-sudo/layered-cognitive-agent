@@ -1,0 +1,145 @@
+# =============================================================================
+# think — brain-think sub-graph (ADR-0206 §5)
+# =============================================================================
+# Layer 2 of 5 (sibling of perceive / effect_dispatch / remember / stop).
+# Equivalent to LCA's ``Brain.think(state) -> Decision`` flattened into a
+# graph:
+#
+#   assemble_messages → call_llm → parse_decision → gate_enforce → decision_out
+#
+# Mounted by: agent_loop.think (see agent_loop.yaml#sub_specs).
+#
+# Inbound cross-spec edges: NONE.
+# Outbound cross-spec edges: NONE (decision_out stays in this spec; the
+# parent's `act` sub_spec host consumes it as in_args).
+#
+# Note: This sub-graph replaces the previous top-level stub + three local
+# workers (flatten_manifest / call_llm_node / parse_decision). The same
+# nodes are reused here — only the topology changed.
+# =============================================================================
+
+id: think
+version: 0.1.0
+region: phase:think
+description: Build the LLM message list from the assembled manifest, call
+  the LLM, parse its response into a Decision, and let DecisionGate
+  enforce / rewrite it. One LCA Brain.think(state) call per loop turn.
+
+graph:
+  id: think
+  layer: phase
+  purpose: Brain.think(state) decomposed into assemble_messages → call_llm → parse_decision → gate_enforce.
+  members: [flatten, llm, parse, gate_enforce]
+  references: [agent_loop]
+  relations:
+    - { graph: agent_loop, kind: child_of, role: think_phase }
+  capabilities:
+    provides: [decision, think_signal]
+    requires: [llm_call, decision_parse, decision_gate]
+
+# -----------------------------------------------------------------------------
+# INITIAL PORTS — what the parent (agent_loop.think) must supply.
+# -----------------------------------------------------------------------------
+# initial.in_assembled_manifest : the frozen ContextManifest produced by
+#                                  mv_assemble (already carries system,
+#                                  history, results, perceive_manifest).
+# initial.in_perception_signal   : passthrough perception signal; feeds
+#                                  gate_enforce as a second input. Optional.
+
+# -----------------------------------------------------------------------------
+# NODES — four workers, one linear chain.
+# -----------------------------------------------------------------------------
+nodes:
+
+  # ----- flatten: manifest → ordered message list ----------------------------
+  # Reads the assembled manifest's `messages` field; falls back to a single
+  # user message if the manifest is empty.
+  - id: flatten
+    region: phase:think
+    factory: assemble_messages
+    config:
+      to: messages
+    ins: [in_assembled_manifest]
+    outs: [messages]
+
+  # ----- llm: call the real OpenAI-compat LCA LLMAdapter --------------------
+  # Provider selection is data, not code. ``provider_kind: lca`` maps to
+  # LcaLlmProvider, which wraps the LCA LLMAdapter. Production graphs
+  # point ``adapter_factory.ref`` at ``OpenAICompatAdapter``.
+  - id: llm
+    region: phase:think
+    factory: call_llm
+    config:
+      provider_kind: lca
+      provider_ref: agent_lab.adapters.lca_llm:LcaLlmProvider
+      provider_config:
+        adapter_factory:
+          ref: lca.infrastructure.llm_adapter.openai_compat:OpenAICompatAdapter
+          kwargs: {}
+      from: messages
+      to: response
+    ins: [messages]
+    outs: [response]
+
+  # ----- parse: LLMResponse.text + tool_calls → Decision --------------------
+  # Adapter: lca_think.LcaThinkParseProvider.parse_decision(response).
+  # Pure transform: turns an LLM message artifact into a Decision artifact
+  # (action_type ∈ {respond, call_tool, delegate, refuse}; tool_calls
+  # embedded verbatim). No graph peers available — this is the only place
+  # where LLM response → LCA Decision happens.
+  - id: parse
+    region: phase:think
+    factory: parse_decision_node
+    config:
+      from: response
+      to: decision
+      provider_kind: lca
+      provider_ref: agent_lab.adapters.lca_think:LcaThinkParseProvider
+      provider_config: {}
+    ins: [response]
+    outs: [decision]
+
+  # ----- gate_enforce: DecisionGate.enforce(state, decision) → Decision ----
+  # Adapter: lca_think.LcaThinkGateProvider.enforce(). May rewrite the
+  # Decision (degradation / approval / hard-refuse). Carries
+  # ``decision_id`` through; gates are deterministic and stateless w.r.t.
+  # the Hub.
+  - id: gate_enforce
+    region: phase:think
+    factory: gate_enforce_node
+    config:
+      from: decision
+      to: enforced_decision
+      provider_kind: lca
+      provider_ref: agent_lab.adapters.lca_think:LcaThinkGateProvider
+      provider_config:
+        gate_factory:
+          ref: lca.cognition.brain.decision_gates.chained.chained:ChainedDecisionGate
+          kwargs: {}
+    ins: [decision]
+    outs: [enforced_decision, think_signal]
+
+# -----------------------------------------------------------------------------
+# EDGES — strict linear chain.
+# -----------------------------------------------------------------------------
+edges:
+
+  # ── initial → flatten (manifest feeds the message list) ──
+  - id: e_init_manifest_to_flatten
+    from: { spec: think, node: _initial, port: in_assembled_manifest }
+    to:   { spec: think, node: flatten,       port: in_assembled_manifest }
+    kind: data
+
+  # ── flatten → llm → parse → gate_enforce ──
+  - id: e_flatten_to_llm
+    from: { spec: think, node: flatten, port: messages }
+    to:   { spec: think, node: llm,     port: messages }
+    kind: data
+  - id: e_llm_to_parse
+    from: { spec: think, node: llm,  port: response }
+    to:   { spec: think, node: parse, port: response }
+    kind: data
+  - id: e_parse_to_gate
+    from: { spec: think, node: parse, port: decision }
+    to:   { spec: think, node: gate_enforce, port: decision }
+    kind: data

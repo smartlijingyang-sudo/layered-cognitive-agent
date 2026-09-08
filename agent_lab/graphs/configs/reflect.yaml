@@ -1,0 +1,136 @@
+# =============================================================================
+# reflect — brain-reflect sub-graph (ADR-0206 §5)
+# =============================================================================
+# Layer 2 of 5 (sibling of perceive / think / effect_dispatch / remember).
+# Equivalent to LCA's ``Brain.reflect(state, observation) -> Reflection``
+# flattened into a graph:
+#
+#   gather_inputs → call_critic → extract_memory → write_extract
+#
+# Mounted by: agent_loop.reflect (see agent_loop.yaml#sub_specs).
+#
+# Inbound cross-spec edges: NONE.
+# Outbound cross-spec edges: NONE.
+#
+# The reflect phase takes an observation (from act via out_observation) +
+# the Decision (from think) + an optional prior-turn Reflection (for
+# incremental reflection), and produces:
+#   - reflection_out       : a Reflection artifact (verdict + lesson + correction)
+#   - memory_extract_out   : extracted memory candidates (list of items to write)
+#   - reflect_signal       : barrier signal for downstream phases
+# =============================================================================
+
+id: reflect
+version: 0.1.0
+region: phase:reflect
+description: Critique the observation against the decision, extract memory
+  candidates from the resulting Reflection, and persist them via MemorySystem.
+  One LCA Brain.reflect(state, observation) call per loop turn.
+
+graph:
+  id: reflect
+  layer: phase
+  purpose: Brain.reflect(state, observation) decomposed into gather_inputs → call_critic → extract_memory → write_extract.
+  members: [gather, critic, memory_extract, memory_write]
+  references: [agent_loop]
+  relations:
+    - { graph: agent_loop, kind: child_of, role: reflect_phase }
+  capabilities:
+    provides: [reflection_out, memory_extract_out, reflect_signal]
+    requires: [critic, memory_system]
+
+# -----------------------------------------------------------------------------
+# INITIAL PORTS — what the parent (agent_loop.reflect) must supply.
+# -----------------------------------------------------------------------------
+# initial.in_observation        : the Observation from act (out_observation)
+# initial.in_decision           : the Decision from think
+# initial.in_prior_reflection   : optional prior-turn Reflection for incremental
+
+# -----------------------------------------------------------------------------
+# NODES — four workers, one linear chain.
+# -----------------------------------------------------------------------------
+nodes:
+
+  # ----- gather_inputs: join observation + decision + optional prior --------
+  # Merges the three initial feeds into a single combined artifact so the
+  # downstream critic sees one input instead of three.
+  - id: gather
+    region: phase:reflect
+    factory: gather_inputs
+    config: {}
+    ins: [in_observation, in_decision, in_prior_reflection]
+    outs: [combined]
+
+  # ----- call_critic: Critic.critique(state, observation) → Reflection -----
+  # Adapter: lca_reflect.LcaReflectCriticProvider.critique().
+  # Default: NullCritic (returns ON_TRACK, no lesson).
+  - id: critic
+    region: phase:reflect
+    factory: call_critic
+    config:
+      provider_kind: lca
+      provider_ref: agent_lab.adapters.lca_reflect:LcaReflectCriticProvider
+      provider_config: {}
+    ins: [combined]
+    outs: [reflection]
+
+  # ----- extract_memory: Reflection → memory candidates --------------------
+  # Pure transform: no I/O.  Turns the Reflection's lesson / verdict / extra
+  # into a list of memory candidate items.
+  - id: memory_extract
+    region: phase:reflect
+    factory: extract_memory
+    config: {}
+    ins: [reflection]
+    outs: [memory_candidates]
+
+  # ----- write_extract: MemorySystem.update(state, observation, reflection) -
+  # Adapter: lca_reflect.LcaReflectMemoryProvider.write().
+  # Default: _StubMemorySystem (records call, no-op).
+  # Emits reflection_out + memory_extract_out + reflect_signal.
+  - id: memory_write
+    region: phase:reflect
+    factory: write_extract
+    config:
+      provider_kind: lca
+      provider_ref: agent_lab.adapters.lca_reflect:LcaReflectMemoryProvider
+      provider_config: {}
+    ins: [reflection, memory_candidates]
+    outs: [reflection_out, memory_extract_out, reflect_signal]
+
+# -----------------------------------------------------------------------------
+# EDGES — strict linear chain.
+# -----------------------------------------------------------------------------
+edges:
+
+  # ── initial → gather (observation + decision + optional prior) ──
+  - id: e_init_obs_to_gather
+    from: { spec: reflect, node: _initial, port: in_observation }
+    to:   { spec: reflect, node: gather,     port: in_observation }
+    kind: data
+  - id: e_init_dec_to_gather
+    from: { spec: reflect, node: _initial, port: in_decision }
+    to:   { spec: reflect, node: gather,     port: in_decision }
+    kind: data
+  - id: e_init_prior_to_gather
+    from: { spec: reflect, node: _initial, port: in_prior_reflection }
+    to:   { spec: reflect, node: gather,     port: in_prior_reflection }
+    kind: data
+
+  # ── gather → critic → memory_extract → memory_write ──
+  - id: e_gather_to_critic
+    from: { spec: reflect, node: gather, port: combined }
+    to:   { spec: reflect, node: critic, port: combined }
+    kind: data
+  - id: e_critic_to_extract
+    from: { spec: reflect, node: critic,         port: reflection }
+    to:   { spec: reflect, node: memory_extract, port: reflection }
+    kind: data
+  - id: e_extract_to_write_reflection
+    from: { spec: reflect, node: memory_extract, port: memory_candidates }
+    to:   { spec: reflect, node: memory_write,   port: memory_candidates }
+    kind: data
+  - id: e_critic_to_write_reflection
+    from: { spec: reflect, node: critic,       port: reflection }
+    to:   { spec: reflect, node: memory_write, port: reflection }
+    kind: data

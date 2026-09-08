@@ -26,8 +26,10 @@ class Discard(Node):
         src = node.config.get("from", node.ins[0])
         out_port = node.config.get("to", node.outs[0])
         src_a = inputs.get(src)
-        return {out_port: Artifact(
-            kind=ArtifactKind.FACT,
-            content={"discarded": True, "digest": src_a.short_id() if src_a else None},
-            schema_ref="discard.v1",
-        )}
+        return {
+            out_port: Artifact(
+                kind=ArtifactKind.FACT,
+                content={"discarded": True, "digest": src_a.short_id() if src_a else None},
+                schema_ref="discard.v1",
+            )
+        }

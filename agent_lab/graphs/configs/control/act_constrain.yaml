@@ -1,0 +1,32 @@
+# =============================================================================
+# act_constrain — control-slot sub-graph for act.constrain (ADR-0206 §5)
+# =============================================================================
+# Single-node graph wrapping LCA's act.constrain control slot.
+# Owner: act phase. Strategy constraints — wraps a callable.
+# Fallback: identity (always allow).
+# =============================================================================
+
+id: act_constrain
+version: 0.1.0
+region: phase:act
+description: Wraps a callable that applies strategy constraints before
+  execution. Fallback is identity (always allow).
+
+nodes:
+  - id: act_constrain_slot
+    region: phase:act
+    factory: act_constrain_node
+    config:
+      from: in_args
+      to: allowed
+      provider_kind: lca
+      provider_ref: agent_lab.adapters.lca_control_act:LcaControlActConstrainProvider
+      provider_config: {}
+    ins: [in_args]
+    outs: [allowed]
+
+edges:
+  - id: e_init_args_to_slot
+    from: { spec: act_constrain, node: _initial, port: in_args }
+    to:   { spec: act_constrain, node: act_constrain_slot, port: in_args }
+    kind: data

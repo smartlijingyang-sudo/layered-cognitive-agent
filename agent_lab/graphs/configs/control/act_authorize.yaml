@@ -1,0 +1,32 @@
+# =============================================================================
+# act_authorize — control-slot sub-graph for act.authorize (ADR-0206 §5)
+# =============================================================================
+# Single-node graph wrapping LCA's act.authorize control slot.
+# Owner: act phase. Tool authorization — wraps a callable / allowlist lookup.
+# Fallback: identity (always allow).
+# =============================================================================
+
+id: act_authorize
+version: 0.1.0
+region: phase:act
+description: Wraps a callable or allowlist that authorizes tool execution.
+  Fallback is identity (always allow).
+
+nodes:
+  - id: act_authorize_slot
+    region: phase:act
+    factory: act_authorize_node
+    config:
+      from: in_args
+      to: allowed
+      provider_kind: lca
+      provider_ref: agent_lab.adapters.lca_control_act:LcaControlActAuthorizeProvider
+      provider_config: {}
+    ins: [in_args]
+    outs: [allowed]
+
+edges:
+  - id: e_init_args_to_slot
+    from: { spec: act_authorize, node: _initial, port: in_args }
+    to:   { spec: act_authorize, node: act_authorize_slot, port: in_args }
+    kind: data

@@ -1,0 +1,96 @@
+# =============================================================================
+# remember — phase:remember sub-graph (ADR-0206 §5)
+# =============================================================================
+# Layer 2 of 5 (sibling of perceive / think / effect_dispatch / stop).
+# Equivalent to LCA's ``Session.append`` + ``StateStore.save`` flattened
+# into a graph:
+#
+#   write_journal → save_state → (identity barrier → remember_signal)
+#
+# Mounted by: agent_loop.remember (see agent_loop.yaml#sub_specs).
+#
+# Inbound cross-spec edges: NONE.
+# Outbound cross-spec edges: NONE.
+# =============================================================================
+
+id: remember
+version: 0.1.0
+region: phase:memory
+description: Persist the turn's durable facts via Session.append (journal
+  fact) and StateStore.save (state snapshot), then emit a remember_signal
+  so downstream phases know the remember stage completed.
+
+graph:
+  id: remember
+  layer: phase
+  purpose: Session.append + StateStore.save decomposed into write_journal → save_state.
+  members: [write_journal, save_state]
+  references: [agent_loop]
+  relations:
+    - { graph: agent_loop, kind: child_of, role: remember_phase }
+  capabilities:
+    provides: [journal_fact, state_ref, remember_signal]
+    requires: [session_append, state_store]
+
+# -----------------------------------------------------------------------------
+# INITIAL PORTS — what the parent (agent_loop.remember) must supply.
+# -----------------------------------------------------------------------------
+# initial.in_reflection    : reflection_out from reflect phase
+# initial.in_observation   : out_observation from act phase
+# initial.in_decision      : decision_out from think phase
+
+# -----------------------------------------------------------------------------
+# NODES — two workers + one identity barrier, linear chain.
+# -----------------------------------------------------------------------------
+nodes:
+
+  # ----- write_journal: Session.append(event_type, data) --------------------
+  # Provider: LcaRememberJournalProvider wraps a Session (ADR-0186/0191/0194).
+  # Reads in_reflection + in_observation + in_decision, produces journal_fact.
+  - id: write_journal
+    region: phase:remember
+    factory: write_journal
+    config:
+      provider_kind: lca
+      provider_ref: agent_lab.adapters.lca_memory:LcaRememberJournalProvider
+      provider_config: {}
+    ins: [in_reflection, in_observation, in_decision]
+    outs: [journal_fact]
+
+  # ----- save_state: StateStore.save(state) -> ref --------------------------
+  # Provider: LcaRememberStateStoreProvider wraps a StateStore.
+  # Reads journal_fact (carries the assembled state), produces state_ref.
+  - id: save_state
+    region: phase:remember
+    factory: save_state
+    config:
+      provider_kind: lca
+      provider_ref: agent_lab.adapters.lca_memory:LcaRememberStateStoreProvider
+      provider_config: {}
+    ins: [journal_fact]
+    outs: [state_ref, remember_signal]
+
+# -----------------------------------------------------------------------------
+# EDGES — strict linear chain.
+# -----------------------------------------------------------------------------
+edges:
+
+  # ── initial → write_journal ──
+  - id: e_init_reflection_to_wj
+    from: { spec: remember, node: _initial, port: in_reflection }
+    to:   { spec: remember, node: write_journal, port: in_reflection }
+    kind: data
+  - id: e_init_observation_to_wj
+    from: { spec: remember, node: _initial, port: in_observation }
+    to:   { spec: remember, node: write_journal, port: in_observation }
+    kind: data
+  - id: e_init_decision_to_wj
+    from: { spec: remember, node: _initial, port: in_decision }
+    to:   { spec: remember, node: write_journal, port: in_decision }
+    kind: data
+
+  # ── write_journal → save_state ──
+  - id: e_wj_to_save
+    from: { spec: remember, node: write_journal, port: journal_fact }
+    to:   { spec: remember, node: save_state, port: journal_fact }
+    kind: data

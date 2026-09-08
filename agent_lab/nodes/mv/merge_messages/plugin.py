@@ -38,8 +38,10 @@ class MergeMessages(Node):
                 merged.append({"role": k, "content": content})
             else:
                 merged.append({"role": k, "content": str(content)})
-        return {out_port: Artifact(
-            kind=ArtifactKind.MESSAGE,
-            content=merged,
-            schema_ref="openai.messages.v1",
-        )}
+        return {
+            out_port: Artifact(
+                kind=ArtifactKind.MESSAGE,
+                content=merged,
+                schema_ref="openai.messages.v1",
+            )
+        }

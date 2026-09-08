@@ -28,9 +28,13 @@ class TrustClassify(Node):
         labeled = []
         for k, a in inputs.items():
             label = "trusted" if a.kind.value in trustable else "untrusted"
-            labeled.append({"port": k, "kind": a.kind.value, "trust": label, "digest": a.short_id()})
-        return {out_port: Artifact(
-            kind=ArtifactKind.FACT,
-            content=labeled,
-            schema_ref="trust.labels.v1",
-        )}
+            labeled.append(
+                {"port": k, "kind": a.kind.value, "trust": label, "digest": a.short_id()}
+            )
+        return {
+            out_port: Artifact(
+                kind=ArtifactKind.FACT,
+                content=labeled,
+                schema_ref="trust.labels.v1",
+            )
+        }

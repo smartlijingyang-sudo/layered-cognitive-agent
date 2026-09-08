@@ -1,0 +1,49 @@
+# =============================================================================
+# observe_wildcard — control-slot sub-graph for observe.wildcard (ADR-0206 §5)
+# =============================================================================
+# Single-node graph wrapping LCA's observe.* wildcard control slot
+# (ControlSlot.OBSERVE_WILDCARD). Cross-cutting observer with no phase
+# owner; mirrors the LCA plugin
+# ``lca.plugins.loop.control.observe_wildcard`` (ObserveWildcardExecutor
+# returns verdict=allow for any input).
+#
+# Region: phase:agent_loop (cross-cutting). Owner: None.
+# =============================================================================
+
+id: observe_wildcard
+version: 0.1.0
+region: phase:agent_loop
+description: Wraps the observe.* wildcard control slot. Default executor
+  is a no-op that returns a wildcard_verdict fact with verdict=allow.
+
+graph:
+  id: observe_wildcard
+  layer: control
+  purpose: Cross-cutting wildcard observer — explicit no-op owner for the observe.* slot.
+  members: [observe_wildcard_handler]
+  references: []
+  relations:
+    - { graph: agent_loop, kind: child_of, role: observe_wildcard_slot }
+  capabilities:
+    provides: [control_observe_wildcard]
+    requires: []
+
+nodes:
+
+  - id: observe_wildcard_handler
+    region: phase:agent_loop
+    factory: observe_wildcard_node
+    config:
+      to: wildcard_event
+      event_type: wildcard
+      provider_kind: lca
+      provider_ref: agent_lab.adapters.lca_control_act:LcaControlObserveWildcardProvider
+      provider_config: {}
+    ins: [in_event]
+    outs: [wildcard_event]
+
+edges:
+  - id: e_init_event_to_slot
+    from: { spec: observe_wildcard, node: _initial, port: in_event }
+    to:   { spec: observe_wildcard, node: observe_wildcard_handler, port: in_event }
+    kind: data

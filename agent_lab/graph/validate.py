@@ -85,12 +85,18 @@ def validate(spec: InfoEdgeSpec, registry: dict[str, dict[str, str]] | None = No
                 continue  # external input — caller supplies the artifact
             # Cross-spec project edges legitimately reference nodes in another spec.
             cross_spec = ref_key.spec_id != spec.id
-            if nk not in declared and ref_key.node_id in node_ids:
+            if nk not in declared and ref_key.node_id in node_ids and not cross_spec:
                 errs.append(f"C6: edge {e.id} {ref_label} port {ref_key.label()} is not declared")
-            elif ref_key.node_id not in node_ids and not (cross_spec and e.kind == EdgeKind.PROJECT):
-                errs.append(f"C6: edge {e.id} {ref_label} references missing node {ref_key.node_id}")
+            elif ref_key.node_id not in node_ids and not (
+                cross_spec and e.kind == EdgeKind.PROJECT
+            ):
+                errs.append(
+                    f"C6: edge {e.id} {ref_label} references missing node {ref_key.node_id}"
+                )
             elif cross_spec and e.kind != EdgeKind.PROJECT:
-                errs.append(f"C1: edge {e.id} {ref_label} crosses spec boundary but is not a project edge")
+                errs.append(
+                    f"C1: edge {e.id} {ref_label} crosses spec boundary but is not a project edge"
+                )
         # port dir sanity
         if e.from_ref.node_id in node_ids:
             d = declared.get((e.from_ref.node_id, e.from_ref.port_id))
@@ -145,13 +151,133 @@ def validate(spec: InfoEdgeSpec, registry: dict[str, dict[str, str]] | None = No
         if not g.ports:
             errs.append(f"C4: grant {g.id} declares no ports")
 
+    # C6.1: on_error=route must target an existing node with an IN port
+    # that can receive an EXCEPTION artifact (ADR-0206 §5.6).
+    for n in spec.nodes:
+        if n.on_error.value != "route":
+            continue
+        if not n.route_to:
+            errs.append(f"C6.1: node {n.id} has on_error=route but route_to is unset")
+            continue
+        try:
+            target = spec.node(n.route_to)
+        except KeyError:
+            errs.append(f"C6.1: node {n.id} on_error=route references missing node {n.route_to}")
+            continue
+        if not target.ins:
+            errs.append(
+                f"C6.1: node {n.id} on_error=route targets {n.route_to} "
+                f"which has no IN port to receive the EXCEPTION artifact"
+            )
+
+    # C6.2: on_error=retry requires the node to declare max_retries (or
+    # rely on the runtime default of 3). We allow implicit default; the
+    # only static constraint here is "on_error must be a known enum value"
+    # which Pydantic already enforces via the InfoNode model.
+
     # Emit declarations must align with effect edges (C2/C11)
     errs.extend(_check_emits_against_edges(spec))
+
+    # C15: data/project edge wiring must respect the port kinds declared
+    # by the source/target node manifests. We only check when BOTH ends
+    # actually declared the corresponding PortInfo; missing manifests are
+    # silently skipped so legacy specs without manifest annotations don't
+    # regress.
+    errs.extend(_check_port_kind_compatibility(spec))
 
     return errs
 
 
-def validate_or_raise(spec: InfoEdgeSpec, registry: dict[str, dict[str, str]] | None = None) -> None:
+def _port_infos_by_factory() -> dict[str, dict[str, dict[str, str]]]:
+    """{factory_name: {port_id: {"dir": "in"|"out", "kind": "<PortKind>", "schema_ref": "..."}}}.
+
+    Imported lazily because agent_lab.nodes pulls in adapters.
+    """
+    try:
+        from agent_lab.nodes.base import NodeRegistry
+    except Exception:  # pragma: no cover - adapter import failures
+        return {}
+    out: dict[str, dict[str, dict[str, str]]] = {}
+    for factory in NodeRegistry.known():
+        try:
+            manifest = NodeRegistry.describe(factory)
+        except KeyError:
+            continue
+        ports: dict[str, dict[str, str]] = {}
+        for p in manifest.inputs:
+            ports[p.id] = {"dir": "in", "kind": p.kind.value, "schema_ref": p.schema_ref}
+        for p in manifest.outputs:
+            ports[p.id] = {"dir": "out", "kind": p.kind.value, "schema_ref": p.schema_ref}
+        out[factory] = ports
+    return out
+
+
+# Conservative compatibility: artifact.kind (ArtifactKind) drives the
+# source side; the target side's declared PortKind is what the node expects.
+# We accept any source kind the target allows. Specific mappings:
+_ALLOWED_SOURCES_FOR_TARGET: dict[str, frozenset[str]] = {
+    "text": frozenset({"text"}),
+    "message": frozenset({"message", "text"}),
+    "manifest": frozenset({"manifest", "text"}),
+    "intent": frozenset({"intent", "artifact", "text"}),
+    "receipt": frozenset({"receipt", "artifact", "text"}),
+    "fact": frozenset({"fact", "artifact", "text"}),
+    "digest": frozenset({"digest", "artifact", "text"}),
+    "verdict": frozenset({"verdict", "artifact", "text"}),
+    # artifact = generic; accepts everything including itself
+    "artifact": frozenset(
+        {"artifact", "text", "message", "manifest", "intent", "receipt", "fact", "digest", "verdict"}
+    ),
+}
+
+
+def _check_port_kind_compatibility(spec: InfoEdgeSpec) -> list[str]:
+    """C15: edge wiring must respect source/target port kind declarations.
+
+    Walks every data/project edge. For each, looks up the source node's
+    declared OUT port kind and the target node's declared IN port kind
+    via the NodeRegistry's PortInfo. Both ends must be declared; if
+    either is absent, the check is skipped (manifest is optional).
+    """
+    port_infos = _port_infos_by_factory()
+    errs: list[str] = []
+    for e in spec.edges:
+        if e.kind.value not in ("data", "project"):
+            continue
+        if e.from_ref.node_id == "_initial":
+            continue  # external input — caller supplies the artifact
+        if e.from_ref.spec_id != spec.id or e.to_ref.spec_id != spec.id:
+            continue  # cross-spec wiring checked separately
+        try:
+            src_node = spec.node(e.from_ref.node_id)
+            dst_node = spec.node(e.to_ref.node_id)
+        except KeyError:
+            continue
+        src_info = port_infos.get(src_node.factory, {}).get(e.from_ref.port_id)
+        dst_info = port_infos.get(dst_node.factory, {}).get(e.to_ref.port_id)
+        if src_info is None or dst_info is None:
+            continue  # one or both ends didn't declare — skip
+        if src_info["dir"] != "out" or dst_info["dir"] != "in":
+            continue  # port dir sanity is already C6
+        # We know src_info["kind"] is a NodeLayer PortKind string. The
+        # runtime Artifact.kind lives in ArtifactKind. The PortKind enum
+        # already mirrors ArtifactKind 1:1 except "artifact" is a generic
+        # catch-all. So we accept direct equality + the artifact fallback.
+        allowed = _ALLOWED_SOURCES_FOR_TARGET.get(dst_info["kind"])
+        if allowed is None:
+            continue  # unknown target kind — don't reject
+        if src_info["kind"] not in allowed:
+            errs.append(
+                f"C15: edge {e.id} wires {src_node.factory}.{e.from_ref.port_id} "
+                f"(kind={src_info['kind']}) -> {dst_node.factory}.{e.to_ref.port_id} "
+                f"(expected kind={dst_info['kind']})"
+            )
+    return errs
+
+
+def validate_or_raise(
+    spec: InfoEdgeSpec, registry: dict[str, dict[str, str]] | None = None
+) -> None:
     errs = validate(spec, registry)
     if errs:
         raise ValidationError(errs)

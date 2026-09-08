@@ -26,4 +26,8 @@ class WriteReceipt(Node):
     def execute(self, node, inputs):
         src = node.config.get("from", "receipt")
         out_port = node.config.get("to", "receipt_fact")
-        return {out_port: inputs[src] if src in inputs else Artifact(kind=ArtifactKind.RECEIPT, content={})}
+        return {
+            out_port: inputs[src]
+            if src in inputs
+            else Artifact(kind=ArtifactKind.RECEIPT, content={})
+        }

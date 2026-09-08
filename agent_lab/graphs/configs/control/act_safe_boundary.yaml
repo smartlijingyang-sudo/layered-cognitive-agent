@@ -1,0 +1,33 @@
+# =============================================================================
+# act_safe_boundary — control-slot sub-graph for act.safe-boundary (ADR-0206 §5)
+# =============================================================================
+# Single-node graph wrapping LCA's act.safe-boundary control slot.
+# Owner: act phase. Last-chance physical isolation gate — wraps a callable.
+# Fallback: identity (always allow).
+# =============================================================================
+
+id: act_safe_boundary
+version: 0.1.0
+region: phase:act
+description: Last-chance physical isolation gate. Wraps a callable that
+  performs final safety checks before execution proceeds. Fallback is
+  identity (always allow).
+
+nodes:
+  - id: act_safe_boundary_slot
+    region: phase:act
+    factory: act_safe_boundary_node
+    config:
+      from: in_args
+      to: allowed
+      provider_kind: lca
+      provider_ref: agent_lab.adapters.lca_control_act:LcaControlActSafeBoundaryProvider
+      provider_config: {}
+    ins: [in_args]
+    outs: [allowed]
+
+edges:
+  - id: e_init_args_to_slot
+    from: { spec: act_safe_boundary, node: _initial, port: in_args }
+    to:   { spec: act_safe_boundary, node: act_safe_boundary_slot, port: in_args }
+    kind: data

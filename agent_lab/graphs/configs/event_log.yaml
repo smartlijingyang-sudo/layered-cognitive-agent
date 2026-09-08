@@ -1,0 +1,61 @@
+# =============================================================================
+# event_log — single durable fact-writing surface (ADR-0206 §5)
+# =============================================================================
+# Layer: lineage (observability seam). Two independent adapter nodes that
+# wrap Session.append and Session.snapshot_events respectively. Every node /
+# edge execution in agent_lab emits a durable record through this graph.
+#
+# Mounted by: future mv_assemble / perceive graphs (NOT this PR).
+#
+# Inbound cross-spec edges: NONE.
+# Outbound cross-spec edges: NONE.
+# =============================================================================
+
+id: event_log
+version: 0.1.0
+region: lineage
+description: Single fact-writing surface. emit wraps Session.append; tail
+  reads recent events via Session.snapshot_events. Both resolve the Session
+  through a fixture / factory / _NoopSession fallback chain.
+
+graph:
+  id: event_log
+  layer: lineage
+  purpose: Durable fact-writing surface — every node/edge execution emits a record.
+  members: [emit, tail]
+  references: []
+  capabilities:
+    provides: [event_emit, event_tail]
+    requires: []
+
+# -----------------------------------------------------------------------------
+# NODES — two independent workers, no edges between them.
+# -----------------------------------------------------------------------------
+nodes:
+
+  # ----- emit: Session.append(event_type, data) → event_fact ----------------
+  # Adapter: lca_event.LcaEventEmitProvider.emit(event_type, event_data).
+  # Writes one durable fact to the Session and returns an event_fact
+  # artifact carrying the SessionEvent's seq and id.
+  - id: emit
+    region: lineage
+    factory: emit_event_node
+    config:
+      provider_kind: lca
+      provider_ref: agent_lab.adapters.lca_event:LcaEventEmitProvider
+      provider_config: {}
+    ins: [event_type, event_data]
+    outs: [event_fact]
+
+  # ----- tail: Session.snapshot_events(from_seq, limit) → events -------------
+  # Adapter: lca_event.LcaEventTailProvider.tail(in_from_seq, in_limit).
+  # Reads recent events from the Session and returns them as a list artifact.
+  - id: tail
+    region: lineage
+    factory: tail_event_node
+    config:
+      provider_kind: lca
+      provider_ref: agent_lab.adapters.lca_event:LcaEventTailProvider
+      provider_config: {}
+    ins: [in_from_seq, in_limit]
+    outs: [events]

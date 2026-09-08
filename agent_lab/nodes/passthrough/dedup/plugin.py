@@ -37,4 +37,8 @@ class Dedup(Node):
             if p not in seen:
                 seen.add(p)
                 unique.append(p)
-        return {dst: Artifact(kind=ArtifactKind.TEXT, content=split_on.join(unique), schema_ref="deduped.v1")}
+        return {
+            dst: Artifact(
+                kind=ArtifactKind.TEXT, content=split_on.join(unique), schema_ref="deduped.v1"
+            )
+        }

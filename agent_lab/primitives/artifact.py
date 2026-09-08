@@ -15,12 +15,13 @@ from pydantic import BaseModel, field_validator
 
 class ArtifactKind(StrEnum):
     TEXT = "text"
-    MESSAGE = "message"          # OpenAI-style chat message
-    MANIFEST = "manifest"        # frozen ContextManifest
-    RECEIPT = "receipt"          # EffectReceipt
-    FACT = "fact"                # appended journal fact
-    INTENT = "intent"            # ToolIntent
-    DIGEST = "digest"            # pointer to another artifact
+    MESSAGE = "message"  # OpenAI-style chat message
+    MANIFEST = "manifest"  # frozen ContextManifest
+    RECEIPT = "receipt"  # EffectReceipt
+    FACT = "fact"  # appended journal fact
+    INTENT = "intent"  # ToolIntent
+    DIGEST = "digest"  # pointer to another artifact
+    EXCEPTION = "exception"  # node failure carrier; consumed by on_error=route targets
 
 
 class Artifact(BaseModel):
@@ -59,4 +60,32 @@ def make_message(role: str, content: str, **extra: Any) -> Artifact:
         kind=ArtifactKind.MESSAGE,
         content={"role": role, "content": content, **extra},
         schema_ref="openai.message.v1",
+    )
+
+
+def make_exception(
+    *,
+    error_class: str,
+    message: str,
+    node_id: str = "",
+    transient: bool = False,
+    detail: Any = None,
+) -> Artifact:
+    """Carrier for a node's failure. Consumed by on_error=route targets.
+
+    transient=True signals a retryable failure (network/timeout); the
+    runner's on_error=retry branch will re-invoke the node up to
+    config.max_retries times. transient=False (default) is treated as
+    deterministic — retry refuses and routes to a deny handler.
+    """
+    return Artifact(
+        kind=ArtifactKind.EXCEPTION,
+        content={
+            "error_class": error_class,
+            "message": message,
+            "node_id": node_id,
+            "transient": transient,
+            "detail": detail,
+        },
+        schema_ref="error.exception.v1",
     )

@@ -1,0 +1,53 @@
+# =============================================================================
+# stop — agent-loop stop phase (ADR-0206 §5)
+# =============================================================================
+# Layer 5 of 5 (sibling of perceive / think / effect_dispatch / remember).
+# Equivalent to LCA's ``StopPolicy.decide(state, decision, observation, reflection)
+# -> StopDecision`` flattened into a single-node graph.
+#
+#   evaluate_stop → stop_decision + terminal
+#
+# Mounted by: agent_loop.stop (see agent_loop.yaml#sub_specs).
+#
+# Inbound cross-spec edges: NONE.
+# Outbound cross-spec edges: NONE (stop_decision / terminal stay in this
+# spec; the parent's reducer reads them).
+# =============================================================================
+
+id: stop
+version: 0.1.0
+region: phase:stop
+description: Evaluate StopPolicy.decide(state, decision, observation, reflection)
+  to produce a StopDecision and the terminal fact artifact. One LCA
+  StopPolicy.decide() call per loop turn.
+
+graph:
+  id: stop
+  layer: phase
+  purpose: StopPolicy.decide(state, decision, observation, reflection) decomposed into evaluate_stop.
+  members: [evaluate_stop]
+  references: [agent_loop]
+  relations:
+    - { graph: agent_loop, kind: child_of, role: stop_phase }
+  capabilities:
+    provides: [stop_decision, terminal]
+    requires: [stop_policy]
+
+# -----------------------------------------------------------------------------
+# NODES — single worker.
+# -----------------------------------------------------------------------------
+nodes:
+
+  # ----- evaluate_stop: StopPolicy.decide → StopDecision + terminal ----------
+  # Adapter: lca_stop.LcaStopPolicyProvider.decide(). The provider wraps a
+  # StopPolicy (fixture for tests, factory ref for production). Produces a
+  # StopDecision artifact and a terminal fact artifact.
+  - id: evaluate_stop
+    region: phase:stop
+    factory: evaluate_stop_node
+    config:
+      provider_kind: lca
+      provider_ref: agent_lab.adapters.lca_stop:LcaStopPolicyProvider
+      provider_config: {}
+    ins: [in_decision, in_observation, in_reflection, in_state]
+    outs: [stop_decision, terminal]

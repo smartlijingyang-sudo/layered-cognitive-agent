@@ -27,4 +27,6 @@ class Join(Node):
         merged: dict = {}
         for k, a in inputs.items():
             merged[k] = a.content
-        return {out_port: Artifact(kind=ArtifactKind.FACT, content=merged, schema_ref="join.merged.v1")}
+        return {
+            out_port: Artifact(kind=ArtifactKind.FACT, content=merged, schema_ref="join.merged.v1")
+        }

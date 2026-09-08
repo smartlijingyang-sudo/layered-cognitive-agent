@@ -82,18 +82,27 @@ class DispatchTool(Node):
         out_port = node.config.get("to", "receipt")
         intent_a = inputs.get(intent_port)
         if intent_a is None or intent_a.content.get("verdict") == "deny":
-            return {out_port: Artifact(
-                kind=ArtifactKind.RECEIPT,
-                content={"status": "denied"},
-                schema_ref="tool.receipt.v1",
-            )}
+            return {
+                out_port: Artifact(
+                    kind=ArtifactKind.RECEIPT,
+                    content={"status": "denied"},
+                    schema_ref="tool.receipt.v1",
+                )
+            }
+        # Empty-tool-name short-circuit is now driven by the
+        # ``ToolDispatchGuardPlugin`` (registered as
+        # ``default_tool_dispatch_guard``). For ad-hoc callers without
+        # the plugin, keep the local fallback so legacy behaviour is
+        # preserved.
         tool = intent_a.content.get("tool")
         if tool in (None, "__none__"):
-            return {out_port: Artifact(
-                kind=ArtifactKind.RECEIPT,
-                content={"status": "denied"},
-                schema_ref="tool.receipt.v1",
-            )}
+            return {
+                out_port: Artifact(
+                    kind=ArtifactKind.RECEIPT,
+                    content={"status": "denied"},
+                    schema_ref="tool.receipt.v1",
+                )
+            }
         args = intent_a.content.get("args", {})
         registry = _registry()
         provider = _resolve_provider(node, tool_registry=registry)

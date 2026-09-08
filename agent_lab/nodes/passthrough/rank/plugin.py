@@ -32,4 +32,8 @@ class Rank(Node):
             return {dst: Artifact(kind=ArtifactKind.TEXT, content="")}
         text = str(src_a.content)
         parts = [p for p in text.split(split_on) if p][:keep]
-        return {dst: Artifact(kind=ArtifactKind.TEXT, content=split_on.join(parts), schema_ref="ranked.v1")}
+        return {
+            dst: Artifact(
+                kind=ArtifactKind.TEXT, content=split_on.join(parts), schema_ref="ranked.v1"
+            )
+        }

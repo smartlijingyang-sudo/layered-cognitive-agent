@@ -23,4 +23,8 @@ class Constant(Node):
 
     def execute(self, node, inputs):
         dst = node.outs[0]
-        return {dst: make_text(str(node.config.get("value", "")), schema_ref=node.config.get("schema_ref", "raw"))}
+        return {
+            dst: make_text(
+                str(node.config.get("value", "")), schema_ref=node.config.get("schema_ref", "raw")
+            )
+        }

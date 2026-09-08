@@ -31,6 +31,7 @@ from agent_lab.runtime.runner import run as run_graph
 
 # ---------- Boot ---------------------------------------------------------
 
+
 def _bootstrap() -> None:
     """Eagerly load .env (for LLM secrets) and the tool registry, then wire
     the registry into the dispatch nodes.
@@ -43,6 +44,7 @@ def _bootstrap() -> None:
     # LLM_API_KEY / LLM_MODEL / LLM_BASE_URL out of the environment.
     try:
         from dotenv import load_dotenv
+
         load_dotenv(Path(__file__).resolve().parents[1] / ".env")
     except Exception:  # noqa: S110 — missing .env is fine, env is the fallback
         pass
@@ -51,9 +53,7 @@ def _bootstrap() -> None:
     from agent_lab.tools import ToolRegistry
 
     registry = ToolRegistry()
-    registry.load_from_yaml(
-        Path(__file__).parent / "tools" / "registry.yaml"
-    )
+    registry.load_from_yaml(Path(__file__).parent / "tools" / "registry.yaml")
     configure_registry(registry)
 
 
@@ -73,18 +73,29 @@ def _register_lca_mv() -> None:
 
 # ---------- Demo runners --------------------------------------------------
 
+
 def _run_mv_assemble(specs, mv_provider: str = "default") -> None:
     spec = specs["mv_assemble"]
     initial = {
         "system": make_text("you are a careful assistant", schema_ref="system.v1"),
-        "history": Artifact(kind=ArtifactKind.MESSAGE, content=[
-            {"role": "assistant", "content": "previous turn"}
-        ], schema_ref="openai.messages.v1"),
-        "results": Artifact(kind=ArtifactKind.TEXT, content="result line A\nresult line A\nresult line B", schema_ref="tool.v1"),
-        "config": Artifact(kind=ArtifactKind.FACT, content={"temperature": 0.0}, schema_ref="config.v1"),
-        "tools": Artifact(kind=ArtifactKind.FACT, content=[
-            {"type": "function", "function": {"name": "read_file"}}
-        ], schema_ref="tools.v1"),
+        "history": Artifact(
+            kind=ArtifactKind.MESSAGE,
+            content=[{"role": "assistant", "content": "previous turn"}],
+            schema_ref="openai.messages.v1",
+        ),
+        "results": Artifact(
+            kind=ArtifactKind.TEXT,
+            content="result line A\nresult line A\nresult line B",
+            schema_ref="tool.v1",
+        ),
+        "config": Artifact(
+            kind=ArtifactKind.FACT, content={"temperature": 0.0}, schema_ref="config.v1"
+        ),
+        "tools": Artifact(
+            kind=ArtifactKind.FACT,
+            content=[{"type": "function", "function": {"name": "read_file"}}],
+            schema_ref="tools.v1",
+        ),
     }
     if mv_provider != "default":
         for n in spec.nodes:
@@ -153,6 +164,7 @@ def _print_trace(trace) -> None:
 
 
 # ---------- Negative compile test -----------------------------------------
+
 
 def _run_negative() -> None:
     """Build a copy of effect_dispatch with no discard_sink, drop the receipt node's
@@ -257,6 +269,7 @@ def _describe(target: str | None) -> None:
                     print(f"  requires: {list(caps['requires'])}")
         # Tool registry
         from agent_lab.tools import ToolRegistry
+
         reg = ToolRegistry()
         try:
             reg.load_from_yaml(Path(__file__).parent / "tools" / "registry.yaml")
@@ -298,18 +311,30 @@ def _describe(target: str | None) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="agent_lab")
-    parser.add_argument("graph", nargs="?", default="agent_loop",
-                        choices=list(_DISPATCH.keys()),
-                        help="which graph to run")
-    parser.add_argument("--negative", action="store_true",
-                        help="compile a broken copy of effect_dispatch and expect a ValidationError")
-    parser.add_argument("--describe", action="store_true",
-                        help="print self-describing node + graph + tool manifests and exit")
-    parser.add_argument("--target", default=None,
-                        help="describe target: node:<id> | graph:<id>")
-    parser.add_argument("--mv-provider", default="default",
-                        choices=["default", "lca"],
-                        help="for mv_assemble: which provider feeds assemble_lca node")
+    parser.add_argument(
+        "graph",
+        nargs="?",
+        default="agent_loop",
+        choices=list(_DISPATCH.keys()),
+        help="which graph to run",
+    )
+    parser.add_argument(
+        "--negative",
+        action="store_true",
+        help="compile a broken copy of effect_dispatch and expect a ValidationError",
+    )
+    parser.add_argument(
+        "--describe",
+        action="store_true",
+        help="print self-describing node + graph + tool manifests and exit",
+    )
+    parser.add_argument("--target", default=None, help="describe target: node:<id> | graph:<id>")
+    parser.add_argument(
+        "--mv-provider",
+        default="default",
+        choices=["default", "lca"],
+        help="for mv_assemble: which provider feeds assemble_lca node",
+    )
     args = parser.parse_args(argv)
 
     if args.describe:

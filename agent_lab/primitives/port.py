@@ -27,7 +27,7 @@ class Port(BaseModel):
 
     id: str
     dir: PortDir
-    type: str = "Any"             # schema ref string
+    type: str = "Any"  # schema ref string
     tag: PortTag = PortTag.FACT
     optional: bool = False
 

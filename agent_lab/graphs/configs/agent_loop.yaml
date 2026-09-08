@@ -2,14 +2,30 @@
 # agent_loop — root loop (ADR-0206 §2)
 # =============================================================================
 # Layer 1 of 3. Owns the six-phase skeleton. Does NOT do real work itself:
-#   - five phases are identity stubs (perceive / reflect / remember / stop,
-#     and the outer think/act shells)
-#   - two phases are sub_spec mount points that delegate the actual work
-#     to nested graphs (see # ============ SUBSPECS ============ below)
+#   - all six phases are sub_spec mount points that delegate the actual
+#     work to nested graphs (perceive / assemble_for_think → mv_assemble
+#     / think / act → effect_dispatch / reflect / remember / stop; see
+#     # ============ SUBSPECS ============ below).
 #
-# Downward references (cross-spec edges / sub_specs):
-#   - assemble_for_think  ──sub_spec──►  mv_assemble        (think: build manifest)
-#   - act                 ──sub_spec──►  effect_dispatch    (act:   run a tool)
+# Cross-spec data flow (kind: project edges; declared in the spec that
+# OWNS the projection):
+#   - perceive.build.manifest      ──project──►  mv_assemble.classify.perceive_manifest
+#     (frozen ContextManifest; closed into the model-visible closure)
+#   - effect_dispatch.integrate.observation  ──project──►  mv_assemble.classify.results
+#     (tool receipt, closed into the model-visible closure)
+#
+# Local data flow (kind: data):
+#   perceive.perceive_out           ──► think.perceive_out      (perception signal; junction)
+#   assemble_for_think.out_manifest ──► think.in_assembled_manifest
+#   think.decision_out              ──► act.in_args             (decision forwarded to effect dispatcher)
+#                                     ──► reflect.in_decision    (Brain.reflect)
+#                                     ──► remember.in_decision   (write_journal writes the Decision)
+#                                     ──► stop.in_decision       (StopPolicy.decide)
+#   act.out_observation             ──► reflect.in_observation
+#                                     ──► remember.in_observation
+#                                     ──► stop.in_observation
+#   reflect.reflection_out          ──► remember.in_reflection
+#                                     ──► stop.in_reflection
 #
 # This file never references the inner nodes of those sub-graphs. To see
 # what runs inside them, read their own YAMLs.
@@ -28,22 +44,24 @@ graph:
   id: agent_loop
   layer: phase
   purpose: Orchestrate the agent loop as six nested sub-graphs wired by sub_spec.
-  # Members = node ids declared locally in this file (stubs + sub_spec hosts).
+  # Members = node ids declared locally in this file (sub_spec hosts).
   members:
-    - perceive              # stub: identity passthrough
-    - think                 # host: holds flatten + llm + parse
+    - perceive              # host: sub_spec link → perceive.yaml
+    - think                 # host: sub_spec link → think.yaml
     - assemble_for_think    # host: sub_spec link → mv_assemble
-    - flatten_manifest      # local: assemble_messages
-    - call_llm_node         # local: call_llm (provider from node.config)
-    - parse_decision        # stub: identity passthrough
     - act                   # host: sub_spec link → effect_dispatch
-    - reflect               # stub: identity passthrough
-    - remember              # stub: identity passthrough
-    - stop                  # terminal: identity passthrough
+    - reflect               # host: sub_spec link → reflect.yaml
+    - remember              # host: sub_spec link → remember.yaml
+    - stop                  # host: sub_spec link → stop.yaml
   # References = nested graph IDs this spec delegates to (via sub_specs).
   references:
+    - perceive              # folds Sensors + Memory + gate facts into a ContextManifest
+    - think                 # Brain.think(state) decomposed: flatten → call_llm → parse → gate_enforce
     - mv_assemble           # builds the model-visible ContextManifest
     - effect_dispatch       # runs a tool call, emits a receipt
+    - reflect               # Brain.reflect(state, observation) decomposed: gather → critic → extract → write
+    - remember              # persists facts to journal + state (Session.append + StateStore.save)
+    - stop                  # terminal verdict from StopPolicy.decide
   relations:
     - { graph: mv_assemble,     kind: contains, role: think_phase_manifest_assembly }
     - { graph: effect_dispatch, kind: contains, role: act_phase_tool_dispatch     }
@@ -62,6 +80,10 @@ graph:
 # initial.tools      : tool schemas (openai-style function list)
 # initial.results    : prior tool observations, for re-assembly
 # initial.user_turn  : this turn's user message (+ optional tool_calls)
+# initial.state      : AgentState snapshot (step, history, retrieved_context,
+#                     extra) — fed into perceive so the Hub can fold the
+#                     prior context into the new ContextManifest. Other
+#                     fields are tolerated and routed into state.extra.
 
 # -----------------------------------------------------------------------------
 # NODES — local workers + sub_spec hosts. Identity stubs are passthroughs;
@@ -69,24 +91,40 @@ graph:
 # -----------------------------------------------------------------------------
 nodes:
 
-  # ===== PHASE: perceive (stub) =============================================
-  # Receives user_turn; emits it untouched. Real perception lives elsewhere.
+  # ===== PHASE: perceive (host) =============================================
+  # Receives user_turn + state; mounts `perceive.yaml` as a nested graph
+  # that folds the inputs into a frozen ContextManifest.
+  # Two distinct output ports:
+  #   - perceive_out  : passthrough signal for the think junction (the think
+  #                     node waits on this to know "perception ran this turn")
+  #   - out_manifest  : the frozen ContextManifest, projected cross-spec
+  #                     into mv_assemble.classify.perceive_manifest (C1/C2
+  #                     closure of the perception half)
+  # The identity factory wires sub_spec output_map's "manifest" into
+  # out_manifest and identity-forwards out_manifest → perceive_out.
   - id: perceive
     region: phase:perceive
     factory: identity
-    config: { from: user_turn, to: perceive_out }
-    ins: [user_turn]
-    outs: [perceive_out]
+    config: { from: out_manifest, to: perceive_out }
+    ins: [user_turn, state]
+    outs: [perceive_out, out_manifest]
 
   # ===== PHASE: think (host) ================================================
-  # Aggregates three think-stage inputs (perceive_out, observe_in, think_in)
-  # and exposes a single think_out. It is a junction, not a worker.
+  # Mounts `think.yaml` as a nested graph. Receives:
+  #   - in_assembled_manifest : mv_assemble's frozen manifest (fed by
+  #                             assemble_for_think.out_manifest)
+  #   - perceive_out          : perception-completed signal from perceive
+  # Emits:
+  #   - decision_out          : the LCA Decision artifact (consumed by act)
+  #   - think_signal          : barrier-style signal for downstream junctions
+  # The previous stub + three local workers (flatten_manifest /
+  # call_llm_node / parse_decision) moved into think.yaml.
   - id: think
     region: phase:think
     factory: identity
-    config: { from: think_in, to: think_out }
-    ins: [perceive_out, observe_in, think_in]
-    outs: [think_out]
+    config: { from: decision_out, to: think_out }
+    ins: [in_assembled_manifest, perceive_out]
+    outs: [decision_out, think_signal]
 
   # ===== PHASE: think / sub_spec host ======================================
   # Mounts mv_assemble as a nested graph. Receives 5 inputs (system/history/
@@ -99,51 +137,6 @@ nodes:
     ins: [in_system, in_results, in_history, in_config, in_tools]
     outs: [out_manifest, out_lca_manifest]
 
-  # ===== PHASE: think / flatten manifest into chat messages ================
-  # Turns (system + history + out_manifest) into a flat ordered message list
-  # ready for the LLM. Pure config-driven; no business logic here.
-  - id: flatten_manifest
-    region: phase:think
-    factory: assemble_messages
-    config: { to: messages_flat }
-    ins: [system, history, manifest]
-    outs: [messages_flat]
-
-  # ===== PHASE: think / call the LLM =======================================
-  # Provider selection is data, not code.  The graph config IS the
-  # provider selection: ``provider_ref`` is ``module:Class`` for the
-  # provider, ``provider_config.adapter_factory`` is ``module:Class`` for
-  # the real LCA LLMAdapter it wraps.
-  #
-  # Real LCA LLMAdapter used here: ``OpenAICompatAdapter``. It reads
-  # LLM_API_KEY / LLM_MODEL / LLM_BASE_URL / LLM_API_STYLE from env at
-  # construction; no secrets live in this file.
-  - id: call_llm_node
-    region: phase:think
-    factory: call_llm
-    config:
-      # provider selection ─────────────────────
-      provider_kind: lca
-      provider_ref: agent_lab.adapters.lca_llm:LcaLlmProvider
-      provider_config:
-        adapter_factory:
-          ref: lca.infrastructure.llm_adapter.openai_compat:OpenAICompatAdapter
-          kwargs: {}
-      # port renames ──────────────────────────
-      from: messages_in
-      to: response
-    ins: [messages_in]
-    outs: [response]
-
-  # ===== PHASE: think / parse LLM response into a decision =================
-  # Identity passthrough today; future: parse tool_call blocks into intents.
-  - id: parse_decision
-    region: phase:think
-    factory: identity
-    config: { from: response, to: think_out }
-    ins: [response]
-    outs: [think_out]
-
   # ===== PHASE: act (host) ==================================================
   # Mounts effect_dispatch. Receives the think_out (which carries the model's
   # tool call) as in_args; exposes out_observation after the tool runs.
@@ -154,29 +147,39 @@ nodes:
     ins: [in_args]
     outs: [out_observation]
 
-  # ===== PHASE: reflect (stub) =============================================
+  # ===== PHASE: reflect (host) =============================================
+  # Mounts `reflect.yaml` as a nested graph. Receives the act's observation
+  # + think's decision + an optional prior-turn reflection. Emits the
+  # current Reflection + extracted memory candidates + a barrier signal.
   - id: reflect
     region: phase:reflect
     factory: identity
-    config: { from: reflect_in, to: reflect_out }
-    ins: [reflect_in]
-    outs: [reflect_out]
+    config: { from: reflection_out, to: reflect_out }
+    ins: [in_observation, in_decision, in_prior_reflection]
+    outs: [reflection_out, memory_extract_out, reflect_signal]
 
-  # ===== PHASE: remember (stub) ============================================
+  # ===== PHASE: remember (host) ============================================
+  # Mounts `remember.yaml` as a nested graph. Persists the turn's facts
+  # via Session.append (write_journal) + StateStore.save (save_state).
+  # Receives the reflect/act/think artifacts; emits journal_fact + state_ref
+  # + a barrier signal.
   - id: remember
     region: phase:remember
     factory: identity
-    config: { from: remember_in, to: remember_out }
-    ins: [remember_in]
-    outs: [remember_out]
+    config: { from: state_ref, to: remember_out }
+    ins: [in_reflection, in_observation, in_decision]
+    outs: [journal_fact, state_ref, remember_signal]
 
-  # ===== PHASE: stop (terminal) ============================================
+  # ===== PHASE: stop (host; terminal) ======================================
+  # Mounts `stop.yaml`. Single-node graph; receives think's decision + act's
+  # observation + reflect's reflection + AgentState. Emits stop_decision +
+  # terminal (the runtime reducer reads terminal).
   - id: stop
     region: phase:stop
     factory: identity
-    config: { from: stop_in, to: terminal }
-    ins: [stop_in]
-    outs: [terminal]
+    config: { from: terminal, to: terminal }
+    ins: [in_decision, in_observation, in_reflection, in_state]
+    outs: [stop_decision, terminal]
 
 # -----------------------------------------------------------------------------
 # EDGES — local data flow. Edges are grouped by their destination node so
@@ -208,72 +211,88 @@ edges:
     to:   { spec: agent_loop, node: assemble_for_think, port: in_results }
     kind: data
 
-  # ── initial → perceive (the one external input the loop's skeleton needs) ──
+  # ── initial → perceive (user_turn + state; the loop's two external inputs) ──
   - id: e_init_user_to_perceive
     from: { spec: agent_loop, node: _initial, port: user_turn }
     to:   { spec: agent_loop, node: perceive, port: user_turn }
     kind: data
+  - id: e_init_state_to_perceive
+    from: { spec: agent_loop, node: _initial, port: state }
+    to:   { spec: agent_loop, node: perceive, port: state }
+    kind: data
 
-  # ── perceive → think (junctions) ──
+  # ── perceive → think (perception SIGNAL — not the manifest; the think
+  #    junction waits on this so its `perceive_out` port lights up when
+  #    perception completed; the manifest itself leaves this spec via the
+  #    cross-spec project edge declared in perceive.yaml). ──
   - id: e_perceive_to_think
     from: { spec: agent_loop, node: perceive, port: perceive_out }
     to:   { spec: agent_loop, node: think,    port: perceive_out }
     kind: data
 
-  # ── assemble_for_think → think (manifest becomes the think's "observation" input) ──
+  # ── perceive → mv_assemble (CROSS-SPEC PROJECT EDGE; owned by perceive.yaml
+  #    because the projection is what closes the perception half of C1/C2).
+  #    The frozen ContextManifest enters mv_assemble through a distinct
+  #    initial port so it never collides with effect_dispatch's observation
+  #    projection (which lands on classify.results). ──
+  - id: e_perceive_to_mv_project
+    from: { spec: perceive,    node: build, port: manifest }
+    to:   { spec: mv_assemble, node: classify, port: perceive_manifest }
+    kind: project
+
+  # ── assemble_for_think → think (frozen manifest feeds the think sub-graph) ──
   - id: e_assemble_to_think
     from: { spec: agent_loop, node: assemble_for_think, port: out_manifest }
-    to:   { spec: agent_loop, node: think,              port: observe_in }
-    kind: data
-
-  # ── assemble_for_think → flatten_manifest (the same manifest feeds the LLM call) ──
-  - id: e_assemble_to_flatten
-    from: { spec: agent_loop, node: assemble_for_think, port: out_manifest }
-    to:   { spec: agent_loop, node: flatten_manifest,  port: manifest }
-    kind: data
-
-  # ── initial → flatten_manifest (system + history bypass the sub-graph) ──
-  - id: e_init_system_to_flatten
-    from: { spec: agent_loop, node: _initial, port: system }
-    to:   { spec: agent_loop, node: flatten_manifest, port: system }
-    kind: data
-  - id: e_init_history_to_flatten
-    from: { spec: agent_loop, node: _initial, port: history }
-    to:   { spec: agent_loop, node: flatten_manifest, port: history }
-    kind: data
-
-  # ── flatten_manifest → call_llm_node → parse_decision → think ──
-  - id: e_flatten_to_llm
-    from: { spec: agent_loop, node: flatten_manifest, port: messages_flat }
-    to:   { spec: agent_loop, node: call_llm_node,     port: messages_in }
-    kind: data
-  - id: e_llm_to_parse
-    from: { spec: agent_loop, node: call_llm_node, port: response }
-    to:   { spec: agent_loop, node: parse_decision, port: response }
-    kind: data
-  - id: e_parse_to_think_in
-    from: { spec: agent_loop, node: parse_decision, port: think_out }
-    to:   { spec: agent_loop, node: think,          port: think_in }
+    to:   { spec: agent_loop, node: think,              port: in_assembled_manifest }
     kind: data
 
   # ── think → act (decision is forwarded to the act sub-graph as in_args) ──
   - id: e_think_to_act
-    from: { spec: agent_loop, node: think, port: think_out }
+    from: { spec: agent_loop, node: think, port: decision_out }
     to:   { spec: agent_loop, node: act,   port: in_args }
     kind: data
 
   # ── act → reflect → remember → stop (the rest of the loop skeleton) ──
-  - id: e_act_to_reflect
+  # act.out_observation feeds reflect.in_observation (the Observation).
+  # think.decision_out feeds reflect.in_decision (the Decision).
+  # reflect.reflection_out feeds both remember.in_reflection and stop.in_reflection.
+  # remember.journal_fact is a one side — also feeds stop.in_state via the
+  # initial.state port on stop (state after the persist step).
+  - id: e_act_to_reflect_obs
     from: { spec: agent_loop, node: act,      port: out_observation }
-    to:   { spec: agent_loop, node: reflect,  port: reflect_in }
+    to:   { spec: agent_loop, node: reflect,  port: in_observation }
+    kind: data
+  - id: e_think_to_reflect_dec
+    from: { spec: agent_loop, node: think,    port: decision_out }
+    to:   { spec: agent_loop, node: reflect,  port: in_decision }
     kind: data
   - id: e_reflect_to_remember
-    from: { spec: agent_loop, node: reflect,  port: reflect_out }
-    to:   { spec: agent_loop, node: remember, port: remember_in }
+    from: { spec: agent_loop, node: reflect,  port: reflection_out }
+    to:   { spec: agent_loop, node: remember, port: in_reflection }
     kind: data
-  - id: e_remember_to_stop
-    from: { spec: agent_loop, node: remember, port: remember_out }
-    to:   { spec: agent_loop, node: stop,     port: stop_in }
+  - id: e_act_obs_to_remember
+    from: { spec: agent_loop, node: act,      port: out_observation }
+    to:   { spec: agent_loop, node: remember, port: in_observation }
+    kind: data
+  - id: e_think_dec_to_remember
+    from: { spec: agent_loop, node: think,    port: decision_out }
+    to:   { spec: agent_loop, node: remember, port: in_decision }
+    kind: data
+  - id: e_reflect_to_stop
+    from: { spec: agent_loop, node: reflect,  port: reflection_out }
+    to:   { spec: agent_loop, node: stop,     port: in_reflection }
+    kind: data
+  - id: e_act_obs_to_stop
+    from: { spec: agent_loop, node: act,      port: out_observation }
+    to:   { spec: agent_loop, node: stop,     port: in_observation }
+    kind: data
+  - id: e_think_dec_to_stop
+    from: { spec: agent_loop, node: think,    port: decision_out }
+    to:   { spec: agent_loop, node: stop,     port: in_decision }
+    kind: data
+  - id: e_init_state_to_stop
+    from: { spec: agent_loop, node: _initial, port: state }
+    to:   { spec: agent_loop, node: stop,     port: in_state }
     kind: data
 
 # -----------------------------------------------------------------------------
@@ -285,6 +304,20 @@ edges:
 # output_map: nested graph's port_id  ->  parent port_id
 # -----------------------------------------------------------------------------
 sub_specs:
+
+  # ── perceive stage: fold sensors+memory+gate facts into a ContextManifest ──
+  # Nested graph: perceive (sibling of mv_assemble / effect_dispatch).
+  # Glue: feed user_turn + state as the sub-graph's inputs; surface its
+  #       `manifest` as parent port out_manifest. The cross-spec project
+  #       edge from perceive.build → mv_assemble.classify.perceive_manifest
+  #       is declared in this file (root owns the projection target's spec).
+  - node: perceive
+    sub_spec: perceive
+    input_map:
+      user_turn: user_turn
+      state:     state
+    output_map:
+      manifest: out_manifest
 
   # ── think stage: build the next ContextManifest before the LLM call ──
   # Nested graph: mv_assemble (model-visible assembly pipeline).
@@ -303,6 +336,20 @@ sub_specs:
       manifest: out_manifest
       lca_manifest: out_lca_manifest
 
+  # ── think stage: Brain.think(state) → Decision ──
+  # Nested graph: think (flatten → call_llm → parse_decision → gate_enforce).
+  # Glue: feed mv_assemble's frozen manifest + perceive's perception signal;
+  #       surface the enforced Decision as parent port decision_out and a
+  #       barrier-style think_signal.
+  - node: think
+    sub_spec: think
+    input_map:
+      in_assembled_manifest: in_assembled_manifest
+      perceive_out:          perceive_out
+    output_map:
+      enforced_decision: decision_out
+      think_signal:       think_signal
+
   # ── act stage: run the model-decided tool call ──
   # Nested graph: effect_dispatch (build_intent → grant_check → route →
   #               dispatch → write_receipt → integrate_observation).
@@ -318,9 +365,107 @@ sub_specs:
     output_map:
       observation: out_observation
 
+  # ── reflect stage: Brain.reflect(state, observation) → Reflection ──
+  # Nested graph: reflect (gather → critic → extract_memory → write_extract).
+  # Glue: feed act's observation + think's decision + an empty prior
+  #       reflection; surface the current reflection + memory candidates
+  #       + a barrier signal.
+  - node: reflect
+    sub_spec: reflect
+    input_map:
+      in_observation:      in_observation
+      in_decision:         in_decision
+      in_prior_reflection: in_prior_reflection
+    output_map:
+      reflection_out:      reflection_out
+      memory_extract_out:  memory_extract_out
+      reflect_signal:      reflect_signal
+
+  # ── remember stage: persist facts (Session.append + StateStore.save) ──
+  # Nested graph: remember (write_journal → save_state).
+  - node: remember
+    sub_spec: remember
+    input_map:
+      in_reflection:  in_reflection
+      in_observation: in_observation
+      in_decision:    in_decision
+    output_map:
+      journal_fact:    journal_fact
+      state_ref:       state_ref
+      remember_signal: remember_signal
+
+  # ── stop stage: terminal verdict from StopPolicy.decide ──
+  # Nested graph: stop (evaluate_stop, single-node).
+  - node: stop
+    sub_spec: stop
+    input_map:
+      in_decision:    in_decision
+      in_observation: in_observation
+      in_reflection:  in_reflection
+      in_state:       in_state
+    output_map:
+      stop_decision: stop_decision
+      terminal:      terminal
+
 # -----------------------------------------------------------------------------
-# MV FEED — which sub_spec's output is the spec's model-visible feed.
-# (Convention used by some downstream consumers to know which nested graph
-#  produced the LLM-bound manifest.)
+# PLUGINS — cross-cutting behavior attached to this graph's lifecycle.
+#
+# Plugins are the agent_lab extension point for things that don't belong
+# inside a single node's execute(): event sinks (durable fact writing),
+# metrics/tracing, control bindings, parse rules, memory policies, etc.
+# The compile hook fans ``before_compile`` / ``after_compile`` into every
+# plugin; the runner fans every ``node_start`` / ``node_end`` /
+# ``edge_fire`` / ``subgraph_enter`` / ``subgraph_exit`` into the same
+# plugin list. See agent_lab/plugins/base.py.
 # -----------------------------------------------------------------------------
-mv_feed: assemble_for_think
+plugins:
+
+  - id: default_event_sink
+    kind: event_sink
+    binds: []
+    config:
+      sink_id: agent_loop
+
+  - id: default_observer
+    kind: observer
+    binds: []
+    config:
+      metric_prefix: agent_loop
+
+  # --- Business-logic plugins (drive parse / observation / extract / dispatch)
+  # Each plugin replaces a branch that used to live in a node's execute():
+
+  - id: default_parse_decision
+    kind: parse_decision
+    binds:
+      - { kind: event_kind, value: on_decision }
+    config: {}
+
+  - id: default_observation_render
+    kind: observation_render
+    binds:
+      - { kind: event_kind, value: on_observation }
+    config: {}
+
+  - id: default_memory_extract
+    kind: memory_extract
+    binds:
+      - { kind: event_kind, value: on_reflection }
+    config: {}
+
+  - id: default_tool_dispatch_guard
+    kind: tool_dispatch_guard
+    binds:
+      - { kind: event_kind, value: on_decision }
+    config: {}
+
+  # --- Business wiring plugins (skeleton only fans hooks) ---
+  - id: default_control_slots
+    kind: control_slots
+    binds: []
+    config: {}
+
+  - id: default_semantic_router
+    kind: semantic_router
+    binds: []
+    config: {}

@@ -1,12 +1,14 @@
 """Compile InfoEdgeSpec -> CompiledGraphBundle.
 
-Borrowed shape from lca_kernel/plan (plan_hash + bindings).
+Skeleton only: resolve plugins, fan before_compile, validate structure,
+build bindings + topological layers. No business wiring.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -14,11 +16,24 @@ from pydantic import BaseModel, ConfigDict, Field
 from agent_lab.graph.spec import InfoEdgeSpec
 from agent_lab.graph.validate import ValidationError, validate
 
+_log = logging.getLogger(__name__)
+
+
+def _resolve_plugins(spec: InfoEdgeSpec) -> list:
+    """Materialise every PluginRef in ``spec.plugins`` into a live plugin."""
+    from agent_lab.plugins import resolve_plugin
+    from agent_lab.plugins.base import GraphPlugin
+
+    plugins: list[GraphPlugin] = []
+    for ref in spec.plugins:
+        inst = resolve_plugin(ref)
+        if inst is not None:
+            plugins.append(inst)
+    return plugins
+
 
 def _stable_hash(obj: Any) -> str:
-    return hashlib.sha256(
-        json.dumps(obj, sort_keys=True, default=str).encode()
-    ).hexdigest()
+    return hashlib.sha256(json.dumps(obj, sort_keys=True, default=str).encode()).hexdigest()
 
 
 class CompiledGraphBundle(BaseModel):
@@ -30,9 +45,11 @@ class CompiledGraphBundle(BaseModel):
     plan_hash: str
     spec_dump: dict[str, Any]
     bindings: list[dict[str, Any]] = Field(default_factory=list)
-    layers: list[list[str]] = Field(default_factory=list)         # topological schedule
-    effect_receipt_targets: dict[str, str] = Field(default_factory=dict)
+    layers: list[list[str]] = Field(default_factory=list)  # topological schedule
     subgraph_calls: list[dict[str, Any]] = Field(default_factory=list)
+    # Materialised plugin instances — the runner reads this and fans out
+    # events. Empty list when the spec declares no plugins.
+    plugin_instances: list[Any] = Field(default_factory=list)
 
 
 def compile(
@@ -41,32 +58,52 @@ def compile(
 ) -> CompiledGraphBundle:
     """Validate, build bindings, topological layers, return frozen bundle.
 
+    Plugins may rewrite ``spec`` and mutate ``sub_registry`` in place via
+    ``before_compile``. The rewritten spec is what ``spec_dump`` /
+    ``subgraph_calls`` reflect; callers that execute should rebuild the
+    spec from ``spec_dump`` (see ``runtime.runner.run``).
+
     Raises ValidationError on invariant violations.
     """
+    if sub_registry is None:
+        sub_registry = {}
+
+    plugins = _resolve_plugins(spec)
+    # Pass the live sub_registry: plugins (e.g. control_slots) may mutate it
+    # in place so the runner can resolve inserted sub_spec ids.
+    for plugin in plugins:
+        try:
+            rewritten = plugin.before_compile(spec, sub_registry)
+            if rewritten is not None:
+                spec = rewritten
+        except Exception as exc:  # pragma: no cover
+            _log.warning("plugin %s before_compile raised: %s", plugin.name, exc)
+
     errs = validate(spec)
     if errs:
         raise ValidationError(errs)
 
-    # Build bindings (edge -> dict). Each binding references its kind for runtime dispatch.
     bindings: list[dict[str, Any]] = []
     for e in spec.edges:
-        bindings.append({
-            "edge_id": e.id,
-            "from": e.from_ref.label(),
-            "to": e.to_ref.label(),
-            "kind": e.kind.value,
-            "required": e.required,
-        })
+        bindings.append(
+            {
+                "edge_id": e.id,
+                "from": e.from_ref.label(),
+                "to": e.to_ref.label(),
+                "kind": e.kind.value,
+                "required": e.required,
+            }
+        )
 
     # Topological schedule: BFS over data edges only.
     in_deg: dict[str, int] = {n.id: 0 for n in spec.nodes}
     adj: dict[str, list[str]] = {n.id: [] for n in spec.nodes}
     for e in spec.edges:
-        if e.kind.value in ("data", "project"):  # only data flow contributes to schedule
+        if e.kind.value in ("data", "project"):
             if e.from_ref.node_id == "_initial":
-                continue  # external input doesn't count toward schedule
+                continue
             if e.from_ref.spec_id != spec.id or e.to_ref.spec_id != spec.id:
-                continue  # cross-spec project edges are dispatched at runtime, not locally
+                continue
             if e.from_ref.node_id in adj and e.to_ref.node_id in adj:
                 adj[e.from_ref.node_id].append(e.to_ref.node_id)
                 in_deg[e.to_ref.node_id] = in_deg.get(e.to_ref.node_id, 0) + 1
@@ -83,31 +120,29 @@ def compile(
                     next_frontier.append(tgt)
         frontier = next_frontier
     if sum(remaining.values()) > 0:
-        # cycles among non-data edges are allowed (e.g. control). Surface a warning, not error.
         layers.append(sorted(nid for nid, d in remaining.items() if d > 0))
 
-    # effect_receipt_targets: every effect edge -> target node id (for C2/C3 dispatch)
-    effect_receipt_targets: dict[str, str] = {}
-    for e in spec.edges:
-        if e.kind.value == "effect":
-            effect_receipt_targets[e.id] = e.to_ref.node_id
-
-    # subgraph_calls: list of (node_id, sub_spec_id) — runtime resolves nested specs
     subgraph_calls = [
-        {"node_id": link.node_id, "sub_spec_id": link.sub_spec_id,
-         "input_map": link.input_map, "output_map": link.output_map}
+        {
+            "node_id": link.node_id,
+            "sub_spec_id": link.sub_spec_id,
+            "input_map": link.input_map,
+            "output_map": link.output_map,
+        }
         for link in spec.sub_specs
     ]
 
     spec_dump = spec.model_dump(mode="json")
-    plan_hash = _stable_hash({
-        "spec_id": spec.id,
-        "version": spec.version,
-        "nodes": [n.model_dump() for n in spec.nodes],
-        "edges": [e.model_dump() for e in spec.edges],
-        "sub_specs": [s.model_dump() for s in spec.sub_specs],
-        "grants": [g.model_dump() for g in spec.grants],
-    })
+    plan_hash = _stable_hash(
+        {
+            "spec_id": spec.id,
+            "version": spec.version,
+            "nodes": [n.model_dump() for n in spec.nodes],
+            "edges": [e.model_dump() for e in spec.edges],
+            "sub_specs": [s.model_dump() for s in spec.sub_specs],
+            "grants": [g.model_dump() for g in spec.grants],
+        }
+    )
 
     return CompiledGraphBundle(
         spec_id=spec.id,
@@ -115,6 +150,6 @@ def compile(
         spec_dump=spec_dump,
         bindings=bindings,
         layers=layers,
-        effect_receipt_targets=effect_receipt_targets,
         subgraph_calls=subgraph_calls,
+        plugin_instances=list(plugins),
     )

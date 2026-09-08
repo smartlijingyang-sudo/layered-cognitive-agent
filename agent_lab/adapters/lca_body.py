@@ -75,14 +75,10 @@ class LcaBodyProvider:
             range_names = tuple(tool_range)
             missing = [n for n in range_names if not tool_registry.contains(n)]
             if missing:
-                raise KeyError(
-                    f"tool_range references tools not in registry: {missing!r}"
-                )
+                raise KeyError(f"tool_range references tools not in registry: {missing!r}")
         self._tools: dict[str, Any] = {n: tool_registry.get(n) for n in range_names}
         allow = set(self._tools.keys())
-        self._executor = SimpleSafeExecutor(
-            ToolPermissionManifest(allowed_tools=sorted(allow))
-        )
+        self._executor = SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=sorted(allow)))
         self._retry = RetryPolicy() if RetryPolicy else None
         self._cache = CacheConfig() if CacheConfig else None
 
@@ -110,10 +106,10 @@ class LcaBodyProvider:
         try:
             obs = asyncio.run(
                 self._executor.execute(
-                    tool=tool,                # type: ignore[arg-type]
+                    tool=tool,  # type: ignore[arg-type]
                     args=args,
-                    retry_policy=self._retry,    # type: ignore[arg-type]
-                    cache_config=self._cache,    # type: ignore[arg-type]
+                    retry_policy=self._retry,  # type: ignore[arg-type]
+                    cache_config=self._cache,  # type: ignore[arg-type]
                     invocation_id="",
                 )
             )

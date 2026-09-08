@@ -1,0 +1,105 @@
+# =============================================================================
+# toolbox — named-tool inventory graph (ADR-0206 §5)
+# =============================================================================
+# Single responsibility: given a tool name, resolve to a Tool instance with
+# its scope + capability metadata. Pure data/lookup graph — NO tool execution
+# happens here.
+#
+# Linear chain:
+#   load_registry → trust_classify → dedup → resolve_tool
+#
+# Initial: in_tool_name (the caller's requested tool name, consumed by resolve_tool).
+# Output:  tool_instance (the resolved Tool metadata).
+#
+# trust_classify and dedup are reused from nodes/mv and nodes/passthrough.
+# =============================================================================
+
+id: toolbox
+version: 0.1.0
+region: model_visible
+description: Resolve a tool name to a Tool instance with scope + capability metadata.
+
+graph:
+  id: toolbox
+  layer: model_visible
+  purpose: Named-tool inventory — resolve a tool name to its Tool instance, scope and capability.
+  members: [load_registry, trust_classify, dedup, resolve_tool]
+  references: [agent_loop]
+  relations:
+    - { graph: agent_loop, kind: child_of, role: tool_resolve_phase }
+  capabilities:
+    provides: [tool_resolve]
+    requires: [tool_registry]
+
+nodes:
+
+  # ----- load_registry: load tool entries from a YAML registry file ---------
+  # Adapter: LcaToolboxRegistryProvider. Emits a FACT artifact (registry_payload)
+  # listing name → ref/kwargs/capability/scope for every tool in the YAML.
+  - id: load_registry
+    region: model_visible
+    factory: registry_loader
+    config:
+      to: registry_payload
+      registry_path: agent_lab/tools/registry.yaml
+    ins: []
+    outs: [registry_payload]
+
+  # ----- trust_classify: tag each entry as trusted/untrusted ----------------
+  # Reuses existing nodes/mv/trust_classify. Tags each tool entry based on
+  # trustable_kinds config.
+  - id: trust_classify
+    region: model_visible
+    factory: trust_classify
+    config:
+      trustable_kinds: [fact]
+    ins: [any_in]
+    outs: [labels]
+
+  # ----- dedup: collapse duplicate entries (idempotent) ---------------------
+  # Reuses existing nodes/passthrough/dedup.
+  - id: dedup
+    region: model_visible
+    factory: dedup
+    config:
+      from: labels
+      to: deduped
+    ins: [from]
+    outs: [to]
+
+  # ----- resolve_tool: resolve tool name → Tool instance --------------------
+  # Adapter: LcaToolboxResolveProvider. Takes in_tool_name (string) and
+  # registry data from the chain. Emits tool_instance artifact.
+  - id: resolve_tool
+    region: model_visible
+    factory: resolve_tool
+    config:
+      from: deduped
+      to: tool_instance
+      provider_kind: lca
+      provider_ref: agent_lab.adapters.lca_toolbox:LcaToolboxResolveProvider
+      provider_config: {}
+    ins: [in_tool_name, registry_data]
+    outs: [tool_instance]
+
+edges:
+
+  # ── initial → resolve_tool (tool name) ──
+  - id: e_init_tool_name_to_resolve
+    from: { spec: toolbox, node: _initial, port: in_tool_name }
+    to:   { spec: toolbox, node: resolve_tool, port: in_tool_name }
+    kind: data
+
+  # ── load_registry → trust_classify → dedup → resolve_tool ──
+  - id: e_load_to_trust
+    from: { spec: toolbox, node: load_registry, port: registry_payload }
+    to:   { spec: toolbox, node: trust_classify, port: any_in }
+    kind: data
+  - id: e_trust_to_dedup
+    from: { spec: toolbox, node: trust_classify, port: labels }
+    to:   { spec: toolbox, node: dedup, port: from }
+    kind: data
+  - id: e_dedup_to_resolve
+    from: { spec: toolbox, node: dedup, port: to }
+    to:   { spec: toolbox, node: resolve_tool, port: registry_data }
+    kind: data

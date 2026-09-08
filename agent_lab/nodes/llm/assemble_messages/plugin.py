@@ -39,4 +39,8 @@ class AssembleMessages(Node):
             messages.extend(history_a.content)
         if user_a is not None:
             messages.append({"role": "user", "content": str(user_a.content)})
-        return {out_port: Artifact(kind=ArtifactKind.MESSAGE, content=messages, schema_ref="openai.messages.v1")}
+        return {
+            out_port: Artifact(
+                kind=ArtifactKind.MESSAGE, content=messages, schema_ref="openai.messages.v1"
+            )
+        }

@@ -46,9 +46,7 @@ class SessionReaderAdapter:
             "tools": list(self._tools),
         }
 
-    def snapshot_events(
-        self, from_seq: int = 0, to_seq_exclusive: int | None = None
-    ) -> tuple:
+    def snapshot_events(self, from_seq: int = 0, to_seq_exclusive: int | None = None) -> tuple:
         # agent_lab adapter has no event log; return empty slice.
         return ()
 

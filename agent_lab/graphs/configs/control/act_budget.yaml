@@ -1,0 +1,36 @@
+# =============================================================================
+# act_budget — control-slot sub-graph for act.budget (ADR-0206 §5)
+# =============================================================================
+# Single-node graph wrapping LCA's act.budget control slot.
+# Owner: act phase. Budget check — wraps BudgetPolicy.
+# Fallback: identity (always allow).
+# =============================================================================
+
+id: act_budget
+version: 0.1.0
+region: phase:act
+description: Wraps a BudgetPolicy that checks whether the current action
+  stays within budget. Fallback is identity (always allow).
+
+nodes:
+  - id: act_budget_slot
+    region: phase:act
+    factory: act_budget_node
+    config:
+      from: in_args
+      to: allowed
+      provider_kind: lca
+      provider_ref: agent_lab.adapters.lca_control_act:LcaControlActBudgetProvider
+      provider_config: {}
+    ins: [in_args, in_state]
+    outs: [allowed]
+
+edges:
+  - id: e_init_args_to_slot
+    from: { spec: act_budget, node: _initial, port: in_args }
+    to:   { spec: act_budget, node: act_budget_slot, port: in_args }
+    kind: data
+  - id: e_init_state_to_slot
+    from: { spec: act_budget, node: _initial, port: in_state }
+    to:   { spec: act_budget, node: act_budget_slot, port: in_state }
+    kind: data

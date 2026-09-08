@@ -29,27 +29,27 @@ class NodeLayer(StrEnum):
 
 
 class NodeKind(StrEnum):
-    PASSTHROUGH = "passthrough"        # identity / constant / select
-    TRANSFORMER = "transformer"        # redact / dedup / rank / integrate_observation
-    ROUTER = "router"                  # route_on / join / barrier / discard
-    PRODUCER = "producer"              # build_intent / commit_manifest
-    VALIDATOR = "validator"            # grant_check / validate_manifest / trust_classify
-    EXECUTOR = "executor"              # dispatch_tool / call_llm / write_receipt
-    ASSEMBLER = "assembler"            # merge_messages / assemble_messages
+    PASSTHROUGH = "passthrough"  # identity / constant / select
+    TRANSFORMER = "transformer"  # redact / dedup / rank / integrate_observation
+    ROUTER = "router"  # route_on / join / barrier / discard
+    PRODUCER = "producer"  # build_intent / commit_manifest
+    VALIDATOR = "validator"  # grant_check / validate_manifest / trust_classify
+    EXECUTOR = "executor"  # dispatch_tool / call_llm / write_receipt
+    ASSEMBLER = "assembler"  # merge_messages / assemble_messages
 
 
 class PortKind(StrEnum):
     """Semantic type of port content."""
 
-    ARTIFACT = "artifact"          # generic artifact
-    TEXT = "text"                  # plain text content
-    MESSAGE = "message"            # chat message (openai-style)
-    MANIFEST = "manifest"           # frozen ContextManifest
-    INTENT = "intent"              # ToolIntent
-    RECEIPT = "receipt"            # EffectReceipt
-    FACT = "fact"                  # structured fact (dict)
-    DIGEST = "digest"              # digest pointer
-    VERDICT = "verdict"            # grant/approval verdict
+    ARTIFACT = "artifact"  # generic artifact
+    TEXT = "text"  # plain text content
+    MESSAGE = "message"  # chat message (openai-style)
+    MANIFEST = "manifest"  # frozen ContextManifest
+    INTENT = "intent"  # ToolIntent
+    RECEIPT = "receipt"  # EffectReceipt
+    FACT = "fact"  # structured fact (dict)
+    DIGEST = "digest"  # digest pointer
+    VERDICT = "verdict"  # grant/approval verdict
 
 
 @dataclass(frozen=True)
@@ -81,19 +81,19 @@ class NodeManifest:
     outputs: tuple[PortInfo, ...] = ()
 
     # Capability declarations (organizational, not data flow)
-    provides: tuple[str, ...] = ()       # names of capabilities this node offers
-    requires: tuple[str, ...] = ()       # names of capabilities this node needs
+    provides: tuple[str, ...] = ()  # names of capabilities this node offers
+    requires: tuple[str, ...] = ()  # names of capabilities this node needs
 
     # Effect emissions/consumptions (compile-time check vs edge kinds)
-    emits: tuple[str, ...] = ()          # effect class names this node may emit
-    consumes: tuple[str, ...] = ()       # effect class names this node may consume
+    emits: tuple[str, ...] = ()  # effect class names this node may emit
+    consumes: tuple[str, ...] = ()  # effect class names this node may consume
 
     # Relations to other nodes (organizational graph; not data flow)
-    relates_to: tuple[str, ...] = ()     # node ids this node collaborates with
+    relates_to: tuple[str, ...] = ()  # node ids this node collaborates with
 
     # Strong-typed config schema (None = free dict)
     config_schema: type[BaseModel] | None = None
-    config_schema_ref: str = ""           # dotted import path or YAML ref
+    config_schema_ref: str = ""  # dotted import path or YAML ref
 
 
 @dataclass(frozen=True)
@@ -115,7 +115,7 @@ class GraphManifest:
     references: tuple[str, ...] = ()
 
     # Relations to other graphs (organizational)
-    relations: tuple[tuple[str, str, str], ...] = ()    # (other_graph_id, kind, role)
+    relations: tuple[tuple[str, str, str], ...] = ()  # (other_graph_id, kind, role)
 
     # Capability declarations (graph-level)
     provides: tuple[str, ...] = ()
@@ -157,13 +157,15 @@ def _coerce_ports(items: Any) -> tuple[PortInfo, ...]:
             kind = it.get("kind", PortKind.ARTIFACT)
             if isinstance(kind, str):
                 kind = PortKind(kind) if kind in PortKind._value2member_map_ else PortKind.ARTIFACT
-            out.append(PortInfo(
-                id=it["id"],
-                kind=kind,
-                schema_ref=it.get("schema_ref", "raw"),
-                required=bool(it.get("required", True)),
-                description=it.get("description", ""),
-            ))
+            out.append(
+                PortInfo(
+                    id=it["id"],
+                    kind=kind,
+                    schema_ref=it.get("schema_ref", "raw"),
+                    required=bool(it.get("required", True)),
+                    description=it.get("description", ""),
+                )
+            )
     return tuple(out)
 
 

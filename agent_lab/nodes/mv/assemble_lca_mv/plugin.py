@@ -16,6 +16,7 @@ def _default_lca_mv_provider() -> object:
     """Lazy-build a DefaultModelContextAssembler-backed provider."""
     if "default" not in _LCA_MV_PROVIDERS:
         from agent_lab.adapters.lca_mv import LcaMvProvider
+
         _LCA_MV_PROVIDERS["default"] = LcaMvProvider()
     return _LCA_MV_PROVIDERS["default"]
 
@@ -57,10 +58,12 @@ class AssembleLcaMv(Node):
         provider = _LCA_MV_PROVIDERS.get(provider_name) or _default_lca_mv_provider()
         out_port = node.config.get("to", "manifest")
         step = int(node.config.get("step", 0))
-        return {out_port: provider.assemble(
-            messages_artifact=inputs.get("messages"),
-            system_artifact=inputs.get("system"),
-            config_artifact=inputs.get("config"),
-            tools_artifact=inputs.get("tools"),
-            step=step,
-        )}
+        return {
+            out_port: provider.assemble(
+                messages_artifact=inputs.get("messages"),
+                system_artifact=inputs.get("system"),
+                config_artifact=inputs.get("config"),
+                tools_artifact=inputs.get("tools"),
+                step=step,
+            )
+        }

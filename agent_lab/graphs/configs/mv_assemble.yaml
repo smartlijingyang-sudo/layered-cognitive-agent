@@ -48,14 +48,21 @@ graph:
 # -----------------------------------------------------------------------------
 # INITIAL PORTS — what the parent (agent_loop.assemble_for_think) and the
 # cross-spec project edge supply. The parent feeds 5 inputs verbatim; the
-# project edge from effect_dispatch also lands on `classify.results`.
+# project edge from effect_dispatch lands on `classify.results`; the
+# project edge from perceive lands on `classify.perceive_manifest`.
 # -----------------------------------------------------------------------------
 # initial.system  : system prompt
 # initial.history : prior conversation
 # initial.config  : LLM runtime config
 # initial.tools   : tool schemas
 # initial.results : prior tool observations
-#  + cross-spec project into classify.results (declared in effect_dispatch.yaml)
+# initial.perceive_manifest : the frozen ContextManifest produced by
+#                             perceive (closed via the C1/C2 closure
+#                             declared in perceive.yaml). Distinct from
+#                             `classify.results` so two project edges
+#                             don't collide.
+#  + cross-spec project into classify.results       (effect_dispatch)
+#  + cross-spec project into classify.perceive_manifest (perceive)
 
 # -----------------------------------------------------------------------------
 # NODES — two parallel pipelines that meet at `merge`.
@@ -68,16 +75,17 @@ nodes:
   # ===== LEFT BRANCH (input cleaning) ======================================
 
   # ----- classify: tag every input with a trust label ----------------------
-  # Receives {results, system, history} and emits a single FACT listing each
-  # input's port / kind / trust / digest. The other right-branch inputs
-  # (system, history) ALSO pass through here so the same trust policy
-  # applies uniformly.
+  # Receives {results, system, history, perceive_manifest} and emits a
+  # single FACT listing each input's port / kind / trust / digest.
+  # ``manifest`` is in the trustable_kinds allowlist so the perceive
+  # ContextManifest is tagged `trusted` (it's produced by LCA's own
+  # PerceiveHub inside the same trust boundary).
   - id: classify
     region: model_visible
     factory: trust_classify
     config:
       trustable_kinds: [text, message, manifest]
-    ins: [results, system, history]
+    ins: [results, system, history, perceive_manifest]
     outs: [labels]
 
   # ----- dedupe: collapse repeated lines ----------------------------------
@@ -158,12 +166,14 @@ nodes:
 # EDGES — two parallel branches that meet at `merge`, then fan out to 3 sinks.
 # Edges are grouped by destination node so the file reads top-to-bottom
 # in the same order as the data path.
-# Cross-spec edges from this file: NONE. The project edge INTO classify.results
-# is declared in effect_dispatch.yaml (see # INTEGRATIONS there).
+# Cross-spec project edges from this file: NONE. The project edges INTO
+# classify.results (effect_dispatch) and classify.perceive_manifest
+# (perceive) are declared in their owning specs.
 # -----------------------------------------------------------------------------
 edges:
 
-  # ── initial → classify (3 parallel feeds) ──
+  # ── initial → classify (4 parallel feeds; results + perceive_manifest
+  #    are the two cross-spec project targets; system + history bypass) ──
   - id: e_results_to_classify
     from: { spec: mv_assemble, node: _initial, port: results }
     to:   { spec: mv_assemble, node: classify,    port: results }
@@ -175,6 +185,10 @@ edges:
   - id: e_history_to_classify
     from: { spec: mv_assemble, node: _initial, port: history }
     to:   { spec: mv_assemble, node: classify,    port: history }
+    kind: data
+  - id: e_perceive_manifest_to_classify
+    from: { spec: mv_assemble, node: _initial, port: perceive_manifest }
+    to:   { spec: mv_assemble, node: classify,    port: perceive_manifest }
     kind: data
 
   # ── left branch: classify → dedupe → rank → redact ──

@@ -1,0 +1,161 @@
+# =============================================================================
+# perceive — world-to-context sub-graph (ADR-0206 §5 / §10 P1)
+# =============================================================================
+# Layer 2 of 4 (sibling of mv_assemble / effect_dispatch). Fold Sensors
+# + Memory + prior GateDecided facts into a frozen ContextManifest via
+# LCA's SequentialPerceiveHub (LCA contracts/protocols/think/cognition.py).
+#
+# Mounted by: agent_loop.perceive (see agent_loop.yaml#sub_specs).
+#
+# Inbound cross-spec edges: NONE (perceive is the start-of-loop).
+# Outbound cross-spec edges: deferred to PR-2 (see note
+# docs/notes/proposed/seam/2026-09-08-agent-lab-perceive-subgraph.md §R1).
+# This sub-graph currently exposes `manifest` only on its own root outputs;
+# no `kind: project` edges leave this file yet.
+# =============================================================================
+
+id: perceive
+version: 0.1.0
+region: phase:perceive
+description: Build a frozen ContextManifest for the next think turn by
+  classifying, deduplicating, ranking, and redacting the inputs, then
+  delegating to LCA's SequentialPerceiveHub. The manifest is the model-
+  visible surface of "what was perceived".
+
+# -----------------------------------------------------------------------------
+# GRAPH — organizational metadata.
+# -----------------------------------------------------------------------------
+graph:
+  id: perceive
+  layer: phase
+  purpose: Fold world inputs into a frozen ContextManifest via the LCA Hub.
+  members: [classify, dedupe, rank, redact, build]
+  references: [agent_loop]
+  relations:
+    - { graph: agent_loop, kind: child_of, role: perceive_phase }
+  capabilities:
+    provides: [context_manifest, perceive_fold]
+    requires: [perceive_hub, sensor_fold, memory_perceive, gate_decision_fold]
+
+# -----------------------------------------------------------------------------
+# INITIAL PORTS — what the parent (agent_loop.perceive) must supply.
+# -----------------------------------------------------------------------------
+# initial.user_turn : this turn's user message (string or message artifact)
+# initial.state     : the AgentState snapshot the Hub needs (history,
+#                     retrieved_context, step). Other fields are tolerated
+#                     and routed into state.extra.
+
+# -----------------------------------------------------------------------------
+# NODES — five workers; left branch mirrors mv_assemble's input-cleaning
+# shape (classify → dedupe → rank → redact) but ends at `build` instead of
+# merge_messages, because the output is a ContextManifest, not a message list.
+# -----------------------------------------------------------------------------
+nodes:
+
+  # ----- classify: tag every input with a trust label -----------------------
+  # Receives the two initial feeds (user_turn, state). The same trust
+  # policy used in mv_assemble applies uniformly.
+  - id: classify
+    region: phase:perceive
+    factory: trust_classify
+    config:
+      trustable_kinds: [text, message, manifest, memory, policy_fact, tool_result]
+    ins: [user_turn, state]
+    outs: [labels]
+
+  # ----- dedupe: collapse identical ContextItem lines ----------------------
+  - id: dedupe
+    region: phase:perceive
+    factory: dedup
+    config: { split_on: "\n" }
+    ins: [labels]
+    outs: [deduped]
+
+  # ----- rank: keep top-K entries -----------------------------------------
+  - id: rank
+    region: phase:perceive
+    factory: rank
+    config: { keep: 100, split_on: "\n" }
+    ins: [deduped]
+    outs: [ranked]
+
+  # ----- redact: scrub known-sensitive patterns ---------------------------
+  - id: redact
+    region: phase:perceive
+    factory: redact
+    config: { patterns: ["<internal>", "sk-XXXX"] }
+    ins: [ranked]
+    outs: [sanitized]
+
+  # ----- build: call LCA's PerceiveHub, freeze the ContextManifest --------
+  # Provider selection is data, not code. Production profiles inject a
+  # Hub via ``provider_config.hub_factory`` (``module:Class`` form).
+  # Fixtures inject ``provider_config.fixture_hub`` directly to avoid the
+  # LCA runtime dependency. No secrets live in this file.
+  - id: build
+    region: phase:perceive
+    factory: perceive_build
+    config:
+      # port renames ──────────────────────────
+      from: sanitized
+      to: manifest
+      # provider selection ─────────────────────
+      provider_kind: lca
+      provider_ref: agent_lab.adapters.lca_perceive:LcaPerceiveProvider
+      provider_config:
+        hub_factory:
+          ref: lca.cognition.perceive.hub:SequentialPerceiveHub
+          kwargs: {}
+    ins: [sanitized, state]
+    outs: [manifest]
+
+# -----------------------------------------------------------------------------
+# EDGES — strict linear chain inside the spec, plus ONE cross-spec project
+# edge that closes the perception half of C1/C2 (ADR-0206 §3). The project
+# edge lands on `mv_assemble.classify.perceive_manifest`, distinct from
+# `classify.results` (which carries effect_dispatch's observation), so the
+# two feeds never collide.
+# -----------------------------------------------------------------------------
+edges:
+
+  # ── initial → classify ──
+  - id: e_user_to_classify
+    from: { spec: perceive, node: _initial, port: user_turn }
+    to:   { spec: perceive, node: classify,  port: user_turn }
+    kind: data
+  - id: e_state_to_classify
+    from: { spec: perceive, node: _initial, port: state }
+    to:   { spec: perceive, node: classify,  port: state }
+    kind: data
+
+  # ── left branch: classify → dedupe → rank → redact ──
+  - id: e_classify_to_dedupe
+    from: { spec: perceive, node: classify, port: labels }
+    to:   { spec: perceive, node: dedupe,   port: labels }
+    kind: data
+  - id: e_dedupe_to_rank
+    from: { spec: perceive, node: dedupe, port: deduped }
+    to:   { spec: perceive, node: rank,   port: deduped }
+    kind: data
+  - id: e_rank_to_redact
+    from: { spec: perceive, node: rank,    port: ranked }
+    to:   { spec: perceive, node: redact,  port: ranked }
+    kind: data
+  - id: e_redact_to_build
+    from: { spec: perceive, node: redact, port: sanitized }
+    to:   { spec: perceive, node: build,  port: sanitized }
+    kind: data
+
+  # ── state → build (the AgentState the Hub needs) ──
+  - id: e_state_to_build
+    from: { spec: perceive, node: _initial, port: state }
+    to:   { spec: perceive, node: build,    port: state }
+    kind: data
+
+  # ── build → mv_assemble (CROSS-SPEC PROJECT EDGE; declared here because
+  #    this spec owns the projection — the frozen ContextManifest is
+  #    produced inside perceive and closed into the model-visible layer). ──
+  - id: e_build_to_mv_project
+    from: { spec: perceive,     node: build,    port: manifest }
+    to:   { spec: mv_assemble,  node: classify, port: perceive_manifest }
+    kind: project

@@ -1,0 +1,36 @@
+# =============================================================================
+# think_guard — control sub-graph for ControlSlot.THINK_GUARD
+# =============================================================================
+# Single-node handler wrapping DecisionGate.enforce.
+# Owner phase: think. Region: phase:think.
+# Mounted as a control slot by the parent agent_loop's think junction.
+# =============================================================================
+
+id: think_guard
+version: 0.1.0
+region: phase
+description: Control-slot handler for think.guard — runs DecisionGate.enforce
+  on the inbound decision and emits the guarded decision.
+
+graph:
+  id: think_guard
+  layer: control
+  purpose: DecisionGate enforcement for the think phase.
+  members: [think_guard_handler]
+  references: []
+  relations:
+    - { graph: agent_loop, kind: child_of, role: think_guard_slot }
+  capabilities:
+    provides: [control_think_guard]
+    requires: [decision_gate]
+
+nodes:
+
+  - id: think_guard_handler
+    region: phase:think
+    factory: think_guard_node
+    config:
+      to: out_decision
+      provider_config: {}
+    ins: [in_decision]
+    outs: [out_decision]

@@ -29,4 +29,10 @@ class GrantCheck(Node):
         out_port = node.config.get("to", "verdict")
         tool = intent_a.content.get("tool") if intent_a else None
         verdict = "allow" if tool in allow else "deny"
-        return {out_port: Artifact(kind=ArtifactKind.FACT, content={"verdict": verdict, "tool": tool}, schema_ref="grant.verdict.v1")}
+        return {
+            out_port: Artifact(
+                kind=ArtifactKind.FACT,
+                content={"verdict": verdict, "tool": tool},
+                schema_ref="grant.verdict.v1",
+            )
+        }

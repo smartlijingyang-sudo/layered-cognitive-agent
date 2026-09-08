@@ -1,0 +1,32 @@
+# =============================================================================
+# perceive_context — control-slot sub-graph for perceive.context (ADR-0206 §5)
+# =============================================================================
+# Single-node graph wrapping LCA's perceive.context control slot.
+# Owner: perceive phase. Decides whether external data becomes trusted context.
+# Fallback: identity (always accept).
+# =============================================================================
+
+id: perceive_context
+version: 0.1.0
+region: phase:perceive
+description: Wraps a callable that decides whether external data becomes
+  trusted context. Fallback is identity (always accept).
+
+nodes:
+  - id: perceive_context_slot
+    region: phase:perceive
+    factory: perceive_context_node
+    config:
+      from: in_args
+      to: allowed
+      provider_kind: lca
+      provider_ref: agent_lab.adapters.lca_control_act:LcaControlPerceiveContextProvider
+      provider_config: {}
+    ins: [in_args]
+    outs: [allowed]
+
+edges:
+  - id: e_init_args_to_slot
+    from: { spec: perceive_context, node: _initial, port: in_args }
+    to:   { spec: perceive_context, node: perceive_context_slot, port: in_args }
+    kind: data

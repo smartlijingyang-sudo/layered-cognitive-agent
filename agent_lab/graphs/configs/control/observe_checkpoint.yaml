@@ -1,0 +1,38 @@
+# =============================================================================
+# observe_checkpoint — control sub-graph for ControlSlot.OBSERVE_CHECKPOINT
+# =============================================================================
+# Single-node handler emitting a checkpoint event to event_log.
+# Owner: None (cross-cutting observer). Region mapped to phase:agent_loop
+# as the closest semantic — this slot is invoked from the agent_loop
+# junction, not from a specific phase.
+# =============================================================================
+
+id: observe_checkpoint
+version: 0.1.0
+region: phase
+description: Control-slot handler for observe.checkpoint — emits a checkpoint
+  event fact. Cross-cutting observer with no specific phase owner.
+
+graph:
+  id: observe_checkpoint
+  layer: control
+  purpose: Checkpoint event emission for the observation cross-cutting slot.
+  members: [observe_checkpoint_handler]
+  references: []
+  relations:
+    - { graph: agent_loop, kind: child_of, role: observe_checkpoint_slot }
+  capabilities:
+    provides: [control_observe_checkpoint]
+    requires: []
+
+nodes:
+
+  - id: observe_checkpoint_handler
+    region: phase:agent_loop
+    factory: observe_checkpoint_node
+    config:
+      to: checkpoint_event
+      event_type: checkpoint
+      provider_config: {}
+    ins: [in_event_log]
+    outs: [checkpoint_event]

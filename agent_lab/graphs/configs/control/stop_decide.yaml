@@ -1,0 +1,35 @@
+# =============================================================================
+# stop_decide — control sub-graph for ControlSlot.STOP_DECIDE
+# =============================================================================
+# Single-node handler wrapping StopPolicy.decide.
+# Owner phase: stop. Region: phase:stop.
+# =============================================================================
+
+id: stop_decide
+version: 0.1.0
+region: phase
+description: Control-slot handler for stop.decide — runs StopPolicy.decide
+  and emits a StopDecision artifact.
+
+graph:
+  id: stop_decide
+  layer: control
+  purpose: StopPolicy decision for the stop phase.
+  members: [stop_decide_handler]
+  references: []
+  relations:
+    - { graph: agent_loop, kind: child_of, role: stop_decide_slot }
+  capabilities:
+    provides: [control_stop_decide]
+    requires: [stop_policy]
+
+nodes:
+
+  - id: stop_decide_handler
+    region: phase:stop
+    factory: stop_decide_node
+    config:
+      to: stop_decision
+      provider_config: {}
+    ins: [in_state, in_decision]
+    outs: [stop_decision]

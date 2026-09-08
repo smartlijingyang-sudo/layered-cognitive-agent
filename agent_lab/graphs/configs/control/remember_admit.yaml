@@ -1,0 +1,35 @@
+# =============================================================================
+# remember_admit — control sub-graph for ControlSlot.REMEMBER_ADMIT
+# =============================================================================
+# Single-node handler deciding whether an observation is admitted to memory.
+# Owner phase: remember (memory). Region: phase:remember.
+# =============================================================================
+
+id: remember_admit
+version: 0.1.0
+region: phase
+description: Control-slot handler for remember.admit — decides whether an
+  observation should be admitted to memory (filter).
+
+graph:
+  id: remember_admit
+  layer: control
+  purpose: Memory admission filter for the remember phase.
+  members: [remember_admit_handler]
+  references: []
+  relations:
+    - { graph: agent_loop, kind: child_of, role: remember_admit_slot }
+  capabilities:
+    provides: [control_remember_admit]
+    requires: [memory_admit_policy]
+
+nodes:
+
+  - id: remember_admit_handler
+    region: phase:remember
+    factory: remember_admit_node
+    config:
+      to: admit_verdict
+      provider_config: {}
+    ins: [in_observation]
+    outs: [admit_verdict]
