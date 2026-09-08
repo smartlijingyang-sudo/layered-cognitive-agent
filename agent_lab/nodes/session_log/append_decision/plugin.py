@@ -11,7 +11,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
 
 @node(
-    id="session_log__append_decision",
+    id="session_log.append.decision",
     layer=NodeLayer.LINEAGE,
     kind=NodeKind.EXECUTOR,
     description="Append a Decision artifact to the Session log (event_type=decision.v1).",
@@ -20,7 +20,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
     provides=["session_seq_ref"],
 )
 class AppendDecision(Node):
-    name = "session_log__append_decision"
+    name = "session_log.append.decision"
 
     def execute(self, node, inputs):
         from agent_lab._session_holder import session

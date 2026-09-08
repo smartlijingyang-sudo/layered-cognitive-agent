@@ -6,7 +6,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
 
 @node(
-    id="session_log__append_before_compile",
+    id="session_log.append.before_compile",
     layer=NodeLayer.LINEAGE,
     kind=NodeKind.EXECUTOR,
     description="Emit a before_compile framework event to Session.",
@@ -14,7 +14,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
     outputs=[PortInfo("seq_ref", kind=PortKind.FACT)],
 )
 class AppendBeforeCompile(Node):
-    name = "session_log__append_before_compile"
+    name = "session_log.append.before_compile"
 
     def execute(self, node, inputs):
         from agent_lab._session_holder import session

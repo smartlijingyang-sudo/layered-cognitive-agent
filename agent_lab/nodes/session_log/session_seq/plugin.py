@@ -11,7 +11,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
 
 @node(
-    id="session_log__session_seq",
+    id="session_log.session.seq",
     layer=NodeLayer.LINEAGE,
     kind=NodeKind.TRANSFORMER,
     description="Return the Session's next seq counter (= current log length).",
@@ -20,7 +20,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
     provides=["session_seq"],
 )
 class SessionSeq(Node):
-    name = "session_log__session_seq"
+    name = "session_log.session.seq"
 
     def execute(self, node, inputs):
         from agent_lab._session_holder import session

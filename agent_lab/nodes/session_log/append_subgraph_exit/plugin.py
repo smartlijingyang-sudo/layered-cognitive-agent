@@ -6,7 +6,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
 
 @node(
-    id="session_log__append_subgraph_exit",
+    id="session_log.append.subgraph_exit",
     layer=NodeLayer.LINEAGE,
     kind=NodeKind.EXECUTOR,
     description="Emit a subgraph_exit framework event to Session.",
@@ -14,7 +14,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
     outputs=[PortInfo("seq_ref", kind=PortKind.FACT)],
 )
 class AppendSubgraphExit(Node):
-    name = "session_log__append_subgraph_exit"
+    name = "session_log.append.subgraph_exit"
 
     def execute(self, node, inputs):
         from agent_lab._session_holder import session

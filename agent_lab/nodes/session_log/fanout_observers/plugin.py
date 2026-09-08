@@ -14,7 +14,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
 
 @node(
-    id="session_log__fanout_observers",
+    id="session_log.fanout.observers",
     layer=NodeLayer.LINEAGE,
     kind=NodeKind.EXECUTOR,
     description="Register an observer + provide a pump to fan-out Session events.",
@@ -22,7 +22,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
     outputs=[PortInfo("pump", kind=PortKind.FACT)],
 )
 class FanoutObservers(Node):
-    name = "session_log__fanout_observers"
+    name = "session_log.fanout.observers"
 
     def execute(self, node, inputs):
         from agent_lab._session_holder import session

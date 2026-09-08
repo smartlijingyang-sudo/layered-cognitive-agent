@@ -149,15 +149,15 @@ class _Runner:
         # complete picture without joining two streams.
         self._emit_to_session(ev)
 
-    # Mapping: trace kind -> session_log append node id
+    # Mapping: trace kind -> session_log append node id (hierarchical names)
     _TRACE_TO_APPEND_NODE: dict[str, str] = {
-        "node_start":       "session_log__append_node_start",
-        "node_end":         "session_log__append_node_end",
-        "edge_fire":        "session_log__append_edge_fire",
-        "subgraph_enter":   "session_log__append_subgraph_enter",
-        "subgraph_exit":    "session_log__append_subgraph_exit",
-        "before_compile":   "session_log__append_before_compile",
-        "after_compile":    "session_log__append_after_compile",
+        "node_start":       "session_log.append.node_start",
+        "node_end":         "session_log.append.node_end",
+        "edge_fire":        "session_log.append.edge_fire",
+        "subgraph_enter":   "session_log.append.subgraph_enter",
+        "subgraph_exit":    "session_log.append.subgraph_exit",
+        "before_compile":   "session_log.append.before_compile",
+        "after_compile":    "session_log.append.after_compile",
     }
 
     def _emit_to_session(self, ev: TraceEvent) -> None:
@@ -187,11 +187,18 @@ class _Runner:
                 region=NodeRegion.LINEAGE,
                 factory=append_node_id,
             )
-            # Build event FACT artifact carrying the full trace payload
+            # Build event FACT artifact carrying the full trace payload.
+            # node.full_path = "{subgraph_path}/{node_id}" gives consumers
+            # a single dotted identifier of WHICH node is firing this event.
+            node_full_path = ""
+            if ev.node_id:
+                prefix = f"{ev.subgraph_path}/" if ev.subgraph_path else ""
+                node_full_path = f"{prefix}{ev.node_id}"
             event_data = {
                 "kind": ev.kind,
                 "subgraph_path": ev.subgraph_path,
                 "node_id": ev.node_id,
+                "node_full_path": node_full_path,
                 "edge_id": ev.edge_id,
                 "artifact_digest": ev.artifact_digest,
                 "ts_ms": ev.ts_ms,

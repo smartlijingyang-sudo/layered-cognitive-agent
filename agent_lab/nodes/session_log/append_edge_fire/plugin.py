@@ -6,7 +6,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
 
 @node(
-    id="session_log__append_edge_fire",
+    id="session_log.append.edge_fire",
     layer=NodeLayer.LINEAGE,
     kind=NodeKind.EXECUTOR,
     description="Emit an edge_fire framework event to Session (data-flow tracing).",
@@ -14,7 +14,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
     outputs=[PortInfo("seq_ref", kind=PortKind.FACT)],
 )
 class AppendEdgeFire(Node):
-    name = "session_log__append_edge_fire"
+    name = "session_log.append.edge_fire"
 
     def execute(self, node, inputs):
         from agent_lab._session_holder import session

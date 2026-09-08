@@ -7,7 +7,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
 
 @node(
-    id="session_log__append_reflection",
+    id="session_log.append.reflection",
     layer=NodeLayer.LINEAGE,
     kind=NodeKind.EXECUTOR,
     description="Append a Reflection artifact to the Session log (event_type=reflection.v1).",
@@ -16,7 +16,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
     provides=["session_seq_ref"],
 )
 class AppendReflection(Node):
-    name = "session_log__append_reflection"
+    name = "session_log.append.reflection"
 
     def execute(self, node, inputs):
         from agent_lab._session_holder import session

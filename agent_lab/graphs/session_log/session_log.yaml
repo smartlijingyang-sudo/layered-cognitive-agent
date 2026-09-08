@@ -75,31 +75,31 @@ nodes:
 
   - id: write_decision
     region: lineage
-    factory: session_log__append_decision
+    factory: session_log.append.decision
     ins: [decision]
     outs: [seq_ref]
 
   - id: write_observation
     region: lineage
-    factory: session_log__append_observation
+    factory: session_log.append.observation
     ins: [observation]
     outs: [seq_ref]
 
   - id: write_reflection
     region: lineage
-    factory: session_log__append_reflection
+    factory: session_log.append.reflection
     ins: [reflection]
     outs: [seq_ref]
 
   - id: write_tool_result
     region: lineage
-    factory: session_log__append_tool_result
+    factory: session_log.append.tool_result
     ins: [tool_message]
     outs: [seq_ref]
 
   - id: write_checkpoint
     region: lineage
-    factory: session_log__append_checkpoint
+    factory: session_log.append.checkpoint
     ins: [checkpoint]
     outs: [seq_ref]
 
@@ -107,43 +107,43 @@ nodes:
 
   - id: trace_node_start
     region: lineage
-    factory: session_log__append_node_start
+    factory: session_log.append.node_start
     ins: [event]
     outs: [seq_ref]
 
   - id: trace_node_end
     region: lineage
-    factory: session_log__append_node_end
+    factory: session_log.append.node_end
     ins: [event]
     outs: [seq_ref]
 
   - id: trace_edge_fire
     region: lineage
-    factory: session_log__append_edge_fire
+    factory: session_log.append.edge_fire
     ins: [event]
     outs: [seq_ref]
 
   - id: trace_subgraph_enter
     region: lineage
-    factory: session_log__append_subgraph_enter
+    factory: session_log.append.subgraph_enter
     ins: [event]
     outs: [seq_ref]
 
   - id: trace_subgraph_exit
     region: lineage
-    factory: session_log__append_subgraph_exit
+    factory: session_log.append.subgraph_exit
     ins: [event]
     outs: [seq_ref]
 
   - id: trace_before_compile
     region: lineage
-    factory: session_log__append_before_compile
+    factory: session_log.append.before_compile
     ins: [event]
     outs: [seq_ref]
 
   - id: trace_after_compile
     region: lineage
-    factory: session_log__append_after_compile
+    factory: session_log.append.after_compile
     ins: [event]
     outs: [seq_ref]
 
@@ -151,20 +151,20 @@ nodes:
 
   - id: read_events
     region: lineage
-    factory: session_log__snapshot_events
+    factory: session_log.snapshot.events
     config: { from_seq: 0, limit: 1000 }
     ins: []
     outs: [events]
 
   - id: read_header
     region: lineage
-    factory: session_log__fold_header
+    factory: session_log.fold.header
     ins: []
     outs: [header]
 
   - id: read_seq
     region: lineage
-    factory: session_log__session_seq
+    factory: session_log.session.seq
     ins: []
     outs: [seq]
 
@@ -172,19 +172,19 @@ nodes:
 
   - id: register_observer
     region: lineage
-    factory: session_log__register_observer
+    factory: session_log.register.observer
     ins: [observer]
     outs: [cancel]
 
   - id: fanout_observers
     region: lineage
-    factory: session_log__fanout_observers
+    factory: session_log.fanout.observers
     ins: [observer]
     outs: [pump]
 
   - id: consume_events
     region: lineage
-    factory: session_log__consume_events
+    factory: session_log.consume.events
     config: { from_seq: 0, limit: 1000 }
     ins: [consumer]
     outs: [results]

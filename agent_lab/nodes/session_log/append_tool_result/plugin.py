@@ -12,7 +12,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
 
 @node(
-    id="session_log__append_tool_result",
+    id="session_log.append.tool_result",
     layer=NodeLayer.LINEAGE,
     kind=NodeKind.EXECUTOR,
     description="Append a {role:tool} message to the Session log (event_type=tool.result.v1).",
@@ -21,7 +21,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
     provides=["session_seq_ref"],
 )
 class AppendToolResult(Node):
-    name = "session_log__append_tool_result"
+    name = "session_log.append.tool_result"
 
     def execute(self, node, inputs):
         from agent_lab._session_holder import session

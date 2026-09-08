@@ -11,7 +11,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
 
 @node(
-    id="session_log__append_checkpoint",
+    id="session_log.append.checkpoint",
     layer=NodeLayer.LINEAGE,
     kind=NodeKind.EXECUTOR,
     description="Append a checkpoint marker to the Session log (event_type=checkpoint.v1).",
@@ -20,7 +20,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
     provides=["session_seq_ref"],
 )
 class AppendCheckpoint(Node):
-    name = "session_log__append_checkpoint"
+    name = "session_log.append.checkpoint"
 
     def execute(self, node, inputs):
         from agent_lab._session_holder import session

@@ -13,7 +13,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
 
 @node(
-    id="session_log__fold_header",
+    id="session_log.fold.header",
     layer=NodeLayer.LINEAGE,
     kind=NodeKind.TRANSFORMER,
     description="Fold the Session header (system/tools/config) for the LLM assembler.",
@@ -22,7 +22,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
     provides=["session_header"],
 )
 class FoldHeader(Node):
-    name = "session_log__fold_header"
+    name = "session_log.fold.header"
 
     def execute(self, node, inputs):
         from agent_lab._session_holder import session

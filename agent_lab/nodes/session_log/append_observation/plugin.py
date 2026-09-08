@@ -7,7 +7,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
 
 @node(
-    id="session_log__append_observation",
+    id="session_log.append.observation",
     layer=NodeLayer.LINEAGE,
     kind=NodeKind.EXECUTOR,
     description="Append an Observation artifact to the Session log (event_type=observation.v1).",
@@ -16,7 +16,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
     provides=["session_seq_ref"],
 )
 class AppendObservation(Node):
-    name = "session_log__append_observation"
+    name = "session_log.append.observation"
 
     def execute(self, node, inputs):
         from agent_lab._session_holder import session

@@ -12,7 +12,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
 
 @node(
-    id="session_log__snapshot_events",
+    id="session_log.snapshot.events",
     layer=NodeLayer.LINEAGE,
     kind=NodeKind.TRANSFORMER,
     description="Snapshot recent Session events (config.from_seq, config.limit).",
@@ -21,7 +21,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
     provides=["session_events_snapshot"],
 )
 class SnapshotEvents(Node):
-    name = "session_log__snapshot_events"
+    name = "session_log.snapshot.events"
 
     def execute(self, node, inputs):
         from agent_lab._session_holder import session

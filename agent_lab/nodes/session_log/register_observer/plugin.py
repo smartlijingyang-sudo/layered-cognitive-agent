@@ -14,7 +14,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
 
 @node(
-    id="session_log__register_observer",
+    id="session_log.register.observer",
     layer=NodeLayer.LINEAGE,
     kind=NodeKind.EXECUTOR,
     description="Register an observer callable to the Session; return cancel handle.",
@@ -23,7 +23,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
     provides=["observer_cancel"],
 )
 class RegisterObserver(Node):
-    name = "session_log__register_observer"
+    name = "session_log.register.observer"
 
     def execute(self, node, inputs):
         from agent_lab._session_holder import session

@@ -13,7 +13,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
 
 @node(
-    id="session_log__consume_events",
+    id="session_log.consume.events",
     layer=NodeLayer.LINEAGE,
     kind=NodeKind.EXECUTOR,
     description="Pull Session events and apply a consumer callable to each.",
@@ -24,7 +24,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
     outputs=[PortInfo("results", kind=PortKind.FACT)],
 )
 class ConsumeEvents(Node):
-    name = "session_log__consume_events"
+    name = "session_log.consume.events"
 
     def execute(self, node, inputs):
         consumer_a = inputs.get("consumer")

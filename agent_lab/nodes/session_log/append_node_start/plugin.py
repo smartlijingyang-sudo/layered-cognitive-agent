@@ -10,7 +10,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
 
 @node(
-    id="session_log__append_node_start",
+    id="session_log.append.node_start",
     layer=NodeLayer.LINEAGE,
     kind=NodeKind.EXECUTOR,
     description="Emit a node_start framework event to Session (lifecycle tracing).",
@@ -18,7 +18,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
     outputs=[PortInfo("seq_ref", kind=PortKind.FACT)],
 )
 class AppendNodeStart(Node):
-    name = "session_log__append_node_start"
+    name = "session_log.append.node_start"
 
     def execute(self, node, inputs):
         from agent_lab._session_holder import session
