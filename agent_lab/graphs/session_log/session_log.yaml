@@ -1,44 +1,77 @@
 # session_log — single fact-write surface (post-fusion v2).
-# Composed of 9 single-responsibility workers:
-#   - 5 append_* (decision / observation / reflection / tool_result / checkpoint)
-#   - 3 reads     (snapshot_events / fold_header / session_seq)
-#   - 1 hook      (register_observer)
+# 18 single-responsibility workers around a shared LCA Session:
 #
-# Architecture: a single identity host + 9 internal nodes. Each
-# append_* node is callable independently from any other graph via
-# sub_spec mounting on this host with input_map/output_map.
-# No internal data edges — the 9 nodes are independent endpoints.
+#   WRITE — domain facts (5):
+#     write_decision / write_observation / write_reflection /
+#     write_tool_result / write_checkpoint
+#
+#   TRACE — framework lifecycle events (7):
+#     trace_node_start / trace_node_end / trace_edge_fire /
+#     trace_subgraph_enter / trace_subgraph_exit /
+#     trace_before_compile / trace_after_compile
+#
+#   READ — fold/snapshot/seal (3):
+#     read_events / read_header / read_seq
+#
+#   HOOK — observer + consumption (3):
+#     register_observer / fanout_observers / consume_events
+#
+# Architecture: single identity host + 18 internal workers. No internal
+# data edges — each node is an independent endpoint, callable from any
+# other graph via sub_spec mounting.
 #
 # Singleton Session: agent_lab._session_holder.session()
-# (configured at boot via configure_session(...); falls back to an
-#  in-memory default Session if not set).
+# Configured at boot via configure_session(...); falls back to an
+# in-memory default Session if not set.
+#
+# Framework integration: runner._emit() in runtime/runner.py automatically
+# calls the corresponding append_*trace* node when lifecycle events fire
+# (node_start, node_end, edge_fire, subgraph_enter, subgraph_exit). This
+# graph is the single durable sink for both domain facts AND framework
+# trace events.
 id: session_log
 version: 0.1.0
 region: lineage
-description: Durable fact-write surface (Session.append SSOT).
-  Composes 9 single-responsibility workers.
+description: Single fact-write surface for agent_lab. Writes domain facts
+  (decision / observation / reflection / tool_result / checkpoint) and
+  framework lifecycle events (node_start/end, edge_fire, subgraph_enter/exit,
+  before/after_compile) to a shared LCA Session.
 
 graph:
   id: session_log
   layer: lineage
-  purpose: Session-backed single fact-write seam (ADR-0186/0191/0194).
+  purpose: Session-backed single fact-write seam (ADR-0186/0191/0194) +
+    framework lifecycle tracing.
   members:
+    # WRITE — domain facts
     - write_decision
     - write_observation
     - write_reflection
     - write_tool_result
     - write_checkpoint
+    # TRACE — framework events
+    - trace_node_start
+    - trace_node_end
+    - trace_edge_fire
+    - trace_subgraph_enter
+    - trace_subgraph_exit
+    - trace_before_compile
+    - trace_after_compile
+    # READ
     - read_events
     - read_header
     - read_seq
-    - hook_observer
+    # HOOK
+    - register_observer
+    - fanout_observers
+    - consume_events
 
 # ──────────────────────────────────────────────────────────────────────
-# NODES — 9 single-responsibility workers + 1 identity host.
+# NODES — 18 single-responsibility workers + 1 identity host.
 # ──────────────────────────────────────────────────────────────────────
 nodes:
 
-  # ----- WRITE: 5 append_* (one per event_type, per C11 closed set) ----
+  # ── WRITE: domain facts (per C11 closed set) ─────────────────────────
 
   - id: write_decision
     region: lineage
@@ -70,7 +103,51 @@ nodes:
     ins: [checkpoint]
     outs: [seq_ref]
 
-  # ----- READ: 3 read endpoints ----------------------------------------
+  # ── TRACE: framework lifecycle events ───────────────────────────────
+
+  - id: trace_node_start
+    region: lineage
+    factory: session_log__append_node_start
+    ins: [event]
+    outs: [seq_ref]
+
+  - id: trace_node_end
+    region: lineage
+    factory: session_log__append_node_end
+    ins: [event]
+    outs: [seq_ref]
+
+  - id: trace_edge_fire
+    region: lineage
+    factory: session_log__append_edge_fire
+    ins: [event]
+    outs: [seq_ref]
+
+  - id: trace_subgraph_enter
+    region: lineage
+    factory: session_log__append_subgraph_enter
+    ins: [event]
+    outs: [seq_ref]
+
+  - id: trace_subgraph_exit
+    region: lineage
+    factory: session_log__append_subgraph_exit
+    ins: [event]
+    outs: [seq_ref]
+
+  - id: trace_before_compile
+    region: lineage
+    factory: session_log__append_before_compile
+    ins: [event]
+    outs: [seq_ref]
+
+  - id: trace_after_compile
+    region: lineage
+    factory: session_log__append_after_compile
+    ins: [event]
+    outs: [seq_ref]
+
+  # ── READ ──────────────────────────────────────────────────────────────
 
   - id: read_events
     region: lineage
@@ -91,15 +168,28 @@ nodes:
     ins: []
     outs: [seq]
 
-  # ----- HOOK: 1 observer registration ----------------------------------
+  # ── HOOK: observer + consumption ─────────────────────────────────────
 
-  - id: hook_observer
+  - id: register_observer
     region: lineage
     factory: session_log__register_observer
     ins: [observer]
     outs: [cancel]
 
-  # ----- HOST: identity — sub_spec mount entry point -------------------
+  - id: fanout_observers
+    region: lineage
+    factory: session_log__fanout_observers
+    ins: [observer]
+    outs: [pump]
+
+  - id: consume_events
+    region: lineage
+    factory: session_log__consume_events
+    config: { from_seq: 0, limit: 1000 }
+    ins: [consumer]
+    outs: [results]
+
+  # ── HOST: identity — sub_spec mount entry point ─────────────────────
   - id: host
     region: lineage
     factory: passthrough__identity

@@ -143,6 +143,73 @@ class _Runner:
         )
         fanout_hooks(self._plugins(), hook_event, ctx)
 
+        # Auto-write framework lifecycle events to the session_log graph.
+        # This makes the Session the single durable sink for both
+        # domain facts AND trace events, so consumers can fold a
+        # complete picture without joining two streams.
+        self._emit_to_session(ev)
+
+    # Mapping: trace kind -> session_log append node id
+    _TRACE_TO_APPEND_NODE: dict[str, str] = {
+        "node_start":       "session_log__append_node_start",
+        "node_end":         "session_log__append_node_end",
+        "edge_fire":        "session_log__append_edge_fire",
+        "subgraph_enter":   "session_log__append_subgraph_enter",
+        "subgraph_exit":    "session_log__append_subgraph_exit",
+        "before_compile":   "session_log__append_before_compile",
+        "after_compile":    "session_log__append_after_compile",
+    }
+
+    def _emit_to_session(self, ev: TraceEvent) -> None:
+        """Forward framework lifecycle events into the session_log graph.
+
+        Calls the corresponding session_log__append_* node (one per event
+        type) so every node_start / node_end / edge_fire / subgraph_enter /
+        subgraph_exit / before_compile / after_compile is durably written
+        to the LCA Session. Failures are contained: the runner continues
+        even if the Session is unavailable (preserves C9 idempotency
+        on emit errors).
+        """
+        append_node_id = self._TRACE_TO_APPEND_NODE.get(ev.kind)
+        if append_node_id is None:
+            return
+        try:
+            from agent_lab.nodes import NodeRegistry
+            from agent_lab.primitives.artifact import Artifact, ArtifactKind
+            from agent_lab.graph.spec import InfoNode, NodeRegion
+            from agent_lab._session_holder import session as _session
+
+            # Skip if no Session configured (ad-hoc callers)
+            _ = _session()  # triggers default-Session build if absent
+            NodeCls = NodeRegistry.get(append_node_id)
+            info_node = InfoNode(
+                id=append_node_id,
+                region=NodeRegion.LINEAGE,
+                factory=append_node_id,
+            )
+            # Build event FACT artifact carrying the full trace payload
+            event_data = {
+                "kind": ev.kind,
+                "subgraph_path": ev.subgraph_path,
+                "node_id": ev.node_id,
+                "edge_id": ev.edge_id,
+                "artifact_digest": ev.artifact_digest,
+                "ts_ms": ev.ts_ms,
+                **dict(ev.payload or {}),
+            }
+            event_a = Artifact(
+                kind=ArtifactKind.FACT,
+                content=event_data,
+                schema_ref=f"trace.{ev.kind}.v1",
+            )
+            NodeCls().execute(info_node, {"event": event_a})
+        except Exception as exc:  # containment boundary (C9)
+            # Emit errors must not abort the run.
+            import logging
+            logging.getLogger(__name__).debug(
+                "session_log emit %s failed: %s", ev.kind, exc,
+            )
+
     def _apply_output_hooks(
         self, node_id: str, outputs: dict[str, Artifact]
     ) -> dict[str, Artifact]:
