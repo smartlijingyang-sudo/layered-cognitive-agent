@@ -29,6 +29,7 @@ from agent_lab.nodes import (
     perceive,  # noqa: F401
     reflect,  # noqa: F401
     remember,  # noqa: F401
+    session_log,  # noqa: F401
     stop,  # noqa: F401
     think,  # noqa: F401
 )

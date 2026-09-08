@@ -1,20 +1,107 @@
-# session_log — durable fact-write surface (skeleton).
-# Workers: append_decision / append_observation / append_reflection.
-# Single fact-write seam per ADR-0186/0191/0194.
+# session_log — single fact-write surface (post-fusion v2).
+# Composed of 9 single-responsibility workers:
+#   - 5 append_* (decision / observation / reflection / tool_result / checkpoint)
+#   - 3 reads     (snapshot_events / fold_header / session_seq)
+#   - 1 hook      (register_observer)
+#
+# Architecture: a single identity host + 9 internal nodes. Each
+# append_* node is callable independently from any other graph via
+# sub_spec mounting on this host with input_map/output_map.
+# No internal data edges — the 9 nodes are independent endpoints.
+#
+# Singleton Session: agent_lab._session_holder.session()
+# (configured at boot via configure_session(...); falls back to an
+#  in-memory default Session if not set).
 id: session_log
 version: 0.1.0
 region: lineage
-description: Session.append(event_type, data) — single fact-write seam.
-  (Skeleton stub.)
+description: Durable fact-write surface (Session.append SSOT).
+  Composes 9 single-responsibility workers.
 
 graph:
   id: session_log
   layer: lineage
-  purpose: Durable fact-writing surface — Session is the SSOT.
+  purpose: Session-backed single fact-write seam (ADR-0186/0191/0194).
+  members:
+    - write_decision
+    - write_observation
+    - write_reflection
+    - write_tool_result
+    - write_checkpoint
+    - read_events
+    - read_header
+    - read_seq
+    - hook_observer
 
+# ──────────────────────────────────────────────────────────────────────
+# NODES — 9 single-responsibility workers + 1 identity host.
+# ──────────────────────────────────────────────────────────────────────
 nodes:
+
+  # ----- WRITE: 5 append_* (one per event_type, per C11 closed set) ----
+
+  - id: write_decision
+    region: lineage
+    factory: session_log__append_decision
+    ins: [decision]
+    outs: [seq_ref]
+
   - id: write_observation
     region: lineage
-    factory: remember__append_observation
+    factory: session_log__append_observation
     ins: [observation]
+    outs: [seq_ref]
+
+  - id: write_reflection
+    region: lineage
+    factory: session_log__append_reflection
+    ins: [reflection]
+    outs: [seq_ref]
+
+  - id: write_tool_result
+    region: lineage
+    factory: session_log__append_tool_result
+    ins: [tool_message]
+    outs: [seq_ref]
+
+  - id: write_checkpoint
+    region: lineage
+    factory: session_log__append_checkpoint
+    ins: [checkpoint]
+    outs: [seq_ref]
+
+  # ----- READ: 3 read endpoints ----------------------------------------
+
+  - id: read_events
+    region: lineage
+    factory: session_log__snapshot_events
+    config: { from_seq: 0, limit: 1000 }
+    ins: []
+    outs: [events]
+
+  - id: read_header
+    region: lineage
+    factory: session_log__fold_header
+    ins: []
+    outs: [header]
+
+  - id: read_seq
+    region: lineage
+    factory: session_log__session_seq
+    ins: []
     outs: [seq]
+
+  # ----- HOOK: 1 observer registration ----------------------------------
+
+  - id: hook_observer
+    region: lineage
+    factory: session_log__register_observer
+    ins: [observer]
+    outs: [cancel]
+
+  # ----- HOST: identity — sub_spec mount entry point -------------------
+  - id: host
+    region: lineage
+    factory: passthrough__identity
+    ins: [in]
+    outs: [out]
