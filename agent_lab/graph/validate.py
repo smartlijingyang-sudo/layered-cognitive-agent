@@ -38,6 +38,35 @@ def _declared_sub_spec_inputs(spec: InfoEdgeSpec) -> dict[tuple[str, str], str]:
     return out
 
 
+def _check_emits_against_edges(spec: InfoEdgeSpec) -> list[str]:
+    """C2/C11: each effect edge source should declare an emit.
+
+    Surfaces a non-fatal-style error if the node forgot to declare what
+    it emits. Compile-time fails to find these means runtime has no
+    permission / capability basis.
+    """
+    errs: list[str] = []
+    for e in spec.edges:
+        if e.kind.value != "effect":
+            continue
+        try:
+            src_node = spec.node(e.from_ref.node_id)
+        except KeyError:
+            continue
+        from agent_lab.nodes.base import NodeRegistry
+
+        try:
+            manifest = NodeRegistry.describe(src_node.factory)
+        except KeyError:
+            continue
+        if not manifest.emits:
+            errs.append(
+                f"C2: effect edge {e.id} originates from {src_node.id} "
+                f"({src_node.factory}) which declares no emits"
+            )
+    return errs
+
+
 def validate(spec: InfoEdgeSpec, registry: dict[str, dict[str, str]] | None = None) -> list[str]:
     """Return a list of error strings. Empty list means valid.
 
@@ -115,6 +144,9 @@ def validate(spec: InfoEdgeSpec, registry: dict[str, dict[str, str]] | None = No
     for g in spec.grants:
         if not g.ports:
             errs.append(f"C4: grant {g.id} declares no ports")
+
+    # Emit declarations must align with effect edges (C2/C11)
+    errs.extend(_check_emits_against_edges(spec))
 
     return errs
 

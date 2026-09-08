@@ -5,18 +5,27 @@ These are the workers in the mv.assemble sub-graph (ADR-0206 §5.3).
 
 from __future__ import annotations
 
-from agent_lab.graph.spec import InfoNode
-from agent_lab.nodes.base import Node, register
+from agent_lab.nodes.base import Node
+from agent_lab.nodes.manifest import NodeKind, NodeLayer, PortInfo, PortKind, node
 from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
 
-@register
+@node(
+    id="trust_classify",
+    layer=NodeLayer.MODEL_VISIBLE,
+    kind=NodeKind.VALIDATOR,
+    description="Tag inputs with trust level (config.trustable_kinds:[str]).",
+    inputs=[PortInfo("any_in", kind=PortKind.ARTIFACT, required=False)],
+    outputs=[PortInfo("labels", kind=PortKind.FACT)],
+    provides=["trust_labels"],
+    relates_to=["redact", "merge_messages", "validate_manifest"],
+)
 class TrustClassify(Node):
     """Tag inputs with trust level (config.trustable_kinds:[str])."""
 
     name = "trust_classify"
 
-    def execute(self, node: InfoNode, inputs: dict[str, Artifact]) -> dict[str, Artifact]:
+    def execute(self, node, inputs):
         trustable = set(node.config.get("trustable_kinds", []))
         out_port = node.outs[0]
         labeled = []
@@ -30,13 +39,23 @@ class TrustClassify(Node):
         )}
 
 
-@register
+@node(
+    id="merge_messages",
+    layer=NodeLayer.MODEL_VISIBLE,
+    kind=NodeKind.ASSEMBLER,
+    description="Combine multiple message-list artifacts into one ordered list.",
+    inputs=[PortInfo("any_in", kind=PortKind.ARTIFACT, required=False)],
+    outputs=[PortInfo("messages", kind=PortKind.MESSAGE)],
+    provides=["merged_messages"],
+    requires=["message_list"],
+    relates_to=["assemble_messages", "commit_manifest", "validate_manifest"],
+)
 class MergeMessages(Node):
     """Combine multiple message-list artifacts into one ordered list."""
 
     name = "merge_messages"
 
-    def execute(self, node: InfoNode, inputs: dict[str, Artifact]) -> dict[str, Artifact]:
+    def execute(self, node, inputs):
         out_port = node.outs[0]
         order = node.config.get("order", list(inputs.keys()))
         merged: list = []
@@ -57,14 +76,23 @@ class MergeMessages(Node):
             schema_ref="openai.messages.v1",
         )}
 
-
-@register
+@node(
+    id="validate_manifest",
+    layer=NodeLayer.MODEL_VISIBLE,
+    kind=NodeKind.VALIDATOR,
+    description="Sanity-check that messages are non-empty and contain required roles.",
+    inputs=[PortInfo("from", kind=PortKind.MESSAGE, required=False)],
+    outputs=[PortInfo("validation", kind=PortKind.FACT)],
+    provides=["manifest_validation"],
+    requires=["message_list"],
+    relates_to=["commit_manifest", "merge_messages"],
+)
 class ValidateManifest(Node):
     """Sanity-check that messages are non-empty and contain required roles."""
 
     name = "validate_manifest"
 
-    def execute(self, node: InfoNode, inputs: dict[str, Artifact]) -> dict[str, Artifact]:
+    def execute(self, node, inputs):
         out_port = node.outs[0]
         src = node.config.get("from", node.ins[0])
         required_roles = node.config.get("required_roles", [])

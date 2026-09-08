@@ -11,6 +11,21 @@ description: >
   Three phases hold real nested graphs (think -> mv_assemble, act -> effect_dispatch);
   the others are stubs to keep the demo runnable.
 
+# Graph manifest — organizational metadata (ADR-0206 §5 + agent_lab/nodes/manifest.py).
+graph:
+  id: agent_loop
+  layer: phase
+  purpose: Orchestrate the agent loop as six nested sub-graphs wired by sub_spec.
+  members: [perceive, think, assemble_for_think, flatten_manifest, call_llm_node,
+            parse_decision, act, reflect, remember, stop]
+  references: [mv_assemble, effect_dispatch]
+  relations:
+    - { graph: mv_assemble,     kind: contains, role: think_phase_manifest_assembly }
+    - { graph: effect_dispatch, kind: contains, role: act_phase_tool_dispatch     }
+  capabilities:
+    provides: [agent_run_loop, six_phase_orchestration]
+    requires: [model_visible_assembly, effect_dispatch, llm_call]
+
 nodes:
   # --- perceive (stub) ---
   - id: perceive

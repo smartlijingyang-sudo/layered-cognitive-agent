@@ -5,8 +5,8 @@ Tool dispatch is mocked via the in-process `_TOOL_REGISTRY`.
 
 from __future__ import annotations
 
-from agent_lab.graph.spec import InfoNode
-from agent_lab.nodes.base import Node, register
+from agent_lab.nodes.base import Node
+from agent_lab.nodes.manifest import NodeKind, NodeLayer, PortInfo, PortKind, node
 from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
 _TOOL_REGISTRY: dict[str, callable] = {}  # name -> callable(intent_dict) -> result_str
@@ -16,13 +16,24 @@ def register_tool(name: str, fn) -> None:
     _TOOL_REGISTRY[name] = fn
 
 
-@register
+@node(
+    id="build_intent",
+    layer=NodeLayer.EFFECT,
+    kind=NodeKind.PRODUCER,
+    description="Combine tool name (config) + args into a structured ToolIntent artifact.",
+    inputs=[PortInfo("args", kind=PortKind.FACT, required=False)],
+    outputs=[PortInfo("intent", kind=PortKind.INTENT)],
+    provides=["tool_intent"],
+    consumes=[],
+    emits=["tool_intent"],
+    relates_to=["grant_check", "dispatch_tool"],
+)
 class BuildIntent(Node):
     """Combine model intent (text) + context into a structured ToolIntent artifact."""
 
     name = "build_intent"
 
-    def execute(self, node: InfoNode, inputs: dict[str, Artifact]) -> dict[str, Artifact]:
+    def execute(self, node, inputs):
         tool_name = node.config["tool"]
         args_a = inputs.get("args")
         out_port = node.config.get("to", "intent")
@@ -34,13 +45,23 @@ class BuildIntent(Node):
         )}
 
 
-@register
+@node(
+    id="grant_check",
+    layer=NodeLayer.EFFECT,
+    kind=NodeKind.VALIDATOR,
+    description="Static allowlist check (config.allow:[str]). No business logic.",
+    inputs=[PortInfo("intent", kind=PortKind.INTENT, required=False)],
+    outputs=[PortInfo("verdict", kind=PortKind.VERDICT)],
+    provides=["grant_verdict"],
+    consumes=["tool_intent"],
+    relates_to=["build_intent", "dispatch_tool", "route_on"],
+)
 class GrantCheck(Node):
     """Static allowlist check (config.allow:[str]). No business logic."""
 
     name = "grant_check"
 
-    def execute(self, node: InfoNode, inputs: dict[str, Artifact]) -> dict[str, Artifact]:
+    def execute(self, node, inputs):
         allow = set(node.config.get("allow", []))
         intent_a = inputs.get("intent")
         out_port = node.config.get("to", "verdict")
@@ -49,13 +70,24 @@ class GrantCheck(Node):
         return {out_port: Artifact(kind=ArtifactKind.FACT, content={"verdict": verdict, "tool": tool}, schema_ref="grant.verdict.v1")}
 
 
-@register
+@node(
+    id="dispatch_tool",
+    layer=NodeLayer.EFFECT,
+    kind=NodeKind.EXECUTOR,
+    description="Invoke the tool from the in-process registry. Mock-safe.",
+    inputs=[PortInfo("routed", kind=PortKind.INTENT, required=False)],
+    outputs=[PortInfo("receipt", kind=PortKind.RECEIPT)],
+    provides=["effect_receipt"],
+    consumes=["tool_intent"],
+    emits=["effect_receipt"],
+    relates_to=["grant_check", "write_receipt", "integrate_observation"],
+)
 class DispatchTool(Node):
     """Invoke the tool from the in-process registry. Mock-safe."""
 
     name = "dispatch_tool"
 
-    def execute(self, node: InfoNode, inputs: dict[str, Artifact]) -> dict[str, Artifact]:
+    def execute(self, node, inputs):
         intent_port = node.config.get("from", "intent")
         out_port = node.config.get("to", "receipt")
         intent_a = inputs.get(intent_port)
@@ -87,7 +119,7 @@ class DispatchTool(Node):
                 content={"status": "ok", "tool": tool, "result": result},
                 schema_ref="tool.receipt.v1",
             )}
-        except Exception as exc:  # surface as receipt error (deterministic boundary)
+        except Exception as exc:
             return {out_port: Artifact(
                 kind=ArtifactKind.RECEIPT,
                 content={"status": "error", "tool": tool, "error": str(exc)},
@@ -95,25 +127,45 @@ class DispatchTool(Node):
             )}
 
 
-@register
+@node(
+    id="write_receipt",
+    layer=NodeLayer.EFFECT,
+    kind=NodeKind.PASSTHROUGH,
+    description="Pass-through the receipt; this is a hook point for journaling later.",
+    inputs=[PortInfo("receipt", kind=PortKind.RECEIPT, required=False)],
+    outputs=[PortInfo("to", kind=PortKind.RECEIPT)],
+    provides=["receipt_fact"],
+    consumes=["effect_receipt"],
+    relates_to=["dispatch_tool", "integrate_observation"],
+)
 class WriteReceipt(Node):
     """Pass-through the receipt; this is a hook point for journaling later."""
 
     name = "write_receipt"
 
-    def execute(self, node: InfoNode, inputs: dict[str, Artifact]) -> dict[str, Artifact]:
+    def execute(self, node, inputs):
         src = node.config.get("from", "receipt")
         out_port = node.config.get("to", "receipt_fact")
         return {out_port: inputs[src] if src in inputs else Artifact(kind=ArtifactKind.RECEIPT, content={})}
 
 
-@register
+@node(
+    id="integrate_observation",
+    layer=NodeLayer.EFFECT,
+    kind=NodeKind.TRANSFORMER,
+    description="Convert a receipt into a model-visible observation artifact.",
+    inputs=[PortInfo("receipt_fact", kind=PortKind.RECEIPT, required=False)],
+    outputs=[PortInfo("observation", kind=PortKind.TEXT)],
+    provides=["observation"],
+    consumes=["effect_receipt"],
+    relates_to=["dispatch_tool", "write_receipt", "merge_messages"],
+)
 class IntegrateObservation(Node):
     """Convert a receipt into a model-visible observation artifact."""
 
     name = "integrate_observation"
 
-    def execute(self, node: InfoNode, inputs: dict[str, Artifact]) -> dict[str, Artifact]:
+    def execute(self, node, inputs):
         src = node.config.get("from", "receipt")
         out_port = node.config.get("to", "observation")
         rcpt = inputs.get(src)

@@ -10,6 +10,20 @@ description: >
   integrate observation, project back to model-visible assembly sub-graph.
   The 'project' edge ending in mv_assemble.in_tool_results is the C1 closure.
 
+graph:
+  id: effect_dispatch
+  layer: effect
+  purpose: Build, authorize, dispatch, and integrate a tool call.
+  members: [build_intent, grant_check, route_verdict, dispatch,
+            write_receipt, integrate]
+  references: [mv_assemble]
+  relations:
+    - { graph: agent_loop,   kind: child_of,   role: act_phase }
+    - { graph: mv_assemble,  kind: writes_to, role: project_observation }
+  capabilities:
+    provides: [effect_receipt, observation]
+    requires: [tool_intent, grant_verdict]
+
 nodes:
   - id: build_intent
     region: effect

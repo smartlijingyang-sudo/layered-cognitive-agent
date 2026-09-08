@@ -149,6 +149,96 @@ _DISPATCH = {
 }
 
 
+def _describe(target: str | None) -> None:
+    """Print self-describing manifests.
+
+    Usage:
+      python -m agent_lab.run describe                 # all nodes + graphs
+      python -m agent_lab.run describe --target node:redact
+      python -m agent_lab.run describe --target graph:agent_loop
+    """
+    from agent_lab.nodes import NodeRegistry
+
+    if target is None or target == "all":
+        # All node manifests
+        print("=== Node Manifests ===")
+        for node_id in sorted(NodeRegistry.known()):
+            m = NodeRegistry.describe(node_id)
+            print(f"\n[{node_id}]  {m.name}")
+            print(f"  layer={m.layer.value}  kind={m.kind.value}")
+            print(f"  description: {m.description}")
+            if m.inputs:
+                print("  inputs:")
+                for p in m.inputs:
+                    print(f"    - {p.id} ({p.kind.value}, required={p.required})")
+            if m.outputs:
+                print("  outputs:")
+                for p in m.outputs:
+                    print(f"    - {p.id} ({p.kind.value}, required={p.required})")
+            if m.provides:
+                print(f"  provides: {list(m.provides)}")
+            if m.requires:
+                print(f"  requires: {list(m.requires)}")
+            if m.emits:
+                print(f"  emits: {list(m.emits)}")
+            if m.consumes:
+                print(f"  consumes: {list(m.consumes)}")
+            if m.relates_to:
+                print(f"  relates_to: {list(m.relates_to)}")
+        # All graph manifests
+        print("\n\n=== Graph Manifests ===")
+        for stem in ("agent_loop", "mv_assemble", "effect_dispatch"):
+            from pathlib import Path
+
+            from agent_lab.graphs.loader import load_graph_manifest
+            yaml_path = Path(__file__).parent / "graphs" / "configs" / f"{stem}.yaml"
+            gm = load_graph_manifest(yaml_path)
+            if not gm:
+                continue
+            print(f"\n[{gm.get('id', stem)}]  layer={gm.get('layer', '?')}")
+            print(f"  purpose: {gm.get('purpose', '')}")
+            if gm.get("members"):
+                print(f"  members: {list(gm['members'])}")
+            if gm.get("references"):
+                print(f"  references: {list(gm['references'])}")
+            if gm.get("relations"):
+                for rel in gm["relations"]:
+                    print(f"  relation: {rel}")
+            if gm.get("capabilities"):
+                caps = gm["capabilities"]
+                if caps.get("provides"):
+                    print(f"  provides: {list(caps['provides'])}")
+                if caps.get("requires"):
+                    print(f"  requires: {list(caps['requires'])}")
+        return
+
+    kind, _, name = target.partition(":")
+    if kind == "node":
+        m = NodeRegistry.describe(name)
+        print(f"[{m.id}] {m.name}")
+        print(f"  layer={m.layer.value}  kind={m.kind.value}  description={m.description}")
+        print(f"  inputs={[p.id for p in m.inputs]}  outputs={[p.id for p in m.outputs]}")
+        print(f"  provides={list(m.provides)}  requires={list(m.requires)}")
+        print(f"  emits={list(m.emits)}  consumes={list(m.consumes)}")
+        print(f"  relates_to={list(m.relates_to)}")
+    elif kind == "graph":
+        from pathlib import Path
+
+        from agent_lab.graphs.loader import load_graph_manifest
+        yaml_path = Path(__file__).parent / "graphs" / "configs" / f"{name}.yaml"
+        gm = load_graph_manifest(yaml_path)
+        if not gm:
+            print(f"no graph manifest for: {name}")
+            return
+        print(f"[{gm.get('id')}]  layer={gm.get('layer')}  purpose={gm.get('purpose')}")
+        print(f"  members={list(gm.get('members', []))}")
+        print(f"  references={list(gm.get('references', []))}")
+        print(f"  relations={list(gm.get('relations', []))}")
+        print(f"  capabilities={gm.get('capabilities', {})}")
+    else:
+        print(f"unknown target kind: {kind} (use 'node:<id>' or 'graph:<id>')")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="agent_lab")
     parser.add_argument("graph", nargs="?", default="agent_loop",
@@ -156,9 +246,16 @@ def main(argv: list[str] | None = None) -> int:
                         help="which graph to run")
     parser.add_argument("--negative", action="store_true",
                         help="compile a broken copy of agent_loop and expect a ValidationError")
+    parser.add_argument("--describe", action="store_true",
+                        help="print self-describing node + graph manifests and exit")
+    parser.add_argument("--target", default=None,
+                        help="describe target: node:<id> | graph:<id>")
     args = parser.parse_args(argv)
 
     _register_mocks()
+    if args.describe:
+        _describe(args.target)
+        return 0
     if args.negative:
         _run_negative()
         return 0

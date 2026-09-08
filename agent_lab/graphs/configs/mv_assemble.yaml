@@ -10,6 +10,18 @@ description: >
   Inputs flow through trust classification, dedup, ranking, redaction,
   message merge, schema validation, and manifest commit.
 
+graph:
+  id: mv_assemble
+  layer: model_visible
+  purpose: Assemble and freeze the next ContextManifest for the LLM.
+  members: [classify, dedupe, rank, redact, merge, validate, commit]
+  references: []
+  relations:
+    - { graph: agent_loop, kind: child_of, role: think_phase }
+  capabilities:
+    provides: [context_manifest, manifest_validation]
+    requires: [trust_classification, dedup, redaction, message_merge]
+
 nodes:
   - id: classify
     region: model_visible

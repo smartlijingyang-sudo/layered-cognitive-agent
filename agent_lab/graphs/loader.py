@@ -114,6 +114,24 @@ def load_spec(path: str | Path) -> InfoEdgeSpec:
     )
 
 
+def load_graph_manifest(path: str | Path) -> dict:
+    """Read a YAML graph file and return its `graph:` manifest section.
+
+    Returns an empty dict if no `graph:` section is present.
+    The manifest carries organizational metadata (purpose, members,
+    references, relations, capabilities) that complements the data-flow
+    spec returned by load_spec().
+    """
+    p = Path(path)
+    raw = yaml.safe_load(p.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        return {}
+    g = raw.get("graph")
+    if not isinstance(g, dict):
+        return {}
+    return g
+
+
 def load_registry(*ids: str) -> dict[str, InfoEdgeSpec]:
     """Load a set of named graphs from configs/. ids are file stems.
 
