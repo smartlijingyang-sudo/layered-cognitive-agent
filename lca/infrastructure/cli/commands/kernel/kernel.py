@@ -25,6 +25,11 @@ from typing import cast
 
 import typer
 
+# Matches KernelServeConfig.host default — referenced from typer Option to
+# keep the printed command and the actual config value in lockstep, and to
+# give ruff S104 a named literal to attach noqa to.
+_LAN_BIND_DEFAULT = "0.0.0.0"  # noqa: S104 — bind-all intentional, see KernelServeConfig
+
 
 def register(app: typer.Typer) -> None:
     """Register kernel subcommands on the typer app."""
@@ -53,7 +58,13 @@ def register(app: typer.Typer) -> None:
             "profiles/web-standard.yaml",
             help="Profile YAML path the LCA kernel should boot",
         ),
-        host: str = typer.Option("127.0.0.1", "--host", help="lca_kernel serve host"),
+        # Default aligned with KernelServeConfig.host (binding all interfaces) —
+        # Next.js proxy in lobehub-ui hits the LAN address (e.g.
+        # http://10.36.6.252:8765/runs); binding loopback causes ECONNREFUSED →
+        # 500 on every /lca-api/* call. noqa reference at the literal site.
+        host: str = typer.Option(
+            _LAN_BIND_DEFAULT, "--host", help="lca_kernel serve host (LAN: 0.0.0.0; loopback only: 127.0.0.1)"
+        ),
         port: int = typer.Option(8765, "--port", help="lca_kernel serve port"),
     ) -> None:
         """Print the command to start the LCA kernel (ADR-0119 决定 4).

@@ -8,6 +8,8 @@ ADR-0119 决定 4 把 LCA 进程入口切到 ``uv run python -m lca_kernel serve
 - ``state()`` 探测 ``/health``,报告 RUNNING / STOPPED。
 - ``heal()`` 不健康时尝试 spawn 一个后台 ``lca_kernel serve`` 进程。
   ``host`` 来自 ``KernelServeConfig``,默认 ``0.0.0.0`` 让局域网能访问。
+  spawn 成功后会再探活 Next.js proxy 配置中的 LAN URL(LCA_GATEWAY_PUBLIC_URL
+  / OPENAI_PROXY_URL),防止"loopback 通 LAN 不通 → 前端打过来 500"静默踩坑。
 
 不实现 ``start / stop / restart`` —— 这些命令面应直接调
 ``lca-ops kernel_serve`` 拿启动命令、或由外部 supervisor 守护。
@@ -33,6 +35,10 @@ from lca.infrastructure.cli.services.process.utils import (
     find_pid_by_argv,
     port_listening,
 )
+
+# Hosts that bind-all. Used by _spawn's LAN probe to decide whether to
+# re-check the Next.js proxy's expected URL after loopback /health is ready.
+_BIND_ALL_HOSTS = frozenset({"0.0.0.0", "::"})  # noqa: S104 — see KernelServeConfig
 
 
 class _ProcessLike(Protocol):
@@ -155,11 +161,45 @@ class KernelServeService:
         while time.monotonic() < deadline:
             if not pid_alive(proc.pid):
                 return False
-            if http_ready(self.health_url, timeout=1.0):
+            if http_ready(self.health_url, timeout=1.0) and (
+                self._config.host not in _BIND_ALL_HOSTS or self._probe_proxy_lan()
+            ):
                 return True
             time.sleep(self._SPAWN_POLL_S)
         # timeout: 子进程可能还在 boot。让 state() 后续再判。
         return pid_alive(proc.pid)
+
+    def _probe_proxy_lan(self) -> bool:
+        """Probe the Next.js proxy's expected kernel URL (LAN).
+
+        Reads ``LCA_GATEWAY_PUBLIC_URL`` (or ``OPENAI_PROXY_URL`` as
+        fallback — both are read by lobehub-ui) and GETs its ``/health``.
+        Returns True if reachable within 2s, False otherwise. When the
+        env var is unset, returns True (operator explicitly chose
+        loopback-only or hasn't deployed lobehub-ui yet).
+        """
+        import os
+        import urllib.parse
+
+        candidates = ("LCA_GATEWAY_PUBLIC_URL", "OPENAI_PROXY_URL")
+        target = next((os.environ[k] for k in candidates if os.environ.get(k)), "")
+        if not target:
+            return True
+        parsed = urllib.parse.urlparse(target)
+        if not parsed.hostname or not parsed.port:
+            return True
+        lan_health = f"http://{parsed.hostname}:{parsed.port}/health"
+        if lan_health == self.health_url:
+            return True  # 同一 host:port,已经探活过了
+        if http_ready(lan_health, timeout=2.0):
+            return True
+        print(
+            f"[FAIL] lca-ops: kernel serve loopback healthy at {self.health_url} "
+            f"but Next.js proxy target {lan_health} unreachable. "
+            f"Set LCA_KERNEL_HOST=0.0.0.0 or fix the LAN route.",
+            flush=True,
+        )
+        return False
 
     # ── Not supported per ADR-0119 决定 4 ─────────────────────────────
 
