@@ -454,9 +454,18 @@ def _scan_step_doc(path: Path) -> StepScan:
     # FoldConsistencyError,但残留 journal 文件可能含历史矛盾样本。
     # doctor 仍要识别它们并报 H7.ok=False。
     tool_ok_error_conflicts: list[int] = []
+    # PR-D: tool_total = distinct non-empty invocation_id count,
+    # excluding phantom steps with empty invocation_id.
+    _tool_invocation_ids: set[str] = set()
+    step_ids: list[str] = []
+    step_indexes: list[int] = []
     for step in doc.steps:
+        step_ids.append(step.step_id)
+        step_indexes.append(step.step_index)
         if step.tool_call is not None:
-            tool_total += 1
+            inv_id = getattr(step.tool_call, "invocation_id", "") or ""
+            if inv_id:
+                _tool_invocation_ids.add(inv_id)
             if step.tool_result is not None and step.tool_result.ok:
                 tool_success += 1
                 consecutive = 0
@@ -467,6 +476,7 @@ def _scan_step_doc(path: Path) -> StepScan:
                 failure_steps.append(step.step_index)
                 consecutive += 1
                 max_consec = max(max_consec, consecutive)
+    tool_total = len(_tool_invocation_ids)
     duration_ms: int | None = None
     if doc.closed_at is not None and doc.started_at is not None:
         duration_ms = int((doc.closed_at - doc.started_at) * 1000)
@@ -500,6 +510,8 @@ def _scan_step_doc(path: Path) -> StepScan:
         step_segment_counts=step_segment_counts,
         phase_time_inversions=phase_time_inversions,
         tool_ok_error_conflicts=tuple(tool_ok_error_conflicts),
+        step_ids=tuple(step_ids),
+        step_indexes=tuple(step_indexes),
     )
 
 
@@ -573,12 +585,41 @@ def _hop_h2(scan: StepScan) -> HopVerdict:
 
 
 def _hop_h3(scan: StepScan) -> HopVerdict:
-    """step_index 顺序 1..N 连续无跳号(从 step_index 字段验证)。"""
-    # 注意: 重建在 _scan_step_doc 之外读 doc —— 这里只判断 closed_at 存在性
-    # 真正的连续性检查在 scan_step_doc 内部做(扩展)。)
+    """step_id 唯一 + step_index 顺序 1..N 连续无跳号。
+
+    COMPAT(owner: PR-B H3, from: stub-ok-True, to: real duplicate/continuity check,
+           delete_when: scan.step_ids 与 scan.step_indexes 不再有空 tuple 回退,
+           forbidden_new_usage: 新 journal schema 不得允许重复 step_id)。
+    """
     if not scan.exists:
         return HopVerdict(ok=None, detail="not evaluated")
-    return HopVerdict(ok=True, detail=f"{scan.total_steps} steps 顺序闭合")
+    extra: dict[str, Any] = {
+        "total_steps": scan.total_steps,
+        "step_ids": list(scan.step_ids),
+        "step_indexes": list(scan.step_indexes),
+    }
+    # 1. duplicate step_id
+    seen_ids: dict[str, int] = {}
+    for sid in scan.step_ids:
+        seen_ids[sid] = seen_ids.get(sid, 0) + 1
+    dup_ids = [sid for sid, cnt in seen_ids.items() if cnt > 1]
+    if dup_ids:
+        extra["duplicate_step_ids"] = dup_ids
+        return HopVerdict(
+            ok=False,
+            detail=f"duplicate step_id: {dup_ids}",
+            extra=extra,
+        )
+    # 2. step_index continuity: must equal list(range(1, N+1))
+    indexes = list(scan.step_indexes)
+    expected = list(range(1, len(indexes) + 1))
+    if indexes != expected:
+        return HopVerdict(
+            ok=False,
+            detail=f"step_index 不连续: 实际 {indexes}, 期望 {expected}",
+            extra=extra,
+        )
+    return HopVerdict(ok=True, detail=f"{scan.total_steps} steps 顺序闭合", extra=extra)
 
 
 def _hop_h4(mode: DoctorMode) -> HopVerdict:
@@ -650,8 +691,23 @@ def _hop_h7(scan: StepScan) -> HopVerdict:
     # H7 多源对账:spine phase.tool.call.end.ok 与 journal step.tool_result.ok
     # 互相对账。不一致即 H7.ok=False。
     if scan.spine_phase_tool_call_end_total > 0:
-        spine_fail = scan.spine_phase_tool_call_end_failure_count
         spine_total = scan.spine_phase_tool_call_end_total
+        # PR-D: parity check — journal distinct invocation count must match
+        # spine phase.tool.call.end total.
+        if scan.tool_total != spine_total:
+            return HopVerdict(
+                ok=False,
+                detail=(
+                    f"H7 journal/spine tool_total mismatch "
+                    f"({scan.tool_total} vs {spine_total})"
+                ),
+                extra={
+                    **extra,
+                    "spine_phase_tool_call_end_total": spine_total,
+                    "journal_tool_total": scan.tool_total,
+                },
+            )
+        spine_fail = scan.spine_phase_tool_call_end_failure_count
         journal_fail = scan.tool_total - scan.tool_success
         if spine_fail > 0 and journal_fail == 0:
             return HopVerdict(

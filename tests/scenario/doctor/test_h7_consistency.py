@@ -61,9 +61,10 @@ def _step_with_tool_result(
     tool_ok: bool,
     error: str | None = None,
     outcome: str = "ok",
+    step_id: str | None = None,
 ) -> JournalStep:
     return JournalStep(
-        step_id=f"s{step_index}",
+        step_id=step_id or f"s{step_index}",
         step_index=step_index,
         phase="act",
         entered_at=float(step_index),
@@ -224,3 +225,174 @@ def test_h7_low_success_rate_remains_a_failure(tmp_path: Path) -> None:
     h7 = report.hops["H7"]
     assert h7.ok is False
     assert "33%" in h7.detail or "成功率" in h7.detail
+
+
+def _phantom_step(step_index: int) -> JournalStep:
+    """Phantom step: tool_call with empty invocation_id, no tool_result.
+
+    Matches real-world pattern of an early ``writable.step.start`` with
+    no subsequent ``tool_call`` (a "thinking but no tool" frame).
+    """
+    return JournalStep(
+        step_id=f"s{step_index}",
+        step_index=step_index,
+        phase="act",
+        entered_at=float(step_index),
+        outcome="ok",
+        tool_call=ToolCallRecord(
+            invocation_id="",
+            name="runCommand",
+            arguments={"command": "echo thinking"},
+        ),
+        tool_result=None,
+        thinking=ThinkingTrace(model="m", latency_ms=10),
+        reflect=ReflectTrace(summary="reflection"),
+    )
+
+
+# ── PR-D: distinct invocation_id semantics ───────────────────────────────
+
+
+def test_h7_phantom_step_excluded_from_tool_total(tmp_path: Path) -> None:
+    """Phantom step (empty invocation_id, no tool_result) excluded from tool_total.
+
+    4 journal steps: 1 phantom + 3 real with distinct invocation_ids.
+    Expected: tool_total=3 (distinct non-empty invocations),
+    success_rate=1.0, parity check passes when spine matches.
+    """
+    meta = JournalMetadata(agent_role="x", strategy_key="solo", plan_ref="p", objective="t")
+    doc = empty_document(run_id="run_x", trace_id="t", metadata=meta, started_at=0.0)
+    # phantom step at index 0
+    doc = append_step(doc, _phantom_step(0))
+    # 3 real steps with distinct invocation_ids
+    for i in (1, 2, 3):
+        doc = append_step(
+            doc,
+            _step_with_tool_result(i, tool_ok=True, error=None, outcome="ok"),
+        )
+    doc = close_document(doc, outcome="completed", closed_at=10.0)
+    path = _write_doc(tmp_path, doc)
+
+    # spine: 3 phase.tool.call.end events (matches distinct invocations)
+    _write_spine(
+        tmp_path,
+        "run_x",
+        [
+            {
+                "execution_point": "phase.tool.call.end",
+                "payload": {"tool_name": "runCommand", "ok": True, "step": i},
+            }
+            for i in (1, 2, 3)
+        ],
+    )
+
+    report = diagnose_step_tree(path)
+    h7 = report.hops["H7"]
+    assert h7.ok is True
+    extra = h7.extra or {}
+    assert extra.get("tool_total") == 3
+    assert extra.get("success_rate") == 1.0
+
+
+def test_h7_journal_spine_tool_total_mismatch(tmp_path: Path) -> None:
+    """Journal distinct invocation count differs from spine total → H7.fail.
+
+    Journal has 3 distinct invocations; spine has only 2 phase.tool.call.end
+    events. Parity check must catch this and report mismatch.
+    """
+    meta = JournalMetadata(agent_role="x", strategy_key="solo", plan_ref="p", objective="t")
+    doc = empty_document(run_id="run_x", trace_id="t", metadata=meta, started_at=0.0)
+    for i in (1, 2, 3):
+        doc = append_step(
+            doc,
+            _step_with_tool_result(i, tool_ok=True, error=None, outcome="ok"),
+        )
+    doc = close_document(doc, outcome="completed", closed_at=5.0)
+    path = _write_doc(tmp_path, doc)
+
+    # spine: only 2 phase.tool.call.end events (mismatch with journal's 3)
+    _write_spine(
+        tmp_path,
+        "run_x",
+        [
+            {
+                "execution_point": "phase.tool.call.end",
+                "payload": {"tool_name": "runCommand", "ok": True, "step": 1},
+            },
+            {
+                "execution_point": "phase.tool.call.end",
+                "payload": {"tool_name": "runCommand", "ok": True, "step": 2},
+            },
+        ],
+    )
+
+    report = diagnose_step_tree(path)
+    h7 = report.hops["H7"]
+    assert h7.ok is False
+    assert "mismatch" in h7.detail.lower()
+    extra = h7.extra or {}
+    assert extra.get("journal_tool_total") == 3
+    assert extra.get("spine_phase_tool_call_end_total") == 2
+
+
+# ── PR-B: H3 step-tree integrity ────────────────────────────────────────
+
+
+def _make_meta() -> JournalMetadata:
+    return JournalMetadata(agent_role="x", strategy_key="solo", plan_ref="p", objective="t")
+
+
+def test_h3_duplicate_step_id(tmp_path: Path) -> None:
+    """两个 step 共享同一个 step_id → H3.ok=False,detail 含 'duplicate step_id'。
+
+    回归场景 run_2910e20390f9:5 步 journal 只有 4 个 distinct step_id。
+    """
+    doc = empty_document(run_id="run_x", trace_id="t", metadata=_make_meta(), started_at=0.0)
+    doc = append_step(doc, _step_with_tool_result(1, tool_ok=True, step_id="step-001"))
+    doc = append_step(doc, _step_with_tool_result(2, tool_ok=True, step_id="step-002"))
+    doc = append_step(doc, _step_with_tool_result(3, tool_ok=True, step_id="step-001"))  # dup
+    doc = close_document(doc, outcome="completed", closed_at=5.0)
+    path = _write_doc(tmp_path, doc)
+
+    report = diagnose_step_tree(path)
+    h3 = report.hops["H3"]
+    assert h3.ok is False
+    assert "duplicate step_id" in h3.detail.lower() or "duplicate step_id" in h3.detail
+
+
+def test_h3_non_contiguous_step_index(tmp_path: Path) -> None:
+    """step_index 不连续(如 [1, 3])→ H3.ok=False,detail 含 'step_index'。"""
+    meta = _make_meta()
+    doc = empty_document(run_id="run_x", trace_id="t", metadata=meta, started_at=0.0)
+    # 手动构建 step_index=1 和 step_index=3(跳过 2)
+    doc = append_step(
+        doc,
+        _step_with_tool_result(1, tool_ok=True, step_id="step-001"),
+    )
+    doc = append_step(
+        doc,
+        _step_with_tool_result(3, tool_ok=True, step_id="step-003"),
+    )
+    doc = close_document(doc, outcome="completed", closed_at=5.0)
+    path = _write_doc(tmp_path, doc)
+
+    report = diagnose_step_tree(path)
+    h3 = report.hops["H3"]
+    assert h3.ok is False
+    assert "step_index" in h3.detail
+
+
+def test_h3_clean_journal_passes(tmp_path: Path) -> None:
+    """distinct step_id + contiguous step_index → H3.ok=True。"""
+    doc = empty_document(run_id="run_x", trace_id="t", metadata=_make_meta(), started_at=0.0)
+    for i in (1, 2, 3):
+        doc = append_step(
+            doc,
+            _step_with_tool_result(i, tool_ok=True, step_id=f"step-{i:03d}"),
+        )
+    doc = close_document(doc, outcome="completed", closed_at=5.0)
+    path = _write_doc(tmp_path, doc)
+
+    report = diagnose_step_tree(path)
+    h3 = report.hops["H3"]
+    assert h3.ok is True

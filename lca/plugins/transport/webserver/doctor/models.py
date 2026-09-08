@@ -135,6 +135,9 @@ class StepScan:
     spine_phase_tool_call_end_failure_count: int = 0
     # ok=True 与 error 非空矛盾的 step_index 列表(fold invariant 触发时填)。
     tool_ok_error_conflicts: tuple[int, ...] = ()
+    # H3 step-tree integrity: step_id / step_index 序列(供 _hop_h3 判定重复与跳号)。
+    step_ids: tuple[str, ...] = ()
+    step_indexes: tuple[int, ...] = ()
 
 
 __all__ = [
