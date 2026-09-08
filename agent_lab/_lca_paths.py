@@ -1,20 +1,21 @@
-"""SSOT: LCA real module paths + runtime availability + fallback policy.
+"""SSOT: LCA real module paths + runtime availability.
 
-Generated from runtime probes on 2026-09-08 against lca main + lca_kernel.
+Generated from runtime probes on 2026-09-08 against lca main + lca_kernel
+with cordis installed via uv (vendor/cordis + vendor/cosmokit + vendor/schemastery).
 
-Each entry: (module_path, symbol, runtime_status, fallback_class).
+After `uv sync`:
+  - cordis is installed at .venv/lib/python3.12/site-packages/cordis/
+  - All 25 LCA real paths below are verified importable via `uv run python`.
+
+Each entry: (module_path, symbol, runtime_status, used_by).
 Runtime status:
-  OK   — `from lca.X import Y` works in current env
-  MISS — ModuleNotFoundError or missing symbol
-          (typically because the LCA hard dep `cordis` is not installed)
-  FB   — adapter fell back to a _Noop* stub
+  OK   — `from lca.X import Y` works via `uv run python`
 
-Fallback policy:
-  - OK  → node plugins import directly
-  - MISS → node plugins use `try: from lca.X except ImportError: use _Noop*`
-           The _Noop* stub is defined in the same node plugin file,
-           co-located with the consumer (no central fallback registry)
-  - FB  → adapter-only behaviour, no longer needed after refactor
+Production code rule:
+  - Use `uv run` (or a venv with cordis installed) to execute agent_lab.
+  - Node plugins import directly from lca.xxx — no adapter, no fallback.
+  - If cordis is missing at runtime, import errors surface immediately
+    (fail-loud per ADR-0186), rather than silently degrading via stub.
 """
 
 from __future__ import annotations
@@ -24,9 +25,7 @@ from enum import StrEnum
 
 
 class LcaStatus(StrEnum):
-    OK = "ok"             # direct import works
-    MISS = "miss"         # import fails (missing cordis / not in env)
-    FB = "fallback"       # was only used inside adapter fallback chain
+    OK = "ok"             # direct import works (after uv sync)
 
 
 @dataclass(frozen=True)
@@ -34,15 +33,15 @@ class LcaPath:
     module: str
     symbol: str
     status: LcaStatus
-    used_by: tuple[str, ...]   # which node plugin / adapter depends on this
+    used_by: tuple[str, ...]   # which node plugin depends on this
 
 
-# --- Provenance: runtime probes, not docs ---------------------------------
-# Each entry below was verified by `python -c "from <module> import <symbol>"`
-# at the time of generation.
+# --- Provenance: 25/25 runtime-verified via `uv run python` ----------------
+# All entries below were verified at the time of generation by:
+#   uv run python -c "from <module> import <symbol>"
 
 LCA_PATHS: tuple[LcaPath, ...] = (
-    # ── OK: direct import works in current env ──
+    # ── Decisions / observations / reflections / LLM ──
     LcaPath("lca.contracts.atoms.enums.enums", "ActionType",
             LcaStatus.OK, ("nodes/think/parse_decision",)),
     LcaPath("lca.contracts.atoms.enums.enums", "ReflectionVerdict",
@@ -65,6 +64,8 @@ LCA_PATHS: tuple[LcaPath, ...] = (
             LcaStatus.OK, ("nodes/think/parse_decision",)),
     LcaPath("lca.contracts.models.core.conversation.llm", "TokenUsage",
             LcaStatus.OK, ("nodes/think/parse_decision",)),
+
+    # ── Stop policy ──
     LcaPath("lca.contracts.models.core.policy.stop", "StopDecision",
             LcaStatus.OK, ("nodes/stop/evaluate_stop",)),
     LcaPath("lca.contracts.models.core.policy.stop", "StopReason",
@@ -73,11 +74,15 @@ LCA_PATHS: tuple[LcaPath, ...] = (
             LcaStatus.OK, ("nodes/stop/evaluate_stop",)),
     LcaPath("lca.contracts.models.core.state.lifecycle", "coerce_status",
             LcaStatus.OK, ("nodes/stop/evaluate_stop",)),
+
+    # ── Agent state / role ──
     LcaPath("lca.contracts.models.core.state.state", "AgentState",
             LcaStatus.OK, ("nodes/perceive/perceive_fold",
                            "nodes/reflect/call_critic", "nodes/reflex adapters")),
     LcaPath("lca.contracts.models.team.role.team", "ToolPermissionManifest",
             LcaStatus.OK, ("nodes/effect/tool_dispatch",)),
+
+    # ── Session / context assembly ──
     LcaPath("lca.contracts.protocols.session.model.context", "ModelContextAssembler",
             LcaStatus.OK, ("nodes/model_visible/commit_manifest",)),
     LcaPath("lca.contracts.protocols.session.model.context", "ModelVisibleRequest",
@@ -88,40 +93,45 @@ LCA_PATHS: tuple[LcaPath, ...] = (
             "DefaultModelContextAssembler",
             LcaStatus.OK, ("nodes/model_visible/commit_manifest",)),
 
-    # ── MISS: blocked by missing `cordis` dep (installable, but not now) ──
-    # Node plugins MUST wrap these in `try: from lca.X except ImportError: _Noop*`
+    # ── cordis-gated (now OK after uv sync) ──
     LcaPath("lca.session.append", "Session",
-            LcaStatus.MISS, ("nodes/remember/append_event",
-                              "nodes/remember/tail_events",
-                              "nodes/remember/fold_messages")),
+            LcaStatus.OK, ("nodes/remember/append_event",
+                            "nodes/remember/tail_events",
+                            "nodes/remember/fold_messages")),
     LcaPath("lca.session.append", "SessionEvent",
-            LcaStatus.MISS, ("nodes/remember/append_event",)),
+            LcaStatus.OK, ("nodes/remember/append_event",)),
     LcaPath("lca.cognition.body.executor.safe_executor", "SimpleSafeExecutor",
-            LcaStatus.MISS, ("nodes/effect/tool_dispatch",)),
+            LcaStatus.OK, ("nodes/effect/tool_dispatch",)),
     LcaPath("lca.cognition.brain.reasoner.null_critic", "NullCritic",
-            LcaStatus.MISS, ("nodes/reflect/call_critic",)),
+            LcaStatus.OK, ("nodes/reflect/call_critic",)),
     LcaPath("lca.plugins.composer.runtime.fixture.runtime_factory", "NullPerceiveHub",
-            LcaStatus.MISS, ("nodes/perceive/perceive_fold",)),
+            LcaStatus.OK, ("nodes/perceive/perceive_fold",)),
 )
 
 
+def all_ok() -> bool:
+    """Return True iff every entry is OK (cordis-gated modules included)."""
+    return all(p.status == LcaStatus.OK for p in LCA_PATHS)
+
+
 def ok_paths() -> tuple[LcaPath, ...]:
-    """Return only paths verified importable in current env."""
+    """Return paths verified importable in current env (uv run python)."""
     return tuple(p for p in LCA_PATHS if p.status == LcaStatus.OK)
 
 
-def miss_paths() -> tuple[LcaPath, ...]:
-    """Return paths that need try/except fallback (missing cordis)."""
-    return tuple(p for p in LCA_PATHS if p.status == LcaStatus.MISS)
+def by_user(node_plugin: str) -> tuple[LcaPath, ...]:
+    """Return all LCA paths used by a given node plugin path."""
+    return tuple(p for p in LCA_PATHS if node_plugin in p.used_by)
 
 
 def format_table() -> str:
     """Render a human-readable table for docs / describe output."""
-    rows = ["module".ljust(64), "symbol".ljust(28), "status".ljust(6), "used_by"]
+    rows = [f"{'module':<64} {'symbol':<28} status  used_by"]
     for p in LCA_PATHS:
-        rows.append(f"{p.module.ljust(64)} {p.symbol.ljust(28)} "
-                    f"{p.status.value.ljust(6)} {', '.join(p.used_by)}")
+        rows.append(f"{p.module:<64} {p.symbol:<28} {p.status.value:<6}  "
+                    f"{', '.join(p.used_by)}")
     return "\n".join(rows)
 
 
-__all__ = ["LcaPath", "LcaStatus", "LCA_PATHS", "ok_paths", "miss_paths", "format_table"]
+__all__ = ["LcaPath", "LcaStatus", "LCA_PATHS",
+           "all_ok", "ok_paths", "by_user", "format_table"]
