@@ -232,7 +232,64 @@ plugins/<seam>/<group>/<plugin-id>/
 
 ---
 
-## 12. `lca/plugins/transport/webserver/` 目标
+## 12. Loop 双图（0075 ↔ InfoEdge）
+
+当前 LCA 持有两套可执行阶段图，由专用 Profile 隔离选择、共享同一副作用路径。两图事实归位见下表；桥接语义与合并进度见 [notes/proposed/seam/2026-09-08-agent-lab-absorb-end-state.md](../notes/proposed/seam/2026-09-08-agent-lab-absorb-end-state.md)。
+
+| 维度 | 图 A：0075 粗阶段图 | 图 B：ADR-0206 InfoEdge 嵌套图 |
+|---|---|---|
+| Profile | `profiles/web-standard.yaml`（出厂默认） | `profiles/agent-lab-infoedge.yaml`（argv `--profile` 切换） |
+| Bundle | `bundles/declarative-phase-graph.yaml` | `bundles/agent-lab-infoedge.yaml`（依赖同一 `declarative-phase-graph.yaml` 满足 boot closure） |
+| 解释器 | `GenericPlanInterpreter`（`lca/harness/graph/execute/interpreter.py`）吃 `ExecutablePlan.phase_graph` | `lca-loop-infoedge` RunLoopDriver → `agent_lab.runtime.runner`（[agent_lab/runtime/runner.py](../../agent_lab/runtime/runner.py)） |
+| 图种 | `phase_graph` + `PhaseNode` 闭集（6 phase + 12 control + 3 graph policy） | `InfoEdgeSpec`（[agent_lab/graph/spec.py](../../agent_lab/graph/spec.py)）：`nodes / edges / sub_specs / plugins / grants`，递归嵌套 |
+| 节点粒度 | 每阶段 1 个 `*.main` 节点；阶段内细节封进 control 插件 | 每阶段 4–8 worker（perceive: resolve/sense/memory/policy/trim/commit/inventory/eye；act: shape/authorize/execute/observe），加 `model_eye`/`toolbox` 等 7 个 sub_spec |
+| 执行编排 | `phase.topology.standard` + `phase.edges.standard` 显式连边（含 `when` 谓词与 loop edge） | YAML `edges` + `sub_specs`（`input_map` / `output_map`）；runner 按拓扑层迭代并递归子图 |
+| 错误路由 | `phase.execution_policy.resilient` 阶段级 max_attempts/timeout/retry；`result.result_kind == "phase_error"` 走 stop | 节点级 `on_error: fail / retry / route`（[runner.py:296](../../agent_lab/runtime/runner.py)）；确定性错误不重试 |
+| Stop 角色 | 第六阶段 `stop.main`（`terminal: true`） | 非 phase 同级，由 `control_slots` 挂到 remember 节点之后 |
+| 副作用出口 | `phase.act.standard` 调 `mint_envelope` → `EffectDispatcher` → `SafeExecutor`（`CommandEnvelope` 唯一出口，C5） | `act.execute` 节点构造 `SimpleBody + PipelineSafeExecutor`（[nodes/act/execute/body.py](../../agent_lab/nodes/act/execute/body.py)），共享同一 LCA Body 链 |
+| 事实写入 | Reducer → `Session.append`（单轨） | `remember.commit` 节点调 `LcaRememberJournalProvider.append_journal` → `Session.append`（单轨） |
+| 控制/治理 | 独立 `control.*` 插件通过 `PhaseContribution(role=…)` 注册到阶段上下文 | `control_slots` graph-level plugin 挂到 host 节点之后；具体 control slot（如 stop_decide / stop_focus）作为子图 |
+| Profile 可见性 | `why-plugin phase.perceive.standard -p profiles/web-standard.yaml` | `why-plugin lca-loop-infoedge -p profiles/agent-lab-infoedge.yaml`；`web-standard` 不挂 |
+
+### 12.1 出厂默认行为
+
+- `profiles/web-standard.yaml` 不列 `bundles/agent-lab-infoedge.yaml`，也不含 `lca-loop-infoedge` driver：见 [tests/profiles/test_agent_lab_infoedge_profile.py:38](../../tests/profiles/test_agent_lab_infoedge_profile.py) 守护。
+- 图 A 是出厂零 diff；图 B 仅经专用 Profile，切换面是 argv `--profile`，不是 env（AGENTS.md env 三层白名单约束）。
+
+### 12.2 Delete-when 进度
+
+合并条件与现状（截至 2026-09-08）：
+
+| # | 条件 | 当前状态 | 证据 |
+|---|---|---|---|
+| 1 | `InfoEdgeSpec` ⊆ `CompiledRunPlan` | ✗ | `rg 'InfoEdgeSpec' lca/contracts/ lca/harness/` 无命中 |
+| 2 | `GenericPlanInterpreter` 递归嵌套子图 | ✗ | `lca/harness/graph/execute/interpreter.py` 单层 phase_graph，无 subgraph 路径 |
+| 3 | `rg 'agent_lab.runtime.runner' lca/ profiles/ bundles/` = 0 | ✗ | 7 处命中（profile/bundle/driver） |
+| 4 | `python -m agent_lab.run` 不再是 Gateway/生产入口 | ✗ | `profiles/README.md` + `lca/infrastructure/cli/guide/guide.py` 仍引用 |
+| 5 | 出厂 Profile 上 `why-plugin` 能回答图事实归属 | ✓ | `why-plugin lca-loop-infoedge -p profiles/agent-lab-infoedge.yaml` 可用 |
+| 6 | 测试断言 `web-standard` 无 `infoedge` driver | ✓ | [tests/profiles/test_agent_lab_infoedge_profile.py:38](../../tests/profiles/test_agent_lab_infoedge_profile.py) |
+
+全部 6 条满足时，删除 `profiles/agent-lab-infoedge.yaml`、`bundles/agent-lab-infoedge.yaml`、`lca/plugins/loop/driver/infoedge/` 三件套；0075 粗阶段图降级为 `region=phase:*`；合并由同 PR 闭环，不跨 PR 留后门。
+
+### 12.3 验收命令
+
+```bash
+# 图 A 出厂
+./scripts/lca-ops inspect-tree profiles/web-standard.yaml
+uv run python -m lca_kernel serve --profile profiles/web-standard.yaml --allow-unknown-env
+
+# 图 B 专用 Profile
+./scripts/lca-ops inspect-tree profiles/agent-lab-infoedge.yaml
+./scripts/lca-ops why-plugin lca-loop-infoedge -p profiles/agent-lab-infoedge.yaml
+uv run python -m lca_kernel serve --profile profiles/agent-lab-infoedge.yaml --allow-unknown-env
+
+# 图 B 进程外
+python -m agent_lab.run agent_loop
+```
+
+---
+
+## 13. `lca/plugins/transport/webserver/` 目标
 
 | 子目录 | 职责 |
 |---|---|
@@ -247,7 +304,7 @@ Legacy `handlers/runs/*` 在 P3 逐子域迁入上表。
 
 ---
 
-## 13. 观测目录对照
+## 14. 观测目录对照
 
 | 段 | 目标位置 | Legacy |
 |---|---|---|
@@ -261,7 +318,7 @@ Legacy `handlers/runs/*` 在 P3 逐子域迁入上表。
 
 ---
 
-## 14. 验证
+## 15. 验证
 
 ```bash
 # 目录门禁（P0）
@@ -279,7 +336,7 @@ uv run python scripts/check_package_organization.py  # 若存在
 
 ---
 
-## 15. 迁移波次（与 ADR-0195 §6 一致）
+## 16. 迁移波次（与 ADR-0195 §6 一致）
 
 | 波 | 目录动作 |
 |---|---|
@@ -292,8 +349,9 @@ uv run python scripts/check_package_organization.py  # 若存在
 
 ---
 
-## 16. 相关文档
+## 17. 相关文档
 
 - [ADR-0195 Platform Convergence](../adr/0195-platform-architecture-convergence.md)
 - [plugins/ARCHITECTURE.md](../../lca/plugins/ARCHITECTURE.md)
 - [declarative-phase-graph-spec.md](declarative-phase-graph-spec.md)
+- [§12 Loop 双图（0075 ↔ InfoEdge）](#12-loop-双图0075--infoedge) — 当前认知阶段图架构与合并进度
