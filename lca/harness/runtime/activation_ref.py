@@ -38,6 +38,7 @@ def compute_activation_ref(
         "plugin_set_ref": plugin_set_ref,
     }
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    # ADR-0203: uses compact separators (",", ":") — not interchangeable with canonical_digest.
     digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     return f"{_ACTIVATION_HASH_NAMESPACE}:{digest}"
 

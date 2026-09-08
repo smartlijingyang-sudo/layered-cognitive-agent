@@ -1,4 +1,5 @@
 """Resolve LobeHub Market Bearer tokens for skill search.
+# ADR-0203 §3.3: HMAC signing — not a digest; canonical_digest does not apply.
 
 Auth priority (first hit wins):
 1. ``LCA_SKILL_MARKET_TOKEN`` — static Bearer (dev / CI)

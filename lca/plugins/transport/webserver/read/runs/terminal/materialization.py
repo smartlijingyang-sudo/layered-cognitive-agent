@@ -1,4 +1,5 @@
 """Materialize a terminal run manifest from Journal-owned facts."""
+# ADR-0203 §3.3: streaming file-bytes hash; canonical_digest requires full payload in memory.
 
 from __future__ import annotations
 

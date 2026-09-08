@@ -38,13 +38,12 @@ References
 
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
 from collections import deque
 from datetime import datetime, timezone
 from typing import Any
 
+from lca.contracts.observability.canonical_digest import canonical_digest
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.observability.spine.derivers.base.base import Deriver
 from lca.infrastructure.observability.spine.event.record import EventRecord
@@ -63,18 +62,16 @@ def _make_anomaly_payload(
     evidence: dict[str, Any],
 ) -> dict[str, Any]:
     """Stamp the canonical anomaly envelope for downstream subscribers."""
-    evidence_hash = hashlib.sha256(
-        json.dumps(
-            {
-                "execution_point": event.execution_point,
-                "span_id": event.span_id,
-                "sequence": event.sequence,
-                "evidence": evidence,
-            },
-            sort_keys=True,
-            default=str,
-        ).encode("utf-8")
-    ).hexdigest()
+    evidence_hash = canonical_digest(
+        {
+            "execution_point": event.execution_point,
+            "span_id": event.span_id,
+            "sequence": event.sequence,
+            "evidence": evidence,
+        },
+        length=64,
+        prefix="",
+    )
     return {
         "kind": kind,
         "execution_point": event.execution_point,

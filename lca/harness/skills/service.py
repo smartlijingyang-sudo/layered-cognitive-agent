@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 from dataclasses import asdict, dataclass
 from typing import Any, ClassVar
 
@@ -25,6 +23,7 @@ from lca.contracts.harness.memory.skill import (
 )
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
+from lca.contracts.observability.canonical_digest import canonical_digest
 from lca.contracts.protocols import Tool
 from lca.contracts.protocols.memory.operational_skills import (
     SkillNotFoundError,
@@ -241,8 +240,12 @@ class SkillSlashActivationPolicy:
 
 
 def _catalog_digest(entries: tuple[SkillCatalogEntry, ...]) -> str:
-    encoded = json.dumps([asdict(entry) for entry in entries], ensure_ascii=True, sort_keys=True)
-    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+    return canonical_digest(
+        [asdict(entry) for entry in entries],
+        length=64,
+        prefix="",
+        ensure_ascii=True,
+    )
 
 
 def _parse_slash(raw_text: str) -> tuple[str, str] | None:

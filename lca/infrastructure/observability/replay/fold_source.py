@@ -18,8 +18,6 @@ ADR-0185 PR-4 收口:旧 ``<run_dir>/model_visible/`` 旁路读取已删除,
 
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
 import typing as _typing
 from collections.abc import Iterable, Mapping
@@ -27,6 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from lca.contracts.observability.canonical_digest import canonical_digest
 from lca_kernel.events.fold.fold import (
     EpochHeader,
     foldRequestHeader,
@@ -115,8 +114,7 @@ def _canonical_digest(header: EpochHeader) -> str:
         "system": header.system,
         "tools": list(header.tools),
     }
-    encoded = json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
-    return "sha256:" + hashlib.sha256(encoded).hexdigest()
+    return canonical_digest(payload, length=64, prefix="sha256:")
 
 
 def _iter_spine_records(spine_path: Path) -> Iterable[SpineEventRecord]:

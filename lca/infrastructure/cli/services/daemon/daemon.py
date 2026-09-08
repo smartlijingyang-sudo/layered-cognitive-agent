@@ -1,4 +1,5 @@
 """Daemon service — sandbox-user CLI connect daemon.
+# ADR-0203 §3.3: streaming file-bytes fingerprint; canonical_digest requires full payload in memory.
 
 Manages the TypeScript CLI daemon that connects sandbox-user to the gateway.
 Lifecycle: start/stop the node process.

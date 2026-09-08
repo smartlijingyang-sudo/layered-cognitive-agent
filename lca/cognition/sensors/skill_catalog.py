@@ -10,20 +10,23 @@ installed index digest changes (meta-event taxonomy skill domain).
 
 from __future__ import annotations
 
-import hashlib
-import json
 from dataclasses import asdict
 
 from lca.contracts.harness.memory.skill import SkillCatalogEntry
 from lca.contracts.models.core.perceive.perception import ContextItem
 from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.observability.canonical_digest import canonical_digest
 from lca.contracts.protocols import Sensor
 from lca.contracts.protocols.memory.operational_skills import SkillPackageStore
 
 
 def _catalog_digest(entries: tuple[SkillCatalogEntry, ...]) -> str:
-    encoded = json.dumps([asdict(entry) for entry in entries], ensure_ascii=True, sort_keys=True)
-    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+    return canonical_digest(
+        [asdict(entry) for entry in entries],
+        length=64,
+        prefix="",
+        ensure_ascii=True,
+    )
 
 
 class SkillCatalogSensor(Sensor):

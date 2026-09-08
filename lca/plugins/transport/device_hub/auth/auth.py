@@ -1,4 +1,5 @@
 """Token verification for device connections and HTTP routes."""
+# ADR-0203 §3.3: HMAC signing — not a digest; canonical_digest does not apply.
 
 from __future__ import annotations
 

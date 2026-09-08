@@ -1,4 +1,5 @@
 """AssistantHome 目录布局 + manifest schema + digest 校验（ADR-0187 §3 D2）。
+# ADR-0203 §3.3: sha256_digest() 是 file-bytes streaming hash;canonical_digest 不适用。
 
 本模块负责磁盘 SSOT 形状：
 
@@ -19,6 +20,8 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+
+from lca.contracts.observability.canonical_digest import canonical_digest
 
 __all__ = [
     "CONFIG_FACE_FILES",
@@ -154,8 +157,7 @@ def build_manifest(
     """
     digests = dict(extra_digests or {})
     digests.update(compute_digests(home))
-    canonical = json.dumps(digests, sort_keys=True).encode()
-    manifest_digest = f"sha256:{hashlib.sha256(canonical).hexdigest()}"
+    manifest_digest = canonical_digest(digests, length=64, prefix="sha256:")
     return {
         "schema_version": SCHEMA_VERSION,
         "assistant_id": assistant_id,

@@ -13,9 +13,7 @@ via provenance.
 
 from __future__ import annotations
 
-import hashlib
 import importlib
-import json
 import warnings
 from collections import defaultdict, deque
 from collections.abc import Mapping, Sequence
@@ -26,6 +24,7 @@ from typing import Any, cast
 
 from pydantic import BaseModel, SecretStr
 
+from lca.contracts.observability.canonical_digest import canonical_digest
 from lca.harness.plugin.spec_projection import native_spec_from_declaration
 from lca.harness.plugin_api import PluginDefinition, PluginSetupFn, definition_from_plugin
 from lca.harness.profile.resolve.source import (
@@ -101,9 +100,11 @@ def _resolve_source(source: ProfileSource) -> ResolvedProfile:
         (plugin for plugin in resolved_plugins if plugin.disabled), key=lambda plugin: plugin.index
     )
     ordered = tuple(order) + tuple(disabled_plugins)
-    digest = hashlib.sha256(
-        json.dumps(_canonical_payload(ordered), sort_keys=True, default=str).encode()
-    ).hexdigest()[:16]
+    digest = canonical_digest(
+        _canonical_payload(ordered),
+        length=16,
+        prefix="",
+    )
     return ResolvedProfile(
         profile_path=str(source.profile_path),
         bundles=source.bundles,

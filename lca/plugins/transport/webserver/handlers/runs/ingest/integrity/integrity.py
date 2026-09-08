@@ -1,4 +1,5 @@
 """Validate remote file bytes before they cross into the managed FileStore."""
+# ADR-0203 §3.3: raw-bytes content hash; not canonical-JSON digest.
 
 from __future__ import annotations
 

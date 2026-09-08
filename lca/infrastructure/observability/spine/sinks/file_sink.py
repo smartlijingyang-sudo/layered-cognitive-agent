@@ -3,6 +3,7 @@
 # 至 PR-9 旧 spine 全退役（rg "lca.plugins.observability.spine.sinks" lca/ = 0 触发）。
 
 """FileSink — single append-only truth file per run plus per-run exception index.
+# ADR-0203 §3.3: offload_sidecar_path hashes already-encoded bytes (sort_keys=False); not canonical-JSON digest.
 
 Append-only JSONL sink writing to ``<run_dir>/<run_id>.spine.jsonl``.
 Any ``exception.caught`` event **also** lands in
