@@ -11,6 +11,7 @@ Node implementation detail (not an agent_lab adapter).
 from __future__ import annotations
 
 import asyncio
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -221,15 +222,23 @@ def observation_to_receipt(
     action_type: str = "",
     tool: str | None = None,
 ) -> dict[str, Any]:
-    """Fold an LCA Observation into tool.receipt.v1 content."""
+    """Fold an LCA Observation into tool.receipt.v1 content.
+
+    Boundary: Body ``Observation.extra`` may carry in-process Enums
+    (e.g. ``MemoryRecordKind``); receipt/observation artifacts must be
+    JSON-plain so digests, Session.append, and logs stay closed.
+    """
     tool_name = tool if tool not in (None, "__none__") else None
-    extra = dict(obs.extra or {})
+    extra = _jsonable(dict(obs.extra or {}))
+    if not isinstance(extra, dict):
+        extra = {"raw": extra}
+    payload = _jsonable(obs.payload)
     base = {
         "decision_id": decision_id,
         "action_type": action_type,
         "observation_id": obs.observation_id,
         "success": obs.success,
-        "payload": obs.payload,
+        "payload": payload,
         "extra": extra,
         "degraded_from": obs.degraded_from,
     }
@@ -241,7 +250,7 @@ def observation_to_receipt(
             **base,
             "status": "ok",
             "tool": tool_name,
-            "result": obs.payload,
+            "result": payload,
         }
     return {
         **base,
@@ -249,3 +258,16 @@ def observation_to_receipt(
         "tool": tool_name,
         "error": obs.error or "unknown",
     }
+
+
+def _jsonable(value: Any) -> Any:
+    """Collapse Enums / nested structures to JSON-plain values."""
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, dict):
+        return {str(k): _jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(v) for v in value]
+    if hasattr(value, "model_dump") and callable(value.model_dump):
+        return _jsonable(value.model_dump())
+    return value

@@ -189,6 +189,37 @@ def test_lca_remember_journal_provider_with_fixture() -> None:
         unregister_fixture_session(name)
 
 
+def test_lca_remember_journal_provider_real_session_event_id() -> None:
+    """Real SessionEvent has no .id; journal_fact.id must be session_id:seq."""
+    from agent_lab.adapters.lca_memory import LcaRememberJournalProvider
+    from agent_lab.nodes.session_log._sink import get_session
+
+    session = get_session()
+    before = session.event_count
+    provider = LcaRememberJournalProvider(_session=session)
+    out = provider.append_journal(
+        reflection_artifact=Artifact(
+            kind=ArtifactKind.FACT,
+            content={"verdict": "on_track"},
+        ),
+        observation_artifact=Artifact(
+            kind=ArtifactKind.FACT,
+            content={"tool": "bash", "status": "ok", "success": True},
+        ),
+        decision_artifact=Artifact(
+            kind=ArtifactKind.FACT,
+            content={"decision_id": "dec_real", "action_type": "call_tool"},
+        ),
+    )
+    fact = out["journal_fact"]
+    assert fact.digest, "journal_fact artifact must carry a non-empty digest"
+    assert fact.content["seq"] == before
+    assert fact.content["id"] == f"{session.id}:{before}"
+    assert session.event_count == before + 1
+    types = {session.event_at(i).type for i in range(session.event_count)}
+    assert "remember.turn_fact" in types
+
+
 # ---------------------------------------------------------------------------
 # (4) state store provider
 # ---------------------------------------------------------------------------

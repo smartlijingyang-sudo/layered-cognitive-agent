@@ -232,10 +232,20 @@ def _artifact_content_or_none(artifact: Artifact | None) -> Any:
 
 
 def _session_event_to_dict(event: Any) -> dict[str, Any]:
-    """Convert a SessionEvent (or stub) to a JSON-serializable dict."""
+    """Convert a SessionEvent (or stub) to a JSON-serializable dict.
+
+    Real ``SessionEvent`` has no ``id`` field; durable identity is
+    ``{session_id}:{seq}`` (same convention as session lifecycle bind).
+    Stubs / fixtures may still expose ``.id`` directly.
+    """
+    seq = getattr(event, "seq", 0)
+    event_id = getattr(event, "id", None)
+    if not event_id:
+        session_id = getattr(event, "session_id", "") or ""
+        event_id = f"{session_id}:{seq}" if session_id else str(seq)
     return {
-        "seq": getattr(event, "seq", 0),
-        "id": getattr(event, "id", ""),
+        "seq": seq,
+        "id": event_id,
     }
 
 

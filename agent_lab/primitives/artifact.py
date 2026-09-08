@@ -10,7 +10,7 @@ import hashlib
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class ArtifactKind(StrEnum):
@@ -32,7 +32,9 @@ class Artifact(BaseModel):
     kind: ArtifactKind
     content: Any
     schema_ref: str = "raw"
-    digest: str = ""
+    # validate_default=True: Pydantic v2 skips field validators for omitted
+    # defaults otherwise, leaving digest permanently empty.
+    digest: str = Field(default="", validate_default=True)
 
     @field_validator("digest", mode="before")
     @classmethod

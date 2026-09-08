@@ -96,10 +96,17 @@ def test_use_tool_allow_produces_ok_observation() -> None:
     assert obs.content.get("status") == "ok"
     assert obs.content.get("tool") == "read_file"
     assert obs.content.get("success") is True
-    # PipelineSafeExecutor mints CommandEnvelope under plan_ref_scope.
-    envelope = obs.content.get("command_envelope") or (obs.content.get("extra") or {}).get(
-        "command_envelope"
+    # Receipt/observation boundary must be JSON-plain (no live Enums) and
+    # Artifact digests must actually hash (Pydantic validate_default).
+    assert obs.digest, "observation artifact digest must be non-empty"
+    assert obs.short_id()
+    extra = obs.content.get("extra") or {}
+    result_kind = extra.get("result_kind")
+    assert result_kind is None or isinstance(result_kind, str), (
+        f"result_kind must be a plain str at the receipt boundary, got {result_kind!r}"
     )
+    # PipelineSafeExecutor mints CommandEnvelope under plan_ref_scope.
+    envelope = obs.content.get("command_envelope") or extra.get("command_envelope")
     assert envelope is not None
     assert envelope.get("plan_ref") == "agent_lab_act"
     # Shared Session received DecisionMade (and tool journal facts).
