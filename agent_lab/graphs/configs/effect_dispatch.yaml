@@ -1,0 +1,99 @@
+# effect_dispatch — tool-call sub-graph (ADR-0206 §5.4)
+# Workers chain: build intent -> grant check -> route allow/deny -> dispatch -> receipt -> observation -> project to mv
+# Two parallel branches allowed (allow path and deny path) but in this minimal graph we keep one path.
+
+id: effect_dispatch
+version: 0.1.0
+region: effect
+description: >
+  Execute a tool call: build intent, check grant, dispatch, write receipt,
+  integrate observation, project back to model-visible assembly sub-graph.
+  The 'project' edge ending in mv_assemble.in_tool_results is the C1 closure.
+
+nodes:
+  - id: build_intent
+    region: effect
+    factory: build_intent
+    config: { tool: echo, to: intent }
+    ins: [args]
+    outs: [intent]
+
+  - id: grant_check
+    region: effect
+    factory: grant_check
+    config: { allow: [echo, calc], to: verdict }
+    ins: [intent]
+    outs: [verdict]
+
+  - id: route_verdict
+    region: effect
+    factory: route_on
+    config:
+      key_from: verdict
+      table: { allow: intent, deny: deny_marker }
+      default: deny_marker
+    ins: [verdict, intent]
+    outs: [routed]
+
+  - id: dispatch
+    region: effect
+    factory: dispatch_tool
+    config: { from: routed, to: receipt }
+    ins: [routed]
+    outs: [receipt]
+
+  - id: write_receipt
+    region: effect
+    factory: write_receipt
+    config: { from: receipt, to: receipt_fact }
+    ins: [receipt]
+    outs: [receipt_fact]
+
+  - id: integrate
+    region: effect
+    factory: integrate_observation
+    config: { from: receipt_fact, to: observation }
+    ins: [receipt_fact]
+    outs: [observation]
+
+edges:
+  - id: e_args_to_build
+    from: { spec: effect_dispatch, node: _initial, port: args }
+    to:   { spec: effect_dispatch, node: build_intent, port: args }
+    kind: data
+
+  - id: e_build_to_grant
+    from: { spec: effect_dispatch, node: build_intent, port: intent }
+    to:   { spec: effect_dispatch, node: grant_check,  port: intent }
+    kind: data
+
+  - id: e_grant_to_route_verdict
+    from: { spec: effect_dispatch, node: grant_check, port: verdict }
+    to:   { spec: effect_dispatch, node: route_verdict, port: verdict }
+    kind: data
+
+  - id: e_intent_to_route
+    from: { spec: effect_dispatch, node: build_intent, port: intent }
+    to:   { spec: effect_dispatch, node: route_verdict, port: intent }
+    kind: data
+
+  - id: e_route_to_dispatch
+    from: { spec: effect_dispatch, node: route_verdict, port: routed }
+    to:   { spec: effect_dispatch, node: dispatch,      port: routed }
+    kind: data
+
+  - id: e_dispatch_to_write_receipt
+    from: { spec: effect_dispatch, node: dispatch, port: receipt }
+    to:   { spec: effect_dispatch, node: write_receipt, port: receipt }
+    kind: data
+
+  - id: e_write_receipt_to_integrate
+    from: { spec: effect_dispatch, node: write_receipt, port: receipt_fact }
+    to:   { spec: effect_dispatch, node: integrate,     port: receipt_fact }
+    kind: data
+
+  # C1/C2 closure: project observation out of effect sub-graph and into mv_assemble
+  - id: e_integrate_to_mv_project
+    from: { spec: effect_dispatch, node: integrate, port: observation }
+    to:   { spec: mv_assemble,    node: classify,  port: results }
+    kind: project

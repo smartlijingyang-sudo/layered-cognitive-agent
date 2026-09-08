@@ -1,0 +1,118 @@
+# mv_assemble — model-visible assembly sub-graph (ADR-0206 §5.3)
+# Workers chain: classify trust -> dedupe -> rank -> redact -> merge -> validate -> commit manifest
+# All logic lives in node configs; the graph itself is pure data.
+
+id: mv_assemble
+version: 0.1.0
+region: model_visible
+description: >
+  Build a frozen ContextManifest for the next LLM turn.
+  Inputs flow through trust classification, dedup, ranking, redaction,
+  message merge, schema validation, and manifest commit.
+
+nodes:
+  - id: classify
+    region: model_visible
+    factory: trust_classify
+    config:
+      trustable_kinds: [text, message, manifest]
+    ins: [results, system, history]
+    outs: [labels]
+
+  - id: dedupe
+    region: model_visible
+    factory: dedup
+    config: { split_on: "\n" }
+    ins: [labels]
+    outs: [deduped]
+
+  - id: rank
+    region: model_visible
+    factory: rank
+    config: { keep: 50, split_on: "\n" }
+    ins: [deduped]
+    outs: [ranked]
+
+  - id: redact
+    region: model_visible
+    factory: redact
+    config: { patterns: ["<internal>", "sk-XXXX"] }
+    ins: [ranked]
+    outs: [sanitized]
+
+  - id: merge
+    region: model_visible
+    factory: merge_messages
+    config: { order: [system, sanitized, history] }
+    ins: [system, sanitized, history]
+    outs: [messages]
+
+  - id: validate
+    region: model_visible
+    factory: validate_manifest
+    config: { required_roles: [user] }
+    ins: [messages]
+    outs: [validation]
+
+  - id: commit
+    region: model_visible
+    factory: commit_manifest
+    config: { from: messages, to: manifest }
+    ins: [messages]
+    outs: [manifest]
+
+edges:
+  - id: e_results_to_classify
+    from: { spec: mv_assemble, node: _initial, port: results }
+    to:   { spec: mv_assemble, node: classify,    port: results }
+    kind: data
+
+  - id: e_system_to_classify
+    from: { spec: mv_assemble, node: _initial, port: system }
+    to:   { spec: mv_assemble, node: classify,    port: system }
+    kind: data
+
+  - id: e_history_to_classify
+    from: { spec: mv_assemble, node: _initial, port: history }
+    to:   { spec: mv_assemble, node: classify,    port: history }
+    kind: data
+
+  - id: e_classify_to_dedupe
+    from: { spec: mv_assemble, node: classify, port: labels }
+    to:   { spec: mv_assemble, node: dedupe,   port: labels }
+    kind: data
+
+  - id: e_dedupe_to_rank
+    from: { spec: mv_assemble, node: dedupe, port: deduped }
+    to:   { spec: mv_assemble, node: rank,   port: deduped }
+    kind: data
+
+  - id: e_rank_to_redact
+    from: { spec: mv_assemble, node: rank,    port: ranked }
+    to:   { spec: mv_assemble, node: redact,  port: ranked }
+    kind: data
+
+  - id: e_redact_to_merge_sanitized
+    from: { spec: mv_assemble, node: redact, port: sanitized }
+    to:   { spec: mv_assemble, node: merge, port: sanitized }
+    kind: data
+
+  - id: e_system_to_merge
+    from: { spec: mv_assemble, node: _initial, port: system }
+    to:   { spec: mv_assemble, node: merge,    port: system }
+    kind: data
+
+  - id: e_history_to_merge
+    from: { spec: mv_assemble, node: _initial, port: history }
+    to:   { spec: mv_assemble, node: merge,    port: history }
+    kind: data
+
+  - id: e_merge_to_validate
+    from: { spec: mv_assemble, node: merge,    port: messages }
+    to:   { spec: mv_assemble, node: validate, port: messages }
+    kind: data
+
+  - id: e_merge_to_commit
+    from: { spec: mv_assemble, node: merge,    port: messages }
+    to:   { spec: mv_assemble, node: commit,   port: messages }
+    kind: data

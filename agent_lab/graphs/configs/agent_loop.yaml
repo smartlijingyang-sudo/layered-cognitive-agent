@@ -1,0 +1,210 @@
+# agent_loop — root graph (ADR-0206 §2)
+# Six phases, each holds a sub_spec link to a leaf graph or a tiny stub.
+# In this prototype three phases are live: think, act, stop. The others are
+# stub identity nodes so the root graph compiles + runs end-to-end.
+
+id: agent_loop
+version: 0.1.0
+region: phase:agent_loop
+description: >
+  Root graph for the agent loop. Six phases as sub_spec links or stubs.
+  Three phases hold real nested graphs (think -> mv_assemble, act -> effect_dispatch);
+  the others are stubs to keep the demo runnable.
+
+nodes:
+  # --- perceive (stub) ---
+  - id: perceive
+    region: phase:perceive
+    factory: identity
+    config: { from: user_turn, to: perceive_out }
+    ins: [user_turn]
+    outs: [perceive_out]
+
+  # --- think (calls mv_assemble as nested sub-graph) ---
+  - id: think
+    region: phase:think
+    factory: identity
+    config: { from: think_in, to: think_out }
+    ins: [perceive_out, observe_in, think_in]
+    outs: [think_out]
+
+  # --- assemble step inside think: holds the mv_assemble sub-graph ---
+  - id: assemble_for_think
+    region: model_visible
+    factory: identity
+    config: { from: manifest, to: manifest_out }
+    ins: [in_system, in_results, in_history]
+    outs: [out_manifest]
+
+  # --- turn the frozen manifest into a flat message list for the LLM ---
+  - id: flatten_manifest
+    region: phase:think
+    factory: assemble_messages
+    config: { to: messages_flat }
+    ins: [system, history, manifest]
+    outs: [messages_flat]
+
+  # --- feed assembled messages into the LLM ---
+  - id: call_llm_node
+    region: phase:think
+    factory: call_llm
+    config:
+      provider: mock
+      from: messages_in
+      to: response
+    ins: [messages_in]
+    outs: [response]
+
+  # --- parse LLM response into a structured decision ---
+  - id: parse_decision
+    region: phase:think
+    factory: identity
+    config: { from: response, to: think_out }
+    ins: [response]
+    outs: [think_out]
+
+  # --- act (calls effect_dispatch as nested sub-graph) ---
+  - id: act
+    region: phase:act
+    factory: identity
+    config: { from: act_in, to: act_out }
+    ins: [in_args]
+    outs: [out_observation]
+
+  # --- reflect (stub) ---
+  - id: reflect
+    region: phase:reflect
+    factory: identity
+    config: { from: reflect_in, to: reflect_out }
+    ins: [reflect_in]
+    outs: [reflect_out]
+
+  # --- remember (stub) ---
+  - id: remember
+    region: phase:remember
+    factory: identity
+    config: { from: remember_in, to: remember_out }
+    ins: [remember_in]
+    outs: [remember_out]
+
+  # --- stop ---
+  - id: stop
+    region: phase:stop
+    factory: identity
+    config: { from: stop_in, to: terminal }
+    ins: [stop_in]
+    outs: [terminal]
+
+edges:
+  # external initial inputs -> assemble_for_think
+  - id: e_init_system_to_assemble
+    from: { spec: agent_loop, node: _initial, port: system }
+    to:   { spec: agent_loop, node: assemble_for_think, port: in_system }
+    kind: data
+
+  - id: e_init_history_to_assemble
+    from: { spec: agent_loop, node: _initial, port: history }
+    to:   { spec: agent_loop, node: assemble_for_think, port: in_history }
+    kind: data
+
+  - id: e_init_results_to_assemble
+    from: { spec: agent_loop, node: _initial, port: results }
+    to:   { spec: agent_loop, node: assemble_for_think, port: in_results }
+    kind: data
+
+  # external user_turn -> perceive
+  - id: e_init_user_to_perceive
+    from: { spec: agent_loop, node: _initial, port: user_turn }
+    to:   { spec: agent_loop, node: perceive, port: user_turn }
+    kind: data
+
+  # perceive -> think
+  - id: e_perceive_to_think
+    from: { spec: agent_loop, node: perceive, port: perceive_out }
+    to:   { spec: agent_loop, node: think,    port: perceive_out }
+    kind: data
+
+  # assemble_for_think -> think (assembled manifest flows in)
+  - id: e_assemble_to_think
+    from: { spec: agent_loop, node: assemble_for_think, port: out_manifest }
+    to:   { spec: agent_loop, node: think,              port: observe_in }
+    kind: data
+
+  # assemble_for_think.out_manifest -> flatten_manifest.manifest
+  - id: e_assemble_to_flatten
+    from: { spec: agent_loop, node: assemble_for_think, port: out_manifest }
+    to:   { spec: agent_loop, node: flatten_manifest,  port: manifest }
+    kind: data
+
+  # external initial inputs -> flatten_manifest (system + history)
+  - id: e_init_system_to_flatten
+    from: { spec: agent_loop, node: _initial, port: system }
+    to:   { spec: agent_loop, node: flatten_manifest, port: system }
+    kind: data
+
+  - id: e_init_history_to_flatten
+    from: { spec: agent_loop, node: _initial, port: history }
+    to:   { spec: agent_loop, node: flatten_manifest, port: history }
+    kind: data
+
+  # flatten_manifest.messages_flat -> call_llm_node.messages_in
+  - id: e_flatten_to_llm
+    from: { spec: agent_loop, node: flatten_manifest, port: messages_flat }
+    to:   { spec: agent_loop, node: call_llm_node,     port: messages_in }
+    kind: data
+
+  # call_llm_node.response -> parse_decision.response
+  - id: e_llm_to_parse
+    from: { spec: agent_loop, node: call_llm_node, port: response }
+    to:   { spec: agent_loop, node: parse_decision, port: response }
+    kind: data
+
+  # parse_decision.think_out -> think.think_in (the think stage's official exit)
+  - id: e_parse_to_think_in
+    from: { spec: agent_loop, node: parse_decision, port: think_out }
+    to:   { spec: agent_loop, node: think,          port: think_in }
+    kind: data
+
+  # think -> act (model decides a tool call)
+  - id: e_think_to_act
+    from: { spec: agent_loop, node: think, port: think_out }
+    to:   { spec: agent_loop, node: act,   port: in_args }
+    kind: data
+
+  # act -> reflect
+  - id: e_act_to_reflect
+    from: { spec: agent_loop, node: act,      port: out_observation }
+    to:   { spec: agent_loop, node: reflect,  port: reflect_in }
+    kind: data
+
+  # reflect -> remember
+  - id: e_reflect_to_remember
+    from: { spec: agent_loop, node: reflect,  port: reflect_out }
+    to:   { spec: agent_loop, node: remember, port: remember_in }
+    kind: data
+
+  # remember -> stop
+  - id: e_remember_to_stop
+    from: { spec: agent_loop, node: remember, port: remember_out }
+    to:   { spec: agent_loop, node: stop,     port: stop_in }
+    kind: data
+
+# Sub-spec wiring: think -> mv_assemble, act -> effect_dispatch
+sub_specs:
+  - node: assemble_for_think
+    sub_spec: mv_assemble
+    input_map:
+      in_system: system
+      in_results: results
+      in_history: history
+    output_map:
+      manifest: out_manifest
+
+  - node: act
+    sub_spec: effect_dispatch
+    input_map:
+      in_args: args
+    output_map:
+      observation: out_observation
+
+mv_feed: assemble_for_think
