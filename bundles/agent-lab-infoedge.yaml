@@ -1,0 +1,24 @@
+# agent-lab-infoedge — dedicated dual-mount of graph B (InfoEdge).
+#
+# Owner: agent_lab absorb (ADR-0206). Prototype only; not a factory default.
+#
+# COMPAT(delete-when: 0206 absorb. Delete this bundle together with
+#   profiles/agent-lab-infoedge.yaml and lca/plugins/loop/driver/infoedge/
+#   when all of:
+#     1. InfoEdgeSpec is a CompiledRunPlan region
+#     2. GenericPlanInterpreter recurses nested subgraphs
+#     3. rg 'agent_lab.runtime.runner' lca/ profiles/ bundles/ = 0)
+#
+# One loop-driver entry. The registry itself lives in runtime-core / web-app;
+# this bundle only registers target=infoedge onto that registry.
+name: agent-lab-infoedge
+description: |
+  Thin RunLoopDriver adapter that hangs agent_lab.runtime.runner on the
+  LCA run_loop_driver_registry under target infoedge. Out-of-box
+  web-standard must not include this bundle.
+entries:
+  - id: lca-loop-infoedge
+    name: lca_loop_infoedge
+    $module: lca.plugins.loop.driver.infoedge.plugin
+    config:
+      target: infoedge

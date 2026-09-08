@@ -92,3 +92,29 @@ python -m agent_lab.run --describe
 python -m agent_lab.run --describe --target node:act.execute
 python -m agent_lab.run --describe --target graph:act
 ```
+
+## Run graphs (process-out)
+
+```bash
+python -m agent_lab.run agent_loop   # full nested loop
+python -m agent_lab.run act          # Decision → Observation demo
+python -m agent_lab.run model_eye
+python -m agent_lab.run --negative   # expect ValidationError on broken act
+```
+
+## Dual-mount with LCA Profile (graph B)
+
+Out-of-box production stays on graph A (`profiles/web-standard.yaml` +
+0075 declarative). Graph B hangs on a **dedicated** Profile — never on
+`web-standard`. Command SSOT:
+[profiles/README.md](../profiles/README.md) (`agent-lab-infoedge` section).
+
+```bash
+./scripts/lca-ops inspect-tree profiles/agent-lab-infoedge.yaml
+./scripts/lca-ops why-plugin lca-loop-infoedge -p profiles/agent-lab-infoedge.yaml
+uv run python -m lca_kernel serve --profile profiles/agent-lab-infoedge.yaml \
+    --host 0.0.0.0 --port 8765 --allow-unknown-env
+```
+
+Decision / delete-when:
+[docs/notes/proposed/seam/2026-09-08-agent-lab-absorb-end-state.md](../docs/notes/proposed/seam/2026-09-08-agent-lab-absorb-end-state.md).

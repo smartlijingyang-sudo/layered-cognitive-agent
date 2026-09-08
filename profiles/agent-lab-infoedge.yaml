@@ -1,0 +1,47 @@
+# agent-lab-infoedge — prototype dual-mount of graph B (InfoEdge).
+#
+# NOT a factory default. Out-of-box web-standard.yaml must not list this
+# profile or bundles/agent-lab-infoedge.yaml.
+#
+# Owner: agent_lab absorb (ADR-0206).
+# COMPAT(delete-when: 0206 absorb. Delete with bundles/agent-lab-infoedge.yaml
+#   and lca/plugins/loop/driver/infoedge/ when InfoEdgeSpec is a
+#   CompiledRunPlan region, GenericPlanInterpreter recurses nested
+#   subgraphs, and rg 'agent_lab.runtime.runner' lca/ profiles/ bundles/ = 0).
+#
+# bundles/declarative-phase-graph.yaml is boot-closure only: the 0075
+# phase graph is a dead Plan region on this profile until absorb.
+name: agent-lab-infoedge
+description: |
+  Prototype dual-mount of the agent_lab InfoEdge runner. NOT a factory
+  default. Selects run_loop_driver_registry default=infoedge. Switch
+  with argv --profile, not env.
+
+observability:
+  loop_cursor:
+    implementation: std
+    spine_default: loop_cursor.spine_default
+  projection_host:
+    initial: [step_tree, narrative, graph, cost]
+  persistence:
+    coalescer: default
+    sink: routing_file
+  model_visible:
+    enabled: true
+  close_barrier:
+    enabled: true
+  plan_ref: agent-lab-infoedge
+
+bundles:
+  - bundles/base.yaml
+  - bundles/session-runtime.yaml
+  - bundles/observability-default.yaml
+  - bundles/declarative-phase-graph.yaml
+  - bundles/web-app.yaml
+  - bundles/agent-lab-infoedge.yaml
+  - bundles/loop_cursor.spine_default.yaml
+
+patch:
+  - id: lca-run-loop-driver-registry
+    config:
+      default: infoedge

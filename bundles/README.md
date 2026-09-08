@@ -26,6 +26,14 @@ capability. The boot DAG enforces this via `requires → provides`.
 See ADR-0112 (Gateway routes plugin 化修订版) and ADR-0115 (Kernel /
 Transport boundary) for the design rationale.
 
+## agent-lab-infoedge.yaml — InfoEdge RunLoopDriver (prototype)
+
+Registers `lca-loop-infoedge` → `run_loop_driver_registry[infoedge]`.
+Consumed only by `profiles/agent-lab-infoedge.yaml`. **Do not** add to
+`profiles/web-standard.yaml`. Commands: [profiles/README.md](../profiles/README.md)
+(`agent-lab-infoedge` section). Delete-when in the bundle header and
+[`docs/notes/proposed/seam/2026-09-08-agent-lab-absorb-end-state.md`](../docs/notes/proposed/seam/2026-09-08-agent-lab-absorb-end-state.md).
+
 ## Other bundles
 
 See file headers for `base.yaml`, `coding-agent-tools.yaml`,

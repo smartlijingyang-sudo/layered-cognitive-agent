@@ -65,6 +65,40 @@ The resolved bundle list now picks up the new transport plugins
 uvicorn gateway.app:create_app --factory
 ```
 
-Other profiles in this directory are specialized: `coding-agent.yaml`,
-`cordis-creator.yaml`, `genai-traced.yaml`, `self-improving-minimal.yaml`,
-`test-minimal.yaml`, `web-standard-continuous.yaml`, `web-standard-recovery.yaml`.
+## agent-lab-infoedge.yaml — InfoEdge dual-mount (prototype, not factory)
+
+Hang graph B (agent_lab nested `InfoEdgeSpec`) beside out-of-box graph A
+(0075 declarative on `web-standard`). Switch with argv `--profile`, not env.
+`web-standard.yaml` must not list `bundles/agent-lab-infoedge.yaml`.
+
+Decision / delete-when:
+[`docs/notes/proposed/seam/2026-09-08-agent-lab-absorb-end-state.md`](../docs/notes/proposed/seam/2026-09-08-agent-lab-absorb-end-state.md).
+
+```bash
+# Inspect / why (graph B)
+./scripts/lca-ops inspect-tree profiles/agent-lab-infoedge.yaml
+./scripts/lca-ops why-plugin lca-loop-infoedge -p profiles/agent-lab-infoedge.yaml
+
+# Assert out-of-box graph A has no infoedge driver
+./scripts/lca-ops inspect-tree profiles/web-standard.yaml
+# expect: no bundles/agent-lab-infoedge.yaml, no lca-loop-infoedge
+
+# Boot / serve graph B
+./scripts/lca-ops kernel-boot profiles/agent-lab-infoedge.yaml
+uv run python -m lca_kernel serve \
+    --profile profiles/agent-lab-infoedge.yaml \
+    --host 0.0.0.0 --port 8765 --allow-unknown-env
+
+# Process-out lab CLI (same InfoEdge runner, no Profile)
+python -m agent_lab.run agent_loop
+python -m agent_lab.run --describe --target graph:act
+
+# Dual-mount regression tests
+.venv/bin/python -m pytest \
+  tests/profiles/test_agent_lab_infoedge_profile.py \
+  tests/plugins/loop/driver/test_infoedge_driver.py -q --no-cov
+```
+
+Other specialized profiles: `coding-agent.yaml`, `cordis-creator.yaml`,
+`genai-traced.yaml`, `self-improving-minimal.yaml`, `test-minimal.yaml`,
+`web-standard-continuous.yaml`, `web-standard-recovery.yaml`.

@@ -92,10 +92,18 @@ SIGTERM/SIGINT LIFO dispose)。本地改完代码 / 换 profile / 强制刷新:
 
   ./scripts/lca-ops kernel-restart   # 一行重启: SIGTERM → 等 K6 dispose → spawn 新进程
 
-  # 启动(前台)
+  # 启动(前台) — 图 A：0075 declarative（出厂）
   uv run python -m lca_kernel serve \\
       --profile profiles/web-standard.yaml \\
       --host 0.0.0.0 --port 8765 --allow-unknown-env
+
+  # 图 B：agent_lab InfoEdge 双挂（专用 Profile，非出厂；详见 profiles/README.md）
+  uv run python -m lca_kernel serve \\
+      --profile profiles/agent-lab-infoedge.yaml \\
+      --host 0.0.0.0 --port 8765 --allow-unknown-env
+  ./scripts/lca-ops inspect-tree profiles/agent-lab-infoedge.yaml
+  ./scripts/lca-ops why-plugin lca-loop-infoedge -p profiles/agent-lab-infoedge.yaml
+  # 进程外仍可：python -m agent_lab.run agent_loop   （见 agent_lab/README.md）
 
   # 打印启动命令(脚本化集成用)
   ./scripts/lca-ops kernel_serve [--host H] [--port P] [profile_path]

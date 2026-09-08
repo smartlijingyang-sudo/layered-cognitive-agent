@@ -1,63 +1,103 @@
-# Agent Note: agent_lab 图管理终态 — Profile/Bundle 启用面 + GenericPlanInterpreter 吸收
+# Agent Note: agent_lab 双挂桥接 → 单图种吸收
 
 Status: proposed
 
 ## Problem
 
-`agent_lab/` 是 ADR-0206 的信息图原型：自有 YAML SSOT、自有 `compile`/`runner`、自有 `GraphPlugin` 钩子。生产认知图仍由 ADR-0075 declarative phase graph 经 Profile → Bundle → Cordis `@plugin` → `CompiledRunPlan` → `GenericPlanInterpreter` 管理。
+`agent_lab/` 持有 ADR-0206 细粒度嵌套 `InfoEdgeSpec`（阶段内工人链）；生产出厂 Profile 仍跑 ADR-0075 粗阶段图（`declarative-phase-graph` → `CompiledRunPlan.phase_graph` → `GenericPlanInterpreter`）。两套语义需要对照验证，但同一份 `CompiledRunPlan` 不能同时编译两套 topology（单 entry）。若把 lab 解释器焊进出厂 `web-standard`，会留下难拆的第二 Runtime；若永远只在进程外 `python -m agent_lab.run`，Profile/`why-plugin` 又看不见图 B。
 
-两套宿主并存时，读者容易把「像 declarative 一样进插件系统」读成「把 lab runner 整包装进 Cordis」。那会留下第二 Runtime / 第二 Session 事实源，与 ADR-0206 Reject 与 Session 单轨（ADR-0186/0191）冲突。同时若长期把「维持双轨」当成终点，InfoEdgeSpec 语义无法进入 Profile/`why-plugin`/effects 审计宇宙。
-
-需要一条可执行的长期口径：终态进 LCA 插件管理面；过渡期 lab 只做语义沙盒；禁止把 lab 解释器升格为生产第二内核。
+需要一条桥接口径：两张图都能跑、都能选；合并后只剩一种可执行图。
 
 ## Proposal
 
-锁定长期方向为 ADR-0206 §6 吸收路径，不新开平行宿主 ADR。
+将用 **专用 Profile + Bundle 双挂** 对照两张图，吸收完成后只留一张 InfoEdge 树进入 `GenericPlanInterpreter`。
 
-1. **管理面终态（与 declarative 同构）**  
-   根图 / 阶段子图 / `model_visible` / effect / lineage 的启用、替换、能力归属、effects、审计进入 Profile/Bundle + Cordis Manifest；`why-plugin` / `audit-plugin-shape` 能回答「谁提供了这张图事实」。
+### 双挂（桥接）
 
-2. **执行面终态**  
-   `InfoEdgeSpec` 进入 `CompiledRunPlan`；解释器仍是 `GenericPlanInterpreter`（扩展 Binding / Join / 路由递归）。`agent_lab.runtime.runner` 在吸收完成后退役，不作为 Profile 挂载的第二解释器。
+| 图 | 启用面 | 解释器 |
+|---|---|---|
+| A — 0075 粗阶段图 | 出厂 `profiles/web-standard.yaml` + `bundles/declarative-phase-graph.yaml` | `GenericPlanInterpreter` |
+| B — InfoEdge 嵌套图 | 专用 `profiles/agent-lab-infoedge.yaml` + `bundles/agent-lab-infoedge.yaml` | 薄 `RunLoopDriver(infoedge)` → `agent_lab.runtime.runner` |
 
-3. **工人节点**  
-   保持图内 `factory` / Node；不为每个 ant-worker 建 Cordis `@plugin`。进程级插件只承载拓扑/能力提供者与既有 Body/Gate/SafeExecutor/control contribution。
+约束：
 
-4. **过渡期（当前 fusion-prep）**  
-   lab 继续迭代 InfoEdgeSpec 形状与 act 窄门 / session·event 事件形状；节点逻辑优先落可吸收 LCA seam。禁止把整张 lab 图先挂进 `bundles/*.yaml` 假装已融合。lab `GraphPlugin` 仅服务原型横切；delete-when = 吸收 PR 内删除。
+1. **出厂 `web-standard` 不挂图 B**（默认生产树零 diff）。
+2. 图 B 仅经专用 Profile；切换面是 argv `--profile`，不是 env。
+3. 薄适配器注入 Run 已有 Session（`configure_session`）；禁止 `agent_lab_default` 第二事实源；禁止插件 `load_dotenv` / 自读密钥。
+4. 工人节点保持图内 `factory`，不逐个 Cordis 化。
+5. 双挂件头注释写死 delete-when；吸收 PR 内删除，不跨 PR 留后门。
 
-5. **切片顺序**（与 0206 P0–P8 对齐，不另立编号宇宙）  
-   A 原型收敛 → B `InfoEdge*` 契约进 `lca.contracts` → C Plan 挂载 InfoEdge region → D Interpreter 递归 + P7 降级 phase_graph → E Bundle 提供图事实且 lab runner 退役。
+### 合并后（终态）
 
-本 Note 不修改 ADR-0075/0206 文本边界；它把「终态 = 吸收进既有插件宇宙与解释器」钉为 fusion-prep 的操作真值。
+- 一种可执行图：`InfoEdgeSpec` 嵌套树进入 `CompiledRunPlan`（region，非平行图种）。
+- 解释器仍是 `GenericPlanInterpreter`（Binding / Join / 路由递归）。
+- 0075 粗阶段图降级为 `region=phase:*`；lab runner 适配器与专用 Profile/Bundle 删除。
+- 管理面与 declarative 同构：Profile/Bundle、effects、`why-plugin`。
+
+### delete-when
+
+`profiles/agent-lab-infoedge.yaml`、`bundles/agent-lab-infoedge.yaml`、`lca/plugins/loop/driver/infoedge/` 在同时满足时删除：
+
+1. `InfoEdgeSpec` ⊆ `CompiledRunPlan`
+2. `GenericPlanInterpreter` 递归嵌套子图
+3. `rg 'agent_lab.runtime.runner' lca/ lca_kernel/ profiles/ bundles/` = 0
+4. `python -m agent_lab.run` 不再是 Gateway/生产入口
+5. 出厂 Profile 上 `why-plugin` 能回答图事实归属
+6. 测试断言 `web-standard` 无 `infoedge` driver
 
 ## Alternatives considered
 
-### Why not 维持双轨到无限期？
+### Why dedicated Profile dual-mount (chosen)?
 
-双轨让原型迭代便宜，但管理面永久缺 `why-plugin`/effects，且 lab Session singleton 与生产 Session 单轨长期分叉。双轨只允许作为 A–D 过渡，不能当终点。
+专用 Profile + Bundle 把图 B 留在出厂树外；切换面是 argv `--profile`，不是 env。桥接件带 delete-when，吸收完成后可整组删除。这是选定桥接。
 
-### Why not 立刻把 agent_lab runner 挂进 Bundle？
+### Why not 一个 Profile 里两 Bundle + flag 切换？
 
-会制造第二 Runtime 与第二图真相，缺 delete-when，违反 ADR-0206 Reject 与「compiler projects Bundle facts；interpreter 不认 plugin id」纪律。正确顺序是契约与 Plan 先吸收，再退役 lab 解释器。
+同 Plan 两套 topology 触发单 entry 失败；或编译 A、执行 B 会把第二解释器焊进生产默认树，合并时更难拆。`LCA_PROFILE` 也禁止从 env 覆盖。
 
-### Why not 每个 `@node` 工人一个 Cordis `@plugin`？
+### Why not 把 lab 挂进出厂 web-standard？
 
-工人是图内 factory，不是进程级 capability。逐节点 Manifest 会膨胀 DAG/生命周期，且与 declarative「topology 是数据、executor 是 capability」切法不一致。
+出厂路径出现第二解释器与 why-plugin 混视，违反 ADR-0206 Reject 第二 Runtime，且误流量会打进原型图。否决。
 
-### Why not 让 lab GraphPlugin 宇宙与 Cordis 长期并存？
+### Why not 永久双轨、不合一张？
 
-横切双轨会重复 observer / control / session 写入路径。横切应收敛到既有 observer、Session.append、control contribution；lab 钩子只是原型脚手架。
+管理面永久分叉，Session/密钥面易漂，InfoEdge 语义进不了出厂 Plan 审计。双挂只服务对照与吸收，不是终点。
+
+### Why not 每个 @node 工人一个 Cordis @plugin？
+
+工人是图内 factory，不是进程级 capability；会爆炸 DAG，且与「topology 是数据、executor 是 capability」切法不一致。
 
 ## Acceptance criteria
 
-- 任意读者能从本 Note + ADR-0206 §6 得出同一结论：终态管理面 = Profile/Bundle；终态执行面 = `GenericPlanInterpreter`；lab runner 非生产宿主。
-- fusion-prep 分支不新增「lab 图进 Bundle 试跑」路径；若出现，同 PR 必须带退役条件或被拒绝。
-- 吸收到达 C 时：`CompiledRunPlan` 可携带 InfoEdge 闭包且 `plan validate` / 相关契约测试 fail-loud。
-- 吸收到达 E 时：`python -m agent_lab.run` 不再是生产入口；出厂 Profile 的图启用可经 `why-plugin` 追溯；lab 第二解释器与 lab Session singleton 生产路径为 0。
+- `web-standard` 与 `agent-lab-infoedge` 均可解析；前者无 infoedge bundle/driver，后者 `why-plugin lca-loop-infoedge` 可见。
+- 图 A、图 B 各有一条可运行入口（kernel Profile / lab Profile 或 `python -m agent_lab.run`）。
+- infoedge 驱动路径使用注入 Session，不创建 `session_id=agent_lab_default`。
+- Note、Profile、Bundle、plugin 头均写明 delete-when；吸收完成后出厂只剩一张 InfoEdge 树。
+
+## Commands
+
+命令真值在 [profiles/README.md](../../../../profiles/README.md)（`agent-lab-infoedge` 节）与
+[agent_lab/README.md](../../../../agent_lab/README.md)；`./scripts/lca-ops` 无参手册
+（`lca/infrastructure/cli/guide/guide.py`）含图 B 启动摘要。
+
+```bash
+# 图 A（出厂）
+./scripts/lca-ops inspect-tree profiles/web-standard.yaml
+uv run python -m lca_kernel serve --profile profiles/web-standard.yaml \
+    --host 0.0.0.0 --port 8765 --allow-unknown-env
+
+# 图 B（专用 Profile）
+./scripts/lca-ops inspect-tree profiles/agent-lab-infoedge.yaml
+./scripts/lca-ops why-plugin lca-loop-infoedge -p profiles/agent-lab-infoedge.yaml
+uv run python -m lca_kernel serve --profile profiles/agent-lab-infoedge.yaml \
+    --host 0.0.0.0 --port 8765 --allow-unknown-env
+
+# 图 B（进程外 lab）
+python -m agent_lab.run agent_loop
+```
 
 ## Risks
 
-- 过早写 Bundle 包装会固化第二真相；用「禁止 C 之前 Bundle 挂 lab runner」约束。
-- 0206 仍为 Proposed、P7 未落地时，生产 SSOT 仍是 0075 phase_graph；本 Note 不授权跳过 P7 直接替换生产拓扑。
-- contracts 引入 `InfoEdge*` 若与 harness 反向依赖，须保持 `contracts → …` 单向；实现落 infrastructure/harness，不落 contracts I/O。
+- lab Profile 若仍挂 `declarative-phase-graph` 仅为过 compile，0075 成为死 Plan region — 必须在头注释标明，合并时删除。
+- 薄驱动若走完整 Gateway `/runs`，装配成本高 — MVP 以注册 + Session 单轨 + runner 可调用为门槛，完整 carrier e2e 可后续补。
+- contracts 引入 `InfoEdge*` 时保持 `contracts` 无 I/O、单向依赖。
