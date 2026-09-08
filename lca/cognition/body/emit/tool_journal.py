@@ -16,13 +16,12 @@ evidence 平面,inline 由后续 EvidencePolicy.should_inline() 决策启用。
 from __future__ import annotations
 
 import json
-import warnings
 from collections.abc import Mapping
 from typing import Any
 
 import structlog
 
-from lca.cognition.body.executor.cursor_record import CursorRecord
+from lca.cognition.body.emit._args_summary import summarize_args
 from lca.cognition.body.tools.tool_result_preview import tool_files
 from lca.contracts.models.core.execution.decision import Observation, ToolCall  # noqa: F401
 from lca.contracts.models.observability.diagnostic.diagnostic import DiagnosticCategory
@@ -40,14 +39,6 @@ from lca.contracts.observability.evidence.evidence import (
 from lca.contracts.protocols.runtime.infra.infra import Tool
 from lca.infrastructure.session.commit.fact_committer import emit_diagnostic
 from lca.infrastructure.tools.contract.project.project import project_tool_state
-
-# COMPAT(delete-when: cursor second-track fully retired per ADR-0185 P5 / ADR-0186,
-#   tracking: PR-C)
-warnings.warn(
-    "cursor.record_* is deprecated; route through Session.append (ADR-0185 P5 / ADR-0186)",
-    DeprecationWarning,
-    stacklevel=2,
-)
 
 _log = structlog.get_logger(__name__)
 
@@ -140,11 +131,15 @@ def record_tool_started_observability(
             "invocation_id": invocation_id,
         },
     )
-    CursorRecord.try_record_tool_call(
+    from lca.loop.commit.tool_journal import (
+        record_step_tool_call,
+    )
+
+    record_step_tool_call(
         tool_name=tool.name,
         invocation_id=invocation_id,
         arguments=inline_args,
-        arguments_summary=_summarize_args(args_dict),
+        arguments_summary=summarize_args(args_dict),
     )
 
 
@@ -182,15 +177,10 @@ def emit_tool_started(
     return arguments_ref
 
 
-def _summarize_args(args: dict[str, Any], limit: int = 200) -> str:
-    """生成 args 的一行人话摘要(进入 step.tool_call.arguments_summary)。"""
-    if not args:
-        return ""
-    keys = list(args.keys())[:5]
-    head = ", ".join(f"{k}={repr(args[k])[:32]}" for k in keys)
-    if len(head) > limit:
-        return head[:limit] + "…"
-    return head
+# delete-when: this file previously had a private ``_summarize_args`` that
+# duplicated ``safe_executor._summarize_args_for_cursor``. Both private copies
+# were consolidated into ``lca.cognition.body.emit._args_summary.summarize_args``
+# (single canonical implementation, ADR-0185 P5 / report_digest_inconsistency.md).
 
 
 def prepare_tool_denied(tool: Tool, reason: str) -> ToolJournalReceipt:
@@ -206,11 +196,16 @@ def record_tool_denied_observability(tool: Tool, reason: str) -> None:
         plugin=type(tool).__name__,
         attributes={"tool_name": tool.name, "reason": reason},
     )
-    CursorRecord.try_record_tool_result(
+    from lca.loop.commit.tool_journal import (
+        record_step_tool_result,
+    )
+
+    record_step_tool_result(
         tool_name=tool.name,
-        result_digest=reason,
+        invocation_id="",
         outcome="denied",
         ok=False,
+        error=reason,
     )
 
 
@@ -305,11 +300,14 @@ def record_tool_invoked_observability(
         inline_output_text,
         committed.output_ref,
     )
-    CursorRecord.try_record_tool_result(
+    from lca.loop.commit.tool_journal import (
+        record_step_tool_result,
+    )
+
+    record_step_tool_result(
         tool_name=tool.name,
-        result_digest=delta,
-        outcome="ok" if obs.success else "failure",
         invocation_id=resolved_id,
+        outcome="ok" if obs.success else "failure",
         ok=obs.success,
         latency_ms=latency_ms,
         stdout_head=(inline_output_text or "")[:2000],

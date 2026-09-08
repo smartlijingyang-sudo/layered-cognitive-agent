@@ -1,4 +1,19 @@
-"""SSOT for cursor.record_* writes (R2).
+"""Internal ``cursor.record_*`` legacy entry (demoted by PR-1).
+
+delete-when: cursor second-track fully retired per ADR-0185 P5 / ADR-0186.
+The business path (safe_executor / pipeline_safe_executor / tool_journal) no
+longer calls into this module — it routes through
+``lca.loop.commit.tool_journal.record_step_tool_call`` /
+``record_step_tool_result``, which go straight to ``FactGateway.publish_ep`` /
+``Session.append`` (single production entry, C4 / I-FACT-1).
+
+This module remains only for:
+- ``try_advance(target)`` — phase-window advance for ``SimpleBody.act``;
+  not a fact-write and out of scope for the single-track migration.
+- cursor-internal callers (e.g. ``CoordinatorAdapter``,
+  ``StdLoopCursor.record_*`` re-emission paths) that still rely on the
+  cursor's typed payload shape and phase guards. These will retire when
+  the cursor second-track itself retires (ADR-0185 P5).
 
 Replaces 7+ duplicated ``try/except CursorError → warning`` blocks across body
 and tool-executor modules. The lazy import of ``get_current_cursor`` lives
@@ -7,7 +22,6 @@ here only.
 
 from __future__ import annotations
 
-import warnings
 from typing import Any, Literal
 
 import structlog
@@ -16,23 +30,19 @@ from lca.contracts.observability.cursor.loop_cursor import CursorError, LoopCurs
 
 _log = structlog.get_logger(__name__)
 
-# COMPAT(delete-when: cursor second-track fully retired per ADR-0185 P5 / ADR-0186,
-#   tracking: PR-C)
-# cursor.record_* is deprecated — Session.append is the sole fact production entry.
-warnings.warn(
-    "cursor.record_* is deprecated; route through Session.append (ADR-0185 P5 / ADR-0186)",
-    DeprecationWarning,
-    stacklevel=2,
-)
-
 # Idempotency guard: invocation_ids already written via try_record_tool_call.
 # Prevents duplicate ``step.tool_call.record`` events when the same invocation
 # is recorded more than once (e.g. dual-track emit during migration).
+#
+# NOTE: business path no longer calls ``CursorRecord`` (see module docstring).
+# This set is retained for cursor-internal callers; Session catalog re-entry
+# rejection (``SessionReentryError``) is the authoritative idempotency
+# boundary for the business path.
 _seen_tool_call_invocations: set[str] = set()
 
 
 class CursorRecord:
-    """Best-effort ``cursor.record_*`` writer (R2 consolidation).
+    """Best-effort ``cursor.record_*`` writer (R2 consolidation, demoted).
 
     Cursor writes are advisory evidence; a missing cursor (no run context) or a
     phase-guard rejection (``CursorError``) must not escalate to a session-level
@@ -47,6 +57,14 @@ class CursorRecord:
     负责把这些字段全部透传给 ``cursor.record_tool_call`` /
     ``cursor.record_tool_result``(经 ``ToolCallRecord`` / ``ToolResultRecord``
     payload 表达,与 ``LoopCursor`` Protocol 对齐)。
+
+    **PR-1 (cursor second-track → Session.append narrow wrapper):**
+    business-path callers (safe_executor / pipeline_safe_executor / tool_journal)
+    were migrated to ``lca.loop.commit.tool_journal.record_step_tool_call`` /
+    ``record_step_tool_result`` — single track via FactGateway → Session.append.
+    This class is retained only for cursor-internal callers; the
+    ``try_record_tool_call`` / ``try_record_tool_result`` methods are
+    no longer reached by the business path.
     """
 
     @staticmethod

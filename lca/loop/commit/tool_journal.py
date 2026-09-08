@@ -7,7 +7,7 @@ Unbound session → no-op (legacy journal path retires).
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.state.state import AgentState
@@ -321,6 +321,117 @@ def commit_body_sandbox_exit(
     )
 
 
+# ── step.tool_call.record / step.tool_result.record narrow wrappers ──────────
+# delete-when: cursor_record.CursorRecord.try_record_tool_call / try_record_tool_result
+#   retired (ADR-0185 P5 owner; cursor second-track fully closed).
+#   Until then, business-path callers route through these two functions and
+#   never reach ``CursorRecord`` directly (C4 / I-FACT-1 single production entry).
+
+
+def record_step_tool_call(
+    *,
+    tool_name: str,
+    invocation_id: str,
+    arguments: dict[str, Any] | None,
+    arguments_summary: str = "",
+    state: AgentState | None = None,
+    session: object | None = None,
+    actor: str = "body",
+) -> AppendReceipt | None:
+    """Commit ``step.tool_call.record`` spine fact via FactGateway (single track).
+
+    Replaces the legacy ``CursorRecord.try_record_tool_call`` second-track
+    path on the business call sites (safe_executor / pipeline_safe_executor /
+    tool_journal). Payload fields mirror what ``StdLoopCursor.record_tool_call``
+    emits (excluding cursor-only fields ``incarnation`` / ``plan_ref`` /
+    ``step_index`` / ``call_seq``, which are injected by the cursor itself
+    on its own path and never reach the business path).
+    """
+    step, run_id = _phase_tool_context()
+    payload: dict[str, Any] = {
+        "step": step,
+        "run_id": run_id,
+        "tool_name": tool_name,
+        "invocation_id": invocation_id,
+        "arguments": arguments,
+    }
+    if arguments_summary:
+        payload["arguments_summary"] = arguments_summary
+    return publish_ep_bound(
+        "step.tool_call.record",
+        payload,
+        state=state,
+        session=session,
+        actor=actor,
+    )
+
+
+def record_step_tool_result(
+    *,
+    tool_name: str,
+    invocation_id: str,
+    outcome: Literal["ok", "failure", "timeout", "denied"],
+    ok: bool,
+    latency_ms: int = 0,
+    stdout_head: str = "",
+    stdout_chars_total: int = 0,
+    stdout_truncated: bool = False,
+    stderr: str = "",
+    files_created: tuple[str, ...] = (),
+    error: str | None = None,
+    delta_summary: str = "",
+    state: AgentState | None = None,
+    session: object | None = None,
+    actor: str = "body",
+) -> AppendReceipt | None:
+    """Commit ``step.tool_result.record`` spine fact via FactGateway (single track).
+
+    Replaces the legacy ``CursorRecord.try_record_tool_result`` second-track
+    path. ``outcome`` / ``ok`` are both required and must agree — invariant
+    from ``ToolResultRecord`` (contracts/observability/cursor/loop_cursor_payloads.py)
+    and the fold binding ``FoldConsistencyError`` (binding_engine.apply_tool_result).
+    """
+    if outcome == "ok" and not ok:
+        raise ValueError(
+            f"tool_result contradiction: outcome='ok' requires ok=True, got ok=False "
+            f"(tool={tool_name!r})"
+        )
+    if outcome in ("failure", "timeout", "denied") and ok:
+        raise ValueError(
+            f"tool_result contradiction: outcome={outcome!r} requires ok=False, "
+            f"got ok=True (tool={tool_name!r})"
+        )
+    step, run_id = _phase_tool_context()
+    payload: dict[str, Any] = {
+        "step": step,
+        "run_id": run_id,
+        "tool_name": tool_name,
+        "invocation_id": invocation_id,
+        "outcome": outcome,
+        "ok": ok,
+        "latency_ms": latency_ms,
+        "stdout_chars_total": stdout_chars_total,
+        "stdout_truncated": stdout_truncated,
+    }
+    if stdout_head:
+        payload["stdout_head"] = stdout_head
+    if stderr:
+        payload["stderr"] = stderr
+    if files_created:
+        payload["files_created"] = list(files_created)
+    if error is not None:
+        payload["error"] = error
+    if delta_summary:
+        payload["delta_summary"] = delta_summary
+    return publish_ep_bound(
+        "step.tool_result.record",
+        payload,
+        state=state,
+        session=session,
+        actor=actor,
+    )
+
+
 __all__ = [
     "commit_body_sandbox_enter",
     "commit_body_sandbox_exit",
@@ -333,4 +444,6 @@ __all__ = [
     "commit_tool_phase_call_end",
     "commit_tool_phase_call_start",
     "commit_tool_phase_denied",
+    "record_step_tool_call",
+    "record_step_tool_result",
 ]

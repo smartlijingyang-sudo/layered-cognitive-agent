@@ -10,12 +10,14 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-import warnings
 from typing import Any, Literal
 
 import structlog
 
-from lca.cognition.body.executor.cursor_record import CursorRecord
+from lca.cognition.body.emit._args_summary import summarize_args
+from lca.cognition.body.internal._retry_classification import (
+    _DETERMINISTIC_EXCEPTIONS,
+)
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.atoms.semantic.keys import (
     FAILURE_KIND,
@@ -33,39 +35,11 @@ from lca.infrastructure.tools.tool.invocation_scope import tool_invocation_scope
 
 _log = structlog.get_logger("lca.safe_executor")
 
-# COMPAT(delete-when: cursor second-track fully retired per ADR-0185 P5 / ADR-0186,
-#   tracking: PR-C)
-warnings.warn(
-    "cursor.record_* is deprecated; route through Session.append (ADR-0185 P5 / ADR-0186)",
-    DeprecationWarning,
-    stacklevel=2,
-)
-
 _PERF_COUNTER_SCALE = 1000
-# R1: deterministic exceptions live in ``_retry_classification`` so the two
-# SafeExecutor implementations cannot drift on what is non-retryable.
-from lca.cognition.body.internal._retry_classification import (
-    _DETERMINISTIC_EXCEPTIONS,
-)
 
 
 def _elapsed_ms(started: float) -> int:
     return int((time.perf_counter() - started) * _PERF_COUNTER_SCALE)
-
-
-def _summarize_args_for_cursor(args: dict[str, Any]) -> str:
-    """人话摘要(< 200 字符)→ step.tool_call.arguments_summary。
-
-    与 :mod:`lca.cognition.body.tool_journal_emit` 的 ``_summarize_args``
-    同语义,这里独立一份以保持 safe_executor 自包含。
-    """
-    if not args:
-        return ""
-    keys = list(args.keys())[:5]
-    head = ", ".join(f"{k}={repr(args[k])[:32]}" for k in keys)
-    if len(head) > 200:
-        return head[:200] + "…"
-    return head
 
 
 def _extract_stdout_head(observation: Any, *, limit: int = 2000) -> str:
@@ -161,7 +135,7 @@ def _commit_tool_started(
     commit_tool_phase_call_start(
         tool_name=tool.name,
         invocation_id=invocation_id,
-        arguments_summary=_summarize_args_for_cursor(dict(args) if isinstance(args, dict) else {}),
+        arguments_summary=summarize_args(dict(args) if isinstance(args, dict) else {}),
     )
     return arguments_ref
 
@@ -266,17 +240,22 @@ class SimpleSafeExecutor(SafeExecutor):
         invocation_id = invocation_id.strip() or new_id("inv")
         evidence_store, evidence_policy = _resolve_evidence_pair()
         # ADR-0164 + ADR-0169 PR-26: phase 推进由 SimpleBody.act 负责,本 seam
-        # 仅负责记录 tool_call/tool_result 证据。CursorRecord.try_* 吞掉
-        # CursorError + 无 cursor 情况(单条记录缺失 ≠ 整 session RuntimeError)。
+        # 仅负责记录 tool_call/tool_result 证据。
         # 2026-09-03 观测面 SSOT 收口:把 ``arguments`` 与 ``arguments_summary``
-        # 也透传给 cursor;后者由 ``_summarize_args`` 生成,deriver
-        # 不必再 sidecar round-trip。
+        # 透传给 record_step_tool_call(Single track via FactGateway →
+        # Session.append);deriver 不必再 sidecar round-trip。
+        # delete-when: cursor_record.CursorRecord.try_record_tool_call 退役
+        # (ADR-0185 P5)。
         arguments_for_record = dict(args) if isinstance(args, dict) else {}
-        CursorRecord.try_record_tool_call(
+        from lca.loop.commit.tool_journal import (
+            record_step_tool_call,
+        )
+
+        record_step_tool_call(
             tool_name=tool.name,
             invocation_id=invocation_id,
             arguments=arguments_for_record,
-            arguments_summary=_summarize_args_for_cursor(arguments_for_record),
+            arguments_summary=summarize_args(arguments_for_record),
         )
         act_closed = False
         try:
@@ -323,11 +302,14 @@ class SimpleSafeExecutor(SafeExecutor):
                     invocation_id=invocation_id,
                     tool_name=tool.name,
                 )
-            CursorRecord.try_record_tool_result(
+            from lca.loop.commit.tool_journal import (
+                record_step_tool_result,
+            )
+
+            record_step_tool_result(
                 tool_name=tool.name,
-                result_digest=observation.error or ("ok" if observation.success else "fail"),
-                outcome="ok" if observation.success else "failure",
                 invocation_id=invocation_id,
+                outcome="ok" if observation.success else "failure",
                 ok=observation.success,
                 error=observation.error or None,
                 stdout_head=_extract_stdout_head(observation),
@@ -339,11 +321,14 @@ class SimpleSafeExecutor(SafeExecutor):
             return observation
         except Exception as exc:
             if not act_closed:
-                CursorRecord.try_record_tool_result(
+                from lca.loop.commit.tool_journal import (
+                    record_step_tool_result,
+                )
+
+                record_step_tool_result(
                     tool_name=tool.name,
-                    result_digest=str(exc),
-                    outcome="failure",
                     invocation_id=invocation_id,
+                    outcome="failure",
                     ok=False,
                     error=str(exc),
                     delta_summary=str(exc)[:120],
@@ -545,54 +530,8 @@ class SimpleSafeExecutor(SafeExecutor):
         return result
 
 
-def _record_tool_call_evidence(tool_name: str, invocation_id: str) -> None:
-    """Write one ``step.tool_call.record`` EP via the bound LoopCursor.
-
-    ADR-0169 PR-1/S1: routes through ``cursor.record_tool_call(ToolCallRecord)``.
-    Phase 推进责任在 ``SimpleBody.act``(PR-26 task-25);本 seam 只负责落证据 EP,
-    cursor 不在 act phase → CursorError 由 caller 降级,不让单 tool 调用失败
-    触发整 session RuntimeError。Unbound cursor → silent no-op(无 run context)。
-
-    R2: thin wrapper over :class:`CursorRecord` SSOT helper.
-    """
-    CursorRecord.try_record_tool_call(
-        tool_name=tool_name,
-        invocation_id=invocation_id,
-    )
-
-
-def _record_tool_result_evidence(
-    *,
-    tool_name: str,
-    invocation_id: str,
-    outcome: str,
-    ok: bool,
-    error: str | None = None,
-) -> None:
-    """Write one ``step.tool_result.record`` EP via the bound LoopCursor.
-
-    ADR-0169 PR-1/S1: routes through ``cursor.record_tool_result(ToolResultRecord)``.
-    ``outcome`` mapped to cursor's ``Literal["ok","failure","timeout","denied"]``。
-    Phase 不在 act → CursorError 由 caller 降级。
-
-    R2: thin wrapper over :class:`CursorRecord` SSOT helper.
-
-    ``ok`` 必须由调用方显式提供 —— cursor SSOT
-    不接受成败默认值(否则 outcome="failure" 也会
-    被写成 ok=True,与 error 字段自相矛盾)。
-    """
-    cursor_outcome: literal["ok", "failure", "timeout", "denied"]
-    if outcome == "ok":
-        cursor_outcome = "ok"
-    elif outcome == "timeout":
-        cursor_outcome = "timeout"
-    elif outcome == "denied":
-        cursor_outcome = "denied"
-    else:
-        cursor_outcome = "failure"
-    CursorRecord.try_record_tool_result(
-        tool_name=tool_name,
-        result_digest=error or outcome,
-        outcome=cursor_outcome,
-        ok=ok,
-    )
+# delete-when: this module previously exposed _record_tool_call_evidence and
+# _record_tool_result_evidence as thin wrappers around CursorRecord.try_record_*.
+# Both helpers were removed in this PR; the business path now goes through
+# ``lca.loop.commit.tool_journal.record_step_tool_call`` / ``record_step_tool_result``
+# (single track via FactGateway → Session.append, ADR-0186 / I-FACT-1).

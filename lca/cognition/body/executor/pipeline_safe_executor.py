@@ -22,14 +22,15 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-import warnings
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from typing import Any, cast
 
 import structlog
 
-from lca.cognition.body.executor.cursor_record import CursorRecord
+from lca.cognition.body.internal._retry_classification import (
+    _DETERMINISTIC_EXCEPTIONS,
+)
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.atoms.semantic.keys import (
     FAILURE_KIND,
@@ -50,23 +51,9 @@ from lca.contracts.protocols.act.tool.pipeline import (
 from lca.infrastructure.tool.pipeline import DefaultToolExecutionPipeline
 from lca.infrastructure.tools.tool.invocation_scope import tool_invocation_scope
 
-# COMPAT(delete-when: cursor second-track fully retired per ADR-0185 P5 / ADR-0186,
-#   tracking: PR-C)
-warnings.warn(
-    "cursor.record_* is deprecated; route through Session.append (ADR-0185 P5 / ADR-0186)",
-    DeprecationWarning,
-    stacklevel=2,
-)
-
 _log = structlog.get_logger("lca.safe_executor")
 
 _PERF_COUNTER_SCALE = 1000
-
-# R1: deterministic exceptions live in ``_retry_classification`` so the two
-# SafeExecutor implementations cannot drift on what is non-retryable.
-from lca.cognition.body.internal._retry_classification import (
-    _DETERMINISTIC_EXCEPTIONS,  # noqa: E402
-)
 
 
 def _elapsed_ms(started: float) -> int:
@@ -315,12 +302,19 @@ class PipelineSafeExecutor(SafeExecutor):
             raise ToolExecutionError("command envelope failed safe-boundary validation")
 
         verdict_refs.append("executor.plan-boundary:valid")
-        # ADR-0164 + ADR-0169 PR-26: 写证据 EP 到 bound cursor(由 SimpleBody.act
-        # 负责 advance 到 act phase);cursor 不在 act phase → CursorRecord.try_*
-        # 降级 warning,不让单 tool 调用失败变 session RuntimeError。
-        CursorRecord.try_record_tool_call(
+        # ADR-0164 + ADR-0169 PR-26: 写证据 EP (由 SimpleBody.act
+        # 负责 advance 到 act phase);失败由 PhaseTransaction 处理,
+        # 不让单 tool 调用失败变 session RuntimeError。
+        # delete-when: cursor_record.CursorRecord.try_record_tool_call 退役
+        # (ADR-0185 P5)。
+        from lca.loop.commit.tool_journal import (
+            record_step_tool_call,
+        )
+
+        record_step_tool_call(
             tool_name=tool.name,
             invocation_id=invocation_id,
+            arguments=None,
         )
         act_closed = False
         try:
@@ -344,9 +338,13 @@ class PipelineSafeExecutor(SafeExecutor):
                 observation = cast("Observation", result.output)
                 observation.extra["command_envelope"] = envelope_evidence
                 observation.extra["policy_verdict_refs"] = list(envelope.policy_verdict_refs)
-                CursorRecord.try_record_tool_result(
+                from lca.loop.commit.tool_journal import (
+                    record_step_tool_result,
+                )
+
+                record_step_tool_result(
                     tool_name=tool.name,
-                    result_digest="ok",
+                    invocation_id=invocation_id,
                     outcome="ok",
                     ok=observation.success,
                 )
@@ -364,21 +362,31 @@ class PipelineSafeExecutor(SafeExecutor):
                     "policy_verdict_refs": list(envelope.policy_verdict_refs),
                 },
             )
-            CursorRecord.try_record_tool_result(
+            from lca.loop.commit.tool_journal import (
+                record_step_tool_result,
+            )
+
+            record_step_tool_result(
                 tool_name=tool.name,
-                result_digest=observation.error,
+                invocation_id=invocation_id,
                 outcome="failure",
                 ok=observation.success,
+                error=observation.error,
             )
             act_closed = True
             return observation
         except Exception as exc:
             if not act_closed:
-                CursorRecord.try_record_tool_result(
+                from lca.loop.commit.tool_journal import (
+                    record_step_tool_result,
+                )
+
+                record_step_tool_result(
                     tool_name=tool.name,
-                    result_digest=str(exc),
+                    invocation_id=invocation_id,
                     outcome="failure",
                     ok=False,
+                    error=str(exc),
                 )
             raise
 
