@@ -76,9 +76,8 @@ graph:
 nodes:
 
   # ===== PHASE: perceive (host) =============================================
-  # Mounts perceive.yaml (which itself mounts model_eye). Feeds sensing +
-  # header inputs; exposes out_manifest (frozen ContextManifest for think)
-  # and perceive_out (barrier signal).
+  # Mounts perceive.yaml: Hub fold → model_eye. Feeds state + header +
+  # user_turn (eye only); exposes out_manifest for think.
   - id: perceive
     region: phase:perceive
     factory: identity
@@ -93,7 +92,7 @@ nodes:
     region: phase:think
     factory: identity
     config: { from: decision_out, to: think_out }
-    ins: [in_assembled_manifest, perceive_out]
+    ins: [in_assembled_manifest, perceive_out, tools, in_state]
     outs: [decision_out, think_signal]
 
   # ===== PHASE: act (host) ==================================================
@@ -164,6 +163,14 @@ edges:
     from: { spec: agent_loop, node: _initial, port: tools }
     to:   { spec: agent_loop, node: perceive, port: tools }
     kind: data
+  - id: e_init_tools_to_think
+    from: { spec: agent_loop, node: _initial, port: tools }
+    to:   { spec: agent_loop, node: think,    port: tools }
+    kind: data
+  - id: e_init_state_to_think
+    from: { spec: agent_loop, node: _initial, port: state }
+    to:   { spec: agent_loop, node: think,    port: in_state }
+    kind: data
 
   # ── perceive → think (manifest + barrier signal) ──
   - id: e_perceive_manifest_to_think
@@ -217,9 +224,7 @@ edges:
 # -----------------------------------------------------------------------------
 sub_specs:
 
-  # ── perceive stage: sense + model_eye → ContextManifest ──
-  # Nested graph: perceive (mounts model_eye internally). Header inputs
-  # feed model_eye via perceive's eye host.
+  # ── perceive stage: Hub fold → model_eye → frozen messages ──
   - node: perceive
     sub_spec: perceive
     input_map:
@@ -239,6 +244,8 @@ sub_specs:
     input_map:
       in_assembled_manifest: in_assembled_manifest
       perceive_out:          perceive_out
+      tools:                 tools
+      in_state:              in_state
     output_map:
       enforced_decision: decision_out
       think_signal:       think_signal

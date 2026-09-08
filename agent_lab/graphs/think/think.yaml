@@ -11,8 +11,49 @@ graph:
   purpose: Think phase — frozen manifest → Decision.
 
 nodes:
+  - id: expose
+    region: phase:think
+    factory: think.expose
+    config: { from: in_assembled_manifest, to: messages }
+    ins: [in_assembled_manifest]
+    outs: [messages]
+  - id: reason
+    region: phase:think
+    factory: think.reason
+    config: { from: messages, to: response }
+    ins: [messages, tools]
+    outs: [response]
+  - id: classify
+    region: phase:think
+    factory: think.classify
+    config: { from: response, to: decision }
+    ins: [response]
+    outs: [decision]
   - id: guard
     region: phase:think
     factory: think.guard
-    ins: [decision]
+    config: { from: decision, to: enforced_decision, null_gate: true }
+    ins: [decision, in_state]
     outs: [enforced_decision, think_signal]
+
+edges:
+  - id: e_init_manifest_to_expose
+    from: { spec: think, node: _initial, port: in_assembled_manifest }
+    to:   { spec: think, node: expose,   port: in_assembled_manifest }
+    kind: data
+  - id: e_init_tools_to_reason
+    from: { spec: think, node: _initial, port: tools }
+    to:   { spec: think, node: reason,   port: tools }
+    kind: data
+  - id: e_expose_to_reason
+    from: { spec: think, node: expose, port: messages }
+    to:   { spec: think, node: reason, port: messages }
+    kind: data
+  - id: e_reason_to_classify
+    from: { spec: think, node: reason,   port: response }
+    to:   { spec: think, node: classify, port: response }
+    kind: data
+  - id: e_classify_to_guard
+    from: { spec: think, node: classify, port: decision }
+    to:   { spec: think, node: guard,    port: decision }
+    kind: data

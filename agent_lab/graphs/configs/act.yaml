@@ -5,8 +5,16 @@
 #
 #   shape → authorize → execute → observe ──project──► model_eye.see
 #
+# execute allow path = LCA SimpleBody.act (ActionRegistry → UseToolOperation
+# → SafeExecutor). Composition lives in nodes/act/execute/body.py (node impl,
+# not an agent_lab adapter). deny/skip never enter Body.
+# respond/stop/ask_human also go through Body; refuse→respond.
+# CommandEnvelope: PipelineSafeExecutor + plan_ref_scope(agent_lab_act).
+# Session: runner ensure_act_runtime → session_log + FactGateway publish.
+# HIL: ApprovalPendingError → waiting_input receipt (no approval.wait node).
+# delegate/handoff: InternalTransport lab_echo.
+#
 # Mounted by: agent_loop.act (see agent_loop.yaml#sub_specs).
-# Replaces effect_dispatch as the act-phase SSOT (ADR-0206 §5.2 / §5.4).
 #
 # Non-tool Decisions (respond / refuse) become no_effect intents; authorize
 # stamps verdict=skip; execute emits a synthetic receipt; observe still

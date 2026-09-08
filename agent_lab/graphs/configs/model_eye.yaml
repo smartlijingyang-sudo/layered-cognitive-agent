@@ -8,7 +8,8 @@
 #   see → guard → shape → freeze → frozen ContextManifest
 #
 # Inbound:
-#   - perceive.bundle / system / history / config / tools  (via perceive sub_spec)
+#   - context_manifest / system / history / config / tools / user_turn
+#     (via perceive.eye sub_spec)
 #   - act.observe.observation ──project──► see.observation
 # =============================================================================
 
@@ -16,24 +17,24 @@ id: model_eye
 version: 1.0.0
 region: model_visible
 description: >
-  Derive and freeze the ContextManifest for the next LLM turn.
+  Derive and freeze the model-visible messages for the next LLM turn.
   Owned by perceive; think only reads the result.
 
 graph:
   id: model_eye
   layer: model_visible
-  purpose: Session derive + this-turn feeds → frozen ContextManifest.
+  purpose: Session derive + Hub ContextManifest + this-turn feeds → frozen messages.
   members: [see, guard, shape, freeze]
   references: [perceive, act]
   relations:
     - { graph: perceive, kind: child_of, role: model_eye }
     - { graph: act, kind: accepts_from, role: project_observation }
   capabilities:
-    provides: [context_manifest]
-    requires: [session_reader, perceive_bundle]
+    provides: [model_eye_manifest]
+    requires: [session_reader, context_manifest]
 
-# initial.perceive_bundle : this-turn sensor fold (perceive.aggregate)
-# initial.system/history/config/tools : header + prior conversation
+# initial.context_manifest : Hub ContextManifest from perceive.commit
+# initial.system/history/config/tools/user_turn : header + this-turn user
 # initial.observation : optional; usually arrives via project from effect
 
 nodes:
@@ -41,7 +42,7 @@ nodes:
   - id: see
     region: model_visible
     factory: model_eye.see
-    ins: [perceive_bundle, observation, system, history, config, tools]
+    ins: [context_manifest, observation, system, history, config, tools, user_turn]
     outs: [sight]
 
   - id: guard
@@ -70,9 +71,9 @@ nodes:
 
 edges:
 
-  - id: e_init_bundle_to_see
-    from: { spec: model_eye, node: _initial, port: perceive_bundle }
-    to:   { spec: model_eye, node: see, port: perceive_bundle }
+  - id: e_init_manifest_to_see
+    from: { spec: model_eye, node: _initial, port: context_manifest }
+    to:   { spec: model_eye, node: see, port: context_manifest }
     kind: data
   - id: e_init_system_to_see
     from: { spec: model_eye, node: _initial, port: system }
@@ -89,6 +90,10 @@ edges:
   - id: e_init_tools_to_see
     from: { spec: model_eye, node: _initial, port: tools }
     to:   { spec: model_eye, node: see, port: tools }
+    kind: data
+  - id: e_init_user_to_see
+    from: { spec: model_eye, node: _initial, port: user_turn }
+    to:   { spec: model_eye, node: see, port: user_turn }
     kind: data
   - id: e_init_observation_to_see
     from: { spec: model_eye, node: _initial, port: observation }

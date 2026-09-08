@@ -2,12 +2,13 @@
 # think — brain-think sub-graph (ADR-0206 §5, first-principles B)
 # =============================================================================
 # Sibling of perceive / act / reflect / remember (stop is control on remember).
-# Equivalent to LCA's ``Brain.think(state) -> Decision`` flattened into:
+# Own workers (not a ModularBrain clone):
 #
 #   expose → reason → classify → guard
 #
 # Eyes belong to perceive/model_eye. Think only reads the frozen
-# ContextManifest and forms a candidate Decision (Gate ⊂ Think).
+# ContextManifest, calls the LLM (with tools), classifies, and guards.
+# Gate ⊂ Think; control-slot think_guard is passthrough.
 #
 # Mounted by: agent_loop.think (see agent_loop.yaml#sub_specs).
 # =============================================================================
@@ -16,8 +17,8 @@ id: think
 version: 1.0.0
 region: phase:think
 description: >
-  Peel frozen messages, call the LLM, classify into a Decision, and let
-  DecisionGate enforce it. One Brain.think(state) per loop turn.
+  Peel frozen messages, call the LLM (with tools), classify into a Decision,
+  and enforce via DecisionGate. One think turn per loop.
 
 graph:
   id: think
@@ -36,6 +37,8 @@ graph:
 # -----------------------------------------------------------------------------
 # initial.in_assembled_manifest : frozen ContextManifest from perceive/model_eye
 # initial.perceive_out          : optional barrier / perception signal
+# initial.tools                 : openai-style tool schemas for reason
+# initial.in_state              : optional AgentState snapshot for guard
 
 nodes:
 
@@ -49,7 +52,7 @@ nodes:
     ins: [in_assembled_manifest]
     outs: [messages]
 
-  # ----- reason: messages → LLMResponse --------------------------------------
+  # ----- reason: messages (+ tools) → LLMResponse ----------------------------
   - id: reason
     region: phase:think
     factory: think.reason
@@ -57,36 +60,30 @@ nodes:
       from: messages
       to: response
       adapter_kwargs: {}
-    ins: [messages]
+    ins: [messages, tools]
     outs: [response]
 
-  # ----- classify: LLMResponse → Decision ------------------------------------
+  # ----- classify: LLMResponse → Decision (lab action_type) ------------------
   - id: classify
     region: phase:think
     factory: think.classify
     config:
       from: response
       to: decision
-      provider_kind: lca
-      provider_ref: agent_lab.adapters.lca_think:LcaThinkParseProvider
-      provider_config: {}
     ins: [response]
     outs: [decision]
 
   # ----- guard: DecisionGate.enforce → Decision + think_signal ---------------
+  # Prototype default: explicit null_gate (no silent identity).
+  # Production: replace with gate_factory.members listing real DecisionGates.
   - id: guard
     region: phase:think
     factory: think.guard
     config:
       from: decision
       to: enforced_decision
-      provider_kind: lca
-      provider_ref: agent_lab.adapters.lca_think:LcaThinkGateProvider
-      provider_config:
-        gate_factory:
-          ref: lca.cognition.brain.decision_gates.chained.chained:ChainedDecisionGate
-          kwargs: {}
-    ins: [decision]
+      null_gate: true
+    ins: [decision, in_state]
     outs: [enforced_decision, think_signal]
 
 edges:
@@ -94,6 +91,16 @@ edges:
   - id: e_init_manifest_to_expose
     from: { spec: think, node: _initial, port: in_assembled_manifest }
     to:   { spec: think, node: expose,   port: in_assembled_manifest }
+    kind: data
+
+  - id: e_init_tools_to_reason
+    from: { spec: think, node: _initial, port: tools }
+    to:   { spec: think, node: reason,   port: tools }
+    kind: data
+
+  - id: e_init_state_to_guard
+    from: { spec: think, node: _initial, port: in_state }
+    to:   { spec: think, node: guard,    port: in_state }
     kind: data
 
   - id: e_expose_to_reason

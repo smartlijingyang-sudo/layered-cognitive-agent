@@ -1,24 +1,21 @@
-"""act.execute — authorized Intent → EffectReceipt via SimpleSafeExecutor.
+"""act.execute — authorized Intent → EffectReceipt via SimpleBody.act.
 
-Sole world-touching node in the act phase (C10). Short-circuits
-verdict ∈ {deny, skip} without calling tools. Shares ToolRegistry with
-the former dispatch_tool path.
+Sole Body entry in the act phase (C10). deny/skip short-circuit without
+Body; allow runs ``SimpleBody.act`` for use_tool / respond / stop / ask_human.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
+from agent_lab.nodes.act.execute import body as act_body
 from agent_lab.nodes.base import Node
 from agent_lab.nodes.manifest import NodeKind, NodeLayer, PortInfo, PortKind, node
 from agent_lab.primitives.artifact import Artifact, ArtifactKind
 from agent_lab.tools.registry import ToolRegistry
-from lca.cognition.body.executor.safe_executor import SimpleSafeExecutor
-from lca.contracts.models.team.role.team import (
-    CacheConfig,
-    RetryPolicy,
-    ToolPermissionManifest,
-)
+from lca.contracts.models.core.execution.result import ApprovalPendingError
+
+_TOOL_KINDS = frozenset({"use_tool", "call_tool"})
 
 
 @node(
@@ -26,8 +23,8 @@ from lca.contracts.models.team.role.team import (
     layer=NodeLayer.EFFECT,
     kind=NodeKind.EXECUTOR,
     description=(
-        "Run one tool via LCA SimpleSafeExecutor when verdict=allow. "
-        "deny/skip → synthetic receipt; never writes cognitive State."
+        "Allow → SimpleBody.act (use_tool/respond/stop/ask_human); "
+        "deny/skip → synthetic receipt. Never writes cognitive State."
     ),
     inputs=[PortInfo("authorized", kind=PortKind.INTENT, required=False)],
     outputs=[PortInfo("receipt", kind=PortKind.RECEIPT)],
@@ -37,7 +34,7 @@ from lca.contracts.models.team.role.team import (
     relates_to=["act.authorize", "act.observe"],
 )
 class ActExecute(Node):
-    """Resolve a Tool by name and run it via SimpleSafeExecutor."""
+    """Dispatch authorized intents through LCA SimpleBody."""
 
     name = "act.execute"
 
@@ -49,9 +46,10 @@ class ActExecute(Node):
         verdict = content.get("verdict")
         tool_name = content.get("tool")
         decision_id = content.get("decision_id", "")
-        action_type = content.get("action_type", "")
+        action_type = str(content.get("action_type") or "")
+        effect_kind = str(content.get("effect_kind") or "")
 
-        if verdict == "skip" or content.get("effect_kind") == "no_effect":
+        if intent_a is None or verdict == "skip" or effect_kind == "no_effect":
             return {
                 out_port: Artifact(
                     kind=ArtifactKind.RECEIPT,
@@ -61,12 +59,13 @@ class ActExecute(Node):
                         "decision_id": decision_id,
                         "action_type": action_type,
                         "response_text": content.get("response_text"),
+                        "reason": content.get("reason"),
                     },
                     schema_ref="tool.receipt.v1",
                 )
             }
 
-        if intent_a is None or verdict == "deny" or tool_name in (None, "__none__"):
+        if verdict == "deny":
             return {
                 out_port: Artifact(
                     kind=ArtifactKind.RECEIPT,
@@ -74,110 +73,106 @@ class ActExecute(Node):
                         "status": "denied",
                         "tool": tool_name,
                         "decision_id": decision_id,
-                        "error": "grant denied" if verdict == "deny" else "missing tool",
+                        "action_type": action_type,
+                        "error": "grant denied",
                     },
                     schema_ref="tool.receipt.v1",
                 )
             }
 
-        args = content.get("args", {}) or {}
-        if not isinstance(args, dict):
-            args = {}
-
-        registry = _registry()
-        if not registry.contains(tool_name):
+        if verdict != "allow":
             return {
                 out_port: Artifact(
                     kind=ArtifactKind.RECEIPT,
                     content={
-                        "status": "denied",
-                        "tool": tool_name,
+                        "status": "error",
                         "decision_id": decision_id,
-                        "error": f"tool not in registry: {tool_name!r}",
+                        "action_type": action_type,
+                        "error": f"unknown verdict: {verdict!r}",
                     },
                     schema_ref="tool.receipt.v1",
                 )
             }
 
         tool_range = tuple(node.config.get("tools", ()) or ())
-        executor = SimpleSafeExecutor(
-            ToolPermissionManifest(allowed_tools=sorted(tool_range or registry.names())),
-        )
-        tool = registry.get(tool_name)
-        retry_policy = RetryPolicy(max_retries=int(node.config.get("max_retries", 0) or 0))
-        cache_config = CacheConfig(enabled=bool(node.config.get("cache_enabled", False)))
-        try:
-            import asyncio
-
-            obs = asyncio.run(
-                executor.execute(
-                    tool=tool,
-                    args=args,
-                    retry_policy=retry_policy,
-                    cache_config=cache_config,
+        lab = act_body.lab_tools()
+        if effect_kind in _TOOL_KINDS and (
+            tool_name in (None, "__none__") or not lab.contains(str(tool_name))
+        ):
+            return {
+                out_port: Artifact(
+                    kind=ArtifactKind.RECEIPT,
+                    content={
+                        "status": "denied",
+                        "tool": tool_name,
+                        "decision_id": decision_id,
+                        "action_type": action_type,
+                        "error": f"tool not in registry: {tool_name!r}",
+                    },
+                    schema_ref="tool.receipt.v1",
                 )
-            )
+            }
+
+        allowed = tool_range or lab.names()
+        try:
+            obs = act_body.run_body_act(content, allowed_tools=allowed)
+        except ApprovalPendingError as pending:
+            req = getattr(pending, "approval_request", None)
+            return {
+                out_port: Artifact(
+                    kind=ArtifactKind.RECEIPT,
+                    content={
+                        "status": "waiting_input",
+                        "tool": tool_name if effect_kind in _TOOL_KINDS else None,
+                        "decision_id": decision_id,
+                        "action_type": action_type,
+                        "error": str(pending),
+                        "approval_request": (
+                            req
+                            if isinstance(req, dict)
+                            else getattr(req, "__dict__", {"raw": repr(req)})
+                        ),
+                    },
+                    schema_ref="tool.receipt.v1",
+                )
+            }
         except Exception as exc:
             return {
                 out_port: Artifact(
                     kind=ArtifactKind.RECEIPT,
                     content={
                         "status": "error",
-                        "tool": tool_name,
+                        "tool": tool_name if effect_kind in _TOOL_KINDS else None,
                         "decision_id": decision_id,
+                        "action_type": action_type,
                         "error": str(exc),
                     },
                     schema_ref="tool.receipt.v1",
                 )
             }
 
-        if obs.success:
-            body = {
-                "status": "ok",
-                "tool": tool_name,
-                "result": obs.payload,
-                "decision_id": decision_id,
-            }
-        else:
-            body = {
-                "status": "error",
-                "tool": tool_name,
-                "error": obs.error or "unknown",
-                "decision_id": decision_id,
-            }
         return {
             out_port: Artifact(
                 kind=ArtifactKind.RECEIPT,
-                content=body,
+                content=act_body.observation_to_receipt(
+                    obs,
+                    decision_id=str(decision_id),
+                    action_type=action_type,
+                    tool=str(tool_name) if tool_name not in (None, "__none__") else None,
+                ),
                 schema_ref="tool.receipt.v1",
             )
         }
 
 
-_REGISTRY_SINGLETON: dict[str, object] = {}
-
-
 def configure_registry(registry: ToolRegistry) -> None:
-    """Set the singleton registry. Called by the runner at boot."""
-    _REGISTRY_SINGLETON["value"] = registry
-    # Keep dispatch_tool's singleton in sync while that factory still exists.
+    """Boot: wire the YAML tool inventory into Body composition."""
+    act_body.configure_lab_tools(registry)
     from agent_lab.nodes.tool.dispatch_tool.plugin import (
         configure_registry as _legacy_configure,
     )
 
     _legacy_configure(registry)
-
-
-def _registry() -> ToolRegistry:
-    from pathlib import Path
-
-    registry = _REGISTRY_SINGLETON.get("value")
-    if registry is not None:
-        return registry  # type: ignore[return-value]
-    registry = ToolRegistry()
-    registry.load_from_yaml(Path(__file__).resolve().parents[3] / "tools" / "registry.yaml")
-    _REGISTRY_SINGLETON["value"] = registry
-    return registry
 
 
 def _content(artifact: Any) -> dict[str, Any]:

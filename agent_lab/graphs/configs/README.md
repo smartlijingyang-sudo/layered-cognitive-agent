@@ -29,9 +29,11 @@ through an explicit `sub_spec` mount or a `kind: project` cross-spec edge.
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Phase siblings at L2: `perceive.yaml`, `think.yaml`, `act.yaml`,
+Phase siblings at L2:
+`perceive.yaml` (`resolve → sense/memory/policy → trim → commit → eye`),
+`think.yaml`, `act.yaml`,
 `reflect.yaml` (`join → critique → extract`),
-`remember.yaml` (`write_journal → save_state`). Stop lives under
+`remember.yaml` (`admit → commit → snapshot`). Stop lives under
 `control/stop_decide.yaml` + `control/stop_focus.yaml`, attached on remember.
 
 ## Per-file layout (every file follows the same 4-section shape)

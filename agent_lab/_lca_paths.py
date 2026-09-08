@@ -134,7 +134,7 @@ LCA_PATHS: tuple[LcaPath, ...] = (
         "lca.contracts.models.core.state.state",
         "AgentState",
         LcaStatus.OK,
-        ("nodes/perceive/perceive_fold", "nodes/reflect/critique", "adapters/lca_reflect"),
+        ("nodes/perceive/commit", "nodes/reflect/critique", "adapters/lca_reflect"),
     ),
     LcaPath(
         "lca.contracts.models.team.role.team",

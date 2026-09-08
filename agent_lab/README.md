@@ -34,15 +34,18 @@ Act answers one question: **given an enforced Decision, what did the world retur
 
 ```
 Decision
-  → shape      (Intent | no_effect)
-  → authorize  (allow | deny | skip)
-  → execute    (EffectReceipt via SimpleSafeExecutor; sole world touch)
+  → shape      (call_tool→use_tool; refuse→respond)
+  → authorize  (tool allowlist | non-tool allow)
+  → execute    (allow → SimpleBody.act)
   → observe    (Observation)
   ──project──► model_eye.see.observation
 ```
 
-`respond` / `refuse` become `no_effect` and never call tools. Journal writes
-belong to `remember`, not act.
+Body handles `use_tool` / `respond` / `stop` / `ask_human` / `delegate` /
+`handoff`. `PipelineSafeExecutor` mints CommandEnvelope under `plan_ref_scope`.
+Runner binds one Session for session_log + FactGateway. HIL surfaces as
+`waiting_input` receipt (no `approval.wait` node). Durable turn facts stay in
+`remember`.
 
 ## How the call chain resolves for one tool call
 
@@ -50,10 +53,10 @@ belong to `remember`, not act.
 agent_loop.yaml
   └─ act.yaml
        └─ execute (factory: act.execute)
-            ├─ config.tools → tool RANGE
-            ├─ registry from tools/registry.yaml → Tool INSTANCES
-            └─ SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=range))
-                 └─ tool.execute(args)
+            ├─ config.tools → ToolPermissionManifest range
+            ├─ tools/registry.yaml → SimpleToolRegistry
+            └─ SimpleBody.act(Decision)
+                 └─ UseToolOperation → SafeExecutor → tool.execute(args)
 ```
 
 ## Adding a new tool

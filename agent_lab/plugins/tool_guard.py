@@ -8,7 +8,7 @@ contained::
 
 That branch moves here. The plugin runs on the on_decision hook
 (because the dispatch node's input is a ToolIntent-shaped artifact
-whose content.action_type == "call_tool" and content.tool_calls[*].
+whose content.action_type ∈ {use_tool, call_tool} and content.tool_calls[*].
 name carries the requested tool name).
 
 When the plugin sees ``name in (None, "", "__none__")`` it rewrites the
@@ -48,7 +48,7 @@ class ToolDispatchGuardPlugin(GraphPlugin):
         content = getattr(artifact, "content", None)
         if not isinstance(content, dict):
             return ctx
-        if content.get("action_type") != "call_tool":
+        if content.get("action_type") not in ("use_tool", "call_tool"):
             return ctx
         tool_calls = content.get("tool_calls") or []
         if not tool_calls:

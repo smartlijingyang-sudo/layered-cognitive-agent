@@ -1,11 +1,12 @@
-"""Act sub-graph: shape → authorize → execute → observe.
+"""Act sub-graph: shape → authorize → execute(SimpleBody.act) → observe.
 
 Covers:
   - act.yaml loads + compiles (with project edge into model_eye)
-  - call_tool allow → observation with status=ok (or tool result)
-  - authorize deny → no tool side effect; observation.status=denied
-  - respond / refuse → no_effect observation without tool call
-  - no parallel effect_dispatch SSOT / no act stub factories
+  - use_tool → PipelineSafeExecutor mints CommandEnvelope under plan_ref
+  - DecisionMade lands on shared Session when publish is bound
+  - authorize deny → Body never called
+  - respond / refuse → Body; ApprovalPendingError → waiting_input
+  - delegate via InternalTransport echo
 """
 
 from __future__ import annotations
@@ -64,8 +65,9 @@ def test_act_declares_decision_initial_port() -> None:
     assert "decision" in specs["act"].initial_ports()
 
 
-def test_call_tool_allow_produces_ok_observation() -> None:
+def test_use_tool_allow_produces_ok_observation() -> None:
     from agent_lab.nodes.act.execute import plugin as execute_plugin
+    from agent_lab.nodes.session_log._sink import get_session
     from agent_lab.tools.registry import ToolRegistry
 
     registry = ToolRegistry()
@@ -73,11 +75,11 @@ def test_call_tool_allow_produces_ok_observation() -> None:
     execute_plugin.configure_registry(registry)
 
     specs = load_registry("act", "model_eye")
-    # Restrict allowlist still includes read_file (default in act.yaml).
     demo = str(Path(__file__).resolve())
+    before = get_session().event_count
     initial = {
         "decision": _decision(
-            action_type="call_tool",
+            action_type="use_tool",
             tool_calls=[
                 {
                     "call_id": "c1",
@@ -93,16 +95,52 @@ def test_call_tool_allow_produces_ok_observation() -> None:
     assert obs.schema_ref == "observation.v1"
     assert obs.content.get("status") == "ok"
     assert obs.content.get("tool") == "read_file"
+    assert obs.content.get("success") is True
+    # PipelineSafeExecutor mints CommandEnvelope under plan_ref_scope.
+    envelope = obs.content.get("command_envelope") or (obs.content.get("extra") or {}).get(
+        "command_envelope"
+    )
+    assert envelope is not None
+    assert envelope.get("plan_ref") == "agent_lab_act"
+    # Shared Session received DecisionMade (and tool journal facts).
+    assert get_session().event_count > before
+    types = {get_session().event_at(i).type for i in range(get_session().event_count)}
+    assert "decision.made.v1" in types
 
 
-def test_authorize_deny_skips_executor() -> None:
+def test_call_tool_alias_maps_to_use_tool() -> None:
+    from agent_lab.nodes.act.execute import plugin as execute_plugin
+    from agent_lab.tools.registry import ToolRegistry
+
+    registry = ToolRegistry()
+    registry.load_from_yaml(REPO_ROOT / "agent_lab" / "tools" / "registry.yaml")
+    execute_plugin.configure_registry(registry)
+
     specs = load_registry("act", "model_eye")
-    # Patch SafeExecutor so any accidental call fails the test loudly.
-    with patch("agent_lab.nodes.act.execute.plugin.SimpleSafeExecutor") as mock_exec:
-        mock_exec.side_effect = AssertionError("execute must not run on deny")
+    demo = str(Path(__file__).resolve())
+    initial = {
+        "decision": _decision(
+            action_type="call_tool",
+            tool_calls=[
+                {
+                    "call_id": "c1",
+                    "name": "read_file",
+                    "arguments": {"path": demo, "max_bytes": 32},
+                }
+            ],
+        )
+    }
+    trace = run_graph(specs["act"], initial=initial, sub_registry=specs)
+    assert trace.final_artifacts["observation"].content.get("status") == "ok"
+
+
+def test_authorize_deny_skips_body() -> None:
+    specs = load_registry("act", "model_eye")
+    with patch("agent_lab.nodes.act.execute.body.run_body_act") as mock_body:
+        mock_body.side_effect = AssertionError("Body must not run on deny")
         initial = {
             "decision": _decision(
-                action_type="call_tool",
+                action_type="use_tool",
                 tool_calls=[
                     {
                         "call_id": "c1",
@@ -116,37 +154,51 @@ def test_authorize_deny_skips_executor() -> None:
 
     obs = trace.final_artifacts["observation"]
     assert obs.content.get("status") == "denied"
-    mock_exec.assert_not_called()
+    mock_body.assert_not_called()
 
 
-def test_respond_is_no_effect() -> None:
+def test_respond_goes_through_body() -> None:
+    from agent_lab.nodes.act.execute import plugin as execute_plugin
+    from agent_lab.tools.registry import ToolRegistry
+
+    registry = ToolRegistry()
+    registry.load_from_yaml(REPO_ROOT / "agent_lab" / "tools" / "registry.yaml")
+    execute_plugin.configure_registry(registry)
+
     specs = load_registry("act", "model_eye")
-    with patch("agent_lab.nodes.act.execute.plugin.SimpleSafeExecutor") as mock_exec:
-        mock_exec.side_effect = AssertionError("respond must not touch the world")
-        initial = {
-            "decision": _decision(
-                action_type="respond",
-                response_text="hello",
-            )
-        }
-        trace = run_graph(specs["act"], initial=initial, sub_registry=specs)
-
-    obs = trace.final_artifacts["observation"]
-    assert obs.content.get("status") == "no_effect"
-    assert obs.content.get("action_type") == "respond"
-    mock_exec.assert_not_called()
-
-
-def test_refuse_is_no_effect() -> None:
-    specs = load_registry("act", "model_eye")
-    initial = {"decision": _decision(action_type="refuse")}
+    initial = {
+        "decision": _decision(
+            action_type="respond",
+            response_text="hello",
+        )
+    }
     trace = run_graph(specs["act"], initial=initial, sub_registry=specs)
     obs = trace.final_artifacts["observation"]
-    assert obs.content.get("status") == "no_effect"
-    assert obs.content.get("action_type") == "refuse"
+    assert obs.content.get("status") == "ok"
+    assert obs.content.get("action_type") == "respond"
+    assert obs.content.get("result") == "hello"
+    assert obs.content.get("success") is True
 
 
-def test_shape_unit_extracts_first_tool_call() -> None:
+def test_refuse_maps_to_respond_via_body() -> None:
+    from agent_lab.nodes.act.execute import plugin as execute_plugin
+    from agent_lab.tools.registry import ToolRegistry
+
+    registry = ToolRegistry()
+    registry.load_from_yaml(REPO_ROOT / "agent_lab" / "tools" / "registry.yaml")
+    execute_plugin.configure_registry(registry)
+
+    specs = load_registry("act", "model_eye")
+    initial = {"decision": _decision(action_type="refuse", response_text="cannot help")}
+    trace = run_graph(specs["act"], initial=initial, sub_registry=specs)
+    obs = trace.final_artifacts["observation"]
+    assert obs.content.get("status") == "ok"
+    assert obs.content.get("action_type") == "respond"
+    assert obs.content.get("result") == "cannot help"
+    assert obs.content.get("degraded_from") == "refuse"
+
+
+def test_shape_canonicalizes_call_tool_to_use_tool() -> None:
     from agent_lab.nodes.act.shape.plugin import ActShape
 
     node = ActShape.__new__(ActShape)
@@ -165,13 +217,14 @@ def test_shape_unit_extracts_first_tool_call() -> None:
         },
     )
     intent = out["intent"]
-    assert intent.content["effect_kind"] == "call_tool"
+    assert intent.content["effect_kind"] == "use_tool"
+    assert intent.content["action_type"] == "use_tool"
     assert intent.content["tool"] == "bash"
     assert intent.content["args"] == {"cmd": "echo"}
+    assert len(intent.content["tool_calls"]) == 2
 
 
 def test_no_act_stub_factories_registered() -> None:
-    # Importing nodes package registers factories.
     import agent_lab.nodes  # noqa: F401
     from agent_lab.nodes import NodeRegistry
 
@@ -200,3 +253,73 @@ def test_agent_loop_mounts_act_not_effect_dispatch() -> None:
     assert "act" in links
     assert "effect_dispatch" not in links
     assert links["act"].input_map.get("in_decision") == "decision"
+
+
+def test_approval_pending_becomes_waiting_input() -> None:
+    from agent_lab.nodes.act.execute import plugin as execute_plugin
+    from agent_lab.tools.registry import ToolRegistry
+    from lca.contracts.models.core.execution.result import ApprovalPendingError
+
+    registry = ToolRegistry()
+    registry.load_from_yaml(REPO_ROOT / "agent_lab" / "tools" / "registry.yaml")
+    execute_plugin.configure_registry(registry)
+
+    specs = load_registry("act", "model_eye")
+    with patch(
+        "agent_lab.nodes.act.execute.body.run_body_act",
+        side_effect=ApprovalPendingError({"id": "apr_1", "tool": "askUserQuestion"}),
+    ):
+        initial = {
+            "decision": _decision(
+                action_type="use_tool",
+                tool_calls=[
+                    {
+                        "call_id": "c1",
+                        "name": "read_file",
+                        "arguments": {"path": str(REPO_ROOT / "README.md")},
+                    }
+                ],
+            )
+        }
+        trace = run_graph(specs["act"], initial=initial, sub_registry=specs)
+
+    obs = trace.final_artifacts["observation"]
+    assert obs.content.get("status") == "waiting_input"
+    assert obs.content.get("approval_request", {}).get("id") == "apr_1"
+
+
+def test_delegate_uses_internal_echo_transport() -> None:
+    from agent_lab.nodes.act.execute import plugin as execute_plugin
+    from agent_lab.tools.registry import ToolRegistry
+
+    registry = ToolRegistry()
+    registry.load_from_yaml(REPO_ROOT / "agent_lab" / "tools" / "registry.yaml")
+    execute_plugin.configure_registry(registry)
+
+    specs = load_registry("act", "model_eye")
+    initial = {
+        "decision": Artifact(
+            kind=ArtifactKind.FACT,
+            content={
+                "decision_id": "dec_del",
+                "action_type": "delegate",
+                "tool_calls": [],
+                "delegations": [
+                    {
+                        "subtask": "ping",
+                        "target_role": "lab_echo",
+                        "protocol": "internal",
+                        "timeout_s": 2,
+                    }
+                ],
+                "rationale": "team",
+                "confidence": 1.0,
+            },
+            schema_ref="decision.v1",
+        )
+    }
+    trace = run_graph(specs["act"], initial=initial, sub_registry=specs)
+    obs = trace.final_artifacts["observation"]
+    assert obs.content.get("status") == "ok"
+    assert obs.content.get("action_type") == "delegate"
+    assert obs.content.get("result") == "echo:ping"

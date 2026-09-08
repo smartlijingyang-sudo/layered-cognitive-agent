@@ -81,7 +81,13 @@ class LcaRememberJournalProvider:
             session_cls = _import_dotted(factory["ref"])
             kwargs = dict(factory.get("kwargs") or {})
             return cls(_session=session_cls(**kwargs))
-        return cls(_session=_NoopSession())
+        # Prefer the process Session owned by session_log / act boot (single SSOT).
+        try:
+            from agent_lab.nodes.session_log._sink import get_session
+
+            return cls(_session=get_session())
+        except Exception:
+            return cls(_session=_NoopSession())
 
     def append_journal(
         self,

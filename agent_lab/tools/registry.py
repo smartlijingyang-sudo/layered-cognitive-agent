@@ -2,8 +2,8 @@
 
 This is a "non-executable graph" seam: a single object that holds every
 named Tool the agent loop is allowed to dispatch.  It is populated from
-``tools/registry.yaml`` at boot and read by ``LcaBodyProvider`` when a
-``dispatch_tool`` node asks for its tool range.
+``tools/registry.yaml`` at boot and read by ``act.execute`` (SimpleBody)
+when resolving the tool range.
 
 Boundary:
   - reads:  a YAML file (one file: ``tools/registry.yaml``)

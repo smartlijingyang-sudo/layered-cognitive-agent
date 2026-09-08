@@ -32,9 +32,9 @@ class ReflectJoin(Node):
     name = "reflect.join"
 
     def execute(self, node, inputs):
-        out = node.config.get("to", "combined") if getattr(node, "config", None) else "combined"
-        if getattr(node, "outs", None):
-            out = node.outs[0]
+        cfg = getattr(node, "config", None) or {}
+        outs = getattr(node, "outs", None) or []
+        out = (outs[0] if outs else None) or cfg.get("to", "combined")
         merged: dict = {}
         for port_name, artifact in inputs.items():
             content = artifact.content if artifact is not None else None

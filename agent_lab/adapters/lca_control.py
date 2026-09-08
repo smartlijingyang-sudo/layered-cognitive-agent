@@ -8,9 +8,8 @@ Five providers, one per ControlSlot:
   - LcaControlRememberAdmitProvider  — wraps a callable admit policy (remember_admit)
   - LcaControlStopFocusProvider      — focus-aware stop governance (stop.focus side-channel)
 
-Each follows the same fixture_X_name / X_factory / fallback resolution
-as ``LcaThinkGateProvider`` (see lca_think.py). Helpers are imported from
-that module to avoid duplication.
+Helpers for Decision dict conversion are imported from ``lca_think``
+(shared helpers only; think phase logic lives in nodes/think).
 """
 
 from __future__ import annotations

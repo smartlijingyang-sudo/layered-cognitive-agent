@@ -463,6 +463,10 @@ def run(
     edge_fire / subgraph_enter / subgraph_exit event plus final artifacts.
     """
     sub_registry = sub_registry or {}
+    # One Session for session_log + FactGateway publish (act Body journal).
+    from agent_lab.nodes.act.execute.runtime_bind import ensure_act_runtime
+
+    ensure_act_runtime()
     bundle = _compile_or_raise(spec, sub_registry)
     effective = InfoEdgeSpec.model_validate(bundle.spec_dump)
     trace = ExecutionTrace()
@@ -484,7 +488,7 @@ def run(
     return trace
 
 
-def _ensure_framework_emitter(runner: "_Runner") -> None:
+def _ensure_framework_emitter(runner: _Runner) -> None:
     """Make sure session_log_emitter is in the runner's plugin chain.
 
     The runner has no knowledge of session_log specifically — it just
@@ -493,7 +497,8 @@ def _ensure_framework_emitter(runner: "_Runner") -> None:
     plugins.discover(); if it's the registered framework-emit handler,
     an instance is added to the runner's inherited_plugins.
     """
-    from agent_lab.plugins.base import HookEvent, get_plugin_class
+    from agent_lab.plugins.base import get_plugin_class
+
     # Look for the canonical framework-emit kind. If the plugin library
     # exposes one under "session_log_emitter", use it.
     plugin_cls = get_plugin_class("session_log_emitter")
@@ -504,9 +509,9 @@ def _ensure_framework_emitter(runner: "_Runner") -> None:
         if isinstance(p, plugin_cls):
             return
     # Add a default instance at the head of the chain (runs early).
-    instance = plugin_cls(name="default_session_log_emitter",
-                          kind="session_log_emitter",
-                          binds=(), config={})
+    instance = plugin_cls(
+        name="default_session_log_emitter", kind="session_log_emitter", binds=(), config={}
+    )
     runner._inherited_plugins.insert(0, instance)
 
 

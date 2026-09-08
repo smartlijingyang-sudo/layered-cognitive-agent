@@ -1,30 +1,13 @@
-"""ParseDecisionPlugin — drives the LLMResponse → Decision.action_type tree.
+"""ParseDecisionPlugin — optional hook to relabel Decision.action_type.
 
-Before this plugin existed, the heuristic lived inside
-``agent_lab.adapters.lca_think._default_parser`` and branched on the
-LLMResponse content (tool_calls / text / empty). The branch moved here
-so the adapter is a thin dict⇄dataclass translator and the cognitive
-policy lives in one plugin-able place.
+Primary classify path is ``think.classify`` (DefaultDecisionClassifier +
+lab mapping use_tool → call_tool). This plugin remains for graph-level
+hooks that want to override labels after classify.
 
 Behaviour (override via ``config``):
-  tool_calls (list of NativeToolCall-shaped dicts in artifact.content["tool_calls"]):
-    non-empty  → action_type = "call_tool"
-  else if text is non-empty:
-    action_type = "respond"
-  else:
-    action_type = "refuse"
-
-The plugin only mutates the artifact's ``action_type`` field and leaves
-all other fields (``decision_id``, ``tool_calls``, ``rationale``,
-``confidence``, ``response_text``) untouched. The adapter's
-``_default_parser`` heuristic is still the fallback when no plugin is
-configured (backward-compat for callers that import
-``LcaThinkParseProvider`` directly).
-
-Configuration:
-  enabled_tool_action (str) — override default "call_tool" label
-  enabled_respond_action (str) — override default "respond" label
-  enabled_refuse_action (str) — override default "refuse" label
+  tool_calls non-empty → enabled_tool_action (default "call_tool")
+  else if text non-empty → enabled_respond_action (default "respond")
+  else → enabled_refuse_action (default "refuse")
 """
 
 from __future__ import annotations

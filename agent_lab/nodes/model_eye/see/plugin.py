@@ -1,8 +1,8 @@
 """model_eye.see — derive the model's field of view for this turn.
 
 Collects Session-derived history/header (ADR-0191 DSH) and merges this-turn
-feeds (perceive.bundle, effect observation, system/tools/config) into one
-unfrozen ``sight`` bag. Pure derive: no State write, no LLM call.
+feeds (Hub context_manifest, user_turn, effect observation, system/tools/config)
+into one unfrozen ``sight`` bag. Pure derive: no State write, no LLM call.
 """
 
 from __future__ import annotations
@@ -23,12 +23,14 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
         "Output is an unfrozen bag for guard/shape/freeze."
     ),
     inputs=[
+        PortInfo("context_manifest", kind=PortKind.ARTIFACT, required=False),
         PortInfo("perceive_bundle", kind=PortKind.ARTIFACT, required=False),
         PortInfo("observation", kind=PortKind.ARTIFACT, required=False),
         PortInfo("system", kind=PortKind.TEXT, required=False),
         PortInfo("history", kind=PortKind.MESSAGE, required=False),
         PortInfo("config", kind=PortKind.FACT, required=False),
         PortInfo("tools", kind=PortKind.FACT, required=False),
+        PortInfo("user_turn", kind=PortKind.MESSAGE, required=False),
     ],
     outputs=[PortInfo("sight", kind=PortKind.FACT)],
     provides=["model_eye_sight"],
@@ -42,10 +44,12 @@ class ModelEyeSee(Node):
     def execute(self, node, inputs):
         messages, system, config, tools = _derive_session()
         messages = _merge_history(messages, inputs.get("history"))
+        messages = _merge_user_turn(messages, inputs.get("user_turn"))
         system = _overlay_text(system, inputs.get("system"))
         config = _overlay_dict(config, inputs.get("config"))
         tools = _overlay_tools(tools, inputs.get("tools"))
-        perceive_items = _artifact_list(inputs.get("perceive_bundle"), key="items")
+        hub_art = inputs.get("context_manifest") or inputs.get("perceive_bundle")
+        perceive_items = _artifact_list(hub_art, key="items")
         observation = _artifact_content(inputs.get("observation"))
 
         sight = {
@@ -118,6 +122,20 @@ def _merge_history(
     if isinstance(content, list):
         extra = [dict(m) for m in content if isinstance(m, dict)]
         return base + extra if base else extra
+    return base
+
+
+def _merge_user_turn(
+    base: list[dict[str, Any]], user_a: Artifact | None
+) -> list[dict[str, Any]]:
+    if user_a is None:
+        return base
+    content = user_a.content
+    if isinstance(content, dict) and content.get("role"):
+        return [*base, dict(content)]
+    if isinstance(content, list):
+        extra = [dict(m) for m in content if isinstance(m, dict)]
+        return [*base, *extra]
     return base
 
 

@@ -21,7 +21,7 @@ if str(REPO_ROOT) not in sys.path:
 
 
 def test_parse_decision_tool_call_action_type() -> None:
-    """Tool calls → action_type = 'call_tool'."""
+    """Tool calls → action_type = 'call_tool' (lab vocab; act maps to use_tool)."""
     from agent_lab.plugins import ParseDecisionPlugin
     from agent_lab.plugins.base import HookContext, HookEvent
     from agent_lab.primitives.artifact import Artifact, ArtifactKind

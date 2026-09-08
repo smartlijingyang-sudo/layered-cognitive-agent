@@ -9,13 +9,14 @@
 id: think_guard
 version: 0.1.0
 region: phase
-description: Control-slot handler for think.guard — runs DecisionGate.enforce
-  on the inbound decision and emits the guarded decision.
+description: >
+  Control-slot attachment for THINK_GUARD. Passthrough by default —
+  phase think.guard is the SSOT for DecisionGate.enforce.
 
 graph:
   id: think_guard
   layer: control
-  purpose: DecisionGate enforcement for the think phase.
+  purpose: Governance attachment for think; does not re-enforce by default.
   members: [think_guard_handler]
   references: []
   relations:
@@ -31,6 +32,8 @@ nodes:
     factory: think_guard_node
     config:
       to: out_decision
-      provider_config: {}
+      mode: passthrough
+      provider_config:
+        mode: passthrough
     ins: [in_decision]
     outs: [out_decision]

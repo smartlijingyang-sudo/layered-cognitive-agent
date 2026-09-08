@@ -1,138 +1,164 @@
 # =============================================================================
-# perceive — phase sub-graph (post-fusion v3, first-principles).
+# perceive — phase sub-graph (LCA production path, first-principles)
 # =============================================================================
-# Sense (user / tool_results / memory) → aggregate(perceive.bundle) →
-# model_eye (see→guard→shape→freeze) → frozen ContextManifest.
+# SequentialPerceiveHub._fold decomposed into workers, then model_eye:
 #
-# model_eye is a CHILD of perceive (sub_spec on the `eye` host). Think does
-# not mount model_eye; it only reads perceive's out_manifest.
+#   resolve → sense ─┐
+#            memory ─┼─► trim → commit.context_manifest ─► eye(model_eye)
+#            policy ─┘
 #
-# Per ADR-0194 C4 + ADR-0191 DSH: facts live in Session log; perceive never
-# writes state.* and never calls a Hub.
+# Hub owns world facts (sensors / memory / policy). Session messages /
+# user_turn / tool observations belong to model_eye (DSH + act project).
 #
-# Mounted by: agent_loop.perceive (see agent_loop.yaml#sub_specs).
+# Mounted by: agent_loop.perceive
 # =============================================================================
 
 id: perceive
-version: 1.0.0
+version: 2.0.0
 region: phase:perceive
 description: >
-  Sense then call model_eye to produce the frozen ContextManifest think reads.
+  Fold sensors, memory, and policy facts into ContextManifest, then freeze
+  the model-visible messages via model_eye.
 
 graph:
   id: perceive
   layer: phase
-  purpose: Perceive = fold(sensors) → model_eye → ContextManifest.
-  members: [sense_user, sense_tool_results, memory_resolve, memory_query, memory_normalize, perceive_aggregate, eye]
+  purpose: Perceive = Hub fold (resolve→sense/memory/policy→trim→commit) → model_eye.
+  members: [resolve, sense, memory, policy, trim, commit, eye]
   references: [agent_loop, model_eye]
   relations:
     - { graph: agent_loop, kind: child_of, role: perceive_phase }
     - { graph: model_eye, kind: contains, role: model_eye }
   capabilities:
-    provides: [context_manifest, perceive_bundle]
-    requires: [sensor_fold, memory_perceive, model_eye]
+    provides: [context_manifest, model_eye_manifest]
+    requires: [sensors, memory_system, session_reader, model_eye]
 
-# initial.user_turn / tool_results / state : sensing inputs
-# initial.system / history / config / tools : header feeds for model_eye
+# initial.state : AgentState snapshot for Hub fold
+# initial.system / history / config / tools / user_turn : model_eye header feeds
 
 nodes:
 
-  - id: sense_user
+  - id: resolve
     region: phase:perceive
-    factory: perceive.sense.user
-    ins: [user_turn_in]
-    outs: [user_turn_out]
+    factory: perceive.resolve
+    config:
+      provider_kind: lca
+      provider_ref: agent_lab.adapters.lca_perceive:LcaPerceiveResolveProvider
+      provider_config: {}
+    ins: [state]
+    outs: [sensors, memory_ref]
 
-  - id: sense_tool_results
+  - id: sense
     region: phase:perceive
-    factory: perceive.sense.tool_results
-    ins: [tool_results_in]
-    outs: [tool_results_out]
+    factory: perceive.sense
+    config: {}
+    ins: [sensors, state]
+    outs: [sensor_items]
 
-  - id: memory_resolve
-    region: phase:perceive:sensor:memory
-    factory: perceive.sense.memory.resolve
-    ins: []
-    outs: [memory_system]
-
-  - id: memory_query
-    region: phase:perceive:sensor:memory
-    factory: perceive.sense.memory.query
-    ins: [memory_system]
-    outs: [raw_items]
-
-  - id: memory_normalize
-    region: phase:perceive:sensor:memory
-    factory: perceive.sense.memory.normalize
-    ins: [raw_items]
-    outs: [retrieved_context]
-
-  - id: perceive_aggregate
+  - id: memory
     region: phase:perceive
-    factory: perceive.aggregate
-    ins: [user_turn, tool_results, retrieved_context]
-    outs: [bundle]
+    factory: perceive.memory
+    config: {}
+    ins: [memory_ref, state]
+    outs: [memory_items]
 
-  # Host for model_eye sub-graph. Identity forwards freeze.manifest → manifest.
+  - id: policy
+    region: phase:perceive
+    factory: perceive.policy
+    config: {}
+    ins: [state]
+    outs: [policy_items]
+
+  - id: trim
+    region: phase:perceive
+    factory: perceive.trim
+    config: {}
+    ins: [sensor_items, memory_items, policy_items]
+    outs: [trimmed_items]
+
+  - id: commit
+    region: phase:perceive
+    factory: perceive.commit
+    config: {}
+    ins: [trimmed_items]
+    outs: [context_manifest]
+
   - id: eye
     region: model_visible
     factory: identity
     config: { from: manifest, to: manifest }
-    ins: [perceive_bundle, system, history, config, tools]
+    ins: [context_manifest, system, history, config, tools, user_turn]
     outs: [manifest]
 
 edges:
 
-  - id: e_init_user_to_sense_user
-    from: { spec: perceive, node: _initial, port: user_turn }
-    to:   { spec: perceive, node: sense_user, port: user_turn_in }
+  - id: e_init_state_to_resolve
+    from: { spec: perceive, node: _initial, port: state }
+    to:   { spec: perceive, node: resolve,  port: state }
     kind: data
-  - id: e_sense_user_to_aggregate
-    from: { spec: perceive, node: sense_user, port: user_turn_out }
-    to:   { spec: perceive, node: perceive_aggregate, port: user_turn }
+  - id: e_init_state_to_sense
+    from: { spec: perceive, node: _initial, port: state }
+    to:   { spec: perceive, node: sense,    port: state }
     kind: data
-
-  - id: e_init_tr_to_sense_tr
-    from: { spec: perceive, node: _initial, port: tool_results }
-    to:   { spec: perceive, node: sense_tool_results, port: tool_results_in }
+  - id: e_init_state_to_memory
+    from: { spec: perceive, node: _initial, port: state }
+    to:   { spec: perceive, node: memory,   port: state }
     kind: data
-  - id: e_sense_tr_to_aggregate
-    from: { spec: perceive, node: sense_tool_results, port: tool_results_out }
-    to:   { spec: perceive, node: perceive_aggregate, port: tool_results }
-    kind: data
-
-  - id: e_memory_resolve_to_query
-    from: { spec: perceive, node: memory_resolve, port: memory_system }
-    to:   { spec: perceive, node: memory_query, port: memory_system }
-    kind: data
-  - id: e_memory_query_to_normalize
-    from: { spec: perceive, node: memory_query, port: raw_items }
-    to:   { spec: perceive, node: memory_normalize, port: raw_items }
-    kind: data
-  - id: e_memory_normalize_to_aggregate
-    from: { spec: perceive, node: memory_normalize, port: retrieved_context }
-    to:   { spec: perceive, node: perceive_aggregate, port: retrieved_context }
+  - id: e_init_state_to_policy
+    from: { spec: perceive, node: _initial, port: state }
+    to:   { spec: perceive, node: policy,   port: state }
     kind: data
 
-  - id: e_aggregate_to_eye
-    from: { spec: perceive, node: perceive_aggregate, port: bundle }
-    to:   { spec: perceive, node: eye, port: perceive_bundle }
+  - id: e_resolve_sensors_to_sense
+    from: { spec: perceive, node: resolve, port: sensors }
+    to:   { spec: perceive, node: sense,   port: sensors }
+    kind: data
+  - id: e_resolve_memory_to_memory
+    from: { spec: perceive, node: resolve, port: memory_ref }
+    to:   { spec: perceive, node: memory,  port: memory_ref }
+    kind: data
+
+  - id: e_sense_to_trim
+    from: { spec: perceive, node: sense, port: sensor_items }
+    to:   { spec: perceive, node: trim,  port: sensor_items }
+    kind: data
+  - id: e_memory_to_trim
+    from: { spec: perceive, node: memory, port: memory_items }
+    to:   { spec: perceive, node: trim,   port: memory_items }
+    kind: data
+  - id: e_policy_to_trim
+    from: { spec: perceive, node: policy, port: policy_items }
+    to:   { spec: perceive, node: trim,   port: policy_items }
+    kind: data
+
+  - id: e_trim_to_commit
+    from: { spec: perceive, node: trim,   port: trimmed_items }
+    to:   { spec: perceive, node: commit, port: trimmed_items }
+    kind: data
+
+  - id: e_commit_to_eye
+    from: { spec: perceive, node: commit, port: context_manifest }
+    to:   { spec: perceive, node: eye,    port: context_manifest }
     kind: data
   - id: e_init_system_to_eye
     from: { spec: perceive, node: _initial, port: system }
-    to:   { spec: perceive, node: eye, port: system }
+    to:   { spec: perceive, node: eye,      port: system }
     kind: data
   - id: e_init_history_to_eye
     from: { spec: perceive, node: _initial, port: history }
-    to:   { spec: perceive, node: eye, port: history }
+    to:   { spec: perceive, node: eye,      port: history }
     kind: data
   - id: e_init_config_to_eye
     from: { spec: perceive, node: _initial, port: config }
-    to:   { spec: perceive, node: eye, port: config }
+    to:   { spec: perceive, node: eye,      port: config }
     kind: data
   - id: e_init_tools_to_eye
     from: { spec: perceive, node: _initial, port: tools }
-    to:   { spec: perceive, node: eye, port: tools }
+    to:   { spec: perceive, node: eye,      port: tools }
+    kind: data
+  - id: e_init_user_to_eye
+    from: { spec: perceive, node: _initial, port: user_turn }
+    to:   { spec: perceive, node: eye,      port: user_turn }
     kind: data
 
 sub_specs:
@@ -140,10 +166,11 @@ sub_specs:
   - node: eye
     sub_spec: model_eye
     input_map:
-      perceive_bundle: perceive_bundle
+      context_manifest: context_manifest
       system: system
       history: history
       config: config
       tools: tools
+      user_turn: user_turn
     output_map:
       manifest: manifest

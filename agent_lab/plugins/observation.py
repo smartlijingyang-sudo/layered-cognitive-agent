@@ -49,7 +49,15 @@ class ObservationRenderPlugin(GraphPlugin):
         tool = content.get("tool", "")
         if status == "ok":
             result = content.get("result", "")
-            text = f"[tool:{tool}] {result}"
+            action = content.get("action_type") or ""
+            if tool:
+                text = f"[tool:{tool}] {result}"
+            elif action and action != "use_tool":
+                text = f"[{action}] {result}".rstrip()
+            else:
+                text = str(result)
+        elif status == "waiting_input":
+            text = f"[waiting-input] {content.get('error') or 'approval pending'}"
         elif status == "no_effect":
             action = content.get("action_type") or "respond"
             snippet = content.get("response_text") or ""

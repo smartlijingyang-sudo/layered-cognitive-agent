@@ -2,11 +2,12 @@
 
 Removed:
   - lca_body.py, lca_llm.py, lca_mv.py
+  - think parse/gate providers (logic now in nodes/think/*)
 
-Remaining (next commits):
-  - lca_perceive.py, lca_event.py, lca_memory.py, lca_think.py,
-    lca_reflect.py, lca_control.py, lca_control_act.py,
-    lca_toolbox.py
+Remaining:
+  - lca_perceive.py, lca_event.py, lca_memory.py
+  - lca_think.py (shared Decision helpers for control only)
+  - lca_reflect.py, lca_control.py, lca_control_act.py, lca_toolbox.py
   - tools/read_file.py (kept, agent_lab's own Tool)
 """
 

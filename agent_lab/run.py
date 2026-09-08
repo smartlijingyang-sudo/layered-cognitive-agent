@@ -49,11 +49,13 @@ def _bootstrap() -> None:
         pass
 
     from agent_lab.nodes.act.execute.plugin import configure_registry
+    from agent_lab.nodes.act.execute.runtime_bind import ensure_act_runtime
     from agent_lab.tools import ToolRegistry
 
     registry = ToolRegistry()
     registry.load_from_yaml(Path(__file__).parent / "tools" / "registry.yaml")
     configure_registry(registry)
+    ensure_act_runtime()
 
 
 def _register_lca_mv() -> None:
@@ -73,14 +75,25 @@ def _run_model_eye(specs, mv_provider: str = "default") -> None:
             content=[{"role": "assistant", "content": "previous turn"}],
             schema_ref="openai.messages.v1",
         ),
-        "perceive_bundle": Artifact(
+        "context_manifest": Artifact(
             kind=ArtifactKind.FACT,
             content={
-                "items": [{"role": "user", "content": "hello", "provenance": "sense.user"}],
+                "items": [
+                    {
+                        "kind": "clock",
+                        "payload": "2026-09-08 Monday",
+                        "provenance": "clock_sensor",
+                    }
+                ],
                 "digest": "demo",
-                "schema_version": "perceive.bundle.v1",
+                "schema_version": "1.0",
             },
-            schema_ref="perceive.bundle.v1",
+            schema_ref="context.manifest.v1",
+        ),
+        "user_turn": Artifact(
+            kind=ArtifactKind.MESSAGE,
+            content={"role": "user", "content": "hello"},
+            schema_ref="openai.message.v1",
         ),
         "observation": Artifact(
             kind=ArtifactKind.TEXT,
@@ -141,6 +154,11 @@ def _run_agent_loop(specs) -> None:
             "user",
             "please run `bash -c 'echo hi from real bash'`",
             tool_calls=[],
+        ),
+        "state": Artifact(
+            kind=ArtifactKind.FACT,
+            content={"trace_id": "demo", "task": "bash echo", "step": 0},
+            schema_ref="agent.state.v1",
         ),
         "system": make_text("you are a careful assistant", schema_ref="system.v1"),
         "history": Artifact(kind=ArtifactKind.MESSAGE, content=[], schema_ref="openai.messages.v1"),

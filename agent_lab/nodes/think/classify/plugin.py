@@ -1,13 +1,13 @@
 """think.classify — pure transform: LLMResponse → Decision.
 
-No LLM call. Provider selection is data (LcaThinkParseProvider).
+Logic lives in ``ops.py`` (node purity: plugin.py has no data branching).
 """
 
 from __future__ import annotations
 
 from agent_lab.nodes.base import Node
 from agent_lab.nodes.manifest import NodeKind, NodeLayer, PortInfo, PortKind, node
-from agent_lab.primitives.artifact import Artifact, ArtifactKind
+from agent_lab.nodes.think.classify.ops import classify_response
 
 
 @node(
@@ -15,8 +15,8 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
     layer=NodeLayer.PHASE,
     kind=NodeKind.TRANSFORMER,
     description=(
-        "Parse an LLMResponse-shaped artifact into a Decision "
-        "(action_type ∈ {respond, call_tool, refuse})."
+        "Classify LLMResponse into a Decision via DefaultDecisionClassifier; "
+        "map use_tool → call_tool for act."
     ),
     inputs=[PortInfo("response", kind=PortKind.MESSAGE, required=False)],
     outputs=[PortInfo("decision", kind=PortKind.FACT)],
@@ -29,16 +29,9 @@ class ThinkClassify(Node):
     name = "think.classify"
 
     def execute(self, node, inputs):
-        from agent_lab.adapters.lca_think import LcaThinkParseProvider
-
-        provider = LcaThinkParseProvider.from_node_config(node.config)
         src = node.config.get("from", "response")
         out = node.config.get("to", "decision")
         response_artifact = inputs.get(src) or inputs.get("response")
-        if response_artifact is None:
-            response_artifact = Artifact(kind=ArtifactKind.MESSAGE, content="")
-        parsed = provider.parse(response_artifact)
-        decision = parsed.get("decision")
-        if decision is None:
-            raise ValueError("think.classify: parser returned no decision artifact")
+        fixture = (node.config.get("provider_config") or {}).get("fixture_classifier")
+        decision = classify_response(response_artifact, classifier=fixture)
         return {out: decision}

@@ -5,7 +5,7 @@ Legacy subpackages (control/event/llm/model_visible/think/tool) are
 kept for backwards compatibility and will be migrated in subsequent PRs.
 
   nodes/passthrough/    — stateless 1-in-1-out workers (7)
-  nodes/perceive/       — perception (sensors → ContextManifest)
+  nodes/perceive/       — resolve→sense/memory/policy→trim→commit (+ eye)
   nodes/model_eye/      — model eye (fold facts → frozen ContextManifest)
   nodes/think/          — reasoning (expose → reason → classify → guard)
   nodes/act/            — act phase (shape → authorize → execute → observe)
