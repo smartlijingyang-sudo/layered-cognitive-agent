@@ -9,8 +9,8 @@
     "editor.defaultFormatter": "charliermarsh.ruff"
   },
   "mypy-type-checker.enabled": false,
-  "python.analysis.typeCheckingMode": "basic",
-  "python.analysis.diagnosticMode": "workspace",
+  "python.analysis.typeCheckingMode": "off",
+  "python.analysis.diagnosticMode": "openFilesOnly",
   "python.analysis.disabledModules": [
     "structlog",
     "structlog.*",
@@ -20,5 +20,19 @@
   "python.analysis.useImportHeuristic": false,
   "python.analysis.reportMissingImports": "none",
   "python.analysis.reportMissingTypeStubs": "none",
+  "python.analysis.exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.venv",
+    "**/venv",
+    "**/site-packages"
+  ],
+  "basedpyright.analysis.typeCheckingMode": "off",
+  "basedpyright.analysis.diagnosticMode": "openFilesOnly",
+  "ruff.lint.enable": false,
+  "eslint.enable": false,
+  "javascript.validate.enable": false,
+  "typescript.validate.enable": false,
+  "problems.decorations.enabled": false,
   "editor.rulers": [100]
 }
