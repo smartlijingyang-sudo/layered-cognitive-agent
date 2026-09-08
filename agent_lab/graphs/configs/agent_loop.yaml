@@ -48,8 +48,8 @@ nodes:
     region: model_visible
     factory: identity
     config: { from: manifest, to: manifest_out }
-    ins: [in_system, in_results, in_history]
-    outs: [out_manifest]
+    ins: [in_system, in_results, in_history, in_config, in_tools]
+    outs: [out_manifest, out_lca_manifest]
 
   # --- turn the frozen manifest into a flat message list for the LLM ---
   - id: flatten_manifest
@@ -120,6 +120,16 @@ edges:
   - id: e_init_history_to_assemble
     from: { spec: agent_loop, node: _initial, port: history }
     to:   { spec: agent_loop, node: assemble_for_think, port: in_history }
+    kind: data
+
+  - id: e_init_config_to_assemble
+    from: { spec: agent_loop, node: _initial, port: config }
+    to:   { spec: agent_loop, node: assemble_for_think, port: in_config }
+    kind: data
+
+  - id: e_init_tools_to_assemble
+    from: { spec: agent_loop, node: _initial, port: tools }
+    to:   { spec: agent_loop, node: assemble_for_think, port: in_tools }
     kind: data
 
   - id: e_init_results_to_assemble
@@ -212,8 +222,11 @@ sub_specs:
       in_system: system
       in_results: results
       in_history: history
+      in_config: config
+      in_tools: tools
     output_map:
       manifest: out_manifest
+      lca_manifest: out_lca_manifest
 
   - node: act
     sub_spec: effect_dispatch

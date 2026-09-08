@@ -53,9 +53,23 @@ def _register_mocks() -> None:
     register_tool("calc", _mock_tool_calc)
 
 
+def _register_lca_mv() -> None:
+    """Register LCA's DefaultModelContextAssembler as the agent_lab mv provider.
+
+    Lazy-imported so the framework still boots if lca isn't importable.
+    """
+    try:
+        from agent_lab.adapters.lca_mv import LcaMvProvider
+        from agent_lab.nodes.mv import register_lca_mv_provider
+
+        register_lca_mv_provider("lca", LcaMvProvider())
+    except Exception as exc:
+        print(f"[warn] LCA mv provider not registered: {exc!r}")
+
+
 # ---------- Demo runners --------------------------------------------------
 
-def _run_mv_assemble(specs) -> None:
+def _run_mv_assemble(specs, mv_provider: str = "default") -> None:
     spec = specs["mv_assemble"]
     initial = {
         "system": make_text("you are a careful assistant", schema_ref="system.v1"),
@@ -63,12 +77,26 @@ def _run_mv_assemble(specs) -> None:
             {"role": "assistant", "content": "previous turn"}
         ], schema_ref="openai.messages.v1"),
         "results": Artifact(kind=ArtifactKind.TEXT, content="result line A\nresult line A\nresult line B", schema_ref="tool.v1"),
+        "config": Artifact(kind=ArtifactKind.FACT, content={"temperature": 0.0}, schema_ref="config.v1"),
+        "tools": Artifact(kind=ArtifactKind.FACT, content=[
+            {"type": "function", "function": {"name": "echo"}}
+        ], schema_ref="tools.v1"),
     }
+    # Override the assemble_lca node config to use the requested provider.
+    if mv_provider != "default":
+        for n in spec.nodes:
+            if n.id == "assemble_lca":
+                n.config["provider"] = mv_provider
     trace = run_graph(spec, initial=initial, sub_registry=specs)
     _print_trace(trace)
+    print(f"=== manifest (provider={mv_provider}) ===")
     manifest = trace.final_artifacts.get("manifest")
-    print("=== final manifest content ===")
+    lca_manifest = trace.final_artifacts.get("lca_manifest")
+    print("--- local commit_manifest:")
     print(json.dumps(manifest.content if manifest else None, indent=2, ensure_ascii=False))
+    if lca_manifest is not None:
+        print("--- LCA DefaultModelContextAssembler.assemble() output:")
+        print(json.dumps(lca_manifest.content, indent=2, ensure_ascii=False))
 
 
 def _run_effect_dispatch(specs) -> None:
@@ -250,9 +278,14 @@ def main(argv: list[str] | None = None) -> int:
                         help="print self-describing node + graph manifests and exit")
     parser.add_argument("--target", default=None,
                         help="describe target: node:<id> | graph:<id>")
+    parser.add_argument("--mv-provider", default="default",
+                        choices=["default", "mock", "lca"],
+                        help="for mv_assemble: which provider feeds assemble_lca node")
     args = parser.parse_args(argv)
 
     _register_mocks()
+    if args.mv_provider == "lca" or args.graph == "mv_assemble":
+        _register_lca_mv()
     if args.describe:
         _describe(args.target)
         return 0
@@ -260,7 +293,10 @@ def main(argv: list[str] | None = None) -> int:
         _run_negative()
         return 0
     specs = load_registry("mv_assemble", "effect_dispatch", "agent_loop")
-    _DISPATCH[args.graph](specs)
+    if args.graph == "mv_assemble":
+        _DISPATCH[args.graph](specs, args.mv_provider)
+    else:
+        _DISPATCH[args.graph](specs)
     return 0
 
 

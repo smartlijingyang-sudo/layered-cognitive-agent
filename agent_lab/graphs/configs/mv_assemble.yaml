@@ -73,6 +73,17 @@ nodes:
     ins: [messages]
     outs: [manifest]
 
+  # --- LCA-backed assembler: invokes DefaultModelContextAssembler.assemble()
+  #     and emits a manifest artifact shaped like ModelVisibleRequest.
+  #     Emits on a distinct port `lca_manifest` so the consumer (agent_loop)
+  #     picks the right one (commit vs lca) explicitly.
+  - id: assemble_lca
+    region: model_visible
+    factory: assemble_lca_mv
+    config: { to: lca_manifest, step: 0 }
+    ins: [messages, system, config, tools]
+    outs: [lca_manifest]
+
 edges:
   - id: e_results_to_classify
     from: { spec: mv_assemble, node: _initial, port: results }
@@ -127,4 +138,26 @@ edges:
   - id: e_merge_to_commit
     from: { spec: mv_assemble, node: merge,    port: messages }
     to:   { spec: mv_assemble, node: commit,   port: messages }
+    kind: data
+
+  # LCA-backed assembler wiring: messages come from merge; system/config/tools
+  # come from external caller via _initial.
+  - id: e_merge_to_assemble_lca
+    from: { spec: mv_assemble, node: merge,       port: messages }
+    to:   { spec: mv_assemble, node: assemble_lca, port: messages }
+    kind: data
+
+  - id: e_init_system_to_assemble_lca
+    from: { spec: mv_assemble, node: _initial, port: system }
+    to:   { spec: mv_assemble, node: assemble_lca, port: system }
+    kind: data
+
+  - id: e_init_config_to_assemble_lca
+    from: { spec: mv_assemble, node: _initial, port: config }
+    to:   { spec: mv_assemble, node: assemble_lca, port: config }
+    kind: data
+
+  - id: e_init_tools_to_assemble_lca
+    from: { spec: mv_assemble, node: _initial, port: tools }
+    to:   { spec: mv_assemble, node: assemble_lca, port: tools }
     kind: data
