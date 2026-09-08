@@ -1,19 +1,18 @@
-# think — phase sub-graph (skeleton).
-# Workers: manifest_to_messages -> prompt_assemble -> llm_call -> response_to_decision -> gate_enforce.
+# think — phase sub-graph (canonical copy lives in graphs/configs/think.yaml).
+# Workers: expose → reason → classify → guard.
 id: think
-version: 0.1.0
+version: 1.0.0
 region: phase:think
-description: Brain.think(state) decomposed into 5 single-responsibility workers.
-  (Skeleton stub.)
+description: Brain.think(state) = expose → reason → classify → guard.
 
 graph:
   id: think
   layer: phase
-  purpose: Think phase — manifest -> prompt -> LLM -> Decision.
+  purpose: Think phase — frozen manifest → Decision.
 
 nodes:
-  - id: gate
+  - id: guard
     region: phase:think
-    factory: think__gate_enforce
+    factory: think.guard
     ins: [decision]
-    outs: [enforced_decision]
+    outs: [enforced_decision, think_signal]

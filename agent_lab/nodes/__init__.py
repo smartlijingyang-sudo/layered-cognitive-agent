@@ -7,11 +7,11 @@ kept for backwards compatibility and will be migrated in subsequent PRs.
   nodes/passthrough/    — stateless 1-in-1-out workers (7)
   nodes/perceive/       — perception (sensors → ContextManifest)
   nodes/model_eye/      — model eye (fold facts → frozen ContextManifest)
-  nodes/think/          — reasoning (5)
-  nodes/act/            — action / tool dispatch (4)
-  nodes/reflect/        — reflection (3)
-  nodes/remember/       — durable fact write + history fold (5)
-  nodes/stop/           — stop policy (1)
+  nodes/think/          — reasoning (expose → reason → classify → guard)
+  nodes/act/            — act phase (shape → authorize → execute → observe)
+  nodes/reflect/        — reflection (join → critique → extract)
+  nodes/remember/       — admit → commit → snapshot (+ fold_history)
+  nodes/control/        — control slots (incl. stop_decide after remember)
   nodes/lineage/        — observability (5)
 
 Importing this package registers every node via its ``@node(...)``
@@ -32,7 +32,6 @@ from agent_lab.nodes import (
     reflect,  # noqa: F401
     remember,  # noqa: F401
     session_log,  # noqa: F401
-    stop,  # noqa: F401
     think,  # noqa: F401
     tool,  # noqa: F401
 )

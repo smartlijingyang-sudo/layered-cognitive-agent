@@ -1,6 +1,7 @@
 # =============================================================================
 # act_safe_boundary — control-slot sub-graph for act.safe-boundary (ADR-0206 §5)
 # =============================================================================
+# NOT auto-mounted. Grant SSOT is act.authorize in configs/act.yaml.
 # Single-node graph wrapping LCA's act.safe-boundary control slot.
 # Owner: act phase. Last-chance physical isolation gate — wraps a callable.
 # Fallback: identity (always allow).

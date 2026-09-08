@@ -1,6 +1,9 @@
 # =============================================================================
-# act_budget — control-slot sub-graph for act.budget (ADR-0206 §5)
+# act_budget — control-slot sub-graph (NOT auto-mounted)
 # =============================================================================
+# Data-plane grant SSOT is act.authorize in configs/act.yaml.
+# Not inserted by control_slots until ExecutionControl exists.
+
 # Single-node graph wrapping LCA's act.budget control slot.
 # Owner: act phase. Budget check — wraps BudgetPolicy.
 # Fallback: identity (always allow).

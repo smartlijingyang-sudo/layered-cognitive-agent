@@ -1,6 +1,7 @@
 # =============================================================================
 # act_execute — control-slot sub-graph for act.execute (ADR-0206 §5)
 # =============================================================================
+# NOT auto-mounted. Grant SSOT is act.authorize in configs/act.yaml.
 # Single-node graph wrapping LCA's act.execute control slot.
 # Owner: act phase. Safe execution gate — wraps LeadBudgetPolicy or similar.
 # Fallback: identity (always allow).

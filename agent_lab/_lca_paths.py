@@ -25,7 +25,7 @@ from enum import StrEnum
 
 
 class LcaStatus(StrEnum):
-    OK = "ok"             # direct import works (after uv sync)
+    OK = "ok"  # direct import works (after uv sync)
 
 
 @dataclass(frozen=True)
@@ -33,7 +33,7 @@ class LcaPath:
     module: str
     symbol: str
     status: LcaStatus
-    used_by: tuple[str, ...]   # which node plugin depends on this
+    used_by: tuple[str, ...]  # which node plugin depends on this
 
 
 # --- Provenance: 25/25 runtime-verified via `uv run python` ----------------
@@ -42,68 +42,154 @@ class LcaPath:
 
 LCA_PATHS: tuple[LcaPath, ...] = (
     # ── Decisions / observations / reflections / LLM ──
-    LcaPath("lca.contracts.atoms.enums.enums", "ActionType",
-            LcaStatus.OK, ("nodes/think/parse_decision",)),
-    LcaPath("lca.contracts.atoms.enums.enums", "ReflectionVerdict",
-            LcaStatus.OK, ("nodes/reflect/join_reflection_inputs",)),
-    LcaPath("lca.contracts.atoms.ids.ids", "new_id",
-            LcaStatus.OK, ("nodes/reflect/call_critic", "nodes/reflex adapters")),
-    LcaPath("lca.contracts.models.core.execution.decision", "Decision",
-            LcaStatus.OK, ("nodes/think/parse_decision", "nodes/think/gate_enforce",
-                           "nodes/remember/append_event", "nodes/stop/evaluate_stop")),
-    LcaPath("lca.contracts.models.core.execution.decision", "Observation",
-            LcaStatus.OK, ("nodes/reflect/call_critic",)),
-    LcaPath("lca.contracts.models.core.execution.decision", "Reflection",
-            LcaStatus.OK, ("nodes/reflect/extract_memory_candidates",
-                           "nodes/reflect/persist_memory")),
-    LcaPath("lca.contracts.models.core.execution.decision", "ToolCall",
-            LcaStatus.OK, ("nodes/think/parse_decision", "nodes/stop/evaluate_stop")),
-    LcaPath("lca.contracts.models.core.conversation.llm", "LLMResponse",
-            LcaStatus.OK, ("nodes/think/parse_decision",)),
-    LcaPath("lca.contracts.models.core.conversation.llm", "NativeToolCall",
-            LcaStatus.OK, ("nodes/think/parse_decision",)),
-    LcaPath("lca.contracts.models.core.conversation.llm", "TokenUsage",
-            LcaStatus.OK, ("nodes/think/parse_decision",)),
-
-    # ── Stop policy ──
-    LcaPath("lca.contracts.models.core.policy.stop", "StopDecision",
-            LcaStatus.OK, ("nodes/stop/evaluate_stop",)),
-    LcaPath("lca.contracts.models.core.policy.stop", "StopReason",
-            LcaStatus.OK, ("nodes/stop/evaluate_stop",)),
-    LcaPath("lca.contracts.models.core.state.lifecycle", "TaskStatus",
-            LcaStatus.OK, ("nodes/stop/evaluate_stop",)),
-    LcaPath("lca.contracts.models.core.state.lifecycle", "coerce_status",
-            LcaStatus.OK, ("nodes/stop/evaluate_stop",)),
-
+    LcaPath(
+        "lca.contracts.atoms.enums.enums", "ActionType", LcaStatus.OK, ("nodes/think/classify",)
+    ),
+    LcaPath(
+        "lca.contracts.atoms.enums.enums",
+        "ReflectionVerdict",
+        LcaStatus.OK,
+        ("nodes/reflect/critique",),
+    ),
+    LcaPath(
+        "lca.contracts.atoms.ids.ids",
+        "new_id",
+        LcaStatus.OK,
+        ("nodes/reflect/critique", "adapters/lca_reflect"),
+    ),
+    LcaPath(
+        "lca.contracts.models.core.execution.decision",
+        "Decision",
+        LcaStatus.OK,
+        (
+            "nodes/think/classify",
+            "nodes/think/guard",
+            "nodes/remember/commit",
+            "nodes/control/stop_decide",
+        ),
+    ),
+    LcaPath(
+        "lca.contracts.models.core.execution.decision",
+        "Observation",
+        LcaStatus.OK,
+        ("nodes/reflect/critique",),
+    ),
+    LcaPath(
+        "lca.contracts.models.core.execution.decision",
+        "Reflection",
+        LcaStatus.OK,
+        ("nodes/reflect/critique", "nodes/reflect/extract"),
+    ),
+    LcaPath(
+        "lca.contracts.models.core.execution.decision",
+        "ToolCall",
+        LcaStatus.OK,
+        ("nodes/think/classify",),
+    ),
+    LcaPath(
+        "lca.contracts.models.core.conversation.llm",
+        "LLMResponse",
+        LcaStatus.OK,
+        ("nodes/think/classify",),
+    ),
+    LcaPath(
+        "lca.contracts.models.core.conversation.llm",
+        "NativeToolCall",
+        LcaStatus.OK,
+        ("nodes/think/classify",),
+    ),
+    LcaPath(
+        "lca.contracts.models.core.conversation.llm",
+        "TokenUsage",
+        LcaStatus.OK,
+        ("nodes/think/classify",),
+    ),
+    # ── Stop policy (control slot on remember) ──
+    LcaPath(
+        "lca.contracts.models.core.policy.stop",
+        "StopDecision",
+        LcaStatus.OK,
+        ("nodes/control/stop_decide",),
+    ),
+    LcaPath(
+        "lca.contracts.models.core.policy.stop",
+        "StopReason",
+        LcaStatus.OK,
+        ("nodes/control/stop_decide",),
+    ),
+    LcaPath(
+        "lca.contracts.models.core.state.lifecycle",
+        "TaskStatus",
+        LcaStatus.OK,
+        ("nodes/control/stop_decide",),
+    ),
+    LcaPath(
+        "lca.contracts.models.core.state.lifecycle",
+        "coerce_status",
+        LcaStatus.OK,
+        ("nodes/control/stop_decide",),
+    ),
     # ── Agent state / role ──
-    LcaPath("lca.contracts.models.core.state.state", "AgentState",
-            LcaStatus.OK, ("nodes/perceive/perceive_fold",
-                           "nodes/reflect/call_critic", "nodes/reflex adapters")),
-    LcaPath("lca.contracts.models.team.role.team", "ToolPermissionManifest",
-            LcaStatus.OK, ("nodes/effect/tool_dispatch",)),
-
+    LcaPath(
+        "lca.contracts.models.core.state.state",
+        "AgentState",
+        LcaStatus.OK,
+        ("nodes/perceive/perceive_fold", "nodes/reflect/critique", "adapters/lca_reflect"),
+    ),
+    LcaPath(
+        "lca.contracts.models.team.role.team",
+        "ToolPermissionManifest",
+        LcaStatus.OK,
+        ("nodes/effect/tool_dispatch",),
+    ),
     # ── Session / context assembly ──
-    LcaPath("lca.contracts.protocols.session.model.context", "ModelContextAssembler",
-            LcaStatus.OK, ("nodes/model_eye/see",)),
-    LcaPath("lca.contracts.protocols.session.model.context", "ModelVisibleRequest",
-            LcaStatus.OK, ("nodes/model_eye/see",)),
-    LcaPath("lca.infrastructure.llm_adapter.openai_compat", "OpenAICompatAdapter",
-            LcaStatus.OK, ("nodes/think/call_llm",)),
-    LcaPath("lca.infrastructure.session.context.model_context_assembler",
-            "DefaultModelContextAssembler",
-            LcaStatus.OK, ("nodes/model_eye/see",)),
-
+    LcaPath(
+        "lca.contracts.protocols.session.model.context",
+        "ModelContextAssembler",
+        LcaStatus.OK,
+        ("nodes/model_eye/see",),
+    ),
+    LcaPath(
+        "lca.contracts.protocols.session.model.context",
+        "ModelVisibleRequest",
+        LcaStatus.OK,
+        ("nodes/model_eye/see",),
+    ),
+    LcaPath(
+        "lca.infrastructure.llm_adapter.openai_compat",
+        "OpenAICompatAdapter",
+        LcaStatus.OK,
+        ("nodes/think/reason",),
+    ),
+    LcaPath(
+        "lca.infrastructure.session.context.model_context_assembler",
+        "DefaultModelContextAssembler",
+        LcaStatus.OK,
+        ("nodes/model_eye/see",),
+    ),
     # ── cordis-gated (now OK after uv sync) ──
-    LcaPath("lca.session.append", "Session",
-            LcaStatus.OK, ("nodes/remember/append_event",
-                            "nodes/remember/tail_events",
-                            "nodes/remember/fold_messages")),
-    LcaPath("lca.session.append", "SessionEvent",
-            LcaStatus.OK, ("nodes/remember/append_event",)),
-    LcaPath("lca.cognition.body.executor.safe_executor", "SimpleSafeExecutor",
-            LcaStatus.OK, ("nodes/effect/tool_dispatch",)),
-    LcaPath("lca.cognition.brain.reasoner.null_critic", "NullCritic",
-            LcaStatus.OK, ("nodes/reflect/call_critic",)),
+    LcaPath(
+        "lca.session.append",
+        "Session",
+        LcaStatus.OK,
+        (
+            "nodes/remember/commit",
+            "nodes/remember/fold_history",
+        ),
+    ),
+    LcaPath("lca.session.append", "SessionEvent", LcaStatus.OK, ("nodes/remember/commit",)),
+    LcaPath(
+        "lca.cognition.body.executor.safe_executor",
+        "SimpleSafeExecutor",
+        LcaStatus.OK,
+        ("nodes/effect/tool_dispatch",),
+    ),
+    LcaPath(
+        "lca.cognition.brain.reasoner.null_critic",
+        "NullCritic",
+        LcaStatus.OK,
+        ("nodes/reflect/critique",),
+    ),
 )
 
 
@@ -126,8 +212,7 @@ def format_table() -> str:
     """Render a human-readable table for docs / describe output."""
     rows = [f"{'module':<64} {'symbol':<28} status  used_by"]
     for p in LCA_PATHS:
-        rows.append(f"{p.module:<64} {p.symbol:<28} {p.status.value:<6}  "
-                    f"{', '.join(p.used_by)}")
+        rows.append(f"{p.module:<64} {p.symbol:<28} {p.status.value:<6}  {', '.join(p.used_by)}")
     return "\n".join(rows)
 
 

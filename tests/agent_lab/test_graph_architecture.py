@@ -31,11 +31,10 @@ def test_every_new_phase_subgraph_compiles() -> None:
         "think",
         "reflect",
         "remember",
-        "stop",
         "toolbox",
         "event_log",
         "model_eye",
-        "effect_dispatch",
+        "act",
         "agent_loop",
     )
     # Snapshot keys first: compiling agent_loop may mutate ``specs`` in
@@ -61,14 +60,13 @@ def test_compile_hook_inserts_control_slots() -> None:
         "think",
         "reflect",
         "remember",
-        "stop",
         "toolbox",
         "event_log",
         "model_eye",
-        "effect_dispatch",
+        "act",
         "agent_loop",
     )
-    # Disable control_slots plugin → expect only the 6 manually-authored
+    # Disable control_slots plugin → expect only the 5 manually-authored
     # sub_specs.
     stripped = [
         p
@@ -77,29 +75,31 @@ def test_compile_hook_inserts_control_slots() -> None:
     ]
     stripped_spec = specs["agent_loop"].model_copy(update={"plugins": stripped})
     manual_only = compile_spec(stripped_spec, sub_registry=specs)
-    assert len(manual_only.subgraph_calls) == 6
-    # Enable hook → expect 6 main + every ControlSlot that has an owner.
+    assert len(manual_only.subgraph_calls) == 5
+    # Enable hook → expect 5 main + every ControlSlot that has an owner.
     with_hook = compile_spec(specs["agent_loop"], sub_registry=specs)
     inserted = {x["sub_spec_id"] for x in with_hook.subgraph_calls}
-    # All 9 owner-bound control slots must be present.
+    # Owner-bound control slots (act.* not auto-inserted; grant is act.authorize).
     expected = {
         "perceive_context",
         "think_guard",
-        "act_authorize",
-        "act_budget",
-        "act_constrain",
-        "act_execute",
-        "act_safe_boundary",
         "remember_admit",
         "stop_decide",
-        "stop_focus",  # focus-aware stop governance (stop phase)
+        "stop_focus",  # focus-aware stop governance (on remember)
         "observe_checkpoint",  # cross-cutting, attached to multiple phases
         "observe_wildcard",  # cross-cutting wildcard observer (observe.*)
     }
     for name in expected:
         assert name in inserted, f"compile hook missed control slot {name}"
-    # Hook should have ADDED at least 9 links beyond the 6 manual ones.
-    assert len(with_hook.subgraph_calls) >= 7 + len(expected)
+    for removed in (
+        "act_authorize",
+        "act_budget",
+        "act_constrain",
+        "act_execute",
+        "act_safe_boundary",
+    ):
+        assert removed not in inserted, f"act control stub {removed} must not auto-insert"
+    assert len(with_hook.subgraph_calls) >= 5 + len(expected)
 
 
 def test_compile_hook_can_be_disabled() -> None:
@@ -112,11 +112,10 @@ def test_compile_hook_can_be_disabled() -> None:
         "think",
         "reflect",
         "remember",
-        "stop",
         "toolbox",
         "event_log",
         "model_eye",
-        "effect_dispatch",
+        "act",
         "agent_loop",
     )
     # Strip the control_slots plugin so before_compile doesn't insert anything.
@@ -133,7 +132,7 @@ def test_compile_hook_can_be_disabled() -> None:
 
 
 def test_act_budget_slot_runs_as_control() -> None:
-    """act.budget slot (auto-inserted into act host) runs end-to-end via runner."""
+    """Standalone act_budget graph still runs (not auto-mounted on act host)."""
     from agent_lab.adapters.lca_control_act import (
         register_fixture_act_budget,
         unregister_fixture_act_budget,
@@ -183,7 +182,6 @@ _NODE_PURITY_SCAN_PATHS = (
     "agent_lab/nodes/think",
     "agent_lab/nodes/reflect",
     "agent_lab/nodes/remember",
-    "agent_lab/nodes/stop",
     "agent_lab/nodes/event",
     # New control sub-slot handlers (not the pre-existing control primitives).
     "agent_lab/nodes/control/think_guard",
@@ -262,11 +260,10 @@ def load_all():
         "think",
         "reflect",
         "remember",
-        "stop",
         "toolbox",
         "event_log",
         "model_eye",
-        "effect_dispatch",
+        "act",
         "agent_loop",
         "think_guard",
         "stop_decide",

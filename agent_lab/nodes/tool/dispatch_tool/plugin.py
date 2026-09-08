@@ -27,7 +27,11 @@ from agent_lab.tools.registry import ToolRegistry
 
 # Direct LCA imports (cordis-gated, fail-loud if missing).
 from lca.cognition.body.executor.safe_executor import SimpleSafeExecutor
-from lca.contracts.models.team.role.team import ToolPermissionManifest
+from lca.contracts.models.team.role.team import (
+    CacheConfig,
+    RetryPolicy,
+    ToolPermissionManifest,
+)
 
 
 @node(
@@ -89,9 +93,18 @@ class DispatchTool(Node):
             ToolPermissionManifest(allowed_tools=sorted(tool_range or registry.names())),
         )
         tool = registry.get(tool_name)
+        retry_policy = RetryPolicy(max_retries=int(node.config.get("max_retries", 0) or 0))
+        cache_config = CacheConfig(enabled=bool(node.config.get("cache_enabled", False)))
         try:
             import asyncio
-            obs = asyncio.run(executor.execute(tool=tool, args=args))
+            obs = asyncio.run(
+                executor.execute(
+                    tool=tool,
+                    args=args,
+                    retry_policy=retry_policy,
+                    cache_config=cache_config,
+                )
+            )
         except Exception as exc:
             return {out_port: Artifact(
                 kind=ArtifactKind.RECEIPT,

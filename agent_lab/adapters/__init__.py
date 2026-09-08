@@ -5,7 +5,7 @@ Removed:
 
 Remaining (next commits):
   - lca_perceive.py, lca_event.py, lca_memory.py, lca_think.py,
-    lca_reflect.py, lca_stop.py, lca_control.py, lca_control_act.py,
+    lca_reflect.py, lca_control.py, lca_control_act.py,
     lca_toolbox.py
   - tools/read_file.py (kept, agent_lab's own Tool)
 """

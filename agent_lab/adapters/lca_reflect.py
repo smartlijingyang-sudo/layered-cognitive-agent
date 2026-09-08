@@ -1,37 +1,23 @@
-"""Adapter: agent_lab reflect sub-graph ↔ LCA Critic + MemorySystem.
+"""Adapter: agent_lab reflect.critique ↔ LCA Critic.
 
 LCA contracts consumed (read-only):
   - lca.contracts.protocols.think.cognition.Critic
-  - lca.contracts.protocols.memory.memory.MemorySystem
   - lca.contracts.models.core.execution.decision.Observation, Reflection
   - lca.contracts.models.core.state.state.AgentState
 
 agent_lab provides (this file):
   - LcaReflectCriticProvider: wraps a Critic and exposes .critique() that
     takes a combined artifact (observation + decision) and returns a
-    Reflection artifact.
-  - LcaReflectMemoryProvider: wraps a MemorySystem and exposes .write()
-    that takes a Reflection artifact + memory candidates artifact, calls
-    MemorySystem.update(state, observation, reflection), and emits
-    reflection_out / memory_extract_out / reflect_signal.
+    Reflection artifact for ``reflect.critique``.
 
-Both providers follow the same fixture_X_name / factory / fallback
-resolution as ``LcaThinkGateProvider`` so node.config stays JSON-
-serializable for plan_hash.
+Reflect does not own durable memory writes. ``LcaReflectMemoryProvider``
+remains for remember-phase wiring only; ``reflect.extract`` emits
+candidates without calling MemorySystem.update.
 
 Critic choice: LCA ships ``SimpleCritic`` (heuristic) and ``NullCritic``
-(no-op).  We default to ``NullCritic`` — a no-op critic that returns
-``Reflection(verdict=ON_TRACK, lesson=None)`` — because SimpleCritic
-requires a live AgentState with history, which the reflect sub-graph does
-not always have.  Override with ``fixture_critic_name`` in tests or
-``critic_factory`` in production profiles.
-
-MemorySystem choice: LCA defines the ``MemorySystem`` Protocol with an
-``async update(state, observation, reflection)`` method.  No concrete
-in-memory stub exists in the codebase, so we provide a tiny
-``_StubMemorySystem`` that records the call and is otherwise a no-op.
-Override with ``fixture_memory_name`` in tests or ``memory_factory`` in
-production profiles.
+(no-op).  Default is ``NullCritic`` (ON_TRACK, no lesson) because
+SimpleCritic needs a live AgentState with history. Override with
+``fixture_critic_name`` in tests or ``critic_factory`` in profiles.
 """
 
 from __future__ import annotations
@@ -75,7 +61,7 @@ def unregister_fixture_memory(name: str) -> None:
 
 @dataclass(frozen=True)
 class LcaReflectCriticProvider:
-    """Bridge agent_lab call_critic node → LCA Critic.critique().
+    """Bridge reflect.critique → LCA Critic.critique().
 
     Resolution order for the critic:
       1. ``provider_config.fixture_critic_name`` (looks up ``_FIXTURE_CRITICS``)
@@ -129,9 +115,9 @@ class LcaReflectCriticProvider:
 
 @dataclass(frozen=True)
 class LcaReflectMemoryProvider:
-    """Bridge agent_lab write_extract node → LCA MemorySystem.update().
+    """Bridge remember-phase memory write → LCA MemorySystem.update().
 
-    Resolution order for the memory system:
+    Not used by reflect (candidates only). Resolution order:
       1. ``provider_config.fixture_memory_name`` (looks up ``_FIXTURE_MEMORIES``)
       2. ``provider_config.memory_factory`` (module:Class form)
       3. Fallback: ``_StubMemorySystem`` (records call, no-op)

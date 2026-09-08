@@ -1,68 +1,71 @@
 # =============================================================================
-# remember — phase:remember sub-graph (ADR-0206 §5)
+# remember — phase:remember sub-graph (ADR-0206 §5, first-principles)
 # =============================================================================
-# Layer 2 of 5 (sibling of perceive / think / effect_dispatch / stop).
-# Equivalent to LCA's ``Session.append`` + ``StateStore.save`` flattened
-# into a graph:
+# Answers one question: what from this turn becomes durable?
 #
-#   write_journal → save_state → (identity barrier → remember_signal)
+#   admit → commit → snapshot
+#
+# Reflect proposes memory_candidates; remember admits them, appends the turn
+# fact via Session.append, then snapshots AgentState via StateStore.save.
 #
 # Mounted by: agent_loop.remember (see agent_loop.yaml#sub_specs).
-#
-# Inbound cross-spec edges: NONE.
-# Outbound cross-spec edges: NONE.
 # =============================================================================
 
 id: remember
-version: 0.1.0
-region: phase:memory
-description: Persist the turn's durable facts via Session.append (journal
-  fact) and StateStore.save (state snapshot), then emit a remember_signal
-  so downstream phases know the remember stage completed.
+version: 1.0.0
+region: phase:remember
+description: >
+  Admit memory candidates, commit the turn fact to Session, and snapshot
+  AgentState. Sole durable-write phase for the loop turn.
 
 graph:
   id: remember
   layer: phase
-  purpose: Session.append + StateStore.save decomposed into write_journal → save_state.
-  members: [write_journal, save_state]
+  purpose: Remember = admit → commit → snapshot.
+  members: [admit, commit, snapshot]
   references: [agent_loop]
   relations:
     - { graph: agent_loop, kind: child_of, role: remember_phase }
   capabilities:
     provides: [journal_fact, state_ref, remember_signal]
-    requires: [session_append, state_store]
+    requires: [session_append, state_store, memory_admit_policy]
 
 # -----------------------------------------------------------------------------
-# INITIAL PORTS — what the parent (agent_loop.remember) must supply.
+# INITIAL PORTS
 # -----------------------------------------------------------------------------
-# initial.in_reflection    : reflection_out from reflect phase
-# initial.in_observation   : out_observation from act phase
-# initial.in_decision      : decision_out from think phase
+# initial.in_reflection  : Reflection from reflect
+# initial.in_observation : Observation from act
+# initial.in_decision    : Decision from think
+# initial.in_candidates  : memory_candidates from reflect.extract
 
-# -----------------------------------------------------------------------------
-# NODES — two workers + one identity barrier, linear chain.
-# -----------------------------------------------------------------------------
 nodes:
 
-  # ----- write_journal: Session.append(event_type, data) --------------------
-  # Provider: LcaRememberJournalProvider wraps a Session (ADR-0186/0191/0194).
-  # Reads in_reflection + in_observation + in_decision, produces journal_fact.
-  - id: write_journal
+  # ----- admit: memory_candidates → admitted ---------------------------------
+  - id: admit
     region: phase:remember
-    factory: write_journal
+    factory: remember.admit
+    config:
+      provider_kind: lca
+      provider_ref: agent_lab.adapters.lca_control:LcaControlRememberAdmitProvider
+      provider_config: {}
+    ins: [in_candidates, in_observation]
+    outs: [admitted]
+
+  # ----- commit: Session.append(turn fact) -----------------------------------
+  - id: commit
+    region: phase:remember
+    factory: remember.commit
     config:
       provider_kind: lca
       provider_ref: agent_lab.adapters.lca_memory:LcaRememberJournalProvider
       provider_config: {}
-    ins: [in_reflection, in_observation, in_decision]
+    ins: [in_reflection, in_observation, in_decision, admitted]
     outs: [journal_fact]
 
-  # ----- save_state: StateStore.save(state) -> ref --------------------------
-  # Provider: LcaRememberStateStoreProvider wraps a StateStore.
-  # Reads journal_fact (carries the assembled state), produces state_ref.
-  - id: save_state
+  # ----- snapshot: StateStore.save + remember_signal -------------------------
+  - id: snapshot
     region: phase:remember
-    factory: save_state
+    factory: remember.snapshot
     config:
       provider_kind: lca
       provider_ref: agent_lab.adapters.lca_memory:LcaRememberStateStoreProvider
@@ -70,27 +73,35 @@ nodes:
     ins: [journal_fact]
     outs: [state_ref, remember_signal]
 
-# -----------------------------------------------------------------------------
-# EDGES — strict linear chain.
-# -----------------------------------------------------------------------------
 edges:
 
-  # ── initial → write_journal ──
-  - id: e_init_reflection_to_wj
-    from: { spec: remember, node: _initial, port: in_reflection }
-    to:   { spec: remember, node: write_journal, port: in_reflection }
+  - id: e_init_candidates_to_admit
+    from: { spec: remember, node: _initial, port: in_candidates }
+    to:   { spec: remember, node: admit,    port: in_candidates }
     kind: data
-  - id: e_init_observation_to_wj
+  - id: e_init_obs_to_admit
     from: { spec: remember, node: _initial, port: in_observation }
-    to:   { spec: remember, node: write_journal, port: in_observation }
-    kind: data
-  - id: e_init_decision_to_wj
-    from: { spec: remember, node: _initial, port: in_decision }
-    to:   { spec: remember, node: write_journal, port: in_decision }
+    to:   { spec: remember, node: admit,    port: in_observation }
     kind: data
 
-  # ── write_journal → save_state ──
-  - id: e_wj_to_save
-    from: { spec: remember, node: write_journal, port: journal_fact }
-    to:   { spec: remember, node: save_state, port: journal_fact }
+  - id: e_init_reflection_to_commit
+    from: { spec: remember, node: _initial, port: in_reflection }
+    to:   { spec: remember, node: commit,   port: in_reflection }
+    kind: data
+  - id: e_init_observation_to_commit
+    from: { spec: remember, node: _initial, port: in_observation }
+    to:   { spec: remember, node: commit,   port: in_observation }
+    kind: data
+  - id: e_init_decision_to_commit
+    from: { spec: remember, node: _initial, port: in_decision }
+    to:   { spec: remember, node: commit,   port: in_decision }
+    kind: data
+  - id: e_admit_to_commit
+    from: { spec: remember, node: admit,  port: admitted }
+    to:   { spec: remember, node: commit, port: admitted }
+    kind: data
+
+  - id: e_commit_to_snapshot
+    from: { spec: remember, node: commit,   port: journal_fact }
+    to:   { spec: remember, node: snapshot, port: journal_fact }
     kind: data

@@ -2,9 +2,9 @@
 
 Usage:
   python -m agent_lab.run model_eye
-  python -m agent_lab.run effect_dispatch
+  python -m agent_lab.run act
   python -m agent_lab.run agent_loop
-  python -m agent_lab.run --negative effect_dispatch
+  python -m agent_lab.run --negative
   python -m agent_lab.run --describe [--target node:<id>|graph:<id>]
 
 Defaults to agent_loop. Tool dispatch is driven by
@@ -36,9 +36,8 @@ def _bootstrap() -> None:
     """Eagerly load .env (for LLM secrets) and the tool registry, then wire
     the registry into the dispatch nodes.
 
-    This is the only place the registry is loaded.  The dispatch nodes
-    access it via the singleton exposed in
-    :mod:`agent_lab.nodes.tool.dispatch_tool`.
+    This is the only place the registry is loaded.  Act execute (and the
+    legacy dispatch_tool singleton) share it via configure_registry.
     """
     # Load project .env if present so OpenAICompatAdapter can read
     # LLM_API_KEY / LLM_MODEL / LLM_BASE_URL out of the environment.
@@ -49,7 +48,7 @@ def _bootstrap() -> None:
     except Exception:  # noqa: S110 — missing .env is fine, env is the fallback
         pass
 
-    from agent_lab.nodes.tool import configure_registry
+    from agent_lab.nodes.act.execute.plugin import configure_registry
     from agent_lab.tools import ToolRegistry
 
     registry = ToolRegistry()
@@ -103,16 +102,28 @@ def _run_model_eye(specs, mv_provider: str = "default") -> None:
     manifest = trace.final_artifacts.get("manifest")
     print(json.dumps(manifest.content if manifest else None, indent=2, ensure_ascii=False))
 
-def _run_effect_dispatch(specs) -> None:
-    spec = specs["effect_dispatch"]
-    # Demo call: a real read_file against this very file. The whole point
-    # is that the dispatch graph talks to the real LCA Tool, not a stub.
+
+def _run_act(specs) -> None:
+    spec = specs["act"]
+    # Demo: Decision(call_tool=read_file) against this very file.
     demo_path = str(Path(__file__).resolve())
     initial = {
-        "args": Artifact(
+        "decision": Artifact(
             kind=ArtifactKind.FACT,
-            content={"tool": "read_file", "args": {"path": demo_path, "max_bytes": 256}},
-            schema_ref="tool.args.v1",
+            content={
+                "decision_id": "dec_demo",
+                "action_type": "call_tool",
+                "tool_calls": [
+                    {
+                        "call_id": "c1",
+                        "name": "read_file",
+                        "arguments": {"path": demo_path, "max_bytes": 256},
+                    }
+                ],
+                "rationale": "demo",
+                "confidence": 1.0,
+            },
+            schema_ref="decision.v1",
         ),
     }
     trace = run_graph(spec, initial=initial, sub_registry=specs)
@@ -124,12 +135,7 @@ def _run_effect_dispatch(specs) -> None:
 
 def _run_agent_loop(specs) -> None:
     spec = specs["agent_loop"]
-    # Demo turn: tell the LLM to call bash; the agent loop will go
-    # through flatten_manifest → call_llm → parse_decision → think →
-    # act (effect_dispatch) → model_eye.see (project) → ... → stop.
-    # The bash call will actually run unless LLM_API_KEY is missing, in
-    # which case OpenAICompatAdapter will surface the auth error in the
-    # receipt (this is the real-failure path, not a hidden mock).
+    # Demo turn: perceive → think → act → reflect → remember (+ stop control).
     initial = {
         "user_turn": make_message(
             "user",
@@ -157,18 +163,16 @@ def _print_trace(trace) -> None:
 
 
 def _run_negative() -> None:
-    """Build a copy of effect_dispatch with no discard_sink, drop the receipt node's
-    'receipt' OUT port and the discard_sink field. Expect a C2/C3 violation.
-    """
-    src = Path(__file__).parent / "graphs" / "configs" / "effect_dispatch.yaml"
+    """Strip execute's receipt OUT port from act.yaml; expect a validation error."""
+    src = Path(__file__).parent / "graphs" / "configs" / "act.yaml"
     dst = src.with_suffix(".broken.yaml")
     text = src.read_text(encoding="utf-8")
     broken = text.replace(
-        "    ins: [routed]\n    outs: [receipt]",
-        "    ins: [routed]\n    outs: []",  # strip receipt out port to trigger C6
+        "    ins: [authorized]\n    outs: [receipt]",
+        "    ins: [authorized]\n    outs: []",
     )
     if broken == text:
-        print("FAILED to mutate effect_dispatch.yaml for negative test")
+        print("FAILED to mutate act.yaml for negative test")
         sys.exit(2)
     dst.write_text(broken, encoding="utf-8")
     try:
@@ -184,7 +188,7 @@ def _run_negative() -> None:
             for err in e.errors[:5]:
                 print(f"  - {err}")
             return
-        print("FAIL: broken effect_dispatch compiled cleanly (this is wrong)")
+        print("FAIL: broken act compiled cleanly (this is wrong)")
         sys.exit(2)
     finally:
         dst.unlink(missing_ok=True)
@@ -194,7 +198,7 @@ def _run_negative() -> None:
 
 _DISPATCH = {
     "model_eye": _run_model_eye,
-    "effect_dispatch": _run_effect_dispatch,
+    "act": _run_act,
     "agent_loop": _run_agent_loop,
 }
 
@@ -237,7 +241,7 @@ def _describe(target: str | None) -> None:
                 print(f"  relates_to: {list(m.relates_to)}")
         # All graph manifests
         print("\n\n=== Graph Manifests ===")
-        for stem in ("agent_loop", "model_eye", "effect_dispatch"):
+        for stem in ("agent_loop", "model_eye", "act", "perceive", "think"):
             yaml_path = Path(__file__).parent / "graphs" / "configs" / f"{stem}.yaml"
             gm = load_graph_manifest(yaml_path)
             if not gm:
@@ -311,7 +315,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--negative",
         action="store_true",
-        help="compile a broken copy of effect_dispatch and expect a ValidationError",
+        help="compile a broken copy of act and expect a ValidationError",
     )
     parser.add_argument(
         "--describe",
@@ -338,7 +342,9 @@ def main(argv: list[str] | None = None) -> int:
     _bootstrap()
     if args.mv_provider == "lca" or args.graph == "model_eye":
         _register_lca_mv()
-    specs = load_registry("perceive", "model_eye", "effect_dispatch", "agent_loop", "think", "reflect", "remember", "stop")
+    specs = load_registry(
+        "perceive", "model_eye", "act", "agent_loop", "think", "reflect", "remember"
+    )
     if args.graph == "model_eye":
         _DISPATCH[args.graph](specs, args.mv_provider)
     else:

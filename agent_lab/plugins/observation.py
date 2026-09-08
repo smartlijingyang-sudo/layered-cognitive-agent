@@ -50,6 +50,10 @@ class ObservationRenderPlugin(GraphPlugin):
         if status == "ok":
             result = content.get("result", "")
             text = f"[tool:{tool}] {result}"
+        elif status == "no_effect":
+            action = content.get("action_type") or "respond"
+            snippet = content.get("response_text") or ""
+            text = f"[no-effect:{action}] {snippet}".rstrip()
         else:
             text = f"[tool-error] {content.get('error') or status}"
         if content.get("text") == text:

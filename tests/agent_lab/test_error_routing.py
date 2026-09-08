@@ -340,24 +340,27 @@ def test_validate_rejects_route_to_target_with_no_in_port() -> None:
 
 
 # ---------------------------------------------------------------------------
-# (5) effect_dispatch.yaml — on_error=route declared in real spec
+# (5) act.yaml — on_error=route declared in real spec
 # ---------------------------------------------------------------------------
 
 
-def test_effect_dispatch_declares_on_error_route() -> None:
-    """Real spec uses on_error=route on dispatch → deny_handler."""
+def test_act_execute_folds_errors_into_receipt() -> None:
+    """act.execute uses default on_error=fail; tool failures become receipt content.
+
+    The runner's on_error=route is a pre-invoke skip (not catch-and-route),
+    so the production act graph must not use it on execute.
+    """
     from agent_lab.graphs import load_registry
 
-    specs = load_registry("effect_dispatch")
-    dispatch_node = specs["effect_dispatch"].node("dispatch")
-    assert dispatch_node.on_error == ErrorRoute.ROUTE
-    assert dispatch_node.route_to == "deny_handler"
-    # deny_handler must exist and have at least one IN port (validate gates this)
-    deny = specs["effect_dispatch"].node("deny_handler")
-    assert "exception" in deny.ins
-    errs = validate(specs["effect_dispatch"])
+    specs = load_registry("act")
+    execute_node = specs["act"].node("execute")
+    assert execute_node.on_error == ErrorRoute.FAIL
+    assert execute_node.route_to is None
+    observe = specs["act"].node("observe")
+    assert "receipt" in observe.ins
+    errs = validate(specs["act"])
     assert not [e for e in errs if e.startswith("C6.1")], (
-        f"effect_dispatch C6.1 violations: {[e for e in errs if e.startswith('C6.1')]}"
+        f"act C6.1 violations: {[e for e in errs if e.startswith('C6.1')]}"
     )
 
 

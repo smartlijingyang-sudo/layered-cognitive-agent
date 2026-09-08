@@ -1,6 +1,7 @@
 # =============================================================================
 # act_constrain — control-slot sub-graph for act.constrain (ADR-0206 §5)
 # =============================================================================
+# NOT auto-mounted. Grant SSOT is act.authorize in configs/act.yaml.
 # Single-node graph wrapping LCA's act.constrain control slot.
 # Owner: act phase. Strategy constraints — wraps a callable.
 # Fallback: identity (always allow).

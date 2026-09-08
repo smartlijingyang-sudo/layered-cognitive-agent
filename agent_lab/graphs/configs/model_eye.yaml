@@ -9,7 +9,7 @@
 #
 # Inbound:
 #   - perceive.bundle / system / history / config / tools  (via perceive sub_spec)
-#   - effect_dispatch.integrate.observation ──project──► see.observation
+#   - act.observe.observation ──project──► see.observation
 # =============================================================================
 
 id: model_eye
@@ -24,10 +24,10 @@ graph:
   layer: model_visible
   purpose: Session derive + this-turn feeds → frozen ContextManifest.
   members: [see, guard, shape, freeze]
-  references: [perceive, effect_dispatch]
+  references: [perceive, act]
   relations:
     - { graph: perceive, kind: child_of, role: model_eye }
-    - { graph: effect_dispatch, kind: accepts_from, role: project_observation }
+    - { graph: act, kind: accepts_from, role: project_observation }
   capabilities:
     provides: [context_manifest]
     requires: [session_reader, perceive_bundle]

@@ -1,8 +1,9 @@
 # =============================================================================
 # stop_focus — control-slot sub-graph for stop.focus (ADR-0206 §5)
 # =============================================================================
-# Single-node graph wrapping LCA's stop.focus control slot. Owner phase:
-# stop. Wraps the focus-aware STOP governance executor
+# Single-node graph wrapping LCA's stop.focus control slot. Owner host:
+# remember (memory). Attached after persist via control_slots. Wraps the
+# focus-aware STOP governance executor
 # (``lca.plugins.loop.control.stop_focus.FocusStopExecutor``).
 #
 # A turn is stagnant only if it has an unsuccessful observation, its
@@ -13,7 +14,7 @@
 # 3, matching the bundle's ``control.stop.focus`` entry), else
 # ``verdict=stop``.
 #
-# Region: phase:stop. Owner: stop phase.
+# Worker region: phase:stop. Owner host: remember.
 # =============================================================================
 
 id: stop_focus
@@ -26,7 +27,7 @@ description: Focus-aware STOP governance — counts consecutive stagnant
 graph:
   id: stop_focus
   layer: control
-  purpose: Stagnation-counting stop governance for the stop phase.
+  purpose: Stagnation-counting stop governance after remember persist.
   members: [stop_focus_handler]
   references: []
   relations:

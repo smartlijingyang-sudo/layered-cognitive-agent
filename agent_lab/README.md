@@ -1,66 +1,66 @@
 # agent_lab — config-driven agent graph framework (ADR-0206 prototype)
 
-The agent loop is three layers (graphs) + one non-executable tool inventory.
+The agent loop is layered graphs + one non-executable tool inventory.
 
 ## Layout
 
 ```
 agent_lab/
-├── graphs/configs/        ← the three graph YAMLs (root + two sub-graphs)
+├── graphs/configs/        ← graph YAMLs (root + phase sub-graphs)
 │   ├── agent_loop.yaml
-│   ├── effect_dispatch.yaml
-│   └── model_eye.yaml          # child of perceive
-├── tools/                 ← NON-executable named-tool inventory (this is
-│   ├── registry.yaml          "the place that holds tools")
-│   └── registry.py           (ToolRegistry class — name → Tool lookup)
+│   ├── perceive.yaml
+│   ├── think.yaml
+│   ├── act.yaml             ← Decision → Observation (shape→authorize→execute→observe)
+│   ├── model_eye.yaml       ← child of perceive
+│   ├── reflect.yaml / remember.yaml
+│   └── control/             ← control slots (stop_decide/stop_focus on remember)
+├── tools/                 ← NON-executable named-tool inventory
+│   ├── registry.yaml
+│   └── registry.py
 ├── adapters/              ← bridges to real LCA contracts (one-way)
-│   ├── lca_body.py           (LcaBodyProvider — SimpleSafeExecutor + tool range)
-│   ├── lca_llm.py            (LcaLlmProvider — wraps any LLMAdapter)
-│   ├── lca_mv.py             (LcaMvProvider — DefaultModelContextAssembler)
-│   └── tools/
-│       └── read_file.py      (agent_lab's own Tool; real fs read)
-├── nodes/                 ← the ant-worker node library (one file per @node)
-│   ├── base.py               (Node / NodeRegistry / invoke)
-│   ├── manifest.py           (NodeManifest etc.)
-│   ├── control/              (join, barrier, route_on, discard)
-│   ├── llm/                  (call_llm, assemble_messages)
-│   ├── tool/                 (build_intent, grant_check, dispatch_tool, write_receipt, integrate_observation)
-│   ├── model_eye/            (see, guard, shape, freeze; trust_classify for toolbox)
-│   └── passthrough/          (identity, constant, select, redact, dedup, rank)
+├── nodes/                 ← ant-worker node library (one file per @node)
+│   ├── act/                 (shape, authorize, execute, observe)
+│   ├── perceive/ / model_eye/ / think/ / …
+│   └── tool/                (legacy helpers; toolbox / registry resolve)
 ├── runtime/               ← recursive interpreter
 ├── graph/                 ← spec + compile + validate
 ├── primitives/            ← Artifact / Port / Edge
 └── run.py                 ← entry point
 ```
 
-## How the call chain resolves
+## Act phase (first principles)
 
-For a single tool call inside `agent_loop`:
+Act answers one question: **given an enforced Decision, what did the world return?**
 
 ```
-agent_loop.yaml                ← dispatch node lists tools: [bash, file_write, read_file]
-  └─ effect_dispatch.yaml      ← sub_spec mount; passes through input_map
-       └─ dispatch node (factory: dispatch_tool)
-            ├─ config.tools → tool RANGE (which names this node may call)
-            ├─ registry loaded from tools/registry.yaml → Tool INSTANCES
-            └─ LcaBodyProvider(tool_registry, tool_range)
-                 └─ SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=range))
-                      └─ tool.execute(args)   ← real LCA Tool (BashTool, ReadFileTool, ...)
+Decision
+  → shape      (Intent | no_effect)
+  → authorize  (allow | deny | skip)
+  → execute    (EffectReceipt via SimpleSafeExecutor; sole world touch)
+  → observe    (Observation)
+  ──project──► model_eye.see.observation
 ```
 
-The graph config (YAML) is the only place that says *which tools* a dispatch
-may call.  The tool registry (also YAML) is the only place that says *what
-tools exist at all*.  No code change is needed to add/remove tools.
+`respond` / `refuse` become `no_effect` and never call tools. Journal writes
+belong to `remember`, not act.
+
+## How the call chain resolves for one tool call
+
+```
+agent_loop.yaml
+  └─ act.yaml
+       └─ execute (factory: act.execute)
+            ├─ config.tools → tool RANGE
+            ├─ registry from tools/registry.yaml → Tool INSTANCES
+            └─ SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=range))
+                 └─ tool.execute(args)
+```
 
 ## Adding a new tool
 
-1. Write a `lca.contracts.protocols.Tool` subclass (or any class implementing
-   the protocol — see `agent_lab/adapters/tools/read_file.py` for the
-   standard shape).
+1. Write a `lca.contracts.protocols.Tool` subclass (see `adapters/tools/read_file.py`).
 2. Append a one-line entry to `tools/registry.yaml`.
-3. If a dispatch graph should be allowed to call it, add the name to that
-   graph's `dispatch` node `config.tools: [...]` and to the
-   `grant_check` node's `config.allow: [...]`.
+3. Add the name to `act.yaml` `authorize.config.allow` and `execute.config.tools`.
 
 ## Adding a new node
 
@@ -68,25 +68,10 @@ tools exist at all*.  No code change is needed to add/remove tools.
 2. Import the new subpackage from `nodes/<layer>/__init__.py`.
 3. Reference it from a graph by its `factory:` name.
 
-## Real LCA seams in use
-
-- `lca.infrastructure.llm_adapter.openai_compat:OpenAICompatAdapter`
-  — real LLM, reads `LLM_API_KEY` / `LLM_MODEL` / `LLM_BASE_URL` from env.
-- `lca.cognition.body.executor.safe_executor:SimpleSafeExecutor`
-  — real tool executor (permission gate, retry, journal).
-- `lca.contracts.models.team.role.team:ToolPermissionManifest`
-  — the allowlist SimpleSafeExecutor enforces.
-- `lca.infrastructure.context.model_visible.assembler.assembler:DefaultModelContextAssembler`
-  — real model-visible assembly (used by `assemble_lca_mv`).
-- `lca.plugins.tools.bash:BashTool` / `lca.plugins.tools.file_write:FileWriteTool`
-  — real LCA tools.
-- `agent_lab.adapters.tools.read_file:ReadFileTool` — agent_lab's own Tool.
-
 ## Self-describe
 
 ```bash
-python -m agent_lab.run --describe                    # all nodes + graphs + tools
-python -m agent_lab.run --describe --target node:call_llm
-python -m agent_lab.run --describe --target graph:effect_dispatch
-python -m agent_lab.run --describe --target graph:tools/registry   # not yet; add later
+python -m agent_lab.run --describe
+python -m agent_lab.run --describe --target node:act.execute
+python -m agent_lab.run --describe --target graph:act
 ```

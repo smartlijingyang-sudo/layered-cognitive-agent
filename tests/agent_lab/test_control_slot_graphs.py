@@ -114,10 +114,12 @@ def test_lca_control_stop_policy_provider_with_fixture() -> None:
         )
         out = provider.decide()
         assert "stop_decision" in out
+        assert "terminal" in out
         result = out["stop_decision"]
         assert result.kind == ArtifactKind.FACT
         assert result.content["should_stop"] is True
         assert result.content["reason"] == "budget_exceeded"
+        assert out["terminal"].schema_ref == "terminal.v1"
     finally:
         unregister_fixture_stop_policy(name)
 

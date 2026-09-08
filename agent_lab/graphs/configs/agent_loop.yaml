@@ -1,28 +1,32 @@
 # =============================================================================
 # agent_loop — root loop (ADR-0206 §2)
 # =============================================================================
-# Owns the six-phase skeleton. Does NOT do real work itself: each phase is a
-# sub_spec host (perceive / think / act → effect_dispatch / reflect /
-# remember / stop).
+# Owns five cognitive phase hosts (perceive / think / act / reflect /
+# remember). Stop is NOT a peer phase: StopPolicy + stop.focus attach as
+# control_slots on remember (after persist). Runner propagates data|project
+# edges only; control attachment is via control_slots sub_spec siblings.
 #
 # model_eye is NOT mounted here. It is perceive's child (perceive.yaml#eye).
 # perceive.out_manifest is already the frozen ContextManifest think reads.
 #
-# Cross-spec project (owned by effect_dispatch.yaml):
-#   effect_dispatch.integrate.observation ──project──► model_eye.see.observation
+# Cross-spec project (owned by act.yaml):
+#   act.observe.observation ──project──► model_eye.see.observation
 #
 # Local data:
 #   perceive.out_manifest  ──► think.in_assembled_manifest
 #   perceive.perceive_out  ──► think.perceive_out
-#   think.decision_out     ──► act / reflect / remember / stop
-#   act.out_observation    ──► reflect / remember / stop
-#   reflect.reflection_out ──► remember / stop
+#   think.decision_out     ──► act / reflect / remember
+#   act.out_observation    ──► reflect / remember
+#   reflect.reflection_out ──► remember
+# Control (control_slots on remember):
+#   remember.state_ref + turn artifacts ──► stop_decide / stop_focus
 # =============================================================================
 
 id: agent_loop
 version: 0.1.0
 region: phase:agent_loop
-description: Root graph for the agent loop. Six phase hosts; model_eye lives under perceive.
+description: Root graph for the agent loop. Five cognitive phase hosts;
+  stop is control on remember. model_eye lives under perceive.
 
 # -----------------------------------------------------------------------------
 # GRAPH — organizational metadata (not data flow). Used by self-describe.
@@ -30,26 +34,24 @@ description: Root graph for the agent loop. Six phase hosts; model_eye lives und
 graph:
   id: agent_loop
   layer: phase
-  purpose: Orchestrate the agent loop as six nested sub-graphs wired by sub_spec.
+  purpose: Orchestrate the agent loop as nested sub-graphs wired by sub_spec.
   members:
     - perceive              # host → perceive.yaml (which mounts model_eye)
     - think                 # host → think.yaml
-    - act                   # host → effect_dispatch
+    - act                   # host → act.yaml
     - reflect               # host → reflect.yaml
-    - remember              # host → remember.yaml
-    - stop                  # host → stop.yaml
+    - remember              # host → remember.yaml (+ stop_* control slots)
   references:
     - perceive
     - think
-    - effect_dispatch
+    - act
     - reflect
     - remember
-    - stop
   relations:
-    - { graph: effect_dispatch, kind: contains, role: act_phase_tool_dispatch }
+    - { graph: act, kind: contains, role: act_phase }
   capabilities:
-    provides: [agent_run_loop, six_phase_orchestration]
-    requires: [perceive, effect_dispatch, llm_call]
+    provides: [agent_run_loop, five_phase_orchestration]
+    requires: [perceive, act, llm_call]
 
 # -----------------------------------------------------------------------------
 # INITIAL PORTS — what a caller must supply when running this graph.
@@ -95,54 +97,45 @@ nodes:
     outs: [decision_out, think_signal]
 
   # ===== PHASE: act (host) ==================================================
-  # Mounts effect_dispatch. Receives the think_out (which carries the model's
-  # tool call) as in_args; exposes out_observation after the tool runs.
+  # Mounts act.yaml. Receives think.decision_out as in_decision; exposes
+  # out_observation after shape→authorize→execute→observe.
   - id: act
     region: phase:act
     factory: identity
     config: { from: act_in, to: act_out }
-    ins: [in_args]
+    ins: [in_decision]
     outs: [out_observation]
 
   # ===== PHASE: reflect (host) =============================================
   # Mounts `reflect.yaml` as a nested graph. Receives the act's observation
   # + think's decision + an optional prior-turn reflection. Emits the
-  # current Reflection + extracted memory candidates + a barrier signal.
+  # current Reflection + memory candidates + a barrier signal.
+  # Reflect does not write Session/Memory (remember owns that).
   - id: reflect
     region: phase:reflect
     factory: identity
     config: { from: reflection_out, to: reflect_out }
     ins: [in_observation, in_decision, in_prior_reflection]
-    outs: [reflection_out, memory_extract_out, reflect_signal]
+    outs: [reflection_out, memory_candidates, reflect_signal]
 
   # ===== PHASE: remember (host) ============================================
-  # Mounts `remember.yaml` as a nested graph. Persists the turn's facts
-  # via Session.append (write_journal) + StateStore.save (save_state).
-  # Receives the reflect/act/think artifacts; emits journal_fact + state_ref
-  # + a barrier signal.
+  # Mounts `remember.yaml` as a nested graph: admit → commit → snapshot.
+  # Receives reflect/act/think artifacts + memory_candidates; emits
+  # journal_fact + state_ref + remember_signal. control_slots then attaches
+  # stop_decide / stop_focus on this host (reads state_ref; writes
+  # stop_decision / terminal / focus_verdict).
   - id: remember
     region: phase:remember
     factory: identity
     config: { from: state_ref, to: remember_out }
-    ins: [in_reflection, in_observation, in_decision]
+    ins: [in_reflection, in_observation, in_decision, in_candidates]
     outs: [journal_fact, state_ref, remember_signal]
-
-  # ===== PHASE: stop (host; terminal) ======================================
-  # Mounts `stop.yaml`. Single-node graph; receives think's decision + act's
-  # observation + reflect's reflection + AgentState. Emits stop_decision +
-  # terminal (the runtime reducer reads terminal).
-  - id: stop
-    region: phase:stop
-    factory: identity
-    config: { from: terminal, to: terminal }
-    ins: [in_decision, in_observation, in_reflection, in_state]
-    outs: [stop_decision, terminal]
 
 # -----------------------------------------------------------------------------
 # EDGES — local data flow. Edges are grouped by their destination node so
 # the file reads top-to-bottom in the same order as the data path.
-# Cross-spec project edges from this root: NONE. effect_dispatch's project
-# edge into model_eye is declared in effect_dispatch.yaml, not here.
+# Cross-spec project edges from this root: NONE. act's project edge into
+# model_eye is declared in act.yaml, not here.
 # -----------------------------------------------------------------------------
 edges:
 
@@ -182,18 +175,13 @@ edges:
     to:   { spec: agent_loop, node: think,    port: perceive_out }
     kind: data
 
-  # ── think → act (decision is forwarded to the act sub-graph as in_args) ──
+  # ── think → act (enforced Decision feeds act.shape) ──
   - id: e_think_to_act
     from: { spec: agent_loop, node: think, port: decision_out }
-    to:   { spec: agent_loop, node: act,   port: in_args }
+    to:   { spec: agent_loop, node: act,   port: in_decision }
     kind: data
 
-  # ── act → reflect → remember → stop (the rest of the loop skeleton) ──
-  # act.out_observation feeds reflect.in_observation (the Observation).
-  # think.decision_out feeds reflect.in_decision (the Decision).
-  # reflect.reflection_out feeds both remember.in_reflection and stop.in_reflection.
-  # remember.journal_fact is a one side — also feeds stop.in_state via the
-  # initial.state port on stop (state after the persist step).
+  # ── act → reflect → remember (cognitive tail; stop is control on remember) ──
   - id: e_act_to_reflect_obs
     from: { spec: agent_loop, node: act,      port: out_observation }
     to:   { spec: agent_loop, node: reflect,  port: in_observation }
@@ -214,21 +202,9 @@ edges:
     from: { spec: agent_loop, node: think,    port: decision_out }
     to:   { spec: agent_loop, node: remember, port: in_decision }
     kind: data
-  - id: e_reflect_to_stop
-    from: { spec: agent_loop, node: reflect,  port: reflection_out }
-    to:   { spec: agent_loop, node: stop,     port: in_reflection }
-    kind: data
-  - id: e_act_obs_to_stop
-    from: { spec: agent_loop, node: act,      port: out_observation }
-    to:   { spec: agent_loop, node: stop,     port: in_observation }
-    kind: data
-  - id: e_think_dec_to_stop
-    from: { spec: agent_loop, node: think,    port: decision_out }
-    to:   { spec: agent_loop, node: stop,     port: in_decision }
-    kind: data
-  - id: e_init_state_to_stop
-    from: { spec: agent_loop, node: _initial, port: state }
-    to:   { spec: agent_loop, node: stop,     port: in_state }
+  - id: e_reflect_candidates_to_remember
+    from: { spec: agent_loop, node: reflect,  port: memory_candidates }
+    to:   { spec: agent_loop, node: remember, port: in_candidates }
     kind: data
 
 # -----------------------------------------------------------------------------
@@ -267,21 +243,19 @@ sub_specs:
       enforced_decision: decision_out
       think_signal:       think_signal
 
-  # ── act stage: run the model-decided tool call ──
-  # Nested graph: effect_dispatch. Projects observation into model_eye.see
-  # via kind:project (declared in effect_dispatch.yaml).
+  # ── act stage: Decision → Observation (shape→authorize→execute→observe) ──
+  # Nested graph: act. Projects observation into model_eye.see via
+  # kind:project (declared in act.yaml).
   - node: act
-    sub_spec: effect_dispatch
+    sub_spec: act
     input_map:
-      in_args: args
+      in_decision: decision
     output_map:
       observation: out_observation
 
-  # ── reflect stage: Brain.reflect(state, observation) → Reflection ──
-  # Nested graph: reflect (gather → critic → extract_memory → write_extract).
-  # Glue: feed act's observation + think's decision + an empty prior
-  #       reflection; surface the current reflection + memory candidates
-  #       + a barrier signal.
+  # ── reflect stage: Brain.reflect = join → critique → extract ──
+  # Nested graph: reflect. Produces Reflection + memory candidates;
+  # durable write is remember's job.
   - node: reflect
     sub_spec: reflect
     input_map:
@@ -289,35 +263,25 @@ sub_specs:
       in_decision:         in_decision
       in_prior_reflection: in_prior_reflection
     output_map:
-      reflection_out:      reflection_out
-      memory_extract_out:  memory_extract_out
-      reflect_signal:      reflect_signal
+      reflection_out:     reflection_out
+      memory_candidates:  memory_candidates
+      reflect_signal:     reflect_signal
 
-  # ── remember stage: persist facts (Session.append + StateStore.save) ──
-  # Nested graph: remember (write_journal → save_state).
+  # ── remember stage: admit → commit → snapshot ──
+  # Nested graph: remember. stop_decide / stop_focus are inserted here by
+  # control_slots (after this data-plane mount), reading state_ref + turn
+  # artifacts.
   - node: remember
     sub_spec: remember
     input_map:
       in_reflection:  in_reflection
       in_observation: in_observation
       in_decision:    in_decision
+      in_candidates:  in_candidates
     output_map:
       journal_fact:    journal_fact
       state_ref:       state_ref
       remember_signal: remember_signal
-
-  # ── stop stage: terminal verdict from StopPolicy.decide ──
-  # Nested graph: stop (evaluate_stop, single-node).
-  - node: stop
-    sub_spec: stop
-    input_map:
-      in_decision:    in_decision
-      in_observation: in_observation
-      in_reflection:  in_reflection
-      in_state:       in_state
-    output_map:
-      stop_decision: stop_decision
-      terminal:      terminal
 
 # -----------------------------------------------------------------------------
 # PLUGINS — cross-cutting behavior attached to this graph's lifecycle.

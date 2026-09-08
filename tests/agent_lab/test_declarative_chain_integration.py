@@ -5,22 +5,19 @@ bundle is complete and consistent: every link and node declared by
 ``bundles/declarative-phase-graph.yaml`` is reachable through the
 ``agent_loop`` compile hook.
 
-The bundle declares:
-  - 6 semantic phases: perceive → think → act → reflect → remember → stop
-  - 12 control-slot contributions (11 ControlSlot enum members +
-    ``control.stop.focus``, a PhaseContribution attached to the stop
-    phase).
+The agent_lab root declares:
+  - 5 cognitive phase hosts: perceive → think → act → reflect → remember
+  - stop as control slots on remember (stop_decide / stop_focus)
+  - other control-slot contributions (act.* data-plane grant is in act.yaml;
+    control/act_* are not auto-inserted).
 
-This test loads the full registry (six phases + every control slot graph),
-compiles agent_loop with the auto-insert control-slot hook enabled, and
-asserts every required sub_spec_id is present in the resulting
-``subgraph_calls``. It also verifies the manual mounts (perceive → model_eye,
-act → effect_dispatch) are intact, and that the host node ports were
-extended with the control-slot wiring.
+This test loads the full registry, compiles agent_loop with the
+control-slot hook enabled, and asserts required sub_spec_ids appear in
+``subgraph_calls``. Manual mounts (perceive → model_eye, act) stay intact.
 
 The full agent_loop runner requires fixtures for perceive / think /
-act / remember / stop; that is exercised by per-phase tests in
-``test_{perceive,think,effect_dispatch,remember,stop}_subgraph.py``.
+act / remember; that is exercised by per-phase tests in
+``test_{perceive,think,act,remember,stop}_subgraph.py``.
 This test focuses on the topology / wiring aspect.
 """
 
@@ -37,28 +34,19 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
-# The full set of sub_specs that must appear in agent_loop after the
-# compile hook runs. Includes both the 6 manual mounts (perceive,
-# perceive (→ model_eye), think, act → effect_dispatch,
-# reflect, remember, stop) and the auto-inserted control slots.
+# Manual cognitive mounts + auto-inserted control slots.
+# Act data-plane grant lives in act.yaml; control/act_* are not inserted.
 EXPECTED_SUB_SPECS = {
     # Manual mounts (already in agent_loop.yaml#sub_specs).
     # model_eye is nested under perceive, not a direct agent_loop mount.
     "perceive",
     "think",
-    "effect_dispatch",
+    "act",
     "reflect",
     "remember",
-    "stop",
-    # Control slots — owner-bound (10 slots from the LCA bundle + the
-    # non-ControlSlot stop.focus contribution).
+    # Control slots — owner-bound (stop_* attach on remember).
     "perceive_context",
     "think_guard",
-    "act_authorize",
-    "act_budget",
-    "act_constrain",
-    "act_execute",
-    "act_safe_boundary",
     "remember_admit",
     "stop_decide",
     "stop_focus",
@@ -72,16 +60,12 @@ def test_full_declarative_chain_wires_through_compile_hook() -> None:
     """Load the full registry; compile agent_loop; assert every sub_spec
     from the declarative bundle is present in the resulting bundle."""
     specs = load_registry(
-        # Six phase sub-graphs.
         "perceive",
         "think",
         "reflect",
         "remember",
-        "stop",
-        # model_eye (via perceive) + effect_dispatch (via act).
         "model_eye",
-        "effect_dispatch",
-        # Agent loop root.
+        "act",
         "agent_loop",
     )
 
@@ -96,21 +80,17 @@ def test_full_declarative_chain_wires_through_compile_hook() -> None:
 
 
 def test_compile_hook_disabled_leaves_only_manual_mounts() -> None:
-    """A profile that omits the control_slots plugin keeps only the 7
+    """A profile that omits the control_slots plugin keeps only the 5
     manual mounts."""
     specs = load_registry(
         "perceive",
         "think",
         "reflect",
         "remember",
-        "stop",
         "model_eye",
-        "effect_dispatch",
+        "act",
         "agent_loop",
     )
-
-    # Strip the control_slots plugin so before_compile doesn't insert anything.
-    from agent_lab.graph.spec import PluginRef  # noqa: F401
 
     stripped_plugins = [
         p for p in specs["agent_loop"].plugins if p.kind != "control_slots"
@@ -125,10 +105,9 @@ def test_compile_hook_disabled_leaves_only_manual_mounts() -> None:
     expected_manual = {
         "perceive",
         "think",
-        "effect_dispatch",
+        "act",
         "reflect",
         "remember",
-        "stop",
     }
     assert inserted == expected_manual
 
@@ -144,17 +123,17 @@ def test_control_slot_wiring_extends_host_node_ports() -> None:
         "think",
         "reflect",
         "remember",
-        "stop",
         "model_eye",
-        "effect_dispatch",
+        "act",
         "agent_loop",
     )
-    # Trigger the plugin manually so we can inspect the mutated spec.
     plugin = ControlSlotsPlugin(name="control_slots", kind="control_slots")
     mutated = plugin.before_compile(specs["agent_loop"], specs)
     host_by_id = {n.id: n for n in mutated.nodes}
 
-    # act host carries 5 act.* control slots → 5 act_*_allowed output ports
+    assert "stop" not in host_by_id
+
+    # act host: grant is in-band (act.authorize); only observer ports added.
     act_host = host_by_id["act"]
     for slot_name in (
         "act_authorize_allowed",
@@ -163,28 +142,28 @@ def test_control_slot_wiring_extends_host_node_ports() -> None:
         "act_execute_allowed",
         "act_safe_boundary_allowed",
     ):
-        assert slot_name in act_host.outs, (
-            f"act host missing {slot_name} in outs; has {act_host.outs}"
+        assert slot_name not in act_host.outs, (
+            f"act host must not expose unused control port {slot_name}; has {act_host.outs}"
         )
 
-    # stop host carries stop_decide (stop_decision, terminal) + stop_focus
-    # (focus_verdict).
-    stop_host = host_by_id["stop"]
+    # remember host carries stop_decide (stop_decision, terminal) + stop_focus
+    # (focus_verdict) after persist.
+    remember_host = host_by_id["remember"]
     for port_name in ("stop_decision", "terminal", "focus_verdict"):
-        assert port_name in stop_host.outs, (
-            f"stop host missing {port_name} in outs; has {stop_host.outs}"
+        assert port_name in remember_host.outs, (
+            f"remember host missing {port_name} in outs; has {remember_host.outs}"
         )
 
     # perceive host carries perceive_context → perceive_context_allowed
     perceive_host = host_by_id["perceive"]
     assert "perceive_context_allowed" in perceive_host.outs
 
-    # observe_* slots are cross-cutting; every phase host gets them.
+    # observe_* slots are cross-cutting; every cognitive phase host gets them.
     observe_out_keys = (
-        "checkpoint_event",  # observe.checkpoint output
-        "wildcard_event",    # observe.* output
+        "checkpoint_event",
+        "wildcard_event",
     )
-    for host_id in ("perceive", "think", "act", "reflect", "remember", "stop"):
+    for host_id in ("perceive", "think", "act", "reflect", "remember"):
         host = host_by_id[host_id]
         for port in observe_out_keys:
             assert port in host.outs, (

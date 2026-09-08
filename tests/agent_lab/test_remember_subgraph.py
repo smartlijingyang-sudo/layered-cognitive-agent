@@ -1,15 +1,11 @@
-"""remember sub-graph wiring + adapter + node tests.
+"""remember sub-graph: admit → commit → snapshot.
 
 Covers:
-  - remember.yaml loads + compiles without validation errors
-  - LcaRememberJournalProvider calls session.append with the right
-    event_type + data
-  - LcaRememberStateStoreProvider calls state_store.save with the correct
-    state dict
-  - The full sub-graph runs via agent_lab's runner
-
-Fixtures use stub Session + noop StateStore; this test does not depend
-on a live LCA runtime.
+  - remember.yaml loads + compiles as a three-node chain
+  - admit filters memory_candidates via admit policy
+  - LcaRememberJournalProvider appends turn fact including admitted
+  - LcaRememberStateStoreProvider saves state + remember_signal
+  - full sub-graph runs via agent_lab's runner
 """
 
 from __future__ import annotations
@@ -35,20 +31,99 @@ def test_remember_subgraph_loads_and_compiles() -> None:
     specs = load_registry("remember")
     assert "remember" in specs
     spec = specs["remember"]
-    assert {n.id for n in spec.nodes} == {"write_journal", "save_state"}
+    assert {n.id for n in spec.nodes} == {"admit", "commit", "snapshot"}
+    assert {n.factory for n in spec.nodes} == {
+        "remember.admit",
+        "remember.commit",
+        "remember.snapshot",
+    }
     bundle = compile_spec(spec, sub_registry=specs)
     assert bundle.spec_id == "remember"
     flat = [nid for layer in bundle.layers for nid in layer]
-    assert flat.index("write_journal") < flat.index("save_state")
+    assert flat.index("admit") < flat.index("commit")
+    assert flat.index("commit") < flat.index("snapshot")
 
 
 # ---------------------------------------------------------------------------
-# (2) journal provider
+# (2) admit node — filter candidates
+# ---------------------------------------------------------------------------
+
+
+def test_remember_admit_passes_candidates_when_policy_allows() -> None:
+    from agent_lab.graph.spec import InfoNode, NodeRegion
+    from agent_lab.nodes.base import NodeRegistry
+
+    factory = NodeRegistry.get("remember.admit")
+    node = InfoNode(
+        id="admit",
+        region=NodeRegion.PHASE,
+        factory="remember.admit",
+        config={},
+        ins=["in_candidates", "in_observation"],
+        outs=["admitted"],
+    )
+    out = factory().execute(
+        node,
+        {
+            "in_candidates": Artifact(
+                kind=ArtifactKind.FACT,
+                content={"items": [{"kind": "lesson", "text": "keep it"}]},
+                schema_ref="memory.candidates.v1",
+            ),
+            "in_observation": Artifact(
+                kind=ArtifactKind.FACT,
+                content={"observation_id": "obs_1", "success": True},
+            ),
+        },
+    )
+    assert out["admitted"].schema_ref == "memory.admitted.v1"
+    assert out["admitted"].content["admitted"] is True
+    assert out["admitted"].content["items"] == [{"kind": "lesson", "text": "keep it"}]
+
+
+def test_remember_admit_drops_candidates_when_policy_denies() -> None:
+    from agent_lab.adapters.lca_control import (
+        register_fixture_remember_admit,
+        unregister_fixture_remember_admit,
+    )
+    from agent_lab.graph.spec import InfoNode, NodeRegion
+    from agent_lab.nodes.base import NodeRegistry
+
+    name = "test-remember-admit-deny"
+    register_fixture_remember_admit(name, lambda _obs: False)
+    try:
+        factory = NodeRegistry.get("remember.admit")
+        node = InfoNode(
+            id="admit",
+            region=NodeRegion.PHASE,
+            factory="remember.admit",
+            config={"provider_config": {"fixture_remember_admit_name": name}},
+            ins=["in_candidates", "in_observation"],
+            outs=["admitted"],
+        )
+        out = factory().execute(
+            node,
+            {
+                "in_candidates": Artifact(
+                    kind=ArtifactKind.FACT,
+                    content={"items": [{"kind": "lesson", "text": "drop me"}]},
+                    schema_ref="memory.candidates.v1",
+                ),
+            },
+        )
+        assert out["admitted"].content["admitted"] is False
+        assert out["admitted"].content["items"] == []
+    finally:
+        unregister_fixture_remember_admit(name)
+
+
+# ---------------------------------------------------------------------------
+# (3) journal provider
 # ---------------------------------------------------------------------------
 
 
 def test_lca_remember_journal_provider_with_fixture() -> None:
-    """Register a fixture Session; assert append receives the right data."""
+    """Register a fixture Session; assert append receives turn fact + admitted."""
     from agent_lab.adapters.lca_memory import (
         LcaRememberJournalProvider,
         register_fixture_session,
@@ -57,15 +132,15 @@ def test_lca_remember_journal_provider_with_fixture() -> None:
 
     appended: list[tuple[str, dict]] = []
 
-    class _RecordingSession:
-        def append(self, event_type, data, **kwargs):
-            appended.append((event_type, data))
-            return _FakeEvent(seq=len(appended) - 1, id=f"evt_{len(appended)}")
-
     class _FakeEvent:
         def __init__(self, seq, id):
             self.seq = seq
             self.id = id
+
+    class _RecordingSession:
+        def append(self, event_type, data, **kwargs):
+            appended.append((event_type, data))
+            return _FakeEvent(seq=len(appended) - 1, id=f"evt_{len(appended)}")
 
     session = _RecordingSession()
     name = "test-remember-session"
@@ -86,23 +161,28 @@ def test_lca_remember_journal_provider_with_fixture() -> None:
             kind=ArtifactKind.FACT,
             content={"decision_id": "dec_01", "action_type": "respond"},
         )
+        admitted = Artifact(
+            kind=ArtifactKind.FACT,
+            content={"admitted": True, "items": [{"kind": "lesson", "text": "ok"}]},
+            schema_ref="memory.admitted.v1",
+        )
         out = provider.append_journal(
             reflection_artifact=reflection,
             observation_artifact=observation,
             decision_artifact=decision,
+            admitted_artifact=admitted,
         )
         assert "journal_fact" in out
         fact = out["journal_fact"]
         assert fact.kind == ArtifactKind.FACT
         assert fact.schema_ref == "journal.fact.v1"
-        # The session received exactly one append call.
         assert len(appended) == 1
         event_type, data = appended[0]
         assert event_type == "remember.turn_fact"
         assert data["reflection"]["topic"] == "self_assessment"
         assert data["observation"]["tool"] == "bash"
         assert data["decision"]["decision_id"] == "dec_01"
-        # The fact artifact carries seq + id from the event.
+        assert data["admitted"]["items"][0]["text"] == "ok"
         assert fact.content["seq"] == 0
         assert fact.content["id"] == "evt_1"
     finally:
@@ -110,7 +190,7 @@ def test_lca_remember_journal_provider_with_fixture() -> None:
 
 
 # ---------------------------------------------------------------------------
-# (3) state store provider
+# (4) state store provider
 # ---------------------------------------------------------------------------
 
 
@@ -151,7 +231,6 @@ def test_lca_remember_state_store_provider_with_fixture() -> None:
         signal = out["remember_signal"]
         assert signal.schema_ref == "remember.signal.v1"
         assert signal.content["phase"] == "remember"
-        # The store received the correct state dict.
         assert len(saved_states) == 1
         state = saved_states[0]
         assert state["journal_seq"] == 42
@@ -161,7 +240,7 @@ def test_lca_remember_state_store_provider_with_fixture() -> None:
 
 
 # ---------------------------------------------------------------------------
-# (4) runner integration
+# (5) runner integration
 # ---------------------------------------------------------------------------
 
 
@@ -178,7 +257,6 @@ def test_remember_subgraph_runs_via_runner() -> None:
     specs = load_registry("remember")
     remember_spec = specs["remember"]
 
-    # Wire fixture providers into both nodes.
     appended: list[tuple[str, dict]] = []
 
     class _FakeEvent:
@@ -201,11 +279,11 @@ def test_remember_subgraph_runs_via_runner() -> None:
     register_fixture_state_store(store_name, _FixtureStateStore())
     try:
         for n in remember_spec.nodes:
-            if n.id == "write_journal":
+            if n.id == "commit":
                 n.config["provider_config"] = {
                     "fixture_session_name": session_name,
                 }
-            if n.id == "save_state":
+            if n.id == "snapshot":
                 n.config["provider_config"] = {
                     "fixture_state_store_name": store_name,
                 }
@@ -223,6 +301,11 @@ def test_remember_subgraph_runs_via_runner() -> None:
                 kind=ArtifactKind.FACT,
                 content={"decision_id": "dec_42", "action_type": "call_tool"},
             ),
+            "in_candidates": Artifact(
+                kind=ArtifactKind.FACT,
+                content={"items": [{"kind": "lesson", "text": "persist this"}]},
+                schema_ref="memory.candidates.v1",
+            ),
         }
         trace = run_graph(remember_spec, initial=initial, sub_registry=specs)
 
@@ -235,6 +318,10 @@ def test_remember_subgraph_runs_via_runner() -> None:
         journal = trace.final_artifacts["journal_fact"]
         assert journal.kind == ArtifactKind.FACT
         assert journal.content["seq"] == 0
+
+        assert len(appended) == 1
+        _, data = appended[0]
+        assert data["admitted"]["items"][0]["text"] == "persist this"
 
         state = trace.final_artifacts["state_ref"]
         assert state.content["state_ref"] == "state_ref_001"

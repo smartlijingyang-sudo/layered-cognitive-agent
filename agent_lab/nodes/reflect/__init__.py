@@ -1,6 +1,11 @@
-"""reflect layer nodes — inputs_join, combined_to_reflection, reflection_to_candidates."""
-from agent_lab.nodes.reflect.inputs_join.plugin import InputsJoin
-from agent_lab.nodes.reflect.combined_to_reflection.plugin import CombinedToReflection
-from agent_lab.nodes.reflect.reflection_to_candidates.plugin import ReflectionToCandidates
+"""reflect layer nodes — join → critique → extract."""
 
-__all__ = ["InputsJoin", "CombinedToReflection", "ReflectionToCandidates"]
+from agent_lab.nodes.reflect.critique.plugin import ReflectCritique
+from agent_lab.nodes.reflect.extract.plugin import ReflectExtract
+from agent_lab.nodes.reflect.join.plugin import ReflectJoin
+
+__all__ = [
+    "ReflectCritique",
+    "ReflectExtract",
+    "ReflectJoin",
+]

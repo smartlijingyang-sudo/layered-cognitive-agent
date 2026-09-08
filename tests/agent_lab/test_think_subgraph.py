@@ -33,20 +33,147 @@ if str(REPO_ROOT) not in sys.path:
 
 
 def test_think_subgraph_loads_and_compiles() -> None:
-    specs = load_registry("perceive", "think", "agent_loop", "model_eye", "effect_dispatch")
+    specs = load_registry("perceive", "think", "agent_loop", "model_eye", "act")
     assert "think" in specs
     spec = specs["think"]
-    assert {n.id for n in spec.nodes} == {"flatten", "llm", "parse", "gate_enforce"}
+    assert {n.id for n in spec.nodes} == {"expose", "reason", "classify", "guard"}
     bundle = compile_spec(spec, sub_registry=specs)
     assert bundle.spec_id == "think"
     flat = [nid for layer in bundle.layers for nid in layer]
-    assert flat.index("flatten") < flat.index("llm")
-    assert flat.index("llm") < flat.index("parse")
-    assert flat.index("parse") < flat.index("gate_enforce")
+    assert flat.index("expose") < flat.index("reason")
+    assert flat.index("reason") < flat.index("classify")
+    assert flat.index("classify") < flat.index("guard")
+
+
+# ---------------------------------------------------------------------------
+# (1b) node unit: expose / classify / guard (reason covered by runner)
+# ---------------------------------------------------------------------------
+
+
+def test_think_expose_peels_committed_messages() -> None:
+    from agent_lab.nodes.think.expose.plugin import ThinkExpose
+
+    node = ThinkExpose.__new__(ThinkExpose)
+    node.config = {"from": "in_assembled_manifest", "to": "messages"}
+    node.outs = ["messages"]
+    messages = [{"role": "user", "content": "hi"}]
+    out = node.execute(
+        node,
+        {
+            "in_assembled_manifest": Artifact(
+                kind=ArtifactKind.MANIFEST,
+                content={
+                    "messages": messages,
+                    "digest": "abc",
+                    "committed": True,
+                    "schema_version": "context.manifest.v1",
+                },
+                schema_ref="context.manifest.v1",
+            )
+        },
+    )
+    assert out["messages"].kind == ArtifactKind.MESSAGE
+    assert out["messages"].content == messages
+    assert out["messages"].schema_ref == "openai.messages.v1"
+
+
+def test_think_expose_rejects_uncommitted_manifest() -> None:
+    from agent_lab.nodes.think.expose.plugin import ThinkExpose
+
+    node = ThinkExpose.__new__(ThinkExpose)
+    node.config = {}
+    node.outs = ["messages"]
+    try:
+        node.execute(
+            node,
+            {
+                "in_assembled_manifest": Artifact(
+                    kind=ArtifactKind.MANIFEST,
+                    content={
+                        "messages": [{"role": "user", "content": "hi"}],
+                        "digest": "abc",
+                        "committed": False,
+                    },
+                    schema_ref="context.manifest.v1",
+                )
+            },
+        )
+        raise AssertionError("expected ValueError for uncommitted manifest")
+    except ValueError as exc:
+        assert "committed" in str(exc)
+
+
+def test_think_expose_rejects_missing_messages() -> None:
+    from agent_lab.nodes.think.expose.plugin import ThinkExpose
+
+    node = ThinkExpose.__new__(ThinkExpose)
+    node.config = {}
+    node.outs = ["messages"]
+    try:
+        node.execute(
+            node,
+            {
+                "in_assembled_manifest": Artifact(
+                    kind=ArtifactKind.MANIFEST,
+                    content={"digest": "abc", "committed": True},
+                    schema_ref="context.manifest.v1",
+                )
+            },
+        )
+        raise AssertionError("expected ValueError for missing messages")
+    except ValueError as exc:
+        assert "messages" in str(exc)
+
+
+def test_think_classify_response_to_decision() -> None:
+    from agent_lab.nodes.think.classify.plugin import ThinkClassify
+
+    node = ThinkClassify.__new__(ThinkClassify)
+    node.config = {"from": "response", "to": "decision", "provider_config": {}}
+    node.outs = ["decision"]
+    out = node.execute(
+        node,
+        {
+            "response": Artifact(
+                kind=ArtifactKind.MESSAGE,
+                content={"text": "hello", "tool_calls": []},
+            )
+        },
+    )
+    assert out["decision"].schema_ref == "decision.v1"
+    assert out["decision"].content["action_type"] == "respond"
+    assert out["decision"].content["response_text"] == "hello"
+
+
+def test_think_guard_emits_decision_and_signal() -> None:
+    from agent_lab.nodes.think.guard.plugin import ThinkGuard
+
+    node = ThinkGuard.__new__(ThinkGuard)
+    node.config = {"from": "decision", "to": "enforced_decision", "provider_config": {}}
+    node.outs = ["enforced_decision", "think_signal"]
+    out = node.execute(
+        node,
+        {
+            "decision": Artifact(
+                kind=ArtifactKind.FACT,
+                content={
+                    "decision_id": "dec_x",
+                    "action_type": "respond",
+                    "rationale": "",
+                    "confidence": 1.0,
+                    "tool_calls": [],
+                },
+                schema_ref="decision.v1",
+            )
+        },
+    )
+    assert out["enforced_decision"].content["decision_id"] == "dec_x"
+    assert out["think_signal"].schema_ref == "think.signal.v1"
+    assert out["think_signal"].content["decision_id"] == "dec_x"
 
 
 def test_agent_loop_compiles_with_think_sub_spec() -> None:
-    specs = load_registry("perceive", "think", "agent_loop", "model_eye", "effect_dispatch")
+    specs = load_registry("perceive", "think", "agent_loop", "model_eye", "act")
     agent_loop = specs["agent_loop"]
     # think node now declares in_assembled_manifest + perceive_out as ins
     think_node = agent_loop.node("think")
@@ -259,15 +386,15 @@ def test_lca_think_gate_provider_resolves_factory_ref() -> None:
 
 def test_think_subgraph_runs_via_runner(monkeypatch) -> None:
     """The think sub-graph runs end-to-end through agent_lab's runner."""
-    import agent_lab.nodes.llm.call_llm.plugin as call_llm_mod
+    import agent_lab.nodes.think.reason.plugin as reason_mod
     from agent_lab.runtime.runner import run as run_graph
     from tests.agent_lab.fixtures.llm_stub import StubLlmAdapter
 
-    # call_llm (post-fusion) imports OpenAICompatAdapter directly; stub it
-    # so the runner test does not need live credentials.
-    monkeypatch.setattr(call_llm_mod, "OpenAICompatAdapter", StubLlmAdapter)
+    # think.reason imports OpenAICompatAdapter directly; stub it so the
+    # runner test does not need live credentials.
+    monkeypatch.setattr(reason_mod, "OpenAICompatAdapter", StubLlmAdapter)
 
-    specs = load_registry("perceive", "think", "agent_loop", "model_eye", "effect_dispatch")
+    specs = load_registry("think")
     think_spec = specs["think"]
 
     initial = {
@@ -277,6 +404,8 @@ def test_think_subgraph_runs_via_runner(monkeypatch) -> None:
             content={
                 "messages": [{"role": "user", "content": "hi"}],
                 "digest": "x",
+                "committed": True,
+                "schema_version": "context.manifest.v1",
             },
             schema_ref="context.manifest.v1",
         ),

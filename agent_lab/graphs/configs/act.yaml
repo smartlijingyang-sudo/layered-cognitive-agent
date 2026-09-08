@@ -1,0 +1,107 @@
+# =============================================================================
+# act — phase sub-graph (first-principles, post-fusion)
+# =============================================================================
+# Answers one question: given an enforced Decision, what did the world return?
+#
+#   shape → authorize → execute → observe ──project──► model_eye.see
+#
+# Mounted by: agent_loop.act (see agent_loop.yaml#sub_specs).
+# Replaces effect_dispatch as the act-phase SSOT (ADR-0206 §5.2 / §5.4).
+#
+# Non-tool Decisions (respond / refuse) become no_effect intents; authorize
+# stamps verdict=skip; execute emits a synthetic receipt; observe still
+# produces an Observation so reflect/remember and model_eye stay fed.
+# =============================================================================
+
+id: act
+version: 1.0.0
+region: phase:act
+description: >
+  Decision → Intent → grant → EffectReceipt → Observation.
+  Sole world-touching phase; projects observation into model_eye.
+
+graph:
+  id: act
+  layer: effect
+  purpose: Body.act(Decision) → Observation, decomposed into four workers.
+  members: [shape, authorize, execute, observe]
+  references: [model_eye, agent_loop]
+  relations:
+    - { graph: agent_loop, kind: child_of, role: act_phase }
+    - { graph: model_eye, kind: writes_to, role: project_observation }
+  capabilities:
+    provides: [effect_receipt, observation]
+    requires: [decision, tool_registry, safe_executor]
+
+# initial.decision : enforced Decision from think (decision.v1)
+
+nodes:
+
+  # ----- shape: Decision → Intent | no_effect --------------------------------
+  - id: shape
+    region: phase:act
+    factory: act.shape
+    config: { from: decision, to: intent }
+    ins: [decision]
+    outs: [intent]
+
+  # ----- authorize: Intent → stamped Intent (allow|deny|skip) ----------------
+  - id: authorize
+    region: phase:act
+    factory: act.authorize
+    config:
+      allow: [bash, file_write, read_file]
+      from: intent
+      to: authorized
+    ins: [intent]
+    outs: [authorized]
+
+  # ----- execute: authorized Intent → EffectReceipt (C10 narrow gate) --------
+  # Errors are folded into receipt content inside the node (status=error).
+  # Do NOT set on_error=route here: the runner treats route as a pre-invoke
+  # skip (demo short-circuit), which would bypass SafeExecutor entirely.
+  - id: execute
+    region: phase:act
+    factory: act.execute
+    config:
+      from: authorized
+      to: receipt
+      tools: [bash, file_write, read_file]
+    ins: [authorized]
+    outs: [receipt]
+
+  # ----- observe: Receipt|EXCEPTION → Observation (single exit) --------------
+  - id: observe
+    region: phase:act
+    factory: act.observe
+    config: { from: receipt, to: observation }
+    ins: [receipt]
+    outs: [observation]
+
+edges:
+
+  - id: e_init_decision_to_shape
+    from: { spec: act, node: _initial, port: decision }
+    to:   { spec: act, node: shape, port: decision }
+    kind: data
+
+  - id: e_shape_to_authorize
+    from: { spec: act, node: shape, port: intent }
+    to:   { spec: act, node: authorize, port: intent }
+    kind: data
+
+  - id: e_authorize_to_execute
+    from: { spec: act, node: authorize, port: authorized }
+    to:   { spec: act, node: execute, port: authorized }
+    kind: data
+
+  - id: e_execute_to_observe
+    from: { spec: act, node: execute, port: receipt }
+    to:   { spec: act, node: observe, port: receipt }
+    kind: data
+
+  # Cross-spec project: effect → model-visible closure (owned by act).
+  - id: e_observe_to_model_eye
+    from: { spec: act, node: observe, port: observation }
+    to:   { spec: model_eye, node: see, port: observation }
+    kind: project

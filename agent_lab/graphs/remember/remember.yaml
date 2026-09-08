@@ -1,20 +1,29 @@
-# remember — phase sub-graph (skeleton).
-# Workers: append_decision + append_observation + append_reflection + snapshot_state.
-# All write paths funnel into Session.append (single fact-write seam).
+# remember — phase sub-graph (first-principles).
+# Workers: admit → commit → snapshot.
+# All durable writes funnel into Session.append + StateStore.save.
 id: remember
-version: 0.1.0
+version: 1.0.0
 region: phase:remember
-description: Persist Decision / Observation / Reflection to Session; snapshot
-  AgentState. (Skeleton stub.)
+description: Admit memory candidates, commit turn fact, snapshot AgentState.
 
 graph:
   id: remember
   layer: phase
-  purpose: Remember phase — durable fact-write + state snapshot.
+  purpose: Remember phase — admit → commit → snapshot.
 
 nodes:
+  - id: admit
+    region: phase:remember
+    factory: remember.admit
+    ins: [in_candidates, in_observation]
+    outs: [admitted]
+  - id: commit
+    region: phase:remember
+    factory: remember.commit
+    ins: [in_reflection, in_observation, in_decision, admitted]
+    outs: [journal_fact]
   - id: snapshot
     region: phase:remember
-    factory: remember__snapshot_state
-    ins: [state]
-    outs: [state_ref]
+    factory: remember.snapshot
+    ins: [journal_fact]
+    outs: [state_ref, remember_signal]

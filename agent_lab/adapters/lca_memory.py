@@ -6,8 +6,8 @@ LCA contracts consumed (read-only):
 
 agent_lab provides (this file):
   - LcaRememberJournalProvider: wraps a Session and exposes
-    ``append_journal(reflection, observation, decision)`` that calls
-    ``session.append(event_type, data)`` and returns a journal_fact
+    ``append_journal(reflection, observation, decision, admitted)`` that
+    calls ``session.append(event_type, data)`` and returns a journal_fact
     artifact (seq + id from the resulting SessionEvent).
   - LcaRememberStateStoreProvider: wraps a StateStore and exposes
     ``save_state(journal_fact)`` that calls
@@ -60,7 +60,7 @@ def unregister_fixture_state_store(name: str) -> None:
 
 @dataclass(frozen=True)
 class LcaRememberJournalProvider:
-    """Bridge agent_lab write_journal node → LCA Session.append.
+    """Bridge agent_lab remember.commit → LCA Session.append.
 
     Resolution order for the session:
       1. ``provider_config.fixture_session_name`` (looks up _FIXTURE_SESSIONS)
@@ -89,13 +89,15 @@ class LcaRememberJournalProvider:
         reflection_artifact: Artifact | None,
         observation_artifact: Artifact | None,
         decision_artifact: Artifact | None,
+        admitted_artifact: Artifact | None = None,
         out_port: str = "journal_fact",
     ) -> dict[str, Artifact]:
-        """Build a fact payload from the three inputs and call session.append."""
+        """Build a fact payload from turn inputs + admitted and call session.append."""
         event_data = _build_fact_data(
             reflection=reflection_artifact,
             observation=observation_artifact,
             decision=decision_artifact,
+            admitted=admitted_artifact,
         )
         event = self._session.append("remember.turn_fact", event_data)
         return {
@@ -114,7 +116,7 @@ class LcaRememberJournalProvider:
 
 @dataclass(frozen=True)
 class LcaRememberStateStoreProvider:
-    """Bridge agent_lab save_state node → LCA StateStore.save.
+    """Bridge agent_lab remember.snapshot → LCA StateStore.save.
 
     Resolution order for the state_store:
       1. ``provider_config.fixture_state_store_name`` (looks up _FIXTURE_STATE_STORES)
@@ -205,12 +207,14 @@ def _build_fact_data(
     reflection: Artifact | None,
     observation: Artifact | None,
     decision: Artifact | None,
+    admitted: Artifact | None = None,
 ) -> dict[str, Any]:
-    """Merge the three inbound artifacts into a single JSON-serializable dict."""
+    """Merge turn artifacts + admitted candidates into one JSON-serializable dict."""
     return {
         "reflection": _artifact_content_or_none(reflection),
         "observation": _artifact_content_or_none(observation),
         "decision": _artifact_content_or_none(decision),
+        "admitted": _artifact_content_or_none(admitted),
         "ts": datetime.now(UTC).isoformat(),
     }
 

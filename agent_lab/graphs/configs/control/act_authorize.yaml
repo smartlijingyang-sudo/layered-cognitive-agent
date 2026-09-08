@@ -1,9 +1,10 @@
 # =============================================================================
-# act_authorize — control-slot sub-graph for act.authorize (ADR-0206 §5)
+# act_authorize — control-slot sub-graph (NOT auto-mounted)
 # =============================================================================
-# Single-node graph wrapping LCA's act.authorize control slot.
-# Owner: act phase. Tool authorization — wraps a callable / allowlist lookup.
-# Fallback: identity (always allow).
+# Standalone loadable stub for LCA's act.authorize control slot.
+# Data-plane grant SSOT is act.authorize inside configs/act.yaml.
+# Not inserted by control_slots until an ExecutionControl aggregator exists.
+# Fallback: identity (always allow) — do not treat as live safety.
 # =============================================================================
 
 id: act_authorize

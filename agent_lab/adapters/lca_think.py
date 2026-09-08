@@ -163,7 +163,7 @@ def _default_parser(response: Any) -> Any:
 
     LCA's full Brain uses ``ModularBrain`` to assemble decisions; in
     agent_lab we don't need the full chain — just enough to hand the
-    Decision to ``gate_enforce`` and onward to ``effect_dispatch``.
+    Decision to ``gate_enforce`` and onward to ``act``.
     """
     from lca.contracts.models.core.execution.decision import Decision, ToolCall
 

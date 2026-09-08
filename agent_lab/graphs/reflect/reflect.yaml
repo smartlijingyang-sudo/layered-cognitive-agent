@@ -1,19 +1,20 @@
-# reflect — phase sub-graph (skeleton).
-# Workers: inputs_join -> combined_to_reflection -> reflection_to_candidates.
+# reflect — phase sub-graph (canonical copy: graphs/configs/reflect.yaml).
+# Workers: join → critique → extract.
 id: reflect
-version: 0.1.0
+version: 1.0.0
 region: phase:reflect
-description: Critique observation+decision+prior -> Reflection -> candidates.
-  (Skeleton stub.)
+description: >
+  Join observation+decision(+prior), critique into a Reflection, extract
+  memory candidates. No durable write (remember owns Session/Memory).
 
 graph:
   id: reflect
   layer: phase
-  purpose: Reflect phase — Brain.reflect(state, observation).
+  purpose: Brain.reflect = join → critique → extract.
 
 nodes:
-  - id: candidates
+  - id: extract
     region: phase:reflect
-    factory: reflect__reflection_to_candidates
+    factory: reflect.extract
     ins: [reflection]
-    outs: [candidates]
+    outs: [reflection_out, memory_candidates, reflect_signal]

@@ -171,11 +171,20 @@ class LcaControlStopPolicyProvider:
         out_port: str = "stop_decision",
     ) -> dict[str, Artifact]:
         result = _call_maybe_async(self._policy.decide, state, decision, observation, reflection)
+        sd_dict = _stop_decision_to_dict(result)
         return {
             out_port: Artifact(
                 kind=ArtifactKind.FACT,
-                content=_stop_decision_to_dict(result),
+                content=sd_dict,
                 schema_ref="stop_decision.v1",
+            ),
+            "terminal": Artifact(
+                kind=ArtifactKind.FACT,
+                content={
+                    "stop_decision": sd_dict,
+                    "ts": datetime.now(UTC).isoformat(),
+                },
+                schema_ref="terminal.v1",
             ),
         }
 

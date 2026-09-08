@@ -2,7 +2,9 @@
 
 Real impl: session.derive_messages() (per LCA projection fabric).
 """
+
 from __future__ import annotations
+
 from agent_lab.nodes.base import Node
 from agent_lab.nodes.manifest import NodeKind, NodeLayer, PortInfo, PortKind, node
 

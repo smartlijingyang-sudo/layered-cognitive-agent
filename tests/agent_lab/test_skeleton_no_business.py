@@ -67,11 +67,10 @@ def test_compile_without_control_slots_plugin_does_not_insert() -> None:
         "think",
         "reflect",
         "remember",
-        "stop",
         "toolbox",
         "event_log",
         "model_eye",
-        "effect_dispatch",
+        "act",
         "agent_loop",
     )
     # Strip business plugins; keep only observer so compile still resolves.
@@ -83,7 +82,7 @@ def test_compile_without_control_slots_plugin_does_not_insert() -> None:
     inserted = {x["sub_spec_id"] for x in bundle.subgraph_calls}
     assert "think_guard" not in inserted
     assert "act_authorize" not in inserted
-    assert len(bundle.subgraph_calls) == 6
+    assert len(bundle.subgraph_calls) == 5
 
 
 def test_control_slots_plugin_inserts_on_before_compile() -> None:
@@ -95,11 +94,10 @@ def test_control_slots_plugin_inserts_on_before_compile() -> None:
         "think",
         "reflect",
         "remember",
-        "stop",
         "toolbox",
         "event_log",
         "model_eye",
-        "effect_dispatch",
+        "act",
         "agent_loop",
     )
     kinds = {p.kind for p in specs["agent_loop"].plugins}
@@ -110,18 +108,21 @@ def test_control_slots_plugin_inserts_on_before_compile() -> None:
     expected = {
         "perceive_context",
         "think_guard",
-        "act_authorize",
-        "act_budget",
-        "act_constrain",
-        "act_execute",
-        "act_safe_boundary",
         "remember_admit",
         "stop_decide",
         "observe_checkpoint",
     }
     for name in expected:
         assert name in inserted, f"control_slots plugin missed {name}"
-    assert len(bundle.subgraph_calls) >= 7 + len(expected)
+    for removed in (
+        "act_authorize",
+        "act_budget",
+        "act_constrain",
+        "act_execute",
+        "act_safe_boundary",
+    ):
+        assert removed not in inserted, f"act control stub {removed} must not auto-insert"
+    assert len(bundle.subgraph_calls) >= 5 + len(expected)
 
 
 def test_semantic_router_plugin_fans_out_on_schema_ref() -> None:

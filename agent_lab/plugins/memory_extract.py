@@ -1,20 +1,15 @@
-"""MemoryExtractPlugin — derive memory candidates from a Reflection.
+"""MemoryExtractPlugin — on_reflection hook that stashes memory candidates.
 
-Before this plugin existed, ``nodes/reflect/extract_memory/plugin.py``
-held a 3-branch decision tree that produced memory candidate items
-based on the Reflection's lesson / correction / extra fields. The
-branches moved here; the node is now a thin passthrough that emits
-the reflection artifact, and the plugin emits a separate
-``memory_candidates`` artifact alongside.
+Canonical candidate derivation for the reflect phase lives in
+``reflect.extract`` (pure transform). This plugin remains for
+agent_loop hook fan-out when a Reflection artifact crosses the
+on_reflection event: it mirrors the same lesson / correction / extra
+branches into ``payload["memory_candidates"]``.
 
-Behaviour (mirrors the previous node logic, verbatim):
-  - if lesson is truthy  → candidate {"kind": "lesson", "verdict":..., "text": lesson, "reflection_id": ...}
-  - if correction is dict → candidate {"kind": "correction", "decision_id":..., "action_type":..., "reflection_id":...}
-  - if extra is dict and truthy → candidate {"kind": "extra", "payload": extra, "reflection_id":...}
-
-Configuration:
-  emit_as_port (str) — name of the side artifact emitted in payload (default: "memory_candidates")
-  Reflection's ``extra`` field, if present, is included as a candidate only when it's a non-empty dict.
+Behaviour:
+  - if lesson is truthy  → candidate {"kind": "lesson", ...}
+  - if correction is dict → candidate {"kind": "correction", ...}
+  - if extra is dict and truthy → candidate {"kind": "extra", ...}
 """
 
 from __future__ import annotations

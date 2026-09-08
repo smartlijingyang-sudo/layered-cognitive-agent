@@ -22,7 +22,7 @@ if str(REPO_ROOT) not in sys.path:
 
 def test_perceive_subgraph_loads_and_compiles() -> None:
     """perceive.yaml passes invariant checks and exposes the v3 node set + eye."""
-    specs = load_registry("perceive", "model_eye", "agent_loop", "effect_dispatch")
+    specs = load_registry("perceive", "model_eye", "agent_loop", "act")
     assert "perceive" in specs
     assert "model_eye" in specs
     spec = specs["perceive"]
@@ -42,7 +42,7 @@ def test_perceive_subgraph_loads_and_compiles() -> None:
 
 def test_perceive_subgraph_declares_initial_ports() -> None:
     """Sensing + header ports that feed model_eye via the eye host."""
-    specs = load_registry("perceive", "model_eye", "agent_loop", "effect_dispatch")
+    specs = load_registry("perceive", "model_eye", "agent_loop", "act")
     initial_ports = specs["perceive"].initial_ports()
     assert "user_turn" in initial_ports
     assert "tool_results" in initial_ports

@@ -38,16 +38,11 @@ _PHASE_OWNER_WIRING: dict[str, list[tuple[str, dict[str, str], dict[str, str]]]]
         ),
         ("observe_wildcard", {"in_event": "in_event"}, {"wildcard_event": "wildcard_event"}),
     ],
+    # Act data-plane grant is act.authorize inside act.yaml (SSOT).
+    # control/act_*.yaml graphs remain loadable but are NOT auto-inserted —
+    # their always-allow sibling outputs never gated dispatch (fake safety).
+    # Re-wire only behind a real ExecutionControl aggregator (follow-up Note).
     "act": [
-        ("act_authorize", {"in_args": "in_args"}, {"allowed": "act_authorize_allowed"}),
-        (
-            "act_budget",
-            {"in_args": "in_args", "in_state": "in_state"},
-            {"allowed": "act_budget_allowed"},
-        ),
-        ("act_constrain", {"in_args": "in_args"}, {"allowed": "act_constrain_allowed"}),
-        ("act_execute", {"in_args": "in_args"}, {"allowed": "act_execute_allowed"}),
-        ("act_safe_boundary", {"in_args": "in_args"}, {"allowed": "act_safe_boundary_allowed"}),
         (
             "observe_checkpoint",
             {"in_event_log": "in_event_log"},
@@ -63,33 +58,25 @@ _PHASE_OWNER_WIRING: dict[str, list[tuple[str, dict[str, str], dict[str, str]]]]
         ),
         ("observe_wildcard", {"in_event": "in_event"}, {"wildcard_event": "wildcard_event"}),
     ],
-    "memory": [
+    # remember owns persist; stop is control after persist (not a sixth
+    # peer phase). stop_decide / stop_focus read state_ref written by the
+    # remember data-plane sub_spec, then emit terminal control artifacts.
+    "remember": [
         ("remember_admit", {"in_observation": "in_observation"}, {"allowed": "remember_admit"}),
-        (
-            "observe_checkpoint",
-            {"in_event_log": "in_event_log"},
-            {"checkpoint_event": "checkpoint_event"},
-        ),
-        ("observe_wildcard", {"in_event": "in_event"}, {"wildcard_event": "wildcard_event"}),
-    ],
-    "stop": [
         (
             "stop_decide",
             {
+                "state_ref": "in_state",
                 "in_decision": "in_decision",
                 "in_observation": "in_observation",
                 "in_reflection": "in_reflection",
-                "in_state": "in_state",
             },
             {"stop_decision": "stop_decision", "terminal": "terminal"},
         ),
-        # stop.focus is a PhaseContribution (not a ControlSlot enum member);
-        # wired here alongside stop_decide because both belong to the stop
-        # phase per the declarative-phase-graph bundle.
         (
             "stop_focus",
             {
-                "in_state": "in_state",
+                "state_ref": "in_state",
                 "in_decision": "in_decision",
             },
             {"focus_verdict": "focus_verdict"},

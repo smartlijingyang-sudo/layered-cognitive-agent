@@ -1,7 +1,8 @@
-"""stop_decide_node — run StopPolicy.decide for the stop phase.
+"""stop_decide_node — run StopPolicy.decide after remember persist.
 
 Single-node handler for the stop_decide control slot (ControlSlot.STOP_DECIDE).
-Wraps LcaControlStopPolicyProvider which delegates to LCA's StopPolicy protocol.
+Attached on the remember host via control_slots. Wraps
+LcaControlStopPolicyProvider which delegates to LCA's StopPolicy protocol.
 """
 
 from __future__ import annotations
@@ -23,19 +24,24 @@ from agent_lab.nodes.manifest import (
     kind=NodeKind.EXECUTOR,
     description=(
         "Control-slot handler for stop.decide: runs StopPolicy.decide "
-        "and emits a StopDecision artifact."
+        "after remember and emits StopDecision + terminal."
     ),
     inputs=[
         PortInfo("in_state", kind=PortKind.ARTIFACT, required=False),
         PortInfo("in_decision", kind=PortKind.FACT, required=False),
+        PortInfo("in_observation", kind=PortKind.FACT, required=False),
+        PortInfo("in_reflection", kind=PortKind.FACT, required=False),
     ],
-    outputs=[PortInfo("stop_decision", kind=PortKind.FACT)],
-    provides=["control_stop_decide"],
+    outputs=[
+        PortInfo("stop_decision", kind=PortKind.FACT),
+        PortInfo("terminal", kind=PortKind.FACT),
+    ],
+    provides=["control_stop_decide", "terminal"],
     requires=["stop_policy"],
-    emits=["stop_decision"],
+    emits=["stop_decision", "terminal"],
 )
 class StopDecideNode(Node):
-    """Bridge state/decision → StopDecision via LcaControlStopPolicyProvider."""
+    """Bridge turn artifacts → StopDecision + terminal via control provider."""
 
     name = "stop_decide_node"
 
@@ -47,5 +53,7 @@ class StopDecideNode(Node):
         return provider.decide(
             state=inputs.get("in_state"),
             decision=inputs.get("in_decision"),
+            observation=inputs.get("in_observation"),
+            reflection=inputs.get("in_reflection"),
             out_port=out_port,
         )
