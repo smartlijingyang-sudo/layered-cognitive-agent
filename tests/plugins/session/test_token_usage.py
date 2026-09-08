@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from lca.plugins.observability.deriver.token_meter.token_meter import HeuristicTokenMeter
 from lca.plugins.session.projection_registry.projection_registry import ProjectionRegistry
-from lca.plugins.session.token_meter.token_meter import HeuristicTokenMeter
 from lca.plugins.session.token_usage.token_usage import TokenUsageUnit
 from lca.session.append import Session
 from lca_kernel.events.fold.fold import SURFACE_ASSISTANT_TYPE, SURFACE_USER_TYPE, foldRequestHeader

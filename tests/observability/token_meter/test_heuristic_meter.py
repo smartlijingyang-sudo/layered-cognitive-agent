@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from lca.plugins.session.token_meter.token_meter import HeuristicTokenMeter, estimate_text_tokens
+from lca.plugins.observability.deriver.token_meter.token_meter import (
+    HeuristicTokenMeter,
+    estimate_text_tokens,
+)
 from lca.session.append import Session
 from lca_kernel.events.fold.fold import SURFACE_ASSISTANT_TYPE, SURFACE_USER_TYPE
 
