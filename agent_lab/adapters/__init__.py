@@ -1,22 +1,23 @@
 """Adapters — bridge agent_lab artifacts into LCA contracts (one-way).
 
-agent_lab does not modify any LCA source. Adapters live here and translate
-between agent_lab primitives (Artifact, ContextManifest) and the LCA
-Protocol/DTO contracts the framework already publishes.
+Fusion refactor (2026-09-08): this module is being progressively deleted.
+Each adapter that becomes redundant (LCA module directly importable via
+`uv run`) is removed and its node plugin imports LCA directly instead.
 
-Seams wired so far:
-  - mv.assemble ↔ DefaultModelContextAssembler (lca_mv.py)
-  - tool dispatch ↔ SimpleSafeExecutor (lca_body.py)
-  - call_llm ↔ LLMAdapter Protocol (lca_llm.py)
+Currently retained:
+  - mv.assemble adapter (lca_mv.py) — will be removed next
+  - call_llm adapter (lca_llm.py) — will be removed next
   - read_file Tool (adapters/tools/read_file.py) — agent_lab's own Tool
+
+Removed:
+  - lca_body.py — dispatch_tool now imports SimpleSafeExecutor directly
 """
 
-from agent_lab.adapters.lca_body import LcaBodyProvider
+# Temporary re-exports kept until lca_mv / lca_llm are also removed.
 from agent_lab.adapters.lca_llm import LcaLlmProvider
 from agent_lab.adapters.lca_mv import LcaMvProvider, SessionReaderAdapter
 
 __all__ = [
-    "LcaBodyProvider",
     "LcaLlmProvider",
     "LcaMvProvider",
     "SessionReaderAdapter",
