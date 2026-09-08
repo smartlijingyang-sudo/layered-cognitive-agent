@@ -184,6 +184,24 @@ class SpineEventRecord:
     # ref.trace_id(可空)透传到落盘字节布局,供跨事件因果追踪。
     trace_id: str | None = None
 
+    def __post_init__(self) -> None:
+        # C11 closed-set guard (ADR-0208): PR-5 dropped the
+        # EventRecord.__post_init__ whitelist check during the spine
+        # byte-layout migration; restore it here so unknown EPs fail loud
+        # instead of silently round-tripping through persistence.
+        from lca_kernel.events.payloads.spine import SPINE_EXECUTION_POINTS
+
+        if self.execution_point not in SPINE_EXECUTION_POINTS:
+            msg = (
+                f"UnknownExecutionPoint({self.execution_point!r}): "
+                "not in SPINE_EXECUTION_POINTS whitelist. "
+                "Add the EP to lca_kernel/events/payloads/spine.py "
+                "(SPINE_EXECUTION_POINTS + _SPINE_EP_TO_CATEGORY) and "
+                "lca_kernel/events/config/observability/{spine,closure_catalog}.yaml. "
+                "See ADR-0208."
+            )
+            raise ValueError(msg)
+
     @classmethod
     def build(
         cls,
@@ -360,7 +378,22 @@ def build_record(
         if category_str is None:
             ref_category = getattr(ref, "category", None)
             category_str = getattr(ref_category, "value", ref_category)
-        execution_point = category_to_spine_ep(str(category_str or "")) or "unknown"
+        execution_point = category_to_spine_ep(str(category_str or ""))
+        if execution_point is None:
+            # ADR-0208: spine.* categories MUST resolve to a registered EP
+            # (C11 closed-set); non-spine categories keep the legacy
+            # "unknown" fallback so the typed EventPayload catch-all path
+            # stays open for non-observability events.
+            if str(category_str or "").startswith("spine."):
+                msg = (
+                    f"UnknownExecutionPoint(category={category_str!r}): "
+                    "no EP registered in _SPINE_EP_TO_CATEGORY. "
+                    "Add the EP to lca_kernel/events/payloads/spine.py "
+                    "and lca_kernel/events/config/observability/{spine,closure_catalog}.yaml. "
+                    "See ADR-0208."
+                )
+                raise ValueError(msg)
+            execution_point = "unknown"
     channel = getattr(payload, "channel", "fact")
     prev_event_hash_attr: str | None = getattr(payload, "prev_event_hash", None)
 

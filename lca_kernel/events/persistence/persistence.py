@@ -109,7 +109,22 @@ def _map_session_event(
     if not isinstance(execution_point, str) or not execution_point:
         from lca_kernel.events.payloads.spine import category_to_spine_ep
 
-        execution_point = category_to_spine_ep(event.type) or "unknown"
+        execution_point = category_to_spine_ep(event.type)
+        if execution_point is None:
+            # ADR-0208: spine.* categories MUST resolve to a registered EP
+            # (C11 closed-set); non-spine categories keep the legacy
+            # "unknown" fallback so the typed EventPayload catch-all path
+            # stays open for non-observability events.
+            if event.type.startswith("spine."):
+                msg = (
+                    f"UnknownExecutionPoint(category={event.type!r}): "
+                    "no EP registered in _SPINE_EP_TO_CATEGORY. "
+                    "Add the EP to lca_kernel/events/payloads/spine.py "
+                    "and lca_kernel/events/config/observability/{spine,closure_catalog}.yaml. "
+                    "See ADR-0208."
+                )
+                raise ValueError(msg)
+            execution_point = "unknown"
     channel = data.get("channel")
     if not isinstance(channel, str) or not channel:
         channel = "fact"
@@ -272,6 +287,7 @@ class PersistenceObserver:
         if cls._default_instance is None:
             instance = cls()
             registry = instance._ensure_registry()
+
             def _on_batch(event_ids: Sequence[str]) -> None:
                 instance._on_spine_batch_written(tuple(event_ids))
 

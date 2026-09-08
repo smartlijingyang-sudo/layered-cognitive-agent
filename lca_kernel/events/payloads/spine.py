@@ -92,6 +92,8 @@ SPINE_EXECUTION_POINTS: tuple[str, ...] = (
     "llm.stream.token",
     "llm.stream.stall",
     "llm.request.header",
+    # Model-visible assistant decision (ADR-0185 §3.3 + ADR-0208)
+    "llm.request.header.assistant",
     # Runtime
     "runtime.reducer.apply",
     "runtime.checkpoint.create",
@@ -218,6 +220,8 @@ _SPINE_EP_TO_CATEGORY: dict[str, str] = {
     "llm.stream.token": "spine.llm.stream.token",
     "llm.stream.stall": "spine.llm.stream.stall",
     "llm.request.header": "spine.llm.request.header",
+    # Model-visible assistant decision (ADR-0185 §3.3 + ADR-0208)
+    "llm.request.header.assistant": "spine.llm.request.header.assistant",
     # Exception（PR-3）
     "exception.caught": "spine.exception.caught",
     "exception.finally": "spine.exception.finally",
