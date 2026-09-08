@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 from typing import Any
 
 from agent_lab.primitives.artifact import Artifact, ArtifactKind
@@ -17,14 +18,16 @@ def complete_turn(
 ) -> Artifact:
     messages = _as_messages(messages_artifact)
     prompt, history = _split_prompt_history(messages)
-    tools = _as_tools(tools_artifact)
+    tool_schemas = _as_tool_schemas(tools_artifact)
 
     adapter = adapter_factory(**dict(adapter_kwargs or {}))
     complete_kwargs: dict[str, Any] = {}
     if history:
         complete_kwargs["history"] = history
-    if tools is not None:
-        complete_kwargs["tools"] = tools
+    if tool_schemas is not None:
+        # OpenAICompatAdapter expects Tool protocol objects; Manifest stores
+        # openai-style schemas. Rehydrate ducks for the adapter seam only.
+        complete_kwargs["tools"] = [_schema_as_tool(s) for s in tool_schemas]
 
     response = asyncio.run(adapter.complete(prompt, **complete_kwargs))
     text = getattr(response, "text", "") or ""
@@ -60,20 +63,40 @@ def _as_messages(art: Artifact | None) -> list[dict[str, Any]]:
     return []
 
 
-def _as_tools(art: Artifact | None) -> list[Any] | None:
+def _as_tool_schemas(art: Artifact | None) -> list[dict[str, Any]] | None:
     if art is None or art.content is None:
         return None
     content = art.content
     if isinstance(content, list):
-        return list(content)
+        return [dict(t) for t in content if isinstance(t, dict)]
     if isinstance(content, dict):
         nested = content.get("tools")
         if isinstance(nested, list):
-            return list(nested)
+            return [dict(t) for t in nested if isinstance(t, dict)]
         keys = set(content)
         if keys & {"type", "function", "name"}:
-            return [content]
+            return [dict(content)]
     return None
+
+
+@dataclass(frozen=True)
+class _SchemaTool:
+    """Duck-typed Tool for OpenAICompatAdapter.to_openai_*_tool_spec."""
+
+    name: str
+    description: str
+    parameters: dict[str, Any]
+
+
+def _schema_as_tool(schema: dict[str, Any]) -> Any:
+    if hasattr(schema, "name") and hasattr(schema, "parameters"):
+        return schema
+    fn = schema.get("function") if isinstance(schema.get("function"), dict) else schema
+    return _SchemaTool(
+        name=str(fn.get("name") or ""),
+        description=str(fn.get("description") or ""),
+        parameters=dict(fn.get("parameters") or {"type": "object", "properties": {}}),
+    )
 
 
 def _split_prompt_history(

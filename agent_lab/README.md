@@ -47,6 +47,19 @@ Runner binds one Session for session_log + FactGateway. HIL surfaces as
 `waiting_input` receipt (no `approval.wait` node). Durable turn facts stay in
 `remember`.
 
+## Model-visible tools (what the LLM sees)
+
+```
+tools/registry.yaml
+  └─ perceive.inventory (expose_schemas)
+       └─ model_eye.see.tools → guard → shape → freeze
+            └─ ContextManifest { messages, tools, digest, committed }
+                 └─ think.expose → reason.complete(tools=…)
+```
+
+Inventory schemas are frozen inside `ContextManifest`. Think does not take a
+parallel `initial.tools` bypass.
+
 ## How the call chain resolves for one tool call
 
 ```
@@ -64,6 +77,7 @@ agent_loop.yaml
 1. Write a `lca.contracts.protocols.Tool` subclass (see `adapters/tools/read_file.py`).
 2. Append a one-line entry to `tools/registry.yaml`.
 3. Add the name to `act.yaml` `authorize.config.allow` and `execute.config.tools`.
+4. No think/perceive wiring change — `expose_schemas` picks it up for the model.
 
 ## Adding a new node
 

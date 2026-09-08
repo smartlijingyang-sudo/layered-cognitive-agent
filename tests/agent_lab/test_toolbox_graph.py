@@ -32,6 +32,7 @@ def test_toolbox_graph_loads_and_compiles() -> None:
     spec = specs["toolbox"]
     assert {n.id for n in spec.nodes} == {
         "load_registry",
+        "expose_schemas",
         "trust_classify",
         "dedup",
         "resolve_tool",
@@ -39,6 +40,7 @@ def test_toolbox_graph_loads_and_compiles() -> None:
     bundle = compile_spec(spec)
     assert bundle.spec_id == "toolbox"
     flat = [nid for layer in bundle.layers for nid in layer]
+    assert flat.index("load_registry") < flat.index("expose_schemas")
     assert flat.index("load_registry") < flat.index("trust_classify")
     assert flat.index("trust_classify") < flat.index("dedup")
     assert flat.index("dedup") < flat.index("resolve_tool")
@@ -47,6 +49,21 @@ def test_toolbox_graph_loads_and_compiles() -> None:
 # ---------------------------------------------------------------------------
 # (2) registry provider
 # ---------------------------------------------------------------------------
+
+
+def test_schemas_from_inventory_emits_openai_tools() -> None:
+    from agent_lab.adapters.lca_toolbox import schemas_from_inventory
+
+    schemas = schemas_from_inventory(registry_path="agent_lab/tools/registry.yaml")
+    names = {
+        (s.get("function") or {}).get("name")
+        for s in schemas
+        if isinstance(s, dict)
+    }
+    assert {"bash", "file_write", "read_file"} <= names
+    for s in schemas:
+        assert s.get("type") == "function"
+        assert "parameters" in (s.get("function") or {})
 
 
 def test_lca_toolbox_registry_provider_loads_yaml(tmp_path: Path) -> None:

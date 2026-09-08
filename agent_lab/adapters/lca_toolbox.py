@@ -222,9 +222,73 @@ def _tool_to_dict(tool: Any) -> dict[str, Any]:
     }
 
 
+def schemas_from_inventory(
+    *,
+    registry_payload: Artifact | None = None,
+    registry_path: str | None = None,
+) -> list[dict[str, Any]]:
+    """Build openai-style tool schemas from inventory.
+
+    Resolution order:
+      1. ``registry_payload`` artifact (entries from load_registry)
+      2. ``registry_path`` YAML (default: agent_lab/tools/registry.yaml)
+
+    Fail-loud when an entry cannot be resolved to a Tool — inventory that
+    cannot be shown to the model must not silently shrink.
+    """
+    from lca.infrastructure.llm_adapter.openai_compat.chat import to_openai_chat_tool_spec
+
+    registry = _registry_for_schemas(registry_payload, registry_path)
+    return [to_openai_chat_tool_spec(registry.get(name)) for name in registry.names()]
+
+
+def _registry_for_schemas(
+    registry_payload: Artifact | None,
+    registry_path: str | None,
+) -> Any:
+    if registry_payload is not None and registry_payload.content:
+        content = registry_payload.content
+        entries = content.get("entries") if isinstance(content, dict) else None
+        if isinstance(entries, list) and entries:
+            return _build_registry_from_entries_strict(entries)
+    path = registry_path or "agent_lab/tools/registry.yaml"
+    registry = _default_registry_from_path(path)
+    if not registry.names():
+        raise ValueError(f"expose_schemas: tool inventory empty at {path!r}")
+    return registry
+
+
+def _build_registry_from_entries_strict(entries: list[dict[str, Any]]) -> Any:
+    """Like ``_build_registry_from_entries`` but fail-loud on any bad entry."""
+    from agent_lab.tools.registry import ToolRegistry
+
+    registry = ToolRegistry()
+    for entry in entries:
+        ref = entry.get("ref", "")
+        if not ref:
+            raise ValueError(f"expose_schemas: registry entry missing ref: {entry!r}")
+        tool = ToolRegistry._resolve_factory(entry)
+        registry.register(tool)
+    return registry
+
+
+def _default_registry_from_path(path_str: str) -> Any:
+    from agent_lab.tools.registry import ToolRegistry
+
+    registry = ToolRegistry()
+    path = Path(path_str)
+    if not path.is_absolute():
+        path = Path(__file__).resolve().parents[2] / path
+    if not path.exists():
+        raise ValueError(f"expose_schemas: registry YAML not found: {path}")
+    registry.load_from_yaml(path)
+    return registry
+
+
 __all__ = [
     "LcaToolboxRegistryProvider",
     "LcaToolboxResolveProvider",
     "register_fixture_tool_registry",
+    "schemas_from_inventory",
     "unregister_fixture_tool_registry",
 ]

@@ -7,17 +7,17 @@
 #   expose → reason → classify → guard
 #
 # Eyes belong to perceive/model_eye. Think only reads the frozen
-# ContextManifest, calls the LLM (with tools), classifies, and guards.
+# ContextManifest (messages + tools), calls the LLM, classifies, and guards.
 # Gate ⊂ Think; control-slot think_guard is passthrough.
 #
 # Mounted by: agent_loop.think (see agent_loop.yaml#sub_specs).
 # =============================================================================
 
 id: think
-version: 1.0.0
+version: 1.1.0
 region: phase:think
 description: >
-  Peel frozen messages, call the LLM (with tools), classify into a Decision,
+  Peel frozen messages + tools, call the LLM, classify into a Decision,
   and enforce via DecisionGate. One think turn per loop.
 
 graph:
@@ -36,23 +36,24 @@ graph:
 # INITIAL PORTS
 # -----------------------------------------------------------------------------
 # initial.in_assembled_manifest : frozen ContextManifest from perceive/model_eye
+#                                 (messages + tools already committed)
 # initial.perceive_out          : optional barrier / perception signal
-# initial.tools                 : openai-style tool schemas for reason
 # initial.in_state              : optional AgentState snapshot for guard
 
 nodes:
 
-  # ----- expose: committed ContextManifest → messages ------------------------
+  # ----- expose: committed ContextManifest → messages + tools ----------------
   - id: expose
     region: phase:think
     factory: think.expose
     config:
       from: in_assembled_manifest
       to: messages
+      tools_to: tools
     ins: [in_assembled_manifest]
-    outs: [messages]
+    outs: [messages, tools]
 
-  # ----- reason: messages (+ tools) → LLMResponse ----------------------------
+  # ----- reason: messages + tools → LLMResponse ------------------------------
   - id: reason
     region: phase:think
     factory: think.reason
@@ -93,19 +94,18 @@ edges:
     to:   { spec: think, node: expose,   port: in_assembled_manifest }
     kind: data
 
-  - id: e_init_tools_to_reason
-    from: { spec: think, node: _initial, port: tools }
-    to:   { spec: think, node: reason,   port: tools }
-    kind: data
-
   - id: e_init_state_to_guard
     from: { spec: think, node: _initial, port: in_state }
     to:   { spec: think, node: guard,    port: in_state }
     kind: data
 
-  - id: e_expose_to_reason
+  - id: e_expose_messages_to_reason
     from: { spec: think, node: expose, port: messages }
     to:   { spec: think, node: reason, port: messages }
+    kind: data
+  - id: e_expose_tools_to_reason
+    from: { spec: think, node: expose, port: tools }
+    to:   { spec: think, node: reason, port: tools }
     kind: data
   - id: e_reason_to_classify
     from: { spec: think, node: reason,   port: response }

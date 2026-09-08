@@ -1,41 +1,38 @@
 # =============================================================================
 # toolbox — named-tool inventory graph (ADR-0206 §5)
 # =============================================================================
-# Single responsibility: given a tool name, resolve to a Tool instance with
-# its scope + capability metadata. Pure data/lookup graph — NO tool execution
-# happens here.
+# Single responsibility: project the non-executable tool inventory.
 #
-# Linear chain:
-#   load_registry → trust_classify → dedup → resolve_tool
+# Two exits from one load:
+#   load_registry → expose_schemas     → tools (openai schemas for model_eye)
+#   load_registry → trust → dedup → resolve_tool  (name → Tool instance)
 #
-# Initial: in_tool_name (the caller's requested tool name, consumed by resolve_tool).
-# Output:  tool_instance (the resolved Tool metadata).
-#
-# trust_classify and dedup are reused from nodes/mv and nodes/passthrough.
+# No tool execution happens here. perceive.inventory uses expose_schemas
+# directly; this graph is the full inventory surface for demos / resolve.
 # =============================================================================
 
 id: toolbox
-version: 0.1.0
+version: 0.2.0
 region: model_visible
-description: Resolve a tool name to a Tool instance with scope + capability metadata.
+description: >
+  Named-tool inventory — openai schemas for model-visible and name→Tool
+  resolve for callers that need an instance.
 
 graph:
   id: toolbox
   layer: model_visible
-  purpose: Named-tool inventory — resolve a tool name to its Tool instance, scope and capability.
-  members: [load_registry, trust_classify, dedup, resolve_tool]
-  references: [agent_loop]
+  purpose: Inventory schemas + optional name resolve; never executes tools.
+  members: [load_registry, expose_schemas, trust_classify, dedup, resolve_tool]
+  references: [perceive, model_eye]
   relations:
-    - { graph: agent_loop, kind: child_of, role: tool_resolve_phase }
+    - { graph: perceive, kind: feeds, role: tool_schemas }
+    - { graph: model_eye, kind: feeds, role: tool_schemas }
   capabilities:
-    provides: [tool_resolve]
+    provides: [tool_schemas, tool_resolve]
     requires: [tool_registry]
 
 nodes:
 
-  # ----- load_registry: load tool entries from a YAML registry file ---------
-  # Adapter: LcaToolboxRegistryProvider. Emits a FACT artifact (registry_payload)
-  # listing name → ref/kwargs/capability/scope for every tool in the YAML.
   - id: load_registry
     region: model_visible
     factory: registry_loader
@@ -45,9 +42,14 @@ nodes:
     ins: []
     outs: [registry_payload]
 
-  # ----- trust_classify: tag each entry as trusted/untrusted ----------------
-  # Reuses existing nodes/model_eye/trust_classify. Tags each tool entry based on
-  # trustable_kinds config.
+  - id: expose_schemas
+    region: model_visible
+    factory: expose_schemas
+    config:
+      to: tools
+    ins: [registry_payload]
+    outs: [tools]
+
   - id: trust_classify
     region: model_visible
     factory: trust_classify
@@ -56,8 +58,6 @@ nodes:
     ins: [any_in]
     outs: [labels]
 
-  # ----- dedup: collapse duplicate entries (idempotent) ---------------------
-  # Reuses existing nodes/passthrough/dedup.
   - id: dedup
     region: model_visible
     factory: dedup
@@ -67,9 +67,6 @@ nodes:
     ins: [from]
     outs: [to]
 
-  # ----- resolve_tool: resolve tool name → Tool instance --------------------
-  # Adapter: LcaToolboxResolveProvider. Takes in_tool_name (string) and
-  # registry data from the chain. Emits tool_instance artifact.
   - id: resolve_tool
     region: model_visible
     factory: resolve_tool
@@ -84,13 +81,16 @@ nodes:
 
 edges:
 
-  # ── initial → resolve_tool (tool name) ──
   - id: e_init_tool_name_to_resolve
     from: { spec: toolbox, node: _initial, port: in_tool_name }
     to:   { spec: toolbox, node: resolve_tool, port: in_tool_name }
     kind: data
 
-  # ── load_registry → trust_classify → dedup → resolve_tool ──
+  - id: e_load_to_expose
+    from: { spec: toolbox, node: load_registry, port: registry_payload }
+    to:   { spec: toolbox, node: expose_schemas, port: registry_payload }
+    kind: data
+
   - id: e_load_to_trust
     from: { spec: toolbox, node: load_registry, port: registry_payload }
     to:   { spec: toolbox, node: trust_classify, port: any_in }

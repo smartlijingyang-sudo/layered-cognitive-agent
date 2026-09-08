@@ -66,13 +66,23 @@ def test_think_subgraph_loads_and_compiles() -> None:
     assert flat.index("classify") < flat.index("guard")
 
 
-def test_think_expose_peels_committed_messages() -> None:
+def test_think_expose_peels_committed_messages_and_tools() -> None:
     from agent_lab.nodes.think.expose.plugin import ThinkExpose
 
     node = ThinkExpose.__new__(ThinkExpose)
-    node.config = {"from": "in_assembled_manifest", "to": "messages"}
-    node.outs = ["messages"]
+    node.config = {"from": "in_assembled_manifest", "to": "messages", "tools_to": "tools"}
+    node.outs = ["messages", "tools"]
     messages = [{"role": "user", "content": "hi"}]
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "bash",
+                "description": "run",
+                "parameters": {"type": "object", "properties": {}},
+            },
+        }
+    ]
     out = node.execute(
         node,
         {
@@ -80,6 +90,7 @@ def test_think_expose_peels_committed_messages() -> None:
                 kind=ArtifactKind.MANIFEST,
                 content={
                     "messages": messages,
+                    "tools": tools,
                     "digest": "abc",
                     "committed": True,
                     "schema_version": "context.manifest.v1",
@@ -91,6 +102,9 @@ def test_think_expose_peels_committed_messages() -> None:
     assert out["messages"].kind == ArtifactKind.MESSAGE
     assert out["messages"].content == messages
     assert out["messages"].schema_ref == "openai.messages.v1"
+    assert out["tools"].kind == ArtifactKind.FACT
+    assert out["tools"].content == tools
+    assert out["tools"].schema_ref == "openai.tools.v1"
 
 
 def test_think_expose_rejects_uncommitted_manifest() -> None:
@@ -147,7 +161,7 @@ def test_agent_loop_compiles_with_think_sub_spec() -> None:
     think_node = agent_loop.node("think")
     assert "in_assembled_manifest" in think_node.ins
     assert "perceive_out" in think_node.ins
-    assert "tools" in think_node.ins
+    assert "tools" not in think_node.ins
     assert "in_state" in think_node.ins
     assert "decision_out" in think_node.outs
     assert "think_signal" in think_node.outs
@@ -162,7 +176,6 @@ def test_agent_loop_compiles_with_think_sub_spec() -> None:
     assert link.input_map == {
         "in_assembled_manifest": "in_assembled_manifest",
         "perceive_out": "perceive_out",
-        "tools": "tools",
         "in_state": "in_state",
     }
     assert link.output_map == {
@@ -455,7 +468,10 @@ def test_think_reason_passes_tools_to_adapter(monkeypatch) -> None:
         },
     )
     assert out["response"].content["text"] == "ok"
-    assert captured["tools"] == tools
+    passed = captured["tools"]
+    assert isinstance(passed, list) and len(passed) == 1
+    assert getattr(passed[0], "name") == "bash"
+    assert getattr(passed[0], "description") == "run"
 
 
 # ---------------------------------------------------------------------------
@@ -494,6 +510,16 @@ def test_think_subgraph_runs_via_runner(monkeypatch) -> None:
             kind=ArtifactKind.MANIFEST,
             content={
                 "messages": [{"role": "user", "content": "hi"}],
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "bash",
+                            "description": "run",
+                            "parameters": {"type": "object"},
+                        },
+                    }
+                ],
                 "digest": "x",
                 "committed": True,
                 "schema_version": "context.manifest.v1",
@@ -504,16 +530,6 @@ def test_think_subgraph_runs_via_runner(monkeypatch) -> None:
             kind=ArtifactKind.FACT,
             content={"perceived": True},
             schema_ref="perceive.signal.v1",
-        ),
-        "tools": Artifact(
-            kind=ArtifactKind.FACT,
-            content=[
-                {
-                    "type": "function",
-                    "function": {"name": "bash", "parameters": {"type": "object"}},
-                }
-            ],
-            schema_ref="openai.tools.v1",
         ),
     }
     trace = run_graph(think_spec, initial=initial, sub_registry=specs)

@@ -6,29 +6,31 @@
 #
 # Answers one question: what will the LLM see this turn?
 #   see → guard → shape → freeze → frozen ContextManifest
+#   ContextManifest = { messages, tools, digest, committed }
 #
 # Inbound:
 #   - context_manifest / system / history / config / tools / user_turn
-#     (via perceive.eye sub_spec)
+#     (via perceive.eye sub_spec; tools usually from perceive.inventory)
 #   - act.observe.observation ──project──► see.observation
 # =============================================================================
 
 id: model_eye
-version: 1.0.0
+version: 1.1.0
 region: model_visible
 description: >
-  Derive and freeze the model-visible messages for the next LLM turn.
-  Owned by perceive; think only reads the result.
+  Derive and freeze the model-visible messages + tool schemas for the next
+  LLM turn. Owned by perceive; think only reads the result.
 
 graph:
   id: model_eye
   layer: model_visible
-  purpose: Session derive + Hub ContextManifest + this-turn feeds → frozen messages.
+  purpose: Session derive + Hub + inventory schemas → frozen ContextManifest.
   members: [see, guard, shape, freeze]
-  references: [perceive, act]
+  references: [perceive, act, toolbox]
   relations:
     - { graph: perceive, kind: child_of, role: model_eye }
     - { graph: act, kind: accepts_from, role: project_observation }
+    - { graph: toolbox, kind: accepts_from, role: tool_schemas }
   capabilities:
     provides: [model_eye_manifest]
     requires: [session_reader, context_manifest]
@@ -59,14 +61,14 @@ nodes:
     region: model_visible
     factory: model_eye.shape
     ins: [safe_sight]
-    outs: [messages]
+    outs: [messages, tools]
 
   - id: freeze
     region: model_visible
     factory: model_eye.freeze
     config:
       required_roles: [user]
-    ins: [messages]
+    ins: [messages, tools]
     outs: [manifest]
 
 edges:
@@ -108,7 +110,11 @@ edges:
     from: { spec: model_eye, node: guard, port: safe_sight }
     to:   { spec: model_eye, node: shape, port: safe_sight }
     kind: data
-  - id: e_shape_to_freeze
+  - id: e_shape_messages_to_freeze
     from: { spec: model_eye, node: shape, port: messages }
     to:   { spec: model_eye, node: freeze, port: messages }
+    kind: data
+  - id: e_shape_tools_to_freeze
+    from: { spec: model_eye, node: shape, port: tools }
+    to:   { spec: model_eye, node: freeze, port: tools }
     kind: data

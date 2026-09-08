@@ -6,8 +6,8 @@ ContextManifest. Think consumes that manifest; it does not mount this graph.
 Nodes (all in model_eye.yaml):
   - see    : Session derive + this-turn feeds → sight
   - guard  : trust / dedup / keep / redact → safe_sight
-  - shape  : fold into OpenAI messages
-  - freeze : validate + digest → frozen ContextManifest
+  - shape  : fold into OpenAI messages; passthrough tools
+  - freeze : validate + digest → frozen ContextManifest {messages, tools}
 
 ``trust_classify`` remains registered here for toolbox.yaml reuse; it is
 not a member of the model_eye graph.

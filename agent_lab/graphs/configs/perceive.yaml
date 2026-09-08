@@ -4,37 +4,43 @@
 # SequentialPerceiveHub._fold decomposed into workers, then model_eye:
 #
 #   resolve → sense ─┐
-#            memory ─┼─► trim → commit.context_manifest ─► eye(model_eye)
-#            policy ─┘
+#            memory ─┼─► trim → commit.context_manifest ─┐
+#            policy ─┘                                   ├─► eye(model_eye)
+#   inventory (expose_schemas) ──────────────────────────┘
 #
-# Hub owns world facts (sensors / memory / policy). Session messages /
-# user_turn / tool observations belong to model_eye (DSH + act project).
+# Hub owns world facts (sensors / memory / policy). Inventory owns
+# model-visible tool schemas. Session messages / user_turn / observations
+# belong to model_eye (DSH + act project).
 #
 # Mounted by: agent_loop.perceive
 # =============================================================================
 
 id: perceive
-version: 2.0.0
+version: 2.1.0
 region: phase:perceive
 description: >
-  Fold sensors, memory, and policy facts into ContextManifest, then freeze
-  the model-visible messages via model_eye.
+  Fold sensors, memory, and policy facts into ContextManifest, project tool
+  inventory schemas, then freeze model-visible messages + tools via model_eye.
 
 graph:
   id: perceive
   layer: phase
-  purpose: Perceive = Hub fold (resolve→sense/memory/policy→trim→commit) → model_eye.
-  members: [resolve, sense, memory, policy, trim, commit, eye]
-  references: [agent_loop, model_eye]
+  purpose: >
+    Perceive = Hub fold (resolve→sense/memory/policy→trim→commit) + inventory
+    schemas → model_eye.
+  members: [resolve, sense, memory, policy, trim, commit, inventory, eye]
+  references: [agent_loop, model_eye, toolbox]
   relations:
     - { graph: agent_loop, kind: child_of, role: perceive_phase }
     - { graph: model_eye, kind: contains, role: model_eye }
+    - { graph: toolbox, kind: uses, role: tool_schemas }
   capabilities:
     provides: [context_manifest, model_eye_manifest]
-    requires: [sensors, memory_system, session_reader, model_eye]
+    requires: [sensors, memory_system, session_reader, model_eye, tool_registry]
 
 # initial.state : AgentState snapshot for Hub fold
-# initial.system / history / config / tools / user_turn : model_eye header feeds
+# initial.system / history / config / user_turn : model_eye header feeds
+# tools schemas come from inventory (not initial.tools bypass)
 
 nodes:
 
@@ -82,6 +88,16 @@ nodes:
     config: {}
     ins: [trimmed_items]
     outs: [context_manifest]
+
+  # Named-tool inventory → openai schemas for model_eye.see.tools
+  - id: inventory
+    region: model_visible
+    factory: expose_schemas
+    config:
+      registry_path: agent_lab/tools/registry.yaml
+      to: tools
+    ins: []
+    outs: [tools]
 
   - id: eye
     region: model_visible
@@ -140,6 +156,10 @@ edges:
     from: { spec: perceive, node: commit, port: context_manifest }
     to:   { spec: perceive, node: eye,    port: context_manifest }
     kind: data
+  - id: e_inventory_to_eye
+    from: { spec: perceive, node: inventory, port: tools }
+    to:   { spec: perceive, node: eye,       port: tools }
+    kind: data
   - id: e_init_system_to_eye
     from: { spec: perceive, node: _initial, port: system }
     to:   { spec: perceive, node: eye,      port: system }
@@ -151,10 +171,6 @@ edges:
   - id: e_init_config_to_eye
     from: { spec: perceive, node: _initial, port: config }
     to:   { spec: perceive, node: eye,      port: config }
-    kind: data
-  - id: e_init_tools_to_eye
-    from: { spec: perceive, node: _initial, port: tools }
-    to:   { spec: perceive, node: eye,      port: tools }
     kind: data
   - id: e_init_user_to_eye
     from: { spec: perceive, node: _initial, port: user_turn }

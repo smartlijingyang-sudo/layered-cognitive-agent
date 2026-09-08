@@ -61,13 +61,13 @@ graph:
 # initial.system     : system prompt (text artifact)
 # initial.history    : prior conversation (openai.messages.v1)
 # initial.config     : LLM runtime config (temperature, etc.)
-# initial.tools      : tool schemas (openai-style function list)
-# initial.results    : prior tool observations, for re-assembly
 # initial.user_turn  : this turn's user message (+ optional tool_calls)
 # initial.state      : AgentState snapshot (step, history, retrieved_context,
 #                     extra) — fed into perceive so the Hub can fold the
 #                     prior context into the new ContextManifest. Other
 #                     fields are tolerated and routed into state.extra.
+# Tool schemas are owned by perceive.inventory → model_eye → ContextManifest;
+# think peels them from the frozen manifest (no initial.tools bypass).
 
 # -----------------------------------------------------------------------------
 # NODES — local workers + sub_spec hosts. Identity stubs are passthroughs;
@@ -76,23 +76,23 @@ graph:
 nodes:
 
   # ===== PHASE: perceive (host) =============================================
-  # Mounts perceive.yaml: Hub fold → model_eye. Feeds state + header +
-  # user_turn (eye only); exposes out_manifest for think.
+  # Mounts perceive.yaml: Hub fold + inventory schemas → model_eye.
+  # Feeds state + header + user_turn; exposes out_manifest for think.
   - id: perceive
     region: phase:perceive
     factory: identity
     config: { from: out_manifest, to: perceive_out }
-    ins: [user_turn, state, system, history, config, tools]
+    ins: [user_turn, state, system, history, config]
     outs: [perceive_out, out_manifest]
 
   # ===== PHASE: think (host) ================================================
   # Receives perceive.out_manifest as in_assembled_manifest (already assembled
-  # by model_eye inside perceive). No assemble_for_think host.
+  # by model_eye inside perceive; includes tools). No tools bypass port.
   - id: think
     region: phase:think
     factory: identity
     config: { from: decision_out, to: think_out }
-    ins: [in_assembled_manifest, perceive_out, tools, in_state]
+    ins: [in_assembled_manifest, perceive_out, in_state]
     outs: [decision_out, think_signal]
 
   # ===== PHASE: act (host) ==================================================
@@ -159,14 +159,6 @@ edges:
     from: { spec: agent_loop, node: _initial, port: config }
     to:   { spec: agent_loop, node: perceive, port: config }
     kind: data
-  - id: e_init_tools_to_perceive
-    from: { spec: agent_loop, node: _initial, port: tools }
-    to:   { spec: agent_loop, node: perceive, port: tools }
-    kind: data
-  - id: e_init_tools_to_think
-    from: { spec: agent_loop, node: _initial, port: tools }
-    to:   { spec: agent_loop, node: think,    port: tools }
-    kind: data
   - id: e_init_state_to_think
     from: { spec: agent_loop, node: _initial, port: state }
     to:   { spec: agent_loop, node: think,    port: in_state }
@@ -224,7 +216,7 @@ edges:
 # -----------------------------------------------------------------------------
 sub_specs:
 
-  # ── perceive stage: Hub fold → model_eye → frozen messages ──
+  # ── perceive stage: Hub fold + inventory → model_eye → frozen manifest ──
   - node: perceive
     sub_spec: perceive
     input_map:
@@ -233,18 +225,16 @@ sub_specs:
       system:    system
       history:   history
       config:    config
-      tools:     tools
     output_map:
       manifest: out_manifest
 
   # ── think stage: Brain.think → Decision ──
-  # Reads perceive.out_manifest (already assembled by model_eye).
+  # Reads perceive.out_manifest (messages + tools already frozen by model_eye).
   - node: think
     sub_spec: think
     input_map:
       in_assembled_manifest: in_assembled_manifest
       perceive_out:          perceive_out
-      tools:                 tools
       in_state:              in_state
     output_map:
       enforced_decision: decision_out

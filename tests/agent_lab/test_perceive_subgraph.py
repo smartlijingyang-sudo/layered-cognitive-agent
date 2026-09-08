@@ -1,9 +1,9 @@
-"""perceive sub-graph: resolve → sense → memory → policy → trim → commit → eye.
+"""perceive sub-graph: Hub fold + inventory → model_eye.
 
 Covers:
-  - perceive.yaml loads + compiles (Hub production steps + model_eye host)
+  - perceive.yaml loads + compiles (Hub + inventory + model_eye host)
   - resolve/sense/memory/policy/trim/commit against LCA fixtures
-  - ContextManifest from commit feeds model_eye
+  - inventory schemas freeze into ContextManifest.tools
 """
 
 from __future__ import annotations
@@ -32,9 +32,10 @@ def test_perceive_subgraph_loads_and_compiles() -> None:
         "policy",
         "trim",
         "commit",
+        "inventory",
         "eye",
     }
-    assert {n.factory for n in spec.nodes if n.id != "eye"} == {
+    assert {n.factory for n in spec.nodes if n.id not in {"eye", "inventory"}} == {
         "perceive.resolve",
         "perceive.sense",
         "perceive.memory",
@@ -42,6 +43,7 @@ def test_perceive_subgraph_loads_and_compiles() -> None:
         "perceive.trim",
         "perceive.commit",
     }
+    assert spec.node("inventory").factory == "expose_schemas"
     assert any(link.sub_spec_id == "model_eye" for link in spec.sub_specs)
     bundle = compile_spec(spec, sub_registry=specs)
     assert bundle.spec_id == "perceive"
@@ -53,6 +55,7 @@ def test_perceive_subgraph_loads_and_compiles() -> None:
     assert flat.index("policy") < flat.index("trim")
     assert flat.index("trim") < flat.index("commit")
     assert flat.index("commit") < flat.index("eye")
+    assert flat.index("inventory") < flat.index("eye")
 
 
 def test_perceive_subgraph_declares_initial_ports() -> None:
@@ -62,7 +65,8 @@ def test_perceive_subgraph_declares_initial_ports() -> None:
     assert "system" in initial_ports
     assert "history" in initial_ports
     assert "user_turn" not in initial_ports or "user_turn" in initial_ports
-    # user_turn may feed eye only; tool_results is not a perceive Hub input
+    # tools come from inventory, not initial bypass; tool_results is not Hub input
+    assert "tools" not in initial_ports
     assert "tool_results" not in initial_ports
 
 
@@ -179,7 +183,6 @@ def test_perceive_subgraph_runs_via_runner() -> None:
                 content=[{"role": "user", "content": "hi"}],
             ),
             "config": Artifact(kind=ArtifactKind.FACT, content={}),
-            "tools": Artifact(kind=ArtifactKind.FACT, content=[]),
             "user_turn": Artifact(
                 kind=ArtifactKind.MESSAGE,
                 content={"role": "user", "content": "hi"},
@@ -193,6 +196,13 @@ def test_perceive_subgraph_runs_via_runner() -> None:
             assert cm.content["items"]
             assert cm.content["items"][0]["kind"] == "clock"
         assert "manifest" in trace.final_artifacts
-        assert trace.final_artifacts["manifest"].content.get("committed") is True
+        frozen = trace.final_artifacts["manifest"].content
+        assert frozen.get("committed") is True
+        tool_names = {
+            (t.get("function") or {}).get("name")
+            for t in (frozen.get("tools") or [])
+            if isinstance(t, dict)
+        }
+        assert {"bash", "file_write", "read_file"} <= tool_names
     finally:
         unregister_fixture_sensors(name)
