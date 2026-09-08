@@ -177,12 +177,33 @@ class CognitiveRuntime(Runtime):
             begin_turn,
             reset_lifecycle,
         )
+        # PR-E:把 reducer 装到 SkillActivationReducerBridge,让
+        # ``register_activated`` 把激活 fold 进 state.activated_skills
+        # (C4 兑现路径)。dispose 由 finally 兜底,保证 run 中断不悬空。
+        from lca.infrastructure.skills.activation.bridge import SkillActivationReducerBridge
 
-        reset_lifecycle()
-        begin_turn()
-        accept_user_message(message_id=f"task:{trace_id}", content=task)
-        await self._lifecycle.publish(RuntimeLifecycleEventType.STARTED, state)
-        return await self._run_driver(state, runner=lambda: self._bindings.new_driver().run(state))
+        bridge: SkillActivationReducerBridge = SkillActivationReducerBridge()
+        # 进程级 singleton —— install 一次覆盖前一个 run 的绑定
+        # (若前一个 run 忘记 dispose,这里强制清理)。
+        from lca.infrastructure.skills.activation.bridge import bridge as global_bridge
+
+        # 持有 live state 的 closure;``state`` 是 mutable,reducer 内
+        # ``extend`` 会改 list 本身 —— 不需要 reassign 引用。
+        live_state = state
+        global_bridge.install(
+            reducer=self.reducer,
+            state_getter=lambda: live_state,
+        )
+        try:
+            reset_lifecycle()
+            begin_turn()
+            accept_user_message(message_id=f"task:{trace_id}", content=task)
+            await self._lifecycle.publish(RuntimeLifecycleEventType.STARTED, state)
+            return await self._run_driver(
+                state, runner=lambda: self._bindings.new_driver().run(state)
+            )
+        finally:
+            global_bridge.dispose()
 
     async def _publish_terminal_event(self, state: object, result: Result) -> None:
         """Compatibility seam delegating terminal projection to the lifecycle emitter."""
