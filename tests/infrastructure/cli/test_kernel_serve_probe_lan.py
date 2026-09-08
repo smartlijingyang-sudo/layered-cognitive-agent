@@ -20,7 +20,7 @@ from lca.infrastructure.cli.services.kernel.serve import KernelServeService
 
 @pytest.fixture
 def svc() -> KernelServeService:
-    cfg = KernelServeConfig(host="0.0.0.0", port=8765, profile="profiles/web-standard.yaml")
+    cfg = KernelServeConfig(host="0.0.0.0", port=8765, profile="profiles/web-standard.yaml")  # noqa: S104 — bind-all intentional, see KernelServeConfig
     return KernelServeService(cfg, Path("."))
 
 
@@ -58,13 +58,12 @@ def test_probe_returns_false_when_lan_unreachable(svc: KernelServeService) -> No
 def test_probe_skipped_when_url_parses_to_loopback(svc: KernelServeService) -> None:
     """If LCA_GATEWAY_PUBLIC_URL == loopback health URL, no extra probe needed."""
     loopback_url = svc.health_url  # http://127.0.0.1:8765/health
-    with patch.dict(os.environ, {"LCA_GATEWAY_PUBLIC_URL": loopback_url}, clear=False):
+    with patch.dict(os.environ, {"LCA_GATEWAY_PUBLIC_URL": loopback_url}, clear=False), patch(
+        "lca.infrastructure.cli.services.kernel.serve.http_ready"
+    ) as mocked:
         # Should return True without invoking http_ready at all.
-        with patch(
-            "lca.infrastructure.cli.services.kernel.serve.http_ready"
-        ) as mocked:
-            assert svc._probe_proxy_lan() is True
-            mocked.assert_not_called()
+        assert svc._probe_proxy_lan() is True
+        mocked.assert_not_called()
 
 
 def test_probe_falls_back_to_openai_proxy_url(svc: KernelServeService) -> None:
