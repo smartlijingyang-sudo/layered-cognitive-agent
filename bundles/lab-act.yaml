@@ -1,0 +1,45 @@
+# bundles/lab-act.yaml — PR-B
+#
+# Body / ToolRegistry / Transport / act.* worker plugin composition for
+# the lab prototype. Loaded only by profiles/agent-lab-infoedge.yaml;
+# web-standard must not include this bundle.
+#
+# Owner: agent_lab absorb (ADR-0209). delete-when: PR-D fully migrates
+# the remaining 92 nodes into lca.plugins.lab.* and the act.* workers
+# are wired by the production compile path.
+
+name: lab-act
+description: |
+  agent_lab act-phase plugin assembly (PR-B). Composes the act.execute
+  worker's dependencies (Body, ToolRegistry, Transport) and registers
+  the act.{shape,authorize,execute,observe} worker nodes on the loader.
+
+entries:
+  # --- providers (assemble before workers so workers can consume them) ---
+  - id: lab-tool-registry
+    $module: lca.plugins.lab.tools.provider.plugin
+    config:
+      tools_yaml: agent_lab/tools/registry.yaml
+  - id: lab-transport
+    $module: lca.plugins.lab.transport.provider.plugin
+    config:
+      agents:
+        - { role: lab_echo, kind: echo }
+  - id: lab-body
+    $module: lca.plugins.lab.act.body_provider.plugin
+    config:
+      plan_ref: agent_lab_act
+      allow_tools: [bash, file_write, read]
+
+  # --- act phase workers (consume providers via loader) ---
+  - id: lab-act-shape
+    $module: lca.plugins.lab.act.shape.plugin
+  - id: lab-act-authorize
+    $module: lca.plugins.lab.act.authorize.plugin
+  - id: lab-act-execute
+    $module: lca.plugins.lab.act.execute.plugin
+    config:
+      tools: [bash, file_write, read]
+      allow: [bash, file_write, read]
+  - id: lab-act-observe
+    $module: lca.plugins.lab.act.observe.plugin

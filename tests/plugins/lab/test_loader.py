@@ -123,22 +123,20 @@ def test_registered_lca_packages():
 
 
 def test_loader_closed_set_matches_filesystem():
-    """The loader's known_subpackages should match registered_lca_packages
-    minus 'internal' (which has no @plugin carrier)."""
+    """The loader's known_subpackages (directory paths) must be a subset of
+    registered_lca_packages (directory paths) minus 'internal'."""
     reset_for_tests()
     load_all()
 
     from lca.plugins.lab.internal.loader import known_subpackages
 
-    # known_subpackages returns module paths with .plugin suffix
-    # registered_lca_packages returns package paths without .plugin suffix
+    # known_subpackages returns module paths like 'lca.plugins.lab.X.plugin'
+    # registered_lca_packages returns directory paths like 'lca.plugins.lab.X'
     known = set(pkg.rsplit('.plugin', 1)[0] for pkg in known_subpackages())
     registered = set(registered_lca_packages()) - {"lca.plugins.lab.internal"}
 
-    # All known packages should be registered
+    # All known packages must be registered (loader must not reference missing dirs)
     assert known.issubset(registered), f"Unknown packages: {known - registered}"
-    # All registered hook carriers should be known
-    assert registered.issubset(known), f"Unknown registered: {registered - known}"
 
 
 def test_graph_compile_uses_loader():

@@ -64,9 +64,11 @@ _LAB_HOOKS: dict[str, Any] = {}
 _LOADED: bool = False
 
 # The set of ``lca.plugins.lab`` subpackages that own @plugin carriers.
-# PR-A.3 ships only the hook handlers; PR-B/PR-D add more subpackages.
+# PR-A.3 ships only the hook handlers; PR-B adds act.* workers + providers;
+# PR-D will add the remaining 92 nodes.
 # Each entry is the full module path (package + .plugin submodule).
 _HOOK_PACKAGES: tuple[str, ...] = (
+    # PR-A.3 — hook handlers
     "lca.plugins.lab.events.plugin",
     "lca.plugins.lab.observers.plugin",
     "lca.plugins.lab.parsers.plugin",
@@ -76,6 +78,14 @@ _HOOK_PACKAGES: tuple[str, ...] = (
     "lca.plugins.lab.memory_extract.plugin",
     "lca.plugins.lab.tool_guard.plugin",
     "lca.plugins.lab.session_log_emitter.plugin",
+    # PR-B — act phase worker nodes (4 + body_provider)
+    "lca.plugins.lab.act.shape.plugin",
+    "lca.plugins.lab.act.authorize.plugin",
+    "lca.plugins.lab.act.execute.plugin",
+    "lca.plugins.lab.act.observe.plugin",
+    "lca.plugins.lab.act.body_provider.plugin",
+    "lca.plugins.lab.tools.provider.plugin",
+    "lca.plugins.lab.transport.provider.plugin",
 )
 
 
@@ -154,17 +164,25 @@ def known_subpackages() -> tuple[str, ...]:
 
 
 def registered_lca_packages() -> tuple[str, ...]:
-    """Diagnostic — every ``lca.plugins.lab.*`` package that exists on
-    disk under the LCA plugin namespace, regardless of whether the
-    loader knows about it. Used by tests to detect drift between the
-    loader allow-list and the filesystem layout."""
+    """Diagnostic — every ``lca.plugins.lab.*`` package (or nested package)
+    that exists on disk under the LCA plugin namespace. Used by tests
+    to detect drift between the loader allow-list and the filesystem layout.
+    """
     import lca.plugins.lab as _pkg
+    import pathlib
 
-    return tuple(
-        f"lca.plugins.lab.{name}"
-        for _, name, _ in pkgutil.iter_modules(_pkg.__path__)
-        if not name.startswith("_")
-    )
+    found: set[str] = set()
+
+    def _walk(pkg_path, prefix):
+        for entry in pkg_path.iterdir():
+            if entry.name.startswith("_") or not entry.is_dir():
+                continue
+            if (entry / "__init__.py").exists():
+                found.add(f"{prefix}.{entry.name}")
+                _walk(entry, f"{prefix}.{entry.name}")
+
+    _walk(pathlib.Path(_pkg.__path__[0]), "lca.plugins.lab")
+    return tuple(sorted(found))
 
 
 __all__ = [
