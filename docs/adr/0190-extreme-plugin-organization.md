@@ -1,5 +1,9 @@
 # LCA 极端插件化组织规范（相对 deepseek-harness）
 
+## 状态
+
+**Accepted** (2026-09-05).
+
 > Status: **镜川 Keep（确认）** · ADR-**0189** Proposed（0187=AssistantAgent 已占用）· Phase B=skill · main · 2026-09-05
 > Scope: 物理布局 + 缝契约 + 可替换/可调试隔离 · **不**改 Runtime 语义  
 > Relates: ADR-0061/0068/0069/0074（插件声明）、0105（8/10/15）、DSH `packages/<group>/<pkg>/`、既有 `DSH-GAP-AUDIT.md`（事件总线/model_visible，非布局）
