@@ -1,24 +1,57 @@
-"""assemble_lca_mv node — invoke LCA DefaultModelContextAssembler.assemble()."""
+"""assemble_lca_mv node — invoke LCA DefaultModelContextAssembler directly.
+
+Fusion refactor (2026-09-08): removed LcaMvProvider + SessionReaderAdapter
+adapter layer. This node now:
+  1. Builds a SessionReader from agent_lab artifact inputs (inlined)
+  2. Invokes DefaultModelContextAssembler.assemble(session, step)
+  3. Emits a manifest artifact shaped like ModelVisibleRequest
+"""
 
 from __future__ import annotations
 
+from typing import Any
+
 from agent_lab.nodes.base import Node
 from agent_lab.nodes.manifest import NodeKind, NodeLayer, PortInfo, PortKind, node
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
-_LCA_MV_PROVIDERS: dict[str, object] = {}
+from lca.contracts.protocols.session.model.context import ModelContextAssembler
+from lca.infrastructure.session.context.model_context_assembler import (
+    DefaultModelContextAssembler,
+)
 
 
-def register_lca_mv_provider(name: str, provider) -> None:
-    _LCA_MV_PROVIDERS[name] = provider
+class _ArtifactSessionReader:
+    """Minimal SessionReader backed by agent_lab artifact inputs.
 
+    Satisfies SessionReader Protocol structurally:
+      derive_messages() -> list[dict]
+      request_header()  -> dict | None
+      snapshot_events() -> tuple (empty, no event log in agent_lab)
+    """
 
-def _default_lca_mv_provider() -> object:
-    """Lazy-build a DefaultModelContextAssembler-backed provider."""
-    if "default" not in _LCA_MV_PROVIDERS:
-        from agent_lab.adapters.lca_mv import LcaMvProvider
+    def __init__(
+        self,
+        messages: list[dict[str, Any]],
+        system: str | None,
+        config: dict[str, Any] | None,
+        tools: list[dict[str, Any]],
+    ) -> None:
+        self._messages = messages
+        self._system = system
+        self._config = config
+        self._tools = tools
 
-        _LCA_MV_PROVIDERS["default"] = LcaMvProvider()
-    return _LCA_MV_PROVIDERS["default"]
+    def derive_messages(self) -> list[dict[str, Any]]:
+        return [dict(m) for m in self._messages]
+
+    def request_header(self) -> dict[str, Any] | None:
+        if self._system is None and self._config is None and not self._tools:
+            return None
+        return {"system": self._system, "config": self._config, "tools": list(self._tools)}
+
+    def snapshot_events(self, from_seq: int = 0, to_seq_exclusive: int | None = None) -> tuple:
+        return ()
 
 
 @node(
@@ -44,26 +77,43 @@ def _default_lca_mv_provider() -> object:
     relates_to=["commit_manifest", "merge_messages", "assemble_messages"],
 )
 class AssembleLcaMv(Node):
-    """Wire agent_lab into LCA's DefaultModelContextAssembler.
-
-    Adapter pattern: agent_lab does not import any LCA implementation here
-    at module-load time; the import is lazy so the framework can still
-    boot without lca installed.
-    """
+    """Wire agent_lab into LCA's DefaultModelContextAssembler directly."""
 
     name = "assemble_lca_mv"
 
     def execute(self, node, inputs):
-        provider_name = node.config.get("provider", "default")
-        provider = _LCA_MV_PROVIDERS.get(provider_name) or _default_lca_mv_provider()
-        out_port = node.config.get("to", "manifest")
+        # 1. Coerce artifact inputs into SessionReader shape.
+        msgs_a = inputs.get("messages")
+        sys_a = inputs.get("system")
+        cfg_a = inputs.get("config")
+        tls_a = inputs.get("tools")
+
+        messages: list[dict[str, Any]] = []
+        if msgs_a is not None and isinstance(msgs_a.content, list):
+            messages = [dict(m) for m in msgs_a.content if isinstance(m, dict)]
+
+        system = sys_a.content if (sys_a and isinstance(sys_a.content, str)) else None
+        config = dict(cfg_a.content) if (cfg_a and isinstance(cfg_a.content, dict)) else None
+        tools: list[dict[str, Any]] = []
+        if tls_a is not None and isinstance(tls_a.content, (list, tuple)):
+            tools = [dict(t) for t in tls_a.content if isinstance(t, dict)]
+
+        reader = _ArtifactSessionReader(messages, system, config, tools)
+
+        # 2. Run the real LCA assembler.
+        assembler: ModelContextAssembler = DefaultModelContextAssembler()
         step = int(node.config.get("step", 0))
-        return {
-            out_port: provider.assemble(
-                messages_artifact=inputs.get("messages"),
-                system_artifact=inputs.get("system"),
-                config_artifact=inputs.get("config"),
-                tools_artifact=inputs.get("tools"),
-                step=step,
-            )
-        }
+        req = assembler.assemble(reader, step=step)
+
+        # 3. Wrap as agent_lab MANIFEST artifact.
+        out_port = node.config.get("to", "manifest")
+        return {out_port: Artifact(
+            kind=ArtifactKind.MANIFEST,
+            content={
+                "messages": list(req.messages),
+                "system": req.system,
+                "config": req.config,
+                "tools": list(req.tools),
+            },
+            schema_ref="context.manifest.v1",
+        )}

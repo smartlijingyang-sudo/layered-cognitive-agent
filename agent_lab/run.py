@@ -58,17 +58,11 @@ def _bootstrap() -> None:
 
 
 def _register_lca_mv() -> None:
-    """Register LCA's DefaultModelContextAssembler as the agent_lab mv provider.
+    """No-op kept for backwards compatibility.
 
-    Lazy-imported so the framework still boots if lca isn't importable.
+    The assemble_lca_mv node now imports DefaultModelContextAssembler
+    directly; provider registration is no longer needed.
     """
-    try:
-        from agent_lab.adapters.lca_mv import LcaMvProvider
-        from agent_lab.nodes.mv import register_lca_mv_provider
-
-        register_lca_mv_provider("lca", LcaMvProvider())
-    except Exception as exc:  # pragma: no cover
-        print(f"[warn] LCA mv provider not registered: {exc!r}")
 
 
 # ---------- Demo runners --------------------------------------------------

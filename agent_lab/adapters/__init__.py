@@ -1,24 +1,13 @@
-"""Adapters — bridge agent_lab artifacts into LCA contracts (one-way).
-
-Fusion refactor (2026-09-08): this module is being progressively deleted.
-Each adapter that becomes redundant (LCA module directly importable via
-`uv run`) is removed and its node plugin imports LCA directly instead.
-
-Currently retained:
-  - mv.assemble adapter (lca_mv.py) — will be removed next
-  - call_llm adapter (lca_llm.py) — will be removed next
-  - read_file Tool (adapters/tools/read_file.py) — agent_lab's own Tool
+"""Adapters — being progressively deleted in fusion refactor (2026-09-08).
 
 Removed:
-  - lca_body.py — dispatch_tool now imports SimpleSafeExecutor directly
+  - lca_body.py, lca_llm.py, lca_mv.py
+
+Remaining (next commits):
+  - lca_perceive.py, lca_event.py, lca_memory.py, lca_think.py,
+    lca_reflect.py, lca_stop.py, lca_control.py, lca_control_act.py,
+    lca_toolbox.py
+  - tools/read_file.py (kept, agent_lab's own Tool)
 """
 
-# Temporary re-exports kept until lca_mv / lca_llm are also removed.
-from agent_lab.adapters.lca_llm import LcaLlmProvider
-from agent_lab.adapters.lca_mv import LcaMvProvider, SessionReaderAdapter
-
-__all__ = [
-    "LcaLlmProvider",
-    "LcaMvProvider",
-    "SessionReaderAdapter",
-]
+__all__: list[str] = []

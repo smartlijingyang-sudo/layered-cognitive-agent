@@ -1,16 +1,19 @@
-"""perceive_build node — call LcaPerceiveProvider and freeze ContextManifest.
+"""perceive_build node — call Hub.perceive(state) directly, freeze ContextManifest.
 
-A single ant-worker: read `sanitized` + `state` artifacts, run
-Hub.perceive(state) through the resolved provider, and emit one
-MANIFEST artifact carrying the frozen ContextManifest.
+Fusion refactor (2026-09-08): removed LcaPerceiveProvider + register_fixture_hub
+adapter layer. This node now:
+  1. Resolves a PerceiveHub from node.config (factory ref or NullPerceiveHub)
+  2. Coerces the state artifact into an LCA AgentState
+  3. Calls hub.perceive(state) and wraps the frozen ContextManifest
 
-Provider selection is data, not code; see
-``agent_lab/graphs/configs/perceive.yaml`` for the canonical call site.
-The Hub is the SOLE emitter of ContextManifested (per LCA contracts);
-this node never constructs a ContextManifest by hand.
+Test fixtures: tests register Hubs via the same _FIXTURE_HUBS dict exposed
+by this module (still process-local; no fixture code in production paths).
 """
 
 from __future__ import annotations
+
+import asyncio
+from typing import Any
 
 from agent_lab.nodes.base import Node
 from agent_lab.nodes.manifest import (
@@ -22,6 +25,69 @@ from agent_lab.nodes.manifest import (
 )
 from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
+# Process-local fixture Hub registry (test-only path; keeps node.config
+# JSON-serializable for plan_hash dump).
+_FIXTURE_HUBS: dict[str, Any] = {}
+
+
+def register_fixture_hub(name: str, hub: Any) -> None:
+    """Register a Hub under ``name`` for later resolution by config."""
+    _FIXTURE_HUBS[name] = hub
+
+
+def unregister_fixture_hub(name: str) -> None:
+    _FIXTURE_HUBS.pop(name, None)
+
+
+def _resolve_hub(config: dict[str, Any]) -> Any:
+    """Resolve a PerceiveHub from the node's provider_config block."""
+    cfg = config.get("provider_config") or {}
+    name = cfg.get("fixture_hub_name")
+    if name and name in _FIXTURE_HUBS:
+        return _FIXTURE_HUBS[name]
+    factory = cfg.get("hub_factory")
+    if isinstance(factory, dict) and factory.get("ref"):
+        ref = factory["ref"]
+        kwargs = dict(factory.get("kwargs") or {})
+        mod, _, attr = ref.partition(":")
+        cls = getattr(__import__(mod, fromlist=[attr]), attr)
+        return cls(**kwargs)
+    # Default: NullPerceiveHub (always works, requires only contracts).
+    from lca.plugins.composer.runtime.fixture.runtime_factory import NullPerceiveHub
+    return NullPerceiveHub()
+
+
+def _coerce_state(artifact: Artifact | None) -> Any:
+    """Coerce an agent_lab state artifact into an LCA AgentState."""
+    from lca.contracts.models.core.state.state import AgentState
+
+    content = (artifact.content if artifact is not None else None) or {}
+    if not isinstance(content, dict):
+        content = {}
+    extra = dict(content.get("extra") or {})
+    known = {"step", "history", "retrieved_context", "working_memory", "schema_version"}
+    for k, v in content.items():
+        if k not in known and k != "extra":
+            extra[k] = v
+    return AgentState(
+        trace_id="",
+        task="",
+        budget=None,
+        step=int(content.get("step", 0) or 0),
+        retrieved_context=tuple(content.get("retrieved_context") or ()),
+        extra=extra,
+    )
+
+
+def _item_to_dict(item: Any) -> dict[str, Any]:
+    return {
+        "kind": getattr(item, "kind", ""),
+        "payload": getattr(item, "payload", None),
+        "provenance": getattr(item, "provenance", ""),
+        "ref": getattr(item, "ref", None),
+        "extra": dict(getattr(item, "extra", {}) or {}),
+    }
+
 
 @node(
     id="perceive_build",
@@ -29,7 +95,7 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
     layer=NodeLayer.MODEL_VISIBLE,
     kind=NodeKind.EXECUTOR,
     description=(
-        "Resolve LcaPerceiveProvider from node.config, call Hub.perceive(state) "
+        "Resolve a PerceiveHub from node.config, call Hub.perceive(state) "
         "on the AgentState coerced from the state artifact, and emit a frozen "
         "ContextManifest as a MANIFEST artifact."
     ),
@@ -44,31 +110,22 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
     relates_to=["trust_classify", "dedup", "rank", "redact"],
 )
 class PerceiveBuild(Node):
-    """Single ant-worker that delegates to LcaPerceiveProvider.
-
-    Adapter pattern: agent_lab does not import any LCA implementation at
-    module-load time; the import is lazy (via
-    ``agent_lab.adapters.lca_perceive.LcaPerceiveProvider``) so the
-    framework can still boot without lca installed. Fixtures inject a
-    Hub directly via ``provider_config.fixture_hub``; production profiles
-    inject ``provider_config.hub_factory``.
-    """
+    """Call Hub.perceive(state) directly; emit frozen ContextManifest."""
 
     name = "perceive_build"
 
     def execute(self, node, inputs):
-        from agent_lab.adapters.lca_perceive import LcaPerceiveProvider
-
-        provider = LcaPerceiveProvider.from_node_config(node.config)
+        hub = _resolve_hub(node.config)
         out_port = node.config.get("to", node.outs[0] if node.outs else "manifest")
-        sanitized = inputs.get("sanitized")
-        state = inputs.get("state")
-        # If the upstream is empty (e.g. classify produced no labels), still
-        # build the artifact so the manifest is frozen for downstream.
-        if sanitized is None:
-            sanitized = Artifact(kind=ArtifactKind.TEXT, content="")
-        return provider.build(
-            sanitized_artifact=sanitized,
-            state_artifact=state,
-            out_port=out_port,
-        )
+        state = _coerce_state(inputs.get("state"))
+        manifest = asyncio.run(hub.perceive(state))
+        return {out_port: Artifact(
+            kind=ArtifactKind.MANIFEST,
+            content={
+                "items": [_item_to_dict(item) for item in manifest.items],
+                "digest": manifest.digest,
+                "schema_version": manifest.schema_version,
+                "extra": dict(manifest.extra or {}),
+            },
+            schema_ref="context.manifest.v1",
+        )}

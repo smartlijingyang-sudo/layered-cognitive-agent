@@ -1,58 +1,77 @@
-"""call_llm node — config-driven provider; no global registry.
+"""call_llm node — invoke LCA LLMAdapter directly.
 
-Each call_llm node reads its provider from ``node.config``:
-  - ``provider_ref``: dotted ``module:Class`` path to a provider class that
-    accepts ``complete(messages_artifact) -> Artifact``. The real LCA
-    adapter ``LcaLlmProvider`` wraps any ``lca.contracts.protocols.LLMAdapter``
-    (e.g. ``OpenAICompatAdapter``); YAML declares it via
-    ``adapter_factory: {ref, kwargs}``.
-  - ``provider_config``: opaque dict passed to the provider's constructor.
-  - ``provider_kind``: optional shorthand — ``"lca"`` maps to the default
-    ``LcaLlmProvider`` so YAML stays terse.
+Fusion refactor (2026-09-08): removed LcaLlmProvider adapter layer.
+This node now imports any LLMAdapter Protocol implementation directly.
 
-No global registration. No Python-side setup. The graph config IS the
-provider selection.
+Configuration (node.config):
+  - adapter_factory: {ref: "module:Class", kwargs: {}}
+      Resolves to an LLMAdapter instance (e.g. OpenAICompatAdapter).
+  - from / to: port renames (default: messages -> response)
+
+The default `provider_kind: lca` maps to OpenAICompatAdapter (the real
+LCA adapter) — same semantics as before, fewer indirections.
+
+Node responsibility boundary:
+  - call_llm DOES NOT handle message-list structure. It hands the
+    artifact's content to the configured LLMAdapter.
+  - The current LCA OpenAICompatAdapter.complete(prompt: str) accepts a
+    string prompt, not a list-of-messages. To preserve that contract
+    while staying close to the node's "just call the adapter" role,
+    the node flattens the OpenAI-style message list into a single
+    prompt string with [role] prefixes.
+  - This is documented as a known limitation: when LCA ships an
+    LLMAdapter that accepts message lists natively, the flatten step
+    disappears. Until then, the node holds the flatten to keep the
+    adapter call minimal.
+
+Behaviour:
+  - messages list is flattened to a single prompt string
+  - adapter.complete(prompt) is awaited via asyncio.run (sync bridge)
+  - response.text is wrapped in a make_message artifact
 """
 
 from __future__ import annotations
 
+import asyncio
 import importlib
 
 from agent_lab.nodes.base import Node
 from agent_lab.nodes.manifest import NodeKind, NodeLayer, PortInfo, PortKind, node
-from agent_lab.primitives.artifact import Artifact, ArtifactKind
+from agent_lab.primitives.artifact import Artifact, ArtifactKind, make_message
 
 _DEFAULT_PROVIDER_KINDS: dict[str, str] = {
-    "lca": "agent_lab.adapters.lca_llm:LcaLlmProvider",
+    "lca": "lca.infrastructure.llm_adapter.openai_compat:OpenAICompatAdapter",
 }
 
 
-def _resolve_provider(node):
-    """Read provider factory from node.config and instantiate it.
+def _resolve_adapter(node):
+    """Read LLMAdapter factory from node.config and instantiate it.
 
     Resolution order:
-      1. ``provider_ref`` (module:Class) -> import + instantiate(**provider_config)
-      2. ``provider_kind`` ('lca') -> map to default ``provider_ref``
-      3. raise ConfigurationError
+      1. ``adapter_factory`` ({ref, kwargs}) -> import + instantiate(**kwargs)
+      2. ``provider_ref`` (module:Class) -> import + instantiate(**provider_config)
+      3. ``provider_kind`` ('lca') -> map to default adapter_factory
     """
     cfg = node.config or {}
-    provider_ref = cfg.get("provider_ref")
-    provider_kind = cfg.get("provider_kind")
-    if provider_ref is None and provider_kind is not None:
-        provider_ref = _DEFAULT_PROVIDER_KINDS.get(provider_kind)
-    if provider_ref is None:
-        raise RuntimeError(
-            f"call_llm node '{node.id}' missing 'provider_ref' or 'provider_kind' in config"
-        )
-    module_name, _, class_name = provider_ref.partition(":")
+    factory = cfg.get("adapter_factory")
+    if factory is None:
+        provider_ref = cfg.get("provider_ref")
+        provider_kind = cfg.get("provider_kind")
+        if provider_ref is None and provider_kind is not None:
+            provider_ref = _DEFAULT_PROVIDER_KINDS.get(provider_kind)
+        if provider_ref is None:
+            raise RuntimeError(
+                f"call_llm node '{node.id}' missing adapter_factory / provider_ref / provider_kind"
+            )
+        factory = {"ref": provider_ref, "kwargs": dict(cfg.get("provider_config", {}) or {})}
+    ref = factory["ref"]
+    kwargs = dict(factory.get("kwargs", {}) or {})
+    module_name, _, class_name = ref.partition(":")
     if not module_name or not class_name:
-        raise RuntimeError(
-            f"call_llm node '{node.id}': provider_ref must be 'module:Class', got {provider_ref!r}"
-        )
+        raise ValueError(f"adapter_factory.ref must be 'module:Class', got {ref!r}")
     module = importlib.import_module(module_name)
-    provider_cls = getattr(module, class_name)
-    provider_config = cfg.get("provider_config", {}) or {}
-    return provider_cls(**provider_config)
+    cls = getattr(module, class_name)
+    return cls(**kwargs)
 
 
 @node(
@@ -60,9 +79,9 @@ def _resolve_provider(node):
     layer=NodeLayer.PHASE,
     kind=NodeKind.EXECUTOR,
     description=(
-        "Send messages to a provider loaded from node.config (provider_ref or "
-        "provider_kind). Returns an assistant message artifact. Provider is "
-        "instantiated per-node on each execute(); no global registry."
+        "Send messages to an LLMAdapter resolved from node.config. Returns "
+        "an assistant message artifact. Adapter is instantiated per-node; "
+        "no global registry."
     ),
     inputs=[PortInfo("from", kind=PortKind.MESSAGE, required=False)],
     outputs=[PortInfo("to", kind=PortKind.MESSAGE)],
@@ -73,7 +92,7 @@ def _resolve_provider(node):
     relates_to=["assemble_messages", "merge_messages"],
 )
 class CallLLM(Node):
-    """Send messages to the configured provider; return assistant message."""
+    """Send messages to a real LLMAdapter; return assistant message."""
 
     name = "call_llm"
 
@@ -84,13 +103,21 @@ class CallLLM(Node):
         msgs = msgs_a.content if msgs_a else []
         if not isinstance(msgs, list):
             msgs = [{"role": "user", "content": str(msgs_a.content if msgs_a else "")}]
-        messages_artifact = Artifact(
-            kind=ArtifactKind.MESSAGE, content=msgs, schema_ref="openai.messages.v1"
-        )
-        provider = _resolve_provider(node)
-        if not hasattr(provider, "complete"):
-            raise RuntimeError(
-                f"call_llm node '{node.id}': provider {type(provider).__name__} "
-                "has no .complete() method"
-            )
-        return {out_port: provider.complete(messages_artifact=messages_artifact)}
+
+        adapter = _resolve_adapter(node)
+        prompt = self._flatten(msgs)
+        # LLMAdapter.complete is async; bridge to sync with asyncio.run.
+        response = asyncio.run(adapter.complete(prompt))
+        text = getattr(response, "text", "") or ""
+        return {out_port: make_message(text, content=text)}
+
+    @staticmethod
+    def _flatten(messages: list[dict]) -> str:
+        parts: list[str] = []
+        for m in messages:
+            if not isinstance(m, dict):
+                continue
+            role = m.get("role", "user")
+            content = m.get("content", "")
+            parts.append(f"[{role}] {content}")
+        return "\n".join(parts)
