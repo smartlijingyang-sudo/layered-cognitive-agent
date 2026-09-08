@@ -18,7 +18,6 @@ from __future__ import annotations
 
 from lca.contracts.models.core.policy.budget import Budget
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.models.core.workspace.activation import ActivatedSkill
 from lca.infrastructure.skills.activation.bridge import SkillActivationReducerBridge
 from lca.infrastructure.skills.activation.bridge import bridge as global_bridge
 from lca.plugins.loop.reducer.plugin import DefaultReducer
@@ -32,7 +31,6 @@ def test_bridge_handle_before_install_is_noop() -> None:
     """未 install 时 handle() 不抛、不写 state。"""
     b = SkillActivationReducerBridge()
     state = _fresh_state()
-    reducer = DefaultReducer()
     # install 之前 call —— 应是 no-op
     b.handle(skill_id="pdf", name="PDF")
     assert state.activated_skills == []
@@ -131,10 +129,10 @@ def test_register_activated_in_scope_invokes_bridge() -> None:
 
 
 __all__ = [
+    "test_bridge_dispose_makes_handle_noop",
     "test_bridge_handle_before_install_is_noop",
     "test_bridge_install_then_handle_folds_into_state",
     "test_bridge_repeated_handle_appends",
-    "test_bridge_dispose_makes_handle_noop",
     "test_global_singleton_install_dispose_idempotent",
     "test_register_activated_in_scope_invokes_bridge",
 ]

@@ -177,12 +177,10 @@ class CognitiveRuntime(Runtime):
             begin_turn,
             reset_lifecycle,
         )
+
         # PR-E:把 reducer 装到 SkillActivationReducerBridge,让
         # ``register_activated`` 把激活 fold 进 state.activated_skills
         # (C4 兑现路径)。dispose 由 finally 兜底,保证 run 中断不悬空。
-        from lca.infrastructure.skills.activation.bridge import SkillActivationReducerBridge
-
-        bridge: SkillActivationReducerBridge = SkillActivationReducerBridge()
         # 进程级 singleton —— install 一次覆盖前一个 run 的绑定
         # (若前一个 run 忘记 dispose,这里强制清理)。
         from lca.infrastructure.skills.activation.bridge import bridge as global_bridge

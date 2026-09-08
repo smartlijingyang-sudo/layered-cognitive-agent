@@ -23,7 +23,8 @@ delete_when(PR-E):
 from __future__ import annotations
 
 import threading
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from lca.contracts.models.core.workspace.activation import ActivatedSkill
 
@@ -50,10 +51,10 @@ class SkillActivationReducerBridge:
     交叉;handle 自身的 reducer 调用由 caller 负责并发语义。
     """
 
-    __slots__ = ("_reducer", "_state_getter", "_lock", "_installed")
+    __slots__ = ("_installed", "_lock", "_reducer", "_state_getter")
 
     def __init__(self) -> None:
-        self._reducer: "Reducer | None" = None
+        self._reducer: Reducer | None = None
         self._state_getter: StateGetter | None = None
         self._lock = threading.Lock()
         self._installed = False
@@ -61,7 +62,7 @@ class SkillActivationReducerBridge:
     def install(
         self,
         *,
-        reducer: "Reducer",
+        reducer: Reducer,
         state_getter: StateGetter,
     ) -> None:
         """运行启动时绑定 reducer + state accessor。多次 install 是幂等的(覆盖)。"""
