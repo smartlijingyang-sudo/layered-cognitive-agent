@@ -7,6 +7,7 @@ here only.
 
 from __future__ import annotations
 
+import warnings
 from typing import Any, Literal
 
 import structlog
@@ -14,6 +15,20 @@ import structlog
 from lca.contracts.observability.cursor.loop_cursor import CursorError, LoopCursor, PhaseName
 
 _log = structlog.get_logger(__name__)
+
+# COMPAT(delete-when: cursor second-track fully retired per ADR-0185 P5 / ADR-0186,
+#   tracking: PR-C)
+# cursor.record_* is deprecated — Session.append is the sole fact production entry.
+warnings.warn(
+    "cursor.record_* is deprecated; route through Session.append (ADR-0185 P5 / ADR-0186)",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+# Idempotency guard: invocation_ids already written via try_record_tool_call.
+# Prevents duplicate ``step.tool_call.record`` events when the same invocation
+# is recorded more than once (e.g. dual-track emit during migration).
+_seen_tool_call_invocations: set[str] = set()
 
 
 class CursorRecord:
@@ -69,7 +84,7 @@ class CursorRecord:
         *,
         tool_name: str,
         invocation_id: str,
-        args_digest: str,
+        args_digest: str = "",
         arguments: dict[str, Any] | None = None,
         arguments_summary: str = "",
     ) -> None:
@@ -83,7 +98,15 @@ class CursorRecord:
           tool 调用内容;
         - exceptions.jsonl / journal.json / model_visible 三处对 tool
           调用的还原走同一条字段链,无需 reader 自己 parse digest。
+
+        Idempotency: if ``invocation_id`` was already recorded, this is a
+        silent no-op (prevents duplicate ``step.tool_call.record`` events
+        during the dual-track migration window).
         """
+        # Idempotency guard — same invocation_id → same fact, no second write.
+        if invocation_id and invocation_id in _seen_tool_call_invocations:
+            return
+
         from lca.contracts.observability.cursor.loop_cursor_payloads import ToolCallRecord
 
         cursor = CursorRecord.get()
@@ -101,6 +124,8 @@ class CursorRecord:
                     invocation_id=invocation_id,
                 ),
             )
+            if invocation_id:
+                _seen_tool_call_invocations.add(invocation_id)
         except CursorError as exc:
             _log.warning(
                 "cursor_record_tool_call_failed",

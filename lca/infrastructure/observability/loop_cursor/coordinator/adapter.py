@@ -37,8 +37,7 @@ COMPAT 块(AGENTS.md §1 + G15 模板)
 
 from __future__ import annotations
 
-import hashlib
-import json
+import warnings
 from contextvars import ContextVar, Token
 from typing import Any, get_args
 
@@ -66,23 +65,14 @@ from lca.infrastructure.observability.writable_matrix.coordinator import StepCoo
 
 _VALID_CURSOR_PHASES = frozenset(get_args(PhaseName))
 
-_DIGEST_PREFIX = "sha256:"
-
-
-def sha256_digest(payload: Any) -> str:
-    """Stable digest in ``sha256:<hex>`` form — JSON 序列化 → sha256。
-
-    ADR-0185 PR-4 收口后为 ``sha256:<hex>`` digest 形态的唯一实现(承接
-    旁路 capture 退场前的同名 helper)。``ensure_ascii=False`` 保持
-    原字节级行为:非 ASCII 内容 digest 不因序列化转义改变。
-    """
-    encoded = json.dumps(
-        payload,
-        sort_keys=True,
-        ensure_ascii=False,
-        default=str,
-    ).encode("utf-8")
-    return _DIGEST_PREFIX + hashlib.sha256(encoded).hexdigest()
+# COMPAT(delete-when: cursor second-track fully retired per ADR-0185 P5 / ADR-0186,
+#   tracking: PR-C)
+# cursor.record_* is deprecated — Session.append is the sole fact production entry.
+warnings.warn(
+    "cursor.record_* is deprecated; route through Session.append (ADR-0185 P5 / ADR-0186)",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 # COMPAT(delete-when: PR-21~24 grep 全部为 0, tracking: ADR-0169-task-25)
@@ -191,7 +181,7 @@ class CoordinatorAdapter:
         reasoning_text = getattr(trace, "reasoning", "") or ""
         self._cursor.record_thinking(
             ThinkingRecord(
-                content_digest=sha256_digest({"reasoning": reasoning_text}),
+                content_digest="",
                 content_path=None,
                 token_count=token_count,
                 thinking_kind="reasoning",
@@ -216,7 +206,7 @@ class CoordinatorAdapter:
         self._cursor.record_tool_call(
             ToolCallRecord(
                 tool_name=tool_name,
-                args_digest=sha256_digest({"args": args_summary, "invocation_id": invocation_id}),
+                args_digest="",
                 args_payload_path=None,
                 call_seq=self._cursor.snapshot.seq,
                 arguments=arguments,
@@ -246,7 +236,7 @@ class CoordinatorAdapter:
         self._cursor.record_tool_result(
             ToolResultRecord(
                 tool_name=tool_name,
-                result_digest=sha256_digest({"delta_summary": delta_summary}),
+                result_digest="",
                 result_path=None,
                 outcome=outcome,  # type: ignore[arg-type]
                 ok=ok,

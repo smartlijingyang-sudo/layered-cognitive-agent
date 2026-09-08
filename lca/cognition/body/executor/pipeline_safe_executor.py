@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+import warnings
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from typing import Any, cast
@@ -48,6 +49,14 @@ from lca.contracts.protocols.act.tool.pipeline import (
 )
 from lca.infrastructure.tool.pipeline import DefaultToolExecutionPipeline
 from lca.infrastructure.tools.tool.invocation_scope import tool_invocation_scope
+
+# COMPAT(delete-when: cursor second-track fully retired per ADR-0185 P5 / ADR-0186,
+#   tracking: PR-C)
+warnings.warn(
+    "cursor.record_* is deprecated; route through Session.append (ADR-0185 P5 / ADR-0186)",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 _log = structlog.get_logger("lca.safe_executor")
 
@@ -312,7 +321,6 @@ class PipelineSafeExecutor(SafeExecutor):
         CursorRecord.try_record_tool_call(
             tool_name=tool.name,
             invocation_id=invocation_id,
-            args_digest=f"tool:{tool.name}",
         )
         act_closed = False
         try:

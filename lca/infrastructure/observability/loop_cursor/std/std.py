@@ -7,6 +7,7 @@ llm hook / model_visible recorder 实例(评审 S1 处方,AST scan 验证)。
 
 from __future__ import annotations
 
+import warnings
 from typing import Literal, get_args
 
 from lca.contracts.observability.core.incarnation import Incarnation
@@ -29,6 +30,14 @@ from lca.infrastructure.observability.loop_cursor.spine._spine_port import Write
 from lca.infrastructure.observability.loop_cursor.state.state import _CursorState
 
 _VALID_PHASES = frozenset(get_args(PhaseName))
+
+# COMPAT(delete-when: cursor second-track fully retired per ADR-0185 P5 / ADR-0186,
+#   tracking: PR-C)
+warnings.warn(
+    "cursor.record_* is deprecated; route through Session.append (ADR-0185 P5 / ADR-0186)",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 class StdLoopCursor:

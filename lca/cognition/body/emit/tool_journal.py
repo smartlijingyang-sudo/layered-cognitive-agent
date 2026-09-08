@@ -16,6 +16,7 @@ evidence 平面,inline 由后续 EvidencePolicy.should_inline() 决策启用。
 from __future__ import annotations
 
 import json
+import warnings
 from collections.abc import Mapping
 from typing import Any
 
@@ -39,6 +40,14 @@ from lca.contracts.observability.evidence.evidence import (
 from lca.contracts.protocols.runtime.infra.infra import Tool
 from lca.infrastructure.session.commit.fact_committer import emit_diagnostic
 from lca.infrastructure.tools.contract.project.project import project_tool_state
+
+# COMPAT(delete-when: cursor second-track fully retired per ADR-0185 P5 / ADR-0186,
+#   tracking: PR-C)
+warnings.warn(
+    "cursor.record_* is deprecated; route through Session.append (ADR-0185 P5 / ADR-0186)",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 _log = structlog.get_logger(__name__)
 
@@ -134,7 +143,6 @@ def record_tool_started_observability(
     CursorRecord.try_record_tool_call(
         tool_name=tool.name,
         invocation_id=invocation_id,
-        args_digest=_summarize_args(args_dict),
         arguments=inline_args,
         arguments_summary=_summarize_args(args_dict),
     )

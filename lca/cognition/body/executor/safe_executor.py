@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+import warnings
 from typing import Any, Literal
 
 import structlog
@@ -31,6 +32,14 @@ from lca.infrastructure.session._overflow_0.bindings import await_tool_side_effe
 from lca.infrastructure.tools.tool.invocation_scope import tool_invocation_scope
 
 _log = structlog.get_logger("lca.safe_executor")
+
+# COMPAT(delete-when: cursor second-track fully retired per ADR-0185 P5 / ADR-0186,
+#   tracking: PR-C)
+warnings.warn(
+    "cursor.record_* is deprecated; route through Session.append (ADR-0185 P5 / ADR-0186)",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 _PERF_COUNTER_SCALE = 1000
 # R1: deterministic exceptions live in ``_retry_classification`` so the two
@@ -266,7 +275,6 @@ class SimpleSafeExecutor(SafeExecutor):
         CursorRecord.try_record_tool_call(
             tool_name=tool.name,
             invocation_id=invocation_id,
-            args_digest=f"tool:{tool.name}",
             arguments=arguments_for_record,
             arguments_summary=_summarize_args_for_cursor(arguments_for_record),
         )
@@ -550,7 +558,6 @@ def _record_tool_call_evidence(tool_name: str, invocation_id: str) -> None:
     CursorRecord.try_record_tool_call(
         tool_name=tool_name,
         invocation_id=invocation_id,
-        args_digest=f"tool:{tool_name}",
     )
 
 
