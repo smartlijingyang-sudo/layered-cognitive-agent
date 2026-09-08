@@ -17,12 +17,36 @@ The async-to-sync bridge uses asyncio.run() inside the sync node.execute() body.
 from __future__ import annotations
 
 import asyncio
+import importlib
 import inspect
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
 from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+
+def _build_tool_from_factory(entry: dict) -> ToolShim:
+    """Build a ToolShim from a ``{ref: module:Class, kwargs: {...}}`` dict.
+
+    The kwargs dict may itself contain a ``callable_ref`` key — a
+    ``module:function`` path — which the resolver turns into the actual
+    Python callable before passing it to the ToolShim constructor.
+    """
+    ref = entry["ref"]
+    kwargs = dict(entry.get("kwargs", {}) or {})
+    module_name, _, class_name = ref.partition(":")
+    if not module_name or not class_name:
+        raise ValueError(f"tool factory ref must be 'module:Class', got {ref!r}")
+    # Resolve callable_ref: module:function -> actual function
+    if "callable_ref" in kwargs:
+        cmod, _, cfn = kwargs["callable_ref"].partition(":")
+        cmod_obj = importlib.import_module(cmod)
+        kwargs["_callable"] = getattr(cmod_obj, cfn)
+        kwargs.pop("callable_ref", None)
+    module = importlib.import_module(module_name)
+    cls = getattr(module, class_name)
+    return cls(**kwargs)
 
 # ---------- Tool Protocol shim --------------------------------------------
 
@@ -71,12 +95,20 @@ class LcaBodyProvider:
     """Wraps SimpleSafeExecutor + a dict of Tool shims.
 
     invoke(tool, args) -> dict (LCA Observation turned into agent_lab receipt).
+
+    Accepts either:
+      - ``tools=``: pre-built dict of ToolShim (Python-side setup)
+      - ``tool_factories=``: list of ``{"ref": "module:Class", "kwargs": {...}}``
+        factory refs the provider uses to build ToolShims on init
+      - ``allowed_tools=``: tuple of tool names; falls back to factory names
     """
 
     def __init__(
         self,
         tools: dict[str, ToolShim] | None = None,
         allowed_tools: tuple[str, ...] | None = None,
+        *,
+        tool_factories: list[dict] | None = None,
     ) -> None:
         # Lazy import so agent_lab boots without lca.
         from lca.cognition.body.executor.safe_executor import SimpleSafeExecutor
@@ -86,7 +118,11 @@ class LcaBodyProvider:
             ToolPermissionManifest,
         )
 
-        self._tools: dict[str, ToolShim] = tools or {}
+        self._tools: dict[str, ToolShim] = dict(tools or {})
+        # Build tools from factory refs (config-driven path).
+        for entry in tool_factories or []:
+            shim = _build_tool_from_factory(entry)
+            self._tools[shim.name] = shim
         allow = set(allowed_tools or self._tools.keys())
         self._executor = SimpleSafeExecutor(
             ToolPermissionManifest(allowed_tools=list(allow))
@@ -126,3 +162,14 @@ class LcaBodyProvider:
             content=self.invoke(tool_name, args),
             schema_ref="tool.receipt.v1",
         )
+
+
+def _echo_factory_callable(args: dict[str, Any]) -> str:
+    """Demo callable referenced by the YAML tool_factories block."""
+    return f"echo({args})"
+
+
+def _calc_factory_callable(args: dict[str, Any]) -> str:
+    """Demo callable referenced by the YAML tool_factories block."""
+    expr = str(args.get("expr", "0"))
+    return str(eval(expr, {"__builtins__": {}}, {}))  # noqa: S307 — demo only

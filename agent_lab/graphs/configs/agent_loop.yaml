@@ -64,7 +64,13 @@ nodes:
     region: phase:think
     factory: call_llm
     config:
-      provider: lca
+      provider_kind: lca
+      provider_ref: agent_lab.adapters.lca_llm:LcaLlmProvider
+      provider_config:
+        adapter_factory:
+          ref: agent_lab.adapters.lca_llm:LlmAdapterShim
+          kwargs:
+            callable_ref: agent_lab.adapters.lca_llm:_echo_llm
       from: messages_in
       to: response
     ins: [messages_in]

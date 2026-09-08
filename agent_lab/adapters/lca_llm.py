@@ -52,10 +52,42 @@ class LlmAdapterShim:
 
 
 class LcaLlmProvider:
-    """Bridge agent_lab call_llm node to LCA LLMAdapter."""
+    """Bridge agent_lab call_llm node to LCA LLMAdapter.
 
-    def __init__(self, adapter: LlmAdapterShim) -> None:
-        self._adapter = adapter
+    Accepts either a pre-built ``LlmAdapterShim`` (``adapter=``) or a
+    factory reference dict (``adapter_factory=``) shaped like
+    ``{"ref": "module:Class", "kwargs": {...}}``. The latter lets YAML
+    config fully describe the provider without Python-side setup.
+    """
+
+    def __init__(
+        self,
+        adapter: LlmAdapterShim | None = None,
+        *,
+        adapter_factory: dict | None = None,
+    ) -> None:
+        if adapter is None and adapter_factory is None:
+            raise ValueError("LcaLlmProvider needs either `adapter` or `adapter_factory`")
+        if adapter is not None:
+            self._adapter = adapter
+            return
+        # Build adapter from factory ref.
+        import importlib
+
+        ref = adapter_factory["ref"]
+        kwargs = dict(adapter_factory.get("kwargs", {}) or {})
+        module_name, _, class_name = ref.partition(":")
+        if not module_name or not class_name:
+            raise ValueError(f"adapter_factory.ref must be 'module:Class', got {ref!r}")
+        # Resolve nested callable_ref: module:function -> actual callable.
+        if "callable_ref" in kwargs:
+            cmod, _, cfn = kwargs["callable_ref"].partition(":")
+            cmod_obj = importlib.import_module(cmod)
+            kwargs["callable_"] = getattr(cmod_obj, cfn)
+            kwargs.pop("callable_ref", None)
+        module = importlib.import_module(module_name)
+        cls = getattr(module, class_name)
+        self._adapter = cls(**kwargs)
 
     def complete(
         self,
@@ -91,3 +123,16 @@ def make_message_artifact(content: str, role: str = "assistant") -> Artifact:
         content={"role": role, "content": content},
         schema_ref="openai.message.v1",
     )
+
+
+def _echo_llm(prompt: str, **kwargs) -> str:
+    """Default echo-style LLM callable used in demo graph configs.
+
+    Real apps replace this via provider_config.adapter_factory.kwargs.callable_ref.
+    """
+    last_user = "no user message"
+    for line in reversed(prompt.split("\n")):
+        if line.startswith("[user]"):
+            last_user = line.removeprefix("[user] ").strip()
+            break
+    return f"ack: {last_user}"

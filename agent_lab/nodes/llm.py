@@ -1,55 +1,67 @@
-"""LLM nodes — thin adapters that call a configured provider.
+"""LLM nodes — thin adapters driven by graph config (no global registry).
 
-In this prototype, providers are in-process callables registered into
-`llm_providers`.  Real wiring would replace this with an HTTP client.
+Each call_llm node reads its provider from ``node.config``:
+  - ``provider_ref``: dotted ``module:Class`` path to a provider class that
+    accepts ``complete(messages_artifact) -> Artifact`` (see
+    ``agent_lab.adapters.lca_llm.LcaLlmProvider`` for the LCA shape).
+  - ``provider_config``: opaque dict passed to the provider's constructor.
+  - ``provider_kind``: optional shorthand — ``"lca"`` / ``"mock"`` map to
+    default provider_ref paths so YAML stays terse.
+
+No global registration. No Python-side setup. The graph config IS the
+provider selection.
 """
 
 from __future__ import annotations
 
+import importlib
+
 from agent_lab.nodes.base import Node
 from agent_lab.nodes.manifest import NodeKind, NodeLayer, PortInfo, PortKind, node
-from agent_lab.primitives.artifact import Artifact, ArtifactKind, make_message
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
-_LLM_PROVIDERS: dict[str, callable] = {}  # name -> callable(messages) -> str
-_LLM_PROVIDER_OBJS: dict[str, object] = {}  # name -> LcaLlmProvider (LCA-backed)
-
-
-def register_llm_provider(name: str, fn) -> None:
-    _LLM_PROVIDERS[name] = fn
+_DEFAULT_PROVIDER_KINDS: dict[str, str] = {
+    "lca": "agent_lab.adapters.lca_llm:LcaLlmProvider",
+}
 
 
-def register_llm_provider_obj(name: str, provider) -> None:
-    _LLM_PROVIDER_OBJS[name] = provider
+def _resolve_provider(node):
+    """Read provider factory from node.config and instantiate it.
 
-
-def _default_lca_llm_provider():
-    if "lca" not in _LLM_PROVIDER_OBJS:
-        from agent_lab.adapters.lca_llm import LcaLlmProvider, LlmAdapterShim
-
-        adapter = LlmAdapterShim(callable_=_echo_llm)
-        _LLM_PROVIDER_OBJS["lca"] = LcaLlmProvider(adapter)
-    return _LLM_PROVIDER_OBJS["lca"]
-
-
-def _echo_llm(prompt: str, **kwargs) -> str:
-    """Default in-process LLM callable used by the LCA shim.
-
-    Trivial: echoes the last user line + a synthetic tool_call payload.
-    Real adapters would replace this via register_llm_provider_obj().
+    Resolution order:
+      1. ``provider_ref`` (module:Class) -> import + instantiate(**provider_config)
+      2. ``provider_kind`` ('lca' | 'mock') -> map to default ``provider_ref``
+      3. raise ConfigurationError
     """
-    lines = [ln for ln in prompt.split("\n") if ln.strip()]
-    last_user = next(
-        (ln.removeprefix("[user] ").strip() for ln in reversed(lines) if ln.startswith("[user]")),
-        "no user message",
-    )
-    return f"ack: {last_user}"
+    cfg = node.config or {}
+    provider_ref = cfg.get("provider_ref")
+    provider_kind = cfg.get("provider_kind")
+    if provider_ref is None and provider_kind is not None:
+        provider_ref = _DEFAULT_PROVIDER_KINDS.get(provider_kind)
+    if provider_ref is None:
+        raise RuntimeError(
+            f"call_llm node '{node.id}' missing 'provider_ref' or 'provider_kind' in config"
+        )
+    module_name, _, class_name = provider_ref.partition(":")
+    if not module_name or not class_name:
+        raise RuntimeError(
+            f"call_llm node '{node.id}': provider_ref must be 'module:Class', got {provider_ref!r}"
+        )
+    module = importlib.import_module(module_name)
+    provider_cls = getattr(module, class_name)
+    provider_config = cfg.get("provider_config", {}) or {}
+    return provider_cls(**provider_config)
 
 
 @node(
     id="call_llm",
     layer=NodeLayer.PHASE,
     kind=NodeKind.EXECUTOR,
-    description="Send messages to a configured LLM provider; return assistant message.",
+    description=(
+        "Send messages to a provider loaded from node.config (provider_ref or "
+        "provider_kind). Returns an assistant message artifact. Provider is "
+        "instantiated per-node on each execute(); no global registry."
+    ),
     inputs=[PortInfo("from", kind=PortKind.MESSAGE, required=False)],
     outputs=[PortInfo("to", kind=PortKind.MESSAGE)],
     provides=["llm_response"],
@@ -59,33 +71,29 @@ def _echo_llm(prompt: str, **kwargs) -> str:
     relates_to=["assemble_messages", "merge_messages"],
 )
 class CallLLM(Node):
-    """Send messages, return assistant message."""
+    """Send messages to the configured provider; return assistant message."""
 
     name = "call_llm"
 
     def execute(self, node, inputs):
-        provider = node.config["provider"]
         messages_in = node.config.get("from", "messages")
         out_port = node.config.get("to", "response")
         msgs_a = inputs.get(messages_in)
         msgs = msgs_a.content if msgs_a else []
         if not isinstance(msgs, list):
             msgs = [{"role": "user", "content": str(msgs_a.content if msgs_a else "")}]
-        provider_fn = _LLM_PROVIDERS.get(provider)
-        if provider_fn is not None:
-            text = provider_fn(msgs)
-            return {out_port: make_message("assistant", text)}
-        # LCA-backed provider path
-        if provider in _LLM_PROVIDER_OBJS or provider == "lca":
-            lca_provider = _LLM_PROVIDER_OBJS.get(provider) or _default_lca_llm_provider()
-            # Reuse the message-list artifact (msgs_a) by re-wrapping it.
-            from agent_lab.primitives.artifact import Artifact, ArtifactKind
-
-            messages_artifact = Artifact(
-                kind=ArtifactKind.MESSAGE, content=msgs, schema_ref="openai.messages.v1"
+        # Wrap msgs into a Message artifact the provider can consume.
+        messages_artifact = Artifact(
+            kind=ArtifactKind.MESSAGE, content=msgs, schema_ref="openai.messages.v1"
+        )
+        provider = _resolve_provider(node)
+        # Providers expose complete(messages_artifact) -> Artifact.
+        if not hasattr(provider, "complete"):
+            raise RuntimeError(
+                f"call_llm node '{node.id}': provider {type(provider).__name__} "
+                "has no .complete() method"
             )
-            return {out_port: lca_provider.complete(messages_artifact=messages_artifact)}
-        raise RuntimeError(f"unknown LLM provider: {provider}")
+        return {out_port: provider.complete(messages_artifact=messages_artifact)}
 
 
 @node(

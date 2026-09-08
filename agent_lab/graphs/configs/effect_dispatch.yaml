@@ -52,7 +52,32 @@ nodes:
   - id: dispatch
     region: effect
     factory: dispatch_tool
-    config: { from: routed, to: receipt, provider: lca }
+    config:
+      from: routed
+      to: receipt
+      provider_kind: lca
+      provider_ref: agent_lab.adapters.lca_body:LcaBodyProvider
+      provider_config:
+        allowed_tools: [echo, calc]
+        tool_factories:
+          - ref: agent_lab.adapters.lca_body:ToolShim
+            kwargs:
+              name: echo
+              description: Echo the args back as text.
+              parameters: { type: object, properties: { text: { type: string } } }
+              is_idempotent: true
+              effect_kind: ephemeral
+              default_timeout_s: 5
+              callable_ref: agent_lab.adapters.lca_body:_echo_factory_callable
+          - ref: agent_lab.adapters.lca_body:ToolShim
+            kwargs:
+              name: calc
+              description: Evaluate a python arithmetic expression.
+              parameters: { type: object, properties: { expr: { type: string } } }
+              is_idempotent: true
+              effect_kind: ephemeral
+              default_timeout_s: 5
+              callable_ref: agent_lab.adapters.lca_body:_calc_factory_callable
     ins: [routed]
     outs: [receipt]
 

@@ -1,32 +1,92 @@
 """Tool nodes — build intent, dispatch, write receipt.
 
-Tool dispatch is mocked via the in-process `_TOOL_REGISTRY`.
+Tool dispatch reads its provider from ``node.config``:
+  - ``provider_ref``: dotted ``module:Class`` path to a provider class that
+    accepts ``register_tool(...)`` and exposes ``to_receipt_artifact(name,
+    args, port) -> Artifact``. See ``agent_lab.adapters.lca_body.LcaBodyProvider``.
+  - ``provider_kind``: optional ``"lca"`` / ``"mock"`` shorthand.
+  - ``provider_config``: opaque dict passed to the provider constructor.
+
+No global registry. The graph config IS the dispatch backend.
 """
 
 from __future__ import annotations
+
+import importlib
 
 from agent_lab.nodes.base import Node
 from agent_lab.nodes.manifest import NodeKind, NodeLayer, PortInfo, PortKind, node
 from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
-_TOOL_REGISTRY: dict[str, callable] = {}  # name -> callable(intent_dict) -> result_str
-_BODY_PROVIDERS: dict[str, object] = {}  # name -> LcaBodyProvider (lazy)
+_DEFAULT_PROVIDER_KINDS: dict[str, str] = {
+    "lca": "agent_lab.adapters.lca_body:LcaBodyProvider",
+}
 
 
-def register_tool(name: str, fn) -> None:
-    _TOOL_REGISTRY[name] = fn
+def _resolve_provider(node):
+    """Read provider factory from node.config and instantiate it.
+
+    Resolution order:
+      1. ``provider_ref`` (module:Class) -> import + instantiate(**provider_config)
+      2. ``provider_kind`` ('lca' | 'mock') -> map to default ``provider_ref``
+      3. raise ConfigurationError
+    """
+    cfg = node.config or {}
+    provider_ref = cfg.get("provider_ref")
+    provider_kind = cfg.get("provider_kind")
+    if provider_ref is None and provider_kind is not None:
+        provider_ref = _DEFAULT_PROVIDER_KINDS.get(provider_kind)
+    if provider_ref is None:
+        raise RuntimeError(
+            f"dispatch_tool node '{node.id}' missing 'provider_ref' or 'provider_kind' in config"
+        )
+    module_name, _, class_name = provider_ref.partition(":")
+    if not module_name or not class_name:
+        raise RuntimeError(
+            f"dispatch_tool node '{node.id}': provider_ref must be 'module:Class', got {provider_ref!r}"
+        )
+    module = importlib.import_module(module_name)
+    provider_cls = getattr(module, class_name)
+    provider_config = cfg.get("provider_config", {}) or {}
+    return provider_cls(**provider_config)
 
 
-def register_body_provider(name: str, provider) -> None:
-    _BODY_PROVIDERS[name] = provider
+def _register_default_tools(provider) -> None:
+    """If the provider exposes register_tool, register two in-process tools.
 
+    These are demo tools (echo, calc) used when dispatch_tool has no
+    provider_config.tools entries. Real apps pass their own ToolShim
+    instances via provider_config.
+    """
+    if not hasattr(provider, "register_tool"):
+        return
+    from agent_lab.adapters.lca_body import ToolShim
 
-def _default_body_provider() -> object:
-    if "default" not in _BODY_PROVIDERS:
-        from agent_lab.adapters.lca_body import LcaBodyProvider
+    def _echo(args):
+        return f"echo({args})"
 
-        _BODY_PROVIDERS["default"] = LcaBodyProvider()
-    return _BODY_PROVIDERS["default"]
+    def _calc(args):
+        expr = str(args.get("expr", "0"))
+        return str(eval(expr, {"__builtins__": {}}, {}))  # noqa: S307 — demo only
+
+    provider.register_tool(ToolShim(
+        name="echo",
+        description="Echo the args back as text.",
+        parameters={"type": "object", "properties": {"text": {"type": "string"}}},
+        is_idempotent=True,
+        effect_kind="ephemeral",
+        default_timeout_s=5,
+        _callable=_echo,
+    ))
+    provider.register_tool(ToolShim(
+        name="calc",
+        description="Evaluate a python arithmetic expression.",
+        parameters={"type": "object", "properties": {"expr": {"type": "string"}}},
+        is_idempotent=True,
+        effect_kind="ephemeral",
+        default_timeout_s=5,
+        _callable=_calc,
+    ))
 
 
 @node(
@@ -87,7 +147,11 @@ class GrantCheck(Node):
     id="dispatch_tool",
     layer=NodeLayer.EFFECT,
     kind=NodeKind.EXECUTOR,
-    description="Invoke the tool from the in-process registry. Mock-safe.",
+    description=(
+        "Dispatch the tool via a provider loaded from node.config "
+        "(provider_ref or provider_kind). Provider is instantiated per-node "
+        "on each execute(); no global registry."
+    ),
     inputs=[PortInfo("routed", kind=PortKind.INTENT, required=False)],
     outputs=[PortInfo("receipt", kind=PortKind.RECEIPT)],
     provides=["effect_receipt"],
@@ -96,7 +160,7 @@ class GrantCheck(Node):
     relates_to=["grant_check", "write_receipt", "integrate_observation"],
 )
 class DispatchTool(Node):
-    """Invoke the tool from the in-process registry. Mock-safe."""
+    """Dispatch the tool via the configured provider; return receipt."""
 
     name = "dispatch_tool"
 
@@ -118,32 +182,20 @@ class DispatchTool(Node):
                 schema_ref="tool.receipt.v1",
             )}
         args = intent_a.content.get("args", {})
-        # Provider selection: "lca" -> LcaBodyProvider (real executor);
-        # "default" or missing -> in-process _TOOL_REGISTRY.
-        provider_name = node.config.get("provider", "default")
-        if provider_name == "lca" or (provider_name not in _TOOL_REGISTRY and _BODY_PROVIDERS):
-            provider = _BODY_PROVIDERS.get(provider_name) or _default_body_provider()
-            return {out_port: provider.to_receipt_artifact(tool, args, port=out_port)}
-        fn = _TOOL_REGISTRY.get(tool)
-        if fn is None:
-            return {out_port: Artifact(
-                kind=ArtifactKind.RECEIPT,
-                content={"status": "error", "error": f"tool {tool} not registered"},
-                schema_ref="tool.receipt.v1",
-            )}
-        try:
-            result = fn(args)
-            return {out_port: Artifact(
-                kind=ArtifactKind.RECEIPT,
-                content={"status": "ok", "tool": tool, "result": result},
-                schema_ref="tool.receipt.v1",
-            )}
-        except Exception as exc:
-            return {out_port: Artifact(
-                kind=ArtifactKind.RECEIPT,
-                content={"status": "error", "tool": tool, "error": str(exc)},
-                schema_ref="tool.receipt.v1",
-            )}
+        provider = _resolve_provider(node)
+        # Auto-register the demo ToolShims if provider supports it and
+        # the user didn't pre-populate tools via provider_config.
+        if hasattr(provider, "register_tool"):
+            existing = getattr(provider, "_tools", {}) or {}
+            if not existing:
+                _register_default_tools(provider)
+        # providers must implement to_receipt_artifact(name, args, port) -> Artifact
+        if not hasattr(provider, "to_receipt_artifact"):
+            raise RuntimeError(
+                f"dispatch_tool node '{node.id}': provider {type(provider).__name__} "
+                "has no .to_receipt_artifact() method"
+            )
+        return {out_port: provider.to_receipt_artifact(tool, args, port=out_port)}
 
 
 @node(

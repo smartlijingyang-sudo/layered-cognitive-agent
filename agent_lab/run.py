@@ -17,8 +17,11 @@ import sys
 from pathlib import Path
 
 from agent_lab.graphs import load_registry
-from agent_lab.nodes.llm import register_llm_provider
-from agent_lab.nodes.tool import register_tool
+
+# No global registration. Each call_llm node loads its provider from
+# node.config (provider_ref / provider_kind / provider_config).
+# All providers are loaded per-node from graph config. See
+# nodes/llm.py and nodes/tool.py _resolve_provider helpers.
 from agent_lab.primitives.artifact import (
     Artifact,
     ArtifactKind,
@@ -61,9 +64,11 @@ def _mock_tool_calc(args):
 
 
 def _register_mocks() -> None:
-    register_llm_provider("mock", _mock_llm)
-    register_tool("echo", _mock_tool_echo)
-    register_tool("calc", _mock_tool_calc)
+    """No-op stub.
+
+    All providers are now loaded per-node from graph config. Kept as a
+    function for callers that may want an eager-init hook.
+    """
 
 
 def _register_lca_mv() -> None:
@@ -81,50 +86,21 @@ def _register_lca_mv() -> None:
 
 
 def _register_lca_body() -> None:
-    """Register LCA's SimpleSafeExecutor + Tool shims as the agent_lab body provider.
+    """No-op stub.
 
-    Wires two in-process tools (echo, calc) so the executor has something
-    to dispatch. Real apps would register ToolShim objects built from
-    concrete LCA Tool implementations.
+    Body provider is now loaded per-node from graph config (dispatch_tool
+    reads provider_ref + provider_config from node.config). Kept as a
+    function reference for callers that want an eager-init hook.
     """
-    try:
-        from agent_lab.adapters.lca_body import LcaBodyProvider, ToolShim
-        from agent_lab.nodes.tool import register_body_provider
-
-        provider = LcaBodyProvider(allowed_tools=("echo", "calc"))
-        provider.register_tool(ToolShim(
-            name="echo",
-            description="Echo the args back as text.",
-            parameters={"type": "object", "properties": {"text": {"type": "string"}}},
-            is_idempotent=True,
-            effect_kind="ephemeral",
-            default_timeout_s=5,
-            _callable=_mock_tool_echo,
-        ))
-        provider.register_tool(ToolShim(
-            name="calc",
-            description="Evaluate a python arithmetic expression.",
-            parameters={"type": "object", "properties": {"expr": {"type": "string"}}},
-            is_idempotent=True,
-            effect_kind="ephemeral",
-            default_timeout_s=5,
-            _callable=_mock_tool_calc,
-        ))
-        register_body_provider("lca", provider)
-    except Exception as exc:
-        print(f"[warn] LCA body provider not registered: {exc!r}")
 
 
 def _register_lca_llm() -> None:
-    """Register LCA's LLMAdapter Protocol-backed provider."""
-    try:
-        from agent_lab.adapters.lca_llm import LcaLlmProvider, LlmAdapterShim
-        from agent_lab.nodes.llm import register_llm_provider_obj
+    """No-op stub.
 
-        adapter = LlmAdapterShim(callable_=_mock_llm)
-        register_llm_provider_obj("lca", LcaLlmProvider(adapter))
-    except Exception as exc:
-        print(f"[warn] LCA llm provider not registered: {exc!r}")
+    LLM provider is now loaded per-node from graph config (call_llm reads
+    provider_ref + provider_config from node.config). Kept as a function
+    reference for callers that want an eager-init hook.
+    """
 
 
 # ---------- Demo runners --------------------------------------------------
@@ -146,7 +122,7 @@ def _run_mv_assemble(specs, mv_provider: str = "default") -> None:
     if mv_provider != "default":
         for n in spec.nodes:
             if n.id == "assemble_lca":
-                n.config["provider"] = mv_provider
+                n.config["provider_kind"] = mv_provider
     trace = run_graph(spec, initial=initial, sub_registry=specs)
     _print_trace(trace)
     print(f"=== manifest (provider={mv_provider}) ===")
@@ -202,8 +178,8 @@ def _run_negative() -> None:
     dst = src.with_suffix(".broken.yaml")
     text = src.read_text(encoding="utf-8")
     broken = text.replace(
-        "    config: { from: routed, to: receipt, provider: lca }\n    ins: [routed]\n    outs: [receipt]",
-        "    config: { from: routed, to: receipt, provider: lca }\n    ins: [routed]\n    outs: []",
+        "    ins: [routed]\n    outs: [receipt]",
+        "    ins: [routed]\n    outs: []",  # strip receipt out port to trigger C6
     )
     if broken == text:
         print("FAILED to mutate effect_dispatch.yaml for negative test")
