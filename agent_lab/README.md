@@ -9,7 +9,7 @@ agent_lab/
 ├── graphs/configs/        ← the three graph YAMLs (root + two sub-graphs)
 │   ├── agent_loop.yaml
 │   ├── effect_dispatch.yaml
-│   └── mv_assemble.yaml
+│   └── model_eye.yaml          # child of perceive
 ├── tools/                 ← NON-executable named-tool inventory (this is
 │   ├── registry.yaml          "the place that holds tools")
 │   └── registry.py           (ToolRegistry class — name → Tool lookup)
@@ -23,9 +23,9 @@ agent_lab/
 │   ├── base.py               (Node / NodeRegistry / invoke)
 │   ├── manifest.py           (NodeManifest etc.)
 │   ├── control/              (join, barrier, route_on, discard)
-│   ├── llm/                  (call_llm, assemble_messages, commit_manifest)
+│   ├── llm/                  (call_llm, assemble_messages)
 │   ├── tool/                 (build_intent, grant_check, dispatch_tool, write_receipt, integrate_observation)
-│   ├── mv/                   (trust_classify, merge_messages, validate_manifest, assemble_lca_mv)
+│   ├── model_eye/            (see, guard, shape, freeze; trust_classify for toolbox)
 │   └── passthrough/          (identity, constant, select, redact, dedup, rank)
 ├── runtime/               ← recursive interpreter
 ├── graph/                 ← spec + compile + validate

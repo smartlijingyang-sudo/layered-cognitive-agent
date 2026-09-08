@@ -1,64 +1,47 @@
-"""perceive.sense.tool_results — land prior-turn tool results into AgentState.
+"""perceive.sense.tool_results — pass through prior-turn tool results + state.
 
-Single-responsibility: ONE list of tool result messages -> state.tool_results
-field. Chain-style: 2 inputs (state, tool_results), 1 output.
+Pure read-only fold. The node DOES NOT write into state. State is an
+inert snapshot passed through to the next node; the only output this
+node emits is the tool_results artifact (already an Artifact).
 
-Each tool result message is OpenAI-style {role: "tool", tool_call_id, content}.
-Attachments inside content (multimodal tool outputs) are preserved verbatim
-as part of the message. We don't pull attachments out — Hub reads
-state.tool_results directly when constructing tool-role ContextItems.
+Per ADR-0194 C4 (Reducer 单写) and ADR-0191 DSH: facts live in Session
+log, state is a read-only projection. sense.tool_results's job is
+"carry prior-turn tool result messages forward", not "mutate
+state.tool_results".
+
+Each tool result message is OpenAI-style {role: "tool", tool_call_id,
+content}; attachments inside content are preserved verbatim. Downstream
+perceive_aggregate reads them from the artifact stream.
+
+History is NOT owned here — history_derive (remember__fold_history)
+folds Session log into _initial.history, which model_eye consumes
+directly.
 """
 from __future__ import annotations
 
 from agent_lab.nodes.base import Node
 from agent_lab.nodes.manifest import NodeKind, NodeLayer, PortInfo, PortKind, node
-from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
 
 @node(
     id="perceive.sense.tool_results",
     layer=NodeLayer.MODEL_VISIBLE,
     kind=NodeKind.TRANSFORMER,
-    description="Land prior-turn tool result messages (incl. attachments) into state.tool_results; append to state.history.",
+    description="Pass-through: forward state (read-only) and the prior-turn tool results artifact. No state mutation.",
     inputs=[
-        PortInfo("state", kind=PortKind.FACT),
-        PortInfo("tool_results", kind=PortKind.MESSAGE),
+        PortInfo("tool_results_in", kind=PortKind.MESSAGE),
     ],
-    outputs=[PortInfo("state", kind=PortKind.FACT)],
+    outputs=[
+        PortInfo("tool_results_out", kind=PortKind.MESSAGE),
+    ],
 )
 class SenseToolResults(Node):
     name = "perceive.sense.tool_results"
 
     def execute(self, node, inputs):
-        state_a = inputs.get("state")
-        tr_a = inputs.get("tool_results")
-        if tr_a is None:
-            return {"state": state_a}
-
-        if state_a and isinstance(state_a.content, dict):
-            base = dict(state_a.content)
-        else:
-            base = {}
-
-        tr_content = tr_a.content
-        # Normalize to a list of messages (one entry per tool call).
-        if isinstance(tr_content, list):
-            tool_msgs = [m for m in tr_content if isinstance(m, dict)]
-        elif isinstance(tr_content, dict):
-            tool_msgs = [tr_content]
-        else:
-            return {"state": state_a}  # unrecognized shape — passthrough
-
-        base["tool_results"] = tool_msgs
-
-        # Append to state.history so Hub sees the full conversation.
-        history = base.get("history") or []
-        if not isinstance(history, list):
-            history = []
-        base["history"] = list(history) + tool_msgs
-
-        return {"state": Artifact(
-            kind=ArtifactKind.FACT,
-            content=base,
-            schema_ref="agent_state.v1",
-        )}
+        # Pass-through: re-emit tool_results on its OUT port.
+        # Per first-principles perceive: each sense is a pure read-only
+        # fold that carries its sensor artifact forward. No state, no hub.
+        return {
+            "tool_results_out": inputs.get("tool_results_in"),
+        }

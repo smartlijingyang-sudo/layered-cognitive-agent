@@ -1,7 +1,7 @@
 """run.py — entry point.
 
 Usage:
-  python -m agent_lab.run mv_assemble
+  python -m agent_lab.run model_eye
   python -m agent_lab.run effect_dispatch
   python -m agent_lab.run agent_loop
   python -m agent_lab.run --negative effect_dispatch
@@ -58,18 +58,15 @@ def _bootstrap() -> None:
 
 
 def _register_lca_mv() -> None:
-    """No-op kept for backwards compatibility.
-
-    The assemble_lca_mv node now imports DefaultModelContextAssembler
-    directly; provider registration is no longer needed.
-    """
+    """No-op kept for backwards compatibility with --mv-provider flags."""
 
 
 # ---------- Demo runners --------------------------------------------------
 
 
-def _run_mv_assemble(specs, mv_provider: str = "default") -> None:
-    spec = specs["mv_assemble"]
+def _run_model_eye(specs, mv_provider: str = "default") -> None:
+    del mv_provider  # reserved; model_eye has no alternate provider path
+    spec = specs["model_eye"]
     initial = {
         "system": make_text("you are a careful assistant", schema_ref="system.v1"),
         "history": Artifact(
@@ -77,9 +74,18 @@ def _run_mv_assemble(specs, mv_provider: str = "default") -> None:
             content=[{"role": "assistant", "content": "previous turn"}],
             schema_ref="openai.messages.v1",
         ),
-        "results": Artifact(
+        "perceive_bundle": Artifact(
+            kind=ArtifactKind.FACT,
+            content={
+                "items": [{"role": "user", "content": "hello", "provenance": "sense.user"}],
+                "digest": "demo",
+                "schema_version": "perceive.bundle.v1",
+            },
+            schema_ref="perceive.bundle.v1",
+        ),
+        "observation": Artifact(
             kind=ArtifactKind.TEXT,
-            content="result line A\nresult line A\nresult line B",
+            content="tool said ok",
             schema_ref="tool.v1",
         ),
         "config": Artifact(
@@ -91,21 +97,11 @@ def _run_mv_assemble(specs, mv_provider: str = "default") -> None:
             schema_ref="tools.v1",
         ),
     }
-    if mv_provider != "default":
-        for n in spec.nodes:
-            if n.id == "assemble_lca":
-                n.config["provider_kind"] = mv_provider
     trace = run_graph(spec, initial=initial, sub_registry=specs)
     _print_trace(trace)
-    print(f"=== manifest (provider={mv_provider}) ===")
+    print("=== ContextManifest (model_eye.freeze) ===")
     manifest = trace.final_artifacts.get("manifest")
-    lca_manifest = trace.final_artifacts.get("lca_manifest")
-    print("--- local commit_manifest:")
     print(json.dumps(manifest.content if manifest else None, indent=2, ensure_ascii=False))
-    if lca_manifest is not None:
-        print("--- LCA DefaultModelContextAssembler.assemble() output:")
-        print(json.dumps(lca_manifest.content, indent=2, ensure_ascii=False))
-
 
 def _run_effect_dispatch(specs) -> None:
     spec = specs["effect_dispatch"]
@@ -130,7 +126,7 @@ def _run_agent_loop(specs) -> None:
     spec = specs["agent_loop"]
     # Demo turn: tell the LLM to call bash; the agent loop will go
     # through flatten_manifest → call_llm → parse_decision → think →
-    # act (effect_dispatch) → mv_assemble.classify → ... → stop.
+    # act (effect_dispatch) → model_eye.see (project) → ... → stop.
     # The bash call will actually run unless LLM_API_KEY is missing, in
     # which case OpenAICompatAdapter will surface the auth error in the
     # receipt (this is the real-failure path, not a hidden mock).
@@ -197,7 +193,7 @@ def _run_negative() -> None:
 # ---------- CLI -----------------------------------------------------------
 
 _DISPATCH = {
-    "mv_assemble": _run_mv_assemble,
+    "model_eye": _run_model_eye,
     "effect_dispatch": _run_effect_dispatch,
     "agent_loop": _run_agent_loop,
 }
@@ -241,7 +237,7 @@ def _describe(target: str | None) -> None:
                 print(f"  relates_to: {list(m.relates_to)}")
         # All graph manifests
         print("\n\n=== Graph Manifests ===")
-        for stem in ("agent_loop", "mv_assemble", "effect_dispatch"):
+        for stem in ("agent_loop", "model_eye", "effect_dispatch"):
             yaml_path = Path(__file__).parent / "graphs" / "configs" / f"{stem}.yaml"
             gm = load_graph_manifest(yaml_path)
             if not gm:
@@ -327,7 +323,7 @@ def main(argv: list[str] | None = None) -> int:
         "--mv-provider",
         default="default",
         choices=["default", "lca"],
-        help="for mv_assemble: which provider feeds assemble_lca node",
+        help="for model_eye: which provider feeds assemble_lca node",
     )
     args = parser.parse_args(argv)
 
@@ -340,10 +336,10 @@ def main(argv: list[str] | None = None) -> int:
 
     # Real boot: load the tool registry before any graph runs.
     _bootstrap()
-    if args.mv_provider == "lca" or args.graph == "mv_assemble":
+    if args.mv_provider == "lca" or args.graph == "model_eye":
         _register_lca_mv()
-    specs = load_registry("mv_assemble", "effect_dispatch", "agent_loop")
-    if args.graph == "mv_assemble":
+    specs = load_registry("perceive", "model_eye", "effect_dispatch", "agent_loop", "think", "reflect", "remember", "stop")
+    if args.graph == "model_eye":
         _DISPATCH[args.graph](specs, args.mv_provider)
     else:
         _DISPATCH[args.graph](specs)

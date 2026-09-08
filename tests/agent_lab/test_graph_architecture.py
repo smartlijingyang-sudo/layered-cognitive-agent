@@ -34,7 +34,7 @@ def test_every_new_phase_subgraph_compiles() -> None:
         "stop",
         "toolbox",
         "event_log",
-        "mv_assemble",
+        "model_eye",
         "effect_dispatch",
         "agent_loop",
     )
@@ -64,11 +64,11 @@ def test_compile_hook_inserts_control_slots() -> None:
         "stop",
         "toolbox",
         "event_log",
-        "mv_assemble",
+        "model_eye",
         "effect_dispatch",
         "agent_loop",
     )
-    # Disable control_slots plugin → expect only the 7 manually-authored
+    # Disable control_slots plugin → expect only the 6 manually-authored
     # sub_specs.
     stripped = [
         p
@@ -77,8 +77,8 @@ def test_compile_hook_inserts_control_slots() -> None:
     ]
     stripped_spec = specs["agent_loop"].model_copy(update={"plugins": stripped})
     manual_only = compile_spec(stripped_spec, sub_registry=specs)
-    assert len(manual_only.subgraph_calls) == 7
-    # Enable hook → expect 7 main + every ControlSlot that has an owner.
+    assert len(manual_only.subgraph_calls) == 6
+    # Enable hook → expect 6 main + every ControlSlot that has an owner.
     with_hook = compile_spec(specs["agent_loop"], sub_registry=specs)
     inserted = {x["sub_spec_id"] for x in with_hook.subgraph_calls}
     # All 9 owner-bound control slots must be present.
@@ -98,7 +98,7 @@ def test_compile_hook_inserts_control_slots() -> None:
     }
     for name in expected:
         assert name in inserted, f"compile hook missed control slot {name}"
-    # Hook should have ADDED at least 9 links beyond the 7 manual ones.
+    # Hook should have ADDED at least 9 links beyond the 6 manual ones.
     assert len(with_hook.subgraph_calls) >= 7 + len(expected)
 
 
@@ -115,7 +115,7 @@ def test_compile_hook_can_be_disabled() -> None:
         "stop",
         "toolbox",
         "event_log",
-        "mv_assemble",
+        "model_eye",
         "effect_dispatch",
         "agent_loop",
     )
@@ -265,7 +265,7 @@ def load_all():
         "stop",
         "toolbox",
         "event_log",
-        "mv_assemble",
+        "model_eye",
         "effect_dispatch",
         "agent_loop",
         "think_guard",

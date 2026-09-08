@@ -158,7 +158,7 @@ def load_graph_manifest(path: str | Path) -> dict:
 def load_registry(*ids: str) -> dict[str, InfoEdgeSpec]:
     """Load a set of named graphs from configs/ (and its subdirs). ids are file stems.
 
-    Example: load_registry("agent_loop", "mv_assemble", "effect_dispatch")
+    Example: load_registry("agent_loop", "model_eye", "effect_dispatch")
     Searches the top-level configs/ dir first, then one level of subdirectories
     (e.g. configs/control/think_guard.yaml).
     """

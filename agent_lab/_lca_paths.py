@@ -84,14 +84,14 @@ LCA_PATHS: tuple[LcaPath, ...] = (
 
     # ── Session / context assembly ──
     LcaPath("lca.contracts.protocols.session.model.context", "ModelContextAssembler",
-            LcaStatus.OK, ("nodes/model_visible/commit_manifest",)),
+            LcaStatus.OK, ("nodes/model_eye/see",)),
     LcaPath("lca.contracts.protocols.session.model.context", "ModelVisibleRequest",
-            LcaStatus.OK, ("nodes/model_visible/commit_manifest",)),
+            LcaStatus.OK, ("nodes/model_eye/see",)),
     LcaPath("lca.infrastructure.llm_adapter.openai_compat", "OpenAICompatAdapter",
             LcaStatus.OK, ("nodes/think/call_llm",)),
     LcaPath("lca.infrastructure.session.context.model_context_assembler",
             "DefaultModelContextAssembler",
-            LcaStatus.OK, ("nodes/model_visible/commit_manifest",)),
+            LcaStatus.OK, ("nodes/model_eye/see",)),
 
     # ── cordis-gated (now OK after uv sync) ──
     LcaPath("lca.session.append", "Session",
@@ -104,8 +104,6 @@ LCA_PATHS: tuple[LcaPath, ...] = (
             LcaStatus.OK, ("nodes/effect/tool_dispatch",)),
     LcaPath("lca.cognition.brain.reasoner.null_critic", "NullCritic",
             LcaStatus.OK, ("nodes/reflect/call_critic",)),
-    LcaPath("lca.plugins.composer.runtime.fixture.runtime_factory", "NullPerceiveHub",
-            LcaStatus.OK, ("nodes/perceive/perceive_fold",)),
 )
 
 
@@ -133,5 +131,12 @@ def format_table() -> str:
     return "\n".join(rows)
 
 
-__all__ = ["LcaPath", "LcaStatus", "LCA_PATHS",
-           "all_ok", "ok_paths", "by_user", "format_table"]
+__all__ = [
+    "LCA_PATHS",
+    "LcaPath",
+    "LcaStatus",
+    "all_ok",
+    "by_user",
+    "format_table",
+    "ok_paths",
+]

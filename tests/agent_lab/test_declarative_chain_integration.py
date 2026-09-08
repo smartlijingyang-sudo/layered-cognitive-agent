@@ -14,7 +14,7 @@ The bundle declares:
 This test loads the full registry (six phases + every control slot graph),
 compiles agent_loop with the auto-insert control-slot hook enabled, and
 asserts every required sub_spec_id is present in the resulting
-``subgraph_calls``. It also verifies the manual mounts (think → mv_assemble,
+``subgraph_calls``. It also verifies the manual mounts (perceive → model_eye,
 act → effect_dispatch) are intact, and that the host node ports were
 extended with the control-slot wiring.
 
@@ -38,13 +38,13 @@ if str(REPO_ROOT) not in sys.path:
 
 
 # The full set of sub_specs that must appear in agent_loop after the
-# compile hook runs. Includes both the 7 manual mounts (perceive,
-# assemble_for_think → mv_assemble, think, act → effect_dispatch,
+# compile hook runs. Includes both the 6 manual mounts (perceive,
+# perceive (→ model_eye), think, act → effect_dispatch,
 # reflect, remember, stop) and the auto-inserted control slots.
 EXPECTED_SUB_SPECS = {
     # Manual mounts (already in agent_loop.yaml#sub_specs).
+    # model_eye is nested under perceive, not a direct agent_loop mount.
     "perceive",
-    "mv_assemble",
     "think",
     "effect_dispatch",
     "reflect",
@@ -78,8 +78,8 @@ def test_full_declarative_chain_wires_through_compile_hook() -> None:
         "reflect",
         "remember",
         "stop",
-        # mv_assemble + effect_dispatch (mounted by agent_loop).
-        "mv_assemble",
+        # model_eye (via perceive) + effect_dispatch (via act).
+        "model_eye",
         "effect_dispatch",
         # Agent loop root.
         "agent_loop",
@@ -104,7 +104,7 @@ def test_compile_hook_disabled_leaves_only_manual_mounts() -> None:
         "reflect",
         "remember",
         "stop",
-        "mv_assemble",
+        "model_eye",
         "effect_dispatch",
         "agent_loop",
     )
@@ -124,7 +124,6 @@ def test_compile_hook_disabled_leaves_only_manual_mounts() -> None:
     inserted = {x["sub_spec_id"] for x in bundle.subgraph_calls}
     expected_manual = {
         "perceive",
-        "mv_assemble",
         "think",
         "effect_dispatch",
         "reflect",
@@ -146,7 +145,7 @@ def test_control_slot_wiring_extends_host_node_ports() -> None:
         "reflect",
         "remember",
         "stop",
-        "mv_assemble",
+        "model_eye",
         "effect_dispatch",
         "agent_loop",
     )

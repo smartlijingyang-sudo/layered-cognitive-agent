@@ -33,7 +33,7 @@ if str(REPO_ROOT) not in sys.path:
 
 
 def test_think_subgraph_loads_and_compiles() -> None:
-    specs = load_registry("perceive", "think", "agent_loop", "mv_assemble", "effect_dispatch")
+    specs = load_registry("perceive", "think", "agent_loop", "model_eye", "effect_dispatch")
     assert "think" in specs
     spec = specs["think"]
     assert {n.id for n in spec.nodes} == {"flatten", "llm", "parse", "gate_enforce"}
@@ -46,7 +46,7 @@ def test_think_subgraph_loads_and_compiles() -> None:
 
 
 def test_agent_loop_compiles_with_think_sub_spec() -> None:
-    specs = load_registry("perceive", "think", "agent_loop", "mv_assemble", "effect_dispatch")
+    specs = load_registry("perceive", "think", "agent_loop", "model_eye", "effect_dispatch")
     agent_loop = specs["agent_loop"]
     # think node now declares in_assembled_manifest + perceive_out as ins
     think_node = agent_loop.node("think")
@@ -257,26 +257,21 @@ def test_lca_think_gate_provider_resolves_factory_ref() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_think_subgraph_runs_via_runner() -> None:
+def test_think_subgraph_runs_via_runner(monkeypatch) -> None:
     """The think sub-graph runs end-to-end through agent_lab's runner."""
+    import agent_lab.nodes.llm.call_llm.plugin as call_llm_mod
     from agent_lab.runtime.runner import run as run_graph
+    from tests.agent_lab.fixtures.llm_stub import StubLlmAdapter
 
-    specs = load_registry("perceive", "think", "agent_loop", "mv_assemble", "effect_dispatch")
+    # call_llm (post-fusion) imports OpenAICompatAdapter directly; stub it
+    # so the runner test does not need live credentials.
+    monkeypatch.setattr(call_llm_mod, "OpenAICompatAdapter", StubLlmAdapter)
+
+    specs = load_registry("perceive", "think", "agent_loop", "model_eye", "effect_dispatch")
     think_spec = specs["think"]
-    # The default config points call_llm at OpenAICompatAdapter which would
-    # need an LLM_API_KEY. For the run path we swap in a no-op LLMAdapter.
-    for n in think_spec.nodes:
-        if n.id == "llm":
-            n.config["provider_config"] = {
-                "adapter_factory": {
-                    "ref": "tests.agent_lab.fixtures.llm_stub:StubLlmAdapter",
-                    "kwargs": {},
-                }
-            }
 
     initial = {
-        # Manifest carrying the message list (assemble_messages reads
-        # `messages` from the manifest content).
+        # Manifest carrying the message list (from model_eye.freeze via perceive).
         "in_assembled_manifest": Artifact(
             kind=ArtifactKind.MANIFEST,
             content={

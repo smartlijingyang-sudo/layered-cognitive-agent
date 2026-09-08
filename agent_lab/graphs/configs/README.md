@@ -11,7 +11,7 @@ through an explicit `sub_spec` mount or a `kind: project` cross-spec edge.
 │  L1  agent_loop.yaml         — six-phase skeleton                          │
 │      owns: perceive, think, act, reflect, remember, stop (5 stubs + 2     │
 │            sub_spec hosts + 2 local workers flatten_manifest/call_llm_node) │
-│      delegates to:  mv_assemble        (via sub_spec on assemble_for_think)│
+│      delegates to:  perceive (mounts model_eye) / effect_dispatch         │
 │                     effect_dispatch    (via sub_spec on act)                │
 └────────────────────────────────────────────────────────────────────────────┘
                                   │
@@ -21,13 +21,13 @@ through an explicit `sub_spec` mount or a `kind: project` cross-spec edge.
 │      chain: build_intent → grant_check → route_verdict → dispatch →        │
 │             write_receipt → integrate                                     │
 │      delegates to:  (no sub_specs; provider is loaded per-node)            │
-│      cross-spec:  integrate.observation  ─project─►  mv_assemble.classify. │
+│      cross-spec:  integrate.observation  ─project─►  model_eye.classify. │
 │                  results  (C1/C2 closure)                                  │
 └────────────────────────────────────────────────────────────────────────────┘
                                   │
                                   ▼
 ┌────────────────────────────────────────────────────────────────────────────┐
-│  L3  mv_assemble.yaml        — frozen ContextManifest for the LLM          │
+│  L3  model_eye.yaml (child of perceive)        — frozen ContextManifest for the LLM          │
 │      left branch:  classify → dedupe → rank → redact                       │
 │      right bypass: system / history go straight to merge                   │
 │      merge:        order [system, sanitized, history] → messages           │
@@ -58,7 +58,7 @@ MV_FEED:  only on agent_loop; tells consumers which sub-graph produced the manif
 - **Sideways (spec ↔ sibling spec)**: only via `kind: project` cross-spec edges.
   The effect-layer projection into the model-visible layer is owned by the
   effect layer (declared in `effect_dispatch.yaml`), not by the root or by
-  `mv_assemble.yaml`.
+  `model_eye.yaml`.
 - **Upward (parent → child)**: never. Children never know who mounted them.
 - **Initial inputs (`_initial` port)**: only the root spec's initial ports are
   public; child specs receive their inputs through the parent's `sub_specs[*].input_map`.

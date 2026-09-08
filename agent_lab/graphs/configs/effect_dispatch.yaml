@@ -3,12 +3,12 @@
 # =============================================================================
 # Layer 2 of 3. Runs exactly one tool call end-to-end:
 #   args  →  build_intent  →  grant_check  →  route_verdict  →  dispatch
-#         →  write_receipt  →  integrate  →  (project → mv_assemble.classify)
+#         →  write_receipt  →  integrate  →  (project → model_eye.see)
 #
 # Mounted by: agent_loop.act (see agent_loop.yaml#sub_specs).
 #
 # Side-channel closure (C1/C2): the integrate.observation output is
-# projected CROSS-SPEC into mv_assemble.classify.results, so the next
+# projected CROSS-SPEC into model_eye.see.observation, so the next
 # think turn's assembly pipeline sees the tool's observation. That
 # cross-spec edge is the ONLY edge in this file that leaves the spec.
 # =============================================================================
@@ -29,12 +29,12 @@ graph:
   # Local members (declared in this file).
   members: [build_intent, grant_check, route_verdict, dispatch,
             write_receipt, integrate]
-  # Cross-spec relations. We write into mv_assemble (the observation closure)
+  # Cross-spec relations. We write into model_eye (the observation closure)
   # and we are called by agent_loop (the act phase).
-  references: [mv_assemble, agent_loop]
+  references: [model_eye, agent_loop]
   relations:
     - { graph: agent_loop,   kind: child_of,   role: act_phase }
-    - { graph: mv_assemble,  kind: writes_to, role: project_observation }
+    - { graph: model_eye,  kind: writes_to, role: project_observation }
   capabilities:
     provides: [effect_receipt, observation]
     requires: [tool_intent, grant_verdict]
@@ -142,7 +142,7 @@ nodes:
   # ===== 6) integrate — turn the receipt into a model-visible text ========
   # Final local step. Emits a TEXT observation shaped like
   # "[tool:<name>] <result>" or "[tool-error] <status>". The cross-spec
-  # project edge below carries this into mv_assemble.
+  # project edge below carries this into model_eye.
   - id: integrate
     region: effect
     factory: integrate_observation
@@ -195,12 +195,12 @@ edges:
     to:   { spec: effect_dispatch, node: integrate,     port: receipt_fact }
     kind: data
 
-  # ── integrate → mv_assemble (CROSS-SPEC PROJECT EDGE) ──
+  # ── integrate → model_eye (CROSS-SPEC PROJECT EDGE) ──
   # This is the C1/C2 closure: the effect layer's observation is projected
   # into the model-visible assembly pipeline so the next think turn sees it.
   # Declared here (not in agent_loop) because the projection is owned by
   # the effect layer, which is what produced the observation.
   - id: e_integrate_to_mv_project
     from: { spec: effect_dispatch, node: integrate, port: observation }
-    to:   { spec: mv_assemble,    node: classify,  port: results }
+    to:   { spec: model_eye,    node: see,       port: observation }
     kind: project

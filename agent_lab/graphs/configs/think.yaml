@@ -41,7 +41,7 @@ graph:
 # INITIAL PORTS — what the parent (agent_loop.think) must supply.
 # -----------------------------------------------------------------------------
 # initial.in_assembled_manifest : the frozen ContextManifest produced by
-#                                  mv_assemble (already carries system,
+#                                  model_eye (already carries system,
 #                                  history, results, perceive_manifest).
 # initial.in_perception_signal   : passthrough perception signal; feeds
 #                                  gate_enforce as a second input. Optional.

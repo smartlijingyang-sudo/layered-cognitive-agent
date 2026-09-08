@@ -70,7 +70,7 @@ def test_compile_without_control_slots_plugin_does_not_insert() -> None:
         "stop",
         "toolbox",
         "event_log",
-        "mv_assemble",
+        "model_eye",
         "effect_dispatch",
         "agent_loop",
     )
@@ -83,7 +83,7 @@ def test_compile_without_control_slots_plugin_does_not_insert() -> None:
     inserted = {x["sub_spec_id"] for x in bundle.subgraph_calls}
     assert "think_guard" not in inserted
     assert "act_authorize" not in inserted
-    assert len(bundle.subgraph_calls) == 7
+    assert len(bundle.subgraph_calls) == 6
 
 
 def test_control_slots_plugin_inserts_on_before_compile() -> None:
@@ -98,7 +98,7 @@ def test_control_slots_plugin_inserts_on_before_compile() -> None:
         "stop",
         "toolbox",
         "event_log",
-        "mv_assemble",
+        "model_eye",
         "effect_dispatch",
         "agent_loop",
     )

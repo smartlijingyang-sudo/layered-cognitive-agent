@@ -19,6 +19,9 @@ class StubLlmAdapter:
     text: str = "stub-llm-response"
     model: str = "stub-llm"
 
+    def __init__(self, **kwargs: Any) -> None:
+        del kwargs  # OpenAICompatAdapter-shaped ctor; ignore for stub
+
     async def complete(self, prompt: str, **kwargs: Any) -> Any:  # type: ignore[no-untyped-def]
         from lca.contracts.models.core.conversation.llm import LLMResponse
 

@@ -46,7 +46,7 @@ nodes:
     outs: [registry_payload]
 
   # ----- trust_classify: tag each entry as trusted/untrusted ----------------
-  # Reuses existing nodes/mv/trust_classify. Tags each tool entry based on
+  # Reuses existing nodes/model_eye/trust_classify. Tags each tool entry based on
   # trustable_kinds config.
   - id: trust_classify
     region: model_visible

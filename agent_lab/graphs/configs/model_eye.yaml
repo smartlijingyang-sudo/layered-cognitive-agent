@@ -1,0 +1,109 @@
+# =============================================================================
+# model_eye — perceive's sub-graph: the model's field of view (ADR-0206 §5.3)
+# =============================================================================
+# Mounted by: perceive.eye (see perceive.yaml#sub_specs). NOT mounted by
+# think / agent_loop.assemble_for_think — eyes belong to perception.
+#
+# Answers one question: what will the LLM see this turn?
+#   see → guard → shape → freeze → frozen ContextManifest
+#
+# Inbound:
+#   - perceive.bundle / system / history / config / tools  (via perceive sub_spec)
+#   - effect_dispatch.integrate.observation ──project──► see.observation
+# =============================================================================
+
+id: model_eye
+version: 1.0.0
+region: model_visible
+description: >
+  Derive and freeze the ContextManifest for the next LLM turn.
+  Owned by perceive; think only reads the result.
+
+graph:
+  id: model_eye
+  layer: model_visible
+  purpose: Session derive + this-turn feeds → frozen ContextManifest.
+  members: [see, guard, shape, freeze]
+  references: [perceive, effect_dispatch]
+  relations:
+    - { graph: perceive, kind: child_of, role: model_eye }
+    - { graph: effect_dispatch, kind: accepts_from, role: project_observation }
+  capabilities:
+    provides: [context_manifest]
+    requires: [session_reader, perceive_bundle]
+
+# initial.perceive_bundle : this-turn sensor fold (perceive.aggregate)
+# initial.system/history/config/tools : header + prior conversation
+# initial.observation : optional; usually arrives via project from effect
+
+nodes:
+
+  - id: see
+    region: model_visible
+    factory: model_eye.see
+    ins: [perceive_bundle, observation, system, history, config, tools]
+    outs: [sight]
+
+  - id: guard
+    region: model_visible
+    factory: model_eye.guard
+    config:
+      trustable_kinds: [text, message, manifest, fact]
+      keep: 200
+      patterns: ["<internal>", "sk-XXXX"]
+    ins: [sight]
+    outs: [safe_sight]
+
+  - id: shape
+    region: model_visible
+    factory: model_eye.shape
+    ins: [safe_sight]
+    outs: [messages]
+
+  - id: freeze
+    region: model_visible
+    factory: model_eye.freeze
+    config:
+      required_roles: [user]
+    ins: [messages]
+    outs: [manifest]
+
+edges:
+
+  - id: e_init_bundle_to_see
+    from: { spec: model_eye, node: _initial, port: perceive_bundle }
+    to:   { spec: model_eye, node: see, port: perceive_bundle }
+    kind: data
+  - id: e_init_system_to_see
+    from: { spec: model_eye, node: _initial, port: system }
+    to:   { spec: model_eye, node: see, port: system }
+    kind: data
+  - id: e_init_history_to_see
+    from: { spec: model_eye, node: _initial, port: history }
+    to:   { spec: model_eye, node: see, port: history }
+    kind: data
+  - id: e_init_config_to_see
+    from: { spec: model_eye, node: _initial, port: config }
+    to:   { spec: model_eye, node: see, port: config }
+    kind: data
+  - id: e_init_tools_to_see
+    from: { spec: model_eye, node: _initial, port: tools }
+    to:   { spec: model_eye, node: see, port: tools }
+    kind: data
+  - id: e_init_observation_to_see
+    from: { spec: model_eye, node: _initial, port: observation }
+    to:   { spec: model_eye, node: see, port: observation }
+    kind: data
+
+  - id: e_see_to_guard
+    from: { spec: model_eye, node: see, port: sight }
+    to:   { spec: model_eye, node: guard, port: sight }
+    kind: data
+  - id: e_guard_to_shape
+    from: { spec: model_eye, node: guard, port: safe_sight }
+    to:   { spec: model_eye, node: shape, port: safe_sight }
+    kind: data
+  - id: e_shape_to_freeze
+    from: { spec: model_eye, node: shape, port: messages }
+    to:   { spec: model_eye, node: freeze, port: messages }
+    kind: data

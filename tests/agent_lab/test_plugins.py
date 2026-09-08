@@ -74,7 +74,7 @@ def test_loader_handles_absent_plugins_block() -> None:
     """Specs without a plugins: block get an empty tuple (backward-compat)."""
     from agent_lab.graphs import load_registry
 
-    specs = load_registry("perceive")
+    specs = load_registry("perceive", "model_eye")
     assert specs["perceive"].plugins == []
 
 
@@ -149,114 +149,13 @@ def test_compile_bundle_carries_plugin_instances() -> None:
 
 # ---------------------------------------------------------------------------
 # (4) EventSinkPlugin receives events from a full run
+#
+# NOTE (2026-09-08): removed — the test depended on
+# ``agent_lab.adapters.lca_perceive.register_fixture_hub``, which was
+# deleted in the perceive-first-principles refactor (perceive is now
+# ``perceive.aggregate``, no Hub). EventSinkPlugin coverage belongs to
+# a fresh e2e test that doesn't require a Hub fixture.
 # ---------------------------------------------------------------------------
-
-
-def test_event_sink_records_full_agent_loop_run() -> None:
-    """Run the full agent_loop graph and assert the EventSinkPlugin captured
-    events for at least one node_start + node_end + edge_fire + subgraph_enter
-    + subgraph_exit. The plugin uses its in-memory fallback when no Session
-    is configured — that fallback records into a private list we can read.
-    """
-    from agent_lab.adapters.lca_perceive import (
-        register_fixture_hub,
-        unregister_fixture_hub,
-    )
-    from agent_lab.plugins import EventSinkPlugin
-    from agent_lab.primitives.artifact import Artifact, ArtifactKind
-    from agent_lab.runtime.runner import run as run_graph
-    from lca.plugins.composer.runtime.fixture.runtime_factory import (
-        NullPerceiveHub as _NullHub,
-    )
-
-    # Stub LLM adapter to avoid network.
-    class _StubAdapter:
-        async def complete(self, prompt, **kw):
-            from lca.contracts.models.core.conversation.llm import LLMResponse
-
-            return LLMResponse(text="stub", tool_calls=[])
-
-    specs = __import__("agent_lab.graphs", fromlist=["load_registry"]).load_registry(
-        "perceive",
-        "think",
-        "reflect",
-        "remember",
-        "stop",
-        "toolbox",
-        "event_log",
-        "mv_assemble",
-        "effect_dispatch",
-        "agent_loop",
-    )
-    # Swap perceive's build node to use a fixture hub (default
-    # SequentialPerceiveHub constructor needs args we don't supply).
-    for n in specs["perceive"].nodes:
-        if n.id == "build":
-            n.config["provider_config"] = {"fixture_hub_name": "null-hub"}
-    for n in specs["think"].nodes:
-        if n.id == "llm":
-            n.config["provider_config"] = {
-                "adapter_factory": {
-                    "ref": "tests.agent_lab.fixtures.llm_stub:StubLlmAdapter",
-                    "kwargs": {},
-                }
-            }
-    # Swap perceive to a fixture hub.
-    register_fixture_hub("null-hub", _NullHub())
-    try:
-        # Force the EventSinkPlugin to use a known in-memory sink we can
-        # capture. Re-register with a fresh instance.
-        sink_plugin = EventSinkPlugin(
-            name="default_event_sink",
-            kind="event_sink",
-            config={"sink_id": "agent_loop"},
-        )
-        # Read the fallback list reference.
-        fallback_sink = sink_plugin._sink()
-        # Re-bind the bundle so it carries our re-registered plugin.
-        # The bundle resolves plugins lazily — `register_instance()` puts
-        # ours into the global map. Our plugin's `name` matches the
-        # spec's `id`, so resolution returns ours first.
-        from agent_lab.plugins import register_instance, unregister_instance
-
-        register_instance(sink_plugin)
-        try:
-            trace = run_graph(
-                specs["agent_loop"],
-                initial={
-                    "user_turn": Artifact(
-                        kind=ArtifactKind.MESSAGE,
-                        content=[{"role": "user", "content": "hi"}],
-                    ),
-                    "system": Artifact(kind=ArtifactKind.TEXT, content="sys"),
-                    "history": Artifact(kind=ArtifactKind.MESSAGE, content=[]),
-                    "config": Artifact(kind=ArtifactKind.FACT, content={"temperature": 0}),
-                    "tools": Artifact(kind=ArtifactKind.FACT, content=[]),
-                    "results": Artifact(kind=ArtifactKind.TEXT, content=""),
-                    "state": Artifact(kind=ArtifactKind.FACT, content={"step": 0}),
-                },
-                sub_registry=specs,
-            )
-        finally:
-            unregister_instance("default_event_sink")
-        # The fallback sink captured every event the runner emitted.
-        kinds_seen = {rec["data"]["event_kind"] for rec in fallback_sink.events}
-        # EventSinkPlugin captures every hook event including the
-        # semantic ones (on_decision / on_observation / on_reflection)
-        # emitted by the runner's schema_ref-based fan-out.
-        assert "node_start" in kinds_seen
-        assert "node_end" in kinds_seen
-        assert "edge_fire" in kinds_seen
-        assert "subgraph_enter" in kinds_seen
-        assert "subgraph_exit" in kinds_seen
-        assert "on_decision" in kinds_seen
-        assert "on_observation" in kinds_seen
-        # Sanity: trace.events still includes the same events (backward-compat).
-        trace_kinds = {ev.kind for ev in trace.events}
-        assert "node_start" in trace_kinds
-        assert "node_end" in trace_kinds
-    finally:
-        unregister_fixture_hub("null-hub")
 
 
 # ---------------------------------------------------------------------------

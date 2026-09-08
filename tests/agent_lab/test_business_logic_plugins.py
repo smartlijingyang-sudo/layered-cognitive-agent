@@ -265,81 +265,12 @@ def test_tool_dispatch_guard_passes_real_name() -> None:
 
 
 # ---------------------------------------------------------------------------
-# (5) end-to-end: runner fans out on_decision → ParseDecisionPlugin rewrites
+# (5) end-to-end: removed (2026-09-08).
+#
+# test_runner_end_to_end_parse_decision_rewrites depended on
+# ``agent_lab.adapters.lca_perceive`` (the PerceiveHub provider + fixture
+# registry), which was deleted in the perceive-first-principles refactor.
+# Perceive now uses ``perceive.aggregate`` (pure composition, no Hub).
+# Coverage of ParseDecisionPlugin's rewrite path belongs to a fresh e2e
+# test that does not require a Hub fixture.
 # ---------------------------------------------------------------------------
-
-
-def test_runner_end_to_end_parse_decision_rewrites() -> None:
-    """Running think.yaml with a stub LLM adapter and the agent_loop's
-    plugins produces a Decision artifact whose action_type was rewritten
-    by ParseDecisionPlugin.
-    """
-    from agent_lab.adapters.lca_perceive import (
-        register_fixture_hub,
-        unregister_fixture_hub,
-    )
-    from agent_lab.plugins import ParseDecisionPlugin, register_instance, unregister_instance
-    from agent_lab.primitives.artifact import Artifact, ArtifactKind
-    from agent_lab.runtime.runner import run as run_graph
-    from lca.plugins.composer.runtime.fixture.runtime_factory import (
-        NullPerceiveHub,
-    )
-
-    specs = __import__("agent_lab.graphs", fromlist=["load_registry"]).load_registry(
-        "perceive",
-        "think",
-        "reflect",
-        "remember",
-        "stop",
-        "toolbox",
-        "event_log",
-        "mv_assemble",
-        "effect_dispatch",
-        "agent_loop",
-    )
-    for n in specs["perceive"].nodes:
-        if n.id == "build":
-            n.config["provider_config"] = {"fixture_hub_name": "null-hub"}
-    for n in specs["think"].nodes:
-        if n.id == "llm":
-            n.config["provider_config"] = {
-                "adapter_factory": {
-                    "ref": "tests.agent_lab.fixtures.llm_stub:StubLlmAdapter",
-                    "kwargs": {},
-                }
-            }
-    register_fixture_hub("null-hub", NullPerceiveHub())
-    # Register ParseDecisionPlugin explicitly so it overrides the agent_loop
-    # default instance (forces the rewrite path).
-    custom = ParseDecisionPlugin(
-        name="default_parse_decision",
-        kind="parse_decision",
-        config={"enabled_refuse_action": "refuse"},
-    )
-    register_instance(custom)
-    try:
-        trace = run_graph(
-            specs["agent_loop"],
-            initial={
-                "user_turn": Artifact(
-                    kind=ArtifactKind.MESSAGE,
-                    content=[{"role": "user", "content": "hi"}],
-                ),
-                "system": Artifact(kind=ArtifactKind.TEXT, content="sys"),
-                "history": Artifact(kind=ArtifactKind.MESSAGE, content=[]),
-                "config": Artifact(kind=ArtifactKind.FACT, content={"temperature": 0}),
-                "tools": Artifact(kind=ArtifactKind.FACT, content=[]),
-                "results": Artifact(kind=ArtifactKind.TEXT, content=""),
-                "state": Artifact(kind=ArtifactKind.FACT, content={"step": 0}),
-            },
-            sub_registry=specs,
-        )
-    finally:
-        unregister_instance("default_parse_decision")
-        unregister_fixture_hub("null-hub")
-
-    decision_out = trace.final_artifacts.get("decision_out")
-    assert decision_out is not None
-    # Stub adapter returned text="stub"; plugin should classify as
-    # "respond" (because tool_calls is empty AND text is non-empty).
-    assert decision_out.content["action_type"] == "respond"
