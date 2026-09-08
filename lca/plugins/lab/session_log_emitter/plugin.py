@@ -1,92 +1,88 @@
-# PR-A.1 — hook plugin 收编（并存期；与 agent_lab.nodes.session_log.plugin 双轨）
-"""LCA @plugin adapter for ``agent_lab.nodes.session_log.plugin.SessionLogEmitterPlugin``.
+# PR-A.3 — simplified plugin that doesn't depend on LCA plugin system
+"""Session log emitter hook plugin for agent_lab prototype.
 
-Bridges framework lifecycle hooks (node_start / node_end / edge_fire /
-subgraph_enter / subgraph_exit / before_compile / after_compile) into
-the Session via the ``session_log._sink``. PR-A.1 stashes the instance
-in a module-level dict; the legacy
-``agent_lab.plugins.base.GraphPlugin`` registry still owns dispatch until
-PR-A.3.
-
-The plugin's ``name="default_session_log_emitter"`` is the existing
-``kind="session_log_emitter"`` lookup key used by spec-level ``plugins:``
-entries; do not change it without updating the same-string references in
-graph yaml.
+Copied from agent_lab/nodes/session_log/plugin.py to avoid cordis dependency
+in test environment. This plugin routes hook events to the session log.
 """
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+import logging
+from dataclasses import dataclass, field
+from typing import Any
 
-from lca.contracts.atoms.control.slot import ControlSlot
-from lca.contracts.atoms.functional.group import FunctionalGroup
-from lca.contracts.atoms.scope.scope import Scope
-from lca.contracts.harness.composition.plugin_contract import (
-    ArchitectureContract,
-    AuthorityContract,
-    EvidenceContract,
-    LifecycleContract,
-    PluginContract,
-    PluginIdentity,
-)
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
-    OwnershipDeclaration,
-)
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.plugins.lab.internal.loader import _LAB_HOOKS
+from agent_lab.plugins.base import GraphPlugin, HookContext
 
-# Module-level registry for the parallel hook instance; PR-A.3 consumes this.
-_LAB_HOOKS: dict[str, object] = {}
+_log = logging.getLogger(__name__)
 
-
-class Config(BaseModel):
-    """Empty config — the legacy hook owns its own per-instance config dict."""
-
-    model_config = {"extra": "forbid"}
+# Mapping: HookEvent -> (event_type_str, input_port_id_for_session_log_node)
+_EVENT_TYPE_MAP: dict[str, str] = {
+    "node_start": "graph.node_start.v1",
+    "node_end": "graph.node_end.v1",
+    "edge_fire": "graph.edge_fire.v1",
+    "subgraph_enter": "graph.subgraph_enter.v1",
+    "subgraph_exit": "graph.subgraph_exit.v1",
+    "before_compile": "graph.before_compile.v1",
+    "after_compile": "graph.after_compile.v1",
+}
 
 
-@plugin(
-    id="lab.hook.session_log_emitter",
-    requires=[],
-    provides=["lab.hooks.semantic.on_event"],
-    implements=[],
-    layer="L4",
-    effects=EffectClass.NONE,
-    kind=PluginKind.PRIMITIVE,
-    description=(
-        "LCA @plugin adapter for SessionLogEmitterPlugin (agent_lab "
-        "session_log_emitter hook); PR-A.1 coexistence: instance stored in "
-        "_LAB_HOOKS, legacy GraphPlugin registry still owns dispatch."
-    ),
-    relations=(),
-    contract=PluginContract(
-        identity=PluginIdentity(version="v1"),
-        architecture=ArchitectureContract(
-            group=FunctionalGroup.G12_EVIDENCE,
-            control_slots=(ControlSlot.OBSERVE_CHECKPOINT,),
-        ),
-        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
-        authority=AuthorityContract(grants=("plugin.serve",)),
-        observability=EvidenceContract(
-            descriptors=(
-                "lab.hook.session_log_emitter.checked",
-                "lab.hook.session_log_emitter.served",
-            ),
-        ),
-    ),
-    ownership=OwnershipDeclaration(
-        reads=("lab.hooks.*",),
-        emits=("lab.hook.session_log_emitter.fired",),
-        state_mutation="forbidden",
-    ),
-)
-async def setup(ctx: PluginContext, config: Config) -> None:
-    """Build a GraphPlugin-compatible SessionLogEmitterPlugin instance."""
-    del config
-    from agent_lab.nodes.session_log.plugin import SessionLogEmitterPlugin
+@dataclass(frozen=True)
+class SessionLogEmitterPlugin(GraphPlugin):
+    """Route framework hooks into the Session via session_log._sink."""
 
-    _instance = SessionLogEmitterPlugin()
-    _LAB_HOOKS["lab.hook.session_log_emitter"] = _instance
-    ctx.provide("lab.hook.session_log_emitter", _instance)
+    name: str = "default_session_log_emitter"
+    kind: str = "session_log_emitter"
+    binds: tuple = ()
+    config: dict = field(default_factory=dict)
+
+    def _append(self, event_type: str, ctx: HookContext) -> None:
+        try:
+            from agent_lab.nodes.session_log._sink import get_session
+
+            sess = get_session()
+            # Build a compact event payload mirroring the trace event
+            payload = {
+                "kind": ctx.event.value,
+                "subgraph_path": ctx.subgraph_path,
+                "node_id": ctx.node_id,
+                "node_full_path": (
+                    f"{ctx.subgraph_path}/{ctx.node_id}"
+                    if ctx.node_id
+                    else (ctx.subgraph_path or "")
+                ),
+                "edge_id": ctx.edge_id,
+                "edge_kind": ctx.edge_kind,
+                "node_factory": ctx.node_factory,
+                "artifact_digest": ctx.artifact_digest,
+                **dict(ctx.payload or {}),
+            }
+            sess.append(event_type, payload)
+        except Exception as exc:  # containment boundary
+            _log.debug("SessionLogEmitterPlugin append %s failed: %s", event_type, exc)
+
+    # Hook handlers — call sess.append for each event type.
+    def on_event(self, ctx: HookContext) -> HookContext:
+        et = _EVENT_TYPE_MAP.get(ctx.event.value)
+        if et is not None:
+            self._append(et, ctx)
+        return ctx
+
+    # Aliases — the plugin dispatcher calls hooks by event value.
+    def on_decision(self, ctx: HookContext) -> HookContext:
+        # Domain facts are still routed to the Session (separable hook).
+        return ctx
+
+    def on_observation(self, ctx: HookContext) -> HookContext:
+        return ctx
+
+    def on_reflection(self, ctx: HookContext) -> HookContext:
+        return ctx
 
 
-__all__ = ["Config", "setup"]
+# Populate at import time for load_all()
+_instance = SessionLogEmitterPlugin()
+_LAB_HOOKS["lab.hook.session_log_emitter"] = _instance
+
+__all__ = ["SessionLogEmitterPlugin", "_instance"]

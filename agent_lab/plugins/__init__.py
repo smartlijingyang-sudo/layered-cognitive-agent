@@ -2,12 +2,16 @@
 
 Every cross-cutting concern (event emission, metrics, control binding,
 parse rules, memory policy, stop policy, LLM provider selection) is a
-plugin, not inline code in the runner or node files. Importing this
-package triggers ``discover()`` so the runner can resolve plugin kinds.
+plugin, not inline code in the runner or node files.
+
+PR-A.3 status:
+  The plugin registration surface (register_plugin, discover, resolve_plugin,
+  etc.) has been removed. Plugin resolution now uses lca.plugins.lab.internal.loader.
+  The 9 Plugin subclasses remain as marker interfaces (until PR-D rewrites
+  the hook subclasses into handler functions).
 
 Public surface:
-  GraphPlugin, HookContext, HookEvent, Bind, register_plugin, discover,
-  resolve_plugin, fanout_hooks
+  GraphPlugin, HookContext, HookEvent, Bind, fanout_hooks
   ControlSlotsPlugin     (agent_lab.plugins.control_slots)
   SemanticRouterPlugin   (agent_lab.plugins.semantic_router)
   EventSinkPlugin        (agent_lab.plugins.events)
@@ -23,17 +27,7 @@ from agent_lab.plugins.base import (
     GraphPlugin,
     HookContext,
     HookEvent,
-    discover,
     fanout_hooks,
-    get_fixture_instance,
-    get_instance,
-    get_plugin_class,
-    register_fixture_instance,
-    register_instance,
-    register_plugin,
-    resolve_plugin,
-    unregister_fixture_instance,
-    unregister_instance,
 )
 from agent_lab.plugins.control_slots import ControlSlotsPlugin
 from agent_lab.plugins.events import EventSinkPlugin
@@ -57,15 +51,5 @@ __all__ = [
     "ParseDecisionPlugin",
     "SemanticRouterPlugin",
     "ToolDispatchGuardPlugin",
-    "discover",
     "fanout_hooks",
-    "get_fixture_instance",
-    "get_instance",
-    "get_plugin_class",
-    "register_fixture_instance",
-    "register_instance",
-    "register_plugin",
-    "resolve_plugin",
-    "unregister_fixture_instance",
-    "unregister_instance",
 ]

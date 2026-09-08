@@ -51,11 +51,13 @@ def _bootstrap() -> None:
     from agent_lab.nodes.act.execute.plugin import configure_registry
     from agent_lab.nodes.act.execute.runtime_bind import ensure_act_runtime
     from agent_lab.tools import ToolRegistry
+    from lca.plugins.lab.internal.loader import load_all
 
     registry = ToolRegistry()
     registry.load_from_yaml(Path(__file__).parent / "tools" / "registry.yaml")
     configure_registry(registry)
     ensure_act_runtime()
+    load_all()
 
 
 def _register_lca_mv() -> None:

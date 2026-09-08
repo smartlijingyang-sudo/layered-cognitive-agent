@@ -93,23 +93,28 @@ class _Runner:
         Sub-graph runners use the inherited plugin list (from the root);
         the root runner uses its own bundle's plugin_instances plus any
         plugins declared on the immediate spec.
+
+        PR-A.3 — resolution moved from ``agent_lab.plugins.resolve_plugin``
+        to ``lca.plugins.lab.internal.loader.resolve_plugin``. The handler
+        instance still satisfies the ``GraphPlugin`` hook-method contract
+        (until PR-D rewrites the 9 hook subclasses).
         """
         if self._inherited_plugins:
             return list(self._inherited_plugins)
-        from agent_lab.plugins.base import GraphPlugin
 
-        bundle_plugins: list[GraphPlugin] = list(getattr(self.bundle, "plugin_instances", []) or [])
-        own_plugins: list[GraphPlugin] = []
+        from lca.plugins.lab.internal.loader import load_all, resolve_plugin
+
+        load_all()
+
+        bundle_plugins: list = list(getattr(self.bundle, "plugin_instances", []) or [])
+        own_plugins: list = []
         try:
-            from agent_lab.plugins import resolve_plugin as _resolve
-
             for ref in getattr(self.spec, "plugins", []) or []:
-                inst = _resolve(ref)
+                inst = resolve_plugin(ref)
                 if inst is not None:
                     own_plugins.append(inst)
         except Exception as exc:
             import logging
-
             logging.getLogger(__name__).debug("runner plugin discovery: %s", exc)
         return bundle_plugins + own_plugins
 
@@ -117,8 +122,7 @@ class _Runner:
         ev.ts_ms = time.time() * 1000.0
         self.trace.events.append(ev)
         # Fanout to plugins. Map TraceEvent.kind -> HookEvent + HookContext.
-        from agent_lab.plugins import fanout_hooks
-        from agent_lab.plugins.base import HookContext, HookEvent
+        from lca.plugins.lab.internal.hooks import HookContext, HookEvent, fanout_hooks
 
         kind_to_event = {
             "node_start": HookEvent.NODE_START,
@@ -151,8 +155,7 @@ class _Runner:
         The skeleton does not interpret schema_ref or cognitive event
         names; a business plugin (e.g. semantic_router) owns that map.
         """
-        from agent_lab.plugins import fanout_hooks
-        from agent_lab.plugins.base import HookContext, HookEvent
+        from lca.plugins.lab.internal.hooks import HookContext, HookEvent, fanout_hooks
 
         plugins = self._plugins()
         ctx = HookContext(
@@ -493,25 +496,24 @@ def _ensure_framework_emitter(runner: _Runner) -> None:
 
     The runner has no knowledge of session_log specifically — it just
     ensures that *some* framework-emit plugin is attached. The
-    session_log_emitter plugin class is discovered via
-    plugins.discover(); if it's the registered framework-emit handler,
-    an instance is added to the runner's inherited_plugins.
+    session_log_emitter plugin instance is loaded via
+    lca.plugins.lab.internal.loader; if it exists, it is added to the
+    runner's inherited_plugins if not already present.
     """
-    from agent_lab.plugins.base import get_plugin_class
+    from lca.plugins.lab.internal.loader import get_instance, load_all
 
-    # Look for the canonical framework-emit kind. If the plugin library
-    # exposes one under "session_log_emitter", use it.
-    plugin_cls = get_plugin_class("session_log_emitter")
-    if plugin_cls is None:
+    load_all()
+
+    # Look for the canonical framework-emit handler in the loader registry.
+    instance = get_instance("lab.hook.session_log_emitter")
+    if instance is None:
         return
+
     # Check whether it's already present in the runner's plugin chain
     for p in runner._inherited_plugins:
-        if isinstance(p, plugin_cls):
+        if p is instance:
             return
-    # Add a default instance at the head of the chain (runs early).
-    instance = plugin_cls(
-        name="default_session_log_emitter", kind="session_log_emitter", binds=(), config={}
-    )
+    # Add it at the head of the chain (runs early).
     runner._inherited_plugins.insert(0, instance)
 
 

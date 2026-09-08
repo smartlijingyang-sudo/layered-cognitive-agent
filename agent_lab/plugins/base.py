@@ -1,4 +1,4 @@
-"""Plugin base — GraphPlugin ABC, PluginRegistry, hook helper re-exports.
+"""Plugin base — GraphPlugin ABC and hook helper re-exports.
 
 The plugin system is the cross-cutting extension point for agent_lab graphs.
 Every "横切关注点" (event emission, metrics, control binding, parse rules,
@@ -6,10 +6,19 @@ memory policy, stop policy, LLM provider selection, observer metrics) is
 expressed as a plugin, NOT as inline code in the runner or in node plugin
 files.
 
+PR-A.3 status:
+  The plugin registration surface (register_plugin, discover, resolve_plugin,
+  etc.) has been removed. Plugin resolution now uses lca.plugins.lab.internal.loader.
+  The GraphPlugin base class remains as a marker interface for handlers that
+  support hook methods.
+
+Hook helpers (HookEvent, HookContext, Bind, fanout_hooks) are re-exported
+from lca.plugins.lab.internal.hooks for backwards compatibility.
+
 Each plugin declares which hooks it cares about by overriding the
 relevant hook methods (before_compile / after_compile / before_node_execute
 / after_node_execute / before_edge_fire / after_edge_fire / before_subgraph_enter
-/ after_subgraph_enter / on_event / on_decision / on_observation / on_reflection).
+/ after_subgraph_exit / on_event / on_decision / on_observation / on_reflection).
 The runner calls each matching hook method at the right point; failures are
 contained at the runner boundary (mirrors LCA Session observer containment).
 
@@ -21,64 +30,26 @@ Bind selectors narrow which events a plugin receives:
   Bind(kind="event_kind",  value="node_start") # only node_start events
 
 An empty binds tuple means "match everything".
-
-PR-A.2 status:
-  The hook helpers (HookEvent / HookContext / Bind / fanout_hooks) are now
-  defined in ``lca.plugins.lab.internal.hooks`` and re-exported here for
-  backwards compatibility. A DeprecationWarning is emitted for the two
-  symbols that external code is expected to migrate first
-  (``HookEvent`` and ``fanout_hooks``). Delete this compat shim together
-  with PR-A.3 — see ADR-0209 §1.7.
 """
 
 from __future__ import annotations
 
-import importlib
 import logging
-import warnings
 from dataclasses import dataclass, field
 from typing import Any
 
-from lca.plugins.lab.internal.hooks import Bind, HookContext
-from lca.plugins.lab.internal.hooks import HookEvent as _HookEvent
-from lca.plugins.lab.internal.hooks import fanout_hooks as _fanout_hooks
-
-# ---------------------------------------------------------------------------
-# PR-A.2 — deprecation warnings for the hook helper re-exports.
-#
-# Two warnings are emitted at module import (one per symbol that downstream
-# code is expected to migrate to ``lca.plugins.lab.internal.hooks`` first):
-#   - HookEvent     (the enum used by graph/compile.py and runtime/runner.py)
-#   - fanout_hooks  (the dispatcher used by runtime/runner.py)
-# HookContext and Bind are also re-exported but do not trigger a warning in
-# this PR; callers may continue to use them through this shim until PR-A.3
-# rewrites the compiler / runner. The shim is deleted in the same PR.
-# ---------------------------------------------------------------------------
-warnings.warn(
-    (
-        "Importing HookEvent from agent_lab.plugins.base is deprecated "
-        "(PR-A.2). Import from lca.plugins.lab.internal.hooks instead; "
-        "this re-export will be removed when PR-A.3 lands."
-    ),
-    DeprecationWarning,
-    stacklevel=2,
-)
-warnings.warn(
-    (
-        "Importing fanout_hooks from agent_lab.plugins.base is deprecated "
-        "(PR-A.2). Import from lca.plugins.lab.internal.hooks instead; "
-        "this re-export will be removed when PR-A.3 lands."
-    ),
-    DeprecationWarning,
-    stacklevel=2,
-)
-
-# Re-exported names (callers may still do ``from agent_lab.plugins.base
-# import HookEvent, fanout_hooks, ...`` — only the two above emit warnings).
-HookEvent = _HookEvent
-fanout_hooks = _fanout_hooks
+from lca.plugins.lab.internal.hooks import Bind, HookContext, HookEvent, fanout_hooks
 
 _log = logging.getLogger(__name__)
+
+__all__ = [
+    "Bind",
+    "GraphPlugin",
+    "HookContext",
+    "HookEvent",
+    "fanout_hooks",
+    "register_plugin",  # Backwards compatibility
+]
 
 
 @dataclass(frozen=True)
@@ -147,135 +118,14 @@ class GraphPlugin:
             return ctx
 
 
-# ---------------------------------------------------------------------------
-# Plugin registry — classes register via @register_plugin decorator; instances
-# bind by id at runtime.
-# ---------------------------------------------------------------------------
-_PLUGIN_CLASSES: dict[str, type[GraphPlugin]] = {}
-_PLUGIN_INSTANCES: dict[str, GraphPlugin] = {}
-_FIXTURE_INSTANCES: dict[str, GraphPlugin] = {}
-
-
-def register_plugin(cls: type[GraphPlugin]) -> type[GraphPlugin]:
-    """Class decorator — register a GraphPlugin subclass by ``cls.kind``.
-
-    The plugin's kind (e.g. ``event_sink``) is the lookup key; spec-level
-    ``plugins: [{kind: event_sink, ...}]`` references it by kind.
+# Backwards compatibility: keep register_plugin as a no-op decorator
+# so old agent_lab plugins can still use it during the transition.
+# The new loader path (lca.plugins.lab.internal.loader) doesn't use this.
+def register_plugin(cls):
+    """No-op decorator for backwards compatibility.
+    
+    Old agent_lab plugins use @register_plugin but the new loader path
+    doesn't need it. This is kept to avoid breaking existing code during
+    the transition period.
     """
-    if not getattr(cls, "kind", None):
-        raise ValueError(f"plugin {cls!r} missing 'kind' class attribute")
-    if cls.kind in _PLUGIN_CLASSES and _PLUGIN_CLASSES[cls.kind] is not cls:
-        raise ValueError(
-            f"plugin kind {cls.kind!r} already registered by {_PLUGIN_CLASSES[cls.kind]!r}"
-        )
-    _PLUGIN_CLASSES[cls.kind] = cls
     return cls
-
-
-def get_plugin_class(kind: str) -> type[GraphPlugin] | None:
-    return _PLUGIN_CLASSES.get(kind)
-
-
-def register_instance(plugin: GraphPlugin) -> None:
-    """Register an instance by name (for spec-level ``id`` binding)."""
-    _PLUGIN_INSTANCES[plugin.name] = plugin
-
-
-def unregister_instance(name: str) -> None:
-    _PLUGIN_INSTANCES.pop(name, None)
-
-
-def get_instance(name: str) -> GraphPlugin | None:
-    return _PLUGIN_INSTANCES.get(name)
-
-
-def register_fixture_instance(name: str, plugin: GraphPlugin) -> None:
-    """Test-only — bind a plugin instance by name without going through the class registry."""
-    _FIXTURE_INSTANCES[name] = plugin
-
-
-def unregister_fixture_instance(name: str) -> None:
-    _FIXTURE_INSTANCES.pop(name, None)
-
-
-def get_fixture_instance(name: str) -> GraphPlugin | None:
-    return _FIXTURE_INSTANCES.get(name)
-
-
-def discover() -> dict[str, type[GraphPlugin]]:
-    """Import all built-in plugin modules and return the registry.
-
-    Idempotent — call once at runner / compiler init.
-    """
-    for module_name in (
-        "agent_lab.plugins.events",
-        "agent_lab.plugins.observers",
-        "agent_lab.plugins.parsers",
-        "agent_lab.plugins.observation",
-        "agent_lab.plugins.memory_extract",
-        "agent_lab.plugins.tool_guard",
-        "agent_lab.plugins.control_slots",
-        "agent_lab.plugins.semantic_router",
-        # Framework-emit bridge: routes framework lifecycle hooks into the
-        # session_log graph (which then writes to the LCA Session). The
-        # runner knows nothing about session_log; the plugin is auto-loaded
-        # via this discover() loop.
-        "agent_lab.nodes.session_log.plugin",
-    ):
-        try:
-            importlib.import_module(module_name)
-        except Exception as exc:  # pragma: no cover - import failures
-            _log.warning("plugin module %s import failed: %s", module_name, exc)
-    return dict(_PLUGIN_CLASSES)
-
-
-def resolve_plugin(ref: Any) -> GraphPlugin | None:
-    """Resolve a PluginRef to a live GraphPlugin instance.
-
-    Resolution order:
-      1. fixture registry (test-only; bypasses config)
-      2. instance registry by name
-      3. instantiate the class with ref.config; register the new instance
-    """
-    fixture = get_fixture_instance(ref.id)
-    if fixture is not None:
-        return fixture
-    inst = get_instance(ref.id)
-    if inst is not None:
-        return inst
-    cls = get_plugin_class(ref.kind)
-    if cls is None:
-        _log.warning("plugin kind %r not registered; cannot resolve %r", ref.kind, ref.id)
-        return None
-    # Instantiate with config
-    try:
-        inst = cls(
-            name=ref.id,
-            kind=ref.kind,
-            binds=tuple(getattr(ref, "binds", ()) or ()),
-            config=dict(getattr(ref, "config", {}) or {}),
-        )
-    except Exception as exc:  # pragma: no cover - plugin init failures
-        _log.warning("plugin %r instantiation failed: %s", ref.id, exc)
-        return None
-    register_instance(inst)
-    return inst
-
-
-__all__ = [
-    "Bind",
-    "GraphPlugin",
-    "HookContext",
-    "HookEvent",
-    "discover",
-    "fanout_hooks",
-    "get_fixture_instance",
-    "get_instance",
-    "get_plugin_class",
-    "register_fixture_instance",
-    "register_instance",
-    "register_plugin",
-    "resolve_plugin",
-    "unregister_fixture_instance",
-    "unregister_instance",
-]

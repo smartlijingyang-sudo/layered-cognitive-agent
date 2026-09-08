@@ -20,11 +20,20 @@ _log = logging.getLogger(__name__)
 
 
 def _resolve_plugins(spec: InfoEdgeSpec) -> list:
-    """Materialise every PluginRef in ``spec.plugins`` into a live plugin."""
-    from agent_lab.plugins import resolve_plugin
-    from agent_lab.plugins.base import GraphPlugin
+    """Materialise every PluginRef in ``spec.plugins`` into a live plugin.
 
-    plugins: list[GraphPlugin] = []
+    PR-A.3 — the resolution path moved from
+    ``agent_lab.plugins.{resolve_plugin,register_*}`` to the LCA loader
+    in ``lca.plugins.lab.internal.loader``. The handler instance still
+    satisfies the ``GraphPlugin`` hook-method contract (until PR-D
+    rewrites the 9 hook subclasses), so the runner / compiler treat the
+    returned objects identically.
+    """
+    from lca.plugins.lab.internal.loader import load_all, resolve_plugin
+
+    load_all()
+
+    plugins: list = []
     for ref in spec.plugins:
         inst = resolve_plugin(ref)
         if inst is not None:
