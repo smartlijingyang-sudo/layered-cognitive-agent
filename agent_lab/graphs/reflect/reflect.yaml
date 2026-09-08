@@ -1,0 +1,19 @@
+# reflect — phase sub-graph (skeleton).
+# Workers: inputs_join -> combined_to_reflection -> reflection_to_candidates.
+id: reflect
+version: 0.1.0
+region: phase:reflect
+description: Critique observation+decision+prior -> Reflection -> candidates.
+  (Skeleton stub.)
+
+graph:
+  id: reflect
+  layer: phase
+  purpose: Reflect phase — Brain.reflect(state, observation).
+
+nodes:
+  - id: candidates
+    region: phase:reflect
+    factory: reflect__reflection_to_candidates
+    ins: [reflection]
+    outs: [candidates]

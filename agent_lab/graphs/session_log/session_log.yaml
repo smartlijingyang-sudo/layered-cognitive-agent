@@ -1,0 +1,20 @@
+# session_log — durable fact-write surface (skeleton).
+# Workers: append_decision / append_observation / append_reflection.
+# Single fact-write seam per ADR-0186/0191/0194.
+id: session_log
+version: 0.1.0
+region: lineage
+description: Session.append(event_type, data) — single fact-write seam.
+  (Skeleton stub.)
+
+graph:
+  id: session_log
+  layer: lineage
+  purpose: Durable fact-writing surface — Session is the SSOT.
+
+nodes:
+  - id: write_observation
+    region: lineage
+    factory: remember__append_observation
+    ins: [observation]
+    outs: [seq]

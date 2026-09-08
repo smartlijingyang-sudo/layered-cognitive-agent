@@ -1,10 +1,11 @@
-"""remember sub-package: write_journal, save_state.
+"""remember layer nodes — append_decision/observation/reflection, snapshot_state, fold_history."""
+from agent_lab.nodes.remember.append_decision.plugin import AppendDecision
+from agent_lab.nodes.remember.append_observation.plugin import AppendObservation
+from agent_lab.nodes.remember.append_reflection.plugin import AppendReflection
+from agent_lab.nodes.remember.snapshot_state.plugin import SnapshotState
+from agent_lab.nodes.remember.fold_history.plugin import FoldHistory
 
-These nodes are loaded by ``agent_lab.nodes/__init__.py`` so their
-@node(...) decorators register them with NodeRegistry at import time.
-"""
-
-from agent_lab.nodes.remember.save_state.plugin import SaveStateNode
-from agent_lab.nodes.remember.write_journal.plugin import WriteJournalNode
-
-__all__ = ["SaveStateNode", "WriteJournalNode"]
+__all__ = [
+    "AppendDecision", "AppendObservation", "AppendReflection",
+    "SnapshotState", "FoldHistory",
+]

@@ -1,0 +1,19 @@
+# history_derive — fold Session log into messages list (skeleton).
+# Real impl: session.derive_messages() (per LCA projection fabric).
+id: history_derive
+version: 0.1.0
+region: lineage
+description: Fold Session.derive_messages() into OpenAI-style messages list.
+  (Skeleton stub.)
+
+graph:
+  id: history_derive
+  layer: lineage
+  purpose: history = fold(Session).
+
+nodes:
+  - id: fold
+    region: lineage
+    factory: remember__fold_history
+    ins: []
+    outs: [messages]

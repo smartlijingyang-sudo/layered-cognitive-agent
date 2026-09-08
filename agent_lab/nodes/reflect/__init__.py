@@ -1,12 +1,6 @@
-"""reflect sub-package: gather_inputs, call_critic, extract_memory, write_extract.
+"""reflect layer nodes — inputs_join, combined_to_reflection, reflection_to_candidates."""
+from agent_lab.nodes.reflect.inputs_join.plugin import InputsJoin
+from agent_lab.nodes.reflect.combined_to_reflection.plugin import CombinedToReflection
+from agent_lab.nodes.reflect.reflection_to_candidates.plugin import ReflectionToCandidates
 
-These nodes are loaded by ``agent_lab.nodes.__init__`` so their
-@node(...) decorators register them with NodeRegistry at import time.
-"""
-
-from agent_lab.nodes.reflect.call_critic.plugin import CallCriticNode
-from agent_lab.nodes.reflect.combine.plugin import GatherInputsNode
-from agent_lab.nodes.reflect.extract_memory.plugin import ExtractMemoryNode
-from agent_lab.nodes.reflect.write_extract.plugin import WriteExtractNode
-
-__all__ = ["CallCriticNode", "ExtractMemoryNode", "GatherInputsNode", "WriteExtractNode"]
+__all__ = ["InputsJoin", "CombinedToReflection", "ReflectionToCandidates"]

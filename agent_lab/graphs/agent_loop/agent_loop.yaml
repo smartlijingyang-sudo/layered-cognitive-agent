@@ -1,0 +1,30 @@
+# agent_loop — root orchestration (skeleton).
+# Each phase is a sub_spec host; the host delegates the real work to its
+# sub-graph. Subgraphs: perceive / think / act / reflect / remember / stop.
+#
+# Skeleton (stub): single host node + sub_spec link. Real edges added in
+# subsequent PRs once the per-phase sub-graphs are wired.
+id: agent_loop
+version: 0.1.0
+region: phase:agent_loop
+description: Root loop — orchestrates perceive / think / act / reflect /
+  remember / stop sub_specs. (Skeleton stub.)
+
+graph:
+  id: agent_loop
+  layer: phase
+  purpose: Orchestrate the agent loop as a sequence of phase sub-graphs.
+
+nodes:
+  - id: perceive
+    region: phase:perceive
+    factory: passthrough__identity
+    ins: []
+    outs: [perceive_out]
+
+sub_specs:
+  - node: perceive
+    sub_spec: perceive
+    input_map: {}
+    output_map:
+      perceive_out: perceive_out

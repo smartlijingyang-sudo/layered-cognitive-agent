@@ -1,0 +1,19 @@
+# perceive — phase sub-graph (skeleton).
+# Workers: toolcall_context_build + user input + hub_fold.
+id: perceive
+version: 0.1.0
+region: phase:perceive
+description: Fold world inputs into a frozen ContextManifest via Hub.perceive.
+  (Skeleton stub.)
+
+graph:
+  id: perceive
+  layer: phase
+  purpose: Perceive phase — Hub fold.
+
+nodes:
+  - id: hub
+    region: phase:perceive
+    factory: perceive__hub_fold
+    ins: [state]
+    outs: [manifest]

@@ -1,9 +1,4 @@
-"""stop sub-package: evaluate_stop node.
+"""stop layer nodes — stop_decide."""
+from agent_lab.nodes.stop.stop_decide.plugin import StopDecide
 
-These nodes are loaded by ``agent_lab.nodes.__init__`` so their
-@node(...) decorators register them with NodeRegistry at import time.
-"""
-
-from agent_lab.nodes.stop.evaluate_stop.plugin import EvaluateStopNode
-
-__all__ = ["EvaluateStopNode"]
+__all__ = ["StopDecide"]

@@ -1,0 +1,21 @@
+# input_clean — shared sub-graph for input cleaning (skeleton).
+# Reused by perceive and model_visible graphs.
+# Workers: passthrough__redact (text-level scrubbing placeholder).
+id: input_clean
+version: 0.1.0
+region: model_visible
+description: Shared sub-graph — text-level scrubbing + dedup + rank.
+  (Skeleton stub.)
+
+graph:
+  id: input_clean
+  layer: model_visible
+  purpose: Clean text input before model-visible assembly.
+
+nodes:
+  - id: redact
+    region: model_visible
+    factory: passthrough__redact
+    config: { patterns: ["<internal>", "sk-XXXX"] }
+    ins: [text]
+    outs: [sanitized]

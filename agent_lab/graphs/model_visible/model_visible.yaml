@@ -1,0 +1,20 @@
+# model_visible — model-visible assembly graph (skeleton).
+# Workers: messages_merge + history_attach + manifest_commit.
+# Pure transform / fold — no side effects.
+id: model_visible
+version: 0.1.0
+region: model_visible
+description: Fold Session-derived history + current messages into a frozen
+  ContextManifest. (Skeleton stub.)
+
+graph:
+  id: model_visible
+  layer: model_visible
+  purpose: Build a frozen ContextManifest for the LLM.
+
+nodes:
+  - id: commit
+    region: model_visible
+    factory: model_visible__manifest_commit
+    ins: [messages]
+    outs: [manifest]

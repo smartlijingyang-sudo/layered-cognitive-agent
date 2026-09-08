@@ -1,10 +1,15 @@
-"""think sub-package: parse_decision_node, gate_enforce_node.
+"""think layer nodes — manifest_to_messages, prompt_assemble, llm_call,
+response_to_decision, gate_enforce."""
+from agent_lab.nodes.think.manifest_to_messages.plugin import ManifestToMessages
+from agent_lab.nodes.think.prompt_assemble.plugin import PromptAssemble
+from agent_lab.nodes.think.llm_call.plugin import LLMCall
+from agent_lab.nodes.think.response_to_decision.plugin import ResponseToDecision
+from agent_lab.nodes.think.gate_enforce.plugin import GateEnforce
 
-These nodes are loaded by ``agent_lab.nodes.__init__`` so their
-@node(...) decorators register them with NodeRegistry at import time.
-"""
-
-from agent_lab.nodes.think.gate_enforce_node.plugin import GateEnforceNode
-from agent_lab.nodes.think.parse_decision_node.plugin import ParseDecisionNode
-
-__all__ = ["GateEnforceNode", "ParseDecisionNode"]
+__all__ = [
+    "ManifestToMessages",
+    "PromptAssemble",
+    "LLMCall",
+    "ResponseToDecision",
+    "GateEnforce",
+]

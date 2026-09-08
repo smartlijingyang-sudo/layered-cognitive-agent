@@ -1,0 +1,19 @@
+# tools — named-tool inventory graph (skeleton).
+# Pure data / lookup — NO tool execution happens here.
+id: tools
+version: 0.1.0
+region: model_visible
+description: Resolve a tool name to its Tool instance + capability metadata.
+  (Skeleton stub — backed by agent_lab/tools/registry.yaml.)
+
+graph:
+  id: tools
+  layer: model_visible
+  purpose: Named-tool inventory — name -> Tool instance.
+
+nodes:
+  - id: identity
+    region: model_visible
+    factory: passthrough__identity
+    ins: [in]
+    outs: [out]
