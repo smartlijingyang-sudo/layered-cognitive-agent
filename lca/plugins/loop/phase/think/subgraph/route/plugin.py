@@ -56,7 +56,7 @@ class RouteStepExecutor:
         lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
         authority=AuthorityContract(grants=("plugin.serve",)),
         observability=EvidenceContract(
-            descriptors=("phase_think_subgraph_route.checked", "phase_think_subgraph_route.served")
+            descriptors=("phase_think_route.checked", "phase_think_route.served")
         ),
     ),
     relations=(),
