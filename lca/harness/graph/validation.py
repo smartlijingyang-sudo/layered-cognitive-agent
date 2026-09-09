@@ -43,6 +43,8 @@ class PhaseGraphValidator:
         phase_bindings: Sequence[PhaseBinding],
         specs: Sequence[PluginSpec],
         effect_policy: EffectPolicyPlan,
+        *,
+        require_all_semantic_phases: bool = True,
     ) -> ValidationReport:
         issues: list[ValidationIssue] = []
         nodes = {node.id: node for node in graph.nodes}
@@ -56,9 +58,12 @@ class PhaseGraphValidator:
         phase_nodes: dict[SemanticPhase, list[PhaseNode]] = defaultdict(list)
         for node in graph.nodes:
             phase_nodes[node.semantic_phase].append(node)
-        for phase in SemanticPhase:
-            if not phase_nodes[phase]:
-                issues.append(ValidationIssue("PG-001", f"missing semantic phase: {phase.value}"))
+        if require_all_semantic_phases:
+            for phase in SemanticPhase:
+                if not phase_nodes[phase]:
+                    issues.append(
+                        ValidationIssue("PG-001", f"missing semantic phase: {phase.value}")
+                    )
         bindings = {binding.node_id: binding for binding in phase_bindings}
         for node in graph.nodes:
             binding = bindings.get(node.id)
@@ -88,19 +93,25 @@ class PhaseGraphValidator:
             edge_targets[edge.source].append(edge)
         if graph.entry in nodes:
             reachable_nodes = reachable(graph.entry, edge_targets)
-            for phase, candidates in phase_nodes.items():
-                if not any(candidate.id in reachable_nodes for candidate in candidates):
-                    issues.append(
-                        ValidationIssue("PG-001", f"semantic phase is unreachable: {phase.value}")
-                    )
-            terminals = [node.id for node in graph.nodes if node.terminal]
-            if not terminals or not any(terminal in reachable_nodes for terminal in terminals):
-                issues.append(ValidationIssue("PG-006", "graph has no reachable terminal path"))
-        self._validate_cycles(nodes, edge_targets, issues)
+            if require_all_semantic_phases:
+                for phase, candidates in phase_nodes.items():
+                    if not any(candidate.id in reachable_nodes for candidate in candidates):
+                        issues.append(
+                            ValidationIssue(
+                                "PG-001", f"semantic phase is unreachable: {phase.value}"
+                            )
+                        )
+            if require_all_semantic_phases:
+                terminals = [node.id for node in graph.nodes if node.terminal]
+                if not terminals or not any(terminal in reachable_nodes for terminal in terminals):
+                    issues.append(ValidationIssue("PG-006", "graph has no reachable terminal path"))
+        if require_all_semantic_phases:
+            self._validate_cycles(nodes, edge_targets, issues)
         self._validate_execution_failure_routes(nodes, edge_targets, issues)
-        self._validate_causality(
-            graph, nodes, edge_targets, phase_bindings, specs, effect_policy, issues
-        )
+        if require_all_semantic_phases:
+            self._validate_causality(
+                graph, nodes, edge_targets, phase_bindings, specs, effect_policy, issues
+            )
         self._validate_contribution_order(phase_bindings, specs, issues)
         return ValidationReport(tuple(issues))
 

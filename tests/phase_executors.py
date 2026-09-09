@@ -17,6 +17,9 @@ from lca.plugins.loop.phase.remember.standard.plugin import (
 )
 from lca.plugins.loop.phase.stop.standard.plugin import create_executor as create_stop_executor
 from lca.plugins.loop.phase.think.standard.plugin import create_executor as create_think_executor
+from lca.plugins.loop.phase.think.subgraph_host.plugin import (
+    create_executor as create_think_subgraph_host_executor,
+)
 
 
 def standard_phase_executors() -> Mapping[str, PhaseExecutor]:
@@ -32,4 +35,12 @@ def standard_phase_executors() -> Mapping[str, PhaseExecutor]:
     }
 
 
-__all__ = ["standard_phase_executors"]
+def think_subgraph_dev_phase_executors() -> Mapping[str, PhaseExecutor]:
+    """Return production phase executors with ``phase.think.subgraph_host`` on think.main."""
+
+    executors = dict(standard_phase_executors())
+    executors["phase.think.subgraph_host"] = create_think_subgraph_host_executor()
+    return executors
+
+
+__all__ = ["standard_phase_executors", "think_subgraph_dev_phase_executors"]

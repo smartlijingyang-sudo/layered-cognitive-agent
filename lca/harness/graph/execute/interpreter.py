@@ -160,6 +160,9 @@ class GenericPlanInterpreter:
         self._subgraph_hook_emitter: SubgraphHookEmitter = (
             subgraph_hook_emitter or NullSubgraphHookEmitter()
         )
+        # Set for the duration of ``_drive`` so nested subgraph recursion
+        # can reuse the outer run's phase capabilities (brain/body/etc.).
+        self._active_capabilities: PhaseCapabilityReader | Mapping[str, object] | None = None
 
     async def run(
         self,
@@ -342,6 +345,8 @@ class GenericPlanInterpreter:
         facts: list[RunFact] = []
         visits: list[PhaseVisit] = []
         plan_ref = compiled_run_plan_ref(plan)
+        previous_capabilities = self._active_capabilities
+        self._active_capabilities = capabilities
 
         try:
             while True:
@@ -492,6 +497,8 @@ class GenericPlanInterpreter:
                 facts=facts,
                 reason="execution_error",
             )
+        finally:
+            self._active_capabilities = previous_capabilities
 
     async def _publish_phase_event(
         self,
@@ -738,7 +745,7 @@ class GenericPlanInterpreter:
             state=outer_state,
             input=None,
             budget=None,
-            capabilities=None,
+            capabilities=self._active_capabilities,
             artifacts=None,
             resume_cursor=None,
         )

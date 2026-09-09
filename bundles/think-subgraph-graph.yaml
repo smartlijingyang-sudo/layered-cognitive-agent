@@ -1,0 +1,49 @@
+# Think subgraph topology + edges (compile fixture only — never merge with declarative-phase-graph).
+#
+# shortcut → route → reason → classify → gate
+
+entries:
+  - id: phase.topology.standard
+    $name: phase_topology_think_subgraph
+    $module: lca.plugins.loop.graph.topology.standard.plugin
+    config:
+      nodes:
+        - id: think.subgraph.shortcut
+          phase: think
+          binding: phase.think.subgraph.shortcut
+          max_visits: 4
+          entry: true
+        - id: think.subgraph.route
+          phase: think
+          binding: phase.think.subgraph.route
+          max_visits: 4
+        - id: think.subgraph.reason
+          phase: think
+          binding: phase.think.subgraph.reason
+          max_visits: 4
+        - id: think.subgraph.classify
+          phase: think
+          binding: phase.think.subgraph.classify
+          max_visits: 4
+        - id: think.subgraph.gate
+          phase: think
+          binding: phase.think.subgraph.gate
+          max_visits: 4
+
+  - id: phase.edge.standard
+    $name: phase_edge_think_subgraph
+    $module: lca.plugins.loop.graph.edges.standard.plugin
+    config:
+      edges:
+        - source: think.subgraph.shortcut
+          target: think.subgraph.route
+          when: result.result_kind != "decision"
+        - source: think.subgraph.route
+          target: think.subgraph.reason
+          when: true
+        - source: think.subgraph.reason
+          target: think.subgraph.classify
+          when: true
+        - source: think.subgraph.classify
+          target: think.subgraph.gate
+          when: true

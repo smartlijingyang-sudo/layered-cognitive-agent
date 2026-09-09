@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING
 
 from lca.contracts.capabilities import GATES
@@ -9,7 +10,11 @@ from lca.contracts.harness.composition.composer import (
     AgentCompositionRequest,
     AgentGraphContribution,
 )
-from lca.contracts.mechanisms.capability.capability import require_capability
+from lca.contracts.mechanisms.capability.capability import (
+    MissingCapabilityError,
+    require_capability,
+)
+from lca.harness.graph.execute.subgraph_phase_runner import SUBGRAPH_PHASE_RUNNER_CAPABILITY
 from lca.plugins.composer.think.brain import (
     apply_lead_brain,
     instrument_llm,
@@ -39,6 +44,13 @@ class BrainComposer:
         brain = resolve_brain(request.spec, llm, scope=scope)
         if request.decision_gate is not None:
             brain = apply_lead_brain(brain, request.decision_gate)
+        phase_capabilities: dict[str, object] = {
+            "gates": require_capability(scope, GATES.key),
+        }
+        with contextlib.suppress(MissingCapabilityError):
+            phase_capabilities[SUBGRAPH_PHASE_RUNNER_CAPABILITY] = require_capability(
+                scope, SUBGRAPH_PHASE_RUNNER_CAPABILITY
+            )
         return AgentGraphContribution(
             brain=brain,
             body=None,
@@ -48,7 +60,7 @@ class BrainComposer:
             hooks=None,
             observability=None,
             llm=llm,
-            phase_capabilities={"gates": require_capability(scope, GATES.key)},
+            phase_capabilities=phase_capabilities,
             metadata={"composer": self.key},
         )
 

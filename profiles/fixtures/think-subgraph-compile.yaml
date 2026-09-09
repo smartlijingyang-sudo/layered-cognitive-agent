@@ -1,0 +1,5 @@
+# Compile fixture for logical plan ``bundles/think-subgraph.yaml``.
+
+bundles:
+  - bundles/think-subgraph-steps.yaml
+  - bundles/think-subgraph-graph.yaml

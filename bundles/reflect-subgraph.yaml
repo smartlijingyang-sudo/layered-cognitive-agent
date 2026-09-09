@@ -17,7 +17,12 @@
 # regression fixture rather than a runtime entry.
 
 entries:
-  - id: phase.topology.reflect_subgraph
+  - id: phase.reflect.standard
+    name: phase_reflect_standard
+    $module: lca.plugins.loop.phase.reflect.standard.plugin
+    config: {}
+
+  - id: phase.topology.standard
     $name: phase_topology_reflect_subgraph
     $module: lca.plugins.loop.graph.topology.standard.plugin
     config:
@@ -39,7 +44,7 @@ entries:
   # confirm the two-graph mutual reference; the interpreter ignores
   # the back-reference field on edges inside the subgraph at runtime
   # (depth = 1).
-  - id: phase.edge.reflect_subgraph
+  - id: phase.edge.standard
     $name: phase_edge_reflect_subgraph
     $module: lca.plugins.loop.graph.edges.standard.plugin
     config:

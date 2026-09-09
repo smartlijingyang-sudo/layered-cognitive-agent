@@ -1,0 +1,4 @@
+# Compile fixture for ``bundles/reflect-subgraph.yaml`` (not a production profile).
+
+bundles:
+  - bundles/reflect-subgraph.yaml

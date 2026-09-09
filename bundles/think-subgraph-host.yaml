@@ -1,0 +1,9 @@
+# Think subgraph host executor (profile merge — pair with think-subgraph-steps.yaml).
+
+entries:
+  - id: phase.think.subgraph_host
+    name: phase_think_subgraph_host
+    $module: lca.plugins.loop.phase.think.subgraph_host.plugin
+    config:
+      plan_ref: bundles/think-subgraph.yaml
+      entry_node: think.subgraph.shortcut

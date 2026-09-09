@@ -52,7 +52,15 @@ from lca.contracts.protocols.runtime.runtime.lifecycle import RuntimeLifecyclePu
 from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.state.reducer import Reducer
 from lca.harness.declarative import GenericPlanInterpreter
+from lca.harness.declarative.compile.subgraph_resolver import default_subgraph_resolver
 from lca.harness.declarative.execute.dispatch import RegistryDeltaReducer, RegistryEffectDispatcher
+from lca.harness.graph.execute.subgraph_executor_factory import (
+    default_subgraph_executable_factory,
+)
+from lca.harness.graph.execute.subgraph_phase_runner import (
+    SUBGRAPH_PHASE_RUNNER_CAPABILITY,
+    SubgraphPhaseRunner,
+)
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.runtime.loop.runtime_journal import RuntimeJournalCommitter
 from lca.runtime.projection.result_finalizer import RuntimeResultFinalizer
@@ -123,8 +131,26 @@ class DefaultResultFinalizerFactory(ResultFinalizerFactory):
 class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
     """Build the standard interpreter with its local traversal policy."""
 
-    def __init__(self, loop_guard_evaluator: object | None = None) -> None:
+    def __init__(
+        self,
+        loop_guard_evaluator: object | None = None,
+        *,
+        subgraph_resolver: object | None = None,
+        subgraph_executable_factory: object | None = None,
+    ) -> None:
         self._loop_guard_evaluator = loop_guard_evaluator
+        self._subgraph_resolver = subgraph_resolver or default_subgraph_resolver()
+        self._subgraph_executable_factory = (
+            subgraph_executable_factory or default_subgraph_executable_factory()
+        )
+
+    def subgraph_phase_runner(self) -> SubgraphPhaseRunner:
+        """Return a runner sharing this factory's resolver and executable builder."""
+
+        return SubgraphPhaseRunner(
+            resolver=self._subgraph_resolver,
+            executable_factory=self._subgraph_executable_factory,
+        )
 
     def create(
         self,
@@ -144,6 +170,8 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
                 phase_observer=cast("PhaseObserver | None", phase_observer),
                 loop_guard_evaluator=cast("LoopGuardEvaluator | None", self._loop_guard_evaluator),
                 lifecycle_publisher=lifecycle_publisher,
+                subgraph_resolver=self._subgraph_resolver,
+                subgraph_executable_factory=self._subgraph_executable_factory,
             ),
         )
 
@@ -161,6 +189,7 @@ class ObservabilityRuntimeJournalFactory(RuntimeJournalFactory):
     provides=[
         "checkpoint_state_resolver_factory",
         "declarative_interpreter_factory",
+        "declarative.subgraph.phase_runner",
         "delta_reducer_factory",
         "effect_dispatcher_factory",
         "result_finalizer_factory",
@@ -201,6 +230,7 @@ class ObservabilityRuntimeJournalFactory(RuntimeJournalFactory):
             "checkpoint_state_resolver_factory",
             "decision.emit",
             "declarative_interpreter_factory",
+            SUBGRAPH_PHASE_RUNNER_CAPABILITY,
             "delta_reducer_factory",
             "effect_dispatcher_factory",
             "result_finalizer_factory",
@@ -209,6 +239,7 @@ class ObservabilityRuntimeJournalFactory(RuntimeJournalFactory):
         emits=(
             "checkpoint_state_resolver_factory.checked",
             "declarative_interpreter_factory.checked",
+            f"{SUBGRAPH_PHASE_RUNNER_CAPABILITY}.checked",
             "delta_reducer_factory.checked",
             "effect_dispatcher_factory.checked",
             "result_finalizer_factory.checked",
@@ -222,9 +253,13 @@ async def setup(ctx: PluginContext, config: Config) -> None:
 
     del config
     ctx.provide("checkpoint_state_resolver_factory", DefaultCheckpointStateResolverFactory())
+    interpreter_factory = DefaultDeclarativeInterpreterFactory(
+        ctx.require("loop_guard_evaluator"),
+    )
+    ctx.provide("declarative_interpreter_factory", interpreter_factory)
     ctx.provide(
-        "declarative_interpreter_factory",
-        DefaultDeclarativeInterpreterFactory(ctx.require("loop_guard_evaluator")),
+        SUBGRAPH_PHASE_RUNNER_CAPABILITY,
+        interpreter_factory.subgraph_phase_runner(),
     )
     ctx.provide("delta_reducer_factory", RegistryDeltaReducerFactory())
     ctx.provide("effect_dispatcher_factory", RegistryEffectDispatcherFactory())

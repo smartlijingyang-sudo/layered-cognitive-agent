@@ -1,0 +1,59 @@
+# think-subgraph-dev — production loop with decomposed think subgraph host.
+#
+# Same bundles as web-standard plus think subgraph steps + host. Only
+# ``think.main`` binding switches to ``phase.think.subgraph_host``; all other
+# phase executors stay on the standard production bindings.
+#
+# Not the factory default. Use:
+#   uv run python -m lca_kernel serve --profile profiles/think-subgraph-dev.yaml
+
+bundles:
+  - bundles/base.yaml
+  - bundles/observability-default.yaml
+  - bundles/web-app.yaml
+  - bundles/scenario-cordis-creator.yaml
+  - bundles/declarative-phase-graph.yaml
+  - bundles/loop_cursor.spine_default.yaml
+  - bundles/session-runtime.yaml
+  - bundles/event-bus-components.yaml
+  - bundles/think-subgraph-steps.yaml
+  - bundles/think-subgraph-host.yaml
+
+patch:
+  - id: lca-llm-resolver
+    config:
+      default_model: qwen3.7-plus
+      load_dotenv: true
+  - id: spine.sink.file
+    config:
+      boot_path: .lca/spine/boot-spine.jsonl
+      runs_root: traces/runs
+  - id: phase.topology.standard
+    config:
+      nodes:
+        - id: perceive.main
+          phase: perceive
+          binding: phase.perceive.standard
+          max_visits: 8
+          entry: true
+        - id: think.main
+          phase: think
+          binding: phase.think.subgraph_host
+          max_visits: 8
+        - id: act.main
+          phase: act
+          binding: phase.act.standard
+          max_visits: 8
+        - id: reflect.main
+          phase: reflect
+          binding: phase.reflect.standard
+          max_visits: 8
+        - id: remember.main
+          phase: remember
+          binding: phase.remember.standard
+          max_visits: 8
+        - id: stop.main
+          phase: stop
+          binding: phase.stop.standard
+          max_visits: 8
+          terminal: true
