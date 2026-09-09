@@ -297,6 +297,7 @@ class GenericPlanInterpreter:
         capabilities: PhaseCapabilityReader | Mapping[str, object] | None,
         artifacts: Mapping[str, object] | None,
         resume_cursor: PhaseRunCursor | None,
+        allow_natural_exit: bool = False,
     ) -> InterpretationResult:
         plan = executable.plan
         # ADR-0210 §6.4: phase_graph is None is legal (P7 path).
@@ -440,6 +441,33 @@ class GenericPlanInterpreter:
                     current_state,
                 )
                 if edge is None:
+                    if allow_natural_exit:
+                        # Subgraph reached a terminal node with no
+                        # matching outgoing edge — exit the subgraph
+                        # cleanly. The outer drive receives the merged
+                        # state and continues from the next edge.
+                        visits.append(
+                            PhaseVisit(
+                                node.id,
+                                node.semantic_phase,
+                                result.result_kind,
+                                None,
+                            )
+                        )
+                        cursor = traversal.checkpoint(
+                            node_id=node.id,
+                            causation_refs=result.evidence_refs,
+                            state_step=getattr(current_state, "step", 0),
+                        )
+                        return InterpretationResult(
+                            state=current_state,
+                            artifact=transaction.effective_payload,
+                            visits=tuple(visits),
+                            facts=tuple(facts),
+                            terminal_node=node.id,
+                            cursor=cursor,
+                            outcome=None,
+                        )
                     raise DeclarativeValidationError(
                         "PG-006", f"no validated next edge from node: {node.id}"
                     )
@@ -747,7 +775,8 @@ class GenericPlanInterpreter:
                 "PG-005",
                 f"interpreter has no subgraph_executable_factory wired for {ref.plan_ref!r}",
             )
-        sub_executable = factory(sub_plan_obj)
+        else:
+            sub_executable = factory(sub_plan_obj)
         sub_traversal = PhaseTraversal.start(
             plan_ref=compiled_run_plan_ref(sub_plan_obj),
             entry_node_id=ref.entry_node,
@@ -762,6 +791,7 @@ class GenericPlanInterpreter:
             capabilities=self._active_capabilities,
             artifacts=None,
             resume_cursor=None,
+            allow_natural_exit=True,
         )
         # Propagate subgraph failures to the outer drive so that
         # observation, journal and recovery see the error.

@@ -48,14 +48,3 @@ entries:
         - source: think.classify
           target: think.gate
           when: true
-        - source: think.gate
-          target: think.gate
-          when: result.result_kind == "decision"
-          # Back-reference edge: satisfies PG-004 mutual-reference
-          # invariant. plan_ref matches the outer edge's binding_edge
-          # (think.main) so the assembler sees both sides of the
-          # subgraph reference.
-          subgraph_ref:
-            plan_ref: think.main
-            entry_node: think.gate
-            binding_edge: think.gate

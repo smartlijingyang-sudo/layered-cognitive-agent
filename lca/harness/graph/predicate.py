@@ -17,6 +17,10 @@ def evaluate_restricted_predicate(
     expression: str, *, result: PhaseResult, artifacts: Mapping[str, object]
 ) -> bool:
     """Evaluate the declarative edge DSL with a fixed, side-effect-free grammar."""
+    if isinstance(expression, bool):
+        return expression
+    if not isinstance(expression, str):
+        expression = str(expression)
     normalized = expression.strip().lower()
     if normalized == "true":
         return True
@@ -33,6 +37,8 @@ def evaluate_restricted_predicate(
         "artifact": artifacts.get("payload"),
         "observation": artifacts.get("observation"),
         "budget": artifacts.get("budget"),
+        "true": True,
+        "false": False,
     }
     return bool(_evaluate_ast(tree.body, roots))
 
