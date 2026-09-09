@@ -64,12 +64,14 @@ _LAB_HOOKS: dict[str, Any] = {}
 # Lazy-load guard — load_all() is idempotent but cheap to skip.
 _LOADED: bool = False
 
-# ADR-0211 §7:六语义 phase 走 worker 反射协议(provider 形态除外)。
-# legacy carrier(passthrough / control / memory_extract / session_log / llm 等)
-# 暂走传统 ``_CARRIER + bind_carrier`` 路径。
-_REFLECTABLE_STAGES: frozenset[str] = frozenset(
-    {"perceive", "think", "act", "reflect", "remember"}
-)
+# ADR-0211 §7:所有 plugin 都走反射协议(provider 形态 docstring ``provider: yes``
+# 例外,仍走 ``_CARRIER + bind_carrier``)。本闭集关闭后不再按 stage 划分;
+# 留作兼容位置以便后续 region-based 反射裁剪(目前全开)。
+_REFLECTABLE_STAGES: frozenset[str] = frozenset({
+    "perceive", "think", "act", "reflect", "remember",
+    "passthrough", "control", "event", "llm", "lineage",
+    "model_eye", "model_visible", "session_log", "tool",
+})
 
 # The set of ``lca.plugins.lab`` subpackages that own @plugin carriers.
 # Auto-generated from filesystem at PR-D landing; PR-D adds the
@@ -244,18 +246,18 @@ def reset_for_tests() -> None:
     global _LOADED
     import sys
 
-    # ADR-0211 §6 §1:``worker.py`` 退役中,reset 函数可能已不存在;try/except 容忍。
-    try:
-        from lca.plugins.lab.internal.worker import reset_aliases, reset_workers
-        reset_workers()
-        reset_aliases()
-    except ImportError:
-        pass
+    # ADR-0211 §6 §1:``worker.py`` 已退役,不再 import;``_ALIASES`` 随 hooks.py
+    # 重置。
 
     # Remove the hook packages from sys.modules so they get re-imported
+    # (重新触发 ``bind_carrier(_CARRIER)`` 模块级调用,用于 provider 例外)。
     for module_name in _HOOK_PACKAGES:
         if module_name in sys.modules:
             del sys.modules[module_name]
+
+    # Reset hooks.py _ALIASES 表
+    from lca.plugins.lab.internal import hooks as _hooks_mod
+    _hooks_mod._ALIASES.clear()
 
     _LAB_HOOKS.clear()
     _LOADED = False
