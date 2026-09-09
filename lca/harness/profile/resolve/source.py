@@ -33,6 +33,11 @@ class ProfileSource:
     ``entries`` 保留稳定的 bundle 声明顺序；``sources`` 与每个 entry 的
     ``_config_sources`` 则保留 patch 产生的 provenance。下游解析器只需将这些
     事实转换为 ``ResolvedPlugin``，无需再次理解 YAML 的便利语法。
+
+    ``regions_declare`` (ADR-0210 §6.2) carries the profile's optional
+    custom region tag declarations (e.g. ``phase:plan`` / ``phase:replan``).
+    Empty tuple = no custom regions; the C14 closed set is just the 6-stage
+    recommended + bare-enum set (see agent_lab.profile_loader).
     """
 
     profile_path: Path
@@ -40,6 +45,7 @@ class ProfileSource:
     entries: tuple[dict[str, Any], ...]
     sources: Mapping[str, str]
     fallback_policy: Mapping[str, str]
+    regions_declare: tuple[str, ...] = ()
 
 
 def programmatic_profile_source(entries: Sequence[Mapping[str, Any]]) -> ProfileSource:
@@ -68,6 +74,7 @@ def programmatic_profile_source(entries: Sequence[Mapping[str, Any]]) -> Profile
         entries=tuple(normalized),
         sources=MappingProxyType(sources),
         fallback_policy=MappingProxyType({}),
+        regions_declare=(),
     )
 
 
@@ -94,6 +101,13 @@ def load_profile_source(
     )
     env_map = dict(os.environ if env is None else env)
     expand_entry_environment(entries, env_map)
+    # ADR-0210 §6.2 — read profile.regions.declare for the P7 region-tag
+    # closed set extension. ProfileSource carries this as an immutable
+    # tuple so the C14 region validator (and the runtime region
+    # fallback in interpreter.py) can read it without re-parsing the
+    # profile. We extract from the same parsed dict so any
+    # patch-driven transformation above is reflected.
+    regions_declare = _parse_regions_declare(raw)
     return ProfileSource(
         profile_path=_profile_identity(path),
         bundles=tuple(str(bundle) for bundle in bundles_raw),
@@ -102,7 +116,37 @@ def load_profile_source(
         fallback_policy=_normalize_fallback_policy(
             raw.get("fallback_policy"), profile_path=str(path)
         ),
+        regions_declare=regions_declare,
     )
+
+
+def _parse_regions_declare(raw: Mapping[str, Any]) -> tuple[str, ...]:
+    """Parse profile.regions.declare into an immutable tuple (ADR-0210 §6.2).
+
+    Schema::
+
+        regions:
+          declare:
+            - phase:plan
+            - phase:replan
+            - control:safety
+
+    Each entry must be a non-empty string. Other shapes (string instead
+    of list, dict with unexpected keys) are silently ignored — a profile
+    that does not declare any custom regions uses only the 6-stage
+    recommended set + bare-enum region (no P7 region-tag extension).
+    """
+    regions = raw.get("regions")
+    if not isinstance(regions, Mapping):
+        return ()
+    declared = regions.get("declare")
+    if not isinstance(declared, list):
+        return ()
+    out: list[str] = []
+    for item in declared:
+        if isinstance(item, str) and item.strip():
+            out.append(item.strip())
+    return tuple(out)
 
 
 def _profile_identity(path: Path) -> Path:

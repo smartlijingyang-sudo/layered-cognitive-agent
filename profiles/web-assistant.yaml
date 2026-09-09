@@ -35,6 +35,18 @@ description: |
   Adds AssistantHome catalog, bootstrap projection and workspace binding
   on top of web-standard. Default path (``web-standard.yaml``) untouched.
 
+  ADR-0210 §6.2 — declares custom region tags (phase:plan / phase:replan)
+  for the P7 region-tag path. The default web-assistant run still uses
+  the legacy ``declarative-phase-graph.yaml`` topology (6 stages); the
+  custom regions are available for assistants that opt into the P7
+  path via the lab profile (``profiles/agent-lab-infoedge.yaml``).
+
+regions:
+  declare:
+    - phase:plan
+    - phase:replan
+    - control:safety
+
 bundles:
   - bundles/base.yaml
   - bundles/observability-default.yaml
