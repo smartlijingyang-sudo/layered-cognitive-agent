@@ -1,0 +1,7 @@
+# Compile fixture for ``bundles/think-orchestrator-graph.yaml`` (not a production profile).
+# Loads the 5-step phase graph topology + edges bundle to verify
+# the think subgraph compiles in isolation.
+
+bundles:
+  - bundles/think-steps.yaml
+  - bundles/think-orchestrator-graph.yaml

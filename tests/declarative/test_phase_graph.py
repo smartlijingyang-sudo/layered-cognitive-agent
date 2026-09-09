@@ -23,6 +23,10 @@ from lca.harness.declarative.controls.validation import (
 from lca.harness.graph.phase_graph_compiler import compile_phase_graph_projection
 from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.profile.resolve.resolve import resolve_profile
+from tests.declarative.conftest import (
+    StubSubgraphResolver,
+    stub_subgraph_executable_factory,
+)
 from tests.phase_executors import standard_phase_executors
 
 
@@ -190,6 +194,52 @@ def test_validator_rejects_non_think_approval_resume_node(standard_plan) -> None
     )
 
 
+class _NoopSubgraphExecutor:
+    """Minimal executor for stub subgraph plans in interpreter tests."""
+
+    async def execute(self, _context: object, _input: PhaseInput) -> PhaseResult:
+        from lca.contracts.models.core.policy.stop import StopDecision, StopReason
+
+        return PhaseResult(
+            result_kind="noop",
+            payload=StopDecision(
+                should_stop=True,
+                reason=StopReason.TASK_COMPLETED,
+            ),
+        )
+
+
+class _StubSubgraphResolver:
+    """Return a minimal CompiledRunPlan for any subgraph plan_ref."""
+
+    def resolve(self, plan_ref: str) -> CompiledRunPlan | None:
+        return StubSubgraphResolver().resolve(plan_ref)
+
+
+def _stub_subgraph_executable_factory(plan: CompiledRunPlan) -> ExecutablePlan:
+    return stub_subgraph_executable_factory(plan)
+
+
+class _NoopSubgraphExecutor:
+    """Minimal executor for stub subgraph plans in interpreter tests."""
+
+    async def execute(self, _context: object, _input: PhaseInput) -> PhaseResult:
+        from lca.contracts.models.core.policy.stop import StopDecision, StopReason
+
+        return PhaseResult(
+            result_kind="noop",
+            payload=StopDecision(
+                should_stop=True,
+                reason=StopReason.TASK_COMPLETED,
+            ),
+        )
+
+
+@pytest.fixture
+def stub_subgraph_resolver() -> StubSubgraphResolver:
+    return StubSubgraphResolver()
+
+
 @pytest.mark.asyncio
 async def test_generic_interpreter_runs_only_from_phase_bindings(standard_plan) -> None:
     capabilities = _capabilities_for(standard_plan)
@@ -197,7 +247,11 @@ async def test_generic_interpreter_runs_only_from_phase_bindings(standard_plan) 
     assert {node.node_id: node.semantic_phase for node in executable.nodes.values()} == {
         binding.node_id: binding.semantic_phase for binding in standard_plan.phase_bindings
     }
-    result = await GenericPlanInterpreter().run(executable, state={"immutable": True})
+    interpreter = GenericPlanInterpreter(
+        subgraph_resolver=_StubSubgraphResolver(),
+        subgraph_executable_factory=_stub_subgraph_executable_factory,
+    )
+    result = await interpreter.run(executable, state={"immutable": True})
     assert [visit.semantic_phase for visit in result.visits] == list(SemanticPhase)
     assert result.terminal_node == "stop.main"
 
@@ -261,6 +315,9 @@ async def test_prepare_contribution_is_resolved_and_executed(standard_plan) -> N
     capabilities["contribution.prepare.fixture"] = prepare
     executable = GraphAssembler().assemble(plan, MappingRestrictedScope(capabilities))
 
-    await GenericPlanInterpreter().run(executable, state={"immutable": True})
+    await GenericPlanInterpreter(
+        subgraph_resolver=StubSubgraphResolver(),
+        subgraph_executable_factory=stub_subgraph_executable_factory,
+    ).run(executable, state={"immutable": True})
 
     assert prepare.calls == 1

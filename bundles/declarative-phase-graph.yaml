@@ -132,6 +132,10 @@ entries:
         - source: think.main
           target: act.main
           when: true
+          subgraph_ref:
+            plan_ref: bundles/think-orchestrator-graph.yaml
+            entry_node: think.shortcut
+            binding_edge: think.main
         - source: act.main
           target: stop.main
           when: result.result_kind == "phase_error"

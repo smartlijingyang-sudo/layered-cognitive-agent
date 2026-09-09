@@ -23,7 +23,12 @@ def project_runtime_phase_capabilities(
     memory: MemorySystem,
     perceive_hub: PerceiveHub,
 ) -> RuntimePhaseCapabilities:
-    """Project graph facts into one frozen phase capability view."""
+    """Project graph facts into one frozen phase capability view.
+
+    ``phase.think.*`` prefixed keys from BrainComposer are additional
+    composition-time projections. They do not share names with the canonical
+    graph facts and therefore pass through without conflict.
+    """
 
     canonical = {
         "brain": brain,

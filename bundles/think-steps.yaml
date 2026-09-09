@@ -1,7 +1,7 @@
 # Think 5-step phase graph node executors.
-# Loaded by profiles/fixtures/think-orchestrator-compile.yaml to ensure
+# Loaded by web-standard and think-subgraph-dev profiles to ensure
 # all five phase.think.{shortcut,route,reason,classify,gate} providers are
-# registered when the subgraph compiles in isolation.
+# registered when the subgraph compiles.
 
 entries:
   - id: phase.think.shortcut

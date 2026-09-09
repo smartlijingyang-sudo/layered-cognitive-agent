@@ -26,6 +26,10 @@ from lca.harness.declarative import GenericPlanInterpreter, GraphAssembler, Mapp
 from lca.harness.graph.governance.phase_governance import classify_control_verdict
 from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.profile.resolve.resolve import resolve_profile
+from tests.declarative.conftest import (
+    StubSubgraphResolver,
+    stub_subgraph_executable_factory,
+)
 from tests.phase_executors import standard_phase_executors
 
 
@@ -125,7 +129,10 @@ async def test_completed_run_returns_completed_outcome(standard_plan) -> None:
     """A successful run should return an outcome with kind='completed'."""
     capabilities = _capabilities_for(standard_plan)
     executable = GraphAssembler().assemble(standard_plan, MappingRestrictedScope(capabilities))
-    interpreter = GenericPlanInterpreter()
+    interpreter = GenericPlanInterpreter(
+        subgraph_resolver=StubSubgraphResolver(),
+        subgraph_executable_factory=stub_subgraph_executable_factory,
+    )
 
     result = await interpreter.run(executable, state={"immutable": True})
 
@@ -144,7 +151,11 @@ async def test_terminal_outcome_preserves_stop_decision_metadata(standard_plan) 
     capabilities["phase.stop.standard"] = _TerminalStopExecutor()
     executable = GraphAssembler().assemble(standard_plan, MappingRestrictedScope(capabilities))
 
-    result = await GenericPlanInterpreter().run(executable, state={"immutable": True})
+    interpreter = GenericPlanInterpreter(
+        subgraph_resolver=StubSubgraphResolver(),
+        subgraph_executable_factory=stub_subgraph_executable_factory,
+    )
+    result = await interpreter.run(executable, state={"immutable": True})
 
     assert result.outcome is not None
     assert result.outcome.kind is ExecutionOutcome.COMPLETED
@@ -160,7 +171,11 @@ async def test_terminal_phase_rejects_legacy_mapping_payload(standard_plan) -> N
     capabilities["phase.stop.standard"] = _LegacyTerminalPayloadExecutor()
     executable = GraphAssembler().assemble(standard_plan, MappingRestrictedScope(capabilities))
 
-    result = await GenericPlanInterpreter().run(executable, state={"immutable": True})
+    interpreter = GenericPlanInterpreter(
+        subgraph_resolver=StubSubgraphResolver(),
+        subgraph_executable_factory=stub_subgraph_executable_factory,
+    )
+    result = await interpreter.run(executable, state={"immutable": True})
 
     assert result.outcome is not None
     assert result.outcome.kind is ExecutionOutcome.FAILED
@@ -173,7 +188,10 @@ async def test_outcome_contains_cursor_and_stop_decision(standard_plan) -> None:
     """Outcome must carry cursor and stop decision for downstream consumers."""
     capabilities = _capabilities_for(standard_plan)
     executable = GraphAssembler().assemble(standard_plan, MappingRestrictedScope(capabilities))
-    interpreter = GenericPlanInterpreter()
+    interpreter = GenericPlanInterpreter(
+        subgraph_resolver=StubSubgraphResolver(),
+        subgraph_executable_factory=stub_subgraph_executable_factory,
+    )
 
     result = await interpreter.run(executable, state={"immutable": True})
     outcome = result.outcome
@@ -204,7 +222,10 @@ async def test_validation_error_maps_to_failed_outcome(standard_plan) -> None:
     broken_plan = replace(standard_plan, phase_graph=broken_graph)
     broken_executable = GraphAssembler().assemble(broken_plan, MappingRestrictedScope(capabilities))
 
-    interpreter = GenericPlanInterpreter()
+    interpreter = GenericPlanInterpreter(
+        subgraph_resolver=StubSubgraphResolver(),
+        subgraph_executable_factory=stub_subgraph_executable_factory,
+    )
 
     # Should not raise; should return a failed outcome
     result = await interpreter.run(broken_executable, state={"immutable": True})

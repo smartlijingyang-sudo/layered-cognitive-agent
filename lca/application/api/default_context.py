@@ -26,12 +26,11 @@ if TYPE_CHECKING:
 
 _DEFAULT_PROFILE = "profiles/web-standard.yaml"
 
-# ``web-standard.yaml`` binds ``think.main`` to ``phase.think.orchestrator``
-# (5-step subgraph: shortcut → route → reason → classify → gate) so the
-# production default runs the decomposed think pipeline with parity to the
-# legacy monolithic ``phase.think.standard`` executor. See
-# ``bundles/think-subgraph-{steps,host,graph}.yaml`` and the parity test
-# ``tests/cognition/test_think_subgraph_parity.py``.
+# ``web-standard.yaml`` binds ``think.main`` to ``phase.think.standard``
+# and drives the 5-step think subgraph (shortcut → route → reason →
+# classify → gate) via the declarative edge's ``subgraph_ref`` in
+# ``bundles/declarative-phase-graph.yaml``. See
+# ``bundles/think-orchestrator-graph.yaml`` and ``bundles/think-steps.yaml``.
 
 # Public deprecation metadata (ADR-0115 决定 7).
 SET_DEFAULT_CTX_DEPRECATION_REASON = (

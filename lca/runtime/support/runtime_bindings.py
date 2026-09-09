@@ -224,6 +224,12 @@ class DeclarativeRuntimeBindings:
 
     # Construct the profile-selected interpreter from this verified closure.
     def new_interpreter(self, *, journal: RuntimeJournal) -> DeclarativeInterpreter:
+        # Wire the resolved phase executor scope into the interpreter factory
+        # so that subgraph assembly can resolve step executors from the same
+        # Cordis scope (no hardcoded _PHASE_EXECUTOR_FACTORIES needed).
+        set_scope = getattr(self.interpreter_factory, "set_subgraph_scope", None)
+        if callable(set_scope):
+            set_scope(self.phase_scope())
         interpreter = self.interpreter_factory.create(
             journal=journal,
             effect_gateway=self.new_effect_dispatcher(),

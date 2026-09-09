@@ -9,13 +9,11 @@
 # + session-runtime (ADR-0186 Session SSOT: session.store before event-bus so
 #   the capability is live when publishers/sinks boot; RunSessionBuilder binds
 #   a per-run Session onto publish/observe slots).
-# + think-orchestrator + think-orchestrator-graph: register the
-#   phase.think.orchestrator PhaseExecutor that drives the 5-step think
-#   phase graph (shortcut/route/reason/classify/gate). ``think.main``
-#   itself is rebound to ``phase.think.orchestrator`` via the topology
-#   patch below — the shared ``declarative-phase-graph`` bundle stays
-#   untouched, so other profiles importing that bundle continue to use
-#   ``phase.think.standard``.
+# + think-steps: register the 5-step think phase plugins
+#   (shortcut/route/reason/classify/gate) into Cordis scope. The think
+#   phase uses the standard PhaseExecutor binding (phase.think.standard);
+#   the subgraph topology is driven by the declarative edge's subgraph_ref
+#   in declarative-phase-graph.yaml.
 # LLM secrets are owned by lca-llm-resolver (loads project .env at setup).
 
 bundles:
@@ -27,7 +25,7 @@ bundles:
   - bundles/loop_cursor.spine_default.yaml
   - bundles/session-runtime.yaml
   - bundles/event-bus-components.yaml
-  - bundles/think-orchestrator.yaml
+  - bundles/think-steps.yaml
 
 patch:
   - id: lca-llm-resolver
@@ -42,9 +40,10 @@ patch:
       boot_path: .lca/spine/boot-spine.jsonl
       runs_root: traces/runs
 
-  # Decompose think.main into the 5-step think subgraph. List fields replace
-  # wholesale (lca/harness/profile/plan/declarations.py deep_merge), so we
-  # repeat all 6 nodes verbatim and swap think.main's binding only.
+  # Patch topology to add PR-C (ADR-0214 §6.3) PG-007 preconditions and
+  # terminal predicates on perceive.main. think.main binding stays at
+  # phase.think.standard (the subgraph topology is driven by the
+  # declarative edge's subgraph_ref).
   - id: phase.topology.standard
     config:
       nodes:
@@ -58,7 +57,7 @@ patch:
           terminal_predicate: perceive.context_complete
         - id: think.main
           phase: think
-          binding: phase.think.orchestrator
+          binding: phase.think.standard
           max_visits: 8
         - id: act.main
           phase: act

@@ -18,7 +18,7 @@ CARRY_KEY = "think.subgraph.carry"
 class ThinkSubgraphCarry:
     """Working state passed between think subgraph nodes.
 
-    Owned by ``SubgraphPhaseRunner._drive_linear_subgraph``. Step plugins
+    Owned by ``GenericPlanInterpreter._drive``. Step plugins
     must not import or mutate this type.
     """
 

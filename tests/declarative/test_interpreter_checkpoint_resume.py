@@ -26,6 +26,10 @@ from lca.harness.composition.plan_compiler import compile_plan
 from lca.harness.declarative import GenericPlanInterpreter, GraphAssembler, MappingRestrictedScope
 from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.profile.resolve.resolve import resolve_profile
+from tests.declarative.conftest import (
+    StubSubgraphResolver,
+    stub_subgraph_executable_factory,
+)
 from tests.phase_executors import standard_phase_executors
 
 
@@ -106,7 +110,10 @@ async def test_approval_pause_uses_plan_declared_resume_node(standard_plan) -> N
     capabilities["phase.act.standard"] = _ApprovalPendingExecutor()
     executable = GraphAssembler().assemble(plan, MappingRestrictedScope(capabilities))
 
-    result = await GenericPlanInterpreter().run(executable, state={"immutable": True})
+    result = await GenericPlanInterpreter(
+        subgraph_resolver=StubSubgraphResolver(),
+        subgraph_executable_factory=stub_subgraph_executable_factory,
+    ).run(executable, state={"immutable": True})
 
     assert result.outcome is not None
     assert result.outcome.kind is ExecutionOutcome.PAUSED
@@ -126,7 +133,10 @@ async def test_approval_pause_without_declared_resume_node_fails_closed(standard
     capabilities["phase.act.standard"] = _ApprovalPendingExecutor()
     executable = GraphAssembler().assemble(plan, MappingRestrictedScope(capabilities))
 
-    result = await GenericPlanInterpreter().run(executable, state={"immutable": True})
+    result = await GenericPlanInterpreter(
+        subgraph_resolver=StubSubgraphResolver(),
+        subgraph_executable_factory=stub_subgraph_executable_factory,
+    ).run(executable, state={"immutable": True})
 
     assert result.outcome is not None
     assert result.outcome.kind is ExecutionOutcome.FAILED
@@ -140,7 +150,10 @@ async def test_interpretation_result_has_cursor_after_run(standard_plan) -> None
     executable = GraphAssembler().assemble(
         standard_plan, MappingRestrictedScope(_capabilities_for(standard_plan))
     )
-    result = await GenericPlanInterpreter().run(executable, state={"immutable": True})
+    result = await GenericPlanInterpreter(
+        subgraph_resolver=StubSubgraphResolver(),
+        subgraph_executable_factory=stub_subgraph_executable_factory,
+    ).run(executable, state={"immutable": True})
 
     assert result.cursor is not None
     assert isinstance(result.cursor, PhaseRunCursor)
@@ -154,7 +167,10 @@ async def test_cursor_contains_all_state(standard_plan) -> None:
     executable = GraphAssembler().assemble(
         standard_plan, MappingRestrictedScope(_capabilities_for(standard_plan))
     )
-    result = await GenericPlanInterpreter().run(executable, state={"immutable": True})
+    result = await GenericPlanInterpreter(
+        subgraph_resolver=StubSubgraphResolver(),
+        subgraph_executable_factory=stub_subgraph_executable_factory,
+    ).run(executable, state={"immutable": True})
     cursor = result.cursor
 
     assert cursor is not None
@@ -173,7 +189,10 @@ async def test_resume_from_terminal_cursor_is_noop(standard_plan) -> None:
     executable = GraphAssembler().assemble(
         standard_plan, MappingRestrictedScope(_capabilities_for(standard_plan))
     )
-    interpreter = GenericPlanInterpreter()
+    interpreter = GenericPlanInterpreter(
+        subgraph_resolver=StubSubgraphResolver(),
+        subgraph_executable_factory=stub_subgraph_executable_factory,
+    )
 
     # First run: execute the full graph
     first = await interpreter.run(executable, state={"immutable": True})
@@ -198,7 +217,10 @@ async def test_resume_rejects_cursor_from_different_plan(standard_plan) -> None:
     executable = GraphAssembler().assemble(
         standard_plan, MappingRestrictedScope(_capabilities_for(standard_plan))
     )
-    interpreter = GenericPlanInterpreter()
+    interpreter = GenericPlanInterpreter(
+        subgraph_resolver=StubSubgraphResolver(),
+        subgraph_executable_factory=stub_subgraph_executable_factory,
+    )
 
     result = await interpreter.run(executable, state={"immutable": True})
     cursor = result.cursor

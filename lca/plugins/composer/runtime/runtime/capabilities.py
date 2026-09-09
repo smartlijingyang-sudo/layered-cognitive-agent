@@ -187,13 +187,20 @@ def resolve_resume_input_adapter(
 def resolve_phase_executor_bindings(
     plan: CompiledRunPlan,
     scope: Context,
+    *,
+    subgraph_resolver: object | None = None,
 ) -> dict[str, PhaseExecutor]:
     """Resolve every executor declared by the plan before interpretation starts.
 
     The graph interpreter receives a closed mapping rather than an ambient
     Context. This preserves plan locality: phase selection is visible from the
     immutable plan and cannot vary later because a Context gained a capability.
+
+    When ``subgraph_resolver`` is provided, bindings from referenced subgraph
+    plans are also resolved so that subgraph step executors are available in
+    the same scope as outer plan executors.
     """
+    from lca.contracts.protocols.state.plan import CompiledRunPlan as _CRP
 
     capabilities = {
         capability
@@ -203,6 +210,18 @@ def resolve_phase_executor_bindings(
             *(contribution.executor for contribution in phase_binding.contributions),
         )
     }
+    # Walk subgraph_ref edges and collect their bindings too.
+    if subgraph_resolver is not None and plan.phase_graph is not None:
+        for edge in plan.phase_graph.edges:
+            if edge.subgraph_ref is None:
+                continue
+            sub_plan = subgraph_resolver.resolve(edge.subgraph_ref.plan_ref)
+            if not isinstance(sub_plan, _CRP):
+                continue
+            for sub_binding in sub_plan.phase_bindings:
+                capabilities.add(sub_binding.executor_capability)
+                for contribution in sub_binding.contributions:
+                    capabilities.add(contribution.executor)
     try:
         resolver = ScopeCapabilityResolver.from_scope(scope)
     except CapabilityResolutionError as exc:

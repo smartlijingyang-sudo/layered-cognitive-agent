@@ -33,6 +33,9 @@ from lca.contracts.protocols.runtime.runtime.lifecycle import (
 )
 from lca.contracts.protocols.state.plan import CompiledRunPlan
 from lca.harness.declarative.compile.assembler.assembler import ExecutablePlan
+from lca.harness.declarative.compile.assembler.assembler import (
+    RestrictedScope,
+)
 from lca.harness.declarative.controls.validation import require_valid
 from lca.harness.declarative.execute.loop_guard import DeclarativeLoopGuardEvaluator
 from lca.harness.declarative.execute.outcome_projection import (
@@ -132,6 +135,7 @@ class GenericPlanInterpreter:
         subgraph_resolver: object | None = None,
         subgraph_executable_factory: object | None = None,
         subgraph_hook_emitter: SubgraphHookEmitter | None = None,
+        subgraph_scope: RestrictedScope | None = None,
     ) -> None:
         self._journal = journal or InMemoryJournalCommitter()
         self._transaction = PhaseExecutionTransaction(
@@ -160,6 +164,9 @@ class GenericPlanInterpreter:
         self._subgraph_hook_emitter: SubgraphHookEmitter = (
             subgraph_hook_emitter or NullSubgraphHookEmitter()
         )
+        # When set, subgraph assembly uses this scope to resolve step
+        # executor capabilities instead of the hardcoded factory.
+        self._subgraph_scope = subgraph_scope
         # Set for the duration of ``_drive`` so nested subgraph recursion
         # can reuse the outer run's phase capabilities (brain/body/etc.).
         self._active_capabilities: PhaseCapabilityReader | Mapping[str, object] | None = None
@@ -728,7 +735,14 @@ class GenericPlanInterpreter:
                 f"{ref.plan_ref!r}: {type(sub_plan_obj).__name__}",
             )
         factory = self._subgraph_executable_factory
-        if factory is None:
+        scope = self._subgraph_scope
+        if scope is not None:
+            # Scope-aware: resolve step executors from the booted plugin
+            # scope via GraphAssembler, no hardcoded factory needed.
+            from lca.harness.declarative.compile.assembler.assembler import GraphAssembler
+
+            sub_executable = GraphAssembler().assemble(sub_plan_obj, scope)
+        elif factory is None:
             raise DeclarativeValidationError(
                 "PG-005",
                 f"interpreter has no subgraph_executable_factory wired for {ref.plan_ref!r}",
@@ -749,6 +763,14 @@ class GenericPlanInterpreter:
             artifacts=None,
             resume_cursor=None,
         )
+        # Propagate subgraph failures to the outer drive so that
+        # observation, journal and recovery see the error.
+        if sub_result.outcome is not None and sub_result.outcome.kind.name == "FAILED":
+            raise RuntimeError(
+                f"subgraph {ref.plan_ref!r} failed at node "
+                f"{sub_result.outcome.cursor.node_id!r}: "
+                f"{sub_result.outcome.error_fact}"
+            )
         # The subgraph's terminal projection carries the merged state
         # because deltas have already been folded into ``outer_state``
         # via the shared ``Reducer`` during recursion. We do NOT import

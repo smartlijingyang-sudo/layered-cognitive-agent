@@ -20,6 +20,10 @@ from lca.contracts.protocols.runtime.runtime.lifecycle import (
 from lca.harness.composition.plan_compiler import compile_plan
 from lca.harness.declarative import GenericPlanInterpreter, GraphAssembler, MappingRestrictedScope
 from lca.harness.profile.resolve.resolve import resolve_profile
+from tests.declarative.conftest import (
+    StubSubgraphResolver,
+    stub_subgraph_executable_factory,
+)
 from tests.phase_executors import standard_phase_executors
 
 
@@ -86,12 +90,19 @@ def _executable(plan, capabilities: dict[str, object] | None = None):
 async def test_phase_events_publish_ordered_safe_progress_for_every_semantic_phase() -> None:
     plan = _standard_plan()
     events: list[RuntimeLifecycleEvent] = []
-    interpreter = GenericPlanInterpreter(lifecycle_publisher=_RecordingPublisher(events))
+    interpreter = GenericPlanInterpreter(
+        lifecycle_publisher=_RecordingPublisher(events),
+        subgraph_resolver=StubSubgraphResolver(),
+        subgraph_executable_factory=stub_subgraph_executable_factory,
+    )
 
     result = await interpreter.run(_executable(plan), state={"immutable": True})
 
     assert [visit.semantic_phase for visit in result.visits] == list(SemanticPhase)
-    assert [event.type for event in events] == [
+    # Filter to outer-phase events only (skip events emitted by the subgraph
+    # stub nodes which share the runtime event bus).
+    outer_events = [event for event in events if not event.phase_cursor.startswith("subgraph.")]
+    assert [event.type for event in outer_events] == [
         event_type
         for _phase in SemanticPhase
         for event_type in (
@@ -99,23 +110,23 @@ async def test_phase_events_publish_ordered_safe_progress_for_every_semantic_pha
             RuntimeLifecycleEventType.PHASE_COMPLETED,
         )
     ]
-    assert [event.semantic_phase for event in events[::2]] == [
+    assert [event.semantic_phase for event in outer_events[::2]] == [
         phase.value for phase in SemanticPhase
     ]
-    assert [event.semantic_phase for event in events[1::2]] == [
+    assert [event.semantic_phase for event in outer_events[1::2]] == [
         phase.value for phase in SemanticPhase
     ]
-    assert [event.phase_cursor for event in events[::2]] == [
+    assert [event.phase_cursor for event in outer_events[::2]] == [
         binding.node_id for binding in plan.phase_bindings
     ]
-    assert [event.phase_cursor for event in events[1::2]] == [
+    assert [event.phase_cursor for event in outer_events[1::2]] == [
         binding.node_id for binding in plan.phase_bindings
     ]
-    assert all(event.result_kind is None for event in events[::2])
-    assert all(event.result_kind for event in events[1::2])
-    assert all(event.trace_id == "" for event in events)
-    assert all(event.status.value == "working" for event in events)
-    assert all(event.budget.max_steps is None for event in events)
+    assert all(event.result_kind is None for event in outer_events[::2])
+    assert all(event.result_kind for event in outer_events[1::2])
+    assert all(event.trace_id == "" for event in outer_events)
+    assert all(event.status.value == "working" for event in outer_events)
+    assert all(event.budget.max_steps is None for event in outer_events)
     assert {
         "task",
         "state",
@@ -133,7 +144,11 @@ async def test_phase_executor_failure_publishes_failed_without_a_completion_even
     events: list[RuntimeLifecycleEvent] = []
     capabilities = _capabilities(plan)
     capabilities["phase.perceive.standard"] = _FailingPerceiveExecutor()
-    interpreter = GenericPlanInterpreter(lifecycle_publisher=_RecordingPublisher(events))
+    interpreter = GenericPlanInterpreter(
+        lifecycle_publisher=_RecordingPublisher(events),
+        subgraph_resolver=StubSubgraphResolver(),
+        subgraph_executable_factory=stub_subgraph_executable_factory,
+    )
 
     result = await interpreter.run(_executable(plan, capabilities), state={"immutable": True})
 

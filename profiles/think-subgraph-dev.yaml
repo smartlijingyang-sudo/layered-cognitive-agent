@@ -1,8 +1,8 @@
 # think-subgraph-dev — production loop with decomposed think phase graph.
 #
-# Same bundles as web-standard plus the orchestrator + 5-step graph. Only
-# ``think.main`` binding switches to ``phase.think.orchestrator``; all other
-# phase executors stay on the standard production bindings.
+# Same bundles as web-standard plus the 5-step think plugins.
+# The think subgraph topology is driven by the declarative edge's subgraph_ref
+# in declarative-phase-graph.yaml; think.main uses the standard binding.
 #
 # Not the factory default. Use:
 #   uv run python -m lca_kernel serve --profile profiles/think-subgraph-dev.yaml
@@ -16,7 +16,7 @@ bundles:
   - bundles/loop_cursor.spine_default.yaml
   - bundles/session-runtime.yaml
   - bundles/event-bus-components.yaml
-  - bundles/think-orchestrator.yaml
+  - bundles/think-steps.yaml
 
 patch:
   - id: lca-llm-resolver
@@ -37,7 +37,7 @@ patch:
           entry: true
         - id: think.main
           phase: think
-          binding: phase.think.orchestrator
+          binding: phase.think.standard
           max_visits: 8
         - id: act.main
           phase: act

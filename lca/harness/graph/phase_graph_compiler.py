@@ -28,6 +28,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
     PluginSpec,
     PluginSpecKind,
     SemanticPhase,
+    SubgraphReference,
 )
 
 
@@ -324,6 +325,7 @@ def _compile_phase_edges_from_specs(specs: tuple[PluginSpec, ...]) -> list[Phase
                     target=target,
                     when=when,
                     loop=_compile_loop_guard(declaration.get("loop")),
+                    subgraph_ref=_compile_subgraph_ref(declaration.get("subgraph_ref"), source),
                 )
             )
     return edges
@@ -347,6 +349,23 @@ def _compile_loop_guard(value: object) -> LoopGuard | None:
         max_iterations=int(value.get("max_iterations", 1)),
         budget=str(value.get("budget", "run.steps")),
         terminal_predicate=str(value.get("terminal_predicate", "false")),
+    )
+
+
+def _compile_subgraph_ref(value: object, binding_edge: str) -> SubgraphReference | None:
+    """Parse an optional ``subgraph_ref`` declaration from an edge config."""
+
+    if not isinstance(value, Mapping):
+        return None
+    plan_ref = str(value.get("plan_ref", "")).strip()
+    entry_node = str(value.get("entry_node", "")).strip()
+    if not plan_ref or not entry_node:
+        return None
+    return SubgraphReference(
+        plan_ref=plan_ref,
+        entry_node=entry_node,
+        binding_edge=binding_edge,
+        return_on=str(value.get("return_on", "next")),
     )
 
 

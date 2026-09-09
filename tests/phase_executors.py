@@ -16,24 +16,29 @@ from lca.plugins.loop.phase.remember.standard.plugin import (
     create_executor as create_remember_executor,
 )
 from lca.plugins.loop.phase.stop.standard.plugin import create_executor as create_stop_executor
-from lca.plugins.loop.phase.think.orchestrator.plugin import (
-    create_executor as create_think_orchestrator_executor,
-)
 from lca.plugins.loop.phase.think.standard.plugin import create_executor as create_think_executor
+from lca.plugins.think.classify.plugin import create_executor as create_think_classify_executor
+from lca.plugins.think.gate.plugin import create_executor as create_think_gate_executor
+from lca.plugins.think.reason.plugin import create_executor as create_think_reason_executor
+from lca.plugins.think.route.plugin import create_executor as create_think_route_executor
+from lca.plugins.think.shortcut.plugin import create_executor as create_think_shortcut_executor
 
 
 def standard_phase_executors() -> Mapping[str, PhaseExecutor]:
-    """Return the seven profile plugin implementations for focused runtime tests.
+    """Return the six standard phase executor implementations for focused runtime tests.
 
-    ``phase.think.orchestrator`` is included because ``profiles/web-standard.yaml``
-    binds ``think.main`` to it; tests resolving ``profiles/web-standard.yaml`` need
-    the orchestrator registered alongside the six standard phase executors.
+    ``phase.think.standard`` is the binding for ``think.main``; the 5-step
+    think subgraph is driven by the declarative edge's ``subgraph_ref``.
     """
 
     return {
         "phase.perceive.standard": create_perceive_executor(),
         "phase.think.standard": create_think_executor(),
-        "phase.think.orchestrator": create_think_orchestrator_executor(),
+        "phase.think.shortcut": create_think_shortcut_executor(),
+        "phase.think.route": create_think_route_executor(),
+        "phase.think.reason": create_think_reason_executor(),
+        "phase.think.classify": create_think_classify_executor(),
+        "phase.think.gate": create_think_gate_executor(),
         "phase.act.standard": create_act_executor(),
         "phase.reflect.standard": create_reflect_executor(),
         "phase.remember.standard": create_remember_executor(),

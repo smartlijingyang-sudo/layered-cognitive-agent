@@ -105,7 +105,11 @@ def bind_runtime_graph(
     )
 
     require_complete_runtime_graph(graph)
-    phase_executors = resolve_phase_executor_bindings(plan, scope)
+    from lca.harness.declarative.compile.subgraph_resolver import default_subgraph_resolver
+
+    phase_executors = resolve_phase_executor_bindings(
+        plan, scope, subgraph_resolver=default_subgraph_resolver()
+    )
     resume_input_adapter = resolve_resume_input_adapter(
         spec,
         capabilities.resume_input_adapters,
