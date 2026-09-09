@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Protocol, runtime_checkable
 
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
     AGGREGATIONS,
@@ -81,16 +82,52 @@ class PhaseNode:
 
 
 @dataclass(frozen=True, slots=True)
+class SubgraphReference:
+    """Compile-time handle from one phase edge to a subgraph plan.
+
+    Binds an outer edge to a referenced plan (bundle-relative ``plan_ref``
+    or absolute plan identity), declares the entry node inside that plan,
+    and pins ``binding_edge`` to the outer edge id so the assembler can
+    enforce the two-graph mutual-reference invariant: if plan A's edge X
+    points at plan B, plan B must declare a back-reference naming X.
+    """
+
+    plan_ref: str
+    entry_node: str
+    binding_edge: str
+    return_on: str = "next"
+
+    def __post_init__(self) -> None:
+        if not self.plan_ref or not self.entry_node or not self.binding_edge:
+            raise DeclarativeValidationError(
+                "PG-004",
+                "subgraph reference requires non-empty plan_ref, entry_node and binding_edge",
+            )
+        if self.return_on != "next":
+            raise DeclarativeValidationError(
+                "PG-004",
+                f"subgraph reference return_on must be 'next', got {self.return_on!r}",
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class PhaseEdge:
     source: str
     target: str
     when: str
     loop: LoopGuard | None = None
+    subgraph_ref: SubgraphReference | None = None
 
     def __post_init__(self) -> None:
         if not self.source or not self.target or not self.when:
             raise DeclarativeValidationError(
                 "PG-001", "phase edge source, target and predicate required"
+            )
+        if self.subgraph_ref is not None and self.subgraph_ref.binding_edge != self.source:
+            raise DeclarativeValidationError(
+                "PG-004",
+                f"subgraph_ref.binding_edge {self.subgraph_ref.binding_edge!r} "
+                f"must equal edge.source {self.source!r}",
             )
 
 
@@ -138,6 +175,7 @@ class PhaseBinding:
         pick an executor; region labels do NOT enter the capability
         closure (P7-I-2).
     """
+
     node_id: str
     semantic_phase: SemanticPhase
     executor_capability: str
@@ -296,6 +334,27 @@ class PlanProvenance:
     actor_grant: tuple[str, ...] = ()
 
 
+@runtime_checkable
+class SubgraphResolver(Protocol):
+    """Compile-time seam that turns a ``SubgraphReference.plan_ref`` into a plan.
+
+    Implementations are pluggable: the default (``BundleSubgraphResolver``
+    in ``lca.harness.declarative.compile.subgraph_resolver``) reads
+    bundle-relative paths; test doubles return hand-built plans. The
+    Protocol owns no I/O so it can be substituted in unit tests without
+    touching the filesystem.
+    """
+
+    def resolve(self, plan_ref: str) -> object | None:
+        """Return the referenced ``CompiledRunPlan`` or ``None`` if unresolved.
+
+        The return is annotated as ``object`` so the Protocol stays free
+        of state-layer imports; concrete implementations and validators
+        narrow the type via their own contracts.
+        """
+        ...
+
+
 __all__ = [
     "ActionAuthorityPlan",
     "ActionScopeAuthority",
@@ -310,6 +369,8 @@ __all__ = [
     "PhaseNode",
     "PlanProvenance",
     "ReplacementDecision",
+    "SubgraphReference",
+    "SubgraphResolver",
     "ValidationIssue",
     "ValidationReport",
     "ValidationSeverity",

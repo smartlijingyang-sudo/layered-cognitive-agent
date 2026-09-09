@@ -31,6 +31,7 @@ from lca.contracts.protocols.runtime.runtime.lifecycle import (
     RuntimeLifecycleEventType,
     RuntimeLifecyclePublisher,
 )
+from lca.contracts.protocols.state.plan import CompiledRunPlan
 from lca.harness.declarative.compile.assembler.assembler import ExecutablePlan
 from lca.harness.declarative.controls.validation import require_valid
 from lca.harness.declarative.execute.loop_guard import DeclarativeLoopGuardEvaluator
@@ -94,6 +95,14 @@ def _extract_run_identity(
     return run_id, trace_id
 
 
+# Maximum recursion depth for ``PhaseEdge.subgraph_ref`` traversal.
+# A subgraph may not itself reference another subgraph; the runtime
+# raises ``PG-005`` if the cap is exceeded. Module-level so the value
+# is stable across interpreter instances and is accessible from the
+# ``_drive_subgraph`` method body without class-binding gymnastics.
+MAX_SUBGRAPH_DEPTH = 4
+
+
 class GenericPlanInterpreter:
     """Traverse an ``ExecutablePlan`` without reading executor internals.
 
@@ -102,6 +111,8 @@ class GenericPlanInterpreter:
     ``PhaseExecutionTransaction``; checkpointing and terminal protocol
     projection remain in ``RunOutcomeProjector``.
     """
+
+    _MAX_SUBGRAPH_DEPTH = MAX_SUBGRAPH_DEPTH
 
     def __init__(
         self,
@@ -112,6 +123,8 @@ class GenericPlanInterpreter:
         phase_observer: PhaseObserver | None = None,
         loop_guard_evaluator: LoopGuardEvaluator | None = None,
         lifecycle_publisher: RuntimeLifecyclePublisher | None = None,
+        subgraph_resolver: object | None = None,
+        subgraph_executable_factory: object | None = None,
     ) -> None:
         self._journal = journal or InMemoryJournalCommitter()
         self._transaction = PhaseExecutionTransaction(
@@ -130,6 +143,13 @@ class GenericPlanInterpreter:
         )
         self._loop_guard_evaluator = loop_guard_evaluator or DeclarativeLoopGuardEvaluator()
         self._lifecycle_publisher = lifecycle_publisher
+        # The interpreter knows nothing about plan resolution by default;
+        # callers wire a ``SubgraphResolver`` and (optionally) a factory
+        # that turns a resolved plan into an ``ExecutablePlan``. The
+        # factory is the seam that lets tests substitute hand-built
+        # executables without touching the filesystem.
+        self._subgraph_resolver = subgraph_resolver
+        self._subgraph_executable_factory = subgraph_executable_factory
 
     async def run(
         self,
@@ -140,7 +160,7 @@ class GenericPlanInterpreter:
         budget: Budget | None = None,
         capabilities: PhaseCapabilityReader | Mapping[str, object] | None = None,
         artifacts: Mapping[str, object] | None = None,
-        spec: "InfoEdgeSpec | None" = None,
+        spec: InfoEdgeSpec | None = None,
     ) -> InterpretationResult:
         """Execute a validated plan from its declared entry node.
 
@@ -157,13 +177,14 @@ class GenericPlanInterpreter:
         plan = executable.plan
         if not plan.phase_graph:
             from agent_lab.profile_loader import build_region_only_phase_graph
+
             if spec is None:
                 spec = getattr(executable, "spec", None)
             if spec is None:
                 raise DeclarativeValidationError(
                     "PG-002",
                     "phase_graph is None and no spec provided; "
-                    "ADR-0210 §6.4 requires spec= for region-tag fallback"
+                    "ADR-0210 §6.4 requires spec= for region-tag fallback",
                 )
             # Stash the synthesized plan on the executable for the
             # duration of this call; the field stays Optional in the
@@ -197,7 +218,7 @@ class GenericPlanInterpreter:
         input: PhaseInput | None = None,
         budget: Budget | None = None,
         capabilities: PhaseCapabilityReader | Mapping[str, object] | None = None,
-        spec: "InfoEdgeSpec | None" = None,
+        spec: InfoEdgeSpec | None = None,
     ) -> InterpretationResult:
         """Resume from a cursor after verifying that it belongs to this plan.
 
@@ -207,13 +228,14 @@ class GenericPlanInterpreter:
         if not plan.phase_graph:
             # Apply the same P7 region-tag fallback as run()
             from agent_lab.profile_loader import build_region_only_phase_graph
+
             if spec is None:
                 spec = getattr(executable, "spec", None)
             if spec is None:
                 raise DeclarativeValidationError(
                     "PG-002",
                     "phase_graph is None and no spec provided; "
-                    "ADR-0210 §6.4 requires spec= for region-tag fallback"
+                    "ADR-0210 §6.4 requires spec= for region-tag fallback",
                 )
             try:
                 object.__setattr__(
@@ -402,6 +424,25 @@ class GenericPlanInterpreter:
                 visits.append(
                     PhaseVisit(node.id, node.semantic_phase, result.result_kind, edge.target)
                 )
+                if edge.subgraph_ref is not None:
+                    # Recurse into the referenced subgraph before
+                    # advancing the outer traversal. The subgraph's
+                    # terminal PhaseResult is folded into the outer
+                    # drive via state merge; visit/edge counts stay
+                    # outer-plan-local (different plan_ref).
+                    sub_state = await self._drive_subgraph(
+                        outer_edge=edge,
+                        outer_state=current_state,
+                        current_node_id=node.id,
+                        depth=1,
+                    )
+                    current_state = sub_state
+                    traversal.advance(
+                        edge=edge,
+                        payload=transaction.effective_payload,
+                        causation_refs=result.evidence_refs,
+                    )
+                    continue
                 traversal.advance(
                     edge=edge,
                     payload=transaction.effective_payload,
@@ -529,6 +570,75 @@ class GenericPlanInterpreter:
             return edge
         return None
 
+    async def _drive_subgraph(
+        self,
+        *,
+        outer_edge: PhaseEdge,
+        outer_state: AgentState,
+        current_node_id: str,
+        depth: int,
+    ) -> AgentState:
+        """Recurse into a subgraph plan and return the merged outer state.
+
+        The subgraph is resolved via ``self._subgraph_resolver`` and
+        turned into an ``ExecutablePlan`` by
+        ``self._subgraph_executable_factory``. Tests substitute a stub
+        factory to avoid filesystem I/O. Recursion depth is capped by
+        ``_MAX_SUBGRAPH_DEPTH``; exceeding it raises ``PG-005``.
+        """
+        if depth > MAX_SUBGRAPH_DEPTH:
+            raise DeclarativeValidationError(
+                "PG-005",
+                f"subgraph recursion exceeded {MAX_SUBGRAPH_DEPTH} "
+                f"from outer edge {outer_edge.source!r}",
+            )
+        ref = outer_edge.subgraph_ref
+        if ref is None:
+            return outer_state
+        resolver = self._subgraph_resolver
+        if resolver is None:
+            raise DeclarativeValidationError(
+                "PG-005",
+                f"outer edge {outer_edge.source!r} declared subgraph_ref "
+                f"but interpreter has no subgraph_resolver wired",
+            )
+        sub_plan_obj = resolver.resolve(ref.plan_ref)
+        if not isinstance(sub_plan_obj, CompiledRunPlan):
+            raise DeclarativeValidationError(
+                "PG-005",
+                f"subgraph_resolver returned non-plan value for "
+                f"{ref.plan_ref!r}: {type(sub_plan_obj).__name__}",
+            )
+        factory = self._subgraph_executable_factory
+        if factory is None:
+            raise DeclarativeValidationError(
+                "PG-005",
+                f"interpreter has no subgraph_executable_factory wired for {ref.plan_ref!r}",
+            )
+        sub_executable = factory(sub_plan_obj)
+        sub_traversal = PhaseTraversal.start(
+            plan_ref=compiled_run_plan_ref(sub_plan_obj),
+            entry_node_id=ref.entry_node,
+            artifacts=None,
+            input=None,
+        )
+        sub_result = await self._drive(
+            sub_executable,
+            state=outer_state,
+            input=None,
+            budget=None,
+            capabilities=None,
+            artifacts=None,
+            resume_cursor=None,
+        )
+        # The subgraph's terminal projection carries the merged state
+        # because deltas have already been folded into ``outer_state``
+        # via the shared ``Reducer`` during recursion. We do NOT import
+        # the subgraph's visits/facts into the outer drive (different
+        # plan_ref); durability is the caller's job.
+        del sub_traversal, current_node_id
+        return sub_result.state
+
 
 __all__ = [
     "GenericPlanInterpreter",
@@ -542,6 +652,7 @@ __all__ = [
 # ---------------------------------------------------------------------------
 # ADR-0210 §6.4 — region-tag fallback when phase_graph is None
 # ---------------------------------------------------------------------------
+
 
 def _resolve_phase_graph(executable, spec=None):
     """Return the CognitivePhaseGraphPlan, synthesizing from region if None.
@@ -560,6 +671,7 @@ def _resolve_phase_graph(executable, spec=None):
         return plan.phase_graph
     # ADR-0210 §6.4 fallback path
     from agent_lab.profile_loader import build_region_only_phase_graph
+
     # Prefer the spec attached to the executable if present, else the
     # bare spec passed in.
     target_spec = spec
