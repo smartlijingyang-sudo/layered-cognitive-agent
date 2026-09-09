@@ -1,7 +1,7 @@
 {
-  // Editor diagnostics: all off. Typecheck/lint only via `lca-ops typecheck` / ruff CLI.
-  // After changing: Developer: Reload Window. Uninstall any extension listed in
-  // extensions.json unwantedRecommendations if Problems still fill.
+  // Navigation on (Go to Definition); diagnostics stay off.
+  // Typecheck/lint only via `lca-ops typecheck` / ruff CLI.
+  // After changing: Developer: Reload Window.
   "python.defaultInterpreterPath": "${workspaceFolder}/.venv",
   "python.languageServer": "None",
   "python.terminal.activateEnvironment": true,
@@ -13,7 +13,7 @@
   ],
   "python.analysis.typeCheckingMode": "off",
   "python.analysis.diagnosticMode": "openFilesOnly",
-  "python.analysis.exclude": ["**"],
+  "python.analysis.indexing": true,
   "python.analysis.diagnosticSeverityOverrides": {
     "reportGeneralTypeIssues": "none",
     "reportMissingImports": "none",
@@ -81,12 +81,25 @@
     "reportMissingModuleSource": "none",
     "reportSyntaxError": "none"
   },
-  "cursorpyright.disableLanguageServices": true,
+
+  "cursorpyright.disableLanguageServices": false,
   "cursorpyright.analysis.typeCheckingMode": "off",
+  "cursorpyright.analysis.diagnosticMode": "openFilesOnly",
+  "cursorpyright.analysis.extraPaths": [
+    "${workspaceFolder}",
+    "${workspaceFolder}/vendor/cordis/src",
+    "${workspaceFolder}/vendor/cosmokit/src",
+    "${workspaceFolder}/vendor/schemastery/src"
+  ],
+  "cursorpyright.analysis.diagnosticSeverityOverrides": {
+    "reportGeneralTypeIssues": "none",
+    "reportMissingImports": "none",
+    "reportMissingModuleSource": "none",
+    "reportSyntaxError": "none"
+  },
 
   "pyright.disableLanguageServices": true,
   "pyright.disableOrganizeImports": true,
-  "python.analysis.indexing": false,
 
   "mypy-type-checker.ignorePatterns": ["**"],
   "mypy-type-checker.preferDaemon": false,

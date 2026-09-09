@@ -17,7 +17,7 @@
     "ms-python.isort",
     "usernamehw.errorlens",
     "sonarsource.sonarlint-vscode",
-    "meta.pyrefly",
-    "anysphere.cursorpyright"
+    "meta.pyrefly"
   ]
+}
 }
