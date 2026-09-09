@@ -1,0 +1,27 @@
+# bundles/lab-session.yaml — PR-C
+#
+# Lab session provider. Replaces agent_lab.nodes.act.execute.runtime_bind
+# (which used a global _PUBLISH_TOKEN + set_publish_session in the node
+# file path). With this bundle, set_publish_session is owned by the
+# provider's setup and exposed as the lab session capability.
+#
+# delete-when (PR-C landing criteria):
+#   - `set_publish_session` and `global _PUBLISH_TOKEN` no longer appear
+#     under agent_lab/nodes/ (rg returns 0).
+#   - `ensure_act_runtime` and `reset_act_runtime_for_tests` are deleted
+#     from agent_lab/nodes/act/execute/runtime_bind.py.
+#   - The provider stub is replaced with a real @plugin carrier that
+#     resolves `run_loop_driver_registry` and calls
+#     `set_publish_session` exactly once.
+
+name: lab-session
+description: |
+  Lab session provider — performs set_publish_session on the active
+  session at setup time and exposes the session via the lab session
+  capability key. Replace the legacy runtime_bind ensure_act_runtime.
+
+entries:
+  - id: lab-session
+    $module: lca.plugins.lab.session.provider.plugin
+    config:
+      plan_ref: agent_lab_act

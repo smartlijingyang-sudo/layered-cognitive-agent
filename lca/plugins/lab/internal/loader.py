@@ -86,6 +86,8 @@ _HOOK_PACKAGES: tuple[str, ...] = (
     "lca.plugins.lab.act.body_provider.plugin",
     "lca.plugins.lab.tools.provider.plugin",
     "lca.plugins.lab.transport.provider.plugin",
+    # PR-C — session provider
+    "lca.plugins.lab.session.provider.plugin",
 )
 
 
