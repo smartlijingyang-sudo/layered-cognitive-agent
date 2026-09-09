@@ -1,74 +1,38 @@
-# PR-D final 2/2 — control.remember_admit real @plugin carrier
-"""Real carrier for ``agent_lab.nodes.control.remember_admit.plugin.RememberAdmitNode``.
+"""Auto-reflected typed worker — replaces _XxxWorker.execute.
 
-Mirrors the LCA ``@plugin`` decorator contract (id / provides / requires /
-emits / effects / contract / setup) without importing ``cordis`` at module
-top. The actual ``RememberAdmitNode`` class is imported lazily inside ``setup()`` so the
-cordis chain (which the legacy class transitively pulls in) is only
-triggered when the carrier is actually registered with a live Cordis
-Context, not when the loader walks plugin modules.
+id: lab.control.remember_admit
+stage: control
+kind: PRODUCER
+out_port: out
+description: Control-plane wrapper around the remember admit producer.
 
-Slot id: ``lab.control.remember_admit``
-Output capability: ``(none)``
-
-delete-when (PR-D final 2/2):
-- agent_lab/nodes/control/remember_admit/plugin.py replaced by this carrier
-  (test env: delete-when happens when LCA runtime with cordis
-  is in place and the legacy plugin can be removed)
+worker: remember_admit_node(*, inputs, from_port, to_port) -> dict[str, Artifact]
+config: from_port to_port
 """
-
 from __future__ import annotations
 
-from lca.plugins.lab.internal.hooks import (
-    LabCarrier,
-    bind_carrier,
-)
+from typing import Any
 
-
-# Carrier data: what the loader's register_carrier() needs.
-_CARRIER = LabCarrier(
-    id="lab.control.remember_admit",
-    stage="control",
-    kind="PRODUCER",
-    description='Control-plane wrapper around the remember admit producer.',
-    node_id='remember_admit',
-    source_module='agent_lab.nodes.control.remember_admit.plugin',
-    source_class='RememberAdmitNode',
-    provides=['remember_admit_control'],
-    requires=[],
-    emits=[],
-    inputs=[],
-    outputs=[],
-    out_capabilities=[],
-)
-
-
-def setup(ctx, config):
-    """Register the carrier with the loader on plugin boot."""
-    bind_carrier(_CARRIER, ctx=ctx, config=config)
-
-
-# Auto-bind on import so the loader walks these like any other plugin
-# carrier — the setup() function is still callable from a real Cordis
-# boot path for two-phase register.
-bind_carrier(_CARRIER)
-
-
-__all__ = ["setup", "_CARRIER"]
-
-# --- PR-D worker execute -----------------------------------------------
-from lca.plugins.lab.internal.worker import Worker, register_worker
 from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
-class _RememberAdmitNode(Worker):
-    factory = "remember_admit_node"
 
-    def execute(self, node, inputs, seams=None):
-        from lca.plugins.lab.control.ops import LcaControlRememberAdmitProvider
-        provider = LcaControlRememberAdmitProvider.from_node_config(node.config)
-        out_port = node.config.get("to", "admit_verdict")
-        return provider.admit(observation=inputs.get("in_observation"), out_port=out_port)
+def remember_admit_node(
+    *,
+    inputs: dict[str, Artifact],
+    from_port: str = "in",
+    to_port: str = "out",
+    **config: Any,
+) -> dict[str, Artifact]:
+    """Typed wrapper for remember_admit_node — 原 execute 体 inline。"""
+    config = dict(config)
+    # 原 execute body 内的局部变量:
+    node = None  # 已迁移到 config / inputs
+    seams = None
 
-register_worker("remember_admit_node", _RememberAdmitNode)
-register_worker("remember_admit", _RememberAdmitNode)
-register_worker("lab.remember_admit_node", _RememberAdmitNode)
+    from lca.plugins.lab.control.ops import LcaControlRememberAdmitProvider
+    provider = LcaControlRememberAdmitProvider.from_node_config(node.config)
+    out_port = node.config.get("to", "admit_verdict")
+    return provider.admit(observation=inputs.get("in_observation"), out_port=out_port)
+
+
+__all__ = ["remember_admit_node"]

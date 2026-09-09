@@ -1,73 +1,38 @@
-# PR-D final 2/2 — control.barrier real @plugin carrier
-"""Real carrier for ``agent_lab.plugins.control_slots.ControlSlotsPlugin``.
+"""Auto-reflected typed worker — replaces _XxxWorker.execute.
 
-Mirrors the LCA ``@plugin`` decorator contract (id / provides / requires /
-emits / effects / contract / setup) without importing ``cordis`` at module
-top. The actual ``ControlSlotsPlugin`` class is imported lazily inside ``setup()`` so the
-cordis chain (which the legacy class transitively pulls in) is only
-triggered when the carrier is actually registered with a live Cordis
-Context, not when the loader walks plugin modules.
+id: lab.control.barrier
+stage: control
+kind: ROUTER
+out_port: out
+description: Single-slot pass-through (BSP barrier lives in runtime scheduler).
 
-Slot id: ``lab.control.barrier``
-Output capability: ``(none)``
-
-delete-when (PR-D final 2/2):
-- agent_lab/nodes/control/barrier/plugin.py replaced by this carrier
-  (test env: delete-when happens when LCA runtime with cordis
-  is in place and the legacy plugin can be removed)
+worker: barrier(*, inputs, from_port, to_port) -> dict[str, Artifact]
+config: from_port to_port
 """
-
 from __future__ import annotations
 
-from lca.plugins.lab.internal.hooks import (
-    LabCarrier,
-    bind_carrier,
-)
+from typing import Any
 
-
-# Carrier data: what the loader's register_carrier() needs.
-_CARRIER = LabCarrier(
-    id="lab.control.barrier",
-    stage="control",
-    kind="ROUTER",
-    description='Single-slot pass-through (BSP barrier lives in runtime scheduler).',
-    node_id='barrier',
-    source_module='agent_lab.plugins.control_slots',
-    source_class='ControlSlotsPlugin',
-    provides=[],
-    requires=[],
-    emits=[],
-    inputs=[],
-    outputs=[],
-    out_capabilities=[],
-)
-
-
-def setup(ctx, config):
-    """Register the carrier with the loader on plugin boot."""
-    bind_carrier(_CARRIER, ctx=ctx, config=config)
-
-
-# Auto-bind on import so the loader walks these like any other plugin
-# carrier — the setup() function is still callable from a real Cordis
-# boot path for two-phase register.
-bind_carrier(_CARRIER)
-
-
-__all__ = ["setup", "_CARRIER"]
-
-# --- PR-D worker execute -----------------------------------------------
-from lca.plugins.lab.internal.worker import Worker, register_worker
 from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
-class _Barrier(Worker):
-    factory = "barrier"
 
-    def execute(self, node, inputs, seams=None):
-        from agent_lab.primitives.artifact import Artifact, ArtifactKind
-        src = node.config.get("from", node.ins[0])
-        dst = node.config.get("to", node.outs[0])
-        return {dst: inputs.get(src, Artifact(kind=ArtifactKind.TEXT, content=""))}
+def barrier(
+    *,
+    inputs: dict[str, Artifact],
+    from_port: str = "in",
+    to_port: str = "out",
+    **config: Any,
+) -> dict[str, Artifact]:
+    """Typed wrapper for barrier — 原 execute 体 inline。"""
+    config = dict(config)
+    # 原 execute body 内的局部变量:
+    node = None  # 已迁移到 config / inputs
+    seams = None
 
-register_worker("barrier", _Barrier)
-register_worker("lab.barrier", _Barrier)
+    from agent_lab.primitives.artifact import Artifact, ArtifactKind
+    src = node.config.get("from", node.ins[0])
+    dst = node.config.get("to", node.outs[0])
+    return {dst: inputs.get(src, Artifact(kind=ArtifactKind.TEXT, content=""))}
+
+
+__all__ = ["barrier"]

@@ -474,6 +474,19 @@ def discover_worker(module_path: str) -> tuple[LabCarrier, Any, tuple[str, ...]]
         outputs=outputs,
         out_capabilities=provides,
     )
+
+    # ADR-0211 §8:load-time worker 体检。错误聚合到 WorkerAuditFailure,
+    # 由 loader.load_all() 决定 raise;不降级到 WARNING — 降级会让违规
+    # 潜伏到 invoke 阶段,违反 fail-loud 语义。
+    from lca.plugins.lab.internal.audit import (
+        WorkerAuditFailure,
+        audit_worker,
+    )
+
+    audit_errors = audit_worker(module_path, worker_fn)
+    if audit_errors:
+        raise WorkerAuditFailure(audit_errors, module_path=module_path)
+
     return carrier, worker_fn, tuple(sorted(config_params))
 
 

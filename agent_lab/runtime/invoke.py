@@ -55,64 +55,65 @@ def invoke(
     inputs: dict[str, Artifact],
     seams: Any = None,
 ) -> dict[str, Artifact]:
-    """Dispatch ``node.factory`` to its registered Worker, else host passthrough.
+    """Dispatch ``node.factory`` to its registered worker marker.
 
-    ADR-0211 §7:优先从 ``_LAB_HOOKS`` 拿 marker 的 ``worker_fn``(typed function,
-    由 ``discover_worker`` 反射注入);fallback 到 legacy ``lookup_worker``
-    registry(供 passthrough / control / legacy carrier 用)。
+    ADR-0211 §7:全部 worker 走反射 + ``_LAB_HOOKS`` marker;provider 形态
+    仍以 ``bind_carrier`` 走老路径(provider 无 worker_fn,invoke 失败
+    时 host passthrough fallback)。
     """
     from lca.plugins.lab.internal.loader import load_all, _LAB_HOOKS
     from lca.plugins.lab.internal.hooks import lookup_alias
-    from lca.plugins.lab.internal.worker import lookup_worker
 
     load_all()
-    # 1. 反射 worker 路径(act / perceive / think / reflect / remember)
     canonical = lookup_alias(node.factory) or node.factory
     marker = _LAB_HOOKS.get(canonical)
-    if marker is not None and "worker_fn" in marker:
-        cfg = dict(node.config or {})
-        # config-only 参数(不进 requires)从 node.config 读取
-        for cp in marker.get("config_params", []):
-            if cp in cfg:
-                inputs = {**inputs, cp: cfg[cp]}
-        # ADR-0211 §7:port_name → param_name 重写(来自 docstring ``in:`` 映射)。
-        port_to_param = marker.get("port_to_param") or {}
-        mapped_inputs: dict[str, Any] = {}
-        for port_name, value in inputs.items():
-            param_name = port_to_param.get(port_name, port_name)
-            mapped_inputs[param_name] = value
-        result = marker["worker_fn"](**mapped_inputs)
-        # worker 返回 typed dataclass(单 out_port)或 dict[str, Artifact](多 out_port);
-        # framework 只接受 dict[str, Artifact]——typed dataclass 自动包成 Artifact。
-        from agent_lab.primitives.artifact import Artifact, ArtifactKind
-        # out_port 命名:graph spec node.outs[0] 优先(框架的 port 命名空间);
-        # marker.outputs[0] 是反射时的语义 port 名。优先用 graph spec 的 out。
-        graph_outs = list(node.outs or [])
-        default_out = graph_outs[0] if graph_outs else (marker.get("outputs", (("out",),))[0][0] if marker.get("outputs") else "out")
-        if isinstance(result, dict):
-            wrapped: dict[str, Artifact] = {}
-            for k, v in result.items():
-                if isinstance(v, Artifact):
-                    wrapped[k] = v
-                else:
-                    wrapped[k] = Artifact(
-                        kind=ArtifactKind.FACT,
-                        content=_dataclass_to_dict(v) if _has_dataclass_fields(v) else {"value": v},
-                    )
-            return wrapped
-        if isinstance(result, Artifact):
-            return {default_out: result}
-        return {
-            default_out: Artifact(
-                kind=ArtifactKind.FACT,
-                content=_dataclass_to_dict(result) if _has_dataclass_fields(result) else {"value": result},
-            )
-        }
-    # 2. legacy Worker class 路径(passthrough / control 等)
-    try:
-        cls = lookup_worker(node.factory)
-    except KeyError:
+    if marker is None or "worker_fn" not in marker:
+        # 无反射 worker:host passthrough(``identity``-like)或 fail-loud。
         if node.factory in _HOST:
             return _passthrough(node, inputs)
-        raise
-    return cls().execute(node, inputs, seams)
+        raise KeyError(
+            f"factory {node.factory!r} has no reflected worker_fn marker; "
+            "agent_lab invoke expects every plugin to expose a typed worker_fn."
+        )
+    cfg = dict(node.config or {})
+    # config-only 参数(不进 requires)从 node.config 读取
+    for cp in marker.get("config_params", []):
+        if cp in cfg:
+            inputs = {**inputs, cp: cfg[cp]}
+    # ADR-0211 §7:port_name → param_name 重写(来自 docstring ``in:`` 映射)。
+    port_to_param = marker.get("port_to_param") or {}
+    mapped_inputs: dict[str, Any] = {}
+    for port_name, value in inputs.items():
+        param_name = port_to_param.get(port_name, port_name)
+        mapped_inputs[param_name] = value
+    result = marker["worker_fn"](**mapped_inputs)
+    # worker 返回 typed dataclass(单 out_port)或 dict[str, Artifact](多 out_port);
+    # framework 只接受 dict[str, Artifact]——typed dataclass 自动包成 Artifact。
+    from agent_lab.primitives.artifact import Artifact, ArtifactKind
+    # out_port 命名:graph spec node.outs[0] 优先(框架的 port 命名空间);
+    # marker.outputs[0] 是反射时的语义 port 名。优先用 graph spec 的 out。
+    graph_outs = list(node.outs or [])
+    default_out = (
+        graph_outs[0]
+        if graph_outs
+        else (marker.get("outputs", (("out",),))[0][0] if marker.get("outputs") else "out")
+    )
+    if isinstance(result, dict):
+        wrapped: dict[str, Artifact] = {}
+        for k, v in result.items():
+            if isinstance(v, Artifact):
+                wrapped[k] = v
+            else:
+                wrapped[k] = Artifact(
+                    kind=ArtifactKind.FACT,
+                    content=_dataclass_to_dict(v) if _has_dataclass_fields(v) else {"value": v},
+                )
+        return wrapped
+    if isinstance(result, Artifact):
+        return {default_out: result}
+    return {
+        default_out: Artifact(
+            kind=ArtifactKind.FACT,
+            content=_dataclass_to_dict(result) if _has_dataclass_fields(result) else {"value": result},
+        )
+    }

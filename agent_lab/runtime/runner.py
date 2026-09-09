@@ -17,7 +17,6 @@ from agent_lab.graph.spec import InfoEdgeSpec, InfoNode, SubSpecLink
 from agent_lab.primitives.artifact import Artifact, ArtifactKind, make_exception
 from agent_lab.primitives.edge import Edge
 from agent_lab.runtime.invoke import invoke as invoke_node
-from agent_lab.runtime.seams import Seams
 
 _log = logging.getLogger(__name__)
 
@@ -511,12 +510,8 @@ def run(
     bundle = _compile_or_raise(spec, sub_registry)
     effective = InfoEdgeSpec.model_validate(bundle.spec_dump)
     trace = ExecutionTrace()
-    # The runner is the single assembler of typed seam handles. Workers
-    # never import framework modules; they only call methods on seams.
-    # When seams is not provided by the caller, build the default body
-    # handle from the lab body_provider so act.* workers get their
-    # SimpleBody via seams.body.act(intent=...) instead of importing the
-    # provider module themselves.
+    # ADR-0211 §6 §2:Seams 退役;runner 不再装配 typed seam 句柄。
+    # worker 通过 ``_LAB_HOOKS`` marker + 反射 worker_fn 直接被 invoke 调度。
     runner = _Runner(
         spec=effective,
         bundle=bundle,
@@ -524,7 +519,8 @@ def run(
         sub_registry=sub_registry,
         trace=trace,
         subgraph_path=effective.id,
-        seams=_default_seams(),
+        # ADR-0211 §6 §2:Seams 退役;invoke 现在只走 _LAB_HOOKS marker。
+        seams=None,
     )
     # Ensure the framework-emit bridge (session_log_emitter) is loaded
     # so every node_start / node_end / edge_fire / subgraph_* / *_compile
@@ -568,15 +564,3 @@ def _compile_or_raise(
     from agent_lab.graph.compile import compile as _compile
 
     return _compile(spec, sub_registry)
-
-
-def _default_seams() -> "Seams":
-    """Build the default Seams handle from the lab body_provider.
-
-    Composition lives here (the runner), not in worker modules. Workers
-    receive a typed handle and call seams.body.act(intent=...) only.
-    """
-    from lca.plugins.lab.act.body_provider.plugin import get_body, plan_ref_default
-    from lca.plugins.lab.session.provider.plugin import PLAN_REF
-
-    return Seams(body=get_body(), plan_ref=PLAN_REF or plan_ref_default())

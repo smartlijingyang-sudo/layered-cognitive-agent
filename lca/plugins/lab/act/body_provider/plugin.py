@@ -12,15 +12,18 @@ ADR-0211 §6 §3:本文件保留但收紧 — ``get_body()`` 函数退役;
 
 注:provider 不是 worker,需要显式声明 requires(反向依赖),不走反射入口。
 loader 通过 docstring 含 ``provider: yes`` 跳过反射,走传统 _CARRIER 自注册。
-"""
 
+Engine-compat helper(``get_body()`` + ``plan_ref_default()``)保留供
+``agent_lab.runtime.runner._default_seams`` 调用;act 工人**不应**直接
+import 此函数。
+"""
 from __future__ import annotations
 
 from lca.plugins.lab.internal.hooks import LabCarrier, bind_carrier
 
 
 # ---------------------------------------------------------------------------
-# Carrier —— lab.body capability 的 marker。
+# Carrier —— lab.body capability 的 marker(provider 形态,跳过反射)。
 # ---------------------------------------------------------------------------
 _CARRIER = LabCarrier(
     id="lab.act.body_provider",
@@ -37,7 +40,6 @@ _CARRIER = LabCarrier(
         "lab.transport",
         "lab.plan_ref",
     ),
-    emits=("lab.body",),
     inputs=(),
     outputs=(("body", "body"),),
     out_capabilities=("lab.body",),
@@ -60,7 +62,7 @@ bind_carrier(_CARRIER)
 # ---------------------------------------------------------------------------
 
 
-def get_body(allowed_tools: list[str] | None = None):
+def get_body(allowed_tools=None):
     """Build a SimpleBody instance with the lab tool registry.
 
     Engine-only helper(agent_lab.runtime.runner);act 工人**不应**直接 import 此函数。
