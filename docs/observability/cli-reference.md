@@ -10,7 +10,44 @@
 | `logs` | (alias for `journal logs`;保留避免外部脚本/ CI 拿到 `No such command`) |
 | `inspect-tree <profile.yaml>` | 解析后的插件树 + capability 图 |
 | `dump-profile <profile.yaml>` | 展开 bundle + patch 的 entries |
+| `kernel-restart` | LCA 进程本地便捷重启: SIGTERM → 等 K6 dispose → spawn 新 worker(ADR-0213 PR-3,5 步状态机;profile 来自 `KernelServeConfig.profile` 默认 `profiles/web-standard.yaml`) |
+| `kernel_serve [profile]` | 打印启动命令(脚本化集成用,不实际启动) |
+| `kernel-boot [profile]` | 仅 boot profile 并 block 到 SIGINT(无 transport) |
+| `why-plugin <plugin_id> [-p profile]` | 单个 plugin 的来源 / kind / test_suite(进程外;不依赖 kernel 在跑) |
 | `diagnose <problem>` | 内置诊断(连字符):`model-not-seen` / `loop-stuck` / `memory-poisoned` / `approval-rejected` |
+
+## 切后自检 think subgraph(2026-09-09 default)
+
+`profiles/web-standard.yaml` 的 `think.main` 已绑定 `phase.think.subgraph_host`
+(5 步子图:`shortcut → route → reason → classify → gate`)。`/health` 不暴露
+profile 路径;用下面四条命令自助验证:
+
+```sh
+# 1) 重启 kernel,加载默认 profile(= web-standard.yaml)
+./scripts/lca-ops kernel-restart
+
+# 2) 看 plugin Manifest:phase.think.subgraph_host 应出现
+./scripts/lca-ops inspect-tree profiles/web-standard.yaml | grep phase.think
+
+# 3) 看 source:subgraph_host 来自 bundles/think-subgraph-host.yaml
+./scripts/lca-ops why-plugin phase.think.subgraph_host -p profiles/web-standard.yaml
+./scripts/lca-ops why-plugin phase.topology.standard -p profiles/web-standard.yaml
+
+# 4) 看 binding:think.main 必须绑 phase.think.subgraph_host(非 standard)
+uv run python -c "
+from lca.harness.profile.resolve.resolve import resolve_profile
+from lca.harness.composition.plan_compiler import compile_plan
+plan = compile_plan(resolve_profile('profiles/web-standard.yaml'))
+for n in plan.phase_graph.nodes:
+    if n.id.startswith('think'):
+        print(n.id, '->', n.binding)
+"
+```
+
+完整证据链与所有命令的精确输出落在
+`history/2026-09/think-subgraph-default-cutover/`(`README.md` + `commands.md`
++ 4 份 captured output)。切前 vs 切后全量回归字面 IDENTICAL
+(1062 passed / 20 failed / 6 errors — 失败全部 pre-existing)。
 
 ## observability 子集
 

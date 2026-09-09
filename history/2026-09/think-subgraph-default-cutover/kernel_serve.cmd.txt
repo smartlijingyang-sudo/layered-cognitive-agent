@@ -1,0 +1,3 @@
+运行模式 OK · kernel_serve profile=profiles/web-standard.yaml host=0.0.0.0 port=8765
+To start, run (in another shell):
+  uv run python -m lca_kernel serve --profile profiles/web-standard.yaml --host 0.0.0.0 --port 8765 --allow-unknown-env

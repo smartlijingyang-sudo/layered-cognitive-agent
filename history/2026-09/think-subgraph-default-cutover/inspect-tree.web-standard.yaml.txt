@@ -1,0 +1,522 @@
+2026-09-09 18:26:02 [debug    ] cognitive_run_driver_registered target=cognitive
+2026-09-09 18:26:02 [info     ] event registry catalog populated entries=6
+2026-09-09 18:26:02 [info     ] event pipeline registered      pipeline=web-standard-event-pipeline version=1
+Profile: profiles/web-standard.yaml
+manifest_hash: 7f91f314d853e6f7
+plugins: 224  dag_edges: 133
+
+  lca-llm-service  [active]  kind=seam layer=L0  module=lca.plugins.think.llm.seam
+    provides: llm
+  lca-decision-classifier-seam  [active]  kind=seam layer=L1  module=lca.plugins.gate.decision_classifier_seam
+    provides: decision_classifier
+  lca-factory-seams-default  [active]  kind=provider layer=L1  module=lca.plugins.gate.factory_seams_seam
+    provides: bodies, brains, hooks, resume_input_adapters, team_strategies
+  lca-cognitive-think-pipeline-standard  [active]  kind=provider layer=L1  module=lca.plugins.think.cognitive.think_pipeline_provider
+    provides: cognitive.think_pipeline
+  lca-cognitive-reflection-pipeline-standard  [active]  kind=provider layer=L1  module=lca.plugins.think.cognitive.reflection_pipeline_provider
+    provides: cognitive.reflection_pipeline
+  lca-tools-service  [active]  kind=provider layer=L0  module=lca.plugins.act.tools.seam
+    provides: tools
+  lca-transport-service  [active]  kind=seam layer=L0  module=lca.plugins.act.transport.seam
+    provides: transport
+  lca-skills-service  [active]  kind=seam layer=L0  module=lca.plugins.memory.seams.skills_seam
+    provides: skills
+  lca-file-store-service  [active]  kind=provider layer=L0  module=lca.plugins.memory.seams.file_store_seam
+    provides: file_store
+  lca-observability-service  [active]  kind=seam layer=L0  module=lca.plugins.perceive.observability.service_seam
+    provides: observability
+  lca-sandbox-service  [active]  kind=provider layer=L0  module=lca.plugins.act.sandbox.seam
+    provides: sandbox
+  lca-memory-service  [active]  kind=provider layer=L0  module=lca.plugins.memory.seams.memory_seam
+    provides: memory
+  lca-search-service  [active]  kind=provider layer=L0  module=lca.plugins.memory.seams.search_seam
+    provides: search
+  lca-state-store-service  [active]  kind=seam layer=L0  module=lca.plugins.state.state.store_seam
+    provides: state_store
+  lca-llm-resolver  [active]  kind=provider layer=L0  module=lca.plugins.think.llm.resolver_seam
+    provides: llm_resolver
+    requires: llm
+    config_from: default_model←profiles/web-standard.yaml#patch.lca-llm-resolver.default_model, load_dotenv←profiles/web-standard.yaml#patch.lca-llm-resolver.load_dotenv
+  lca-memory-write-policy-simple  [active]  kind=provider layer=L0  module=lca.plugins.memory.policy.write_policy
+    provides: memory.write_policy
+    config_from: min_confidence←/home/lichao/layered-cognitive-agent/bundles/base.yaml#config.min_confidence
+  lca-memory-compaction-policy-simple  [active]  kind=provider layer=L0  module=lca.plugins.memory.policy.compaction_policy
+    provides: memory.compaction_policy
+  lca-retrieval-layered  [active]  kind=provider layer=L0  module=lca.plugins.memory.policy.layered_retrieval
+    provides: retrieval.layered, memory.retrieval_policy
+  lca-memory-provider  [active]  kind=provider layer=L0  module=lca.plugins.memory.providers.memory_provider
+    requires: memory, memory.write_policy, memory.compaction_policy, memory.retrieval_policy
+    config_from: providers←/home/lichao/layered-cognitive-agent/bundles/base.yaml#config.providers
+  lca-state-store-provider  [active]  kind=provider layer=L0  module=lca.plugins.state.state.store_provider
+    requires: state_store
+    config_from: active_provider←/home/lichao/layered-cognitive-agent/bundles/base.yaml#config.active_provider, providers←/home/lichao/layered-cognitive-agent/bundles/base.yaml#config.providers
+  lca-search-provider  [active]  kind=provider layer=L0  module=lca.plugins.memory.providers.search_provider
+    requires: search
+    config_from: providers←/home/lichao/layered-cognitive-agent/bundles/base.yaml#config.providers
+  lca-tools-provider  [active]  kind=provider layer=L0  module=lca.plugins.act.tools.provider
+    requires: tools
+    config_from: factories←/home/lichao/layered-cognitive-agent/bundles/base.yaml#config.factories
+  lca-transport-provider  [active]  kind=provider layer=L0  module=lca.plugins.act.transport.provider
+    requires: transport
+    config_from: providers←/home/lichao/layered-cognitive-agent/bundles/base.yaml#config.providers
+  lca-skills-provider  [active]  kind=provider layer=L0  module=lca.plugins.memory.providers.skills_provider
+    requires: skills
+    config_from: providers←/home/lichao/layered-cognitive-agent/bundles/base.yaml#config.providers
+  lca-file-store-provider  [active]  kind=provider layer=L0  module=lca.plugins.memory.providers.file_store_provider
+    requires: file_store
+    config_from: providers←/home/lichao/layered-cognitive-agent/bundles/base.yaml#config.providers
+  lca-sandbox-provider  [active]  kind=provider layer=L0  module=lca.plugins.act.sandbox.provider
+    requires: sandbox
+    config_from: providers←/home/lichao/layered-cognitive-agent/bundles/base.yaml#config.providers
+  lca-event-descriptor-registry  [active]  kind=seam layer=L0  module=lca.plugins.observability.event.descriptor_seam
+    provides: event_descriptor_registry
+  lca-event-descriptor-bootstrap  [active]  kind=provider layer=L0  module=lca.plugins.observability.event.descriptor_provider
+    requires: event_descriptor_registry
+  lca-journal-store-factory-registry  [active]  kind=seam layer=L0  module=lca.plugins.journal.journal.store_factories_seam
+    provides: journal_store_factories
+  lca-fact-store-memory-factory  [active]  kind=provider layer=L0  module=lca.plugins.journal.fact.store_memory_provider
+    requires: journal_store_factories
+  lca-journal-seam  [active]  kind=seam layer=L0  module=lca.plugins.observability.journal.seam
+    provides: journal_backends
+  lca-tracer-seam  [active]  kind=seam layer=L0  module=lca.plugins.observability.tracer.seam
+    provides: tracer_backends
+  lca-attribute-policy-seam  [active]  kind=seam layer=L0  module=lca.plugins.observability.attribute.policy_seam
+    provides: attribute_policy_backends
+  lca-fact-reader-seam  [active]  kind=seam layer=L0  module=lca.plugins.observability.fact_1.fact_reader_seam
+    provides: fact_readers
+  lca-fact-scorer-seam  [active]  kind=seam layer=L0  module=lca.plugins.observability.fact_2.fact_scorer_seam
+    provides: fact_scorers
+  lca-journal-memory-factory  [active]  kind=provider layer=L0  module=lca.plugins.memory.store.journal_memory_provider
+    requires: journal_backends
+  lca-tracer-otel-factory  [active]  kind=provider layer=L0  module=lca.plugins.observability.tracer.otel_provider
+    requires: tracer_backends
+  lca-attribute-policy-default-factory  [active]  kind=provider layer=L0  module=lca.plugins.observability.attribute.policy_provider
+    requires: attribute_policy_backends
+  lca-fact-reader-console-factory  [active]  kind=provider layer=L0  module=lca.plugins.observability.fact_1.fact_reader_console_provider
+    requires: fact_readers
+  lca-fact-reader-otel-factory  [active]  kind=provider layer=L0  module=lca.plugins.observability.fact_1.fact_reader_otel_provider
+    requires: fact_readers
+  lca-fact-reader-langfuse-factory  [active]  kind=provider layer=L0  module=lca.plugins.observability.fact_1.fact_reader_langfuse_provider
+    requires: fact_readers
+  lca-langfuse-eval-scorer  [active]  kind=provider layer=L0  module=lca.plugins.observability.fact_1.fact_scorer_langfuse_provider
+    requires: fact_scorers
+  lca-trace-tool-seam  [active]  kind=seam layer=L3  module=lca.plugins.observability.trace.tool_seam
+    provides: trace_inspector_tools
+  lca-trace-tool-provider  [active]  kind=provider layer=L3  module=lca.plugins.observability.trace.tool_provider
+    requires: trace_inspector_tools
+  lca-cli-debug-command-seam  [active]  kind=seam layer=L0  module=lca.plugins.observability.cli.debug_seam
+    provides: cli_debug_command
+  lca-cli-debug-trace  [active]  kind=provider layer=L0  module=lca.plugins.observability.cli.debug_trace_provider
+    requires: cli_debug_command
+  lca-genai-semantic-mapper-seam  [active]  kind=seam layer=L0  module=lca.plugins.observability.genai.seam
+    provides: genai_semantic_mapper
+  lca-genai-llm-mapper  [active]  kind=provider layer=L0  module=lca.plugins.observability.genai.llm_provider
+    requires: genai_semantic_mapper
+  lca-genai-tool-mapper  [active]  kind=provider layer=L0  module=lca.plugins.observability.genai.tool_provider
+    requires: genai_semantic_mapper
+  lca-idempotency-store-seam  [active]  kind=provider layer=L2  module=lca.plugins.journal.idempotency.store_seam
+    provides: idempotency_store
+  lca-effect-handler-registry-seam  [active]  kind=seam layer=L2  module=lca.plugins.act.effect.handler_seam
+    provides: effect_handler_registry
+  lca-effect-handler-provider  [active]  kind=provider layer=L2  module=lca.plugins.act.effect.handlers_provider
+    requires: effect_handler_registry
+  lca-delta-handler-registry-seam  [active]  kind=seam layer=L2  module=lca.plugins.act.delta.handler_seam
+    provides: delta_handler_registry
+  lca-delta-handler-provider  [active]  kind=provider layer=L2  module=lca.plugins.act.delta.handlers_provider
+    requires: delta_handler_registry
+  lca-declarative-loop-guard  [active]  kind=provider layer=L2  module=lca.plugins.think.loop.guard_provider
+    provides: loop_guard_evaluator
+  lca-declarative-runtime-seams-provider  [active]  kind=provider layer=L2  module=lca.plugins.journal.declarative.runtime_seams_provider
+    provides: checkpoint_state_resolver_factory, declarative_interpreter_factory, declarative.subgraph.phase_runner, delta_reducer_factory, effect_dispatcher_factory, result_finalizer_factory, runtime_journal_factory
+    requires: loop_guard_evaluator
+  lca-cognitive-runtime-factory  [active]  kind=provider layer=L2  module=lca.plugins.journal.runtime.factory_provider
+    provides: runtime_factory
+  lca-artifact-closure-provider  [active]  kind=provider layer=L2  module=lca.plugins.journal.artifact.closure_provider
+    provides: artifact_closure
+  lca-phase-observer-registry-seam  [active]  kind=seam layer=L2  module=lca.plugins.perceive.phase.observer_registry_seam
+    provides: phase_observer_registry
+  lca-phase-observer-tracing-provider  [active]  kind=provider layer=L2  module=lca.plugins.perceive.phase.observer_tracing_provider
+    requires: phase_observer_registry
+  lca-phase-observer-provider  [active]  kind=composite layer=L2  module=lca.plugins.perceive.phase.observer_provider
+    provides: phase_observer
+    requires: phase_observer_registry
+    config_from: failure_mode←/home/lichao/layered-cognitive-agent/bundles/base.yaml#config.failure_mode
+  lca-runtime-lifecycle-subscriber-registry-seam  [active]  kind=seam layer=L2  module=lca.plugins.state.runtime.lifecycle_registry_seam
+    provides: runtime_lifecycle_subscriber_registry
+  lca-runtime-lifecycle-logging-provider  [active]  kind=provider layer=L2  module=lca.plugins.state.runtime.lifecycle_logging_provider
+    requires: runtime_lifecycle_subscriber_registry
+    config_from: priority←/home/lichao/layered-cognitive-agent/bundles/base.yaml#config.priority
+  lca-runtime-lifecycle-publisher  [active]  kind=composite layer=L2  module=lca.plugins.state.runtime.lifecycle_provider
+    provides: runtime_lifecycle_publisher
+    requires: runtime_lifecycle_subscriber_registry
+    config_from: failure_mode←/home/lichao/layered-cognitive-agent/bundles/base.yaml#config.failure_mode
+  lca-team-shared-memory-default  [active]  kind=provider layer=L3  module=lca.plugins.collaboration.team_2.team_shared_memory_seam
+    provides: team_shared_memory_resolver
+  lca-team-communication-default  [active]  kind=provider layer=L3  module=lca.plugins.collaboration.team_1.team_communication_seam
+    provides: team_communication
+  lca-team-role-library-default  [active]  kind=provider layer=L3  module=lca.plugins.collaboration.team_1.team_role_library_seam
+    provides: team_role_library
+  lca-team-casting-prompt-renderer-builtin  [active]  kind=provider layer=L4  module=lca.plugins.collaboration.team_1.team_casting_prompt_renderer_seam
+    provides: team_casting_prompt_renderer
+    config_from: template_name←/home/lichao/layered-cognitive-agent/bundles/base.yaml#config.template_name
+  lca-team-caster-default  [active]  kind=provider layer=L4  module=lca.plugins.collaboration.team_1.team_caster_seam
+    provides: team_caster
+    requires: team_casting_prompt_renderer
+  lca-team-seam-seam  [active]  kind=seam layer=L3  module=lca.plugins.collaboration.team_1.team_seam_seam
+    provides: team_seam
+    requires: team_communication, team_shared_memory_resolver
+  lca-run-mode-registry-seam  [active]  kind=seam layer=L1  module=lca.plugins.state.run.mode_registry_seam
+    provides: run_mode_registry
+  lca-mode-solo-default  [active]  kind=provider layer=L4  module=lca.plugins.collaboration.modes.solo
+    requires: run_mode_registry
+  lca-mode-team-default  [active]  kind=provider layer=L4  module=lca.plugins.collaboration.modes.team
+    requires: run_mode_registry, team_role_library, team_caster
+  lca-evidence-store-seam  [active]  kind=provider layer=L0  module=lca.plugins.observability.evidence.store_seam
+    provides: evidence_store, evidence_policy
+  lca-run-ledger-factory-seam  [active]  kind=provider layer=L0  module=lca.plugins.observability.run.ledger_seam
+    provides: run_ledger_factory
+  lca-default-reducer  [active]  kind=provider layer=L2  module=lca.plugins.loop.reducer.plugin
+    provides: reducer
+  observability.loop_cursor.factory  [active]  kind=seam layer=L1  module=lca.plugins.observability.seams.loop_cursor_factory
+    provides: observability.loop_cursor
+  observability.projection_host  [active]  kind=seam layer=L1  module=lca.plugins.observability.seams.projection_host
+    provides: observability.projection_host
+  observability.close_barrier  [active]  kind=seam layer=L1  module=lca.plugins.observability.seams.close_barrier
+    provides: observability.close_barrier
+  observability.persistence  [active]  kind=seam layer=L1  module=lca.plugins.observability.seams.persistence_coordinator
+    provides: observability.persistence
+  observability.loop_cursor.standard  [active]  kind=provider layer=L1  module=lca.plugins.observability.providers.loop_cursor.standard
+    requires: observability.loop_cursor
+  observability.projection_host.standard  [active]  kind=provider layer=L1  module=lca.plugins.observability.providers.projection_host.standard
+    requires: observability.projection_host
+  observability.close_barrier.standard  [active]  kind=provider layer=L1  module=lca.plugins.observability.providers.close_barrier.standard
+    requires: observability.close_barrier
+  observability.persistence.null  [active]  kind=provider layer=L1  module=lca.plugins.observability.providers.persistence_coordinator.null
+    requires: observability.persistence
+  perceive  [active]  kind=seam layer=L1  module=lca.plugins.perceive.service.service
+    provides: perceive
+  perceive.hub.sequential  [active]  kind=provider layer=L1  module=lca.plugins.perceive.sequential.hub
+    requires: perceive
+  sensor.clock  [active]  kind=provider layer=L1  module=lca.plugins.sensors.clock.clock
+    requires: perceive
+  sensor.convergence-task  [active]  kind=provider layer=L1  module=lca.plugins.sensors.convergence.task
+    requires: perceive
+  sensor.workspace-artifacts  [active]  kind=provider layer=L1  module=lca.plugins.sensors.workspace.artifacts
+    requires: perceive
+  sensor.inbox-facts  [active]  kind=provider layer=L1  module=lca.plugins.sensors.inbox.facts
+    requires: perceive
+  sensor.team-inbox  [active]  kind=provider layer=L1  module=lca.plugins.sensors.team.inbox
+    requires: perceive
+  sensor.workspace-instructions  [active]  kind=provider layer=L1  module=lca.plugins.sensors.workspace.instructions
+    requires: perceive
+  sensor.skill-catalog  [active]  kind=provider layer=L1  module=lca.plugins.sensors.skill.catalog
+    requires: perceive
+  gates  [active]  kind=seam layer=L1  module=lca.plugins.cognitive.gate.service.plugin
+    provides: gates
+  gates.chain.sequential  [active]  kind=provider layer=L1  module=lca.plugins.cognitive.gate.chained.plugin
+    requires: gates
+  loop.policy.default  [active]  kind=provider layer=L1  module=lca.plugins.cognitive.loop.policy.plugin
+    provides: loop_guard_policy
+    config_from: arguments_preview_chars←/home/lichao/layered-cognitive-agent/bundles/web-app.yaml#config.arguments_preview_chars, break_failures←/home/lichao/layered-cognitive-agent/bundles/web-app.yaml#config.break_failures, break_stalled←/home/lichao/layered-cognitive-agent/bundles/web-app.yaml#config.break_stalled, progress_break←/home/lichao/layered-cognitive-agent/bundles/web-app.yaml#config.progress_break
+  gate.repeat-tool-call  [active]  kind=provider layer=L1  module=lca.plugins.cognitive.gate.repeat_tool_call.plugin
+    requires: gates, loop_guard_policy
+  gate.tool-loop-breaker  [active]  kind=provider layer=L1  module=lca.plugins.cognitive.gate.tool_loop_breaker.plugin
+    requires: gates, loop_guard_policy
+  gate.progress-loop-detector  [active]  kind=provider layer=L1  module=lca.plugins.cognitive.gate.progress_loop_detector.plugin
+    requires: gates, loop_guard_policy
+  convergence.policy.default  [active]  kind=provider layer=L1  module=lca.plugins.cognitive.convergence.policy.plugin
+    provides: convergence_policy, convergence_runtime
+  gate.delivery-satisfied  [active]  kind=provider layer=L1  module=lca.plugins.cognitive.gate.delivery_satisfied.plugin
+    requires: gates, convergence_runtime
+  gate.terminal-respond  [active]  kind=provider layer=L1  module=lca.plugins.cognitive.gate.terminal_respond.plugin
+    requires: gates
+  gate.artifact-respond-injector  [active]  kind=provider layer=L1  module=lca.plugins.cognitive.gate.artifact_respond_injector.plugin
+    requires: gates
+  gate.must-consult-all  [active]  kind=provider layer=L1  module=lca.plugins.cognitive.gate.must_consult_all.plugin
+    requires: gates
+  lca-tool-batch-execution-policy  [active]  kind=provider layer=L1  module=lca.plugins.act.tool.batch_execution_policy_provider
+    provides: tool_batch_execution_policy
+    config_from: mode←/home/lichao/layered-cognitive-agent/bundles/web-app.yaml#config.mode
+  lca-action-handler-registry-seam  [active]  kind=seam layer=L1  module=lca.plugins.act.action.handler_seam
+    provides: action_handler_registry
+  lca-action-handler-provider  [active]  kind=provider layer=L1  module=lca.plugins.act.action.handlers_provider
+    requires: action_handler_registry, tool_batch_execution_policy
+  body.simple  [active]  kind=provider layer=L1  module=lca.plugins.cognitive.body.simple
+    requires: bodies
+  tool.guards.service  [active]  kind=provider layer=L1  module=lca.plugins.cognitive.body.tool_guards_service.plugin
+    provides: tool_guards
+  guard.tool-timeout  [active]  kind=provider layer=L1  module=lca.plugins.cognitive.body.guard_tool_timeout.plugin
+    requires: tool_guards
+    config_from: enabled←/home/lichao/layered-cognitive-agent/bundles/web-app.yaml#config.enabled
+  guard.tool-result-spill  [active]  kind=provider layer=L1  module=lca.plugins.cognitive.body.guard_tool_result_spill.plugin
+    requires: tool_guards
+    config_from: max_inline_bytes←/home/lichao/layered-cognitive-agent/bundles/web-app.yaml#config.max_inline_bytes
+  safe_executor.simple  [active]  kind=provider layer=L1  module=lca.plugins.cognitive.body.safe_executor
+    provides: safe_executor.simple
+    requires: tool_guards
+  state.stop-policy.default  [active]  kind=provider layer=L2  module=lca.plugins.loop.state.stop_policy.plugin
+    provides: stop_policy
+    requires: artifact_closure, convergence_runtime
+  resume_input.human_answer  [active]  kind=provider layer=L2  module=lca.plugins.runtime.resume_input
+    requires: resume_input_adapters
+  lca-brain-prompt-catalog-default  [active]  kind=provider layer=L1  module=lca.plugins.composer.composition.prompt_catalog
+    provides: brain_prompt_catalog_factory
+  lca-prompt-section-registry  [active]  kind=seam layer=L1  module=lca.plugins.prompts.registry
+    provides: prompt_section_registry
+  lca-prompt-template-provider-builtin  [active]  kind=provider layer=L1  module=lca.plugins.prompts.template_provider
+    provides: prompt_template_provider
+  lca-brain-prompt-sections  [active]  kind=provider layer=L1  module=lca.plugins.prompts.sections
+    requires: prompt_section_registry
+  lca-prompt-assembler-section-manifest  [active]  kind=provider layer=L1  module=lca.plugins.prompts.assembler
+    provides: prompt_assembler
+    requires: prompt_section_registry, prompt_template_provider
+    config_from: strip_empty_fields←/home/lichao/layered-cognitive-agent/bundles/web-app.yaml#config.strip_empty_fields
+  lca-prompt-template-selector-team-awareness  [active]  kind=provider layer=L1  module=lca.plugins.prompts.selector
+    provides: prompt_template_selector
+    config_from: default_template←/home/lichao/layered-cognitive-agent/bundles/web-app.yaml#config.default_template
+  lca-reasoner-prompt  [active]  kind=provider layer=L1  module=lca.plugins.reasoner.prompt
+    provides: reasoner.prompt
+  lca-critic-simple  [active]  kind=provider layer=L1  module=lca.plugins.critic.simple
+    provides: critic.simple
+  lca-brain-simple  [active]  kind=provider layer=L1  module=lca.plugins.cognitive.brain.simple
+    requires: brains, gates, critic.simple, reasoner.prompt, decision_classifier, cognitive.think_pipeline, cognitive.reflection_pipeline, prompt_assembler, prompt_template_selector
+  lca-journal-store  [active]  kind=provider layer=L1  module=lca.plugins.journal.journal.store_seam
+    provides: journal_store
+  lca-run-loop-driver-registry  [active]  kind=provider layer=L1  module=lca.plugins.loop.driver.plugin
+    provides: run_loop_driver_registry
+    config_from: default←/home/lichao/layered-cognitive-agent/bundles/web-app.yaml#config.default
+  lca-loop-cognitive  [active]  kind=provider layer=L4  module=lca.plugins.collaboration.modes.cognitive
+    provides: run_loop_driver_registry[cognitive]
+    requires: run_loop_driver_registry, run_mode_registry
+    config_from: target←/home/lichao/layered-cognitive-agent/bundles/web-app.yaml#config.target
+  lca-plan-brain-composer  [active]  kind=provider layer=L4  module=lca.plugins.composer.think.brain_provider
+    provides: composer.brain
+  lca-plan-body-composer  [active]  kind=provider layer=L4  module=lca.plugins.composer.act.body_provider
+    provides: composer.body
+  lca-plan-perceive-composer  [active]  kind=provider layer=L4  module=lca.plugins.composer.perceive.provider
+    provides: composer.perceive
+  lca-plan-team-composer  [active]  kind=provider layer=L4  module=lca.plugins.composer.collaboration.team_provider
+    provides: composer.team
+  tools.compose_service  [active]  kind=provider layer=L1  module=lca.plugins.factories.tools
+    provides: tools.compose_service
+  transport.compose_service  [active]  kind=provider layer=L1  module=lca.plugins.factories.transport
+    provides: transport.compose_service
+  lca-component-registry-seam  [active]  kind=seam layer=L4  module=lca.plugins.state.component.registry_seam
+    provides: component_registry
+  lca-component-state-store-contributor  [active]  kind=provider layer=L4  module=lca.plugins.state.component.state_store_provider
+    requires: component_registry
+  lca-component-memory-contributor  [active]  kind=provider layer=L4  module=lca.plugins.memory.store.component_memory_provider
+    requires: component_registry
+  lca-component-budget-policy-contributor  [active]  kind=provider layer=L4  module=lca.plugins.state.component.budget_policy_provider
+    provides: lead_budget_policy_resolver
+    requires: component_registry
+  strategy.lead  [active]  kind=provider layer=L3  module=lca.plugins.strategies.lead.lead
+    requires: team_strategies
+  strategy.pipeline  [active]  kind=provider layer=L3  module=lca.plugins.strategies.pipeline.pipeline
+    requires: team_strategies
+  strategy.fan_out  [active]  kind=provider layer=L3  module=lca.plugins.strategies.fan.out
+    requires: team_strategies
+  strategy.peer_relay  [active]  kind=provider layer=L3  module=lca.plugins.strategies.peer.relay
+    requires: team_strategies
+  strategy.peer_swarm  [active]  kind=provider layer=L3  module=lca.plugins.strategies.peer.swarm
+    requires: team_strategies
+  strategy.debate  [active]  kind=provider layer=L3  module=lca.plugins.strategies.debate.debate
+    requires: team_strategies
+  lca.graph-node-executor-registry  [active]  kind=seam layer=L3  module=lca.plugins.loop.graph.nodes.registry.plugin
+    provides: graph_node_executors
+  graph-node.agent.default  [active]  kind=provider layer=L3  module=lca.plugins.loop.graph.nodes.agent.plugin
+    requires: graph_node_executors
+  graph-node.aggregator.default  [active]  kind=provider layer=L3  module=lca.plugins.loop.graph.nodes.aggregator.plugin
+    requires: graph_node_executors
+  graph-node.topology.default  [active]  kind=provider layer=L3  module=lca.plugins.loop.graph.nodes.topology.plugin
+    requires: graph_node_executors
+  strategy.graph  [active]  kind=provider layer=L3  module=lca.plugins.strategies.graph.graph
+    requires: team_strategies, graph_node_executors
+  lca-webserver-router  [active]  kind=seam layer=L0  module=lca.plugins.transport.webserver.router.router
+    provides: route_registry
+  lca-gateway-routes-health-options  [active]  kind=provider layer=L1  module=lca.plugins.transport.webserver.routes_1.routes_health_options
+    requires: route_registry
+  lca-gateway-routes-runs-sessions  [active]  kind=provider layer=L1  module=lca.plugins.transport.webserver.routes_2.routes_runs_sessions
+    requires: route_registry
+  lca-gateway-routes-openai-compat-files  [active]  kind=provider layer=L1  module=lca.plugins.transport.webserver.routes_1.routes_openai_compat_files
+    requires: route_registry, llm_resolver
+  lca-gateway-routes-device  [active]  kind=provider layer=L1  module=lca.plugins.transport.webserver.routes_1.routes_device
+    requires: route_registry
+  lca-webserver-bootstrap  [active]  kind=provider layer=L0  module=lca.plugins.transport.webserver.bootstrap.bootstrap
+    provides: webserver_bootstrap_factory, webserver_bootstrap_config, install_bootstrap_state
+    requires: file_store
+  lca-webserver-jwt-keys  [active]  kind=provider layer=L0  module=lca.plugins.transport.webserver.jwt_keys_seam.jwt_keys
+    provides: jwt_keys
+    config_from: dev_mode←/home/lichao/layered-cognitive-agent/bundles/web-app.yaml#config.dev_mode
+  lca-web-server  [active]  kind=seam layer=L1  module=lca.plugins.transport.webserver.server.server
+    provides: web_server
+    requires: route_registry, install_bootstrap_state, webserver_bootstrap_config
+    config_from: host←/home/lichao/layered-cognitive-agent/bundles/web-app.yaml#config.host, log_level←/home/lichao/layered-cognitive-agent/bundles/web-app.yaml#config.log_level, port←/home/lichao/layered-cognitive-agent/bundles/web-app.yaml#config.port
+  lca-gateway-ws-mount  [active]  kind=provider layer=L1  module=lca.plugins.transport.webserver.routes_2.routes_agent_gateway_ws
+    requires: web_server
+  lca-composition-invariant-default  [active]  kind=provider layer=L0  module=lca.plugins.journal.composition.invariant_seam
+    provides: composition.invariant_checker
+  lca-composer-provider  [active]  kind=provider layer=L0  module=lca.plugins.think.composition.provider_provider
+    provides: composition.compose_factory
+    requires: composition.invariant_checker
+  lca-role-cordis-creator  [active]  kind=provider layer=L3  module=lca.plugins.roles.cordis_creator
+    provides: role.cordis_creator
+  lca-tool-cordis-control  [active]  kind=provider layer=L1  module=lca.plugins.tools.cordis_control
+    provides: cordis_control_tool_factory
+    config_from: caller_grant←/home/lichao/layered-cognitive-agent/bundles/scenario-cordis-creator.yaml#config.caller_grant
+  lca-mode-cordis-creator-default  [active]  kind=provider layer=L4  module=lca.plugins.collaboration.modes.cordis_creator
+    requires: run_mode_registry, role.cordis_creator, cordis_control_tool_factory
+  lca-tool-bash  [active]  kind=provider layer=L1  module=lca.plugins.tools.bash
+    provides: tools.bash
+    requires: tools
+    config_from: allowed←/home/lichao/layered-cognitive-agent/bundles/scenario-cordis-creator.yaml#config.allowed
+  lca-tool-file-write  [active]  kind=provider layer=L1  module=lca.plugins.tools.file_write
+    provides: tools.file_write
+    requires: tools
+    config_from: allowed←/home/lichao/layered-cognitive-agent/bundles/scenario-cordis-creator.yaml#config.allowed
+  phase.perceive.standard  [active]  kind=phase-executor layer=L2  module=lca.plugins.loop.phase.perceive.standard.plugin
+    provides: phase.perceive.standard
+  phase.think.standard  [active]  kind=phase-executor layer=L2  module=lca.plugins.loop.phase.think.standard.plugin
+    provides: phase.think.standard
+  phase.act.standard  [active]  kind=phase-executor layer=L2  module=lca.plugins.loop.phase.act.standard.plugin
+    provides: phase.act.standard
+  phase.reflect.standard  [active]  kind=phase-executor layer=L2  module=lca.plugins.loop.phase.reflect.standard.plugin
+    provides: phase.reflect.standard
+  phase.remember.standard  [active]  kind=phase-executor layer=L2  module=lca.plugins.loop.phase.remember.standard.plugin
+    provides: phase.remember.standard
+  phase.stop.standard  [active]  kind=phase-executor layer=L2  module=lca.plugins.loop.phase.stop.standard.plugin
+    provides: phase.stop.standard
+  phase.topology.standard  [active]  kind=provider layer=L2  module=lca.plugins.loop.graph.topology.standard.plugin
+    provides: phase.topology.standard
+    config_from: nodes←profiles/web-standard.yaml#patch.phase.topology.standard.nodes
+  phase.execution_policy.resilient  [active]  kind=provider layer=L2  module=lca.plugins.loop.graph.resilient.plugin
+    provides: phase.execution_policy.resilient
+    config_from: policies←/home/lichao/layered-cognitive-agent/bundles/declarative-phase-graph.yaml#config.policies
+  phase.edge.standard  [active]  kind=provider layer=L2  module=lca.plugins.loop.graph.edges.standard.plugin
+    provides: phase.edge.standard
+    config_from: approval_resume_node←/home/lichao/layered-cognitive-agent/bundles/declarative-phase-graph.yaml#config.approval_resume_node, edges←/home/lichao/layered-cognitive-agent/bundles/declarative-phase-graph.yaml#config.edges
+  control.perceive.context  [active]  kind=provider layer=L2  module=lca.plugins.loop.control.perceive_context.plugin
+    provides: control.perceive.context
+  control.think.guard  [active]  kind=provider layer=L2  module=lca.plugins.loop.control.think_guard.plugin
+    provides: control.think.guard, control.think.guard.enforce
+  control.act.authorize  [active]  kind=provider layer=L2  module=lca.plugins.loop.control.act_authorize.plugin
+    provides: control.act.authorize
+  control.act.budget  [active]  kind=provider layer=L2  module=lca.plugins.loop.control.act_budget.plugin
+    provides: control.act.budget
+  control.act.constrain  [active]  kind=provider layer=L2  module=lca.plugins.loop.control.act_constrain.plugin
+    provides: control.act.constrain
+  control.act.execute  [active]  kind=provider layer=L2  module=lca.plugins.loop.control.act_execute.plugin
+    provides: control.act.execute
+  control.act.safe-boundary  [active]  kind=provider layer=L2  module=lca.plugins.loop.control.act_safe_boundary.plugin
+    provides: control.act.safe-boundary
+  control.remember.admit  [active]  kind=provider layer=L2  module=lca.plugins.loop.control.remember_admit.plugin
+    provides: control.remember.admit
+  control.stop.decide  [active]  kind=provider layer=L2  module=lca.plugins.loop.control.stop_decide.plugin
+    provides: control.stop.decide
+  control.stop.focus  [active]  kind=provider layer=L2  module=lca.plugins.loop.control.stop_focus.plugin
+    provides: control.stop.focus
+    config_from: max_consecutive_stagnant_turns←/home/lichao/layered-cognitive-agent/bundles/declarative-phase-graph.yaml#config.max_consecutive_stagnant_turns
+  control.observe.checkpoint  [active]  kind=provider layer=L2  module=lca.plugins.loop.control.observe_checkpoint.plugin
+    provides: control.observe.checkpoint
+  control.observe.wildcard  [active]  kind=provider layer=L2  module=lca.plugins.loop.control.observe_wildcard.plugin
+    provides: control.observe.wildcard
+  spine.reflector.source  [active]  kind=seam layer=L0  module=lca.plugins.observability.spine.reflectors.source
+    provides: field_producer.source
+  spine.classifier.exception.builtin  [active]  kind=seam layer=L0  module=lca.plugins.observability.spine.classifiers.exception_builtin
+    provides: field_producer.exception.builtin
+  spine.classifier.exception.unclass  [active]  kind=seam layer=L0  module=lca.plugins.observability.spine.classifiers.exception_unclass
+    provides: field_producer.exception.unclass
+  spine.spantree  [active]  kind=seam layer=L0  module=lca.plugins.observability.spine.spantree
+    provides: field_producer.spantree
+  spine.deriver.anomaly  [active]  kind=seam layer=L0  module=lca.plugins.observability.spine.derivers.anomaly
+    provides: deriver.anomaly
+  spine.emit_pipeline  [active]  kind=seam layer=L1  module=lca.plugins.observability.spine.emit_pipeline
+    provides: emit_pipeline
+    requires: field_producer.*, deriver.anomaly
+  spine.deriver.narrative  [active]  kind=provider layer=L0  module=lca.plugins.observability.spine.derivers.narrative
+    provides: narrative
+  spine.deriver.graph  [active]  kind=provider layer=L0  module=lca.plugins.observability.spine.derivers.graph
+    provides: graph
+  spine.deriver.live_tail  [active]  kind=seam layer=L0  module=lca.plugins.observability.spine.derivers.live_tail
+    provides: live_tail
+  spine.sink.file  [active]  kind=provider layer=L0  module=lca.plugins.observability.spine.sinks.file
+    provides: file_sink
+    config_from: boot_path←profiles/web-standard.yaml#patch.spine.sink.file.boot_path, runs_root←profiles/web-standard.yaml#patch.spine.sink.file.runs_root
+  spine.core  [active]  kind=seam layer=L2  module=lca.plugins.observability.spine.core
+    provides: event_spine, spine_context
+    requires: emit_pipeline, file_sink
+  writable.matrix.default  [active]  kind=seam layer=L2  module=lca.plugins.observability.writable_matrix.assembly
+    provides: writable_face_registry
+    requires: event_spine
+  spine.sink.console  [active]  kind=seam layer=L0  module=lca.plugins.observability.spine.sinks.console
+    provides: console_sink
+  spine.wrap.assembler  [active]  kind=seam layer=L0  module=lca.plugins.observability.spine.wraps.assembler
+    provides: assembler_wrap
+  lca.plugins.session.runtime  [active]  kind=provider layer=L2  module=lca.plugins.session.runtime.plugin.plugin
+    provides: session.store
+  lca.plugins.session.spine_anomaly  [active]  kind=provider layer=L2  module=lca.plugins.session.spine_anomaly.spine_anomaly
+    provides: session.spine_anomaly
+    requires: session.store, deriver.anomaly
+  lca.plugins.session.checkpoint_policy  [active]  kind=provider layer=L2  module=lca.plugins.session.checkpoint_policy.checkpoint_policy
+    provides: session.checkpoint.policy
+    requires: session.store
+  lca.plugins.session.projection_registry  [active]  kind=provider layer=L2  module=lca.plugins.session.projection_registry.projection_registry
+    provides: session.projections
+    requires: session.store
+  lca.plugins.session.projection_cache  [active]  kind=provider layer=L2  module=lca.plugins.session.projection_cache.projection_cache
+    provides: session.projection_cache
+    requires: session.projections
+  lca.plugins.session.model_visible  [active]  kind=provider layer=L2  module=lca.plugins.session.session_model_visible.session_model_visible
+    provides: session.projection.model_visible
+    requires: session.projections
+  lca.plugins.session.session_stats  [active]  kind=provider layer=L2  module=lca.plugins.session.session_stats.session_stats
+    provides: session.projection.session_stats
+    requires: session.projections
+  lca.plugins.session.session_turn_outline  [active]  kind=provider layer=L2  module=lca.plugins.session.session_turn_outline.session_turn_outline
+    provides: session.projection.session_turn_outline
+    requires: session.projections
+  lca.plugins.session.token_usage  [active]  kind=provider layer=L2  module=lca.plugins.session.token_usage.token_usage
+    provides: session.projection.token_usage, session.token_meter
+    requires: session.projections
+  lca.plugins.session.turn_control  [active]  kind=provider layer=L2  module=lca.plugins.session.session_turn_control.session_turn_control
+    provides: session.projection.turn_control
+    requires: session.projections
+  lca.plugins.session.title_service  [active]  kind=provider layer=L2  module=lca.plugins.session.title_service.title_service
+    provides: session.title
+    requires: session.store
+  lca.plugins.session.telemetry_capture  [active]  kind=provider layer=L2  module=lca.plugins.session.telemetry_capture.telemetry_capture
+    provides: session.telemetry
+    requires: session.store
+  lca.plugins.session.telemetry_otel  [active]  kind=provider layer=L2  module=lca.plugins.session.telemetry_otel.telemetry_otel
+    provides: session.telemetry.backend.otel
+    requires: session.telemetry
+    config_from: mode←/home/lichao/layered-cognitive-agent/bundles/session-runtime.yaml#config.mode
+  lca.events.bus  [active]  kind=provider layer=L0  module=lca_kernel.events.manifest.manifest
+    provides: event.bus
+  events.spine.loop_cursor  [active]  kind=provider layer=L2  module=lca.plugins.events.publishers.spine_loop_cursor.plugin
+    provides: event.bus.loop_cursor
+  events.spine.writable_matrix  [active]  kind=provider layer=L2  module=lca.plugins.events.publishers.spine_writable_matrix.plugin
+    provides: event.bus.writable_matrix
+  events.model_visible.publisher  [active]  kind=provider layer=L2  module=lca.plugins.events.publishers.model_visible.publisher
+    provides: event.bus.publisher.model_visible, llm.adapter.hook.model_visible
+    requires: event.bus
+  delegation_cache  [active]  kind=provider layer=L1  module=lca.plugins.events.publishers.delegation_cache.plugin
+    provides: delegation_cache
+  lca.events.sink.spine_file  [active]  kind=provider layer=L0  module=lca.plugins.events.sinks.spine_file_sink.manifest
+    provides: event.sink.spine_file
+  events.subscriber.exception_index_writer  [active]  kind=provider layer=L0  module=lca.plugins.events.subscribers.exception_index_writer
+    provides: events.subscriber.exception_index
+  phase.think.subgraph.shortcut  [active]  kind=phase-executor layer=L2  module=lca.plugins.loop.phase.think.subgraph.shortcut.plugin
+    provides: phase.think.subgraph.shortcut
+  phase.think.subgraph.route  [active]  kind=phase-executor layer=L2  module=lca.plugins.loop.phase.think.subgraph.route.plugin
+    provides: phase.think.subgraph.route
+  phase.think.subgraph.reason  [active]  kind=phase-executor layer=L2  module=lca.plugins.loop.phase.think.subgraph.reason.plugin
+    provides: phase.think.subgraph.reason
+  phase.think.subgraph.classify  [active]  kind=phase-executor layer=L2  module=lca.plugins.loop.phase.think.subgraph.classify.plugin
+    provides: phase.think.subgraph.classify
+  phase.think.subgraph.gate  [active]  kind=phase-executor layer=L2  module=lca.plugins.loop.phase.think.subgraph.gate.plugin
+    provides: phase.think.subgraph.gate
+  phase.think.subgraph_host  [active]  kind=phase-executor layer=L2  module=lca.plugins.loop.phase.think.subgraph_host.plugin
+    provides: phase.think.subgraph_host
+    config_from: entry_node←/home/lichao/layered-cognitive-agent/bundles/think-subgraph-host.yaml#config.entry_node, plan_ref←/home/lichao/layered-cognitive-agent/bundles/think-subgraph-host.yaml#config.plan_ref
+

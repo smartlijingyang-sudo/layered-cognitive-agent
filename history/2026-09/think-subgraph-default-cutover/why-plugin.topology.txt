@@ -1,0 +1,12 @@
+2026-09-09 18:26:13 [debug    ] cognitive_run_driver_registered target=cognitive
+2026-09-09 18:26:13 [info     ] event registry catalog populated entries=6
+2026-09-09 18:26:13 [info     ] event pipeline registered      pipeline=web-standard-event-pipeline version=1
+plugin: phase.topology.standard
+module: lca.plugins.loop.graph.topology.standard.plugin
+source: /home/lichao/layered-cognitive-agent/bundles/declarative-phase-graph.yaml+patch
+kind/layer: provider/L2
+provides: ['phase.topology.standard']
+requires: []
+test_suite: tests/declarative/test_phase_graph.py
+disabled: False
+enables: (no dependents in DAG)

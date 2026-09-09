@@ -1,0 +1,12 @@
+2026-09-09 18:26:11 [debug    ] cognitive_run_driver_registered target=cognitive
+2026-09-09 18:26:11 [info     ] event registry catalog populated entries=6
+2026-09-09 18:26:11 [info     ] event pipeline registered      pipeline=web-standard-event-pipeline version=1
+plugin: phase.think.subgraph_host
+module: lca.plugins.loop.phase.think.subgraph_host.plugin
+source: /home/lichao/layered-cognitive-agent/bundles/think-subgraph-host.yaml
+kind/layer: phase-executor/L2
+provides: ['phase.think.subgraph_host']
+requires: []
+test_suite: tests/cognition/test_think_subgraph_parity.py
+disabled: False
+enables: (no dependents in DAG)

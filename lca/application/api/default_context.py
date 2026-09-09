@@ -26,6 +26,13 @@ if TYPE_CHECKING:
 
 _DEFAULT_PROFILE = "profiles/web-standard.yaml"
 
+# ``web-standard.yaml`` binds ``think.main`` to ``phase.think.subgraph_host``
+# (5-step subgraph: shortcut → route → reason → classify → gate) so the
+# production default runs the decomposed think pipeline with parity to the
+# legacy monolithic ``phase.think.standard`` executor. See
+# ``bundles/think-subgraph-{steps,host,graph}.yaml`` and the parity test
+# ``tests/cognition/test_think_subgraph_parity.py``.
+
 # Public deprecation metadata (ADR-0115 决定 7).
 SET_DEFAULT_CTX_DEPRECATION_REASON = (
     "set_default_ctx is deprecated; pass an explicit cordis Context as "
