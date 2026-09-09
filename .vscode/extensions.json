@@ -3,10 +3,12 @@
     "charliermarsh.ruff",
     "ms-python.python",
     "ms-python.vscode-pylance",
-    "ms-python.mypy-type-checker",
-    "detachhead.basedpyright",
     "tamasfe.even-better-toml",
     "redhat.vscode-yaml",
     "github.vscode-github-actions"
+  ],
+  "unwantedRecommendations": [
+    "detachhead.basedpyright",
+    "ms-python.mypy-type-checker"
   ]
 }

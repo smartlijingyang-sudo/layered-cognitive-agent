@@ -334,6 +334,15 @@ reportMissingImports = true
 module = ["langfuse", "langfuse.*", "structlog", "structlog.*"]
 reportMissingImports = false
 
+# basedpyright (VS Code) reads this instead of [tool.pyright]. CLI `pyright`
+# still uses [tool.pyright] basic. Without this, the editor paints lca/ red
+# because config-file typeCheckingMode overrides workspace settings.
+[tool.basedpyright]
+typeCheckingMode = "off"
+reportMissingImports = false
+reportMissingModuleSource = false
+reportMissingTypeStubs = false
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 addopts = "-ra --cov=lca --cov-report=term-missing -m 'not real_llm'"
