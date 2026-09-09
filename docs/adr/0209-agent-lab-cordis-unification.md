@@ -20,8 +20,9 @@
 > **Accepted 条件（依 ADR 头 §"Accepted 条件"）：**
 > 1. PR-A ~ PR-E 全部合并 ✅
 > 2. ADR-0209 §6 delete-when 全 7 条满足 ⏸（PR-D final 完成 → 剩 P7 + bundles/profile 接入 + GraphPlugin/agents 旧文件清理）
-> 3. ADR-0206 §10 P7 阶段闭集迁移完成 ⏸
+> 3. ADR-0206 §10 P7 阶段闭集迁移完成 ✅（[ADR-0210 §九 8 条](../0210-stage-closure-migration-p7.md)全部满足）
 > 4. ADR-0209 §8 验收 1–10 全部绿 ✅（**115 passed, 3 skipped**）
+> 5. **[ADR-0211](../0211-worker-contract-tightening.md)**（Worker Contract 收紧：execute 签名 / Config 边界 / 错误三态 / `register_worker` + `Seams` + `body_provider.get_body` 退役契约）§9 delete-when 全 6 条满足 ⏸——本 ADR §1.2「节点即 LCA plugin」只规定了**模块形态**，未规定**签名契约**；[ADR-0211](../0211-worker-contract-tightening.md) 是本 ADR §1.2 / §1.6 的**契约层收口**，必须先于本 ADR 升 Accepted
 >
 > **Note 镜像落地状态：**
 > [`docs/notes/implemented/seam/2026-09-09-lab-cordis-unification-landing.md`](../notes/implemented/seam/2026-09-09-lab-cordis-unification-landing.md)（PR-A.3 → PR-E.2 实际落地状态镜像；含 delete-when 与 Alternatives considered）
