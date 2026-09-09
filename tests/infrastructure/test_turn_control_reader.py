@@ -51,6 +51,23 @@ def test_commit_turn_appends_turn_control_fact() -> None:
         reset_publish_session(token)
 
 
+def test_control_turns_falls_back_to_in_process_mirror_without_session() -> None:
+    state = AgentState(trace_id="t", task="task", budget=create_budget(max_steps=8))
+    state.control_turns.append(
+        Turn(
+            decision=Decision(
+                decision_id="d1",
+                action_type=ActionType.USE_TOOL,
+                rationale="r",
+                confidence=1.0,
+                tool_calls=[ToolCall(call_id="c1", tool_name="listFiles", arguments={})],
+            ),
+            observation=Observation(observation_id="o1", success=True, payload={"stdout": "[]"}),
+        )
+    )
+    assert control_turns(state)[0].tool_name == "listFiles"
+
+
 def test_gates_prefer_session_projection_over_history() -> None:
     session = Session("tc_gate")
     append_turn_control_fact(

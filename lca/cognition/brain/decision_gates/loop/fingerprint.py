@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 from collections.abc import Mapping, Sequence
 from hashlib import sha256
 
@@ -11,6 +13,7 @@ from lca.infrastructure.session.context.turn_control_reader import ControlTurnVi
 
 _DIRECTORY_ARG_KEYS = ("directoryPath", "directory", "path", "dir")
 _INSPECT_TOOLS = frozenset({"listFiles", "list_files", "readFile", "read_file"})
+_RUN_COMMAND_TOOLS = frozenset({"runCommand", "local_runCommand", "run_command"})
 _WORKSPACE_ROOT_ALIASES = frozenset({".", "./", "", "/mnt/data", "/mnt/data/"})
 
 
@@ -21,15 +24,39 @@ def _normalize_directory_path(path: str) -> str:
     return stripped
 
 
+def _normalize_shell_command(command: str) -> str:
+    """Collapse cwd wrappers and path variants for intent-level loop detection."""
+    text = command.strip()
+    while True:
+        match = re.match(r"cd\s+[^\s&]+\s*&&\s*(.+)", text, re.DOTALL | re.IGNORECASE)
+        if match is None:
+            break
+        text = match.group(1).strip()
+    officecli = re.match(
+        r'officecli\s+(\S+)\s+(?:["\'])([^"\']+)(?:["\'])',
+        text,
+        re.IGNORECASE,
+    )
+    if officecli is not None:
+        subcommand = officecli.group(1).lower()
+        path = os.path.basename(officecli.group(2).strip())
+        return f"officecli {subcommand} {path}"
+    return text
+
+
 def _normalize_tool_arguments(
     tool_name: str,
     arguments: Mapping[str, object] | None,
 ) -> dict[str, object]:
     if arguments is None:
         return {}
-    if tool_name not in _INSPECT_TOOLS:
-        return dict(arguments)
     normalized = dict(arguments)
+    if tool_name in _RUN_COMMAND_TOOLS:
+        command = normalized.get("command")
+        if isinstance(command, str):
+            normalized["command"] = _normalize_shell_command(command)
+    if tool_name not in _INSPECT_TOOLS:
+        return normalized
     for key in _DIRECTORY_ARG_KEYS:
         value = normalized.get(key)
         if isinstance(value, str):

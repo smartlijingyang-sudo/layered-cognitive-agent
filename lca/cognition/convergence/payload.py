@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from lca.cognition.convergence.constants import MIN_SUBSTANTIVE_STDOUT_CHARS
 from lca.cognition.convergence.task_class import task_requires_synthesis
+from lca.contracts.atoms.semantic.cli_diagnostic import is_cli_diagnostic_output
 from lca.contracts.models.core.execution.decision import Observation
 
 _STDOUT_KEYS = ("output", "stdout", "content", "text")
@@ -53,6 +54,8 @@ def merge_files_created(
 
 def is_substantive_stdout(text: str) -> bool:
     stripped = text.strip()
+    if not stripped or is_cli_diagnostic_output(stripped):
+        return False
     if len(stripped) < MIN_SUBSTANTIVE_STDOUT_CHARS:
         return False
     lines = [line.strip() for line in stripped.splitlines() if line.strip()]

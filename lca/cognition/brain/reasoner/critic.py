@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from lca.cognition.convergence.payload import payload_stdout
 from lca.contracts.atoms.enums.enums import ReflectionVerdict
 from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.atoms.semantic.cli_diagnostic import is_cli_diagnostic_output
 from lca.contracts.atoms.semantic.keys import (
     FAILURE_KIND,
     FAILURE_KIND_EXECUTION,
@@ -38,6 +40,13 @@ class SimpleCritic(Critic):
         if partial is not None:
             return partial
         if observation.success:
+            if is_cli_diagnostic_output(payload_stdout(observation.payload)):
+                return Reflection(
+                    reflection_id=new_id("refl"),
+                    verdict=ReflectionVerdict.NEEDS_CORRECTION,
+                    lesson=f"步骤{state.step}失败(命令被拒绝或输出了 CLI 帮助文本，请修正子命令/参数)",
+                    extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
+                )
             tool_name = self._last_tool_name(state)
             if tool_name:
                 lesson = f"{tool_name} 执行成功"

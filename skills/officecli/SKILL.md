@@ -1,6 +1,6 @@
 ---
 name: officecli
-description: "Create/read/edit/validate .docx .xlsx .pptx via preinstalled officecli (run_command + --json). Prefer over python-docx/openpyxl for Office construction. Not for PDF or pure pandas analysis."
+description: "Create/view/edit/validate .docx .xlsx .pptx via preinstalled officecli (run_command + --json). Read with `officecli view <file> outline|text`, not a `read` subcommand. Prefer over python-docx/openpyxl for Office construction. Not for PDF or pure pandas analysis."
 version: 1.1.0
 ---
 

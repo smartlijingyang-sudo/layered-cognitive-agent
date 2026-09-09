@@ -31,6 +31,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.session.context.turn_control_reader import control_turns
 
 _FALSE_COMPLETION_WINDOW = 3
 
@@ -58,7 +59,9 @@ class DefaultStopPolicy(StopPolicy):
         self._artifact_closure = artifact_closure
         from lca.cognition.convergence.runtime import ConvergenceRuntime
 
-        self._runtime = runtime if isinstance(runtime, ConvergenceRuntime) else ConvergenceRuntime.default()
+        self._runtime = (
+            runtime if isinstance(runtime, ConvergenceRuntime) else ConvergenceRuntime.default()
+        )
 
     def decide(
         self,
@@ -70,6 +73,9 @@ class DefaultStopPolicy(StopPolicy):
         completed = self._completed_decision(state, decision, observation, reflection)
         if completed is not None:
             return completed
+        delivery_stop = self._delivery_satisfied_stop(state, decision, reflection)
+        if delivery_stop is not None:
+            return delivery_stop
         if state.budget.exceeded():
             return self._budget_exhausted_decision(observation, state)
         return StopDecision()
@@ -140,13 +146,41 @@ class DefaultStopPolicy(StopPolicy):
             status=status,
         )
 
+    def _delivery_satisfied_stop(
+        self,
+        state: AgentState,
+        decision: Decision | None,
+        reflection: Reflection | None,
+    ) -> StopDecision | None:
+        """Backup for DeliverySatisfiedGate: stop when evidence is ready but model keeps tooling."""
+        if decision is None or reflection is None:
+            return None
+        if decision.action_type == ActionType.RESPOND:
+            return None
+        if reflection.verdict == ReflectionVerdict.NEEDS_CORRECTION:
+            return None
+        evidence = self._runtime.evidence(state)
+        if not evidence.satisfied:
+            return None
+        final_output = self._runtime.synthesize(state, evidence).strip()
+        if not final_output:
+            final_output = (self._artifact_closure.synthesize() or "").strip()
+        if not final_output:
+            return None
+        return StopDecision(
+            should_stop=True,
+            reason=StopReason.TASK_COMPLETED,
+            final_output=final_output,
+            status=TaskStatus.COMPLETED,
+        )
+
     @staticmethod
     def _recent_tool_failures(state: AgentState) -> int:
         failures = 0
-        for turn in reversed(state.history):
-            if turn.decision.action_type != ActionType.USE_TOOL:
+        for view in reversed(control_turns(state)):
+            if view.action_type not in {ActionType.USE_TOOL.value, ActionType.USE_TOOL}:
                 break
-            if turn.observation is not None and not turn.observation.success:
+            if view.observation_success is False:
                 failures += 1
         return failures
 

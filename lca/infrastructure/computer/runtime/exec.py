@@ -12,7 +12,7 @@ from lca.contracts.atoms.enums.enums import SpanStatus
 from lca.contracts.models.core.execution.sandbox import DEFAULT_SANDBOX_TIMEOUT_S, SandboxFile
 from lca.contracts.models.core.policy.sandbox_policy import SandboxPolicy
 from lca.infrastructure.computer.background.background import get_background_registry
-from lca.infrastructure.computer.cli.json import cli_json_success
+from lca.infrastructure.computer.cli.outcome import resolve_terminal_success
 from lca.infrastructure.computer.guest import (
     build_background_kill_script,
     build_background_poll_script,
@@ -255,8 +255,11 @@ class ComputerRuntimeExecMixin:
                 timeout_s=timeout_s,
                 invocation_id=inv,
             )
-            json_ok = cli_json_success(terminal_result.stdout)
-            ok = terminal_result.success if json_ok is None else json_ok
+            ok = resolve_terminal_success(
+                exit_code=terminal_result.exit_code,
+                stdout=terminal_result.stdout,
+                stderr=terminal_result.stderr,
+            )
             # ADR-0102: state is the Tool's wire-shape view.  Snake_case
             # python keys matching the ``runCommand`` RenderContract.  The
             # legacy ``output`` alias is dropped — renderer reads
@@ -277,7 +280,12 @@ class ComputerRuntimeExecMixin:
                     f"exit_code={terminal_result.exit_code}" if terminal_result.exit_code else ""
                 )
                 state["error_summary"] = terminal_result.error_summary or terminal_result.error
-                state["error_kind"] = getattr(terminal_result.error_kind, "value", None) or "none"
+                if terminal_result.success and not ok:
+                    state["error_kind"] = "validation"
+                else:
+                    state["error_kind"] = (
+                        getattr(terminal_result.error_kind, "value", None) or "none"
+                    )
             generated = terminal_result.generated_files
             if is_office_publish_intent(tool_name="runCommand", command=command):
                 scanned = await runtime.scan_output_files(invocation_id=f"{inv}_office_pub")

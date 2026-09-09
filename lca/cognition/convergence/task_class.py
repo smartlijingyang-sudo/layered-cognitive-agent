@@ -19,7 +19,7 @@ _VISUAL = re.compile(
     re.I,
 )
 _INFORMATIVE = re.compile(
-    r"笑话|joke|解释|说明|介绍|故事|段子|文字|说说|讲一",
+    r"笑话|joke|解释|说明|介绍|故事|段子|文字|说说|讲一|这是什么|是什么|what is this|what's this",
     re.I,
 )
 _CODE = re.compile(
