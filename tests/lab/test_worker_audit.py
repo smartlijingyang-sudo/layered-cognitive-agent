@@ -83,6 +83,9 @@ def test_w2_dict_input_forbidden():
 
     sig = inspect.signature(f)
     errs = sig_run(sig, "<test:f>")
+    print("DEBUG x.annotation:", sig.parameters["x"].annotation, repr(sig.parameters["x"].annotation))
+    print("DEBUG is dict:", sig.parameters["x"].annotation is dict)
+    print("DEBUG errs:", errs)
     assert any(e.rule_id == "W-2" for e in errs), [str(e) for e in errs]
 
 
