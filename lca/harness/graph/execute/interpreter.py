@@ -43,12 +43,6 @@ from lca.harness.declarative.execute.outcome_projection import (
 )
 from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
 from lca.harness.declarative.lifecycle.phase_observation import NullPhaseObserver, PhaseObserver
-from lca.harness.graph.execute.hook_seam import (
-    NullSubgraphHookEmitter,
-    SubgraphHookContext,
-    SubgraphHookEmitter,
-    SubgraphHookEvent,
-)
 from lca.harness.graph.predicate import evaluate_restricted_predicate
 from lca.harness.graph.traversal import PhaseTraversal
 from lca.harness.plan import compiled_run_plan_ref
@@ -131,7 +125,6 @@ class GenericPlanInterpreter:
         lifecycle_publisher: RuntimeLifecyclePublisher | None = None,
         subgraph_resolver: object | None = None,
         subgraph_executable_factory: object | None = None,
-        subgraph_hook_emitter: SubgraphHookEmitter | None = None,
     ) -> None:
         self._journal = journal or InMemoryJournalCommitter()
         self._transaction = PhaseExecutionTransaction(
@@ -157,9 +150,6 @@ class GenericPlanInterpreter:
         # executables without touching the filesystem.
         self._subgraph_resolver = subgraph_resolver
         self._subgraph_executable_factory = subgraph_executable_factory
-        self._subgraph_hook_emitter: SubgraphHookEmitter = (
-            subgraph_hook_emitter or NullSubgraphHookEmitter()
-        )
 
     async def run(
         self,
@@ -580,26 +570,6 @@ class GenericPlanInterpreter:
             return edge
         return None
 
-    @staticmethod
-    def _emit_subgraph_hook(
-        emitter: SubgraphHookEmitter, ctx: SubgraphHookContext
-    ) -> None:
-        """Contain emitter failures so observation never breaks the drive.
-
-        C7 (control/observation separation) requires observation to be
-        passive: a buggy recorder must not turn into a re-raised exception
-        that aborts the phase graph traversal. We log the failure at
-        debug level and swallow.
-        """
-        try:
-            emitter.emit(ctx)
-        except Exception as exc:  # containment boundary
-            import logging
-
-            logging.getLogger(__name__).debug(
-                "subgraph hook emitter raised: %s", exc
-            )
-
     async def _drive_subgraph(
         self,
         *,
@@ -615,12 +585,6 @@ class GenericPlanInterpreter:
         ``self._subgraph_executable_factory``. Tests substitute a stub
         factory to avoid filesystem I/O. Recursion depth is capped by
         ``_MAX_SUBGRAPH_DEPTH``; exceeding it raises ``PG-005``.
-
-        SUBGRAPH_ENTER and SUBGRAPH_EXIT are emitted through the passive
-        ``SubgraphHookEmitter`` seam; the default is no-op and unit tests
-        opt in with a recording emitter. The exit emission runs in a
-        ``finally`` block so every PG-005 / inner exception is paired
-        with the corresponding SUBGRAPH_EXIT before the error re-raises.
         """
         if depth > MAX_SUBGRAPH_DEPTH:
             raise DeclarativeValidationError(
@@ -631,81 +595,6 @@ class GenericPlanInterpreter:
         ref = outer_edge.subgraph_ref
         if ref is None:
             return outer_state
-
-        emitter = self._subgraph_hook_emitter
-        self._emit_subgraph_hook(
-            emitter,
-            SubgraphHookContext(
-                event=SubgraphHookEvent.SUBGRAPH_ENTER,
-                plan_ref=ref.plan_ref,
-                entry_node=ref.entry_node,
-                binding_edge=ref.binding_edge,
-                depth=depth,
-                parent_path="",
-                node_id=current_node_id,
-                edge_id=outer_edge.source,
-                outcome="in_progress",
-            ),
-        )
-
-        result_state: AgentState = outer_state
-        outcome = "success"
-        error = ""
-        try:
-            result_state = await self._drive_subgraph_inner(
-                outer_edge=outer_edge,
-                outer_state=outer_state,
-                current_node_id=current_node_id,
-                depth=depth,
-            )
-        except DeclarativeValidationError as exc:
-            outcome = "validation_error"
-            error = f"{exc.code}: {exc}"
-            raise
-        except Exception as exc:
-            outcome = "execution_error"
-            error = f"{type(exc).__name__}: {exc}"
-            raise
-        finally:
-            self._emit_subgraph_hook(
-                emitter,
-                SubgraphHookContext(
-                    event=SubgraphHookEvent.SUBGRAPH_EXIT,
-                    plan_ref=ref.plan_ref,
-                    entry_node=ref.entry_node,
-                    binding_edge=ref.binding_edge,
-                    depth=depth,
-                    parent_path="",
-                    node_id=current_node_id,
-                    edge_id=outer_edge.source,
-                    outcome=outcome,
-                    error=error,
-                ),
-            )
-        return result_state
-
-    async def _drive_subgraph_inner(
-        self,
-        *,
-        outer_edge: PhaseEdge,
-        outer_state: AgentState,
-        current_node_id: str,
-        depth: int,
-    ) -> AgentState:
-        """Resolved recursion body for ``_drive_subgraph``.
-
-        Keeps each PG-005 error path explicit; the surrounding try block
-        in ``_drive_subgraph`` turns every exit into a SUBGRAPH_EXIT
-        observation regardless of which branch raised.
-        """
-        del depth
-        ref = outer_edge.subgraph_ref
-        if ref is None:  # caller (_drive_subgraph) checked
-            raise DeclarativeValidationError(
-                "PG-005",
-                f"outer edge {outer_edge.source!r} reached _drive_subgraph_inner "
-                "with subgraph_ref=None",
-            )
         resolver = self._subgraph_resolver
         if resolver is None:
             raise DeclarativeValidationError(
