@@ -2,7 +2,7 @@
 
 ## 状态
 
-**Accepted — 2026-08-22**
+**Accepted — 2026-08-22 (P7 部分 Superseded by [ADR-0210](0210-stage-closure-migration-p7.md) — 阶段闭集从 SSOT 降级为 region 标签)**
 
 Refines: [ADR-0061](0061-plugin-manifest-resolve-boot.md)、[ADR-0066](0066-declarative-atomic-control-plugins.md)、[ADR-0068](0068-compiled-plugin-kernel-and-unified-run-plan.md)、[ADR-0069](0069-agent-primitive-system-and-declarative-grammar.md)、[ADR-0074](0074-plugin-everything-trimmed-implementation.md)。
 

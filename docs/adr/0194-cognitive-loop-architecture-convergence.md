@@ -2,7 +2,7 @@
 
 ## 状态
 
-**Implemented (P0–P5 core)**（2026-09-06）。P0–P5 按 [0194-0195-implementation-plan](../specs/0194-0195-implementation-plan.md) 落地;验收见 `tests/architecture/test_0194_0195_acceptance.py`。
+**Implemented (P0–P5 core) (P7 部分 Superseded by [ADR-0210](0210-stage-closure-migration-p7.md) — 阶段闭集强制部分降级为 region 标签机制)**（2026-09-06）。P0–P5 按 [0194-0195-implementation-plan](../specs/0194-0195-implementation-plan.md) 落地;验收见 `tests/architecture/test_0194_0195_acceptance.py`。
 
 **Completion note（2026-09-06）**：
 
