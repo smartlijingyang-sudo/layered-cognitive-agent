@@ -245,6 +245,50 @@ class TestC14AcceptsProfileExtendedRegions:
 # (P7-I-2: region labels do NOT participate in capability closure)
 # ---------------------------------------------------------------------------
 
+class TestWebAssistantOnP7Path:
+    """web-assistant.yaml now runs the P7 region-tag path
+    (declarative-phase-graph.yaml removed; the 3 custom regions
+    are the closed-set extension)."""
+
+    def test_no_0075_phase_topology_bundle(self):
+        f = pathlib.Path("profiles/web-assistant.yaml")
+        data = yaml.safe_load(f.read_text(encoding="utf-8"))
+        assert "bundles/declarative-phase-graph.yaml" not in data["bundles"], (
+            "web-assistant.yaml must not load declarative-phase-graph.yaml "
+            "(0075 phase_graph SSOT path); the P7 region-tag path is the "
+            "recommended runtime per ADR-0210 §6.6"
+        )
+
+    def test_regions_declare_still_there(self):
+        f = pathlib.Path("profiles/web-assistant.yaml")
+        data = yaml.safe_load(f.read_text(encoding="utf-8"))
+        assert "regions" in data, "regions: section must remain (ADR-0210 §6.6)"
+        assert data["regions"]["declare"] == list(REGIONS_DECLARED), (
+            "regions.declare must still be phase:plan / phase:replan / "
+            "control:safety for the P7 path"
+        )
+
+    def test_nine_bundles_remaining(self):
+        """web-assistant now loads 9 bundles (down from 10 after dropping
+        declarative-phase-graph.yaml)."""
+        f = pathlib.Path("profiles/web-assistant.yaml")
+        data = yaml.safe_load(f.read_text(encoding="utf-8"))
+        assert len(data["bundles"]) == 9, (
+            f"web-assistant expected 9 bundles after P7 switch, "
+            f"got {len(data['bundles'])}"
+        )
+
+    def test_docstring_documents_p7_path(self):
+        """The header docstring must explain the P7 switch."""
+        f = pathlib.Path("profiles/web-assistant.yaml")
+        text = f.read_text(encoding="utf-8")
+        assert "P7 region-tag path" in text or "P7 path" in text, (
+            "web-assistant.yaml header must document the P7 region-tag switch"
+        )
+
+
+
+
 class TestRegionNotInLabCapabilityClosedSet:
     """The 3 declared regions (phase:plan, phase:replan, control:safety) must
     NOT appear in the lab.* capability closed set in capability-closed-set.md

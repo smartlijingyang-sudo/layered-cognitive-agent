@@ -11,8 +11,7 @@
 #     - bundles/observability-default.yaml
 #     - bundles/web-app.yaml
 #     - bundles/scenario-cordis-creator.yaml
-#     - bundles/declarative-phase-graph.yaml
-#     - bundles/loop_cursor.spine_default.yaml
+#   #     - bundles/loop_cursor.spine_default.yaml
 #     - bundles/session-runtime.yaml
 #     - bundles/event-bus-components.yaml
 #     - bundles/assistant-runtime.yaml(PR-4 增量)
@@ -35,11 +34,13 @@ description: |
   Adds AssistantHome catalog, bootstrap projection and workspace binding
   on top of web-standard. Default path (``web-standard.yaml``) untouched.
 
-  ADR-0210 §6.2 — declares custom region tags (phase:plan / phase:replan)
-  for the P7 region-tag path. The default web-assistant run still uses
-  the legacy ``declarative-phase-graph.yaml`` topology (6 stages); the
-  custom regions are available for assistants that opt into the P7
-  path via the lab profile (``profiles/agent-lab-infoedge.yaml``).
+  ADR-0210 §6.6 — web-assistant now runs the P7 region-tag path
+  (no ``declarative-phase-graph.yaml`` bundle). The custom regions
+  (``phase:plan`` / ``phase:replan`` / ``control:safety``) declared
+  below are the closed-set extension that the GenericPlanInterpreter
+  uses for runtime phase selection. The default 6-stage topology is
+  still available via the lab profile
+  (``profiles/agent-lab-infoedge.yaml``) for assistant debug paths.
 
 regions:
   declare:
@@ -52,7 +53,6 @@ bundles:
   - bundles/observability-default.yaml
   - bundles/web-app.yaml
   - bundles/scenario-cordis-creator.yaml
-  - bundles/declarative-phase-graph.yaml
   - bundles/loop_cursor.spine_default.yaml
   - bundles/session-runtime.yaml
   - bundles/event-bus-components.yaml
