@@ -352,3 +352,57 @@ def validate_with_profile_or_raise(
     errs = validate_with_profile(spec, profile_regions, registry)
     if errs:
         raise ValidationError(errs)
+
+
+# ---------------------------------------------------------------------------
+# ADR-0210 §6.3 — recursive region validation (per nested sub_spec)
+# ---------------------------------------------------------------------------
+
+def validate_subgraph_with_profile(
+    root: "InfoEdgeSpec",
+    profile_regions: "set[str] | None" = None,
+    registry: "dict[str, InfoEdgeSpec] | None" = None,
+) -> list[str]:
+    """C14 region validation over the entire nested sub_spec graph.
+
+    Per ADR-0210 §3 P7-I-4 + §5.2: region tags are part of the
+    GenericPlanInterpreter's recursive walk. Each nested sub_spec's
+    region label is independently validated against the profile's
+    regions.declare set + the 6-stage recommended set.
+
+    The walker is depth-first iterative (see agent_lab.graph.spec.walk_sub_specs);
+    a sub_spec whose id is not in ``registry`` is skipped (the
+    C6 port check during the parent's compile() would have caught it).
+
+    Returns a list of "C14: spec <id> region <label> not in closed set"
+    error strings (one per offending sub_spec). The root spec is also
+    validated.
+    """
+    from agent_lab.graph.spec import current_region_label, walk_sub_specs
+
+    all_specs = walk_sub_specs(root)
+    if not all_specs:
+        # Empty graph (no nodes) — nothing to validate.
+        return []
+    errs: list[str] = []
+    for spec in all_specs:
+        label = current_region_label(spec)
+        errs.extend(_check_regions(spec, profile_regions))
+        # Defensive: empty region label → flag
+        if label == "phase:<unnamed>":
+            errs.append(
+                f"C14: spec {spec.id!r} has region=PHASE but no phase name "
+                f"(set region: phase:<name> in YAML or spec.phase = '<name>')"
+            )
+    return errs
+
+
+def validate_subgraph_with_profile_or_raise(
+    root: "InfoEdgeSpec",
+    profile_regions: "set[str] | None" = None,
+    registry: "dict[str, InfoEdgeSpec] | None" = None,
+) -> None:
+    """Raise ValidationError if any spec in the sub_spec graph fails C14."""
+    errs = validate_subgraph_with_profile(root, profile_regions, registry)
+    if errs:
+        raise ValidationError(errs)

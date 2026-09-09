@@ -139,3 +139,76 @@ class InfoEdgeSpec(BaseModel):
             if e.from_ref.node_id == "_initial":
                 ports.add(e.from_ref.port_id)
         return ports
+
+
+# ---------------------------------------------------------------------------
+# ADR-0210 §6.3 — runtime region label construction + nested subgraph walk
+# ---------------------------------------------------------------------------
+
+def current_region_label(spec: "InfoEdgeSpec") -> str:
+    """Build the full region label for an InfoEdgeSpec instance.
+
+    Composes ``spec.region.value`` + ``spec.phase`` into the label the
+    C14 region check uses (per ADR-0210 §3 P7-I-1). Used at runtime to
+    stamp the spec's region into spine events and lineage so a recorder
+    can see *which* phase a node ran under (per ADR-0206 §13 C13).
+
+    Returns one of:
+      - ``phase:<phase>`` (when region == PHASE and phase is non-empty)
+      - ``region.value`` (bare-enum: model_visible / effect / etc.)
+      - ``region:phase:<unnamed>`` (PHASE with empty phase — flagged by
+        the validator as a P7-I-4 violation)
+    """
+    enum_value = spec.region.value if hasattr(spec.region, "value") else str(spec.region)
+    phase_name = (getattr(spec, "phase", "") or "").strip()
+    if enum_value == "phase":
+        return f"phase:{phase_name}" if phase_name else "phase:<unnamed>"
+    return enum_value
+
+
+def walk_sub_specs(root: "InfoEdgeSpec") -> "list[InfoEdgeSpec]":
+    """Return the depth-first traversal of the sub_spec graph under root.
+
+    The root is included as the first element. Sub_specs are looked up by
+    their ``sub_spec_id`` in the caller-supplied ``registry``; if a
+    sub_spec id is not in the registry it is skipped (the caller should
+    have validated references during the C6 port check).
+
+    The walker is iterative (not recursive on the Python call stack) to
+    avoid RecursionError on deeply-nested sub_spec chains.
+    """
+    return _walk_sub_specs(root, registry=None, _seen=None)
+
+
+def _walk_sub_specs(
+    spec: "InfoEdgeSpec",
+    registry: "dict[str, InfoEdgeSpec] | None",
+    _seen: "set[str] | None",
+) -> "list[InfoEdgeSpec]":
+    if _seen is None:
+        _seen = set()
+    out: list[InfoEdgeSpec] = []
+    if spec.id in _seen:
+        return out
+    _seen.add(spec.id)
+    out.append(spec)
+    for link in spec.sub_specs:
+        sub = (registry or {}).get(link.sub_spec_id)
+        if sub is None:
+            continue  # unresolvable — caller-side C6 will have caught it
+        out.extend(_walk_sub_specs(sub, registry, _seen))
+    return out
+
+
+__all__ = [
+    "NodeRegion",
+    "ErrorRoute",
+    "InfoNode",
+    "SubSpecLink",
+    "BindSpec",
+    "PluginRef",
+    "InfoGrant",
+    "InfoEdgeSpec",
+    "current_region_label",
+    "walk_sub_specs",
+]
