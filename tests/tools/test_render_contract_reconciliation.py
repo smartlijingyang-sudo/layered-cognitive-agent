@@ -105,11 +105,11 @@ def test_known_field_renames_are_applied() -> None:
         "activate_skill skill_id must rename to LobeHub's ActivateSkillParams.name"
     )
 
-    contract2 = REGISTRY["read_skill_reference"]
+    contract2 = REGISTRY["read_skill_reference_once"]
     skill_id_args2 = [f for f in contract2.args if f.python_key == "skill_id"]
-    assert skill_id_args2, "read_skill_reference must declare skill_id arg"
+    assert skill_id_args2, "read_skill_reference_once must declare skill_id arg"
     assert skill_id_args2[0].wire_key == "id", (
-        "read_skill_reference skill_id must rename to LobeHub's ReadReferenceParams.id"
+        "read_skill_reference_once skill_id must rename to LobeHub's ReadReferenceParams.id"
     )
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from lca.contracts.protocols.memory.operational_skills import SkillIndexEntry
@@ -10,7 +10,7 @@ from lca.contracts.protocols.memory.operational_skills import SkillIndexEntry
 
 def to_market_skill_items(items: tuple[SkillIndexEntry, ...]) -> list[dict[str, Any]]:
     """Project ``SkillIndexEntry`` rows into LobeHub ``SearchSkillState.items`` shape."""
-    now = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     out: list[dict[str, Any]] = []
     for item in items:
         out.append(

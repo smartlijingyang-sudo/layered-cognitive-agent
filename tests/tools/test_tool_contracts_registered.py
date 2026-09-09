@@ -23,7 +23,7 @@ class TestSkillToolContracts(unittest.TestCase):
     SKILL_TOOL_NAMES = (
         "activate_skill",
         "run_skill_script",
-        "read_skill_reference",
+        "read_skill_reference_once",
         "import_skill",
         "search_skill",
     )
@@ -41,13 +41,13 @@ class TestSkillToolContracts(unittest.TestCase):
         self.assertEqual(c.args[0].wire_key, "name")
 
     def test_skill_id_renames_correctly_for_read_reference(self) -> None:
-        c = get_contract("read_skill_reference")
+        c = get_contract("read_skill_reference_once")
         assert c is not None
         self.assertGreaterEqual(len(c.args), 1)
         self.assertEqual(c.args[0].wire_key, "id")
 
     def test_skill_identifiers_correct(self) -> None:
-        for name in ("activate_skill", "run_skill_script", "read_skill_reference"):
+        for name in ("activate_skill", "run_skill_script", "read_skill_reference_once"):
             c = get_contract(name)
             assert c is not None
             self.assertEqual(c.identifier, "lobe-skills")

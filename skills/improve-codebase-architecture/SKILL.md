@@ -1,6 +1,7 @@
 ---
 name: improve-codebase-architecture
 description: Scan a codebase for deepening opportunities, present them concisely, then grill through whichever one you pick.
+references: []
 ---
 
 # Improve Codebase Architecture

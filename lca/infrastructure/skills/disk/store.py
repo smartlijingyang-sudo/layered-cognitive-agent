@@ -5,19 +5,24 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from lca.contracts.protocols.memory.operational_skills import (
     SKILL_MAX_CONTENT_CHARS,
     SKILL_MAX_RESOURCE_BYTES,
+    SkillContractError,
     SkillIndexEntry,
     SkillNotFoundError,
     SkillPackage,
     SkillPackageInstaller,
     SkillPackageStore,
 )
-from lca.infrastructure.skills.frontmatter.frontmatter import skill_title, split_frontmatter
+from lca.infrastructure.skills.frontmatter.frontmatter import (
+    parse_references_field,
+    skill_title,
+    split_frontmatter,
+)
 from lca.infrastructure.skills.settings.settings import SkillSettings, get_skill_settings
 
 _MANIFEST = "manifest.json"
@@ -87,6 +92,8 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
         body = skill_md_path.read_text(encoding="utf-8")
         raw_paths = meta.get("resource_paths")
         resource_paths = tuple(str(p) for p in raw_paths) if isinstance(raw_paths, list) else ()
+        raw_refs = meta.get("references")
+        references = tuple(str(p) for p in raw_refs) if isinstance(raw_refs, list) else ()
         return SkillPackage(
             skill_id=sid,
             name=str(meta.get("name") or sid),
@@ -96,6 +103,7 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
             source_url=str(meta.get("source_url") or ""),
             content_hash=str(meta.get("content_hash") or ""),
             version=str(meta.get("version") or ""),
+            references=references,
         )
 
     def read_resource(self, skill_id: str, rel_path: str) -> str:
@@ -138,6 +146,14 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
             raise ValueError(f"SKILL.md 超过上限 {SKILL_MAX_CONTENT_CHARS} 字符")
 
         meta_front, body = split_frontmatter(skill_md_text)
+        # ADR-0214 §7: SKILL.md frontmatter 必须声明 references(可空)。
+        # split_frontmatter 跳过列表值,二次检查 parse_references_field;
+        # 两份都缺失才 fail-loud。
+        if "references" not in meta_front and not parse_references_field(skill_md_text):
+            raise SkillContractError(
+                f"SKILL.md frontmatter 缺 'references' 字段: {sid!r}"
+                " — 在 frontmatter 里加 'references: []' 声明打包清单。"
+            )
         name = skill_title(meta_front, sid)
         summary = meta_front.get("description", "").strip()
         digest = content_hash(skill_md_text.encode("utf-8"))
@@ -164,6 +180,20 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
             out_path.write_bytes(data)
             normalized_resources.append(clean)
 
+        # ADR-0214 §7: 校验 references 列表里的所有路径必须落到 _root/<sid>/_RESOURCES
+        # 或 _root/<sid>/(SKILL.md 同级) — 不存在就 fail-loud。
+        declared_refs = parse_references_field(skill_md_text)
+        for ref in declared_refs:
+            candidate = (dest / ref).resolve()
+            try:
+                candidate.relative_to(dest.resolve())
+            except ValueError:
+                raise SkillContractError(
+                    f"SKILL.md references[{ref!r}] 越界 — 必须落在 {sid!r} 包内"
+                ) from None
+            if not candidate.is_file():
+                raise SkillContractError(f"SKILL.md references[{ref!r}] 指向缺失文件: {candidate}")
+
         (dest / _SKILL_MD).write_text(body, encoding="utf-8")
         manifest = {
             "skill_id": sid,
@@ -173,7 +203,8 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
             "content_hash": digest,
             "version": version,
             "resource_paths": normalized_resources,
-            "imported_at": datetime.now(tz=timezone.utc).isoformat(),
+            "references": list(declared_refs),
+            "imported_at": datetime.now(tz=UTC).isoformat(),
         }
         (dest / _MANIFEST).write_text(
             json.dumps(manifest, ensure_ascii=False, indent=2),
@@ -188,6 +219,7 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
             source_url=source_url,
             content_hash=digest,
             version=version,
+            references=tuple(declared_refs),
         )
 
 

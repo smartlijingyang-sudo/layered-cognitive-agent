@@ -45,7 +45,7 @@ def test_contracts_table_generated_and_present() -> None:
     contracts = _read(_CONTRACTS)
     assert "export const CONTRACTS" in contracts, "contracts.generated.ts must export CONTRACTS"
     # Spot-check that skill tools are present
-    for tool in ("activate_skill", "read_skill_reference", "runCommand", "executeCode"):
+    for tool in ("activate_skill", "read_skill_reference_once", "runCommand", "executeCode"):
         assert f'"{tool}"' in contracts, f"CONTRACTS missing {tool}"
 
 
@@ -65,12 +65,12 @@ def test_projection_applies_wire_key_renames() -> None:
         contracts,
     )
     assert m is not None, "activate_skill must rename skill_id → name"
-    # read_skill_reference: skill_id → id
+    # read_skill_reference_once: skill_id → id
     m = re.search(
-        r'"read_skill_reference":\s*\{[^}]*args:\s*\[\s*\{\s*pythonKey:\s*"skill_id",\s*wireKey:\s*"id"',
+        r'"read_skill_reference_once":\s*\{[^}]*args:\s*\[\s*\{\s*pythonKey:\s*"skill_id",\s*wireKey:\s*"id"',
         contracts,
     )
-    assert m is not None, "read_skill_reference must rename skill_id → id"
+    assert m is not None, "read_skill_reference_once must rename skill_id → id"
 
 
 def test_projection_returns_unified_shape() -> None:

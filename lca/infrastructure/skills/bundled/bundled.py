@@ -16,7 +16,9 @@ from lca.infrastructure.skills.disk.store import (
     content_hash,
     sanitize_skill_id,
 )
-from lca.infrastructure.skills.frontmatter.frontmatter import split_frontmatter
+from lca.infrastructure.skills.frontmatter.frontmatter import (
+    split_frontmatter,
+)
 
 logger = logging.getLogger(__name__)
 

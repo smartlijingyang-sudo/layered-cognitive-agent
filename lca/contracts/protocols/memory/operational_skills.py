@@ -30,6 +30,16 @@ class SkillImportError(ValueError):
     """技能包下载 / 解析 / 校验失败。"""
 
 
+class SkillContractError(ValueError):
+    """SKILL.md frontmatter / 资源路径契约违反(ADR-0214 §7)。
+
+    触发场景:
+    - SKILL.md frontmatter 缺 ``references`` 字段
+    - ``references`` 列表里的路径在包内不存在
+    - 节流器判定 ``read_skill_reference_once`` 失败过多
+    """
+
+
 @dataclass(frozen=True)
 class SkillIndexEntry:
     """精简索引 —— 供 search / activate 选择，不含全文。"""
@@ -53,6 +63,7 @@ class SkillPackage:
     source_url: str
     content_hash: str
     version: str = ""
+    references: tuple[str, ...] = ()  # ADR-0214 §7: SKILL.md frontmatter 声明的引用路径索引
 
 
 @dataclass(frozen=True)

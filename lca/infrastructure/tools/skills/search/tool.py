@@ -36,7 +36,11 @@ _SANDBOX_FALLBACK = "无匹配 skill。建议用 execute_code 直接编码实现
         tool_name="search_skill",
         identifier="lobe-skill-store",
         api_name="searchSkill",
-        args=(COMMON["query"].rename("q"), COMMON["page"].optional(), COMMON["page_size"].optional()),
+        args=(
+            COMMON["query"].rename("q"),
+            COMMON["page"].optional(),
+            COMMON["page_size"].optional(),
+        ),
         state=(
             COMMON["items"],
             COMMON["page"],

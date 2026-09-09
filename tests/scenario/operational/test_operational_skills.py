@@ -38,7 +38,7 @@ from lca.infrastructure.tools.contract.project.project import project_tool_state
 from lca.infrastructure.tools.default.set import build_default_tools
 from lca.infrastructure.tools.skills.activate.tool import SkillActivateTool
 from lca.infrastructure.tools.skills.importer.import_tool import SkillImportTool
-from lca.infrastructure.tools.skills.read.reference_tool import SkillReadReferenceTool
+from lca.infrastructure.tools.skills.read.reference_tool import SkillReadReferenceOnceTool
 from lca.infrastructure.tools.skills.search.tool import SkillSearchTool
 
 
@@ -198,14 +198,14 @@ class TestSkillTools(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(act_obs.payload["has_resources"])
         self.assertNotIn("可用资源", act_obs.payload["text"])
 
-        read_tool = SkillReadReferenceTool(self.store)
+        read_tool = SkillReadReferenceOnceTool(self.store)
         read_obs = await read_tool.execute({"skill_id": "demo", "path": "tips.md"})
         self.assertTrue(read_obs.success)
         self.assertEqual(read_obs.payload["content"], "tip")
         # RenderContract join: payload 键必须能被 project_tool_state 投影到
         # wire state(content 字段),否则前端 renderer 拿不到结果。
         projected = project_tool_state(
-            "read_skill_reference", {"skill_id": "demo", "path": "tips.md"}, read_obs
+            "read_skill_reference_once", {"skill_id": "demo", "path": "tips.md"}, read_obs
         )
         self.assertEqual(projected["content"], "tip")
 
@@ -337,7 +337,7 @@ class TestDefaultTools(unittest.TestCase):
         self.assertIn("search_skill", names)
         self.assertIn("import_skill", names)
         self.assertIn("activate_skill", names)
-        self.assertIn("read_skill_reference", names)
+        self.assertIn("read_skill_reference_once", names)
         self.assertNotIn("run_skill_script", names)
         self.assertNotIn("listFiles", names)
         self.assertNotIn("sandbox_execute", names)

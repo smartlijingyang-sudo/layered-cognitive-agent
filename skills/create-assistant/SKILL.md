@@ -2,6 +2,7 @@
 name: create-assistant
 description: "创建新的个人助理（助手）：交互式选定角色模板与名字，调用 create_assistant 工具在后端初始化助理并注册前端入口。触发：用户说创建助理/新建助手/帮我建一个助理/我想要一个XX助理。"
 version: 1.0.0
+references: []
 ---
 
 # create-assistant

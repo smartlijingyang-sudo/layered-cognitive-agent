@@ -25,7 +25,7 @@ def test_registry_has_only_expected_categories() -> None:
     """REGISTRY contains all five skill tools plus 13 cloud-sandbox tools
     plus 12 local-system tools plus search + askUserQuestion."""
     assert "activate_skill" in REGISTRY
-    assert "read_skill_reference" in REGISTRY
+    assert "read_skill_reference_once" in REGISTRY
     assert "search_skill" in REGISTRY
     assert "import_skill" in REGISTRY
     assert "executeCode" in REGISTRY

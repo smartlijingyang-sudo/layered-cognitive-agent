@@ -476,8 +476,8 @@ export const CONTRACTS: Readonly<Record<string, ToolRenderContract>> =   {
       contentField: null,
       waitFor: [],
     },
-    "read_skill_reference": {
-      toolName: "read_skill_reference",
+    "read_skill_reference_once": {
+      toolName: "read_skill_reference_once",
       identifier: "lobe-skills",
       apiName: "readReference",
       args: [
@@ -581,11 +581,11 @@ export const CONTRACTS: Readonly<Record<string, ToolRenderContract>> =   {
       args: [
         { pythonKey: "query", wireKey: "q", kind: "string", source: "argument", required: true },
         { pythonKey: "page", wireKey: "page", kind: "int", source: "argument", required: false },
-        { pythonKey: "page_size", wireKey: "pageSize", kind: "int", source: "argument", required: false },
+        { pythonKey: "page_size", wireKey: "pageSize", kind: "int", source: "observation", required: false },
       ],
       state: [
         { pythonKey: "items", wireKey: "items", kind: "json", source: "observation", required: true },
-        { pythonKey: "page", wireKey: "page", kind: "int", source: "observation", required: true },
+        { pythonKey: "page", wireKey: "page", kind: "int", source: "argument", required: true },
         { pythonKey: "page_size", wireKey: "pageSize", kind: "int", source: "observation", required: true },
         { pythonKey: "total", wireKey: "total", kind: "int", source: "observation", required: true },
         { pythonKey: "content", wireKey: "content", kind: "string", source: "observation", required: true },

@@ -4,7 +4,7 @@ Asserts that two first-party SKILL.md packs ship at the repo root under
 ``skills/``, that ``ensure_bundled_skills`` materializes them into a
 :class:`DiskSkillPackageStore`, that ``_render_available_skills`` exposes
 their summary + version in the prompt catalog, and that
-``SkillActivateTool`` / ``SkillReadReferenceTool`` load the body and
+``SkillActivateTool`` / ``SkillReadReferenceOnceTool`` load the body and
 resource files. Mirrors the pattern of :mod:`tests.test_officecli_plane`.
 """
 
@@ -25,7 +25,7 @@ from lca.infrastructure.skills.bundled.bundled import (
 from lca.infrastructure.skills.disk.store import DiskSkillPackageStore
 from lca.infrastructure.skills.settings.settings import SkillSettings
 from lca.infrastructure.tools.skills.activate.tool import SkillActivateTool
-from lca.infrastructure.tools.skills.read.reference_tool import SkillReadReferenceTool
+from lca.infrastructure.tools.skills.read.reference_tool import SkillReadReferenceOnceTool
 
 CORDIS_PLUGIN_DEVELOPMENT_SKILL_ID: str = "cordis-plugin-development"
 EDITING_LCA_COMPOSITIONS_SKILL_ID: str = "editing-lca-compositions"
@@ -239,7 +239,7 @@ class TestActivateSkillTool(unittest.TestCase):
 
 
 class TestReadSkillReferenceTool(unittest.TestCase):
-    """``read_skill_reference`` must load resource/*.md files declared in frontmatter."""
+    """``read_skill_reference_once`` must load resource/*.md files declared in frontmatter."""
 
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
@@ -250,7 +250,7 @@ class TestReadSkillReferenceTool(unittest.TestCase):
         self._tmp.cleanup()
 
     async def _read_reference(self, skill_id: str, path: str) -> Any:
-        tool = SkillReadReferenceTool(self.store)
+        tool = SkillReadReferenceOnceTool(self.store)
         return await tool.execute({"skill_id": skill_id, "path": path})
 
     def test_read_plugin_meta_fields_reference(self) -> None:
@@ -289,7 +289,7 @@ class TestCordisCreatorToolPermissions(unittest.TestCase):
         profile = build_cordis_creator_role_profile()
         allowed = set(profile.tool_permission_manifest.allowed_tools)
         self.assertIn("activate_skill", allowed)
-        self.assertIn("read_skill_reference", allowed)
+        self.assertIn("read_skill_reference_once", allowed)
         self.assertIn("cordis_control", allowed)
         self.assertIn("file_write", allowed)
         self.assertIn("bash", allowed)
@@ -300,9 +300,9 @@ class TestCordisCreatorToolPermissions(unittest.TestCase):
         profile = build_cordis_creator_role_profile()
         budgets = profile.tool_permission_manifest.max_calls_per_task
         self.assertIn("activate_skill", budgets)
-        self.assertIn("read_skill_reference", budgets)
+        self.assertIn("read_skill_reference_once", budgets)
         self.assertGreater(budgets["activate_skill"], 0)
-        self.assertGreater(budgets["read_skill_reference"], 0)
+        self.assertGreater(budgets["read_skill_reference_once"], 0)
 
 
 class TestFilterCreatorTools(unittest.TestCase):
@@ -321,7 +321,7 @@ class TestFilterCreatorTools(unittest.TestCase):
             _fake_tool("file_write"),
             _fake_tool("bash"),
             _fake_tool("activate_skill"),
-            _fake_tool("read_skill_reference"),
+            _fake_tool("read_skill_reference_once"),
             _fake_tool("web_search"),  # must drop
             _fake_tool("file_read"),  # must drop
         ]
@@ -332,12 +332,12 @@ class TestFilterCreatorTools(unittest.TestCase):
                 "file_write",
                 "bash",
                 "activate_skill",
-                "read_skill_reference",
+                "read_skill_reference_once",
             },
         )
         self.assertEqual(
             set(filtered.keys()),
-            {"file_write", "bash", "activate_skill", "read_skill_reference"},
+            {"file_write", "bash", "activate_skill", "read_skill_reference_once"},
         )
 
     def test_returns_empty_when_input_is_none(self) -> None:
@@ -424,7 +424,7 @@ class TestCordisCreatorEndToEndPrompt(unittest.TestCase):
             _fake_tool("file_write"),
             _fake_tool("bash"),
             _fake_tool("activate_skill"),
-            _fake_tool("read_skill_reference"),
+            _fake_tool("read_skill_reference_once"),
         ]
         tools_xml = _format_tools_xml(fake_tools)
 
@@ -474,7 +474,7 @@ class TestCordisCreatorEndToEndPrompt(unittest.TestCase):
         prompt = self._render_full_prompt()
         # <tools> section should expose all five creator tools.
         self.assertIn('name="activate_skill"', prompt)
-        self.assertIn('name="read_skill_reference"', prompt)
+        self.assertIn('name="read_skill_reference_once"', prompt)
         self.assertIn('name="file_write"', prompt)
         self.assertIn('name="bash"', prompt)
         self.assertIn('name="cordis_control"', prompt)

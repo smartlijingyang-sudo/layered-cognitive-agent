@@ -2,6 +2,9 @@
 name: editing-lca-compositions
 description: "Author, edit, and publish LCA compositions — bundles, profiles, presets. Covers the 5-layer unidirectional dependency rule, HOST vs PRESET plane decision, reducer-only-writes-State (C4), journal-single-source (C3), capability decay (C5), preset directory layout under $LCA_AGENT_PRESETS_HOME, and the bundle YAML entry schema. Load this skill before editing bundles/*.yaml, profiles/*.yaml, or publishing a preset."
 version: 1.0.0
+references:
+  - resources/plane-decision.md
+  - resources/preset-schema.md
 ---
 
 # Editing LCA Compositions

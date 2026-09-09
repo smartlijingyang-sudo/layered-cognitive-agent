@@ -30,6 +30,36 @@ _REDIRECT_WEB_SEARCH_MESSAGE = (
 )
 
 
+def build_skill_references_section(package: SkillPackage) -> str:
+    """构建 references 列表注入段(ADR-0214 §7.4)。
+
+    注入位置:SKILL.md body 之后,``<skill_references>`` 标记内。
+    列表为空时显式声明「无可用 references」,避免模型猜测 SKILL.md
+    body 暗示的路径而误调 ``read_skill_reference_once``。
+    """
+    version = (package.version or "").strip() or "?"
+    refs = package.references
+    lines: list[str] = [
+        f"<skill_references skill_id={package.skill_id!r} version={version!r}>",
+        "SKILL.md frontmatter references 字段声明的包内可读路径:",
+    ]
+    if refs:
+        for rel in refs:
+            lines.append(f"- {rel}")
+        lines.append(
+            "上述路径已通过加载期校验(文件存在);"
+            "read_skill_reference_once(path) 仅用于正文未涵盖的子文档,"
+            "不要重复读。"
+        )
+    else:
+        lines.append(
+            "(无可用 references — SKILL.md 正文已是完整指南,"
+            "不要调 read_skill_reference_once;读不存在的路径会被节流熔断)"
+        )
+    lines.append("</skill_references>")
+    return "\n".join(lines)
+
+
 @contract(
     RenderContract(
         tool_name="activate_skill",
@@ -113,6 +143,9 @@ class SkillActivateTool(Tool):
         from lca.infrastructure.sandbox.surface.surface import skill_preamble
 
         body = skill_preamble() + package.content
+        # ADR-0214 §7.4: SKILL.md 正文后追加 references 索引,引导它走
+        # ``read_skill_reference_once`` 而不是凭 body 暗示的路径去试读。
+        body = body + "\n\n" + build_skill_references_section(package)
         summary = (package.summary or "").strip()
         # ADR-0102: payload is the Tool's wire-shape view, flattened so the
         # RenderContract reader (``project_tool_state``) can pick fields
@@ -133,6 +166,11 @@ class SkillActivateTool(Tool):
         }
         if summary:
             state["description"] = summary
+        if package.references:
+            state["references"] = list(package.references)
+        elif package.resource_paths:
+            # 向后兼容:旧 manifest 没存 references,但有 resource_paths。
+            state["references"] = list(package.resource_paths)
         if package.resource_paths:
             state["resources"] = list(package.resource_paths)
         latency_ms = int((time.monotonic() - start) * 1000)

@@ -2,6 +2,8 @@
 name: cordis-plugin-development
 description: "Author, validate, inspect, promote, and retire Cordis plugin Artifacts with the four-face cordis_control tool. Use before authoring plugin source or invoking Creator control."
 version: 2.0.0
+references:
+  - resources/plugin-meta-fields.md
 ---
 
 # Cordis Plugin Development

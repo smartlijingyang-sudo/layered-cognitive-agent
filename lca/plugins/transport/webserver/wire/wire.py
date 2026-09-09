@@ -57,7 +57,7 @@ WIRE: dict[str, tuple[str, str]] = {
     # ── skills ──
     "activate_skill": (_SKILLS, "activateSkill"),
     "run_skill_script": (_SKILLS, "execScript"),
-    "read_skill_reference": (_SKILLS, "readReference"),
+    "read_skill_reference_once": (_SKILLS, "readReference"),
     "search_skill": (_SKILL_STORE, "searchSkill"),
     "import_skill": (_SKILL_STORE, "importSkill"),
     # ── web search / user interaction / assistant management ──
