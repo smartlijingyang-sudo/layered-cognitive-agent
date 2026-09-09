@@ -4,7 +4,13 @@ from dataclasses import replace
 
 import pytest
 
+from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
+    CognitivePhaseGraphPlan,
+    PhaseNode,
+    SubgraphReference,
+)
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
+    EffectPolicyPlan,
     PhaseEdge,
     PhaseInput,
     PhaseResult,
@@ -21,6 +27,7 @@ from lca.harness.declarative.controls.validation import (
     validation_errors,
 )
 from lca.harness.graph.phase_graph_compiler import compile_phase_graph_projection
+from lca.harness.graph.validation import PhaseGraphValidator
 from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.profile.resolve.resolve import resolve_profile
 from tests.declarative.conftest import (
@@ -321,3 +328,85 @@ async def test_prepare_contribution_is_resolved_and_executed(standard_plan) -> N
     ).run(executable, state={"immutable": True})
 
     assert prepare.calls == 1
+
+
+class TestPhaseNodeSubSpecRefValidation:
+    """Node Note 2026-09-09-phase-node-sub-spec-ref: PhaseGraphValidator
+    对节点级 sub_spec_ref 的形状校验。binding_edge == node.id 校验由
+    PhaseNode.__post_init__ 在 dataclass 构造期完成 (PG-004);这里再加
+    plan_ref / entry_node 形状校验 + 拒绝自引用。"""
+
+    def test_node_level_sub_spec_ref_with_self_entry_node_is_rejected(self) -> None:
+        from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
+            PhaseBinding,
+        )
+
+        ref = SubgraphReference(
+            plan_ref="bundles/think-steps.yaml",
+            entry_node="think.main",  # 自引用:entry_node 与宿主节点同名
+            binding_edge="think.main",
+        )
+        node = PhaseNode(
+            id="think.main",
+            semantic_phase=SemanticPhase.THINK,
+            binding="phase.think.standard",
+            max_visits=1,
+            sub_spec_ref=ref,
+        )
+        graph = CognitivePhaseGraphPlan(
+            entry="think.main",
+            nodes=(node,),
+            edges=(),
+        )
+        binding = PhaseBinding(
+            node_id=node.id,
+            semantic_phase=node.semantic_phase,
+            executor_capability=node.binding,
+            contributions=(),
+        )
+        validator = PhaseGraphValidator()
+        report = validator.validate(
+            graph, [binding], specs=(), effect_policy=EffectPolicyPlan()
+        )
+        # 自引用触发我们新加的 PG-004 self-reference 校验
+        assert any(
+            "self-reference" in issue.message for issue in report.issues
+        ), [str(i) for i in report.issues]
+
+    def test_node_level_sub_spec_ref_with_clean_entry_node_is_accepted(self) -> None:
+        from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
+            PhaseBinding,
+        )
+
+        ref = SubgraphReference(
+            plan_ref="bundles/think-steps.yaml",
+            entry_node="think.shortcut",  # 干净:子图节点,非当前图节点
+            binding_edge="think.main",
+        )
+        node = PhaseNode(
+            id="think.main",
+            semantic_phase=SemanticPhase.THINK,
+            binding="phase.think.standard",
+            max_visits=1,
+            sub_spec_ref=ref,
+        )
+        graph = CognitivePhaseGraphPlan(
+            entry="think.main",
+            nodes=(node,),
+            edges=(),
+        )
+        binding = PhaseBinding(
+            node_id=node.id,
+            semantic_phase=node.semantic_phase,
+            executor_capability=node.binding,
+            contributions=(),
+        )
+        validator = PhaseGraphValidator()
+        report = validator.validate(
+            graph, [binding], specs=(), effect_policy=EffectPolicyPlan()
+        )
+        # 干净 fixture 不应触发我们新加的 self-reference 校验
+        # (其他 PG-001/PG-004/PG-006 是既有 validation 拓扑规则, 与本次改动无关)
+        assert not any(
+            "self-reference" in issue.message for issue in report.issues
+        ), [str(i) for i in report.issues]

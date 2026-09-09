@@ -52,6 +52,11 @@ class PhaseNodeConfig(BaseModel):
     # 编译器拒绝; None 表示未声明, 行为等价于历史)。
     precondition: str | None = None
     terminal_predicate: str | None = None
+    # Node Note 2026-09-09-phase-node-sub-spec-ref: 节点级嵌套子图引用。
+    # 与 ``PhaseEdge.subgraph_ref`` 同形 (plan_ref/entry_node/binding_edge),
+    # 由 ``_compile_subgraph_ref`` 在 phase_graph_compiler 路径编译为
+    # ``SubgraphReference(binding_edge=node.id)``。
+    sub_spec_ref: dict | None = None
 
 
 class Config(BaseModel):

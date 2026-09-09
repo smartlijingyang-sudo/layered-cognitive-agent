@@ -61,6 +61,15 @@ entries:
           phase: think
           binding: phase.think.standard
           max_visits: 8
+          # Node Note 2026-09-09-phase-node-sub-spec-ref: think 节点持有
+          # 节点级 sub_spec_ref, 直接引用 think 5 步子图。interpreter 在
+          # 进入节点时分发到子图, 不调用 phase.think.standard phase executor。
+          # 与下一条 think.main → act.main 边的 subgraph_ref 二选一即可 —
+          # 本 PR 切到节点级, 边级 subgraph_ref 删除。
+          sub_spec_ref:
+            plan_ref: bundles/think-steps.yaml
+            entry_node: think.shortcut
+            binding_edge: think.main
         - id: act.main
           phase: act
           binding: phase.act.standard
@@ -132,15 +141,6 @@ entries:
         - source: think.main
           target: act.main
           when: true
-          subgraph_ref:
-            # 2026-09-09: plan_ref redirected to think-steps.yaml. The
-            # former think-orchestrator-graph.yaml was an orphan bundle
-            # (its named "orchestrator" plugin never landed on disk);
-            # think-steps.yaml holds the same topology+edge patch and
-            # additionally registers the 5 phase-executor capabilities.
-            plan_ref: bundles/think-steps.yaml
-            entry_node: think.shortcut
-            binding_edge: think.main
         - source: act.main
           target: stop.main
           when: result.result_kind == "phase_error"

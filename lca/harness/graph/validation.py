@@ -81,6 +81,8 @@ class PhaseGraphValidator:
                 issues.append(
                     ValidationIssue("PG-001", f"binding executor mismatch: {node.id}", node.id)
                 )
+            if node.sub_spec_ref is not None:
+                self._validate_node_sub_spec_ref(node, nodes, issues)
         edge_targets: dict[str, list[PhaseEdge]] = defaultdict(list)
         for edge in graph.edges:
             if edge.source not in nodes or edge.target not in nodes:
@@ -159,6 +161,42 @@ class PhaseGraphValidator:
         elif node.semantic_phase is not SemanticPhase.THINK:
             issues.append(
                 ValidationIssue("PG-001", "approval resume node must be a think node", node_id)
+            )
+
+    def _validate_node_sub_spec_ref(
+        self,
+        node: PhaseNode,
+        nodes: Mapping[str, PhaseNode],
+        issues: list[ValidationIssue],
+    ) -> None:
+        """Node Note 2026-09-09-phase-node-sub-spec-ref: 节点级 sub_spec_ref 校验。
+
+        校验 binding_edge 已由 ``PhaseNode.__post_init__`` 强制等于 ``node.id``
+        (PG-004);此层再加 plan_ref / entry_node 形状校验。完整 plan 解析校验
+        (plan_ref 文件存在、entry_node 必在子图内、嵌套深度) 由 interpreter 在
+        ``_drive_subgraph_ref`` 运行时执行 (PG-005)。"""
+
+        ref = node.sub_spec_ref
+        if ref is None:
+            return
+        if not ref.plan_ref or not ref.entry_node:
+            issues.append(
+                ValidationIssue(
+                    "PG-004",
+                    f"node {node.id!r} sub_spec_ref requires non-empty plan_ref and entry_node",
+                    node.id,
+                )
+            )
+            return
+        # 拒绝自引用:entry_node 不能是当前图的节点 (否则嵌套语义冲突)
+        if ref.entry_node in nodes:
+            issues.append(
+                ValidationIssue(
+                    "PG-004",
+                    f"node {node.id!r} sub_spec_ref entry_node {ref.entry_node!r} "
+                    "must not be a node of the current graph (no self-reference)",
+                    node.id,
+                )
             )
 
     def _validate_cycles(

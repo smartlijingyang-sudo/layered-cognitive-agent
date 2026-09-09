@@ -13,6 +13,9 @@ from dataclasses import dataclass, field
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols.act.command.envelope import RunDelta, RunFact
+from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
+    SubgraphReference,
+)
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     DeclarativeValidationError,
     DeltaReducer,
@@ -32,8 +35,8 @@ from lca.contracts.protocols.runtime.runtime.lifecycle import (
     RuntimeLifecyclePublisher,
 )
 from lca.contracts.protocols.state.plan import CompiledRunPlan
-from lca.harness.declarative.compile.assembler.assembler import ExecutablePlan
 from lca.harness.declarative.compile.assembler.assembler import (
+    ExecutablePlan,
     RestrictedScope,
 )
 from lca.harness.declarative.controls.validation import require_valid
@@ -366,6 +369,68 @@ class GenericPlanInterpreter:
                         "PG-001", f"unassembled phase node: {current_id}"
                     )
                 visit_count = traversal.visit(node_id=node.id, max_visits=node.max_visits)
+                # Node Note 2026-09-09-phase-node-sub-spec-ref: 节点级嵌套子图
+                # 代理。当节点持有 sub_spec_ref, 不调 phase executor, 直接递归子图,
+                # 把子图返回的 state 折回 outer drive。复用现有 edge-level subgraph
+                # _drive_subgraph_ref seam (共享 MAX_SUBGRAPH_DEPTH 计数), 不重复
+                # 推进 traversal — 让 _select_edge + traversal.advance 走原路径。
+                if node.sub_spec_ref is not None:
+                    current_state = await self._drive_subgraph_ref(
+                        ref=node.sub_spec_ref,
+                        outer_state=current_state,
+                        current_node_id=node.id,
+                        depth=1,
+                        edge_id=node.id,
+                    )
+                    virtual_result = PhaseResult(
+                        result_kind="think_stage", payload=current_state
+                    )
+                    edge = self._select_edge(
+                        graph.edges,
+                        node.id,
+                        virtual_result,
+                        traversal.artifacts,
+                        current_state,
+                    )
+                    if edge is None:
+                        if allow_natural_exit:
+                            cursor = traversal.checkpoint(
+                                node_id=node.id,
+                                causation_refs=(),
+                                state_step=getattr(current_state, "step", 0),
+                            )
+                            return InterpretationResult(
+                                state=current_state,
+                                artifact=None,
+                                visits=tuple(visits),
+                                facts=tuple(facts),
+                                terminal_node=node.id,
+                                cursor=cursor,
+                                outcome=None,
+                            )
+                        raise DeclarativeValidationError(
+                            "PG-006",
+                            f"no validated next edge from node: {node.id} after sub_spec",
+                        )
+                    visits.append(
+                        PhaseVisit(
+                            node.id, node.semantic_phase, "think_stage", edge.target
+                        )
+                    )
+                    if edge.subgraph_ref is not None:
+                        current_state = await self._drive_subgraph_ref(
+                            ref=edge.subgraph_ref,
+                            outer_state=current_state,
+                            current_node_id=node.id,
+                            depth=1,
+                            edge_id=edge.source,
+                        )
+                    traversal.advance(
+                        edge=edge,
+                        payload=current_state,
+                        causation_refs=(),
+                    )
+                    continue
                 await self._publish_phase_event(
                     RuntimeLifecycleEventType.PHASE_STARTED,
                     node_id=node.id,
@@ -480,11 +545,12 @@ class GenericPlanInterpreter:
                     # terminal PhaseResult is folded into the outer
                     # drive via state merge; visit/edge counts stay
                     # outer-plan-local (different plan_ref).
-                    sub_state = await self._drive_subgraph(
-                        outer_edge=edge,
+                    sub_state = await self._drive_subgraph_ref(
+                        ref=edge.subgraph_ref,
                         outer_state=current_state,
                         current_node_id=node.id,
                         depth=1,
+                        edge_id=edge.source,
                     )
                     current_state = sub_state
                     traversal.advance(
@@ -650,7 +716,40 @@ class GenericPlanInterpreter:
         current_node_id: str,
         depth: int,
     ) -> AgentState:
+        """Edge-level subgraph recursion shell.
+
+        Thin wrapper that extracts ``outer_edge.subgraph_ref`` and
+        delegates to ``_drive_subgraph_ref``. Node-level subgraph hosts
+        (Node Note 2026-09-09-phase-node-sub-spec-ref) call
+        ``_drive_subgraph_ref`` directly with their own ``sub_spec_ref``.
+        """
+        ref = outer_edge.subgraph_ref
+        if ref is None:
+            return outer_state
+        return await self._drive_subgraph_ref(
+            ref=ref,
+            outer_state=outer_state,
+            current_node_id=current_node_id,
+            depth=depth,
+            edge_id=outer_edge.source,
+        )
+
+    async def _drive_subgraph_ref(
+        self,
+        *,
+        ref: SubgraphReference,
+        outer_state: AgentState,
+        current_node_id: str,
+        depth: int,
+        edge_id: str,
+    ) -> AgentState:
         """Recurse into a subgraph plan and return the merged outer state.
+
+        Called by both edge-level ``PhaseEdge.subgraph_ref`` and node-level
+        ``PhaseNode.sub_spec_ref`` (Node Note 2026-09-09-phase-node-sub-spec-ref).
+        ``edge_id`` is the outer seam identifier (edge.source for edge-level,
+        node.id for node-level) used for observability + SUBGRAPH_ENTER/EXIT
+        attribution.
 
         The subgraph is resolved via ``self._subgraph_resolver`` and
         turned into an ``ExecutablePlan`` by
@@ -668,11 +767,8 @@ class GenericPlanInterpreter:
             raise DeclarativeValidationError(
                 "PG-005",
                 f"subgraph recursion exceeded {MAX_SUBGRAPH_DEPTH} "
-                f"from outer edge {outer_edge.source!r}",
+                f"from outer seam {edge_id!r}",
             )
-        ref = outer_edge.subgraph_ref
-        if ref is None:
-            return outer_state
 
         emitter = self._subgraph_hook_emitter
         self._emit_subgraph_hook(
@@ -685,7 +781,7 @@ class GenericPlanInterpreter:
                 depth=depth,
                 parent_path="",
                 node_id=current_node_id,
-                edge_id=outer_edge.source,
+                edge_id=edge_id,
                 outcome="in_progress",
             ),
         )
@@ -695,10 +791,11 @@ class GenericPlanInterpreter:
         error = ""
         try:
             result_state = await self._drive_subgraph_inner(
-                outer_edge=outer_edge,
+                ref=ref,
                 outer_state=outer_state,
                 current_node_id=current_node_id,
                 depth=depth,
+                edge_id=edge_id,
             )
         except DeclarativeValidationError as exc:
             outcome = "validation_error"
@@ -719,7 +816,7 @@ class GenericPlanInterpreter:
                     depth=depth,
                     parent_path="",
                     node_id=current_node_id,
-                    edge_id=outer_edge.source,
+                    edge_id=edge_id,
                     outcome=outcome,
                     error=error,
                 ),
@@ -729,31 +826,25 @@ class GenericPlanInterpreter:
     async def _drive_subgraph_inner(
         self,
         *,
-        outer_edge: PhaseEdge,
+        ref: SubgraphReference,
         outer_state: AgentState,
         current_node_id: str,
         depth: int,
+        edge_id: str,
     ) -> AgentState:
-        """Resolved recursion body for ``_drive_subgraph``.
+        """Resolved recursion body for ``_drive_subgraph_ref``.
 
         Keeps each PG-005 error path explicit; the surrounding try block
-        in ``_drive_subgraph`` turns every exit into a SUBGRAPH_EXIT
+        in ``_drive_subgraph_ref`` turns every exit into a SUBGRAPH_EXIT
         observation regardless of which branch raised.
         """
-        del depth
-        ref = outer_edge.subgraph_ref
-        if ref is None:  # caller (_drive_subgraph) checked
-            raise DeclarativeValidationError(
-                "PG-005",
-                f"outer edge {outer_edge.source!r} reached _drive_subgraph_inner "
-                "with subgraph_ref=None",
-            )
+        del depth, edge_id, current_node_id
         resolver = self._subgraph_resolver
         if resolver is None:
             raise DeclarativeValidationError(
                 "PG-005",
-                f"outer edge {outer_edge.source!r} declared subgraph_ref "
-                f"but interpreter has no subgraph_resolver wired",
+                f"subgraph_ref {ref.binding_edge!r} declared but interpreter "
+                f"has no subgraph_resolver wired",
             )
         sub_plan_obj = resolver.resolve(ref.plan_ref)
         if not isinstance(sub_plan_obj, CompiledRunPlan):
@@ -777,12 +868,6 @@ class GenericPlanInterpreter:
             )
         else:
             sub_executable = factory(sub_plan_obj)
-        sub_traversal = PhaseTraversal.start(
-            plan_ref=compiled_run_plan_ref(sub_plan_obj),
-            entry_node_id=ref.entry_node,
-            artifacts=None,
-            input=None,
-        )
         sub_result = await self._drive(
             sub_executable,
             state=outer_state,
@@ -806,7 +891,6 @@ class GenericPlanInterpreter:
         # via the shared ``Reducer`` during recursion. We do NOT import
         # the subgraph's visits/facts into the outer drive (different
         # plan_ref); durability is the caller's job.
-        del sub_traversal, current_node_id
         return sub_result.state
 
 

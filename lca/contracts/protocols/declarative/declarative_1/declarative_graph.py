@@ -75,6 +75,11 @@ class PhaseNode:
     # 入口校验 / 出口谓词 (callable 名字, 由 harness 注册表解析, profile YAML 用字符串名引用)。
     precondition: str | None = None
     terminal_predicate: str | None = None
+    # Node-level sub_spec_ref (Node Note 2026-09-09-phase-node-sub-spec-ref):
+    # 把 think 节点挂成 InfoEdgeSpec 嵌套子图代理。binding_edge 必须 == node.id,
+    # 与 PhaseEdge.subgraph_ref 的 PG-004 不变量对齐。优先级低于边级 subgraph_ref
+    # (interpreter 进入节点时若边级已挂 sub_spec, 不重复 fork)。
+    sub_spec_ref: SubgraphReference | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.semantic_phase, SemanticPhase):
@@ -90,6 +95,12 @@ class PhaseNode:
         if self.terminal_predicate is not None and not str(self.terminal_predicate).strip():
             raise DeclarativeValidationError(
                 "PG-007", "phase node terminal_predicate must be a non-empty name when declared"
+            )
+        if self.sub_spec_ref is not None and self.sub_spec_ref.binding_edge != self.id:
+            raise DeclarativeValidationError(
+                "PG-004",
+                f"sub_spec_ref.binding_edge {self.sub_spec_ref.binding_edge!r} "
+                f"must equal node.id {self.id!r}",
             )
 
 

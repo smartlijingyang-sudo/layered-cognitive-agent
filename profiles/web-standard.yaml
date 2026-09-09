@@ -41,9 +41,11 @@ patch:
       runs_root: traces/runs
 
   # Patch topology to add PR-C (ADR-0214 §6.3) PG-007 preconditions and
-  # terminal predicates on perceive.main. think.main binding stays at
-  # phase.think.standard (the subgraph topology is driven by the
-  # declarative edge's subgraph_ref).
+  # terminal predicates on perceive.main. think.main carries a node-level
+  # sub_spec_ref (Node Note 2026-09-09-phase-node-sub-spec-ref) that
+  # delegates to bundles/think-steps.yaml; the ``phase.think.standard``
+  # binding below is a Pydantic-required field but the interpreter
+  # short-circuits the phase executor when ``sub_spec_ref`` is present.
   - id: phase.topology.standard
     config:
       nodes:
@@ -59,6 +61,10 @@ patch:
           phase: think
           binding: phase.think.standard
           max_visits: 8
+          sub_spec_ref:
+            plan_ref: bundles/think-steps.yaml
+            entry_node: think.shortcut
+            binding_edge: think.main
         - id: act.main
           phase: act
           binding: phase.act.standard

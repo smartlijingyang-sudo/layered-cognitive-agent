@@ -1,4 +1,13 @@
-"""标准 think PhaseExecutor。"""
+"""标准 think PhaseExecutor。
+
+.. deprecated::
+    2026-09-09 起 think 阶段通过节点级 ``sub_spec_ref`` (Node Note
+    2026-09-09-phase-node-sub-spec-ref) 直接挂 5 步子图,interpreter 进入
+    ``think.main`` 时跳过 phase executor。本插件保留作为 ``PhaseNodeConfig``
+    binding 字段的 Pydantic-required placeholder,生产路径不被调用。下个 PR
+    与 ``phase.think.standard`` bundle 注册 / profile binding / phase_node
+    字段一次性删除。
+"""
 
 from __future__ import annotations
 

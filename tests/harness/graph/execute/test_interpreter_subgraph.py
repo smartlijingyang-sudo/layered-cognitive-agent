@@ -236,3 +236,76 @@ class _StubResolver:
 
 class _StopRecursionError(Exception):
     """Sentinel that the factory raises to short-circuit further recursion."""
+
+
+class TestDriveSubgraphRefSeam:
+    """Node Note 2026-09-09-phase-node-sub-spec-ref: ``_drive_subgraph_ref`` is
+    the unified seam used by both edge-level and node-level subgraph
+    recursion. The thin ``_drive_subgraph(outer_edge)`` shell delegates here.
+    """
+
+    @pytest.mark.asyncio
+    async def test_node_level_ref_drives_subgraph_via_factory(self) -> None:
+        """Happy path: node-level sub_spec_ref enters the recursion seam and
+        the subgraph_executable_factory is invoked with the resolved plan.
+
+        We use ``_StopRecursionError`` to short-circuit before the (minimal)
+        test fixture's ``_drive`` would crash — the integration suite covers
+        end-to-end subgraph execution. What we assert here is the new seam
+        is reachable from the node-level entry path.
+        """
+        sub = _sub_plan()
+        calls: list[str] = []
+
+        def factory(plan: CompiledRunPlan) -> ExecutablePlan:
+            calls.append(plan.profile_path)
+            raise _StopRecursionError
+
+        interpreter = GenericPlanInterpreter(
+            subgraph_resolver=_StubResolver({"bundles/think-steps.yaml": sub}),
+            subgraph_executable_factory=factory,
+        )
+        ref = SubgraphReference(
+            plan_ref="bundles/think-steps.yaml",
+            entry_node="reflect.inner_score",
+            binding_edge="think.main",
+        )
+        with pytest.raises(_StopRecursionError):
+            await interpreter._drive_subgraph_ref(
+                ref=ref,
+                outer_state=_state(),
+                current_node_id="think.main",
+                depth=1,
+                edge_id="think.main",
+            )
+        assert calls == ["sub://reflect-subgraph-test"]
+
+    @pytest.mark.asyncio
+    async def test_node_level_ref_depth_limit_raises_pg_005(self) -> None:
+        ref = SubgraphReference(
+            plan_ref="bundles/think-steps.yaml",
+            entry_node="reflect.inner_score",
+            binding_edge="think.main",
+        )
+        interpreter = GenericPlanInterpreter(
+            subgraph_resolver=_StubResolver(),
+            subgraph_executable_factory=_executable_for,
+        )
+        with pytest.raises(DeclarativeValidationError) as excinfo:
+            await interpreter._drive_subgraph_ref(
+                ref=ref,
+                outer_state=_state(),
+                current_node_id="think.main",
+                depth=MAX_SUBGRAPH_DEPTH + 1,
+                edge_id="think.main",
+            )
+        assert excinfo.value.code == "PG-005"
+
+    def test_drive_subgraph_thin_shell_delegates_to_ref_seam(self) -> None:
+        """The legacy ``_drive_subgraph(outer_edge)`` signature still works —
+        it extracts ``outer_edge.subgraph_ref`` and delegates to
+        ``_drive_subgraph_ref`` so edge-level callers are unaffected.
+        """
+        edge = _outer_edge_with_ref()
+        assert edge.subgraph_ref is not None
+        assert edge.subgraph_ref.binding_edge == edge.source

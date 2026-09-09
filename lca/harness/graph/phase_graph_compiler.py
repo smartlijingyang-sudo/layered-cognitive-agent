@@ -53,6 +53,9 @@ class _DeclaredNode:
     # PR-C (ADR-0214 §6.1): optional PG-007 三件套 — callable 名字字符串
     precondition: str | None = None
     terminal_predicate: str | None = None
+    # Node Note 2026-09-09-phase-node-sub-spec-ref: optional node-level nested
+    # InfoEdgeSpec sub_spec_ref. 与 PhaseEdge.subgraph_ref 并存, 互不抢占。
+    sub_spec_ref: SubgraphReference | None = None
 
 
 def compile_phase_graph_projection(specs: tuple[PluginSpec, ...]) -> PhaseGraphProjection:
@@ -149,6 +152,7 @@ def _compile_declared_node(raw_node: object, *, spec_id: str, index: int) -> _De
         terminal_predicate=(
             str(terminal_predicate_raw).strip() if terminal_predicate_raw is not None else None
         ),
+        sub_spec_ref=_compile_subgraph_ref(raw_node.get("sub_spec_ref"), node_id),
     )
 
 
@@ -215,6 +219,7 @@ def _compile_phase_graph(
             execution_policy=policies.get(node.id, PhaseExecutionPolicy()),
             precondition=node.precondition,
             terminal_predicate=node.terminal_predicate,
+            sub_spec_ref=node.sub_spec_ref,
         )
         for node in declared_nodes
     )

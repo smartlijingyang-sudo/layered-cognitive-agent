@@ -39,6 +39,11 @@ patch:
           phase: think
           binding: phase.think.standard
           max_visits: 8
+          # Node Note 2026-09-09-phase-node-sub-spec-ref: 节点级嵌套 think 子图。
+          sub_spec_ref:
+            plan_ref: bundles/think-steps.yaml
+            entry_node: think.shortcut
+            binding_edge: think.main
         - id: act.main
           phase: act
           binding: phase.act.standard
