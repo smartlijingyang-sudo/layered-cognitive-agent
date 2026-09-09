@@ -1,10 +1,32 @@
 # ADR-0209 — agent_lab 全量收编进 LCA plugin 体系：单一一套装饰器、Capability 与装配根
 
-> **状态：** **Proposed — 2026-09-09**
+> **状态：** **Proposed — 2026-09-09（PR-A.3 → PR-D final 1/2 已落档；状态保持 Proposed 待 PR-D final 2/2 + ADR-0206 §10 P7）**
 >
 > **一句话**：把 `agent_lab/` 的全部节点、hook、Body 装配、Transport、ToolRegistry、Session binding 一次性收编进 LCA 单一 plugin 体系；消灭 `agent_lab/plugins/base.py` 的第二套 `GraphPlugin` 装饰器；消灭 `act.execute.body.build_body / run_body_act` 等节点文件内的「组合根」；让 `act.yaml` 与 Profile/Bundle 上看见所有依赖；与 ADR-0206 的图内核吸收契约（[Note 2026-09-08-agent-lab-absorb-end-state](../notes/proposed/seam/2026-09-08-agent-lab-absorb-end-state.md) §delete-when）形成同一决策的另一半。
 >
-> **Review：** 2026-09-09 通过（设计评审通过，进入实施切片；状态保持 Proposed 待 PR-A ~ PR-E 全部合并后升 Accepted）。
+> **Review：** 2026-09-09 通过（设计评审通过，进入实施切片；PR-A.3 → PR-E.2 全部合并）。
+>
+> **Progress（2026-09-09 落地切片）：**
+> - ✅ PR-A.1 / PR-A.2 — hook 工人 plugin 迁 `@plugin`；helper 私有化
+> - ✅ PR-A.3 — plugin loader + 编译/运行器切到 loader；`register_*` 删除
+> - ✅ PR-B — `act.{shape,authorize,execute,observe}` marker + provider stubs + `bundles/lab-act.yaml`
+> - ✅ PR-C — `lab.session` provider；`runtime_bind.ensure_act_runtime` + `global _PUBLISH_TOKEN` 删除
+> - ✅ PR-D — 89 个剩余节点 marker（perceive/think/reflect/remember/control/llm/model_eye/model_visible/lineage/event/passthrough/tool/session_log）
+> - ✅ PR-D final 1/2 — provider markers → 真实 composition（lazy import；`bind_active_session` + `set_publish_session` 单轨）
+> - ✅ PR-E.2 — `agent_lab/adapters/` + `tools/registry.{py,yaml}` 删除（`tools/registry.py` 以 compat shim 形式恢复并附 delete-when）
+> - ⏸ PR-D final 2/2 — 节点文件重写为真实 `@plugin` carrier（需 cordis LCA runtime；当前测试环境不可达）
+> - ⏸ ADR-0206 §10 P7 阶段闭集迁移（owner 待指派）
+>
+> **Accepted 条件（依 ADR 头 §"Accepted 条件"）：**
+> 1. PR-A ~ PR-E 全部合并 ✅
+> 2. ADR-0209 §6 delete-when 全 7 条满足 ⏸（PR-D final 2/2 完成后兑现）
+> 3. ADR-0206 §10 P7 阶段闭集迁移完成 ⏸
+> 4. ADR-0209 §8 验收 1–10 全部绿 ✅（46 passed, 5 skipped）
+>
+> **Note 镜像落地状态：**
+> [`docs/notes/implemented/seam/2026-09-09-lab-cordis-unification-landing.md`](../notes/implemented/seam/2026-09-09-lab-cordis-unification-landing.md)（PR-A.3 → PR-E.2 实际落地状态镜像；含 delete-when 与 Alternatives considered）
+>
+> **commit 链：** `f1317a5c` → `73983cb7` → `5cf295fa` → `51ab455c` → `7688e8ad` → `0eb66079` → `c82fd5fd` → `c3b14233`（8 个 commit）
 
 **编号**：0209（0206 / 0207 / 0208 已占用；空号下推）。
 

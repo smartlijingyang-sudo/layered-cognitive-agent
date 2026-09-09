@@ -155,6 +155,7 @@
 | [0205](0205-wire-contract-as-plugin-seam.md) | WireContract 元机制 — **2026-09-08 撤回**; 已并入 [ADR-0195 §1.4 / §1.5](0195-platform-architecture-convergence.md) + [ADR-0204](0204-surface-render-slot-plan-strategy.md) 重写版; 历史文件保留追溯 | Deprecated — Superseded |
 | [0206](0206-information-graph-kernel.md) | 可编译信息图认知内核 — 单一可执行图种 InfoEdgeSpec + 嵌套子图驱动六个阶段 / 模型可见 / 效应 / 溯源；C1–C14 不变式（含 C11 单图种 / C12 子图端口 / C13 嵌套点火 / C14 阶段退化为 region）；§5.7 八项生效证明 E1–E8 + §8.1 不可替代边界 + §9.1 MVP 金丝雀验收；§10 P7 阶段闭集迁移承担 0075/0194 部分吸收（吸收 0207） | Proposed |
 | [0207](0207-graph-orchestrated-cognitive-agent-kernel.md) | 图编排式认知 Agent 内核 — 多图协作与编译期信息契约（已并入 0206） | Superseded |
+| [0209](0209-agent-lab-cordis-unification.md) | agent_lab 全量收编进 LCA plugin 体系 — 唯一插件入口 `@plugin` + 单 `lca.plugins.lab.internal.loader` 闭包 + Body/ToolRegistry/Transport/Session 四个 provider 拆分 + Session 单轨 + `agent_lab/adapters/` 与 `tools/registry.{py,yaml}` 删除；PR-A.3 → PR-D final 1/2 已合并（46 tests passed, 5 skipped）；PR-D final 2/2 节点真实 @plugin carrier 重写依赖 cordis LCA runtime（当前测试环境不可达）；与 Note `2026-09-08-agent-lab-absorb-end-state` §delete-when + Note `2026-09-09-lab-cordis-unification-landing.md` delete-when 共同锁定 | Proposed — PR-D final 1/2 done; 2/2 pending |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
 
