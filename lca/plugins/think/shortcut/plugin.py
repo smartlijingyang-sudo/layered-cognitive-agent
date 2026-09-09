@@ -1,4 +1,4 @@
-"""think subgraph — shortcut step (``SupportsShortcut`` fast path)."""
+"""phase.think.shortcut — try a deterministic shortcut before reason."""
 
 from __future__ import annotations
 
@@ -15,7 +15,9 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
+from lca.contracts.models.core.execution.think_carry import CARRY_KEY, ThinkSubgraphCarry
+from lca.contracts.protocols import SupportsShortcut
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     PhaseContext,
     PhaseInput,
     PhaseResult,
@@ -25,33 +27,45 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.loop.phase._shared.common import StandardPhaseConfig
-from lca.plugins.loop.phase.think.subgraph._shared import run_shortcut_step, step_plugin_spec
 
-SPEC = step_plugin_spec(
-    plugin_id="phase.think.subgraph.shortcut",
-    module="lca.plugins.loop.phase.think.subgraph.shortcut.plugin",
-)
+STAGE_KIND = "think_stage"
+
+
+def _carry(context: PhaseContext) -> ThinkSubgraphCarry:
+    existing = context.artifacts.get(CARRY_KEY)
+    if isinstance(existing, ThinkSubgraphCarry):
+        return existing
+    return ThinkSubgraphCarry(state=context.state)
 
 
 @dataclass(frozen=True, slots=True)
-class ShortcutStepExecutor:
+class ThinkShortcutExecutor:
     async def execute(self, context: PhaseContext, input: PhaseInput) -> PhaseResult:
-        return await run_shortcut_step(context, input)
+        cap = context.capabilities.get("phase.think.shortcut")
+        if cap is None:
+            return PhaseResult(result_kind=STAGE_KIND, payload=_carry(context))
+        assert isinstance(cap, SupportsShortcut), (  # noqa: S101 - C5 typed capability contract check
+            "phase.think.shortcut must implement SupportsShortcut"
+        )
+        decision = await cap.try_shortcut(context.state)
+        if decision is None:
+            return PhaseResult(result_kind=STAGE_KIND, payload=_carry(context))
+        return PhaseResult(result_kind="decision", payload=decision)
 
 
 @plugin(
-    id="phase.think.subgraph.shortcut",
+    id="phase.think.shortcut",
     Config=StandardPhaseConfig,
-    provides=("phase.think.subgraph.shortcut",),
+    provides=("phase.think.shortcut",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
-    test_suite="tests/cognition/test_think_subgraph_parity.py",
-    spec=SPEC,
+    test_suite="tests/think/test_shortcut_phase_plugin.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(
-            group=FunctionalGroup.G7_EXECUTION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
+            group=FunctionalGroup.G7_EXECUTION,
+            control_slots=(ControlSlot.OBSERVE_WILDCARD,),
         ),
         lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
         authority=AuthorityContract(grants=("plugin.serve",)),
@@ -71,11 +85,11 @@ class ShortcutStepExecutor:
 )
 async def setup(ctx: PluginContext, config: StandardPhaseConfig) -> None:
     del config
-    ctx.provide("phase.think.subgraph.shortcut", ShortcutStepExecutor())
+    ctx.provide("phase.think.shortcut", ThinkShortcutExecutor())
 
 
-def create_executor() -> ShortcutStepExecutor:
-    return ShortcutStepExecutor()
+def create_executor() -> ThinkShortcutExecutor:
+    return ThinkShortcutExecutor()
 
 
-__all__ = ["ShortcutStepExecutor", "create_executor", "setup"]
+__all__ = ["ThinkShortcutExecutor", "create_executor", "setup"]
