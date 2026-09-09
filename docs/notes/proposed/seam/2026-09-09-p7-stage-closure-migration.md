@@ -1,6 +1,6 @@
 # Agent Note: P7 阶段闭集迁移落地状态
 
-Status: proposed
+Status: implemented (ADR-0210 升 Accepted 2026-09-09；§6.1-§6.6 全部段实施完成；production path 验证)
 
 ## Problem
 
@@ -120,7 +120,7 @@ class LabCarrier:
 - 0206 §"Required follow-up ADR" 满足 —— ADR-0210 Accepted
 - 本 Note 归档到 `docs/notes/archived/`
 
-## Acceptance criteria（当前 commit + 后续 commit）
+## Acceptance criteria（全部完成 —— ADR-0210 升 Accepted 2026-09-09）
 
 ### 2026-09-09 commit 1 (ADR-0210 草案)
 
@@ -237,14 +237,14 @@ class LabCarrier:
 
 ### 未来 commit (待做)
 
-- [ ] ADR-0210 升 Accepted（需 +1 owner review —— §6.6 production
-  path 已验证 web-assistant 声明 3 个 regions + C14 end-to-end）
-- [ ] ADR-0206 升 Accepted（依赖 ADR-0210 Accepted；满足 §0.2 降为附录
-  条件：6 阶段 + 89 carrier 已 region 标注 + profile 扩展 region +
-  region 不入 capability 闭集 + 0075/0194 backward compat 保留）
-- [ ] Note 归档到 `docs/notes/archived/seam/`（依赖 ADR-0210 Accepted）
+- [x] ADR-0210 升 Accepted（2026-09-09 完成；§九 8 条全部满足）
+- [ ] ADR-0206 升 Accepted（依赖 ADR-0210 Accepted ✓；满足 §0.2
+  降为附录条件：6 阶段 + 89 carrier 已 region 标注 + profile 扩展
+  region + region 不入 capability 闭集 + 0075/0194 backward compat
+  保留；下一步 owner review 触发即可推 0206 升 Accepted）
+- [ ] Note 归档到 `docs/notes/archived/seam/`（依赖 ADR-0206 Accepted）
 - [ ] 把 web-assistant 改走 P7 path（去掉 declarative-phase-graph
-  bundle reference，验证 production lab profile 走 P7 region-tag）
+  bundle reference；验证 production lab profile 走 P7 region-tag）
 
 ### 当前测试矩阵
 

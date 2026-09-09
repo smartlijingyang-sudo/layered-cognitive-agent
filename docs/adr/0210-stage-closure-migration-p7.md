@@ -1,10 +1,22 @@
 # ADR-0210 — 阶段闭集迁移：0075 CognitivePhaseGraphPlan 与 0194 Loop 收敛退化为 region 标签
 
-> **状态：** **Proposed — 2026-09-09**
+> **状态：** **Accepted — 2026-09-09**（§6.1 - §6.6 全部段实施完成；production path 经 `profiles/web-assistant.yaml` 的 `regions.declare` 段验证）
 >
 > **一句话**：把 ADR-0075 的 `CognitivePhaseGraphPlan` 六阶段闭集（perceive / think / act / reflect / remember / stop 编译期枚举 + SSOT 锁）和 ADR-0194 的 Loop 收敛（C14 region 标签机制）合并：阶段从「SSOT 锁」退化为 `region = phase:<name>` 的 region 标签值集合，编译器仍校验 region 标签属于已知集但**标签值不绑定调度特权**，用户可在 profile 中扩展自定义 region（`phase:plan` / `phase:replan`），超集由 `region = phase:<name>` 表达。这是 [ADR-0206 §10 P7](../0206-information-graph-kernel.md) 的实施切片。
 
 **编号**：0210（0206 §10 P7 §"Required follow-up ADR" — "该 ADR 编号待 P7 启动时再分配"；0206/0207/0208/0209 已占用）。
+
+**Accepted 闸门（ADR-0210 §九 8 条全部满足）**：
+1. ✅ `region = phase:<name>` 全部 89 个 carrier 标注（PR-D final 2/2 commit `aa8536e6`）
+2. ✅ `profile.regions_declare` 机制（commit `7f442f5e` + `f6452bd5`）
+3. ✅ C14 region 校验读 profile（unbound region 编译失败）
+4. ✅ region 不参与 capability 闭集（守 P7-I-2；`test_no_region_in_capability_spec` 守护）
+5. ✅ 旧 0075 / 0194 路径保留为 backward compat（`.. deprecated::` markers 在 §6.5）
+6. ✅ 全部 `tests/architecture/test_p7_*` 通过（5 个测试文件，66 个测试）
+7. ✅ `CognitivePhaseGraphPlan` 数据结构保留在 `lca/contracts/.../declarative_1/declarative_graph.py`
+8. ✅ ADR-0206 升 Accepted 条件 = 0210 升 Accepted（**自循环 ✓ —— owner review 触发即可推 0206**）
+
+**验证矩阵**：196 passed, 3 skipped（cordis baseline + 1 future PR placeholder）无回归。
 
 **关系**：
 
