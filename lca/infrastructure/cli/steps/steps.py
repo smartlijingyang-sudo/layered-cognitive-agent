@@ -206,20 +206,40 @@ def stack_status(ctx: PipelineContext) -> None:
 def stack_heal(ctx: PipelineContext) -> None:
     """Heal every service. Do the work here — do not bounce the operator.
 
-    PR-3: 先 KernelServeService.heal() 把 LCA 进程(若不在)拉起;再走
-    STATUS_SERVICES 修外部服务。kernel_serve 不在 STATUS_SERVICES 里,
-    因为 status 只观察不拉起(那是 heal 的工作)。
+    PR-3 (ADR-0213): kernel_serve 走 ``spawner().run()`` 直接拿
+    ``SpawnResult``,原样透传 actionable 到 operator;不 fallback 到
+    "kernel 没在跑,去 heal"。再走 STATUS_SERVICES 修外部服务。
+    kernel_serve 不在 STATUS_SERVICES 里,因为 status 只观察不拉起
+    (那是 heal 的工作)。
     """
     ctx.console.info("Healing services...")
     leftover: list[str] = []
-    # 1) LCA 进程自愈 (ADR-0119 决定 4 + PR-3)
+    # 1) LCA 进程自愈 (ADR-0119 决定 4 + ADR-0213 PR-3)
     try:
         ks = ctx.registry.get("kernel_serve")
-        ks_state = ks.heal()
-        ctx.console.service_state("kernel_serve", ks_state)
-        if not ks_state.is_running:
-            leftover.append(f"kernel_serve: {ks_state.why or ks_state.detail}")
-            ctx.failed = True
+        if ks.state().is_running:
+            pass  # already healthy; skip spawn
+        else:
+            spawner = ks.spawner()
+            result = spawner.run()
+            if not result.ok:
+                failed = result.failed_stage or "unknown"
+                err = next((s.error for s in result.steps if not s.ok), "unknown")
+                actionable = result.actionable or (
+                    f"Inspect stderr: {result.stderr_path}"
+                    if result.stderr_path
+                    else "no actionable hint"
+                )
+                ctx.console.error(
+                    f"kernel_serve spawn failed at stage={failed}: {err}\n  action: {actionable}"
+                )
+                leftover.append(f"kernel_serve: {actionable}")
+                ctx.failed = True
+            else:
+                ctx.console.info(f"kernel_serve spawned (pid={result.pid}, {result.duration_ms}ms)")
+                # re-probe via state() to confirm running projection
+                ks_state = ks.state()
+                ctx.console.service_state("kernel_serve", ks_state)
     except Exception as exc:
         ctx.console.error(f"kernel_serve heal crashed: {exc}")
         leftover.append("kernel_serve: crashed — see error above")

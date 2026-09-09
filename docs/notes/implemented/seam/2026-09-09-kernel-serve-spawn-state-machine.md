@@ -1,6 +1,6 @@
 # Agent Note: KernelServe spawn 状态机化 + stderr 独立落盘
 
-Status: proposed
+Status: implemented
 
 > 配套 ADR:[`0213-kernel-serve-spawn-result-and-health-readiness.md`](../../adr/0213-kernel-serve-spawn-result-and-health-readiness.md)。
 > 本 note 描述单点 seam 的改动;跨 ADR 影响走 ADR 本身。

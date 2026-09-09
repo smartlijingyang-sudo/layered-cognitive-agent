@@ -1,6 +1,6 @@
 # ADR-0213: KernelServe spawn 结果结构化 + /health plugin readiness 字段
 
-**状态:** Proposed
+**状态:** Implemented (PR-1 + PR-2 + PR-3, 2026-09-09)
 **日期:** 2026-09-09
 **父 ADR:** [0119-webserver-as-plugin.md](0119-webserver-as-plugin.md) ·
 [0119-followup-gateway-name-removal.md](0119-followup-gateway-name-removal.md)

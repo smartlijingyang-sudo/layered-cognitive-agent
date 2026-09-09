@@ -85,15 +85,57 @@ def register(app: typer.Typer) -> None:
         ADR-0119 决定 4: lca-ops 不长管 LCA 进程 (生产由 supervisor 守护)。
         本命令给"改完代码 / 换 profile / 强制刷新"用的本地快捷方式。
         旧进程被 SIGTERM,K6 ``run_kernel_lifespan`` LIFO dispose,然后
-        ``KernelServeService._spawn`` 拉起新 worker。
+        :class:`KernelServeSpawner` 拉起新 worker。
 
-        与 ``heal`` 区别: heal 不重启健康进程,只补缺失进程。
+        Implementation (ADR-0213 PR-3):
+        - SIGTERM 旧 PID → 等端口空 → :meth:`KernelServeSpawner.run()`。
+        - 不走 ``stack.heal`` 的全站自愈(infra/lobehub/daemon/onlyboxes)，
+          ``kernel-restart`` 只动 kernel。
+        - 失败信息原样透传 ``SpawnResult.actionable`` 到 operator，不
+          fallback 到 "kernel 没在跑,去 heal"。
         """
+        import contextlib
+        import time as _time
+        from typing import cast
+
+        from lca.infrastructure.cli.services.process.utils import (
+            find_pid_by_argv,
+            port_listening,
+        )
+
         ctx = make_context(json_mode, quiet, config)
+
+        # 1) SIGTERM existing kernel PID (let K6 LIFO dispose)
+        existing_pid = find_pid_by_argv("lca_kernel", "serve")
+        if existing_pid is not None:
+            with contextlib.suppress(ProcessLookupError):
+                cast("object", existing_pid).send_signal(15)  # SIGTERM
+            ks = ctx.registry.get("kernel_serve")
+            deadline = _time.monotonic() + 10.0
+            while _time.monotonic() < deadline:
+                if not port_listening(ks._config.port):
+                    break
+                _time.sleep(0.5)
+
+        # 2) Spawn via KernelServeSpawner; surface SpawnResult directly
         ks = ctx.registry.get("kernel_serve")
-        state = ks.restart()
-        ctx.console.service_state("kernel_serve", state)
-        if not state.is_running:
-            ctx.console.verdict(False, f"kernel_restart failed: {state.why or state.detail}")
+        spawner = ks.spawner()
+        result = spawner.run()
+
+        if not result.ok:
+            failed = result.failed_stage or "unknown"
+            err = next((s.error for s in result.steps if not s.ok), "unknown")
+            ctx.console.verdict(
+                False,
+                f"kernel_restart failed at stage={failed}: {err}",
+            )
+            if result.actionable:
+                ctx.console.info(result.actionable)
+            if result.stderr_path:
+                ctx.console.info(f"inspect stderr: {result.stderr_path}")
             raise typer.Exit(1)
-        ctx.console.verdict(True, "LCA kernel restarted")
+
+        ctx.console.verdict(
+            True,
+            f"LCA kernel restarted (pid={result.pid}, {result.duration_ms}ms)",
+        )
