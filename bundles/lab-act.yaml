@@ -26,7 +26,7 @@ entries:
       agents:
         - { role: lab_echo, kind: echo }
   - id: lab-body
-    $module: lca.plugins.lab.act.body_provider.plugin
+    $module: lca.plugins.lab.act.compose.plugin
     config:
       plan_ref: agent_lab_act
       allow_tools: [bash, file_write, read]

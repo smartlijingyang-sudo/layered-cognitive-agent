@@ -39,7 +39,7 @@ audit/
 | W-5 | 返回值必 typed;禁 `dict` / `Any` | ADR-0211 §1.1 强约束 3 |
 | W-7 | 禁 `try/except` | ADR-0211 §1.3 强约束 1 |
 | W-8 | 禁构造 `Receipt(...)` / `EXCEPTION(...)` | ADR-0211 §1.3 强约束 2 |
-| W-9 | 禁引用退役符号 `register_worker` / `Seams` / `body_provider` / `get_body` | ADR-0211 §1.4 |
+| W-9 | 禁引用退役符号 `register_worker` / `Seams`（`body_provider` / `get_body` PR-E 落地后从退役清单移除） | ADR-0211 §1.4 |
 | W-10 | 禁 `if x is None` / `getattr(x, attr, default)` 防御 | ADR-0211 §0.2 命题 5 |
 
 W-4 / W-6 是 Config 收紧视角(非 signature / body),留给 Config 层 follow-up。

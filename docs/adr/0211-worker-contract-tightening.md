@@ -169,7 +169,7 @@ class Config(BaseModel):
 | `lookup_worker(factory)` / `bind_factory_aliases` / `_ALIAS_TO_CANONICAL` / `_CANONICAL_TO_ALIASES` | `factory:` 字段值直接 = `@plugin` 的 `id`;不需要别名解析 | graph compile `resolve_plugin_id(factory)` 直接查 `@plugin` registry |
 | `agent_lab/runtime/seams.py::Seams` typed handle | 「runner 给 worker 句柄」违反 §5 原则 1(签名 = 真实依赖);Worker 不该知道 runner 协议 | framework 在调用前完成 typed 投影;Worker 拿 typed 入参 |
 | `agent_lab/runtime/runner.py::_default_seams()` | runner 偷偷懂 body_provider | framework 的 `_build_ctx_for_node(node_id)` 按 §1.5 cordis_bridge 投影 |
-| `lca/plugins/lab/act/body_provider/plugin.py::get_body()` 函数 | 「装配品构造在节点外函数」违反 ADR-0209 §1.3 / §5 Worker 原则 3 | `act.compose` 节点化;`@plugin(requires=["lab.tool_registry", "lab.safe_executor", "lab.transport", "lab.plan_ref"])` 在 setup 阶段装配,execute 阶段只 `body.act(decision=...)` |
+| `lca/plugins/lab/act/body_provider/plugin.py::get_body()` 函数 | 「装配品构造在节点外函数」违反 ADR-0209 §1.3 / §5 Worker 原则 3 | PR-E 落地:`get_body` 迁入 `lca/plugins.lab.act.compose` 节点模块(`act/compose/plugin.py`);`@plugin(provides=("lab.body",), requires=("lab.tool_registry", "lab.safe_executor", "lab.transport", "lab.plan_ref"))` 在 setup 阶段装配,execute 阶段只 `body.act(decision=...)` |
 | `if seams is None: raise RuntimeError(...)` 模式(act.execute / act.body / act.dispatch) | Worker 不该校验 runner 协议 | framework 在调用前 fail-loud(类型校验失败 → raise);Worker 不感知 |
 
 ### 1.5 cordis_bridge:framework 投影层
@@ -456,7 +456,7 @@ except Exception as exc:
 |---|---|---|---|
 | 1 | `lca/plugins/lab/internal/worker.py` 整文件 | `_WORKERS` / `_ALIAS_TO_CANONICAL` / `_CANONICAL_TO_ALIASES` / `register_worker` / `get_worker` / `lookup_worker` / `bind_factory_aliases` / `reset_workers` / `reset_aliases` | `lca/plugins/lab/internal/discover_worker.py`:只读 `@plugin` 元数据 |
 | 2 | `agent_lab/runtime/seams.py` 整文件 | `Seams` dataclass + `_SimpleBodyProtocol` + `_default_seams()` | framework 的 `cordis_bridge.build_execute_kwargs(worker, *, ctx)` 自动投影 |
-| 3 | `lca/plugins/lab/act/body_provider/plugin.py::get_body` 函数 | 整函数(`plan_ref_default()` 保留为 provider 的 config 默认值) | `lca/plugins/lab/act/compose/plugin.py` 节点化;`@plugin(requires=["lab.tool_registry", "lab.safe_executor", "lab.transport", "lab.plan_ref"])` 在 setup 阶段装配,execute 阶段只 `body.act(decision=...)` |
+| 3 | `lca/plugins/lab/act/body_provider/plugin.py` 整文件 + `get_body` 函数 | 整文件 + 整函数(PR-E 落地:`act/body_provider/` 已删;`get_body` 整体迁入 `act/compose/plugin.py`) | `lca/plugins/lab/act/compose/plugin.py` 节点化 + provider 化;`@plugin(provides=("lab.body",), requires=("lab.tool_registry", "lab.safe_executor", "lab.transport", "lab.plan_ref"))` 在 setup 阶段装配,execute 阶段只 `body.act(decision=...)`;`get_body` / `plan_ref_default()` 迁入 compose 作为 engine-compat helper |
 | 4 | `agent_lab/runtime/runner.py::_default_seams()` 函数 | runner 不再懂 body_provider | runner._run_node 调 `cordis_bridge.build_execute_kwargs(worker, *, ctx)` |
 | 5 | `if seams is None: raise RuntimeError(...)` 模式(act.execute / act.body / act.dispatch 当前 3 处) | 3 处全删 | framework 在调用前 fail-loud;Worker 不感知 |
 

@@ -223,7 +223,7 @@ description: |
   提供 Body / ToolRegistry / plan_ref / Transport；act.* 工兵 require 它们。
 entries:
   - id: lab-act-body
-    $module: lca.plugins.lab.act.body_provider
+    $module: lca.plugins.lab.act.compose
     config:
       plan_ref: agent_lab_act
       allow_tools: [bash, file_write, read_file]

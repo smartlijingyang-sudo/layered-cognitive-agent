@@ -35,7 +35,8 @@ STAGE_WORKERS = [
     ("think", "guard", {"decision": "decision", "in_state": "in_state"}, {"provider_config", "null_gate", "gate_factory", "fixture_gate_name", "allow_empty_chain", "gate", "out_port"}),
     ("act", "shape", {"decision": "decision"}, set()),
     ("act", "authorize", {"intent": "intent"}, {"allow"}),  # allow is config
-    ("act", "compose", {}, set()),  # all params are config
+    # ("act", "compose", ...) omitted — compose is a provider (binds ``lab.body``
+    # capability explicitly); reflection skip applies; see test_provider_escape_hatch.
     ("act", "execute", {"authorized": "intent", "body_handle": "body"}, set()),
     ("act", "observe", {"receipt": "observation"}, set()),
     ("reflect", "join", {"in_observation": "in_observation", "in_decision": "in_decision", "in_prior_reflection": "in_prior_reflection"}, set()),
@@ -108,19 +109,25 @@ def test_reflected_marker_registered(stage, basename, port_to_param, config_para
 
 
 def test_provider_escape_hatch():
-    """``provider: yes`` docstring → 跳过反射,走老 ``_CARRIER + bind_carrier`` 路径。"""
-    body_provider = get_instance("lab.act.body_provider")
-    assert body_provider is not None
-    assert body_provider["id"] == "body_provider"
-    assert body_provider["stage"] == "composition"
+    """``provider: yes`` docstring → 跳过反射,走老 ``_CARRIER + bind_carrier`` 路径。
+
+    PR-E:lab.body capability 由 ``act.compose`` 节点承担(provider 形态);
+    ``act.body_provider`` 已退役。
+    """
+    compose_provider = get_instance("lab.act.compose")
+    assert compose_provider is not None
+    assert compose_provider["id"] == "compose"
+    assert compose_provider["stage"] == "act"
+    # provides 必须含 lab.body(吸收自 body_provider)
+    assert "lab.body" in compose_provider["provides"]
     # 没有 worker_fn(不是反射 worker)
-    assert "worker_fn" not in body_provider
+    assert "worker_fn" not in compose_provider
 
 
 def test_worker_files_have_no_framework_imports():
     """worker 文件**零 framework 知识**:不 import LabCarrier / bind_carrier / setup。"""
     base = Path("lca/plugins/lab")
-    provider_dirs = {"body_provider"}  # provider 形态除外
+    provider_dirs = {"compose"}  # provider 形态除外(act.compose 承担 lab.body)
     for stage_dir in ("perceive", "think", "act", "reflect", "remember"):
         for sub in (base / stage_dir).iterdir():
             if not sub.is_dir():
@@ -139,12 +146,13 @@ def test_worker_files_have_no_framework_imports():
 
 
 def test_loader_resolves_stage_aliases():
-    """alias: lab.act.shape → lab.act.shape,lab.act.body_provider → 同。"""
+    """alias: lab.act.shape → lab.act.shape。"""
     # Alias: "act.shape" should resolve to "lab.act.shape"
     from lca.plugins.lab.internal.hooks import lookup_alias
 
     assert lookup_alias("lab.act.shape") == "lab.act.shape"
     assert lookup_alias("act.shape") == "lab.act.shape"
+    assert lookup_alias("act.compose") == "lab.act.compose"
     assert lookup_alias("unknown_factory") is None
 
 

@@ -15,6 +15,7 @@ capability 与 SimpleBody 装配),这两个名字从退役清单移除。
     "Worker 自己写 try/except" 模式;特定白名单模式(如 typed guard)
     留给后续 review。
 """
+
 from __future__ import annotations
 
 import ast
@@ -23,10 +24,12 @@ from lca.plugins.lab.internal.audit.errors import WorkerAuditError
 
 # W-9: framework 退役符号(ADR-0211 §1.4)
 # ``body_provider`` / ``get_body`` PR-E 落地后已并入 act.compose,不再禁。
-_FORBIDDEN_NAMES: frozenset[str] = frozenset({
-    "register_worker",
-    "Seams",
-})
+_FORBIDDEN_NAMES: frozenset[str] = frozenset(
+    {
+        "register_worker",
+        "Seams",
+    }
+)
 
 
 def _w7_no_try_except(tree: ast.AST, loc: str) -> list[WorkerAuditError]:

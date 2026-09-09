@@ -81,7 +81,8 @@ nodes:
     outs: [receipt]
 
   # ----- compose: capability refs → BodyHandle(scope-bound) -------------------
-  # body_provider 提供的 lab.body 装配成 BodyHandle;execute 拿 BodyHandle 调用。
+  # compose 节点同时是 lab.body capability provider(吸收 body_provider,PR-E);
+  # produce BodyHandle(scope-bound) 给 execute 调用。
   - id: compose
     region: phase:act
     factory: lab.act.compose

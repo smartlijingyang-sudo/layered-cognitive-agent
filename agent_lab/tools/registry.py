@@ -8,7 +8,8 @@ LCA plugin layer (see ``lca.plugins.lab.tools.provider``).
 
 delete-when (PR-D final):
 - agent_lab/nodes/act/execute/body.py replaced by body composition in
-  lca.plugins.lab.act.body_provider; this shim then becomes dead code.
+  lca.plugins.lab.act.compose (PR-E; previously lca.plugins.lab.act.body_provider);
+  this shim then becomes dead code.
 - agent_lab/nodes/act/execute/plugin.py replaced by @plugin carrier in
   lca.plugins.lab.act.execute; body.py becomes unreachable.
 """

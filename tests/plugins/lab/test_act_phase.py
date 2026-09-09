@@ -77,7 +77,11 @@ class TestActPhasePlugins:
 
 
 class TestProviders:
-    """Verify the body/tool/transport provider stubs are registered."""
+    """Verify the body/tool/transport provider stubs are registered.
+
+    ``lab.body`` capability is provided by ``lab.act.compose`` post PR-E
+    (was ``lab.act.body_provider``); see ADR-0211 §459.
+    """
 
     def setup_method(self):
         reset_for_tests()
@@ -104,13 +108,14 @@ class TestProviders:
         assert instance is not None
         assert instance.get("id") in ("provider", "transport.provider")
 
-    def test_body_provider_registered(self):
-        """lca.plugins.lab.act.body_provider should register a marker."""
+    def test_act_compose_owns_lab_body_capability(self):
+        """lab.act.compose should provide lab.body (absorbed body_provider in PR-E)."""
         load_all()
         from lca.plugins.lab.internal.loader import get_instance
-        instance = get_instance("lab.act.body_provider")
+        instance = get_instance("lab.act.compose")
         assert instance is not None
-        assert instance.get("id") in ("body_provider", "lab.act.body_provider")
+        assert instance.get("id") in ("compose", "lab.act.compose")
+        assert "lab.body" in instance.get("provides", [])
 
 
 class TestLoaderClosedSet:
@@ -129,9 +134,9 @@ class TestLoaderClosedSet:
         # PR-B plugin modules
         assert "lca.plugins.lab.act.shape.plugin" in known
         assert "lca.plugins.lab.act.authorize.plugin" in known
+        assert "lca.plugins.lab.act.compose.plugin" in known
         assert "lca.plugins.lab.act.execute.plugin" in known
         assert "lca.plugins.lab.act.observe.plugin" in known
-        assert "lca.plugins.lab.act.body_provider.plugin" in known
         assert "lca.plugins.lab.tools.provider.plugin" in known
         assert "lca.plugins.lab.transport.provider.plugin" in known
 
@@ -148,15 +153,14 @@ class TestNoBuildBodyInActNodes:
     def test_act_plugin_files_have_no_build_body(self):
         """Worker plugin files must not contain 'build_body(' call sites in code.
 
-        The body_provider/* files are the legitimate owner of the
-        build_body call — they're the body composition entry. Workers
-        (act.shape / authorize / execute / observe) must delegate to
-        the provider instead.
+        act.compose owns the body composition entry (post PR-E; absorbed
+        body_provider) — Workers (act.shape / authorize / execute /
+        observe) must delegate to the provider instead.
         """
         import pathlib, re
         for plugin_file in pathlib.Path("lca/plugins/lab/act").rglob("plugin.py"):
-            # Skip the body_provider — it's the legitimate wrapper
-            if "body_provider" in str(plugin_file):
+            # Skip act.compose — it's the legitimate body composition node.
+            if "compose" in plugin_file.parts:
                 continue
             text = plugin_file.read_text()
             # Strip docstrings and comments before matching

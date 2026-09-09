@@ -37,7 +37,7 @@ ADR-0209 / spec `2026-09-09-lab-cordis-unification-design.md` / Note `2026-09-08
 
 | Slot | Provider 路径 | 状态 |
 |---|---|---|
-| `lab.body` | `lca.plugins.lab.act.body_provider` | **marker**（PR-D final 写真实 compose） |
+| `lab.body` | `lca.plugins.lab.act.compose` | **provider**（PR-E:吸收 `act.body_provider`;`provides=("lab.body",)`,与节点同模块） |
 | `lab.tool_registry` | `lca.plugins.lab.tools.provider` | **marker**（PR-D final 写真实 LabToolRegistry 装载 + SimpleToolRegistry 转换） |
 | `lab.transport` | `lca.plugins.lab.transport.provider` | **marker**（PR-D final 写真实 InternalTransport + lab_echo 注册） |
 | `lab.session` | `lca.plugins.lab.session.provider` | **marker**（PR-D final 写真实 `set_publish_session` 调用，缺 active session 抛 `RuntimeError`） |
@@ -189,7 +189,7 @@ PR-D final 必须满足：
 2. `agent_lab/plugins/{events,observers,parsers,semantic_router,control_slots,observation,memory_extract,tool_guard}.py` 删（hook 行为由 PR-A.1 `lca.plugins.lab.<hook>/plugin.py` 接管）
 3. `agent_lab/nodes/session_log/plugin.py` 删（由 `lca.plugins.lab.session_log_emitter/plugin.py` 接管）
 4. `agent_lab/plugins/base.py` GraphPlugin 基类 + `register_plugin` 空操作装饰器删
-5. `lca.plugins.lab.act.body_provider` / `tools.provider` / `transport.provider` / `session.provider` 写真实 composition 代码（非 marker）
+5. `lca.plugins.lab.tools.provider` / `transport.provider` / `session.provider` 写真实 composition 代码（非 marker）;`lab.body` 由 `act.compose` 节点同模块的 `provides=("lab.body",)` 承担（PR-E）
 6. `bundles/lab-act.yaml` + `bundles/lab-session.yaml` 接入 `profiles/agent-lab-infoedge.yaml`
 7. `agent_lab_default` session_id 不在任何 plugin 代码构造；缺失 active session 时 fail-loud
 8. ADR-0206 §10 P7 阶段闭集迁移完成
