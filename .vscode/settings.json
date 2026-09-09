@@ -1,9 +1,9 @@
 {
-  // Interpreter: point at the venv folder so Windows (.venv/Scripts) and
-  // Unix (.venv/bin) both resolve. Editor typecheck is off (Pylance via
-  // [tool.pyright]=off; mypy extension via ignorePatterns). CLI: lca-ops typecheck.
+  // Editor diagnostics: all off. Typecheck/lint only via `lca-ops typecheck` / ruff CLI.
+  // After changing: Developer: Reload Window. Uninstall any extension listed in
+  // extensions.json unwantedRecommendations if Problems still fill.
   "python.defaultInterpreterPath": "${workspaceFolder}/.venv",
-  "python.languageServer": "Pylance",
+  "python.languageServer": "None",
   "python.terminal.activateEnvironment": true,
   "python.analysis.extraPaths": [
     "${workspaceFolder}",
@@ -13,22 +13,81 @@
   ],
   "python.analysis.typeCheckingMode": "off",
   "python.analysis.diagnosticMode": "openFilesOnly",
-  "python.analysis.exclude": [
-    "**/node_modules",
-    "**/__pycache__",
-    "**/.venv",
-    "**/venv",
-    "**/site-packages",
-    "**/vendor",
-    "**/tests",
-    "**/lobehub-ui"
-  ],
+  "python.analysis.exclude": ["**"],
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportGeneralTypeIssues": "none",
+    "reportMissingImports": "none",
+    "reportMissingModuleSource": "none",
+    "reportMissingTypeStubs": "none",
+    "reportUndefinedVariable": "none",
+    "reportUnboundVariable": "none",
+    "reportPossiblyUnboundVariable": "none",
+    "reportArgumentType": "none",
+    "reportAssignmentType": "none",
+    "reportAttributeAccessIssue": "none",
+    "reportCallIssue": "none",
+    "reportIndexIssue": "none",
+    "reportOperatorIssue": "none",
+    "reportOptionalMemberAccess": "none",
+    "reportOptionalSubscript": "none",
+    "reportOptionalIterable": "none",
+    "reportOptionalContextManager": "none",
+    "reportOptionalOperand": "none",
+    "reportReturnType": "none",
+    "reportIncompatibleMethodOverride": "none",
+    "reportIncompatibleVariableOverride": "none",
+    "reportPrivateImportUsage": "none",
+    "reportUnusedImport": "none",
+    "reportUnusedVariable": "none",
+    "reportUnusedClass": "none",
+    "reportUnusedFunction": "none",
+    "reportUnusedCoroutine": "none",
+    "reportUnusedExpression": "none",
+    "reportUnusedCallResult": "none",
+    "reportUnnecessaryCast": "none",
+    "reportUnnecessaryComparison": "none",
+    "reportUnnecessaryContains": "none",
+    "reportUnnecessaryIsInstance": "none",
+    "reportUnknownArgumentType": "none",
+    "reportUnknownMemberType": "none",
+    "reportUnknownVariableType": "none",
+    "reportUnknownParameterType": "none",
+    "reportMissingParameterType": "none",
+    "reportUntypedFunctionDecorator": "none",
+    "reportUntypedClassDecorator": "none",
+    "reportUntypedBaseClass": "none",
+    "reportUntypedNamedTuple": "none",
+    "reportImportCycles": "none",
+    "reportDuplicateImport": "none",
+    "reportWildcardImportFromLibrary": "none",
+    "reportAbstractUsage": "none",
+    "reportInvalidTypeForm": "none",
+    "reportInvalidTypeArguments": "none",
+    "reportInvalidTypeVarUse": "none",
+    "reportCallInDefaultInitializer": "none",
+    "reportUnhashable": "none",
+    "reportUnusedParameter": "none",
+    "reportSyntaxError": "none"
+  },
+
   "basedpyright.disableLanguageServices": true,
   "basedpyright.disableOrganizeImports": true,
+  "basedpyright.disableTaggedHints": true,
   "basedpyright.analysis.typeCheckingMode": "off",
   "basedpyright.analysis.diagnosticMode": "openFilesOnly",
-  // ms-python.mypy-type-checker has no "enabled" flag; ignorePatterns is the kill switch.
-  // Keep CLI mypy via `lca-ops typecheck`. Uninstall the extension if Problems still fill.
+  "basedpyright.analysis.diagnosticSeverityOverrides": {
+    "reportGeneralTypeIssues": "none",
+    "reportMissingImports": "none",
+    "reportMissingModuleSource": "none",
+    "reportSyntaxError": "none"
+  },
+  "cursorpyright.disableLanguageServices": true,
+  "cursorpyright.analysis.typeCheckingMode": "off",
+
+  "pyright.disableLanguageServices": true,
+  "pyright.disableOrganizeImports": true,
+  "python.analysis.indexing": false,
+
   "mypy-type-checker.ignorePatterns": ["**"],
   "mypy-type-checker.preferDaemon": false,
   "mypy-type-checker.showNotifications": "off",
@@ -37,20 +96,63 @@
     "note": "Hint"
   },
   "mypy.enabled": false,
+  "mypy.targets": [],
+  "mypy.runUsingActiveInterpreter": false,
+
   "python.linting.enabled": false,
   "python.linting.mypyEnabled": false,
+  "python.linting.pylintEnabled": false,
+  "python.linting.flake8Enabled": false,
+  "python.linting.banditEnabled": false,
+  "python.linting.pydocstyleEnabled": false,
+  "python.linting.pycodestyleEnabled": false,
+  "python.linting.prospectorEnabled": false,
+  "pylint.enabled": false,
+  "flake8.enabled": false,
+  "flake8.args": ["--exit-zero"],
+
+  "ruff.enable": true,
   "ruff.lint.enable": false,
+  "ruff.format.enable": true,
+  "ruff.organizeImports": false,
+  "ruff.configuration": null,
+  "ruff.nativeServer": "on",
+
   "eslint.enable": false,
   "javascript.validate.enable": false,
   "typescript.validate.enable": false,
+  "css.validate": false,
+  "html.validate.scripts": false,
+  "html.validate.styles": false,
+  "json.validate.enable": false,
+  "yaml.validate": false,
+  "evenBetterToml.schema.enabled": false,
+  "redhat.telemetry.enabled": false,
+
+  "errorLens.enabled": false,
+  "sonarlint.rules": {},
+  "sonarlint.disableTelemetry": true,
+
   "problems.decorations.enabled": false,
+  "problems.showCurrentInStatus": false,
+  "editor.showUnused": false,
+  "editor.showDeprecated": false,
+  "editor.semanticValidation": false,
+  "editor.parameterHints.enabled": false,
+
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
-    "source.fixAll.ruff": "explicit",
-    "source.organizeImports.ruff": "explicit"
+    "source.fixAll.ruff": "never",
+    "source.organizeImports.ruff": "never",
+    "source.fixAll": "never",
+    "source.organizeImports": "never"
   },
   "[python]": {
-    "editor.defaultFormatter": "charliermarsh.ruff"
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "never",
+      "source.organizeImports.ruff": "never"
+    }
   },
   "editor.rulers": [100]
 }
