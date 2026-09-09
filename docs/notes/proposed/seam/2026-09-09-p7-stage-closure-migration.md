@@ -184,6 +184,30 @@ class LabCarrier:
   (3 skips = cordis baseline + 1 future PR placeholder)
 - [x] 无回归
 
+### 2026-09-09 commit 5 (ADR-0210 §6.5 实施)
+
+- [x] CognitivePhaseGraphPlan docstring 加 .. deprecated::
+  (P7 region-tag 路径是 recommended runtime, build_region_only_phase_graph
+  + _resolve_phase_graph 是 reference path)
+- [x] PhaseBinding docstring 加 .. deprecated:: (semantic_phase 字段
+  保留 backward compat; 新代码用 spec.region + profile.regions.declare;
+  region 标签不绑 capability 闭集 - P7-I-2)
+- [x] bundles/declarative-phase-graph.yaml header 加 .. note::
+  (Backward-compat only ADR-0210 §6.3 P7 §6.5; P7 region-tag 路径
+  是 recommended runtime; 新 profile 不应依赖此 bundle; delete-when:
+  所有 production profile 迁到 region-tag 路径 + ADR-0210 升 Accepted)
+- [x] agent_lab/plugins/base.py 简化为 thin compat shim
+  (40 行, 4 个 hook helper 重导出; 无 GraphPlugin, 无 register_plugin;
+  .. deprecated:: marker)
+- [x] agent_lab/plugins/__init__.py 移除 stale GraphPlugin 重导出
+  (GraphPlugin 已迁到 lca.plugins.lab.internal.hooks, PR-D final 1/2)
+- [x] tests/architecture/test_p7_backward_compat_markers.py 全绿
+  (8 tests: 4 7/8/7 8+ PhaseBinding/PhaseNode/Plan deprecation,
+  bundle header note, base.py shim cleanliness, __init__ no leak)
+- [x] 177 passed total in tests/plugins/lab/ + tests/architecture/
+  (3 skips = cordis baseline + 1 future PR placeholder)
+- [x] 无回归
+
 ### 未来 commit (待做)
 
 - [ ] ADR-0210 升 Accepted（需 +1 owner review + 真实 production
